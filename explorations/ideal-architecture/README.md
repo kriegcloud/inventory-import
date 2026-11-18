@@ -4,7 +4,7 @@ title: Ideal architecture
 description: What inventory-import becomes as a model-first Turborepo of deep packages, shipped with Alchemy.
 status: active
 stage: shape
-next: step 5, kernel and drivers, is next to shape (goal beep-csv is done)
+next: Benjamin's word on BRIEF-kernel-drivers.md and its decisions (a) to (e4), for step 5
 goals: [workspace-and-strictness, beep-csv]
 ---
 
@@ -21,7 +21,8 @@ each report lists what it could not verify.
 | [04 beep-effect direction](research/04-beep-direction.md) | Two contexts in the model-first shape, nineteen packages and one app. `@beep/csv` first, `@beep/xlsx` last. |
 
 The brief for `beep-csv` (step 4) is [BRIEF.md](BRIEF.md); Benjamin said it matches, and the goal is open at
-[goals/beep-csv](../../goals/beep-csv/SPEC.md).
+[goals/beep-csv](../../goals/beep-csv/SPEC.md). Each later goal's brief is its own file, `BRIEF-<goal>.md`; the first
+brief keeps its name. Step 5's is [BRIEF-kernel-drivers.md](BRIEF-kernel-drivers.md), awaiting "the brief matches".
 
 ## Where the research disagrees with the request
 
@@ -77,6 +78,7 @@ Each step ends with the full check and an import of the messy sample in a browse
 
 ## Trail
 
+- 2026-11-18: BRIEF-kernel-drivers.md written for the goal `kernel-drivers` (step 5); awaiting "the brief matches".
 - 2026-11-18: goal `beep-csv` done: the app reads CSV through `@beep/csv`; papaparse removed.
 - 2026-11-18: goal `beep-csv` opened from BRIEF.md after "the brief matches".
 - 2026-11-18: BRIEF.md written for the goal `beep-csv` (step 4); awaiting "the brief matches".

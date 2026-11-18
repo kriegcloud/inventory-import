@@ -20,7 +20,9 @@ import { FileUpload, FileUploadDropzone } from "@/components/ui/file-upload"
 import { Progress } from "@/components/ui/progress"
 import { useActor } from "@/lib/actor"
 import { when, whenShort } from "@/lib/dates"
-import { useImportCache, useOpenImports, useRemoveImport } from "@/lib/imports"
+import { useImportCache, useOpenImports, usePastImports, useRemoveImport } from "@/lib/imports"
+import { ListTable } from "@/components/app/ListTable"
+import { pastImportColumnsShort } from "./pastImports.tsx"
 import { importAddress, navigate } from "@/lib/route"
 import { useSavedProgress } from "@/lib/saved-progress"
 import { type UploadEnd, useUpload, type UploadState } from "@/lib/upload"
@@ -209,6 +211,53 @@ function OpenImport(props: { view: ImportView; lead: boolean; canImport: boolean
         </Button>
       </ItemActions>
     </Item>
+  )
+}
+
+/**
+ * The files imported before, last confirmed first, each a link to its result: what it imported, what it left out,
+ * the take-back. Shown once there is one; a failure to list them says so instead of looking like none.
+ */
+function PastImports() {
+  const past = usePastImports()
+  if (past.isError) {
+    return (
+      <div className="px-4 pt-6 sm:px-9">
+        <Alert>
+          <AlertTitle>Past imports could not be listed</AlertTitle>
+          <AlertDescription>
+            <p>They are safe. {sayError(past.error).sentence}</p>
+            <Button variant="outline" size="sm" onClick={() => void past.refetch()}>
+              Try again
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    )
+  }
+  const listed = past.data?.imports ?? []
+  if (listed.length === 0) return null
+  const older = past.data?.older ?? 0
+  return (
+    <section aria-labelledby="past-imports" className="flex flex-col pt-6">
+      <h2 id="past-imports" className="px-4 pb-2 text-sm font-medium sm:px-9">
+        Imported before
+      </h2>
+      <ListTable
+        caption="Files imported before"
+        searchLabel="Search past imports"
+        columns={pastImportColumnsShort}
+        rows={listed}
+        rowKey={(entry) => entry.id}
+        empty="No file has been imported yet."
+        maxWidth={672}
+      />
+      {older === 0 ? null : (
+        <p className="px-4 text-sm text-muted-foreground sm:px-9">
+          {whole.format(older)} older {older === 1 ? "import is" : "imports are"} listed under Activity, Imports.
+        </p>
+      )}
+    </section>
   )
 }
 
@@ -459,6 +508,7 @@ export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
             </Alert>
           )}
         </div>
+        <PastImports />
       </div>
       {dragging ? (
         // Over the whole page while a file is held above it. It takes no pointer events: the drop lands on the page.

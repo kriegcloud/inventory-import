@@ -43,6 +43,9 @@ import { textWidth } from "@/lib/text-width"
 import {
   askFor,
   choicesOf,
+  columnFor,
+  shownWith,
+  weakGuess,
   choiceText,
   groupUse,
   inSentence,
@@ -67,17 +70,22 @@ import {
   ReasonTag,
   WhyBody
 } from "./parts.tsx"
-import type { Entry, FixGroup, ProblemKind, ReviewColumn, ReviewRegionProps, ReviewWords, RowView } from "./types.ts"
+import type {
+  Entry,
+  Fix,
+  FixGroup,
+  ProblemKind,
+  ReviewColumn,
+  ReviewRegionProps,
+  ReviewWords,
+  RowView
+} from "./types.ts"
 
 /**
  * The region's own Reason column: the sentence behind each row that needs the person or cannot be fixed here, with or
  * without a fix. A `fill` column, cut to one line with the whole sentence one hover, focus or tap away.
  */
-export const reasonColumn: ReviewColumn = { id: "review:reason", label: "Reason", size: "fill", width: 180 }
-
-/** A value as its column shows it (`ReviewColumn.display`). */
-const shownIn = (column: ReviewColumn | undefined, text: string): string =>
-  column?.display === undefined || text === "" ? text : column.display(text)
+export const reasonColumn: ReviewColumn = { id: "review:reason", label: "Reason", size: "fill", width: 240 }
 
 /** What a row can ask the region to do. Stable for the life of the region, so rows do not re-render for nothing. */
 export type RowActions = {
@@ -291,18 +299,22 @@ const measureNeeds = (input: {
     if (column.size === "fill") return Math.max(least, index === 0 ? 0 : 0)
     let widest = 0
     for (const value of longest(
-      views.map((view) => shownIn(column, view.cells[column.id] ?? "")),
+      views.map((view) =>
+        (view.cells[column.id] ?? "") === "" && column.byDefault !== undefined
+          ? `${shownWith(column, column.byDefault, view.cells)}, default`
+          : shownWith(column, view.cells[column.id] ?? "", view.cells)
+      ),
       40
     ))
       widest = Math.max(widest, textWidth(value, { mono }))
     for (const view of views) {
       const mark = view.marks[column.id]
       if (mark === undefined || mark.from === mark.to || view.status === "out") continue
-      const from = textWidth(spellingOf(shownIn(column, mark.from)), { mono })
+      const from = textWidth(spellingOf(shownWith(column, mark.from, view.cells)), { mono })
       const guess = mark.state === "proposed" && choicesOf(mark.fix) !== undefined
       // A mark that draws an icon: a model's sparkle, or the question mark of a suggestion nobody was named for.
       const icon = mark.by === "model" || mark.by === "unknown" ? sparkle : 0
-      const to = shownIn(column, mark.to)
+      const to = shownWith(column, mark.to, view.cells)
       const chip = textWidth(to, { mono, medium: true }) + chipChrome + icon
       const value = guess
         ? from + 6 + icon + textWidth(`${to}?`, { mono })
@@ -374,6 +386,8 @@ export const actionsFit = (input: {
 const Row = memo(function Row(props: {
   view: RowView
   index: number
+  /** Measures the drawn row: a reason in full can take more than one line. */
+  measure: (element: Element | null) => void
   columns: ReadonlyArray<ReviewColumn>
   allColumns: ReadonlyArray<ReviewColumn>
   /** Columns whose value sits under the name at this width. */
@@ -444,7 +458,7 @@ const Row = memo(function Row(props: {
             ? `Why ${valueWords(fix, fix.to)}?`
             : `${choices.map((choice) => valueWords(fix, choice)).join(" or ")}?`
         }
-        about={`Why ${fix.to} is proposed for ${name}`}
+        about={`Why ${valueWords(fix, fix.to)} is proposed for ${name}`}
         className="w-80"
         hover
         card
@@ -453,7 +467,7 @@ const Row = memo(function Row(props: {
             Why?
             <span className="sr-only">
               {" "}
-              {fix.to} for {name}
+              {valueWords(fix, fix.to)} for {name}
             </span>
           </Button>
         }
@@ -480,7 +494,7 @@ const Row = memo(function Row(props: {
             onPick={(picked) => {
               close()
               if (picked === fix.to) actions.accept(view.row.id)
-              else actions.edit(view.row.id, fix.column, picked)
+              else actions.edit(view.row.id, columnFor(fix, picked), picked)
             }}
             onReject={
               actions.reject === undefined
@@ -535,8 +549,9 @@ const Row = memo(function Row(props: {
   const value = (column: ReviewColumn): ReactNode => {
     if (column.id === reasonColumn.id) {
       const reason = reasonOf({ view, kinds: props.kinds, words: props.words })
+      // The whole reason, on as many lines as it takes: it is the sentence the person acts on.
       return reason === "" || view.status === "out" || view.status === "stored" ? null : (
-        <CutText text={reason} className="min-w-0" />
+        <span className="block py-1.5 leading-snug whitespace-normal">{reason}</span>
       )
     }
     const isSubject = subject === column.id
@@ -551,17 +566,23 @@ const Row = memo(function Row(props: {
       >
         {(out || view.marks[column.id] === undefined) && (view.cells[column.id] ?? "") !== "" ? (
           // A plain value that does not fit ends in an ellipsis; its whole text is one hover, focus or tap away.
-          <CutText text={shownIn(column, view.cells[column.id] ?? "")} className="min-w-0" />
+          <CutText text={shownWith(column, view.cells[column.id] ?? "", view.cells)} className="min-w-0" />
         ) : (
           <span className="min-w-0 truncate">
             <CellValue
               value={view.cells[column.id] ?? ""}
-              display={column.display}
+              display={(text) => shownWith(column, text, view.cells)}
               mark={out ? undefined : view.marks[column.id]}
               accepted={view.decided === "accepted"}
               stated={props.banded}
               empty={
-                isSubject ? <span className="text-destructive">Empty</span> : <span className="sr-only">Not set</span>
+                isSubject ? (
+                  <span className="text-destructive">Empty</span>
+                ) : column.byDefault !== undefined ? (
+                  <DefaultValue column={column} cells={view.cells} />
+                ) : (
+                  <span className="sr-only">Not set</span>
+                )
               }
             />
           </span>
@@ -605,6 +626,70 @@ const Row = memo(function Row(props: {
         )}
       </Overlay>
     )
+
+  // The person types the value: the panel that asks for it. A weak guess (`weakGuess`) is offered inside it, as one
+  // outline button with its evidence, never as the row's own answer.
+  const typeIt = (subject: string, guess?: Fix): ReactNode => {
+    if (problem === undefined) return null
+    const label = Option.getOrElse(HashMap.get(props.labels, subject), () => subject)
+    const own = props.cellEditor?.({ row: view.row, column: subject, value: view.cells[subject] ?? "" })
+    return (
+      <Overlay
+        title={own?.title ?? `${label} for ${name}`}
+        about={`Type the ${label} so ${name} can be imported`}
+        align="end"
+        {...(own === undefined ? {} : { className: "w-96" })}
+        trigger={
+          <Button variant="secondary" size="xs" className="min-w-32 shrink" {...firstAction}>
+            <span className="truncate">{own?.label ?? problem.ask ?? askFor(label)}</span>
+            <span className="sr-only"> for {name}</span>
+          </Button>
+        }
+      >
+        {(close) =>
+          own !== undefined ? (
+            // A form of several fields can be taller than the room under the row: it scrolls inside its panel.
+            <ScrollArea className="max-h-96">
+              <div className="p-0.5 pr-3">
+                {own.render((next) => {
+                  close()
+                  actions.edit(view.row.id, subject, next)
+                })}
+              </div>
+            </ScrollArea>
+          ) : (
+            <span className="flex flex-col gap-3">
+              {guess === undefined ? null : (
+                <span className="flex flex-col gap-1.5">
+                  <span className="text-xs text-muted-foreground">{guess.why.basis}</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-auto min-h-8"
+                    onClick={() => {
+                      close()
+                      actions.accept(view.row.id)
+                    }}
+                  >
+                    <span className="py-1.5 whitespace-normal">Use {valueWords(guess, guess.to)} (suggested)</span>
+                  </Button>
+                </span>
+              )}
+              <EditForm
+                label={label}
+                size="sm"
+                value={view.cells[subject] ?? ""}
+                onSave={(next) => {
+                  close()
+                  actions.edit(view.row.id, subject, next)
+                }}
+              />
+            </span>
+          )
+        }
+      </Overlay>
+    )
+  }
 
   // A row's own answer takes at least 128 px and what its words need beyond that, as the actions column was sized
   // for (`actionsFit`). Short of room it cuts its words, never running under the button after it.
@@ -669,6 +754,8 @@ const Row = memo(function Row(props: {
             )}
           </Overlay>
         )
+    } else if (subject !== undefined && fix !== undefined && weakGuess(fix)) {
+      main = typeIt(subject, fix)
     } else if (fix !== undefined && choices !== undefined) {
       main = (
         <ButtonGroup aria-label={`Choose for ${name}`} className="min-w-32 shrink">
@@ -681,7 +768,9 @@ const Row = memo(function Row(props: {
                   className="min-w-0 flex-1 shrink"
                   {...(at === 0 ? firstAction : {})}
                   onClick={() =>
-                    choice === fix.to ? actions.accept(view.row.id) : actions.edit(view.row.id, fix.column, choice)
+                    choice === fix.to
+                      ? actions.accept(view.row.id)
+                      : actions.edit(view.row.id, columnFor(fix, choice), choice)
                   }
                 >
                   <span className="truncate">Use {valueWords(fix, choice)}</span>
@@ -712,51 +801,14 @@ const Row = memo(function Row(props: {
         </Tooltip>
       )
     } else if (subject !== undefined) {
-      const label = Option.getOrElse(HashMap.get(props.labels, subject), () => subject)
-      const own = props.cellEditor?.({ row: view.row, column: subject, value: view.cells[subject] ?? "" })
-      main = (
-        <Overlay
-          title={own?.title ?? `${label} for ${name}`}
-          about={`Type the ${label} so ${name} can be imported`}
-          align="end"
-          {...(own === undefined ? {} : { className: "w-96" })}
-          trigger={
-            <Button variant="secondary" size="xs" className="min-w-32 shrink" {...firstAction}>
-              <span className="truncate">{own?.label ?? problem.ask ?? askFor(label)}</span>
-              <span className="sr-only"> for {name}</span>
-            </Button>
-          }
-        >
-          {(close) =>
-            own !== undefined ? (
-              // A form of several fields can be taller than the room under the row: it scrolls inside its panel.
-              <ScrollArea className="max-h-96">
-                <div className="p-0.5 pr-3">
-                  {own.render((next) => {
-                    close()
-                    actions.edit(view.row.id, subject, next)
-                  })}
-                </div>
-              </ScrollArea>
-            ) : (
-              <EditForm
-                label={label}
-                size="sm"
-                value={view.cells[subject] ?? ""}
-                onSave={(next) => {
-                  close()
-                  actions.edit(view.row.id, subject, next)
-                }}
-              />
-            )
-          }
-        </Overlay>
-      )
+      main = typeIt(subject)
     }
   }
 
   return (
     <StickyTableRow
+      ref={props.measure}
+      data-index={props.index}
       data-row-id={view.row.id}
       // Under a group's heading the decision is the heading's: focus moving to this row goes to its accept.
       data-group={props.banded ? props.group?.id : undefined}
@@ -788,7 +840,8 @@ const Row = memo(function Row(props: {
                 <del className="block font-normal text-muted-foreground">
                   <CutText text={name} />
                 </del>
-              ) : (view.cells[first.id] ?? "") === "" ? (
+              ) : (view.cells[first.id] ?? "") === "" && view.marks[first.id] === undefined ? (
+                // An empty name with a suggestion for it shows the suggestion (who made it, Why?, Reject) instead.
                 <span className="font-normal text-destructive">Empty</span>
               ) : (
                 <span className="flex min-w-0">{value(first)}</span>
@@ -837,6 +890,7 @@ const Row = memo(function Row(props: {
           key={column.id}
           align={column.align}
           tone={subject === column.id && subjectEmpty ? "danger" : undefined}
+          className={column.id === reasonColumn.id ? "whitespace-normal" : undefined}
         >
           {value(column)}
         </StickyTableCell>
@@ -946,6 +1000,16 @@ type Line = Entry | { type: "detail"; view: RowView }
 export type Density = "compact" | "comfortable"
 
 /** The columns with no room in the table at this width, under their row: each label and its value, change and all. */
+/** An empty cell that takes a default when imported: the default, quieter, and said to be one ("0 EA, default"). */
+function DefaultValue(props: { column: ReviewColumn; cells: Readonly<Record<string, string>> }) {
+  return (
+    <span className="text-muted-foreground">
+      {shownWith(props.column, props.column.byDefault ?? "", props.cells)}
+      <span className="text-xs">, default</span>
+    </span>
+  )
+}
+
 function Detail(props: { view: RowView; columns: ReadonlyArray<ReviewColumn> }) {
   const { view } = props
   return (
@@ -960,10 +1024,16 @@ function Detail(props: { view: RowView; columns: ReadonlyArray<ReviewColumn> }) 
           <dd className={cn("min-w-0 whitespace-normal", codeFace(column))}>
             <CellValue
               value={view.cells[column.id] ?? ""}
-              display={column.display}
+              display={(text) => shownWith(column, text, view.cells)}
               mark={view.status === "out" ? undefined : view.marks[column.id]}
               accepted={view.decided === "accepted"}
-              empty={<span className="text-muted-foreground">Not set</span>}
+              empty={
+                column.byDefault !== undefined ? (
+                  <DefaultValue column={column} cells={view.cells} />
+                ) : (
+                  <span className="text-muted-foreground">Not set</span>
+                )
+              }
             />
           </dd>
         </div>
@@ -1031,6 +1101,8 @@ function GroupRow(props: {
   /** The actions column's width, to tell whether the quiet answers fit beside each other. */
   actionsWidth: number
   measure: (element: Element | null) => void
+  /** How the group's column shows a value (`ReviewColumn.display`). */
+  display?: ((value: string) => string) | undefined
 }) {
   const { group } = props
   const rowIds = group.rowIds.filter((rowId) => !HashSet.has(props.excluded, rowId))
@@ -1158,7 +1230,7 @@ function GroupRow(props: {
               Guess
             </StatusPill>
           )}
-          <GroupChange group={group} applied={props.applied} oneLine />
+          <GroupChange group={group} applied={props.applied} oneLine display={props.display} />
           <Badge variant="secondary" className="flex-none">
             {rowsWord(group.rowIds.length)}
           </Badge>
@@ -1530,6 +1602,7 @@ export function ReviewGrid(props: {
                     <GroupRow
                       key={`group:${entry.group.id}`}
                       group={entry.group}
+                      display={props.allColumns.find((column) => column.id === entry.group.column)?.display}
                       applied={entry.applied}
                       span={span}
                       index={item.index}
@@ -1565,6 +1638,7 @@ export function ReviewGrid(props: {
                     key={entry.view.row.id}
                     view={entry.view}
                     index={item.index}
+                    measure={virtual.measureElement}
                     columns={columns}
                     allColumns={props.allColumns}
                     under={under}

@@ -54,6 +54,16 @@ export type ReviewColumn = {
   priority?: number
   /** A second, quieter header line under the label: the unit the values are in ("USD", "kg", "days"). */
   unit?: string
+  /**
+   * The column that holds each row's unit, for a quantity whose unit is the row's own ("120 EA", "4 KG"): the value is
+   * shown with it. Only what is drawn changes.
+   */
+  unitFrom?: string
+  /**
+   * What an empty cell of this column becomes when the row is imported ("0" for a quantity, "true" for Active):
+   * an empty cell shows it, quieter, marked as the default, so nobody reads an empty cell as a missing value.
+   */
+  byDefault?: string
   align?: "right"
   /** Kept in the table on a tablet. The first column always is. */
   core?: boolean
@@ -91,6 +101,13 @@ export type Why = {
    * themselves ("2024-04-06 (month first)"): what the buttons that take them say.
    */
   labels?: ReadonlyArray<string>
+  /**
+   * The column each pick writes, for the fix's `to` and then each of `alternatives`, in that order, when a pick is a
+   * value of another column ("No discontinued date" on a question asked on Active). Left out when every pick
+   * is a value of the fix's own column. A pick written to another column is a typed value: one undo step, checked
+   * again by `recheck`.
+   */
+  targets?: ReadonlyArray<string>
 }
 
 /** Who prepared a fix: a fixed rule or a model. */
@@ -483,6 +500,12 @@ export type ReviewRegionProps = {
    * `undefined` for a row it does not fit. Keep the function stable (`useCallback`).
    */
   rowAction?: (row: ReviewRow) => RowAction | undefined
+  /**
+   * "Why flagged?": the caller's own account of the flagged rows on screen (what the view, the problem kind, the
+   * search and the filters narrow it to), each row named with every reason it has. Shown in a side panel from the
+   * toolbar. Left out, there is no such button.
+   */
+  explain?: (rows: ReadonlyArray<ReviewRow>) => ReactNode
   /**
    * The caller's own form for a value the person has to give, where one box of text would not do (a cell that holds
    * several values). It stands where the region's one field would, behind the same button, and what it saves is the

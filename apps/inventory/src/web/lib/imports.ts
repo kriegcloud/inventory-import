@@ -66,6 +66,14 @@ export function useOpenImports() {
 }
 
 /**
+ * The imports confirmed at least once, last confirmed first, each with how many of its items are stored now: the
+ * way back to a past import's result from the first screen and from Activity. The server counts the older ones.
+ */
+export function usePastImports() {
+  return useQuery({ queryKey: queryKeys.pastImports, queryFn: () => call((api) => api.imports.past()) })
+}
+
+/**
  * Removes an import nobody has confirmed: its staged rows and the decisions made on it. The server refuses one
  * that has created records. Afterwards nothing of it is left in this tab's cache either.
  *

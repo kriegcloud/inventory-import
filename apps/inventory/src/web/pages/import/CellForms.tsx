@@ -1,4 +1,4 @@
-import { parse, stringify } from "../../lib/json.ts"
+import { stringify } from "../../lib/json.ts"
 // The two cells of an item that hold JSON, fixed in a small form instead of as raw text. The form writes the cell back
 // as the brief's own JSON; the one thing not to break: nothing is saved that the domain's readers (`readDimensions`,
 // `readVendors`) would refuse, and their sentence is what the person reads under the fields.
@@ -11,42 +11,14 @@ import { Label } from "@/components/ui/label"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { readDimensions, readVendors } from "../../../domain/ItemImport.ts"
-
-const parsed = (text: string): unknown => {
-  try {
-    return parse(text) as unknown
-  } catch {
-    return undefined
-  }
-}
-
-const isObject = (value: unknown): value is Readonly<Record<string, unknown>> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
-
-/** A number or text of a parsed cell as the text a field holds; nothing for anything else. */
-const textOf = (value: unknown): string => (typeof value === "number" || typeof value === "string" ? `${value}` : "")
-
-/** A number as JSON writes it, or the typed text itself when it is no number (the reader then says what is wrong). */
-const numberOrText = (text: string): number | string => {
-  const trimmed = text.trim()
-  return trimmed !== "" && Number.isFinite(Number(trimmed)) ? Number(trimmed) : trimmed
-}
-
-type DimensionsDraft = { length: string; width: string; height: string; unit: string }
-
-/**
- * Whatever of a dimensions cell can be read: the whole cell when it is JSON, else each measurement found in a cell
- * that was cut off.
- *
- * @example dimensionsDraft('{"length":31.2,"width":41.4,"un') // { length: "31.2", width: "41.4", height: "", unit: "cm" }
- */
-export const dimensionsDraft = (text: string): DimensionsDraft => {
-  const value = parsed(text)
-  const found = (key: string): string =>
-    isObject(value) ? textOf(value[key]) : (new RegExp(`"${key}"\\s*:\\s*"?([^",}\\s]+)`).exec(text)?.[1] ?? "")
-  const unit = found("unit")
-  return { length: found("length"), width: found("width"), height: found("height"), unit: unit === "in" ? "in" : "cm" }
-}
+import {
+  type DimensionsDraft,
+  dimensionsDraft,
+  emptyVendor,
+  numberOrText,
+  type VendorDraft,
+  vendorsDraft
+} from "./cellDrafts.ts"
 
 /** The dimensions as the brief's JSON text. */
 const dimensionsCell = (draft: DimensionsDraft): string =>
@@ -116,32 +88,6 @@ export function DimensionsForm(props: { value: string; onSave: (cell: string) =>
       </div>
     </form>
   )
-}
-
-type VendorDraft = { name: string; sku: string; cost: string; lead: string; preferred: boolean }
-
-const emptyVendor: VendorDraft = { name: "", sku: "", cost: "", lead: "", preferred: false }
-
-const vendorDraft = (value: Readonly<Record<string, unknown>>): VendorDraft => ({
-  name: textOf(value["vendor_name"]),
-  sku: textOf(value["vendor_sku"]),
-  cost: textOf(value["unit_cost"]),
-  lead: textOf(value["lead_time_days"]),
-  preferred: value["is_preferred"] === true
-})
-
-/**
- * Whatever of a vendors cell can be read: every vendor of a cell that is JSON, else each whole vendor found in a cell
- * that was cut off. At most three, and at most the first marked preferred stays so.
- */
-export const vendorsDraft = (text: string): ReadonlyArray<VendorDraft> => {
-  const value = parsed(text)
-  const entries: ReadonlyArray<unknown> = Array.isArray(value)
-    ? (value as ReadonlyArray<unknown>)
-    : (text.match(/\{[^{}]*\}/g) ?? []).map(parsed)
-  const vendors = entries.filter(isObject).map(vendorDraft).slice(0, 3)
-  const preferred = vendors.findIndex((vendor) => vendor.preferred)
-  return vendors.map((vendor, index) => ({ ...vendor, preferred: index === preferred }))
 }
 
 /** The vendors as the brief's JSON text. */

@@ -177,7 +177,7 @@ describe("a row discontinued yet active", () => {
           lossless: false,
           to: "false",
           alternatives: [""],
-          labels: ["Not active", "Clear the discontinued date"],
+          labels: ["Not active", "No discontinued date"],
           targets: ["isActive", "discontinuedOn"]
         })
         // Nothing is taken for the person: the file's values stand and the row waits.

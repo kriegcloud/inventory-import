@@ -456,10 +456,12 @@ export function GroupChange(props: {
   applied?: boolean
   /** In a table heading of one fixed height: short of room, the file's spellings end in an ellipsis. */
   oneLine?: boolean
+  /** How the column shows a value (`ReviewColumn.display`): vendors as "2 · Acme preferred", not the file's JSON. */
+  display?: ((value: string) => string) | undefined
 }) {
   const { group } = props
   const choices = choicesOf(group)
-  const variants = variantsText(group)
+  const variants = variantsText(group, props.display)
   return (
     <span
       className={cn(

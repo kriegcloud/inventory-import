@@ -236,8 +236,9 @@ CREATE TABLE importSuggestion (
 
 -- One confirm of an import: who confirmed it and when, and what it did, counted from the rows it stored in the same
 -- batch. A take-back of the import marks the confirms it reversed (takeBackId, the same for every confirm one
--- take-back reversed) with who took them back and when, how many of their items it removed, and how many it kept
--- because someone had changed them since. A confirm with takenBackAt null is in force.
+-- take-back reversed) with who took them back and when, how many of their items it removed, how many stored items it
+-- had replaced it put back as they were (restored), and how many it kept because someone had changed them since. A
+-- confirm with takenBackAt null is in force.
 CREATE TABLE importBatch (
   id TEXT NOT NULL,
   organizationId TEXT NOT NULL REFERENCES organization (id),
@@ -254,6 +255,7 @@ CREATE TABLE importBatch (
   takenBackByName TEXT,
   takenBackAt TEXT,
   removed INTEGER NOT NULL DEFAULT 0,
+  restored INTEGER NOT NULL DEFAULT 0,
   kept INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (organizationId, id),
   FOREIGN KEY (organizationId, importId) REFERENCES importDraft (organizationId, id),
@@ -320,6 +322,47 @@ CREATE INDEX item_batch ON item (organizationId, batchId, sourceRow, sourcePart)
 -- SKU Z to A. The only other index on `item` on purpose: each one is paid at every confirm and take-back, and
 -- with no statistics SQLite may pick a new one for a scan it does not suit; check the plans before adding another.
 CREATE INDEX item_org_sku ON item (organizationId, sku COLLATE NOCASE, id);
+
+-- A stored item as it was just before a confirm replaced it with a file's row (the person chose "replace"), so taking
+-- that confirm back can put every value back, its revision and who last changed it included. revisionAfter is the
+-- item's revision right after the replace: a take-back restores the item only while it is still there, and keeps it
+-- (restored stays 0) once someone edited it or a later import replaced it again. The copy goes with its item.
+CREATE TABLE importReplaced (
+  organizationId TEXT NOT NULL REFERENCES organization (id),
+  importId TEXT NOT NULL,
+  batchId TEXT NOT NULL,
+  itemId TEXT NOT NULL,
+  sourceRow INTEGER NOT NULL,
+  sourcePart INTEGER NOT NULL DEFAULT 0,
+  name TEXT NOT NULL,
+  description TEXT,
+  category TEXT NOT NULL,
+  uom TEXT NOT NULL,
+  unitCost TEXT NOT NULL,
+  quantityOnHand INTEGER NOT NULL,
+  reorderPoint INTEGER,
+  isActive INTEGER NOT NULL,
+  lotTracked INTEGER NOT NULL,
+  tags TEXT NOT NULL,
+  firstReceivedOn TEXT,
+  discontinuedOn TEXT,
+  dimensions TEXT,
+  vendors TEXT NOT NULL,
+  revision INTEGER NOT NULL,
+  updatedById TEXT,
+  updatedBy TEXT,
+  updatedAt TEXT,
+  revisionAfter INTEGER NOT NULL,
+  restored INTEGER NOT NULL DEFAULT 0 CHECK (restored IN (0, 1)),
+  PRIMARY KEY (organizationId, batchId, itemId),
+  FOREIGN KEY (organizationId, importId) REFERENCES importDraft (organizationId, id),
+  FOREIGN KEY (organizationId, batchId) REFERENCES importBatch (organizationId, id),
+  FOREIGN KEY (organizationId, updatedById) REFERENCES member (organizationId, id),
+  FOREIGN KEY (organizationId, itemId) REFERENCES item (organizationId, id) ON DELETE CASCADE
+);
+
+CREATE INDEX importReplaced_import ON importReplaced (organizationId, importId);
+CREATE INDEX importReplaced_item ON importReplaced (organizationId, itemId);
 
 -- What the confirms did with each row of the file: created an item, found the SKU already there, did not import
 -- it (with the reason), or created an item a take-back then removed. One row per item of the file (`part` 0 when

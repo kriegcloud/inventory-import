@@ -2,6 +2,7 @@ import { parse, stringify } from "../../lib/json.ts"
 import { type Column, createColumnHelper, Subscribe } from "@tanstack/react-table"
 import {
   CheckIcon,
+  CircleHelpIcon,
   Columns3Icon,
   DownloadIcon,
   HistoryIcon,
@@ -285,6 +286,7 @@ export function ReviewRegion(props: ReviewRegionProps) {
   const [picked, setPicked] = useState<FilterId | undefined>(undefined)
   const [kind, setKind] = useState<string | undefined>(undefined)
   const [activityOpen, setActivityOpen] = useState(false)
+  const [whyOpen, setWhyOpen] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [search, setSearch] = useState("")
   // Rows the person took out of their group's one action, and kinds whose rows they folded or unfolded.
@@ -386,27 +388,40 @@ export function ReviewRegion(props: ReviewRegionProps) {
   const facets = useMemo(
     () =>
       facetColumns.map((column) => {
-        const found = MutableHashMap.empty<string, { values: MutableHashSet.MutableHashSet<string>; n: number }>()
+        // Spellings that differ only by spaces around them or by capitals ("Packaging" and "packaging") read the
+        // same: one choice that holds both, named by the spelling most rows have.
+        const found = MutableHashMap.empty<
+          string,
+          { values: MutableHashSet.MutableHashSet<string>; n: number; spellings: Record<string, number> }
+        >()
+        const keyOf = (value: string): string => value.trim().toLowerCase()
         for (const view of views) {
           const value = view.cells[column.id] ?? ""
-          const label = value.trim()
-          if (label === "") continue
-          const entry = Option.getOrElse(MutableHashMap.get(found, label), () => ({
+          const key = keyOf(value)
+          if (key === "") continue
+          const entry = Option.getOrElse(MutableHashMap.get(found, key), () => ({
             values: MutableHashSet.empty<string>(),
-            n: 0
+            n: 0,
+            spellings: {} as Record<string, number>
           }))
           MutableHashSet.add(entry.values, value)
-          MutableHashMap.set(found, label, entry)
+          entry.spellings[value.trim()] = (entry.spellings[value.trim()] ?? 0) + 1
+          MutableHashMap.set(found, key, entry)
         }
         for (const view of list) {
-          const entry = Option.getOrUndefined(MutableHashMap.get(found, (view.cells[column.id] ?? "").trim()))
+          const entry = Option.getOrUndefined(MutableHashMap.get(found, keyOf(view.cells[column.id] ?? "")))
           if (entry !== undefined) entry.n += 1
         }
         const options = [...found]
-          .map(([label, entry]) => ({ label, values: [...entry.values], n: entry.n }))
+          .map(([key, entry]) => ({
+            key,
+            label: Object.entries(entry.spellings).sort((a, b) => b[1] - a[1])[0]?.[0] ?? key,
+            values: [...entry.values],
+            n: entry.n
+          }))
           .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }))
         // A choice whose value is no longer in the file (the person fixed the last row that had it) is dropped.
-        const picked = (facetPicked[column.id] ?? []).filter((label) => MutableHashMap.has(found, label))
+        const picked = (facetPicked[column.id] ?? []).filter((key) => MutableHashMap.has(found, key))
         return { column, options, picked }
       }),
     [facetColumns, facetPicked, views, list]
@@ -415,7 +430,7 @@ export function ReviewRegion(props: ReviewRegionProps) {
   const facetValues = stringify(
     facets.map((facet) => [
       facet.column.id,
-      facet.options.filter((option) => facet.picked.includes(option.label)).flatMap((option) => option.values)
+      facet.options.filter((option) => facet.picked.includes(option.key)).flatMap((option) => option.values)
     ])
   )
   // The table object is new on every render, so it is read through a ref: only a change of values runs this, and
@@ -907,12 +922,13 @@ export function ReviewRegion(props: ReviewRegionProps) {
       onValueChange={(next) => {
         if (next !== "") chooseFilter(next as FilterId)
       }}
-      className={narrow ? "w-full overflow-x-auto" : undefined}
+      // On a phone the tabs stand apart and wrap onto a second line: every one is on screen, none past its edge.
+      {...(narrow ? { spacing: 1, className: "w-full flex-wrap" } : {})}
     >
       {filters.map((entry) =>
         narrow ? (
           // On a phone the count goes under its words. A tab is never narrower than its words ("Needs a decision"
-          // is read whole): with more tabs than the screen holds, the row scrolls sideways by itself.
+          // is read whole); the tabs of a line share its width.
           <ToggleGroupItem key={entry.id} value={entry.id} className="h-11 min-w-fit flex-1">
             <span className="flex flex-col items-center">
               <span className="leading-4 whitespace-nowrap">{entry.label}</span>
@@ -977,7 +993,7 @@ export function ReviewRegion(props: ReviewRegionProps) {
               } as unknown as Column<DataTableFeatures, RowView, string>
             }
             title={facet.column.label}
-            options={facet.options.map((option) => ({ label: option.label, value: option.label, count: option.n }))}
+            options={facet.options.map((option) => ({ label: option.label, value: option.key, count: option.n }))}
             multiple
           />
         ))}
@@ -1024,6 +1040,40 @@ export function ReviewRegion(props: ReviewRegionProps) {
         </TooltipTrigger>
         <TooltipContent>{heldWords}</TooltipContent>
       </Tooltip>
+    )
+
+  // "Why flagged?": every reason of every flagged row on screen, in the caller's words, in a side panel.
+  const flaggedOnScreen = ordered
+    .filter((view) => view.status === "needs" || view.status === "cannot")
+    .map((view) => view.row)
+  const whyButton =
+    props.explain === undefined || loading ? null : (
+      <ToolButton
+        label="Why flagged?"
+        tip={`Why flagged: every reason for the ${flaggedOnScreen.length} flagged ${flaggedOnScreen.length === 1 ? "row" : "rows"} on screen`}
+        narrow={narrow}
+        onClick={() => setWhyOpen(true)}
+      >
+        <CircleHelpIcon aria-hidden />
+      </ToolButton>
+    )
+  const whyPanel =
+    props.explain === undefined ? null : (
+      <Sheet open={whyOpen} onOpenChange={setWhyOpen}>
+        <SheetContent className="overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Why flagged?</SheetTitle>
+            <SheetDescription>
+              {flaggedOnScreen.length === 0
+                ? "No row on screen is flagged. Choose another view, or clear the search."
+                : `The ${flaggedOnScreen.length} flagged ${flaggedOnScreen.length === 1 ? "row" : "rows"} on screen, each with every reason. Narrow the view or search to ask about fewer.`}
+            </SheetDescription>
+          </SheetHeader>
+          {whyOpen && flaggedOnScreen.length > 0 ? (
+            <div className="px-4 pb-6">{props.explain(flaggedOnScreen)}</div>
+          ) : null}
+        </SheetContent>
+      </Sheet>
     )
 
   const activityButton =
@@ -1295,6 +1345,7 @@ export function ReviewRegion(props: ReviewRegionProps) {
           <div className="flex flex-none items-center gap-1 px-4 pt-2 pb-1">
             <div className="min-w-0 flex-1">{heading}</div>
             {loading || failed ? null : columnsMenu}
+            {whyButton}
             {activityButton}
           </div>
           {failed ? (
@@ -1349,6 +1400,7 @@ export function ReviewRegion(props: ReviewRegionProps) {
             </>
           )}
           {activityPanel}
+          {whyPanel}
           {confirmStep}
         </section>
       </LayoutContext>
@@ -1384,6 +1436,7 @@ export function ReviewRegion(props: ReviewRegionProps) {
                       {loading ? null : filterMenu}
                       {densityMenu}
                       {loading ? null : download}
+                      {whyButton}
                       {activityButton}
                     </div>
                     <div className="ml-auto flex min-w-0 items-center gap-2">
@@ -1404,6 +1457,7 @@ export function ReviewRegion(props: ReviewRegionProps) {
                       {loading ? null : filterMenu}
                       {densityMenu}
                       {loading ? null : download}
+                      {whyButton}
                       {activityButton}
                     </div>
                   </>
@@ -1454,6 +1508,7 @@ export function ReviewRegion(props: ReviewRegionProps) {
           )}
         </div>
         {activityPanel}
+        {whyPanel}
         {confirmStep}
       </section>
     </LayoutContext>

@@ -29,6 +29,7 @@ import { defaultReviewWords, reviewWords } from "../../src/web/components/review
 import { readSpreadsheet } from "../../src/web/lib/spreadsheet/index.ts"
 import type { ItemFields } from "../../src/domain/Item.ts"
 import { costText, dimensionsCellText, vendorsCellText } from "../../src/web/pages/import/itemText.ts"
+import { vendorsDraft } from "../../src/web/pages/import/cellDrafts.ts"
 import { reasonShown, regionColumns, regionKinds, toRegionRows } from "../../src/web/pages/import/reviewAdapter.ts"
 
 const sample = (name: string): File =>
@@ -241,6 +242,25 @@ describe("a cost, the dimensions and the vendors in the review", () => {
       )
     ).toBe("2 · Summit Polymers preferred")
     expect(vendorsCellText('[{"vendor_name":"Acme')).toBe('[{"vendor_name":"Acme')
+    // A cell cut off after a vendor's name says so, with the name, instead of showing the file's JSON.
+    expect(vendorsCellText('[{"vendor_name":"Keystone Components","vendor_sku":"KE-61504')).toBe(
+      "Cut off · Keystone Components"
+    )
+  })
+
+  it("opens the vendors form with what a cut-off cell holds, whole vendors and the one cut short", () => {
+    // Rows 80 and 157 of the messy sample.
+    expect(vendorsDraft('[{"vendor_name":"Keystone Components","vendor_sku":"KE-61504')).toEqual([
+      { name: "Keystone Components", sku: "KE-61504", cost: "", lead: "", preferred: false }
+    ])
+    expect(
+      vendorsDraft(
+        '[{"vendor_name":"Acme Industrial","unit_cost":3.5,"is_preferred":true},{"vendor_name":"Copperline Supply","vendor_sku":"CO-33160","unit_cost":14.19,"is_preferred":false'
+      )
+    ).toEqual([
+      { name: "Acme Industrial", sku: "", cost: "3.5", lead: "", preferred: true },
+      { name: "Copperline Supply", sku: "CO-33160", cost: "14.19", lead: "", preferred: false }
+    ])
   })
 
   it.effect("is how the sample's cost column shows, with no second currency sign in its header", () =>

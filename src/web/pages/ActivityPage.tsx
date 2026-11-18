@@ -5,7 +5,7 @@ import { Code } from "@/components/app/Code"
 import { importAddress } from "@/lib/route"
 import { PageHeader, Views } from "@/components/app/PageHeader"
 import { ProposedValue } from "@/components/app/ProposedValue"
-import { type RecordColumn, RecordsTable } from "@/components/ui/data-table/data-table-records"
+import { type ListColumn, ListTable } from "@/components/app/ListTable"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { TableSkeleton } from "@/components/app/Skeletons"
 import { Button } from "@/components/ui/button"
@@ -23,12 +23,14 @@ type Event = (typeof Activity.json)["Type"]
 const sourceWords = { rule: "Rule", model: "Model", person: "Person" } as const
 
 const proposedBy = (change: ChangeRecord): string => sourceWords[change.source]
+const decidedBy = (change: ChangeRecord): string =>
+  change.decidedBy === "rule" ? "Rule" : (change.decidedByName ?? "Person")
 
-const changeColumns: ReadonlyArray<RecordColumn<ChangeRecord>> = [
+const changeColumns: ReadonlyArray<ListColumn<ChangeRecord>> = [
   {
     id: "sku",
     label: "Item",
-    width: 168,
+    width: 112,
     // A value whose import was taken back is kept still; the item it went into is gone.
     cell: (change) =>
       change.takenBack ? (
@@ -39,32 +41,37 @@ const changeColumns: ReadonlyArray<RecordColumn<ChangeRecord>> = [
         <Code>{change.sku}</Code>
       ),
     title: (change) => (change.takenBack ? `${change.sku}, taken back with its import` : change.sku),
-    sort: (change) => change.sku
+    value: (change) => change.sku
   },
   {
     id: "row",
     label: "Row",
-    width: 56,
+    width: 64,
     align: "right",
-    cell: (change) => (change.part === undefined ? change.rowNumber : `${change.rowNumber} · ${change.part}`)
+    cell: (change) => (change.part === undefined ? change.rowNumber : `${change.rowNumber} · ${change.part}`),
+    value: (change) => change.rowNumber,
+    searchable: false
   },
   {
     id: "field",
     label: "Field",
-    width: 96,
-    cell: (change) => fieldLabels[change.field],
-    sort: (change) => fieldLabels[change.field]
+    width: 124,
+    value: (change) => fieldLabels[change.field],
+    facet: true
   },
   {
     id: "change",
     label: "Was, now",
     width: 150,
-    cell: (change) => <ProposedValue from={change.from === "" ? "empty" : change.from} to={change.to} />
+    cell: (change) => <ProposedValue from={change.from === "" ? "empty" : change.from} to={change.to} />,
+    // Searched by both values; a pair has no one order to sort by.
+    value: (change) => `${change.from} ${change.to}`,
+    sortable: false
   },
   {
     id: "source",
     label: "Proposed by",
-    width: 124,
+    width: 112,
     // Who proposed it and how sure they were, in one column: beside the sidebar ten columns did not fit, and the
     // table ran past its frame with the file and the time out of sight.
     cell: (change) => (
@@ -73,19 +80,23 @@ const changeColumns: ReadonlyArray<RecordColumn<ChangeRecord>> = [
         {change.confidence === null ? null : <span className="text-muted-foreground"> · {change.confidence}</span>}
       </>
     ),
-    title: (change) => `${proposedBy(change)}${change.confidence === null ? "" : `, confidence ${change.confidence}`}`
+    title: (change) => `${proposedBy(change)}${change.confidence === null ? "" : `, confidence ${change.confidence}`}`,
+    value: proposedBy,
+    facet: true
   },
   {
     id: "decided",
     label: "Decided by",
-    width: 120,
-    cell: (change) => (change.decidedBy === "rule" ? "Rule" : (change.decidedByName ?? "Person")),
-    sort: (change) => (change.decidedBy === "rule" ? "Rule" : (change.decidedByName ?? "Person"))
+    width: 112,
+    value: decidedBy,
+    facet: true
   },
   {
     id: "basis",
     label: "Basis",
-    cell: (change) => change.basis ?? change.how
+    value: (change) => change.basis ?? change.how,
+    sortable: false,
+    wrap: true
   },
   {
     id: "file",
@@ -98,22 +109,24 @@ const changeColumns: ReadonlyArray<RecordColumn<ChangeRecord>> = [
       </a>
     ),
     title: (change) => change.fileName,
-    sort: (change) => change.fileName
+    value: (change) => change.fileName,
+    facet: true
   },
   {
     id: "when",
     label: "When",
-    width: 132,
+    width: 124,
     cell: (change) => whenShort(change.createdAt),
     title: (change) => when(change.createdAt),
-    sort: (change) => change.createdAt
+    value: (change) => change.createdAt,
+    searchable: false
   }
 ]
 
-const eventColumns: ReadonlyArray<RecordColumn<Event>> = [
-  { id: "action", label: "What", width: 220, cell: (event) => event.action, sort: (event) => event.action },
-  { id: "who", label: "Who", width: 200, cell: (event) => event.actorName, sort: (event) => event.actorName },
-  { id: "detail", label: "Detail", cell: (event) => event.detail },
+const eventColumns: ReadonlyArray<ListColumn<Event>> = [
+  { id: "action", label: "What", width: 220, value: (event) => event.action, facet: true },
+  { id: "who", label: "Who", width: 200, value: (event) => event.actorName, facet: true },
+  { id: "detail", label: "Detail", value: (event) => event.detail, sortable: false, wrap: true },
   // The same short form as the decisions' column, so the two lists on this page read alike.
   {
     id: "when",
@@ -121,7 +134,8 @@ const eventColumns: ReadonlyArray<RecordColumn<Event>> = [
     width: 150,
     cell: (event) => whenShort(DateTime.formatIso(event.createdAt)),
     title: (event) => when(DateTime.formatIso(event.createdAt)),
-    sort: (event) => DateTime.formatIso(event.createdAt)
+    value: (event) => DateTime.formatIso(event.createdAt),
+    searchable: false
   }
 ]
 
@@ -171,8 +185,10 @@ export function ActivityPage() {
           columns={view === "decisions" ? changeColumns : eventColumns}
         />
       ) : view === "decisions" ? (
-        <RecordsTable
+        <ListTable
+          key="decisions"
           caption="Values that imports changed, and who decided each"
+          searchLabel="Search decisions"
           columns={changeColumns}
           rows={changes.data ?? []}
           rowKey={(change) =>
@@ -181,8 +197,10 @@ export function ActivityPage() {
           empty="No decisions yet. They appear here once an import with accepted or typed values is confirmed."
         />
       ) : (
-        <RecordsTable
+        <ListTable
+          key="events"
           caption="Uploads and imports"
+          searchLabel="Search events"
           columns={eventColumns}
           rows={events.data ?? []}
           rowKey={(event) => event.id}

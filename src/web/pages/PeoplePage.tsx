@@ -5,7 +5,7 @@ import { toast } from "sonner"
 import { PageHeader } from "@/components/app/PageHeader"
 import { TableSkeleton } from "@/components/app/Skeletons"
 import { NotSet } from "@/components/app/NotSet"
-import { type RecordColumn, RecordsTable } from "@/components/ui/data-table/data-table-records"
+import { type ListColumn, ListTable } from "@/components/app/ListTable"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
   AlertDialog,
@@ -45,6 +45,9 @@ type PersonRow = Person & { readonly saving: boolean }
 
 /** The person a row shows, as the server and the cache have them. */
 const personOf = ({ saving: _saving, ...person }: PersonRow): Person => person
+
+/** A role as one word, as the Role column's filter and the rows of people who cannot change it show it. */
+const roleWords: Record<Role, string> = { viewer: "Viewer", editor: "Editor", admin: "Admin" }
 
 const roles: ReadonlyArray<{ value: Role; label: string }> = [
   { value: "viewer", label: "Viewer: can look" },
@@ -199,11 +202,12 @@ export function PeoplePage() {
     saving: setRole.isPending && setRole.variables?.person.memberId === person.memberId
   }))
 
-  const columns: ReadonlyArray<RecordColumn<PersonRow>> = [
+  const columns: ReadonlyArray<ListColumn<PersonRow>> = [
     {
       id: "name",
       label: "Name",
       width: 280,
+      value: (person) => person.name,
       // The signed-in person's own row says so: the role and Remove beside it act on themself.
       cell: (person) =>
         person.memberId === actor?.id ? (
@@ -214,11 +218,21 @@ export function PeoplePage() {
           person.name
         )
     },
-    { id: "email", label: "Email", cell: (person) => person.email ?? <NotSet /> },
+    {
+      id: "email",
+      label: "Email",
+      value: (person) => person.email ?? "",
+      cell: (person) => person.email ?? <NotSet />,
+      title: (person) => person.email ?? "Not set",
+      blank: (person) => person.email === null
+    },
     {
       id: "role",
       label: "Role",
       width: 260,
+      // Admin, Editor, Viewer: in the order of what each may do, and alphabetical too.
+      value: (person) => roleWords[person.role],
+      facet: true,
       cell: (person) =>
         admin && person.email !== null ? (
           <NativeSelect
@@ -236,14 +250,18 @@ export function PeoplePage() {
             ))}
           </NativeSelect>
         ) : (
-          person.role
+          roleWords[person.role]
         )
     },
     {
       id: "joined",
       label: "Joined",
       width: 190,
-      cell: (person) => (person.joinedAt === null ? <NotSet /> : when(person.joinedAt))
+      value: (person) => person.joinedAt ?? "",
+      searchable: false,
+      cell: (person) => (person.joinedAt === null ? <NotSet /> : when(person.joinedAt)),
+      title: (person) => (person.joinedAt === null ? "Not set" : when(person.joinedAt)),
+      blank: (person) => person.joinedAt === null
     },
     ...(admin
       ? [
@@ -251,6 +269,7 @@ export function PeoplePage() {
             id: "actions",
             label: "Remove",
             width: 120,
+            end: true,
             cell: (person: PersonRow) => (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
@@ -306,8 +325,9 @@ export function PeoplePage() {
       ) : people.data === undefined ? (
         <TableSkeleton caption="People in the organization" columns={columns} />
       ) : (
-        <RecordsTable
+        <ListTable
           caption="People in the organization"
+          searchLabel="Search people"
           columns={columns}
           rows={rows}
           rowKey={(person) => person.memberId}

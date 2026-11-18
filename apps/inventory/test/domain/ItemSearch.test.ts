@@ -2,7 +2,8 @@
 // longer than the box allows is refused, not cut; a word's quotes, `%` and `_` are text, never syntax; and a word
 // with one letter missing, extra, wrong or swapped is always found by one of its near spellings.
 import { describe, expect, it } from "@effect/vitest"
-import { Array as Arr, Effect, Schema, String as Str } from "effect"
+import { Array as Arr, Effect, String as Str } from "effect"
+import * as S from "effect/Schema"
 import { ItemQueryParams } from "../../src/api/v1/Api.ts"
 import { ItemQuery } from "../../src/domain/ItemQuery.ts"
 import {
@@ -16,8 +17,8 @@ import {
   wordsToCheck
 } from "../../src/domain/ItemSearch.ts"
 
-const decodeQuery = Schema.decodeUnknownEffect(ItemQuery)
-const decodeParams = Schema.decodeUnknownEffect(ItemQueryParams)
+const decodeQuery = S.decodeUnknownEffect(ItemQuery)
+const decodeParams = S.decodeUnknownEffect(ItemQueryParams)
 const asked = { page: 1, perPage: 20, sorting: [], filters: [], joinOperator: "and" }
 
 /** SQLite's LIKE with `ESCAPE '\'`, ignoring case: what the server compares a pattern with. */
@@ -90,15 +91,15 @@ describe("the words of a search", () => {
 })
 
 const letters = ["a", "b", "e", "k", "s", "w", "1", "8", "-", "%", "_", '"'] as const
-const Letter = Schema.Literals(letters)
+const Letter = S.Literals(letters)
 
 describe("a word with one letter different", () => {
   it.prop(
     "is always found in the item's text by one of the typed word's near spellings",
     {
-      stored: Schema.Array(Letter).check(Schema.isMinLength(5), Schema.isMaxLength(12)),
-      edit: Schema.Literals(["missing", "extra", "wrong", "swapped"]),
-      at: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 11 })),
+      stored: S.Array(Letter).check(S.isMinLength(5), S.isMaxLength(12)),
+      edit: S.Literals(["missing", "extra", "wrong", "swapped"]),
+      at: S.Int.check(S.isBetween({ minimum: 0, maximum: 11 })),
       letter: Letter
     },
     ({ stored, edit, at, letter }) => {

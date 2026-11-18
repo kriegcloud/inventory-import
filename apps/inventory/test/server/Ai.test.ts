@@ -1,7 +1,8 @@
 import { expect, layer } from "@effect/vitest"
 import { APICallError } from "ai"
 import { MockLanguageModelV4 } from "ai/test"
-import { Array as Arr, Effect, Fiber, Formatter, Layer, Schema, String as Str } from "effect"
+import { Array as Arr, Effect, Fiber, Formatter, Layer, String as Str } from "effect"
+import * as S from "effect/Schema"
 import { TestClock, TestConsole } from "effect/testing"
 import { modelSentences } from "../../src/api/v1/ModelTrouble.ts"
 import { Ai, answeredByRules, type ModelRoute, routesFrom } from "../../src/server/Ai.ts"
@@ -11,7 +12,7 @@ import { settingsLayer } from "./support/app.ts"
 // The model call's one retry policy and its fallbacks, with scripted models. The SDK's own retries are off, so each
 // scripted failure is one attempt: the call counts below are the policy's, not the SDK's.
 
-const Greeting = Schema.Struct({ greeting: Schema.String })
+const Greeting = S.Struct({ greeting: S.String })
 const ask = Effect.gen(function* () {
   const ai = yield* Ai
   return yield* ai.generateObject({ name: "greeting", prompt: "Say hello.", schema: Greeting })

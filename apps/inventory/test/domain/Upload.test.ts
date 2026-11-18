@@ -2,7 +2,8 @@
 // rows are done than there are ("Saving 51,000 of 50,000 rows"), whatever the estimate did and however often a piece
 // was sent again.
 import { describe, expect, it } from "@effect/vitest"
-import { Array as Arr, Schema } from "effect"
+import { Array as Arr } from "effect"
+import * as S from "effect/Schema"
 import {
   chunkProblem,
   chunkRows,
@@ -23,11 +24,11 @@ const reading = (rowsRead: number, about: number | null): UploadState => ({
 })
 
 describe("progress", () => {
-  const Count = Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 120_000 }))
+  const Count = S.Int.check(S.isBetween({ minimum: 0, maximum: 120_000 }))
 
   it.prop(
     "never reports more rows done than the total while reading, whatever the estimate",
-    { read: Count, about: Schema.NullOr(Count) },
+    { read: Count, about: S.NullOr(Count) },
     ({ read, about }) => {
       const { done, total } = progressOf({ state: reading(read, about) })
       expect(done).toBe(read)
@@ -39,8 +40,8 @@ describe("progress", () => {
     "never reports less than none or more than the file while saving",
     {
       // A count from a piece sent twice or an answer out of order can be anything, below zero included.
-      saved: Schema.Int.check(Schema.isBetween({ minimum: -1_000, maximum: 120_000 })),
-      rows: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 50_000 }))
+      saved: S.Int.check(S.isBetween({ minimum: -1_000, maximum: 120_000 })),
+      rows: S.Int.check(S.isBetween({ minimum: 1, maximum: 50_000 }))
     },
     ({ saved, rows }) => {
       const { done, total } = progressOf({
@@ -69,13 +70,11 @@ describe("progress", () => {
   it.prop(
     "counts a piece sent again once, so saved rows never pass the file's rows",
     {
-      sizes: Schema.Array(Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: chunkRows }))).check(
-        Schema.isMinLength(1),
-        Schema.isMaxLength(12)
+      sizes: S.Array(S.Int.check(S.isBetween({ minimum: 1, maximum: chunkRows }))).check(
+        S.isMinLength(1),
+        S.isMaxLength(12)
       ),
-      acknowledged: Schema.Array(Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 11 }))).check(
-        Schema.isMaxLength(40)
-      )
+      acknowledged: S.Array(S.Int.check(S.isBetween({ minimum: 0, maximum: 11 }))).check(S.isMaxLength(40))
     },
     ({ sizes, acknowledged }) => {
       const rows = Arr.reduce(sizes, 0, (a, b) => a + b)
@@ -97,7 +96,7 @@ describe("pieces", () => {
 
   it.prop(
     "splits any file into pieces of at most 500, in order, losing none, that the server accepts as a whole",
-    { count: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 3_000 })) },
+    { count: S.Int.check(S.isBetween({ minimum: 1, maximum: 3_000 })) },
     ({ count }) => {
       const file = Arr.makeBy(count, (i) => ({ rowNumber: i + 2, cells: [{ text: `SKU-${i}` }] }))
       const pieces = uploadChunks({ rows: file })

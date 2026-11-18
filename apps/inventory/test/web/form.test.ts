@@ -1,11 +1,12 @@
 // A form says every problem at once. The rule that would hurt if wrong: a press on a form with several mistakes lists
 // every one of them, in the form's order, and nothing for a field that is fine.
 import { it } from "@effect/vitest"
-import { Array as Arr, Schema } from "effect"
+import { Array as Arr } from "effect"
+import * as S from "effect/Schema"
 import { expect } from "vitest"
 import { formProblems, problemOf } from "../../src/web/lib/form.ts"
 
-const Check = Schema.NullOr(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(40)))
+const Check = S.NullOr(S.String.check(S.isMinLength(1), S.isMaxLength(40)))
 
 it.prop(
   "lists exactly the fields whose check failed, all of them, in the form's order",

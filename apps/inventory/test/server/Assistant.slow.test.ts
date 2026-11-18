@@ -3,7 +3,8 @@
 // does not have is refused whole, and a model's answer leaves one audit line that only its own organization sees.
 import { expect, layer } from "@effect/vitest"
 import { MockLanguageModelV4 } from "ai/test"
-import { Array as Arr, Effect, Layer, Result, Schema } from "effect"
+import { Array as Arr, Effect, Layer, Result } from "effect"
+import * as S from "effect/Schema"
 import { HttpApiTest } from "effect/http-api"
 import { TestClock } from "effect/testing"
 import { Api } from "../../src/api/v1/Api.ts"
@@ -49,7 +50,7 @@ layer(TestApp)("the table assistant with no AI key", (it) => {
   )
 })
 
-const toJson = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))
+const toJson = S.encodeEffect(S.fromJsonString(S.Unknown))
 
 const answering = (reply: unknown) =>
   Layer.unwrap(

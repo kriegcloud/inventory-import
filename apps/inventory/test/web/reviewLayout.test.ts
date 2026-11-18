@@ -2,7 +2,8 @@
 // that brings back something other than what was undone, a work list whose counts do not add up, a button that reads
 // "Type a item #", and a row already in the system offered "Leave out".
 import { describe, expect, it } from "@effect/vitest"
-import { Array as Arr, HashSet, Option, Record as Rec, Schema } from "effect"
+import { Array as Arr, HashSet, Option, Record as Rec } from "effect"
+import * as S from "effect/Schema"
 import {
   act,
   type Action,
@@ -72,11 +73,11 @@ describe("column sizing", () => {
   it.prop(
     "every fit column shown keeps its measured width, and the table fits the room unless it must scroll",
     {
-      needs: Schema.Array(Schema.Int.check(Schema.isBetween({ minimum: 20, maximum: 400 }))).check(
-        Schema.isMinLength(1),
-        Schema.isMaxLength(10)
+      needs: S.Array(S.Int.check(S.isBetween({ minimum: 20, maximum: 400 }))).check(
+        S.isMinLength(1),
+        S.isMaxLength(10)
       ),
-      room: Schema.Int.check(Schema.isBetween({ minimum: 300, maximum: 2400 }))
+      room: S.Int.check(S.isBetween({ minimum: 300, maximum: 2400 }))
     },
     ({ needs, room }) => {
       const sized = Arr.map(needs, (need, index): SizedColumn => ({
@@ -106,9 +107,9 @@ describe("column sizing", () => {
 describe("undo and redo", () => {
   const ready = Arr.filter(rows, (row) => row.problem === undefined)
   const needing = Arr.filter(rows, (row) => row.problem !== undefined)
-  const Pick = Schema.Struct({
-    kind: Schema.Literals(["leaveOut", "edit", "accept", "undo", "redo"]),
-    at: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 40 }))
+  const Pick = S.Struct({
+    kind: S.Literals(["leaveOut", "edit", "accept", "undo", "redo"]),
+    at: S.Int.check(S.isBetween({ minimum: 0, maximum: 40 }))
   })
   const actionOf = (pick: typeof Pick.Type): Action => {
     const one = ready[pick.at % ready.length] ?? ready[0]!
@@ -131,7 +132,7 @@ describe("undo and redo", () => {
 
   it.prop(
     "a redo right after an undo brings back exactly the decisions that were undone",
-    { picks: Schema.Array(Pick).check(Schema.isMaxLength(15)) },
+    { picks: S.Array(Pick).check(S.isMaxLength(15)) },
     ({ picks }) => {
       const state = play(picks)
       if (state.undo.length === 0) return
@@ -145,7 +146,7 @@ describe("undo and redo", () => {
 
   it.prop(
     "an undo right after a redo takes the same decisions back again",
-    { picks: Schema.Array(Pick).check(Schema.isMaxLength(15)) },
+    { picks: S.Array(Pick).check(S.isMaxLength(15)) },
     ({ picks }) => {
       const state = play(picks)
       if ((state.redo ?? []).length === 0) return
@@ -154,16 +155,12 @@ describe("undo and redo", () => {
     }
   )
 
-  it.prop(
-    "any new decision empties the redo stack",
-    { picks: Schema.Array(Pick).check(Schema.isMaxLength(15)) },
-    ({ picks }) => {
-      const state = play(picks)
-      const row = ready[0]!
-      const outcome = act({ rows, state, action: { type: "edit", rowId: row.id, column: "name", value: "New" } })
-      expect(outcome.state.redo ?? []).toEqual([])
-    }
-  )
+  it.prop("any new decision empties the redo stack", { picks: S.Array(Pick).check(S.isMaxLength(15)) }, ({ picks }) => {
+    const state = play(picks)
+    const row = ready[0]!
+    const outcome = act({ rows, state, action: { type: "edit", rowId: row.id, column: "name", value: "New" } })
+    expect(outcome.state.redo ?? []).toEqual([])
+  })
 
   it("undo moves a step to redo, redo moves it back, and each says what it did", () => {
     const row = ready[0]!

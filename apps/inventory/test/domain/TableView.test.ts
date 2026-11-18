@@ -1,7 +1,8 @@
 // The table assistant's command: what decodes, what the catalog refuses, and what the fixed rules read. The claim
 // that would hurt most if wrong is that an answer naming anything the table does not have is refused whole.
 import { describe, expect, it } from "@effect/vitest"
-import { Array as Arr, Result, Schema, String as Str } from "effect"
+import { Array as Arr, Result, String as Str } from "effect"
+import * as S from "effect/Schema"
 import {
   type CatalogColumn,
   checkCommand,
@@ -39,7 +40,7 @@ const check = (changes: ReadonlyArray<ViewChange>) => checkCommand({ changes, co
 
 describe("the command a model may answer", () => {
   it("decodes the shape the model is asked for, and refuses a kind of change it is not", () => {
-    const decode = Schema.decodeUnknownResult(ViewCommand)
+    const decode = S.decodeUnknownResult(ViewCommand)
     expect(
       Result.isSuccess(decode({ changes: [{ kind: "sort", column: "name", direction: "desc" }], cannot: "" }))
     ).toBe(true)

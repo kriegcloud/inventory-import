@@ -2,7 +2,8 @@
 import { expect, it } from "@effect/vitest"
 import { betterAuth } from "better-auth"
 import { memoryAdapter } from "better-auth/adapters/memory"
-import { Array as Arr, Effect, Schema, String as Str } from "effect"
+import { Array as Arr, Effect, String as Str } from "effect"
+import * as S from "effect/Schema"
 import { vi } from "vitest"
 import { authOptions } from "../../src/server/authOptions.ts"
 
@@ -34,7 +35,7 @@ const authWith = (pwnedPasswordCheck: boolean) =>
     })
   )
 
-const toJson = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))
+const toJson = S.encodeEffect(S.fromJsonString(S.Unknown))
 
 /** A sign-up as the app's own page sends it. */
 const signUp = Effect.fnUntraced(function* (auth: ReturnType<typeof authWith>, email: string) {

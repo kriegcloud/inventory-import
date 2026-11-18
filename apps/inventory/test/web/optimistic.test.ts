@@ -2,7 +2,8 @@
 // value in a cached list: a member's role set at once, put back when the server refuses. Inputs are drawn from the
 // app's Role schema.
 import { describe, expect, it } from "@effect/vitest"
-import { Array as Arr, Schema } from "effect"
+import { Array as Arr } from "effect"
+import * as S from "effect/Schema"
 import { Role } from "../../src/domain/Identity.ts"
 import { rollback } from "../../src/web/lib/rollback.ts"
 
@@ -25,7 +26,7 @@ const people: ReadonlyArray<Person> = [
   { memberId: "mem_marcus", role: "editor" },
   { memberId: "mem_priya", role: "viewer" }
 ]
-const Member = Schema.Literals(["mem_dana", "mem_marcus", "mem_priya"])
+const Member = S.Literals(["mem_dana", "mem_marcus", "mem_priya"])
 
 describe("rolling back an optimistic write", () => {
   it.prop(

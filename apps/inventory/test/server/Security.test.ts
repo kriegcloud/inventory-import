@@ -1,5 +1,6 @@
 import { expect, it, layer } from "@effect/vitest"
-import { Array as Arr, Effect, Option, Record as Rec, Schema, String as Str } from "effect"
+import { Array as Arr, Effect, Option, Record as Rec, String as Str } from "effect"
+import * as S from "effect/Schema"
 import { Member, MemberId, OrganizationId } from "../../src/domain/Identity.ts"
 import { Ai } from "../../src/server/Ai.ts"
 import { safeRedirectPath } from "../../src/server/security.ts"
@@ -19,22 +20,20 @@ const dana = Member.make({
 const App = TestFetch.layer(inMemoryApp({ member: dana, ai: Ai.layerFor({ routes: [], model: "test/model" }) }))
 
 // The parts of the OpenAPI document the document's own corrections (src/api/v1/Document.ts) change.
-const Operation = Schema.Struct({
-  responses: Schema.Record(Schema.String, Schema.Unknown),
-  security: Schema.Array(Schema.Record(Schema.String, Schema.Array(Schema.String)))
+const Operation = S.Struct({
+  responses: S.Record(S.String, S.Unknown),
+  security: S.Array(S.Record(S.String, S.Array(S.String)))
 })
-const OpenApiDocument = Schema.Struct({
-  paths: Schema.Record(Schema.String, Schema.Record(Schema.String, Operation)),
-  components: Schema.Struct({
-    schemas: Schema.Record(Schema.String, Schema.Unknown),
-    securitySchemes: Schema.Record(Schema.String, Schema.Unknown)
+const OpenApiDocument = S.Struct({
+  paths: S.Record(S.String, S.Record(S.String, Operation)),
+  components: S.Struct({
+    schemas: S.Record(S.String, S.Unknown),
+    securitySchemes: S.Record(S.String, S.Unknown)
   })
 })
 
-const ProblemDocument = Schema.Struct({
-  errors: Schema.Array(
-    Schema.Struct({ path: Schema.Array(Schema.Union([Schema.String, Schema.Int])), message: Schema.String })
-  )
+const ProblemDocument = S.Struct({
+  errors: S.Array(S.Struct({ path: S.Array(S.Union([S.String, S.Int])), message: S.String }))
 })
 
 // A request to the table assistant: a POST any member may send, so it stands for every write in these tests.
@@ -104,13 +103,13 @@ layer(App)("the API over HTTP", (it) => {
         body: { ...view("  "), table: Str.repeat(41)("x") }
       })
       expect(twoWrong.status).toBe(400)
-      const problem = yield* Schema.decodeUnknownEffect(ProblemDocument)(twoWrong.json)
+      const problem = yield* S.decodeUnknownEffect(ProblemDocument)(twoWrong.json)
       expect(Arr.map(problem.errors, (issue) => issue.path)).toEqual([
         ["payload", "prompt"],
         ["payload", "table"]
       ])
       const missing = yield* send({ path: "/api/v1/assistant/view", body: { ...view("x"), prompt: undefined } })
-      const absent = yield* Schema.decodeUnknownEffect(ProblemDocument)(missing.json)
+      const absent = yield* S.decodeUnknownEffect(ProblemDocument)(missing.json)
       expect(Arr.map(absent.errors, (issue) => issue.message)).toEqual(["Type what you want to see in the table."])
     })
   )
@@ -126,7 +125,7 @@ layer(App)("the API over HTTP", (it) => {
       expect(document.text).toContain("The file column's position, from 0, that fills the field; null for none")
       expect(document.text).toContain("True when trying again later may work")
       // The session cookie is the one scheme, required wherever a 401 can come back, and the session answer is open.
-      const spec = yield* Schema.decodeUnknownEffect(OpenApiDocument)(document.json)
+      const spec = yield* S.decodeUnknownEffect(OpenApiDocument)(document.json)
       expect(Rec.keys(spec.components.securitySchemes)).toEqual(["sessionCookie"])
       const operations = Arr.flatMap(Rec.values(spec.paths), (item) => Rec.toEntries(item))
       for (const [, operation] of operations) {

@@ -5,7 +5,8 @@
 // A new table joins the first test by itself: it reads the schema, not a list.
 import { D1Client } from "@effect/sql-d1"
 import { expect, layer } from "@effect/vitest"
-import { Array as Arr, Effect, Schema, String as Str } from "effect"
+import { Array as Arr, Effect, String as Str } from "effect"
+import * as S from "effect/Schema"
 import { type SqlError, SqlSchema } from "effect/sql"
 import { TestDatabase } from "./support/app.ts"
 
@@ -27,8 +28,8 @@ layer(TestDatabase)("tenancy in the database", (it) => {
     Effect.gen(function* () {
       const sql = yield* D1Client.D1Client
       const tables = yield* SqlSchema.findAll({
-        Request: Schema.Void,
-        Result: Schema.Struct({ name: Schema.String }),
+        Request: S.Void,
+        Result: S.Struct({ name: S.String }),
         execute: () => sql`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
           AND name NOT LIKE '_cf_%' AND name NOT LIKE 'd1_%' AND name NOT LIKE 'itemSearch%' ORDER BY name`
       })(undefined)
@@ -51,8 +52,8 @@ layer(TestDatabase)("tenancy in the database", (it) => {
       ])
       for (const table of tenant) {
         const columns = yield* SqlSchema.findAll({
-          Request: Schema.String,
-          Result: Schema.Struct({ name: Schema.String }),
+          Request: S.String,
+          Result: S.Struct({ name: S.String }),
           execute: (name) => sql`SELECT name FROM pragma_table_info(${name})`
         })(table.name)
         expect([table.name, Arr.some(columns, (column) => column.name === "organizationId")]).toEqual([
@@ -60,15 +61,15 @@ layer(TestDatabase)("tenancy in the database", (it) => {
           true
         ])
         const indexes = yield* SqlSchema.findAll({
-          Request: Schema.String,
-          Result: Schema.Struct({ name: Schema.String }),
+          Request: S.String,
+          Result: S.Struct({ name: S.String }),
           execute: (name) => sql`SELECT name FROM pragma_index_list(${name})`
         })(table.name)
         for (const index of indexes) {
           if (Arr.contains(crossTenantIndexes, index.name)) continue
           const first = yield* SqlSchema.findAll({
-            Request: Schema.String,
-            Result: Schema.Struct({ name: Schema.NullOr(Schema.String) }),
+            Request: S.String,
+            Result: S.Struct({ name: S.NullOr(S.String) }),
             execute: (name) => sql`SELECT name FROM pragma_index_info(${name}) WHERE seqno = 0`
           })(index.name)
           // A table's own primary key on `id` alone (member) is the plugin's; every other key starts with the tenant.

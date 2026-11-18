@@ -1,7 +1,8 @@
 // @effect-diagnostics nodeBuiltinImport:off
 import { DatabaseSync } from "node:sqlite"
 import { expect, it } from "@effect/vitest"
-import { Array as Arr, Effect, Option, Order, Record as Rec, Schema } from "effect"
+import { Array as Arr, Effect, Option, Order, Record as Rec } from "effect"
+import * as S from "effect/Schema"
 
 // The statements whose speed depends on an index, asked of SQLite's own planner on the real migrations (the same
 // engine D1 runs). A page of items in its default order is read off `item_org_sku` in both directions, with no
@@ -10,12 +11,12 @@ import { Array as Arr, Effect, Option, Order, Record as Rec, Schema } from "effe
 
 const migrations = import.meta.glob<string>("../../migrations/*.sql", { query: "?raw", import: "default", eager: true })
 
-const PlanRow = Schema.Struct({ detail: Schema.String })
+const PlanRow = S.Struct({ detail: S.String })
 
 const columns = "id, sku, name, category, uom, unitCost, quantityOnHand, createdAt, createdBy, revision"
 
 const planOf = (db: DatabaseSync, query: string) =>
-  Schema.decodeUnknownEffect(Schema.Array(PlanRow))(db.prepare(`EXPLAIN QUERY PLAN ${query}`).all()).pipe(
+  S.decodeUnknownEffect(S.Array(PlanRow))(db.prepare(`EXPLAIN QUERY PLAN ${query}`).all()).pipe(
     Effect.map((rows) =>
       Arr.join(
         Arr.map(rows, (row) => row.detail),

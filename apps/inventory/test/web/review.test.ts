@@ -1,5 +1,6 @@
 import { it as fx } from "@effect/vitest"
-import { Array as Arr, Effect, HashMap, HashSet, Option, Schema, String as Str } from "effect"
+import { Array as Arr, Effect, HashMap, HashSet, Option, String as Str } from "effect"
+import * as S from "effect/Schema"
 import { describe, expect, it } from "vitest"
 import {
   act,
@@ -444,10 +445,10 @@ describe("the approved standards", () => {
         proposing(rows),
         (before, action) => act({ rows, state: before, action, recheck }).state
       )
-      const Json = Schema.fromJsonString(Schema.Unknown)
-      const text = yield* Schema.encodeEffect(Json)(saved(state))
+      const Json = S.fromJsonString(S.Unknown)
+      const text = yield* S.encodeEffect(Json)(saved(state))
       expect(typeof text).toBe("string")
-      const back = restored((yield* Schema.decodeEffect(Json)(text)) as SavedDecisions)
+      const back = restored((yield* S.decodeEffect(Json)(text)) as SavedDecisions)
       const shape = (given: ReviewState) =>
         Arr.map(views(given), (view) => [
           view.row.id,

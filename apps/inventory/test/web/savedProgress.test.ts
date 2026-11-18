@@ -2,7 +2,8 @@
 // never read for anyone else; the decisions and the undo history come back exactly as they were left; and a draft
 // that no longer decodes is dropped, never shown half.
 import { it } from "@effect/vitest"
-import { Array as Arr, Effect, Record as Rec, Schema } from "effect"
+import { Array as Arr, Effect, Record as Rec } from "effect"
+import * as S from "effect/Schema"
 import { describe, expect, it as plain } from "vitest"
 import { act, emptyState, restored, saved } from "../../src/web/components/review/logic.ts"
 import type { ReviewRow, ReviewState } from "../../src/web/components/review/types.ts"
@@ -42,7 +43,7 @@ const progress = (step: string): SavedProgress => ({
   savedAt: "2026-11-17T12:00:00.000Z"
 })
 
-const Scope = Schema.Struct({ organizationId: Schema.String, memberId: Schema.String, screen: Schema.String })
+const Scope = S.Struct({ organizationId: S.String, memberId: S.String, screen: S.String })
 
 describe("saved progress", () => {
   it.prop(
@@ -80,19 +81,19 @@ describe("saved progress", () => {
     cells: { name: `Item ${i}`, qty: "" },
     problem: { kind: "blank", column: "qty" }
   }))
-  const Step = Schema.Struct({
-    row: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 5 })),
-    leaveOut: Schema.Boolean,
-    value: Schema.String.check(Schema.isMaxLength(12))
+  const Step = S.Struct({
+    row: S.Int.check(S.isBetween({ minimum: 0, maximum: 5 })),
+    leaveOut: S.Boolean,
+    value: S.String.check(S.isMaxLength(12))
   })
 
-  const asText = Schema.fromJsonString(StoredReview)
+  const asText = S.fromJsonString(StoredReview)
 
   it.effect.prop(
     "brings back every decision and the whole undo and redo history after a trip through storage",
     {
-      steps: Schema.Array(Step).check(Schema.isMaxLength(12)),
-      undos: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 3 }))
+      steps: S.Array(Step).check(S.isMaxLength(12)),
+      undos: S.Int.check(S.isBetween({ minimum: 0, maximum: 3 }))
     },
     ({ steps, undos }) =>
       Effect.gen(function* () {
@@ -109,8 +110,8 @@ describe("saved progress", () => {
         // And one redo, so the redo history makes the trip too.
         if (undos > 1) state = act({ rows, state, action: { type: "redo" } }).state
         // What a refresh does: the decisions handed out, kept as JSON text, decoded and handed back.
-        const text = yield* Schema.encodeEffect(asText)(storedReview(saved(state)))
-        const stored = yield* Schema.decodeEffect(asText)(text)
+        const text = yield* S.encodeEffect(asText)(storedReview(saved(state)))
+        const stored = yield* S.decodeEffect(asText)(text)
         const back = restored(restoredDecisions(stored))
         const plainOf = (decisions: ReviewState["decisions"]) => Rec.fromEntries(decisions)
         const history = (of: ReviewState) =>

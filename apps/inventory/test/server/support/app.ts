@@ -19,9 +19,9 @@ import {
   Option,
   Record as Rec,
   Ref,
-  Schema,
   String as Str
 } from "effect"
+import * as S from "effect/Schema"
 import { DevTools } from "effect/devtools"
 import { type HttpRouter, HttpServer } from "effect/http"
 import { HttpApiMiddleware } from "effect/http-api"
@@ -363,8 +363,8 @@ export class TestFetch extends Context.Service<
     )
 }
 
-const toJson = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))
-const fromJson = Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown))
+const toJson = S.encodeEffect(S.fromJsonString(S.Unknown))
+const fromJson = S.decodeUnknownEffect(S.fromJsonString(S.Unknown))
 
 /** The address the tests send to. Its origin is the app's own. */
 export const testOrigin = "http://localhost:5320"
@@ -429,8 +429,8 @@ export const signInApp = (
     ).pipe(Layer.provide(settingsLayer({ ...testSettings, PWNED_PASSWORD_CHECK: "false", ...options.settings })))
   )
 
-const decodeAny = Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Any))
-const encodeAny = Schema.encodeUnknownEffect(Schema.fromJsonString(Schema.Any))
+const decodeAny = S.decodeUnknownEffect(S.fromJsonString(S.Any))
+const encodeAny = S.encodeUnknownEffect(S.fromJsonString(S.Any))
 
 /**
  * One browser on the app's own page: keeps the session cookie between requests and sends the headers such a page

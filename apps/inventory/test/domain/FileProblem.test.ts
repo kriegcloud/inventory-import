@@ -3,17 +3,18 @@
 // can say what is wrong and what to do; a 4xx would reach the screen as "This was not accepted". Sent through a real
 // HttpApi in memory, so the status and the body are what a browser gets.
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Layer, Result, Schema } from "effect"
+import { Effect, Layer, Result } from "effect"
+import * as S from "effect/Schema"
 import { HttpRouter, HttpServer } from "effect/http"
 import { HttpApi, HttpApiBuilder, HttpApiEndpoint, HttpApiGroup } from "effect/http-api"
 import { FileProblem, fileProblem, fileProblemTitles, StagingOutcome } from "../../src/domain/FileProblem.ts"
 
-const Staged = Schema.Struct({ rows: Schema.Int })
+const Staged = S.Struct({ rows: S.Int })
 
 class StagingApi extends HttpApi.make("staging").add(
   HttpApiGroup.make("files").add(
     HttpApiEndpoint.post("stage", "/stage", {
-      payload: Schema.Struct({ fileName: Schema.String.check(Schema.isMaxLength(200)), rows: Schema.Int }),
+      payload: S.Struct({ fileName: S.String.check(S.isMaxLength(200)), rows: S.Int }),
       success: StagingOutcome(Staged)
     })
   )
@@ -39,7 +40,7 @@ const send = (body: unknown) =>
     ),
     ({ handler }) =>
       Effect.gen(function* () {
-        const text = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(body)
+        const text = yield* S.encodeEffect(S.fromJsonString(S.Unknown))(body)
         const response = yield* Effect.promise(() =>
           handler(
             new Request("http://localhost/stage", {
@@ -84,9 +85,9 @@ describe("a file that cannot be staged", () => {
     Effect.gen(function* () {
       const outcome = StagingOutcome(Staged)
       const problem = fileProblem.tooManyRows({ fileName: "stock.xlsx", rows: 60_000, limit: 50_000 })
-      const encoded = yield* Schema.encodeEffect(Schema.toCodecJson(outcome))(Result.fail(problem))
-      const decoded = yield* Schema.decodeEffect(Schema.toCodecJson(outcome))(encoded)
-      expect(Result.isFailure(decoded) && Schema.is(FileProblem)(decoded.failure)).toBe(true)
+      const encoded = yield* S.encodeEffect(S.toCodecJson(outcome))(Result.fail(problem))
+      const decoded = yield* S.decodeEffect(S.toCodecJson(outcome))(encoded)
+      expect(Result.isFailure(decoded) && S.is(FileProblem)(decoded.failure)).toBe(true)
       expect(decoded).toEqual(Result.fail(problem))
       expect(fileProblemTitles[problem.kind]).toBe("This file is too large")
     })

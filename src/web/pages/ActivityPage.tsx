@@ -17,6 +17,8 @@ import { whenShort } from "@/lib/dates"
 import { when } from "./import/format.tsx"
 import { sayError } from "@/lib/errors"
 import { queryKeys } from "@/lib/queries"
+import { usePastImports } from "@/lib/imports"
+import { pastImportColumns } from "./import/pastImports.tsx"
 
 type Event = (typeof Activity.json)["Type"]
 
@@ -142,16 +144,20 @@ const eventColumns: ReadonlyArray<ListColumn<Event>> = [
 /**
  * Who decided what. "Decisions" lists every value an import wrote that differs from the file: what it was, what
  * it became, who proposed it and who accepted or typed it. "Events" is the audit trail of uploads and imports.
+ * "Imports" lists every confirmed import, a clean file's too, each a link back to its result.
  */
 export function ActivityPage() {
-  const [chosen, setView] = useState<"decisions" | "events">()
+  const [chosen, setView] = useState<"decisions" | "events" | "imports">()
   const changes = useQuery({ queryKey: queryKeys.changes, queryFn: () => call((api) => api.imports.changes()) })
   const events = useQuery({ queryKey: queryKeys.activity, queryFn: () => call((api) => api.activity.recent()) })
+  const past = usePastImports()
   // Until the person chooses, the page opens on the list that has something in it: an empty "Decisions" beside
   // nine events read as "nothing has happened here".
   const view = chosen ?? (changes.data?.length === 0 && (events.data?.length ?? 0) > 0 ? "events" : "decisions")
-  const failed = view === "decisions" ? changes.error : events.error
-  const loading = view === "decisions" ? changes.data === undefined : events.data === undefined
+  const shown = view === "decisions" ? changes : view === "events" ? events : past
+  const failed = shown.error
+  const loading = shown.data === undefined
+  const older = past.data?.older ?? 0
   return (
     <div className="flex h-full flex-col">
       <PageHeader title="Activity" />
@@ -162,6 +168,9 @@ export function ActivityPage() {
         <Button variant="ghost" size="sm" aria-pressed={view === "events"} onClick={() => setView("events")}>
           Events {events.data?.length ?? ""}
         </Button>
+        <Button variant="ghost" size="sm" aria-pressed={view === "imports"} onClick={() => setView("imports")}>
+          Imports {past.data === undefined ? "" : past.data.imports.length + past.data.older}
+        </Button>
       </Views>
       {failed !== null ? (
         <div className="px-4 sm:px-9">
@@ -169,21 +178,38 @@ export function ActivityPage() {
             <AlertTitle>The activity could not be loaded</AlertTitle>
             <AlertDescription>
               {sayError(failed).sentence}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => void (view === "decisions" ? changes.refetch() : events.refetch())}
-              >
+              <Button variant="outline" size="sm" onClick={() => void shown.refetch()}>
                 Try again
               </Button>
             </AlertDescription>
           </Alert>
         </div>
       ) : loading ? (
-        <TableSkeleton
-          caption={view === "decisions" ? "Values that imports changed, and who decided each" : "Uploads and imports"}
-          columns={view === "decisions" ? changeColumns : eventColumns}
-        />
+        view === "imports" ? (
+          <TableSkeleton caption="Imports that were confirmed" columns={pastImportColumns} />
+        ) : (
+          <TableSkeleton
+            caption={view === "decisions" ? "Values that imports changed, and who decided each" : "Uploads and imports"}
+            columns={view === "decisions" ? changeColumns : eventColumns}
+          />
+        )
+      ) : view === "imports" ? (
+        <>
+          <ListTable
+            key="imports"
+            caption="Imports that were confirmed"
+            searchLabel="Search imports"
+            columns={pastImportColumns}
+            rows={past.data?.imports ?? []}
+            rowKey={(entry) => entry.id}
+            empty="No import has been confirmed yet. Each one confirmed appears here, with a link to its result."
+          />
+          {older === 0 ? null : (
+            <p className="px-4 py-2 text-sm text-muted-foreground sm:px-9">
+              {older} older {older === 1 ? "import is" : "imports are"} not listed.
+            </p>
+          )}
+        </>
       ) : view === "decisions" ? (
         <ListTable
           key="decisions"

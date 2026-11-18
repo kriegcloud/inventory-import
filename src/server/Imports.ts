@@ -14,6 +14,7 @@ import {
   changedItemsShown,
   type DecisionDelta,
   ImportEvent,
+  PastImport,
   RowOutcome,
   type TakeBackState
 } from "../api/v1/Api.ts"
@@ -289,6 +290,14 @@ export class Imports extends Context.Service<
       organizationId: OrganizationId,
       limit: number
     ): Effect.Effect<{ readonly drafts: ReadonlyArray<Draft>; readonly total: number }>
+    /**
+     * The organization's imports that were confirmed at least once, last confirmed first, at most `limit`, each
+     * with how many items in the system came from it now, and how many such imports there are in all.
+     */
+    listPast(
+      organizationId: OrganizationId,
+      limit: number
+    ): Effect.Effect<{ readonly imports: ReadonlyArray<PastImport>; readonly total: number }>
     /**
      * Removes an import that has no item in force, with everything that hangs off it (its confirms and what they
      * noted, once every one was taken back), and records who removed it, in one atomic batch. Returns false, having
@@ -795,6 +804,33 @@ export class Imports extends Context.Service<
         const drafts = yield* findOpen({ org: organizationId, limit })
         const total = yield* countOpen(organizationId)
         return { drafts, total: total.n }
+      }, Effect.orDie)
+
+      // Each import with at least one confirm, by its last one. Its items are counted from the item table, so a
+      // take-back or a later edit shows as it is stored, not as the confirm once said.
+      const findPast = SqlSchema.findAll({
+        Request: Schema.Struct({ org: OrganizationId, limit: Schema.Int }),
+        Result: PastImport,
+        execute: ({ org, limit }) =>
+          sql`SELECT d.id, d.fileName, d.rowCount, d.status, b.confirmedByName, b.confirmedAt, b.notImported,
+              (SELECT COUNT(*) FROM item i WHERE i.organizationId = d.organizationId AND i.importId = d.id) AS items
+            FROM importDraft d
+            JOIN importBatch b ON b.organizationId = d.organizationId AND b.importId = d.id
+            WHERE d.organizationId = ${org}
+              AND b.rowid = (SELECT x.rowid FROM importBatch x
+                WHERE x.organizationId = d.organizationId AND x.importId = d.id
+                ORDER BY x.confirmedAt DESC, x.rowid DESC LIMIT 1)
+            ORDER BY b.confirmedAt DESC, b.rowid DESC LIMIT ${limit}`
+      })
+      const countPast = SqlSchema.findOne({
+        Request: OrganizationId,
+        Result: Schema.Struct({ n: Schema.Int }),
+        execute: (org) => sql`SELECT COUNT(DISTINCT importId) AS n FROM importBatch WHERE organizationId = ${org}`
+      })
+      const listPast = Effect.fn("Imports.listPast")(function* (organizationId: OrganizationId, limit: number) {
+        const imports = yield* findPast({ org: organizationId, limit })
+        const total = yield* countPast(organizationId)
+        return { imports, total: total.n }
       }, Effect.orDie)
 
       // -- Removing an import nobody needs --------------------------------------------------------------------
@@ -1383,6 +1419,7 @@ export class Imports extends Context.Service<
         decide,
         reopen,
         listOpen,
+        listPast,
         remove,
         choices,
         setChoices,

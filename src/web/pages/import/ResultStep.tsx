@@ -117,6 +117,7 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
     onSuccess: (opened) => {
       cache.setView(opened)
       void queryClient.invalidateQueries({ queryKey: queryKeys.openImports })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.pastImports })
       void queryClient.invalidateQueries({ queryKey: queryKeys.activity })
       navigate(importAddress(opened.id, "review"))
     },
@@ -139,6 +140,7 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
       void queryClient.invalidateQueries({ queryKey: queryKeys.changes })
       void queryClient.invalidateQueries({ queryKey: queryKeys.activity })
       void queryClient.invalidateQueries({ queryKey: queryKeys.openImports })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.pastImports })
     },
     onError: (error) => {
       toastError(error)

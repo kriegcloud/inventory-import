@@ -245,6 +245,7 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
       void queryClient.invalidateQueries({ queryKey: queryKeys.changes })
       void queryClient.invalidateQueries({ queryKey: queryKeys.activity })
       void queryClient.invalidateQueries({ queryKey: queryKeys.openImports })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.pastImports })
       navigate(importAddress(done.id, "result"))
     },
     onError: (error) => {

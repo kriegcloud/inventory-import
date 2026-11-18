@@ -21,6 +21,11 @@ layer(TypedApp)("a take-back after two confirms", (it) => {
       const params = { id: staged.id }
       const first = yield* client.imports.commit({ params, payload: { set: {}, clear: [] } }).pipe(marcus)
       expect(first.result?.created).toBe(155)
+      // Listed among the past imports at once, its items counted from what is stored.
+      const listed = yield* client.imports.past().pipe(marcus)
+      expect(listed.imports.map((past) => [past.id, past.status, past.items, past.notImported])).toEqual([
+        [staged.id, "imported", 155, 45]
+      ])
       // Opened again, one answer given (the decimal comma on row 55), confirmed again: one more item.
       yield* client.imports.reopen({ params }).pipe(marcus)
       const second = yield* client.imports
@@ -37,6 +42,9 @@ layer(TypedApp)("a take-back after two confirms", (it) => {
         [156, 0]
       ])
       expect((yield* client.items.list().pipe(marcus)).length).toBe(0)
+      // Still listed, so its result stays one click away, with nothing of it left in the system.
+      const after = yield* client.imports.past().pipe(marcus)
+      expect(after.imports.map((past) => [past.status, past.items])).toEqual([["takenBack", 0]])
       const trail = yield* client.activity.recent().pipe(marcus)
       const line = Option.getOrThrow(Arr.findFirst(trail, (entry) => entry.action === "Took back an import"))
       expect(Str.includes("removed 156 items")(line.detail)).toBe(true)

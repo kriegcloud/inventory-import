@@ -582,6 +582,45 @@ export const DecisionDelta = Schema.Struct({
 /** The decoded value of `DecisionDelta`: what changed in the draft since the last save. */
 export type DecisionDelta = typeof DecisionDelta.Type
 
+/** How many past imports the first screen and the activity view are sent. The rest are counted. */
+export const pastImportsShown = 50
+
+/**
+ * One import that was confirmed at least once, as a list shows it so the person can open its result again: the file,
+ * who confirmed it last and when, and how many of its items are stored now, counted from the items themselves.
+ */
+export const PastImport = Schema.Struct({
+  id: Schema.String.annotate({ description: "The import's id: its result is at `/?import=<id>&step=result`" }),
+  fileName: Schema.String.annotate({ description: "The file it came from", examples: ["items_messy.csv"] }),
+  rowCount: Schema.Int.annotate({ description: "The rows of the file", examples: [200] }),
+  status: Schema.Literals(["open", "imported", "takenBack"]).annotate({
+    description:
+      "imported: confirmed and in force; takenBack: its last confirm was taken back; open: confirmed once, then opened again to finish the rows it left out"
+  }),
+  confirmedByName: personName("Who confirmed it last"),
+  confirmedAt: instant("When it was confirmed last"),
+  items: Schema.Int.annotate({
+    description: "How many items in the system came from this import now, counted from the stored items",
+    examples: [155]
+  }),
+  notImported: Schema.Int.annotate({ description: "Rows its last confirm did not import", examples: [45] })
+}).annotate({
+  identifier: "PastImport",
+  description: "One import that was confirmed at least once, so its result can be opened again"
+})
+/** The decoded value of `PastImport`. */
+export type PastImport = typeof PastImport.Type
+
+/** The organization's confirmed imports, newest first, and how many older ones were left out. */
+export const PastImports = Schema.Struct({
+  imports: Schema.Array(PastImport).annotate({
+    description: `The confirmed imports, last confirmed first, at most ${pastImportsShown}`
+  }),
+  older: Schema.Int.annotate({ description: "How many more there are, older than those listed. Zero when all are" })
+}).annotate({ identifier: "PastImports", description: "The organization's confirmed imports, newest first" })
+/** The decoded value of `PastImports`. */
+export type PastImports = typeof PastImports.Type
+
 /** One changed value of an imported row as the activity view shows it: the file it came from, when, and who. */
 export const ChangeRecord = Schema.Struct({
   importId: Schema.String.annotate({ description: "The import that wrote the value" }),
@@ -615,6 +654,12 @@ export class ImportsApi extends HttpApiGroup.make("imports")
       .annotate(
         OpenApi.Description,
         "Every import that is still open, each as its own file, so a person who loaded two files (a .csv and an .xlsx of the same list) can continue either or remove either. The newest are sent in full; `older` counts the rest. Any member may read it."
+      ),
+    HttpApiEndpoint.get("past", "/past", { success: PastImports })
+      .annotate(OpenApi.Summary, "The imports that were confirmed")
+      .annotate(
+        OpenApi.Description,
+        "Every import confirmed at least once, last confirmed first, so a person can open its result again: what it imported, the rows it left out and the take-back. Counts are read from the stored items. Any member may read it."
       ),
     HttpApiEndpoint.get("changes", "/changes", {
       success: Schema.Array(ChangeRecord).annotate({

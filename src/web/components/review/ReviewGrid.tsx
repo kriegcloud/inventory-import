@@ -455,7 +455,7 @@ const Row = memo(function Row(props: {
             ? `Why ${valueWords(fix, fix.to)}?`
             : `${choices.map((choice) => valueWords(fix, choice)).join(" or ")}?`
         }
-        about={`Why ${fix.to} is proposed for ${name}`}
+        about={`Why ${valueWords(fix, fix.to)} is proposed for ${name}`}
         className="w-80"
         hover
         card
@@ -464,7 +464,7 @@ const Row = memo(function Row(props: {
             Why?
             <span className="sr-only">
               {" "}
-              {fix.to} for {name}
+              {valueWords(fix, fix.to)} for {name}
             </span>
           </Button>
         }
@@ -1072,6 +1072,8 @@ function GroupRow(props: {
   /** The actions column's width, to tell whether the quiet answers fit beside each other. */
   actionsWidth: number
   measure: (element: Element | null) => void
+  /** How the group's column shows a value (`ReviewColumn.display`). */
+  display?: ((value: string) => string) | undefined
 }) {
   const { group } = props
   const rowIds = group.rowIds.filter((rowId) => !HashSet.has(props.excluded, rowId))
@@ -1199,7 +1201,7 @@ function GroupRow(props: {
               Guess
             </StatusPill>
           )}
-          <GroupChange group={group} applied={props.applied} oneLine />
+          <GroupChange group={group} applied={props.applied} oneLine display={props.display} />
           <Badge variant="secondary" className="flex-none">
             {rowsWord(group.rowIds.length)}
           </Badge>
@@ -1571,6 +1573,7 @@ export function ReviewGrid(props: {
                     <GroupRow
                       key={`group:${entry.group.id}`}
                       group={entry.group}
+                      display={props.allColumns.find((column) => column.id === entry.group.column)?.display}
                       applied={entry.applied}
                       span={span}
                       index={item.index}

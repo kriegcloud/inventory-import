@@ -447,8 +447,13 @@ export function appliedGroups(views: ReadonlyArray<RowView>): ReadonlyArray<FixG
 }
 
 /** "ea (6) · each (3)": the spellings in a group with their row counts. */
-export const variantsText = (group: FixGroup): string =>
-  group.variants.map((variant) => `${spellingOf(variant.from)} (${variant.count})`).join(" · ")
+export const variantsText = (group: FixGroup, display?: (value: string) => string): string =>
+  group.variants
+    .map(
+      (variant) =>
+        `${display === undefined || variant.from === "" ? spellingOf(variant.from) : display(variant.from)} (${variant.count})`
+    )
+    .join(" · ")
 
 /**
  * A value from the file as the person can tell it apart: "empty" for nothing, and quotation marks around a value

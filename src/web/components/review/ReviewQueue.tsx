@@ -110,7 +110,7 @@ function Decision(props: {
         </ItemHeader>
         <ItemContent className="min-w-0">
           <ItemTitle>
-            <GroupChange group={group} />
+            <GroupChange group={group} display={columnOf(group.column)?.display} />
           </ItemTitle>
           <WhySheet title="Why this change?" about="What the proposal is based on">
             <p>

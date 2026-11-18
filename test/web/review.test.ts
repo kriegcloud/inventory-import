@@ -25,6 +25,7 @@ import {
   sections,
   result,
   saved,
+  shownWith,
   viewRows,
   visible,
   waitingGroups,
@@ -627,5 +628,17 @@ describe("a model's weak guess", () => {
     expect(weakGuess({ by: "model", confidence: "medium" })).toBe(false)
     // A rule's low proposal is a question with two readings, answered by a press: it stays one.
     expect(weakGuess({ by: "rule", confidence: "low" })).toBe(false)
+  })
+})
+
+describe("a quantity in the review", () => {
+  it("is shown in its row's unit, and only a plain number takes one", () => {
+    const onHand = { unitFrom: "uom" }
+    expect(shownWith(onHand, "120", { uom: "EA" })).toBe("120 EA")
+    expect(shownWith(onHand, "1,250", { uom: "BX" })).toBe("1,250 BX")
+    // A value that does not read stays as the file has it, so the person sees what is wrong with it.
+    expect(shownWith(onHand, "12 boxes", { uom: "BX" })).toBe("12 boxes")
+    expect(shownWith(onHand, "", { uom: "EA" })).toBe("")
+    expect(shownWith(onHand, "4", { uom: "" })).toBe("4")
   })
 })

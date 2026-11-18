@@ -54,6 +54,16 @@ export type ReviewColumn = {
   priority?: number
   /** A second, quieter header line under the label: the unit the values are in ("USD", "kg", "days"). */
   unit?: string
+  /**
+   * The column that holds each row's unit, for a quantity whose unit is the row's own ("120 EA", "4 KG"): the value is
+   * shown with it. Only what is drawn changes.
+   */
+  unitFrom?: string
+  /**
+   * What an empty cell of this column becomes when the row is imported ("0" for a quantity, "true" for Active):
+   * an empty cell shows it, quieter, marked as the default, so nobody reads an empty cell as a missing value.
+   */
+  byDefault?: string
   align?: "right"
   /** Kept in the table on a tablet. The first column always is. */
   core?: boolean

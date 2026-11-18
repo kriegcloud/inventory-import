@@ -25,7 +25,7 @@ import {
   type StagedColumn,
   type StagedTable
 } from "../../../domain/ItemImport.ts"
-import { costText, dimensionsCellText, tagsCellText, vendorsCellText } from "./itemText.ts"
+import { costText, countText, dimensionsCellText, tagsCellText, vendorsCellText } from "./itemText.ts"
 
 /** The problem kinds in the region's shape, in the order their headings show. */
 export const regionKinds: ReadonlyArray<ProblemKind> = problemKinds.map((kind) => ({
@@ -215,10 +215,11 @@ const layout: Record<Field, Omit<ReviewColumn, "id" | "label" | "match">> = {
   category: { core: true, facet: true, priority: 8 },
   uom: { core: true, facet: true, context: true, priority: 8 },
   unitCost: { align: "right", core: true, priority: 7, display: costText },
-  quantityOnHand: { align: "right", priority: 6 },
-  reorderPoint: { align: "right", priority: 3 },
-  isActive: { priority: 4 },
-  lotTracked: { priority: 2 },
+  // A quantity is counted in the row's own unit of measure; an empty one is imported as the default the brief gives.
+  quantityOnHand: { align: "right", priority: 6, unitFrom: "uom", byDefault: "0", display: countText },
+  reorderPoint: { align: "right", priority: 3, unitFrom: "uom", display: countText },
+  isActive: { priority: 4, byDefault: "true" },
+  lotTracked: { priority: 2, byDefault: "false" },
   tags: { priority: 2, display: tagsCellText },
   firstReceivedOn: { priority: 3 },
   discontinuedOn: { priority: 4 },

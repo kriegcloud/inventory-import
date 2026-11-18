@@ -18,6 +18,7 @@ import {
   reasonOf,
   rowName,
   rowsWord,
+  shownWith,
   valueWords,
   weakGuess
 } from "./logic.ts"
@@ -52,9 +53,7 @@ const contextOf = (view: RowView, columns: ReadonlyArray<ReviewColumn>, skip: st
       <Fragment key={column.id}>
         {at === 0 ? "" : " · "}
         {column.label}{" "}
-        <ColumnText column={column}>
-          {column.display === undefined ? view.cells[column.id] : column.display(view.cells[column.id] ?? "")}
-        </ColumnText>
+        <ColumnText column={column}>{shownWith(column, view.cells[column.id] ?? "", view.cells)}</ColumnText>
       </Fragment>
     ))
 

@@ -19,6 +19,21 @@ export const costText = (text: string): string => {
 }
 
 /**
+ * A whole-number count with thousands separators, as the Items table shows a quantity. Text that is not a plain whole
+ * number stays as it is, so the person sees what is wrong with it.
+ *
+ * @example countText("3911") // "3,911"
+ * @example countText("12.5") // "12.5"
+ */
+export const countText = (text: string): string =>
+  /^\d+$/.test(text.trim())
+    ? text
+        .trim()
+        .replace(/^0+(?=\d)/, "")
+        .replace(/\B(?=(\d{3})+$)/g, ",")
+    : text
+
+/**
  * A sum of money to the cent, rounded half up from its digits and never through a float: a stock value, which is a
  * total and not a price. Text that is not a plain amount stays as it is.
  *

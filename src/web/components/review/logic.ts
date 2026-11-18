@@ -1031,6 +1031,23 @@ export const columnFor = (
   return (at === -1 ? undefined : fix.why.targets?.[at]) ?? fix.column
 }
 
+/**
+ * A cell's text as its column draws it: through `display`, then with the row's unit after a plain number when the
+ * column takes its unit from another (`unitFrom`). Empty stays empty.
+ *
+ * @example shownWith({ id: "quantityOnHand", label: "On hand", unitFrom: "uom" }, "120", { uom: "EA" }) // "120 EA"
+ */
+export const shownWith = (
+  column: { display?: ((value: string) => string) | undefined; unitFrom?: string | undefined },
+  text: string,
+  cells: Readonly<Record<string, string>>
+): string => {
+  if (text === "") return text
+  const shown = column.display === undefined ? text : column.display(text)
+  const unit = column.unitFrom === undefined ? "" : (cells[column.unitFrom] ?? "").trim()
+  return unit !== "" && /^-?\d[\d,]*(\.\d+)?$/.test(shown.trim()) ? `${shown} ${unit}` : shown
+}
+
 /** Words in a "Why?" answer, heading excluded. The region's budget is 25. */
 export const whyWords = (why: { basis: string; detail?: string }): number =>
   `${why.basis} ${why.detail ?? ""}`.split(/\s+/).filter((word) => word !== "").length

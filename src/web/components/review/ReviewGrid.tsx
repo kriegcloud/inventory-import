@@ -44,6 +44,7 @@ import {
   askFor,
   choicesOf,
   columnFor,
+  shownWith,
   weakGuess,
   choiceText,
   groupUse,
@@ -85,10 +86,6 @@ import type {
  * without a fix. A `fill` column, cut to one line with the whole sentence one hover, focus or tap away.
  */
 export const reasonColumn: ReviewColumn = { id: "review:reason", label: "Reason", size: "fill", width: 240 }
-
-/** A value as its column shows it (`ReviewColumn.display`). */
-const shownIn = (column: ReviewColumn | undefined, text: string): string =>
-  column?.display === undefined || text === "" ? text : column.display(text)
 
 /** What a row can ask the region to do. Stable for the life of the region, so rows do not re-render for nothing. */
 export type RowActions = {
@@ -302,18 +299,22 @@ const measureNeeds = (input: {
     if (column.size === "fill") return Math.max(least, index === 0 ? 0 : 0)
     let widest = 0
     for (const value of longest(
-      views.map((view) => shownIn(column, view.cells[column.id] ?? "")),
+      views.map((view) =>
+        (view.cells[column.id] ?? "") === "" && column.byDefault !== undefined
+          ? `${shownWith(column, column.byDefault, view.cells)}, default`
+          : shownWith(column, view.cells[column.id] ?? "", view.cells)
+      ),
       40
     ))
       widest = Math.max(widest, textWidth(value, { mono }))
     for (const view of views) {
       const mark = view.marks[column.id]
       if (mark === undefined || mark.from === mark.to || view.status === "out") continue
-      const from = textWidth(spellingOf(shownIn(column, mark.from)), { mono })
+      const from = textWidth(spellingOf(shownWith(column, mark.from, view.cells)), { mono })
       const guess = mark.state === "proposed" && choicesOf(mark.fix) !== undefined
       // A mark that draws an icon: a model's sparkle, or the question mark of a suggestion nobody was named for.
       const icon = mark.by === "model" || mark.by === "unknown" ? sparkle : 0
-      const to = shownIn(column, mark.to)
+      const to = shownWith(column, mark.to, view.cells)
       const chip = textWidth(to, { mono, medium: true }) + chipChrome + icon
       const value = guess
         ? from + 6 + icon + textWidth(`${to}?`, { mono })
@@ -565,17 +566,23 @@ const Row = memo(function Row(props: {
       >
         {(out || view.marks[column.id] === undefined) && (view.cells[column.id] ?? "") !== "" ? (
           // A plain value that does not fit ends in an ellipsis; its whole text is one hover, focus or tap away.
-          <CutText text={shownIn(column, view.cells[column.id] ?? "")} className="min-w-0" />
+          <CutText text={shownWith(column, view.cells[column.id] ?? "", view.cells)} className="min-w-0" />
         ) : (
           <span className="min-w-0 truncate">
             <CellValue
               value={view.cells[column.id] ?? ""}
-              display={column.display}
+              display={(text) => shownWith(column, text, view.cells)}
               mark={out ? undefined : view.marks[column.id]}
               accepted={view.decided === "accepted"}
               stated={props.banded}
               empty={
-                isSubject ? <span className="text-destructive">Empty</span> : <span className="sr-only">Not set</span>
+                isSubject ? (
+                  <span className="text-destructive">Empty</span>
+                ) : column.byDefault !== undefined ? (
+                  <DefaultValue column={column} cells={view.cells} />
+                ) : (
+                  <span className="sr-only">Not set</span>
+                )
               }
             />
           </span>
@@ -993,6 +1000,16 @@ type Line = Entry | { type: "detail"; view: RowView }
 export type Density = "compact" | "comfortable"
 
 /** The columns with no room in the table at this width, under their row: each label and its value, change and all. */
+/** An empty cell that takes a default when imported: the default, quieter, and said to be one ("0 EA, default"). */
+function DefaultValue(props: { column: ReviewColumn; cells: Readonly<Record<string, string>> }) {
+  return (
+    <span className="text-muted-foreground">
+      {shownWith(props.column, props.column.byDefault ?? "", props.cells)}
+      <span className="text-xs">, default</span>
+    </span>
+  )
+}
+
 function Detail(props: { view: RowView; columns: ReadonlyArray<ReviewColumn> }) {
   const { view } = props
   return (
@@ -1007,10 +1024,16 @@ function Detail(props: { view: RowView; columns: ReadonlyArray<ReviewColumn> }) 
           <dd className={cn("min-w-0 whitespace-normal", codeFace(column))}>
             <CellValue
               value={view.cells[column.id] ?? ""}
-              display={column.display}
+              display={(text) => shownWith(column, text, view.cells)}
               mark={view.status === "out" ? undefined : view.marks[column.id]}
               accepted={view.decided === "accepted"}
-              empty={<span className="text-muted-foreground">Not set</span>}
+              empty={
+                column.byDefault !== undefined ? (
+                  <DefaultValue column={column} cells={view.cells} />
+                ) : (
+                  <span className="text-muted-foreground">Not set</span>
+                )
+              }
             />
           </dd>
         </div>

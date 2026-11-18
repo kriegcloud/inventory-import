@@ -84,6 +84,46 @@ const usedSourcesOnly = (): Plugin => ({
   }
 })
 
+// The effect modules the CSV reader's worker imports (see optimizeDeps below).
+const csvReaderModules = [
+  "effect/Array",
+  "effect/Boolean",
+  "effect/ByteSize",
+  "effect/Cause",
+  "effect/Channel",
+  "effect/Clock",
+  "effect/Context",
+  "effect/Data",
+  "effect/DateTime",
+  "effect/Effect",
+  "effect/Equal",
+  "effect/Exit",
+  "effect/FileSystem",
+  "effect/HashMap",
+  "effect/HashSet",
+  "effect/Layer",
+  "effect/Match",
+  "effect/Number",
+  "effect/Option",
+  "effect/Path",
+  "effect/PlatformError",
+  "effect/Predicate",
+  "effect/Random",
+  "effect/Record",
+  "effect/RegExp",
+  "effect/Result",
+  "effect/SchemaIssue",
+  "effect/SchemaParser",
+  "effect/SchemaTransformation",
+  "effect/Stream",
+  "effect/String",
+  "effect/Struct",
+  "effect/Tuple",
+  "effect/TxQueue",
+  "effect/TxRef",
+  "effect/Utils"
+]
+
 export default defineConfig({
   plugins: [...bundleReport(), usedSourcesOnly(), compressPreview(), react(), tailwindcss(), cloudflare()],
   resolve: {
@@ -94,10 +134,11 @@ export default defineConfig({
   // origin access, and neither do the servers in front of it.
   server: { port: 5173, strictPort: false, cors: false, ...(https === undefined ? {} : { https }) },
   preview: { cors: false },
-  // The file reader loads on the first file, so Vite found SheetJS only then, optimised it and reloaded the page: the
-  // first file on a cold dev server was lost. Listed here, it is ready at start. @beep/csv is workspace source, which
-  // Vite serves as it is and never optimises.
-  optimizeDeps: { include: ["xlsx/dist/xlsx.mini.min.js"] },
+  // The file reader loads on the first file, so Vite found its dependencies only then, optimised them and reloaded the
+  // page: the first file on a cold dev server was lost. Listed here, they are ready at start: SheetJS, and the
+  // effect modules @beep/csv and the vendored kit reach (workspace source, which Vite serves as it is, so their own
+  // imports are what it would otherwise discover late).
+  optimizeDeps: { include: ["xlsx/dist/xlsx.mini.min.js", ...csvReaderModules] },
   // Keep every asset a file. Vite would otherwise inline small font subsets as data: URIs,
   // which the content security policy (font-src 'self') rightly blocks.
   build: { assetsInlineLimit: 0 },

@@ -368,7 +368,7 @@ export class Imports extends Context.Service<
     /** Every item of the organization, by SKU. */
     items(organizationId: OrganizationId): Effect.Effect<ReadonlyArray<StoredItem>>
   }
->()("inventory/server/Imports") {
+>()("@inventory/app/server/Imports") {
   static readonly layer = Layer.effect(
     Imports,
     Effect.gen(function* () {
@@ -585,8 +585,10 @@ export class Imports extends Context.Service<
 
       const uploadChunks = Effect.fn("Imports.uploadChunks")(function* (actor: Member, upload: Upload) {
         const chunks = yield* findUploadChunks({ org: actor.organizationId, id: upload.id })
-        return yield* Effect.forEach(chunks, (chunk) =>
-          Effect.map(Schema.decodeEffect(RowsJson)(chunk.rowsJson), (rows) => ({ seq: chunk.seq, rows }))
+        return yield* Effect.forEach(
+          chunks,
+          (chunk) => Effect.map(Schema.decodeEffect(RowsJson)(chunk.rowsJson), (rows) => ({ seq: chunk.seq, rows })),
+          { concurrency: 1 }
         )
       }, Effect.orDie)
 
@@ -667,14 +669,22 @@ export class Imports extends Context.Service<
       const table = Effect.fn("Imports.table")(function* (organizationId: OrganizationId, draft: Draft) {
         const head = yield* Schema.decodeEffect(HeadJson)(draft.headJson)
         const chunks = yield* findChunks({ org: organizationId, id: draft.id })
-        const rows = yield* Effect.forEach(chunks, (chunk) => Schema.decodeEffect(RowsJson)(chunk.rowsJson))
+        const rows = yield* Effect.forEach(chunks, (chunk) => Schema.decodeEffect(RowsJson)(chunk.rowsJson), {
+          concurrency: 1
+        })
         return { ...head, rows: Arr.flatten(rows) }
       }, Effect.orDie)
 
       const decisions = Effect.fn("Imports.decisions")(function* (organizationId: OrganizationId, importId: string) {
         const rows = yield* findDecisions({ org: organizationId, id: importId })
-        const decoded = yield* Effect.forEach(rows, (row) =>
-          Effect.map(Schema.decodeEffect(DecisionJson)(row.decisionJson), (decision) => [row.rowId, decision] as const)
+        const decoded = yield* Effect.forEach(
+          rows,
+          (row) =>
+            Effect.map(
+              Schema.decodeEffect(DecisionJson)(row.decisionJson),
+              (decision) => [row.rowId, decision] as const
+            ),
+          { concurrency: 1 }
         )
         return {
           decisions: Rec.fromEntries(decoded),
@@ -961,8 +971,10 @@ export class Imports extends Context.Service<
         keys: ReadonlyArray<string>
       ) {
         // The keys travel as one JSON value per 5,000, so the statement never nears D1's 100 bound parameters.
-        const found = yield* Effect.forEach(Arr.chunksOf(keys, 5000), (some) =>
-          findStored({ org: organizationId, keys: some })
+        const found = yield* Effect.forEach(
+          Arr.chunksOf(keys, 5000),
+          (some) => findStored({ org: organizationId, keys: some }),
+          { concurrency: 1 }
         )
         return Arr.flatten(found)
       }, Effect.orDie)
@@ -1127,7 +1139,7 @@ export class Imports extends Context.Service<
         const scope = { ...acting(actor), id: draft.id, batch: batchId, at }
         const ready = Arr.filter(rows, (row) => row.item !== null && row.status === "ready")
         const replacing = Arr.filter(rows, (row) => row.item !== null && row.status === "update")
-        const ids = yield* Effect.forEach(ready, () => random.uuidV4())
+        const ids = yield* Effect.forEach(ready, () => random.uuidV4(), { concurrency: 1 })
         const entries = (list: ReadonlyArray<readonly [CommitRow, string]>) =>
           Arr.map(
             bySize(list, ([row]) => textOf(row.item)),

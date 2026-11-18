@@ -77,7 +77,7 @@ export const DevToolsWhenAsked = Layer.unwrap(
  * A fresh D1 database (local workerd, nothing persisted) with every migration applied, in filename order, as the raw
  * binding: Better Auth takes it directly. `TestDatabase` and `TestAuth` share the one this layer opens.
  */
-export class TestD1 extends Context.Service<TestD1, D1Database>()("inventory/test/server/support/app/TestD1") {
+export class TestD1 extends Context.Service<TestD1, D1Database>()("@inventory/app/test/server/support/app/TestD1") {
   static readonly layer = Layer.effect(
     TestD1,
     Effect.gen(function* () {
@@ -95,7 +95,7 @@ export class TestD1 extends Context.Service<TestD1, D1Database>()("inventory/tes
         Arr.filter(readdirSync(migrations), (name) => Str.endsWith(".sql")(name)),
         Str.Order
       )
-      yield* Effect.forEach(files, (name) => runSqlFile(db, new URL(name, migrations)))
+      yield* Effect.forEach(files, (name) => runSqlFile(db, new URL(name, migrations)), { concurrency: 1 })
       return db
     })
   )
@@ -349,7 +349,7 @@ export const TypedApp = testAppWith(Ai.layerFor({ routes: [], model: testSetting
 export class TestFetch extends Context.Service<
   TestFetch,
   { readonly handle: (request: Request) => Promise<Response> }
->()("inventory/test/server/support/app/TestFetch") {
+>()("@inventory/app/test/server/support/app/TestFetch") {
   static readonly layer = <E>(app: Layer.Layer<never, E, HttpRouter.HttpRouter>) =>
     Layer.effect(
       TestFetch,

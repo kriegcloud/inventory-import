@@ -60,20 +60,21 @@ export function useOptimisticWrite<Input, A, E>(spec: {
   return useMutation({
     mutationKey: [spec.name],
     mutationFn: (input: Input) => callWrite((client) => spec.write(client, input)),
-    onMutate: async (input): Promise<{ readonly written: ReadonlyArray<Written> }> => {
+    onMutate: (input): Promise<{ readonly written: ReadonlyArray<Written> }> => {
       const changes = spec.changes(input)
       // A list request already on its way would land on top of the change and undo it on screen: stop it first.
-      await Promise.all(changes.map((change) => queryClient.cancelQueries({ queryKey: change.key })))
-      const written: Array<Written> = []
-      for (const change of changes) {
-        for (const [key, before] of queryClient.getQueriesData({ queryKey: change.key })) {
-          if (before === undefined) continue
-          const after = change.apply(before, input)
-          queryClient.setQueryData(key, after)
-          written.push({ key, before, written: after, undo: (now, was) => change.undo(now, was, input) })
+      return Promise.all(changes.map((change) => queryClient.cancelQueries({ queryKey: change.key }))).then(() => {
+        const written: Array<Written> = []
+        for (const change of changes) {
+          for (const [key, before] of queryClient.getQueriesData({ queryKey: change.key })) {
+            if (before === undefined) continue
+            const after = change.apply(before, input)
+            queryClient.setQueryData(key, after)
+            written.push({ key, before, written: after, undo: (now, was) => change.undo(now, was, input) })
+          }
         }
-      }
-      return { written }
+        return { written }
+      })
     },
     onError: (error, input, context) => {
       for (const entry of context?.written ?? []) {

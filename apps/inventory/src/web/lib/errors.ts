@@ -2,7 +2,7 @@
 // protects: the screen never shows a status code, a stack, a URL or a provider's own text. Those go to the console,
 // once per failure, for whoever is debugging; the person reads a sentence. Every screen calls `sayError`, so a new
 // kind of failure is worded here once, not in each component.
-import { Predicate } from "effect"
+import { Effect, Predicate } from "effect"
 import { HttpClientError } from "effect/http"
 import { toast } from "sonner"
 import type { AnsweredBy } from "../../api/v1/Api.ts"
@@ -81,10 +81,10 @@ const logged = new WeakSet<object>()
 
 /** The raw failure, for whoever is debugging: in the console once, never on the screen. */
 const logOnce = (error: unknown) => {
-  if (typeof error !== "object" || error === null) return console.error("[failure]", error)
+  if (typeof error !== "object" || error === null) return Effect.runSync(Effect.logError("[failure]", error))
   if (logged.has(error)) return
   logged.add(error)
-  console.error("[failure]", error)
+  Effect.runSync(Effect.logError("[failure]", error))
 }
 
 /**

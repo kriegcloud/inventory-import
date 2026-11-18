@@ -1,5 +1,6 @@
+import { SecureRandom } from "effect/crypto"
 import { Cause, Context, Effect, Exit, type Fiber, Layer, ManagedRuntime, Schedule } from "effect"
-import { FetchHttpClient } from "effect/http"
+import { FetchHttpClient, HttpClient, HttpClientError, HttpClientResponse } from "effect/http"
 import { HttpApiClient } from "effect/http-api"
 import { Api } from "../../api/v1/Api.ts"
 import { RequestId } from "../../domain/Activity.ts"
@@ -11,32 +12,31 @@ import { browserTelemetry } from "./telemetry.ts"
 /** A client derived from the API contract. Methods, payloads and errors are all typed from src/api/v1/Api.ts. */
 export type Client = HttpApiClient.ForApi<typeof Api>
 
-/**
- * `fetch`, except that a GET whose address was asked for early (`early` in early.ts, by preload.ts) takes that answer
- * instead of asking again. Only once per early request; every other request goes to the network as it is.
- */
-const fetchOrEarly: typeof globalThis.fetch = (input, init) => {
-  const request = typeof input === "object" && "url" in input ? input : undefined
-  if ((init?.method ?? request?.method ?? "GET") === "GET") {
-    // The address without this origin's scheme and host, as preload.ts names it.
-    const answer = takeEarly((request?.url ?? String(input)).replace(/^https?:\/\/[^/]+/, ""))
-    if (answer !== undefined) return answer
-  }
-  return fetch(input, init)
-}
+/** Reuses each early GET once; all other calls keep the API runtime's HTTP client and tracing. */
+const withEarly = (client: HttpClient.HttpClient): HttpClient.HttpClient =>
+  HttpClient.transform(
+    client,
+    Effect.fnUntraced(function* (response, request) {
+      if (request.method !== "GET") return yield* response
+      const answer = takeEarly(request.url.replace(/^https?:\/\/[^/]+/, ""))
+      if (answer === undefined) return yield* response
+      const native = yield* Effect.tryPromise({
+        try: () => answer,
+        catch: (cause) =>
+          new HttpClientError.HttpClientError({
+            reason: new HttpClientError.TransportError({ request, cause })
+          })
+      })
+      return HttpClientResponse.fromWeb(request, native)
+    })
+  )
 
-class ApiClient extends Context.Service<ApiClient, Client>()("inventory/web/lib/api/ApiClient") {
+class ApiClient extends Context.Service<ApiClient, Client>()("@inventory/app/web/lib/api/ApiClient") {
   static readonly layer = Layer.effect(
     ApiClient,
     // Same origin: the browser sends the session cookie with every call, so nothing names the actor here.
-    HttpApiClient.make(Api)
-    // A fresh fetch client: the runtime's memo map shares one `FetchHttpClient.layer` with any other layer of the
-    // runtime that uses it, built without this `Fetch`, and a shared one never asks `fetchOrEarly` (measured: every
-    // early answer went untaken, three requests left unread and asked again).
-  ).pipe(
-    Layer.provide(Layer.fresh(FetchHttpClient.layer)),
-    Layer.provide(Layer.succeed(FetchHttpClient.Fetch, fetchOrEarly))
-  )
+    HttpApiClient.make(Api, { transformClient: withEarly })
+  ).pipe(Layer.provide(FetchHttpClient.layer))
 }
 
 /**
@@ -52,16 +52,18 @@ export const appRuntime = ManagedRuntime.make(
  * Run one API call as a Promise, for TanStack Query.
  * A typed API error (for example `AiUnavailable`) rejects with that error object, so the UI can switch on `_tag`.
  */
-export const call = async <A, E>(use: (client: Client) => Effect.Effect<A, E>): Promise<A> => {
-  const exit = await appRuntime.runPromiseExit(
-    Effect.gen(function* () {
-      const client = yield* ApiClient
-      return yield* use(client)
+export const call = <A, E>(use: (client: Client) => Effect.Effect<A, E>): Promise<A> =>
+  appRuntime
+    .runPromiseExit(
+      Effect.gen(function* () {
+        const client = yield* ApiClient
+        return yield* use(client)
+      })
+    )
+    .then((exit) => {
+      if (Exit.isSuccess(exit)) return exit.value
+      throw Cause.squash(exit.cause)
     })
-  )
-  if (Exit.isSuccess(exit)) return exit.value
-  throw Cause.squash(exit.cause)
-}
 
 /**
  * Runs one write as a Promise, for a mutation. A failure that may pass (the network, a server error, "too many
@@ -99,4 +101,4 @@ export const runExit = <A, E>(effect: Effect.Effect<A, E>): Promise<Exit.Exit<A,
  * A key for one thing the person does: make it once per click of a write button (or per Confirm), and send the same
  * key if that request is retried. The server writes once per key, so a retry or a double submit adds nothing.
  */
-export const newRequestId = (): RequestId => RequestId.make(crypto.randomUUID())
+export const newRequestId = (): RequestId => RequestId.make(SecureRandom.uuidV4Unsafe())

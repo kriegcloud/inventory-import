@@ -48,7 +48,8 @@ it.effect("a page by SKU, either way, and an import's changes are read off an in
       "SELECT COUNT(*), MIN(quantityOnHand), MAX(quantityOnHand), MIN(CAST(unitCost AS REAL)), MAX(CAST(unitCost AS REAL)) FROM item WHERE organizationId = 'org'",
       `SELECT ${columns} FROM item WHERE organizationId = 'org' ORDER BY name COLLATE NOCASE ASC, id ASC LIMIT 10`
     ]) {
-      expect(yield* planOf(db, scan), scan).not.toContain("item_org_sku")
+      const plan = yield* planOf(db, scan)
+      expect(plan, scan).not.toContain("item_org_sku")
     }
   })
 )

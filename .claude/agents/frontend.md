@@ -13,6 +13,12 @@ hand-back). The rules live in `CLAUDE.md` ("UI") and `docs/standards/` (`buildin
 `proposals`, `after-confirm`, `saved-progress`, `review-screen`, `phone`, `without-a-key`). Read the ones that apply
 once, before your first edit; a brief does not repeat them.
 
+Web code is type-checked under beep-effect's full Effect profile (`CLAUDE.md` "What the type-check enforces"):
+explicit boolean conditions, no `JSON.parse`/`JSON.stringify`, `fetch`, `console`, `new Date()`, `async` functions or
+`crypto.randomUUID()` outside the edges the code already has. Four style rules (native array, string and record
+methods, and pipeable two-argument helpers) are only counted, against a ceiling that may only fall: write new code
+with `Arr`, `Str` and `Rec` from `effect` so the count does not rise.
+
 ## What is already here: use it, do not build it
 
 Every component below is installed in `src/web/components/ui`. Compose them. Never add another UI library and never

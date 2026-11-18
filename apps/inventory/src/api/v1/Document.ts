@@ -1,7 +1,7 @@
 // What the OpenAPI document says that the contract's own types cannot: corrections made to the generated document
 // only (`OpenApi.Transform` on the `Api`, applied last). Nothing here changes a route, a payload or an answer; the
 // one thing not to break is that every line below states what the server already does, never what it should do.
-import { Equal } from "effect"
+import { Array as Arr, Equal, Record as Rec, String as Str } from "effect"
 
 /** The name of the security scheme every signed-in endpoint lists: the session cookie Better Auth sets. */
 export const sessionCookieScheme = "sessionCookie"
@@ -28,7 +28,7 @@ const methods = ["get", "put", "post", "delete", "patch", "head", "options"]
 /** Every operation of the document, with its method. */
 const operationsOf = (spec: Json): Array<{ readonly method: string; readonly operation: Json }> => {
   const found: Array<{ readonly method: string; readonly operation: Json }> = []
-  for (const item of Object.values<Json>(spec["paths"] ?? {})) {
+  for (const item of Rec.values<string, Json>(spec["paths"] ?? {})) {
     for (const method of methods) {
       const operation = item[method]
       if (operation !== undefined) found.push({ method, operation })
@@ -41,18 +41,18 @@ const refPrefix = "#/components/schemas/"
 
 /** Every `$ref` to a component schema, anywhere in the document, pointed at the component's new name. */
 const renameRefs = (node: unknown, renamed: Readonly<Record<string, string>>): void => {
-  if (Array.isArray(node)) {
+  if (Arr.isArray(node)) {
     for (const item of node) renameRefs(item, renamed)
     return
   }
   if (typeof node !== "object" || node === null) return
   const object = node as Json
   const ref = object["$ref"]
-  if (typeof ref === "string" && ref.startsWith(refPrefix)) {
-    const name = ref.slice(refPrefix.length)
-    if (Object.hasOwn(renamed, name)) object["$ref"] = `${refPrefix}${renamed[name]}`
+  if (typeof ref === "string" && Str.startsWith(refPrefix)(ref)) {
+    const name = Str.slice(refPrefix.length)(ref)
+    if (Rec.has(renamed, name)) object["$ref"] = `${refPrefix}${renamed[name]}`
   }
-  for (const value of Object.values(object)) renameRefs(value, renamed)
+  for (const value of Rec.values(object)) renameRefs(value, renamed)
 }
 
 /**
@@ -64,20 +64,20 @@ const renameRefs = (node: unknown, renamed: Readonly<Record<string, string>>): v
 const nameComponents = (spec: Json): void => {
   const schemas: Json = spec["components"]["schemas"]
   const renamed: Record<string, string> = {}
-  for (const name of Object.keys(schemas)) {
+  for (const name of Rec.keys(schemas)) {
     const copy = /^(.+)_\d+$/.exec(name)
     const original = copy?.[1]
-    if (original !== undefined && Object.hasOwn(schemas, original) && Equal.equals(schemas[name], schemas[original])) {
+    if (original !== undefined && Rec.has(schemas, original) && Equal.equals(schemas[name], schemas[original])) {
       renamed[name] = original
       continue
     }
     const plain = /^(.+)Encoded$/.exec(name)?.[1]
-    if (plain !== undefined && !Object.hasOwn(schemas, plain)) renamed[name] = plain
+    if (plain !== undefined && !Rec.has(schemas, plain)) renamed[name] = plain
   }
   const next: Json = {}
-  for (const [name, schema] of Object.entries(schemas)) {
+  for (const [name, schema] of Rec.toEntries(schemas)) {
     const to = renamed[name] ?? name
-    if (!Object.hasOwn(next, to)) next[to] = schema
+    if (!Rec.has(next, to)) next[to] = schema
   }
   spec["components"]["schemas"] = next
   renameRefs(spec, renamed)

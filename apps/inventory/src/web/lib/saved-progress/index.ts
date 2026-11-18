@@ -1,3 +1,4 @@
+import { DateTime } from "effect"
 // The browser half of saved progress: the chosen file in IndexedDB and the hook a screen uses. The rules and the
 // stored shape are in `store.ts` (tested without a browser).
 import { Effect, Option, Schema } from "effect"
@@ -103,7 +104,7 @@ export function useSavedProgress(scope: ProgressScope | undefined) {
         ...(latest.current ?? blank),
         ...change,
         version: 1,
-        savedAt: new Date().toISOString()
+        savedAt: DateTime.formatIso(DateTime.nowUnsafe())
       }
       latest.current = next
       if (storage === undefined || !writeAt(storage, key, next)) setRefused(true)

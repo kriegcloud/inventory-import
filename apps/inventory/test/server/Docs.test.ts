@@ -41,7 +41,7 @@ layer(TestFetch.layer(inMemoryApp({ member: dana, ai: Ai.layerFor({ routes: [], 
           (match) => match[1] ?? ""
         )
         expect(scripts.length).toBe(2)
-        const hashes = yield* Effect.forEach(scripts, sha256)
+        const hashes = yield* Effect.forEach(scripts, sha256, { concurrency: 1 })
         const policy = page.headers.get("content-security-policy") ?? ""
         expect(policy).toContain(
           `script-src ${Arr.join(

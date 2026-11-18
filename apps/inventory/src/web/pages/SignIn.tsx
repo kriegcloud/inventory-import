@@ -1,3 +1,4 @@
+import { SecureRandom } from "effect/crypto"
 import { useMutation } from "@tanstack/react-query"
 import { type FormEvent, useId, useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -22,7 +23,7 @@ const slugFor = (name: string) =>
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "")
       .slice(0, 40) || "organization"
-  }-${crypto.randomUUID().slice(0, 6)}`
+  }-${SecureRandom.uuidV4Unsafe().slice(0, 6)}`
 
 const roleWord = { admin: "Admin", editor: "Editor", viewer: "Viewer" } as const
 
@@ -51,15 +52,23 @@ export function SignIn(props: { features: SignInFeatures | undefined; onSignedIn
   const testAccounts = props.features?.testAccounts ?? null
 
   const submit = useMutation({
-    mutationFn: async (attempt: Attempt) => {
-      const { authClient: client, orThrow } = await authClient()
-      if (attempt.mode === "sign-in") {
-        orThrow(await client.signIn.email({ email: attempt.email, password: attempt.password }))
-        return
-      }
-      orThrow(await client.signUp.email({ name: attempt.name, email: attempt.email, password: attempt.password }))
-      orThrow(await client.organization.create({ name: attempt.organization, slug: slugFor(attempt.organization) }))
-    },
+    mutationFn: (attempt: Attempt) =>
+      authClient().then(({ authClient: client, orThrow }) => {
+        if (attempt.mode === "sign-in") {
+          return client.signIn.email({ email: attempt.email, password: attempt.password }).then((answer) => {
+            orThrow(answer)
+          })
+        }
+        return client.signUp
+          .email({ name: attempt.name, email: attempt.email, password: attempt.password })
+          .then((answer) => {
+            orThrow(answer)
+          })
+          .then(() => client.organization.create({ name: attempt.organization, slug: slugFor(attempt.organization) }))
+          .then((answer) => {
+            orThrow(answer)
+          })
+      }),
     onSuccess: props.onSignedIn
   })
 
@@ -225,10 +234,12 @@ export function CreateOrganization(props: { onCreated: () => void; onSignOut: ()
   const id = useId()
   const [name, setName] = useState("")
   const create = useMutation({
-    mutationFn: async () => {
-      const { authClient: client, orThrow } = await authClient()
-      orThrow(await client.organization.create({ name, slug: slugFor(name) }))
-    },
+    mutationFn: () =>
+      authClient().then(({ authClient: client, orThrow }) =>
+        client.organization.create({ name, slug: slugFor(name) }).then((answer) => {
+          orThrow(answer)
+        })
+      ),
     onSuccess: props.onCreated
   })
   return (

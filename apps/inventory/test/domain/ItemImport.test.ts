@@ -27,7 +27,8 @@ const messyTable = stage(new File([messy], "items_messy.csv"))
 describe("items_clean.csv", () => {
   it.effect("is 25 ready rows with nothing proposed, and reads the nested cells and the cost from the digits", () =>
     Effect.gen(function* () {
-      const result = reviewOf(yield* cleanTable)
+      const table = yield* cleanTable
+      const result = reviewOf(table)
       expect(result.counts).toMatchObject({ rows: 25, ready: 25, needs: 0, decision: 0, cannot: 0, out: 0, already: 0 })
       expect(result.fixed).toEqual({ rows: 0, cells: 0 })
       expect(Arr.flatMap(result.rows, (row) => row.proposals)).toEqual([])
@@ -57,7 +58,8 @@ describe("items_clean.csv", () => {
 describe("items_messy.csv", () => {
   it.effect("puts every row in one outcome, the outcomes add up to 200, and each kind is where DECISIONS.md says", () =>
     Effect.gen(function* () {
-      const result = reviewOf(yield* messyTable)
+      const table = yield* messyTable
+      const result = reviewOf(table)
       const { counts } = result
       expect(counts.rows).toBe(200)
       expect(counts.ready + counts.decision + counts.cannot + counts.out + counts.already).toBe(200)
@@ -140,7 +142,8 @@ describe("items_messy.csv", () => {
 
   it.effect("turns decisions into ready rows: accepted proposals, a kept row, a typed value", () =>
     Effect.gen(function* () {
-      const result = reviewOf(yield* messyTable, {
+      const table = yield* messyTable
+      const result = reviewOf(table, {
         "row-55": { accepted: ["unitCost"] },
         "row-85": { accepted: ["quantityOnHand"] },
         "row-44": { edits: { firstReceivedOn: "2024-06-04" } },

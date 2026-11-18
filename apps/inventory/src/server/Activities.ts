@@ -21,7 +21,7 @@ export class Activities extends Context.Service<
     /** How many lines the organization has: the status endpoint's proof that the database answers for this tenant. */
     count(organizationId: OrganizationId): Effect.Effect<number>
   }
->()("inventory/server/Activities") {
+>()("@inventory/app/server/Activities") {
   static readonly layer = Layer.effect(
     Activities,
     Effect.gen(function* () {

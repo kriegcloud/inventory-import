@@ -1,3 +1,4 @@
+import { parse, stringify } from "../../lib/json.ts"
 import { type Column, createColumnHelper, Subscribe } from "@tanstack/react-table"
 import {
   CheckIcon,
@@ -297,8 +298,8 @@ export function ReviewRegion(props: ReviewRegionProps) {
   const { rows, recheck, problemKinds, columns } = props
   // The caller's words over the defaults: every tab, tag and count below says these. Keyed on the words themselves,
   // so a caller that writes the object inline does not redraw the table on every render.
-  const wordsKey = JSON.stringify(props.words ?? {})
-  const words = useMemo(() => reviewWords(JSON.parse(wordsKey) as ReviewRegionProps["words"]), [wordsKey])
+  const wordsKey = stringify(props.words ?? {})
+  const words = useMemo(() => reviewWords(parse(wordsKey) as ReviewRegionProps["words"]), [wordsKey])
   const fixable = useMemo(() => fixableBy(problemKinds), [problemKinds])
   // Where the rules' fixes arrive in force, one the person undid or turned down stays turned down.
   const rejects = props.ruleFixes === "apply"
@@ -350,8 +351,8 @@ export function ReviewRegion(props: ReviewRegionProps) {
   const defs = useMemo(
     () =>
       col.columns(
-        columns.map((column, index) => {
-          return col.accessor((view) => view.cells[column.id] ?? "", {
+        columns.map((column, index) =>
+          col.accessor((view) => view.cells[column.id] ?? "", {
             id: column.id,
             header: column.label,
             enableHiding: index !== 0,
@@ -364,7 +365,7 @@ export function ReviewRegion(props: ReviewRegionProps) {
                 ? { label: column.label, variant: "select" as const, options: [], multiple: true }
                 : { label: column.label }
           })
-        })
+        )
       ),
     [columns]
   )
@@ -411,7 +412,7 @@ export function ReviewRegion(props: ReviewRegionProps) {
     [facetColumns, facetPicked, views, list]
   )
   // The table does the filtering; this hands it the values behind the ticked choices whenever they change.
-  const facetValues = JSON.stringify(
+  const facetValues = stringify(
     facets.map((facet) => [
       facet.column.id,
       facet.options.filter((option) => facet.picked.includes(option.label)).flatMap((option) => option.values)
@@ -422,10 +423,10 @@ export function ReviewRegion(props: ReviewRegionProps) {
   const tableNow = useRef(table)
   tableNow.current = table
   useEffect(() => {
-    for (const [id, values] of JSON.parse(facetValues) as ReadonlyArray<[string, ReadonlyArray<string>]>) {
+    for (const [id, values] of parse(facetValues) as ReadonlyArray<[string, ReadonlyArray<string>]>) {
       const target = tableNow.current.getColumn(id)
       const next = values.length > 0 ? values : undefined
-      if (target !== undefined && JSON.stringify(target.getFilterValue()) !== JSON.stringify(next)) {
+      if (target !== undefined && stringify(target.getFilterValue()) !== stringify(next)) {
         target.setFilterValue(next)
       }
     }

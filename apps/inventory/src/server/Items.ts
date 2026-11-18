@@ -155,7 +155,7 @@ export class Items extends Context.Service<
      */
     edit(actor: Member, id: string, edit: ItemEdit): Effect.Effect<EditOutcome>
   }
->()("inventory/server/Items") {
+>()("@inventory/app/server/Items") {
   static readonly layer = Layer.effect(
     Items,
     Effect.gen(function* () {
@@ -217,8 +217,10 @@ export class Items extends Context.Service<
         words: ReadonlyArray<WordMatch>
       ) {
         const indexed = Arr.flatMap(words, (word) => (word._tag === "Indexed" ? [word.phrase] : []))
-        const texts = yield* Effect.forEach(words, (word) =>
-          word._tag === "Indexed" ? Effect.succeedNone : Effect.asSome(anyLike(word.patterns, everywhere))
+        const texts = yield* Effect.forEach(
+          words,
+          (word) => (word._tag === "Indexed" ? Effect.succeedNone : Effect.asSome(anyLike(word.patterns, everywhere))),
+          { concurrency: 1 }
         )
         const all = [
           ...(Arr.isReadonlyArrayNonEmpty(indexed) ? [inIndex(org, Arr.join(indexed, " AND "))] : []),
@@ -233,10 +235,13 @@ export class Items extends Context.Service<
         words: ReadonlyArray<WordMatch>,
         column: "name" | "sku"
       ) {
-        const hits = yield* Effect.forEach(words, (word) =>
-          word._tag === "Indexed"
-            ? Effect.succeed(inIndex(org, `${column} : ${word.phrase}`))
-            : anyLike(word.patterns, [column])
+        const hits = yield* Effect.forEach(
+          words,
+          (word) =>
+            word._tag === "Indexed"
+              ? Effect.succeed(inIndex(org, `${column} : ${word.phrase}`))
+              : anyLike(word.patterns, [column]),
+          { concurrency: 1 }
         )
         return sql.join(" + ", true, "0")(hits)
       })
@@ -436,7 +441,7 @@ export class Items extends Context.Service<
       })
 
       const page = Effect.fn("Items.page")(function* (organizationId: OrganizationId, query: ItemQuery) {
-        const read = yield* Effect.forEach(query.filters, condition)
+        const read = yield* Effect.forEach(query.filters, condition, { concurrency: 1 })
         const conditions = Arr.getSomes(read)
         const filters = Arr.isReadonlyArrayNonEmpty(conditions)
           ? Option.some(query.joinOperator === "and" ? sql.and(conditions) : sql.or(conditions))

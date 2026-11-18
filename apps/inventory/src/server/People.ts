@@ -28,7 +28,7 @@ export class People extends Context.Service<
     setRole(actor: Member, memberId: string, role: Role): Effect.Effect<Person, PersonNotFound | LastAdmin>
     remove(actor: Member, memberId: string): Effect.Effect<void, PersonNotFound | LastAdmin>
   }
->()("inventory/server/People") {
+>()("@inventory/app/server/People") {
   static readonly layer = Layer.effect(
     People,
     Effect.gen(function* () {

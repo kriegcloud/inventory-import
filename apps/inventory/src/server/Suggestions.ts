@@ -142,7 +142,7 @@ export class Suggestions extends Context.Service<
       readonly lines: ReadonlyArray<string>
     }>
   }
->()("inventory/server/Suggestions") {
+>()("@inventory/app/server/Suggestions") {
   static readonly layer = Layer.effect(
     Suggestions,
     Effect.gen(function* () {
@@ -216,8 +216,10 @@ export class Suggestions extends Context.Service<
         }
         const now = yield* DateTime.now
         const at = DateTime.formatIso(now)
-        const rows = yield* Effect.forEach(proposed.suggestions, (suggestion) =>
-          Effect.map(random.uuidV4(), (id) => ({ ...suggestion, id, rowId: suggestion.rowId ?? "" }))
+        const rows = yield* Effect.forEach(
+          proposed.suggestions,
+          (suggestion) => Effect.map(random.uuidV4(), (id) => ({ ...suggestion, id, rowId: suggestion.rowId ?? "" })),
+          { concurrency: 1 }
         )
         const activity = yield* random.uuidV4()
         const who = proposed.answeredBy._tag === "Model" ? proposed.answeredBy.model : "the rules, with no model"

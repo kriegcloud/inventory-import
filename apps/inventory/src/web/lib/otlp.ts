@@ -1,3 +1,4 @@
+import { SecureRandom } from "effect/crypto"
 import { Context, Effect, Layer, Logger, Metric, Scope, Tracer } from "effect"
 import { FetchHttpClient } from "effect/http"
 import { OtlpExporter, OtlpLogger, OtlpMetrics, OtlpSerialization, OtlpTracer } from "effect/observability"
@@ -14,7 +15,7 @@ const resource = {
   serviceName: "inventory-web",
   attributes: {
     "deployment.environment.name": import.meta.env.DEV ? "development" : "production",
-    "service.instance.id": crypto.randomUUID()
+    "service.instance.id": SecureRandom.uuidV4Unsafe()
   }
 }
 

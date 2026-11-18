@@ -1,3 +1,4 @@
+import { stringify } from "../lib/json.ts"
 import {
   type ColumnFiltersState,
   functionalUpdate,
@@ -9,7 +10,7 @@ import {
   type Updater,
   useTable
 } from "@tanstack/react-table"
-import { Array as Arr } from "effect"
+import { Array as Arr, Effect } from "effect"
 import * as React from "react"
 
 import type { ColumnFilterItem, JoinOperator } from "@/components/ui/data-table/data-table-types"
@@ -94,7 +95,7 @@ function useDataTable<TData extends RowData>({
 }: UseDataTableProps<TData>) {
   const isServer = mode === "server"
   const builtConfig = getIsDataTableConfig(configProp) ? configProp : undefined
-  const configInputKey = builtConfig ? "" : getConfigInputKey(columns, configProp)
+  const configInputKey = builtConfig !== undefined ? "" : getConfigInputKey(columns, configProp)
   const config = React.useMemo(
     () => builtConfig ?? createConfigFromInputKey(configInputKey),
     [builtConfig, configInputKey]
@@ -109,24 +110,29 @@ function useDataTable<TData extends RowData>({
   }))
 
   const tableColumns = React.useMemo(
-    () => (builtConfig ? columns.map((column) => applyColumnConfig(column, builtConfig.columns)) : columns),
+    () =>
+      builtConfig !== undefined ? columns.map((column) => applyColumnConfig(column, builtConfig.columns)) : columns,
     [columns, builtConfig]
   )
 
-  const hasInlineColumns = configProp !== undefined && !builtConfig && "columns" in configProp
+  const hasInlineColumns = configProp !== undefined && builtConfig === undefined && "columns" in configProp
 
   React.useEffect(() => {
     if (!import.meta.env.DEV) return
     if (hasInlineColumns) {
-      console.warn(
-        "useDataTable: an inline config ignores `columns`. Pass the config through createDataTableConfig, or set the filter and sorting on the column defs."
+      Effect.runSync(
+        Effect.logWarning(
+          "useDataTable: an inline config ignores `columns`. Pass the config through createDataTableConfig, or set the filter and sorting on the column defs."
+        )
       )
     }
-    if (!builtConfig) return
+    if (builtConfig === undefined) return
     const unmatchedIds = getUnmatchedConfigIds(builtConfig.columns, columns)
     if (unmatchedIds.length === 0) return
-    console.warn(
-      `useDataTable: the config has no matching column for ${unmatchedIds.map((columnId) => `"${columnId}"`).join(", ")}. Rename the config key or add the column.`
+    Effect.runSync(
+      Effect.logWarning(
+        `useDataTable: the config has no matching column for ${unmatchedIds.map((columnId) => `"${columnId}"`).join(", ")}. Rename the config key or add the column.`
+      )
     )
   }, [hasInlineColumns, builtConfig, columns])
 
@@ -165,7 +171,7 @@ function useDataTable<TData extends RowData>({
 
   function onSortingChange(updater: Updater<SortingState>) {
     const next = getNextSorting(updater)
-    if (JSON.stringify(next) === JSON.stringify(sorting)) return
+    if (stringify(next) === stringify(sorting)) return
     void setQueryState({ sort: next, page: null })
   }
 
@@ -306,7 +312,7 @@ function useDataTable<TData extends RowData>({
 }
 
 function getFilterColumnOrder(filters: ColumnFilterItem[]) {
-  return JSON.stringify(Arr.dedupe(filters.map((filter) => filter.id)))
+  return stringify(Arr.dedupe(filters.map((filter) => filter.id)))
 }
 
 function getGlobalFilterValue(value: unknown) {

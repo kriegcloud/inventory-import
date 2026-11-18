@@ -36,7 +36,7 @@ export type RequestExports = {
  * default; a telemetry module provides them. Effect DevTools, when on, sees every span they see.
  */
 export const Collector = Context.Reference<Option.Option<(scope: Scope.Scope) => Effect.Effect<RequestExports>>>(
-  "inventory/server/RequestTelemetry/Collector",
+  "@inventory/app/server/RequestTelemetry/Collector",
   { defaultValue: () => Option.none() }
 )
 
@@ -82,7 +82,7 @@ let devToolsMissedAt = Number.NEGATIVE_INFINITY
 export class RequestTelemetry extends Context.Service<
   RequestTelemetry,
   { readonly begin: Effect.Effect<RequestScope> }
->()("inventory/server/RequestTelemetry") {
+>()("@inventory/app/server/RequestTelemetry") {
   /**
    * From the settings: an Effect DevTools client per request when EFFECT_DEVTOOLS_URL is set (development builds
    * only), the `Collector`'s exporters when one is provided, nothing at all when neither is.

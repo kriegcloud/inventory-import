@@ -50,16 +50,20 @@ export function AppShell(props: {
   fill?: boolean
   children: ReactNode
 }) {
-  const frame = props.wide || props.fill ? "w-full px-4 sm:px-9" : "mx-auto w-full max-w-5xl px-4 sm:px-6"
+  const frame =
+    props.wide === true || props.fill === true ? "w-full px-4 sm:px-9" : "mx-auto w-full max-w-5xl px-4 sm:px-6"
   const [barSlot, setBarSlot] = useState<HTMLElement | null>(null)
   if (props.sidebar !== undefined) {
     return (
-      <SidebarProvider defaultOpen={sidebarWasOpen()} className={props.fill ? "h-svh overflow-hidden" : undefined}>
+      <SidebarProvider
+        defaultOpen={sidebarWasOpen()}
+        className={props.fill === true ? "h-svh overflow-hidden" : undefined}
+      >
         {skipLink}
         <SidebarRoom />
         {props.sidebar}
         {/* min-w-0: a wide table scrolls inside its own frame instead of pushing the page past the screen. */}
-        <SidebarInset className={props.fill ? "min-h-0 min-w-0 overflow-hidden" : "min-w-0"}>
+        <SidebarInset className={props.fill === true ? "min-h-0 min-w-0 overflow-hidden" : "min-w-0"}>
           <header className="flex h-12 flex-none items-center gap-2 border-b px-4">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
@@ -72,7 +76,7 @@ export function AppShell(props: {
               <ThemeToggle />
             </div>
           </header>
-          <div id="main" className={props.fill ? "min-h-0 flex-1" : `flex-1 py-8 ${frame}`}>
+          <div id="main" className={props.fill === true ? "min-h-0 flex-1" : `flex-1 py-8 ${frame}`}>
             <BarSlotContext value={barSlot}>{props.children}</BarSlotContext>
           </div>
         </SidebarInset>
@@ -80,7 +84,7 @@ export function AppShell(props: {
     )
   }
   return (
-    <div className={props.fill ? "flex h-svh flex-col overflow-hidden" : "flex min-h-svh flex-col"}>
+    <div className={props.fill === true ? "flex h-svh flex-col overflow-hidden" : "flex min-h-svh flex-col"}>
       {skipLink}
       <header className="sticky top-0 z-40 border-b bg-background">
         <div className={`flex h-14 items-center gap-3 ${frame}`}>
@@ -94,7 +98,7 @@ export function AppShell(props: {
           </div>
         </div>
       </header>
-      <main id="main" className={props.fill ? "min-h-0 flex-1" : `flex-1 py-8 ${frame}`}>
+      <main id="main" className={props.fill === true ? "min-h-0 flex-1" : `flex-1 py-8 ${frame}`}>
         {props.children}
       </main>
     </div>

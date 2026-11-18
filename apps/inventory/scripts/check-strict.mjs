@@ -1,10 +1,13 @@
-// `bun run check:strict`: the Effect diagnostics at their production severity, as a measurement, not a gate.
-// `bun run check` uses the profile in tsconfig.base.json, where style rules are suggestions that never fail it.
-// This runs the same rules with every suggestion raised to the error it is in production, prints the findings grouped
-// by rule with a total, and exits 0. The TypeScript compiler's own errors are `bun run check`'s job, not counted here.
-//   bun run check:strict                       every project in tsconfig.json
-//   node scripts/check-strict.mjs --project <tsconfig>   one project (absolute or relative path)
-//   bun run check:strict -- --all              every finding, not the first three of each rule
+// `bun run check:strict` (part of `check`): the app's two recorded exceptions to the repository profile, held to account.
+// 1. The app's Effect plugin options (tsconfig.base.json here) must equal the root's (../../tsconfig.base.json, copied
+//    from beep-effect) everywhere but `overrides`: `plugins` replaces the inherited list whole, so a drift would be
+//    silent otherwise.
+// 2. Stage C turns four style rules off for own web code. Their findings are counted here with that override taken
+//    out, and the count must equal the ceiling in scripts/strict-ceiling.json: above it fails (new findings), below it
+//    fails too until the ceiling is lowered to the new count, so the recorded number only ever falls and stays true.
+//    The vendored src/web/components/ui (stage D) stays excluded.
+//   bun run check:strict           the check, with the first three findings of each rule
+//   bun run check:strict -- --all  every finding
 import { execFileSync } from "node:child_process"
 import { existsSync, readFileSync } from "node:fs"
 import { dirname, join, relative, resolve } from "node:path"
@@ -43,22 +46,6 @@ export function parseJsonc(text) {
   return JSON.parse(out.replace(/,(\s*[}\]])/g, "$1"))
 }
 
-/** The plugin options with every "suggestion" raised to "error": the production profile. */
-export function productionProfile(plugin) {
-  const raise = (severities) =>
-    Object.fromEntries(
-      Object.entries(severities ?? {}).map(([rule, level]) => [rule, level === "suggestion" ? "error" : level])
-    )
-  return {
-    ...plugin,
-    diagnosticSeverity: raise(plugin.diagnosticSeverity),
-    overrides: (plugin.overrides ?? []).map((o) => ({
-      ...o,
-      options: { ...o.options, diagnosticSeverity: raise(o.options?.diagnosticSeverity) }
-    }))
-  }
-}
-
 /** Findings grouped by rule, most first, each finding once even when two projects include its file. */
 export function groupFindings(findings) {
   const seen = new Set()
@@ -73,14 +60,6 @@ export function groupFindings(findings) {
   return { total: seen.size, rules }
 }
 
-function projects(args) {
-  const named = []
-  for (let i = 0; i < args.length; i += 1) if (args[i] === "--project" && args[i + 1]) named.push(resolve(args[i + 1]))
-  if (named.length > 0) return named
-  const root = parseJsonc(readFileSync(join(ROOT, "tsconfig.json"), "utf8"))
-  return (root.references ?? []).map((r) => join(ROOT, r.path))
-}
-
 /** The plugin options a project resolves to: its own, or the first found up its `extends` chain. */
 function pluginOf(tsconfig) {
   const config = parseJsonc(readFileSync(tsconfig, "utf8"))
@@ -90,46 +69,72 @@ function pluginOf(tsconfig) {
   return pluginOf(resolve(dirname(tsconfig), config.extends))
 }
 
+/** The plugin options with the stage C override (the one that turns the ledgered rules off) taken out. */
+function withoutLedger(plugin, rules) {
+  const ledgered = (o) => {
+    const severity = o.options?.diagnosticSeverity ?? {}
+    const keys = Object.keys(severity)
+    return keys.length === rules.length && rules.every((rule) => severity[rule] === "off")
+  }
+  return { ...plugin, overrides: (plugin.overrides ?? []).filter((o) => !ledgered(o)) }
+}
+
 function main(args) {
   const started = Date.now()
-  const findings = []
-  for (const project of projects(args)) {
-    const plugin = pluginOf(project)
-    if (plugin === undefined) continue
-    let out
-    try {
-      out = execFileSync(
-        process.execPath,
-        [
-          installed("@effect/tsgo/dist/effect-tsgo.cjs"),
-          "diagnostics",
-          "--project",
-          project,
-          "--format",
-          "json",
-          "--lspconfig",
-          JSON.stringify(productionProfile(plugin))
-        ],
-        { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 64 * 1024 * 1024 }
-      )
-    } catch (error) {
-      // The command exits 1 when it finds an error; its report is still on stdout.
-      out = error.stdout ?? ""
-    }
-    const report = out.trim() === "" ? { diagnostics: [] } : JSON.parse(out)
-    findings.push(...report.diagnostics)
+  let failed = false
+  const fail = (message) => {
+    console.error(`check:strict FAIL  ${message}`)
+    failed = true
   }
-  const { total, rules } = groupFindings(findings)
-  console.log("Effect diagnostics at production severity (bun run check:strict). A measurement: this never fails.")
+
+  const own = pluginOf(join(ROOT, "tsconfig.base.json"))
+  const root = pluginOf(join(ROOT, "..", "..", "tsconfig.base.json"))
+  if (own === undefined || root === undefined) return fail("no @effect/language-service plugin in tsconfig.base.json")
+  if (JSON.stringify({ ...own, overrides: [] }) !== JSON.stringify({ ...root, overrides: [] })) {
+    fail("the app's plugin options differ from the root's outside `overrides`: copy the root's block again")
+  }
+
+  const ledger = JSON.parse(readFileSync(join(ROOT, "scripts", "strict-ceiling.json"), "utf8"))
+  const project = join(ROOT, "tsconfig.app.json")
+  let out
+  try {
+    out = execFileSync(
+      process.execPath,
+      [
+        installed("@effect/tsgo/dist/effect-tsgo.cjs"),
+        "diagnostics",
+        "--project",
+        project,
+        "--format",
+        "json",
+        "--lspconfig",
+        JSON.stringify(withoutLedger(own, ledger.rules))
+      ],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 64 * 1024 * 1024 }
+    )
+  } catch (error) {
+    // The command exits 1 when it finds an error; its report is still on stdout.
+    out = error.stdout ?? ""
+  }
+  const report = out.trim() === "" ? { diagnostics: [] } : JSON.parse(out)
+  const inWeb = (f) => {
+    const path = relative(ROOT, f.file)
+    return path.startsWith("src/web/") && !path.startsWith("src/web/components/ui/")
+  }
+  const { total, rules } = groupFindings(report.diagnostics.filter((f) => inWeb(f) && ledger.rules.includes(f.name)))
+  console.log(`Stage C ledger: ${ledger.rules.join(", ")} in own web code.`)
   for (const [rule, list] of rules) {
     console.log(`  ${rule}: ${list.length}`)
     const shown = args.includes("--all") ? list : list.slice(0, 3)
     for (const f of shown) console.log(`    ${relative(ROOT, f.file)}:${f.line}:${f.column}`)
     if (list.length > shown.length) console.log(`    and ${list.length - shown.length} more (--all lists them)`)
   }
-  console.log(
-    `Total: ${total} finding${total === 1 ? "" : "s"} in ${rules.length} rule${rules.length === 1 ? "" : "s"} (${((Date.now() - started) / 1000).toFixed(1)} s).`
-  )
+  console.log(`Total: ${total}, ceiling ${ledger.ceiling} (${((Date.now() - started) / 1000).toFixed(1)} s).`)
+  if (total > ledger.ceiling)
+    fail(`${total - ledger.ceiling} new finding(s) above the ceiling: write them the Effect way`)
+  if (total < ledger.ceiling)
+    fail(`the count fell to ${total}: set "ceiling" to ${total} in scripts/strict-ceiling.json`)
+  if (failed) process.exitCode = 1
 }
 
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url))

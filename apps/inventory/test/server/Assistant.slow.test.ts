@@ -192,7 +192,7 @@ layer(testAppWith(answering({ changes: [{ kind: "sort", column: "name", directio
         Effect.gen(function* () {
           const client = yield* HttpApiTest.groups(Api, ["assistant", "system"])
           const ask = client.assistant.view(request("sort by name")).pipe(as("mem_priya"))
-          const answers = yield* Effect.forEach(Arr.range(1, dailyModelCalls + 1), () => ask)
+          const answers = yield* Effect.forEach(Arr.range(1, dailyModelCalls + 1), () => ask, { concurrency: 1 })
           const by = Arr.map(answers, (answer) => (Result.isSuccess(answer) ? answer.success.by : answer.failure.by))
           expect(Arr.filter(by, (who) => who === "model").length).toBe(dailyModelCalls)
           const last = Arr.last(answers)

@@ -109,7 +109,8 @@ layer(Ai.layerFor({ routes: [], model: "none" }))("with no model", (it) => {
         )
       })
       expect(proposed.answeredBy._tag).toBe("Rules")
-      expect(yield* Ref.get(taken)).toBe(0)
+      const calls = yield* Ref.get(taken)
+      expect(calls).toBe(0)
       expect(Arr.map(proposed.suggestions, (s) => [s.rowNumber, s.to, s.by, s.confidence])).toEqual([
         [7, "Nylon Coil", "rule", "low"],
         [83, "Copper Plate 1/4in", "rule", "low"]

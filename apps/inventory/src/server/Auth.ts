@@ -63,7 +63,7 @@ export class Auth extends Context.Service<
      */
     readonly publicOrigin: Option.Option<string>
   }
->()("inventory/server/Auth") {
+>()("@inventory/app/server/Auth") {
   /**
    * In production a missing or short `BETTER_AUTH_SECRET` stops the Worker: sessions signed with a guessable key can
    * be forged. In development `bun run dev` has written one into `.dev.vars`; without it a random one is made, and

@@ -228,7 +228,7 @@ package's task and replays it when nothing it reads has changed. The app's own s
 | `check` | Type-check with tsrs plus the Effect diagnostics (`typecheck` is the same) |
 | `lint`, `lint:shadcn` | oxlint and the design-system lint; `lint:shadcn` alone. Fixes: `docs/kit.md` "The two design lints" |
 | `test`, `test:slow`, `test:all` | The fast tests, the slow ones, both |
-| `check:strict` | The Effect diagnostics at production severity, grouped by rule with a total |
+| `check:strict` | The stage C ceiling and the plugin-parity check (part of `check`); `-- --all` lists every ledgered finding |
 | `dev:https` | Optional. The dev server over HTTPS with a local certificate (mkcert), so an `https:` origin, Secure cookies and HSTS behave as deployed |
 | `build:report` | The browser's build, then each chunk's makeup by package, largest first (`-- index` for one chunk); the treemap is `.scratch/bundle/client.html` |
 | `lighthouse` | Lighthouse on the production build, mobile and desktop. `-- /path` for another page. Prints the scores and every audit that scored below 100 |
@@ -303,7 +303,7 @@ Design in this order. Do not start from the UI.
 Models often write Effect 3 from memory. This repo uses Effect 4.1. Before using an API you have not already seen in
 this repo, check it in `node_modules/effect/src/` or the guides in `node_modules/effect/ai-docs/src/`.
 
-- Services: `class X extends Context.Service<X, Shape>()("inventory/server/X") { static readonly layer =
+- Services: `class X extends Context.Service<X, Shape>()("@inventory/app/server/X") { static readonly layer =
   Layer.effect(X, ...) }`.
 - Errors a caller can act on are `Schema.TaggedError`s in the function's error type. Everything else is a defect
   (`Effect.orDie`). Never `throw`, never `try/catch` around Effects.
@@ -317,10 +317,20 @@ this repo, check it in `node_modules/effect/src/` or the guides in `node_modules
 
 ### What the type-check enforces
 
-The compiler runs with `strict`, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, `noImplicitReturns` and
-`noImplicitOverride`. The Effect diagnostics run in `src/domain`, `src/api`, `src/server` and `test` in two profiles
-(`tsconfig.base.json`): a rule whose finding can change what the code does at run time fails the check; a rule about
-spelling, API preference or naming is only a suggestion, and `bun run check:strict` counts it.
+One profile for the whole repository: the root `tsconfig.base.json`, beep-effect's compiler flags and Effect
+language-service severities copied verbatim (the source commit is in its header comment). Every Effect diagnostic is
+an error and suggestions fail the exit code too. Everything new starts on it with no exception. The app adds two
+recorded exceptions in `apps/inventory/tsconfig.base.json`, and nothing else may:
+
+- **Stage C, own web code** (`src/web` outside `components/ui`): `preferEffectArray`, `preferEffectString`,
+  `preferEffectRecord` and `missingPipeableSignature` are off. Their count is a ceiling in
+  `apps/inventory/scripts/strict-ceiling.json`, and the app's `check` (`check:strict`) fails when the count is above
+  it, and when it is below it until the ceiling is lowered: the number only falls. Write new web code the Effect way
+  anyway.
+- **Stage D, the vendored components** (`src/web/components/ui`): every rule off, permanently.
+
+The same `check` fails if the app's plugin block drifts from the root's outside `overrides`. Server, api, domain and
+test code have no exception at all.
 
 **What fails the check.** Write to these from the start:
 
@@ -346,25 +356,16 @@ spelling, API preference or naming is only a suggestion, and `bun run check:stri
   fills, or a `Record` or `Arr.dedupe`. `WeakMap` and `WeakSet` stay where an entry must go with its key. Only
   `src/web/components/ui` (vendored, as published) keeps its own.
 
-**What the production profile would enforce, and the check does not yet.** Follow these when it costs nothing.
-`bun run check:strict` measures the code ones:
+**Also enforced, beyond the list above** (the full profile): the Effect modules for strings, arrays and records
+(`import { Array as Arr, String as Str } from "effect"`: `Arr.map(xs, f)`, `Arr.findFirst` (an Option),
+`Str.trim(x)`, `Record.toEntries(r)`); `concurrency` stated on every `Effect.forEach` and `Effect.all`
+(`{ concurrency: 1 }` keeps them sequential); no `yield*` inside a call's arguments (yield, then call); time from
+`Clock` or `DateTime`, randomness from `Random`, ids from `effect/crypto`, logs through `Effect.log`, never
+`console`; service keys that follow the package and path (`"@inventory/app/server/Activities"`, as the
+`deterministicKeys` rule derives it); a two-argument exported helper is dual (data-first and pipeable, `dual` from
+`effect/Function`; see `hasRole`). Schema classes carry a brand and are built with `.make`.
 
-- The Effect modules for strings, arrays and records (`import { Array as Arr, String as Str } from "effect"`):
-  `Arr.map(xs, f)`, `Arr.findFirst` (an Option), `Str.trim(x)`, `Record.toEntries(r)`.
-- `Effect.fn("Name")(function*(...) { ... })` for every Effect-returning function, so each is a span. Yield, then
-  call: `const now = yield* DateTime.now`, then `DateTime.formatIso(now)`.
-- Time from `Clock` or `DateTime`, randomness from `Random`, ids from `SecureRandom` (`effect/crypto`), logs through
-  `Effect.log`, never `console`.
-- Schema classes carry a brand (`Schema.Class<X, { readonly brand: unique symbol }>("X")(...)`), and are built with
-  `.make`, not `new`.
-- Service keys follow the file path (`"inventory/server/Activities"`); a two-argument exported helper is dual
-  (data-first and pipeable, `dual` from `effect/Function`; see `hasRole`).
-- The shorter spellings: `mapError`, `tap`, `as`, `asVoid`, `orElseSucceed`, `catchTag` and the like.
-- Beyond the code: docgen-grade JSDoc with categories, versions and compiling examples; Have I Been Pwned on (with
-  sign-in); the Observatory scan of a deployed copy, its grade reported; the telemetry stack on; and the session
-  cookie cache's trade-off written down (a revoked session lasts up to its `maxAge`).
-
-**Not checked by either profile**, and still rules:
+**Not checked by the profile**, and still rules:
 
 - **Look up file content with `Record.get(table, key)`** (an Option; `import { Record as Rec } from "effect"`, so
   TypeScript's `Record<K, V>` stays usable). A plain `table[key]` finds `constructor` and `toString` when a cell

@@ -7,6 +7,7 @@
  * gone, the server broke).
  */
 import { Schema } from "effect"
+import { dual } from "effect/Function"
 
 /**
  * The ways a file can be wrong as a whole. `wrongType`: not a .csv or .xlsx, whatever its name says. `empty`: no
@@ -72,9 +73,14 @@ export const StagingOutcome = <S extends Schema.Top>(success: S) =>
  * the file, never to this file.
  *
  * @example fileProblemTitle("empty", "invoices") // "This file has no invoices"
+ * @example pipe("empty", fileProblemTitle("items")) // "This file has no items"
  */
-export const fileProblemTitle = (kind: FileProblemKind, noun = "rows"): string =>
+export const fileProblemTitle: {
+  (noun: string): (kind: FileProblemKind) => string
+  (kind: FileProblemKind, noun: string): string
+} = dual(2, (kind: FileProblemKind, noun: string): string =>
   kind === "empty" ? `This file has no ${noun}` : fileProblemTitles[kind]
+)
 
 /** The headings with no screen's noun: "rows" stands for what a row is. */
 export const fileProblemTitles: Readonly<Record<FileProblemKind, string>> = {

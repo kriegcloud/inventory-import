@@ -312,7 +312,7 @@ export const ImportHandlers = HttpApiBuilder.group(
       open: Effect.fn("imports.open")(function* () {
         const actor = yield* CurrentActor
         const { drafts, total } = yield* imports.listOpen(actor.organizationId, openImportsShown)
-        const views = yield* Effect.forEach(drafts, (draft) => viewOf(actor, draft))
+        const views = yield* Effect.forEach(drafts, (draft) => viewOf(actor, draft), { concurrency: 1 })
         return { views, older: Math.max(0, total - views.length) }
       }),
       changes: Effect.fn("imports.changes")(function* () {

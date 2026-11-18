@@ -2,7 +2,7 @@
 type: Goal
 title: Workspace and strictness
 description: Clear the timed-build tooling, move the app into a bun + Turborepo workspace, and adopt beep-effect's compiler and Effect diagnostic profile in stages.
-status: active
+status: done
 from: explorations/ideal-architecture
 ---
 
@@ -63,16 +63,16 @@ Step 1, workspace:
 
 Step 2, toolchain:
 
-- [ ] `tsconfig.base.json` holds beep-effect's compiler flags and Effect language-service severities, with the
+- [x] `tsconfig.base.json` holds beep-effect's compiler flags and Effect language-service severities, with the
       beep-effect commit noted in a comment; `@effect/tsgo` and `tsrs` are pinned to the versions in research 04
       section 5.
-- [ ] Server, api, domain and test code pass the full profile with no override.
-- [ ] Own web code passes with one commented override for `preferEffectArray`, `preferEffectString`,
-      `preferEffectRecord` and `missingPipeableSignature`; its error count is recorded as a ceiling, and
+- [x] Server, api, domain and test code pass the full profile with no override.
+- [x] Own web code passes with one commented override for `preferEffectArray`, `preferEffectString`,
+      `preferEffectRecord` and `missingPipeableSignature`; its error count is recorded as a ceiling (610), and
       `bun run check:strict` fails when the count rises above it.
-- [ ] `components/ui` is excluded and recorded as a permanent exception.
-- [ ] `bun run check:full` and the production build pass.
-- [ ] Browser: the same import, three numbers agreeing.
+- [x] `components/ui` is excluded and recorded as a permanent exception.
+- [x] `bun run check:full` and the production build pass.
+- [x] Browser: the same import, three numbers agreeing.
 
 ## Decisions
 

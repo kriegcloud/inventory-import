@@ -30,7 +30,7 @@ export class Members extends Context.Service<
     /** Those of these users that have an account here, in the order given, each with their memberships. */
     testAccounts(userIds: ReadonlyArray<string>): Effect.Effect<ReadonlyArray<TestAccount>>
   }
->()("inventory/server/Members") {
+>()("@inventory/app/server/Members") {
   static readonly layer = Layer.effect(
     Members,
     Effect.gen(function* () {

@@ -50,6 +50,7 @@ export const upload = Effect.fn("upload")(function* (input: { readonly client: C
   const { client } = input
   const { id, chunks } = yield* beginUpload(input)
   yield* Effect.forEach(chunks, (_, seq) => Effect.flatMap(putChunk({ client, id, chunks, seq }), Effect.fromResult), {
+    concurrency: 1,
     discard: true
   })
   const finished = yield* client.imports.finishUpload({ params: { id } })

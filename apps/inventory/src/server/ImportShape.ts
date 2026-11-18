@@ -9,6 +9,6 @@ import { type ItemsOfRow as ItemsOfRowShape, itemsOfRow } from "../domain/ItemIm
  * How a row of a staged file becomes items on the server: `itemsOfRow` from the domain unless a test provides
  * another, so the confirm writes exactly the items the review screen showed.
  */
-export const ItemsOfRow = Context.Reference<ItemsOfRowShape>("inventory/server/ImportShape/ItemsOfRow", {
+export const ItemsOfRow = Context.Reference<ItemsOfRowShape>("@inventory/app/server/ImportShape/ItemsOfRow", {
   defaultValue: () => itemsOfRow
 })

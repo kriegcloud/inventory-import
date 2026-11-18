@@ -1,3 +1,4 @@
+import { request } from "../../lib/http.ts"
 import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { PageHeader } from "@/components/app/PageHeader"
@@ -267,15 +268,16 @@ export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
     if (saving) void import("./ReviewStep.tsx")
   }, [saving])
 
-  const takeSample = async (sample: (typeof samples)[number]) => {
+  const takeSample = (sample: (typeof samples)[number]) => {
     setProblem(undefined)
-    try {
-      const response = await fetch(sample.href)
-      if (!response.ok) throw new Error(String(response.status))
-      send(new File([await response.blob()], sample.name))
-    } catch {
-      setProblem(`The sample ${sample.name} could not be loaded. Download it with the link beside it and choose it.`)
-    }
+    return request(sample.href)
+      .then((response) => {
+        if (!response.ok) throw new Error(String(response.status))
+        return response.blob().then((blob) => send(new File([blob], sample.name)))
+      })
+      .catch(() => {
+        setProblem(`The sample ${sample.name} could not be loaded. Download it with the link beside it and choose it.`)
+      })
   }
 
   const fileInput = () => picker.current?.querySelector<HTMLInputElement>('input[type="file"]') ?? null

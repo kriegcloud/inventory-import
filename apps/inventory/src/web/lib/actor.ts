@@ -1,11 +1,12 @@
+import { request } from "./http.ts"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { sessionPath } from "../../api/v1/Version.ts"
 import { preload } from "../preload.ts"
 import { forgetEarly } from "./early.ts"
 import { queryKeys, sessionQuery } from "./queries.ts"
 
-// Who is signed in, read with a plain fetch: this module is in the sign-in screen's first download, which must not
-// carry the API client, the contract or Effect's HTTP code. The answer is decoded by a module of its own
+// Who is signed in, read through the browser HTTP boundary: this module is in the sign-in screen's first download,
+// without the API client or contract. The answer is decoded by a module of its own
 // (./session.ts), asked for as this module loads, beside the first session request.
 
 /** Better Auth's browser client, fetched the first time a person signs in, switches or signs out. */
@@ -72,7 +73,7 @@ export function useActor() {
     queryKey: queryKeys.session,
     queryFn: () =>
       // index.html preloads this address, so the answer is usually on its way before this code runs.
-      fetch(sessionPath, { credentials: "same-origin" }).then((response) => {
+      request(sessionPath, { credentials: "same-origin" }).then((response) => {
         if (!response.ok) throw new Error("The session could not be read. Reload the page.")
         return response.json().then((body: unknown) =>
           decoder
@@ -105,29 +106,39 @@ export function useActor() {
     error: session.error,
     retry: () => void session.refetch(),
     refresh,
-    switchTo: async (organizationId: string) => {
-      const { authClient, orThrow } = await loadAuthClient()
-      orThrow(await authClient.organization.setActive({ organizationId }))
-      await refresh()
-    },
+    switchTo: (organizationId: string) =>
+      loadAuthClient().then(({ authClient, orThrow }) =>
+        authClient.organization
+          .setActive({ organizationId })
+          .then(orThrow)
+          .then(() => refresh())
+      ),
     /**
      * Signs in as another account (a test account, from the person's menu): out of this one, into that one, then a
      * full reload, so nothing the previous person saw stays in memory.
      */
-    signInAs: async (email: string, password: string) => {
-      const { authClient, orThrow } = await loadAuthClient()
-      await authClient.signOut()
-      orThrow(await authClient.signIn.email({ email, password }))
-      rememberSignedOut(false)
-      window.location.assign("/")
-    },
+    signInAs: (email: string, password: string) =>
+      loadAuthClient().then(({ authClient, orThrow }) =>
+        authClient
+          .signOut()
+          .then(() => authClient.signIn.email({ email, password }))
+          .then(orThrow)
+          .then(() => {
+            rememberSignedOut(false)
+            window.location.assign("/")
+          })
+      ),
     // A full reload after signing out: nothing the previous person saw stays in memory for the next one.
-    signOut: async () => {
-      const { authClient, orThrow } = await loadAuthClient()
-      orThrow(await authClient.signOut())
-      rememberSignedIn(false)
-      rememberSignedOut(true)
-      window.location.assign("/")
-    }
+    signOut: () =>
+      loadAuthClient().then(({ authClient, orThrow }) =>
+        authClient
+          .signOut()
+          .then(orThrow)
+          .then(() => {
+            rememberSignedIn(false)
+            rememberSignedOut(true)
+            window.location.assign("/")
+          })
+      )
   }
 }

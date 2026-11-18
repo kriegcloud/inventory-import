@@ -1,7 +1,8 @@
+import { stringify } from "../../lib/json.ts"
 import { useMutation } from "@tanstack/react-query"
 import { ArrowUp, ChevronRight, MessageSquarePlus, Sparkles, Undo2, X } from "lucide-react"
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react"
-import { Result } from "effect"
+import { Clock, Effect, Result } from "effect"
 import { Button } from "@/components/ui/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Input } from "@/components/ui/input"
@@ -48,11 +49,11 @@ export function useTableView(table: AssistedTable, searchable: boolean) {
       }
     },
     write: (before: ViewState, next: ViewState) => {
-      if (JSON.stringify(before.sorting) !== JSON.stringify(next.sorting)) table.setSorting([...next.sorting])
-      if (JSON.stringify(before.filters) !== JSON.stringify(next.filters)) {
+      if (stringify(before.sorting) !== stringify(next.sorting)) table.setSorting([...next.sorting])
+      if (stringify(before.filters) !== stringify(next.filters)) {
         table.setColumnFilters(next.filters.map((filter) => ({ ...filter })) as Array<never>)
       }
-      if (JSON.stringify(before.visibility) !== JSON.stringify(next.visibility)) {
+      if (stringify(before.visibility) !== stringify(next.visibility)) {
         table.setColumnVisibility({ ...next.visibility })
       }
       if (searchable && before.search !== next.search) table.setGlobalFilter(next.search)
@@ -132,7 +133,7 @@ export function TableAssistant(props: {
     if (typed === "" || pending !== null) return
     setPrompt("")
     setPending(typed)
-    const id = `${Date.now()}`
+    const id = `${Effect.runSync(Clock.currentTimeMillis)}`
     ask.mutate(typed, {
       onSettled: () => setPending(null),
       onError: (error) => {

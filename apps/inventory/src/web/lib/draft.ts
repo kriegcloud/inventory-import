@@ -1,3 +1,4 @@
+import { stringify } from "./json.ts"
 import { useCallback, useRef } from "react"
 import type { DecisionDelta } from "../../api/v1/Api.ts"
 import type { SavedDecisions } from "../../domain/ItemImport.ts"
@@ -9,7 +10,7 @@ export const deltaOf = (before: SavedDecisions, after: SavedDecisions): Decision
   const set: Record<string, SavedDecisions[string]> = {}
   for (const [rowId, decision] of Object.entries(after)) {
     const earlier = before[rowId]
-    if (earlier === undefined || JSON.stringify(earlier) !== JSON.stringify(decision)) set[rowId] = decision
+    if (earlier === undefined || stringify(earlier) !== stringify(decision)) set[rowId] = decision
   }
   return { set, clear: Object.keys(before).filter((rowId) => !Object.hasOwn(after, rowId)) }
 }
@@ -40,30 +41,36 @@ export function useDecisionSaver(input: {
   const busy = useRef(false)
   const { importId, onSaved, onRefused } = input
 
-  const flush = useCallback(async () => {
-    if (busy.current) return
+  const flush = useCallback((): Promise<void> => {
+    if (busy.current) return Promise.resolve()
     busy.current = true
-    try {
-      for (;;) {
-        const target = wanted.current
-        const delta = deltaOf(onServer.current, target)
-        if (isEmpty(delta)) break
-        const { revision } = await callWrite((api) => api.imports.decide({ params: { id: importId }, payload: delta }))
-        onServer.current = target
-        onSaved(revision, target)
-      }
-    } catch (error) {
-      if (isTransient(error)) {
-        toastError(error, {
-          lead: "Your last decision is on this screen but not saved yet.",
-          action: { label: "Save again", onClick: () => void flush() }
-        })
-      } else {
-        onRefused(error)
-      }
-    } finally {
-      busy.current = false
+    const saveNext = (): Promise<void> => {
+      const target = wanted.current
+      const delta = deltaOf(onServer.current, target)
+      if (isEmpty(delta)) return Promise.resolve()
+      return callWrite((api) => api.imports.decide({ params: { id: importId }, payload: delta })).then(
+        ({ revision }) => {
+          onServer.current = target
+          onSaved(revision, target)
+          return saveNext()
+        }
+      )
     }
+    return Promise.resolve()
+      .then(saveNext)
+      .catch((error: unknown) => {
+        if (isTransient(error)) {
+          toastError(error, {
+            lead: "Your last decision is on this screen but not saved yet.",
+            action: { label: "Save again", onClick: () => void flush() }
+          })
+        } else {
+          onRefused(error)
+        }
+      })
+      .finally(() => {
+        busy.current = false
+      })
   }, [importId, onSaved, onRefused])
 
   return {

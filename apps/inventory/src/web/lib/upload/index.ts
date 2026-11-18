@@ -1,3 +1,5 @@
+import { request } from "../http.ts"
+import { SecureRandom } from "effect/crypto"
 // One file on its way in: read in a worker, sent to the server in chunks, turned into an import. The upload lives in
 // this module, not in a component, so it carries on while the person opens another page, and there is one per tab.
 // The one thing not to break: Cancel stops everything (the worker, every request in flight) and then deletes what
@@ -160,7 +162,7 @@ const program = Effect.fn("upload.program")(function* (client: Client, request: 
           const rows = message.chunkSizes.reduce((sum, size) => sum + size, 0)
           // One key for this file: a begin sent again after a lost answer is the same upload on the server, so the
           // begin can be retried like every other step.
-          const key = crypto.randomUUID()
+          const key = SecureRandom.uuidV4Unsafe()
           const { id } = yield* staged(
             client.imports.beginUpload({
               payload: { key, head: message.head, rowCount: rows, chunkCount: message.chunkSizes.length }
@@ -207,10 +209,8 @@ const program = Effect.fn("upload.program")(function* (client: Client, request: 
 })
 
 /** Asks the server to delete an upload. Resolves to whether it answered. */
-const discard = async (uploadId: string): Promise<boolean> =>
-  Exit.isSuccess(
-    await runExit(Fiber.join(fork((client) => client.imports.discardUpload({ params: { id: uploadId } }))))
-  )
+const discard = (uploadId: string): Promise<boolean> =>
+  runExit(Fiber.join(fork((client) => client.imports.discardUpload({ params: { id: uploadId } })))).then(Exit.isSuccess)
 
 /** Puts a finished upload where the next screen looks for it, and moves on to it if the person is still here. */
 const arrive = (queryClient: QueryClient, file: File, done: Finished) => {
@@ -268,27 +268,31 @@ const start = (queryClient: QueryClient, file: File, sheet: string | null, onEnd
  * Stops the upload under way: the worker ends, requests in flight are aborted, and what reached the server is
  * deleted. Once the import is being prepared it is too late, and Cancel is not offered then.
  */
-const cancel = async () => {
+const cancel = (): Promise<void> => {
   const current = running
-  if (current === null || state._tag === "Preparing" || state._tag === "Cancelling") return
+  if (current === null || state._tag === "Preparing" || state._tag === "Cancelling") return Promise.resolve()
   set({ _tag: "Cancelling", fileName: current.fileName, uploadId: current.uploadId })
-  await runExit(Fiber.interrupt(current.fiber))
-  running = null
-  current.onEnd({ _tag: "Cancelled" })
-  const answered = current.uploadId === null ? true : await discard(current.uploadId)
-  set({ _tag: "Idle" })
-  if (answered) toast(`Cancelled. Nothing from ${current.fileName} was saved.`)
-  else
-    toast.error(
-      `Cancelled, but the server could not be reached to delete what arrived. It is never imported and is deleted within the hour.`
-    )
+  return runExit(Fiber.interrupt(current.fiber))
+    .then(() => {
+      running = null
+      current.onEnd({ _tag: "Cancelled" })
+      return current.uploadId === null ? true : discard(current.uploadId)
+    })
+    .then((answered) => {
+      set({ _tag: "Idle" })
+      if (answered) toast(`Cancelled. Nothing from ${current.fileName} was saved.`)
+      else
+        toast.error(
+          `Cancelled, but the server could not be reached to delete what arrived. It is never imported and is deleted within the hour.`
+        )
+    })
 }
 
 // Leaving the page mid-upload: ask the server to delete what arrived, in a request that outlives the page.
 window.addEventListener("pagehide", () => {
   const id = running?.uploadId
   if (id === null || id === undefined) return
-  void fetch(`${apiPrefix}/imports/uploads/${encodeURIComponent(id)}`, { method: "DELETE", keepalive: true }).catch(
+  void request(`${apiPrefix}/imports/uploads/${encodeURIComponent(id)}`, { method: "DELETE", keepalive: true }).catch(
     () => {}
   )
 })

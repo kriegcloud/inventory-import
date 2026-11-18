@@ -75,7 +75,7 @@ export const SessionIdentityLive = Layer.effect(
 
 /** The session as the browser needs it, in one answer (`GET /api/v1/identity/session`). */
 export class Sessions extends Context.Service<Sessions, { state(headers: Headers): Effect.Effect<SessionState> }>()(
-  "inventory/server/SessionIdentity/Sessions"
+  "@inventory/app/server/SessionIdentity/Sessions"
 ) {
   /**
    * The answer from the Better Auth session, the same membership rule as `SessionIdentityLive`, and the sign-in

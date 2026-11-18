@@ -1,3 +1,4 @@
+import { Effect } from "effect"
 import { type ReactNode, useEffect, useState } from "react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -37,7 +38,7 @@ function useDevelopmentSignIn(): "idle" | "signing-in" | "failed" {
       .then(() => refresh())
       .catch((error: unknown) => {
         // The sign-in page is drawn instead, with the test accounts on it; the reason is for whoever is debugging.
-        console.error("Signing in as the first test account failed", error)
+        Effect.runSync(Effect.logError("Signing in as the first test account failed", error))
         setState("failed")
       })
   }, [wanted, state, first, password, refresh])

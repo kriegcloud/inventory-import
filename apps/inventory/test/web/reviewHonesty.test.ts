@@ -5,7 +5,7 @@
 // @effect-diagnostics nodeBuiltinImport:off
 import { readFileSync } from "node:fs"
 import { describe, expect, it } from "@effect/vitest"
-import { Array as Arr, Effect } from "effect"
+import { Array as Arr, Effect, Option, Record as Rec, String as Str } from "effect"
 import { firstDecisions, review, stageTable, type StagedTable } from "../../src/domain/ItemImport.ts"
 import { sourceLead, sourceWordsFor } from "../../src/web/components/app/proposalSource.ts"
 import {
@@ -50,7 +50,7 @@ describe("who is behind a suggestion", () => {
     expect(sourceWordsFor("model").tip).toContain("model")
     for (const source of ["rule", "person", undefined] as const) {
       const words = sourceWordsFor(source)
-      expect(`${words.tag} ${words.hidden} ${words.tip}`.toLowerCase()).not.toContain("model")
+      expect(Str.toLowerCase(`${words.tag} ${words.hidden} ${words.tip}`)).not.toContain("model")
     }
     expect(sourceLead({ by: "rule", confidence: "low" })).toBe("Rule, low confidence")
     expect(sourceLead({ confidence: "low" })).toBe("Suggestion, low confidence")
@@ -62,10 +62,10 @@ describe("who is behind a suggestion", () => {
         ...(row.applied ?? []),
         ...(row.problem?.fix === undefined ? [] : [row.problem.fix])
       ])
-      const questions = fixes.filter((fix) => fix.confidence === "low")
+      const questions = Arr.filter(fixes, (fix) => fix.confidence === "low")
       expect(questions.length).toBeGreaterThan(0)
       for (const fix of fixes) expect(fix.by).toBe("rule")
-      for (const fix of questions) expect(sourceLead(fix).toLowerCase()).not.toContain("model")
+      for (const fix of questions) expect(Str.toLowerCase(sourceLead(fix))).not.toContain("model")
     })
   )
 })
@@ -75,13 +75,13 @@ describe("every row says why", () => {
     Effect.map(sampleRows(), ({ current, decisions, rows }) => {
       const views = viewRows({ rows, state: restored(decisions) })
       const kinds = kindsOf(regionKinds)
-      const open = views.filter((view) => view.status === "needs")
+      const open = Arr.filter(views, (view) => view.status === "needs")
       expect(open.length).toBe(current.counts.needs)
       // A row with an empty SKU has no fix, only a refusal: it still says why, in the domain's own sentence.
-      const noFix = open.filter((view) => view.problem?.fix === undefined)
+      const noFix = Arr.filter(open, (view) => view.problem?.fix === undefined)
       expect(noFix.length).toBeGreaterThan(0)
       for (const view of open) {
-        const domain = current.rows.find((row) => row.id === view.row.id)
+        const domain = Option.getOrUndefined(Arr.findFirst(current.rows, (row) => row.id === view.row.id))
         // The first problem's sentence, and how many more the row has behind it.
         expect(reasonOf({ view, kinds })).toBe(reasonShown(domain?.reason ?? "", domain?.reasons.length ?? 0))
       }
@@ -114,9 +114,9 @@ describe("rows that cannot be fixed here", () => {
     expect([counts.ready, counts.needs, counts.cannot, counts.out]).toEqual([1, 1, 2, 0])
     expect(counts.needs + counts.cannot + counts.ready + counts.out + counts.stored).toBe(counts.total)
     expect(decisionsLeft(views)).toBe(1)
-    expect(visible({ views, filter: "cannot" }).map((view) => view.row.line)).toEqual([3, 4])
-    expect(visible({ views, filter: "needs" }).map((view) => view.row.line)).toEqual([5])
-    const cannot = views.find((view) => view.row.line === 3)
+    expect(Arr.map(visible({ views, filter: "cannot" }), (view) => view.row.line)).toEqual([3, 4])
+    expect(Arr.map(visible({ views, filter: "needs" }), (view) => view.row.line)).toEqual([5])
+    const cannot = Option.getOrUndefined(Arr.findFirst(views, (view) => view.row.line === 3))
     expect(cannot === undefined ? "" : reasonOf({ view: cannot, kinds: kindsOf(kinds) })).toBe(
       "Item 3 is not in the system yet."
     )
@@ -181,7 +181,7 @@ describe("status words", () => {
   })
 
   it("keep the current words as defaults, each said once", () => {
-    const values = Object.values(defaultReviewWords)
+    const values = Rec.values(defaultReviewWords)
     expect(Arr.dedupe(values)).toHaveLength(values.length)
     expect(reviewWords(undefined)).toEqual(defaultReviewWords)
   })
@@ -221,7 +221,7 @@ describe("the table fits at 1440", () => {
     const plan = planColumns({ columns, fixed: 360 + 120, room })
     expect(plan.scrolls).toBe(false)
     expect(plan.minWidth).toBeLessThanOrEqual(room)
-    expect(plan.shown.map((column) => column.id)).toContain("reason")
+    expect(Arr.map(plan.shown, (column) => column.id)).toContain("reason")
   })
 })
 
@@ -245,12 +245,16 @@ describe("a cost, the dimensions and the vendors in the review", () => {
 
   it.effect("is how the sample's cost column shows, with no second currency sign in its header", () =>
     Effect.map(
-      Effect.flatMap(stage(sample("items_messy.csv")), (table) =>
-        Effect.succeed({ table, current: review({ table, choices: [], decisions: {}, storedItems: [] }) })
-      ),
+      Effect.map(stage(sample("items_messy.csv")), (table) => ({
+        table,
+        current: review({ table, choices: [], decisions: {}, storedItems: [] })
+      })),
       ({ table, current }) => {
-        const cost = regionColumns(current.mapping, current.unusedColumns, table).find(
-          (column) => column.id === "unitCost"
+        const cost = Option.getOrUndefined(
+          Arr.findFirst(
+            regionColumns(current.mapping, current.unusedColumns, table),
+            (column) => column.id === "unitCost"
+          )
         )
         expect(cost?.unit).toBeUndefined()
         expect(cost?.display?.("31.4")).toBe("$31.40")

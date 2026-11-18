@@ -175,7 +175,7 @@ describe("the fixed rules", () => {
   })
 
   it("read every request the README, the box's hint and its suggestions offer on the Items table", () => {
-    const withKilogram: ColumnCatalog = items.map((entry) =>
+    const withKilogram: ColumnCatalog = Arr.map(items, (entry) =>
       entry.id === "unit" ? { ...entry, values: [...entry.values, "Kilogram"] } : entry
     )
     const offered = [

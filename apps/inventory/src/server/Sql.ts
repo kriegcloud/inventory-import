@@ -90,11 +90,15 @@ export const batchOn =
     ServicesOf<Queries[number]>
   > =>
     Effect.flatMap(
-      Effect.all(queries as ReadonlyArray<Pending<unknown, ErrorOf<Queries[number]>, ServicesOf<Queries[number]>>>),
+      Effect.all(queries as ReadonlyArray<Pending<unknown, ErrorOf<Queries[number]>, ServicesOf<Queries[number]>>>, {
+        concurrency: 1
+      }),
       (built) =>
         Effect.flatMap(d1.batch(Arr.map(built, (query) => query.statement)), (results) =>
-          Effect.forEach(Arr.zip(built, results as ReadonlyArray<ReadonlyArray<unknown>>), ([query, rows]) =>
-            query.decode(rows)
+          Effect.forEach(
+            Arr.zip(built, results as ReadonlyArray<ReadonlyArray<unknown>>),
+            ([query, rows]) => query.decode(rows),
+            { concurrency: 1 }
           )
         )
     ) as unknown as Effect.Effect<

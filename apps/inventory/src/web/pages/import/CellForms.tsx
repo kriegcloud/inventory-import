@@ -1,3 +1,4 @@
+import { parse, stringify } from "../../lib/json.ts"
 // The two cells of an item that hold JSON, fixed in a small form instead of as raw text. The form writes the cell back
 // as the brief's own JSON; the one thing not to break: nothing is saved that the domain's readers (`readDimensions`,
 // `readVendors`) would refuse, and their sentence is what the person reads under the fields.
@@ -13,7 +14,7 @@ import { readDimensions, readVendors } from "../../../domain/ItemImport.ts"
 
 const parsed = (text: string): unknown => {
   try {
-    return JSON.parse(text) as unknown
+    return parse(text) as unknown
   } catch {
     return undefined
   }
@@ -49,7 +50,7 @@ export const dimensionsDraft = (text: string): DimensionsDraft => {
 
 /** The dimensions as the brief's JSON text. */
 const dimensionsCell = (draft: DimensionsDraft): string =>
-  JSON.stringify({
+  stringify({
     length: numberOrText(draft.length),
     width: numberOrText(draft.width),
     height: numberOrText(draft.height),
@@ -145,7 +146,7 @@ export const vendorsDraft = (text: string): ReadonlyArray<VendorDraft> => {
 
 /** The vendors as the brief's JSON text. */
 const vendorsCell = (vendors: ReadonlyArray<VendorDraft>): string =>
-  JSON.stringify(
+  stringify(
     vendors.map((vendor) => ({
       vendor_name: vendor.name.trim(),
       vendor_sku: vendor.sku.trim() === "" ? null : vendor.sku.trim(),

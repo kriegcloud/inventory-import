@@ -1,3 +1,4 @@
+import { request } from "./http.ts"
 // Requests started before the code that will read them needs them. The first screen's data can be asked for the
 // moment someone is known to be signed in, by its address, and the API client takes the answer when it asks for that
 // address itself (`takeEarly`, in api.ts). Nothing here reads an answer: the client decodes it through the contract,
@@ -8,7 +9,7 @@ let started: ReadonlyArray<{ readonly path: string; readonly response: Promise<R
 /** Starts a GET of `path` (an address on this origin) now, unless one is already on its way. */
 export const early = (path: string): void => {
   if (started.some((entry) => entry.path === path)) return
-  started = [...started, { path, response: fetch(path, { credentials: "same-origin" }) }]
+  started = [...started, { path, response: request(path, { credentials: "same-origin" }) }]
 }
 
 /** The answer of an early GET of `path`, once; undefined when none was started, and the client asks itself. */

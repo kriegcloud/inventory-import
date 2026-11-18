@@ -501,6 +501,12 @@ export type ReviewRegionProps = {
    */
   rowAction?: (row: ReviewRow) => RowAction | undefined
   /**
+   * "Why flagged?": the caller's own account of the flagged rows on screen (what the view, the problem kind, the
+   * search and the filters narrow it to), each row named with every reason it has. Shown in a side panel from the
+   * toolbar. Left out, there is no such button.
+   */
+  explain?: (rows: ReadonlyArray<ReviewRow>) => ReactNode
+  /**
    * The caller's own form for a value the person has to give, where one box of text would not do (a cell that holds
    * several values). It stands where the region's one field would, behind the same button, and what it saves is the
    * cell's text: one undo step, checked again by `recheck`, as a typed value is. `undefined` for a cell it does not

@@ -24,6 +24,7 @@ import {
   type SavedDecisions,
   type StagedTable
 } from "../../../domain/ItemImport.ts"
+import { WhyFlagged } from "./WhyFlagged.tsx"
 import { DimensionsForm, VendorsForm } from "./CellForms.tsx"
 import { notImportedColumn, reviewStepWords } from "./format.tsx"
 import { totalText } from "./itemText.ts"
@@ -361,6 +362,7 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
         activity={activity}
         recheck={recheck}
         cellEditor={cellEditor}
+        explain={(flagged) => <WhyFlagged rows={flagged} current={current} />}
         ruleFixes={ruleFixes}
         savedDecisions={start}
         onDecisionsChange={decided}

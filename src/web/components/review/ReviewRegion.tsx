@@ -1,6 +1,7 @@
 import { type Column, createColumnHelper, Subscribe } from "@tanstack/react-table"
 import {
   CheckIcon,
+  CircleHelpIcon,
   Columns3Icon,
   DownloadIcon,
   HistoryIcon,
@@ -284,6 +285,7 @@ export function ReviewRegion(props: ReviewRegionProps) {
   const [picked, setPicked] = useState<FilterId | undefined>(undefined)
   const [kind, setKind] = useState<string | undefined>(undefined)
   const [activityOpen, setActivityOpen] = useState(false)
+  const [whyOpen, setWhyOpen] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [search, setSearch] = useState("")
   // Rows the person took out of their group's one action, and kinds whose rows they folded or unfolded.
@@ -1026,6 +1028,40 @@ export function ReviewRegion(props: ReviewRegionProps) {
       </Tooltip>
     )
 
+  // "Why flagged?": every reason of every flagged row on screen, in the caller's words, in a side panel.
+  const flaggedOnScreen = ordered
+    .filter((view) => view.status === "needs" || view.status === "cannot")
+    .map((view) => view.row)
+  const whyButton =
+    props.explain === undefined || loading ? null : (
+      <ToolButton
+        label="Why flagged?"
+        tip={`Why flagged: every reason for the ${flaggedOnScreen.length} flagged ${flaggedOnScreen.length === 1 ? "row" : "rows"} on screen`}
+        narrow={narrow}
+        onClick={() => setWhyOpen(true)}
+      >
+        <CircleHelpIcon aria-hidden />
+      </ToolButton>
+    )
+  const whyPanel =
+    props.explain === undefined ? null : (
+      <Sheet open={whyOpen} onOpenChange={setWhyOpen}>
+        <SheetContent className="overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Why flagged?</SheetTitle>
+            <SheetDescription>
+              {flaggedOnScreen.length === 0
+                ? "No row on screen is flagged. Choose another view, or clear the search."
+                : `The ${flaggedOnScreen.length} flagged ${flaggedOnScreen.length === 1 ? "row" : "rows"} on screen, each with every reason. Narrow the view or search to ask about fewer.`}
+            </SheetDescription>
+          </SheetHeader>
+          {whyOpen && flaggedOnScreen.length > 0 ? (
+            <div className="px-4 pb-6">{props.explain(flaggedOnScreen)}</div>
+          ) : null}
+        </SheetContent>
+      </Sheet>
+    )
+
   const activityButton =
     props.activity === undefined ? null : (
       <ToolButton
@@ -1295,6 +1331,7 @@ export function ReviewRegion(props: ReviewRegionProps) {
           <div className="flex flex-none items-center gap-1 px-4 pt-2 pb-1">
             <div className="min-w-0 flex-1">{heading}</div>
             {loading || failed ? null : columnsMenu}
+            {whyButton}
             {activityButton}
           </div>
           {failed ? (
@@ -1349,6 +1386,7 @@ export function ReviewRegion(props: ReviewRegionProps) {
             </>
           )}
           {activityPanel}
+          {whyPanel}
           {confirmStep}
         </section>
       </LayoutContext>
@@ -1384,6 +1422,7 @@ export function ReviewRegion(props: ReviewRegionProps) {
                       {loading ? null : filterMenu}
                       {densityMenu}
                       {loading ? null : download}
+                      {whyButton}
                       {activityButton}
                     </div>
                     <div className="ml-auto flex min-w-0 items-center gap-2">
@@ -1404,6 +1443,7 @@ export function ReviewRegion(props: ReviewRegionProps) {
                       {loading ? null : filterMenu}
                       {densityMenu}
                       {loading ? null : download}
+                      {whyButton}
                       {activityButton}
                     </div>
                   </>
@@ -1454,6 +1494,7 @@ export function ReviewRegion(props: ReviewRegionProps) {
           )}
         </div>
         {activityPanel}
+        {whyPanel}
         {confirmStep}
       </section>
     </LayoutContext>

@@ -46,7 +46,7 @@ const Measure = S.Finite.check(S.isGreaterThan(0))
 
 /** An item's size: all three measurements together, each above zero, in centimetres or inches. */
 export const Dimensions = S.Struct({
-  length: Measure.annotateKey({ description: "Length, above zero", examples: [78.8] }).annotateKey({
+  length: Measure.annotate({ description: "Length, above zero", examples: [78.8] }).annotateKey({
     description: "How long the item is, in `unit`",
     messageMissingKey: "Give the length: an item's three measurements come together."
   }),
@@ -75,7 +75,7 @@ export const Vendor = S.Struct({
     messageMissingKey: "Give the vendor's name."
   }),
   vendorSku: S.NullOr(S.String)
-    .annotateKey({
+    .annotate({
       description: "The vendor's own code for the item; null for none",
       examples: ["TI-12311"]
     })
@@ -117,7 +117,7 @@ export const ItemFields = S.Struct({
       description: "The code the item is known by. No two items of one organization share it, and it never changes",
       messageMissingKey: "Give the item's SKU: three capital letters, a hyphen and four digits, like SHH-9574."
     }),
-  name: S.NonEmptyString.check(S.isMaxLength(maxNameLength)).annotate({
+  name: S.NonEmptyString.check(S.isMaxLength(maxNameLength)).annotateKey({
     description: "The item's name, 1 to 120 characters, trimmed",
     examples: ["Oak Foam Insert"]
   }),
@@ -133,19 +133,19 @@ export const ItemFields = S.Struct({
     description: "The unit the item is counted and costed in: EA (each), BX (box), KG, M or L",
     messageMissingKey: "Choose the unit of measure."
   }),
-  unitCost: Decimal.annotate({
+  unitCost: Decimal.annotateKey({
     description: "The cost of one unit in US dollars, a decimal string read from the digits, up to 4 decimals",
     examples: ["12.33"]
   }),
-  quantityOnHand: Count.annotate({
+  quantityOnHand: Count.annotateKey({
     description: "How many are in stock; 0 when the file gives none",
     examples: [3845]
   }),
   reorderPoint: S.NullOr(Count)
     .annotate({ description: "The stock level to reorder at; null for none", examples: [402] })
     .annotateKey({ description: "Reorder when the quantity on hand falls to this number; null when nobody set one" }),
-  isActive: S.Boolean.annotate({ description: "Whether the item is in use; true when the file does not say" }),
-  lotTracked: S.Boolean.annotate({
+  isActive: S.Boolean.annotateKey({ description: "Whether the item is in use; true when the file does not say" }),
+  lotTracked: S.Boolean.annotateKey({
     description: "Whether stock is tracked by lot; false when the file does not say"
   }),
   tags: S.Array(S.String)
@@ -175,11 +175,11 @@ export type ItemFields = typeof ItemFields.Type
 
 /** An item as stored for one organization. */
 export const StoredItem = S.Struct({
-  id: S.String.annotate({ description: "The item's id, given when the import created it" }),
+  id: S.String.annotateKey({ description: "The item's id, given when the import created it" }),
   ...ItemFields.fields,
   createdAt: instant("When the import created the item"),
   createdBy: personName("Who confirmed the import that created the item"),
-  revision: S.Int.annotate({
+  revision: S.Int.annotateKey({
     description:
       "1 as the import created it, one more after each change. An edit names the revision it was made on, and a " +
       "take-back of the import removes only items still at 1",
@@ -201,13 +201,16 @@ export const fieldsOf = (item: StoredItem): ItemFields => {
  * import writes. An edit made on an older revision is refused instead of overwriting a change the person did not see.
  */
 export const ItemEdit = S.Struct({
-  revision: S.Int.check(S.isGreaterThanOrEqualTo(1))
-    .annotate({ description: "The revision the person was looking at when they made the change", examples: [1] })
-    .annotateKey({ messageMissingKey: "Send the revision of the item the change was made on." }),
+  revision: S.Int.check(S.isGreaterThanOrEqualTo(1)).annotateKey({
+    description: "The revision the person was looking at when they made the change",
+    examples: [1],
+    messageMissingKey: "Send the revision of the item the change was made on."
+  }),
   name: ItemFields.fields.name.annotateKey({ messageMissingKey: "Give the item a name." }),
-  description: S.NullOr(S.String.check(S.isMaxLength(32767)))
-    .annotate({ description: "Free text about the item; null for none" })
-    .annotateKey({ messageMissingKey: "Give a description, or null for none." }),
+  description: S.NullOr(S.String.check(S.isMaxLength(32767))).annotateKey({
+    description: "Free text about the item; null for none",
+    messageMissingKey: "Give a description, or null for none."
+  }),
   category: Category.annotateKey({ messageMissingKey: "Choose the category." }),
   uom: Uom.annotateKey({ messageMissingKey: "Choose the unit of measure." }),
   unitCost: ItemFields.fields.unitCost.annotateKey({ messageMissingKey: "Give the unit cost." }),
@@ -215,10 +218,12 @@ export const ItemEdit = S.Struct({
   reorderPoint: ItemFields.fields.reorderPoint.annotateKey({
     messageMissingKey: "Give the reorder point, or null for none."
   }),
-  isActive: S.Boolean.annotate({ description: "Whether the item is in use" }).annotateKey({
+  isActive: S.Boolean.annotateKey({
+    description: "Whether the item is in use",
     messageMissingKey: "Say whether the item is active."
   }),
-  lotTracked: S.Boolean.annotate({ description: "Whether stock is tracked by lot" }).annotateKey({
+  lotTracked: S.Boolean.annotateKey({
+    description: "Whether stock is tracked by lot",
     messageMissingKey: "Say whether the item is lot tracked."
   }),
   firstReceivedOn: ItemFields.fields.firstReceivedOn.annotateKey({

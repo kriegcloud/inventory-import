@@ -93,7 +93,7 @@ const FilterText = S.String.check(S.isMaxLength(200))
 /** One column of the order: its id, and whether it runs from high to low. */
 export const ItemSort = S.Struct({
   id: ItemSortColumn,
-  desc: S.Boolean.annotate({ description: "True: from high to low, Z to A" })
+  desc: S.Boolean.annotateKey({ description: "True: from high to low, Z to A" })
 }).annotate({
   identifier: "ItemSort",
   description: "One column of the order: its id, and whether it runs from high to low"
@@ -108,12 +108,12 @@ export type ItemSort = typeof ItemSort.Type
  */
 export const ItemFilter = S.Struct({
   id: ItemFilterColumn,
-  value: S.Union([FilterText, S.Array(FilterText).check(S.isMaxLength(50))]).annotate({
+  value: S.Union([FilterText, S.Array(FilterText).check(S.isMaxLength(50))]).annotateKey({
     description: "One text, or a list: any of these, or the two ends of a range (either may be empty for an open end)"
   }),
   variant: FilterVariant,
   operator: FilterOperator,
-  filterId: S.optional(S.String.check(S.isMaxLength(64))).annotate({
+  filterId: S.optional(S.String.check(S.isMaxLength(64))).annotateKey({
     description: "The table's own name for this filter. The server does not read it"
   })
 }).annotate({ identifier: "ItemFilter", description: "One filter as the data table kit holds it" })
@@ -125,7 +125,7 @@ export const itemPageSizes = [10, 20, 30, 40, 50] as const
 
 /** Which page of the items, in what order, narrowed how. */
 export const ItemQuery = S.Struct({
-  page: S.Int.check(S.isBetween({ minimum: 1, maximum: 100000 })).annotate({
+  page: S.Int.check(S.isBetween({ minimum: 1, maximum: 100000 })).annotateKey({
     description: "Counted from 1"
   }),
   perPage: S.Int.check(S.isBetween({ minimum: 1, maximum: 50 })),
@@ -133,10 +133,10 @@ export const ItemQuery = S.Struct({
     description: "First entry first. Empty means by SKU, as the full list is, or best match first while searching"
   }),
   filters: S.Array(ItemFilter).check(S.isMaxLength(20)),
-  joinOperator: S.Literals(["and", "or"]).annotate({
+  joinOperator: S.Literals(["and", "or"]).annotateKey({
     description: "Whether a row must pass every filter or any one of them"
   }),
-  search: ItemSearchText.annotate({
+  search: ItemSearchText.annotateKey({
     description:
       "Words every item shown must hold in its name, SKU or description, in any order, whatever the filters' join. With no order chosen, the best matches come first"
   })
@@ -146,9 +146,9 @@ export type ItemQuery = typeof ItemQuery.Type
 
 /** One page of items, and how many pages and items the same filters give in all. */
 export const ItemPage = S.Struct({
-  data: S.Array(StoredItem).annotate({ description: "The items on this page, in the order asked for" }),
-  pageCount: S.Int.annotate({ description: "How many pages the same filters give at this page size" }),
-  total: S.Int.annotate({ description: "Items that pass the filters, on every page together" })
+  data: S.Array(StoredItem).annotateKey({ description: "The items on this page, in the order asked for" }),
+  pageCount: S.Int.annotateKey({ description: "How many pages the same filters give at this page size" }),
+  total: S.Int.annotateKey({ description: "Items that pass the filters, on every page together" })
 }).annotate({
   identifier: "ItemPage",
   description: "One page of items, and how many pages and items the same filters give in all"
@@ -157,12 +157,12 @@ export const ItemPage = S.Struct({
 export type ItemPage = typeof ItemPage.Type
 
 const Count = S.Struct({
-  value: S.String.annotate({ description: "The value as stored" }),
-  count: S.Int.annotate({ description: "How many items have it" })
+  value: S.String.annotateKey({ description: "The value as stored" }),
+  count: S.Int.annotateKey({ description: "How many items have it" })
 }).annotate({ description: "One value in use, and how many items have it" })
 const Range = S.Struct({
-  min: S.NullOr(S.Finite).annotate({ description: "The lowest value; null when no item has one" }),
-  max: S.NullOr(S.Finite).annotate({ description: "The highest value; null when no item has one" })
+  min: S.NullOr(S.Finite).annotateKey({ description: "The lowest value; null when no item has one" }),
+  max: S.NullOr(S.Finite).annotateKey({ description: "The highest value; null when no item has one" })
 }).annotate({ description: "The lowest and highest value; null when no item has one" })
 
 /**
@@ -171,18 +171,18 @@ const Range = S.Struct({
  * the filtered ones.
  */
 export const ItemFacets = S.Struct({
-  total: S.Int.annotate({ description: "How many items the organization has, unfiltered" }),
-  category: S.Array(Count).annotate({ description: "Each category in use, and how many items have it" }),
-  uom: S.Array(Count).annotate({ description: "Each unit of measure in use, and how many items have it" }),
-  isActive: S.Array(Count).annotate({
+  total: S.Int.annotateKey({ description: "How many items the organization has, unfiltered" }),
+  category: S.Array(Count).annotateKey({ description: "Each category in use, and how many items have it" }),
+  uom: S.Array(Count).annotateKey({ description: "Each unit of measure in use, and how many items have it" }),
+  isActive: S.Array(Count).annotateKey({
     description: 'How many items are active ("true") and how many are not ("false"); a value no item has is left out'
   }),
-  lotTracked: S.Array(Count).annotate({
+  lotTracked: S.Array(Count).annotateKey({
     description:
       'How many items are lot tracked ("true") and how many are not ("false"); a value no item has is left out'
   }),
-  quantityOnHand: Range.annotate({ description: "The lowest and highest quantity on hand; null with no items" }),
-  unitCost: Range.annotate({ description: "The lowest and highest unit cost, in dollars; null with no items" })
+  quantityOnHand: Range.annotateKey({ description: "The lowest and highest quantity on hand; null with no items" }),
+  unitCost: Range.annotateKey({ description: "The lowest and highest unit cost, in dollars; null with no items" })
 }).annotate({
   identifier: "ItemFacets",
   description:

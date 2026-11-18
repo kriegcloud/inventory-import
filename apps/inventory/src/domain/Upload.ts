@@ -44,19 +44,19 @@ export const UploadState = S.TaggedUnion({
   Idle: {},
   Reading: {
     fileName: S.String,
-    rowsRead: S.Int.annotate({ description: "Rows of the file read so far, heading and blank rows included" }),
-    rowsAbout: S.NullOr(S.Int).annotate({
+    rowsRead: S.Int.annotateKey({ description: "Rows of the file read so far, heading and blank rows included" }),
+    rowsAbout: S.NullOr(S.Int).annotateKey({
       description:
         "How many rows the file has: worked out from how much of a CSV has been read (an estimate), counted for a " +
         "workbook once it is open (exact), and null while a workbook is still being opened"
     }),
-    exact: S.Boolean.annotate({ description: "True when rowsAbout is a count, not an estimate" })
+    exact: S.Boolean.annotateKey({ description: "True when rowsAbout is a count, not an estimate" })
   },
   Saving: {
     fileName: S.String,
     uploadId: S.String,
-    rowsSaved: S.Int.annotate({ description: "Rows in the pieces the server has acknowledged, each piece once" }),
-    rows: S.Int.annotate({ description: "Data rows in the file: what will be staged" })
+    rowsSaved: S.Int.annotateKey({ description: "Rows in the pieces the server has acknowledged, each piece once" }),
+    rows: S.Int.annotateKey({ description: "Data rows in the file: what will be staged" })
   },
   /** Every piece arrived; the server is turning the upload into an import and preparing its review. */
   Preparing: { fileName: S.String, uploadId: S.String, rows: S.Int },
@@ -67,8 +67,8 @@ export const UploadState = S.TaggedUnion({
   /** Something that is not the file stopped it (the network, the server, the browser): the sentence says what to do. */
   Failed: {
     fileName: S.String,
-    step: S.Literals(["read", "save"]).annotate({ description: "Reading the file, or saving it" }),
-    message: S.String.annotate({ description: "What happened and what to do, for the person" })
+    step: S.Literals(["read", "save"]).annotateKey({ description: "Reading the file, or saving it" }),
+    message: S.String.annotateKey({ description: "What happened and what to do, for the person" })
   }
 }).annotate({ description: "Where one upload stands, as the screen shows it" })
 /** The decoded value of `UploadState`: where one upload stands, as the screen shows it. */

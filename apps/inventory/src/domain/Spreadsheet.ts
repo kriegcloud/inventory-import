@@ -25,19 +25,19 @@ export type CellType = typeof CellType.Type
 /** One cell, as the file holds it. A plain struct, not a class: a 50,000-row file has hundreds of thousands. */
 export const Cell = S.Struct({
   type: CellType,
-  text: S.String.annotate({
+  text: S.String.annotateKey({
     description:
       "The value as text, with nothing coerced. text: exactly as stored, spaces kept. number: plain decimal at the " +
       "15 significant digits Excel keeps, no exponent and no floating-point noise (0.1+0.2 is 0.3, 12.5 stays 12.5). " +
       "date: ISO 8601 from the stored date value, so day and month are never guessed (2026-03-04, 2026-03-04T14:30:00, " +
       "or 14:30:00 for a time alone). boolean: TRUE or FALSE. error: the spreadsheet's code (#N/A). empty: ''."
   }),
-  shown: S.optionalKey(S.String).annotate({
+  shown: S.optionalKey(S.String).annotateKey({
     description:
       "What the spreadsheet displays with the cell's number format ($12.50, 00123, 3/4/2026), when that differs " +
       "from text. Workbooks only. Use it for codes: a SKU stored as 123 with format 00000 is shown as 00123."
   }),
-  formula: S.optionalKey(S.String).annotate({
+  formula: S.optionalKey(S.String).annotateKey({
     description: "The cell's formula (=C5*D5) when it has one. `text` is the result the file stored for it."
   })
 }).annotate({
@@ -48,12 +48,12 @@ export type Cell = typeof Cell.Type
 
 /** A column of the table, named by the header row. Columns are positions; two may share a name. */
 export const Column = S.Struct({
-  index: S.Int.annotate({ description: "Zero-based position among the table's columns." }),
-  letter: S.String.annotate({
+  index: S.Int.annotateKey({ description: "Zero-based position among the table's columns." }),
+  letter: S.String.annotateKey({
     description: "The spreadsheet's own column letter (C), so a message can say where."
   }),
-  header: S.String.annotate({ description: "The header cell's text exactly as found, spaces kept; '' if empty." }),
-  label: S.String.annotate({
+  header: S.String.annotateKey({ description: "The header cell's text exactly as found, spaces kept; '' if empty." }),
+  label: S.String.annotateKey({
     description:
       "A name to show: the header trimmed, 'Column D' when it is empty, and 'Quantity (column E)' for the second of " +
       "two columns with the same name. Unique within the table."
@@ -64,7 +64,7 @@ export type Column = typeof Column.Type
 
 /** A non-empty cell outside the named columns, kept so nothing in the file disappears. */
 export const ExtraCell = S.Struct({
-  letter: S.String.annotate({
+  letter: S.String.annotateKey({
     description: "The spreadsheet's column letter of the cell (H), past the last named column."
   }),
   cell: Cell
@@ -74,16 +74,16 @@ export type ExtraCell = typeof ExtraCell.Type
 
 /** One data row. Blank rows are not rows; they are listed in a Note. */
 export const Row = S.Struct({
-  rowNumber: S.Int.annotate({
+  rowNumber: S.Int.annotateKey({
     description:
       "The row number the person sees when they open the file in Excel, so 'row 56' in a message is findable. For a " +
       "CSV it counts items: a line break inside quotes stays in its row, as Excel shows it."
   }),
-  cells: S.Array(Cell).annotate({ description: "One cell per column, in column order." }),
-  extra: ExtraCell.pipe(S.Array, S.optionalKey).annotate({
+  cells: S.Array(Cell).annotateKey({ description: "One cell per column, in column order." }),
+  extra: ExtraCell.pipe(S.Array, S.optionalKey).annotateKey({
     description: "Non-empty cells beyond the named columns, when the row has any."
   }),
-  hidden: S.optionalKey(S.Boolean).annotate({ description: "True when the row is hidden in Excel." })
+  hidden: S.optionalKey(S.Boolean).annotateKey({ description: "True when the row is hidden in Excel." })
 }).annotate({ description: "One data row, numbered as the person sees it in Excel, with one cell per column." })
 /** A decoded `Row`. Cite `rowNumber` in every message about it, so the person can find it in their file. */
 export type Row = typeof Row.Type
@@ -91,11 +91,11 @@ export type Row = typeof Row.Type
 /** A sheet of a workbook, for the sheet chooser. */
 export const SheetSummary = S.Struct({
   name: S.String,
-  position: S.Int.annotate({ description: "1-based position among the workbook's sheets, hidden ones included." }),
-  visibility: S.Literals(["visible", "hidden", "veryHidden"]).annotate({
+  position: S.Int.annotateKey({ description: "1-based position among the workbook's sheets, hidden ones included." }),
+  visibility: S.Literals(["visible", "hidden", "veryHidden"]).annotateKey({
     description: "veryHidden sheets are not listed by Excel's Unhide; only a macro shows them."
   }),
-  rowCount: S.Int.annotate({ description: "Rows with at least one non-empty cell, title rows included." })
+  rowCount: S.Int.annotateKey({ description: "Rows with at least one non-empty cell, title rows included." })
 }).annotate({ description: "One sheet of a workbook, as the sheet chooser lists it." })
 /** A decoded `SheetSummary`. */
 export type SheetSummary = typeof SheetSummary.Type
@@ -103,23 +103,23 @@ export type SheetSummary = typeof SheetSummary.Type
 /** Which sheet the table came from and why, stated so the choice is never silent. */
 export const SheetChoice = S.Struct({
   name: S.String,
-  position: S.Int.annotate({
+  position: S.Int.annotateKey({
     description: "1-based position of the chosen sheet among all the workbook's sheets."
   }),
-  sheetCount: S.Int.annotate({ description: "How many sheets the workbook has, hidden ones included." }),
-  reason: S.Literals(["onlySheetWithData", "mostData", "chosenByPerson", "onlyHiddenSheetsHaveData"]).annotate({
+  sheetCount: S.Int.annotateKey({ description: "How many sheets the workbook has, hidden ones included." }),
+  reason: S.Literals(["onlySheetWithData", "mostData", "chosenByPerson", "onlyHiddenSheetsHaveData"]).annotateKey({
     description:
       "Why this sheet: the only one with data, the one with the most, the person's choice, or only hidden ones had data."
   }),
-  explanation: S.String.annotate({ description: "One sentence for the screen: why this sheet." })
+  explanation: S.String.annotateKey({ description: "One sentence for the screen: why this sheet." })
 }).annotate({ description: "Which sheet the table came from and why, so the choice is never silent." })
 /** A decoded `SheetChoice`. */
 export type SheetChoice = typeof SheetChoice.Type
 
 /** How a CSV was read. */
 export const CsvFormat = S.TaggedStruct("csv", {
-  delimiter: S.Literals([",", ";", "\t", "|"]).annotate({ description: "The separator found in the file." }),
-  encoding: S.Literals(["utf-8", "windows-1252"]).annotate({
+  delimiter: S.Literals([",", ";", "\t", "|"]).annotateKey({ description: "The separator found in the file." }),
+  encoding: S.Literals(["utf-8", "windows-1252"]).annotateKey({
     description: "windows-1252 only when the bytes are not valid UTF-8; a Note then asks the person to check accents."
   })
 }).annotate({ description: "How a CSV was read: its separator and its text encoding." })
@@ -163,11 +163,11 @@ export type NoteKind = typeof NoteKind.Type
 /** Something the reader did, skipped or noticed, in a sentence the person can act on. */
 export const Note = S.Struct({
   kind: NoteKind,
-  level: S.Literals(["info", "warning"]).annotate({
+  level: S.Literals(["info", "warning"]).annotateKey({
     description: "warning: the person should look before importing. info: how the file was read."
   }),
-  message: S.String.annotate({ description: "One sentence for the screen, written for the person." }),
-  rows: S.Array(S.Int).annotate({ description: "The row numbers it concerns (as in Excel), if any." })
+  message: S.String.annotateKey({ description: "One sentence for the screen, written for the person." }),
+  rows: S.Array(S.Int).annotateKey({ description: "The row numbers it concerns (as in Excel), if any." })
 }).annotate({ description: "Something the reader did, skipped or noticed, in a sentence the person can act on." })
 /** A decoded `Note`. */
 export type Note = typeof Note.Type
@@ -180,7 +180,7 @@ export const SpreadsheetTable = S.Struct({
   fileName: S.String,
   kind: FileKind,
   format: S.Union([CsvFormat, WorkbookFormat]),
-  headerRowNumber: S.Int.annotate({ description: "The row the column names were found on, as in Excel." }),
+  headerRowNumber: S.Int.annotateKey({ description: "The row the column names were found on, as in Excel." }),
   columns: S.Array(Column),
   rows: S.Array(Row),
   notes: S.Array(Note)

@@ -89,8 +89,8 @@ const bounded = (max: number) => S.String.check(S.isMaxLength(max))
 
 /** One cell as the reader found it: `text` with nothing coerced, and `shown` when Excel displays it differently. */
 export const StagedCell = S.Struct({
-  text: bounded(32767).annotate({ description: "The cell's value as text, nothing coerced", examples: ["120"] }),
-  shown: S.optionalKey(bounded(32767)).annotate({
+  text: bounded(32767).annotateKey({ description: "The cell's value as text, nothing coerced", examples: ["120"] }),
+  shown: S.optionalKey(bounded(32767)).annotateKey({
     description: "What Excel displays, when that differs from the value; left out otherwise"
   })
 }).annotate({
@@ -106,17 +106,17 @@ export type StagedCell = typeof StagedCell.Type
  * the identity of each item the row holds (`rowId`). Never offset to tell a row's items apart.
  */
 export const StagedRow = S.Struct({
-  rowNumber: S.Int.annotate({ description: "The row number Excel shows, so 'row 56' on a screen is findable" }),
-  cells: S.Array(StagedCell).annotate({ description: "The row's cells, in the order of the file's columns" })
+  rowNumber: S.Int.annotateKey({ description: "The row number Excel shows, so 'row 56' on a screen is findable" }),
+  cells: S.Array(StagedCell).annotateKey({ description: "The row's cells, in the order of the file's columns" })
 }).annotate({ identifier: "StagedRow", description: "One data row of the file" })
 /** The decoded value of `StagedRow`: one data row of the file. */
 export type StagedRow = typeof StagedRow.Type
 
 /** A column of the file: its position, Excel's letter and the heading as shown. */
 export const StagedColumn = S.Struct({
-  index: S.Int.annotate({ description: "The column's position in the file, from 0", examples: [3] }),
-  letter: bounded(8).annotate({ description: "The column's letter in Excel: A, B, AA", examples: ["D"] }),
-  label: bounded(32767).annotate({ description: "The heading as the file shows it", examples: ["Unit"] })
+  index: S.Int.annotateKey({ description: "The column's position in the file, from 0", examples: [3] }),
+  letter: bounded(8).annotateKey({ description: "The column's letter in Excel: A, B, AA", examples: ["D"] }),
+  label: bounded(32767).annotateKey({ description: "The heading as the file shows it", examples: ["Unit"] })
 }).annotate({
   identifier: "StagedColumn",
   description: "A column of the file: its position, Excel's letter and the heading as shown"
@@ -126,10 +126,10 @@ export type StagedColumn = typeof StagedColumn.Type
 
 /** Something the reader did, skipped or noticed, as the sentence it wrote. */
 export const StagedNote = S.Struct({
-  kind: bounded(40).annotate({ description: "What kind of note it is, as the reader names it" }),
-  level: S.Literals(["info", "warning"]).annotate({ description: "warning: something the person should look at" }),
-  message: bounded(4000).annotate({ description: "The sentence the reader wrote" }),
-  rows: S.Array(S.Int).annotate({
+  kind: bounded(40).annotateKey({ description: "What kind of note it is, as the reader names it" }),
+  level: S.Literals(["info", "warning"]).annotateKey({ description: "warning: something the person should look at" }),
+  message: bounded(4000).annotateKey({ description: "The sentence the reader wrote" }),
+  rows: S.Array(S.Int).annotateKey({
     description: "The rows of the file it is about, as Excel numbers them; empty when it is about the whole file"
   })
 }).annotate({
@@ -144,16 +144,16 @@ export type StagedNote = typeof StagedNote.Type
  * review needs. Nothing in it is an item yet.
  */
 export const StagedTable = S.Struct({
-  fileName: bounded(255).annotate({ description: "The file's name as it was chosen", examples: ["items.csv"] }),
-  kind: S.Literals(["csv", "xlsx"]).annotate({ description: "What kind of file it was read as" }),
-  sheet: S.NullOr(bounded(200)).annotate({ description: "The sheet the table came from; null for a CSV" }),
-  headerRowNumber: S.Int.annotate({
+  fileName: bounded(255).annotateKey({ description: "The file's name as it was chosen", examples: ["items.csv"] }),
+  kind: S.Literals(["csv", "xlsx"]).annotateKey({ description: "What kind of file it was read as" }),
+  sheet: S.NullOr(bounded(200)).annotateKey({ description: "The sheet the table came from; null for a CSV" }),
+  headerRowNumber: S.Int.annotateKey({
     description: "The row the headings are on, as Excel numbers it",
     examples: [1]
   }),
-  columns: S.Array(StagedColumn).annotate({ description: "The file's columns, in order" }),
-  rows: S.Array(StagedRow).annotate({ description: "The data rows, in file order" }),
-  notes: S.Array(StagedNote).annotate({ description: "What the reader did, skipped or noticed" })
+  columns: S.Array(StagedColumn).annotateKey({ description: "The file's columns, in order" }),
+  rows: S.Array(StagedRow).annotateKey({ description: "The data rows, in file order" }),
+  notes: S.Array(StagedNote).annotateKey({ description: "What the reader did, skipped or noticed" })
 }).annotate({
   identifier: "StagedTable",
   description:
@@ -234,10 +234,10 @@ export const stagingProblem = (input: {
 /** A column the person chose for a field. `column` null means none, on purpose. */
 export const MappingChoice = S.Struct({
   field: Field,
-  column: S.NullOr(S.Int).annotate({
+  column: S.NullOr(S.Int).annotateKey({
     description: "The file column's position, from 0; null for none, on purpose"
   }),
-  by: S.Literals(["person"]).annotate({ description: "Who chose it: always a person" })
+  by: S.Literals(["person"]).annotateKey({ description: "Who chose it: always a person" })
 }).annotate({
   identifier: "MappingChoice",
   description: "A column the person chose for a field; column null means none, on purpose"
@@ -248,14 +248,14 @@ export type MappingChoice = typeof MappingChoice.Type
 /** How one field is filled: from which file column, and how that was settled. */
 export const ColumnMatch = S.Struct({
   field: Field,
-  column: S.NullOr(S.Int).annotate({
+  column: S.NullOr(S.Int).annotateKey({
     description: "The file column's position, from 0; null when no column fills the field"
   }),
-  header: S.NullOr(S.String).annotate({ description: "That column's heading; null with no column" }),
-  how: S.Literals(["heading", "person", "none"]).annotate({
+  header: S.NullOr(S.String).annotateKey({ description: "That column's heading; null with no column" }),
+  how: S.Literals(["heading", "person", "none"]).annotateKey({
     description: "Matched by its heading, chosen by a person, or not matched"
   }),
-  examples: S.Array(S.String).annotate({
+  examples: S.Array(S.String).annotateKey({
     description: "A few values from that column, to check the match by eye"
   })
 }).annotate({
@@ -280,31 +280,31 @@ export type Confidence = typeof Confidence.Type
  * column is offered for the person to match.
  */
 export const Suggestion = S.Struct({
-  id: S.String.annotate({ description: "The suggestion's id" }),
-  kind: S.Literals(["name", "category", "column"]).annotate({
+  id: S.String.annotateKey({ description: "The suggestion's id" }),
+  kind: S.Literals(["name", "category", "column"]).annotateKey({
     description:
       "A name for a row with none, a category for a row whose category is not listed, or a column for a field"
   }),
-  rowId: S.NullOr(S.String).annotate({
+  rowId: S.NullOr(S.String).annotateKey({
     description: "The row it is for, as the review keys rows (`row-7`); null for a column",
     examples: ["row-7"]
   }),
-  rowNumber: S.NullOr(S.Int).annotate({ description: "That row's number in the file; null for a column" }),
+  rowNumber: S.NullOr(S.Int).annotateKey({ description: "That row's number in the file; null for a column" }),
   field: Field,
-  from: S.String.annotate({ description: "The cell exactly as the file has it; empty for a column" }),
-  to: S.String.annotate({
+  from: S.String.annotateKey({ description: "The cell exactly as the file has it; empty for a column" }),
+  to: S.String.annotateKey({
     description: "The suggested value; for a column, the file column's heading",
     examples: ["Nylon Coil"]
   }),
-  column: S.NullOr(S.Int).annotate({
+  column: S.NullOr(S.Int).annotateKey({
     description: "For a column, the file column's position from 0: what `match` takes; null otherwise"
   }),
-  by: S.Literals(["model", "rule"]).annotate({ description: "Who suggested it: a language model, or a rule" }),
-  model: S.NullOr(S.String).annotate({ description: "The model that suggested it; null for a rule" }),
-  confidence: S.Literals(["medium", "low"]).annotate({
+  by: S.Literals(["model", "rule"]).annotateKey({ description: "Who suggested it: a language model, or a rule" }),
+  model: S.NullOr(S.String).annotateKey({ description: "The model that suggested it; null for a rule" }),
+  confidence: S.Literals(["medium", "low"]).annotateKey({
     description: "How sure it is, set by the guard from the file's rows, never by the model: medium at most"
   }),
-  basis: S.String.annotate({ description: "One sentence of evidence, written by code from the file's rows" })
+  basis: S.String.annotateKey({ description: "One sentence of evidence, written by code from the file's rows" })
 }).annotate({
   identifier: "Suggestion",
   description: "A stored suggestion for something the fixed rules cannot settle; the person accepts or rejects it"
@@ -344,30 +344,30 @@ export const suggestionFits = (input: {
  * SKU is stored with other values, whether the stored item stays or the file's row replaces it.
  */
 export const RowDecision = S.Struct({
-  out: S.optionalKey(S.Boolean).annotate({
+  out: S.optionalKey(S.Boolean).annotateKey({
     description: "True: the person left the row out. Leave the key out for a row that stays in",
     examples: [true]
   }),
-  kept: S.optionalKey(S.Boolean).annotate({
+  kept: S.optionalKey(S.Boolean).annotateKey({
     description:
       "True: the person kept this row over another with the same SKU (rows 4 and 10 both say YDR-8742). Leave it out otherwise",
     examples: [true]
   }),
-  accepted: S.optionalKey(S.Array(bounded(40)).check(S.isMaxLength(fields.length))).annotate({
+  accepted: S.optionalKey(S.Array(bounded(40)).check(S.isMaxLength(fields.length))).annotateKey({
     description:
       "Fields whose proposal the person accepted: a rule's, or a stored suggestion's. Leave it out when none was accepted",
     examples: [["unitCost"]]
   }),
-  reverted: S.optionalKey(S.Array(bounded(40)).check(S.isMaxLength(fields.length))).annotate({
+  reverted: S.optionalKey(S.Array(bounded(40)).check(S.isMaxLength(fields.length))).annotateKey({
     description:
       "Fields whose fix or proposal the person undid: the file's value stands. Leave it out when nothing was undone",
     examples: [["uom"]]
   }),
-  edits: S.optionalKey(S.Record(bounded(40), bounded(32767)).check(S.isMaxProperties(fields.length))).annotate({
+  edits: S.optionalKey(S.Record(bounded(40), bounded(32767)).check(S.isMaxProperties(fields.length))).annotateKey({
     description: "Values the person typed, by field. Leave it out when nothing was typed",
     examples: [{ name: "Steel Tube 1in" }]
   }),
-  stored: S.optionalKey(S.Literals(["keep", "replace"])).annotate({
+  stored: S.optionalKey(S.Literals(["keep", "replace"])).annotateKey({
     description:
       "For a row whose SKU is stored with other values: keep the stored item (the row is skipped) or replace it with the file's row"
   })
@@ -535,19 +535,19 @@ export type Problem = {
 /** One value that differs from the file, and who is behind it: what the activity view shows per row. */
 export const Change = S.Struct({
   field: Field,
-  from: S.String.annotate({ description: "The value as the file gives it", examples: ["bx"] }),
-  to: S.String.annotate({ description: "The value the import wrote in its place", examples: ["BX"] }),
-  source: S.Literals(["rule", "model", "person"]).annotate({
+  from: S.String.annotateKey({ description: "The value as the file gives it", examples: ["bx"] }),
+  to: S.String.annotateKey({ description: "The value the import wrote in its place", examples: ["BX"] }),
+  source: S.Literals(["rule", "model", "person"]).annotateKey({
     description: "Where the new value came from: a rule, a model's suggestion the person accepted, or the person"
   }),
-  decidedBy: S.Literals(["person", "rule"]).annotate({ description: "Who put it in force" }),
-  how: S.Literals(["accepted a proposal", "typed or chose a value", "applied by a rule"]).annotate({
+  decidedBy: S.Literals(["person", "rule"]).annotateKey({ description: "Who put it in force" }),
+  how: S.Literals(["accepted a proposal", "typed or chose a value", "applied by a rule"]).annotateKey({
     description: "How the new value came to stand, in the words the activity view shows"
   }),
-  basis: S.NullOr(S.String).annotate({
+  basis: S.NullOr(S.String).annotateKey({
     description: "What a proposal rested on, in a sentence; null for a value a person typed"
   }),
-  confidence: S.NullOr(Confidence).annotate({
+  confidence: S.NullOr(Confidence).annotateKey({
     description: "How sure a proposal's source was; null where there was no proposal"
   })
 }).annotate({
@@ -616,7 +616,7 @@ export type UnitTotal = { readonly unit: string; readonly quantity: number }
 /** A file column no field reads, and how many rows hold a value in it: said on screen, never stored. */
 export const UnusedColumn = S.Struct({
   ...StagedColumn.fields,
-  filled: S.Int.annotate({ description: "How many rows of the file hold a value in this column", examples: [20] })
+  filled: S.Int.annotateKey({ description: "How many rows of the file hold a value in this column", examples: [20] })
 }).annotate({
   identifier: "UnusedColumn",
   description: "A file column no field reads, and how many rows hold a value in it"

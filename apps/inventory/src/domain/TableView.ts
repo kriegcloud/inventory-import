@@ -59,18 +59,18 @@ export const operatorsFor: Readonly<Record<ColumnType, ReadonlyArray<ViewOperato
 /** One column of a table as the assistant may use it: what it is called, what it holds and what it allows. */
 export const CatalogColumn = S.Struct({
   id: ColumnId,
-  label: S.String.check(S.isMinLength(1), S.isMaxLength(80)).annotate({
+  label: S.String.check(S.isMinLength(1), S.isMaxLength(80)).annotateKey({
     description: "The column's heading as the person reads it"
   }),
   type: ColumnType,
-  sortable: S.Boolean.annotate({ description: "The table can be ordered by this column" }),
-  hideable: S.Boolean.annotate({ description: "The person may hide this column" }),
+  sortable: S.Boolean.annotateKey({ description: "The table can be ordered by this column" }),
+  hideable: S.Boolean.annotateKey({ description: "The person may hide this column" }),
   operators: S.Array(ViewOperator)
     .check(S.isMaxLength(12))
-    .annotate({ description: "The comparisons a filter on this column may use; empty when it cannot be filtered" }),
+    .annotateKey({ description: "The comparisons a filter on this column may use; empty when it cannot be filtered" }),
   values: S.Array(Text(80))
     .check(S.isMaxLength(100))
-    .annotate({ description: "For a select column, every value it can hold; empty otherwise" })
+    .annotateKey({ description: "For a select column, every value it can hold; empty otherwise" })
 }).annotate({ identifier: "CatalogColumn", description: "One column of a table as the assistant may use it" })
 /** The decoded value of `CatalogColumn`. */
 export type CatalogColumn = typeof CatalogColumn.Type
@@ -86,7 +86,7 @@ export type ColumnCatalog = typeof ColumnCatalog.Type
 export const SortChange = S.Struct({
   kind: S.Literal("sort"),
   column: ColumnId,
-  direction: S.Literals(["asc", "desc"]).annotate({ description: "asc: A to Z, low to high. desc: the reverse" })
+  direction: S.Literals(["asc", "desc"]).annotateKey({ description: "asc: A to Z, low to high. desc: the reverse" })
 }).annotate({ description: "Order the table by one column, replacing the order it had" })
 
 /** Keep only the rows whose column passes a comparison. It replaces any filter the column had. */
@@ -94,7 +94,7 @@ export const FilterChange = S.Struct({
   kind: S.Literal("filter"),
   column: ColumnId,
   operator: ViewOperator,
-  values: S.Array(Text(200)).check(S.isMaxLength(50)).annotate({
+  values: S.Array(Text(200)).check(S.isMaxLength(50)).annotateKey({
     description:
       'What to compare with. One entry for text and number; "true" or "false" for boolean; one or more of the column\'s values for select; none for isEmpty and isNotEmpty'
   })
@@ -109,7 +109,7 @@ export const maxSearchText = 200
  */
 export const SearchChange = S.Struct({
   kind: S.Literal("search"),
-  text: Text(maxSearchText).annotate({
+  text: Text(maxSearchText).annotateKey({
     description:
       'The words to put in the search box, as the person would type them ("m8 washer"); empty to stop searching'
   })
@@ -143,7 +143,7 @@ export const maxChanges = 12
  */
 export const ViewCommand = S.Struct({
   changes: S.Array(ViewChange).check(S.isMaxLength(maxChanges)),
-  cannot: Text(300).annotate({
+  cannot: Text(300).annotateKey({
     description:
       "In one plain sentence, what the person asked that these changes cannot do (a column the table does not have, grouping, charts, changing data). Empty when everything was done"
   })
@@ -158,12 +158,12 @@ export const AnsweredBy = S.Literals(["rules", "model"]).annotate({
 
 /** A request the assistant could turn into changes, and who read it. */
 export const ViewAnswer = S.Struct({
-  changes: S.Array(ViewChange).annotate({
+  changes: S.Array(ViewChange).annotateKey({
     description: "The changes to make to the view, in order; each was checked against the table's columns"
   }),
   by: AnsweredBy,
-  model: S.NullOr(S.String).annotate({ description: "The model that answered; null for the rules" }),
-  note: S.NullOr(S.String).annotate({
+  model: S.NullOr(S.String).annotateKey({ description: "The model that answered; null for the rules" }),
+  note: S.NullOr(S.String).annotateKey({
     description: "A sentence for the person: what was not done, or why the rules answered. Null when there is none"
   })
 }).annotate({ identifier: "ViewAnswer", description: "The changes a request asked for, and who read it" })
@@ -172,10 +172,10 @@ export type ViewAnswer = typeof ViewAnswer.Type
 
 /** A request the assistant would not apply, said for the person. Nothing in the view changes. */
 export const ViewRefusal = S.Struct({
-  reason: S.String.annotate({ description: "What could not be done and what to try, for the person" }),
+  reason: S.String.annotateKey({ description: "What could not be done and what to try, for the person" }),
   by: AnsweredBy,
-  model: S.NullOr(S.String).annotate({ description: "The model that answered; null for the rules" }),
-  note: S.NullOr(S.String).annotate({
+  model: S.NullOr(S.String).annotateKey({ description: "The model that answered; null for the rules" }),
+  note: S.NullOr(S.String).annotateKey({
     description: "A sentence for the person, such as why the rules answered. Null when there is none"
   })
 }).annotate({ identifier: "ViewRefusal", description: "A request the assistant would not apply, said for the person" })

@@ -5,14 +5,14 @@ import * as S from "effect/Schema"
 
 /**
  * A moment the server recorded, as text. The server writes every one with `DateTime.formatIso`, so the document
- * says `date-time`; the format is stated, not enforced.
+ * says `date-time`; the format is stated, not enforced. The words describe the field, so they sit on its key; the
+ * format describes the text itself, so it stays on the value.
  *
  * @example instant("When the import created the item")
  */
 export const instant = (what: string) =>
-  S.String.annotate({
+  S.String.annotate({ format: "date-time" }).annotateKey({
     description: `${what}, as an ISO 8601 instant in UTC`,
-    format: "date-time",
     examples: ["2026-03-02T09:30:00.000Z"]
   })
 
@@ -23,7 +23,7 @@ export const instant = (what: string) =>
  * @example personName("Who confirmed the import")
  */
 export const personName = (what: string) =>
-  S.String.annotate({
+  S.String.annotateKey({
     description: `${what}: the member's name as it was then, for the screen. Not an id`,
     examples: ["Marcus Oyelaran"]
   })

@@ -30,22 +30,22 @@ const plural = (n: number, one: string, many: string): string => `${n} ${n === 1
 export const SuggestAnswer = S.Struct({
   names: S.Array(
     S.Struct({
-      rowNumber: S.Int.annotate({ description: "A rowNumber from rowsWithoutName" }),
-      name: S.String.annotate({
+      rowNumber: S.Int.annotateKey({ description: "A rowNumber from rowsWithoutName" }),
+      name: S.String.annotateKey({
         description: "A short name for the item, taken from its description: the thing itself, in title case"
       })
     })
   ),
   categories: S.Array(
     S.Struct({
-      rowNumber: S.Int.annotate({ description: "A rowNumber from rowsWithoutCategory" }),
-      category: S.String.annotate({ description: "One value copied from the categories list, exactly as written" })
+      rowNumber: S.Int.annotateKey({ description: "A rowNumber from rowsWithoutCategory" }),
+      category: S.String.annotateKey({ description: "One value copied from the categories list, exactly as written" })
     })
   ),
   columns: S.Array(
     S.Struct({
-      field: S.String.annotate({ description: "A field from fieldsWithoutColumn" }),
-      heading: S.String.annotate({ description: "A heading from unusedHeadings, exactly as written" })
+      field: S.String.annotateKey({ description: "A field from fieldsWithoutColumn" }),
+      heading: S.String.annotateKey({ description: "A heading from unusedHeadings, exactly as written" })
     })
   )
 }).annotate({ description: "A model's suggestions for an import: names, categories and columns, with no rating" })

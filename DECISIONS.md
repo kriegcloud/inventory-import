@@ -13,27 +13,31 @@ didn't": a messy file in, what is wrong fixed in the app, a clear account of the
   156. `items_clean.csv`: 25 Ready, 25 imported, 25 stored; loaded again it adds nothing and says so.
 - **Works by test, seen in part:** a second import (155 Already there; rows 148, 195 wait); a take-back naming every
   item removed; the item editor refusing a discontinued yet active item.
+- **Fixed after the hour, each seen in a browser:** both answers on a discontinued yet active row (row 45 stored
+  active, no date); a model's name shows its source, "Why?" and Reject, and a weak guess waits for a typed name; the
+  vendors form opens with what a cut-off cell holds and the question names vendors, not JSON; every view and every
+  reason in full on a phone; every confirmed import, a clean file's too, listed on Upload and under Activity, each
+  linking to its result; a .txt letter refused with a message; quantities with their unit and default ("0 EA,
+  default"); Activity and People on the data table; "Why flagged?"; Items filtered by Active and Lot tracked; a
+  take-back restores the items it replaced. Every screen measured at 1440, 820 and 375 px: nothing past the edge. On
+  the last version Confirm stored 155, the result said 155 imported and 45 not, Items showed 155.
 - **Known wrong or missing:**
-  - A discontinued yet active row offers one answer, "Not active"; clearing the date means typing in its cell.
-  - A name suggested by the model shows no source, "Why?" or reject (a category does); a weak model suggestion is
-    still the row's one-press answer.
-  - The vendors form opens empty for a cut-off cell; the vendors question shows the cell's raw text.
-  - On a phone the last two views sit past the edge. A reason in the review is cut to one line, whole on hover.
-  - A past import is reached from Activity only when it changed a value; the clean file's has no link.
-  - A .txt file chosen by mistake gets no message. Quantities in the review have no unit and show no default.
-  - Activity and People are not on the data table.
-- **Not verified on the last version:** read on it: the messy file to Confirm, the clean file (Items 155 to 180),
-  the link from Activity, the drop message. Read one to four versions earlier: answers, undo, refresh, the
-  dimension form, take-back, the second load. Read by the browser tester one version earlier: "Reject this
-  proposal", "Undo this fix", the vendors form, scrollbars in both themes, the review and Items at tablet and phone
-  widths. Seen by nobody: the review's filter and column menus, the Items filters for active and lot tracked, Upload
-  and Result at tablet and phone widths, the rendered diagrams. The model help made one real call that I saw
-  ("Suggested 2 names. Suggested 2 categories."); its quality on other files and its cost are not measured.
+  - A model's weak name guess (rated low by the guard) never came up in my runs, so its panel is not seen on screen;
+    a test covers the rule.
+  - Activity, People and the past-imports list keep their search, sort and filters only until a refresh; Items keeps
+    them in the address. On a phone their cards cannot be sorted.
+  - "Why flagged?" asks about the rows that the view, the problem kind and the search narrow the table to. There is
+    no tick box for picking rows one at a time.
+  - On a phone the grey line under the result's heading is cut to one line.
+  - A take-back restores at most ten replaces of one item in turn. No test covers two rows of one file replacing the
+    same SKU.
+- **Not verified:** how good the model help is on other files, and what it costs; the dark theme on the new screens;
+  a restore after several confirms of one import replaced the same item in turn.
 - **Where my agent was wrong:** its profile missed rows 92 and 103 ("2024-13-01"), caught by the rules on the real
   file. It counted a stored SKU that could not be read yet as "Already there", caught by the code review. A group
   button named one value for rows that got different ones, caught by the browser pass. All three are fixed.
-- **Checks:** `bun run check` before commits; `npm run check:full` in each checkpoint's clean copy, passing at the
-  last. Commit `81daa36` was made while the check failed on unfinished work not in the commit.
+- **Checks:** `bun run check` before every commit; `bun run check:full` and `bun run build` pass on the last commit.
+  In the hour, commit `81daa36` was made while the check failed on unfinished work not in the commit.
 
 ## What the data does
 
@@ -66,17 +70,20 @@ means I chose and the agent recommended the same.
 | A date that reads two ways | One proposal per column; ask every row | same | 3 rows; none decides, so each asks |
 | The same SKU twice in a file | A question, side by side; two items; neither | same | 6 pairs |
 | "Why?" card | Kept, on every proposal, a word and its evidence, with Reject | I chose: "Keep it, style as hover card", "Every proposal", "A word and its evidence", "Reject this proposal" | opens by hover, click, keyboard |
-| Model help or the "Why flagged?" panel | Model help; the panel; both | same | both did not fit |
+| Model help or the "Why flagged?" panel | Model help; the panel; both | same; the panel was added after the hour | both did not fit in the hour |
 | "Internal Notes" | Left out, and said; flag the 20 rows | same | 20 rows; no such field |
-| Filters on Items, Activity, People | Items only; all three | same | the other two are on a simpler table |
+| Filters on Items, Activity, People | Items only; all three | same in the hour; all three since | Activity and People moved onto the data table |
 | Review's filter and column menus; scrollbars; the problems strip; messages | the table's menus; thin; one line of pills; top centre | Mine, in my words: "canonical filters dropdown form the datatable", "less 'thiccc' ... scroll bars", "scroll more naturally", "blocks page navigation controls" | seen on screen |
 | A stored SKU on a row that cannot be read yet | It waits; already there | the agent's default; I was told | rows 148, 195 |
 | A two-digit year; a cost below zero; quantity 12.5 | Typed by the person; proposed | the agent's default; I was told | "0 or more", "integer" |
-| Discontinued yet active | Both readings; one | the agent's default was both; one is built | rows 45, 164 |
+| Discontinued yet active | Both readings; one | the agent's default, both; both are built | rows 45, 164 |
 | "2024-13-01" | Cannot import until fixed; import without the date | same | rows 92, 103 |
-| Take-back after a replace | Leave it, and say so; restore | same | no sample row |
+| Take-back after a replace | Restore, unless changed since; leave it, and say so | the agent's default after the hour: restore, keep and name one changed since | a changed copy of the clean file |
 | A rejected proposal | It leaves the row; stays, marked rejected | the agent's default; I was told | Ctrl+Z brings it back |
 | Into the last version | A past import found again; the drop indication | Mine, in my words: "Find a past import again, Drop indication on Upload" | both seen on it |
+| A model's name guess the guard rates low | Typed by the person, the guess offered beside the box; one press | the agent's default after the hour | "the app never invents a value" |
+| What "Why flagged?" asks about | The rows on screen (view, kind, search); rows ticked one by one | the agent's default after the hour: it needs no new control | the standard's "the answer names them" |
+| A .txt file | A table only when most rows have as many cells as the heading; any text with commas | the agent's default after the hour | a letter read as two columns |
 
 **Reference ledger.** My own app stockroom (MIT): `src/domain/Prep.ts`, functions taken and rewritten (`inspect`,
 the guard); `src/domain/ItemImport.ts`, the stored-suggestion shape and its proposal branch; `src/server/Prep.ts`,
@@ -91,11 +98,9 @@ Medium by rules, never rating itself, accepted like any proposal. With no key th
 
 | Cut | Why | What it would take |
 | --- | --- | --- |
-| The "Why flagged?" panel | I asked for it, then chose the model help first | The ask rules, an endpoint and the panel, from stockroom |
-| Activity and People on the data table, with filters, a column toggle and the assistant | Each is a move onto the data table | Rebuild both pages as Items is |
 | Messages inside the table's footer | The footer has no place for one | A status bar per page |
-| Restoring old values when a replace is taken back | Needs a copy of each replaced item | A history row per replace |
-| "Clear the date" for a discontinued yet active row | It made the confirm button and the stored count disagree, so I withdrew it | A pick that writes another column, read alike by screen and server |
+| Picking rows one by one to ask "Why flagged?" | The view, the kind and the search already narrow the rows | A tick column on the review table |
+| A model's answer in "Why flagged?" | The rules give every reason already, and work with no key | One model call on the rows asked about, drawn from the day's allowance |
 
 ## How I worked with my agent
 
@@ -107,10 +112,10 @@ the confirm cannot disagree.
 
 1. Sign-in hardening: a second factor or passkeys, email verification and reset.
 2. Files past a few thousand rows: the review is computed in the browser.
-3. A history of replaced items, so a take-back restores them.
+3. A full history of every change to an item, beyond the one copy a replace keeps for its take-back.
 
 ## With another hour
 
-The "Why flagged?" panel; Activity and People on the data table; past imports listed on Upload; the strip's arrows,
-the filter menus and the three widths looked at on every screen; both answers on a discontinued row; reasons in
-full; units and defaults in the review.
+Search, sort and filters of Activity and People kept in the address; a tick column for "Why flagged?"; the result's
+grey line whole on a phone; a test for two rows of one file replacing the same SKU; the dark theme looked at on the
+new screens.

@@ -58,18 +58,18 @@ export const StoredFile = S.Struct({
   name: S.String,
   size: S.Int,
   lastModified: S.Finite,
-  sheet: S.NullOr(S.String).annotate({ description: "The sheet the person picked, null for the first read." })
+  sheet: S.NullOr(S.String).annotateKey({ description: "The sheet the person picked, null for the first read." })
 })
 
 /** Everything a screen keeps for one person: the step, the file, the decisions, and a count to offer "Continue" by. */
 export const SavedProgress = S.Struct({
   version: S.Literal(1),
-  step: S.String.annotate({ description: "The step the person was on, as in `?step=`." }),
+  step: S.String.annotateKey({ description: "The step the person was on, as in `?step=`." }),
   file: S.NullOr(StoredFile),
   review: S.NullOr(StoredReview),
-  decided: S.Int.annotate({ description: 'Rows the person has decided, for "3 of 7 decided".' }),
-  needed: S.Int.annotate({ description: "Rows that needed a decision when the file was read." }),
-  savedAt: S.String.annotate({ description: "When it was last saved, ISO 8601." })
+  decided: S.Int.annotateKey({ description: 'Rows the person has decided, for "3 of 7 decided".' }),
+  needed: S.Int.annotateKey({ description: "Rows that needed a decision when the file was read." }),
+  savedAt: S.String.annotateKey({ description: "When it was last saved, ISO 8601." })
 }).annotate({ description: "What one person has done so far on one screen." })
 export type SavedProgress = typeof SavedProgress.Type
 

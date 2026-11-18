@@ -23,9 +23,9 @@ import { authSettings, minimumSecretLength } from "./Settings.ts"
 
 /** What a valid session cookie says: whose it is, and which organisation they are working in. */
 export class AuthSession extends S.Class<AuthSession, { readonly brand: unique symbol }>("AuthSession")({
-  userId: S.String.annotate({ description: "Better Auth's user id: who signed in." }),
-  email: S.String.annotate({ description: "The email the person signed in with, for the account menu." }),
-  activeOrganizationId: S.NullOr(S.String).annotate({
+  userId: S.String.annotateKey({ description: "Better Auth's user id: who signed in." }),
+  email: S.String.annotateKey({ description: "The email the person signed in with, for the account menu." }),
+  activeOrganizationId: S.NullOr(S.String).annotateKey({
     description: "The organisation the person last chose. Null until they belong to one."
   })
 }) {}

@@ -118,7 +118,7 @@ export const propose = Effect.fn("Suggestions.propose")(function* (input: {
 
 const Stored = S.Struct({
   ...Suggestion.fields,
-  rowId: S.String.annotate({ description: "The row's id; empty for a column" })
+  rowId: S.String.annotateKey({ description: "The row's id; empty for a column" })
 }).annotate({ description: "A suggestion as its table holds it: the row id is empty, not null, for a column" })
 
 const toSuggestion = (row: typeof Stored.Type): Suggestion => ({ ...row, rowId: row.rowId === "" ? null : row.rowId })

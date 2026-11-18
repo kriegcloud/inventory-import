@@ -906,12 +906,13 @@ export function ReviewRegion(props: ReviewRegionProps) {
       onValueChange={(next) => {
         if (next !== "") chooseFilter(next as FilterId)
       }}
-      className={narrow ? "w-full overflow-x-auto" : undefined}
+      // On a phone the tabs stand apart and wrap onto a second line: every one is on screen, none past its edge.
+      {...(narrow ? { spacing: 1, className: "w-full flex-wrap" } : {})}
     >
       {filters.map((entry) =>
         narrow ? (
           // On a phone the count goes under its words. A tab is never narrower than its words ("Needs a decision"
-          // is read whole): with more tabs than the screen holds, the row scrolls sideways by itself.
+          // is read whole); the tabs of a line share its width.
           <ToggleGroupItem key={entry.id} value={entry.id} className="h-11 min-w-fit flex-1">
             <span className="flex flex-col items-center">
               <span className="leading-4 whitespace-nowrap">{entry.label}</span>

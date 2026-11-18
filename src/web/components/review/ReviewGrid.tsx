@@ -84,7 +84,7 @@ import type {
  * The region's own Reason column: the sentence behind each row that needs the person or cannot be fixed here, with or
  * without a fix. A `fill` column, cut to one line with the whole sentence one hover, focus or tap away.
  */
-export const reasonColumn: ReviewColumn = { id: "review:reason", label: "Reason", size: "fill", width: 180 }
+export const reasonColumn: ReviewColumn = { id: "review:reason", label: "Reason", size: "fill", width: 240 }
 
 /** A value as its column shows it (`ReviewColumn.display`). */
 const shownIn = (column: ReviewColumn | undefined, text: string): string =>
@@ -385,6 +385,8 @@ export const actionsFit = (input: {
 const Row = memo(function Row(props: {
   view: RowView
   index: number
+  /** Measures the drawn row: a reason in full can take more than one line. */
+  measure: (element: Element | null) => void
   columns: ReadonlyArray<ReviewColumn>
   allColumns: ReadonlyArray<ReviewColumn>
   /** Columns whose value sits under the name at this width. */
@@ -546,8 +548,9 @@ const Row = memo(function Row(props: {
   const value = (column: ReviewColumn): ReactNode => {
     if (column.id === reasonColumn.id) {
       const reason = reasonOf({ view, kinds: props.kinds, words: props.words })
+      // The whole reason, on as many lines as it takes: it is the sentence the person acts on.
       return reason === "" || view.status === "out" || view.status === "stored" ? null : (
-        <CutText text={reason} className="min-w-0" />
+        <span className="block py-1.5 leading-snug whitespace-normal">{reason}</span>
       )
     }
     const isSubject = subject === column.id
@@ -797,6 +800,8 @@ const Row = memo(function Row(props: {
 
   return (
     <StickyTableRow
+      ref={props.measure}
+      data-index={props.index}
       data-row-id={view.row.id}
       // Under a group's heading the decision is the heading's: focus moving to this row goes to its accept.
       data-group={props.banded ? props.group?.id : undefined}
@@ -878,6 +883,7 @@ const Row = memo(function Row(props: {
           key={column.id}
           align={column.align}
           tone={subject === column.id && subjectEmpty ? "danger" : undefined}
+          className={column.id === reasonColumn.id ? "whitespace-normal" : undefined}
         >
           {value(column)}
         </StickyTableCell>
@@ -1609,6 +1615,7 @@ export function ReviewGrid(props: {
                     key={entry.view.row.id}
                     view={entry.view}
                     index={item.index}
+                    measure={virtual.measureElement}
                     columns={columns}
                     allColumns={props.allColumns}
                     under={under}

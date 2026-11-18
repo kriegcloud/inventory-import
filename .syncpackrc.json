@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/syncpack/schema.json",
-  "source": ["package.json"],
+  "source": ["package.json", "apps/*/package.json", "packages/*/package.json"],
   "semverGroups": [
     {
       "label": "Effect packages move together and are pinned to one exact version",

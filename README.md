@@ -57,24 +57,24 @@ What to try first, on the brief's messy file (`public/samples/items_messy.csv`, 
 
 `items_clean.csv` (25 items) imports as it is: all 25 Ready, nothing to decide.
 
-AI features are optional. To turn them on, copy `.dev.vars.example` to `.dev.vars` and add an OpenRouter key (or a
+AI features are optional. To turn them on, copy `apps/inventory/.dev.vars.example` to `apps/inventory/.dev.vars` and add an OpenRouter key (or a
 Vercel AI Gateway key). Without a key the app says so and uses its non-AI path.
 
 The API reference (Scalar) is at http://localhost:5173/api/v1/docs while `bun run dev` runs; the OpenAPI document is
 at `/api/v1/openapi.json` in development and production. Logs: `LOG_LEVEL` and `LOG_FORMAT` in `.dev.vars` (valid
-values in `.dev.vars.example`). After pulling a change to `migrations/0001_init.sql`, run `bun run db:reset` once.
+values in `.dev.vars.example`). After pulling a change to `apps/inventory/migrations/0001_init.sql`, run `bun run db:reset` once.
 
 | Command | What it does |
 | --- | --- |
 | `bun run dev` | App and API on http://localhost:5173, signed in as the first test account in development |
-| `bun run check` | Type-check with Effect diagnostics, lint (including two design lints), format check and the fast tests |
-| `bun run check:full` | Type-check with Effect diagnostics, lint (including two design lints), format check, every test, and a check of `docs/`, `explorations/` and `goals/` |
+| `bun run check` | Through turbo: type-check with Effect diagnostics, lint (including two design lints), the fast tests, format check and the docs check; a second run with nothing changed replays from the cache |
+| `bun run check:full` | `check` plus the slow tests and the production build |
 | `bun run test` | Every test, fast and slow (Vitest, on Node) |
 | `bun run db:reset` | Start again with an empty database (restart `bun run dev` afterwards) |
 | `bun run preview` | The production build on http://localhost:4173, with every security header, compressed as Cloudflare compresses it (`PREVIEW_COMPRESSION=off` sends it as it is) |
-| `bun run build:report` | The production build, and what each of its chunks is made of (`.scratch/bundle/client.html`, a treemap) |
+| `bun run --cwd apps/inventory build:report` | The production build, and what each of its chunks is made of (`.scratch/bundle/client.html`, a treemap) |
 | `bun run auth:schema` | After a change to Better Auth's options, prints the migration it still needs (Node 22.18 or newer) |
-| `bun run deploy:setup`, then `bun run deploy` | Host it on Cloudflare (both need a Cloudflare login) |
+| `bun run --cwd apps/inventory deploy:setup`, then `deploy` | Host it on Cloudflare (both need a Cloudflare login) |
 
 ### Signing in
 
@@ -94,7 +94,7 @@ session, unless you signed out in that tab; a production build always shows the 
 "Create an account" makes a new person and their own organization, which they are the admin of. Someone in two
 organizations switches in the menu under their name.
 
-Sessions are signed with `BETTER_AUTH_SECRET`. The first `bun run dev` writes a random one into `.dev.vars`
+Sessions are signed with `BETTER_AUTH_SECRET`. The first `bun run dev` writes a random one into `apps/inventory/.dev.vars`
 (git-ignored) when that file has none, so there is nothing to set up; to make your own, run `openssl rand -base64 32`
 (`.dev.vars.example` has the line). A deployed copy needs `wrangler secret put BETTER_AUTH_SECRET`: a production build
 refuses to start without it.
@@ -117,7 +117,7 @@ to its PEM files. Pass Vite options after `--`: `bun run dev:https -- --port 517
 ### Optional: telemetry
 
 `bun run telemetry` starts Grafana's LGTM stack in Docker (Grafana on http://localhost:3000, an OpenTelemetry collector
-on 4318) and prints the line to add to `.dev.vars`: `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318`. Restart
+on 4318) and prints the line to add to `apps/inventory/.dev.vars`: `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318`. Restart
 `bun run dev` and use the app: Grafana's Explore shows the Worker's and the browser's traces (Tempo), logs (Loki) and
 metrics (Prometheus). `bun run dev` never starts it, and without that line nothing is built or sent.
 `bun run telemetry:down` stops it and throws the data away.
@@ -147,14 +147,16 @@ What the starter held, now turned to the brief's inventory item:
 
 ## How it is put together
 
-One package, one runtime. `bun run dev` runs a Cloudflare Worker locally in workerd, next to the React app.
+A bun workspace driven by Turborepo, with one app so far. `bun run dev` runs a Cloudflare Worker locally in workerd,
+next to the React app, both built by one Vite config in `apps/inventory`.
 
 ```
-src/domain/   Schemas and pure rules (Effect Schema)
-src/api/      The HTTP contract, shared by server and browser (Effect HttpApi)
-src/server/   Worker: services, handlers, identity, the AI service
-src/web/      React 19, Tailwind 4, shadcn/ui, TanStack Query
-migrations/   D1 (SQLite) schema
+apps/inventory/src/domain/   Schemas and pure rules (Effect Schema)
+apps/inventory/src/api/      The HTTP contract, shared by server and browser (Effect HttpApi)
+apps/inventory/src/server/   Worker: services, handlers, identity, the AI service
+apps/inventory/src/web/      React 19, Tailwind 4, shadcn/ui, TanStack Query
+apps/inventory/migrations/   D1 (SQLite) schema
+turbo.json                   check, lint, test, test:slow, build and dev per package; format and docs checks at the root
 ```
 
 The browser calls the API through a client derived from the contract in `src/api/`, so payloads and errors are typed
@@ -168,11 +170,11 @@ the log format (`src/server/Observability.ts`). In development Effect DevTools c
 Worker's (`.dev.vars.example`), and `bun run telemetry` sends them to a local Grafana. Errors a caller can act on
 are part of each function's type, so a missing case fails the type-check, not a request. One contract serves the
 server and the browser. Start with `src/api/v1/Api.ts`, then `src/server/Items.ts`, then
-`src/server/handlers.ts`.
+`src/server/handlers.ts` (all under `apps/inventory/`).
 
 ## Secrets and security
 
-- **Secrets** are read on the server only. Locally they come from `.dev.vars`, which is git-ignored.
+- **Secrets** are read on the server only. Locally they come from `apps/inventory/.dev.vars`, which is git-ignored.
   `.dev.vars.example` explains what a real project would do instead (a secrets manager at start-up, the platform's
   encrypted store when deployed). `bun run check` fails when a string shaped like an OpenRouter or Anthropic key, or a
   private key, appears in any file git would commit (`test/repo/KeyScan.test.ts`).

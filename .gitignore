@@ -38,3 +38,6 @@ worker-configuration.d.ts
 .dev.pid
 .scratch/
 .taste-skill/
+.turbo
+# Written by the activity-log hook of checkouts made before it was removed; never committed
+.session/

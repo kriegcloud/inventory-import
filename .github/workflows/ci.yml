@@ -24,9 +24,8 @@ jobs:
           node-version: 22
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.4.4
+          bun-version-file: .bun-version
       - run: bun install --frozen-lockfile
-      - name: Types, lint, format, images, every test, docs
-        run: bun run check:full
-      - name: Production build
-        run: bun run build
+      # Through turbo: type-check, lint, fast and slow tests, the production build, format and docs checks.
+      - name: Check, test and build
+        run: bun run check:full -- --summarize

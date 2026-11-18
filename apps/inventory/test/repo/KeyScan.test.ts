@@ -10,7 +10,10 @@ import { describe, expect, it } from "vitest"
 // git would commit, so a key-shaped test value fails `bun run check`. A test that needs one puts it together at run
 // time, as below. A failure names the file and line, never the string.
 
-const root = fileURLToPath(new URL("../../", import.meta.url))
+const here = fileURLToPath(new URL(".", import.meta.url))
+
+/** The repository's top folder: the scan covers every workspace, not only this app. */
+const root = Str.trim(spawnSync("git", ["rev-parse", "--show-toplevel"], { cwd: here, encoding: "utf8" }).stdout)
 
 /** What a secret looks like in a text file. */
 const keyPattern = /sk-or-[A-Za-z0-9_-]{16,}|sk-ant-[A-Za-z0-9_-]{16,}|-----BEGIN [A-Z ]*PRIVATE KEY/

@@ -5,17 +5,20 @@
   "singleQuote": false,
   "trailingComma": "none",
   "ignorePatterns": [
-    "src/web/components/ui/**",
-    "src/web/shadcn-utilities.css",
-    "brief/**",
-    "dist/**",
-    "migrations/**",
-    "package-lock.json",
+    "apps/inventory/src/web/components/ui/**",
+    "apps/inventory/src/web/shadcn-utilities.css",
+    "**/dist/**",
+    "apps/inventory/migrations/**",
     "bun.lock",
     "**/*.md",
     "docs/**",
+    "explorations/**",
+    "goals/**",
     ".agents/**",
     ".claude/**",
-    ".codex/**"
+    ".codex/**",
+    ".turbo/**",
+    "**/.turbo/**",
+    "**/.wrangler/**"
   ]
 }

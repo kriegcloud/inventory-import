@@ -52,14 +52,14 @@ Step 0, clear the ground:
 
 Step 1, workspace:
 
-- [ ] The app lives in `apps/inventory`; the root `package.json` declares bun workspaces and `turbo.json` has the
+- [x] The app lives in `apps/inventory`; the root `package.json` declares bun workspaces and `turbo.json` has the
       seven package tasks and two root tasks.
-- [ ] `bun run check:full` (through `turbo`) passes, and a second `bunx turbo run check` reports every task cached
+- [x] `bun run check:full` (through `turbo`) passes, and a second `bun run check` reports every task cached
       (`FULL TURBO`).
-- [ ] The production CSS still contains a class used only in `components/ui` (named in PLAN with the command).
-- [ ] `.github/workflows/ci.yml` calls turbo through the root scripts.
-- [ ] `bun run docs:check` validates `docs/`, `explorations/` and `goals/`.
-- [ ] Browser: the same import, three numbers agreeing.
+- [x] The production CSS still contains a class used only in `components/ui` (named in PLAN with the command).
+- [x] `.github/workflows/ci.yml` calls turbo through the root scripts.
+- [x] `bun run docs:check` validates `docs/`, `explorations/` and `goals/`.
+- [x] Browser: the same import, three numbers agreeing.
 
 Step 2, toolchain:
 

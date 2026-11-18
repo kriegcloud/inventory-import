@@ -1,12 +1,22 @@
 // Applies D1 migrations to the local database (a SQLite file under .wrangler/).
 // Runs before `bun run dev` and `bun run test` so a fresh checkout needs no manual step.
-// Runs the project's own wrangler with this same Node, so it works the same under `bun run` and `npm run`.
+// Runs the project's own wrangler with this same Node, so it works the same however it is started.
 import { spawnSync } from "node:child_process"
 import { randomBytes } from "node:crypto"
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
+import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
-const wrangler = fileURLToPath(new URL("../node_modules/wrangler/bin/wrangler.js", import.meta.url))
+/** A file inside an installed package: the nearest `node_modules` up from this script (the workspace root's, hoisted). */
+const installed = (path) => {
+  for (let dir = dirname(fileURLToPath(import.meta.url)); ; dir = dirname(dir)) {
+    const candidate = join(dir, "node_modules", path)
+    if (existsSync(candidate)) return candidate
+    if (dirname(dir) === dir) throw new Error(`${path} is not installed: run \`bun install\` at the repository root.`)
+  }
+}
+
+const wrangler = installed("wrangler/bin/wrangler.js")
 const result = spawnSync(process.execPath, [wrangler, "d1", "migrations", "apply", "DB", "--local"], {
   stdio: ["ignore", "pipe", "pipe"],
   env: { ...process.env, CI: "true", WRANGLER_SEND_METRICS: "false" },

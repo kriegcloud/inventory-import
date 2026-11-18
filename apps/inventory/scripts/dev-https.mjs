@@ -12,6 +12,7 @@
 //    trusts, so it is your call. Without it the page still loads after the browser's certificate warning.
 import { spawn, spawnSync } from "node:child_process"
 import { existsSync, mkdirSync } from "node:fs"
+import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const root = fileURLToPath(new URL("..", import.meta.url))
@@ -43,7 +44,16 @@ if (!own && !(existsSync(made.cert) && existsSync(made.key))) {
   console.log("If the browser warns about it, run `mkcert -install` once to trust mkcert's local authority.")
 }
 
-const vite = fileURLToPath(new URL("../node_modules/vite/bin/vite.js", import.meta.url))
+/** A file inside an installed package: the nearest `node_modules` up from this script (the workspace root's, hoisted). */
+const installed = (path) => {
+  for (let dir = dirname(fileURLToPath(import.meta.url)); ; dir = dirname(dir)) {
+    const candidate = join(dir, "node_modules", path)
+    if (existsSync(candidate)) return candidate
+    if (dirname(dir) === dir) throw new Error(`${path} is not installed: run \`bun install\` at the repository root.`)
+  }
+}
+
+const vite = installed("vite/bin/vite.js")
 const child = spawn(process.execPath, [vite, ...process.argv.slice(2)], {
   stdio: "inherit",
   env: { ...process.env, DEV_HTTPS_CERT: files.cert, DEV_HTTPS_KEY: files.key }

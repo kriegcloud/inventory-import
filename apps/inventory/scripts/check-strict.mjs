@@ -6,11 +6,20 @@
 //   node scripts/check-strict.mjs --project <tsconfig>   one project (absolute or relative path)
 //   bun run check:strict -- --all              every finding, not the first three of each rule
 import { execFileSync } from "node:child_process"
-import { readFileSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { dirname, join, relative, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
+
+/** A file inside an installed package: the nearest `node_modules` up from this script (the workspace root's, hoisted). */
+const installed = (path) => {
+  for (let dir = dirname(fileURLToPath(import.meta.url)); ; dir = dirname(dir)) {
+    const candidate = join(dir, "node_modules", path)
+    if (existsSync(candidate)) return candidate
+    if (dirname(dir) === dir) throw new Error(`${path} is not installed: run \`bun install\` at the repository root.`)
+  }
+}
 
 /** JSON with comments and trailing commas (tsconfig) as a value. Strings are kept as they are. */
 export function parseJsonc(text) {
@@ -92,7 +101,7 @@ function main(args) {
       out = execFileSync(
         process.execPath,
         [
-          join(ROOT, "node_modules", "@effect", "tsgo", "dist", "effect-tsgo.cjs"),
+          installed("@effect/tsgo/dist/effect-tsgo.cjs"),
           "diagnostics",
           "--project",
           project,

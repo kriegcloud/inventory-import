@@ -13,7 +13,7 @@ from: explorations/ideal-architecture
 | --- | --- | --- |
 | P | Packets: this goal, `explorations/README.md`, `goals/README.md`, `docs:check` over both roots | done |
 | 0 | Clear the ground: timed-build tooling out, placeholder names renamed to `inventory`, bun only | done |
-| 1 | Workspace: bun workspaces, `turbo.json`, app moved to `apps/inventory`, CI through turbo | todo |
+| 1 | Workspace: bun workspaces, `turbo.json`, app moved to `apps/inventory`, CI through turbo | done |
 | 2 | Toolchain: beep-effect flags and severities, staged overrides, ceiling check | todo |
 
 ## Current blocker
@@ -41,6 +41,18 @@ Recommendations taken where the answered decisions leave a choice open.
   the record they are; they still name the old checkpoints and are not rewritten.
 - `allowScripts` (npm only) became bun's `trustedDependencies` for `esbuild` and `workerd`.
 - `beep.json` no longer lists the starter's `timebox` module.
+- Step 1 names the app package `@inventory/app` (the `@inventory/*` scope decision) and the workspace root
+  `inventory`. `bunfig.toml` sets bun's hoisted linker, as beep-effect does, so `effect-tsgo patch` keeps patching
+  the one TypeScript and oxlint at the root; `.bun-version` pins bun for CI.
+- Step 1 sets Turborepo's `envMode` to `loose`: the slow tests start workerd and wrangler, which read variables no
+  list would keep complete, and no variable changes a cached result. `//#docs:check` hashes only the three bundles,
+  its script and the validator; `//#format:check` hashes the repository.
+- Step 1 keeps the app's `tsconfig.base.json` inside `apps/inventory` for now, because its Effect plugin's override
+  globs (`src/web/**`) are relative to the app; step 2 puts beep-effect's profile in a root `tsconfig.base.json`.
+- Step 1 replaced the scripts' `../node_modules/...` paths with a lookup for the nearest `node_modules`, so they work
+  with the hoisted root.
+- `.session/` is ignored again: a checkout made before step 0 still runs the old activity-log hook, which writes
+  there, and that file must never be committed or hashed into the root tasks.
 
 ## Evidence
 
@@ -48,3 +60,11 @@ Recommendations taken where the answered decisions leave a choice open.
   `bun run build` passed. Browser, dev server on port 5196: "Use items_messy.csv" read 200 rows (All 200, Ready 155,
   Needs a decision 24, Cannot import 21); "Import 155 items" confirmed; the result read Imported 155, Not imported
   45, All 200; Items read "155 items"; `wrangler d1 execute DB --local` counted 155 rows in `item` for `org_prairie`.
+- Step 1: `bun run check` then `bun run check` again: the second run read "Tasks: 5 successful, 5 total / Cached:
+  5 cached, 5 total / FULL TURBO". `bun run check:full` passed (7 of 7 tasks; 34 fast files, 213 tests; 10 slow
+  files, 43 tests; build and production identity check). CSS: `auto-rows-min` appears in `src/web` only in
+  `components/ui/card.tsx`, and `grep -o '\.auto-rows-min{[^}]*}' apps/inventory/dist/client/assets/*.css` prints
+  `.auto-rows-min{grid-auto-rows:min-content}`. Browser, after `bun run db:reset`, `bun run dev -- --port 5196
+  --strictPort` from the root: 200 rows read (Ready 155, Needs a decision 24, Cannot import 21, All 200); "Import 155
+  items" confirmed; the result read Not imported 45, Imported 155, Already there 0, All 200; Items read "155 items";
+  D1 counted 155 rows in `item`.

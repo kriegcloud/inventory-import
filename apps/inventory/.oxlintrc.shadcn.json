@@ -3,7 +3,7 @@
   // Components in src/web/components/ui own their appearance; feature code and pages own layout only; every colour
   // and size comes from the theme in src/web/index.css. Every rule is an error. No disable comments, no allow-lists,
   // no contracts: a finding is fixed in the code or the theme.
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "$schema": "../../node_modules/oxlint/configuration_schema.json",
   "plugins": [],
   "categories": {
     "correctness": "off",

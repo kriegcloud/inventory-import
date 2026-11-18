@@ -1,0 +1,40 @@
+{
+  "$schema": "./node_modules/turbo/schema.json",
+  "futureFlags": { "globalConfiguration": true },
+  "global": {
+    // Every task's hash starts from these. A package's own package.json is already in its inputs.
+    "inputs": [".bun-version", "bunfig.toml"],
+    // Tasks see the whole environment (the slow tests start workerd and wrangler, which read many variables); none
+    // of it changes a cached result, so none of it is hashed.
+    "envMode": "loose"
+  },
+  "tasks": {
+    // A task with no script anywhere: depending on `^transit` folds every workspace dependency's source into a
+    // task's hash, so a cached check cannot survive a change in a package it imports. Packages export TypeScript
+    // source and never build, so `check` has no `^build` edge to do this.
+    "transit": { "dependsOn": ["^transit"], "inputs": ["$TURBO_DEFAULT$", "!**/*.md", "!test/**"] },
+    // Type-check with the Effect diagnostics.
+    "check": { "dependsOn": ["transit"], "outputs": [] },
+    // oxlint, and the design-system lint in packages with screens.
+    "lint": { "outputs": [] },
+    // The fast tests.
+    "test": { "dependsOn": ["transit"], "outputs": [] },
+    // The slow tests: workerd, a real D1 database and sign-in. One suite calls a live service, so never cached.
+    "test:slow": { "dependsOn": ["transit"], "cache": false },
+    // The production build and its identity check.
+    "build": { "dependsOn": ["transit"], "outputs": ["dist/**"] },
+    "dev": { "cache": false, "persistent": true },
+    // Repository checks: root scripts that do not call turbo.
+    "//#format:check": { "outputs": [] },
+    "//#docs:check": {
+      "inputs": [
+        "docs/**",
+        "explorations/**",
+        "goals/**",
+        "scripts/docs-check.sh",
+        ".agents/skills/okf-open-knowledge-format/**"
+      ],
+      "outputs": []
+    }
+  }
+}

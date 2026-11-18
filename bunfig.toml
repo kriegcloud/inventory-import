@@ -1,0 +1,4 @@
+# One node_modules at the root: effect-tsgo patches the TypeScript and oxlint it finds there (`prepare`), and every
+# workspace resolves the same copy.
+[install]
+linker = "hoisted"

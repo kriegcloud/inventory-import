@@ -2,6 +2,9 @@
 okf_version: "0.2"
 ---
 
+Paths here that start `src/`, `test/`, `migrations/`, `public/` or `scripts/` (but `scripts/docs-check.sh`) are inside
+`apps/inventory/`, the app's workspace.
+
 # Read before building
 
 * [Standards](standards/index.md) - My standards for this work, each rule with its check. Read the ones under "Read before building"; look up the rest when the task touches them.

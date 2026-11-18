@@ -205,26 +205,39 @@ goes wrong.
 and one-off tools with `bunx`. Vitest, the dev server and Wrangler always run on Node, never under Bun's runtime: no `bunx --bun`, and never
 `bun test`, Bun's own runner (`bun run test` runs Vitest on Node, where the sign-in, database and Worker tests pass).
 
-| Command | What it does |
+**Where commands run.** The repository is a bun workspace driven by Turborepo. Root scripts (below, first group) run
+from the repository root; `check`, `check:full`, `build`, `lint` and `test` go through `turbo`, which caches each
+package's task and replays it when nothing it reads has changed. The app's own scripts (second group) run with
+`bun run --cwd apps/inventory <script>`, or plain `bun run <script>` inside `apps/inventory`.
+
+| Root command | What it does |
 | --- | --- |
 | `bun run dev` | Applies local migrations and the test accounts, then serves the app and API on http://localhost:5173, signed in by itself as the first test account |
-| `bun run check` | The loop check: type-check with Effect diagnostics, lint (with the two design lints), format check and the fast tests, in a few seconds. Before every commit |
-| `bun run check:full` | Everything: the type-check, lint (with the two design lints), format check, every test including the slow ones (`*.slow.test.ts`) and `docs:check`. CI runs it |
-| `bun run check:strict` | The Effect diagnostics at production severity, grouped by rule with a total. A measurement in seconds: it never fails. `-- --all` lists every finding |
-| `bun run lint:shadcn` | The design-system lint alone. `bunx oxlint --disable-nested-config --deny-warnings -c .oxlintrc.shadcn.json <folder>` for one folder. Fixes: `docs/kit.md` "The two design lints" |
+| `bun run check` | The loop check through turbo: type-check with Effect diagnostics, lint (with the two design lints), the fast tests, the format check and `docs:check`. Before every commit |
+| `bun run check:full` | `check` plus the slow tests (`*.slow.test.ts`) and the production build. CI runs it |
+| `bun run build` | The production build through turbo |
+| `bun run test` | Every test, fast and slow (Vitest, Node) |
+| `bun run format` | oxfmt, writes files: `bun run format -- <files>` for only yours, since a bare run rewrites every file. `format:check` only reports |
 | `bun run docs:check` | Checks that `docs/`, `explorations/` and `goals/` are Open Knowledge Format bundles (the OKF skill's validator). Needs bash |
-| `bun run typecheck` | Type-check with tsrs plus the Effect diagnostics (under a second) |
-| `bun run format` | oxfmt, writes files: `bun run format -- <files>` for only yours, since a bare run rewrites every file. `format:check` only reports. `bun run lint` is oxlint |
-| `bun run test` | Every test, fast and slow (Vitest, Node). `bun run test -- --project fast` for the fast ones only |
-| `bun run build` | Type-check with `tsc -b` (patched with the same Effect diagnostics), then the production build |
-| `bun run dev:https` | Optional. The dev server over HTTPS with a local certificate (mkcert), so an `https:` origin, Secure cookies and HSTS behave as deployed. `bun run dev` needs none of it |
-| `bun run build:report` | The browser's build, then each chunk's makeup by package, largest first (`-- index` for one chunk); the treemap is `.scratch/bundle/client.html`. Read it before moving code between chunks |
-| `bun run preview` | Builds and serves the production build on http://localhost:4173, with security headers, compressed (brotli, else gzip) as Cloudflare serves it; `PREVIEW_COMPRESSION=off` for the raw bytes |
-| `bun run lighthouse` | Lighthouse on the production build, mobile and desktop, in under a minute. `-- /path` for another page. Prints the scores and every audit that scored below 100 |
-| `bun run telemetry` | Optional, Benjamin's to start (needs Docker): Grafana's LGTM stack, then `OTEL_EXPORTER_OTLP_ENDPOINT` in `.dev.vars` sends the Worker's and the browser's traces, metrics and logs to it. Never part of `bun run dev`; `telemetry:down` stops it |
 | `bun run db:reset` | Deletes the local database and re-applies migrations. **Restart `bun run dev` afterwards.** |
+| `bun run preview` | Builds and serves the production build on http://localhost:4173, with security headers, compressed (brotli, else gzip) as Cloudflare serves it; `PREVIEW_COMPRESSION=off` for the raw bytes |
+| `bun run telemetry` | Optional, Benjamin's to start (needs Docker): Grafana's LGTM stack, then `OTEL_EXPORTER_OTLP_ENDPOINT` in `apps/inventory/.dev.vars` sends the Worker's and the browser's traces, metrics and logs to it. Never part of `bun run dev`; `telemetry:down` stops it |
 
-If you add or remove a dependency, do it with `bun add` or `bun remove`; `bun.lock` is the only lockfile.
+| App command (`apps/inventory`) | What it does |
+| --- | --- |
+| `check` | Type-check with tsrs plus the Effect diagnostics (`typecheck` is the same) |
+| `lint`, `lint:shadcn` | oxlint and the design-system lint; `lint:shadcn` alone. Fixes: `docs/kit.md` "The two design lints" |
+| `test`, `test:slow`, `test:all` | The fast tests, the slow ones, both |
+| `check:strict` | The Effect diagnostics at production severity, grouped by rule with a total |
+| `dev:https` | Optional. The dev server over HTTPS with a local certificate (mkcert), so an `https:` origin, Secure cookies and HSTS behave as deployed |
+| `build:report` | The browser's build, then each chunk's makeup by package, largest first (`-- index` for one chunk); the treemap is `.scratch/bundle/client.html` |
+| `lighthouse` | Lighthouse on the production build, mobile and desktop. `-- /path` for another page. Prints the scores and every audit that scored below 100 |
+| `auth:schema` | After a change to Better Auth's options, prints the migration it still needs |
+| `deploy:setup`, `deploy` | Host it on Cloudflare (both need a Cloudflare login) |
+
+If you add or remove a dependency, do it with `bun add` or `bun remove` in the workspace that uses it
+(`bun add --cwd apps/inventory <name>`); `bun.lock` at the root is the only lockfile, and `bunfig.toml` keeps one
+hoisted `node_modules`.
 
 **A second dev server.** Benjamin usually runs the dev server in his own terminal on port 5173; ask before starting
 another. Start one with `bun run dev -- --port 5174 --strictPort & echo $! > .dev.pid`, stop it with
@@ -233,25 +246,33 @@ another. Start one with `bun run dev -- --port 5174 --strictPort & echo $! > .de
 Never `pkill -f` or `pgrep -f` a string that is also in the command you are typing (`pkill -f vite`): it matches your
 shell. After a change to `migrations/0001_init.sql`, a copy that has run the dev server needs `bun run db:reset` once.
 
-**Running without the AI key**, leaving `.dev.vars` alone:
+**Running without the AI key**, leaving `apps/inventory/.dev.vars` alone:
 `CLOUDFLARE_INCLUDE_PROCESS_ENV=true AI_ENABLED=false bun run dev -- --port 5174 --strictPort`. `/api/v1/system/status`
 then reports `"available": false` and why. Without `CLOUDFLARE_INCLUDE_PROCESS_ENV=true` the Worker ignores the shell.
 
 ## Layout
 
 ```
-src/domain/   Schemas and pure functions. Imports only `effect`. No I/O.
-src/api/v1/   The HTTP contract (Effect HttpApi), served at /api/v1. Imports domain. Shared by server and browser.
-src/server/   Cloudflare Worker: services (Context.Service + Layer), handlers, App.ts composition, worker.ts entry.
-src/web/      React app. Calls the API through a client derived from src/api. Never imports src/server.
-migrations/   D1 (SQLite) migrations, applied in filename order.
-test/         Unit tests.
-public/samples/  The sample files the Upload step offers.
-docs/         Standards, the kit, patterns, the glossary and sign-in (`docs/index.md` lists them); qa/ is evidence.
-explorations/ Questions being shaped: research, decisions, briefs.
-goals/        Work with a definition of done: SPEC.md and PLAN.md.
-.agents/      Skills (see above). Not application code; the check ignores it.
+apps/inventory/         The app: the Worker and the SPA, one Vite build. Its own package.json, tsconfigs, wrangler.jsonc.
+  src/domain/           Schemas and pure functions. Imports only `effect`. No I/O.
+  src/api/v1/           The HTTP contract (Effect HttpApi), served at /api/v1. Imports domain. Shared by server and browser.
+  src/server/           Cloudflare Worker: services (Context.Service + Layer), handlers, App.ts composition, worker.ts entry.
+  src/web/              React app. Calls the API through a client derived from src/api. Never imports src/server.
+  migrations/           D1 (SQLite) migrations, applied in filename order.
+  test/                 Unit tests (`*.slow.test.ts` need workerd, D1 or sign-in).
+  public/samples/       The sample files the Upload step offers.
+  scripts/              The app's development scripts (local migrations, HTTPS, deploy setup, strict count).
+packages/               Workspace packages (none yet; see explorations/ideal-architecture).
+docs/                   Standards, the kit, patterns, the glossary and sign-in (`docs/index.md` lists them); qa/ is evidence.
+explorations/           Questions being shaped: research, decisions, briefs.
+goals/                  Work with a definition of done: SPEC.md and PLAN.md.
+scripts/                Repository checks (`docs-check.sh`).
+turbo.json              The task graph: seven package tasks and two root tasks.
+.agents/                Skills (see above). Not application code; the check ignores it.
 ```
+
+Paths in this file and in `docs/` that start `src/`, `test/`, `migrations/` or `public/`, and every `scripts/` file but
+`docs-check.sh`, are inside `apps/inventory/`.
 
 Dependencies point one way: `web -> api -> domain` and `server -> api -> domain`.
 

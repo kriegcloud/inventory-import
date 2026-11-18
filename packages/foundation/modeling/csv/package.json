@@ -1,0 +1,40 @@
+{
+  "name": "@beep/csv",
+  "version": "0.0.0",
+  "private": true,
+  "description": "CSV as an Effect Schema codec: any dialect read leniently or strictly into one table model, written back canonically",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": [],
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts",
+    "./Csv": "./src/Csv.codec.ts",
+    "./CsvPosition": "./src/CsvPosition.schema.ts",
+    "./CsvTable": "./src/CsvTable.schema.ts",
+    "./CsvOptions": "./src/CsvOptions.schema.ts",
+    "./CsvDiagnostic": "./src/CsvDiagnostic.schema.ts",
+    "./CsvRead": "./src/CsvRead.schema.ts",
+    "./CsvError": "./src/CsvError.errors.ts"
+  },
+  "scripts": {
+    "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",
+    "lint": "oxlint --quiet src test",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@beep/identity": "workspace:*",
+    "@beep/schema": "workspace:*",
+    "@beep/utils": "workspace:*",
+    "effect": "4.1.4"
+  },
+  "devDependencies": {
+    "@effect/vitest": "4.1.4",
+    "@types/node": "^24.19.2",
+    "vitest": "^5.1.0"
+  },
+  "beep": {
+    "family": "foundation",
+    "kind": "modeling"
+  }
+}

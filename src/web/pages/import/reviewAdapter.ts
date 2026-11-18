@@ -81,7 +81,11 @@ const choicesFor = (
 ): { readonly ask: string; readonly choices: ReadonlyArray<Choice> } | undefined => {
   if (problem.proposal !== null || problem.field === null || problem.choices.length === 0) return undefined
   return {
-    ask: problem.ask ?? `Choose ${fieldLabels[problem.field].toLowerCase()}`,
+    // Keep or replace is a choice about the stored item, not a value of the SKU the problem sits on.
+    ask:
+      problem.kind === "changed"
+        ? "Keep or replace"
+        : (problem.ask ?? `Choose ${fieldLabels[problem.field].toLowerCase()}`),
     choices: problem.choices.map((value) => ({ value, label: storedWords[value] ?? value }))
   }
 }

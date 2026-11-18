@@ -319,6 +319,8 @@ describe("what the review screen is handed for a pick, for spaces and for a stor
         const view = opened.views[0]
         expect(view?.status).toBe("needs")
         expect(view?.problem?.column).toBe(storedChoice)
+        // The button says what the choice is, not the SKU column the problem sits on.
+        expect(view?.problem?.ask).toBe("Keep or replace")
         expect(Arr.map(view?.problem?.choices ?? [], (choice) => choice.value)).toEqual(["keep", "replace"])
         s.press({ type: "edit", rowId: "row-2", column: storedChoice, value: answer })
         expect(s.decisions["row-2"]).toEqual({ stored: answer })

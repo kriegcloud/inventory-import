@@ -6,8 +6,9 @@
  * the guard, never the model, sets the confidence (medium at most) and writes the evidence from the file's own rows.
  * Nothing here changes a row: a suggestion is a proposal the person accepts or rejects in the review.
  */
-import { Array as Arr, Option, Schema, String as Str } from "effect"
+import { Array as Arr, Option, String as Str } from "effect"
 import { categories, maxNameLength } from "./Item.ts"
+import * as S from "effect/Schema"
 import {
   type Field,
   fieldLabels,
@@ -26,25 +27,25 @@ export const suggestCap = 20
 const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`
 
 /** What a model answers with: a value per row it was shown, and a heading per field. No rating: the guard rates. */
-export const SuggestAnswer = Schema.Struct({
-  names: Schema.Array(
-    Schema.Struct({
-      rowNumber: Schema.Int.annotate({ description: "A rowNumber from rowsWithoutName" }),
-      name: Schema.String.annotate({
+export const SuggestAnswer = S.Struct({
+  names: S.Array(
+    S.Struct({
+      rowNumber: S.Int.annotate({ description: "A rowNumber from rowsWithoutName" }),
+      name: S.String.annotate({
         description: "A short name for the item, taken from its description: the thing itself, in title case"
       })
     })
   ),
-  categories: Schema.Array(
-    Schema.Struct({
-      rowNumber: Schema.Int.annotate({ description: "A rowNumber from rowsWithoutCategory" }),
-      category: Schema.String.annotate({ description: "One value copied from the categories list, exactly as written" })
+  categories: S.Array(
+    S.Struct({
+      rowNumber: S.Int.annotate({ description: "A rowNumber from rowsWithoutCategory" }),
+      category: S.String.annotate({ description: "One value copied from the categories list, exactly as written" })
     })
   ),
-  columns: Schema.Array(
-    Schema.Struct({
-      field: Schema.String.annotate({ description: "A field from fieldsWithoutColumn" }),
-      heading: Schema.String.annotate({ description: "A heading from unusedHeadings, exactly as written" })
+  columns: S.Array(
+    S.Struct({
+      field: S.String.annotate({ description: "A field from fieldsWithoutColumn" }),
+      heading: S.String.annotate({ description: "A heading from unusedHeadings, exactly as written" })
     })
   )
 }).annotate({ description: "A model's suggestions for an import: names, categories and columns, with no rating" })

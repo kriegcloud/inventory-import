@@ -1,4 +1,5 @@
-import { Array as Arr, Schema, String as Str } from "effect"
+import { Array as Arr, String as Str } from "effect"
+import * as S from "effect/Schema"
 
 // THE ITEMS PAGE'S ONE SEARCH BOX, READ INTO WORDS THE DATABASE CAN ANSWER. A person types a few words; each word
 // must be found somewhere in an item's name, SKU or description, in any order. What "found" means is decided here,
@@ -26,7 +27,7 @@ export const indexedFrom = 3
 export const closeFrom = 4
 
 /** What a person typed into the search box. Empty when they are not searching. */
-export const ItemSearchText = Schema.String.check(Schema.isMaxLength(maxSearch)).annotate({
+export const ItemSearchText = S.String.check(S.isMaxLength(maxSearch)).annotate({
   description:
     "Words to find in an item's name, SKU or description, in any order, ignoring case and accents; empty for no search"
 })

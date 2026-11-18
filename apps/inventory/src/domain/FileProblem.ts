@@ -6,8 +6,8 @@
  * `FileProblem`; request errors stay for what is not the person's file (not signed in, not allowed, an upload that is
  * gone, the server broke).
  */
-import { Schema } from "effect"
 import { dual } from "effect/Function"
+import * as S from "effect/Schema"
 
 /**
  * The ways a file can be wrong as a whole. `wrongType`: not a .csv or .xlsx, whatever its name says. `empty`: no
@@ -15,7 +15,7 @@ import { dual } from "effect/Function"
  * limit (bytes, rows, columns, or a cell too long to store). `unreadable`: damaged, cut short, or locked with a
  * password. `incomplete`: part of it did not reach the server whole.
  */
-export const FileProblemKind = Schema.Literals([
+export const FileProblemKind = S.Literals([
   "wrongType",
   "empty",
   "noHeaderRow",
@@ -31,13 +31,13 @@ export type FileProblemKind = typeof FileProblemKind.Type
  * not an error: the reader fails with it in the browser, and a server step answers it as the failure of a
  * `StagingOutcome`.
  */
-export class FileProblem extends Schema.TaggedClass<FileProblem, { readonly brand: unique symbol }>()(
+export class FileProblem extends S.TaggedClass<FileProblem, { readonly brand: unique symbol }>()(
   "FileProblem",
   {
     kind: FileProblemKind,
-    fileName: Schema.String.annotate({ description: "The file's name, as the person chose it" }),
-    problem: Schema.String.annotate({ description: "What is wrong with the file, in a sentence that names it" }),
-    todo: Schema.String.annotate({ description: "What the person can do about it, in a sentence" })
+    fileName: S.String.annotateKey({ description: "The file's name, as the person chose it" }),
+    problem: S.String.annotateKey({ description: "What is wrong with the file, in a sentence that names it" }),
+    todo: S.String.annotateKey({ description: "What the person can do about it, in a sentence" })
   },
   { description: "A file that cannot be staged, said for the person: what is wrong, and what to do about it" }
 ) {}
@@ -45,7 +45,7 @@ export class FileProblem extends Schema.TaggedClass<FileProblem, { readonly bran
 // The wire side named, so the OpenAPI document holds the shape once as a `FileProblem` component, referenced from
 // every staging step. Annotation only.
 const namedFileProblem = FileProblem.pipe(
-  Schema.annotateEncoded({
+  S.annotateEncoded({
     identifier: "FileProblem",
     description: "A file that cannot be staged, said for the person: what is wrong, and what to do about it"
   })
@@ -62,8 +62,8 @@ const namedFileProblem = FileProblem.pipe(
  * HttpApiEndpoint.post("beginUpload", "/uploads", { payload: UploadHead, success: StagingOutcome(UploadId), error: Forbidden })
  * // 200 {"_tag":"Failure","failure":{"_tag":"FileProblem","kind":"empty","fileName":"items.csv","problem":"...","todo":"..."}}
  */
-export const StagingOutcome = <S extends Schema.Top>(success: S) =>
-  Schema.Result(success, namedFileProblem).annotate({
+export const StagingOutcome = <S extends S.Top>(success: S) =>
+  S.Result(success, namedFileProblem).annotate({
     description: "What the staging step made, or what is wrong with the file (a FileProblem)"
   })
 

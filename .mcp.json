@@ -19,6 +19,12 @@
     "better-auth": {
       "type": "http",
       "url": "https://mcp.better-auth.com/mcp"
+    },
+    "drizzle": {
+      "type": "stdio",
+      "command": "bunx",
+      "args": ["--no-install", "drizzle-kit", "mcp"],
+      "env": {}
     }
   }
 }

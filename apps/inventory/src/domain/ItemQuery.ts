@@ -1,4 +1,4 @@
-import { Schema } from "effect"
+import * as S from "effect/Schema"
 import { StoredItem } from "./Item.ts"
 import { ItemSearchText } from "./ItemSearch.ts"
 
@@ -23,7 +23,7 @@ export const itemSortColumns = [
   "createdAt"
 ] as const
 /** A column the Items table can be sorted by. */
-export const ItemSortColumn = Schema.Literals(itemSortColumns).annotate({
+export const ItemSortColumn = S.Literals(itemSortColumns).annotate({
   description: "A column the Items table can be sorted by"
 })
 /** The decoded value of `ItemSortColumn`: a column the Items table can be sorted by. */
@@ -46,7 +46,7 @@ export const itemFilterVariants = {
   unitCost: "number"
 } as const
 /** A column the Items table can be filtered by. */
-export const ItemFilterColumn = Schema.Literals([
+export const ItemFilterColumn = S.Literals([
   "name",
   "sku",
   "description",
@@ -63,7 +63,7 @@ export const ItemFilterColumn = Schema.Literals([
 export type ItemFilterColumn = typeof ItemFilterColumn.Type
 
 /** The comparisons the data table kit can ask for. Which of them a column honours depends on its variant. */
-export const FilterOperator = Schema.Literals([
+export const FilterOperator = S.Literals([
   "iLike",
   "notILike",
   "eq",
@@ -82,18 +82,18 @@ export const FilterOperator = Schema.Literals([
 export type FilterOperator = typeof FilterOperator.Type
 
 /** What kind of value a filter carries, as the data table kit names it. */
-export const FilterVariant = Schema.Literals(["text", "number", "date", "boolean", "select"]).annotate({
+export const FilterVariant = S.Literals(["text", "number", "date", "boolean", "select"]).annotate({
   description: "What kind of value a filter carries, as the data table kit names it"
 })
 /** The decoded value of `FilterVariant`: what kind of value a filter carries, as the data table kit names it. */
 export type FilterVariant = typeof FilterVariant.Type
 
-const FilterText = Schema.String.check(Schema.isMaxLength(200))
+const FilterText = S.String.check(S.isMaxLength(200))
 
 /** One column of the order: its id, and whether it runs from high to low. */
-export const ItemSort = Schema.Struct({
+export const ItemSort = S.Struct({
   id: ItemSortColumn,
-  desc: Schema.Boolean.annotate({ description: "True: from high to low, Z to A" })
+  desc: S.Boolean.annotate({ description: "True: from high to low, Z to A" })
 }).annotate({
   identifier: "ItemSort",
   description: "One column of the order: its id, and whether it runs from high to low"
@@ -106,14 +106,14 @@ export type ItemSort = typeof ItemSort.Type
  * (two entries, either of which may be empty for an open end). A filter whose operator does not suit its column is
  * ignored, never an error: the table can hold a half-typed filter.
  */
-export const ItemFilter = Schema.Struct({
+export const ItemFilter = S.Struct({
   id: ItemFilterColumn,
-  value: Schema.Union([FilterText, Schema.Array(FilterText).check(Schema.isMaxLength(50))]).annotate({
+  value: S.Union([FilterText, S.Array(FilterText).check(S.isMaxLength(50))]).annotate({
     description: "One text, or a list: any of these, or the two ends of a range (either may be empty for an open end)"
   }),
   variant: FilterVariant,
   operator: FilterOperator,
-  filterId: Schema.optional(Schema.String.check(Schema.isMaxLength(64))).annotate({
+  filterId: S.optional(S.String.check(S.isMaxLength(64))).annotate({
     description: "The table's own name for this filter. The server does not read it"
   })
 }).annotate({ identifier: "ItemFilter", description: "One filter as the data table kit holds it" })
@@ -124,16 +124,16 @@ export type ItemFilter = typeof ItemFilter.Type
 export const itemPageSizes = [10, 20, 30, 40, 50] as const
 
 /** Which page of the items, in what order, narrowed how. */
-export const ItemQuery = Schema.Struct({
-  page: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 100000 })).annotate({
+export const ItemQuery = S.Struct({
+  page: S.Int.check(S.isBetween({ minimum: 1, maximum: 100000 })).annotate({
     description: "Counted from 1"
   }),
-  perPage: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 50 })),
-  sorting: Schema.Array(ItemSort).check(Schema.isMaxLength(5)).annotate({
+  perPage: S.Int.check(S.isBetween({ minimum: 1, maximum: 50 })),
+  sorting: S.Array(ItemSort).check(S.isMaxLength(5)).annotate({
     description: "First entry first. Empty means by SKU, as the full list is, or best match first while searching"
   }),
-  filters: Schema.Array(ItemFilter).check(Schema.isMaxLength(20)),
-  joinOperator: Schema.Literals(["and", "or"]).annotate({
+  filters: S.Array(ItemFilter).check(S.isMaxLength(20)),
+  joinOperator: S.Literals(["and", "or"]).annotate({
     description: "Whether a row must pass every filter or any one of them"
   }),
   search: ItemSearchText.annotate({
@@ -145,10 +145,10 @@ export const ItemQuery = Schema.Struct({
 export type ItemQuery = typeof ItemQuery.Type
 
 /** One page of items, and how many pages and items the same filters give in all. */
-export const ItemPage = Schema.Struct({
-  data: Schema.Array(StoredItem).annotate({ description: "The items on this page, in the order asked for" }),
-  pageCount: Schema.Int.annotate({ description: "How many pages the same filters give at this page size" }),
-  total: Schema.Int.annotate({ description: "Items that pass the filters, on every page together" })
+export const ItemPage = S.Struct({
+  data: S.Array(StoredItem).annotate({ description: "The items on this page, in the order asked for" }),
+  pageCount: S.Int.annotate({ description: "How many pages the same filters give at this page size" }),
+  total: S.Int.annotate({ description: "Items that pass the filters, on every page together" })
 }).annotate({
   identifier: "ItemPage",
   description: "One page of items, and how many pages and items the same filters give in all"
@@ -156,13 +156,13 @@ export const ItemPage = Schema.Struct({
 /** The decoded value of `ItemPage`: one page of items, and how many pages and items the same filters give in all. */
 export type ItemPage = typeof ItemPage.Type
 
-const Count = Schema.Struct({
-  value: Schema.String.annotate({ description: "The value as stored" }),
-  count: Schema.Int.annotate({ description: "How many items have it" })
+const Count = S.Struct({
+  value: S.String.annotate({ description: "The value as stored" }),
+  count: S.Int.annotate({ description: "How many items have it" })
 }).annotate({ description: "One value in use, and how many items have it" })
-const Range = Schema.Struct({
-  min: Schema.NullOr(Schema.Finite).annotate({ description: "The lowest value; null when no item has one" }),
-  max: Schema.NullOr(Schema.Finite).annotate({ description: "The highest value; null when no item has one" })
+const Range = S.Struct({
+  min: S.NullOr(S.Finite).annotate({ description: "The lowest value; null when no item has one" }),
+  max: S.NullOr(S.Finite).annotate({ description: "The highest value; null when no item has one" })
 }).annotate({ description: "The lowest and highest value; null when no item has one" })
 
 /**
@@ -170,14 +170,14 @@ const Range = Schema.Struct({
  * items have it, and the lowest and highest quantity on hand and unit cost (dollars). Counted over all the items, not
  * the filtered ones.
  */
-export const ItemFacets = Schema.Struct({
-  total: Schema.Int.annotate({ description: "How many items the organization has, unfiltered" }),
-  category: Schema.Array(Count).annotate({ description: "Each category in use, and how many items have it" }),
-  uom: Schema.Array(Count).annotate({ description: "Each unit of measure in use, and how many items have it" }),
-  isActive: Schema.Array(Count).annotate({
+export const ItemFacets = S.Struct({
+  total: S.Int.annotate({ description: "How many items the organization has, unfiltered" }),
+  category: S.Array(Count).annotate({ description: "Each category in use, and how many items have it" }),
+  uom: S.Array(Count).annotate({ description: "Each unit of measure in use, and how many items have it" }),
+  isActive: S.Array(Count).annotate({
     description: 'How many items are active ("true") and how many are not ("false"); a value no item has is left out'
   }),
-  lotTracked: Schema.Array(Count).annotate({
+  lotTracked: S.Array(Count).annotate({
     description:
       'How many items are lot tracked ("true") and how many are not ("false"); a value no item has is left out'
   }),

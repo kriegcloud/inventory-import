@@ -1,0 +1,4 @@
+[mcp_servers.drizzle]
+command = "bunx"
+args = ["--no-install", "drizzle-kit", "mcp"]
+enabled = true

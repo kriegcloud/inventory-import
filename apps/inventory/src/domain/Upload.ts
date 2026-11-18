@@ -4,9 +4,10 @@
  * until every piece has arrived and been checked, and only then become an import, whole, in one step; a cancelled or
  * failed upload never leaves rows anyone could confirm.
  */
-import { Array as Arr, Schema } from "effect"
+import { Array as Arr } from "effect"
 import { FileProblem, fileProblem } from "./FileProblem.ts"
 import { maxStagedRows, type StagedRow } from "./ItemImport.ts"
+import * as S from "effect/Schema"
 
 /** Rows in one piece of an upload, and in one stored chunk of an import: the two are the same chunks. */
 export const chunkRows = 500
@@ -38,36 +39,36 @@ export const fitsChunks = (input: { readonly rowCount: number; readonly chunkCou
  * Where one upload stands, as the screen shows it. Each state carries only what is needed to say so in words and
  * numbers; `progressOf` turns it into a bar.
  */
-export const UploadState = Schema.TaggedUnion({
+export const UploadState = S.TaggedUnion({
   /** Nothing chosen, or the last upload finished, failed or was cancelled. */
   Idle: {},
   Reading: {
-    fileName: Schema.String,
-    rowsRead: Schema.Int.annotate({ description: "Rows of the file read so far, heading and blank rows included" }),
-    rowsAbout: Schema.NullOr(Schema.Int).annotate({
+    fileName: S.String,
+    rowsRead: S.Int.annotate({ description: "Rows of the file read so far, heading and blank rows included" }),
+    rowsAbout: S.NullOr(S.Int).annotate({
       description:
         "How many rows the file has: worked out from how much of a CSV has been read (an estimate), counted for a " +
         "workbook once it is open (exact), and null while a workbook is still being opened"
     }),
-    exact: Schema.Boolean.annotate({ description: "True when rowsAbout is a count, not an estimate" })
+    exact: S.Boolean.annotate({ description: "True when rowsAbout is a count, not an estimate" })
   },
   Saving: {
-    fileName: Schema.String,
-    uploadId: Schema.String,
-    rowsSaved: Schema.Int.annotate({ description: "Rows in the pieces the server has acknowledged, each piece once" }),
-    rows: Schema.Int.annotate({ description: "Data rows in the file: what will be staged" })
+    fileName: S.String,
+    uploadId: S.String,
+    rowsSaved: S.Int.annotate({ description: "Rows in the pieces the server has acknowledged, each piece once" }),
+    rows: S.Int.annotate({ description: "Data rows in the file: what will be staged" })
   },
   /** Every piece arrived; the server is turning the upload into an import and preparing its review. */
-  Preparing: { fileName: Schema.String, uploadId: Schema.String, rows: Schema.Int },
+  Preparing: { fileName: S.String, uploadId: S.String, rows: S.Int },
   /** The person pressed Cancel: the reader is stopped and the server is deleting what arrived. */
-  Cancelling: { fileName: Schema.String, uploadId: Schema.NullOr(Schema.String) },
+  Cancelling: { fileName: S.String, uploadId: S.NullOr(S.String) },
   /** The file itself cannot be staged, found by the reader or by the server: what is wrong and what to do. */
   Refused: { problem: FileProblem },
   /** Something that is not the file stopped it (the network, the server, the browser): the sentence says what to do. */
   Failed: {
-    fileName: Schema.String,
-    step: Schema.Literals(["read", "save"]).annotate({ description: "Reading the file, or saving it" }),
-    message: Schema.String.annotate({ description: "What happened and what to do, for the person" })
+    fileName: S.String,
+    step: S.Literals(["read", "save"]).annotate({ description: "Reading the file, or saving it" }),
+    message: S.String.annotate({ description: "What happened and what to do, for the person" })
   }
 }).annotate({ description: "Where one upload stands, as the screen shows it" })
 /** The decoded value of `UploadState`: where one upload stands, as the screen shows it. */

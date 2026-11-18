@@ -3,13 +3,14 @@
 // switches, tags, two dates, and two nested values (dimensions and up to three vendors). The one thing not to break:
 // every value is read from the text as written (a cost from its digits as a decimal string, never through a float; a
 // date only when it has one reading), never through a guess.
-import { Array as Arr, Option, Record as Rec, Result, Schema, String as Str } from "effect"
+import { Array as Arr, Option, Record as Rec, Result, String as Str } from "effect"
 import { instant, personName } from "./Described.ts"
+import * as S from "effect/Schema"
 
 /** The categories an item may be filed under: the list the category column is checked against. */
 export const categories = ["raw-materials", "components", "finished-goods", "packaging", "supplies"] as const
 /** A category from the list (`categories`). */
-export const Category = Schema.Literals(categories).annotate({
+export const Category = S.Literals(categories).annotate({
   description: "The category an item is filed under",
   examples: ["packaging"]
 })
@@ -19,7 +20,7 @@ export type Category = typeof Category.Type
 /** The units of measure an item may be counted in: the list the unit column is checked against. */
 export const uoms = ["EA", "BX", "KG", "M", "L"] as const
 /** A unit of measure from the list (`uoms`). */
-export const Uom = Schema.Literals(uoms).annotate({
+export const Uom = S.Literals(uoms).annotate({
   description: "The unit of measure an item is counted in",
   examples: ["EA"]
 })
@@ -38,14 +39,14 @@ export const maxCount = 999_999_999_999
 /** The longest name an item may have, after trimming. */
 export const maxNameLength = 120
 
-const Decimal = Schema.String.check(Schema.isPattern(decimalPattern))
-const Count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(maxCount))
-const IsoDate = Schema.String.check(Schema.isPattern(/^\d{4}-\d{2}-\d{2}$/))
-const Measure = Schema.Finite.check(Schema.isGreaterThan(0))
+const Decimal = S.String.check(S.isPattern(decimalPattern))
+const Count = S.Int.check(S.isGreaterThanOrEqualTo(0), S.isLessThanOrEqualTo(maxCount))
+const IsoDate = S.String.check(S.isPattern(/^\d{4}-\d{2}-\d{2}$/))
+const Measure = S.Finite.check(S.isGreaterThan(0))
 
 /** An item's size: all three measurements together, each above zero, in centimetres or inches. */
-export const Dimensions = Schema.Struct({
-  length: Measure.annotate({ description: "Length, above zero", examples: [78.8] }).annotateKey({
+export const Dimensions = S.Struct({
+  length: Measure.annotateKey({ description: "Length, above zero", examples: [78.8] }).annotateKey({
     description: "How long the item is, in `unit`",
     messageMissingKey: "Give the length: an item's three measurements come together."
   }),
@@ -57,7 +58,7 @@ export const Dimensions = Schema.Struct({
     description: "How high the item is, in `unit`",
     messageMissingKey: "Give the height: an item's three measurements come together."
   }),
-  unit: Schema.Literals(["cm", "in"])
+  unit: S.Literals(["cm", "in"])
     .annotate({ description: "cm or in; cm when the file does not say", examples: ["cm"] })
     .annotateKey({ description: "The unit all three measurements are in: centimetres or inches" })
 }).annotate({ identifier: "Dimensions", description: "An item's size: three measurements together and their unit" })
@@ -65,16 +66,16 @@ export const Dimensions = Schema.Struct({
 export type Dimensions = typeof Dimensions.Type
 
 /** One vendor an item can be bought from. At most three per item, at most one of them preferred. */
-export const Vendor = Schema.Struct({
-  vendorName: Schema.NonEmptyString.annotate({
+export const Vendor = S.Struct({
+  vendorName: S.NonEmptyString.annotate({
     description: "The vendor's name",
     examples: ["Acme Industrial"]
   }).annotateKey({
     description: "Who the item is bought from (the file's `vendor_name`)",
     messageMissingKey: "Give the vendor's name."
   }),
-  vendorSku: Schema.NullOr(Schema.String)
-    .annotate({
+  vendorSku: S.NullOr(S.String)
+    .annotateKey({
       description: "The vendor's own code for the item; null for none",
       examples: ["TI-12311"]
     })
@@ -86,12 +87,12 @@ export const Vendor = Schema.Struct({
     description: "What one unit costs from this vendor, in US dollars, read from the digits (the file's `unit_cost`)",
     messageMissingKey: "Give the vendor's unit cost."
   }),
-  leadTimeDays: Schema.NullOr(Count)
+  leadTimeDays: S.NullOr(Count)
     .annotate({ description: "Days from order to delivery; null when not given", examples: [54] })
     .annotateKey({
       description: "How many days the vendor takes to deliver (the file's `lead_time_days`); null when not given"
     }),
-  isPreferred: Schema.Boolean.annotate({
+  isPreferred: S.Boolean.annotate({
     description: "True for the one vendor the item is usually bought from",
     examples: [false]
   }).annotateKey({
@@ -106,8 +107,8 @@ export type Vendor = typeof Vendor.Type
  * What one item needs before it can be stored. A row of the file becomes this only when every value was read without
  * a doubt; the server decodes each row through it again before writing.
  */
-export const ItemFields = Schema.Struct({
-  sku: Schema.String.check(Schema.isPattern(skuPattern))
+export const ItemFields = S.Struct({
+  sku: S.String.check(S.isPattern(skuPattern))
     .annotate({
       description: "The item's SKU, unique in its organization: three capitals, a hyphen, four digits",
       examples: ["SHH-9574"]
@@ -116,11 +117,11 @@ export const ItemFields = Schema.Struct({
       description: "The code the item is known by. No two items of one organization share it, and it never changes",
       messageMissingKey: "Give the item's SKU: three capital letters, a hyphen and four digits, like SHH-9574."
     }),
-  name: Schema.NonEmptyString.check(Schema.isMaxLength(maxNameLength)).annotate({
+  name: S.NonEmptyString.check(S.isMaxLength(maxNameLength)).annotate({
     description: "The item's name, 1 to 120 characters, trimmed",
     examples: ["Oak Foam Insert"]
   }),
-  description: Schema.NullOr(Schema.String)
+  description: S.NullOr(S.String)
     .annotate({ description: "Free text; null for none", examples: ["Oak foam insert for general use."] })
     .annotateKey({ description: "What the item is, in a sentence or two; null when the file gives none" }),
   category: Category.annotateKey({
@@ -140,20 +141,20 @@ export const ItemFields = Schema.Struct({
     description: "How many are in stock; 0 when the file gives none",
     examples: [3845]
   }),
-  reorderPoint: Schema.NullOr(Count)
+  reorderPoint: S.NullOr(Count)
     .annotate({ description: "The stock level to reorder at; null for none", examples: [402] })
     .annotateKey({ description: "Reorder when the quantity on hand falls to this number; null when nobody set one" }),
-  isActive: Schema.Boolean.annotate({ description: "Whether the item is in use; true when the file does not say" }),
-  lotTracked: Schema.Boolean.annotate({
+  isActive: S.Boolean.annotate({ description: "Whether the item is in use; true when the file does not say" }),
+  lotTracked: S.Boolean.annotate({
     description: "Whether stock is tracked by lot; false when the file does not say"
   }),
-  tags: Schema.Array(Schema.String)
+  tags: S.Array(S.String)
     .annotate({ description: "Lower-case tags, each once", examples: [["fragile"]] })
     .annotateKey({ description: "Words the item is filed under; the file writes them in one cell with | between" }),
-  firstReceivedOn: Schema.NullOr(IsoDate)
+  firstReceivedOn: S.NullOr(IsoDate)
     .annotate({ description: "ISO date first received; null for none", examples: ["2019-03-18"] })
     .annotateKey({ description: "The day the item first came into stock, as year-month-day; null when not known" }),
-  discontinuedOn: Schema.NullOr(IsoDate)
+  discontinuedOn: S.NullOr(IsoDate)
     .annotate({
       description: "ISO date discontinued; null for none. An item with one is not active",
       examples: ["2024-06-19"]
@@ -162,26 +163,23 @@ export const ItemFields = Schema.Struct({
       description:
         "The day the item stopped being stocked, as year-month-day; null while it is stocked. With a date, `isActive` must be false"
     }),
-  dimensions: Schema.NullOr(Dimensions)
+  dimensions: S.NullOr(Dimensions)
     .annotate({ description: "The item's size; null for none" })
     .annotateKey({ description: "The item's length, width and height with their unit, all together; null for none" }),
-  vendors: Schema.Array(Vendor)
-    .check(Schema.isMaxLength(3))
-    .annotate({ description: "Up to three vendors" })
-    .annotateKey({
-      description: "Who the item can be bought from: up to three, at most one of them preferred; empty for none"
-    })
+  vendors: S.Array(Vendor).check(S.isMaxLength(3)).annotate({ description: "Up to three vendors" }).annotateKey({
+    description: "Who the item can be bought from: up to three, at most one of them preferred; empty for none"
+  })
 }).annotate({ identifier: "ItemFields", description: "What one item needs before it can be stored" })
 /** The decoded value of `ItemFields`: what one item needs before it can be stored. */
 export type ItemFields = typeof ItemFields.Type
 
 /** An item as stored for one organization. */
-export const StoredItem = Schema.Struct({
-  id: Schema.String.annotate({ description: "The item's id, given when the import created it" }),
+export const StoredItem = S.Struct({
+  id: S.String.annotate({ description: "The item's id, given when the import created it" }),
   ...ItemFields.fields,
   createdAt: instant("When the import created the item"),
   createdBy: personName("Who confirmed the import that created the item"),
-  revision: Schema.Int.annotate({
+  revision: S.Int.annotate({
     description:
       "1 as the import created it, one more after each change. An edit names the revision it was made on, and a " +
       "take-back of the import removes only items still at 1",
@@ -202,12 +200,12 @@ export const fieldsOf = (item: StoredItem): ItemFields => {
  * saw. The SKU is not among them (it is the item's identity), nor are tags, dimensions and vendors, which only an
  * import writes. An edit made on an older revision is refused instead of overwriting a change the person did not see.
  */
-export const ItemEdit = Schema.Struct({
-  revision: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1))
+export const ItemEdit = S.Struct({
+  revision: S.Int.check(S.isGreaterThanOrEqualTo(1))
     .annotate({ description: "The revision the person was looking at when they made the change", examples: [1] })
     .annotateKey({ messageMissingKey: "Send the revision of the item the change was made on." }),
   name: ItemFields.fields.name.annotateKey({ messageMissingKey: "Give the item a name." }),
-  description: Schema.NullOr(Schema.String.check(Schema.isMaxLength(32767)))
+  description: S.NullOr(S.String.check(S.isMaxLength(32767)))
     .annotate({ description: "Free text about the item; null for none" })
     .annotateKey({ messageMissingKey: "Give a description, or null for none." }),
   category: Category.annotateKey({ messageMissingKey: "Choose the category." }),
@@ -217,10 +215,10 @@ export const ItemEdit = Schema.Struct({
   reorderPoint: ItemFields.fields.reorderPoint.annotateKey({
     messageMissingKey: "Give the reorder point, or null for none."
   }),
-  isActive: Schema.Boolean.annotate({ description: "Whether the item is in use" }).annotateKey({
+  isActive: S.Boolean.annotate({ description: "Whether the item is in use" }).annotateKey({
     messageMissingKey: "Say whether the item is active."
   }),
-  lotTracked: Schema.Boolean.annotate({ description: "Whether stock is tracked by lot" }).annotateKey({
+  lotTracked: S.Boolean.annotate({ description: "Whether stock is tracked by lot" }).annotateKey({
     messageMissingKey: "Say whether the item is lot tracked."
   }),
   firstReceivedOn: ItemFields.fields.firstReceivedOn.annotateKey({

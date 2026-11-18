@@ -1,7 +1,7 @@
 // Three kinds of field the contract has many of, each described once: a moment, the name of who did something, and
 // the sentence an error carries. Annotation only: all three are plain strings on the wire and nothing is checked
 // beyond that, so a stored value written before a rule existed still decodes.
-import { Schema } from "effect"
+import * as S from "effect/Schema"
 
 /**
  * A moment the server recorded, as text. The server writes every one with `DateTime.formatIso`, so the document
@@ -10,7 +10,7 @@ import { Schema } from "effect"
  * @example instant("When the import created the item")
  */
 export const instant = (what: string) =>
-  Schema.String.annotate({
+  S.String.annotate({
     description: `${what}, as an ISO 8601 instant in UTC`,
     format: "date-time",
     examples: ["2026-03-02T09:30:00.000Z"]
@@ -23,7 +23,7 @@ export const instant = (what: string) =>
  * @example personName("Who confirmed the import")
  */
 export const personName = (what: string) =>
-  Schema.String.annotate({
+  S.String.annotate({
     description: `${what}: the member's name as it was then, for the screen. Not an id`,
     examples: ["Marcus Oyelaran"]
   })
@@ -32,6 +32,6 @@ export const personName = (what: string) =>
  * The sentence every error of the contract carries. Written for the person, so a screen can show it as it is; it
  * never repeats what the request sent.
  */
-export const reasonForPerson = Schema.String.annotate({
+export const reasonForPerson = S.String.annotate({
   description: "What happened and what to do, in words for the person. A screen can show it as it is"
 })

@@ -9,7 +9,7 @@
  *
  * Each rule is one kind of problem (`problemKinds`), one check (`fault`) and at most one proposal (`proposeFor`).
  */
-import { Array as Arr, HashMap, HashSet, Option, Record as Rec, Schema, String as Str } from "effect"
+import { Array as Arr, HashMap, HashSet, Option, Record as Rec, String as Str } from "effect"
 import { type FileProblem, fileProblem } from "./FileProblem.ts"
 import {
   categories,
@@ -28,6 +28,7 @@ import {
   type Vendor
 } from "./Item.ts"
 import type { SpreadsheetTable } from "./Spreadsheet.ts"
+import * as S from "effect/Schema"
 
 /**
  * Whether the rules' form-only fixes (spaces round a SKU or a name, "bx" for BX, a "$" before a cost, yes for true,
@@ -56,7 +57,7 @@ export const fields = [
 ] as const
 
 /** One field of an item that a file column can be matched to. */
-export const Field = Schema.Literals(fields).annotate({
+export const Field = S.Literals(fields).annotate({
   description: "One field of an item that a file column can be matched to"
 })
 /** The decoded value of `Field`: one field of an item that a file column can be matched to. */
@@ -84,12 +85,12 @@ export const fieldLabels: Record<Field, string> = {
 /** Fields an item must have. A file with no column for one of these cannot produce a ready row. */
 export const requiredFields: ReadonlyArray<Field> = ["sku", "name", "category", "uom", "unitCost"]
 
-const bounded = (max: number) => Schema.String.check(Schema.isMaxLength(max))
+const bounded = (max: number) => S.String.check(S.isMaxLength(max))
 
 /** One cell as the reader found it: `text` with nothing coerced, and `shown` when Excel displays it differently. */
-export const StagedCell = Schema.Struct({
+export const StagedCell = S.Struct({
   text: bounded(32767).annotate({ description: "The cell's value as text, nothing coerced", examples: ["120"] }),
-  shown: Schema.optionalKey(bounded(32767)).annotate({
+  shown: S.optionalKey(bounded(32767)).annotate({
     description: "What Excel displays, when that differs from the value; left out otherwise"
   })
 }).annotate({
@@ -104,16 +105,16 @@ export type StagedCell = typeof StagedCell.Type
  * One data row of the file. `rowNumber` is the row the person sees in Excel: a row's identity, and, with its part,
  * the identity of each item the row holds (`rowId`). Never offset to tell a row's items apart.
  */
-export const StagedRow = Schema.Struct({
-  rowNumber: Schema.Int.annotate({ description: "The row number Excel shows, so 'row 56' on a screen is findable" }),
-  cells: Schema.Array(StagedCell).annotate({ description: "The row's cells, in the order of the file's columns" })
+export const StagedRow = S.Struct({
+  rowNumber: S.Int.annotate({ description: "The row number Excel shows, so 'row 56' on a screen is findable" }),
+  cells: S.Array(StagedCell).annotate({ description: "The row's cells, in the order of the file's columns" })
 }).annotate({ identifier: "StagedRow", description: "One data row of the file" })
 /** The decoded value of `StagedRow`: one data row of the file. */
 export type StagedRow = typeof StagedRow.Type
 
 /** A column of the file: its position, Excel's letter and the heading as shown. */
-export const StagedColumn = Schema.Struct({
-  index: Schema.Int.annotate({ description: "The column's position in the file, from 0", examples: [3] }),
+export const StagedColumn = S.Struct({
+  index: S.Int.annotate({ description: "The column's position in the file, from 0", examples: [3] }),
   letter: bounded(8).annotate({ description: "The column's letter in Excel: A, B, AA", examples: ["D"] }),
   label: bounded(32767).annotate({ description: "The heading as the file shows it", examples: ["Unit"] })
 }).annotate({
@@ -124,11 +125,11 @@ export const StagedColumn = Schema.Struct({
 export type StagedColumn = typeof StagedColumn.Type
 
 /** Something the reader did, skipped or noticed, as the sentence it wrote. */
-export const StagedNote = Schema.Struct({
+export const StagedNote = S.Struct({
   kind: bounded(40).annotate({ description: "What kind of note it is, as the reader names it" }),
-  level: Schema.Literals(["info", "warning"]).annotate({ description: "warning: something the person should look at" }),
+  level: S.Literals(["info", "warning"]).annotate({ description: "warning: something the person should look at" }),
   message: bounded(4000).annotate({ description: "The sentence the reader wrote" }),
-  rows: Schema.Array(Schema.Int).annotate({
+  rows: S.Array(S.Int).annotate({
     description: "The rows of the file it is about, as Excel numbers them; empty when it is about the whole file"
   })
 }).annotate({
@@ -142,17 +143,17 @@ export type StagedNote = typeof StagedNote.Type
  * An uploaded file as the server keeps it until the person confirms: the reader's table, trimmed to what the
  * review needs. Nothing in it is an item yet.
  */
-export const StagedTable = Schema.Struct({
+export const StagedTable = S.Struct({
   fileName: bounded(255).annotate({ description: "The file's name as it was chosen", examples: ["items.csv"] }),
-  kind: Schema.Literals(["csv", "xlsx"]).annotate({ description: "What kind of file it was read as" }),
-  sheet: Schema.NullOr(bounded(200)).annotate({ description: "The sheet the table came from; null for a CSV" }),
-  headerRowNumber: Schema.Int.annotate({
+  kind: S.Literals(["csv", "xlsx"]).annotate({ description: "What kind of file it was read as" }),
+  sheet: S.NullOr(bounded(200)).annotate({ description: "The sheet the table came from; null for a CSV" }),
+  headerRowNumber: S.Int.annotate({
     description: "The row the headings are on, as Excel numbers it",
     examples: [1]
   }),
-  columns: Schema.Array(StagedColumn).annotate({ description: "The file's columns, in order" }),
-  rows: Schema.Array(StagedRow).annotate({ description: "The data rows, in file order" }),
-  notes: Schema.Array(StagedNote).annotate({ description: "What the reader did, skipped or noticed" })
+  columns: S.Array(StagedColumn).annotate({ description: "The file's columns, in order" }),
+  rows: S.Array(StagedRow).annotate({ description: "The data rows, in file order" }),
+  notes: S.Array(StagedNote).annotate({ description: "What the reader did, skipped or noticed" })
 }).annotate({
   identifier: "StagedTable",
   description:
@@ -167,7 +168,7 @@ const { rows: _rows, ...headFields } = StagedTable.fields
  * A staged file without its rows: name, sheet, columns and the reader's notes. An upload sends it first and the rows
  * after it in chunks, and the server stores it beside the rows, so the rows never travel with it.
  */
-export const StagedHead = Schema.Struct(headFields).annotate({
+export const StagedHead = S.Struct(headFields).annotate({
   identifier: "StagedHead",
   description: "A staged file without its rows: name, sheet, columns and the reader's notes"
 })
@@ -231,12 +232,12 @@ export const stagingProblem = (input: {
 }
 
 /** A column the person chose for a field. `column` null means none, on purpose. */
-export const MappingChoice = Schema.Struct({
+export const MappingChoice = S.Struct({
   field: Field,
-  column: Schema.NullOr(Schema.Int).annotate({
+  column: S.NullOr(S.Int).annotate({
     description: "The file column's position, from 0; null for none, on purpose"
   }),
-  by: Schema.Literals(["person"]).annotate({ description: "Who chose it: always a person" })
+  by: S.Literals(["person"]).annotate({ description: "Who chose it: always a person" })
 }).annotate({
   identifier: "MappingChoice",
   description: "A column the person chose for a field; column null means none, on purpose"
@@ -245,16 +246,16 @@ export const MappingChoice = Schema.Struct({
 export type MappingChoice = typeof MappingChoice.Type
 
 /** How one field is filled: from which file column, and how that was settled. */
-export const ColumnMatch = Schema.Struct({
+export const ColumnMatch = S.Struct({
   field: Field,
-  column: Schema.NullOr(Schema.Int).annotate({
+  column: S.NullOr(S.Int).annotate({
     description: "The file column's position, from 0; null when no column fills the field"
   }),
-  header: Schema.NullOr(Schema.String).annotate({ description: "That column's heading; null with no column" }),
-  how: Schema.Literals(["heading", "person", "none"]).annotate({
+  header: S.NullOr(S.String).annotate({ description: "That column's heading; null with no column" }),
+  how: S.Literals(["heading", "person", "none"]).annotate({
     description: "Matched by its heading, chosen by a person, or not matched"
   }),
-  examples: Schema.Array(Schema.String).annotate({
+  examples: S.Array(S.String).annotate({
     description: "A few values from that column, to check the match by eye"
   })
 }).annotate({
@@ -265,7 +266,7 @@ export const ColumnMatch = Schema.Struct({
 export type ColumnMatch = typeof ColumnMatch.Type
 
 /** How sure a proposal's source is, in a word. Code sets it from the file's own rows. */
-export const Confidence = Schema.Literals(["high", "medium", "low"]).annotate({
+export const Confidence = S.Literals(["high", "medium", "low"]).annotate({
   description: "How sure a proposal's source is, in a word"
 })
 /** The decoded value of `Confidence`: how sure a proposal's source is, in a word. */
@@ -278,32 +279,32 @@ export type Confidence = typeof Confidence.Type
  * applies itself: a name or a category becomes a proposal in `review` that the person accepts or rejects, and a
  * column is offered for the person to match.
  */
-export const Suggestion = Schema.Struct({
-  id: Schema.String.annotate({ description: "The suggestion's id" }),
-  kind: Schema.Literals(["name", "category", "column"]).annotate({
+export const Suggestion = S.Struct({
+  id: S.String.annotate({ description: "The suggestion's id" }),
+  kind: S.Literals(["name", "category", "column"]).annotate({
     description:
       "A name for a row with none, a category for a row whose category is not listed, or a column for a field"
   }),
-  rowId: Schema.NullOr(Schema.String).annotate({
+  rowId: S.NullOr(S.String).annotate({
     description: "The row it is for, as the review keys rows (`row-7`); null for a column",
     examples: ["row-7"]
   }),
-  rowNumber: Schema.NullOr(Schema.Int).annotate({ description: "That row's number in the file; null for a column" }),
+  rowNumber: S.NullOr(S.Int).annotate({ description: "That row's number in the file; null for a column" }),
   field: Field,
-  from: Schema.String.annotate({ description: "The cell exactly as the file has it; empty for a column" }),
-  to: Schema.String.annotate({
+  from: S.String.annotate({ description: "The cell exactly as the file has it; empty for a column" }),
+  to: S.String.annotate({
     description: "The suggested value; for a column, the file column's heading",
     examples: ["Nylon Coil"]
   }),
-  column: Schema.NullOr(Schema.Int).annotate({
+  column: S.NullOr(S.Int).annotate({
     description: "For a column, the file column's position from 0: what `match` takes; null otherwise"
   }),
-  by: Schema.Literals(["model", "rule"]).annotate({ description: "Who suggested it: a language model, or a rule" }),
-  model: Schema.NullOr(Schema.String).annotate({ description: "The model that suggested it; null for a rule" }),
-  confidence: Schema.Literals(["medium", "low"]).annotate({
+  by: S.Literals(["model", "rule"]).annotate({ description: "Who suggested it: a language model, or a rule" }),
+  model: S.NullOr(S.String).annotate({ description: "The model that suggested it; null for a rule" }),
+  confidence: S.Literals(["medium", "low"]).annotate({
     description: "How sure it is, set by the guard from the file's rows, never by the model: medium at most"
   }),
-  basis: Schema.String.annotate({ description: "One sentence of evidence, written by code from the file's rows" })
+  basis: S.String.annotate({ description: "One sentence of evidence, written by code from the file's rows" })
 }).annotate({
   identifier: "Suggestion",
   description: "A stored suggestion for something the fixed rules cannot settle; the person accepts or rejects it"
@@ -342,33 +343,31 @@ export const suggestionFits = (input: {
  * another row with the same SKU, proposals accepted or undone by field, values typed by field, and, for a row whose
  * SKU is stored with other values, whether the stored item stays or the file's row replaces it.
  */
-export const RowDecision = Schema.Struct({
-  out: Schema.optionalKey(Schema.Boolean).annotate({
+export const RowDecision = S.Struct({
+  out: S.optionalKey(S.Boolean).annotate({
     description: "True: the person left the row out. Leave the key out for a row that stays in",
     examples: [true]
   }),
-  kept: Schema.optionalKey(Schema.Boolean).annotate({
+  kept: S.optionalKey(S.Boolean).annotate({
     description:
       "True: the person kept this row over another with the same SKU (rows 4 and 10 both say YDR-8742). Leave it out otherwise",
     examples: [true]
   }),
-  accepted: Schema.optionalKey(Schema.Array(bounded(40)).check(Schema.isMaxLength(fields.length))).annotate({
+  accepted: S.optionalKey(S.Array(bounded(40)).check(S.isMaxLength(fields.length))).annotate({
     description:
       "Fields whose proposal the person accepted: a rule's, or a stored suggestion's. Leave it out when none was accepted",
     examples: [["unitCost"]]
   }),
-  reverted: Schema.optionalKey(Schema.Array(bounded(40)).check(Schema.isMaxLength(fields.length))).annotate({
+  reverted: S.optionalKey(S.Array(bounded(40)).check(S.isMaxLength(fields.length))).annotate({
     description:
       "Fields whose fix or proposal the person undid: the file's value stands. Leave it out when nothing was undone",
     examples: [["uom"]]
   }),
-  edits: Schema.optionalKey(
-    Schema.Record(bounded(40), bounded(32767)).check(Schema.isMaxProperties(fields.length))
-  ).annotate({
+  edits: S.optionalKey(S.Record(bounded(40), bounded(32767)).check(S.isMaxProperties(fields.length))).annotate({
     description: "Values the person typed, by field. Leave it out when nothing was typed",
     examples: [{ name: "Steel Tube 1in" }]
   }),
-  stored: Schema.optionalKey(Schema.Literals(["keep", "replace"])).annotate({
+  stored: S.optionalKey(S.Literals(["keep", "replace"])).annotate({
     description:
       "For a row whose SKU is stored with other values: keep the stored item (the row is skipped) or replace it with the file's row"
   })
@@ -381,8 +380,8 @@ export const RowDecision = Schema.Struct({
 export type RowDecision = typeof RowDecision.Type
 
 /** Every row's decision by row id (`row-56`). This is the draft the server keeps while the person reviews. */
-export const SavedDecisions = Schema.Record(bounded(40), RowDecision)
-  .check(Schema.isMaxProperties(50000))
+export const SavedDecisions = S.Record(bounded(40), RowDecision)
+  .check(S.isMaxProperties(50000))
   .annotate({ description: "Every row's decision by row id (`row-56`)" })
 /** The decoded value of `SavedDecisions`: every row's decision by row id (`row-56`). */
 export type SavedDecisions = typeof SavedDecisions.Type
@@ -534,21 +533,21 @@ export type Problem = {
 }
 
 /** One value that differs from the file, and who is behind it: what the activity view shows per row. */
-export const Change = Schema.Struct({
+export const Change = S.Struct({
   field: Field,
-  from: Schema.String.annotate({ description: "The value as the file gives it", examples: ["bx"] }),
-  to: Schema.String.annotate({ description: "The value the import wrote in its place", examples: ["BX"] }),
-  source: Schema.Literals(["rule", "model", "person"]).annotate({
+  from: S.String.annotate({ description: "The value as the file gives it", examples: ["bx"] }),
+  to: S.String.annotate({ description: "The value the import wrote in its place", examples: ["BX"] }),
+  source: S.Literals(["rule", "model", "person"]).annotate({
     description: "Where the new value came from: a rule, a model's suggestion the person accepted, or the person"
   }),
-  decidedBy: Schema.Literals(["person", "rule"]).annotate({ description: "Who put it in force" }),
-  how: Schema.Literals(["accepted a proposal", "typed or chose a value", "applied by a rule"]).annotate({
+  decidedBy: S.Literals(["person", "rule"]).annotate({ description: "Who put it in force" }),
+  how: S.Literals(["accepted a proposal", "typed or chose a value", "applied by a rule"]).annotate({
     description: "How the new value came to stand, in the words the activity view shows"
   }),
-  basis: Schema.NullOr(Schema.String).annotate({
+  basis: S.NullOr(S.String).annotate({
     description: "What a proposal rested on, in a sentence; null for a value a person typed"
   }),
-  confidence: Schema.NullOr(Confidence).annotate({
+  confidence: S.NullOr(Confidence).annotate({
     description: "How sure a proposal's source was; null where there was no proposal"
   })
 }).annotate({
@@ -615,9 +614,9 @@ export type ReviewedRow = {
 export type UnitTotal = { readonly unit: string; readonly quantity: number }
 
 /** A file column no field reads, and how many rows hold a value in it: said on screen, never stored. */
-export const UnusedColumn = Schema.Struct({
+export const UnusedColumn = S.Struct({
   ...StagedColumn.fields,
-  filled: Schema.Int.annotate({ description: "How many rows of the file hold a value in this column", examples: [20] })
+  filled: S.Int.annotate({ description: "How many rows of the file hold a value in this column", examples: [20] })
 }).annotate({
   identifier: "UnusedColumn",
   description: "A file column no field reads, and how many rows hold a value in it"
@@ -830,29 +829,29 @@ const tagsOf = (text: string): ReadonlyArray<string> => Arr.filter(Str.split("|"
 
 // The dimensions cell as the file writes it: JSON with the brief's own keys. Each measurement may be missing here, so
 // the review can say which one is, instead of only "not readable".
-const DimensionsCell = Schema.fromJsonString(
-  Schema.Struct({
-    length: Schema.optionalKey(Schema.Finite),
-    width: Schema.optionalKey(Schema.Finite),
-    height: Schema.optionalKey(Schema.Finite),
-    unit: Schema.optionalKey(Schema.String)
+const DimensionsCell = S.fromJsonString(
+  S.Struct({
+    length: S.optionalKey(S.Finite),
+    width: S.optionalKey(S.Finite),
+    height: S.optionalKey(S.Finite),
+    unit: S.optionalKey(S.String)
   })
 )
-const decodeDimensions = Schema.decodeUnknownOption(DimensionsCell)
-const encodeDimensions = Schema.encodeOption(DimensionsCell)
+const decodeDimensions = S.decodeUnknownOption(DimensionsCell)
+const encodeDimensions = S.encodeOption(DimensionsCell)
 
 // One vendor as the file writes it, in the brief's own keys. A cost is a JSON number there, or the same digits in
 // quotes ("7.50"): both are read from the digits by `readDecimal`, so a quoted cost is not a cell "cut off".
-const VendorCell = Schema.Struct({
-  vendor_name: Schema.optionalKey(Schema.String),
-  vendor_sku: Schema.optionalKey(Schema.NullOr(Schema.String)),
-  unit_cost: Schema.optionalKey(Schema.Union([Schema.Finite, Schema.String])),
-  lead_time_days: Schema.optionalKey(Schema.NullOr(Schema.Finite)),
-  is_preferred: Schema.optionalKey(Schema.Boolean)
+const VendorCell = S.Struct({
+  vendor_name: S.optionalKey(S.String),
+  vendor_sku: S.String.pipe(S.NullOr, S.optionalKey),
+  unit_cost: S.optionalKey(S.Union([S.Finite, S.String])),
+  lead_time_days: S.Finite.pipe(S.NullOr, S.optionalKey),
+  is_preferred: S.optionalKey(S.Boolean)
 })
-const VendorsCell = Schema.fromJsonString(Schema.Array(VendorCell))
-const decodeVendors = Schema.decodeUnknownOption(VendorsCell)
-const encodeVendors = Schema.encodeOption(VendorsCell)
+const VendorsCell = VendorCell.pipe(S.Array, S.fromJsonString)
+const decodeVendors = S.decodeUnknownOption(VendorsCell)
+const encodeVendors = S.encodeOption(VendorsCell)
 
 /** A value of a cell that holds JSON: read, or the sentence that says what is wrong with it. */
 type Read<A> = { readonly _tag: "ok"; readonly value: A } | { readonly _tag: "bad"; readonly message: string }

@@ -19,6 +19,7 @@
 * [Building screens](building-screens.md) - The installed components and a reference's components before anything hand-built, every table on tablecn, the product's own look, and taste checked with a tool.
 * [Reading the file](reading-files.md) - A .csv or .xlsx is read as it is, what the reader noticed reaches the person, and a refused file says what to do.
 * [Complete without an AI key](without-a-key.md) - The whole job works with no AI key, someone without a key still sees the AI path, a provider's outage falls back in order, and keys stay secret.
+* [Schema first](schema-first.md) - Data is an Effect Schema that decodes into canonical Effect values, normalises and defaults at the boundary, models every finite variant as a tagged union, annotates keys as keys, and generates only valid values.
 * [Engineering targets](engineering.md) - How the code is designed, tested, documented and measured, the server's rules for data, and how close development stays to production.
 * [Settings, logs and traces](config-and-logs.md) - Settings and secrets come through Effect Config on the server, a missing setting turns its feature off, and logs, failures and spans are useful without leaking anything.
 * [Security and tenancy](security.md) - Production headers on every response, secrets kept on the server, every write checked for its role and origin, and one organization never sees another's rows.

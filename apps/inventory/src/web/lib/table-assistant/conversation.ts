@@ -1,37 +1,37 @@
 // The assistant's conversation for one table, kept in this browser so a hard refresh brings it back: each request,
 // who answered, and the changes it made with what takes each back. It is keyed like the import's saved progress
 // (`progressKey`: per person, organization and screen) and decoded on the way back, so an older shape is dropped.
-import { Schema } from "effect"
+import * as S from "effect/Schema"
 import { ViewChange } from "../../../domain/TableView.ts"
 import { progressKey, type ProgressScope } from "../saved-progress/store.ts"
 import { Patch } from "./view.ts"
 
-const Applied = Schema.Struct({
+const Applied = S.Struct({
   change: ViewChange,
-  label: Schema.String,
+  label: S.String,
   patch: Patch,
-  removed: Schema.Boolean
+  removed: S.Boolean
 })
 /** One change a request made, what it says, what takes it back, and whether the person removed it. */
 export type Applied = typeof Applied.Type
 
-const Entry = Schema.Struct({
-  id: Schema.String,
-  prompt: Schema.String,
-  outcome: Schema.Literals(["applied", "refused", "failed"]),
-  answeredBy: Schema.NullOr(Schema.String),
-  note: Schema.NullOr(Schema.String),
-  reason: Schema.NullOr(Schema.String),
-  applied: Schema.Array(Applied),
-  undone: Schema.Boolean
+const Entry = S.Struct({
+  id: S.String,
+  prompt: S.String,
+  outcome: S.Literals(["applied", "refused", "failed"]),
+  answeredBy: S.NullOr(S.String),
+  note: S.NullOr(S.String),
+  reason: S.NullOr(S.String),
+  applied: S.Array(Applied),
+  undone: S.Boolean
 })
 /** One request and what came of it. */
 export type Entry = typeof Entry.Type
 
-const Conversation = Schema.Struct({
-  version: Schema.Literal(1),
-  entries: Schema.Array(Entry),
-  visibility: Schema.Record(Schema.String, Schema.Boolean)
+const Conversation = S.Struct({
+  version: S.Literal(1),
+  entries: S.Array(Entry),
+  visibility: S.Record(S.String, S.Boolean)
 })
 /** Everything kept for one table. `visibility` is the columns as the assistant left them, which the address does not hold. */
 export type Conversation = typeof Conversation.Type
@@ -39,8 +39,8 @@ export type Conversation = typeof Conversation.Type
 /** A conversation before anything was asked. */
 export const emptyConversation: Conversation = { version: 1, entries: [], visibility: {} }
 
-const decode = Schema.decodeUnknownOption(Schema.fromJsonString(Conversation))
-const encode = Schema.encodeOption(Schema.fromJsonString(Conversation))
+const decode = S.decodeUnknownOption(S.fromJsonString(Conversation))
+const encode = S.encodeOption(S.fromJsonString(Conversation))
 
 /** The storage key of one table's conversation for one person. */
 export const conversationKey = (scope: Omit<ProgressScope, "screen">, table: string) =>

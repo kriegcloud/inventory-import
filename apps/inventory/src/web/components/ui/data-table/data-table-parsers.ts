@@ -2,7 +2,8 @@ import {
   createParser,
   parseAsNativeArrayOf,
 } from "@/components/ui/data-table/data-table-state";
-import { Option, Schema } from "effect";
+import { Option } from "effect"
+import * as S from "effect/Schema"
 
 import type {
   ColumnFilterItem,
@@ -159,9 +160,9 @@ export function getColumnFiltersKey(filters: ColumnFilterItem[]) {
 }
 
 // Effect Schema instead of upstream's zod: one schema library in the app. Bad JSON and wrong shapes both read as no sort.
-const decodeSortingJson = Schema.decodeUnknownOption(
-  Schema.fromJsonString(
-    Schema.Array(Schema.Struct({ id: Schema.String, desc: Schema.Boolean })),
+const decodeSortingJson = S.decodeUnknownOption(
+  S.fromJsonString(
+    S.Array(S.Struct({ id: S.String, desc: S.Boolean })),
   ),
 );
 

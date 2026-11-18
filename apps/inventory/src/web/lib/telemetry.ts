@@ -1,4 +1,5 @@
-import { Effect, Layer, Logger, Schema, Tracer } from "effect"
+import { Effect, Layer, Logger, Tracer } from "effect"
+import * as S from "effect/Schema"
 import { FetchHttpClient, HttpClient, HttpClientResponse } from "effect/http"
 import { sendTraceContext, traceContextGate } from "./traceContext.ts"
 
@@ -41,7 +42,7 @@ export const browserTelemetry = Layer.mergeAll(
 
 /** Whether the server forwards the browser's telemetry. False when it cannot say: the page then sends nothing. */
 const telemetryIsOn = HttpClient.get("/api/otlp/status").pipe(
-  Effect.flatMap(HttpClientResponse.schemaBodyJson(Schema.Struct({ on: Schema.Boolean }))),
+  Effect.flatMap(HttpClientResponse.schemaBodyJson(S.Struct({ on: S.Boolean }))),
   Effect.map((answer) => answer.on),
   Effect.orElseSucceed(() => false)
 )

@@ -1,16 +1,16 @@
 // The pure part of applying an assistant's answer to a table: the view before, a change, the view after, and the patch
 // that takes back just that change. The table's own state is read and written by `useTableView`, so the sort and filter
 // menus show exactly what the assistant set: it is the same state, never a copy beside it.
-import { Schema } from "effect"
+import * as S from "effect/Schema"
 import type { CatalogColumn, ColumnCatalog, ViewChange, ViewOperator } from "../../../domain/TableView.ts"
 
-const Sort = Schema.Struct({ id: Schema.String, desc: Schema.Boolean })
-const FilterItem = Schema.Struct({
-  id: Schema.String,
-  value: Schema.Union([Schema.String, Schema.Array(Schema.String)]),
-  variant: Schema.String,
-  operator: Schema.String,
-  filterId: Schema.String
+const Sort = S.Struct({ id: S.String, desc: S.Boolean })
+const FilterItem = S.Struct({
+  id: S.String,
+  value: S.Union([S.String, S.Array(S.String)]),
+  variant: S.String,
+  operator: S.String,
+  filterId: S.String
 })
 
 /** A filter as the data table holds it. */
@@ -31,13 +31,13 @@ export type ViewState = {
 }
 
 /** What takes one change back: each part it holds is put back as it was before the change. */
-export const Patch = Schema.Struct({
-  sorting: Schema.optionalKey(Schema.Array(Sort)),
-  column: Schema.optionalKey(Schema.String),
-  columnFilters: Schema.optionalKey(Schema.Array(FilterItem)),
-  filters: Schema.optionalKey(Schema.Array(FilterItem)),
-  visibility: Schema.optionalKey(Schema.Record(Schema.String, Schema.Boolean)),
-  search: Schema.optionalKey(Schema.String)
+export const Patch = S.Struct({
+  sorting: Sort.pipe(S.Array, S.optionalKey),
+  column: S.optionalKey(S.String),
+  columnFilters: FilterItem.pipe(S.Array, S.optionalKey),
+  filters: FilterItem.pipe(S.Array, S.optionalKey),
+  visibility: S.optionalKey(S.Record(S.String, S.Boolean)),
+  search: S.optionalKey(S.String)
 })
 /** The decoded value of `Patch`. */
 export type Patch = typeof Patch.Type

@@ -1,7 +1,8 @@
 import { DateTime } from "effect"
 // The browser half of saved progress: the chosen file in IndexedDB and the hook a screen uses. The rules and the
 // stored shape are in `store.ts` (tested without a browser).
-import { Effect, Option, Schema } from "effect"
+import { Effect, Option } from "effect"
+import * as S from "effect/Schema"
 import { useCallback, useMemo, useRef, useState } from "react"
 import { browserRuntime } from "../runtime.ts"
 import {
@@ -22,10 +23,7 @@ const database = "saved-progress"
 const files = "files"
 
 /** The browser would not keep or read the chosen file: a private window, a full disk, or storage turned off. */
-export class FileNotKept extends Schema.TaggedError<FileNotKept, { readonly brand: unique symbol }>()(
-  "FileNotKept",
-  {}
-) {}
+export class FileNotKept extends S.TaggedError<FileNotKept, { readonly brand: unique symbol }>()("FileNotKept", {}) {}
 
 const openFiles = Effect.callback<IDBDatabase, FileNotKept>((resume) => {
   if (typeof indexedDB === "undefined") return resume(Effect.fail(FileNotKept.make()))

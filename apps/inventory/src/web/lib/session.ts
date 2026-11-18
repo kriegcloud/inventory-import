@@ -1,4 +1,4 @@
-import { Schema } from "effect"
+import * as S from "effect/Schema"
 import { SessionState } from "../../api/v1/Identity.ts"
 
 /**
@@ -6,4 +6,4 @@ import { SessionState } from "../../api/v1/Identity.ts"
  * sign-in form is drawn before it arrives, so the first download carries neither Effect's Schema nor the contract
  * (src/web/lib/actor.ts).
  */
-export const decodeSession = Schema.decodeUnknownPromise(SessionState)
+export const decodeSession = S.decodeUnknownPromise(SessionState)

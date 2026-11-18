@@ -5,20 +5,8 @@ import { SecureRandom } from "effect/crypto"
 // The one thing not to break: Cancel stops everything (the worker, every request in flight) and then deletes what
 // reached the server, and the screen says it was cancelled only once the server has answered.
 import { useQueryClient, type QueryClient } from "@tanstack/react-query"
-import {
-  Cause,
-  Deferred,
-  Effect,
-  Exit,
-  Fiber,
-  HashSet,
-  MutableHashSet,
-  Queue,
-  Result,
-  Schedule,
-  Schema,
-  Stream
-} from "effect"
+import { Cause, Deferred, Effect, Exit, Fiber, HashSet, MutableHashSet, Queue, Result, Schedule, Stream } from "effect"
+import * as S from "effect/Schema"
 import { useCallback, useSyncExternalStore } from "react"
 import { toast } from "sonner"
 import type { ImportView } from "../../../api/v1/Api.ts"
@@ -37,8 +25,8 @@ import { queryKeys } from "../queries.ts"
 export type { UploadState } from "../../../domain/Upload.ts"
 
 /** The reader itself failed (not the file): `message` says so, for the person. */
-class ReadFailed extends Schema.TaggedError<ReadFailed, { readonly brand: unique symbol }>()("ReadFailed", {
-  message: Schema.String
+class ReadFailed extends S.TaggedError<ReadFailed, { readonly brand: unique symbol }>()("ReadFailed", {
+  message: S.String
 }) {}
 
 /**
@@ -248,12 +236,12 @@ const start = (queryClient: QueryClient, file: File, sheet: string | null, onEnd
     // Nothing half-sent stays behind; the server would also delete it within the hour.
     if (current.uploadId !== null) void discard(current.uploadId)
     // The file's own problem is said as data: what is wrong with it and what to do.
-    if (Schema.is(FileProblem)(error)) {
+    if (S.is(FileProblem)(error)) {
       current.onEnd({ _tag: "Refused" })
       set({ _tag: "Refused", problem: error })
       return
     }
-    const read = Schema.is(ReadFailed)(error)
+    const read = S.is(ReadFailed)(error)
     current.onEnd({ _tag: "Failed", step: read ? "read" : "save" })
     set({
       _tag: "Failed",

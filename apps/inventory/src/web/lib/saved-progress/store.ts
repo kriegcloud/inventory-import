@@ -4,7 +4,7 @@
 // in another organization, never sees it); what is read back is decoded, so a draft from an older version is dropped,
 // never shown half; and Confirm clears it. The decisions are small and go to localStorage, written before the next
 // frame; the file itself is a Blob in IndexedDB, written once when it is chosen and read again by the worker on return.
-import { Schema } from "effect"
+import * as S from "effect/Schema"
 import { fromDraft, toDraft } from "../../components/review/logic.ts"
 import type { ReviewDraft, SavedDecisions } from "../../components/review/types.ts"
 
@@ -29,52 +29,52 @@ export const progressKey = (scope: ProgressScope): string =>
 // (a lone surrogate in an id made it throw; the property test found it).
 const escapePart = (part: string): string => part.replaceAll("%", "%25").replaceAll(":", "%3A")
 
-const RowDecision = Schema.Struct({
-  out: Schema.optionalKey(Schema.Boolean),
-  kept: Schema.optionalKey(Schema.Boolean),
-  accepted: Schema.optionalKey(Schema.Array(Schema.String)),
-  reverted: Schema.optionalKey(Schema.Array(Schema.String)),
-  edits: Schema.optionalKey(Schema.Record(Schema.String, Schema.String))
+const RowDecision = S.Struct({
+  out: S.optionalKey(S.Boolean),
+  kept: S.optionalKey(S.Boolean),
+  accepted: S.String.pipe(S.Array, S.optionalKey),
+  reverted: S.String.pipe(S.Array, S.optionalKey),
+  edits: S.optionalKey(S.Record(S.String, S.String))
 })
 
-const StoredStep = Schema.Struct({
-  label: Schema.String,
-  before: Schema.Array(Schema.Tuple([Schema.String, Schema.NullOr(RowDecision)])),
-  focus: Schema.NullOr(Schema.String)
+const StoredStep = S.Struct({
+  label: S.String,
+  before: S.Array(S.Tuple([S.String, S.NullOr(RowDecision)])),
+  focus: S.NullOr(S.String)
 })
 
 /**
  * The review region's decisions, undo history and redo history as stored (`ReviewDraft`). `redo` is optional so a
  * draft saved before redo existed still decodes, with nothing to redo.
  */
-export const StoredReview = Schema.Struct({
-  decisions: Schema.Record(Schema.String, RowDecision),
-  undo: Schema.Array(StoredStep),
-  redo: Schema.optionalKey(Schema.Array(StoredStep))
+export const StoredReview = S.Struct({
+  decisions: S.Record(S.String, RowDecision),
+  undo: S.Array(StoredStep),
+  redo: StoredStep.pipe(S.Array, S.optionalKey)
 }).annotate({ description: "The person's decisions on the review and the undo and redo history behind them." })
 
 /** The file the person chose, so the screen can say which one and read it again from IndexedDB. */
-export const StoredFile = Schema.Struct({
-  name: Schema.String,
-  size: Schema.Int,
-  lastModified: Schema.Finite,
-  sheet: Schema.NullOr(Schema.String).annotate({ description: "The sheet the person picked, null for the first read." })
+export const StoredFile = S.Struct({
+  name: S.String,
+  size: S.Int,
+  lastModified: S.Finite,
+  sheet: S.NullOr(S.String).annotate({ description: "The sheet the person picked, null for the first read." })
 })
 
 /** Everything a screen keeps for one person: the step, the file, the decisions, and a count to offer "Continue" by. */
-export const SavedProgress = Schema.Struct({
-  version: Schema.Literal(1),
-  step: Schema.String.annotate({ description: "The step the person was on, as in `?step=`." }),
-  file: Schema.NullOr(StoredFile),
-  review: Schema.NullOr(StoredReview),
-  decided: Schema.Int.annotate({ description: 'Rows the person has decided, for "3 of 7 decided".' }),
-  needed: Schema.Int.annotate({ description: "Rows that needed a decision when the file was read." }),
-  savedAt: Schema.String.annotate({ description: "When it was last saved, ISO 8601." })
+export const SavedProgress = S.Struct({
+  version: S.Literal(1),
+  step: S.String.annotate({ description: "The step the person was on, as in `?step=`." }),
+  file: S.NullOr(StoredFile),
+  review: S.NullOr(StoredReview),
+  decided: S.Int.annotate({ description: 'Rows the person has decided, for "3 of 7 decided".' }),
+  needed: S.Int.annotate({ description: "Rows that needed a decision when the file was read." }),
+  savedAt: S.String.annotate({ description: "When it was last saved, ISO 8601." })
 }).annotate({ description: "What one person has done so far on one screen." })
 export type SavedProgress = typeof SavedProgress.Type
 
-const decode = Schema.decodeUnknownOption(Schema.fromJsonString(SavedProgress))
-const encode = Schema.encodeOption(Schema.fromJsonString(SavedProgress))
+const decode = S.decodeUnknownOption(S.fromJsonString(SavedProgress))
+const encode = S.encodeOption(S.fromJsonString(SavedProgress))
 
 /** The part of the Web Storage interface (localStorage) the progress needs, so a test can hand in its own. */
 export interface ProgressStorage {

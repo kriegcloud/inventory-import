@@ -27,7 +27,7 @@ const https =
 // `PREVIEW_COMPRESSION=off bun run preview` sends everything as it is, for a comparison. Registered before the
 // Cloudflare plugin, so it wraps the Worker's answers and the static files alike.
 const compressPreview = (): Plugin => ({
-  name: "takehome:compress-preview",
+  name: "inventory:compress-preview",
   configurePreviewServer(server) {
     // Typed for Express, which hands it the same Node request and response as Vite's server does.
     if (process.env["PREVIEW_COMPRESSION"] !== "off") {
@@ -68,7 +68,7 @@ const bundleReport = (): Array<PluginOption> =>
 // the entry (scripts/reachable-sources.mjs). Runs before Tailwind reads the file.
 const web = fileURLToPath(new URL("./src/web", import.meta.url))
 const usedSourcesOnly = (): Plugin => ({
-  name: "takehome:used-sources",
+  name: "inventory:used-sources",
   apply: "build",
   enforce: "pre",
   transform(code, id) {

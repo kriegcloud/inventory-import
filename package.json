@@ -1,5 +1,5 @@
 {
-  "name": "inventory-import",
+  "name": "inventory",
   "version": "0.6.1",
   "private": true,
   "description": "Bulk import of inventory items from a messy .csv or .xlsx, with a review you can trust",
@@ -18,26 +18,21 @@
     "db:migrate": "node scripts/migrate-local.mjs",
     "db:reset": "node -e \"require('node:fs').rmSync('.wrangler/state',{recursive:true,force:true})\" && node scripts/migrate-local.mjs",
     "deploy": "tsc -b && vite build && wrangler d1 migrations apply DB --remote && wrangler deploy",
-    "pack": "bash scripts/pack.sh",
     "lighthouse": "bash scripts/lighthouse.sh",
     "deploy:setup": "node scripts/deploy-setup.mjs",
-    "dev:portless": "node scripts/migrate-local.mjs && portless takehome vite",
+    "dev:portless": "node scripts/migrate-local.mjs && portless inventory vite",
     "dev:https": "node scripts/migrate-local.mjs && node scripts/dev-https.mjs",
     "prepare": "effect-tsgo patch --typescript --oxlint",
     "typecheck:tsc": "effect-tsgo tsc -b",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
-    "check": "effect-tsgo tsrs -b --fast && (oxlint --quiet; lint=$?; oxlint --disable-nested-config --deny-warnings -c .oxlintrc.shadcn.json src/web && exit $lint) && oxfmt --check && node scripts/check-images.mjs && vitest run --project fast",
-    "check:full": "effect-tsgo tsrs -b --fast && (oxlint --quiet; lint=$?; oxlint --disable-nested-config --deny-warnings -c .oxlintrc.shadcn.json src/web && exit $lint) && oxfmt --check && node scripts/check-images.mjs && vitest run && bash scripts/docs-check.sh",
+    "check": "effect-tsgo tsrs -b --fast && (oxlint --quiet; lint=$?; oxlint --disable-nested-config --deny-warnings -c .oxlintrc.shadcn.json src/web && exit $lint) && oxfmt --check && vitest run --project fast",
+    "check:full": "effect-tsgo tsrs -b --fast && (oxlint --quiet; lint=$?; oxlint --disable-nested-config --deny-warnings -c .oxlintrc.shadcn.json src/web && exit $lint) && oxfmt --check && vitest run && bash scripts/docs-check.sh",
     "check:strict": "node scripts/check-strict.mjs",
-    "shot": "node scripts/shot.mjs",
     "docs:check": "bash scripts/docs-check.sh",
     "deps:lint": "syncpack lint",
     "deps:outdated": "syncpack update --check",
     "test:watch": "vitest",
-    "clock": "node scripts/clock.mjs",
-    "checkpoint": "node scripts/checkpoint.mjs",
-    "session": "node scripts/session-report.mjs",
     "telemetry": "node scripts/telemetry.mjs",
     "telemetry:down": "node scripts/telemetry.mjs down",
     "auth:schema": "node scripts/auth-schema.mjs"
@@ -111,9 +106,9 @@
   "engines": {
     "node": ">=22"
   },
-  "packageManager": "npm@11.19.1",
-  "allowScripts": {
-    "esbuild@0.28.2": true,
-    "workerd@1.20261110.1": true
-  }
+  "packageManager": "bun@1.4.4",
+  "trustedDependencies": [
+    "esbuild",
+    "workerd"
+  ]
 }

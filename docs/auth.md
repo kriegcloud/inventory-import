@@ -15,7 +15,7 @@ exists: they read `CurrentActor` and call `requireRole`, as before. The rules it
 ## How a request gets its actor
 
 ```
-browser ── cookie takehome.session_token ──> Worker
+browser ── cookie inventory.session_token ──> Worker
   /api/auth/*  -> AuthRoute (src/server/Auth.ts): our cross-site check, then Better Auth's handler
                   (sign-up, sign-in, sign-out, organizations). Never versioned: Better Auth's own contract.
   /api/v1/*    -> HttpApi: SameOrigin, then the Identity middleware
@@ -79,7 +79,7 @@ are in `.dev.vars.example`.
 | --- | --- | --- |
 | Password hashing | scrypt, Better Auth's default; in workerd it runs on `node:crypto` (`nodejs_compat`) | no hashing code of ours |
 | Password length | 12 to 128 | test "refuses a short password" |
-| Session cookie | `takehome.session_token`, HttpOnly, SameSite=Lax, Path=/, 7 days; production: `__Secure-` prefix and Secure | tests check HttpOnly and SameSite, and a production build's `__Secure-` and Secure; `curl -I` on `bun run preview` |
+| Session cookie | `inventory.session_token`, HttpOnly, SameSite=Lax, Path=/, 7 days; production: `__Secure-` prefix and Secure | tests check HttpOnly and SameSite, and a production build's `__Secure-` and Secure; `curl -I` on `bun run preview` |
 | Session expiry | 7 days, extended once a day while used; no cookie cache, so sign-out applies at once in every tab | test "signs out, and the session ends at once" |
 | CSRF and origins | our cross-site check first (`allowsRequest`, as on the API), then Better Auth's origin, callback and Fetch Metadata checks, on even under test (`disableOriginCheck: false`); trusted origins from `BETTER_AUTH_URL` | test "refuses sign-in and sign-out sent from another site, and a foreign callback address" |
 | Rate limits | stored in D1 (`rateLimit` table; Workers keep no memory between isolates), per address from `cf-connecting-ip`: sign-in 10 a minute, sign-up 5 a minute, the rest 100 a minute | test "limits sign-in attempts" (the 11th is 429) |

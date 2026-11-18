@@ -21,7 +21,7 @@
       {
         "name": "@effect/language-service",
         "namespaceImportPackages": [],
-        // Suggestions (the style rules relaxed for the hour, below) never fail the check and are not printed by it; the
+        // Suggestions (the style rules relaxed for now, below) never fail the check and are not printed by it; the
         // editor still shows them, and `bun run check:strict` counts them.
         "ignoreEffectSuggestionsInTscExitCode": true,
         "ignoreEffectWarningsInTscExitCode": false,
@@ -246,7 +246,7 @@
             }
           }
         ],
-        // Every Effect diagnostic, at its severity for the hour. A rule whose finding can change what the code does at
+        // Every Effect diagnostic, at its current severity. A rule whose finding can change what the code does at
         // run time (crash, run differently, hide a failure) is an error, here and in production. A rule about spelling,
         // API preference or naming is a suggestion: it never fails `bun run check`, and `bun run check:strict` counts it
         // as the error it is in production. Each suggestion says what it guards in production.

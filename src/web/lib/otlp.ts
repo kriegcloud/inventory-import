@@ -11,7 +11,7 @@ const baseUrl = "/api/otlp"
 // Each page load is its own instance: its counters start at zero, so without an id of its own every page's
 // `web_page_loads` would be one series stuck at 1, however many pages were opened.
 const resource = {
-  serviceName: "takehome-web",
+  serviceName: "inventory-web",
   attributes: {
     "deployment.environment.name": import.meta.env.DEV ? "development" : "production",
     "service.instance.id": crypto.randomUUID()

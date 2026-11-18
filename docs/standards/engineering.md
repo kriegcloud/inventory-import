@@ -18,7 +18,7 @@ My engineering rules are in `CLAUDE.md` and [patterns](../patterns.md). This pag
   Commit the contract before splitting work between agents. Check: `git log` shows the contract committed before
   the first screen.
 - **Commit at each working step with `bun run check` green**; never leave the app broken between commits. Check:
-  the session record shows a passing check before each commit.
+  CI passes on every commit pushed.
 - **Check every Effect API against the Effect 4 source** (`node_modules/effect/src`) before using it; never write
   Effect 3 from memory. Check: `bun run typecheck` passes, and no import names `@effect/platform`.
 - **Effect's collections, never `Map` or `Set`**, in `src` and `test`: `HashMap` and `HashSet` for a value handed on
@@ -27,8 +27,8 @@ My engineering rules are in `CLAUDE.md` and [patterns](../patterns.md). This pag
   hold no Effect code may keep a listener list as an array; none here does, since `main.tsx` loads Effect for the
   API client. The vendored components in `src/web/components/ui` are as published. Check: `bun run check`
   (oxlint's `no-restricted-globals` refuses `new Map(` and `new Set(`).
-- **`bun`, not npm, in every command we run** (`bun run`, `bun install`, `bunx`). The npm path is proven by the
-  clean-copy check of every pack and checkpoint. Check: the session record's commands start with `bun`.
+- **`bun` is the only package manager** (`bun run`, `bun install`, `bunx`). Check: `packageManager` in
+  `package.json` names bun, and `bun.lock` is the only lockfile.
 - **Migrations before features**, and **deployable at every commit**, deployed only when I ask. Check: `bun run
   db:reset` applies a feature's tables before its screen exists, and `bun run build` passes.
 
@@ -65,8 +65,7 @@ My engineering rules are in `CLAUDE.md` and [patterns](../patterns.md). This pag
   person can see it) on API payload fields a person can leave out and on fields whose name is unclear. The
   descriptions reach the OpenAPI document and the model's JSON Schema. Check: the OpenAPI document has a description
   on each schema.
-- **Inside the hour these are required only on new domain schemas**: everything the template brings already has
-  them. Docgen-grade JSDoc (categories, versions, examples that compile) is what production would add.
+- **Required on every new schema**: everything the starter brought already has them. Docgen-grade JSDoc (categories, versions, examples that compile) is what production would add.
 - **The API reference works**: the HttpApi's Scalar page (`HttpApiScalar`) in development, the OpenAPI document in
   production. Check: in `bun run dev`, `/api/v1/docs` lists every endpoint; under `bun run preview` it answers 404
   and `/api/v1/openapi.json` answers.

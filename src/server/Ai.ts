@@ -60,7 +60,7 @@ export interface ModelRoute {
 
 /** The route the current attempt uses. Each step of the execution plan provides one. */
 class CurrentRoute extends Context.Service<CurrentRoute, ModelRoute & { readonly first: boolean }>()(
-  "takehome/server/Ai/CurrentRoute"
+  "inventory/server/Ai/CurrentRoute"
 ) {}
 
 /** A structured answer, what it used, and which model gave it (the screen says which one answered). */
@@ -171,7 +171,7 @@ export class Ai extends Context.Service<
       readonly maxOutputTokens?: number
     }): Effect.Effect<AiAnswer<S["Type"]>, AiUnavailable>
   }
->()("takehome/server/Ai") {
+>()("inventory/server/Ai") {
   /** The service from the model settings (src/server/Settings.ts): the routes their keys allow, in order. */
   static readonly layer = Layer.unwrap(
     Effect.gen(function* () {

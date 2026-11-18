@@ -41,8 +41,7 @@ Write these correctly the first time. Each one costs a fix cycle.
 Before using an Effect API you have not seen in this repository, read it in `node_modules/effect/src/`. Models write
 Effect 3 from memory; this is Effect 4.
 
-**Style that production would enforce and the hour does not.** Follow it when it costs nothing; never stop to fix
-it. The Effect modules for strings, arrays and records (`import { Array as Arr, Record as Rec, String as Str } from
+**Style the production profile would enforce and the check does not yet.** Follow it when it costs nothing. The Effect modules for strings, arrays and records (`import { Array as Arr, Record as Rec, String as Str } from
 "effect"`: `Str.includes("x")(name)`, `Str.toLowerCase(Str.trim(s))`, `Arr.map(xs, f)`, `Arr.findFirst(xs, p)` and
 `Rec.get(table, key)`, both Options); `Effect.fn("Service.method")(function* (...) { ... })` for Effect-returning
 functions; `const now = yield* DateTime.now` before `DateTime.formatIso(now)` rather than `yield*` inside a call;
@@ -55,15 +54,14 @@ functions; `const now = yield* DateTime.now` before `DateTime.formatIso(now)` ra
 - Before you hand back: `bun run check`, bare. It runs the fast tests; `bun run check:full` adds the slow ones.
 - Format only your own files: `bun run format -- <the files you changed>`. A bare `bun run format` rewrites the
   files other agents are editing. Check: `git status` after it lists only files your brief gave you.
-- Tests: in the hour, three to six, only for rules where a wrong result hurts the person (a count, a total, a match, a
+- Tests: for rules where a wrong result hurts the person (a count, a total, a match, a
   unit, a permission that guards a write). None for plumbing. A test that needs sign-in or a real database is slow:
   name it `*.slow.test.ts`, and write it only when the rule cannot be shown another way.
 - Permissions and tenancy are enforced in the service or handler, never only in the screen. People are told apart by
   id (`actor.id`), never by name.
-- The database has no transactions. Writes that must land together go in one batch. Migrations: the example's
-  own tables are changed in `migrations/0001_init.sql` itself during the first job (`CLAUDE.md` "Your first job"),
-  then `bun run db:reset` once; a new table goes in a new migration file; and once a copy holds rows that must stay
-  (a frozen copy, a deployed one), never edit a migration it has applied: add one.
+- The database has no transactions. Writes that must land together go in one batch. Migrations: a new table goes
+  in a new migration file, and once a copy holds rows that must stay (a deployed one), never edit a migration it has
+  applied: add one.
 - No new dependency without being asked.
 
 ## Hand-back

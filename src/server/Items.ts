@@ -155,7 +155,7 @@ export class Items extends Context.Service<
      */
     edit(actor: Member, id: string, edit: ItemEdit): Effect.Effect<EditOutcome>
   }
->()("takehome/server/Items") {
+>()("inventory/server/Items") {
   static readonly layer = Layer.effect(
     Items,
     Effect.gen(function* () {

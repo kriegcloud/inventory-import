@@ -13,7 +13,7 @@ const placeholder = "00000000-0000-0000-0000-000000000000"
 const config = readFileSync("wrangler.jsonc", "utf8")
 
 if (config.includes(placeholder)) {
-  const name = /"database_name":\s*"([^"]+)"/.exec(config)?.[1] ?? "takehome"
+  const name = /"database_name":\s*"([^"]+)"/.exec(config)?.[1] ?? "inventory"
   let id
   try {
     id = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/.exec(run(["d1", "create", name]))?.[0]

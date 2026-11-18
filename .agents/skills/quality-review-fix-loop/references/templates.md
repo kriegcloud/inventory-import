@@ -24,8 +24,8 @@ are explicitly marked optional.
 - `label`: issue | suggestion | question | todo | note
 - `blockingStatus`: blocking | non-blocking | question | note
 - `severity`: P0-critical | P1-high | P2-medium | P3-low
-- `ruleSource`: {{the line in `CLAUDE.md`, `docs/patterns.md` or the brief that this breaks, or "judgement"}}
-- `sourceRefs`: {{the rule or brief line, or command output}}
+- `ruleSource`: {{the line in `CLAUDE.md`, `docs/patterns.md` or the goal SPEC that this breaks, or "judgement"}}
+- `sourceRefs`: {{the rule or SPEC line, or command output}}
 - `affectedFiles`: {{repo-relative paths with line numbers where possible}}
 - `evidence`: {{specific diff, code path, failing command, log excerpt, missing doc, or violated rule}}
 - `impact`: {{why this matters for the person importing, correctness, or someone reading the zip}}
@@ -44,7 +44,7 @@ are explicitly marked optional.
 
 - `P0-critical`: confirmed data loss, security issue, broken release, or
   impossible-to-ship regression.
-- `P1-high`: confirmed break of a written rule, the brief, or a test in changed scope.
+- `P1-high`: confirmed break of a written rule, the goal SPEC, or a test in changed scope.
 - `P2-medium`: likely maintainability, documentation, boundary, or coverage
   gap that should be fixed before closure.
 - `P3-low`: non-blocking polish or future improvement.
@@ -86,7 +86,7 @@ fixed, create a waiver record:
 ```md
 ### Waiver: {{item_id}}
 
-- `ruleSource`: {{the rule or brief line}}
+- `ruleSource`: {{the rule or SPEC line}}
 - `reason`: {{why fixing now is not the right move}}
 - `owner`: Benjamin
 - `expiryOrFollowUp`: {{date, issue, or explicit trigger}}

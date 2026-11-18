@@ -2,14 +2,15 @@
 
 `.claude/skills/` and `.codex/skills/` link to these folders, so Claude Code and Codex read one copy.
 
-## Written for this project
+## Benjamin's own
 
-`intake`, `lead`, `references`, `next`, `qa`, `verify`, `decisions`, `ship`: short procedures for a one-hour build. They are the
-working agreement between Benjamin and his coding agent.
+`quality-review-fix-loop`: ported from one of his own repositories, with that repo's standards replaced by this one's
+(the goal's `SPEC.md`, `CLAUDE.md`, `docs/patterns.md`) and the reviewer panel cut from ten roles to seven.
 
-`quality-review-fix-loop` is also Benjamin's: ported from one of his own repositories, with that repo's standards
-replaced by this one's (the brief, `CLAUDE.md`, `docs/patterns.md`) and the reviewer panel cut from ten roles to the
-seven that apply to a one-hour build.
+`create-beep-app`: how to use his project starter tool, which made this repository (`beep.json` records the modules).
+
+The procedures written for the original timed build (intake, lead, references, next, qa, verify, decisions, ship)
+were removed with that build's tooling; git history has them.
 
 ## Vendored, with their licences
 

@@ -14,10 +14,10 @@ export const sessionCookieScheme = "sessionCookie"
 const sessionCookie = {
   type: "apiKey",
   in: "cookie",
-  name: "takehome.session_token",
+  name: "inventory.session_token",
   description:
     "The session cookie Better Auth sets when you sign in at `POST /api/auth/sign-in/email` (HttpOnly, " +
-    "SameSite=Lax). A copy served over https names it `__Secure-takehome.session_token`. The browser sends it by " +
+    "SameSite=Lax). A copy served over https names it `__Secure-inventory.session_token`. The browser sends it by " +
     "itself; nothing in a header or a payload can choose who a request acts as."
 }
 

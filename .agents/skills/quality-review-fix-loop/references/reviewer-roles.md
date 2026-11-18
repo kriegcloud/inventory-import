@@ -8,19 +8,18 @@ commit, the changed-file list, the sources of truth, and the inventory item form
 Every reviewer must:
 
 - stay read-only (it may run the app, the check and `curl`; it edits nothing)
-- cite the written rule or the line of the brief, and concrete file or command evidence
+- cite the written rule or the line of the goal's SPEC, and concrete file or command evidence
 - classify each finding as `blocking`, `non-blocking`, `question` or `note`
-- keep to what this hour changed: the template commit is not under review
+- keep to what changed since the base commit
 - include the smallest fix and a command or step that proves it
 - return `0 required findings` when no blockers remain
-- stop after four minutes and report what it did not get to
 
 ## Roles
 
-1. **Quality gate.** `bun run check:full`, `bun run build`, `bun run pack -- --early`, `bun run lighthouse -- <path>` for
+1. **Quality gate.** `bun run check:full`, `bun run build`, `bun run lighthouse -- <path>` for
    each screen. Any failure, warning or audit below 100 outside mobile Performance is a finding.
 
-2. **The brief and the person.** Reads `brief/` again and uses the running app with the sample file. Each requirement:
+2. **The goal and the person.** Reads the goal's `SPEC.md` again and uses the running app with the sample file. Each requirement:
    met, partly, not met. What lands if the person presses nothing but the last button. Whether someone who has never
    seen the app knows what each screen wants from them.
 
@@ -42,6 +41,6 @@ Every reviewer must:
    lines, dead code, a leftover from a recipe or a spike, a comment that restates the code, an export in
    `src/domain`, `src/api` or `src/server` without a JSDoc that says why.
 
-7. **The write-up.** `README.md` and `DECISIONS.md` against the repo and the session record. Each claim under "Where
-   it stands" tried; each decision credited to whoever made it; no adapted code described as written from scratch;
+7. **The documents.** `README.md`, `DECISIONS.md` and the goal's `PLAN.md` against the repo and git history. Each
+   claim tried; each decision credited to whoever made it; no adapted code described as written from scratch;
    machine-written phrasing (Benjamin can type `/unslop` for it); a TODO left in.

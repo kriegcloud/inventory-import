@@ -351,7 +351,7 @@ layer(signInApp({ production: true }), { timeout: "60 seconds" })("a production 
       const marcus = browser("10.1.0.1")
       const signIn = yield* marcus.signIn("marcus@example-works.test")
       expect(signIn.status).toBe(200)
-      expect(signIn.setCookie).toMatch(/^__Secure-takehome\.session_token=/)
+      expect(signIn.setCookie).toMatch(/^__Secure-inventory\.session_token=/)
       expect(signIn.setCookie).toContain("Secure")
       expect(signIn.setCookie).toContain("HttpOnly")
       expect(signIn.setCookie).toContain("SameSite=Lax")
@@ -396,7 +396,7 @@ layer(signInApp({ settings: { BETTER_AUTH_URL: "https://app.example.test" } }), 
           there
         )
         expect(signIn.status).toBe(200)
-        expect(signIn.setCookie).toMatch(/^__Secure-takehome\.session_token=.*; Secure/)
+        expect(signIn.setCookie).toMatch(/^__Secure-inventory\.session_token=.*; Secure/)
         // A callback to anywhere else, and a sign-out from the address the request reached (not the configured one).
         const elsewhere = yield* browser("10.2.0.2").send(
           "POST",

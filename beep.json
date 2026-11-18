@@ -2,9 +2,9 @@
   "tool": "create-beep-app",
   "version": "0.1.0",
   "target": "vite",
-  "modules": ["base", "design-lints", "docs", "agent-kit", "telemetry", "timebox"],
+  "modules": ["base", "design-lints", "docs", "agent-kit", "telemetry"],
   "options": {
-    "name": "takehome",
+    "name": "inventory",
     "packageManager": "bun"
   }
 }

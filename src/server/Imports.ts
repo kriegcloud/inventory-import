@@ -368,7 +368,7 @@ export class Imports extends Context.Service<
     /** Every item of the organization, by SKU. */
     items(organizationId: OrganizationId): Effect.Effect<ReadonlyArray<StoredItem>>
   }
->()("takehome/server/Imports") {
+>()("inventory/server/Imports") {
   static readonly layer = Layer.effect(
     Imports,
     Effect.gen(function* () {

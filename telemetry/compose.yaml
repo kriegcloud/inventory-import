@@ -4,13 +4,13 @@
 # The app sends to it only when OTEL_EXPORTER_OTLP_ENDPOINT is set (.dev.vars.example). Nothing is kept: stopping it
 # throws the data away. The ports listen on this machine only; GRAFANA_PORT, OTLP_HTTP_PORT and OTLP_GRPC_PORT move
 # them.
-name: takehome-telemetry
+name: inventory-telemetry
 services:
   lgtm:
     image: grafana/otel-lgtm:0.41.0
-    container_name: takehome-telemetry
+    container_name: inventory-telemetry
     environment:
-      # Set to true to see each component's own output in `docker logs takehome-telemetry`.
+      # Set to true to see each component's own output in `docker logs inventory-telemetry`.
       ENABLE_LOGS_ALL: ${TELEMETRY_STACK_LOGS:-false}
       # Loki stops taking logs when the disk it writes to is 90% full ("Ingester is shutting down"), which a developer
       # machine often is: every log line was refused on one at 93%. The data here is a few megabytes and thrown away by

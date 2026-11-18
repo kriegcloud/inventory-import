@@ -48,7 +48,7 @@ while (!ready && Date.now() < deadline) {
   if (!ready) await new Promise((resolve) => setTimeout(resolve, 2000))
 }
 if (!ready) {
-  console.error("The telemetry stack did not answer within two minutes: `docker logs takehome-telemetry` says why.")
+  console.error("The telemetry stack did not answer within two minutes: `docker logs inventory-telemetry` says why.")
   process.exit(1)
 }
 console.log(`

@@ -40,13 +40,14 @@ written down and counted. A person importing `items_messy.csv` sees exactly what
 
 Step 0, clear the ground:
 
-- [ ] No timed-build tooling is left: `git grep -nE 'clock|checkpoint|session-log|session-report|check-images|pack\.sh'`
-      over `package.json`, `scripts/`, `test/` and `.claude/` finds nothing.
-- [ ] No hook calls a missing script: `.claude/settings.json` has no `hooks` entry naming a file that does not exist.
-- [ ] No starter placeholder name is left: `git grep -niw takehome` finds nothing outside git history.
-- [ ] `packageManager` names bun and `package-lock.json` is gone (`git ls-files package-lock.json` is empty).
-- [ ] `bun run check:full` and `bun run build` pass.
-- [ ] Browser: `items_messy.csv` imported through Confirm; rows in the file, the result screen and the stored count
+- [x] No timed-build tooling is left:
+      `git grep -nE 'scripts/(clock|checkpoint|pack|shot|check-images|session-log|session-report)'` over
+      `package.json`, `scripts/`, `test/` and `.claude/` finds nothing.
+- [x] No hook calls a missing script: `.claude/settings.json` has no `hooks` entry at all.
+- [x] No starter placeholder name is left: `git grep -niw takehome` finds nothing outside this goal's own text.
+- [x] `packageManager` names bun and `package-lock.json` is gone (`git ls-files package-lock.json` is empty).
+- [x] `bun run check:full` and `bun run build` pass.
+- [x] Browser: `items_messy.csv` imported through Confirm; rows in the file, the result screen and the stored count
       agree (200 rows, 155 stored).
 
 Step 1, workspace:

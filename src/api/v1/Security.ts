@@ -18,6 +18,6 @@ export class CrossSiteRequest extends Schema.TaggedError<CrossSiteRequest, { rea
  * browser too old to send it). Applied to the whole API, so every write is covered whichever identity is in place:
  * the header switcher here, a session cookie once sign-in is added.
  */
-export class SameOrigin extends HttpApiMiddleware.Service<SameOrigin>()("takehome/api/v1/Security/SameOrigin", {
+export class SameOrigin extends HttpApiMiddleware.Service<SameOrigin>()("inventory/api/v1/Security/SameOrigin", {
   error: CrossSiteRequest
 }) {}

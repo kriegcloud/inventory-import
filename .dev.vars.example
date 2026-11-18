@@ -70,8 +70,8 @@ AI_GATEWAY_API_KEY=
 # local one (Grafana's LGTM stack, in Docker) and prints this line; `bun run dev` never starts it. Set, the Worker's
 # and the browser's traces, metrics and logs go there (the browser's through the app's own /api/otlp).
 # OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
-# The service name the Worker's telemetry carries. Default takehome; the browser's is takehome-web.
-# OTEL_SERVICE_NAME=takehome
+# The service name the Worker's telemetry carries. Default inventory; the browser's is inventory-web.
+# OTEL_SERVICE_NAME=inventory
 
 # --- Public flags for the browser ---------------------------------------------------------------------------------
 # VITE_* values are compiled into the browser bundle, so anything here is public: never put a secret in one. They go

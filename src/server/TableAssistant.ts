@@ -68,7 +68,7 @@ export class TableAssistant extends Context.Service<
      */
     view(actor: Member, request: ViewRequest): Effect.Effect<ViewOutcome>
   }
->()("takehome/server/TableAssistant") {
+>()("inventory/server/TableAssistant") {
   static readonly layer = Layer.effect(
     TableAssistant,
     Effect.gen(function* () {

@@ -924,7 +924,7 @@ export class ItemsApi extends HttpApiGroup.make("items")
  * every field that is wrong at once (`errors: "all"`, `HttpApiMiddleware.ProblemDetails`); a write that did not come
  * from this app's own pages is refused first (`SameOrigin`).
  */
-export class Api extends HttpApi.make("takehome")
+export class Api extends HttpApi.make("inventory")
   .add(SystemApi)
   .add(IdentityApi)
   .add(ActivityApi)
@@ -937,7 +937,7 @@ export class Api extends HttpApi.make("takehome")
   .prefix(apiPrefix)
   .annotate(HttpApi.PayloadParseOptions, { errors: "all" })
   .annotate(OpenApi.Title, "Items API")
-  // The document's own version, not the path's and not package.json's (every checkpoint bumps that): the major is
+  // The document's own version, not the path's and not package.json's (each release bumps that): the major is
   // the `v1` of the address, the minor goes up when the contract gains something, the patch when only words change.
   .annotate(OpenApi.Version, "1.0.0")
   // No `OpenApi.Servers`: OpenAPI reads a document without one as served from "/" of whichever host serves it, which

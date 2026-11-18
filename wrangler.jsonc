@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "takehome",
+  "name": "inventory",
   "main": "src/server/worker.ts",
   "compatibility_date": "2026-11-01",
   "compatibility_flags": ["nodejs_compat"],
@@ -12,7 +12,7 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "takehome",
+      "database_name": "inventory",
       // Local dev ignores this id. `bun run deploy:setup` writes the real one.
       "database_id": "00000000-0000-0000-0000-000000000000",
       "migrations_dir": "migrations"

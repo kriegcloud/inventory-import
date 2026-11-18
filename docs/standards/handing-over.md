@@ -20,8 +20,7 @@ status: draft
   running.
 - **An open question stays open.** When I have not answered, the docs and the write-up say "not decided", name the
   agent's default, and never present it as my decision. Check: each such item reads "not decided" until I answer.
-- **Your defaults stay in front of me until I decide them**: each is asked again at every round until I decide it
-  or the hour ends. A default that decides what my data becomes is a decision, not a default. Check: the last
+- **Your defaults stay in front of me until I decide them**: each is asked again at every round until I decide it. A default that decides what my data becomes is a decision, not a default. Check: the last
   round's questions match the defaults the write-up names as not decided.
 - **Every finding reaches me.** Every finding of the tester, the reviewer and each lane is an option in a round, or
   a line in its text past four, marked fixed or open, not your pick of them. Check: the rounds hold as many findings

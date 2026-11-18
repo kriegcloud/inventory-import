@@ -81,11 +81,11 @@ export type AiSettings = Config.Success<typeof aiSettings>
  * - `OTEL_EXPORTER_OTLP_ENDPOINT`: the collector's OTLP over HTTP address (`http://localhost:4318` for the local
  *   stack). Unset, the default: off, and nothing is built or sent. Set, the Worker's and the browser's traces, metrics
  *   and logs go there; the browser's through the app's own /api/otlp.
- * - `OTEL_SERVICE_NAME`: the service name the Worker's carry. Default `takehome`; the browser's are `takehome-web`.
+ * - `OTEL_SERVICE_NAME`: the service name the Worker's carry. Default `inventory`; the browser's are `inventory-web`.
  */
 export const telemetrySettings = Config.all({
   endpoint: optionalUrl("OTEL_EXPORTER_OTLP_ENDPOINT"),
-  serviceName: Config.String("OTEL_SERVICE_NAME").pipe(Config.withDefault("takehome"))
+  serviceName: Config.String("OTEL_SERVICE_NAME").pipe(Config.withDefault("inventory"))
 })
 
 /** The shortest `BETTER_AUTH_SECRET` accepted: Better Auth's own warning threshold. */

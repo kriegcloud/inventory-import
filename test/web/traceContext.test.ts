@@ -18,7 +18,7 @@ const spy = vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
 })
 afterAll(() => spy.mockRestore())
 
-class Client extends Context.Service<Client, HttpClient.HttpClient>()("takehome/test/web/traceContext.test/Client") {
+class Client extends Context.Service<Client, HttpClient.HttpClient>()("inventory/test/web/traceContext.test/Client") {
   static readonly layer = Layer.effect(Client, HttpClient.HttpClient).pipe(Layer.provide(FetchHttpClient.layer))
 }
 

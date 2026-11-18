@@ -44,7 +44,7 @@ export const authOptions = (input: {
   readonly rateLimit?: boolean | undefined
 }) =>
   ({
-    appName: "Takehome",
+    appName: "Inventory",
     database: input.database,
     secret: input.secret,
     // Unset locally: Better Auth then takes the origin of each request, so any dev or preview port works.
@@ -96,7 +96,7 @@ export const authOptions = (input: {
     },
     advanced: {
       useSecureCookies: input.secureCookies ?? false,
-      cookiePrefix: "takehome",
+      cookiePrefix: "inventory",
       defaultCookieAttributes: { sameSite: "lax", httpOnly: true },
       // Cloudflare sets this header to the visitor's address; rate limits are counted per address.
       ipAddress: { ipAddressHeaders: ["cf-connecting-ip"] },

@@ -3,7 +3,7 @@ name: quality-review-fix-loop
 description: >
   Close a piece of work with a quality loop: green baseline commit, a panel of read-only reviewers, fixes routed to
   fixer agents by file ownership, waivers for what stays, zero required blockers. Use when Benjamin asks to run the
-  quality loop, to close out the build before the write-up, or to loop reviewers and fixers until nothing required
+  quality loop, to close a goal, or to loop reviewers and fixers until nothing required
   remains.
 metadata:
   version: "0.1.0"
@@ -21,21 +21,20 @@ Fill or infer before starting:
 
 - `repo_root`: `git rev-parse --show-toplevel`
 - `summary`: one paragraph on what was built
-- `base_ref`: the brief commit, the one `bun run clock` counts from (the first that adds a file under `brief/` other
-  than its README):
-  `git log --reverse --no-renames --diff-filter=A --format=%h -- brief ':(exclude)brief/README.md' | head -n 1`
+- `base_ref`: the commit the work started from: for a goal, the parent of the commit that added its `SPEC.md`
+  (`git log --reverse --diff-filter=A --format=%h -- goals/<slug>/SPEC.md | head -n 1`, then `^`)
 - `review_scope`: files changed since `base_ref`, plus the screens, endpoints and tables they touch
 - `zero_gate`: zero required blocker findings from the reviewer panel
-- `loop_budget`: one round inside the hour; a second only if the first finished before minute 40
+- `loop_budget`: one round; a second only when the first fixed a blocker
 - `commit_policy`: green baseline commit before the loop; a commit per fix group; never push
 - `waiver_policy`: a required blocker may remain only with a waiver record (see `references/templates.md`), and
-  each waiver is also a line under "Known wrong or missing" in `DECISIONS.md`
+  each waiver is also a line in the goal's `PLAN.md` closing note
 
 ## This repo's defaults
 
 Sources of truth. Read what is relevant to the changed files before reviewing; never review from generic taste:
 
-- `brief/` (it decides what was asked for)
+- the goal's `SPEC.md` and `PLAN.md` (they decide what was asked for)
 - `CLAUDE.md`: "Rules for an import", "Identity and permissions", "What the type-check enforces", "Platform", "UI"
 - `docs/patterns.md` (section 8 for screens), `docs/kit.md`, `docs/review-table.md` where they apply
 - `DECISIONS.md` for what Benjamin chose and cut: a cut he made is not a finding
@@ -43,7 +42,7 @@ Sources of truth. Read what is relevant to the changed files before reviewing; n
 Quality commands, from `repo_root`:
 
 ```bash
-bun run format -- <the files changed since base_ref>   # never a bare format: it rewrites every lane's files
+bun run format -- <the files changed since base_ref>   # never a bare format: it rewrites every file
 bun run check:full
 bun run build
 ```
@@ -53,9 +52,8 @@ call the baseline green while a relevant one remains.
 
 ## Operating rules
 
-- Run `bun run clock` first. Say the minute and whether the budget allows a round.
 - Inspect the working tree first; never revert changes you did not make.
-- Keep scope to this hour's work. The template commit is not under review.
+- Keep scope to the work since `base_ref`.
 - Reviewers are read-only: they inspect, run the app and commands, and report. They do not edit.
 - Fixer agents edit only the files they are given and are told other agents share the repo. Two fixers never share
   a file. A one-file fix is done in the main thread: a fixer agent costs more than it saves there.
@@ -79,7 +77,7 @@ with the summary, `base_ref`, the changed files, the sources of truth and the it
 each may write in, so two reviewers never trip over each other's data.
 
 **Phase 3: triage and routing.** Merge the reports into one inventory: drop duplicates; reject findings with no
-evidence or no fix; move anything outside this hour's work to the backlog; group blocking findings by the files they
+evidence or no fix; move anything outside the work since `base_ref` to the backlog; group blocking findings by the files they
 touch; give each group to one fixer with the prompt in `references/templates.md`. Start the fixers on the groups
 that block the person, then put the rest to Benjamin in a decision round (`CLAUDE.md` "Decisions by dialog"), most
 harmful first: he may cut a group, and anything that is a product decision is his.

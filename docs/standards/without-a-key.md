@@ -13,8 +13,8 @@ status: stable
   file and replayed when there is no key, labelled with its date, model id and "recorded, not live". Check: with
   no key, the replay is one click away and the label is on screen. Not built in the starter: with no key the table
   assistant's rules answer and say so, and nothing saves or replays a run, so build the replay when the plan has it.
-- **Keys stay secret**: never in logs, reports or commits. Check: `bun run check` passes the pack's key scan
-  (`test/scripts/KeyScan.test.ts`), and so does `bun run pack`.
+- **Keys stay secret**: never in logs, reports or commits. Check: `bun run check` passes the key scan
+  (`test/repo/KeyScan.test.ts`).
 - **A missing key turns the AI features off**, through their settings ([settings](config-and-logs.md)), and the
   screen says so, and so does `AI_ENABLED=false` with a key. Check: `/api/v1/system/status` reports the provider as
   none and why.

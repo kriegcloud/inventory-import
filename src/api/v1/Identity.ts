@@ -3,7 +3,7 @@ import { HttpApiEndpoint, HttpApiGroup, HttpApiMiddleware, OpenApi } from "effec
 import { Member, OrganizationId, Role } from "../../domain/Identity.ts"
 
 /** The member making this request. Handlers read it; they never trust an id from the payload. */
-export class CurrentActor extends Context.Service<CurrentActor, Member>()("takehome/api/v1/Identity/CurrentActor") {}
+export class CurrentActor extends Context.Service<CurrentActor, Member>()("inventory/api/v1/Identity/CurrentActor") {}
 
 /** No member could be resolved for this request. The reason says what to do, without echoing what was sent. */
 export class NotSignedIn extends Schema.TaggedError<NotSignedIn, { readonly brand: unique symbol }>()(
@@ -38,7 +38,7 @@ export class Identity extends HttpApiMiddleware.Service<
     provides: CurrentActor
     requires: never
   }
->()("takehome/api/v1/Identity", {
+>()("inventory/api/v1/Identity", {
   error: NotSignedIn
 }) {}
 

@@ -77,7 +77,7 @@ export const DevToolsWhenAsked = Layer.unwrap(
  * A fresh D1 database (local workerd, nothing persisted) with every migration applied, in filename order, as the raw
  * binding: Better Auth takes it directly. `TestDatabase` and `TestAuth` share the one this layer opens.
  */
-export class TestD1 extends Context.Service<TestD1, D1Database>()("takehome/test/server/support/app/TestD1") {
+export class TestD1 extends Context.Service<TestD1, D1Database>()("inventory/test/server/support/app/TestD1") {
   static readonly layer = Layer.effect(
     TestD1,
     Effect.gen(function* () {
@@ -349,7 +349,7 @@ export const TypedApp = testAppWith(Ai.layerFor({ routes: [], model: testSetting
 export class TestFetch extends Context.Service<
   TestFetch,
   { readonly handle: (request: Request) => Promise<Response> }
->()("takehome/test/server/support/app/TestFetch") {
+>()("inventory/test/server/support/app/TestFetch") {
   static readonly layer = <E>(app: Layer.Layer<never, E, HttpRouter.HttpRouter>) =>
     Layer.effect(
       TestFetch,
@@ -465,7 +465,7 @@ export const browser = (address: string) => {
       )
     )
     const setCookie = Option.getOrUndefined(
-      Arr.findFirst(response.headers.getSetCookie(), (line) => Str.includes("takehome.session_token=")(line))
+      Arr.findFirst(response.headers.getSetCookie(), (line) => Str.includes("inventory.session_token=")(line))
     )
     if (setCookie !== undefined) cookie = Str.split(setCookie, ";")[0] ?? ""
     const text = yield* Effect.promise(() => response.text())

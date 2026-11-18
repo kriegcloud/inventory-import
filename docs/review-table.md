@@ -276,6 +276,6 @@ const [draft, setDraft] = useState<SavedDecisions | undefined>(() => readDraft(f
 The app's own Review step is the worked example: `src/web/pages/import/ReviewStep.tsx` draws the region, and
 `src/web/pages/import/reviewAdapter.ts` turns the pure review (`review` in `src/domain/ItemImport.ts`) into its rows,
 columns and problem kinds and the region's decisions back into the saved draft. The region holds no record words and
-the adapter holds no rules: a brief's own records change `ItemImport.ts` and the adapter's columns, never the
+the adapter holds no rules: a different kind of record changes `ItemImport.ts` and the adapter's columns, never the
 region. `test/web/reviewParity.test.ts` drives the region's logic and `review` side by side on `items_messy.csv` and
 requires the same statuses after every step.

@@ -7,7 +7,7 @@ import type { AgentRun } from "../domain/Agent.ts"
 // it acts for: there is no agent id in any payload.
 
 /** The agent acting in this request, when one is. Read with `Effect.serviceOption(CurrentAgent)`. */
-export class CurrentAgent extends Context.Service<CurrentAgent, AgentRun>()("takehome/server/Agent/CurrentAgent") {}
+export class CurrentAgent extends Context.Service<CurrentAgent, AgentRun>()("inventory/server/Agent/CurrentAgent") {}
 
 /** Runs `effect` as the agent in `run`, for the current actor, with its own span. */
 export const asAgent =

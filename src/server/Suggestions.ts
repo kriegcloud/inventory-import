@@ -142,7 +142,7 @@ export class Suggestions extends Context.Service<
       readonly lines: ReadonlyArray<string>
     }>
   }
->()("takehome/server/Suggestions") {
+>()("inventory/server/Suggestions") {
   static readonly layer = Layer.effect(
     Suggestions,
     Effect.gen(function* () {

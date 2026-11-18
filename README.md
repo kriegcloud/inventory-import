@@ -7,8 +7,10 @@ This began as a one-hour take-home project. The first commit here is the app as 
 the company's brief and without the record of my working session; the two sample files are theirs. Everything after
 that commit is later work.
 
-Read [DECISIONS.md](DECISIONS.md) first. It says what was built, what was cut, and where the work stands.
-[docs/architecture.md](docs/architecture.md) draws the data model, a row's path through the import and the layers.
+Read [DECISIONS.md](DECISIONS.md) first. It says what was built, what was cut, and the product decisions behind the
+import. [docs/architecture.md](docs/architecture.md) draws the data model, a row's path through the import and the
+layers. Where the repository is going is in [explorations/](explorations/README.md) (questions being shaped, with
+their research and decisions) and [goals/](goals/README.md) (work with a definition of done).
 
 ## What this started from
 
@@ -16,8 +18,6 @@ Read [DECISIONS.md](DECISIONS.md) first. It says what was built, what was cut, a
   of an example record with a review, undo and take-back, a searchable table with an assistant, and the toolchain.
 - My own earlier app, stockroom, was the reference for the model suggestions: its guard and its way of turning a
   stored suggestion into a proposal were taken and rewritten for items (DECISIONS.md lists the files).
-- Everything after the commit "docs: the brief as received" is this hour's work: the item's fields and rules, the
-  fixes applied for you, the questions, the forms, the model suggestions and the screens' words.
 
 ## A look at it
 
@@ -40,8 +40,8 @@ bun install && bun run dev
 
 Open http://localhost:5173. In development the app opens already signed in, as the first test account, Dana
 Whitfield, admin of Example Works (test); the others are one click away in the menu under her name. The
-database is a local SQLite file created on first run. `npm install && npm run dev` works too. Both lockfiles are
-committed.
+database is a local SQLite file created on first run. bun is the only package manager (`packageManager` in
+`package.json`, one `bun.lock`).
 
 What to try first, on the brief's messy file (`public/samples/items_messy.csv`, 200 items):
 
@@ -68,7 +68,7 @@ values in `.dev.vars.example`). After pulling a change to `migrations/0001_init.
 | --- | --- |
 | `bun run dev` | App and API on http://localhost:5173, signed in as the first test account in development |
 | `bun run check` | Type-check with Effect diagnostics, lint (including two design lints), format check and the fast tests |
-| `bun run check:full` | Type-check with Effect diagnostics, lint (including two design lints), format check, every test, and a check of `docs/` |
+| `bun run check:full` | Type-check with Effect diagnostics, lint (including two design lints), format check, every test, and a check of `docs/`, `explorations/` and `goals/` |
 | `bun run test` | Every test, fast and slow (Vitest, on Node) |
 | `bun run db:reset` | Start again with an empty database (restart `bun run dev` afterwards) |
 | `bun run preview` | The production build on http://localhost:4173, with every security header, compressed as Cloudflare compresses it (`PREVIEW_COMPRESSION=off` sends it as it is) |
@@ -135,18 +135,15 @@ What the starter held, now turned to the brief's inventory item:
 - The toolchain: Vite, React, Tailwind, every shadcn/ui component and more from Dice UI's and tablecn's registries
   (MIT; `docs/kit.md` says what was changed), Effect, Wrangler, Vitest, a .csv and .xlsx reader, and syncpack.
 - Two design lints in `bun run check` that hold every screen to the theme and its components.
-- `CLAUDE.md`, and the skills and agents my coding agent works from. Some skills are mine (`/intake`, `/lead`,
-  `/references`, `/next`, `/quality-review-fix-loop`, `/verify`, `/qa`, `/decisions`, `/ship`); the rest are vendored
-  unchanged, and [.agents/skills/README.md](.agents/skills/README.md) credits each author and licence.
+- `CLAUDE.md`, and the skills and agents my coding agent works from. One skill is mine
+  (`/quality-review-fix-loop`); the rest are vendored unchanged, and
+  [.agents/skills/README.md](.agents/skills/README.md) credits each author and licence.
 - Better Auth's six skills and its docs server (read only), for sign-in work. Their repository has no licence file.
 - `docs/`: my standards for this work, each rule with its check, and guides to the kit and the review region.
-- A session record. `bun run session` (part of `/ship`) turns the hook-written log into `docs/session/` (not kept in
-  this repository).
+- `explorations/` and `goals/`: plain-markdown packets for planned work, checked by `bun run docs:check`.
 - The skills, documentation and practices in this repository come from years of building software, including Rocket
   Inventory, a warehouse-management product I designed, built and led, where I designed its inventory import and
   review features.
-- Checkpoints: `bun run checkpoint` gives each working step a version, a tag and a checked zip.
-- Time-boxed work: `bun run clock` prints the minute of the hour, and `bun run pack` builds a checked zip.
 
 ## How it is put together
 
@@ -177,8 +174,8 @@ server and the browser. Start with `src/api/v1/Api.ts`, then `src/server/Items.t
 
 - **Secrets** are read on the server only. Locally they come from `.dev.vars`, which is git-ignored.
   `.dev.vars.example` explains what a real project would do instead (a secrets manager at start-up, the platform's
-  encrypted store when deployed). `bun run pack` fails, and labels the zip `DO-NOT-UPLOAD`, when `.dev.vars` or
-  `.env` is committed or a string shaped like an OpenRouter or Anthropic key appears in the tree or the history.
+  encrypted store when deployed). `bun run check` fails when a string shaped like an OpenRouter or Anthropic key, or a
+  private key, appears in any file git would commit (`test/repo/KeyScan.test.ts`).
 - **Security headers** are set for every response in the production build: a content security policy with no inline
   scripts, HSTS, `nosniff`, no framing, a strict referrer policy, same-origin opener and resource policies and
   `Cross-Origin-Embedder-Policy: require-corp` (`public/_headers` for the app, `src/server/security.ts` for the API).
@@ -192,4 +189,5 @@ server and the browser. Start with `src/api/v1/Api.ts`, then `src/server/Items.t
 - **Identity** comes from the session cookie only (HttpOnly, SameSite=Lax, Secure in production). Permissions and
   tenancy are enforced on the server. [docs/auth.md](docs/auth.md) lists each security setting.
 
-Scaffolded with create-beep-app 0.1.0: base, design-lints, docs, agent-kit, telemetry, timebox.
+Scaffolded with create-beep-app 0.1.0: base, design-lints, docs, agent-kit, telemetry. The starter's time-boxed
+workflow (clock, checkpoints, packing, the session record) was removed once the timed build was over.

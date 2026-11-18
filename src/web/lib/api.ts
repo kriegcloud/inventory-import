@@ -25,7 +25,7 @@ const fetchOrEarly: typeof globalThis.fetch = (input, init) => {
   return fetch(input, init)
 }
 
-class ApiClient extends Context.Service<ApiClient, Client>()("takehome/web/lib/api/ApiClient") {
+class ApiClient extends Context.Service<ApiClient, Client>()("inventory/web/lib/api/ApiClient") {
   static readonly layer = Layer.effect(
     ApiClient,
     // Same origin: the browser sends the session cookie with every call, so nothing names the actor here.

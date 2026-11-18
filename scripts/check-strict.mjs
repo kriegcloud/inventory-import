@@ -1,5 +1,5 @@
 // `bun run check:strict`: the Effect diagnostics at their production severity, as a measurement, not a gate.
-// `bun run check` uses the hour profile in tsconfig.base.json, where style rules are suggestions that never fail it.
+// `bun run check` uses the profile in tsconfig.base.json, where style rules are suggestions that never fail it.
 // This runs the same rules with every suggestion raised to the error it is in production, prints the findings grouped
 // by rule with a total, and exits 0. The TypeScript compiler's own errors are `bun run check`'s job, not counted here.
 //   bun run check:strict                       every project in tsconfig.json

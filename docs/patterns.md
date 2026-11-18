@@ -209,10 +209,9 @@ upload.start(file)                       // returns at once; upload.state: Readi
 - **Limits.** CSV 10 MB, .xlsx 3 MB (about 70,000 rows; 50,000 rows read in 0.7 s). `.xls`, `.xlsb`, `.ods`,
   password-protected files and PDFs are refused with what to do instead. Hidden rows, columns and sheets, merged
   cells, formulas and error cells are read and named in `notes`.
-- **Samples.** `public/samples/items_messy.csv` and `.xlsx`: the same 13 rows of the example Record, with five kinds of
-  deliberate mess (an empty code, a unit written two ways, one code on two rows, a date that reads two ways, a
-  quantity with a comma). Link: `<a href="/samples/records.xlsx" download>Download the sample workbook</a>`. Replace
-  them with the brief's files.
+- **Samples.** `public/samples/items_messy.csv` (200 items, with the mess the review exists for) and
+  `items_clean.csv` (25 items that import as they are). Link: `<a href="/samples/items_clean.csv" download>Download
+  the clean sample</a>`.
 
 ## 8. Screens that pass an accessibility audit
 
@@ -401,15 +400,14 @@ step (`src/web/pages/import/ResultStep.tsx`) says what it will do and shows what
 A file with a row per item and a quantity column per month, or a row that lists two lots, holds several records in
 one row. The import does this end to end: one function says how a row becomes records, and the review, the screen,
 the confirm, the result and the take-back key each record on its own id. Files: `src/domain/ItemImport.ts`
-(`RecordsOfRow`, `recordsOfRow`, `rowId`, `rowPlace`), `src/server/ImportShape.ts`, `src/server/Imports.ts`,
+(`ItemsOfRow`, `recordsOfRow`, `rowId`, `rowPlace`), `src/server/ImportShape.ts`, `src/server/Imports.ts`,
 `migrations/0001_init.sql` (`part`, `sourcePart`), `src/web/pages/import/reviewAdapter.ts`,
 `test/domain/RowParts.test.ts` and `test/server/RowParts.slow.test.ts`. The gallery's "One line, several records"
 (`/gallery/review?state=months`) shows the region with it.
 
-- **Say it once, in the domain.** `recordsOfRow` in `ItemImport.ts` is one line, like `ruleFixes`: the starter's
-  is `oneRecordPerRow`. Set it to the brief's function; the review screen uses it, and the server reviews with
-  `RecordsOfRow` (`src/server/ImportShape.ts`), which defaults to it. Never give the server another in the app: the
-  confirm would then write records the screen never showed. A test provides its own (`Layer.succeed(RecordsOfRow,
+- **Say it once, in the domain.** `itemsOfRow` in `ItemImport.ts` says how a row becomes items; the review screen
+  uses it, and the server reviews with `ItemsOfRow` (`src/server/ImportShape.ts`), which defaults to it. Never give the server another in the app: the
+  confirm would then write records the screen never showed. A test provides its own (`Layer.succeed(ItemsOfRow,
   byMonth)`).
 - **A record has its own id; its row keeps its number.** Each record of a row has a `part` (1, 2, ...) and the
   file's word for it (`label`, "Feb"). Its id is `rowId({ rowNumber, part })`, `row-8.2`; decisions, rivals,
@@ -430,14 +428,14 @@ the confirm, the result and the take-back key each record on its own id. Files: 
   keys, and a record names its row and part (`sourceRow`, `sourcePart`), so each record's outcome, changed values
   and take-back are its own. The result and the Activity page show a record of a split row as "8 · 2" (the stored
   part; the month's word is not stored).
-- **One record per code still holds.** Records of one row that share a code are rivals like any two rows: when the
-  brief's record is one per code and month, the month is a field of the record and part of its key, in the rename.
+- **One record per code still holds.** Records of one row that share a code are rivals like any two rows: when a
+  record is one per code and month, the month is a field of the record and part of its key.
 
-In `src/domain/ItemImport.ts`, for a file of items by month, in place of its `recordsOfRow` line (the file
+In `src/domain/ItemImport.ts`, for a file of items by month, in place of its `itemsOfRow` (the file
 already imports `Arr` and `Str`; checked: this type-checks there):
 
 ```ts
-// The file's shape, from the brief: one row per item, one quantity column per month, each month its own record.
+// The file's shape: one row per item, one quantity column per month, each month its own record.
 const months = [
   { part: 1, label: "Jan", column: 7 },
   { part: 2, label: "Feb", column: 8 },
@@ -445,13 +443,13 @@ const months = [
 ] as const
 
 /** Each month with a quantity is its own record of its row. A row with none is kept as one entry by the review. */
-export const byMonth: RecordsOfRow = ({ row, file }) =>
+export const byMonth: ItemsOfRow = ({ row, file }) =>
   Arr.flatMap(months, (month) => {
     const quantity = Str.trim(row.cells[month.column]?.text ?? "")
     return quantity === "" ? [] : [{ part: month.part, label: month.label, file: { ...file, quantity } }]
   })
 
-export const recordsOfRow: RecordsOfRow = byMonth
+export const recordsOfRow: ItemsOfRow = byMonth
 ```
 
 The rest needs no change: `ReviewStep` already says the two counts, the adapter already labels each record, and the

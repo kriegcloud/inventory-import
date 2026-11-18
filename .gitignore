@@ -37,9 +37,4 @@ worker-configuration.d.ts
 .claude/settings.local.json
 .dev.pid
 .scratch/
-submit/
-# The frozen copy of the last checkpoint, running beside the work for the qa and reviewer agents
-.frozen/
-# Raw log written by the session hooks; `bun run session` turns it into docs/session/
-.session/
 .taste-skill/

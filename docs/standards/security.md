@@ -26,8 +26,8 @@ status: draft
 ## Secrets and writes
 
 - **Secrets stay on the server**, are read as redacted settings ([settings](config-and-logs.md)), are never logged,
-  and the pack refuses a tree that holds one. Check: `bun run check` runs the pack's key scan over every file git
-  would commit (`test/scripts/KeyScan.test.ts`), and `bun run pack` runs it over the history too.
+  and no commit holds one. Check: `bun run check` runs the key scan over every file git would commit
+  (`test/repo/KeyScan.test.ts`).
 - **Cookies are `HttpOnly`, `Secure` in production and `SameSite=Lax` at least**, so no script reads a session.
   Check: the `Set-Cookie` header under `bun run preview`.
 - **Every write checks the role on the server and that the request came from our own pages** (`requireRole`, and the

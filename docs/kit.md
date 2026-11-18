@@ -10,8 +10,8 @@ tags: [ui, components, import]
 What is ready for an import screen and a list of records, and when to use each piece. Each was checked in the
 production build under the content security policy, in both themes, at 1440, 768 and 390 px, with the keyboard, and
 with Lighthouse (Accessibility 100). `CLAUDE.md` "UI" and [patterns](patterns.md) section 8 still win over anything here.
-Nothing here is product logic: what a row means and which rule applies are the brief's, written in
-`src/domain/ItemImport.ts` (`CLAUDE.md` "Your first job").
+Nothing here is product logic: what a row means and which rule applies are written in `src/domain/ItemImport.ts`,
+and the decisions behind them in `DECISIONS.md`.
 
 | Need | Use | File |
 | --- | --- | --- |
@@ -425,19 +425,16 @@ agent's is set up beside the shadcn server in `.mcp.json`, `.claude/settings.jso
 `.codex/config.toml`; `qa`'s, named `playwright-qa`, is declared in the header of `.claude/agents/qa.md` and starts
 with that agent (its tools `mcp__playwright-qa__*`, allowed in `.claude/settings.json`). Each drives the Google Chrome
 already installed, headless, in a fresh profile of its own (`--isolated`), with a 1440 × 900 window. So no agent
-shares Chrome, its tabs or its sign-ins with the person, with the upload agent or with each other. Where an agent
+shares Chrome, its tabs or its sign-ins with the person or with each other. Where an agent
 program does not start `qa`'s own server (Codex, a folder Claude Code does not trust), `qa` uses the main one and
 says so first, and the main agent does not look while it runs. Page snapshots go to `.scratch/playwright/` (the main
 browser) and `.scratch/playwright-qa/` (`qa`'s), screenshots to `.scratch/shots/`, all git-ignored. These folders are
 relative to the folder the server started in: a side session in a git worktree that should keep its files there
-starts in that worktree, not in the main checkout. The few screenshots a write-up shows are made small with
-`bun run shot` before they are committed (`CLAUDE.md` "Look at it"); it writes into the checkout it is run from.
+starts in that worktree, not in the main checkout.
 
-**A frozen copy that is a production build** (`bun run checkpoint`'s `Frozen copy:` line says "production build")
-opens on the sign-in page and offers no test accounts, as a deployed copy does. Its database has the local test
-accounts all the same (the copy's migrate applies `scripts/dev-accounts.sql`), and the `Frozen copy:` line names
-the first one's email and the test password (`README.md` lists them all). `bun run checkpoint -- --status` prints the
-line again. A copy served by the dev server opens signed in, as `bun run dev` does.
+**A production build** (`bun run preview`) opens on the sign-in page and offers no test accounts, as a deployed copy
+does. Its local database has the test accounts all the same (migrate applies `scripts/dev-accounts.sql`): sign in
+with the first one's email and the test password (`README.md` lists them all). The dev server opens signed in.
 
 It is pinned (`0.0.85`) and started through `bunx` from bun's cache like the shadcn server: 0.2 to 0.4 s to answer
 `tools/list`, also with the network cut off.

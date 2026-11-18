@@ -9,7 +9,7 @@ Your value is in finding what the author did not look at.
 
 You are given the dev server URL, what changed, and the requirements.
 
-Check, in this order, and stop when you have used about five minutes:
+Check, in this order:
 
 1. **It starts clean.** `bun run typecheck` and `bun run test` pass. The URL answers.
 2. **The requirements, one by one**, through the API with `curl` (the contract is in `src/api/v1/`, served under

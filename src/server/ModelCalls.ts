@@ -36,7 +36,7 @@ export class ModelCalls extends Context.Service<
      */
     take(actor: Member, kind: ModelCallKind): Effect.Effect<boolean>
   }
->()("takehome/server/ModelCalls") {
+>()("inventory/server/ModelCalls") {
   static readonly layer = Layer.effect(
     ModelCalls,
     Effect.gen(function* () {

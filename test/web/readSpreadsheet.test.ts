@@ -330,6 +330,17 @@ describe("Failures a person can act on", () => {
     })
   )
 
+  it.effect("wrong type: a letter saved as .txt, its commas making ragged rows, is said to be plain text", () =>
+    Effect.gen(function* () {
+      const error = yield* failure(textFile("Dear Sam, thanks for the order, see you soon\nBest, Pat\n", "letter.txt"))
+      expect(error).toMatchObject({ kind: "wrongType", fileName: "letter.txt" })
+      expect(error.problem).toContain("plain text")
+      // A real table saved as .txt still reads.
+      const table = yield* readSpreadsheet({ file: textFile("sku,name\nBLT-0042,Bolt\nNUT-0001,Nut\n", "items.txt") })
+      expect(table.rows.length).toBe(2)
+    })
+  )
+
   it.effect("unreadable: a password-protected workbook says how to remove the password", () =>
     Effect.gen(function* () {
       const error = yield* failure(fixture("password.xlsx"))

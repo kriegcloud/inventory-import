@@ -1,6 +1,6 @@
 // Decides what a chosen file really is from its bytes, not its name, then hands it to the CSV or workbook reader.
 // Each reader is its own lazily loaded chunk, so choosing a CSV never downloads the workbook library.
-import { Effect, Option } from "effect"
+import { Array as Arr, Effect, Option } from "effect"
 import { type FileProblem, fileProblem } from "../../../domain/FileProblem.ts"
 import { maxFileBytes, type Note, type SpreadsheetTable } from "../../../domain/Spreadsheet.ts"
 
@@ -96,6 +96,23 @@ export const sniff = (fileName: string, bytes: Uint8Array): Sniffed => {
 const extensionOf = (fileName: string): string => /\.([^.]+)$/.exec(fileName)?.[1]?.toLowerCase() ?? ""
 
 /**
+ * Whether text read as CSV holds a table: at least two columns, headings short enough to be names, and most rows
+ * with as many cells as the heading row. A letter with commas in it has none of these.
+ *
+ * @example looksLikeTable(readOf("Dear Sam, thanks for the order, see you soon\nBest, Pat")) // false
+ */
+const looksLikeTable = (table: SpreadsheetTable): boolean => {
+  const width = table.columns.length
+  if (table.rows.length === 0 || width < 2) return false
+  if (table.columns.some((column) => column.label.trim().length > 60)) return false
+  // Rows come padded to the heading's width; the reader's notes name the ones that were short or too long.
+  const ragged = Arr.dedupe(
+    table.notes.filter((note) => note.kind === "shortRows" || note.kind === "extraCells").flatMap((note) => note.rows)
+  )
+  return (table.rows.length - ragged.length) * 2 > table.rows.length
+}
+
+/**
  * Reads a chosen .csv or .xlsx into one table the rest of the app imports from. Fails with a `FileProblem` that
  * says what is wrong with the file and what to do. Format comes from the bytes; a misleading extension gets a Note.
  */
@@ -137,9 +154,10 @@ export const readSpreadsheet = Effect.fn("readSpreadsheet")(function* (
   if (sniffed.kind === "csv") {
     const { readCsv } = yield* Effect.promise(() => import("./csv.ts"))
     const table = yield* readCsv({ fileName, bytes, notes, onProgress })
-    // A .txt is read as CSV only when it holds a table: column names over rows. Notes or a letter saved as text are
-    // said to be what they are, instead of "column names with no rows under them".
-    if (extension === "txt" && (table.rows.length === 0 || table.columns.length < 2)) {
+    // A .txt is read as CSV only when it holds a table: short column names over rows of as many cells. Notes or a
+    // letter saved as text (its commas make ragged "rows") are said to be what they are, instead of a Match screen
+    // with nothing matched.
+    if (extension === "txt" && !looksLikeTable(table)) {
       return yield* Effect.fail(
         fileProblem.notASpreadsheet({ fileName, is: "plain text, not a table of rows under column names" })
       )

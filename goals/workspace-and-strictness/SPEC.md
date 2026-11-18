@@ -53,7 +53,7 @@ Step 0, clear the ground:
 Step 1, workspace:
 
 - [x] The app lives in `apps/inventory`; the root `package.json` declares bun workspaces and `turbo.json` has the
-      seven package tasks and two root tasks.
+      seven package tasks and two root tasks (a third, the key scan, was added after step 2; see PLAN).
 - [x] `bun run check:full` (through `turbo`) passes, and a second `bun run check` reports every task cached
       (`FULL TURBO`).
 - [x] The production CSS still contains a class used only in `components/ui` (named in PLAN with the command).

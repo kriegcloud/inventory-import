@@ -26,6 +26,8 @@
     "dev": { "cache": false, "persistent": true },
     // Repository checks: root scripts that do not call turbo.
     "//#format:check": { "outputs": [] },
+    // Every file git would commit, so its hash is the whole repository's.
+    "//#keys:check": { "outputs": [] },
     "//#docs:check": {
       "inputs": [
         "docs/**",

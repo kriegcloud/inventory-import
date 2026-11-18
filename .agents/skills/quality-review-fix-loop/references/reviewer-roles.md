@@ -1,46 +1,75 @@
-# Reviewer roles
+# Reviewer Roles
 
-Read-only reviewers for the quality-review-fix loop (Phase 2). Each receives the summary of what was built, the base
-commit, the changed-file list, the sources of truth, and the inventory item format from `templates.md`.
+Read-only reviewer/critic panel for the quality-review-fix loop (Phase 2).
+Each reviewer receives the initiative summary, base commit, changed-surface
+list, source-of-truth list, and the inventory item format from
+`templates.md`.
 
-## Reviewer contract
+## Reviewer Contract
 
 Every reviewer must:
 
-- stay read-only (it may run the app, the check and `curl`; it edits nothing)
-- cite the written rule or the line of the goal's SPEC, and concrete file or command evidence
-- classify each finding as `blocking`, `non-blocking`, `question` or `note`
-- keep to what changed since the base commit
-- include the smallest fix and a command or step that proves it
+- stay read-only
+- cite source standards and concrete file/command evidence
+- classify each finding as `blocking`, `non-blocking`, `question`, or `note`
+- distinguish changed-scope blockers from historical repo debt
+- include suggested fixes and acceptance commands
 - return `0 required findings` when no blockers remain
 
 ## Roles
 
-1. **Quality gate.** `bun run check:full`, `bun run build`, `bun run lighthouse -- <path>` for
-   each screen. Any failure, warning or audit below 100 outside mobile Performance is a finding.
+1. Quality Gate Reviewer
+   - Checks the quality commands, failed lanes, warnings, docgen, generated
+     config drift, package metadata, and repo sanity.
 
-2. **The goal and the person.** Reads the goal's `SPEC.md` again and uses the running app with the sample file. Each requirement:
-   met, partly, not met. What lands if the person presses nothing but the last button. Whether someone who has never
-   seen the app knows what each screen wants from them.
+2. Architecture Boundary Reviewer
+   - Checks package home, dependency direction, canonical subpaths, slice vs
+     shared vs foundation vs drivers vs tooling routing, package README policy,
+     and shared-kernel promotion records.
 
-3. **Trust.** `CLAUDE.md` "Rules for an import". Any value changed without being shown, any count that does not add
-   up, any row left out without a reason, any proposal that reaches stored data without a person's yes, a second
-   import that duplicates, a claim on screen the code does not back.
+3. Schema And Domain Reviewer
+   - Checks schema-first models, `S.Class`, annotations, same-name schema/type
+     exports, `LiteralKit`, `OptionFrom*`, schema defaults/transforms, entity
+     invariants, and table projection rules.
+   - Suggested skill: `$schema-first-development`.
 
-4. **Boundaries.** `CLAUDE.md` "Layout", "Identity and permissions", "What the type-check enforces", "Platform". An
-   endpoint without the identity middleware or a role check, a query without `organizationId`, input that is trusted
-   without decoding, a write that is not one atomic batch, a statement that can pass 100 bound parameters, an
-   expected problem returned as an error instead of as data, a rule with no test.
+4. Effect Law Reviewer
+   - Checks A/O/P/R/S aliases, typed errors, no unsafe TypeScript, no native
+     runtime helpers in domain logic, `Effect.fn`, `Context.Service`, `Layer`,
+     `Config`, `Redacted`, `Path`, `HttpClient`, resource handling, retries,
+     timeouts, and concurrency.
+   - Suggested skill: `$effect-first-development`.
 
-5. **Screens.** `CLAUDE.md` "UI" and `docs/patterns.md` section 8, with the inspector's screenshots at 1440, 768 and
-   390 pixels in both themes (`node .agents/skills/design-taste-frontend/scripts/inspect.mjs <url> --app`). One
-   question per screen; what the person must do visible without scrolling; prose over the budget; a label, a name or
-   a heading missing; a status by colour alone; a phone layout that only scrolls sideways.
+5. Error Boundary Reviewer
+   - Checks driver/internal errors die in adapters, port errors die in
+     use-cases, public action errors die in protocol handlers, server-only vs
+     public exports are separated, and dropped technical detail is logged at
+     the translation boundary.
 
-6. **Coherence.** The same thing named two ways on two screens, two helpers that do one job, a file over about 600
-   lines, dead code, a leftover from a recipe or a spike, a comment that restates the code, an export in
-   `src/domain`, `src/api` or `src/server` without a JSDoc that says why.
+6. Testing Reviewer
+   - Checks slice isolation, `@effect/vitest`, port stubs, contract tests,
+     package-alias imports from tests, targeted coverage,
+     and no `bun test` usage for repo tests.
 
-7. **The documents.** `README.md`, `DECISIONS.md` and the goal's `PLAN.md` against the repo and git history. Each
-   claim tried; each decision credited to whoever made it; no adapted code described as written from scratch;
-   machine-written phrasing (Benjamin can type `/unslop` for it); a TODO left in.
+7. Observability Reviewer
+   - Checks span-per-boundary, `Concept(.Sub)*.action` domain-span naming,
+     domain-semantic vs technical attributes, low-cardinality attributes, no
+     secrets/PII, logging vs tracing vs console, and error-translation logs.
+
+8. Documentation And API Reviewer
+   - Checks public exports, JSDoc/TSDoc, compilable examples, kebab-case
+     `@category`, `@since`, useful conditional tags, package READMEs, docs that
+     match behavior, and doctrine updates when code changed architecture.
+   - Suggested skill: `$jsdoc-annotation-specialist`.
+
+9. Reuse And Duplication Reviewer
+   - Checks duplication, missed existing modules, and proposed abstractions.
+     Rejects vague `common`, `core`, `utils`, or `lib` gravity. Enforces
+     `foundation/capability` only after the specific-home-first routing test and
+     canonical negative gate, with multiple real consumers or an explicit
+     platform-capability rationale (`standards/ARCHITECTURE.md`).
+
+10. Evolution And Deprecation Reviewer
+    - Checks deprecation windows, feature-flag lifetime, migration notes,
+      shared contract versioning, removal triggers, and whether a
+      `DECISIONS.md` entry or package promotion record is actually warranted.

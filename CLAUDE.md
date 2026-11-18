@@ -110,15 +110,27 @@ table and the stored rows agree.
 
 ## Skills
 
-Skills are in `.agents/skills/`, linked into `.claude/skills/` and `.codex/skills/`. One is ours
-(`quality-review-fix-loop`); the rest are other people's, vendored with only their commands written for bun
-(`.agents/skills/README.md` credits them). `/in-your-own-words`, `/grill-me` and `/unslop` are Benjamin's to type
-(`disable-model-invocation`); `grilling` is the one you can run yourself, to put open decisions to him as questions.
+Skills are in `.agents/skills/`, linked into `.claude/skills/` and `.codex/skills/`. Twenty-one come from Benjamin's
+beep-effect as they stand there (`.agents/skills/README.md`, "From beep-effect"): `effect-first-development`,
+`schema-first-development`, `crispen`, `grill-with-docs`, `grilling`, `grill-me`, `teach`, `adhd`, `portless`,
+`turborepo`, `quality-review-fix-loop`, `unslop`, `sparql-expert` and the eight `ontology-*` skills. They still name
+beep-effect's standards and paths in places; where they disagree with this file, this file wins. The rest are other
+people's, vendored with only their commands written for bun, and `create-beep-app` is Benjamin's starter tool.
+`/in-your-own-words`, `/grill-me` and `/teach` are Benjamin's to type (`disable-model-invocation`); `grilling` is the
+one you can run yourself, to put open decisions to him as questions.
 
 | When | Skill | Here |
 | --- | --- | --- |
 | Before building, when a real decision is still open | `grilling` (or Benjamin types `/grill-me`) | One question per frontier decision through `AskUserQuestion`, recommended answer first, at most four per call. Each answer is written down at once |
 | A bug survives one fix | `/diagnosing-bugs` | Reproduce first; no second guess without evidence |
+| Writing or changing Effect code | `effect-first-development`, `schema-first-development` | Schema first, then the `Context.Service` contract, then the implementation; check each API against Effect 4's source. Where they name beep-effect paths or packages that do not exist here, follow "Effect (version 4)" below |
+| Refactoring code whose rules belong in a schema | `crispen` | Absorbs guard and decode helpers into existing schemas; not for new models |
+| Stress-testing an architecture plan against the exploration's decisions | `grill-with-docs` | Here its decision log is the exploration's `DECISIONS.md` |
+| Open-ended design or naming with no known answer | `adhd` | Divergent ideation; skip it for closed questions |
+| Turborepo tasks, caching, `turbo.json` | `turborepo` | Reads the docs bundled in the installed `turbo` package |
+| Named local dev URLs | `portless` | `bun run --cwd apps/inventory dev:portless` serves the app as `inventory` |
+| Ontology work (classes, mappings, SPARQL) | the `ontology-*` skills, `sparql-expert` | Not used by the app today |
+| Cutting filler from prose | `unslop` | On documents and messages, never on code |
 | A screen looks generic | `design-taste-frontend` | App screens only: read its `references/app-screens.md` and run `inspect.mjs --app`. Never its page build (pictures and fonts from the network; our policy blocks them). Where it and "UI" below disagree, "UI" below wins |
 | Before hand-building a component | `shadcn`, with the `shadcn` MCP server | Look it up in `@shadcn`, `@diceui` and `@tablecn` first (the MCP tools, or `bunx shadcn@latest search`). Add it with the CLI, `yes n \| bunx shadcn@latest add <item>`, then `bun install`. Never `--overwrite`. Steps in `docs/kit.md` "Finding and adding a component". Where it and "UI" below disagree (`cn` comes from `"cn"`, status is `StatusPill`), "UI" below wins |
 | Sign-in, sessions, organisations or roles | The six Better Auth skills, with the `better-auth` MCP server for its docs | Sign-in is installed: read [docs/auth.md](docs/auth.md) first; where a skill disagrees with it, it wins (the skills assume a framework and a database the CLI can reach). After adding a plugin or field, `bun run auth:schema` prints the migration to add |
@@ -213,7 +225,7 @@ package's task and replays it when nothing it reads has changed. The app's own s
 | Root command | What it does |
 | --- | --- |
 | `bun run dev` | Applies local migrations and the test accounts, then serves the app and API on http://localhost:5173, signed in by itself as the first test account |
-| `bun run check` | The loop check through turbo: type-check with Effect diagnostics, lint (with the two design lints), the fast tests, the format check and `docs:check`. Before every commit |
+| `bun run check` | The loop check through turbo: type-check with Effect diagnostics, lint (with the two design lints), the fast tests, the format check, `docs:check` and the key scan (`keys:check`). Before every commit |
 | `bun run check:full` | `check` plus the slow tests (`*.slow.test.ts`) and the production build. CI runs it |
 | `bun run build` | The production build through turbo |
 | `bun run test` | Every test, fast and slow (Vitest, Node) |
@@ -266,13 +278,13 @@ packages/               Workspace packages (none yet; see explorations/ideal-arc
 docs/                   Standards, the kit, patterns, the glossary and sign-in (`docs/index.md` lists them); qa/ is evidence.
 explorations/           Questions being shaped: research, decisions, briefs.
 goals/                  Work with a definition of done: SPEC.md and PLAN.md.
-scripts/                Repository checks (`docs-check.sh`).
-turbo.json              The task graph: seven package tasks and two root tasks.
+scripts/                Repository checks (`docs-check.sh`, `keys-check.sh`).
+turbo.json              The task graph: seven package tasks and three root tasks.
 .agents/                Skills (see above). Not application code; the check ignores it.
 ```
 
 Paths in this file and in `docs/` that start `src/`, `test/`, `migrations/` or `public/`, and every `scripts/` file but
-`docs-check.sh`, are inside `apps/inventory/`.
+`docs-check.sh` and `keys-check.sh`, are inside `apps/inventory/`.
 
 Dependencies point one way: `web -> api -> domain` and `server -> api -> domain`.
 

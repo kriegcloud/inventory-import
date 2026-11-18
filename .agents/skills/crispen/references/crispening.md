@@ -1,0 +1,209 @@
+# Crispening reference
+
+Two parts: **A. the toolkit** (what to reach for, with real signatures + the noise it
+kills + a live usage site), and **B. the moves** (before→after transforms distilled from
+the `@beep/md` / `@beep/lexical-schema` crispening). Import combinators as a namespace:
+`import { LiteralKit, MappedLiteralKit, SchemaUtils } from "@beep/schema"`. Line anchors
+are current-as-written; trust the *symbol*, re-`rg` if a number drifted.
+
+---
+
+## Part A — the crispening toolkit
+
+Source: `packages/foundation/modeling/schema/src/{SchemaUtils,LiteralKit,MappedLiteralKit}/` and upstream `effect/Schema`.
+
+### Defaults — kill `*Defaults` spreads and per-call boilerplate
+
+| Symbol | Signature (abridged) | Kills | Live site |
+|--------|----------------------|-------|-----------|
+| `S.withConstructorDefault(Effect.succeedNone)` | upstream; `Option` field defaults to `O.none()` at construction | explicit `O.none()` at every `make` call | `Lexical.model.ts` |
+| `S.withConstructorDefault(Effect.succeed(v))` | upstream; constant default at construction | `version: 1` / `format: ""` at construction (wire stays required) | `Lexical.model.ts` |
+| `S.withConstructorDefault(Effect.succeed(v))` + `S.withDecodingDefaultTypeKey(Effect.succeed(v))` | upstream pair; bind a constructed `v` to one const first | double-wiring a default for **both** make and missing-key decode | `ScanState.ts` |
+| `S.withConstructorDefault(Effect.succeed(empty))` + `S.withDecodingDefaultType(Effect.succeed(empty))` | upstream pair over one `const empty = A.empty<T>()` | repeated `[]` default wiring on array fields | `Md.model.ts` |
+| `SchemaUtils.BoolKeyDefaultFalse` / `BoolKeyDefaultTrue` | annotated boolean field defaulting make + missing key | `O.getOrElse(O.fromUndefinedOr(...), thunkFalse)` plumbing | `Md.model.ts:1101,1468` |
+| `S.withDecodingDefaultTypeKey(Effect.succeed(v))` | upstream decode-only default for a missing key; encode stays strict | a decode fallback that must NOT leak into the encoded shape; the v4 form of `S.optionalWith(s, { exact, default })` | `effect/Schema` |
+
+> `S.withConstructorDefault` alone is **constructor-only**, so the encoded/wire
+> contract stays unchanged. Add `S.withDecodingDefaultTypeKey` (same value) when a
+> missing key on **decode** should also default; a literal default for a
+> literal-typed schema takes `as const` there, or `Effect.succeed` widens it.
+> The `SchemaUtils` default helpers that wrapped these were retired under the
+> Upstream-First Foundation/Modeling decision.
+
+### Statics & guards — kill the top-of-file decode/guard wall
+
+| Symbol | Signature (abridged) | Kills | Live site |
+|--------|----------------------|-------|-----------|
+| in-body `static readonly is = S.is(Self)` | attach on `S.Class`/`S.TaggedClass` (they lose piped statics) | a free-floating guard next to the class | `Md.model.ts:873` (`Heading.is`) |
+| `S.is` / `S.decodeUnknownOption` / `S.toEquivalence` | upstream free functions over the schema | a hand-written guard, decoder or `===` comparison | call at the use site; Effect caches parsers per AST |
+| `SchemaUtils.withStatics` | `dual` `(self, (schema) => methods) => self & methods` | ad-hoc `Object.assign(schema, {...})` + domain helpers lost on `.annotate`; never for codecs (`SFV4-codec-static`) | `SchemaUtils/withStatics.ts:91` |
+| `SchemaUtils.withLiteralKitStatics` | `(literalKit) => (self) => self & kitHelpers` | LiteralKit helpers lost by a derivation such as `S.brand`; annotations already preserve them | `SchemaUtils/withLiteralKitStatics.ts:37` |
+
+> Codec statics (`withCodecStatics`, codec facades attached with `withStatics`) were
+> retired under the Upstream-First Foundation/Modeling decision: a decode/guard wall
+> collapses into `S.*` calls at the use site, not into schema statics.
+
+### Literal domains — collapse repeated variant families
+
+| Symbol | API | Kills | Live site |
+|--------|-----|-------|-----------|
+| `LiteralKit([...])` | `.Enum`, `.is`, `.match`, `.toTaggedUnion`; inherited `S.Literals` `.literals`, `.pick(...)`, `.mapMembers(...)` | duplicate literal arrays + enum-like objects + ad-hoc literal guards; N near-identical nodes | `Lexical.model.ts:755` (`HeadingTag`) |
+| `MappedLiteralKit([[from,to]])` | `.From.Enum` (from→to), `.To.Enum` (to→from), `.Pairs`, `.is` | a hand-written bidirectional lookup table + its inverse | code/protocol maps (e.g. `level↔"h1".."h6"`, SQLSTATE) |
+
+> **Key-stringification gotcha.** Non-string literals become string helper keys:
+> `1 → "number1"`, `true → "true"`, `1n → "bigint1n"`. So `LiteralKit([1,2,3,4,5,6]).Enum`
+> is `{ number1, …, number6 }` and matching is keyed by the same names, such as `.match({ number1: …, … })`. A manual second-arg map
+> `[[1,"H1"],…]` renames them (`.Enum.H1`). Do **not** add `as const` to the inline array —
+> the const type params already preserve the tuple.
+
+### Identity & errors — no bare-string identifiers, no `new Error`
+
+```ts
+import { $SchemaId } from "@beep/identity/packages";          // package-scoped identity composer
+import * as S from "effect/Schema";
+import { LiteralKit } from "@beep/schema";
+
+const $I = $SchemaId.create("relative/path/from/pkg/src");    // file-scoped child composer
+
+// pipeable schema annotation
+export const HeadingLevel = LiteralKit([1,2,3,4,5,6]).pipe($I.annoteSchema("HeadingLevel", { description: "Heading level." }));
+
+// plain tagged data: branded Opaque over an annotated TaggedStruct
+export class Heading extends S.Opaque<Heading, { readonly brand: unique symbol }>()(
+  S.TaggedStruct("heading", { level: HeadingLevel }).pipe($I.annoteSchema("Heading", { description: "…" }))
+) { static readonly is = S.is(Heading); }
+
+// per-key annotation
+const fields = { level: HeadingLevel.annotateKey({ description: "…" }) };
+
+// typed error (identifier from $I, never a bare string)
+class ParseError extends S.TaggedError<ParseError, { readonly brand: unique symbol }>($I`ParseError`)(
+  "ParseError", { operation: S.String }, $I.annote("ParseError", { description: "…" })
+) {}
+
+// boundary-translation error (always declares message + cause explicitly)
+class DomainError extends S.TaggedError<DomainError, { readonly brand: unique symbol }>($I`DomainError`)(
+  "DomainError",
+  { message: S.String, cause: S.Defect({ includeStack: true }) },
+  $I.annote("DomainError", { description: "…" })
+) {}
+// Effect.fail(raw).pipe(Effect.mapError((cause) =>
+//   new DomainError({ message: "Domain operation failed", cause })
+// ))
+```
+
+Use the package `$I` composer for a distinct namespaced identifier. When no
+distinct identifier is needed, use
+`S.TaggedError<ParseError, { readonly brand: unique symbol }>()("ParseError", fields)`.
+Never pass a bare identifier equal to the tag.
+
+`$I` API: `` $I`Name` `` (schema identifier), `$I.annote(name, extras)` (annotation record),
+`$I.annoteSchema(name, extras)` / `$I.annoteKey(name, extras)` (pipeable), `$XId.create(seg)`
+(child composer). One segment per template tag — interpolation throws.
+
+### Terse behavior & tests
+
+| Symbol | Use |
+|--------|-----|
+| `Match.tagsExhaustive({ tag: fn, … })` | the catamorphism: one arm per variant, exhaustiveness enforced. Adding a node = adding one arm. |
+| `Effect.fn("Name")(function* …)` / `Effect.fnUntraced(...)` | production (traced) / tests + hot paths (untraced) — never `(a) => Effect.gen(...)`. |
+| `dual(2, impl)` | public 2–3-arg helpers get data-first + data-last for free (EF-18). |
+| `flow(...)` | passthrough `pipe` callbacks; direct helper refs over trivial lambdas. |
+| `Arbitrary.schema(Schema)` (`effect/Arbitrary`) + `it.prop` (`@effect/vitest`) | derive test data from the schema; delete hand fixtures. `Md.test.ts:120`, `Lexical.model.test.ts:85` |
+
+---
+
+## Part B — before → after moves
+
+Distilled from `packages/foundation/modeling/md/src/` and `.../lexical/src/`.
+
+**1. Six heading nodes → one `Heading{ level }`.** Kills ~20 repeated match arms + the
+`headingConstructors`/`headingMarkerCount` lookup tables.
+```ts skip-type-checking
+// before: H1..H6 as six S.TaggedClass nodes, six render arms, two lookup tables
+// after:
+export const HeadingLevel = LiteralKit([1,2,3,4,5,6]).pipe($I.annoteSchema("HeadingLevel", { … }));  // Md.model.ts:830
+export class Heading extends S.Opaque<Heading, { readonly brand: unique symbol }>()(
+  S.TaggedStruct("heading", { level: HeadingLevel.annotateKey({ … }), children: … })
+    .pipe($I.annoteSchema("Heading", { … }))
+) {
+  static readonly is = S.is(Heading);
+}
+// one render arm: heading: (b) => `${Str.repeat("#")(b.level)} ${inline(b.children)}`
+// Md.h1…h6 stay as thin builders that construct Heading with a level.
+```
+
+**2. Decode/guard header wall → upstream calls at the use site.**
+```ts
+// before: const isBlock = S.is(Block); const decodeBlock = S.decodeUnknownOption(Block); // ×N at file top, used once each
+// after: call sites read S.is(Block)(x) / S.decodeUnknownOption(Block)(raw); the parser is cached per AST.
+```
+
+**3. `*Defaults` spreads → schema-field defaults.** ~30 construction sites collapse.
+```ts skip-type-checking
+// before: new ParagraphNode({ ...ParagraphDefaults, children })  // version:1, direction:none, format:"", indent:0 …
+// after (fields carry their own defaults):
+version: LexicalNodeVersion.pipe(S.withConstructorDefault(Effect.succeed(1))),                 // Lexical.model.ts
+format:  ElementFormat.pipe(S.withConstructorDefault(Effect.succeed<ElementFormat>(""))),
+indent:  LexicalIndentDepth.pipe(S.withConstructorDefault(Effect.succeed<number>(0))),
+direction: SomeDirection.pipe(S.withConstructorDefault(Effect.succeedNone)),
+// call site: ParagraphNode.makeEffect({ children })
+```
+
+**4. Nullable field + null-ternary → `Option` field.**
+```ts skip-type-checking
+// before: backgroundColor: string | null;  … color != null ? color : fallback
+// after:
+backgroundColor: S.OptionFromNullOr(S.String).pipe(S.withConstructorDefault(Effect.succeedNone)),
+// use: O.getOrElse(cell.backgroundColor, () => fallback) — no null in domain code.
+```
+
+**5. Duplicated imperative segmentation loop → one shared `dual` combinator.**
+```ts skip-type-checking
+// before: let runs = []; for (const c of children) { if (isInline(c)) …push… }  // repeated in every list renderer
+// after: one combinator, data-first or data-last, no let/for/push:
+export const segmentInlineRuns: {
+  <I,B>(items: ReadonlyArray<I|B>, s: SegmentStrategy<I,B>): ReadonlyArray<string>;
+  <I,B>(s: SegmentStrategy<I,B>): (items: ReadonlyArray<I|B>) => ReadonlyArray<string>;
+} = dual(2, (items, s) => A.match(items, {
+  onEmpty: A.empty<string>,
+  onNonEmpty: flow(A.groupWith((l,r) => s.isInline(l) === s.isInline(r)), A.flatMap(/* … */)),
+}));
+```
+
+**6. Hand fixtures → schema-derived property laws.**
+```ts
+import * as S from "effect/Schema";
+import { fcRuns } from "@beep/test-utils";
+import { expect, it } from "@effect/vitest";
+import * as Arbitrary from "effect/Arbitrary";
+const Document = S.Struct({ text: S.String });
+declare const encode: (doc: typeof Document.Type) => string;
+declare const decode: (input: string) => typeof Document.Type;
+const DocumentArbitrary = Arbitrary.schema(Document);              // Md.test.ts:120
+it.prop("round-trips losslessly", [DocumentArbitrary], ([doc]) => {
+  expect(decode(encode(doc))).toEqual(doc);
+}, { arbitrary: fcRuns(50) });
+// codec law: Md → Lexical → Md stabilizes after one pass (the lossiness profile IS the law).
+```
+
+**7. Module role split.** Behavior moves off the schema class; `.model.ts` stays pure,
+breaking the model↔utils cycle.
+```
+Md.model.ts    — schemas only (S.TaggedClass, LiteralKit, SchemaUtils.*)
+Md.behavior.ts — pure projections (plain-text, run segmentation)
+Md.escape.ts   — escaping / URL sanitization (trust boundary — stays explicit + tested)
+Md.render.ts   — render adapters (Match.tagsExhaustive matchers)
+Md.ts          — public builder namespace (Md.h1 … Md.table)
+```
+`@beep/lexical-schema` specializes differently: `.model` / `.behavior` / `.codec` /
+`.normalize`. No package uses all five suffixes — pick per package.
+
+**8. Lesson — a value→function schema is a breaking change.** A schema whose type
+arguments are phantom (`S.declare` can't runtime-check them) tempts a type-parameterized
+factory (`<A,E,R>() => S.declare(...)`). Turning a schema **value** into a **function**
+breaks every value-form consumer: tests and `**Example**` blocks must now call the factory
+(or `S.is(factory())`), not pass the bare function. When you parameterize a schema, sweep
+the guard/decode/example call sites in the same change. For typed `Effect<A,E,R>` values,
+skip the factory: declare at the consumer with a typed guard,
+`S.declare((u): u is Effect.Effect<A, E, R> => Effect.isEffect(u))`.

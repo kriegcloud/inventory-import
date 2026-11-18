@@ -30,13 +30,21 @@ Recommendations taken where the answered decisions leave a choice open.
   four research reports) gained a `type`/`title`/`description` block so they pass; their text is unchanged.
 - The validator warns that `status: active` is not one of OKF's own `draft|stable|deprecated`. The packet scheme's
   statuses are kept on purpose; the warning is printed and does not fail the check.
-- Step 0 kept the key-shaped-secret scan that used to read its pattern from the pack script: it is now
-  `test/repo/KeyScan.test.ts` with the pattern inline, run by `bun run check`. The history scan the pack also did is
-  gone with it.
-- Step 0 removed the process skills (`intake`, `lead`, `next`, `ship`, `decisions`, `qa`, `verify`, `references`) and
-  the `uploader` agent; the `qa`, `reviewer` and `verifier` agents stay, rewritten without frozen copies. The
-  `quality-review-fix-loop` skill stays, pointed at a goal's SPEC instead of the brief. `in-your-own-words`,
-  `grill-me`, `grilling` and `unslop` stay: nothing in them is about the timed build.
+- Step 0 kept the key-shaped-secret scan that used to read its pattern from the pack script. After step 2 it became
+  the root task `//#keys:check` (`scripts/keys-check.sh`, run by `bun run check`): as a test inside the app it read
+  the whole repository while turbo hashed only the app's files, so a new file outside the app (the restored skills,
+  for one) replayed a cached pass without being scanned. A root task's hash is the whole repository. The history scan
+  the pack also did is gone.
+- Step 0 removed the process skills written for the timed build (`intake`, `lead`, `next`, `ship`, `decisions`, `qa`,
+  `verify`, `references`) and the `uploader` agent; the `qa`, `reviewer` and `verifier` agents stay, rewritten without
+  frozen copies.
+- The 21 skills that `main` took from beep-effect (commit `cbeaa4c`, made after this branch was cut from `840a358`)
+  were added after step 2, each folder and its `.claude/skills` and `.codex/skills` links byte-identical to `main`,
+  with the "From beep-effect" section of `.agents/skills/README.md`. That replaced this branch's older `grilling`,
+  `unslop` and `quality-review-fix-loop` with `main`'s copies, so step 0's edit of `quality-review-fix-loop` (pointing
+  it at a goal's SPEC instead of the brief) is gone; its beep-effect text names beep-effect's paths, and CLAUDE.md says
+  this file wins where they disagree. None of them needed an exclusion: `.agents/` is outside the format check, and
+  lint and the type-check cover only `apps/inventory`.
 - `DECISIONS.md` (the product decisions of the original build) and `docs/qa/QA.md` (its browser passes) are kept as
   the record they are; they still name the old checkpoints and are not rewritten.
 - `allowScripts` (npm only) became bun's `trustedDependencies` for `esbuild` and `workerd`.

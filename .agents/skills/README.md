@@ -4,13 +4,20 @@
 
 ## Benjamin's own
 
-`quality-review-fix-loop`: ported from one of his own repositories, with that repo's standards replaced by this one's
-(the goal's `SPEC.md`, `CLAUDE.md`, `docs/patterns.md`) and the reviewer panel cut from ten roles to seven.
-
 `create-beep-app`: how to use his project starter tool, which made this repository (`beep.json` records the modules).
 
 The procedures written for the original timed build (intake, lead, references, next, qa, verify, decisions, ship)
 were removed with that build's tooling; git history has them.
+
+## From beep-effect
+
+Copied as they stand from Benjamin's own monorepo, [beep-effect](https://github.com/beep-effect/beep-effect)
+(Apache-2.0), at commit `ef2886e94dd`: `adhd`, `crispen`, `effect-first-development`, `schema-first-development`,
+`grill-with-docs`, `grilling`, `grill-me`, `teach`, `portless`, `turborepo`, `quality-review-fix-loop`, `unslop`,
+`sparql-expert` and the ontology set (`ontology-scout`, `ontology-requirements`, `ontology-conceptualizer`,
+`ontology-architect`, `ontology-mapper`, `ontology-validator`, `ontology-curator`, `ontology-foundational-auditor`).
+They still name beep-effect's standards and paths in places; those are corrected as this repository takes on that
+layout. `grilling`, `grill-me` and `unslop` began as the vendored skills in the table below and keep their licences.
 
 ## Vendored, with their licences
 

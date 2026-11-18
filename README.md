@@ -135,9 +135,9 @@ What the starter held, now turned to the brief's inventory item:
 - The toolchain: Vite, React, Tailwind, every shadcn/ui component and more from Dice UI's and tablecn's registries
   (MIT; `docs/kit.md` says what was changed), Effect, Wrangler, Vitest, a .csv and .xlsx reader, and syncpack.
 - Two design lints in `bun run check` that hold every screen to the theme and its components.
-- `CLAUDE.md`, and the skills and agents my coding agent works from. One skill is mine
-  (`/quality-review-fix-loop`); the rest are vendored unchanged, and
-  [.agents/skills/README.md](.agents/skills/README.md) credits each author and licence.
+- `CLAUDE.md`, and the skills and agents my coding agent works from. Twenty-one skills come from my monorepo
+  beep-effect; the rest are vendored unchanged, and [.agents/skills/README.md](.agents/skills/README.md) credits each
+  author and licence.
 - Better Auth's six skills and its docs server (read only), for sign-in work. Their repository has no licence file.
 - `docs/`: my standards for this work, each rule with its check, and guides to the kit and the review region.
 - `explorations/` and `goals/`: plain-markdown packets for planned work, checked by `bun run docs:check`.
@@ -156,7 +156,7 @@ apps/inventory/src/api/      The HTTP contract, shared by server and browser (Ef
 apps/inventory/src/server/   Worker: services, handlers, identity, the AI service
 apps/inventory/src/web/      React 19, Tailwind 4, shadcn/ui, TanStack Query
 apps/inventory/migrations/   D1 (SQLite) schema
-turbo.json                   check, lint, test, test:slow, build and dev per package; format and docs checks at the root
+turbo.json                   check, lint, test, test:slow, build and dev per package; format, docs and key checks at the root
 ```
 
 The browser calls the API through a client derived from the contract in `src/api/`, so payloads and errors are typed
@@ -177,7 +177,7 @@ server and the browser. Start with `src/api/v1/Api.ts`, then `src/server/Items.t
 - **Secrets** are read on the server only. Locally they come from `apps/inventory/.dev.vars`, which is git-ignored.
   `.dev.vars.example` explains what a real project would do instead (a secrets manager at start-up, the platform's
   encrypted store when deployed). `bun run check` fails when a string shaped like an OpenRouter or Anthropic key, or a
-  private key, appears in any file git would commit (`test/repo/KeyScan.test.ts`).
+  private key, appears in any file git would commit (`scripts/keys-check.sh`).
 - **Security headers** are set for every response in the production build: a content security policy with no inline
   scripts, HSTS, `nosniff`, no framing, a strict referrer policy, same-origin opener and resource policies and
   `Cross-Origin-Embedder-Policy: require-corp` (`public/_headers` for the app, `src/server/security.ts` for the API).

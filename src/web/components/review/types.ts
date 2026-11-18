@@ -91,6 +91,13 @@ export type Why = {
    * themselves ("2024-04-06 (month first)"): what the buttons that take them say.
    */
   labels?: ReadonlyArray<string>
+  /**
+   * The column each pick writes, for the fix's `to` and then each of `alternatives`, in that order, when a pick is a
+   * value of another column ("No discontinued date" on a question asked on Active). Left out when every pick
+   * is a value of the fix's own column. A pick written to another column is a typed value: one undo step, checked
+   * again by `recheck`.
+   */
+  targets?: ReadonlyArray<string>
 }
 
 /** Who prepared a fix: a fixed rule or a model. */

@@ -39,7 +39,7 @@ export const regionKinds: ReadonlyArray<ProblemKind> = problemKinds.map((kind) =
 // each row still shows its own old and new value and is given its own.
 const trimLabel = "the value without its spaces"
 
-const toFix = (proposal: Proposal, reason?: string, second = proposal.targets.length > 0): Fix => ({
+const toFix = (proposal: Proposal, reason?: string): Fix => ({
   ...(reason === undefined ? {} : { reason }),
   column: proposal.field,
   to: proposal.to,
@@ -51,11 +51,11 @@ const toFix = (proposal: Proposal, reason?: string, second = proposal.targets.le
     basis: proposal.basis,
     // What each value means, when the values do not speak for themselves ("2024-04-06 (month first)"): the words on
     // the buttons that take them.
-    ...(proposal.labels.length === 0 ? {} : { labels: second ? proposal.labels.slice(0, 1) : proposal.labels }),
-    // An answer that writes another column ("clear the discontinued date", `Proposal.targets`) is not offered
-    // here: the region writes a pick to the question's own column, and the screen and the server would then count
-    // the row differently. The person clears that date by typing in its cell.
-    ...(proposal.alternatives.length === 0 || second ? {} : { alternatives: proposal.alternatives })
+    ...(proposal.labels.length === 0 ? {} : { labels: proposal.labels }),
+    ...(proposal.alternatives.length === 0 ? {} : { alternatives: proposal.alternatives }),
+    // An answer that writes another column ("No discontinued date" on a question asked on Active): the region
+    // writes it there as a typed value, which the domain's `recheckRow` and the commit read alike.
+    ...(proposal.targets.length === 0 ? {} : { targets: proposal.targets })
   }
 })
 

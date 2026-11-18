@@ -8,7 +8,18 @@ import { Label } from "@/components/ui/label"
 import { Item, ItemContent, ItemDescription, ItemFooter, ItemGroup, ItemHeader, ItemTitle } from "@/components/ui/item"
 import { Progress } from "@/components/ui/progress"
 import { Skeleton } from "@/components/ui/skeleton"
-import { askFor, choicesOf, choiceText, otherAnswers, queue, reasonOf, rowName, rowsWord, valueWords } from "./logic.ts"
+import {
+  askFor,
+  choicesOf,
+  columnFor,
+  choiceText,
+  otherAnswers,
+  queue,
+  reasonOf,
+  rowName,
+  rowsWord,
+  valueWords
+} from "./logic.ts"
 import { CellValue, ColumnText, DecisionTag, EditForm, GroupChange, Overlay, Reason, ReasonTag } from "./parts.tsx"
 import type { GroupActions, RowActions } from "./ReviewGrid.tsx"
 import type { ProblemKind, QueueEntry, ReviewColumn, ReviewRegionProps, ReviewWords, RowView } from "./types.ts"
@@ -218,7 +229,9 @@ function Decision(props: {
             className="flex-1"
             {...(at === 0 ? first : {})}
             onClick={() =>
-              choice === fix.to ? actions.accept(view.row.id) : actions.edit(view.row.id, fix.column, choice)
+              choice === fix.to
+                ? actions.accept(view.row.id)
+                : actions.edit(view.row.id, columnFor(fix, choice), choice)
             }
           >
             Use {valueWords(fix, choice)}

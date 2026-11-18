@@ -17,6 +17,7 @@ import {
 import { readSpreadsheet } from "../../src/web/lib/spreadsheet/index.ts"
 import {
   act,
+  columnFor,
   count,
   type Action,
   restored,
@@ -214,6 +215,38 @@ describe("the screen and the server apply decisions the same way", () => {
 })
 
 const heading = "sku,name,category,uom,unit_cost"
+
+describe("a row discontinued yet active, on the screen", () => {
+  it.effect("offers both answers, and either one makes the row ready on the screen and on the server alike", () =>
+    Effect.gen(function* () {
+      const table = yield* stage(sample("items_messy.csv"))
+      for (const answer of ["Not active", "No discontinued date"]) {
+        const s = screen(table, "apply")
+        const view = s.derive().views.find((candidate) => candidate.row.id === "row-45")
+        const fix = view?.problem?.fix
+        expect(fix?.why.labels).toEqual(["Not active", "No discontinued date"])
+        expect(fix?.why.alternatives).toEqual([""])
+        if (fix === undefined) return
+        const value = answer === "Not active" ? fix.to : ""
+        s.press(
+          value === fix.to
+            ? { type: "accept", rowIds: ["row-45"] }
+            : { type: "edit", rowId: "row-45", column: columnFor(fix, value), value }
+        )
+        const { current, views } = s.agree()
+        const row = current.rows.find((candidate) => candidate.id === "row-45")
+        expect(row?.status, answer).toBe("ready")
+        expect(views.find((candidate) => candidate.row.id === "row-45")?.status, answer).toBe("ready")
+        expect([row?.item?.isActive, row?.item?.discontinuedOn], answer).toEqual(
+          answer === "Not active" ? [false, "2025-06-30"] : [true, null]
+        )
+        // Undone, the row asks again on both sides.
+        s.press({ type: "undo" })
+        expect(s.agree().current.rows.find((candidate) => candidate.id === "row-45")?.outcome).toBe("decision")
+      }
+    })
+  )
+})
 
 describe("what the review screen is handed for a pick, for spaces and for a stored item", () => {
   it.effect("a category no rule reads is a pick among the five, none suggested", () =>

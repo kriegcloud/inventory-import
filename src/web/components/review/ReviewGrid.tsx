@@ -43,6 +43,7 @@ import { textWidth } from "@/lib/text-width"
 import {
   askFor,
   choicesOf,
+  columnFor,
   choiceText,
   groupUse,
   inSentence,
@@ -480,7 +481,7 @@ const Row = memo(function Row(props: {
             onPick={(picked) => {
               close()
               if (picked === fix.to) actions.accept(view.row.id)
-              else actions.edit(view.row.id, fix.column, picked)
+              else actions.edit(view.row.id, columnFor(fix, picked), picked)
             }}
             onReject={
               actions.reject === undefined
@@ -681,7 +682,9 @@ const Row = memo(function Row(props: {
                   className="min-w-0 flex-1 shrink"
                   {...(at === 0 ? firstAction : {})}
                   onClick={() =>
-                    choice === fix.to ? actions.accept(view.row.id) : actions.edit(view.row.id, fix.column, choice)
+                    choice === fix.to
+                      ? actions.accept(view.row.id)
+                      : actions.edit(view.row.id, columnFor(fix, choice), choice)
                   }
                 >
                   <span className="truncate">Use {valueWords(fix, choice)}</span>

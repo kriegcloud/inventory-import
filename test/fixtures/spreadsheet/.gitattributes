@@ -1,0 +1,2 @@
+# Fixtures are bytes as a spreadsheet app wrote them (CRLF line ends, a byte-order mark, Windows-1252): never convert.
+* -text

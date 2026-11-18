@@ -1,0 +1,306 @@
+/* Classes are read from src/web only. A production build narrows this to the files the app can load (vite.config.ts,
+   `usedSourcesOnly`), so an installed component nobody uses adds nothing to what a page downloads. */
+@import "tailwindcss" source(none);
+@source "./";
+@import "tw-animate-css";
+@import "./shadcn-utilities.css";
+
+/*
+ * Type: IBM Plex Sans for text and numbers, JetBrains Mono for codes a person compares character by character (SKU,
+ * part number, barcode, lot or serial, document number: `font-mono` where a table or card shows one). Codes are set in
+ * a monospace face whose 0 and O, and 1, l and I, cannot be confused, and numbers keep plain figures that line up
+ * (Plex's figures are all one width). Both are served from our own origin (the content security policy allows fonts
+ * from 'self' only). Latin subset only; a letter outside it (Cyrillic, Greek, or Latin Extended such as "ł") is drawn
+ * in the fallback face. Rules copied from each package's index.css, "latin-wght-normal". Licences:
+ * public/LICENSE-fonts.txt. To change the text face: its package, this first rule, and --font-sans below.
+ */
+@font-face {
+  font-family: "IBM Plex Sans Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 700;
+  src: url("@fontsource-variable/ibm-plex-sans/files/ibm-plex-sans-latin-wght-normal.woff2") format("woff2-variations");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC,
+    U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "JetBrains Mono Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 800;
+  src: url("@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2")
+    format("woff2-variations");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC,
+    U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Design tokens: Benjamin's brand (`@beep/brand`, MIT; notice in public/LICENSE-brand.txt). Surfaces and text are
+ * the brand's zinc scale; the focus ring is its forest-green scale, and the mark in the header is drawn in --brand.
+ * The filled button, the one thing to press next, is the brand's forest green (--brand with --brand-foreground on it).
+ * Ticks, links, progress and the current step stay the brand's ink, and an accepted value is the mint success tint,
+ * so before any click no value on a review screen is tinted. Hover, muted and secondary fills stay neutral zinc:
+ * green on them would read as status.
+ * Colour otherwise carries meaning only: status, errors, negatives. No glow, gradient or decorative colour.
+ *
+ * Each value names its brand step. The brand's light scheme darkens green 300 and 400 so green keeps contrast on white,
+ * so light --brand (green 400) is #214e21 and dark --brand (green 400) is #5c9a5c.
+ *
+ * Every text/background pair below meets WCAG AA (4.5:1) in both themes.
+ */
+:root {
+  --radius: 0.5rem;
+
+  /* surface 0 */
+  --background: #ffffff;
+  /* fg */
+  --foreground: #18181b;
+  /* surface 50 */
+  --card: #fafafa;
+  --card-foreground: #18181b;
+  /* surface 0: menus, popovers and dialogs stay white, lifted by their border and shadow. */
+  --popover: #ffffff;
+  --popover-foreground: #18181b;
+  /* fg with surface 50 on it: ticks, links, progress, the current step. */
+  --primary: #18181b;
+  --primary-foreground: #fafafa;
+  /* green 400: the filled button (one per surface) and the mark's stroke. Its glasses take --foreground and
+     --background. green 50 on it: 8.7:1 at rest, 6.6:1 hovered. */
+  --brand: #214e21;
+  --brand-foreground: #eef5ee;
+  /* surface 200. Also the grey "Already there" status chip. */
+  --secondary: #e4e4e7;
+  --secondary-foreground: #18181b;
+  /* surface 100 */
+  --muted: #f4f4f5;
+  /* fg-muted. Header labels and supporting text: 6.6:1 on --secondary, the lowest surface it sits on. */
+  --muted-foreground: #52525b;
+  /* surface 200: hover, focus and skeleton fill, a step past --muted so a hovered button on a muted row still shows. */
+  --accent: #e4e4e7;
+  --accent-foreground: #18181b;
+  /* 0.47, not 0.5: red text must also pass (4.6:1) on the red tint of a problem cell. */
+  --destructive: oklch(0.47 0.19 27);
+  /* surface 200: table hairlines and card outlines. */
+  --border: #e4e4e7;
+  /* surface 300 (the brand's border): inputs and checkboxes, a step darker than the hairlines. */
+  --input: #d4d4d8;
+  /* green 500: focus and selection. */
+  --ring: #3d7d3d;
+
+  /* Status: saturated pastel chips, all with the same ink on them. */
+  --success: oklch(0.87 0.11 154);
+  --success-foreground: oklch(0.216 0.006 56);
+  --warning: oklch(0.88 0.145 100);
+  --warning-foreground: oklch(0.216 0.006 56);
+  --danger: oklch(0.85 0.085 18);
+  --danger-foreground: oklch(0.216 0.006 56);
+  --info: oklch(0.82 0.075 254);
+  --info-foreground: oklch(0.216 0.006 56);
+
+  /* Chart series: blue, emerald, violet, amber, then grey. */
+  --chart-1: oklch(0.546 0.245 263);
+  --chart-2: oklch(0.596 0.145 163);
+  --chart-3: oklch(0.541 0.281 293);
+  --chart-4: oklch(0.666 0.179 58);
+  --chart-5: oklch(0.709 0.01 56);
+
+  --sidebar: #fafafa;
+  --sidebar-foreground: #18181b;
+  --sidebar-primary: #18181b;
+  --sidebar-primary-foreground: #fafafa;
+  --sidebar-accent: #e4e4e7;
+  --sidebar-accent-foreground: #18181b;
+  --sidebar-border: #e4e4e7;
+  --sidebar-ring: #3d7d3d;
+}
+
+/* The brand's dark scheme: a near-black zinc page, with cards, menus and dialogs a step lighter. */
+.dark {
+  /* surface 0 */
+  --background: #09090b;
+  --foreground: #fafafa;
+  /* surface 50 */
+  --card: #111113;
+  --card-foreground: #fafafa;
+  /* surface 100 */
+  --popover: #18181b;
+  --popover-foreground: #fafafa;
+  /* fg with surface 100 on it. */
+  --primary: #fafafa;
+  --primary-foreground: #18181b;
+  /* green 400 with surface 0 on it, not green 900: 5.9:1 at rest and 4.95:1 hovered (green 900 drops to 3.9:1). */
+  --brand: #5c9a5c;
+  --brand-foreground: #09090b;
+  /* surface 200 */
+  --secondary: #27272a;
+  --secondary-foreground: #fafafa;
+  /* surface 100 */
+  --muted: #18181b;
+  /* fg-muted */
+  --muted-foreground: #a1a1aa;
+  /* surface 200 */
+  --accent: #27272a;
+  --accent-foreground: #fafafa;
+  /* 0.7, not 0.68: red text must also pass on the page and on the red tint of a problem cell. */
+  --destructive: oklch(0.7 0.18 25);
+  /* surface 200 */
+  --border: #27272a;
+  /* surface 300 */
+  --input: #3f3f46;
+  /* green 500 */
+  --ring: #3d7d3d;
+
+  --success: oklch(0.33 0.06 158);
+  --success-foreground: oklch(0.88 0.1 158);
+  --warning: oklch(0.34 0.06 80);
+  --warning-foreground: oklch(0.89 0.1 85);
+  --danger: oklch(0.3 0.07 25);
+  --danger-foreground: oklch(0.87 0.08 25);
+  --info: oklch(0.33 0.05 250);
+  --info-foreground: oklch(0.87 0.07 240);
+
+  --chart-1: oklch(0.707 0.165 254.6);
+  --chart-2: oklch(0.765 0.177 163);
+  --chart-3: oklch(0.702 0.183 293.5);
+  --chart-4: oklch(0.828 0.189 84.4);
+  --chart-5: oklch(0.553 0.013 58);
+
+  --sidebar: #111113;
+  --sidebar-foreground: #fafafa;
+  --sidebar-primary: #fafafa;
+  --sidebar-primary-foreground: #18181b;
+  --sidebar-accent: #27272a;
+  --sidebar-accent-foreground: #fafafa;
+  --sidebar-border: #27272a;
+  --sidebar-ring: #3d7d3d;
+}
+
+@theme inline {
+  /* Table text: the product's own tables are 13px. Used by ui/sticky-table. */
+  --text-table: 0.8125rem;
+  --font-sans: "IBM Plex Sans Variable", "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  /* The brand's mono stack. */
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+/*
+ * Sizes the app's own components use, as tokens so the design-system lint (`bun run lint:shadcn`) can hold every value
+ * to the theme. Chips are 20px tall (h-5) with a 4px radius; a fixed 4px, not radius-sm, so the chip keeps its shape
+ * if --radius changes.
+ */
+@theme {
+  --radius-chip: 4px;
+  /* A label and its value: the label as wide as it needs, the value takes the rest and may wrap. */
+  --grid-template-columns-label-value: auto minmax(0, 1fr);
+  /* The same on a phone card, with the label column at least 6rem so values line up. */
+  --grid-template-columns-field-value: minmax(6rem, auto) minmax(0, 1fr);
+  /* A progress bar whose end nobody knows yet (a workbook being opened): a third of the bar slides across. */
+  --animate-progress-slide: progress-slide 1.2s ease-in-out infinite;
+  @keyframes progress-slide {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(300%);
+    }
+  }
+}
+
+/* Phone cards: the browser skips layout and paint for cards off screen; 8rem is a card's usual height. */
+@utility cv-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 8rem;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    /* Thin scrollbars from the theme, on tables and every other scrolling box, in both directions and both themes:
+       a muted thumb on a clear track, so a wide table does not lose a row's height to its scrollbar. */
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklab, var(--muted-foreground) 45%, transparent) transparent;
+  }
+  html {
+    color-scheme: light;
+    /* Codes take `font-mono`, whose zero is dotted and whose 1, l and I differ. Tabular figures are set on tables
+       only; a total outside a table takes `tabular-nums`. */
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+  /* Figures in tables line up in columns. A total or count outside a table takes `tabular-nums`. */
+  table {
+    font-size: 0.8125rem;
+    font-variant-numeric: tabular-nums;
+  }
+  ::selection {
+    background: color-mix(in oklch, var(--primary) 22%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

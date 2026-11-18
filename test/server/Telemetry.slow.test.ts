@@ -1,0 +1,66 @@
+// @effect-diagnostics globalFetch:off
+import { expect, it } from "@effect/vitest"
+import { Effect, Layer, String as Str } from "effect"
+import { afterAll, vi } from "vitest"
+import { Member, MemberId, OrganizationId } from "../../src/domain/Identity.ts"
+import { Ai } from "../../src/server/Ai.ts"
+import { toTracedFetch } from "../../src/server/App.ts"
+import { RequestTelemetry } from "../../src/server/RequestTelemetry.ts"
+import { collector } from "../../src/server/Telemetry.ts"
+import { inMemoryApp, settingsLayer, testOrigin, testSettings } from "./support/app.ts"
+
+// A collector that cannot be reached (src/server/Telemetry.ts): its exporters retry each batch for seconds under
+// `waitUntil`. The first failed connection marks a miss, and for thirty seconds after it nothing is built for the
+// collector, so later requests stop paying for it. The stand-in at http://collector.test refuses every connection,
+// through a spy on `fetch` installed before any client is built. Slow: it waits for the first request's retries.
+
+const endpoint = "http://collector.test"
+let attempts = 0
+const real = globalThis.fetch
+const spy = vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+  const url = String(input instanceof Request ? input.url : input)
+  if (!Str.startsWith(endpoint)(url)) return real(input, init)
+  attempts += 1
+  return Promise.reject(new TypeError("fetch failed"))
+})
+afterAll(() => spy.mockRestore())
+
+const tom = Member.make({
+  id: MemberId.make("mem_tom"),
+  name: "Tom Becker",
+  role: "editor",
+  organizationId: OrganizationId.make("org_northline"),
+  organizationName: "Sample Supply Co. (test)"
+})
+
+it.effect("after a refused connection, the next requests build nothing for the collector", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const settings = { ...testSettings, OTEL_EXPORTER_OTLP_ENDPOINT: endpoint }
+      const pending: Array<Promise<unknown>> = []
+      const served = yield* Effect.acquireRelease(
+        Effect.sync(() =>
+          toTracedFetch({
+            app: inMemoryApp({ member: tom, ai: Ai.layerFor({ routes: [], model: "test/model" }), settings }),
+            telemetry: RequestTelemetry.layer.pipe(
+              Layer.provide(collector({ production: false })),
+              Layer.provide(settingsLayer(settings))
+            ),
+            waitUntil: (promise) => pending.push(promise)
+          })
+        ),
+        (fetch) => Effect.promise(() => fetch.dispose())
+      )
+      const ask = () => served.fetch(new Request(`${testOrigin}/api/v1/identity/me`))
+      expect((yield* Effect.promise(ask)).status).toBe(200)
+      yield* Effect.promise(() => Promise.all(pending))
+      const afterFirst = attempts
+      expect(afterFirst).toBeGreaterThan(0)
+      // The miss is remembered: two more requests answer, and neither tries the collector.
+      expect((yield* Effect.promise(ask)).status).toBe(200)
+      expect((yield* Effect.promise(ask)).status).toBe(200)
+      yield* Effect.promise(() => Promise.all(pending))
+      expect(attempts).toBe(afterFirst)
+    })
+  )
+)

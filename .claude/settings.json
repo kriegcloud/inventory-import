@@ -1,0 +1,51 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bun run:*)",
+      "Bash(bun install:*)",
+      "Bash(bunx oxlint:*)",
+      "Bash(bunx tsc:*)",
+      "Bash(bunx vitest:*)",
+      "Bash(bunx wrangler d1:*)",
+      "Bash(node:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git show:*)",
+      "Bash(curl:*)",
+      "Bash(ls:*)",
+      "Bash(wc:*)",
+      "Bash(head:*)",
+      "Bash(printenv CLAUDE_CODE_HOST_SESSION_ID)",
+      "Bash(python3:*)",
+      "mcp__shadcn",
+      "mcp__playwright",
+      "mcp__playwright-qa"
+    ],
+    "deny": [
+      "Bash(git push:*)",
+      "Bash(bunx wrangler deploy:*)",
+      "Bash(bunx wrangler secret:*)",
+      "Bash(npx wrangler deploy:*)",
+      "Bash(npx wrangler secret:*)",
+      "Read(.dev.vars)"
+    ]
+  },
+  "enabledMcpjsonServers": ["shadcn", "playwright", "better-auth"],
+  "hooks": {
+    "SessionStart": [{ "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/scripts/session-log.mjs"], "timeout": 5 }] }],
+    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/scripts/session-log.mjs"], "timeout": 5 }] }],
+    "UserPromptExpansion": [{ "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/scripts/session-log.mjs"], "timeout": 5 }] }],
+    "PreToolUse": [{ "matcher": "Agent|Task|Skill", "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/scripts/session-log.mjs"], "timeout": 5 }] }],
+    "PostToolUse": [{ "matcher": "*", "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/scripts/session-log.mjs"], "timeout": 5 }] }],
+    "PostToolUseFailure": [{ "matcher": "*", "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/scripts/session-log.mjs"], "timeout": 5 }] }],
+    "SubagentStart": [{ "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/scripts/session-log.mjs"], "timeout": 5 }] }],
+    "SubagentStop": [{ "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/scripts/session-log.mjs"], "timeout": 5 }] }],
+    "Stop": [{ "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/scripts/session-log.mjs"], "timeout": 5 }] }],
+    "StopFailure": [{ "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/scripts/session-log.mjs"], "timeout": 5 }] }],
+    "PreCompact": [{ "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/scripts/session-log.mjs"], "timeout": 5 }] }],
+    "SessionEnd": [{ "hooks": [{ "type": "command", "command": "node", "args": ["${CLAUDE_PROJECT_DIR}/scripts/session-log.mjs"], "timeout": 5 }] }]
+  }
+}

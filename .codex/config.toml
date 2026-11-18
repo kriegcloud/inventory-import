@@ -1,0 +1,14 @@
+# Project-scoped Codex settings. Codex reads this file only after the folder is trusted.
+# The shadcn MCP server, pinned and started through bunx from bun's cache (see docs/kit.md).
+[mcp_servers.shadcn]
+command = "bunx"
+args = ["shadcn@4.23.0", "mcp"]
+
+# A headless browser for the qa agent (Playwright), pinned and started through bunx the same way (see docs/kit.md).
+[mcp_servers.playwright]
+command = "bunx"
+args = ["@playwright/mcp@0.0.85", "--headless", "--isolated", "--viewport-size", "1440x900", "--output-dir", ".scratch/playwright"]
+
+# Better Auth's hosted documentation server (search and read only). Not used unless a task needs sign-in.
+[mcp_servers.better-auth]
+url = "https://mcp.better-auth.com/mcp"

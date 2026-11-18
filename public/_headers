@@ -1,0 +1,20 @@
+# Security headers for every static response (the HTML shell, scripts, styles, fonts).
+# API responses get theirs in src/server/security.ts. Applied by the production runtime;
+# the Vite dev server does not apply them, because hot reload needs inline scripts.
+# Cross-origin isolation: COOP, COEP require-corp and CORP. Every resource the app loads is from this origin, so
+# require-corp blocks nothing; a later image, font or script from another origin would need its own CORP or CORS.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  Strict-Transport-Security: max-age=63072000; includeSubDomains
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+  Cross-Origin-Resource-Policy: same-origin
+
+# Built scripts, styles and fonts have a content hash in their name, so a browser may keep them for a year.
+# index.html, theme-init.js and favicon.svg keep the default (revalidate every load).
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

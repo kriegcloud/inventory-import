@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Inventory import</title>
+    <meta
+      name="description"
+      content="Load inventory items from a file, fix what is wrong, and see exactly what got in"
+    />
+    <!-- The page colour of the light theme. ThemeProvider updates it when the theme changes. -->
+    <meta name="theme-color" content="#ffffff" />
+    <script src="/theme-init.js"></script>
+    <!-- Who is signed in, asked for while the page's code downloads (useActor in src/web/lib/actor.ts reads it). -->
+    <link rel="preload" href="/api/v1/identity/session" as="fetch" crossorigin />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/web/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,491 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
+    "noUncheckedIndexedAccess": true,
+    "noFallthroughCasesInSwitch": true,
+    "noErrorTruncation": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "allowImportingTsExtensions": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "plugins": [
+      {
+        "name": "@effect/language-service",
+        "namespaceImportPackages": [],
+        // Suggestions (the style rules relaxed for the hour, below) never fail the check and are not printed by it; the
+        // editor still shows them, and `bun run check:strict` counts them.
+        "ignoreEffectSuggestionsInTscExitCode": true,
+        "ignoreEffectWarningsInTscExitCode": false,
+        "ignoreEffectErrorsInTscExitCode": false,
+        "includeSuggestionsInTsc": false,
+        "skipDisabledOptimization": false,
+        "effectFn": ["span", "inferred-span", "suggested-span"],
+        "refactors": true,
+        "diagnostics": true,
+        "quickinfo": true,
+        "completions": true,
+        "goto": true,
+        "renames": true,
+        "allowedExperimentalApis": [],
+        "allowedUnstableApis": [],
+        "inlays": false,
+        "mermaidProvider": "mermaid.live",
+        "noExternal": false,
+        "layerGraphFollowDepth": 0,
+        "barrelImportPackages": [],
+        "topLevelNamedReexports": "ignore",
+        "keyPatterns": [
+          {
+            "target": "service",
+            "pattern": "default",
+            "skipLeadingPath": ["src/"]
+          },
+          {
+            "target": "custom",
+            "pattern": "default",
+            "skipLeadingPath": ["src/"]
+          }
+        ],
+        "extendedKeyDetection": false,
+        "brandedSchemaClasses": ["Class", "TaggedClass", "Error", "TaggedError", "Opaque"],
+        "pipeableMinArgCount": 2,
+        "allowedDuplicatedPackages": [],
+        "overrides": [
+          {
+            "include": ["src/web/**/*.ts", "src/web/**/*.tsx", "*.config.ts"],
+            "options": {
+              "diagnosticSeverity": {
+                "asyncFunction": "off",
+                "cryptoRandomUUID": "off",
+                "cryptoRandomUUIDInEffect": "off",
+                "globalConsole": "off",
+                "globalConsoleInEffect": "off",
+                "globalDate": "off",
+                "globalDateInEffect": "off",
+                "globalErrorInEffectCatch": "off",
+                "globalErrorInEffectFailure": "off",
+                "globalFetch": "off",
+                "globalFetchInEffect": "off",
+                "globalJson": "off",
+                "globalJsonInEffect": "off",
+                "globalRandom": "off",
+                "globalRandomInEffect": "off",
+                "globalTimers": "off",
+                "globalTimersInEffect": "off",
+                "missingPipeableSignature": "off",
+                "newSchemaClass": "off",
+                "preferEffectArray": "off",
+                "preferEffectRecord": "off",
+                "preferEffectString": "off",
+                "strictBooleanExpressions": "off",
+                "unnecessaryArrowBlock": "off"
+              }
+            }
+          },
+          {
+            "include": ["src/web/components/ui/**/*.ts", "src/web/components/ui/**/*.tsx"],
+            "options": {
+              "diagnosticSeverity": {
+                "abortControllerInEffect": "off",
+                "acquireReleaseDisposable": "off",
+                "allOfMapToForEach": "off",
+                "anyUnknownInErrorContext": "off",
+                "apiStabilityLeak": "off",
+                "asyncFunction": "off",
+                "catchAllTagDispatchToCatchTag": "off",
+                "catchAllToMapError": "off",
+                "catchChainToFirstSuccessOf": "off",
+                "catchConditionalRefailToCatchIf": "off",
+                "catchDieToOrDie": "off",
+                "catchIfTagToCatchTag": "off",
+                "catchRefailToTapError": "off",
+                "catchTagToCatchReason": "off",
+                "catchToIgnore": "off",
+                "catchToOrElseSucceed": "off",
+                "catchUnfailableEffect": "off",
+                "classSelfMismatch": "off",
+                "cryptoRandomUUID": "off",
+                "cryptoRandomUUIDInEffect": "off",
+                "deterministicKeys": "off",
+                "duplicatePackage": "off",
+                "effectDoNotation": "off",
+                "effectFnIife": "off",
+                "effectFnImplicitAny": "off",
+                "effectFnOpportunity": "off",
+                "effectGenUsesAdapter": "off",
+                "effectInFailure": "off",
+                "effectInVoidSuccess": "off",
+                "effectMapFlatten": "off",
+                "effectMapVoid": "off",
+                "effectSleepZeroToYieldNow": "off",
+                "effectSucceedWithUndefined": "off",
+                "effectSucceedWithVoid": "off",
+                "effectTryWithoutCatch": "off",
+                "errorPayloadShadowsName": "off",
+                "experimentalApiUsage": "off",
+                "extendsNativeError": "off",
+                "failCauseToConstructor": "off",
+                "flatMapConditionalToFilterOrFail": "off",
+                "flatMapIdentityToFlatten": "off",
+                "flatMapIgnoredParamToAndThen": "off",
+                "flatMapToMap": "off",
+                "flatMapToTap": "off",
+                "floatingEffect": "off",
+                "floatingEffectInVitest": "off",
+                "genericEffectServices": "off",
+                "globalConsole": "off",
+                "globalConsoleInEffect": "off",
+                "globalDate": "off",
+                "globalDateInEffect": "off",
+                "globalErrorInEffectCatch": "off",
+                "globalErrorInEffectFailure": "off",
+                "globalFetch": "off",
+                "globalFetchInEffect": "off",
+                "globalJson": "off",
+                "globalJsonInEffect": "off",
+                "globalRandom": "off",
+                "globalRandomInEffect": "off",
+                "globalTimers": "off",
+                "globalTimersInEffect": "off",
+                "instanceOfSchema": "off",
+                "layerMergeAllWithDependencies": "off",
+                "lazyEffect": "off",
+                "lazyPromiseInEffectSync": "off",
+                "leakingRequirements": "off",
+                "manualMetricTapToTrack": "off",
+                "mapConstToAs": "off",
+                "mapMapErrorToMapBoth": "off",
+                "mapSomeCatchNoSuchElement": "off",
+                "mapSomeToAsSome": "off",
+                "matchBooleanToIsSuccess": "off",
+                "matchEffectToMapBoth": "off",
+                "matchEffectToMatch": "off",
+                "matchToResultOrOption": "off",
+                "missedPipeableOpportunity": "off",
+                "missingEffectContext": "off",
+                "missingEffectError": "off",
+                "missingEffectServiceDependency": "off",
+                "missingLayerContext": "off",
+                "missingPipeableSignature": "off",
+                "missingReturnYieldStar": "off",
+                "missingStarInYieldEffectGen": "off",
+                "multipleCatchTag": "off",
+                "multipleEffectProvide": "off",
+                "nestedEffectGenYield": "off",
+                "newPromise": "off",
+                "newSchemaClass": "off",
+                "nodeBuiltinImport": "off",
+                "nonObjectEffectServiceType": "off",
+                "obsoleteMatchImport": "off",
+                "obsoleteSchemaImport": "off",
+                "onExitFailureToOnError": "off",
+                "optionMatchToFromOption": "off",
+                "outdatedApi": "off",
+                "overriddenSchemaConstructor": "off",
+                "preferBarrelImport": "off",
+                "preferEffectArray": "off",
+                "preferEffectRecord": "off",
+                "preferEffectString": "off",
+                "preferNamespaceImport": "off",
+                "preferSchemaTaggedError": "off",
+                "preferSchemaTypeProperty": "off",
+                "preferSucceedSomeOrNone": "off",
+                "preferTypedSchemaDecoder": "off",
+                "preferUnsafeConstructor": "off",
+                "processEnv": "off",
+                "processEnvInEffect": "off",
+                "promiseInEffectSuccess": "off",
+                "provideLayerSucceedToProvideService": "off",
+                "provideMergeAllToArray": "off",
+                "raceFirstWithSleepToTimeout": "off",
+                "redundantMapError": "off",
+                "redundantOrDie": "off",
+                "redundantSchemaTagIdentifier": "off",
+                "resultMatchToFromResult": "off",
+                "returnEffectInGen": "off",
+                "runEffectInsideEffect": "off",
+                "runOfExitToRunExit": "off",
+                "schemaClassMissingBrand": "off",
+                "schemaClassObjectLiteral": "off",
+                "schemaLiteralNonFinite": "off",
+                "schemaNumber": "off",
+                "schemaOpaqueInstanceMember": "off",
+                "schemaStructWithTag": "off",
+                "schemaSync": "off",
+                "schemaSyncInEffect": "off",
+                "schemaUnionOfLiterals": "off",
+                "scopeInLayerEffect": "off",
+                "serviceNotAsClass": "off",
+                "strictBooleanExpressions": "off",
+                "strictEffectProvide": "off",
+                "suspendFailToFailSync": "off",
+                "syncToSucceed": "off",
+                "timeoutCatchTagToTimeoutOrElse": "off",
+                "tryCatchInEffectGen": "off",
+                "typeUnionToSchemaUnion": "off",
+                "unknownInEffectCatch": "off",
+                "unnecessaryArrowBlock": "off",
+                "unnecessaryEffectGen": "off",
+                "unnecessaryFailYieldableError": "off",
+                "unnecessaryPipe": "off",
+                "unnecessaryPipeChain": "off",
+                "unnecessaryTypeofType": "off",
+                "unsafeEffectTypeAssertion": "off",
+                "unstableApiUsage": "off",
+                "yieldInCallArgument": "off"
+              }
+            }
+          }
+        ],
+        // Every Effect diagnostic, at its severity for the hour. A rule whose finding can change what the code does at
+        // run time (crash, run differently, hide a failure) is an error, here and in production. A rule about spelling,
+        // API preference or naming is a suggestion: it never fails `bun run check`, and `bun run check:strict` counts it
+        // as the error it is in production. Each suggestion says what it guards in production.
+        "diagnosticSeverity": {
+          "abortControllerInEffect": "error",
+          // Production: error. The resource's own disposal is the finalizer, so release is never written twice.
+          "acquireReleaseDisposable": "suggestion",
+          // Production: error. Effect.forEach states its concurrency and builds no array of Effects first.
+          "allOfMapToForEach": "suggestion",
+          "anyUnknownInErrorContext": "error",
+          "apiStabilityLeak": "off",
+          "asyncFunction": "error",
+          // Production: error. CatchTag names the errors handled, so a new error is not swallowed by a catch-all.
+          "catchAllTagDispatchToCatchTag": "suggestion",
+          // Production: error. MapError says the error is translated, not recovered from.
+          "catchAllToMapError": "suggestion",
+          // Production: error. FirstSuccessOf lists the fallbacks in order in one call.
+          "catchChainToFirstSuccessOf": "suggestion",
+          // Production: error. CatchIf keeps the unhandled errors typed without a hand-written re-fail.
+          "catchConditionalRefailToCatchIf": "suggestion",
+          // Production: error. OrDie says in one word that the failure is a defect.
+          "catchDieToOrDie": "suggestion",
+          // Production: error. CatchTag narrows the error type by its tag.
+          "catchIfTagToCatchTag": "suggestion",
+          // Production: error. TapError says the error passes through unchanged.
+          "catchRefailToTapError": "suggestion",
+          // Production: error. CatchReason handles nested reasons without re-failing the rest by hand.
+          "catchTagToCatchReason": "suggestion",
+          // Production: error. Ignore says the result is dropped on purpose.
+          "catchToIgnore": "suggestion",
+          // Production: error. OrElseSucceed says a failure becomes a value.
+          "catchToOrElseSucceed": "suggestion",
+          // Production: error. A catch on an Effect that cannot fail is dead code that suggests a failure exists.
+          "catchUnfailableEffect": "suggestion",
+          "classSelfMismatch": "error",
+          // Production: error. Ids from SecureRandom can be fixed in a test and swapped for another source.
+          "cryptoRandomUUID": "suggestion",
+          // Production: error. Ids from SecureRandom can be fixed in a test and swapped for another source.
+          "cryptoRandomUUIDInEffect": "suggestion",
+          // Production: error. A service or error key that follows its file path is unique and names where it lives.
+          "deterministicKeys": "suggestion",
+          "duplicatePackage": "error",
+          // Production: error. Effect.gen and Effect.fn read top to bottom and carry spans.
+          "effectDoNotation": "suggestion",
+          // Production: error. Effect.gen runs once; Effect.fn is for a function called more than once.
+          "effectFnIife": "suggestion",
+          "effectFnImplicitAny": "error",
+          // Production: error. Effect.fn gives each named function a span in traces and a name in errors.
+          "effectFnOpportunity": "suggestion",
+          // Production: error. The adapter argument is deprecated in Effect 4.
+          "effectGenUsesAdapter": "suggestion",
+          "effectInFailure": "error",
+          "effectInVoidSuccess": "error",
+          // Production: error. FlatMap is one step instead of two.
+          "effectMapFlatten": "suggestion",
+          // Production: error. AsVoid says the value is dropped on purpose.
+          "effectMapVoid": "suggestion",
+          // Production: error. YieldNow says the fiber yields; sleep(0) reads as a delay.
+          "effectSleepZeroToYieldNow": "suggestion",
+          // Production: error. Effect.undefined is one shared value.
+          "effectSucceedWithUndefined": "suggestion",
+          // Production: error. Effect.void is one shared value.
+          "effectSucceedWithVoid": "suggestion",
+          "effectTryWithoutCatch": "error",
+          "errorPayloadShadowsName": "error",
+          "experimentalApiUsage": "off",
+          "extendsNativeError": "error",
+          // Production: error. Fail or die names the channel without building a Cause by hand.
+          "failCauseToConstructor": "suggestion",
+          // Production: error. FilterOrFail states the condition and the failure together.
+          "flatMapConditionalToFilterOrFail": "suggestion",
+          // Production: error. Flatten says what the step does.
+          "flatMapIdentityToFlatten": "suggestion",
+          // Production: error. AndThen says the previous value is not used.
+          "flatMapIgnoredParamToAndThen": "suggestion",
+          // Production: error. Map does not wrap a value in an Effect only to unwrap it.
+          "flatMapToMap": "suggestion",
+          // Production: error. Tap says the value passes through unchanged.
+          "flatMapToTap": "suggestion",
+          "floatingEffect": "error",
+          "floatingEffectInVitest": "error",
+          "genericEffectServices": "error",
+          // Production: error. Effect.log writes JSON with the request's span and actor, which Workers Logs can search.
+          "globalConsole": "suggestion",
+          // Production: error. Effect.log writes JSON with the request's span and actor, which Workers Logs can search.
+          "globalConsoleInEffect": "suggestion",
+          // Production: error. Time from Clock or DateTime can be fixed in a test.
+          "globalDate": "suggestion",
+          // Production: error. Time from Clock or DateTime can be fixed in a test.
+          "globalDateInEffect": "suggestion",
+          "globalErrorInEffectCatch": "error",
+          "globalErrorInEffectFailure": "error",
+          "globalFetch": "error",
+          "globalFetchInEffect": "error",
+          "globalJson": "error",
+          "globalJsonInEffect": "error",
+          // Production: error. The Random service can be seeded in a test.
+          "globalRandom": "suggestion",
+          // Production: error. The Random service can be seeded in a test.
+          "globalRandomInEffect": "suggestion",
+          "globalTimers": "error",
+          "globalTimersInEffect": "error",
+          "instanceOfSchema": "error",
+          "layerMergeAllWithDependencies": "error",
+          // Production: error. A zero-argument function that only returns an Effect is better as the Effect itself.
+          "lazyEffect": "suggestion",
+          "lazyPromiseInEffectSync": "error",
+          // Production: error. A service method that needs another service exposes the implementation to every caller.
+          "leakingRequirements": "suggestion",
+          // Production: error. TrackSuccesses and trackErrors count every outcome in one place.
+          "manualMetricTapToTrack": "suggestion",
+          // Production: error. As says the value is replaced.
+          "mapConstToAs": "suggestion",
+          // Production: error. MapBoth is one step for both channels.
+          "mapMapErrorToMapBoth": "suggestion",
+          // Production: error. CatchNoSuchElement turns a missing value into an Option in one step.
+          "mapSomeCatchNoSuchElement": "suggestion",
+          // Production: error. AsSome says the value is wrapped.
+          "mapSomeToAsSome": "suggestion",
+          // Production: error. IsSuccess and isFailure say what is asked.
+          "matchBooleanToIsSuccess": "suggestion",
+          // Production: error. MapBoth avoids two Effect.succeed wrappers.
+          "matchEffectToMapBoth": "suggestion",
+          // Production: error. Match avoids two Effect.succeed wrappers.
+          "matchEffectToMatch": "suggestion",
+          // Production: error. Effect.result and Effect.option say the outcome becomes a value.
+          "matchToResultOrOption": "suggestion",
+          // Production: error. A pipe reads in the order things happen.
+          "missedPipeableOpportunity": "suggestion",
+          "missingEffectContext": "error",
+          "missingEffectError": "error",
+          "missingEffectServiceDependency": "error",
+          "missingLayerContext": "error",
+          // Production: error. Exported two-argument helpers work data-first and in a pipe.
+          "missingPipeableSignature": "suggestion",
+          "missingReturnYieldStar": "error",
+          "missingStarInYieldEffectGen": "error",
+          // Production: error. One catchTags call lists every handled error together.
+          "multipleCatchTag": "suggestion",
+          "multipleEffectProvide": "error",
+          // Production: error. A nested Effect.gen inside a generator is one indirection too many.
+          "nestedEffectGenYield": "suggestion",
+          "newPromise": "error",
+          // Production: error. Make is the one constructor style for Schema classes.
+          "newSchemaClass": "suggestion",
+          "nodeBuiltinImport": "error",
+          "nonObjectEffectServiceType": "error",
+          "obsoleteMatchImport": "error",
+          "obsoleteSchemaImport": "error",
+          // Production: error. OnError says only failures are handled.
+          "onExitFailureToOnError": "suggestion",
+          // Production: error. FromOption turns a missing value into a failure in one step.
+          "optionMatchToFromOption": "suggestion",
+          "outdatedApi": "error",
+          "overriddenSchemaConstructor": "error",
+          "preferBarrelImport": "off",
+          // Production: error. One set of array functions that read the same in a pipe and return Options where a value can be missing.
+          "preferEffectArray": "suggestion",
+          // Production: error. Record functions return Options where a key can be missing and never see inherited keys.
+          "preferEffectRecord": "suggestion",
+          // Production: error. One set of string functions that read the same in a pipe.
+          "preferEffectString": "suggestion",
+          "preferNamespaceImport": "off",
+          // Production: error. A Schema error can cross the API and be logged with its fields.
+          "preferSchemaTaggedError": "suggestion",
+          // Production: error. Typeof X.Type is the one way to name a schema's type.
+          "preferSchemaTypeProperty": "suggestion",
+          // Production: error. SucceedSome and succeedNone are one call.
+          "preferSucceedSomeOrNone": "suggestion",
+          // Production: error. A typed decoder catches a wrong input type at compile time.
+          "preferTypedSchemaDecoder": "suggestion",
+          // Production: error. The synchronous constructor builds a value without running an Effect.
+          "preferUnsafeConstructor": "suggestion",
+          "processEnv": "error",
+          "processEnvInEffect": "error",
+          "promiseInEffectSuccess": "error",
+          // Production: error. ProvideService does not build a Layer for one value.
+          "provideLayerSucceedToProvideService": "suggestion",
+          // Production: error. An array of layers is the one style for several.
+          "provideMergeAllToArray": "suggestion",
+          // Production: error. TimeoutOrElse says what happens on a timeout.
+          "raceFirstWithSleepToTimeout": "suggestion",
+          // Production: error. One mapError after the generator instead of one per step.
+          "redundantMapError": "suggestion",
+          // Production: error. One orDie after the generator instead of one per step.
+          "redundantOrDie": "suggestion",
+          // Production: error. The tag is the identifier; written twice, the two can drift apart.
+          "redundantSchemaTagIdentifier": "suggestion",
+          // Production: error. FromResult converts a Result in one step.
+          "resultMatchToFromResult": "suggestion",
+          "returnEffectInGen": "error",
+          "runEffectInsideEffect": "error",
+          // Production: error. RunPromiseExit is one call.
+          "runOfExitToRunExit": "suggestion",
+          // Production: error. A brand keeps two Schema classes with the same fields from being swapped in types.
+          "schemaClassMissingBrand": "suggestion",
+          "schemaClassObjectLiteral": "error",
+          "schemaLiteralNonFinite": "error",
+          "schemaNumber": "error",
+          "schemaOpaqueInstanceMember": "error",
+          // Production: error. TaggedStruct makes the tag a literal the decoder fills in.
+          "schemaStructWithTag": "suggestion",
+          "schemaSync": "error",
+          "schemaSyncInEffect": "error",
+          // Production: error. One Literals call is one schema to read.
+          "schemaUnionOfLiterals": "suggestion",
+          "scopeInLayerEffect": "error",
+          // Production: error. A class gives a service one name for its type and its key.
+          "serviceNotAsClass": "suggestion",
+          "strictBooleanExpressions": "error",
+          "strictEffectProvide": "error",
+          // Production: error. FailSync says the error is built lazily.
+          "suspendFailToFailSync": "suggestion",
+          // Production: error. Succeed needs no thunk for a constant.
+          "syncToSucceed": "suggestion",
+          // Production: error. TimeoutOrElse says what happens on a timeout.
+          "timeoutCatchTagToTimeoutOrElse": "suggestion",
+          "tryCatchInEffectGen": "error",
+          // Production: error. A Schema union validates at run time as well as in types.
+          "typeUnionToSchemaUnion": "suggestion",
+          "unknownInEffectCatch": "error",
+          // Production: error. A concise arrow body for a block that only returns.
+          "unnecessaryArrowBlock": "suggestion",
+          // Production: error. A generator with one return is a plain Effect.
+          "unnecessaryEffectGen": "suggestion",
+          // Production: error. A yieldable error is yielded directly.
+          "unnecessaryFailYieldableError": "suggestion",
+          // Production: error. An empty pipe does nothing.
+          "unnecessaryPipe": "suggestion",
+          // Production: error. One pipe instead of two.
+          "unnecessaryPipeChain": "suggestion",
+          // Production: error. The named type reads better than typeof X.Type.
+          "unnecessaryTypeofType": "suggestion",
+          "unsafeEffectTypeAssertion": "error",
+          "unstableApiUsage": "off",
+          // Production: error. Yielding into a const first gives the value a name and its own line in a stack trace.
+          "yieldInCallArgument": "suggestion"
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,22 @@
+# Grafana's all-in-one OpenTelemetry stack for local development: an OpenTelemetry Collector taking OTLP on 4317
+# (gRPC) and 4318 (HTTP), with Tempo for traces, Loki for logs, Prometheus for metrics and Grafana on 3000 to look at
+# them. Optional, and never part of `bun run dev`: `bun run telemetry` starts it, `bun run telemetry:down` stops it.
+# The app sends to it only when OTEL_EXPORTER_OTLP_ENDPOINT is set (.dev.vars.example). Nothing is kept: stopping it
+# throws the data away. The ports listen on this machine only; GRAFANA_PORT, OTLP_HTTP_PORT and OTLP_GRPC_PORT move
+# them.
+name: takehome-telemetry
+services:
+  lgtm:
+    image: grafana/otel-lgtm:0.41.0
+    container_name: takehome-telemetry
+    environment:
+      # Set to true to see each component's own output in `docker logs takehome-telemetry`.
+      ENABLE_LOGS_ALL: ${TELEMETRY_STACK_LOGS:-false}
+      # Loki stops taking logs when the disk it writes to is 90% full ("Ingester is shutting down"), which a developer
+      # machine often is: every log line was refused on one at 93%. The data here is a few megabytes and thrown away by
+      # `bun run telemetry:down`, so the check is off.
+      LOKI_EXTRA_ARGS: -ingester.wal-disk-full-threshold=0
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-3000}:3000"
+      - "127.0.0.1:${OTLP_GRPC_PORT:-4317}:4317"
+      - "127.0.0.1:${OTLP_HTTP_PORT:-4318}:4318"

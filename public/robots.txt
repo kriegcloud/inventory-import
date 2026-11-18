@@ -1,0 +1,4 @@
+# A real file, so the single-page fallback does not answer /robots.txt with index.html.
+# It allows everything. A deployed internal tool would say "Disallow: /", which Lighthouse scores as an SEO failure.
+User-agent: *
+Disallow:

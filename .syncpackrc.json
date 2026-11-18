@@ -1,0 +1,11 @@
+{
+  "$schema": "./node_modules/syncpack/schema.json",
+  "source": ["package.json"],
+  "semverGroups": [
+    {
+      "label": "Effect packages move together and are pinned to one exact version",
+      "dependencies": ["effect", "@effect/**"],
+      "range": ""
+    }
+  ]
+}

@@ -1,0 +1,472 @@
+import { useEffect, useRef, useState } from "react"
+import { toast } from "sonner"
+import { PageHeader } from "@/components/app/PageHeader"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger
+} from "@/components/ui/alert-dialog"
+import { Button } from "@/components/ui/button"
+import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item"
+import { FileUpload, FileUploadDropzone } from "@/components/ui/file-upload"
+import { Progress } from "@/components/ui/progress"
+import { useActor } from "@/lib/actor"
+import { when, whenShort } from "@/lib/dates"
+import { useImportCache, useOpenImports, useRemoveImport } from "@/lib/imports"
+import { importAddress, navigate } from "@/lib/route"
+import { useSavedProgress } from "@/lib/saved-progress"
+import { type UploadEnd, useUpload, type UploadState } from "@/lib/upload"
+import type { ImportView } from "../../../api/v1/Api.ts"
+import { fileProblemTitle } from "../../../domain/FileProblem.ts"
+import { progressOf } from "../../../domain/Upload.ts"
+import { sayError } from "@/lib/errors"
+
+/**
+ * What the picker offers: the spreadsheets the reader takes, and the ones it recognises to say how to convert them
+ * (an old .xls, an .ods), so those still get their own sentence. Anything else is refused before it is read.
+ */
+const pickable = ".csv,.tsv,.txt,.xlsx,.xlsm,.xls,.xlsb,.ods"
+
+const samples = [
+  { name: "items_messy.csv", href: "/samples/items_messy.csv" },
+  { name: "items_clean.csv", href: "/samples/items_clean.csv" }
+] as const
+
+const whole = new Intl.NumberFormat()
+/** A number with its noun: "1 row", "1,200 rows". */
+const count = (n: number, noun: string): string => `${whole.format(n)} ${noun}${n === 1 ? "" : "s"}`
+
+/** Where an upload stands, in words and numbers: "Reading 12,400 of about 50,000 rows". */
+const line = (state: UploadState): string => {
+  const { done, total } = progressOf({ state })
+  switch (state._tag) {
+    case "Reading":
+      return total === null
+        ? "Reading"
+        : `Reading ${whole.format(done)} of ${state.exact ? "" : "about "}${whole.format(total)} rows`
+    case "Saving":
+      return `Saving ${whole.format(done)} of ${whole.format(total ?? done)} rows`
+    case "Preparing":
+      return "Preparing the review"
+    case "Cancelling":
+      return "Cancelling"
+    default:
+      return ""
+  }
+}
+
+/** The file on its way in: its name, how far it is, and Cancel while cancelling still stops something. */
+function UploadProgress(props: { state: UploadState; onCancel: () => void }) {
+  const { state } = props
+  const { done, total } = progressOf({ state })
+  const fileName = state._tag === "Idle" ? "" : state._tag === "Refused" ? state.problem.fileName : state.fileName
+  const stoppable = state._tag === "Reading" || state._tag === "Saving"
+  return (
+    <div className="flex w-full max-w-md flex-col items-center gap-3">
+      <div role="status" className="flex w-full flex-col gap-1.5">
+        <span className="truncate text-sm font-medium">{fileName}</span>
+        <Progress
+          value={total === null || total === 0 ? null : Math.round((done / total) * 100)}
+          aria-label={`Progress of ${fileName}`}
+        />
+        <span className="text-sm text-muted-foreground tabular-nums">{line(state)}</span>
+      </div>
+      <Button variant="outline" size="sm" disabled={!stoppable} onClick={props.onCancel}>
+        Cancel
+      </Button>
+    </div>
+  )
+}
+
+const carriesFiles = (event: DragEvent): boolean => event.dataTransfer?.types.includes("Files") === true
+
+/**
+ * Makes the whole page take a dropped file, not only the dashed box: a file let go beside the box would otherwise
+ * make the browser open it and leave the app. Returns whether a file is being dragged over the page. `onFiles` is
+ * called for a drop that nothing on the page took for itself (the dashed box takes its own). While `enabled` is
+ * false a drop is swallowed, so the page stays, and nothing is read.
+ */
+function usePageDrop(input: { enabled: boolean; onFiles: (files: ReadonlyArray<File>) => void }): boolean {
+  const [over, setOver] = useState(false)
+  const latest = useRef(input)
+  latest.current = input
+  useEffect(() => {
+    // dragenter and dragleave fire for every element the pointer crosses: the page is left when they balance.
+    let depth = 0
+    const enter = (event: DragEvent) => {
+      if (!carriesFiles(event)) return
+      depth += 1
+      if (latest.current.enabled) setOver(true)
+    }
+    const leave = (event: DragEvent) => {
+      if (!carriesFiles(event)) return
+      depth = Math.max(0, depth - 1)
+      if (depth === 0) setOver(false)
+    }
+    const hold = (event: DragEvent) => {
+      // Without this the browser refuses the drop and opens the file instead.
+      if (carriesFiles(event)) event.preventDefault()
+    }
+    const drop = (event: DragEvent) => {
+      if (!carriesFiles(event)) return
+      depth = 0
+      setOver(false)
+      // The dashed box already took a file dropped on it.
+      if (event.defaultPrevented) return
+      event.preventDefault()
+      if (latest.current.enabled) latest.current.onFiles(Array.from(event.dataTransfer?.files ?? []))
+    }
+    window.addEventListener("dragenter", enter)
+    window.addEventListener("dragleave", leave)
+    window.addEventListener("dragover", hold)
+    window.addEventListener("drop", drop)
+    return () => {
+      window.removeEventListener("dragenter", enter)
+      window.removeEventListener("dragleave", leave)
+      window.removeEventListener("dragover", hold)
+      window.removeEventListener("drop", drop)
+    }
+  }, [])
+  return over
+}
+
+/**
+ * A file somebody loaded and nobody has confirmed: continue its review, or remove it. Removing asks first, because
+ * the decisions made on it go with it. One that has already created items (confirmed once, then opened again) has
+ * no Remove: the server keeps it with what it wrote.
+ */
+function OpenImport(props: { view: ImportView; lead: boolean; canImport: boolean }) {
+  const { view } = props
+  const cache = useImportCache()
+  const remove = useRemoveImport()
+  return (
+    <Item variant="outline" className="flex-wrap">
+      <ItemContent className="min-w-56">
+        <ItemTitle className="max-w-full">
+          <span className="truncate">{view.fileName}</span>
+        </ItemTitle>
+        <ItemDescription>
+          {/* Two lines of their own, the same on a desk and a phone: what is left to do, then who loaded it and
+              when. One wrapping line ended in a dot or split a name. A viewer is not told the rows need them. */}
+          <span className="block truncate">
+            {view.progress.needs === 0
+              ? "Nothing left to decide"
+              : `${whole.format(view.progress.needs)} of ${count(view.progress.rows, "row")} ${view.progress.needs === 1 ? "needs" : "need"} a decision`}
+          </span>
+          <span className="block truncate" title={when(view.createdAt)}>
+            {view.startedBy} · {whenShort(view.createdAt)}
+          </span>
+        </ItemDescription>
+      </ItemContent>
+      <ItemActions>
+        {props.canImport && view.createdRows.length === 0 ? (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost" disabled={remove.isPending}>
+                Remove<span className="sr-only"> {view.fileName}</span>
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Remove {view.fileName}?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This deletes the {count(view.rowCount, "row")} it loaded from this file and any decisions made on
+                  them. Nothing from it was imported, and the file itself is untouched.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Keep</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() =>
+                    // The card goes at once; a refusal puts it back and says why (useRemoveImport).
+                    remove.mutate(view, { onSuccess: () => toast(`Removed ${view.fileName}`) })
+                  }
+                >
+                  Remove
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        ) : null}
+        <Button
+          // A viewer can look and cannot decide: for them it is not the screen's filled button, and it says "Open".
+          variant={props.lead && props.canImport ? "default" : "outline"}
+          onClick={() => {
+            cache.setView(view)
+            navigate(importAddress(view.id, "review"))
+          }}
+        >
+          {props.canImport ? "Continue" : "Open"}
+          <span className="sr-only"> {view.fileName}</span>
+        </Button>
+      </ItemActions>
+    </Item>
+  )
+}
+
+/**
+ * The first screen: choose or drop a file, or take the sample list, which goes through the same code. The chosen
+ * file is kept in this browser until the server has it all (`useSavedProgress`): a reload or a closed tab in the
+ * middle of an upload offers Continue, which reads the same file again, instead of asking for it again.
+ */
+export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
+  const upload = useUpload()
+  const { actor } = useActor()
+  const progress = useSavedProgress(
+    actor === undefined ? undefined : { organizationId: actor.organizationId, memberId: actor.id, screen: "upload" }
+  )
+  const [problem, setProblem] = useState<string | undefined>(undefined)
+  const picker = useRef<HTMLDivElement>(null)
+  // Every file somebody loaded and has not confirmed, each on its own: coming back resumes one or removes it.
+  const openImports = useOpenImports()
+  const open = openImports.data
+  const views = open?.views ?? []
+  const { state } = upload
+  const busy = state._tag !== "Idle" && state._tag !== "Failed" && state._tag !== "Refused"
+
+  // Keeps the file until the upload ends: arrived or cancelled, nothing is left to continue; a file that cannot be
+  // staged (its own problem) is not worth reading again; a save that failed (the network) can be continued.
+  const { keepFile, save, clear } = progress
+  const send = (file: File) => {
+    keepFile(file)
+    save({
+      step: "upload",
+      file: { name: file.name, size: file.size, lastModified: file.lastModified, sheet: null },
+      review: null
+    })
+    upload.start(file, undefined, (end: UploadEnd) => {
+      if (end._tag !== "Failed" || end.step === "read") clear()
+    })
+  }
+  // A file whose upload stopped with the page. Not offered once an import of it exists: a reload while the server
+  // was preparing it still finished it, and it is in the list above.
+  const stopped = progress.saved?.step === "upload" ? progress.saved.file : null
+  const landed =
+    stopped !== null &&
+    views.some((view) => view.fileName === stopped.name && view.createdAt >= (progress.saved?.savedAt ?? ""))
+  // One filled button on the screen: Continue when a file stopped, else the first open import, else Choose file.
+  const offered = stopped !== null && !landed && !busy && props.canImport
+  const resume = () => {
+    if (stopped === null) return
+    void progress.file().then((file) => {
+      if (file !== undefined) return send(file)
+      clear()
+      setProblem(`${stopped.name} is no longer kept in this browser. Choose it again.`)
+    })
+  }
+  // While the rows are saving, fetch the review's code, so it is ready when the import is.
+  const saving = state._tag === "Saving"
+  useEffect(() => {
+    if (saving) void import("./ReviewStep.tsx")
+  }, [saving])
+
+  const takeSample = async (sample: (typeof samples)[number]) => {
+    setProblem(undefined)
+    try {
+      const response = await fetch(sample.href)
+      if (!response.ok) throw new Error(String(response.status))
+      send(new File([await response.blob()], sample.name))
+    } catch {
+      setProblem(`The sample ${sample.name} could not be loaded. Download it with the link beside it and choose it.`)
+    }
+  }
+
+  const fileInput = () => picker.current?.querySelector<HTMLInputElement>('input[type="file"]') ?? null
+  // A file dropped anywhere on the page goes in through the upload's own input, so it meets the same checks as a
+  // chosen one and reaches `onAccept` below: one way in.
+  const dragging = usePageDrop({
+    enabled: props.canImport && !busy,
+    onFiles: (files) => {
+      const input = fileInput()
+      if (input === null || files.length === 0) return
+      const transfer = new DataTransfer()
+      for (const file of files) transfer.items.add(file)
+      input.files = transfer.files
+      input.dispatchEvent(new Event("change", { bubbles: true }))
+    }
+  })
+
+  const failed = state._tag === "Failed" ? state : undefined
+  const refused = state._tag === "Refused" ? state.problem : undefined
+  return (
+    <div className="relative h-full overflow-y-auto">
+      <div className="mx-auto flex w-full max-w-2xl flex-col pb-8">
+        <PageHeader title="Import items" line=".csv or .xlsx" />
+        <div className="flex flex-col gap-4 px-4 sm:px-9">
+          {openImports.isError ? (
+            // Not knowing is not the same as none: without this the screen would look as if no file were waiting.
+            <Alert>
+              <AlertTitle>Files loaded earlier could not be listed</AlertTitle>
+              <AlertDescription>
+                <p>They are safe. {sayError(openImports.error).sentence}</p>
+                <Button variant="outline" size="sm" onClick={() => void openImports.refetch()}>
+                  Try again
+                </Button>
+              </AlertDescription>
+            </Alert>
+          ) : null}
+          {!offered || stopped === null ? null : (
+            <Item variant="outline" className="flex-wrap">
+              <ItemContent className="min-w-56">
+                <ItemTitle className="max-w-full">
+                  <span className="truncate">{stopped.name}</span>
+                </ItemTitle>
+                <ItemDescription>
+                  Stopped before it was saved. Continue reads it again from this browser.
+                </ItemDescription>
+              </ItemContent>
+              <ItemActions>
+                <Button variant="ghost" onClick={clear}>
+                  Start again
+                </Button>
+                <Button onClick={resume}>
+                  Continue<span className="sr-only"> {stopped.name}</span>
+                </Button>
+              </ItemActions>
+            </Item>
+          )}
+          {views.length === 0 ? null : (
+            <ul aria-label="Files not imported yet" className="flex flex-col gap-2">
+              {views.map((view, index) => (
+                <li key={view.id}>
+                  <OpenImport view={view} lead={index === 0 && !offered} canImport={props.canImport} />
+                </li>
+              ))}
+            </ul>
+          )}
+          {open === undefined || open.older === 0 ? null : (
+            <p className="text-sm text-muted-foreground">
+              {whole.format(open.older)} older {open.older === 1 ? "file is" : "files are"} not shown.{" "}
+              {props.canImport
+                ? `Remove or import one above to see ${open.older === 1 ? "it" : "them"}.`
+                : `${open.older === 1 ? "It appears" : "They appear"} once an editor removes or imports one above.`}
+            </p>
+          )}
+          {props.viewOnly ? (
+            // A viewer is told why, where the control would be: a dimmed button that does nothing explains nothing.
+            <div
+              role="note"
+              // A plain frame, not the upload box's dashes: dashes say "drop a file here".
+              className="flex min-h-40 flex-col items-center justify-center gap-1 rounded-lg border bg-muted/40 p-6 text-center"
+            >
+              <p className="text-sm font-medium">Importing needs an editor</p>
+              <p className="max-w-sm text-sm text-muted-foreground">
+                You are a viewer{actor === undefined ? "" : ` in ${actor.organizationName}`}, so you can open what is
+                here and cannot load a file. An admin changes roles under People.
+              </p>
+            </div>
+          ) : busy ? (
+            // While a file is read and saved the upload box is switched off (it takes no second file), and a switched
+            // off box takes no pointer at all: Cancel inside it could not be pressed. The progress and its Cancel
+            // stand in the box's place instead, outside it.
+            <div className="flex min-h-40 flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-6">
+              <UploadProgress state={state} onCancel={upload.cancel} />
+            </div>
+          ) : (
+            <FileUpload
+              ref={picker}
+              label="Items file"
+              accept={pickable}
+              maxFiles={1}
+              value={[]}
+              disabled={!props.canImport}
+              // onAccept, not onValueChange: the kit calls onValueChange twice for one controlled choice, which staged
+              // every chosen file twice.
+              onAccept={(files) => {
+                const file = files[0]
+                if (file === undefined) return
+                setProblem(undefined)
+                send(file)
+              }}
+              // The kit's own words ("File type not accepted") are not the person's: say what the file is not.
+              onFileReject={(file, why) =>
+                setProblem(
+                  why === "File type not accepted"
+                    ? `"${file.name}" is not a spreadsheet. Choose a .csv or .xlsx file.`
+                    : why
+                )
+              }
+            >
+              <FileUploadDropzone className="min-h-40">
+                {/* Nobody drags a file on a phone. */}
+                <span className="text-center text-sm text-muted-foreground max-md:hidden">
+                  Drop a file here, or anywhere on this page
+                </span>
+                {/* A plain button that opens the picker: wrapped in the upload's own trigger it stops being counted
+                    as the screen's one filled button. */}
+                <Button
+                  variant={views.length === 0 && !offered ? "default" : "outline"}
+                  disabled={!props.canImport}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    fileInput()?.click()
+                  }}
+                >
+                  Choose file
+                </Button>
+              </FileUploadDropzone>
+            </FileUpload>
+          )}
+
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+            <span className="text-muted-foreground max-sm:w-full">Sample files</span>
+            {samples.map((sample) => (
+              <span key={sample.name} className="flex items-center gap-2">
+                {props.viewOnly ? null : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!props.canImport || busy}
+                    onClick={() => void takeSample(sample)}
+                  >
+                    Use {sample.name}
+                  </Button>
+                )}
+                <Button variant="link" size="sm" asChild>
+                  <a href={sample.href} download>
+                    Download
+                    {/* With no "Use" button beside it, the link has to name its file itself. */}
+                    <span className={props.viewOnly ? undefined : "sr-only"}> {sample.name}</span>
+                  </a>
+                </Button>
+              </span>
+            ))}
+          </div>
+
+          {refused === undefined ? null : (
+            // The file's own problem, as data: what is wrong with it, then what to do. Nothing was saved.
+            <Alert variant="destructive" aria-live="polite">
+              <AlertTitle>{fileProblemTitle(refused.kind, "items")}</AlertTitle>
+              <AlertDescription>
+                <p>{refused.problem}</p>
+                <p>{refused.todo}</p>
+              </AlertDescription>
+            </Alert>
+          )}
+          {problem === undefined && failed === undefined ? null : (
+            <Alert variant="destructive">
+              <AlertTitle>{failed?.step === "save" ? "The file was not saved" : "The file was not read"}</AlertTitle>
+              <AlertDescription>{problem ?? failed?.message}</AlertDescription>
+            </Alert>
+          )}
+        </div>
+      </div>
+      {dragging ? (
+        // Over the whole page while a file is held above it. It takes no pointer events: the drop lands on the page.
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-2 z-30 flex items-center justify-center rounded-lg border-2 border-dashed border-primary bg-background/90"
+        >
+          <span className="text-base font-medium">Drop the file to load it</span>
+        </div>
+      ) : null}
+    </div>
+  )
+}

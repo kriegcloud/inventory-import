@@ -1,0 +1,31 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "takehome",
+  "main": "src/server/worker.ts",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  // The Worker answers /api/*. Everything else is the built React app.
+  "assets": {
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "takehome",
+      // Local dev ignores this id. `bun run deploy:setup` writes the real one.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  // Settings that are not secret, reviewed like code. Every one is read through effect/Config (src/server/Settings.ts);
+  // `.dev.vars` can override any of them locally. Valid values for each are in .dev.vars.example.
+  "vars": {
+    // A small, fast model whose id is the same on OpenRouter and the Vercel AI Gateway.
+    "AI_MODEL": "anthropic/claude-haiku-5.5",
+    // What OpenRouter tries, in order, when AI_MODEL fails (its `models` list): another vendor, so one outage does not
+    // take both. Comma-separated vendor/model ids.
+    "AI_FALLBACK_MODELS": "google/gemini-3.8-flash"
+  },
+  "observability": { "enabled": true }
+}

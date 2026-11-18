@@ -1,0 +1,232 @@
+import { LayoutGridIcon } from "lucide-react"
+import { useMemo, useState } from "react"
+import { toast } from "sonner"
+import { AppShell } from "@/components/app/AppShell"
+import { type ProblemKind, type ReviewColumn, ReviewRegion, type ReviewRow } from "@/components/review"
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu"
+import { activity, columns, columnsUnmatched, makeRows, problemKinds, recheck } from "./gallery/fabrication.ts"
+import { JobsReview } from "./gallery/JobsReview.tsx"
+
+const states = [
+  ["default", "Default: 178 rows"],
+  ["stored", "Some already there"],
+  ["elsewhere", "Some can't be fixed here"],
+  ["settled", "Every row already there"],
+  ["unmatched", "A column to match"],
+  ["readonly", "Read only"],
+  ["loading", "Loading"],
+  ["empty", "Empty file"],
+  ["clear", "All clear"],
+  ["error", "Error"],
+  ["big", "5,000 rows"],
+  ["parent", "Records with a parent"],
+  ["months", "One line, several records"]
+] as const
+
+type GalleryState = (typeof states)[number][0]
+
+const readState = (): GalleryState => {
+  const wanted = new URLSearchParams(window.location.search).get("state")
+  return states.find(([id]) => id === wanted)?.[0] ?? "default"
+}
+
+/** Rows whose items are in stock already: nothing is written for them and nothing is asked. */
+const storedRows: ReadonlyArray<ReviewRow> = [
+  {
+    id: "stored-1",
+    line: 180,
+    cells: { name: "Hex bolt M8 × 30", sku: "HB-M8-30", unit: "pcs", onHand: "400" },
+    stored: true
+  },
+  {
+    id: "stored-2",
+    line: 181,
+    cells: { name: "Flat bar 40 × 5", sku: "FB-40-5", unit: "m", onHand: "60" },
+    stored: true
+  },
+  {
+    id: "stored-3",
+    line: 182,
+    cells: { name: "Weld wire 0.9 mm", sku: "WW-09", unit: "kg", onHand: "15" },
+    stored: true
+  }
+]
+
+/**
+ * A kind of problem nothing on the review can settle: the supplier is not in the shop's supplier list yet, and only
+ * that list can add one. Its rows are counted apart, say why, and hold nothing back.
+ */
+const newSupplier: ProblemKind = {
+  id: "supplier",
+  label: "New supplier",
+  tone: "blocker",
+  help: "Add the supplier to your supplier list, then load the file again.",
+  fixable: false
+}
+const elsewhereKinds: ReadonlyArray<ProblemKind> = [...problemKinds, newSupplier]
+
+/** Rows whose supplier is not in the list yet, each with its own reason. */
+const elsewhereRows: ReadonlyArray<ReviewRow> = [
+  ["Square tube 40 × 40", "ST-40-2", "Ridgeline Metals"],
+  ["Angle iron 30 × 3", "AI-30-3", "Ridgeline Metals"],
+  ["Cutting disc 125 mm", "CD-125", "Sample Abrasives"]
+].map(([name = "", sku = "", supplier = ""], index) => ({
+  id: `elsewhere-${index + 1}`,
+  line: 183 + index,
+  cells: { name, sku, unit: "pcs", onHand: "10", supplier },
+  problem: {
+    kind: newSupplier.id,
+    column: "supplier",
+    reason: `Supplier ${supplier} is not in your supplier list yet.`
+  }
+}))
+
+/**
+ * A file with a line per item and a count per month: each month is its own record, so two rows share a line. The
+ * Month column tells them apart on every row, and each row's label names it in the region's sentences ("Leave row
+ * 3 · Feb out").
+ */
+const monthColumns: ReadonlyArray<ReviewColumn> = [
+  { id: "name", label: "Item", size: "fill", width: 200, core: true },
+  { id: "sku", label: "SKU", code: true, search: true, core: true, under: true },
+  { id: "month", label: "Month", core: true, context: true, facet: true },
+  { id: "unit", label: "Unit", core: true },
+  { id: "onHand", label: "On hand", align: "right", core: true, context: true }
+]
+
+const monthItems = [
+  { name: "Flat bar 40 × 5", sku: "FB-40-5", unit: "m", counts: ["120", "96"] },
+  { name: "Hex bolt M8 × 30", sku: "HB-M8-30", unit: "pcs", counts: ["400", "-20"] },
+  { name: "Weld wire 0.9 mm", sku: "WW-09", unit: "kg", counts: ["15", "12"] }
+]
+
+const belowZero = (month: string, onHand: string) =>
+  onHand.trim().startsWith("-")
+    ? { kind: "below", column: "onHand", reason: `On hand "${onHand}" for ${month} is below zero.` }
+    : undefined
+
+const monthRows: ReadonlyArray<ReviewRow> = monthItems.flatMap((item, index) =>
+  item.counts.map((onHand, part) => {
+    const line = index + 2
+    const month = part === 0 ? "Jan" : "Feb"
+    const problem = belowZero(month, onHand)
+    return {
+      id: `line-${line}.${part + 1}`,
+      line,
+      label: `${line} · ${month}`,
+      cells: { name: item.name, sku: item.sku, month, unit: item.unit, onHand },
+      ...(problem === undefined ? {} : { problem })
+    }
+  })
+)
+
+/** The item's own answer on each of its months: every record of its line goes. Module level, so it is stable. */
+const leaveItemOut = (row: ReviewRow) => ({
+  label: `Leave ${row.cells.name ?? "the item"} out, every month`,
+  onSelect: () => toast(`Would leave every month of line ${row.line} out`)
+})
+
+/**
+ * Development only. The review region driven by made-up fabrication-shop stock, one state at a time
+ * (`/gallery/review?state=unmatched`), and the shop's jobs with their lines as records with a parent
+ * (`?state=parent`). `App.tsx` loads this page only when `import.meta.env.DEV`.
+ */
+export default function ReviewGallery() {
+  const [state, setState] = useState<GalleryState>(readState)
+  const choose = (next: GalleryState) => {
+    window.history.replaceState(null, "", `?state=${next}`)
+    setState(next)
+  }
+  const rows = useMemo(
+    () =>
+      state === "empty" || state === "loading" || state === "error" || state === "parent" || state === "months"
+        ? []
+        : state === "settled"
+          ? storedRows
+          : [
+              ...makeRows({
+                size: state === "big" ? 5000 : 178,
+                clean: state === "clear",
+                withoutUnit: state === "unmatched"
+              }),
+              ...(state === "stored" ? storedRows : []),
+              ...(state === "elsewhere" ? elsewhereRows : [])
+            ],
+    [state]
+  )
+  return (
+    <AppShell
+      fill
+      title="Review gallery"
+      actions={
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon-sm" aria-label="Gallery state">
+              <LayoutGridIcon aria-hidden />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuRadioGroup value={state} onValueChange={(next) => choose(next as GalleryState)}>
+              {states.map(([id, label]) => (
+                <DropdownMenuRadioItem key={id} value={id}>
+                  {label}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      }
+    >
+      {state === "parent" ? (
+        <JobsReview />
+      ) : state === "months" ? (
+        <ReviewRegion
+          title="Review stock by month.csv"
+          noun={["record", "records"]}
+          columns={monthColumns}
+          rows={monthRows}
+          problemKinds={problemKinds}
+          summary={[`${monthItems.length} rows in the file, ${monthRows.length} records`]}
+          recheck={({ row, cells }) => belowZero(cells.month ?? "", cells.onHand ?? row.cells.onHand ?? "")}
+          rowAction={leaveItemOut}
+          onImport={(result) => toast(`Would import ${result.ready.length} records and hold ${result.held.length}`)}
+        />
+      ) : (
+        <ReviewRegion
+          key={state}
+          title="Review items.csv"
+          noun={["item", "items"]}
+          columns={state === "unmatched" ? columnsUnmatched : columns}
+          rows={rows}
+          problemKinds={state === "elsewhere" ? elsewhereKinds : problemKinds}
+          summary={[]}
+          activity={activity(rows.length)}
+          recheck={recheck}
+          state={state === "loading" ? "loading" : state === "error" ? "error" : "ready"}
+          error="The file could not be read: the first sheet has no header row. Check the file and upload it again."
+          onRetry={() => choose("default")}
+          readOnly={state === "readonly"}
+          importNote="Each row becomes a new item; nothing already in stock is updated."
+          readOnlyNote="View only. An editor can import."
+          emptyAction={
+            <Button variant="outline" size="sm" onClick={() => choose("default")}>
+              Choose another file
+            </Button>
+          }
+          onMatchColumn={(columnId, source) => {
+            toast(`${source} matched to ${columnId}`)
+            choose("default")
+          }}
+          onImport={(result) => toast(`Would import ${result.ready.length} items and hold ${result.held.length}`)}
+        />
+      )}
+    </AppShell>
+  )
+}

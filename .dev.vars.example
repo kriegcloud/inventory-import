@@ -1,0 +1,84 @@
+# Local settings and secrets for `bun run dev`. Copy to .dev.vars (git-ignored). The app runs without it: AI features
+# then say they are off and the app uses its non-AI path.
+#
+# Every variable here is read on the server through effect/Config (src/server/Settings.ts), from one ConfigProvider the
+# Worker builds from its environment. Secrets are read as redacted values: logged or printed they show "<redacted>".
+# The browser never sees any of them; it reads only public VITE_* flags (at the end of this file).
+#
+# A plain file is the simplest thing that works on one machine. On a team project these values would not live on
+# disk: they would come from a secrets manager at start-up (for example `op run -- bun run dev` with references into a
+# password manager), and the deployed Worker reads them from the platform's encrypted store
+# (`wrangler secret put OPENROUTER_API_KEY`), never from a file or from wrangler.jsonc.
+#
+# Non-secret settings have their defaults in wrangler.jsonc `vars`, where they are reviewed like code. A line here
+# overrides that default locally. An empty value counts as not set.
+
+# --- Model (AI) ---------------------------------------------------------------------------------------------------
+
+# Secret. An OpenRouter key (https://openrouter.ai/keys). Asked first, and the provider that reports what a call cost.
+OPENROUTER_API_KEY=
+# Secret. A Vercel AI Gateway key. With both keys set, the gateway is the second provider, tried when OpenRouter cannot
+# answer; with only this one, it is the only provider.
+AI_GATEWAY_API_KEY=
+# true or false (also yes/no, on/off, 1/0). Default true. false turns AI off even with a key set, to see the non-AI
+# path without removing the key.
+# AI_ENABLED=false
+# The vendor/model id asked first. Default in wrangler.jsonc (anthropic/claude-haiku-5.5).
+# AI_MODEL=anthropic/claude-haiku-5.5
+# Comma-separated vendor/model ids OpenRouter tries, in order, when AI_MODEL fails. Default in wrangler.jsonc.
+# Empty means no fallback model. The gateway ignores it.
+# AI_FALLBACK_MODELS=google/gemini-3.8-flash
+
+# --- Logs ---------------------------------------------------------------------------------------------------------
+
+# The least severe log entry written. Valid values, most to least verbose, exactly as written:
+# All, Trace, Debug, Info, Warn, Error, Fatal, None. Default Info.
+# LOG_LEVEL=Debug
+# How log lines are written. Valid values: pretty (readable), json (one JSON object per line, what Cloudflare Workers
+# Logs indexes), logfmt (key=value pairs), structured (one object per line). Default pretty in development, json in
+# a production build.
+# LOG_FORMAT=json
+
+# --- Sign-in (Better Auth, docs/auth.md) --------------------------------------------------------------------------
+
+# Secret. Signs the session cookies: at least 32 random characters. Make one with
+#   openssl rand -base64 32
+# `bun run dev` writes one into .dev.vars the first time, when the file has none, so nothing has to be done locally.
+# Without it a production build refuses to start. Deployed: `wrangler secret put BETTER_AUTH_SECRET`.
+# BETTER_AUTH_SECRET=
+# The address people open the app at, deployed (https://app.example.com). Unset locally: each request's own origin is
+# used, so any dev or preview port works. When set, it is the one trusted origin, and cookies are Secure exactly when
+# it is https: (set https://localhost:5173 under `bun run dev:https` to try Secure cookies locally).
+# BETTER_AUTH_URL=https://app.example.com
+# true or false. Refuse a new password found in known data breaches (Have I Been Pwned; only the first five
+# characters of its SHA-1 hash are sent). Default: on in a production build, off in development. When on, a sign-up is
+# refused while the service cannot be reached.
+# PWNED_PASSWORD_CHECK=true
+# true or false. Offer the local test accounts in one click on the sign-in page. Default: on in development, off in a
+# production build. Only `bun run dev` writes those accounts (scripts/dev-accounts.sql, password local-test-password),
+# so a deployed database has none whatever this says.
+# TEST_ACCOUNTS=false
+# --- Developer tools ----------------------------------------------------------------------------------------------
+
+# The Effect DevTools server's WebSocket address, for the Worker's spans in development (one client per request).
+# Default: unset, off. The editor extension listens on ws://localhost:34437. A production build ignores it.
+# EFFECT_DEVTOOLS_URL=ws://localhost:34437
+
+# --- Telemetry ----------------------------------------------------------------------------------------------------
+
+# The collector's OTLP over HTTP address. Default: unset, off: nothing is built or sent. `bun run telemetry` starts a
+# local one (Grafana's LGTM stack, in Docker) and prints this line; `bun run dev` never starts it. Set, the Worker's
+# and the browser's traces, metrics and logs go there (the browser's through the app's own /api/otlp).
+# OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+# The service name the Worker's telemetry carries. Default takehome; the browser's is takehome-web.
+# OTEL_SERVICE_NAME=takehome
+
+# --- Public flags for the browser ---------------------------------------------------------------------------------
+# VITE_* values are compiled into the browser bundle, so anything here is public: never put a secret in one. They go
+# in .env.local (git-ignored), not in .dev.vars, because Vite reads them, not the Worker. Read in src/web/lib/api.ts.
+#
+# true or false. Default false. In development only, connect the browser's Effect runtime to the Effect DevTools
+# panel. Leave it off when nothing listens: the first API call then waits up to a second for the connection.
+# VITE_EFFECT_DEVTOOLS=true
+# The DevTools panel's WebSocket address. Default ws://localhost:34437, where the panel listens.
+# VITE_EFFECT_DEVTOOLS_URL=ws://localhost:34437

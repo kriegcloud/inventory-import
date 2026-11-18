@@ -1,0 +1,194 @@
+import { useQuery } from "@tanstack/react-query"
+import { DateTime } from "effect"
+import { useState } from "react"
+import { Code } from "@/components/app/Code"
+import { importAddress } from "@/lib/route"
+import { PageHeader, Views } from "@/components/app/PageHeader"
+import { ProposedValue } from "@/components/app/ProposedValue"
+import { type RecordColumn, RecordsTable } from "@/components/ui/data-table/data-table-records"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { TableSkeleton } from "@/components/app/Skeletons"
+import { Button } from "@/components/ui/button"
+import { call } from "@/lib/api"
+import type { ChangeRecord } from "../../api/v1/Api.ts"
+import type { Activity } from "../../domain/Activity.ts"
+import { fieldLabels } from "../../domain/ItemImport.ts"
+import { whenShort } from "@/lib/dates"
+import { when } from "./import/format.tsx"
+import { sayError } from "@/lib/errors"
+import { queryKeys } from "@/lib/queries"
+
+type Event = (typeof Activity.json)["Type"]
+
+const sourceWords = { rule: "Rule", model: "Model", person: "Person" } as const
+
+const proposedBy = (change: ChangeRecord): string => sourceWords[change.source]
+
+const changeColumns: ReadonlyArray<RecordColumn<ChangeRecord>> = [
+  {
+    id: "sku",
+    label: "Item",
+    width: 168,
+    // A value whose import was taken back is kept still; the item it went into is gone.
+    cell: (change) =>
+      change.takenBack ? (
+        <>
+          <Code>{change.sku}</Code> <span className="font-normal text-muted-foreground">taken back</span>
+        </>
+      ) : (
+        <Code>{change.sku}</Code>
+      ),
+    title: (change) => (change.takenBack ? `${change.sku}, taken back with its import` : change.sku),
+    sort: (change) => change.sku
+  },
+  {
+    id: "row",
+    label: "Row",
+    width: 56,
+    align: "right",
+    cell: (change) => (change.part === undefined ? change.rowNumber : `${change.rowNumber} · ${change.part}`)
+  },
+  {
+    id: "field",
+    label: "Field",
+    width: 96,
+    cell: (change) => fieldLabels[change.field],
+    sort: (change) => fieldLabels[change.field]
+  },
+  {
+    id: "change",
+    label: "Was, now",
+    width: 150,
+    cell: (change) => <ProposedValue from={change.from === "" ? "empty" : change.from} to={change.to} />
+  },
+  {
+    id: "source",
+    label: "Proposed by",
+    width: 124,
+    // Who proposed it and how sure they were, in one column: beside the sidebar ten columns did not fit, and the
+    // table ran past its frame with the file and the time out of sight.
+    cell: (change) => (
+      <>
+        {proposedBy(change)}
+        {change.confidence === null ? null : <span className="text-muted-foreground"> · {change.confidence}</span>}
+      </>
+    ),
+    title: (change) => `${proposedBy(change)}${change.confidence === null ? "" : `, confidence ${change.confidence}`}`
+  },
+  {
+    id: "decided",
+    label: "Decided by",
+    width: 120,
+    cell: (change) => (change.decidedBy === "rule" ? "Rule" : (change.decidedByName ?? "Person")),
+    sort: (change) => (change.decidedBy === "rule" ? "Rule" : (change.decidedByName ?? "Person"))
+  },
+  {
+    id: "basis",
+    label: "Basis",
+    cell: (change) => change.basis ?? change.how
+  },
+  {
+    id: "file",
+    label: "File",
+    width: 100,
+    // The way back to a confirmed import: its result, with the rows not imported and the take-back.
+    cell: (change) => (
+      <a className="underline underline-offset-4" href={importAddress(change.importId, "result")}>
+        {change.fileName}
+      </a>
+    ),
+    title: (change) => change.fileName,
+    sort: (change) => change.fileName
+  },
+  {
+    id: "when",
+    label: "When",
+    width: 132,
+    cell: (change) => whenShort(change.createdAt),
+    title: (change) => when(change.createdAt),
+    sort: (change) => change.createdAt
+  }
+]
+
+const eventColumns: ReadonlyArray<RecordColumn<Event>> = [
+  { id: "action", label: "What", width: 220, cell: (event) => event.action, sort: (event) => event.action },
+  { id: "who", label: "Who", width: 200, cell: (event) => event.actorName, sort: (event) => event.actorName },
+  { id: "detail", label: "Detail", cell: (event) => event.detail },
+  // The same short form as the decisions' column, so the two lists on this page read alike.
+  {
+    id: "when",
+    label: "When",
+    width: 150,
+    cell: (event) => whenShort(DateTime.formatIso(event.createdAt)),
+    title: (event) => when(DateTime.formatIso(event.createdAt)),
+    sort: (event) => DateTime.formatIso(event.createdAt)
+  }
+]
+
+/**
+ * Who decided what. "Decisions" lists every value an import wrote that differs from the file: what it was, what
+ * it became, who proposed it and who accepted or typed it. "Events" is the audit trail of uploads and imports.
+ */
+export function ActivityPage() {
+  const [chosen, setView] = useState<"decisions" | "events">()
+  const changes = useQuery({ queryKey: queryKeys.changes, queryFn: () => call((api) => api.imports.changes()) })
+  const events = useQuery({ queryKey: queryKeys.activity, queryFn: () => call((api) => api.activity.recent()) })
+  // Until the person chooses, the page opens on the list that has something in it: an empty "Decisions" beside
+  // nine events read as "nothing has happened here".
+  const view = chosen ?? (changes.data?.length === 0 && (events.data?.length ?? 0) > 0 ? "events" : "decisions")
+  const failed = view === "decisions" ? changes.error : events.error
+  const loading = view === "decisions" ? changes.data === undefined : events.data === undefined
+  return (
+    <div className="flex h-full flex-col">
+      <PageHeader title="Activity" />
+      <Views label="What to show">
+        <Button variant="ghost" size="sm" aria-pressed={view === "decisions"} onClick={() => setView("decisions")}>
+          Decisions {changes.data?.length ?? ""}
+        </Button>
+        <Button variant="ghost" size="sm" aria-pressed={view === "events"} onClick={() => setView("events")}>
+          Events {events.data?.length ?? ""}
+        </Button>
+      </Views>
+      {failed !== null ? (
+        <div className="px-4 sm:px-9">
+          <Alert variant="destructive">
+            <AlertTitle>The activity could not be loaded</AlertTitle>
+            <AlertDescription>
+              {sayError(failed).sentence}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void (view === "decisions" ? changes.refetch() : events.refetch())}
+              >
+                Try again
+              </Button>
+            </AlertDescription>
+          </Alert>
+        </div>
+      ) : loading ? (
+        <TableSkeleton
+          caption={view === "decisions" ? "Values that imports changed, and who decided each" : "Uploads and imports"}
+          columns={view === "decisions" ? changeColumns : eventColumns}
+        />
+      ) : view === "decisions" ? (
+        <RecordsTable
+          caption="Values that imports changed, and who decided each"
+          columns={changeColumns}
+          rows={changes.data ?? []}
+          rowKey={(change) =>
+            `${change.importId}:${change.rowNumber}.${change.part ?? 0}:${change.field}:${change.createdAt}`
+          }
+          empty="No decisions yet. They appear here once an import with accepted or typed values is confirmed."
+        />
+      ) : (
+        <RecordsTable
+          caption="Uploads and imports"
+          columns={eventColumns}
+          rows={events.data ?? []}
+          rowKey={(event) => event.id}
+          empty="Nothing has happened yet."
+        />
+      )}
+    </div>
+  )
+}

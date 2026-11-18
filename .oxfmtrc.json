@@ -1,0 +1,21 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "printWidth": 120,
+  "semi": false,
+  "singleQuote": false,
+  "trailingComma": "none",
+  "ignorePatterns": [
+    "src/web/components/ui/**",
+    "src/web/shadcn-utilities.css",
+    "brief/**",
+    "dist/**",
+    "migrations/**",
+    "package-lock.json",
+    "bun.lock",
+    "**/*.md",
+    "docs/**",
+    ".agents/**",
+    ".claude/**",
+    ".codex/**"
+  ]
+}

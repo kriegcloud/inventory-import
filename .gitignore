@@ -1,0 +1,45 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Local secrets and Cloudflare state
+.dev.vars
+.dev.vars.*
+.env
+.env.*
+!.env.example
+!.dev.vars.example
+.wrangler
+worker-configuration.d.ts
+
+# Machine-specific agent settings
+.claude/settings.local.json
+.dev.pid
+.scratch/
+submit/
+# The frozen copy of the last checkpoint, running beside the work for the qa and reviewer agents
+.frozen/
+# Raw log written by the session hooks; `bun run session` turns it into docs/session/
+.session/
+.taste-skill/

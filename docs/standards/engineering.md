@@ -1,0 +1,88 @@
+---
+type: Standard
+title: Engineering targets
+description: How the code is designed, tested, documented and measured, the server's rules for data, and how close development stays to production.
+tags: [effect, cloudflare]
+status: stable
+---
+
+My engineering rules are in `CLAUDE.md` and [patterns](../patterns.md). This page adds what they leave out.
+
+## Working
+
+- **It runs from the README with one command and no key**: `bun install && bun run dev`, and nothing to sign up for,
+  set up or pay for. Check: on a fresh clone with no `.dev.vars`, that command reaches the first screen.
+- **Look before building**: this project, a module it does not have yet, then a reference repository I named
+  (`CLAUDE.md` "Use what exists before building"). Check: the write-up's reuse table names what was used.
+- **Design in this order**: Schema, then the `Context.Service` contract, then the Layer, the handler and the screen.
+  Commit the contract before splitting work between agents. Check: `git log` shows the contract committed before
+  the first screen.
+- **Commit at each working step with `bun run check` green**; never leave the app broken between commits. Check:
+  the session record shows a passing check before each commit.
+- **Check every Effect API against the Effect 4 source** (`node_modules/effect/src`) before using it; never write
+  Effect 3 from memory. Check: `bun run typecheck` passes, and no import names `@effect/platform`.
+- **Effect's collections, never `Map` or `Set`**, in `src` and `test`: `HashMap` and `HashSet` for a value handed on
+  (React state included), `MutableHashMap` and `MutableHashSet` for one a function fills and reads. `WeakMap` and
+  `WeakSet` stay where an entry must go with its key; Effect has no weak collection. A module whose download must
+  hold no Effect code may keep a listener list as an array; none here does, since `main.tsx` loads Effect for the
+  API client. The vendored components in `src/web/components/ui` are as published. Check: `bun run check`
+  (oxlint's `no-restricted-globals` refuses `new Map(` and `new Set(`).
+- **`bun`, not npm, in every command we run** (`bun run`, `bun install`, `bunx`). The npm path is proven by the
+  clean-copy check of every pack and checkpoint. Check: the session record's commands start with `bun`.
+- **Migrations before features**, and **deployable at every commit**, deployed only when I ask. Check: `bun run
+  db:reset` applies a feature's tables before its screen exists, and `bun run build` passes.
+
+## The server
+
+- **The API is versioned**: the HttpApi sits behind `v1`, in its folder (`src/api/v1/`) and in its path
+  (`/api/v1`). Sign-in's own routes (`/api/auth/*`) are never versioned. Check: every contract path starts with it.
+- **Every query and mutation has its inputs and outputs decoded by an Effect Schema** (`SqlSchema`, `Model`), never
+  a type cast on a raw row. Check: no `sql<...>` result is used without a Schema.
+- **Errors are values**: a failure a caller can act on is a `Schema.TaggedError` in the function's type, everything
+  else a defect. Check: no `throw` and no class extending `Error` in `src/domain`, `src/api` or `src/server`.
+- **Writes that must land together are one batch, and running a write twice adds nothing** (`D1Client.batch`,
+  `INSERT ... ON CONFLICT ... DO NOTHING`). Check: a test sends the same write twice and finds one row.
+- **Every string in a payload is bounded and every number is finite or an integer** (`Schema.isMaxLength`,
+  `Schema.Finite`, `Schema.Int`). Check: no unbounded `Schema.String` in a payload.
+- **Nothing the person sees is faked**: a real SQLite database (D1) with real tables, and indexes that fit the
+  queries. Check: each list query's `EXPLAIN QUERY PLAN` uses an index.
+
+## Tests
+
+- **`@effect/vitest`**: `it.effect` with `layer(...)` for services, test layers for integration tests (the real HTTP
+  contract against a test Layer), never `Effect.provide` inside the test. Check: `bun run check:full` passes.
+- **Property tests from Schemas** (`it.prop` or `it.effect.prop`, which take Schemas as arbitraries) for rules that
+  hold for every input: cents read from digits, a key normalised twice equals once, outcome counts add up to the
+  rows. Check: at least one property test for the import's main rule.
+- **Anything timed is tested on `TestClock`**, never with a real wait. Check: no `sleep` or timer in a test.
+- **No test re-asserts what the types or another test already prove.** Check: each test names the rule it protects.
+
+## Documentation
+
+- **JSDoc on every export in `src/domain`, `src/api` and `src/server`**: what it is for and the rule it protects;
+  `@example` on pure helpers whose use is not obvious. Check: read the exports of a changed file.
+- **`.annotate({ description })` on every exported schema**, and `annotateKey` (with `messageMissingKey` where a
+  person can see it) on API payload fields a person can leave out and on fields whose name is unclear. The
+  descriptions reach the OpenAPI document and the model's JSON Schema. Check: the OpenAPI document has a description
+  on each schema.
+- **Inside the hour these are required only on new domain schemas**: everything the template brings already has
+  them. Docgen-grade JSDoc (categories, versions, examples that compile) is what production would add.
+- **The API reference works**: the HttpApi's Scalar page (`HttpApiScalar`) in development, the OpenAPI document in
+  production. Check: in `bun run dev`, `/api/v1/docs` lists every endpoint; under `bun run preview` it answers 404
+  and `/api/v1/openapi.json` answers.
+
+## Measured
+
+- **Lighthouse Accessibility, Best Practices and SEO at 100**; Performance measured and reported with its cause.
+  Check: `bun run lighthouse` prints all four categories, and the write-up gives each one.
+- **Logs, traces and metrics** as far as the platform allows ([settings, logs and traces](config-and-logs.md)).
+  Check: the write-up names what did not work, and why.
+
+## Development close to production
+
+- **Development runs as production does as far as it can**: the Worker in workerd, a local D1, the API's headers.
+  Check: `bun run dev` serves the API with its production headers.
+- **`bun run preview` is the parity check for headers**: the production build, served with every header
+  ([security](security.md)). Check: `curl -sI localhost:4173` under `bun run preview`.
+- **`bun run dev:https` is optional**: local certificates, so secure cookies and HSTS behave as deployed. The README
+  says how, marked optional. Check: the README's section exists and says "optional".

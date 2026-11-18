@@ -1,0 +1,131 @@
+// What a refresh brings back. The rules that would hurt if wrong: progress saved for one person in one organization is
+// never read for anyone else; the decisions and the undo history come back exactly as they were left; and a draft
+// that no longer decodes is dropped, never shown half.
+import { it } from "@effect/vitest"
+import { Array as Arr, Effect, Record as Rec, Schema } from "effect"
+import { describe, expect, it as plain } from "vitest"
+import { act, emptyState, restored, saved } from "../../src/web/components/review/logic.ts"
+import type { ReviewRow, ReviewState } from "../../src/web/components/review/types.ts"
+import {
+  clearProgress,
+  progressKey,
+  type ProgressStorage,
+  readProgress,
+  restoredDecisions,
+  type SavedProgress,
+  storedReview,
+  StoredReview,
+  writeProgress
+} from "../../src/web/lib/saved-progress/store.ts"
+
+const memory = (): ProgressStorage & { readonly items: Record<string, string> } => {
+  const items: Record<string, string> = {}
+  return {
+    items,
+    getItem: (key) => Rec.get(items, key).pipe((found) => (found._tag === "Some" ? found.value : null)),
+    setItem: (key, value) => {
+      items[key] = value
+    },
+    removeItem: (key) => {
+      delete items[key]
+    }
+  }
+}
+
+const progress = (step: string): SavedProgress => ({
+  version: 1,
+  step,
+  file: { name: "items.csv", size: 1797, lastModified: 1_763_000_000_000, sheet: null },
+  review: { decisions: { "row-9": { edits: { qty: "2000" } } }, undo: [] },
+  decided: 1,
+  needed: 4,
+  savedAt: "2026-11-17T12:00:00.000Z"
+})
+
+const Scope = Schema.Struct({ organizationId: Schema.String, memberId: Schema.String, screen: Schema.String })
+
+describe("saved progress", () => {
+  it.prop(
+    "gives two different people, organizations or screens two different keys",
+    { a: Scope, b: Scope },
+    ({ a, b }) => {
+      const same = a.organizationId === b.organizationId && a.memberId === b.memberId && a.screen === b.screen
+      expect(progressKey(a) === progressKey(b)).toBe(same)
+    }
+  )
+
+  plain("never reads one member's progress for another member or another organization", () => {
+    const storage = memory()
+    const dana = { organizationId: "org_prairie", memberId: "mem_dana", screen: "import" }
+    expect(writeProgress(storage, dana, progress("review"))).toBe(true)
+    expect(readProgress(storage, dana)?.step).toBe("review")
+    expect(readProgress(storage, { ...dana, memberId: "mem_marcus" })).toBeUndefined()
+    expect(readProgress(storage, { ...dana, organizationId: "org_northline" })).toBeUndefined()
+    clearProgress(storage, dana)
+    expect(readProgress(storage, dana)).toBeUndefined()
+  })
+
+  plain("drops a stored draft that does not decode, and does not offer it again", () => {
+    const storage = memory()
+    const scope = { organizationId: "org_prairie", memberId: "mem_dana", screen: "import" }
+    storage.setItem(progressKey(scope), '{"version":0,"step":"review"}')
+    expect(readProgress(storage, scope)).toBeUndefined()
+    expect(Rec.keys(storage.items)).toEqual([])
+  })
+
+  // Rows with a problem in one column; the person types values and leaves rows out in any order.
+  const rows: ReadonlyArray<ReviewRow> = Arr.makeBy(6, (i) => ({
+    id: `row-${i + 2}`,
+    line: i + 2,
+    cells: { name: `Item ${i}`, qty: "" },
+    problem: { kind: "blank", column: "qty" }
+  }))
+  const Step = Schema.Struct({
+    row: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 5 })),
+    leaveOut: Schema.Boolean,
+    value: Schema.String.check(Schema.isMaxLength(12))
+  })
+
+  const asText = Schema.fromJsonString(StoredReview)
+
+  it.effect.prop(
+    "brings back every decision and the whole undo and redo history after a trip through storage",
+    {
+      steps: Schema.Array(Step).check(Schema.isMaxLength(12)),
+      undos: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 3 }))
+    },
+    ({ steps, undos }) =>
+      Effect.gen(function* () {
+        let state: ReviewState = emptyState
+        for (const step of steps) {
+          const row = rows[step.row]
+          if (row === undefined) continue
+          const action = step.leaveOut
+            ? ({ type: "leaveOut", rowIds: [row.id] } as const)
+            : ({ type: "edit", rowId: row.id, column: "qty", value: step.value } as const)
+          state = act({ rows, state, action }).state
+        }
+        for (let i = 0; i < undos; i++) state = act({ rows, state, action: { type: "undo" } }).state
+        // And one redo, so the redo history makes the trip too.
+        if (undos > 1) state = act({ rows, state, action: { type: "redo" } }).state
+        // What a refresh does: the decisions handed out, kept as JSON text, decoded and handed back.
+        const text = yield* Schema.encodeEffect(asText)(storedReview(saved(state)))
+        const stored = yield* Schema.decodeEffect(asText)(text)
+        const back = restored(restoredDecisions(stored))
+        const plainOf = (decisions: ReviewState["decisions"]) => Rec.fromEntries(decisions)
+        const history = (of: ReviewState) =>
+          Arr.map(of.undo, (step) => [step.label, Rec.fromEntries(step.before), step.focus])
+        expect(plainOf(back.decisions)).toEqual(plainOf(state.decisions))
+        expect(history(back)).toEqual(history(state))
+        const redoHistory = (of: ReviewState) =>
+          Arr.map(of.redo ?? [], (step) => [step.label, Rec.fromEntries(step.before), step.focus])
+        expect(redoHistory(back)).toEqual(redoHistory(state))
+        // Undo after the refresh takes back the same step it would have taken before it.
+        if (state.undo.length > 0) {
+          expect(plainOf(act({ rows, state: back, action: { type: "undo" } }).state.decisions)).toEqual(
+            plainOf(act({ rows, state, action: { type: "undo" } }).state.decisions)
+          )
+        }
+      })
+  )
+})

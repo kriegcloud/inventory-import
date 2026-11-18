@@ -9,12 +9,9 @@ Answered decisions move below with the date, the answer and how to reverse it.
 
 | # | Question | Recommendation | Source |
 | --- | --- | --- | --- |
-| 5 | Atoms or TanStack Query? | Keep TanStack Query now; atoms as a later change | 03 §7.1 |
-| 6 | Filename postfixes and exports in foundation packages? | Role suffix in every filename outside `internal/`; exact exports, no `./internal/*` | 04 §9.4, §9.5 |
 | 7 | Byte-lossless CSV document in the first version? | No: canonical table codec first | 04 §9.7 |
 | 8 | Drop SheetJS and papaparse? | Yes, each behind fixture parity | 04 §9.8 |
 | 9 | Lenient or strict CSV by default? | Lenient for reading; strict as an option | 04 §9.16 |
-| 10 | Effect diagnostics adoption? | Staged: strict for new packages, fix on move, vendored ui excluded | 04 §9.10 |
 | 11 | Where is `Model.Class` used? | Stored-row schemas in host packages only | 01 §8, 03 §7.2 |
 | 12 | `Option`/`DateTime` fields or `null`/strings? | `DateTime` for timestamps only | 03 §7.2 |
 
@@ -39,7 +36,6 @@ Answered decisions move below with the date, the answer and how to reverse it.
 | 22 | Model keys outside production? | None | 02 §10.8 |
 | 23 | Email through Resend now? | Not now | 02 §10.9 |
 | 24 | Repository rules as code? | Yes, in a workstation-only stack | 02 §10.12 |
-| 25 | Rename placeholder names, cookie included? | Yes, before the first deploy | 02 §10.10, 04 §9.13 |
 | 26 | Where do `explorations/` and `goals/` live? | Repository root, checked by `docs:check` | 04 §9.11 |
 
 ## Answered
@@ -64,3 +60,29 @@ Question: how is the app's code cut and named? Answer: two contexts, `access` an
 host and web; `@beep/*` for product-neutral foundation, drivers and infra; `@inventory/*` for kernel, contexts, ui and
 the app. Rationale: items and imports share one atomic write; `@beep/ui` would collide with beep-effect's. Rejected
 were one scope and a package per feature. Reverse: a context can be split when it gains its own invariant.
+
+### 2026-11-18 — file naming
+
+Question: which naming and export rule do new packages follow? Answer: a role suffix in every filename outside
+`internal/` and `index.ts`; public paths name the concept only; exact exports, `internal/` never exported. Rationale:
+the role is read at file-name time and one export rule is cheaper to check than two; rejected were copying the
+exemplars exactly and keeping `./internal/*`. Reverse: add an export entry.
+
+### 2026-11-18 — strictness
+
+Question: how is beep-effect's Effect diagnostic profile adopted? Answer: staged. Full profile for every new package;
+moved back-end code is fixed as it moves; web code gets a recorded override for four style rules whose count may only
+fall; vendored ui is excluded. Rejected were fixing everything first and strict for new packages only. Reverse:
+remove an override when its count reaches zero.
+
+### 2026-11-18 — step 0
+
+Question: what is cleared before the workspace move? Answer: the timed-build tooling, hooks and process-only skills
+and documents are removed, and every placeholder name becomes `inventory`, the sign-in cookie included. Rationale:
+nothing is deployed, so nobody is signed out. Reverse: git history.
+
+### 2026-11-18 — client state
+
+Question: atoms or TanStack Query? Answer: TanStack Query for the rebuild; atoms later as their own goal. Rationale:
+undo per change, invalidate-after-last-write and keep-previous-data paging have no atom equivalent yet. Reverse: a
+goal that moves the web packages onto `@effect/atom-react`.

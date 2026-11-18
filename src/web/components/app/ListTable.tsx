@@ -115,9 +115,11 @@ export function ListTable<Row extends RowData>(props: {
   readonly empty: ReactNode
   /** The search box's label and placeholder ("Search people"). */
   readonly searchLabel: string
+  /** The widest the table's column of the page can be, in pixels, when it sits in a narrow column of its own. */
+  readonly maxWidth?: number
 }) {
   const narrow = useIsNarrow()
-  const room = useContentWidth()
+  const room = Math.min(useContentWidth(), props.maxWidth ?? Number.POSITIVE_INFINITY)
   const { columns, rows } = props
   // The column without a width takes the room the others leave, never less than `leastFlexible`: only then does
   // the table scroll sideways inside its frame.

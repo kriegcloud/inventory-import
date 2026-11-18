@@ -41,8 +41,8 @@ const statusColumn: ListColumn<PastImport> = {
 
 const itemsColumn: ListColumn<PastImport> = {
   id: "items",
-  label: "Items now",
-  width: 104,
+  label: "Items",
+  width: 88,
   align: "right",
   value: (past) => past.items,
   cell: (past) => whole.format(past.items),

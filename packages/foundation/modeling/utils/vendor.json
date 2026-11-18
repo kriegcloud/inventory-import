@@ -1,0 +1,327 @@
+{
+  "$comment": "Written by scripts/vendor-beep.mjs; checked by scripts/vendor-check.mjs. sha256 is of each file without its first (provenance) line; it equals sourceSha256 unless the file lists rewrites. local files are written here, not copied.",
+  "source": {
+    "repository": "beep-effect",
+    "commit": "c5cebd5c9de7077493cb9ccaaa18e1d4f73da0b0",
+    "path": "packages/foundation/modeling/utils",
+    "license": "Apache-2.0"
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts",
+    "./Array": "./src/Array.ts",
+    "./Bool": "./src/Bool.ts",
+    "./Data": "./src/Data.ts",
+    "./DateTime": "./src/DateTime.ts",
+    "./DrainableWorker": "./src/DrainableWorker.ts",
+    "./Equal": "./src/Equal.ts",
+    "./Errors": "./src/Errors.ts",
+    "./FileSystem": "./src/FileSystem.ts",
+    "./GlobalValue": "./src/GlobalValue.ts",
+    "./HostProcess": "./src/HostProcess.ts",
+    "./Html": "./src/Html.ts",
+    "./NodeUrl": "./src/NodeUrl.ts",
+    "./Number": "./src/Number.ts",
+    "./Option": "./src/Option.ts",
+    "./Path": "./src/Path.ts",
+    "./Predicate": "./src/Predicate.ts",
+    "./Random": "./src/Random.ts",
+    "./Record": "./src/Record.ts",
+    "./Schema": "./src/Schema.ts",
+    "./Str": "./src/Str.ts",
+    "./Stream": "./src/Stream.ts",
+    "./Struct": "./src/Struct.ts",
+    "./Text": "./src/Text.ts",
+    "./Utils": "./src/Utils.ts",
+    "./index": "./src/index.ts",
+    "./thunk": "./src/thunk.ts"
+  },
+  "files": [
+    {
+      "path": "src/Array.ts",
+      "sourceSha256": "cf2d09c8afce25bd96af79785776eb77b25759bfc151b149255a37089e2da7af",
+      "sha256": "cf2d09c8afce25bd96af79785776eb77b25759bfc151b149255a37089e2da7af",
+      "rewrites": []
+    },
+    {
+      "path": "src/Bool.ts",
+      "sourceSha256": "18a9bafa143e643d9bfa23d4e36231e92ae59803aed677f62ff2cc8c00103a16",
+      "sha256": "18a9bafa143e643d9bfa23d4e36231e92ae59803aed677f62ff2cc8c00103a16",
+      "rewrites": []
+    },
+    {
+      "path": "src/Data.ts",
+      "sourceSha256": "f242cd6c3bb8f780638a8fb25f26527ce8742084210d9cebe9a06148c42a906a",
+      "sha256": "f242cd6c3bb8f780638a8fb25f26527ce8742084210d9cebe9a06148c42a906a",
+      "rewrites": []
+    },
+    {
+      "path": "src/DateTime.ts",
+      "sourceSha256": "e8f50eda5b8429e3bd8ed626647693977fbfa391b8e13f18e6bf9925b7926c32",
+      "sha256": "e8f50eda5b8429e3bd8ed626647693977fbfa391b8e13f18e6bf9925b7926c32",
+      "rewrites": []
+    },
+    {
+      "path": "src/DrainableWorker.ts",
+      "sourceSha256": "7eb72f907dadacc4b058c3082ec3832bef525c731b1b5158d7fbbb64d334597c",
+      "sha256": "7eb72f907dadacc4b058c3082ec3832bef525c731b1b5158d7fbbb64d334597c",
+      "rewrites": []
+    },
+    {
+      "path": "src/Equal.ts",
+      "sourceSha256": "bbfc180657df60f2e23d4e71dc2a9de7206c044b95e10397399bdfd24ac759b7",
+      "sha256": "bbfc180657df60f2e23d4e71dc2a9de7206c044b95e10397399bdfd24ac759b7",
+      "rewrites": []
+    },
+    {
+      "path": "src/Errors.ts",
+      "sourceSha256": "54d88c0016027e85bef0eef0c16850f3029c087d4d0edf03e0886e7f575728c1",
+      "sha256": "54d88c0016027e85bef0eef0c16850f3029c087d4d0edf03e0886e7f575728c1",
+      "rewrites": []
+    },
+    {
+      "path": "src/FileSystem.ts",
+      "sourceSha256": "3dc1fd8de02d93e976136fba9e996e4f86f19762adaf07ef4fd58392e3614d0d",
+      "sha256": "3dc1fd8de02d93e976136fba9e996e4f86f19762adaf07ef4fd58392e3614d0d",
+      "rewrites": []
+    },
+    {
+      "path": "src/GlobalValue.ts",
+      "sourceSha256": "44c57b1babda195b59018fea3f79ba28bc9fd615e73d8f0a2a1f8d707bddf019",
+      "sha256": "44c57b1babda195b59018fea3f79ba28bc9fd615e73d8f0a2a1f8d707bddf019",
+      "rewrites": []
+    },
+    {
+      "path": "src/HostProcess.ts",
+      "sourceSha256": "fb74e2b8fe0269ae9a2c53eaa328fc67c9fc232d91673c1b73f931f44d4856ba",
+      "sha256": "fb74e2b8fe0269ae9a2c53eaa328fc67c9fc232d91673c1b73f931f44d4856ba",
+      "rewrites": []
+    },
+    {
+      "path": "src/Html.ts",
+      "sourceSha256": "e1d1d95410241882250d627780c0d314596297603af5f95277491b7c28e7d9c1",
+      "sha256": "e1d1d95410241882250d627780c0d314596297603af5f95277491b7c28e7d9c1",
+      "rewrites": []
+    },
+    {
+      "path": "src/NodeUrl.ts",
+      "sourceSha256": "bd8f55ea42a5989cef611042825571155c4aee5f8ea8bcdfc2d0360157b6903c",
+      "sha256": "bd8f55ea42a5989cef611042825571155c4aee5f8ea8bcdfc2d0360157b6903c",
+      "rewrites": []
+    },
+    {
+      "path": "src/Number.ts",
+      "sourceSha256": "ba4d025d94c7344b57557800b24c25dc72fb64ce4c969aea999952194c863d81",
+      "sha256": "ba4d025d94c7344b57557800b24c25dc72fb64ce4c969aea999952194c863d81",
+      "rewrites": []
+    },
+    {
+      "path": "src/Option.ts",
+      "sourceSha256": "b32ca456d72e0094ecc93579e3f84b9b7b05657353f95b28e3ffdbd4959ef74b",
+      "sha256": "b32ca456d72e0094ecc93579e3f84b9b7b05657353f95b28e3ffdbd4959ef74b",
+      "rewrites": []
+    },
+    {
+      "path": "src/Path.ts",
+      "sourceSha256": "813232c9ca430b2dc3e0050634216ab0a927649eafb1156a89a332aa00a58859",
+      "sha256": "813232c9ca430b2dc3e0050634216ab0a927649eafb1156a89a332aa00a58859",
+      "rewrites": []
+    },
+    {
+      "path": "src/Predicate.ts",
+      "sourceSha256": "d8bc195dcf7da0278b3c76fa68273a5f0480a3d0cb19285c361300b889c3da8b",
+      "sha256": "d8bc195dcf7da0278b3c76fa68273a5f0480a3d0cb19285c361300b889c3da8b",
+      "rewrites": []
+    },
+    {
+      "path": "src/Random.ts",
+      "sourceSha256": "fc491e5f54885bef958a57efbe3f0a65288658f3feea06271885c3f71fc8d9d2",
+      "sha256": "fc491e5f54885bef958a57efbe3f0a65288658f3feea06271885c3f71fc8d9d2",
+      "rewrites": []
+    },
+    {
+      "path": "src/Record.ts",
+      "sourceSha256": "e005f0517d06972b6921eab5903300a63f65190bfb470323fb7bfe8fd36ba8f1",
+      "sha256": "e005f0517d06972b6921eab5903300a63f65190bfb470323fb7bfe8fd36ba8f1",
+      "rewrites": []
+    },
+    {
+      "path": "src/Schema.ts",
+      "sourceSha256": "5f0e2c248587da8583e047c647f75a5eacc918b0d5c6e113b75583bb5a72817f",
+      "sha256": "5f0e2c248587da8583e047c647f75a5eacc918b0d5c6e113b75583bb5a72817f",
+      "rewrites": []
+    },
+    {
+      "path": "src/Str.ts",
+      "sourceSha256": "3e716327a32999b90b6e7b9d02cc5eacdc148e9ccd5be5b59001525127e1eb1a",
+      "sha256": "3e716327a32999b90b6e7b9d02cc5eacdc148e9ccd5be5b59001525127e1eb1a",
+      "rewrites": []
+    },
+    {
+      "path": "src/Stream.ts",
+      "sourceSha256": "654e2d5261486ef63b4fc31075541d015a09ff715f1f306ae379f177d0bf3f57",
+      "sha256": "654e2d5261486ef63b4fc31075541d015a09ff715f1f306ae379f177d0bf3f57",
+      "rewrites": []
+    },
+    {
+      "path": "src/Struct.ts",
+      "sourceSha256": "dc10046826e2d2765afdff327a2c0e40a3661812ae492074d191aba6cf40ff07",
+      "sha256": "dc10046826e2d2765afdff327a2c0e40a3661812ae492074d191aba6cf40ff07",
+      "rewrites": []
+    },
+    {
+      "path": "src/Text.ts",
+      "sourceSha256": "d3ba15816eb4e223e67e7a9fee4b5eb3840237b034909f2894f286c31770d585",
+      "sha256": "d3ba15816eb4e223e67e7a9fee4b5eb3840237b034909f2894f286c31770d585",
+      "rewrites": []
+    },
+    {
+      "path": "src/Utils.ts",
+      "sourceSha256": "970021956007b94933ad8588b23bddfe34abbf6e2eac07b71df918a281a21a0b",
+      "sha256": "970021956007b94933ad8588b23bddfe34abbf6e2eac07b71df918a281a21a0b",
+      "rewrites": []
+    },
+    {
+      "path": "src/index.ts",
+      "sourceSha256": "5f8b54d33f4d3eab893f9db81c61f09309fcd77fffb47ddf3194a60f10690fdb",
+      "sha256": "5f8b54d33f4d3eab893f9db81c61f09309fcd77fffb47ddf3194a60f10690fdb",
+      "rewrites": []
+    },
+    {
+      "path": "src/internal/StructPath.ts",
+      "sourceSha256": "4137aed647bbd215338785820d08b16c2e0b25c01db82428313536ded1601034",
+      "sha256": "4137aed647bbd215338785820d08b16c2e0b25c01db82428313536ded1601034",
+      "rewrites": []
+    },
+    {
+      "path": "src/thunk.ts",
+      "sourceSha256": "e591c720534892fa1535bc7e9c055aabb47149ea3210b971e1cf14baa046a03f",
+      "sha256": "e591c720534892fa1535bc7e9c055aabb47149ea3210b971e1cf14baa046a03f",
+      "rewrites": []
+    },
+    {
+      "path": "test/Array.test.ts",
+      "sourceSha256": "4b6f1035411f12d0c63669b89762fbc1f79eb9ef8d5e37b2bc760272f83ccc44",
+      "sha256": "f38dbdaea144f5113477f0a9e25d062a58a44f6b23c6c0321701ec6f9e52b6c1",
+      "rewrites": [
+        "@beep/test-runner -> @effect/vitest"
+      ]
+    },
+    {
+      "path": "test/DrainableWorker.test.ts",
+      "sourceSha256": "3f6de9c68cd10395285d8a1de7d4c78ab589eb4376525f8427e9b56739334636",
+      "sha256": "38e33fb0ac8101e45ffc1f331c733b85043e297700dfce6bcffe0cd9aac72000",
+      "rewrites": [
+        "@beep/test-runner -> @effect/vitest"
+      ]
+    },
+    {
+      "path": "test/Errors.test.ts",
+      "sourceSha256": "6dad5ef23284534788b18920539c203ce80e33d61a96a2eb1c9099e03d982e80",
+      "sha256": "d740a80d3b0df58ecfdc6b0f592e8b6e50bb3a05d11011f1e336f45d85779cf7",
+      "rewrites": [
+        "@beep/test-runner -> @effect/vitest"
+      ]
+    },
+    {
+      "path": "test/FileSystem.test.ts",
+      "sourceSha256": "c68d63dd8cc6d865581425a7877451444a7574a4bb1a34143074d0848c3157cd",
+      "sha256": "9abfeef160811b208bb1750b31a6790d57f637a7466c5a7aa3289faa1499a202",
+      "rewrites": [
+        "@beep/test-runner -> @effect/vitest"
+      ]
+    },
+    {
+      "path": "test/FormatHelpers.test.ts",
+      "sourceSha256": "9c391590e8f4cef2c3966dba5e82ad0631d270cc4e086b5eb8ee2e3cb52473be",
+      "sha256": "56c1bf93b3e219a5d521cb7a1ac76c2722d8aced7b12291390fde4e6e86d8942",
+      "rewrites": [
+        "@beep/test-runner -> @effect/vitest"
+      ]
+    },
+    {
+      "path": "test/HostProcess.test.ts",
+      "sourceSha256": "7d85b5394fa1d853b3d0db77b025b8e4371eed3ea4966ed78fd6b110c0ea7183",
+      "sha256": "cfd11b9ee7d87b07c73a5f8cd315af19556ab934736e22de9bf4599164a8e825",
+      "rewrites": [
+        "@beep/test-runner -> @effect/vitest"
+      ]
+    },
+    {
+      "path": "test/Number.test.ts",
+      "sourceSha256": "bcce9fcf1b6b2e6f1dde0f8900b17ea4df84e510a6f6888502f7f7f93eac416a",
+      "sha256": "607cc3d62451048fd11ff7b98aecad90b4cb1a957ea33692f01ed33e900d5233",
+      "rewrites": [
+        "@beep/test-runner -> @effect/vitest"
+      ]
+    },
+    {
+      "path": "test/Option.test.ts",
+      "sourceSha256": "517a5b74b44db1a61da24a3e5f14bdd44f62064dadfc9315326defc9909b5d7b",
+      "sha256": "3410a84685a7d1b391153692a220d067466a3b2a5012d08fe2029ae2d5395229",
+      "rewrites": [
+        "@beep/test-runner -> @effect/vitest"
+      ]
+    },
+    {
+      "path": "test/Path.test.ts",
+      "sourceSha256": "ed3557d85b8d85e129942cce262c8579de644d73919777dbfb4e2fac2dc94291",
+      "sha256": "75ae5eed8001c514aca7961fe240e48dc844d1f7cfc53672582e057e3f31b064",
+      "rewrites": [
+        "@beep/test-runner -> @effect/vitest"
+      ]
+    },
+    {
+      "path": "test/Predicate.test.ts",
+      "sourceSha256": "b1a9ae661aa40c4aef2a65ae57095a1710bc87e7ce1a54197bd9dcf78a00c264",
+      "sha256": "b7826a6a928ebdc0a134139a72ffa517efc398500b581bb2b203b0df538a3770",
+      "rewrites": [
+        "@beep/test-runner -> @effect/vitest"
+      ]
+    },
+    {
+      "path": "test/Schema.test.ts",
+      "sourceSha256": "0ad82177a6fef8836c94a6cac2c0e3944aef6edf16ba3b93bffde385449efc64",
+      "sha256": "1648883023ebdfeb947af2637c5f859b67dbd255b4c3fdfbb1a4088203d1d0fe",
+      "rewrites": [
+        "@beep/test-runner -> @effect/vitest"
+      ]
+    },
+    {
+      "path": "test/SchemaParity.test.ts",
+      "sourceSha256": "7a909209fdd9501cc67ec224197becfe00a31a1f5b566903640fdb654b80a9da",
+      "sha256": "eae4e618cdc4879a8bcba8b5efd0a4c290f577cfb17f97e3e2f3b34012d84ab5",
+      "rewrites": [
+        "@beep/test-runner -> @effect/vitest",
+        "@beep/fc-runs -> ./support/fcRuns.ts"
+      ]
+    },
+    {
+      "path": "test/Str.test.ts",
+      "sourceSha256": "2a32a3837bf9e29bb21131daa9bf079dca703474d9cd72c5c2023599677bd12a",
+      "sha256": "94ef02490bbcf167b785ebec2f1082f3549a9565cc785a14e652668ee933321f",
+      "rewrites": [
+        "@beep/test-runner -> @effect/vitest"
+      ]
+    },
+    {
+      "path": "test/Struct.test.ts",
+      "sourceSha256": "372ea8587f95502d0d514c3e76ae0425873815b2f9891a16980d1856bf931e05",
+      "sha256": "be454f3fae41106acab2eef343e5f46415a17f471c57298588c998937704151f",
+      "rewrites": [
+        "@beep/test-runner -> @effect/vitest"
+      ]
+    },
+    {
+      "path": "test/TaggedError.equivalence.test.ts",
+      "sourceSha256": "610eb50017ba5936fd554ad0dd0425ae8b5a7273de80d49fd3434e31df299e6f",
+      "sha256": "dc908337bb722a27ae382a7307eb7303389a4ff6dc761adf6c7513810a6d1081",
+      "rewrites": [
+        "@beep/test-runner -> @effect/vitest"
+      ]
+    }
+  ],
+  "local": [
+    "test/support/fcRuns.ts"
+  ]
+}

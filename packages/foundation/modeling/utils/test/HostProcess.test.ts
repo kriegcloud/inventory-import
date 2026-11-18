@@ -1,0 +1,77 @@
+// Vendored from beep-effect c5cebd5c9de7:packages/foundation/modeling/utils/test/HostProcess.test.ts (Apache-2.0, see LICENSE). Do not edit: scripts/vendor-check.mjs compares the rest of this file with its recorded hash.
+import { it } from "@effect/vitest";
+import {
+  currentHostArchitecture,
+  currentHostPlatform,
+  HostProcessArchitecture,
+  HostProcessPlatform,
+} from "@beep/utils/HostProcess";
+import * as NodeServices from "@effect/platform-node/NodeServices";
+import { describe, expect } from "@effect/vitest";
+import * as A from "effect/Array";
+import * as Effect from "effect/Effect";
+import * as ChildProcess from "effect/process/ChildProcess";
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
+import * as S from "effect/Schema";
+import * as Str from "effect/String";
+
+const decodeGuardOutput = S.decodeUnknownEffect(S.fromJsonString(S.Struct({ platform: S.String, arch: S.String })));
+
+describe("HostProcess", () => {
+  it("reads the real host platform and architecture on a Node-compatible runtime", () => {
+    expect(currentHostPlatform.length).toBeGreaterThan(0);
+    expect(currentHostPlatform).not.toBe("browser");
+    expect(currentHostArchitecture.length).toBeGreaterThan(0);
+    expect(currentHostArchitecture).not.toBe("unknown");
+  });
+
+  it.effect(
+    "defaults the Effect references to the module constants",
+    Effect.fnUntraced(function* () {
+      const HostProcessPlatform1 = yield* HostProcessPlatform;
+      expect(HostProcessPlatform1).toBe(currentHostPlatform);
+      const HostProcessArchitecture2 = yield* HostProcessArchitecture;
+      expect(HostProcessArchitecture2).toBe(currentHostArchitecture);
+    })
+  );
+
+  it.effect(
+    "lets tests pin the platform and architecture via provideService",
+    Effect.fnUntraced(function* () {
+      const pinned = yield* Effect.all([HostProcessPlatform, HostProcessArchitecture], { concurrency: 1 }).pipe(
+        Effect.provideService(HostProcessPlatform, "win32"),
+        Effect.provideService(HostProcessArchitecture, "arm64")
+      );
+      expect(pinned).toEqual(["win32", "arm64"]);
+    })
+  );
+});
+
+it.layer(NodeServices.layer, { timeout: "5 seconds" })("HostProcess browser-eval guard", (it) => {
+  // Regression guard for the professional-desktop blank shell: evaluating the
+  // `@beep/utils` barrel in an environment with no `process` global (a browser
+  // bundle) must not throw, and the host constants must take their fallbacks.
+  it.effect(
+    "evaluates the @beep/utils barrel without a process global",
+    Effect.fnUntraced(function* () {
+      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+      const script = A.join(
+        [
+          "delete globalThis.process;",
+          'const mod = await import("@beep/utils");',
+          "console.log(JSON.stringify({ platform: mod.currentHostPlatform, arch: mod.currentHostArchitecture }));",
+        ],
+        "\n"
+      );
+      const command = ChildProcess.make("bun", ["-e", script], {
+        cwd: import.meta.dirname,
+        stdout: "pipe",
+        stderr: "inherit",
+      });
+      const output = yield* spawner.string(command);
+      const decodedGuardOutput = yield* decodeGuardOutput(Str.trim(output));
+      expect(decodedGuardOutput).toEqual({ platform: "browser", arch: "unknown" });
+    }),
+    30_000
+  );
+});

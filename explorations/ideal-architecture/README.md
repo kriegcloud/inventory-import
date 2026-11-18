@@ -4,7 +4,7 @@ title: Ideal architecture
 description: What inventory-import becomes as a model-first Turborepo of deep packages, shipped with Alchemy.
 status: active
 stage: shape
-next: Benjamin answers the open decisions in DECISIONS.md
+next: Benjamin reads BRIEF.md (goal beep-csv) and says whether the brief matches
 goals: [workspace-and-strictness]
 ---
 
@@ -19,6 +19,9 @@ each report lists what it could not verify.
 | [02 Alchemy infrastructure](research/02-alchemy-infra.md) | Alchemy can declare, test and ship the app end to end. Keep D1 with raw SQL. No cluster, Drizzle or R2 yet. |
 | [03 Effect v4 modules](research/03-effect-modules.md) | `Model.Class` for stored rows and `@effect/ai-openrouter` are clear wins. Atoms are possible but costly. GraphQL adds nothing. |
 | [04 beep-effect direction](research/04-beep-direction.md) | Two contexts in the model-first shape, nineteen packages and one app. `@beep/csv` first, `@beep/xlsx` last. |
+
+The brief for the next goal, `beep-csv` (step 4), is [BRIEF.md](BRIEF.md). It opens once Benjamin says the brief
+matches.
 
 ## Where the research disagrees with the request
 
@@ -74,5 +77,6 @@ Each step ends with the full check and an import of the messy sample in a browse
 
 ## Trail
 
+- 2026-11-18: BRIEF.md written for the goal `beep-csv` (step 4); awaiting "the brief matches".
 - 2026-11-18: goal `workspace-and-strictness` opened for steps 0 to 2 of the order of work.
 - 2026-11-18: four research reports written; decisions put to Benjamin.

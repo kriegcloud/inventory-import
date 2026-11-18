@@ -5,12 +5,13 @@
   "license": "MIT",
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "packages/*",
+    "packages/foundation/*/*"
   ],
   "type": "module",
   "scripts": {
-    "check": "turbo run check lint test //#format:check //#docs:check //#keys:check",
-    "check:full": "turbo run check lint test test:slow build //#format:check //#docs:check //#keys:check",
+    "check": "turbo run check lint test //#format:check //#docs:check //#keys:check //#vendor:check",
+    "check:full": "turbo run check lint test test:slow build //#format:check //#docs:check //#keys:check //#vendor:check",
     "dev": "bun run --cwd apps/inventory dev",
     "build": "turbo run build",
     "preview": "bun run --cwd apps/inventory preview",
@@ -27,7 +28,8 @@
     "deps:lint": "syncpack lint",
     "deps:outdated": "syncpack update --check",
     "prepare": "effect-tsgo patch --typescript --oxlint --tsrs",
-    "keys:check": "bash scripts/keys-check.sh"
+    "keys:check": "bash scripts/keys-check.sh",
+    "vendor:check": "node scripts/vendor-check.mjs"
   },
   "devDependencies": {
     "@effect/tsgo": "0.70.0",

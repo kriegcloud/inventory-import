@@ -1,0 +1,34 @@
+{
+  "name": "@beep/types",
+  "version": "0.0.1",
+  "description": "Shared type utilities for beep: the subset inventory-import uses, vendored from beep-effect (see vendor.json)",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": [],
+  "beep": {
+    "family": "foundation",
+    "kind": "primitive"
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts",
+    "./TArray.types": "./src/TArray.types.ts",
+    "./TString.types": "./src/TString.types.ts",
+    "./TUnsafe.types": "./src/TUnsafe.types.ts",
+    "./TUtils.types": "./src/TUtils.types.ts",
+    "./index": "./src/index.ts"
+  },
+  "scripts": {
+    "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "effect": "4.1.4"
+  },
+  "devDependencies": {
+    "@effect/vitest": "4.1.4",
+    "@types/node": "^24.19.2",
+    "vitest": "^5.1.0"
+  }
+}

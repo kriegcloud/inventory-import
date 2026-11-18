@@ -1,0 +1,39 @@
+{
+  "name": "@beep/identity",
+  "version": "0.1.1",
+  "description": "Effect v4 identity package: the subset inventory-import uses, vendored from beep-effect (see vendor.json)",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": [],
+  "beep": {
+    "family": "foundation",
+    "kind": "modeling"
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts",
+    "./Curie": "./src/Curie.ts",
+    "./Fibered": "./src/Fibered.ts",
+    "./Id": "./src/Id.ts",
+    "./IdentityRegistry": "./src/IdentityRegistry.ts",
+    "./PnLocal": "./src/PnLocal.ts",
+    "./Vocab": "./src/Vocab.ts",
+    "./index": "./src/index.ts",
+    "./packages": "./src/packages.ts"
+  },
+  "scripts": {
+    "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@beep/types": "workspace:*",
+    "effect": "4.1.4",
+    "type-fest": "^6.0.1"
+  },
+  "devDependencies": {
+    "@effect/vitest": "4.1.4",
+    "@types/node": "^24.19.2",
+    "vitest": "^5.1.0"
+  }
+}

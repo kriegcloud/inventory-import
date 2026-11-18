@@ -1,0 +1,34 @@
+// Vendored from beep-effect c5cebd5c9de7:packages/foundation/modeling/identity/test/TemplateGuards.test.ts (Apache-2.0, see LICENSE). Do not edit: scripts/vendor-check.mjs compares the rest of this file with its recorded hash.
+import { IdentityInterpolationError, IdentitySegmentCountError, make } from "@beep/identity";
+import { it } from "@effect/vitest";
+import { describe, expect } from "@effect/vitest";
+
+const $I = make("probe").$ProbeId.create("Widget");
+
+const templateStrings = (...parts: ReadonlyArray<string>) => Object.assign([...parts], { raw: [...parts] });
+
+describe("identity template guards", () => {
+  it("rejects a template with interpolations", () => {
+    expect(() => $I(templateStrings("Widget", "Error"), "x")).toThrow(IdentityInterpolationError);
+  });
+
+  it("rejects an empty template", () => {
+    expect(() => $I(templateStrings())).toThrow(IdentitySegmentCountError);
+  });
+
+  it("rejects a single missing literal segment", () => {
+    const missingSegment = Object.assign([undefined], { raw: [undefined] }) as unknown as TemplateStringsArray;
+    expect(() => $I(missingSegment)).toThrow(IdentitySegmentCountError);
+  });
+
+  it("rejects a template with more than one literal segment", () => {
+    expect(() => $I(templateStrings("Widget", "Error"))).toThrow(IdentitySegmentCountError);
+  });
+
+  it("explains both guard failures", () => {
+    expect(IdentityInterpolationError.make({}).message).toBe("Identity template tags do not allow interpolations.");
+    expect(IdentitySegmentCountError.make({}).message).toBe(
+      "Identity template tags must use a single literal segment."
+    );
+  });
+});

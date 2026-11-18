@@ -1,0 +1,161 @@
+// Vendored from beep-effect c5cebd5c9de7:packages/foundation/modeling/identity/test/Curie.test.ts (Apache-2.0, see LICENSE). Do not edit: scripts/vendor-check.mjs compares the rest of this file with its recorded hash.
+import { fcRuns } from "./support/fcRuns.ts";
+import {
+  CoreVocab,
+  CurieFromIri,
+  contract,
+  contractOption,
+  expand,
+  expandOption,
+  expandPredicate,
+  makeCurieCodec,
+  makeCurieFromIri,
+} from "@beep/identity";
+import { it } from "@effect/vitest";
+import { describe, expect, expectTypeOf } from "@effect/vitest";
+import * as Arbitrary from "effect/Arbitrary";
+import * as A from "effect/Array";
+import * as Effect from "effect/Effect";
+import * as Equal from "effect/Equal";
+import * as O from "effect/Option";
+import * as R from "effect/Record";
+import * as S from "effect/Schema";
+
+const decodeUnknownCurieFromIriOption = S.decodeUnknownOption(CurieFromIri);
+const encodeCurieFromIriOption = S.encodeOption(CurieFromIri);
+
+const decodeCurie = S.decodeUnknownEffect(CurieFromIri);
+const encodeIri = S.encodeUnknownEffect(CurieFromIri);
+
+const coreCurieCases = A.flatMap(R.toEntries(CoreVocab), ([prefix, vocab]) =>
+  A.map(vocab.terms, (term) => ({
+    curie: `${prefix}:${term}`,
+    iri: `${vocab.iri}${term}`,
+    prefix,
+    term,
+  }))
+);
+
+describe("CURIE codec", () => {
+  it("preserves literal expansion types", () => {
+    expectTypeOf(expand("skos:prefLabel")).toEqualTypeOf<"http://www.w3.org/2004/02/skos/core#prefLabel">();
+    expect(expand("skos:prefLabel")).toBe("http://www.w3.org/2004/02/skos/core#prefLabel");
+  });
+
+  it("round-trips every CoreVocab term", () => {
+    for (const current of coreCurieCases) {
+      const iri = expandOption(current.curie, CoreVocab);
+
+      expect(O.getOrUndefined(iri), current.curie).toBe(current.iri);
+      if (O.isSome(iri)) {
+        expect(O.getOrUndefined(contractOption(iri.value, CoreVocab)), current.iri).toBe(current.curie);
+      }
+    }
+  });
+
+  // Arbitrary.Constant ignores size/seed: the 100-run floor intentionally repeats
+  // the same fixed registry list rather than exploring a generated domain.
+  it.prop(
+    "repeats deterministic round-trips over the entire registry",
+    [Arbitrary.Constant(coreCurieCases)],
+    ([cases]) => {
+      for (const current of cases) {
+        const iri = expandOption(current.curie, CoreVocab);
+
+        expect(O.getOrUndefined(iri), current.curie).toBe(current.iri);
+        if (O.isSome(iri)) {
+          expect(O.getOrUndefined(contractOption(iri.value, CoreVocab)), current.iri).toBe(current.curie);
+        }
+      }
+
+      return true;
+    },
+    { arbitrary: fcRuns(100) }
+  );
+
+  it.effect(
+    "decodes and encodes known CURIEs",
+    Effect.fnUntraced(function* () {
+      const decodedCurie = yield* decodeCurie("skos:prefLabel");
+      expect(decodedCurie).toBe("http://www.w3.org/2004/02/skos/core#prefLabel");
+      const encodedIri = yield* encodeIri("http://www.w3.org/2004/02/skos/core#prefLabel");
+      expect(encodedIri).toBe("skos:prefLabel");
+    })
+  );
+
+  it.prop(
+    "round-trips generated CoreVocab IRIs through the schema codec",
+    [Arbitrary.schema(CurieFromIri)],
+    ([iri]) => {
+      const decoded = O.flatMap(encodeCurieFromIriOption(iri), decodeUnknownCurieFromIriOption);
+
+      expect(O.exists(decoded, (value) => Equal.equals(value, iri))).toBe(true);
+
+      return true;
+    },
+    { arbitrary: fcRuns(100) }
+  );
+
+  it.effect(
+    "fails schema decoding for unknown prefixes and known-prefix unknown terms",
+    Effect.fnUntraced(function* () {
+      expect((yield* Effect.flip(decodeCurie("nope:term")))._tag).toBe("SchemaError");
+      expect((yield* Effect.flip(decodeCurie("skos:nope")))._tag).toBe("SchemaError");
+    })
+  );
+
+  it.effect(
+    "fails schema encoding for unregistered IRIs",
+    Effect.fnUntraced(function* () {
+      expect((yield* Effect.flip(encodeIri("http://www.w3.org/2004/02/skos/core#nope")))._tag).toBe("SchemaError");
+    })
+  );
+
+  it("expands inverse predicates", () => {
+    expect(expandPredicate("^rdfs:subClassOf")).toEqual({
+      iri: "http://www.w3.org/2000/01/rdf-schema#subClassOf",
+      inverse: true,
+    });
+  });
+
+  it("contracts an IRI with the default core vocabulary", () => {
+    expect(contract("http://www.w3.org/2004/02/skos/core#prefLabel")).toBe("skos:prefLabel");
+  });
+
+  it("preserves the forward direction of ordinary predicates", () => {
+    expect(expandPredicate("rdfs:subClassOf")).toEqual({
+      iri: "http://www.w3.org/2000/01/rdf-schema#subClassOf",
+      inverse: false,
+    });
+  });
+
+  it("supports data-last CURIE operations", () => {
+    expect(expand(CoreVocab)("skos:prefLabel")).toBe("http://www.w3.org/2004/02/skos/core#prefLabel");
+    expect(contract(CoreVocab)("http://www.w3.org/2004/02/skos/core#prefLabel")).toBe("skos:prefLabel");
+    expect(expandPredicate(CoreVocab)("^rdfs:subClassOf")).toEqual({
+      iri: "http://www.w3.org/2000/01/rdf-schema#subClassOf",
+      inverse: true,
+    });
+  });
+});
+
+describe("custom vocabulary codecs", () => {
+  it.effect(
+    "round-trips registered terms and rejects unknown values",
+    Effect.fnUntraced(function* () {
+      const codec = makeCurieFromIri(CoreVocab);
+      const iri = "http://www.w3.org/2004/02/skos/core#prefLabel";
+      const value1 = yield* S.decodeEffect(codec)("skos:prefLabel");
+      expect(value1).toBe(iri);
+      const value2 = yield* S.encodeEffect(codec)(iri);
+      expect(value2).toBe("skos:prefLabel");
+      expect((yield* Effect.flip(S.decodeEffect(codec)("missing:term"))).message).toContain("Unknown CURIE");
+      expect((yield* Effect.flip(S.encodeEffect(codec)("https://unknown.example/term"))).message).toContain(
+        "Unknown IRI"
+      );
+      const helpers = makeCurieCodec(CoreVocab);
+      expect(helpers.decode("skos:prefLabel")).toBe(iri);
+      expect(helpers.encode(iri)).toBe("skos:prefLabel");
+    })
+  );
+});

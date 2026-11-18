@@ -1,0 +1,41 @@
+{
+  "name": "@beep/schema",
+  "version": "0.1.2",
+  "description": "Effect v4 schema package: the subset inventory-import uses, vendored from beep-effect (see vendor.json)",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": [],
+  "beep": {
+    "family": "foundation",
+    "kind": "modeling"
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    "./LiteralKit": "./src/LiteralKit/index.ts",
+    "./SchemaUtils": "./src/SchemaUtils/index.ts",
+    "./SchemaUtils/collectAnnotationsAt": "./src/SchemaUtils/collectAnnotationsAt.ts",
+    "./SchemaUtils/defectDiagnostics": "./src/SchemaUtils/defectDiagnostics.ts",
+    "./SchemaUtils/index": "./src/SchemaUtils/index.ts",
+    "./SchemaUtils/isCodecDataFirst": "./src/SchemaUtils/isCodecDataFirst.ts",
+    "./SchemaUtils/optionalDefect": "./src/SchemaUtils/optionalDefect.ts",
+    "./SchemaUtils/toEquivalence": "./src/SchemaUtils/toEquivalence.ts",
+    "./SchemaUtils/withKeyDefaults": "./src/SchemaUtils/withKeyDefaults.ts",
+    "./SchemaUtils/withLiteralKitStatics": "./src/SchemaUtils/withLiteralKitStatics.ts",
+    "./SchemaUtils/withStatics": "./src/SchemaUtils/withStatics.ts"
+  },
+  "scripts": {
+    "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@beep/identity": "workspace:*",
+    "@beep/utils": "workspace:*",
+    "effect": "4.1.4"
+  },
+  "devDependencies": {
+    "@effect/vitest": "4.1.4",
+    "@types/node": "^24.19.2",
+    "vitest": "^5.1.0"
+  }
+}

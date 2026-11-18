@@ -1,0 +1,67 @@
+// Vendored from beep-effect c5cebd5c9de7:packages/foundation/modeling/utils/src/Stream.ts (Apache-2.0, see LICENSE). Do not edit: scripts/vendor-check.mjs compares the rest of this file with its recorded hash.
+/**
+ * A module containing utilities for working with `effect/Stream`.
+ *
+ * @packageDocumentation
+ * @since 0.0.0
+ */
+import * as Effect from "effect/Effect";
+import { dual, flow } from "effect/Function";
+import * as S from "effect/Schema";
+import * as Stream from "effect/Stream";
+
+/**
+ * Splits a text stream into lines, decodes each line as JSON with `schema`,
+ * and emits only the successfully decoded values.
+ *
+ * **Details**
+ *
+ * Invalid JSON lines and schema decode failures are filtered out rather than
+ * failing the stream.
+ *
+ * Supports both call styles:
+ * - Data-last: `pipe(stream, streamFilterJson(schema))`
+ * - Data-first: `streamFilterJson(stream, schema)`
+ *
+ * **Example** (Filter JSON lines stream)
+ *
+ * ```ts
+ * import * as Effect from "effect/Effect";
+ * import * as Stream from "effect/Stream";
+ * import * as S from "effect/Schema"
+ * import { streamFilterJson } from "@beep/utils/Stream"
+ *
+ * const program = Stream.make("1\n", "nope\n", "2\n").pipe(
+ *   streamFilterJson(S.Finite),
+ *   Stream.runCollect
+ * )
+ *
+ * console.log(Effect.runPromise(program))
+ * ```
+ *
+ * @param self - The stream of JSON lines to decode.
+ * @param schema - The schema used to decode each JSON line.
+ * @returns A stream that emits only successfully decoded values.
+ * @category utilities
+ * @since 0.0.0
+ */
+export const streamFilterJson: {
+  <const TSchema extends S.Top>(
+    schema: TSchema
+  ): <E, R>(self: Stream.Stream<string, E, R>) => Stream.Stream<TSchema["Type"], E, R | TSchema["DecodingServices"]>;
+  <const TSchema extends S.Top, E, R>(
+    self: Stream.Stream<string, E, R>,
+    schema: TSchema
+  ): Stream.Stream<TSchema["Type"], E, R | TSchema["DecodingServices"]>;
+} = dual(
+  2,
+  <const TSchema extends S.Top, E, R>(
+    self: Stream.Stream<string, E, R>,
+    schema: TSchema
+  ): Stream.Stream<TSchema["Type"], E, R | TSchema["DecodingServices"]> => {
+    const fromString = S.fromJsonString(schema);
+    const decode = S.decodeEffect(fromString);
+
+    return flow(Stream.splitLines, Stream.filterMapEffect(flow(decode, Effect.result)))(self);
+  }
+);

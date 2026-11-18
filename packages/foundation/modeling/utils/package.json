@@ -1,0 +1,59 @@
+{
+  "name": "@beep/utils",
+  "version": "0.0.2",
+  "description": "Shared runtime utilities for beep: the subset inventory-import uses, vendored from beep-effect (see vendor.json)",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": [],
+  "beep": {
+    "family": "foundation",
+    "kind": "modeling"
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts",
+    "./Array": "./src/Array.ts",
+    "./Bool": "./src/Bool.ts",
+    "./Data": "./src/Data.ts",
+    "./DateTime": "./src/DateTime.ts",
+    "./DrainableWorker": "./src/DrainableWorker.ts",
+    "./Equal": "./src/Equal.ts",
+    "./Errors": "./src/Errors.ts",
+    "./FileSystem": "./src/FileSystem.ts",
+    "./GlobalValue": "./src/GlobalValue.ts",
+    "./HostProcess": "./src/HostProcess.ts",
+    "./Html": "./src/Html.ts",
+    "./NodeUrl": "./src/NodeUrl.ts",
+    "./Number": "./src/Number.ts",
+    "./Option": "./src/Option.ts",
+    "./Path": "./src/Path.ts",
+    "./Predicate": "./src/Predicate.ts",
+    "./Random": "./src/Random.ts",
+    "./Record": "./src/Record.ts",
+    "./Schema": "./src/Schema.ts",
+    "./Str": "./src/Str.ts",
+    "./Stream": "./src/Stream.ts",
+    "./Struct": "./src/Struct.ts",
+    "./Text": "./src/Text.ts",
+    "./Utils": "./src/Utils.ts",
+    "./index": "./src/index.ts",
+    "./thunk": "./src/thunk.ts"
+  },
+  "scripts": {
+    "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@beep/identity": "workspace:*",
+    "@beep/types": "workspace:*",
+    "effect": "4.1.4",
+    "type-fest": "^6.0.1"
+  },
+  "devDependencies": {
+    "@effect/platform-node": "4.1.4",
+    "@effect/vitest": "4.1.4",
+    "@types/node": "^24.19.2",
+    "vitest": "^5.1.0"
+  }
+}

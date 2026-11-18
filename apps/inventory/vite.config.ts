@@ -94,13 +94,14 @@ export default defineConfig({
   // origin access, and neither do the servers in front of it.
   server: { port: 5173, strictPort: false, cors: false, ...(https === undefined ? {} : { https }) },
   preview: { cors: false },
-  // The file reader loads on the first file, so Vite found its two dependencies only then, optimised them and
-  // reloaded the page: the first file on a cold dev server was lost. Listed here, they are ready at start.
-  optimizeDeps: { include: ["papaparse", "xlsx/dist/xlsx.mini.min.js"] },
+  // The file reader loads on the first file, so Vite found SheetJS only then, optimised it and reloaded the page: the
+  // first file on a cold dev server was lost. Listed here, it is ready at start. @beep/csv is workspace source, which
+  // Vite serves as it is and never optimises.
+  optimizeDeps: { include: ["xlsx/dist/xlsx.mini.min.js"] },
   // Keep every asset a file. Vite would otherwise inline small font subsets as data: URIs,
   // which the content security policy (font-src 'self') rightly blocks.
   build: { assetsInlineLimit: 0 },
-  // The file reader's worker is an ES module, so it loads papaparse or SheetJS as a chunk of its own, only the one a
+  // The file reader's worker is an ES module, so it loads the CSV reader or SheetJS as a chunk of its own, only the one a
   // file needs.
   worker: { format: "es" }
 })

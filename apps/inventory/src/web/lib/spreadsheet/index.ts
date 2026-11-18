@@ -1,4 +1,4 @@
-// The one door to the spreadsheet reader. Importing this costs the first page load nothing: the reader, papaparse
+// The one door to the spreadsheet reader. Importing this costs the first page load nothing: the reader, @beep/csv
 // and SheetJS are separate chunks fetched when a file is chosen. Import types from the domain, values from here.
 // The upload screen calls it inside a worker (src/web/lib/upload), so the read never holds up the page.
 import { Effect } from "effect"

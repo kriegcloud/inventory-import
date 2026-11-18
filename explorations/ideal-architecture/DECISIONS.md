@@ -107,3 +107,21 @@ byte-lossless document in the first version. Reverse: add the document codec.
 Question: lenient or strict reading by default? Answer: lenient, each oddity reported as a diagnostic; strict is an
 option and is tested against Effect's own `Csv`. papaparse is removed once the old and new readers agree on every
 fixture. Rejected: strict by default. Reverse: flip the default option.
+
+### 2026-11-18 — csv brief
+
+Question: does `BRIEF.md` for the goal `beep-csv` match? Answer: the brief matches, after it was rewritten to
+`docs/standards/schema-first.md`. Rejected: the first version, which used optional fields, defaults in code and flat
+literal flags. Reverse: reopen the brief before the goal's SPEC is ticked.
+
+### 2026-11-18 — schema form
+
+Question: which form does plain data take in the new packages? Answer: branded `S.Opaque` over `S.Struct`, as the
+four exemplar packages; `S.TaggedError` for errors. Rejected: `S.Class`/`S.TaggedClass` for every data type.
+Reverse: change the convention in the standard and the packages together.
+
+### 2026-11-18 — kit licence
+
+Question: which licence do the vendored kit copies carry? Answer: MIT, as each package's own LICENSE file in
+beep-effect says. Rejected: Apache-2.0 from the package.json files, and waiting for beep-effect to be corrected.
+Reverse: replace the licence files and notices in the vendored folders.

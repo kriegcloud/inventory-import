@@ -4,7 +4,7 @@
     "repository": "beep-effect",
     "commit": "c5cebd5c9de7077493cb9ccaaa18e1d4f73da0b0",
     "path": "packages/foundation/modeling/identity",
-    "license": "Apache-2.0"
+    "license": "MIT"
   },
   "exports": {
     "./package.json": "./package.json",

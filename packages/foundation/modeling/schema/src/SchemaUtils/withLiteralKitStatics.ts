@@ -1,4 +1,4 @@
-// Vendored from beep-effect c5cebd5c9de7:packages/foundation/modeling/schema/src/SchemaUtils/withLiteralKitStatics.ts (Apache-2.0, see LICENSE). Do not edit: scripts/vendor-check.mjs compares the rest of this file with its recorded hash.
+// Vendored from beep-effect c5cebd5c9de7:packages/foundation/modeling/schema/src/SchemaUtils/withLiteralKitStatics.ts (MIT, see LICENSE). Do not edit: scripts/vendor-check.mjs compares the rest of this file with its recorded hash.
 /**
  * Reattach LiteralKit keyed helpers after a schema derivation that builds a new schema.
  *

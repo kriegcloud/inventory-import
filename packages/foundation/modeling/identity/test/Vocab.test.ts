@@ -1,4 +1,4 @@
-// Vendored from beep-effect c5cebd5c9de7:packages/foundation/modeling/identity/test/Vocab.test.ts (Apache-2.0, see LICENSE). Do not edit: scripts/vendor-check.mjs compares the rest of this file with its recorded hash.
+// Vendored from beep-effect c5cebd5c9de7:packages/foundation/modeling/identity/test/Vocab.test.ts (MIT, see LICENSE). Do not edit: scripts/vendor-check.mjs compares the rest of this file with its recorded hash.
 import { fcRuns } from "./support/fcRuns.ts";
 import { CoreVocab, mergeVocab, SemanticFoundationVocab, SparVocab, VocabRegistry } from "@beep/identity";
 import { it } from "@effect/vitest";

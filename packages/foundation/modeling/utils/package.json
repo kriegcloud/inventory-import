@@ -2,7 +2,7 @@
   "name": "@beep/utils",
   "version": "0.0.2",
   "description": "Shared runtime utilities for beep: the subset inventory-import uses, vendored from beep-effect (see vendor.json)",
-  "license": "Apache-2.0",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "sideEffects": [],

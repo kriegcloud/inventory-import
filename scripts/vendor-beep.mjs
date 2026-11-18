@@ -117,7 +117,7 @@ const TEST_REWRITES = [
 
 const LICENSE_FILE = "LICENSE"
 const header = (pkgDir, file) =>
-  `// Vendored from beep-effect ${commit.slice(0, 12)}:${pkgDir}/${file} (Apache-2.0, see LICENSE). Do not edit: scripts/vendor-check.mjs compares the rest of this file with its recorded hash.\n`
+  `// Vendored from beep-effect ${commit.slice(0, 12)}:${pkgDir}/${file} (MIT, see LICENSE). Do not edit: scripts/vendor-check.mjs compares the rest of this file with its recorded hash.\n`
 
 const sha256 = (data) => createHash("sha256").update(data).digest("hex")
 
@@ -241,7 +241,7 @@ const writePackageFiles = (pkg, target, exportsMap, sources) => {
     name: pkg.name,
     version: upstream.version,
     description: `${upstream.description}: the subset inventory-import uses, vendored from beep-effect (see vendor.json)`,
-    license: "Apache-2.0",
+    license: "MIT",
     private: true,
     type: "module",
     sideEffects: [],
@@ -283,14 +283,13 @@ here under the same name and the same export subpaths, and is replaced by the pu
   copy starts with one provenance line, which the hash leaves out). \`bun run vendor:check\` fails when they differ.
 - Copied tests have their imports of beep-effect's test runner and run-count helper rewritten (each rewrite is listed
   in \`vendor.json\`); \`test/support/fcRuns.ts\`, when present, stands in for the run-count helper.
-- Licensed under Apache-2.0, as in beep-effect (\`LICENSE\`).
+- Licensed under MIT, as the package's own LICENSE file in beep-effect says (\`LICENSE\`, copied unchanged).
 `
   )
   return local
 }
 
 // ── Writing ──────────────────────────────────────────────────────────────────────────────────────────────────────────
-const upstreamLicense = show("LICENSE")
 for (const pkg of PACKAGES) {
   const target = path.join(repoRoot, pkg.dir)
   for (const sub of ["src", "test"]) fs.rmSync(path.join(target, sub), { recursive: true, force: true })
@@ -326,7 +325,7 @@ for (const pkg of PACKAGES) {
     fs.writeFileSync(path.join(target, file), header(pkg.dir, file) + body)
     entries.push({ path: file, sourceSha256: sha256(source), sha256: sha256(body), rewrites })
   }
-  fs.writeFileSync(path.join(target, LICENSE_FILE), upstreamLicense)
+  fs.writeFileSync(path.join(target, LICENSE_FILE), show(`${pkg.dir}/LICENSE`))
 
   // The upstream subpath of every vendored module that has one; a module without one is internal.
   const exportsMap = { "./package.json": "./package.json" }
@@ -345,7 +344,7 @@ for (const pkg of PACKAGES) {
   const manifest = {
     $comment:
       "Written by scripts/vendor-beep.mjs; checked by scripts/vendor-check.mjs. sha256 is of each file without its first (provenance) line; it equals sourceSha256 unless the file lists rewrites. local files are written here, not copied.",
-    source: { repository: "beep-effect", commit, path: pkg.dir, license: "Apache-2.0" },
+    source: { repository: "beep-effect", commit, path: pkg.dir, license: "MIT" },
     exports: exportsMap,
     files: entries,
     local: writePackageFiles(pkg, target, exportsMap, sources)

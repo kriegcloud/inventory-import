@@ -2,7 +2,7 @@
   "name": "@beep/types",
   "version": "0.0.1",
   "description": "Shared type utilities for beep: the subset inventory-import uses, vendored from beep-effect (see vendor.json)",
-  "license": "Apache-2.0",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "sideEffects": [],

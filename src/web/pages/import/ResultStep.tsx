@@ -97,7 +97,7 @@ function ChangedList(props: { items: ReadonlyArray<ChangedItem>; count: number }
 const eventLine = (event: ImportEvent): string =>
   event._tag === "Confirmed"
     ? `Imported ${items(event.created)}${event.updated === 0 ? "" : `, updated ${event.updated}`}, ${event.by}, ${whenShort(event.at)}`
-    : `Took back ${items(event.removed)}${event.kept === 0 ? "" : `, kept ${event.kept}`}, ${event.by}, ${whenShort(event.at)}`
+    : `Took back ${items(event.removed)}${event.restored === 0 ? "" : `, restored ${event.restored}`}${event.kept === 0 ? "" : `, kept ${event.kept}`}, ${event.by}, ${whenShort(event.at)}`
 
 /**
  * What the import did, row by row: imported, updated, already there, not imported with the reason, or taken back. The rows
@@ -132,7 +132,7 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
       toast.success(
         last?._tag === "TakenBack"
           ? // The event's numbers are the whole take-back's, over every confirm it undid.
-            `Took back ${items(last.removed)} from ${done.fileName}${last.kept === 0 ? "" : `, kept ${last.kept}`}`
+            `Took back ${items(last.removed)} from ${done.fileName}${last.restored === 0 ? "" : `, restored ${last.restored}`}${last.kept === 0 ? "" : `, kept ${last.kept}`}`
           : `${done.fileName} has nothing left to take back`
       )
       setFilter("takenBack")
@@ -160,20 +160,24 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
     ["all", importWords.all, result.rows.length]
   ]
 
-  const { removable, changed, changedCount, kept, keptCount, confirms } = view.takeBack
+  const { removable, restorable, changed, changedCount, kept, keptCount, confirms } = view.takeBack
   const takenBack = view.status === "takenBack"
   const lastTakeBack = view.history.findLast((event) => event._tag === "TakenBack")
-  // A take-back is possible while a confirm is in force and one of its items is as it created it.
-  const canTakeBack = props.canImport && !takenBack && confirms.length > 0 && removable > 0
-  const noLonger = !takenBack && confirms.length > 0 && removable === 0 && changedCount > 0
-  // A take-back removes what the import created. An item it replaced is not put back to what it was before.
+  // A take-back is possible while a confirm is in force and one of its items is as it created or replaced it.
+  const canTakeBack = props.canImport && !takenBack && confirms.length > 0 && (removable > 0 || restorable > 0)
+  const noLonger = !takenBack && confirms.length > 0 && removable === 0 && restorable === 0 && changedCount > 0
+  // What a take-back does now: removes the items the import created and puts back the ones it replaced.
+  const undoes = [
+    ...(removable === 0 ? [] : [`removes the ${items(removable)} that ${view.fileName} created`]),
+    ...(restorable === 0
+      ? []
+      : [`puts back the ${items(restorable)} it replaced as ${restorable === 1 ? "it was" : "they were"} before`])
+  ].join(" and ")
   const replaced = result.updated
-  const staysReplaced =
-    replaced === 0
+  const putsBack =
+    takenBack || replaced === 0
       ? null
-      : `The ${replaced === 1 ? "item" : `${replaced} items`} this import replaced ${replaced === 1 ? "stays" : "stay"} as replaced.`
-  // Nothing created and nothing changed since: no take-back is offered, and the screen says why.
-  const onlyReplaced = !takenBack && replaced > 0 && result.created === 0 && removable === 0 && changedCount === 0
+      : `A take-back puts back the ${items(replaced)} this import replaced as ${replaced === 1 ? "it was" : "they were"} before, unless changed since.`
 
   const downloadButton =
     result.notImported === 0 ? null : (
@@ -212,20 +216,21 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
           <AlertDialogDescription asChild>
             <div className="flex flex-col gap-2">
               <p>
-                This removes from Items the {items(removable)} that {view.fileName} created.
+                This {undoes}.
                 {changedCount === 0
                   ? null
                   : ` It keeps the ${changedCount === 1 ? "item" : `${changedCount} items`} someone changed since:`}
               </p>
               {changedCount === 0 ? null : <ChangedList items={changed} count={changedCount} />}
-              {staysReplaced === null ? null : <p>{staysReplaced}</p>}
               <p>Your decisions in the review are kept, so you can review the file again and confirm it.</p>
             </div>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Keep the items</AlertDialogCancel>
-          <AlertDialogAction onClick={() => takeBack.mutate()}>Take back {items(removable)}</AlertDialogAction>
+          <AlertDialogAction onClick={() => takeBack.mutate()}>
+            {restorable === 0 ? `Take back ${items(removable)}` : "Take back this import"}
+          </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -237,7 +242,7 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
         title={takenBack ? `Took back ${view.fileName}` : `Imported ${view.fileName}`}
         line={
           takenBack && lastTakeBack !== undefined
-            ? `${lastTakeBack.by} · ${when(lastTakeBack.at)} · removed ${items(lastTakeBack._tag === "TakenBack" ? lastTakeBack.removed : 0)}`
+            ? `${lastTakeBack.by} · ${when(lastTakeBack.at)} · removed ${items(lastTakeBack._tag === "TakenBack" ? lastTakeBack.removed : 0)}${lastTakeBack._tag === "TakenBack" && lastTakeBack.restored > 0 ? ` · restored ${lastTakeBack.restored}` : ""}`
             : // What the form-only rules changed without the person, counted from what the confirms stored.
               `${result.importedBy} · ${when(result.importedAt)}${result.fixed.cells === 0 ? "" : ` · ${result.fixed.cells} values fixed for you in ${result.fixed.rows} ${result.fixed.rows === 1 ? "row" : "rows"}`}`
         }
@@ -278,8 +283,8 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
             <AlertDescription>
               <p>
                 {noLonger
-                  ? "Every item it created has been changed since:"
-                  : `Taking it back removes the other ${items(removable)} and keeps ${changedCount === 1 ? "this one" : "these"}:`}
+                  ? "Every item it created or replaced has been changed since:"
+                  : `Taking it back ${undoes} and keeps ${changedCount === 1 ? "this one" : "these"}:`}
               </p>
               <ChangedList items={changed} count={changedCount} />
             </AlertDescription>
@@ -298,20 +303,9 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
           </Alert>
         </div>
       ) : null}
-      {staysReplaced === null && view.unusedColumns.length === 0 ? null : (
+      {putsBack === null && view.unusedColumns.length === 0 ? null : (
         <p className="px-4 pb-2 text-sm text-muted-foreground sm:px-9">
-          {[
-            ...(staysReplaced === null
-              ? []
-              : [
-                  onlyReplaced
-                    ? `This import created no items, so there is nothing to take back. ${staysReplaced}`
-                    : takenBack
-                      ? staysReplaced
-                      : `A take-back removes the items this import created. ${staysReplaced}`
-                ]),
-            ...view.unusedColumns.map(notImportedColumn)
-          ].join(" · ")}
+          {[...(putsBack === null ? [] : [putsBack]), ...view.unusedColumns.map(notImportedColumn)].join(" · ")}
         </p>
       )}
       {view.history.length > 1 ? (

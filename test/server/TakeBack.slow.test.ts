@@ -1,9 +1,11 @@
 // A take-back of an import confirmed twice (155 items, then one more after an answer): its result and its audit
 // line count every item it removed across both confirms, read from what was stored. And a row with two problems
-// names both in its reason.
+// names both in its reason. And a take-back of an import that replaced a stored item puts it back as it was, unless
+// someone changed it after the replace: then it is kept and named.
 import { expect, layer } from "@effect/vitest"
 import { Array as Arr, Effect, Option, String as Str } from "effect"
 import { HttpApiTest } from "effect/http-api"
+import clean from "../../public/samples/items_clean.csv?raw"
 import messy from "../../public/samples/items_messy.csv?raw"
 import { Api } from "../../src/api/v1/Api.ts"
 import { review } from "../../src/domain/ItemImport.ts"
@@ -63,5 +65,105 @@ layer(TypedApp)("a take-back after two confirms", (it) => {
           Str.includes("is also on row 151")(reason)
         ]).toEqual([true, true])
       })
+  )
+})
+
+// The clean sample, then a copy whose row 2 (SKU SHH-9574) has another name and cost, replaced as the person chose.
+const replaceRow2 = Effect.fn("test.replaceRow2")(function* () {
+  const client = yield* HttpApiTest.groups(Api, ["imports", "items", "activity"])
+  const marcus = as("mem_marcus")
+  const first = yield* upload({ client, table: yield* stage(new File([clean], "items_clean.csv")) }).pipe(marcus)
+  yield* client.imports.commit({ params: { id: first.id }, payload: { set: {}, clear: [] } }).pipe(marcus)
+  const copy = Str.replace(
+    "SHH-9574,Oak Foam Insert,Oak foam insert for general use.,packaging,EA,12.33,",
+    "SHH-9574,Oak Foam Insert XL,Oak foam insert for general use.,packaging,EA,14.10,"
+  )(clean)
+  expect(copy).not.toBe(clean)
+  const second = yield* upload({ client, table: yield* stage(new File([copy], "items_changed.csv")) }).pipe(marcus)
+  const replaced = yield* client.imports
+    .commit({ params: { id: second.id }, payload: { set: { "row-2": { stored: "replace" } }, clear: [] } })
+    .pipe(marcus)
+  expect([replaced.result?.updated, replaced.result?.created]).toEqual([1, 0])
+  const insert = Option.getOrThrow(
+    Arr.findFirst(yield* client.items.list().pipe(marcus), (item) => item.sku === "SHH-9574")
+  )
+  expect([insert.name, insert.unitCost, insert.revision]).toEqual(["Oak Foam Insert XL", "14.1", 2])
+  return { client, marcus, first, second, replaced, insert }
+})
+
+layer(TypedApp)("a take-back of an import that replaced a stored item", (it) => {
+  it.effect("puts the item back with its original name and cost, and says it restored 1", () =>
+    Effect.gen(function* () {
+      const { client, marcus, first, second, replaced } = yield* replaceRow2()
+      expect([replaced.takeBack.removable, replaced.takeBack.restorable, replaced.takeBack.changedCount]).toEqual([
+        0, 1, 0
+      ])
+      const back = yield* client.imports
+        .takeBack({ params: { id: second.id }, payload: { confirms: replaced.takeBack.confirms } })
+        .pipe(marcus)
+      const event = Option.getOrThrow(Arr.findFirst(back.history, (event) => event._tag === "TakenBack"))
+      expect(event._tag === "TakenBack" ? [event.removed, event.restored, event.kept] : []).toEqual([0, 1, 0])
+      expect([back.status, back.result?.updated, back.result?.takenBack]).toEqual(["takenBack", 0, 1])
+      const after = yield* client.items.list().pipe(marcus)
+      const insert = Option.getOrThrow(Arr.findFirst(after, (item) => item.sku === "SHH-9574"))
+      expect([insert.name, insert.unitCost, insert.revision, after.length]).toEqual(["Oak Foam Insert", "12.33", 1, 25])
+      const trail = yield* client.activity.recent().pipe(marcus)
+      const line = Option.getOrThrow(Arr.findFirst(trail, (entry) => entry.action === "Took back an import"))
+      expect(line.detail).toBe("items_changed.csv: removed 0 items, restored 1 item it had replaced")
+      // Back as the first import created it, so that import can take it back again with the others.
+      const original = yield* client.imports.get({ params: { id: first.id } }).pipe(marcus)
+      expect(original.takeBack.removable).toBe(25)
+      // A second press finds nothing in force and writes nothing.
+      yield* client.imports
+        .takeBack({ params: { id: second.id }, payload: { confirms: replaced.takeBack.confirms } })
+        .pipe(marcus)
+      expect(
+        Arr.filter(yield* client.activity.recent().pipe(marcus), (e) => e.action === "Took back an import")
+      ).toHaveLength(1)
+    })
+  )
+})
+
+layer(TypedApp)("a take-back of an import whose replaced item was edited since", (it) => {
+  it.effect("keeps the edited item as it is and names it, and restores nothing", () =>
+    Effect.gen(function* () {
+      const { client, marcus, second, insert } = yield* replaceRow2()
+      yield* client.items
+        .edit({
+          params: { id: insert.id },
+          payload: {
+            revision: insert.revision,
+            name: "Oak Foam Insert, edited",
+            description: insert.description,
+            category: insert.category,
+            uom: insert.uom,
+            unitCost: insert.unitCost,
+            quantityOnHand: insert.quantityOnHand,
+            reorderPoint: insert.reorderPoint,
+            isActive: insert.isActive,
+            lotTracked: insert.lotTracked,
+            firstReceivedOn: insert.firstReceivedOn,
+            discontinuedOn: insert.discontinuedOn
+          }
+        })
+        .pipe(marcus)
+      const before = yield* client.imports.get({ params: { id: second.id } }).pipe(marcus)
+      expect([before.takeBack.restorable, before.takeBack.changedCount]).toEqual([0, 1])
+      expect(Arr.map(before.takeBack.changed, (item) => item.sku)).toEqual(["SHH-9574"])
+      const back = yield* client.imports
+        .takeBack({ params: { id: second.id }, payload: { confirms: before.takeBack.confirms } })
+        .pipe(marcus)
+      const event = Option.getOrThrow(Arr.findFirst(back.history, (event) => event._tag === "TakenBack"))
+      expect(event._tag === "TakenBack" ? [event.removed, event.restored, event.kept] : []).toEqual([0, 0, 1])
+      expect([back.result?.updated, back.result?.takenBack]).toEqual([1, 0])
+      expect([back.takeBack.keptCount, Arr.map(back.takeBack.kept, (item) => item.sku)]).toEqual([1, ["SHH-9574"]])
+      const after = Option.getOrThrow(
+        Arr.findFirst(yield* client.items.list().pipe(marcus), (item) => item.sku === "SHH-9574")
+      )
+      expect([after.name, after.unitCost, after.revision]).toEqual(["Oak Foam Insert, edited", "14.1", 3])
+      const trail = yield* client.activity.recent().pipe(marcus)
+      const line = Option.getOrThrow(Arr.findFirst(trail, (entry) => entry.action === "Took back an import"))
+      expect(line.detail).toBe("items_changed.csv: removed 0 items, kept 1 that had changed since")
+    })
   )
 })

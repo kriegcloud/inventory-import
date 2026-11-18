@@ -13,15 +13,14 @@ const promptDescription = `What the person wants to see, in their words. Spaces 
 /** What the screen sends: the person's request and the table's columns, which every answer is checked against. */
 export const ViewRequest = S.Struct({
   prompt: S.Trim.check(S.isNonEmpty(), S.isMaxLength(maxPrompt))
-    .annotate({ description: promptDescription })
     .pipe(S.annotateEncoded({ description: promptDescription, examples: ["only kilograms, cheapest first"] }))
-    .annotateKey({ messageMissingKey: "Type what you want to see in the table." }),
-  table: S.String.check(S.isMinLength(1), S.isMaxLength(40)).annotate({
+    .annotateKey({ description: promptDescription, messageMissingKey: "Type what you want to see in the table." }),
+  table: S.String.check(S.isMinLength(1), S.isMaxLength(40)).annotateKey({
     description: 'Which table the request is about, as the person reads its name ("Items")',
     examples: ["Items"]
   }),
   columns: ColumnCatalog,
-  searchable: S.Boolean.annotate({ description: "The table has a search box over every column" })
+  searchable: S.Boolean.annotateKey({ description: "The table has a search box over every column" })
 }).annotate({ identifier: "ViewRequest", description: "A request for a view of a table, with the table's columns" })
 /** The decoded value of `ViewRequest`. */
 export type ViewRequest = typeof ViewRequest.Type

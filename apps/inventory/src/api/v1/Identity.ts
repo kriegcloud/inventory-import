@@ -11,7 +11,7 @@ export class CurrentActor extends Context.Service<CurrentActor, Member>()(
 /** No member could be resolved for this request. The reason says what to do, without echoing what was sent. */
 export class NotSignedIn extends S.TaggedError<NotSignedIn, { readonly brand: unique symbol }>()(
   "NotSignedIn",
-  { reason: S.String.annotate({ description: "What to do next, in words for the person." }) },
+  { reason: S.String.annotateKey({ description: "What to do next, in words for the person." }) },
   { httpApiStatus: 401, description: "The request has no session, or its person is in no organization yet." }
 ) {}
 
@@ -19,10 +19,10 @@ export class NotSignedIn extends S.TaggedError<NotSignedIn, { readonly brand: un
 export class Forbidden extends S.TaggedError<Forbidden, { readonly brand: unique symbol }>()(
   "Forbidden",
   {
-    reason: S.String.annotate({
+    reason: S.String.annotateKey({
       description: "Which role the person has and which one this needs. It never names the person."
     }),
-    required: Role.annotate({ description: "The lowest role that may do this." })
+    required: Role.annotateKey({ description: "The lowest role that may do this." })
   },
   { httpApiStatus: 403, description: "The member's role is too low for this action." }
 ) {}
@@ -48,22 +48,22 @@ export class Identity extends HttpApiMiddleware.Service<
 /** A seeded test account the sign-in page offers in one click: who it is, and where it belongs as what. */
 export class TestAccount extends S.Class<TestAccount, { readonly brand: unique symbol }>("TestAccount")(
   {
-    email: S.String.annotate({
+    email: S.String.annotateKey({
       description: "The email the account signs in with",
       examples: ["marcus@example-works.test"]
     }),
-    name: S.String.annotate({
+    name: S.String.annotateKey({
       description: "The account's name, as the sign-in page shows it",
       examples: ["Marcus Oyelaran"]
     }),
     memberships: S.Array(
       S.Struct({
-        organizationName: S.String.annotate({ description: "The organization's name" }),
+        organizationName: S.String.annotateKey({ description: "The organization's name" }),
         role: Role
       }).annotate({
         description: "An organization the account belongs to, earliest first, and its role there."
       })
-    ).annotate({ description: "Where the account belongs, earliest first" })
+    ).annotateKey({ description: "Where the account belongs, earliest first" })
   },
   { description: "A local test account: written by `bun run dev`, never in a deployed database." }
 ) {}
@@ -76,13 +76,13 @@ export class SignInFeatures extends S.Class<SignInFeatures, { readonly brand: un
   {
     testAccounts: S.NullOr(
       S.Struct({
-        password: S.String.annotate({
+        password: S.String.annotateKey({
           description: "The one password every test account shares; it is in the README"
         }),
-        accounts: S.Array(TestAccount).annotate({ description: "The test accounts this copy's database holds" })
+        accounts: S.Array(TestAccount).annotateKey({ description: "The test accounts this copy's database holds" })
       })
-    ).annotate({ description: "TEST_ACCOUNTS: the accounts to offer and their password, or null when it is off." }),
-    pwnedPasswordCheck: S.Boolean.annotate({
+    ).annotateKey({ description: "TEST_ACCOUNTS: the accounts to offer and their password, or null when it is off." }),
+    pwnedPasswordCheck: S.Boolean.annotateKey({
       description: "PWNED_PASSWORD_CHECK: a new password is checked against known data breaches."
     })
   },
@@ -95,7 +95,7 @@ export class OrganizationChoice extends S.Class<OrganizationChoice, { readonly b
 )(
   {
     id: OrganizationId,
-    name: S.String.annotate({
+    name: S.String.annotateKey({
       description: "The organization's name, for the switch",
       examples: ["Example Works (test)"]
     })
@@ -110,14 +110,14 @@ export class OrganizationChoice extends S.Class<OrganizationChoice, { readonly b
  */
 export class SessionState extends S.Class<SessionState, { readonly brand: unique symbol }>("SessionState")(
   {
-    status: S.Literals(["signed-out", "no-organization", "ready"]).annotate({
+    status: S.Literals(["signed-out", "no-organization", "ready"]).annotateKey({
       description: "ready: `actor` is set. no-organization: signed in, in no organization yet (or not the chosen one)."
     }),
-    email: S.NullOr(S.String).annotate({
+    email: S.NullOr(S.String).annotateKey({
       description: "The email of the signed-in account; null when nobody is signed in"
     }),
-    actor: S.NullOr(Member).annotate({ description: "Who this session acts as: the same member `me` answers." }),
-    organizations: S.Array(OrganizationChoice).annotate({
+    actor: S.NullOr(Member).annotateKey({ description: "Who this session acts as: the same member `me` answers." }),
+    organizations: S.Array(OrganizationChoice).annotateKey({
       description: "The organizations the person can switch between; empty when nobody is signed in"
     }),
     features: SignInFeatures

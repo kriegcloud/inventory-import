@@ -50,8 +50,8 @@ export type AiProvider = typeof AiProvider.Type
 export class AiRoute extends S.Class<AiRoute, { readonly brand: unique symbol }>("AiRoute")(
   {
     provider: AiProvider,
-    model: S.String.annotate({ description: "The model asked first on this provider (a vendor/model id)." }),
-    fallbackModels: S.Array(S.String).annotate({
+    model: S.String.annotateKey({ description: "The model asked first on this provider (a vendor/model id)." }),
+    fallbackModels: S.Array(S.String).annotateKey({
       description: "Models this provider tries, in order, when the first one fails (OpenRouter's models list)."
     })
   },
@@ -61,15 +61,15 @@ export class AiRoute extends S.Class<AiRoute, { readonly brand: unique symbol }>
 /** Whether a language model can be used right now, and in which order the server will try them. */
 export class AiStatus extends S.Class<AiStatus, { readonly brand: unique symbol }>("AiStatus")(
   {
-    available: S.Boolean.annotate({ description: "False with no key, or with AI_ENABLED=false." }),
-    provider: S.Literals(["openrouter", "gateway", "none"]).annotate({
+    available: S.Boolean.annotateKey({ description: "False with no key, or with AI_ENABLED=false." }),
+    provider: S.Literals(["openrouter", "gateway", "none"]).annotateKey({
       description: "The provider asked first, or none when AI is off."
     }),
-    model: S.String.annotate({ description: "The model asked first (AI_MODEL), even when AI is off." }),
-    routes: S.Array(AiRoute).annotate({
+    model: S.String.annotateKey({ description: "The model asked first (AI_MODEL), even when AI is off." }),
+    routes: S.Array(AiRoute).annotateKey({
       description: "Every provider the server will try, in order. After the last, features use their non-AI path."
     }),
-    reason: S.String.annotate({
+    reason: S.String.annotateKey({
       description: "One sentence for the screen: why AI is off, or what will answer when it is on."
     })
   },
@@ -83,13 +83,13 @@ export class AiStatus extends S.Class<AiStatus, { readonly brand: unique symbol 
 export const AnsweredBy = S.Union([
   S.TaggedStruct("Model", {
     provider: AiProvider,
-    model: S.String.annotate({ description: "The model that answered, as the provider reported it." }),
-    fallback: S.Boolean.annotate({
+    model: S.String.annotateKey({ description: "The model that answered, as the provider reported it." }),
+    fallback: S.Boolean.annotateKey({
       description: "True when it was not the first model of the first provider: a fallback answered."
     })
   }),
   S.TaggedStruct("Rules", {
-    reason: S.String.annotate({ description: "Why no model answered, in words for the person." })
+    reason: S.String.annotateKey({ description: "Why no model answered, in words for the person." })
   })
 ]).annotate({ identifier: "AnsweredBy", description: "Which one answered: a model, or the rules when no model could." })
 /** An `AnsweredBy` value. */
@@ -99,12 +99,12 @@ export type AnsweredBy = typeof AnsweredBy.Type
 export class SystemStatus extends S.Class<SystemStatus, { readonly brand: unique symbol }>("SystemStatus")(
   {
     database: S.Struct({
-      ok: S.Boolean.annotate({ description: "True when the database answered this request" }),
-      activityCount: S.Int.annotate({
+      ok: S.Boolean.annotateKey({ description: "True when the database answered this request" }),
+      activityCount: S.Int.annotateKey({
         description: "Audit-trail rows in the actor's organization.",
         examples: [12]
       })
-    }).annotate({ description: "Whether the database answers, and one count read from it" }),
+    }).annotateKey({ description: "Whether the database answers, and one count read from it" }),
     ai: AiStatus
   },
   { description: "Whether the database answers and what will answer a model call." }
@@ -113,9 +113,9 @@ export class SystemStatus extends S.Class<SystemStatus, { readonly brand: unique
 /** One round trip to the model, timed, so a person can see the key works before relying on it. */
 export class AiCheck extends S.Class<AiCheck, { readonly brand: unique symbol }>("AiCheck")(
   {
-    model: S.String.annotate({ description: "The model that answered." }),
-    reply: S.String.annotate({ description: "What the model said back to the test prompt" }),
-    millis: S.Int.annotate({
+    model: S.String.annotateKey({ description: "The model that answered." }),
+    reply: S.String.annotateKey({ description: "What the model said back to the test prompt" }),
+    millis: S.Int.annotateKey({
       description: "How long the whole call took, retries and fallbacks included.",
       examples: [840]
     }),
@@ -144,9 +144,9 @@ export type AiTrouble = typeof AiTrouble.Type
 export class AiUnavailable extends S.TaggedError<AiUnavailable, { readonly brand: unique symbol }>()(
   "AiUnavailable",
   {
-    reason: S.String.annotate({ description: "What happened, in words for the person. No provider text." }),
+    reason: S.String.annotateKey({ description: "What happened, in words for the person. No provider text." }),
     kind: AiTrouble,
-    retryable: S.Boolean.annotate({
+    retryable: S.Boolean.annotateKey({
       description: "True when trying again later may work (busy, down). False for no key, a refused key, a bad answer."
     })
   },
@@ -168,7 +168,7 @@ export const aiUnavailable = (input: { readonly kind: AiTrouble; readonly retrya
  */
 export class ModelCallsUsedUp extends S.TaggedError<ModelCallsUsedUp, { readonly brand: unique symbol }>()(
   "ModelCallsUsedUp",
-  { reason: S.String.annotate({ description: "What happened, in words for the person." }) },
+  { reason: S.String.annotateKey({ description: "What happened, in words for the person." }) },
   { httpApiStatus: 429, description: "The day's model calls are used: the model was not asked." }
 ) {}
 
@@ -225,27 +225,27 @@ export class ActivityApi extends HttpApiGroup.make("activity")
  * take-back removed (`takenBack`).
  */
 export const RowOutcome = S.Struct({
-  rowNumber: S.Int.annotate({ description: "The row as Excel numbers it", examples: [7] }),
-  part: S.optionalKey(S.Int).annotate({
+  rowNumber: S.Int.annotateKey({ description: "The row as Excel numbers it", examples: [7] }),
+  part: S.optionalKey(S.Int).annotateKey({
     description:
       "Which of its row's items this is (1, 2, ...), when the row holds several; left out for a row that is one item",
     examples: [2]
   }),
-  sku: S.String.annotate({ description: "The item's SKU as the row gives it", examples: ["RJS-3545"] }),
-  name: S.String.annotate({ description: "The row's name, as the result lists it", examples: ["Nylon Coil"] }),
-  outcome: S.Literals(["created", "updated", "already", "notImported", "takenBack"]).annotate({
+  sku: S.String.annotateKey({ description: "The item's SKU as the row gives it", examples: ["RJS-3545"] }),
+  name: S.String.annotateKey({ description: "The row's name, as the result lists it", examples: ["Nylon Coil"] }),
+  outcome: S.Literals(["created", "updated", "already", "notImported", "takenBack"]).annotateKey({
     description:
       "Created an item, replaced a stored item as the person chose, found the SKU already there, not imported, or taken back: the item it created was removed, or the stored item it replaced was put back as it was"
   }),
-  reason: S.String.annotate({
+  reason: S.String.annotateKey({
     description:
       "Why the row was not imported or was already there, one sentence per problem; empty for a created row and for one a take-back removed",
     examples: ["Name is empty."]
   }),
-  decidedBy: S.NullOr(S.Literals(["person", "nobody"])).annotate({
+  decidedBy: S.NullOr(S.Literals(["person", "nobody"])).annotateKey({
     description: "For a row that was not imported: the person left it out, or nobody had settled it yet"
   }),
-  decidedByName: S.NullOr(S.String).annotate({ description: "Who left the row out, when someone did" })
+  decidedByName: S.NullOr(S.String).annotateKey({ description: "Who left the row out, when someone did" })
 }).annotate({ identifier: "RowOutcome", description: "What the confirms did with one row of the file" })
 /** The decoded value of `RowOutcome`: what the confirms did with one row of the file. */
 export type RowOutcome = typeof RowOutcome.Type
@@ -254,32 +254,32 @@ export type RowOutcome = typeof RowOutcome.Type
 export const ImportResult = S.Struct({
   importedBy: personName("Who confirmed the import"),
   importedAt: instant("When it was confirmed"),
-  created: S.Int.annotate({ description: "Rows whose item this import created and still has", examples: [11] }),
-  updated: S.Int.annotate({
+  created: S.Int.annotateKey({ description: "Rows whose item this import created and still has", examples: [11] }),
+  updated: S.Int.annotateKey({
     description: "Rows that replaced a stored item with the same SKU, because the person chose to",
     examples: [1]
   }),
-  already: S.Int.annotate({
+  already: S.Int.annotateKey({
     description: "Rows whose SKU the organization already had: nothing was written for them",
     examples: [154]
   }),
-  notImported: S.Int.annotate({
+  notImported: S.Int.annotateKey({
     description: "Rows left out, by a person or because nobody had settled them",
     examples: [45]
   }),
-  takenBack: S.Int.annotate({
+  takenBack: S.Int.annotateKey({
     description:
       "Rows whose item this import created and a take-back removed, or whose replace of a stored item a take-back undid",
     examples: [0]
   }),
   fixed: S.Struct({
-    rows: S.Int.annotate({ description: "Rows written with at least one value a form-only rule changed" }),
-    cells: S.Int.annotate({ description: "Values a form-only rule changed, in all" })
-  }).annotate({
+    rows: S.Int.annotateKey({ description: "Rows written with at least one value a form-only rule changed" }),
+    cells: S.Int.annotateKey({ description: "Values a form-only rule changed, in all" })
+  }).annotateKey({
     description:
       'What the form-only rules changed without the person, counted from the changed values the confirms stored (`how` "applied by a rule")'
   }),
-  rows: S.Array(RowOutcome).annotate({
+  rows: S.Array(RowOutcome).annotateKey({
     description: "Every row of the file with what happened to it; the five counts add up to these"
   })
 }).annotate({ identifier: "ImportResult", description: "What the confirms of an import did with each row of its file" })
@@ -294,28 +294,28 @@ export type ImportResult = typeof ImportResult.Type
  */
 export const ImportEvent = S.TaggedUnion({
   Confirmed: {
-    batchId: S.String.annotate({ description: "The confirm's id: what a take-back names in `confirms`" }),
+    batchId: S.String.annotateKey({ description: "The confirm's id: what a take-back names in `confirms`" }),
     by: personName("Who confirmed"),
     at: instant("When"),
-    created: S.Int.annotate({ description: "Items this confirm created" }),
-    updated: S.Int.annotate({ description: "Stored items this confirm replaced, as the person chose" }),
-    already: S.Int.annotate({ description: "Rows it found already there" }),
-    notImported: S.Int.annotate({ description: "Rows it left out" })
+    created: S.Int.annotateKey({ description: "Items this confirm created" }),
+    updated: S.Int.annotateKey({ description: "Stored items this confirm replaced, as the person chose" }),
+    already: S.Int.annotateKey({ description: "Rows it found already there" }),
+    notImported: S.Int.annotateKey({ description: "Rows it left out" })
   },
   TakenBack: {
-    batchId: S.String.annotate({
+    batchId: S.String.annotateKey({
       description: "The first confirm the take-back reversed; one take-back of several confirms is one event"
     }),
     by: personName("Who took it back"),
     at: instant("When"),
-    removed: S.Int.annotate({
+    removed: S.Int.annotateKey({
       description: "Every item the take-back removed, across all the confirms it reversed"
     }),
-    restored: S.Int.annotate({
+    restored: S.Int.annotateKey({
       description:
         "Every stored item those confirms had replaced that the take-back put back to its values from before the replace"
     }),
-    kept: S.Int.annotate({
+    kept: S.Int.annotateKey({
       description:
         "Every item it kept because someone had changed it since (one it created, or one it replaced), across all the confirms it reversed"
     })
@@ -326,8 +326,8 @@ export type ImportEvent = typeof ImportEvent.Type
 
 /** An item an import created that someone changed afterwards: what it is, who changed it last and when. */
 export const ChangedItem = S.Struct({
-  sku: S.String.annotate({ description: "The item's SKU" }),
-  name: S.String.annotate({ description: "The item's name, for the list" }),
+  sku: S.String.annotateKey({ description: "The item's SKU" }),
+  name: S.String.annotateKey({ description: "The item's name, for the list" }),
   changedBy: personName("Who changed it last"),
   changedAt: instant("When it was last changed")
 }).annotate({ identifier: "ChangedItem", description: "An item changed after the import that created it" })
@@ -344,22 +344,22 @@ export const changedItemsShown = 20
  * such item has changed, nothing can be taken back, and the screen says so.
  */
 export const TakeBackState = S.Struct({
-  confirms: S.Array(S.String).annotate({
+  confirms: S.Array(S.String).annotateKey({
     description: "The confirms still in force: what a take-back of the import would reverse"
   }),
-  removable: S.Int.annotate({ description: "Items of those confirms still as the import created them" }),
-  restorable: S.Int.annotate({
+  removable: S.Int.annotateKey({ description: "Items of those confirms still as the import created them" }),
+  restorable: S.Int.annotateKey({
     description:
       "Stored items those confirms replaced that are still as the replace left them: a take-back puts back their values from before"
   }),
-  changed: S.Array(ChangedItem).annotate({
+  changed: S.Array(ChangedItem).annotateKey({
     description: `Items those confirms created or replaced that someone changed since, at most ${changedItemsShown}: a take-back keeps them`
   }),
-  changedCount: S.Int.annotate({ description: "How many items of those confirms changed since, in all" }),
-  kept: S.Array(ChangedItem).annotate({
+  changedCount: S.Int.annotateKey({ description: "How many items of those confirms changed since, in all" }),
+  kept: S.Array(ChangedItem).annotateKey({
     description: `Items an earlier take-back of this import kept because they had changed, at most ${changedItemsShown}`
   }),
-  keptCount: S.Int.annotate({ description: "How many items earlier take-backs kept, in all" })
+  keptCount: S.Int.annotateKey({ description: "How many items earlier take-backs kept, in all" })
 }).annotate({ identifier: "TakeBackState", description: "What taking the import back would do now" })
 /** The decoded value of `TakeBackState`: whether the import can be taken back, and what that would do. */
 export type TakeBackState = typeof TakeBackState.Type
@@ -370,53 +370,53 @@ export type TakeBackState = typeof TakeBackState.Type
  */
 export class ImportView extends S.Class<ImportView, { readonly brand: unique symbol }>("ImportView")(
   {
-    id: S.String.annotate({ description: "The import's id: the id its upload was given" }),
-    fileName: S.String.annotate({
+    id: S.String.annotateKey({ description: "The import's id: the id its upload was given" }),
+    fileName: S.String.annotateKey({
       description: "The file's name as it was chosen",
       examples: ["items_messy.csv"]
     }),
-    status: S.Literals(["open", "imported", "takenBack"]).annotate({
+    status: S.Literals(["open", "imported", "takenBack"]).annotateKey({
       description: "Under review, confirmed, or confirmed and then taken back"
     }),
     startedBy: personName("Who uploaded the file"),
     createdAt: instant("When the upload finished and the import began"),
-    rowCount: S.Int.annotate({ description: "Data rows the file was uploaded with", examples: [200] }),
-    storedItems: S.Array(ItemFields).annotate({
+    rowCount: S.Int.annotateKey({ description: "Data rows the file was uploaded with", examples: [200] }),
+    storedItems: S.Array(ItemFields).annotateKey({
       description:
         "The organization's items that share a SKU with a row of this file: the review skips a row that says the same, and asks about one that says something else"
     }),
-    mapping: S.Array(ColumnMatch).annotate({ description: "Which file column fills each field, and how" }),
-    choices: S.Array(MappingChoice).annotate({ description: "The matches people made, as the review takes them" }),
-    unusedColumns: S.Array(UnusedColumn).annotate({
+    mapping: S.Array(ColumnMatch).annotateKey({ description: "Which file column fills each field, and how" }),
+    choices: S.Array(MappingChoice).annotateKey({ description: "The matches people made, as the review takes them" }),
+    unusedColumns: S.Array(UnusedColumn).annotateKey({
       description: "File columns no field reads, each with how many rows hold a value in it. They are never stored"
     }),
-    createdRows: S.Array(S.Int).annotate({
+    createdRows: S.Array(S.Int).annotateKey({
       description: "Rows an earlier confirm of this import turned into items: already there when it is opened again"
     }),
-    createdIds: S.String.pipe(S.Array, S.optionalKey).annotate({
+    createdIds: S.String.pipe(S.Array, S.optionalKey).annotateKey({
       description:
         "The items an earlier confirm of this import created, by row id (`row-7`, or `row-8.2` for the second item of row 8): what the review counts as already there",
       examples: [["row-7", "row-8.2"]]
     }),
-    decisions: SavedDecisions.annotate({ description: "The saved draft: what has been decided about each row" }),
-    suggestions: S.Array(Suggestion).annotate({
+    decisions: SavedDecisions.annotateKey({ description: "The saved draft: what has been decided about each row" }),
+    suggestions: S.Array(Suggestion).annotateKey({
       description:
         "The stored suggestions for this import (`suggest` makes them): pass them to the review as `suggestions`, as the server does at the confirm, so each shows as a proposal on its row. A column suggestion is offered for the person to match",
       default: []
     }),
-    revision: S.Int.annotate({ description: "Goes up with every saved decision, from any screen", examples: [3] }),
+    revision: S.Int.annotateKey({ description: "Goes up with every saved decision, from any screen", examples: [3] }),
     progress: S.Struct({
-      needsAtStart: S.Int.annotate({ description: "Rows that needed the person when the file was staged" }),
-      needs: S.Int.annotate({ description: "Rows that still need the person: decision and cannot together" }),
-      decision: S.Int.annotate({ description: "Rows that wait for a proposal or a choice: Needs a decision" }),
-      cannot: S.Int.annotate({ description: "Rows that wait for a typed value: Cannot import" }),
-      ready: S.Int.annotate({ description: "Rows a confirm would write now" }),
-      fixedRows: S.Int.annotate({ description: "Rows with a value a form-only rule changed, still in force" }),
-      fixedCells: S.Int.annotate({ description: "Values a form-only rule changed, still in force" }),
-      rows: S.Int.annotate({ description: "Record rows in the file: every row but blank and total rows" })
-    }).annotate({ description: "How far the review is: rows that needed the person at first, and now" }),
-    result: S.NullOr(ImportResult).annotate({ description: "What the confirms did, once there has been one" }),
-    history: S.Array(ImportEvent).annotate({
+      needsAtStart: S.Int.annotateKey({ description: "Rows that needed the person when the file was staged" }),
+      needs: S.Int.annotateKey({ description: "Rows that still need the person: decision and cannot together" }),
+      decision: S.Int.annotateKey({ description: "Rows that wait for a proposal or a choice: Needs a decision" }),
+      cannot: S.Int.annotateKey({ description: "Rows that wait for a typed value: Cannot import" }),
+      ready: S.Int.annotateKey({ description: "Rows a confirm would write now" }),
+      fixedRows: S.Int.annotateKey({ description: "Rows with a value a form-only rule changed, still in force" }),
+      fixedCells: S.Int.annotateKey({ description: "Values a form-only rule changed, still in force" }),
+      rows: S.Int.annotateKey({ description: "Record rows in the file: every row but blank and total rows" })
+    }).annotateKey({ description: "How far the review is: rows that needed the person at first, and now" }),
+    result: S.NullOr(ImportResult).annotateKey({ description: "What the confirms did, once there has been one" }),
+    history: S.Array(ImportEvent).annotateKey({
       description: "Every confirm and take-back of this import, oldest first"
     }),
     takeBack: TakeBackState
@@ -433,14 +433,14 @@ export class ImportView extends S.Class<ImportView, { readonly brand: unique sym
  * changed a row: each suggestion waits in the review for the person.
  */
 export const SuggestOutcome = S.Struct({
-  made: S.Array(Suggestion).annotate({
+  made: S.Array(Suggestion).annotateKey({
     description: "The suggestions this request stored; empty when it added none"
   }),
-  suggestions: S.Array(Suggestion).annotate({
+  suggestions: S.Array(Suggestion).annotateKey({
     description: "Every suggestion now stored for the import: what `ImportView.suggestions` holds from now on"
   }),
   answeredBy: AnsweredBy,
-  lines: S.Array(S.String).annotate({
+  lines: S.Array(S.String).annotateKey({
     description: "What happened, in the past tense with real counts, for the person",
     examples: [["Suggested 2 names", "Suggested 2 categories"]]
   })
@@ -498,10 +498,10 @@ export const openImportsShown = 5
 
 /** The organization's imports nobody has confirmed yet, so the first screen can offer to continue or remove each. */
 export const OpenImports = S.Struct({
-  views: S.Array(ImportView).annotate({
+  views: S.Array(ImportView).annotateKey({
     description: `The open imports, newest first, at most ${openImportsShown}`
   }),
-  older: S.Int.annotate({
+  older: S.Int.annotateKey({
     description: "How many more open imports there are, older than those in views. Zero when every one is shown"
   })
 }).annotate({
@@ -513,7 +513,7 @@ export const OpenImports = S.Struct({
 export type OpenImports = typeof OpenImports.Type
 
 const importId = {
-  id: S.String.check(S.isMaxLength(64)).annotate({
+  id: S.String.check(S.isMaxLength(64)).annotateKey({
     description: "The id `beginUpload` answered: the upload's, and the import's once the upload has finished"
   })
 }
@@ -534,14 +534,14 @@ export class UploadNotFound extends S.TaggedError<UploadNotFound, { readonly bra
 
 /** The start of an upload: the file without its rows, and how many rows will follow in how many pieces. */
 export const UploadStart = S.Struct({
-  key: S.String.check(S.isMinLength(1), S.isMaxLength(64)).annotate({
+  key: S.String.check(S.isMinLength(1), S.isMaxLength(64)).annotateKey({
     description:
       "Chosen by the browser for this one file: a begin sent again with the same key (a retry after a lost answer) " +
       "is the same upload, not a second one"
   }),
   head: StagedHead,
-  rowCount: S.Int.annotate({ description: "Data rows the pieces will carry in all", examples: [13] }),
-  chunkCount: S.Int.annotate({ description: "Pieces that will follow, numbered from 0", examples: [1] })
+  rowCount: S.Int.annotateKey({ description: "Data rows the pieces will carry in all", examples: [13] }),
+  chunkCount: S.Int.annotateKey({ description: "Pieces that will follow, numbered from 0", examples: [1] })
 }).annotate({
   identifier: "UploadStart",
   description: "The start of an upload: the file without its rows, and how many rows will follow in how many pieces"
@@ -554,13 +554,13 @@ export type UploadStart = typeof UploadStart.Type
  * so a piece whose answer was lost on the network can simply be sent again.
  */
 export const UploadChunk = S.Struct({
-  seq: S.Int.check(S.isGreaterThanOrEqualTo(0)).annotate({
+  seq: S.Int.check(S.isGreaterThanOrEqualTo(0)).annotateKey({
     description: "The piece's place in the file, from 0: sending a piece again with the same number stores it once",
     examples: [0]
   }),
   rows: S.Array(StagedRow)
     .check(S.isMinLength(1), S.isMaxLength(chunkRows))
-    .annotate({ description: `The piece's rows, in file order: 1 to ${chunkRows}` })
+    .annotateKey({ description: `The piece's rows, in file order: 1 to ${chunkRows}` })
 }).annotate({ identifier: "UploadChunk", description: "One piece of an upload's rows, in file order" })
 /** The decoded value of `UploadChunk`: one piece of an upload's rows, in file order. */
 export type UploadChunk = typeof UploadChunk.Type
@@ -603,20 +603,20 @@ export const pastImportsShown = 50
  * who confirmed it last and when, and how many of its items are stored now, counted from the items themselves.
  */
 export const PastImport = S.Struct({
-  id: S.String.annotate({ description: "The import's id: its result is at `/?import=<id>&step=result`" }),
-  fileName: S.String.annotate({ description: "The file it came from", examples: ["items_messy.csv"] }),
-  rowCount: S.Int.annotate({ description: "The rows of the file", examples: [200] }),
-  status: S.Literals(["open", "imported", "takenBack"]).annotate({
+  id: S.String.annotateKey({ description: "The import's id: its result is at `/?import=<id>&step=result`" }),
+  fileName: S.String.annotateKey({ description: "The file it came from", examples: ["items_messy.csv"] }),
+  rowCount: S.Int.annotateKey({ description: "The rows of the file", examples: [200] }),
+  status: S.Literals(["open", "imported", "takenBack"]).annotateKey({
     description:
       "imported: confirmed and in force; takenBack: its last confirm was taken back; open: confirmed once, then opened again to finish the rows it left out"
   }),
   confirmedByName: personName("Who confirmed it last"),
   confirmedAt: instant("When it was confirmed last"),
-  items: S.Int.annotate({
+  items: S.Int.annotateKey({
     description: "How many items in the system came from this import now, counted from the stored items",
     examples: [155]
   }),
-  notImported: S.Int.annotate({ description: "Rows its last confirm did not import", examples: [45] })
+  notImported: S.Int.annotateKey({ description: "Rows its last confirm did not import", examples: [45] })
 }).annotate({
   identifier: "PastImport",
   description: "One import that was confirmed at least once, so its result can be opened again"
@@ -626,28 +626,28 @@ export type PastImport = typeof PastImport.Type
 
 /** The organization's confirmed imports, newest first, and how many older ones were left out. */
 export const PastImports = S.Struct({
-  imports: S.Array(PastImport).annotate({
+  imports: S.Array(PastImport).annotateKey({
     description: `The confirmed imports, last confirmed first, at most ${pastImportsShown}`
   }),
-  older: S.Int.annotate({ description: "How many more there are, older than those listed. Zero when all are" })
+  older: S.Int.annotateKey({ description: "How many more there are, older than those listed. Zero when all are" })
 }).annotate({ identifier: "PastImports", description: "The organization's confirmed imports, newest first" })
 /** The decoded value of `PastImports`. */
 export type PastImports = typeof PastImports.Type
 
 /** One changed value of an imported row as the activity view shows it: the file it came from, when, and who. */
 export const ChangeRecord = S.Struct({
-  importId: S.String.annotate({ description: "The import that wrote the value" }),
-  fileName: S.String.annotate({ description: "That import's file" }),
-  rowNumber: S.Int.annotate({ description: "The row of the file, as Excel numbers it" }),
-  part: S.optionalKey(S.Int).annotate({
+  importId: S.String.annotateKey({ description: "The import that wrote the value" }),
+  fileName: S.String.annotateKey({ description: "That import's file" }),
+  rowNumber: S.Int.annotateKey({ description: "The row of the file, as Excel numbers it" }),
+  part: S.optionalKey(S.Int).annotateKey({
     description:
       "Which of its row's items the value went into (1, 2, ...), when the row holds several; left out for a row that is one item"
   }),
-  sku: S.String.annotate({ description: "The SKU of the item the value went into" }),
+  sku: S.String.annotateKey({ description: "The SKU of the item the value went into" }),
   ...Change.fields,
-  decidedByName: S.NullOr(S.String).annotate({ description: "The member who accepted or typed it" }),
+  decidedByName: S.NullOr(S.String).annotateKey({ description: "The member who accepted or typed it" }),
   createdAt: instant("When the import wrote it"),
-  takenBack: S.Boolean.annotate({
+  takenBack: S.Boolean.annotateKey({
     description:
       "True when the import was taken back and the item this value went into was removed with it, or, for a stored item it replaced, put back as it was"
   })
@@ -687,7 +687,7 @@ export class ImportsApi extends HttpApiGroup.make("imports")
       ),
     HttpApiEndpoint.post("beginUpload", "/uploads", {
       payload: UploadStart,
-      success: StagingOutcome(S.Struct({ id: S.String.annotate({ description: "The upload's id" }) })),
+      success: StagingOutcome(S.Struct({ id: S.String.annotateKey({ description: "The upload's id" }) })),
       error: Forbidden
     })
       .annotate(OpenApi.Summary, "Start an upload with the file's head")
@@ -700,8 +700,8 @@ export class ImportsApi extends HttpApiGroup.make("imports")
       payload: UploadChunk,
       success: StagingOutcome(
         S.Struct({
-          seq: S.Int.annotate({ description: "The piece stored" }),
-          rows: S.Int.annotate({ description: "Rows in it" })
+          seq: S.Int.annotateKey({ description: "The piece stored" }),
+          rows: S.Int.annotateKey({ description: "Rows in it" })
         })
       ),
       error: [Forbidden, UploadNotFound]
@@ -724,7 +724,7 @@ export class ImportsApi extends HttpApiGroup.make("imports")
     HttpApiEndpoint.delete("discardUpload", "/uploads/:id", {
       params: importId,
       success: S.Struct({
-        discarded: S.Boolean.annotate({
+        discarded: S.Boolean.annotateKey({
           description: "True when an unfinished upload was deleted; false when there was none (finished, or gone)"
         })
       }).annotate({ description: "Whether an unfinished upload was deleted" }),
@@ -754,15 +754,16 @@ export class ImportsApi extends HttpApiGroup.make("imports")
     HttpApiEndpoint.post("match", "/:id/mapping", {
       params: importId,
       payload: S.Struct({
-        field: Field.annotate({ description: "The item field to fill", examples: ["uom"] }).annotateKey({
+        field: Field.annotateKey({
+          description: "The item field to fill",
+          examples: ["uom"],
           messageMissingKey: "Say which field of the item to match."
         }),
-        column: S.NullOr(S.Int.check(S.isGreaterThanOrEqualTo(0)))
-          .annotate({
-            description: "The file column's position, from 0, that fills the field; null for none",
-            examples: [3]
-          })
-          .annotateKey({ messageMissingKey: "Say which column of the file fills the field, or null for none." })
+        column: S.NullOr(S.Int.check(S.isGreaterThanOrEqualTo(0))).annotateKey({
+          description: "The file column's position, from 0, that fills the field; null for none",
+          examples: [3],
+          messageMissingKey: "Say which column of the file fills the field, or null for none."
+        })
       }),
       success: ImportView,
       error: [Forbidden, ImportNotFound, AlreadyImported, ColumnNotFound]
@@ -786,7 +787,7 @@ export class ImportsApi extends HttpApiGroup.make("imports")
       params: importId,
       payload: DecisionDelta,
       success: S.Struct({
-        revision: S.Int.annotate({ description: "The draft's revision after this save" })
+        revision: S.Int.annotateKey({ description: "The draft's revision after this save" })
       }).annotate({ description: "The decisions are saved; the draft's new revision" }),
       error: [Forbidden, ImportNotFound, AlreadyImported]
     })
@@ -811,7 +812,7 @@ export class ImportsApi extends HttpApiGroup.make("imports")
       payload: S.Struct({
         confirms: S.Array(S.String.check(S.isMaxLength(64)))
           .check(S.isMinLength(1), S.isMaxLength(1000))
-          .annotate({ description: "The confirms the screen offered to take back (TakeBackState.confirms)" })
+          .annotateKey({ description: "The confirms the screen offered to take back (TakeBackState.confirms)" })
       }),
       success: ImportView,
       error: [Forbidden, ImportNotFound]
@@ -834,7 +835,7 @@ export class ImportsApi extends HttpApiGroup.make("imports")
     HttpApiEndpoint.delete("remove", "/:id", {
       params: importId,
       success: S.Struct({
-        removed: S.Boolean.annotate({ description: "True: the import and its saved decisions are gone" })
+        removed: S.Boolean.annotateKey({ description: "True: the import and its saved decisions are gone" })
       }).annotate({ description: "The import was removed" }),
       error: [Forbidden, ImportNotFound, ImportKept]
     })
@@ -956,7 +957,7 @@ export class ItemsApi extends HttpApiGroup.make("items")
       ),
     HttpApiEndpoint.put("edit", "/:id", {
       params: {
-        id: S.String.check(S.isMaxLength(64)).annotate({
+        id: S.String.check(S.isMaxLength(64)).annotateKey({
           description: "The item's id, as `items.page` gives it (`id`)"
         })
       },

@@ -8,7 +8,7 @@ import { HttpApiMiddleware } from "effect/http-api"
 export class CrossSiteRequest extends S.TaggedError<CrossSiteRequest, { readonly brand: unique symbol }>()(
   "CrossSiteRequest",
   {
-    reason: S.String.annotate({ description: "What happened and what to do, in words for the person." })
+    reason: S.String.annotateKey({ description: "What happened and what to do, in words for the person." })
   },
   { httpApiStatus: 403, description: "A write that did not come from this app's own pages." }
 ) {}

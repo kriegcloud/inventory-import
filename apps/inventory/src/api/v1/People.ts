@@ -10,19 +10,19 @@ const emailDescription =
 
 /** One member of the organization as the People page shows them. `email` is null for a member with no account. */
 export const Person = S.Struct({
-  memberId: S.String.annotate({
+  memberId: S.String.annotateKey({
     description: "The member's id: what the address of a change of role or a removal names",
     examples: ["mem_marcus"]
   }),
-  name: S.String.annotate({
+  name: S.String.annotateKey({
     description: "The name people read. Not unique, so it never tells two people apart",
     examples: ["Marcus Oyelaran"]
   }),
-  email: S.NullOr(S.String).annotate({
+  email: S.NullOr(S.String).annotateKey({
     description: "The email of the person's account; null for a member with no account"
   }),
   role: Role,
-  joinedAt: S.NullOr(S.String).annotate({
+  joinedAt: S.NullOr(S.String).annotateKey({
     description: "When they became a member, as stored; null when that is not known"
   })
 }).annotate({ identifier: "Person", description: "One member of the organization as the People page shows them" })
@@ -67,7 +67,7 @@ export class LastAdmin extends S.TaggedError<LastAdmin, { readonly brand: unique
 ) {}
 
 const memberId = {
-  memberId: S.String.check(S.isMaxLength(64)).annotate({
+  memberId: S.String.check(S.isMaxLength(64)).annotateKey({
     description: "The member's id, as `people.list` gives it (`memberId`)",
     examples: ["mem_marcus"]
   })
@@ -92,9 +92,11 @@ export class PeopleApi extends HttpApiGroup.make("people")
         // Trimmed on the way in: the description goes on both sides, so the OpenAPI document (the encoded side)
         // shows it too.
         email: S.Trim.check(S.isNonEmpty(), S.isMaxLength(254))
-          .annotate({ description: emailDescription })
           .pipe(S.annotateEncoded({ description: emailDescription, examples: ["elena@sample-supply.test"] }))
-          .annotateKey({ messageMissingKey: "Give the email the person signed up with." }),
+          .annotateKey({
+            description: emailDescription,
+            messageMissingKey: "Give the email the person signed up with."
+          }),
         role: Role.annotateKey({ messageMissingKey: "Choose a role: viewer, editor or admin." })
       }),
       success: AddPersonOutcome,
@@ -121,7 +123,7 @@ export class PeopleApi extends HttpApiGroup.make("people")
     HttpApiEndpoint.delete("remove", "/:memberId", {
       params: memberId,
       success: S.Struct({
-        removed: S.Boolean.annotate({ description: "True: the person is no longer a member" })
+        removed: S.Boolean.annotateKey({ description: "True: the person is no longer a member" })
       }).annotate({ description: "The person was removed from the organization" }),
       error: [Forbidden, PersonNotFound, LastAdmin]
     })

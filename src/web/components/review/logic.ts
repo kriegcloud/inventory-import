@@ -932,6 +932,14 @@ export function queue(input: {
   ]
 }
 
+/**
+ * A model's guess its guard rated low: a value the file does not hold, on evidence that does not back it (a name
+ * with words its description lacks). It is never a row's one-press answer: the row asks the person to type the
+ * value, and the guess is offered beside the box with its evidence.
+ */
+export const weakGuess = (fix: { by?: string | undefined; confidence?: string | undefined }): boolean =>
+  fix.by === "model" && fix.confidence === "low"
+
 /** A `low` fix is a question for the person, not something to accept. Its choices are `to` and the alternatives. */
 export const choicesOf = (fix: {
   to: string

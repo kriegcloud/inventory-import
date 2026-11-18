@@ -44,6 +44,7 @@ import {
   askFor,
   choicesOf,
   columnFor,
+  weakGuess,
   choiceText,
   groupUse,
   inSentence,
@@ -68,7 +69,16 @@ import {
   ReasonTag,
   WhyBody
 } from "./parts.tsx"
-import type { Entry, FixGroup, ProblemKind, ReviewColumn, ReviewRegionProps, ReviewWords, RowView } from "./types.ts"
+import type {
+  Entry,
+  Fix,
+  FixGroup,
+  ProblemKind,
+  ReviewColumn,
+  ReviewRegionProps,
+  ReviewWords,
+  RowView
+} from "./types.ts"
 
 /**
  * The region's own Reason column: the sentence behind each row that needs the person or cannot be fixed here, with or
@@ -607,6 +617,70 @@ const Row = memo(function Row(props: {
       </Overlay>
     )
 
+  // The person types the value: the panel that asks for it. A weak guess (`weakGuess`) is offered inside it, as one
+  // outline button with its evidence, never as the row's own answer.
+  const typeIt = (subject: string, guess?: Fix): ReactNode => {
+    if (problem === undefined) return null
+    const label = Option.getOrElse(HashMap.get(props.labels, subject), () => subject)
+    const own = props.cellEditor?.({ row: view.row, column: subject, value: view.cells[subject] ?? "" })
+    return (
+      <Overlay
+        title={own?.title ?? `${label} for ${name}`}
+        about={`Type the ${label} so ${name} can be imported`}
+        align="end"
+        {...(own === undefined ? {} : { className: "w-96" })}
+        trigger={
+          <Button variant="secondary" size="xs" className="min-w-32 shrink" {...firstAction}>
+            <span className="truncate">{own?.label ?? problem.ask ?? askFor(label)}</span>
+            <span className="sr-only"> for {name}</span>
+          </Button>
+        }
+      >
+        {(close) =>
+          own !== undefined ? (
+            // A form of several fields can be taller than the room under the row: it scrolls inside its panel.
+            <ScrollArea className="max-h-96">
+              <div className="p-0.5 pr-3">
+                {own.render((next) => {
+                  close()
+                  actions.edit(view.row.id, subject, next)
+                })}
+              </div>
+            </ScrollArea>
+          ) : (
+            <span className="flex flex-col gap-3">
+              {guess === undefined ? null : (
+                <span className="flex flex-col gap-1.5">
+                  <span className="text-xs text-muted-foreground">{guess.why.basis}</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-auto min-h-8"
+                    onClick={() => {
+                      close()
+                      actions.accept(view.row.id)
+                    }}
+                  >
+                    <span className="py-1.5 whitespace-normal">Use {valueWords(guess, guess.to)} (suggested)</span>
+                  </Button>
+                </span>
+              )}
+              <EditForm
+                label={label}
+                size="sm"
+                value={view.cells[subject] ?? ""}
+                onSave={(next) => {
+                  close()
+                  actions.edit(view.row.id, subject, next)
+                }}
+              />
+            </span>
+          )
+        }
+      </Overlay>
+    )
+  }
+
   // A row's own answer takes at least 128 px and what its words need beyond that, as the actions column was sized
   // for (`actionsFit`). Short of room it cuts its words, never running under the button after it.
   let main: ReactNode = null
@@ -670,6 +744,8 @@ const Row = memo(function Row(props: {
             )}
           </Overlay>
         )
+    } else if (subject !== undefined && fix !== undefined && weakGuess(fix)) {
+      main = typeIt(subject, fix)
     } else if (fix !== undefined && choices !== undefined) {
       main = (
         <ButtonGroup aria-label={`Choose for ${name}`} className="min-w-32 shrink">
@@ -715,46 +791,7 @@ const Row = memo(function Row(props: {
         </Tooltip>
       )
     } else if (subject !== undefined) {
-      const label = Option.getOrElse(HashMap.get(props.labels, subject), () => subject)
-      const own = props.cellEditor?.({ row: view.row, column: subject, value: view.cells[subject] ?? "" })
-      main = (
-        <Overlay
-          title={own?.title ?? `${label} for ${name}`}
-          about={`Type the ${label} so ${name} can be imported`}
-          align="end"
-          {...(own === undefined ? {} : { className: "w-96" })}
-          trigger={
-            <Button variant="secondary" size="xs" className="min-w-32 shrink" {...firstAction}>
-              <span className="truncate">{own?.label ?? problem.ask ?? askFor(label)}</span>
-              <span className="sr-only"> for {name}</span>
-            </Button>
-          }
-        >
-          {(close) =>
-            own !== undefined ? (
-              // A form of several fields can be taller than the room under the row: it scrolls inside its panel.
-              <ScrollArea className="max-h-96">
-                <div className="p-0.5 pr-3">
-                  {own.render((next) => {
-                    close()
-                    actions.edit(view.row.id, subject, next)
-                  })}
-                </div>
-              </ScrollArea>
-            ) : (
-              <EditForm
-                label={label}
-                size="sm"
-                value={view.cells[subject] ?? ""}
-                onSave={(next) => {
-                  close()
-                  actions.edit(view.row.id, subject, next)
-                }}
-              />
-            )
-          }
-        </Overlay>
-      )
+      main = typeIt(subject)
     }
   }
 
@@ -791,7 +828,8 @@ const Row = memo(function Row(props: {
                 <del className="block font-normal text-muted-foreground">
                   <CutText text={name} />
                 </del>
-              ) : (view.cells[first.id] ?? "") === "" ? (
+              ) : (view.cells[first.id] ?? "") === "" && view.marks[first.id] === undefined ? (
+                // An empty name with a suggestion for it shows the suggestion (who made it, Why?, Reject) instead.
                 <span className="font-normal text-destructive">Empty</span>
               ) : (
                 <span className="flex min-w-0">{value(first)}</span>

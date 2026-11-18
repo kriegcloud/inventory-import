@@ -19,6 +19,21 @@ export const costText = (text: string): string => {
 }
 
 /**
+ * A whole-number count with thousands separators, as the Items table shows a quantity. Text that is not a plain whole
+ * number stays as it is, so the person sees what is wrong with it.
+ *
+ * @example countText("3911") // "3,911"
+ * @example countText("12.5") // "12.5"
+ */
+export const countText = (text: string): string =>
+  /^\d+$/.test(text.trim())
+    ? text
+        .trim()
+        .replace(/^0+(?=\d)/, "")
+        .replace(/\B(?=(\d{3})+$)/g, ",")
+    : text
+
+/**
  * A sum of money to the cent, rounded half up from its digits and never through a float: a stock value, which is a
  * total and not a price. Text that is not a plain amount stays as it is.
  *
@@ -53,15 +68,20 @@ export const dimensionsText = (dimensions: DimensionsShown): string =>
 export type VendorShown = { readonly name: string; readonly preferred: boolean }
 
 /**
- * An item's vendors in one line: how many, and the preferred one's name.
+ * An item's vendors in one line: how many, and the preferred one's name. A file's cell that marks more than one
+ * preferred names each, so the question about it reads true.
  *
  * @example vendorsText([{ name: "Acme Industrial", preferred: false }, { name: "Summit Polymers", preferred: true }])
  * // "2 · Summit Polymers preferred"
  * @example vendorsText([{ name: "Acme Industrial", preferred: false }]) // "1 · none preferred"
+ * @example vendorsText([{ name: "Ridgeline Metals", preferred: true }, { name: "Acme Industrial", preferred: true }])
+ * // "2 · Ridgeline Metals and Acme Industrial preferred"
  */
 export const vendorsText = (vendors: ReadonlyArray<VendorShown>): string => {
-  const preferred = vendors.find((vendor) => vendor.preferred)
-  return `${vendors.length} · ${preferred === undefined ? "none preferred" : `${preferred.name} preferred`}`
+  const preferred = vendors.filter((vendor) => vendor.preferred).map((vendor) => vendor.name)
+  const names =
+    preferred.length <= 2 ? preferred.join(" and ") : `${preferred.slice(0, -1).join(", ")} and ${preferred.at(-1)}`
+  return `${vendors.length} · ${preferred.length === 0 ? "none preferred" : `${names} preferred`}`
 }
 
 const parsed = (text: string): unknown => {
@@ -90,15 +110,19 @@ export const dimensionsCellText = (text: string): string => {
 }
 
 /**
- * A file's vendors cell (a JSON list in one cell) as the Items table shows vendors. A cell that is not a list of
- * named vendors stays as the file has it.
+ * A file's vendors cell (a JSON list in one cell) as the Items table shows vendors. A cell that was cut off says so,
+ * with the vendors it names; any other cell that is not a list of named vendors stays as the file has it.
  *
  * @example vendorsCellText('[{"vendor_name":"Acme Industrial","unit_cost":3.35,"is_preferred":true}]')
  * // "1 · Acme Industrial preferred"
+ * @example vendorsCellText('[{"vendor_name":"Keystone Components","vendor_sku":"KE-61') // "Cut off · Keystone Components"
  */
 export const vendorsCellText = (text: string): string => {
   const value = parsed(text)
-  if (!Array.isArray(value)) return text
+  if (!Array.isArray(value)) {
+    const names = [...text.matchAll(/"vendor_name"\s*:\s*"([^"]+)"/g)].map((found) => found[1] ?? "")
+    return text.trimStart().startsWith("[") && names.length > 0 ? `Cut off · ${names.join(", ")}` : text
+  }
   const vendors: Array<VendorShown> = []
   for (const entry of value as ReadonlyArray<unknown>) {
     if (!isObject(entry) || typeof entry["vendor_name"] !== "string") return text

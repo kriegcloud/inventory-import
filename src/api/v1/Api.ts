@@ -234,7 +234,7 @@ export const RowOutcome = Schema.Struct({
   name: Schema.String.annotate({ description: "The row's name, as the result lists it", examples: ["Nylon Coil"] }),
   outcome: Schema.Literals(["created", "updated", "already", "notImported", "takenBack"]).annotate({
     description:
-      "Created an item, replaced a stored item as the person chose, found the SKU already there, not imported, or created and then taken back"
+      "Created an item, replaced a stored item as the person chose, found the SKU already there, not imported, or taken back: the item it created was removed, or the stored item it replaced was put back as it was"
   }),
   reason: Schema.String.annotate({
     description:
@@ -267,7 +267,8 @@ export const ImportResult = Schema.Struct({
     examples: [45]
   }),
   takenBack: Schema.Int.annotate({
-    description: "Rows whose item this import created and a take-back removed",
+    description:
+      "Rows whose item this import created and a take-back removed, or whose replace of a stored item a take-back undid",
     examples: [0]
   }),
   fixed: Schema.Struct({
@@ -286,7 +287,8 @@ export type ImportResult = typeof ImportResult.Type
 
 /**
  * One thing that happened to a confirmed import, for its history: a confirm, with what it did, or the take-back of
- * one, with how many of its items it removed and how many it kept because they had changed since. Every number is
+ * one, with how many of its items it removed, how many items it had replaced it put back as they were, and how many
+ * it kept because they had changed since. Every number is
  * read from what the confirm and the take-back stored.
  */
 export const ImportEvent = Schema.TaggedUnion({
@@ -308,8 +310,13 @@ export const ImportEvent = Schema.TaggedUnion({
     removed: Schema.Int.annotate({
       description: "Every item the take-back removed, across all the confirms it reversed"
     }),
+    restored: Schema.Int.annotate({
+      description:
+        "Every stored item those confirms had replaced that the take-back put back to its values from before the replace"
+    }),
     kept: Schema.Int.annotate({
-      description: "Every item it kept because someone had changed it since, across all the confirms it reversed"
+      description:
+        "Every item it kept because someone had changed it since (one it created, or one it replaced), across all the confirms it reversed"
     })
   }
 }).annotate({ identifier: "ImportEvent", description: "A confirm of an import, or the take-back of one" })
@@ -331,16 +338,21 @@ export const changedItemsShown = 20
 
 /**
  * Whether the import can be taken back, and what that would do, worked out from what is stored. A take-back removes
- * the items of the confirms still in force that nobody has changed since (`removable`); an item someone changed
- * is kept, and named. When every such item has changed, nothing can be taken back, and the screen says so.
+ * the items of the confirms still in force that nobody has changed since (`removable`) and puts back the stored items
+ * they replaced that nobody has changed since (`restorable`); an item someone changed is kept, and named. When every
+ * such item has changed, nothing can be taken back, and the screen says so.
  */
 export const TakeBackState = Schema.Struct({
   confirms: Schema.Array(Schema.String).annotate({
     description: "The confirms still in force: what a take-back of the import would reverse"
   }),
   removable: Schema.Int.annotate({ description: "Items of those confirms still as the import created them" }),
+  restorable: Schema.Int.annotate({
+    description:
+      "Stored items those confirms replaced that are still as the replace left them: a take-back puts back their values from before"
+  }),
   changed: Schema.Array(ChangedItem).annotate({
-    description: `Items of those confirms someone changed since, at most ${changedItemsShown}: a take-back keeps them`
+    description: `Items those confirms created or replaced that someone changed since, at most ${changedItemsShown}: a take-back keeps them`
   }),
   changedCount: Schema.Int.annotate({ description: "How many items of those confirms changed since, in all" }),
   kept: Schema.Array(ChangedItem).annotate({
@@ -582,6 +594,45 @@ export const DecisionDelta = Schema.Struct({
 /** The decoded value of `DecisionDelta`: what changed in the draft since the last save. */
 export type DecisionDelta = typeof DecisionDelta.Type
 
+/** How many past imports the first screen and the activity view are sent. The rest are counted. */
+export const pastImportsShown = 50
+
+/**
+ * One import that was confirmed at least once, as a list shows it so the person can open its result again: the file,
+ * who confirmed it last and when, and how many of its items are stored now, counted from the items themselves.
+ */
+export const PastImport = Schema.Struct({
+  id: Schema.String.annotate({ description: "The import's id: its result is at `/?import=<id>&step=result`" }),
+  fileName: Schema.String.annotate({ description: "The file it came from", examples: ["items_messy.csv"] }),
+  rowCount: Schema.Int.annotate({ description: "The rows of the file", examples: [200] }),
+  status: Schema.Literals(["open", "imported", "takenBack"]).annotate({
+    description:
+      "imported: confirmed and in force; takenBack: its last confirm was taken back; open: confirmed once, then opened again to finish the rows it left out"
+  }),
+  confirmedByName: personName("Who confirmed it last"),
+  confirmedAt: instant("When it was confirmed last"),
+  items: Schema.Int.annotate({
+    description: "How many items in the system came from this import now, counted from the stored items",
+    examples: [155]
+  }),
+  notImported: Schema.Int.annotate({ description: "Rows its last confirm did not import", examples: [45] })
+}).annotate({
+  identifier: "PastImport",
+  description: "One import that was confirmed at least once, so its result can be opened again"
+})
+/** The decoded value of `PastImport`. */
+export type PastImport = typeof PastImport.Type
+
+/** The organization's confirmed imports, newest first, and how many older ones were left out. */
+export const PastImports = Schema.Struct({
+  imports: Schema.Array(PastImport).annotate({
+    description: `The confirmed imports, last confirmed first, at most ${pastImportsShown}`
+  }),
+  older: Schema.Int.annotate({ description: "How many more there are, older than those listed. Zero when all are" })
+}).annotate({ identifier: "PastImports", description: "The organization's confirmed imports, newest first" })
+/** The decoded value of `PastImports`. */
+export type PastImports = typeof PastImports.Type
+
 /** One changed value of an imported row as the activity view shows it: the file it came from, when, and who. */
 export const ChangeRecord = Schema.Struct({
   importId: Schema.String.annotate({ description: "The import that wrote the value" }),
@@ -596,7 +647,8 @@ export const ChangeRecord = Schema.Struct({
   decidedByName: Schema.NullOr(Schema.String).annotate({ description: "The member who accepted or typed it" }),
   createdAt: instant("When the import wrote it"),
   takenBack: Schema.Boolean.annotate({
-    description: "True when the import was taken back and the item this value went into was removed with it"
+    description:
+      "True when the import was taken back and the item this value went into was removed with it, or, for a stored item it replaced, put back as it was"
   })
 }).annotate({ identifier: "ChangeRecord", description: "One value an import wrote that differs from its file" })
 /** The decoded value of `ChangeRecord`: one changed value of an imported row as the activity view shows it. */
@@ -615,6 +667,12 @@ export class ImportsApi extends HttpApiGroup.make("imports")
       .annotate(
         OpenApi.Description,
         "Every import that is still open, each as its own file, so a person who loaded two files (a .csv and an .xlsx of the same list) can continue either or remove either. The newest are sent in full; `older` counts the rest. Any member may read it."
+      ),
+    HttpApiEndpoint.get("past", "/past", { success: PastImports })
+      .annotate(OpenApi.Summary, "The imports that were confirmed")
+      .annotate(
+        OpenApi.Description,
+        "Every import confirmed at least once, last confirmed first, so a person can open its result again: what it imported, the rows it left out and the take-back. Counts are read from the stored items. Any member may read it."
       ),
     HttpApiEndpoint.get("changes", "/changes", {
       success: Schema.Array(ChangeRecord).annotate({
@@ -760,7 +818,7 @@ export class ImportsApi extends HttpApiGroup.make("imports")
       .annotate(OpenApi.Summary, "Take a confirmed import back while its items are unchanged")
       .annotate(
         OpenApi.Description,
-        "Removes the items of the listed confirms that nobody has changed since, keeps and names the ones someone changed, and records it, in one atomic write. Safe to send twice: the second changes nothing, since those confirms are no longer in force. The review's decisions stay, so the import can be reviewed again. Needs the editor role."
+        "Removes the items of the listed confirms that nobody has changed since, puts back the stored items they replaced that nobody has changed since, keeps and names the ones someone changed, and records it, in one atomic write. Safe to send twice: the second changes nothing, since those confirms are no longer in force. The review's decisions stay, so the import can be reviewed again. Needs the editor role."
       ),
     HttpApiEndpoint.post("reopen", "/:id/reopen", {
       params: importId,

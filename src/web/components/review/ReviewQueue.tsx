@@ -8,7 +8,20 @@ import { Label } from "@/components/ui/label"
 import { Item, ItemContent, ItemDescription, ItemFooter, ItemGroup, ItemHeader, ItemTitle } from "@/components/ui/item"
 import { Progress } from "@/components/ui/progress"
 import { Skeleton } from "@/components/ui/skeleton"
-import { askFor, choicesOf, choiceText, otherAnswers, queue, reasonOf, rowName, rowsWord, valueWords } from "./logic.ts"
+import {
+  askFor,
+  choicesOf,
+  columnFor,
+  choiceText,
+  otherAnswers,
+  queue,
+  reasonOf,
+  rowName,
+  rowsWord,
+  shownWith,
+  valueWords,
+  weakGuess
+} from "./logic.ts"
 import { CellValue, ColumnText, DecisionTag, EditForm, GroupChange, Overlay, Reason, ReasonTag } from "./parts.tsx"
 import type { GroupActions, RowActions } from "./ReviewGrid.tsx"
 import type { ProblemKind, QueueEntry, ReviewColumn, ReviewRegionProps, ReviewWords, RowView } from "./types.ts"
@@ -40,9 +53,7 @@ const contextOf = (view: RowView, columns: ReadonlyArray<ReviewColumn>, skip: st
       <Fragment key={column.id}>
         {at === 0 ? "" : " · "}
         {column.label}{" "}
-        <ColumnText column={column}>
-          {column.display === undefined ? view.cells[column.id] : column.display(view.cells[column.id] ?? "")}
-        </ColumnText>
+        <ColumnText column={column}>{shownWith(column, view.cells[column.id] ?? "", view.cells)}</ColumnText>
       </Fragment>
     ))
 
@@ -98,7 +109,7 @@ function Decision(props: {
         </ItemHeader>
         <ItemContent className="min-w-0">
           <ItemTitle>
-            <GroupChange group={group} />
+            <GroupChange group={group} display={columnOf(group.column)?.display} />
           </ItemTitle>
           <WhySheet title="Why this change?" about="What the proposal is based on">
             <p>
@@ -207,7 +218,7 @@ function Decision(props: {
         <span className="py-2.5 whitespace-normal">{choiceText(pick)}</span>
       </Button>
     ))
-  } else if (fix !== undefined && choices !== undefined) {
+  } else if (fix !== undefined && choices !== undefined && !weakGuess(fix)) {
     main = (
       <ButtonGroup aria-label={`${label} for ${name}`} className="w-full">
         {choices.map((choice, at) => (
@@ -218,7 +229,9 @@ function Decision(props: {
             className="flex-1"
             {...(at === 0 ? first : {})}
             onClick={() =>
-              choice === fix.to ? actions.accept(view.row.id) : actions.edit(view.row.id, fix.column, choice)
+              choice === fix.to
+                ? actions.accept(view.row.id)
+                : actions.edit(view.row.id, columnFor(fix, choice), choice)
             }
           >
             Use {valueWords(fix, choice)}
@@ -226,7 +239,7 @@ function Decision(props: {
         ))}
       </ButtonGroup>
     )
-  } else if (fix !== undefined) {
+  } else if (fix !== undefined && !weakGuess(fix)) {
     main = (
       <Button size="touch" {...first} onClick={() => actions.accept(view.row.id)}>
         Use {valueWords(fix, fix.to)}
@@ -251,15 +264,34 @@ function Decision(props: {
               actions.edit(view.row.id, subject, next)
             })
           ) : (
-            <EditForm
-              label={label}
-              size="touch"
-              value={view.cells[subject] ?? ""}
-              onSave={(next) => {
-                close()
-                actions.edit(view.row.id, subject, next)
-              }}
-            />
+            <span className="flex flex-col gap-3">
+              {/* A weak guess is offered beside the box with its evidence, never as the row's own answer. */}
+              {fix === undefined ? null : (
+                <span className="flex flex-col gap-1.5">
+                  <span className="text-sm text-muted-foreground">{fix.why.basis}</span>
+                  <Button
+                    variant="outline"
+                    size="touch"
+                    className="h-auto min-h-11"
+                    onClick={() => {
+                      close()
+                      actions.accept(view.row.id)
+                    }}
+                  >
+                    <span className="py-2.5 whitespace-normal">Use {valueWords(fix, fix.to)} (suggested)</span>
+                  </Button>
+                </span>
+              )}
+              <EditForm
+                label={label}
+                size="touch"
+                value={view.cells[subject] ?? ""}
+                onSave={(next) => {
+                  close()
+                  actions.edit(view.row.id, subject, next)
+                }}
+              />
+            </span>
           )
         }
       </Overlay>

@@ -25,7 +25,7 @@ import {
   type StagedColumn,
   type StagedTable
 } from "../../../domain/ItemImport.ts"
-import { costText, dimensionsCellText, tagsCellText, vendorsCellText } from "./itemText.ts"
+import { costText, countText, dimensionsCellText, tagsCellText, vendorsCellText } from "./itemText.ts"
 
 /** The problem kinds in the region's shape, in the order their headings show. */
 export const regionKinds: ReadonlyArray<ProblemKind> = problemKinds.map((kind) => ({
@@ -39,7 +39,7 @@ export const regionKinds: ReadonlyArray<ProblemKind> = problemKinds.map((kind) =
 // each row still shows its own old and new value and is given its own.
 const trimLabel = "the value without its spaces"
 
-const toFix = (proposal: Proposal, reason?: string, second = proposal.targets.length > 0): Fix => ({
+const toFix = (proposal: Proposal, reason?: string): Fix => ({
   ...(reason === undefined ? {} : { reason }),
   column: proposal.field,
   to: proposal.to,
@@ -51,11 +51,11 @@ const toFix = (proposal: Proposal, reason?: string, second = proposal.targets.le
     basis: proposal.basis,
     // What each value means, when the values do not speak for themselves ("2024-04-06 (month first)"): the words on
     // the buttons that take them.
-    ...(proposal.labels.length === 0 ? {} : { labels: second ? proposal.labels.slice(0, 1) : proposal.labels }),
-    // An answer that writes another column ("clear the discontinued date", `Proposal.targets`) is not offered
-    // here: the region writes a pick to the question's own column, and the screen and the server would then count
-    // the row differently. The person clears that date by typing in its cell.
-    ...(proposal.alternatives.length === 0 || second ? {} : { alternatives: proposal.alternatives })
+    ...(proposal.labels.length === 0 ? {} : { labels: proposal.labels }),
+    ...(proposal.alternatives.length === 0 ? {} : { alternatives: proposal.alternatives }),
+    // An answer that writes another column ("No discontinued date" on a question asked on Active): the region
+    // writes it there as a typed value, which the domain's `recheckRow` and the commit read alike.
+    ...(proposal.targets.length === 0 ? {} : { targets: proposal.targets })
   }
 })
 
@@ -81,7 +81,11 @@ const choicesFor = (
 ): { readonly ask: string; readonly choices: ReadonlyArray<Choice> } | undefined => {
   if (problem.proposal !== null || problem.field === null || problem.choices.length === 0) return undefined
   return {
-    ask: problem.ask ?? `Choose ${fieldLabels[problem.field].toLowerCase()}`,
+    // Keep or replace is a choice about the stored item, not a value of the SKU the problem sits on.
+    ask:
+      problem.kind === "changed"
+        ? "Keep or replace"
+        : (problem.ask ?? `Choose ${fieldLabels[problem.field].toLowerCase()}`),
     choices: problem.choices.map((value) => ({ value, label: storedWords[value] ?? value }))
   }
 }
@@ -215,10 +219,11 @@ const layout: Record<Field, Omit<ReviewColumn, "id" | "label" | "match">> = {
   category: { core: true, facet: true, priority: 8 },
   uom: { core: true, facet: true, context: true, priority: 8 },
   unitCost: { align: "right", core: true, priority: 7, display: costText },
-  quantityOnHand: { align: "right", priority: 6 },
-  reorderPoint: { align: "right", priority: 3 },
-  isActive: { priority: 4 },
-  lotTracked: { priority: 2 },
+  // A quantity is counted in the row's own unit of measure; an empty one is imported as the default the brief gives.
+  quantityOnHand: { align: "right", priority: 6, unitFrom: "uom", byDefault: "0", display: countText },
+  reorderPoint: { align: "right", priority: 3, unitFrom: "uom", display: countText },
+  isActive: { priority: 4, byDefault: "true" },
+  lotTracked: { priority: 2, byDefault: "false" },
   tags: { priority: 2, display: tagsCellText },
   firstReceivedOn: { priority: 3 },
   discontinuedOn: { priority: 4 },

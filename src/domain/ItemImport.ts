@@ -1506,7 +1506,7 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): Option.Option<
         confidence: "low",
         basis: `The row is discontinued on ${date} and ${trimmed === "" ? "says nothing about Active, which means true" : "active"}; a discontinued item is not active. Either it is not active, or it has no discontinued date.`,
         alternatives: [""],
-        labels: ["Not active", "Clear the discontinued date"],
+        labels: ["Not active", "No discontinued date"],
         targets: ["isActive", "discontinuedOn"],
         group: `discontinued:ask:${row.id}`
       })

@@ -18,6 +18,8 @@ export const queryKeys = {
   status: ["system", "status"],
   /** The imports nobody has confirmed yet. Staging, confirming, taking back or removing a file makes it stale. */
   openImports: ["imports-open"],
+  /** The imports confirmed at least once. Confirming, reopening or taking back an import makes it stale. */
+  pastImports: ["imports-past"],
   /** Every import's view: the prefix an item edit invalidates. */
   imports: ["import"],
   /** One import as the server has it now. */

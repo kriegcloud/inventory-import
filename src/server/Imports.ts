@@ -1,7 +1,8 @@
 // Storage for imports: the staged file, what each confirm did with each row, the items it created, and taking a
 // confirm back. SQL lives here only; every statement filters on the organization, and goes through a Schema both ways
 // (`SqlSchema` for a read, `statement` from ./Sql.ts for a write). The rules not to break: a confirm is the only
-// statement that writes to `item`, and a take-back the only one that deletes from it; each is one atomic batch whose
+// statement that adds to `item` (and keeps a copy of each item it replaces, in `importReplaced`), and a take-back the
+// only one that deletes from it or puts a replaced item back; each is one atomic batch whose
 // every statement checks the same condition (the import is still open; the confirm is still in force), so a second
 // press, a retry or another tab writes nothing.
 import { D1Client } from "@effect/sql-d1"
@@ -14,6 +15,7 @@ import {
   changedItemsShown,
   type DecisionDelta,
   ImportEvent,
+  PastImport,
   RowOutcome,
   type TakeBackState
 } from "../api/v1/Api.ts"
@@ -228,6 +230,7 @@ const BatchRow = Schema.Struct({
   takenBackAt: Schema.NullOr(Schema.String),
   takeBackId: Schema.NullOr(Schema.String),
   removed: Schema.Int,
+  restored: Schema.Int,
   kept: Schema.Int
 }).annotate({ description: "One confirm of an import, and its take-back when there was one" })
 
@@ -289,6 +292,14 @@ export class Imports extends Context.Service<
       organizationId: OrganizationId,
       limit: number
     ): Effect.Effect<{ readonly drafts: ReadonlyArray<Draft>; readonly total: number }>
+    /**
+     * The organization's imports that were confirmed at least once, last confirmed first, at most `limit`, each
+     * with how many items in the system came from it now, and how many such imports there are in all.
+     */
+    listPast(
+      organizationId: OrganizationId,
+      limit: number
+    ): Effect.Effect<{ readonly imports: ReadonlyArray<PastImport>; readonly total: number }>
     /**
      * Removes an import that has no item in force, with everything that hangs off it (its confirms and what they
      * noted, once every one was taken back), and records who removed it, in one atomic batch. Returns false, having
@@ -354,8 +365,9 @@ export class Imports extends Context.Service<
     commit(actor: Member, draft: Draft, rows: ReadonlyArray<CommitRow>): Effect.Effect<boolean>
     /**
      * Takes back the import's confirms named in `confirms` that are still in force, in one atomic batch: removes
-     * their items that nobody has changed since (revision 1), keeps the ones someone changed, marks the rows of
-     * the removed items, records who took them back with the counts, and writes the audit line. Returns false, having
+     * their items that nobody has changed since (revision 1), puts back the stored items they replaced that nobody
+     * has changed since (from the copy each replace kept), keeps the ones someone changed, marks the rows of the
+     * removed and restored items, records who took them back with the counts, and writes the audit line. Returns false, having
      * written nothing, when none of those confirms is in force any more (taken back already: a second press).
      */
     takeBack(actor: Member, draft: Draft, confirms: ReadonlyArray<string>): Effect.Effect<boolean>
@@ -408,8 +420,8 @@ export class Imports extends Context.Service<
           sql`SELECT rowId, decisionJson, decidedByName FROM importDecision
             WHERE organizationId = ${org} AND importId = ${id}`
       })
-      // A value counts as taken back when its confirm was taken back and the item it went into is gone with it; a
-      // item that was kept because someone had changed it still holds the value.
+      // A value counts as taken back when its confirm was taken back and the item it went into is gone with it, or,
+      // for a replace, was put back as it was; an item that was kept because someone had changed it still holds it.
       const findChanges = SqlSchema.findAll({
         Request: OrganizationId,
         Result: ChangeRow,
@@ -418,7 +430,10 @@ export class Imports extends Context.Service<
               c.source, c.decidedBy, c.decidedByName, c.how, c.basis, c.confidence, c.createdAt,
               c.part, (b.takeBackId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM item i
                 WHERE i.organizationId = c.organizationId AND i.batchId = c.batchId AND i.sourceRow = c.rowNumber
-                  AND i.sourcePart = c.part)) AS takenBack
+                  AND i.sourcePart = c.part)
+                AND NOT EXISTS (SELECT 1 FROM importReplaced p
+                  WHERE p.organizationId = c.organizationId AND p.batchId = c.batchId AND p.sourceRow = c.rowNumber
+                    AND p.sourcePart = c.part AND p.restored = 0)) AS takenBack
             FROM importChange c
             JOIN importDraft d ON d.organizationId = c.organizationId AND d.id = c.importId
             JOIN importBatch b ON b.organizationId = c.organizationId AND b.id = c.batchId
@@ -461,7 +476,7 @@ export class Imports extends Context.Service<
         Result: BatchRow,
         execute: ({ org, id }) =>
           sql`SELECT id, confirmedByName, confirmedAt, created, updated, already, notImported, takenBackByName, takenBackAt,
-              takeBackId, removed, kept
+              takeBackId, removed, restored, kept
             FROM importBatch WHERE organizationId = ${org} AND importId = ${id} ORDER BY confirmedAt, rowid`
       })
       const findUploadRow = SqlSchema.findOneOption({
@@ -797,12 +812,43 @@ export class Imports extends Context.Service<
         return { drafts, total: total.n }
       }, Effect.orDie)
 
+      // Each import with at least one confirm, by its last one. Its items are counted from the item table, so a
+      // take-back or a later edit shows as it is stored, not as the confirm once said.
+      const findPast = SqlSchema.findAll({
+        Request: Schema.Struct({ org: OrganizationId, limit: Schema.Int }),
+        Result: PastImport,
+        execute: ({ org, limit }) =>
+          sql`SELECT d.id, d.fileName, d.rowCount, d.status, b.confirmedByName, b.confirmedAt, b.notImported,
+              (SELECT COUNT(*) FROM item i WHERE i.organizationId = d.organizationId AND i.importId = d.id) AS items
+            FROM importDraft d
+            JOIN importBatch b ON b.organizationId = d.organizationId AND b.importId = d.id
+            WHERE d.organizationId = ${org}
+              AND b.rowid = (SELECT x.rowid FROM importBatch x
+                WHERE x.organizationId = d.organizationId AND x.importId = d.id
+                ORDER BY x.confirmedAt DESC, x.rowid DESC LIMIT 1)
+            ORDER BY b.confirmedAt DESC, b.rowid DESC LIMIT ${limit}`
+      })
+      const countPast = SqlSchema.findOne({
+        Request: OrganizationId,
+        Result: Schema.Struct({ n: Schema.Int }),
+        execute: (org) => sql`SELECT COUNT(DISTINCT importId) AS n FROM importBatch WHERE organizationId = ${org}`
+      })
+      const listPast = Effect.fn("Imports.listPast")(function* (organizationId: OrganizationId, limit: number) {
+        const imports = yield* findPast({ org: organizationId, limit })
+        const total = yield* countPast(organizationId)
+        return { imports, total: total.n }
+      }, Effect.orDie)
+
       // -- Removing an import nobody needs --------------------------------------------------------------------
 
       // An import may be removed while it is open and has no item in force: never confirmed, or every confirm taken
       // back with nothing kept. Its items, if any, would point at it (and the foreign key would refuse anyway).
+      // A replace still in force keeps it too: its copy of the item as it was is what a take-back puts back.
       const removable = (org: string, id: string) => sql`(${stillOpen(org, id)}
-        AND NOT EXISTS (SELECT 1 FROM item WHERE organizationId = ${org} AND importId = ${id}))`
+        AND NOT EXISTS (SELECT 1 FROM item WHERE organizationId = ${org} AND importId = ${id})
+        AND NOT EXISTS (SELECT 1 FROM importReplaced p JOIN importBatch b
+            ON b.organizationId = p.organizationId AND b.id = p.batchId
+          WHERE p.organizationId = ${org} AND p.importId = ${id} AND b.takeBackId IS NULL))`
       const RemoveRequest = Schema.Struct({
         ...Acting,
         id: Schema.String,
@@ -853,11 +899,12 @@ export class Imports extends Context.Service<
           removeFrom(sql`importChunk`)(scope),
           removeFrom(sql`importChange`)(scope),
           removeFrom(sql`importOutcome`)(scope),
+          removeFrom(sql`importReplaced`)(scope),
           removeFrom(sql`importBatch`)(scope),
           removeDraft(scope)
         ])
         // The last statement returns the import's id only when this batch was the one that removed it.
-        return Option.isSome(Arr.last(answers[7]))
+        return Option.isSome(Arr.last(answers[8]))
       }, Effect.orDie)
 
       // -- Columns ---------------------------------------------------------------------------------------------------
@@ -1020,6 +1067,24 @@ export class Imports extends Context.Service<
           FROM json_each(${r.items}) WHERE ${thisConfirm(r.org, r.batch)}
           ON CONFLICT (organizationId, skuKey) DO NOTHING`
       })
+      // Before a replace, in the same batch: the stored item as it is, so a take-back of this confirm can put it back.
+      // revisionAfter is the revision the replace below gives it; one copy per item, however many rows name it.
+      const keepReplaced = statement({
+        Request: Schema.Struct({ ...CommitScope.fields, items: ItemInserts }),
+        Result: NoRows,
+        execute: (r) => sql`INSERT INTO importReplaced (organizationId, importId, batchId, itemId, sourceRow,
+            sourcePart, name, description, category, uom, unitCost, quantityOnHand, reorderPoint, isActive, lotTracked,
+            tags, firstReceivedOn, discontinuedOn, dimensions, vendors, revision, updatedById, updatedBy, updatedAt,
+            revisionAfter)
+          SELECT ${r.org}, ${r.id}, ${r.batch}, i.id, json_extract(j.value, '$.rowNumber'),
+            json_extract(j.value, '$.part'), i.name, i.description, i.category, i.uom, i.unitCost, i.quantityOnHand,
+            i.reorderPoint, i.isActive, i.lotTracked, i.tags, i.firstReceivedOn, i.discontinuedOn, i.dimensions,
+            i.vendors, i.revision, i.updatedById, i.updatedBy, i.updatedAt, i.revision + 1
+          FROM json_each(${r.items}) AS j
+          JOIN item i ON i.organizationId = ${r.org} AND i.skuKey = json_extract(j.value, '$.skuKey')
+          WHERE ${thisConfirm(r.org, r.batch)}
+          ON CONFLICT (organizationId, batchId, itemId) DO NOTHING`
+      })
       // A stored item the person chose to replace with the file's row: every value but its SKU and its origin is
       // written over, and its revision goes up, so the import that created it can no longer take it back.
       const replaceItems = statement({
@@ -1170,6 +1235,7 @@ export class Imports extends Context.Service<
           insertBatch(scope),
           closeDraft(scope),
           ...Arr.map(items, (chunk) => insertItems({ ...scope, items: chunk })),
+          ...Arr.map(replacements, (chunk) => keepReplaced({ ...scope, items: chunk })),
           ...Arr.map(replacements, (chunk) => replaceItems({ ...scope, items: chunk })),
           ...Arr.map(outcomes, (chunk) => insertOutcomes({ ...scope, outcomes: chunk })),
           ...Arr.map(changes, (chunk) => insertChanges({ ...scope, changes: chunk })),
@@ -1191,20 +1257,57 @@ export class Imports extends Context.Service<
       })
       const ofTakeBack = (org: string, takeBack: string) =>
         sql`(SELECT id FROM importBatch WHERE organizationId = ${org} AND takeBackId = ${takeBack})`
-      // First, while the items are all still there: mark the confirms in force that were asked for, counting what
-      // this take-back removes (items still at revision 1) and keeps (items someone changed since).
+      // First: mark the confirms in force that were asked for. Every later statement acts only on the confirms this
+      // take-back marked, so a second press, which marks none, writes nothing.
       const markConfirms = statement({
         Request: TakeBackScope,
         Result: Ids,
         execute: (r) => sql`UPDATE importBatch SET takeBackId = ${r.takeBack}, takenBackById = ${r.actor},
-            takenBackByName = ${r.name}, takenBackAt = ${r.at},
-            removed = (SELECT COUNT(*) FROM item
-              WHERE organizationId = ${r.org} AND batchId = importBatch.id AND revision = 1),
-            kept = (SELECT COUNT(*) FROM item
-              WHERE organizationId = ${r.org} AND batchId = importBatch.id AND revision > 1)
+            takenBackByName = ${r.name}, takenBackAt = ${r.at}
           WHERE organizationId = ${r.org} AND importId = ${r.id} AND takeBackId IS NULL
             AND id IN (SELECT value FROM json_each(${r.confirms}))
           RETURNING id`
+      })
+      // Then the stored items those confirms replaced go back to their copies, each only while it is still at the
+      // revision the replace gave it: one someone edited, or a later import replaced again, is kept as it is. A pass
+      // marks the copies it will use, then writes them; a second pass reaches an item two confirms of this take-back
+      // replaced in turn, now back at the revision the earlier replace gave it.
+      const flagRestorable = statement({
+        Request: TakeBackScope,
+        Result: NoRows,
+        execute: (r) => sql`UPDATE importReplaced SET restored = 1
+          WHERE organizationId = ${r.org} AND restored = 0 AND batchId IN ${ofTakeBack(r.org, r.takeBack)}
+            AND EXISTS (SELECT 1 FROM item WHERE item.organizationId = ${r.org} AND item.id = importReplaced.itemId
+              AND item.revision = importReplaced.revisionAfter)`
+      })
+      const restoreItems = statement({
+        Request: TakeBackScope,
+        Result: NoRows,
+        execute: (r) => sql`UPDATE item SET name = p.name, description = p.description, category = p.category,
+            uom = p.uom, unitCost = p.unitCost, quantityOnHand = p.quantityOnHand, reorderPoint = p.reorderPoint,
+            isActive = p.isActive, lotTracked = p.lotTracked, tags = p.tags, firstReceivedOn = p.firstReceivedOn,
+            discontinuedOn = p.discontinuedOn, dimensions = p.dimensions, vendors = p.vendors, revision = p.revision,
+            updatedById = p.updatedById, updatedBy = p.updatedBy, updatedAt = p.updatedAt
+          FROM importReplaced AS p
+          WHERE item.organizationId = ${r.org} AND p.organizationId = ${r.org} AND p.itemId = item.id
+            AND p.restored = 1 AND item.revision = p.revisionAfter
+            AND p.batchId IN ${ofTakeBack(r.org, r.takeBack)}`
+      })
+      // Counted once the items are put back and before any is removed: what this take-back removes (items still at
+      // revision 1), restores (copies it used) and keeps (items it created, or replaced, that someone changed since).
+      const countTakeBack = statement({
+        Request: TakeBackScope,
+        Result: NoRows,
+        execute: (r) => sql`UPDATE importBatch SET
+            removed = (SELECT COUNT(*) FROM item
+              WHERE organizationId = ${r.org} AND batchId = importBatch.id AND revision = 1),
+            restored = (SELECT COUNT(*) FROM importReplaced
+              WHERE organizationId = ${r.org} AND batchId = importBatch.id AND restored = 1),
+            kept = (SELECT COUNT(*) FROM item
+              WHERE organizationId = ${r.org} AND batchId = importBatch.id AND revision > 1)
+              + (SELECT COUNT(*) FROM importReplaced
+                WHERE organizationId = ${r.org} AND batchId = importBatch.id AND restored = 0)
+          WHERE organizationId = ${r.org} AND takeBackId = ${r.takeBack}`
       })
       const takenBackLine = statement({
         Request: Schema.Struct({ ...TakeBackScope.fields, activity: Schema.String, fileName: Schema.String }),
@@ -1214,9 +1317,14 @@ export class Imports extends Context.Service<
             WHERE organizationId = ${r.org} AND takeBackId = ${r.takeBack})`
           const kept = sql`(SELECT COALESCE(SUM(kept), 0) FROM importBatch
             WHERE organizationId = ${r.org} AND takeBackId = ${r.takeBack})`
+          const restored = sql`(SELECT COALESCE(SUM(restored), 0) FROM importBatch
+            WHERE organizationId = ${r.org} AND takeBackId = ${r.takeBack})`
           return sql`INSERT INTO activity (id, organizationId, actorId, actorName, action, detail, createdAt)
             SELECT ${r.activity}, ${r.org}, ${r.actor}, ${r.name}, 'Took back an import',
               ${r.fileName} || ': removed ' || ${removed} || CASE WHEN ${removed} = 1 THEN ' item' ELSE ' items' END
+                || CASE WHEN ${restored} = 0 THEN ''
+                  WHEN ${restored} = 1 THEN ', restored 1 item it had replaced'
+                  ELSE ', restored ' || ${restored} || ' items it had replaced' END
                 || CASE WHEN ${kept} = 0 THEN ''
                   WHEN ${kept} = 1 THEN ', kept 1 that had changed since'
                   ELSE ', kept ' || ${kept} || ' that had changed since' END,
@@ -1234,6 +1342,17 @@ export class Imports extends Context.Service<
             AND EXISTS (SELECT 1 FROM item WHERE item.organizationId = ${r.org} AND item.importId = ${r.id}
               AND item.sourceRow = importOutcome.rowNumber AND item.sourcePart = importOutcome.part
               AND item.revision = 1 AND item.batchId IN ${ofTakeBack(r.org, r.takeBack)})`
+      })
+      // The rows whose replace was undone, from the copies this take-back used.
+      const markReplacedOutcomes = statement({
+        Request: TakeBackScope,
+        Result: NoRows,
+        execute: (r) => sql`UPDATE importOutcome SET outcome = 'takenBack', reason = '', decidedBy = NULL,
+            decidedByName = NULL
+          WHERE organizationId = ${r.org} AND importId = ${r.id} AND outcome = 'updated'
+            AND EXISTS (SELECT 1 FROM importReplaced p WHERE p.organizationId = ${r.org} AND p.importId = ${r.id}
+              AND p.sourceRow = importOutcome.rowNumber AND p.sourcePart = importOutcome.part AND p.restored = 1
+              AND p.batchId IN ${ofTakeBack(r.org, r.takeBack)})`
       })
       const removeItems = statement({
         Request: TakeBackScope,
@@ -1261,10 +1380,18 @@ export class Imports extends Context.Service<
         const activity = yield* random.uuidV4()
         const takeBackId = yield* random.uuidV4()
         const scope = { ...acting(actor), id: draft.id, takeBack: takeBackId, confirms, at }
+        // One restore pass per confirm asked for (at most 10): enough for an item each of them replaced in turn.
+        const passes = Arr.flatMap(Arr.range(1, Math.min(Math.max(confirms.length, 1), 10)), () => [
+          flagRestorable(scope),
+          restoreItems(scope)
+        ])
         const [marked] = yield* batch([
           markConfirms(scope),
+          ...passes,
+          countTakeBack(scope),
           takenBackLine({ ...scope, activity, fileName: draft.fileName }),
           markOutcomes(scope),
+          markReplacedOutcomes(scope),
           removeItems(scope),
           settleDraft(scope)
         ])
@@ -1296,6 +1423,7 @@ export class Imports extends Context.Service<
                   by: row.takenBackByName ?? "",
                   at: row.takenBackAt,
                   removed: Arr.reduce(sameTakeBack(row), 0, (total, other) => total + other.removed),
+                  restored: Arr.reduce(sameTakeBack(row), 0, (total, other) => total + other.restored),
                   kept: Arr.reduce(sameTakeBack(row), 0, (total, other) => total + other.kept)
                 })
               ])
@@ -1321,6 +1449,17 @@ export class Imports extends Context.Service<
         execute: (r) => sql`SELECT COUNT(*) AS n FROM item WHERE organizationId = ${r.org} AND importId = ${r.id}
           AND revision = 1 AND batchId IN ${inForce(r.org, r.id)}`
       })
+      // A stored item a confirm in force replaced, still as the replace left it: a take-back puts it back.
+      const restorableCount = statement({
+        Request: Scope,
+        Result: Count,
+        execute: (r) => sql`SELECT COUNT(*) AS n FROM importReplaced p
+          JOIN item i ON i.organizationId = p.organizationId AND i.id = p.itemId
+          WHERE p.organizationId = ${r.org} AND p.importId = ${r.id} AND p.batchId IN ${inForce(r.org, r.id)}
+            AND i.revision = p.revisionAfter`
+      })
+      // Items the import created that changed since, and stored items it replaced that changed since the replace.
+      // `kept`: those an earlier take-back kept; otherwise those a take-back now would keep.
       const changedItems = (kept: boolean) =>
         statement({
           Request: Scope,
@@ -1328,7 +1467,16 @@ export class Imports extends Context.Service<
           execute: (r) => sql`SELECT sku, name, updatedBy AS changedBy, updatedAt AS changedAt FROM item
             WHERE organizationId = ${r.org} AND importId = ${r.id} AND revision > 1
               AND ${kept ? sql`batchId NOT IN ${inForce(r.org, r.id)}` : sql`batchId IN ${inForce(r.org, r.id)}`}
-            ORDER BY updatedAt DESC, sku`
+            UNION
+            SELECT i.sku, i.name, i.updatedBy AS changedBy, i.updatedAt AS changedAt FROM importReplaced p
+              JOIN item i ON i.organizationId = p.organizationId AND i.id = p.itemId
+            WHERE p.organizationId = ${r.org} AND p.importId = ${r.id}
+              AND ${
+                kept
+                  ? sql`p.restored = 0 AND p.batchId NOT IN ${inForce(r.org, r.id)}`
+                  : sql`i.revision <> p.revisionAfter AND p.batchId IN ${inForce(r.org, r.id)}`
+              }
+            ORDER BY changedAt DESC, sku`
         })
 
       const takeBackState = Effect.fn("Imports.takeBackState")(function* (
@@ -1336,9 +1484,10 @@ export class Imports extends Context.Service<
         importId: string
       ) {
         const scope = { org: organizationId, id: importId }
-        const [confirms, removable, changed, kept] = yield* batch([
+        const [confirms, removable, restorable, changed, kept] = yield* batch([
           confirmsInForce(scope),
           removableCount(scope),
+          restorableCount(scope),
           changedItems(false)(scope),
           changedItems(true)(scope)
         ])
@@ -1354,6 +1503,7 @@ export class Imports extends Context.Service<
         return {
           confirms: Arr.map(confirms, (row) => row.id),
           removable: Option.match(Arr.head(removable), { onNone: () => 0, onSome: (row) => row.n }),
+          restorable: Option.match(Arr.head(restorable), { onNone: () => 0, onSome: (row) => row.n }),
           changed: named(changed),
           changedCount: changed.length,
           kept: named(kept),
@@ -1383,6 +1533,7 @@ export class Imports extends Context.Service<
         decide,
         reopen,
         listOpen,
+        listPast,
         remove,
         choices,
         setChoices,

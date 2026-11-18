@@ -41,6 +41,7 @@ layer(TestDatabase)("tenancy in the database", (it) => {
         "importDecision",
         "importDraft",
         "importOutcome",
+        "importReplaced",
         "importSuggestion",
         "importUpload",
         "importUploadChunk",

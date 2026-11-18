@@ -229,7 +229,11 @@ function build(
     typed = true
   }
   // The caller's rules never saw a typed value, so they look at the row again. Accepted fixes came from them.
-  if (typed && recheck !== undefined) problem = recheck({ row, cells }) ?? problem
+  // What the rules say then stands, a row they find nothing wrong with included: a pick written to another column
+  // (an empty Discontinued on) settles a question asked on this one. Only a copy's problem is kept when they find
+  // nothing, since whether it was kept is a decision they do not see.
+  if (typed && recheck !== undefined)
+    problem = recheck({ row, cells }) ?? (problem?.rivals === undefined ? undefined : problem)
   if (problem !== undefined && gone(problem.fix)) problem = withoutFix(problem)
 
   if (problem?.fix !== undefined && decision?.out !== true) {
@@ -443,8 +447,13 @@ export function appliedGroups(views: ReadonlyArray<RowView>): ReadonlyArray<FixG
 }
 
 /** "ea (6) · each (3)": the spellings in a group with their row counts. */
-export const variantsText = (group: FixGroup): string =>
-  group.variants.map((variant) => `${spellingOf(variant.from)} (${variant.count})`).join(" · ")
+export const variantsText = (group: FixGroup, display?: (value: string) => string): string =>
+  group.variants
+    .map(
+      (variant) =>
+        `${display === undefined || variant.from === "" ? spellingOf(variant.from) : display(variant.from)} (${variant.count})`
+    )
+    .join(" · ")
 
 /**
  * A value from the file as the person can tell it apart: "empty" for nothing, and quotation marks around a value
@@ -626,7 +635,8 @@ export function act(input: {
         if (action.value === view.problem?.fix?.to) accept(view)
         else {
           const decision = decisionOf(rowId) ?? {}
-          MutableHashMap.set(next, rowId, { ...decision, edits: { ...decision.edits, [group!.column]: action.value } })
+          const column = view.problem?.fix === undefined ? group!.column : columnFor(view.problem.fix, action.value)
+          MutableHashMap.set(next, rowId, { ...decision, edits: { ...decision.edits, [column]: action.value } })
         }
       }
       label = `${plural(MutableHashMap.size(next), "row", "rows")} set to ${action.value}`
@@ -927,6 +937,14 @@ export function queue(input: {
   ]
 }
 
+/**
+ * A model's guess its guard rated low: a value the file does not hold, on evidence that does not back it (a name
+ * with words its description lacks). It is never a row's one-press answer: the row asks the person to type the
+ * value, and the guess is offered beside the box with its evidence.
+ */
+export const weakGuess = (fix: { by?: string | undefined; confidence?: string | undefined }): boolean =>
+  fix.by === "model" && fix.confidence === "low"
+
 /** A `low` fix is a question for the person, not something to accept. Its choices are `to` and the alternatives. */
 export const choicesOf = (fix: {
   to: string
@@ -998,6 +1016,36 @@ export const valueWords = (
 ): string => {
   const at = [fix.to, ...(fix.why.alternatives ?? [])].indexOf(value)
   return (at === -1 ? undefined : fix.why.labels?.[at]) ?? value
+}
+
+/**
+ * The column a pick of `value` writes: the fix's own column, or the one its `why.targets` names for that value.
+ *
+ * @example columnFor({ column: "isActive", to: "false", why: { alternatives: [""], targets: ["isActive", "discontinuedOn"] } }, "") // "discontinuedOn"
+ */
+export const columnFor = (
+  fix: { column: string; to: string; why: { alternatives?: ReadonlyArray<string>; targets?: ReadonlyArray<string> } },
+  value: string
+): string => {
+  const at = [fix.to, ...(fix.why.alternatives ?? [])].indexOf(value)
+  return (at === -1 ? undefined : fix.why.targets?.[at]) ?? fix.column
+}
+
+/**
+ * A cell's text as its column draws it: through `display`, then with the row's unit after a plain number when the
+ * column takes its unit from another (`unitFrom`). Empty stays empty.
+ *
+ * @example shownWith({ id: "quantityOnHand", label: "On hand", unitFrom: "uom" }, "120", { uom: "EA" }) // "120 EA"
+ */
+export const shownWith = (
+  column: { display?: ((value: string) => string) | undefined; unitFrom?: string | undefined },
+  text: string,
+  cells: Readonly<Record<string, string>>
+): string => {
+  if (text === "") return text
+  const shown = column.display === undefined ? text : column.display(text)
+  const unit = column.unitFrom === undefined ? "" : (cells[column.unitFrom] ?? "").trim()
+  return unit !== "" && /^-?\d[\d,]*(\.\d+)?$/.test(shown.trim()) ? `${shown} ${unit}` : shown
 }
 
 /** Words in a "Why?" answer, heading excluded. The region's budget is 25. */

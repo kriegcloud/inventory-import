@@ -11,6 +11,7 @@ import {
   ImportNotFound,
   ImportView,
   openImportsShown,
+  pastImportsShown,
   ItemChanged,
   ItemInvalid,
   ItemNotFound,
@@ -314,6 +315,11 @@ export const ImportHandlers = HttpApiBuilder.group(
         const { drafts, total } = yield* imports.listOpen(actor.organizationId, openImportsShown)
         const views = yield* Effect.forEach(drafts, (draft) => viewOf(actor, draft))
         return { views, older: Math.max(0, total - views.length) }
+      }),
+      past: Effect.fn("imports.past")(function* () {
+        const actor = yield* CurrentActor
+        const { imports: listed, total } = yield* imports.listPast(actor.organizationId, pastImportsShown)
+        return { imports: listed, older: Math.max(0, total - listed.length) }
       }),
       changes: Effect.fn("imports.changes")(function* () {
         const actor = yield* CurrentActor

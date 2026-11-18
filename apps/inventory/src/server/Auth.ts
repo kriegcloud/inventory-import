@@ -3,7 +3,8 @@ import type { D1Database } from "@cloudflare/workers-types"
 // database connection requires Kysely") and has no migration planner, and this app hands Better Auth the D1 binding
 // itself (Better Auth builds its own Kysely D1 dialect from it). Minimal would mean an ORM adapter and a second schema.
 import { betterAuth } from "better-auth"
-import { Context, Effect, Layer, Option, Redacted, Schema, String as Str } from "effect"
+import { Context, Effect, Layer, Option, Redacted, String as Str } from "effect"
+import * as S from "effect/Schema"
 import { SecureRandom } from "effect/crypto"
 import * as Base64 from "effect/encoding/Base64"
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http"
@@ -21,22 +22,22 @@ import { authSettings, minimumSecretLength } from "./Settings.ts"
 // status, never an email, a password or a cookie.
 
 /** What a valid session cookie says: whose it is, and which organisation they are working in. */
-export class AuthSession extends Schema.Class<AuthSession, { readonly brand: unique symbol }>("AuthSession")({
-  userId: Schema.String.annotate({ description: "Better Auth's user id: who signed in." }),
-  email: Schema.String.annotate({ description: "The email the person signed in with, for the account menu." }),
-  activeOrganizationId: Schema.NullOr(Schema.String).annotate({
+export class AuthSession extends S.Class<AuthSession, { readonly brand: unique symbol }>("AuthSession")({
+  userId: S.String.annotate({ description: "Better Auth's user id: who signed in." }),
+  email: S.String.annotate({ description: "The email the person signed in with, for the account menu." }),
+  activeOrganizationId: S.NullOr(S.String).annotate({
     description: "The organisation the person last chose. Null until they belong to one."
   })
 }) {}
 
 /** The part of Better Auth's `getSession` answer this app reads. Anything else in it is ignored. */
-const SessionAnswer = Schema.NullOr(
-  Schema.Struct({
-    session: Schema.Struct({
-      userId: Schema.String,
-      activeOrganizationId: Schema.optional(Schema.NullOr(Schema.String))
+const SessionAnswer = S.NullOr(
+  S.Struct({
+    session: S.Struct({
+      userId: S.String,
+      activeOrganizationId: S.String.pipe(S.NullOr, S.optional)
     }),
-    user: Schema.Struct({ email: Schema.String })
+    user: S.Struct({ email: S.String })
   })
 )
 
@@ -119,7 +120,7 @@ export class Auth extends Context.Service<
             rateLimit: options.rateLimit
           })
         )
-        const decodeSession = Schema.decodeUnknownEffect(SessionAnswer)
+        const decodeSession = S.decodeUnknownEffect(SessionAnswer)
 
         return Auth.of({
           publicOrigin,

@@ -1,14 +1,15 @@
-import { Array as Arr, Context, Effect, Layer, Option, Schema } from "effect"
+import { Array as Arr, Context, Effect, Layer, Option } from "effect"
+import * as S from "effect/Schema"
 import { SqlClient, SqlSchema } from "effect/sql"
 import { OrganizationChoice, TestAccount } from "../api/v1/Identity.ts"
 import { Member, MemberId, OrganizationId, Role } from "../domain/Identity.ts"
 
 /** One membership row of a test account, as the database holds it. */
-const AccountRow = Schema.Struct({
-  userId: Schema.String,
-  email: Schema.String,
-  name: Schema.String,
-  organizationName: Schema.String,
+const AccountRow = S.Struct({
+  userId: S.String,
+  email: S.String,
+  name: S.String,
+  organizationName: S.String,
   role: Role
 }).annotate({ description: "A test account's membership, read from user, member and organization." })
 
@@ -43,7 +44,7 @@ export class Members extends Context.Service<
       `
 
       const findAll = SqlSchema.findAll({
-        Request: Schema.Void,
+        Request: S.Void,
         Result: Member,
         execute: () => sql`${select} ORDER BY o.name, m.name`
       })
@@ -55,7 +56,7 @@ export class Members extends Context.Service<
       })
 
       const findMembership = SqlSchema.findOneOption({
-        Request: Schema.Struct({ userId: Schema.String, organizationId: Schema.NullOr(OrganizationId) }),
+        Request: S.Struct({ userId: S.String, organizationId: S.NullOr(OrganizationId) }),
         Result: Member,
         execute: ({ organizationId, userId }) =>
           organizationId === null
@@ -70,7 +71,7 @@ export class Members extends Context.Service<
       })
 
       const findOrganizations = SqlSchema.findAll({
-        Request: Schema.String,
+        Request: S.String,
         Result: OrganizationChoice,
         execute: (userId) => sql`
           SELECT o.id, o.name FROM member m JOIN organization o ON o.id = m.organizationId
@@ -78,7 +79,7 @@ export class Members extends Context.Service<
       })
 
       const findAccounts = SqlSchema.findAll({
-        Request: Schema.Array(Schema.String),
+        Request: S.Array(S.String),
         Result: AccountRow,
         execute: (userIds) => sql`
           SELECT u.id AS userId, u.email, u.name, o.name AS organizationName, m.role

@@ -5,7 +5,8 @@
 // reach another organization or bring back an item the search left out. What a search word matches is decided in
 // `src/domain/ItemSearch.ts`; this file only turns that decision into SQL over the `itemSearch` index.
 import { D1Client } from "@effect/sql-d1"
-import { Array as Arr, Context, DateTime, Effect, Layer, Option, Schema, String as Str } from "effect"
+import { Array as Arr, Context, DateTime, Effect, Layer, Option, String as Str } from "effect"
+import * as S from "effect/Schema"
 import { SecureRandom } from "effect/crypto"
 import { SqlClient, SqlSchema, type Statement } from "effect/sql"
 import { type Member, MemberId, OrganizationId } from "../domain/Identity.ts"
@@ -82,31 +83,31 @@ const quantityOf = (text: string): Option.Option<number> => {
 // find "É".
 const containsPattern = (text: string): string => `%${Str.replace(/[\\%_]/g, "\\$&")(text)}%`
 
-const StringList = Schema.fromJsonString(Schema.Array(Schema.String)).annotate({
+const StringList = S.String.pipe(S.Array, S.fromJsonString).annotate({
   description: "A list of values bound as one JSON parameter and read with json_each"
 })
-const PageCount = Schema.Array(Schema.Struct({ n: Schema.Int })).annotate({
+const PageCount = S.Array(S.Struct({ n: S.Int })).annotate({
   description: "COUNT(*) of the filtered items"
 })
-const Counts = Schema.Array(Schema.Struct({ value: Schema.String, n: Schema.Int })).annotate({
+const Counts = S.Array(S.Struct({ value: S.String, n: S.Int })).annotate({
   description: "Each value in use and how many items have it"
 })
-const Totals = Schema.Array(
-  Schema.Struct({
-    total: Schema.Int,
-    quantityMin: Schema.NullOr(Schema.Finite),
-    quantityMax: Schema.NullOr(Schema.Finite),
-    costMin: Schema.NullOr(Schema.Finite),
-    costMax: Schema.NullOr(Schema.Finite)
+const Totals = S.Array(
+  S.Struct({
+    total: S.Int,
+    quantityMin: S.NullOr(S.Finite),
+    quantityMax: S.NullOr(S.Finite),
+    costMin: S.NullOr(S.Finite),
+    costMax: S.NullOr(S.Finite)
   })
 ).annotate({ description: "How many items there are, and the lowest and highest quantity and price (cents)" })
-const PageRequest = Schema.Struct({ org: OrganizationId, perPage: Schema.Int, offset: Schema.Int }).annotate({
+const PageRequest = S.Struct({ org: OrganizationId, perPage: S.Int, offset: S.Int }).annotate({
   description: "Which organization's items, and which slice of them"
 })
-const AsTypedRequest = Schema.Struct({ org: OrganizationId, phrases: StringList }).annotate({
+const AsTypedRequest = S.Struct({ org: OrganizationId, phrases: StringList }).annotate({
   description: "The search words long enough to be read as typos, each as one FTS5 string, as one JSON list"
 })
-const AsTyped = Schema.Struct({ phrase: Schema.String, found: Schema.BooleanFromBit }).annotate({
+const AsTyped = S.Struct({ phrase: S.String, found: S.BooleanFromBit }).annotate({
   description: "Whether the organization's items hold this search word as typed"
 })
 
@@ -121,13 +122,13 @@ export type EditOutcome =
   | { readonly _tag: "Missing" }
 
 // The values an edit compares with what is stored.
-const EditRequest = Schema.Struct({
+const EditRequest = S.Struct({
   org: OrganizationId,
   actor: MemberId,
-  name: Schema.String,
-  id: Schema.String,
-  activity: Schema.String,
-  at: Schema.String,
+  name: S.String,
+  id: S.String,
+  activity: S.String,
+  at: S.String,
   edit: ItemEdit
 }).annotate({ description: "One edit of one item, by whom, with the revision it was made on" })
 
@@ -175,7 +176,7 @@ export class Items extends Context.Service<
       const pageRows = (narrowed: Narrowed, order: Statement.Fragment) =>
         statement({
           Request: PageRequest,
-          Result: Schema.Array(ItemRow),
+          Result: S.Array(ItemRow),
           execute: (r) => sql`SELECT ${itemColumns(sql)}
             FROM item WHERE ${scoped(r.org, narrowed)} ORDER BY ${order} LIMIT ${r.perPage} OFFSET ${r.offset}`
         })
@@ -202,7 +203,7 @@ export class Items extends Context.Service<
         patterns: ReadonlyArray<string>,
         columns: ReadonlyArray<"name" | "sku" | "description">
       ) {
-        const json = yield* Schema.encodeEffect(StringList)(patterns).pipe(Effect.orDie)
+        const json = yield* S.encodeEffect(StringList)(patterns).pipe(Effect.orDie)
         const tests = Arr.map(columns, (column) => sql`${sql(column)} LIKE value ESCAPE '\\'`)
         return sql`EXISTS (SELECT 1 FROM json_each(${json}) WHERE ${sql.or(tests)})`
       })
@@ -311,7 +312,7 @@ export class Items extends Context.Service<
         }
         if (operator !== "inArray" && operator !== "notInArray") return Option.none()
         if (typeof value === "string" || !Arr.isReadonlyArrayNonEmpty(value)) return Option.none()
-        const json = yield* Schema.encodeEffect(StringList)(value).pipe(Effect.orDie)
+        const json = yield* S.encodeEffect(StringList)(value).pipe(Effect.orDie)
         return Option.some(
           operator === "inArray"
             ? sql`(${column} IN (SELECT value FROM json_each(${json})))`
@@ -500,7 +501,7 @@ export class Items extends Context.Service<
       }, Effect.orDie)
 
       const findItem = SqlSchema.findOneOption({
-        Request: Schema.Struct({ org: OrganizationId, id: Schema.String }),
+        Request: S.Struct({ org: OrganizationId, id: S.String }),
         Result: ItemRow,
         execute: ({ org, id }) => sql`SELECT ${itemColumns(sql)} FROM item WHERE organizationId = ${org} AND id = ${id}`
       })
@@ -523,7 +524,7 @@ export class Items extends Context.Service<
       })
       const editItem = statement({
         Request: EditRequest,
-        Result: Schema.Array(ItemRow),
+        Result: S.Array(ItemRow),
         execute: (r) => sql`UPDATE item SET name = ${r.edit.name}, description = ${r.edit.description},
             category = ${r.edit.category}, uom = ${r.edit.uom}, unitCost = ${r.edit.unitCost},
             quantityOnHand = ${r.edit.quantityOnHand}, reorderPoint = ${r.edit.reorderPoint},

@@ -1,10 +1,11 @@
-import { Context, Effect, Layer, Option, Schema } from "effect"
+import { Context, Effect, Layer, Option } from "effect"
+import * as S from "effect/Schema"
 import { SqlClient, SqlSchema } from "effect/sql"
 import { Activity } from "../domain/Activity.ts"
 import { OrganizationId } from "../domain/Identity.ts"
 
 /** How many lines of the audit trail one organization has, as the count query answers it. */
-const ActivityCount = Schema.Struct({ n: Schema.Int }).annotate({
+const ActivityCount = S.Struct({ n: S.Int }).annotate({
   description: "COUNT(*) of an organization's audit lines"
 })
 

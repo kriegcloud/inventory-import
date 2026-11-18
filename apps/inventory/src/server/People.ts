@@ -4,19 +4,20 @@
 // up without an admin, and the check and the write are one statement, so two admins demoting each other at the
 // same moment cannot both succeed.
 import { D1Client } from "@effect/sql-d1"
-import { Context, DateTime, Effect, Layer, Option, Result, Schema, String as Str } from "effect"
+import { Context, DateTime, Effect, Layer, Option, Result, String as Str } from "effect"
+import * as S from "effect/Schema"
 import { SecureRandom } from "effect/crypto"
 import { SqlClient, SqlSchema, type Statement } from "effect/sql"
 import { LastAdmin, Person, PersonNotFound } from "../api/v1/People.ts"
 import { AddPersonProblem, type Member, MemberId, OrganizationId, Role } from "../domain/Identity.ts"
 import { batchOn, NoRows, statement } from "./Sql.ts"
 
-const Scope = Schema.Struct({ org: OrganizationId, id: Schema.String }).annotate({
+const Scope = S.Struct({ org: OrganizationId, id: S.String }).annotate({
   description: "One member of one organization, by id"
 })
-const Ids = Schema.Array(Schema.Struct({ id: Schema.String })).annotate({ description: "The ids a write returned" })
+const Ids = S.Array(S.Struct({ id: S.String })).annotate({ description: "The ids a write returned" })
 /** Who is acting and where: every write here is scoped to the actor's organization and names them in the audit line. */
-const Acting = { org: OrganizationId, actor: MemberId, name: Schema.String }
+const Acting = { org: OrganizationId, actor: MemberId, name: S.String }
 
 /** Data access for the members of an organization. */
 export class People extends Context.Service<
@@ -42,7 +43,7 @@ export class People extends Context.Service<
           m.createdAt AS joinedAt
         FROM member m LEFT JOIN user u ON u.id = m.userId`
       const findAll = SqlSchema.findAll({
-        Request: Schema.String,
+        Request: S.String,
         Result: Person,
         execute: (org) => sql`${select} WHERE m.organizationId = ${org} AND m.removedAt IS NULL ORDER BY name, m.id`
       })
@@ -54,12 +55,12 @@ export class People extends Context.Service<
       })
       // Matched whatever its case, through the index on lower(email) (part 5 of migrations/0001_init.sql).
       const findUser = SqlSchema.findOneOption({
-        Request: Schema.String,
-        Result: Schema.Struct({ id: Schema.String, name: Schema.String }),
+        Request: S.String,
+        Result: S.Struct({ id: S.String, name: S.String }),
         execute: (email) => sql`SELECT id, name FROM user WHERE lower(email) = ${email}`
       })
       const findMembership = SqlSchema.findOneOption({
-        Request: Schema.Struct({ org: Schema.String, userId: Schema.String }),
+        Request: S.Struct({ org: S.String, userId: S.String }),
         Result: Person,
         execute: ({ org, userId }) =>
           sql`${select} WHERE m.organizationId = ${org} AND m.userId = ${userId} AND m.removedAt IS NULL`
@@ -70,13 +71,13 @@ export class People extends Context.Service<
       // The audit line of a change, written only when `guard` holds: the same condition as the change it records.
       const auditLine = (guard: (r: { readonly org: string; readonly member: string }) => Statement.Fragment) =>
         statement({
-          Request: Schema.Struct({
+          Request: S.Struct({
             ...Acting,
-            id: Schema.String,
-            member: Schema.String,
-            action: Schema.String,
-            detail: Schema.String,
-            at: Schema.String
+            id: S.String,
+            member: S.String,
+            action: S.String,
+            detail: S.String,
+            at: S.String
           }),
           Result: NoRows,
           execute: (r) => sql`INSERT INTO activity (id, organizationId, actorId, actorName, action, detail, createdAt)
@@ -90,13 +91,13 @@ export class People extends Context.Service<
           AND userId IS NOT NULL)`
 
       const insertMember = statement({
-        Request: Schema.Struct({
+        Request: S.Struct({
           org: OrganizationId,
-          id: Schema.String,
-          userId: Schema.String,
-          name: Schema.String,
+          id: S.String,
+          userId: S.String,
+          name: S.String,
           role: Role,
-          at: Schema.String
+          at: S.String
         }),
         Result: Ids,
         execute: (r) => sql`INSERT INTO member (id, organizationId, userId, name, role, createdAt)
@@ -108,7 +109,7 @@ export class People extends Context.Service<
       )
 
       const updateRole = statement({
-        Request: Schema.Struct({ org: OrganizationId, member: Schema.String, role: Role }),
+        Request: S.Struct({ org: OrganizationId, member: S.String, role: Role }),
         Result: Ids,
         execute: (r) => sql`UPDATE member SET role = ${r.role}
           WHERE organizationId = ${r.org} AND id = ${r.member}
@@ -129,7 +130,7 @@ export class People extends Context.Service<
           AND (role != 'admin' OR ${anotherAdmin(r.org, r.member)}))`
       const removedLine = auditLine(removable)
       const unlinkMember = statement({
-        Request: Schema.Struct({ org: OrganizationId, member: Schema.String, at: Schema.String }),
+        Request: S.Struct({ org: OrganizationId, member: S.String, at: S.String }),
         Result: Ids,
         execute: (r) => sql`UPDATE member SET userId = NULL, removedAt = ${r.at}
           WHERE organizationId = ${r.org} AND id = ${r.member} AND removedAt IS NULL

@@ -3,7 +3,8 @@
 // budget. The one thing not to break: the count and the taking are one INSERT ... WHERE (SELECT COUNT(*) ...) < limit,
 // written BEFORE the call, so two requests cannot both take the last call, and a call that fails or times out has
 // still been counted. With no key nothing is taken: the rules answer and cost nothing.
-import { Array as Arr, Context, DateTime, Effect, Layer, Schema } from "effect"
+import { Array as Arr, Context, DateTime, Effect, Layer } from "effect"
+import * as S from "effect/Schema"
 import { SecureRandom } from "effect/crypto"
 import { SqlClient } from "effect/sql"
 import { type Member, MemberId, OrganizationId } from "../domain/Identity.ts"
@@ -16,7 +17,7 @@ export const dailyModelCalls = 40
  * What a model call is for: the table assistant reading a request (`view`), the check that the key works, or
  * suggestions for an import's rows the rules cannot fix (`suggest`).
  */
-export const ModelCallKind = Schema.Literals(["view", "check", "suggest"]).annotate({
+export const ModelCallKind = S.Literals(["view", "check", "suggest"]).annotate({
   description:
     "What a model call is for: the table assistant reading a request, the check that the key works, or suggestions for an import"
 })
@@ -44,16 +45,16 @@ export class ModelCalls extends Context.Service<
       const random = yield* SecureRandom.SecureRandom
 
       const reserve = statement({
-        Request: Schema.Struct({
-          id: Schema.String,
+        Request: S.Struct({
+          id: S.String,
           org: OrganizationId,
           actor: MemberId,
           kind: ModelCallKind,
-          since: Schema.String,
-          limit: Schema.Int,
-          at: Schema.String
+          since: S.String,
+          limit: S.Int,
+          at: S.String
         }),
-        Result: Schema.Array(Schema.Struct({ id: Schema.String })),
+        Result: S.Array(S.Struct({ id: S.String })),
         execute: (r) => sql`INSERT INTO modelCall (id, organizationId, actorId, kind, createdAt)
           SELECT ${r.id}, ${r.org}, ${r.actor}, ${r.kind}, ${r.at}
           WHERE (SELECT COUNT(*) FROM modelCall WHERE organizationId = ${r.org} AND createdAt >= ${r.since}) < ${r.limit}

@@ -5,7 +5,8 @@
 // stored in `importSuggestion`: no item and no decision is touched, and the review shows each one as a proposal the
 // person accepts or rejects. One call is taken from the organization's allowance before the model is asked.
 import { D1Client } from "@effect/sql-d1"
-import { Array as Arr, Context, DateTime, Effect, Layer, Schema } from "effect"
+import { Array as Arr, Context, DateTime, Effect, Layer } from "effect"
+import * as S from "effect/Schema"
 import { SecureRandom } from "effect/crypto"
 import { SqlClient, SqlSchema } from "effect/sql"
 import type { AnsweredBy } from "../api/v1/Api.ts"
@@ -35,7 +36,7 @@ export const usedUp = `${usedUpWords}, so the rules answered.`
 /** Why nobody was asked when every open row already has a suggestion, or none can have one. */
 export const nothingToAsk = "Nothing was left to suggest, so no model was asked."
 
-const toJson = Schema.encodeUnknownEffect(Schema.fromJsonString(Schema.Unknown))
+const toJson = S.encodeUnknownEffect(S.fromJsonString(S.Unknown))
 
 // What the model is told. It picks and names; it is never asked to count or to rate itself.
 const system = Arr.join(
@@ -115,9 +116,9 @@ export const propose = Effect.fn("Suggestions.propose")(function* (input: {
   return proposed
 })
 
-const Stored = Schema.Struct({
+const Stored = S.Struct({
   ...Suggestion.fields,
-  rowId: Schema.String.annotate({ description: "The row's id; empty for a column" })
+  rowId: S.String.annotate({ description: "The row's id; empty for a column" })
 }).annotate({ description: "A suggestion as its table holds it: the row id is empty, not null, for a column" })
 
 const toSuggestion = (row: typeof Stored.Type): Suggestion => ({ ...row, rowId: row.rowId === "" ? null : row.rowId })
@@ -154,7 +155,7 @@ export class Suggestions extends Context.Service<
       const calls = yield* ModelCalls
 
       const findAll = SqlSchema.findAll({
-        Request: Schema.Struct({ org: OrganizationId, id: Schema.String }),
+        Request: S.Struct({ org: OrganizationId, id: S.String }),
         Result: Stored,
         execute: (r) => sql`SELECT id, kind, rowId, rowNumber, field, fromValue AS "from", toValue AS "to",
             columnIndex AS "column", madeBy AS "by", model, confidence, basis
@@ -163,14 +164,14 @@ export class Suggestions extends Context.Service<
 
       // Written only while the import is open, and only where the row and field have no suggestion yet.
       const insert = statement({
-        Request: Schema.Struct({
+        Request: S.Struct({
           org: OrganizationId,
-          importId: Schema.String,
+          importId: S.String,
           actor: MemberId,
-          at: Schema.String,
+          at: S.String,
           row: Stored
         }),
-        Result: Schema.Array(Schema.Struct({ id: Schema.String })),
+        Result: S.Array(S.Struct({ id: S.String })),
         execute: (r) => sql`INSERT INTO importSuggestion (id, organizationId, importId, kind, rowId, rowNumber, field,
             fromValue, toValue, columnIndex, madeBy, model, confidence, basis, askedById, createdAt)
           SELECT ${r.row.id}, ${r.org}, ${r.importId}, ${r.row.kind}, ${r.row.rowId}, ${r.row.rowNumber},
@@ -182,14 +183,14 @@ export class Suggestions extends Context.Service<
       })
 
       const line = statement({
-        Request: Schema.Struct({
-          id: Schema.String,
+        Request: S.Struct({
+          id: S.String,
           org: OrganizationId,
           actor: MemberId,
-          name: Schema.String,
-          detail: Schema.String,
-          agent: Schema.String,
-          at: Schema.String
+          name: S.String,
+          detail: S.String,
+          agent: S.String,
+          at: S.String
         }),
         Result: NoRows,
         execute: (r) => sql`INSERT INTO activity (id, organizationId, actorId, actorName, action, detail, createdAt,

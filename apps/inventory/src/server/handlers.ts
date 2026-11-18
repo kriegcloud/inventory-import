@@ -1,4 +1,5 @@
-import { Clock, Effect, Layer, Schema } from "effect"
+import { Clock, Effect, Layer } from "effect"
+import * as S from "effect/Schema"
 import { HttpServerRequest } from "effect/http"
 import { HttpApiBuilder } from "effect/http-api"
 import { AiCheck, Api, ModelCallsUsedUp, SystemStatus } from "../api/v1/Api.ts"
@@ -39,7 +40,7 @@ const SystemHandlers = HttpApiBuilder.group(
         const answer = yield* ai.generateObject({
           name: "greeting",
           prompt: "Reply with a five-word greeting.",
-          schema: Schema.Struct({ greeting: Schema.String })
+          schema: S.Struct({ greeting: S.String })
         })
         const finished = yield* Clock.currentTimeMillis
         return AiCheck.make({

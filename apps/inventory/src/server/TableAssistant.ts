@@ -5,7 +5,8 @@
 // daily allowance first (ModelCalls.ts), the one every model feature draws on; when it is used up the rules answer
 // and say so. The one thing not to break: nothing here writes anything but that count and the audit line of a
 // model's answer, so it never needs more than the viewer role.
-import { Array as Arr, Context, DateTime, Effect, Layer, Result, Schema } from "effect"
+import { Array as Arr, Context, DateTime, Effect, Layer, Result } from "effect"
+import * as S from "effect/Schema"
 import { SecureRandom } from "effect/crypto"
 import { SqlClient } from "effect/sql"
 import type { ViewRequest } from "../api/v1/Assistant.ts"
@@ -41,7 +42,7 @@ export const answerByRules = (input: { readonly request: ViewRequest; readonly w
 /** The agent that reads table requests. It changes a person's view only, so it never acts above a viewer. */
 export const viewReader = AgentRun.make({ agent: "Table assistant", maxRole: "viewer" })
 
-const toJson = Schema.encodeUnknownEffect(Schema.fromJsonString(Schema.Unknown))
+const toJson = S.encodeUnknownEffect(S.fromJsonString(S.Unknown))
 
 // What the model is told. The catalog travels as JSON in the prompt; the answer's Schema says the rest.
 const system = Arr.join(
@@ -78,14 +79,14 @@ export class TableAssistant extends Context.Service<
       const calls = yield* ModelCalls
 
       const line = statement({
-        Request: Schema.Struct({
-          id: Schema.String,
-          org: Schema.String,
-          actor: Schema.String,
-          name: Schema.String,
-          detail: Schema.String,
-          agent: Schema.String,
-          at: Schema.String
+        Request: S.Struct({
+          id: S.String,
+          org: S.String,
+          actor: S.String,
+          name: S.String,
+          detail: S.String,
+          agent: S.String,
+          at: S.String
         }),
         Result: NoRows,
         execute: (r) => sql`INSERT INTO activity (id, organizationId, actorId, actorName, action, detail, createdAt,

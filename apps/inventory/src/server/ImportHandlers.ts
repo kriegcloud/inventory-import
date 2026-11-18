@@ -1,7 +1,8 @@
 // The import and item endpoints. The one thing a reader must not break: the browser never sends a row to write. `commit`
 // reads the staged file back from storage and runs the same pure `review` the screen ran, so a row the screen
 // refused cannot be written by a crafted request.
-import { Array as Arr, Effect, Option, Record as Rec, Result, Schema } from "effect"
+import { Array as Arr, Effect, Option, Record as Rec, Result } from "effect"
+import * as S from "effect/Schema"
 import { HttpApiBuilder } from "effect/http-api"
 import {
   AlreadyImported,
@@ -233,7 +234,7 @@ export const ImportHandlers = HttpApiBuilder.group(
         const finished = yield* imports.find(actor.organizationId, params.id)
         if (Option.isSome(finished)) return yield* Effect.map(viewOf(actor, finished.value), Result.succeed)
         const upload = yield* findUpload(actor, params.id)
-        const head = yield* Schema.decodeEffect(Schema.fromJsonString(StagedHead))(upload.headJson).pipe(Effect.orDie)
+        const head = yield* S.decodeEffect(S.fromJsonString(StagedHead))(upload.headJson).pipe(Effect.orDie)
         const chunks = yield* imports.uploadChunks(actor, upload)
         const table: StagedTable = { ...head, rows: Arr.flatMap(chunks, (chunk) => chunk.rows) }
         const problem =

@@ -12,9 +12,9 @@ import {
   Predicate,
   Redacted,
   Schedule,
-  Schema,
   String as Str
 } from "effect"
+import * as S from "effect/Schema"
 import {
   type AiProvider,
   AiRoute,
@@ -27,7 +27,7 @@ import {
 import { type AiSettings, aiSettings } from "./Settings.ts"
 
 /** A schema whose decoding needs no services: anything built from plain Schema combinators. */
-type AnswerSchema = Schema.Top & { readonly DecodingServices: never }
+type AnswerSchema = S.Top & { readonly DecodingServices: never }
 
 /**
  * The one retry policy for model calls. The AI SDK's own retries are off (`maxRetries: 0` on every call), so this is
@@ -77,14 +77,11 @@ export interface AiAnswer<A> {
  * One failed attempt, with the provider's own words kept for the log. Never leaves this file: callers see
  * `AiUnavailable`, worded for the person by its kind (`modelSentences`).
  */
-class ModelCallFailed extends Schema.TaggedError<ModelCallFailed, { readonly brand: unique symbol }>()(
-  "ModelCallFailed",
-  {
-    kind: AiTrouble,
-    retryable: Schema.Boolean,
-    detail: Schema.String
-  }
-) {}
+class ModelCallFailed extends S.TaggedError<ModelCallFailed, { readonly brand: unique symbol }>()("ModelCallFailed", {
+  kind: AiTrouble,
+  retryable: S.Boolean,
+  detail: S.String
+}) {}
 
 const statusOf = (cause: unknown): number | undefined =>
   Predicate.hasProperty(cause, "statusCode") && Predicate.isNumber(cause.statusCode) ? cause.statusCode : undefined
@@ -162,7 +159,7 @@ export class Ai extends Context.Service<
      * `maxRetries: 0` and pipe it through `retryModelCall`.
      */
     readonly languageModel: LanguageModel | undefined
-    /** One structured answer. Pass a `Schema.Struct`: models answer with a JSON object. */
+    /** One structured answer. Pass a `S.Struct`: models answer with a JSON object. */
     generateObject<S extends AnswerSchema>(options: {
       readonly name: string
       readonly prompt: string
@@ -369,16 +366,13 @@ export const answeredByRules =
  * and decoding the answer through it is the validation. A reply that does not decode never reaches the caller.
  */
 export const toAiSchema = <S extends AnswerSchema>(schema: S) => {
-  const decode = Schema.decodeUnknownExit(schema)
-  return jsonSchema<S["Type"]>(
-    Schema.toStandardJSONSchemaV1(schema)["~standard"].jsonSchema.input({ target: "draft-07" }),
-    {
-      validate: (value) => {
-        const exit = decode(value)
-        return Exit.isSuccess(exit)
-          ? { success: true, value: exit.value }
-          : { success: false, error: new Error(String(exit.cause)) }
-      }
+  const decode = S.decodeUnknownExit(schema)
+  return jsonSchema<S["Type"]>(S.toStandardJSONSchemaV1(schema)["~standard"].jsonSchema.input({ target: "draft-07" }), {
+    validate: (value) => {
+      const exit = decode(value)
+      return Exit.isSuccess(exit)
+        ? { success: true, value: exit.value }
+        : { success: false, error: new Error(String(exit.cause)) }
     }
-  )
+  })
 }

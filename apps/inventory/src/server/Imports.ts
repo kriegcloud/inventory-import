@@ -6,7 +6,8 @@
 // every statement checks the same condition (the import is still open; the confirm is still in force), so a second
 // press, a retry or another tab writes nothing.
 import { D1Client } from "@effect/sql-d1"
-import { Array as Arr, Context, DateTime, Effect, Layer, Option, Order, Record as Rec, Result, Schema } from "effect"
+import { Array as Arr, Context, DateTime, Effect, Layer, Option, Order, Record as Rec, Result } from "effect"
+import * as S from "effect/Schema"
 import { SecureRandom } from "effect/crypto"
 import { SqlClient, SqlSchema, type Statement } from "effect/sql"
 import {
@@ -42,19 +43,19 @@ import { abandonedAfterMinutes, chunkRows, maxChunkChars } from "../domain/Uploa
 import { batchOn, NoRows, run, statement } from "./Sql.ts"
 
 /** An import as stored, without its rows. */
-export const Draft = Schema.Struct({
-  id: Schema.String,
-  fileName: Schema.String,
-  headJson: Schema.String,
-  rowCount: Schema.Int,
-  status: Schema.Literals(["open", "imported", "takenBack"]),
-  actorName: Schema.String,
-  createdAt: Schema.String,
-  importedBy: Schema.NullOr(Schema.String),
-  importedAt: Schema.NullOr(Schema.String),
-  revision: Schema.Int,
-  needsAtStart: Schema.Int,
-  choicesJson: Schema.String
+export const Draft = S.Struct({
+  id: S.String,
+  fileName: S.String,
+  headJson: S.String,
+  rowCount: S.Int,
+  status: S.Literals(["open", "imported", "takenBack"]),
+  actorName: S.String,
+  createdAt: S.String,
+  importedBy: S.NullOr(S.String),
+  importedAt: S.NullOr(S.String),
+  revision: S.Int,
+  needsAtStart: S.Int,
+  choicesJson: S.String
 }).annotate({ description: "An import as stored, without its rows" })
 /** The decoded value of `Draft`: an import as stored, without its rows. */
 export type Draft = typeof Draft.Type
@@ -96,12 +97,12 @@ const textOf = (item: ItemFields | null): number =>
       Arr.reduce(item.vendors, 0, (total, vendor) => total + vendor.vendorName.length + 120)
 
 /** An upload that has not finished: who started it, what file, and how many rows in how many pieces will follow. */
-export const Upload = Schema.Struct({
-  id: Schema.String,
-  fileName: Schema.String,
-  headJson: Schema.String,
-  rowCount: Schema.Int,
-  chunkCount: Schema.Int
+export const Upload = S.Struct({
+  id: S.String,
+  fileName: S.String,
+  headJson: S.String,
+  rowCount: S.Int,
+  chunkCount: S.Int
 }).annotate({ description: "An unfinished upload, without its pieces" })
 /** The decoded value of `Upload`: an upload that has not finished. */
 export type Upload = typeof Upload.Type
@@ -132,13 +133,13 @@ const bySize = <A>(rows: ReadonlyArray<A>, size: (row: A) => number): ReadonlyAr
  * An item as SQLite stores it, decoded by the services that read `item` (here and `Items`): the two switches are 0 or
  * 1, and tags, dimensions and vendors are JSON text, each checked against its Schema on the way out as on the way in.
  */
-export const ItemRow = Schema.Struct({
+export const ItemRow = S.Struct({
   ...StoredItem.fields,
-  isActive: Schema.BooleanFromBit,
-  lotTracked: Schema.BooleanFromBit,
-  tags: Schema.fromJsonString(Schema.Array(Schema.String)),
-  dimensions: Schema.NullOr(Schema.fromJsonString(Dimensions)),
-  vendors: Schema.fromJsonString(Schema.Array(Vendor))
+  isActive: S.BooleanFromBit,
+  lotTracked: S.BooleanFromBit,
+  tags: S.String.pipe(S.Array, S.fromJsonString),
+  dimensions: Dimensions.pipe(S.fromJsonString, S.NullOr),
+  vendors: Vendor.pipe(S.Array, S.fromJsonString)
 }).annotate({ description: "An item row as SQLite stores it" })
 
 /** The columns of `item` that `ItemRow` reads, in one place for every query that answers items. */
@@ -146,71 +147,71 @@ export const itemColumns = (sql: SqlClient.SqlClient) =>
   sql`id, sku, name, description, category, uom, unitCost, quantityOnHand, reorderPoint, isActive, lotTracked, tags,
     firstReceivedOn, discontinuedOn, dimensions, vendors, createdAt, createdBy, revision`
 
-const HeadJson = Schema.fromJsonString(StagedHead)
-const RowsJson = Schema.fromJsonString(Schema.Array(StagedRow))
-const DecisionJson = Schema.fromJsonString(RowDecision)
-const ChoicesJson = Schema.fromJsonString(Schema.Array(MappingChoice))
-const IdList = Schema.fromJsonString(Schema.Array(Schema.String)).annotate({
+const HeadJson = S.fromJsonString(StagedHead)
+const RowsJson = StagedRow.pipe(S.Array, S.fromJsonString)
+const DecisionJson = S.fromJsonString(RowDecision)
+const ChoicesJson = MappingChoice.pipe(S.Array, S.fromJsonString)
+const IdList = S.String.pipe(S.Array, S.fromJsonString).annotate({
   description: "Ids or keys bound as one JSON parameter and read with json_each"
 })
 
-const Scope = Schema.Struct({ org: OrganizationId, id: Schema.String }).annotate({
+const Scope = S.Struct({ org: OrganizationId, id: S.String }).annotate({
   description: "One row of one organization, by id"
 })
-const Ids = Schema.Array(Schema.Struct({ id: Schema.String })).annotate({ description: "The ids a write returned" })
-const Count = Schema.Array(Schema.Struct({ n: Schema.Int })).annotate({ description: "One COUNT(*)" })
+const Ids = S.Array(S.Struct({ id: S.String })).annotate({ description: "The ids a write returned" })
+const Count = S.Array(S.Struct({ n: S.Int })).annotate({ description: "One COUNT(*)" })
 /** Who is acting and where: every write is scoped to the actor's organization and names them in the audit line. */
-const Acting = { org: OrganizationId, actor: MemberId, name: Schema.String }
+const Acting = { org: OrganizationId, actor: MemberId, name: S.String }
 
 // One decision as it travels to SQL: the row it is for, and the decision as the JSON `importDecision` stores.
-const DecisionEntry = Schema.Struct({ rowId: Schema.String, json: DecisionJson })
-const DecisionEntries = Schema.fromJsonString(Schema.Array(DecisionEntry))
+const DecisionEntry = S.Struct({ rowId: S.String, json: DecisionJson })
+const DecisionEntries = DecisionEntry.pipe(S.Array, S.fromJsonString)
 
 // One item a confirm writes, as it travels to SQL, with the key that makes the SKU unique.
-const ItemInsert = Schema.Struct({
+const ItemInsert = S.Struct({
   ...ItemFieldsSchema.fields,
-  id: Schema.String,
-  rowNumber: Schema.Int,
-  part: Schema.Int,
-  skuKey: Schema.String
+  id: S.String,
+  rowNumber: S.Int,
+  part: S.Int,
+  skuKey: S.String
 }).annotate({ description: "An item a confirm writes, as the JSON one statement reads with json_each" })
-const ItemInserts = Schema.fromJsonString(Schema.Array(ItemInsert))
+const ItemInserts = ItemInsert.pipe(S.Array, S.fromJsonString)
 
 // What a confirm items for one item of the file.
-const OutcomeInsert = Schema.Struct({
-  rowNumber: Schema.Int,
-  part: Schema.Int,
-  sku: Schema.String,
-  name: Schema.String,
-  status: Schema.Literals(["ready", "update", "already", "notImported"]),
-  reason: Schema.String,
-  decidedBy: Schema.NullOr(Schema.Literals(["person", "nobody"])),
-  decidedByName: Schema.NullOr(Schema.String)
+const OutcomeInsert = S.Struct({
+  rowNumber: S.Int,
+  part: S.Int,
+  sku: S.String,
+  name: S.String,
+  status: S.Literals(["ready", "update", "already", "notImported"]),
+  reason: S.String,
+  decidedBy: S.NullOr(S.Literals(["person", "nobody"])),
+  decidedByName: S.NullOr(S.String)
 }).annotate({ description: "The review's verdict on one row, before the confirm knows whether its item landed" })
-const OutcomeInserts = Schema.fromJsonString(Schema.Array(OutcomeInsert))
+const OutcomeInserts = OutcomeInsert.pipe(S.Array, S.fromJsonString)
 
 // One changed value a confirm items.
-const ChangeInsert = Schema.Struct({
+const ChangeInsert = S.Struct({
   ...Change.fields,
-  rowNumber: Schema.Int,
-  part: Schema.Int,
-  sku: Schema.String,
-  update: Schema.Boolean,
-  decidedByName: Schema.NullOr(Schema.String)
+  rowNumber: S.Int,
+  part: S.Int,
+  sku: S.String,
+  update: S.Boolean,
+  decidedByName: S.NullOr(S.String)
 }).annotate({ description: "One value a confirm writes that differs from the file" })
-const ChangeInserts = Schema.fromJsonString(Schema.Array(ChangeInsert))
+const ChangeInserts = ChangeInsert.pipe(S.Array, S.fromJsonString)
 
-const ChangeRow = Schema.Struct({
+const ChangeRow = S.Struct({
   ...ChangeRecord.fields,
-  part: Schema.Int,
-  takenBack: Schema.BooleanFromBit
+  part: S.Int,
+  takenBack: S.BooleanFromBit
 }).annotate({
   description:
     "A changed value as stored, with its part (0 for a row that is one item) and whether its item was taken back as 0 or 1"
 })
 
 // What a confirm stored for one item of the file, its part as stored: 0 for a row that is one item.
-const OutcomeRow = Schema.Struct({ ...RowOutcome.fields, part: Schema.Int }).annotate({
+const OutcomeRow = S.Struct({ ...RowOutcome.fields, part: S.Int }).annotate({
   description: "What the confirms did with one item of the file, as stored"
 })
 
@@ -218,27 +219,27 @@ const OutcomeRow = Schema.Struct({ ...RowOutcome.fields, part: Schema.Int }).ann
 const partOf = (part: number): { readonly part?: number } => (part === 0 ? {} : { part })
 
 // A confirm as `importBatch` stores it: what it did, and the take-back that reversed it, if one did.
-const BatchRow = Schema.Struct({
-  id: Schema.String,
-  confirmedByName: Schema.String,
-  confirmedAt: Schema.String,
-  created: Schema.Int,
-  updated: Schema.Int,
-  already: Schema.Int,
-  notImported: Schema.Int,
-  takenBackByName: Schema.NullOr(Schema.String),
-  takenBackAt: Schema.NullOr(Schema.String),
-  takeBackId: Schema.NullOr(Schema.String),
-  removed: Schema.Int,
-  restored: Schema.Int,
-  kept: Schema.Int
+const BatchRow = S.Struct({
+  id: S.String,
+  confirmedByName: S.String,
+  confirmedAt: S.String,
+  created: S.Int,
+  updated: S.Int,
+  already: S.Int,
+  notImported: S.Int,
+  takenBackByName: S.NullOr(S.String),
+  takenBackAt: S.NullOr(S.String),
+  takeBackId: S.NullOr(S.String),
+  removed: S.Int,
+  restored: S.Int,
+  kept: S.Int
 }).annotate({ description: "One confirm of an import, and its take-back when there was one" })
 
-const ChangedItemRow = Schema.Struct({
-  sku: Schema.String,
-  name: Schema.String,
-  changedBy: Schema.NullOr(Schema.String),
-  changedAt: Schema.NullOr(Schema.String)
+const ChangedItemRow = S.Struct({
+  sku: S.String,
+  name: S.String,
+  changedBy: S.NullOr(S.String),
+  changedAt: S.NullOr(S.String)
 }).annotate({ description: "An item someone changed after the import, with who and when as stored" })
 
 /** Data access for imports and the items they create. */
@@ -402,7 +403,7 @@ export class Imports extends Context.Service<
           sql`SELECT ${draftColumns} FROM importDraft WHERE organizationId = ${org} AND id = ${id}`
       })
       const findOpen = SqlSchema.findAll({
-        Request: Schema.Struct({ org: OrganizationId, limit: Schema.Int }),
+        Request: S.Struct({ org: OrganizationId, limit: S.Int }),
         Result: Draft,
         execute: ({ org, limit }) =>
           sql`SELECT ${draftColumns} FROM importDraft WHERE organizationId = ${org} AND status = 'open'
@@ -410,12 +411,12 @@ export class Imports extends Context.Service<
       })
       const countOpen = SqlSchema.findOne({
         Request: OrganizationId,
-        Result: Schema.Struct({ n: Schema.Int }),
+        Result: S.Struct({ n: S.Int }),
         execute: (org) => sql`SELECT COUNT(*) AS n FROM importDraft WHERE organizationId = ${org} AND status = 'open'`
       })
       const findDecisions = SqlSchema.findAll({
         Request: Scope,
-        Result: Schema.Struct({ rowId: Schema.String, decisionJson: Schema.String, decidedByName: Schema.String }),
+        Result: S.Struct({ rowId: S.String, decisionJson: S.String, decidedByName: S.String }),
         execute: ({ org, id }) =>
           sql`SELECT rowId, decisionJson, decidedByName FROM importDecision
             WHERE organizationId = ${org} AND importId = ${id}`
@@ -441,7 +442,7 @@ export class Imports extends Context.Service<
       })
       const findChunks = SqlSchema.findAll({
         Request: Scope,
-        Result: Schema.Struct({ rowsJson: Schema.String }),
+        Result: S.Struct({ rowsJson: S.String }),
         execute: ({ org, id }) =>
           sql`SELECT rowsJson FROM importChunk WHERE organizationId = ${org} AND importId = ${id} ORDER BY seq`
       })
@@ -459,13 +460,13 @@ export class Imports extends Context.Service<
       })
       const findCreatedRows = SqlSchema.findAll({
         Request: Scope,
-        Result: Schema.Struct({ rowNumber: Schema.Int, part: Schema.Int }),
+        Result: S.Struct({ rowNumber: S.Int, part: S.Int }),
         execute: ({ org, id }) =>
           sql`SELECT rowNumber, part FROM importOutcome
             WHERE organizationId = ${org} AND importId = ${id} AND outcome = 'created' ORDER BY rowNumber, part`
       })
       const findStored = SqlSchema.findAll({
-        Request: Schema.Struct({ org: OrganizationId, keys: IdList }),
+        Request: S.Struct({ org: OrganizationId, keys: IdList }),
         Result: ItemRow,
         execute: ({ org, keys }) =>
           sql`SELECT ${itemColumns(sql)} FROM item WHERE organizationId = ${org}
@@ -480,21 +481,21 @@ export class Imports extends Context.Service<
             FROM importBatch WHERE organizationId = ${org} AND importId = ${id} ORDER BY confirmedAt, rowid`
       })
       const findUploadRow = SqlSchema.findOneOption({
-        Request: Schema.Struct({ org: OrganizationId, actor: MemberId, id: Schema.String }),
+        Request: S.Struct({ org: OrganizationId, actor: MemberId, id: S.String }),
         Result: Upload,
         execute: ({ org, actor, id }) =>
           sql`SELECT id, fileName, headJson, rowCount, chunkCount FROM importUpload
             WHERE organizationId = ${org} AND id = ${id} AND actorId = ${actor}`
       })
       const findUploadByKey = SqlSchema.findOne({
-        Request: Schema.Struct({ org: OrganizationId, actor: MemberId, key: Schema.String }),
-        Result: Schema.Struct({ id: Schema.String }),
+        Request: S.Struct({ org: OrganizationId, actor: MemberId, key: S.String }),
+        Result: S.Struct({ id: S.String }),
         execute: ({ org, actor, key }) =>
           sql`SELECT id FROM importUpload WHERE organizationId = ${org} AND actorId = ${actor} AND requestKey = ${key}`
       })
       const findUploadChunks = SqlSchema.findAll({
         Request: Scope,
-        Result: Schema.Struct({ seq: Schema.Int, rowsJson: Schema.String }),
+        Result: S.Struct({ seq: S.Int, rowsJson: S.String }),
         execute: ({ org, id }) =>
           sql`SELECT seq, rowsJson FROM importUploadChunk WHERE organizationId = ${org} AND uploadId = ${id}
             ORDER BY seq`
@@ -509,28 +510,28 @@ export class Imports extends Context.Service<
 
       // -- Uploads ---------------------------------------------------------------------------------------------
 
-      const UploadScope = Schema.Struct({ org: OrganizationId, actor: MemberId, id: Schema.String })
+      const UploadScope = S.Struct({ org: OrganizationId, actor: MemberId, id: S.String })
       const dropAbandonedChunks = statement({
-        Request: Schema.Struct({ org: OrganizationId, before: Schema.String }),
+        Request: S.Struct({ org: OrganizationId, before: S.String }),
         Result: NoRows,
         execute: (r) => sql`DELETE FROM importUploadChunk WHERE organizationId = ${r.org}
           AND uploadId IN (SELECT id FROM importUpload WHERE organizationId = ${r.org} AND createdAt < ${r.before})`
       })
       const dropAbandonedUploads = statement({
-        Request: Schema.Struct({ org: OrganizationId, before: Schema.String }),
+        Request: S.Struct({ org: OrganizationId, before: S.String }),
         Result: NoRows,
         execute: (r) => sql`DELETE FROM importUpload WHERE organizationId = ${r.org} AND createdAt < ${r.before}`
       })
       const insertUpload = statement({
-        Request: Schema.Struct({
+        Request: S.Struct({
           ...Acting,
-          id: Schema.String,
-          key: Schema.String,
-          fileName: Schema.String,
+          id: S.String,
+          key: S.String,
+          fileName: S.String,
           headJson: HeadJson,
-          rowCount: Schema.Int,
-          chunkCount: Schema.Int,
-          at: Schema.String
+          rowCount: S.Int,
+          chunkCount: S.Int,
+          at: S.String
         }),
         Result: NoRows,
         execute: (r) => sql`INSERT INTO importUpload (id, organizationId, actorId, actorName, requestKey, fileName,
@@ -550,7 +551,7 @@ export class Imports extends Context.Service<
         const now = yield* DateTime.now
         const at = DateTime.formatIso(now)
         const before = DateTime.formatIso(DateTime.subtract(now, { minutes: abandonedAfterMinutes }))
-        const headJson = yield* Schema.encodeEffect(HeadJson)(head).pipe(Effect.orDie)
+        const headJson = yield* S.encodeEffect(HeadJson)(head).pipe(Effect.orDie)
         // D1 refuses a value over 2 MB. Say so in words before it does.
         if (headJson.length > maxChunkChars) {
           return Result.fail(fileProblem.tooLong({ fileName: head.fileName, part: "headings" }))
@@ -567,10 +568,10 @@ export class Imports extends Context.Service<
       })
 
       const insertChunk = statement({
-        Request: Schema.Struct({
+        Request: S.Struct({
           ...UploadScope.fields,
-          seq: Schema.Int,
-          rowCount: Schema.Int,
+          seq: S.Int,
+          rowCount: S.Int,
           rows: RowsJson
         }),
         Result: NoRows,
@@ -588,7 +589,7 @@ export class Imports extends Context.Service<
         seq: number,
         rows: ReadonlyArray<StagedRow>
       ) {
-        const json = yield* Schema.encodeEffect(RowsJson)(rows)
+        const json = yield* S.encodeEffect(RowsJson)(rows)
         if (json.length > maxChunkChars) {
           return Result.fail(fileProblem.tooLong({ fileName: upload.fileName, part: "cells" }))
         }
@@ -602,13 +603,13 @@ export class Imports extends Context.Service<
         const chunks = yield* findUploadChunks({ org: actor.organizationId, id: upload.id })
         return yield* Effect.forEach(
           chunks,
-          (chunk) => Effect.map(Schema.decodeEffect(RowsJson)(chunk.rowsJson), (rows) => ({ seq: chunk.seq, rows })),
+          (chunk) => Effect.map(S.decodeEffect(RowsJson)(chunk.rowsJson), (rows) => ({ seq: chunk.seq, rows })),
           { concurrency: 1 }
         )
       }, Effect.orDie)
 
       const draftFromUpload = statement({
-        Request: Schema.Struct({ ...UploadScope.fields, at: Schema.String, needsAtStart: Schema.Int }),
+        Request: S.Struct({ ...UploadScope.fields, at: S.String, needsAtStart: S.Int }),
         Result: NoRows,
         execute: (r) => sql`INSERT INTO importDraft (id, organizationId, actorId, actorName, fileName, headJson,
             rowCount, status, createdAt, needsAtStart)
@@ -623,12 +624,12 @@ export class Imports extends Context.Service<
           WHERE organizationId = ${r.org} AND uploadId = ${r.id} AND ${stillUploading(r.org, r.actor, r.id)}`
       })
       const uploadedLine = statement({
-        Request: Schema.Struct({
+        Request: S.Struct({
           ...Acting,
-          upload: Schema.String,
-          activity: Schema.String,
-          detail: Schema.String,
-          at: Schema.String
+          upload: S.String,
+          activity: S.String,
+          detail: S.String,
+          at: S.String
         }),
         Result: NoRows,
         execute: (r) => sql`INSERT INTO activity (id, organizationId, actorId, actorName, action, detail, createdAt)
@@ -682,9 +683,9 @@ export class Imports extends Context.Service<
       // -- The staged file and its draft ---------------------------------------------------------------------
 
       const table = Effect.fn("Imports.table")(function* (organizationId: OrganizationId, draft: Draft) {
-        const head = yield* Schema.decodeEffect(HeadJson)(draft.headJson)
+        const head = yield* S.decodeEffect(HeadJson)(draft.headJson)
         const chunks = yield* findChunks({ org: organizationId, id: draft.id })
-        const rows = yield* Effect.forEach(chunks, (chunk) => Schema.decodeEffect(RowsJson)(chunk.rowsJson), {
+        const rows = yield* Effect.forEach(chunks, (chunk) => S.decodeEffect(RowsJson)(chunk.rowsJson), {
           concurrency: 1
         })
         return { ...head, rows: Arr.flatten(rows) }
@@ -695,10 +696,7 @@ export class Imports extends Context.Service<
         const decoded = yield* Effect.forEach(
           rows,
           (row) =>
-            Effect.map(
-              Schema.decodeEffect(DecisionJson)(row.decisionJson),
-              (decision) => [row.rowId, decision] as const
-            ),
+            Effect.map(S.decodeEffect(DecisionJson)(row.decisionJson), (decision) => [row.rowId, decision] as const),
           { concurrency: 1 }
         )
         return {
@@ -713,11 +711,11 @@ export class Imports extends Context.Service<
           AND d.rowId = json_extract(j.value, '$.rowId') AND d.decisionJson = json_extract(j.value, '$.json')))`
       const clears = (org: string, id: string, rowIds: string) => sql`EXISTS (SELECT 1 FROM importDecision
         WHERE organizationId = ${org} AND importId = ${id} AND rowId IN (SELECT value FROM json_each(${rowIds})))`
-      const DeltaRequest = Schema.Struct({
+      const DeltaRequest = S.Struct({
         org: OrganizationId,
-        id: Schema.String,
-        sets: Schema.Array(DecisionEntries),
-        clears: Schema.Array(IdList)
+        id: S.String,
+        sets: S.Array(DecisionEntries),
+        clears: S.Array(IdList)
       })
       // Bumps the revision only when the delta changes something, before the writes below make it true.
       const bumpRevision = statement({
@@ -733,7 +731,7 @@ export class Imports extends Context.Service<
         }
       })
       const upsertDecisions = statement({
-        Request: Schema.Struct({ ...Acting, id: Schema.String, entries: DecisionEntries, at: Schema.String }),
+        Request: S.Struct({ ...Acting, id: S.String, entries: DecisionEntries, at: S.String }),
         Result: NoRows,
         // The same decision sent again leaves the row (and who made it) as it is.
         execute: (r) => sql`INSERT INTO importDecision (importId, organizationId, rowId, decisionJson, decidedById,
@@ -746,14 +744,14 @@ export class Imports extends Context.Service<
           WHERE importDecision.decisionJson IS NOT excluded.decisionJson`
       })
       const clearDecisions = statement({
-        Request: Schema.Struct({ org: OrganizationId, id: Schema.String, rowIds: IdList }),
+        Request: S.Struct({ org: OrganizationId, id: S.String, rowIds: IdList }),
         Result: NoRows,
         execute: (r) => sql`DELETE FROM importDecision WHERE organizationId = ${r.org} AND importId = ${r.id}
           AND rowId IN (SELECT value FROM json_each(${r.rowIds})) AND ${stillOpen(r.org, r.id)}`
       })
       const openRevision = statement({
         Request: Scope,
-        Result: Schema.Array(Schema.Struct({ revision: Schema.Int })),
+        Result: S.Array(S.Struct({ revision: S.Int })),
         execute: (r) => sql`SELECT revision FROM importDraft
           WHERE organizationId = ${r.org} AND id = ${r.id} AND status = 'open'`
       })
@@ -781,12 +779,12 @@ export class Imports extends Context.Service<
         return Option.map(Arr.head(revision), (row) => row.revision)
       }, Effect.orDie)
 
-      const ReopenRequest = Schema.Struct({
+      const ReopenRequest = S.Struct({
         ...Acting,
-        id: Schema.String,
-        activity: Schema.String,
-        detail: Schema.String,
-        at: Schema.String
+        id: S.String,
+        activity: S.String,
+        detail: S.String,
+        at: S.String
       })
       const reopenedLine = statement({
         Request: ReopenRequest,
@@ -825,7 +823,7 @@ export class Imports extends Context.Service<
       // Each import with at least one confirm, by its last one. Its items are counted from the item table, so a
       // take-back or a later edit shows as it is stored, not as the confirm once said.
       const findPast = SqlSchema.findAll({
-        Request: Schema.Struct({ org: OrganizationId, limit: Schema.Int }),
+        Request: S.Struct({ org: OrganizationId, limit: S.Int }),
         Result: PastImport,
         execute: ({ org, limit }) =>
           sql`SELECT d.id, d.fileName, d.rowCount, d.status, b.confirmedByName, b.confirmedAt, b.notImported,
@@ -840,7 +838,7 @@ export class Imports extends Context.Service<
       })
       const countPast = SqlSchema.findOne({
         Request: OrganizationId,
-        Result: Schema.Struct({ n: Schema.Int }),
+        Result: S.Struct({ n: S.Int }),
         execute: (org) => sql`SELECT COUNT(DISTINCT importId) AS n FROM importBatch WHERE organizationId = ${org}`
       })
       const listPast = Effect.fn("Imports.listPast")(function* (organizationId: OrganizationId, limit: number) {
@@ -859,12 +857,12 @@ export class Imports extends Context.Service<
         AND NOT EXISTS (SELECT 1 FROM importReplaced p JOIN importBatch b
             ON b.organizationId = p.organizationId AND b.id = p.batchId
           WHERE p.organizationId = ${org} AND p.importId = ${id} AND b.takeBackId IS NULL))`
-      const RemoveRequest = Schema.Struct({
+      const RemoveRequest = S.Struct({
         ...Acting,
-        id: Schema.String,
-        activity: Schema.String,
-        detail: Schema.String,
-        at: Schema.String
+        id: S.String,
+        activity: S.String,
+        detail: S.String,
+        at: S.String
       })
       const removedLine = statement({
         Request: RemoveRequest,
@@ -920,16 +918,16 @@ export class Imports extends Context.Service<
       // -- Columns ---------------------------------------------------------------------------------------------------
 
       const choices = Effect.fn("Imports.choices")(function* (draft: Draft) {
-        return yield* Schema.decodeEffect(ChoicesJson)(draft.choicesJson)
+        return yield* S.decodeEffect(ChoicesJson)(draft.choicesJson)
       }, Effect.orDie)
 
-      const ChoicesRequest = Schema.Struct({
+      const ChoicesRequest = S.Struct({
         ...Acting,
-        id: Schema.String,
+        id: S.String,
         choices: ChoicesJson,
-        activity: Schema.String,
-        detail: Schema.String,
-        at: Schema.String
+        activity: S.String,
+        detail: S.String,
+        at: S.String
       })
       // Choices that are already so are not a change: no audit line and no new revision.
       const choicesDiffer = (r: { readonly org: string; readonly id: string; readonly choices: string }) =>
@@ -978,7 +976,7 @@ export class Imports extends Context.Service<
       // updates, since it reads only rows that exist, and keeps who decided each. `CROSS JOIN` keeps the list on the
       // outside; an UPDATE that looks each row up in the list reads the whole list once per row.
       const rewriteRows = statement({
-        Request: Schema.Struct({ org: OrganizationId, id: Schema.String, entries: DecisionEntries }),
+        Request: S.Struct({ org: OrganizationId, id: S.String, entries: DecisionEntries }),
         Result: NoRows,
         execute: (r) => sql`INSERT INTO importDecision
             (organizationId, importId, rowId, decisionJson, decidedById, decidedByName, updatedAt)
@@ -1028,7 +1026,7 @@ export class Imports extends Context.Service<
 
       const findFixed = SqlSchema.findOne({
         Request: Scope,
-        Result: Schema.Struct({ rows: Schema.Int, cells: Schema.Int }),
+        Result: S.Struct({ rows: S.Int, cells: S.Int }),
         execute: ({ org, id }) =>
           sql`SELECT COUNT(DISTINCT c.rowNumber || '.' || c.part) AS rows, COUNT(*) AS cells FROM importChange c
             JOIN importOutcome o ON o.organizationId = c.organizationId AND o.importId = c.importId
@@ -1039,7 +1037,7 @@ export class Imports extends Context.Service<
 
       // -- The confirm ---------------------------------------------------------------------------------------
 
-      const CommitScope = Schema.Struct({ ...Acting, id: Schema.String, batch: Schema.String, at: Schema.String })
+      const CommitScope = S.Struct({ ...Acting, id: S.String, batch: S.String, at: S.String })
       // The confirm's own row is written first and only while the import is open; the import is closed next. Every
       // statement after them checks that this confirm's row exists, so a second confirm (a double click, a retry,
       // another tab) finds the import closed, writes no row of its own, and so writes nothing at all.
@@ -1063,7 +1061,7 @@ export class Imports extends Context.Service<
       // One statement per 500 rows, the rows as one JSON value read with json_each: a handful of bound values a
       // statement however many rows it writes. A stored code is left as it is (ON CONFLICT DO NOTHING).
       const insertItems = statement({
-        Request: Schema.Struct({ ...CommitScope.fields, items: ItemInserts }),
+        Request: S.Struct({ ...CommitScope.fields, items: ItemInserts }),
         Result: NoRows,
         execute: (r) => sql`INSERT INTO item (id, organizationId, sku, skuKey, name, description, category, uom,
             unitCost, quantityOnHand, reorderPoint, isActive, lotTracked, tags, firstReceivedOn, discontinuedOn,
@@ -1082,7 +1080,7 @@ export class Imports extends Context.Service<
       // Before a replace, in the same batch: the stored item as it is, so a take-back of this confirm can put it back.
       // revisionAfter is the revision the replace below gives it; one copy per item, however many rows name it.
       const keepReplaced = statement({
-        Request: Schema.Struct({ ...CommitScope.fields, items: ItemInserts }),
+        Request: S.Struct({ ...CommitScope.fields, items: ItemInserts }),
         Result: NoRows,
         execute: (r) => sql`INSERT INTO importReplaced (organizationId, importId, batchId, itemId, sourceRow,
             sourcePart, name, description, category, uom, unitCost, quantityOnHand, reorderPoint, isActive, lotTracked,
@@ -1100,7 +1098,7 @@ export class Imports extends Context.Service<
       // A stored item the person chose to replace with the file's row: every value but its SKU and its origin is
       // written over, and its revision goes up, so the import that created it can no longer take it back.
       const replaceItems = statement({
-        Request: Schema.Struct({ ...CommitScope.fields, items: ItemInserts }),
+        Request: S.Struct({ ...CommitScope.fields, items: ItemInserts }),
         Result: NoRows,
         execute: (r) => sql`UPDATE item SET name = json_extract(j.value, '$.name'),
             description = json_extract(j.value, '$.description'), category = json_extract(j.value, '$.category'),
@@ -1122,7 +1120,7 @@ export class Imports extends Context.Service<
         AND r.importId = ${id} AND r.sourceRow = json_extract(value, '$.rowNumber')
         AND r.sourcePart = json_extract(value, '$.part'))`
       const insertOutcomes = statement({
-        Request: Schema.Struct({ ...CommitScope.fields, outcomes: OutcomeInserts }),
+        Request: S.Struct({ ...CommitScope.fields, outcomes: OutcomeInserts }),
         Result: NoRows,
         execute: (r) => sql`INSERT INTO importOutcome (importId, organizationId, rowNumber, part, sku, name, outcome,
             reason, decidedBy, decidedByName)
@@ -1148,7 +1146,7 @@ export class Imports extends Context.Service<
       })
       // A changed value is recorded only for a row this confirm really created, and only once.
       const insertChanges = statement({
-        Request: Schema.Struct({ ...CommitScope.fields, changes: ChangeInserts }),
+        Request: S.Struct({ ...CommitScope.fields, changes: ChangeInserts }),
         Result: NoRows,
         execute: (r) => sql`INSERT INTO importChange (importId, batchId, organizationId, rowNumber, part, sku, field,
             fromValue, toValue, source, decidedBy, decidedByName, how, basis, confidence, createdAt)
@@ -1180,7 +1178,7 @@ export class Imports extends Context.Service<
           WHERE organizationId = ${r.org} AND id = ${r.batch}`
       })
       const importedLine = statement({
-        Request: Schema.Struct({ ...CommitScope.fields, activity: Schema.String, fileName: Schema.String }),
+        Request: S.Struct({ ...CommitScope.fields, activity: S.String, fileName: S.String }),
         Result: NoRows,
         execute: (r) => sql`INSERT INTO activity (id, organizationId, actorId, actorName, action, detail, createdAt)
           SELECT ${r.activity}, ${r.org}, ${r.actor}, ${r.name}, 'Imported items',
@@ -1260,12 +1258,12 @@ export class Imports extends Context.Service<
 
       // -- Taking a confirm back -----------------------------------------------------------------------------
 
-      const TakeBackScope = Schema.Struct({
+      const TakeBackScope = S.Struct({
         ...Acting,
-        id: Schema.String,
-        takeBack: Schema.String,
+        id: S.String,
+        takeBack: S.String,
         confirms: IdList,
-        at: Schema.String
+        at: S.String
       })
       const ofTakeBack = (org: string, takeBack: string) =>
         sql`(SELECT id FROM importBatch WHERE organizationId = ${org} AND takeBackId = ${takeBack})`
@@ -1322,7 +1320,7 @@ export class Imports extends Context.Service<
           WHERE organizationId = ${r.org} AND takeBackId = ${r.takeBack}`
       })
       const takenBackLine = statement({
-        Request: Schema.Struct({ ...TakeBackScope.fields, activity: Schema.String, fileName: Schema.String }),
+        Request: S.Struct({ ...TakeBackScope.fields, activity: S.String, fileName: S.String }),
         Result: NoRows,
         execute: (r) => {
           const removed = sql`(SELECT COALESCE(SUM(removed), 0) FROM importBatch
@@ -1475,7 +1473,7 @@ export class Imports extends Context.Service<
       const changedItems = (kept: boolean) =>
         statement({
           Request: Scope,
-          Result: Schema.Array(ChangedItemRow),
+          Result: S.Array(ChangedItemRow),
           execute: (r) => sql`SELECT sku, name, updatedBy AS changedBy, updatedAt AS changedAt FROM item
             WHERE organizationId = ${r.org} AND importId = ${r.id} AND revision > 1
               AND ${kept ? sql`batchId NOT IN ${inForce(r.org, r.id)}` : sql`batchId IN ${inForce(r.org, r.id)}`}

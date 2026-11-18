@@ -1,4 +1,5 @@
-import { Array as Arr, Config, Option, Redacted, Schema, String as Str } from "effect"
+import { Array as Arr, Config, Option, Redacted, String as Str } from "effect"
+import * as S from "effect/Schema"
 
 // SETTINGS. Every setting and secret the server reads is declared here, as an `effect/Config`, and nowhere else reads
 // the environment. The Worker builds a ConfigProvider from its `env` (worker.ts); a test passes its own. Secrets are
@@ -13,7 +14,7 @@ import { Array as Arr, Config, Option, Redacted, Schema, String as Str } from "e
  * `structured` (one object per line, for a console that renders objects). Default: `pretty` in development, `json`
  * in a production build.
  */
-export const LogFormat = Schema.Literals(["pretty", "json", "logfmt", "structured"]).annotate({
+export const LogFormat = S.Literals(["pretty", "json", "logfmt", "structured"]).annotate({
   description: "How log lines are written: pretty, json, logfmt or structured."
 })
 /** One of the `LogFormat` names. */
@@ -34,7 +35,7 @@ export const logSettings = (defaults: { readonly format: LogFormat }) =>
 
 /** An address setting: unset or blank is none, anything else must be a URL. */
 export const optionalUrl = (name: string) =>
-  Config.schema(Schema.Union([Schema.Literal(""), Schema.URL]), name).pipe(
+  Config.schema(S.Union([S.Literal(""), S.URL]), name).pipe(
     Config.withDefault(""),
     Config.map((url) => (url === "" ? Option.none() : Option.some(url)))
   )
@@ -64,8 +65,8 @@ const present = (key: Option.Option<Redacted.Redacted<string>>) =>
  */
 export const aiSettings = Config.all({
   enabled: Config.Boolean("AI_ENABLED").pipe(Config.withDefault(true)),
-  model: Config.schema(Schema.Trim.check(Schema.isNonEmpty()), "AI_MODEL"),
-  fallbackModels: Config.Array(Schema.Trim, "AI_FALLBACK_MODELS").pipe(
+  model: Config.schema(S.Trim.check(S.isNonEmpty()), "AI_MODEL"),
+  fallbackModels: Config.Array(S.Trim, "AI_FALLBACK_MODELS").pipe(
     Config.map(Arr.filter((model) => model !== "")),
     Config.withDefault<ReadonlyArray<string>>([])
   ),

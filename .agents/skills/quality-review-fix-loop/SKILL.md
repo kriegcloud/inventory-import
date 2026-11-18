@@ -1,97 +1,138 @@
 ---
 name: quality-review-fix-loop
 description: >
-  Close a piece of work with a quality loop: green baseline commit, a panel of read-only reviewers, fixes routed to
-  fixer agents by file ownership, waivers for what stays, zero required blockers. Use when Benjamin asks to run the
-  quality loop, to close out the build before the write-up, or to loop reviewers and fixers until nothing required
-  remains.
+  Close an initiative with a quality loop: green baseline commit, read-only
+  reviewer panel, fixer-agent routing, waivers, zero required blockers. Use
+  when asked to run repo quality, fix all warnings/errors, close an
+  initiative, or loop reviewers/fixers until no required findings remain.
 metadata:
   version: "0.1.0"
-  origin: ported from one of Benjamin's own repositories; the defaults are this repo's
+  status: active
 ---
 
-# Quality review fix loop
+# Quality Review Fix Loop
 
-Use near the end of a piece of work. The goal is not endless polishing. It is a green, committed, review-ready
-state with zero required blockers in the chosen scope.
+Use near the end of a repository initiative. The goal is not endless polishing;
+it is a green, committed, review-ready repo state with zero required blockers
+in the chosen scope.
 
-## Header
+## Template Header
 
 Fill or infer before starting:
 
 - `repo_root`: `git rev-parse --show-toplevel`
-- `summary`: one paragraph on what was built
-- `base_ref`: the brief commit, the one `bun run clock` counts from (the first that adds a file under `brief/` other
-  than its README):
-  `git log --reverse --no-renames --diff-filter=A --format=%h -- brief ':(exclude)brief/README.md' | head -n 1`
-- `review_scope`: files changed since `base_ref`, plus the screens, endpoints and tables they touch
+- `initiative_summary`: one paragraph on the initiative being closed
+- `base_ref`: `origin/main` unless the user says otherwise
+- `review_scope`: changed files plus directly affected public APIs, package
+  boundaries, docs, tests, generated configs, and manifests
 - `zero_gate`: zero required blocker findings from the reviewer panel
-- `loop_budget`: one round inside the hour; a second only if the first finished before minute 40
-- `commit_policy`: green baseline commit before the loop; a commit per fix group; never push
-- `waiver_policy`: a required blocker may remain only with a waiver record (see `references/templates.md`), and
-  each waiver is also a line under "Known wrong or missing" in `DECISIONS.md`
+- `loop_budget`: 3 reviewer/fixer rounds before escalating
+- `commit_policy`: green baseline commit before loops; local follow-up commits
+  for fixes; no push/PR unless explicitly asked
+- `waiver_policy`: a required blocker may remain only with an explicit waiver
+  record (see `references/templates.md`)
+- `publish_policy`: local commits only unless the user explicitly asks to
+  push, open a PR, or touch GitHub review threads
 
-## This repo's defaults
+## beep-effect Defaults
 
-Sources of truth. Read what is relevant to the changed files before reviewing; never review from generic taste:
+For non-beep-effect repos, replace this section with local equivalents.
 
-- `brief/` (it decides what was asked for)
-- `CLAUDE.md`: "Rules for an import", "Identity and permissions", "What the type-check enforces", "Platform", "UI"
-- `docs/patterns.md` (section 8 for screens), `docs/kit.md`, `docs/review-table.md` where they apply
-- `DECISIONS.md` for what Benjamin chose and cut: a cut he made is not a finding
+Source of truth — read what is relevant to the changed surface before
+reviewing; never review from generic taste:
 
-Quality commands, from `repo_root`:
+- root and package-local `AGENTS.md`
+- `standards/ARCHITECTURE.md` plus the numbered doctrine index under
+  `standards/architecture/` (00-15; `README.md` covers posture and drift
+  buckets)
+- `standards/effect-laws-v1.md`, `standards/effect-first-development.md`
+- `.patterns/jsdoc-documentation.md`
+- inventories/allowlists: `standards/schema-first.inventory.jsonc`,
+  `standards/effect-laws.allowlist.jsonc`, and the JSDoc inventory report that
+  `bun run beep quality jsdoc-inventory` writes under the ignored .beep/ci/ directory
+- package READMEs; `packages/architecture-lab/*` and
+  `apps/architecture-lab-proof/test/` as executable proof
+
+Architecture docs are target doctrine. Classify code/doctrine disagreements as
+`target-doctrine-violation` | `transitional-compatibility` |
+`cleanup-on-touch` | `forbidden-in-new-work` | `pending-automation` |
+`missing-doctrine`. Repo-wide inventories are context, not automatic blockers:
+blockers only when this initiative touched, worsened, or depended on them.
+
+### Quality Commands
+
+Run from `repo_root`. Baseline:
 
 ```bash
-bun run format -- <the files changed since base_ref>   # never a bare format: it rewrites every lane's files
-bun run check:full
-bun run build
+bun run lint:fix
+bun run audit:github quality
 ```
 
-and, for anything with a screen, `bun run lighthouse -- <path>` and the inspector (role 5). Warnings count: do not
-call the baseline green while a relevant one remains.
+Portable fallback when a repo has no all-up quality script: `bun run lint:fix`,
+`check`, `build`, `test`, `audit`, `lint`. In beep-effect,
+`bun run audit:github quality` covers build, check, lint, docgen
+generate/aggregate, test, repo sanity, and changeset status; ensure the local
+docgen lane is included for docs/export changes. Warnings and policy
+diagnostics are actionable — do not call the baseline green while relevant
+warnings remain.
 
-## Operating rules
+## Operating Rules
 
-- Run `bun run clock` first. Say the minute and whether the budget allows a round.
-- Inspect the working tree first; never revert changes you did not make.
-- Keep scope to this hour's work. The template commit is not under review.
-- Reviewers are read-only: they inspect, run the app and commands, and report. They do not edit.
-- Fixer agents edit only the files they are given and are told other agents share the repo. Two fixers never share
-  a file. A one-file fix is done in the main thread: a fixer agent costs more than it saves there.
-- Evidence over opinion: a blocker needs concrete evidence and a concrete way to clear it. Improvements that do not
-  protect the person importing, correctness or an honest write-up go to the backlog.
-- A finding that needs a product decision is not a fixer's job: bring it to Benjamin with a recommendation.
+- Inspect the worktree first; never revert unrelated user changes.
+- Use the current checkout as truth for commands and package surfaces.
+- Keep scope tied to this initiative; historical repo-wide debt is not a
+  blocker unless the initiative touched it or made it worse.
+- Reviewer/critic agents are read-only: inspect, run non-mutating commands,
+  report. They must not edit.
+- Fixer agents edit only their assigned write surface and are told other
+  agents share the codebase.
+- Prefer focused fixes; add abstractions only when they remove real
+  duplication or match an established local pattern.
+- Evidence beats vibes: a blocker needs concrete evidence and a concrete
+  unblock action. Optional improvements go to backlog unless they protect
+  correctness, doctrine, release safety, or maintainability in changed scope.
 
 ## Phases
 
-**Phase 0: grounding.** Confirm `repo_root`, the working tree and `base_ref`. Capture what changed
-(`git status --short`, `git diff --name-status {{base_ref}}...HEAD`, `--stat`). Summarise the work in three to six
-bullets: what the person can do, what was touched, what is risky, what is known to be unfinished.
+**Phase 0 — Grounding.** Confirm `repo_root`, branch, dirty worktree,
+`base_ref`. Capture the changed surface (`git status --short`,
+`git diff --name-status {{base_ref}}...HEAD`, `--stat`). Summarize the
+initiative in 3-6 bullets (intent, surfaces touched, public changes, risks,
+known unrelated dirty files). Read the relevant source-of-truth docs.
 
-**Phase 1: baseline and commit.** Run the quality commands, fix every relevant failure or warning, rerun until
-green, then commit. Record the commit and the commands run. Do not start reviewers before a green committed
-baseline.
+**Phase 1 — Baseline quality and commit.** Run the baseline commands, fix
+every relevant failure or warning, rerun until green, then make a local
+Conventional Commit. Record SHA, commands run, out-of-scope failures verified,
+and remaining pre-existing inventory debt. Do not start reviewer loops before
+a green committed baseline (unless the user changes commit policy).
 
-**Phase 2: read-only reviewer panel.** Launch the seven roles in `references/reviewer-roles.md` in parallel, each
-with the summary, `base_ref`, the changed files, the sources of truth and the item format from
-`references/templates.md`. Give the reviewers that use the app the dev server's address and say which organization
-each may write in, so two reviewers never trip over each other's data.
+**Phase 2 — Read-only reviewer panel.** Launch the 10 reviewer roles in
+`references/reviewer-roles.md` in parallel where possible, each given the
+initiative summary, base commit, changed surface, source-of-truth list, and
+the inventory item format from `references/templates.md`. Reviewers stay
+read-only, cite standards and file/command evidence, classify findings
+(`blocking` | `non-blocking` | `question` | `note`), separate changed-scope
+blockers from historical debt, and return `0 required findings` when clean.
 
-**Phase 3: triage and routing.** Merge the reports into one inventory: drop duplicates; reject findings with no
-evidence or no fix; move anything outside this hour's work to the backlog; group blocking findings by the files they
-touch; give each group to one fixer with the prompt in `references/templates.md`. Start the fixers on the groups
-that block the person, then put the rest to Benjamin in a decision round (`CLAUDE.md` "Decisions by dialog"), most
-harmful first: he may cut a group, and anything that is a product decision is his.
+**Phase 3 — Triage and fixer routing.** Merge reviewer output into one
+inventory: dedupe; reject findings without evidence or an actionable fix;
+reclassify out-of-scope historical debt as `backlog`; group blocking findings
+by write surface (source package, docs/standards, tests, generated
+config/metadata, tooling); assign fixers only to non-overlapping groups using
+the fixer prompt template in `references/templates.md`.
 
-**Phase 4: verification.** Read each fix, run its acceptance command, rerun the baseline, commit. If the budget
-allows, relaunch only the reviewers whose findings were fixed. Stop when there are zero required blockers, or every
-remaining one has a waiver, or the budget is spent. Then report what remains, why, and what you recommend.
+**Phase 4 — Verification round.** Review each patch, resolve conflicts while
+preserving unrelated changes, run item-level acceptance commands, rerun the
+baseline, commit (Conventional Commit), then relaunch the reviewer panel on
+the new commit. Repeat Phases 2-4 until zero required blockers, every
+remaining blocker has a waiver record, or `loop_budget` is exhausted — then
+stop and report remaining blockers, why, options, and a recommended action.
 
 ## References
 
-- `references/reviewer-roles.md`: the seven roles and the reviewer contract
-- `references/templates.md`: the inventory item format, severity calibration, the fixer prompt, waiver and backlog
-  records, the final report format
+- `references/reviewer-roles.md` — the 10 reviewer roles and reviewer contract
+- `references/templates.md` — inventory item format, severity calibration,
+  fixer prompt, waiver/backlog records, final response format
 
-Do not say the work is ready while a required blocker has no waiver or the baseline is red.
+Do not say the repository is ready if required blockers remain without waiver
+or baseline quality is red.

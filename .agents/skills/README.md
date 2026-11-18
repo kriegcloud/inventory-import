@@ -7,9 +7,15 @@
 `intake`, `lead`, `references`, `next`, `qa`, `verify`, `decisions`, `ship`: short procedures for a one-hour build. They are the
 working agreement between Benjamin and his coding agent.
 
-`quality-review-fix-loop` is also Benjamin's: ported from one of his own repositories, with that repo's standards
-replaced by this one's (the brief, `CLAUDE.md`, `docs/patterns.md`) and the reviewer panel cut from ten roles to the
-seven that apply to a one-hour build.
+## From beep-effect
+
+Copied as they stand from Benjamin's own monorepo, [beep-effect](https://github.com/beep-effect/beep-effect)
+(Apache-2.0), at commit `ef2886e94dd`: `adhd`, `crispen`, `effect-first-development`, `schema-first-development`,
+`grill-with-docs`, `grilling`, `grill-me`, `teach`, `portless`, `turborepo`, `quality-review-fix-loop`, `unslop`,
+`sparql-expert` and the ontology set (`ontology-scout`, `ontology-requirements`, `ontology-conceptualizer`,
+`ontology-architect`, `ontology-mapper`, `ontology-validator`, `ontology-curator`, `ontology-foundational-auditor`).
+They still name beep-effect's standards and paths in places; those are corrected as this repository takes on that
+layout. `grilling`, `grill-me` and `unslop` began as the vendored skills in the table below and keep their licences.
 
 ## Vendored, with their licences
 

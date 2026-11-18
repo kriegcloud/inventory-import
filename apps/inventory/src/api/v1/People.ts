@@ -1,4 +1,4 @@
-import { Schema } from "effect"
+import * as S from "effect/Schema"
 import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/http-api"
 import { reasonForPerson } from "../../domain/Described.ts"
 import { AddPersonProblem, Role } from "../../domain/Identity.ts"
@@ -9,20 +9,20 @@ const emailDescription =
   "The email the person signed up with, whatever its case. Spaces around it are dropped; what is left is 1 to 254 characters"
 
 /** One member of the organization as the People page shows them. `email` is null for a member with no account. */
-export const Person = Schema.Struct({
-  memberId: Schema.String.annotate({
+export const Person = S.Struct({
+  memberId: S.String.annotate({
     description: "The member's id: what the address of a change of role or a removal names",
     examples: ["mem_marcus"]
   }),
-  name: Schema.String.annotate({
+  name: S.String.annotate({
     description: "The name people read. Not unique, so it never tells two people apart",
     examples: ["Marcus Oyelaran"]
   }),
-  email: Schema.NullOr(Schema.String).annotate({
+  email: S.NullOr(S.String).annotate({
     description: "The email of the person's account; null for a member with no account"
   }),
   role: Role,
-  joinedAt: Schema.NullOr(Schema.String).annotate({
+  joinedAt: S.NullOr(S.String).annotate({
     description: "When they became a member, as stored; null when that is not known"
   })
 }).annotate({ identifier: "Person", description: "One member of the organization as the People page shows them" })
@@ -30,7 +30,7 @@ export const Person = Schema.Struct({
 export type Person = typeof Person.Type
 
 /** The member in the address is not in this organization (removed meanwhile, or never there). */
-export class PersonNotFound extends Schema.TaggedError<PersonNotFound, { readonly brand: unique symbol }>()(
+export class PersonNotFound extends S.TaggedError<PersonNotFound, { readonly brand: unique symbol }>()(
   "PersonNotFound",
   { reason: reasonForPerson },
   { description: "The member in the address is not in this organization", httpApiStatus: 404 }
@@ -41,11 +41,11 @@ export class PersonNotFound extends Schema.TaggedError<PersonNotFound, { readonl
  * (`AddPersonProblem`), answered with 200 either way: an email nobody signed up with is a problem with what the admin
  * typed, not a request error.
  */
-export const AddPersonOutcome = Schema.Result(
+export const AddPersonOutcome = S.Result(
   Person,
   // The wire side named, so the document holds it as an `AddPersonProblem` component. Annotation only.
   AddPersonProblem.pipe(
-    Schema.annotateEncoded({
+    S.annotateEncoded({
       identifier: "AddPersonProblem",
       description: "Why a person could not be added, as data the form shows beside the email typed"
     })
@@ -57,7 +57,7 @@ export const AddPersonOutcome = Schema.Result(
 export type AddPersonOutcome = typeof AddPersonOutcome.Type
 
 /** The change would leave the organization with no admin, so nobody could manage it afterwards. */
-export class LastAdmin extends Schema.TaggedError<LastAdmin, { readonly brand: unique symbol }>()(
+export class LastAdmin extends S.TaggedError<LastAdmin, { readonly brand: unique symbol }>()(
   "LastAdmin",
   { reason: reasonForPerson },
   {
@@ -67,7 +67,7 @@ export class LastAdmin extends Schema.TaggedError<LastAdmin, { readonly brand: u
 ) {}
 
 const memberId = {
-  memberId: Schema.String.check(Schema.isMaxLength(64)).annotate({
+  memberId: S.String.check(S.isMaxLength(64)).annotate({
     description: "The member's id, as `people.list` gives it (`memberId`)",
     examples: ["mem_marcus"]
   })
@@ -80,7 +80,7 @@ const memberId = {
 export class PeopleApi extends HttpApiGroup.make("people")
   .add(
     HttpApiEndpoint.get("list", "/", {
-      success: Schema.Array(Person).annotate({ description: "Every member of the caller's organization" })
+      success: S.Array(Person).annotate({ description: "Every member of the caller's organization" })
     })
       .annotate(OpenApi.Summary, "List the people of the caller's organization")
       .annotate(
@@ -88,12 +88,12 @@ export class PeopleApi extends HttpApiGroup.make("people")
         "Who is in the caller's organization, with each person's role. Any member may read it."
       ),
     HttpApiEndpoint.post("add", "/", {
-      payload: Schema.Struct({
+      payload: S.Struct({
         // Trimmed on the way in: the description goes on both sides, so the OpenAPI document (the encoded side)
         // shows it too.
-        email: Schema.Trim.check(Schema.isNonEmpty(), Schema.isMaxLength(254))
+        email: S.Trim.check(S.isNonEmpty(), S.isMaxLength(254))
           .annotate({ description: emailDescription })
-          .pipe(Schema.annotateEncoded({ description: emailDescription, examples: ["elena@sample-supply.test"] }))
+          .pipe(S.annotateEncoded({ description: emailDescription, examples: ["elena@sample-supply.test"] }))
           .annotateKey({ messageMissingKey: "Give the email the person signed up with." }),
         role: Role.annotateKey({ messageMissingKey: "Choose a role: viewer, editor or admin." })
       }),
@@ -107,7 +107,7 @@ export class PeopleApi extends HttpApiGroup.make("people")
       ),
     HttpApiEndpoint.post("setRole", "/:memberId/role", {
       params: memberId,
-      payload: Schema.Struct({
+      payload: S.Struct({
         role: Role.annotateKey({ messageMissingKey: "Choose a role: viewer, editor or admin." })
       }),
       success: Person,
@@ -120,8 +120,8 @@ export class PeopleApi extends HttpApiGroup.make("people")
       ),
     HttpApiEndpoint.delete("remove", "/:memberId", {
       params: memberId,
-      success: Schema.Struct({
-        removed: Schema.Boolean.annotate({ description: "True: the person is no longer a member" })
+      success: S.Struct({
+        removed: S.Boolean.annotate({ description: "True: the person is no longer a member" })
       }).annotate({ description: "The person was removed from the organization" }),
       error: [Forbidden, PersonNotFound, LastAdmin]
     })

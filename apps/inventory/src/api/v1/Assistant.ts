@@ -1,4 +1,4 @@
-import { Schema } from "effect"
+import * as S from "effect/Schema"
 import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/http-api"
 import { ColumnCatalog, maxPrompt, ViewOutcome } from "../../domain/TableView.ts"
 import { Identity } from "./Identity.ts"
@@ -11,17 +11,17 @@ import { Identity } from "./Identity.ts"
 const promptDescription = `What the person wants to see, in their words. Spaces around it are dropped; what is left is 1 to ${maxPrompt} characters`
 
 /** What the screen sends: the person's request and the table's columns, which every answer is checked against. */
-export const ViewRequest = Schema.Struct({
-  prompt: Schema.Trim.check(Schema.isNonEmpty(), Schema.isMaxLength(maxPrompt))
+export const ViewRequest = S.Struct({
+  prompt: S.Trim.check(S.isNonEmpty(), S.isMaxLength(maxPrompt))
     .annotate({ description: promptDescription })
-    .pipe(Schema.annotateEncoded({ description: promptDescription, examples: ["only kilograms, cheapest first"] }))
+    .pipe(S.annotateEncoded({ description: promptDescription, examples: ["only kilograms, cheapest first"] }))
     .annotateKey({ messageMissingKey: "Type what you want to see in the table." }),
-  table: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(40)).annotate({
+  table: S.String.check(S.isMinLength(1), S.isMaxLength(40)).annotate({
     description: 'Which table the request is about, as the person reads its name ("Items")',
     examples: ["Items"]
   }),
   columns: ColumnCatalog,
-  searchable: Schema.Boolean.annotate({ description: "The table has a search box over every column" })
+  searchable: S.Boolean.annotate({ description: "The table has a search box over every column" })
 }).annotate({ identifier: "ViewRequest", description: "A request for a view of a table, with the table's columns" })
 /** The decoded value of `ViewRequest`. */
 export type ViewRequest = typeof ViewRequest.Type

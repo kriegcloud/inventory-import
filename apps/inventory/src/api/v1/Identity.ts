@@ -1,4 +1,5 @@
-import { Context, Schema } from "effect"
+import { Context } from "effect"
+import * as S from "effect/Schema"
 import { HttpApiEndpoint, HttpApiGroup, HttpApiMiddleware, OpenApi } from "effect/http-api"
 import { Member, OrganizationId, Role } from "../../domain/Identity.ts"
 
@@ -8,17 +9,17 @@ export class CurrentActor extends Context.Service<CurrentActor, Member>()(
 ) {}
 
 /** No member could be resolved for this request. The reason says what to do, without echoing what was sent. */
-export class NotSignedIn extends Schema.TaggedError<NotSignedIn, { readonly brand: unique symbol }>()(
+export class NotSignedIn extends S.TaggedError<NotSignedIn, { readonly brand: unique symbol }>()(
   "NotSignedIn",
-  { reason: Schema.String.annotate({ description: "What to do next, in words for the person." }) },
+  { reason: S.String.annotate({ description: "What to do next, in words for the person." }) },
   { httpApiStatus: 401, description: "The request has no session, or its person is in no organization yet." }
 ) {}
 
 /** The member is known but their role is too low for this action. `required` is the role that would be allowed. */
-export class Forbidden extends Schema.TaggedError<Forbidden, { readonly brand: unique symbol }>()(
+export class Forbidden extends S.TaggedError<Forbidden, { readonly brand: unique symbol }>()(
   "Forbidden",
   {
-    reason: Schema.String.annotate({
+    reason: S.String.annotate({
       description: "Which role the person has and which one this needs. It never names the person."
     }),
     required: Role.annotate({ description: "The lowest role that may do this." })
@@ -45,19 +46,19 @@ export class Identity extends HttpApiMiddleware.Service<
 }) {}
 
 /** A seeded test account the sign-in page offers in one click: who it is, and where it belongs as what. */
-export class TestAccount extends Schema.Class<TestAccount, { readonly brand: unique symbol }>("TestAccount")(
+export class TestAccount extends S.Class<TestAccount, { readonly brand: unique symbol }>("TestAccount")(
   {
-    email: Schema.String.annotate({
+    email: S.String.annotate({
       description: "The email the account signs in with",
       examples: ["marcus@example-works.test"]
     }),
-    name: Schema.String.annotate({
+    name: S.String.annotate({
       description: "The account's name, as the sign-in page shows it",
       examples: ["Marcus Oyelaran"]
     }),
-    memberships: Schema.Array(
-      Schema.Struct({
-        organizationName: Schema.String.annotate({ description: "The organization's name" }),
+    memberships: S.Array(
+      S.Struct({
+        organizationName: S.String.annotate({ description: "The organization's name" }),
         role: Role
       }).annotate({
         description: "An organization the account belongs to, earliest first, and its role there."
@@ -71,17 +72,17 @@ export class TestAccount extends Schema.Class<TestAccount, { readonly brand: uni
  * What the settings turned on that the sign-in page must know before anyone signs in. Everything here is public: the
  * test accounts' one password is in the README, and they exist only in a local database.
  */
-export class SignInFeatures extends Schema.Class<SignInFeatures, { readonly brand: unique symbol }>("SignInFeatures")(
+export class SignInFeatures extends S.Class<SignInFeatures, { readonly brand: unique symbol }>("SignInFeatures")(
   {
-    testAccounts: Schema.NullOr(
-      Schema.Struct({
-        password: Schema.String.annotate({
+    testAccounts: S.NullOr(
+      S.Struct({
+        password: S.String.annotate({
           description: "The one password every test account shares; it is in the README"
         }),
-        accounts: Schema.Array(TestAccount).annotate({ description: "The test accounts this copy's database holds" })
+        accounts: S.Array(TestAccount).annotate({ description: "The test accounts this copy's database holds" })
       })
     ).annotate({ description: "TEST_ACCOUNTS: the accounts to offer and their password, or null when it is off." }),
-    pwnedPasswordCheck: Schema.Boolean.annotate({
+    pwnedPasswordCheck: S.Boolean.annotate({
       description: "PWNED_PASSWORD_CHECK: a new password is checked against known data breaches."
     })
   },
@@ -89,12 +90,12 @@ export class SignInFeatures extends Schema.Class<SignInFeatures, { readonly bran
 ) {}
 
 /** An organization the signed-in person belongs to, for the switch in the account menu. */
-export class OrganizationChoice extends Schema.Class<OrganizationChoice, { readonly brand: unique symbol }>(
+export class OrganizationChoice extends S.Class<OrganizationChoice, { readonly brand: unique symbol }>(
   "OrganizationChoice"
 )(
   {
     id: OrganizationId,
-    name: Schema.String.annotate({
+    name: S.String.annotate({
       description: "The organization's name, for the switch",
       examples: ["Example Works (test)"]
     })
@@ -107,16 +108,16 @@ export class OrganizationChoice extends Schema.Class<OrganizationChoice, { reado
  * or a member with the organizations they can switch between, and the sign-in features this copy has on. Always a
  * 200, so a signed-out visit logs no failed request; fetched once per page load and cached (src/web/lib/actor.ts).
  */
-export class SessionState extends Schema.Class<SessionState, { readonly brand: unique symbol }>("SessionState")(
+export class SessionState extends S.Class<SessionState, { readonly brand: unique symbol }>("SessionState")(
   {
-    status: Schema.Literals(["signed-out", "no-organization", "ready"]).annotate({
+    status: S.Literals(["signed-out", "no-organization", "ready"]).annotate({
       description: "ready: `actor` is set. no-organization: signed in, in no organization yet (or not the chosen one)."
     }),
-    email: Schema.NullOr(Schema.String).annotate({
+    email: S.NullOr(S.String).annotate({
       description: "The email of the signed-in account; null when nobody is signed in"
     }),
-    actor: Schema.NullOr(Member).annotate({ description: "Who this session acts as: the same member `me` answers." }),
-    organizations: Schema.Array(OrganizationChoice).annotate({
+    actor: S.NullOr(Member).annotate({ description: "Who this session acts as: the same member `me` answers." }),
+    organizations: S.Array(OrganizationChoice).annotate({
       description: "The organizations the person can switch between; empty when nobody is signed in"
     }),
     features: SignInFeatures
@@ -134,7 +135,7 @@ export class IdentityApi extends HttpApiGroup.make("identity")
         "Open: it answers for nobody too, so the page can show sign-in without a failed request. Always 200; `status` says whether nobody is signed in, someone is signed in but in no organization, or a member is ready to act."
       ),
     HttpApiEndpoint.get("members", "/members", {
-      success: Schema.Array(Member).annotate({ description: "Every member of the caller's organization" })
+      success: S.Array(Member).annotate({ description: "Every member of the caller's organization" })
     })
       .middleware(Identity)
       .annotate(OpenApi.Summary, "The people in the actor's organization")

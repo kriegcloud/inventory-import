@@ -1,4 +1,5 @@
-import { Effect, Schema } from "effect"
+import { Effect } from "effect"
+import * as S from "effect/Schema"
 import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiMiddleware, OpenApi } from "effect/http-api"
 import { Activity } from "../../domain/Activity.ts"
 import { instant, personName, reasonForPerson } from "../../domain/Described.ts"
@@ -39,18 +40,18 @@ export const openApiPath = `${apiPrefix}/openapi.json` as const
 export const docsPath = `${apiPrefix}/docs` as const
 
 /** The two model providers the server can reach, each with its own key. */
-export const AiProvider = Schema.Literals(["openrouter", "gateway"]).annotate({
+export const AiProvider = S.Literals(["openrouter", "gateway"]).annotate({
   description: "A model provider: OpenRouter (OPENROUTER_API_KEY) or the Vercel AI Gateway (AI_GATEWAY_API_KEY)."
 })
 /** One of the `AiProvider` names. */
 export type AiProvider = typeof AiProvider.Type
 
 /** One step of the model plan: a provider, the model asked first, and the models that provider falls back to. */
-export class AiRoute extends Schema.Class<AiRoute, { readonly brand: unique symbol }>("AiRoute")(
+export class AiRoute extends S.Class<AiRoute, { readonly brand: unique symbol }>("AiRoute")(
   {
     provider: AiProvider,
-    model: Schema.String.annotate({ description: "The model asked first on this provider (a vendor/model id)." }),
-    fallbackModels: Schema.Array(Schema.String).annotate({
+    model: S.String.annotate({ description: "The model asked first on this provider (a vendor/model id)." }),
+    fallbackModels: S.Array(S.String).annotate({
       description: "Models this provider tries, in order, when the first one fails (OpenRouter's models list)."
     })
   },
@@ -58,17 +59,17 @@ export class AiRoute extends Schema.Class<AiRoute, { readonly brand: unique symb
 ) {}
 
 /** Whether a language model can be used right now, and in which order the server will try them. */
-export class AiStatus extends Schema.Class<AiStatus, { readonly brand: unique symbol }>("AiStatus")(
+export class AiStatus extends S.Class<AiStatus, { readonly brand: unique symbol }>("AiStatus")(
   {
-    available: Schema.Boolean.annotate({ description: "False with no key, or with AI_ENABLED=false." }),
-    provider: Schema.Literals(["openrouter", "gateway", "none"]).annotate({
+    available: S.Boolean.annotate({ description: "False with no key, or with AI_ENABLED=false." }),
+    provider: S.Literals(["openrouter", "gateway", "none"]).annotate({
       description: "The provider asked first, or none when AI is off."
     }),
-    model: Schema.String.annotate({ description: "The model asked first (AI_MODEL), even when AI is off." }),
-    routes: Schema.Array(AiRoute).annotate({
+    model: S.String.annotate({ description: "The model asked first (AI_MODEL), even when AI is off." }),
+    routes: S.Array(AiRoute).annotate({
       description: "Every provider the server will try, in order. After the last, features use their non-AI path."
     }),
-    reason: Schema.String.annotate({
+    reason: S.String.annotate({
       description: "One sentence for the screen: why AI is off, or what will answer when it is on."
     })
   },
@@ -79,27 +80,27 @@ export class AiStatus extends Schema.Class<AiStatus, { readonly brand: unique sy
  * Who produced a result that a model may have helped with: a model (which provider and model, and whether it was a
  * fallback) or the rules (the non-AI path, with the reason the model was not used). The screen says which.
  */
-export const AnsweredBy = Schema.Union([
-  Schema.TaggedStruct("Model", {
+export const AnsweredBy = S.Union([
+  S.TaggedStruct("Model", {
     provider: AiProvider,
-    model: Schema.String.annotate({ description: "The model that answered, as the provider reported it." }),
-    fallback: Schema.Boolean.annotate({
+    model: S.String.annotate({ description: "The model that answered, as the provider reported it." }),
+    fallback: S.Boolean.annotate({
       description: "True when it was not the first model of the first provider: a fallback answered."
     })
   }),
-  Schema.TaggedStruct("Rules", {
-    reason: Schema.String.annotate({ description: "Why no model answered, in words for the person." })
+  S.TaggedStruct("Rules", {
+    reason: S.String.annotate({ description: "Why no model answered, in words for the person." })
   })
 ]).annotate({ identifier: "AnsweredBy", description: "Which one answered: a model, or the rules when no model could." })
 /** An `AnsweredBy` value. */
 export type AnsweredBy = typeof AnsweredBy.Type
 
 /** Health of the stack as the current member sees it. The activity count is their organization's only. */
-export class SystemStatus extends Schema.Class<SystemStatus, { readonly brand: unique symbol }>("SystemStatus")(
+export class SystemStatus extends S.Class<SystemStatus, { readonly brand: unique symbol }>("SystemStatus")(
   {
-    database: Schema.Struct({
-      ok: Schema.Boolean.annotate({ description: "True when the database answered this request" }),
-      activityCount: Schema.Int.annotate({
+    database: S.Struct({
+      ok: S.Boolean.annotate({ description: "True when the database answered this request" }),
+      activityCount: S.Int.annotate({
         description: "Audit-trail rows in the actor's organization.",
         examples: [12]
       })
@@ -110,11 +111,11 @@ export class SystemStatus extends Schema.Class<SystemStatus, { readonly brand: u
 ) {}
 
 /** One round trip to the model, timed, so a person can see the key works before relying on it. */
-export class AiCheck extends Schema.Class<AiCheck, { readonly brand: unique symbol }>("AiCheck")(
+export class AiCheck extends S.Class<AiCheck, { readonly brand: unique symbol }>("AiCheck")(
   {
-    model: Schema.String.annotate({ description: "The model that answered." }),
-    reply: Schema.String.annotate({ description: "What the model said back to the test prompt" }),
-    millis: Schema.Int.annotate({
+    model: S.String.annotate({ description: "The model that answered." }),
+    reply: S.String.annotate({ description: "What the model said back to the test prompt" }),
+    millis: S.Int.annotate({
       description: "How long the whole call took, retries and fallbacks included.",
       examples: [840]
     }),
@@ -126,7 +127,7 @@ export class AiCheck extends Schema.Class<AiCheck, { readonly brand: unique symb
 export { modelSentences } from "./ModelTrouble.ts"
 
 /** Why no model answered, in the five cases the screens have words for (`modelSentences`). */
-export const AiTrouble = Schema.Literals(aiTroubles).annotate({
+export const AiTrouble = S.Literals(aiTroubles).annotate({
   description:
     "noKey: no key, or AI turned off. refused: the key was refused or its account has no credit left (trying again " +
     "will not help). busy: rate-limited. badAnswer: an answer that did not fit. down: anything else."
@@ -140,12 +141,12 @@ export type AiTrouble = typeof AiTrouble.Type
  * did not fit. `reason` is `modelSentences[kind]`, a sentence for the person (`aiUnavailable` makes it); the
  * provider's own text goes to the log, never to the screen.
  */
-export class AiUnavailable extends Schema.TaggedError<AiUnavailable, { readonly brand: unique symbol }>()(
+export class AiUnavailable extends S.TaggedError<AiUnavailable, { readonly brand: unique symbol }>()(
   "AiUnavailable",
   {
-    reason: Schema.String.annotate({ description: "What happened, in words for the person. No provider text." }),
+    reason: S.String.annotate({ description: "What happened, in words for the person. No provider text." }),
     kind: AiTrouble,
-    retryable: Schema.Boolean.annotate({
+    retryable: S.Boolean.annotate({
       description: "True when trying again later may work (busy, down). False for no key, a refused key, a bad answer."
     })
   },
@@ -165,9 +166,9 @@ export const aiUnavailable = (input: { readonly kind: AiTrouble; readonly retrya
  * The organization has used the day's model calls (src/server/ModelCalls.ts): nothing was asked. Every model feature
  * draws on the same allowance; a feature with a non-AI path answers by its rules instead of failing with this.
  */
-export class ModelCallsUsedUp extends Schema.TaggedError<ModelCallsUsedUp, { readonly brand: unique symbol }>()(
+export class ModelCallsUsedUp extends S.TaggedError<ModelCallsUsedUp, { readonly brand: unique symbol }>()(
   "ModelCallsUsedUp",
-  { reason: Schema.String.annotate({ description: "What happened, in words for the person." }) },
+  { reason: S.String.annotate({ description: "What happened, in words for the person." }) },
   { httpApiStatus: 429, description: "The day's model calls are used: the model was not asked." }
 ) {}
 
@@ -203,7 +204,7 @@ export class SystemApi extends HttpApiGroup.make("system")
 export class ActivityApi extends HttpApiGroup.make("activity")
   .add(
     HttpApiEndpoint.get("recent", "/", {
-      success: Schema.Array(Activity.json).annotate({ description: "The organization's audit trail, newest first" })
+      success: S.Array(Activity.json).annotate({ description: "The organization's audit trail, newest first" })
     })
       .annotate(OpenApi.Summary, "The organization's audit trail, newest first")
       .annotate(
@@ -223,62 +224,62 @@ export class ActivityApi extends HttpApiGroup.make("activity")
  * What the confirms did with one row of the file. `reason` is empty for a created row and for one whose item a
  * take-back removed (`takenBack`).
  */
-export const RowOutcome = Schema.Struct({
-  rowNumber: Schema.Int.annotate({ description: "The row as Excel numbers it", examples: [7] }),
-  part: Schema.optionalKey(Schema.Int).annotate({
+export const RowOutcome = S.Struct({
+  rowNumber: S.Int.annotate({ description: "The row as Excel numbers it", examples: [7] }),
+  part: S.optionalKey(S.Int).annotate({
     description:
       "Which of its row's items this is (1, 2, ...), when the row holds several; left out for a row that is one item",
     examples: [2]
   }),
-  sku: Schema.String.annotate({ description: "The item's SKU as the row gives it", examples: ["RJS-3545"] }),
-  name: Schema.String.annotate({ description: "The row's name, as the result lists it", examples: ["Nylon Coil"] }),
-  outcome: Schema.Literals(["created", "updated", "already", "notImported", "takenBack"]).annotate({
+  sku: S.String.annotate({ description: "The item's SKU as the row gives it", examples: ["RJS-3545"] }),
+  name: S.String.annotate({ description: "The row's name, as the result lists it", examples: ["Nylon Coil"] }),
+  outcome: S.Literals(["created", "updated", "already", "notImported", "takenBack"]).annotate({
     description:
       "Created an item, replaced a stored item as the person chose, found the SKU already there, not imported, or taken back: the item it created was removed, or the stored item it replaced was put back as it was"
   }),
-  reason: Schema.String.annotate({
+  reason: S.String.annotate({
     description:
       "Why the row was not imported or was already there, one sentence per problem; empty for a created row and for one a take-back removed",
     examples: ["Name is empty."]
   }),
-  decidedBy: Schema.NullOr(Schema.Literals(["person", "nobody"])).annotate({
+  decidedBy: S.NullOr(S.Literals(["person", "nobody"])).annotate({
     description: "For a row that was not imported: the person left it out, or nobody had settled it yet"
   }),
-  decidedByName: Schema.NullOr(Schema.String).annotate({ description: "Who left the row out, when someone did" })
+  decidedByName: S.NullOr(S.String).annotate({ description: "Who left the row out, when someone did" })
 }).annotate({ identifier: "RowOutcome", description: "What the confirms did with one row of the file" })
 /** The decoded value of `RowOutcome`: what the confirms did with one row of the file. */
 export type RowOutcome = typeof RowOutcome.Type
 
 /** What a confirmed import did, row by row, counted from the stored rows. Kept with the import, so it survives a reload. */
-export const ImportResult = Schema.Struct({
+export const ImportResult = S.Struct({
   importedBy: personName("Who confirmed the import"),
   importedAt: instant("When it was confirmed"),
-  created: Schema.Int.annotate({ description: "Rows whose item this import created and still has", examples: [11] }),
-  updated: Schema.Int.annotate({
+  created: S.Int.annotate({ description: "Rows whose item this import created and still has", examples: [11] }),
+  updated: S.Int.annotate({
     description: "Rows that replaced a stored item with the same SKU, because the person chose to",
     examples: [1]
   }),
-  already: Schema.Int.annotate({
+  already: S.Int.annotate({
     description: "Rows whose SKU the organization already had: nothing was written for them",
     examples: [154]
   }),
-  notImported: Schema.Int.annotate({
+  notImported: S.Int.annotate({
     description: "Rows left out, by a person or because nobody had settled them",
     examples: [45]
   }),
-  takenBack: Schema.Int.annotate({
+  takenBack: S.Int.annotate({
     description:
       "Rows whose item this import created and a take-back removed, or whose replace of a stored item a take-back undid",
     examples: [0]
   }),
-  fixed: Schema.Struct({
-    rows: Schema.Int.annotate({ description: "Rows written with at least one value a form-only rule changed" }),
-    cells: Schema.Int.annotate({ description: "Values a form-only rule changed, in all" })
+  fixed: S.Struct({
+    rows: S.Int.annotate({ description: "Rows written with at least one value a form-only rule changed" }),
+    cells: S.Int.annotate({ description: "Values a form-only rule changed, in all" })
   }).annotate({
     description:
       'What the form-only rules changed without the person, counted from the changed values the confirms stored (`how` "applied by a rule")'
   }),
-  rows: Schema.Array(RowOutcome).annotate({
+  rows: S.Array(RowOutcome).annotate({
     description: "Every row of the file with what happened to it; the five counts add up to these"
   })
 }).annotate({ identifier: "ImportResult", description: "What the confirms of an import did with each row of its file" })
@@ -291,30 +292,30 @@ export type ImportResult = typeof ImportResult.Type
  * it kept because they had changed since. Every number is
  * read from what the confirm and the take-back stored.
  */
-export const ImportEvent = Schema.TaggedUnion({
+export const ImportEvent = S.TaggedUnion({
   Confirmed: {
-    batchId: Schema.String.annotate({ description: "The confirm's id: what a take-back names in `confirms`" }),
+    batchId: S.String.annotate({ description: "The confirm's id: what a take-back names in `confirms`" }),
     by: personName("Who confirmed"),
     at: instant("When"),
-    created: Schema.Int.annotate({ description: "Items this confirm created" }),
-    updated: Schema.Int.annotate({ description: "Stored items this confirm replaced, as the person chose" }),
-    already: Schema.Int.annotate({ description: "Rows it found already there" }),
-    notImported: Schema.Int.annotate({ description: "Rows it left out" })
+    created: S.Int.annotate({ description: "Items this confirm created" }),
+    updated: S.Int.annotate({ description: "Stored items this confirm replaced, as the person chose" }),
+    already: S.Int.annotate({ description: "Rows it found already there" }),
+    notImported: S.Int.annotate({ description: "Rows it left out" })
   },
   TakenBack: {
-    batchId: Schema.String.annotate({
+    batchId: S.String.annotate({
       description: "The first confirm the take-back reversed; one take-back of several confirms is one event"
     }),
     by: personName("Who took it back"),
     at: instant("When"),
-    removed: Schema.Int.annotate({
+    removed: S.Int.annotate({
       description: "Every item the take-back removed, across all the confirms it reversed"
     }),
-    restored: Schema.Int.annotate({
+    restored: S.Int.annotate({
       description:
         "Every stored item those confirms had replaced that the take-back put back to its values from before the replace"
     }),
-    kept: Schema.Int.annotate({
+    kept: S.Int.annotate({
       description:
         "Every item it kept because someone had changed it since (one it created, or one it replaced), across all the confirms it reversed"
     })
@@ -324,9 +325,9 @@ export const ImportEvent = Schema.TaggedUnion({
 export type ImportEvent = typeof ImportEvent.Type
 
 /** An item an import created that someone changed afterwards: what it is, who changed it last and when. */
-export const ChangedItem = Schema.Struct({
-  sku: Schema.String.annotate({ description: "The item's SKU" }),
-  name: Schema.String.annotate({ description: "The item's name, for the list" }),
+export const ChangedItem = S.Struct({
+  sku: S.String.annotate({ description: "The item's SKU" }),
+  name: S.String.annotate({ description: "The item's name, for the list" }),
   changedBy: personName("Who changed it last"),
   changedAt: instant("When it was last changed")
 }).annotate({ identifier: "ChangedItem", description: "An item changed after the import that created it" })
@@ -342,23 +343,23 @@ export const changedItemsShown = 20
  * they replaced that nobody has changed since (`restorable`); an item someone changed is kept, and named. When every
  * such item has changed, nothing can be taken back, and the screen says so.
  */
-export const TakeBackState = Schema.Struct({
-  confirms: Schema.Array(Schema.String).annotate({
+export const TakeBackState = S.Struct({
+  confirms: S.Array(S.String).annotate({
     description: "The confirms still in force: what a take-back of the import would reverse"
   }),
-  removable: Schema.Int.annotate({ description: "Items of those confirms still as the import created them" }),
-  restorable: Schema.Int.annotate({
+  removable: S.Int.annotate({ description: "Items of those confirms still as the import created them" }),
+  restorable: S.Int.annotate({
     description:
       "Stored items those confirms replaced that are still as the replace left them: a take-back puts back their values from before"
   }),
-  changed: Schema.Array(ChangedItem).annotate({
+  changed: S.Array(ChangedItem).annotate({
     description: `Items those confirms created or replaced that someone changed since, at most ${changedItemsShown}: a take-back keeps them`
   }),
-  changedCount: Schema.Int.annotate({ description: "How many items of those confirms changed since, in all" }),
-  kept: Schema.Array(ChangedItem).annotate({
+  changedCount: S.Int.annotate({ description: "How many items of those confirms changed since, in all" }),
+  kept: S.Array(ChangedItem).annotate({
     description: `Items an earlier take-back of this import kept because they had changed, at most ${changedItemsShown}`
   }),
-  keptCount: Schema.Int.annotate({ description: "How many items earlier take-backs kept, in all" })
+  keptCount: S.Int.annotate({ description: "How many items earlier take-backs kept, in all" })
 }).annotate({ identifier: "TakeBackState", description: "What taking the import back would do now" })
 /** The decoded value of `TakeBackState`: whether the import can be taken back, and what that would do. */
 export type TakeBackState = typeof TakeBackState.Type
@@ -367,55 +368,55 @@ export type TakeBackState = typeof TakeBackState.Type
  * One file on its way in, without its rows (those are fetched once from `table`, since they never change). While
  * `status` is `open` nothing has been stored as an item.
  */
-export class ImportView extends Schema.Class<ImportView, { readonly brand: unique symbol }>("ImportView")(
+export class ImportView extends S.Class<ImportView, { readonly brand: unique symbol }>("ImportView")(
   {
-    id: Schema.String.annotate({ description: "The import's id: the id its upload was given" }),
-    fileName: Schema.String.annotate({
+    id: S.String.annotate({ description: "The import's id: the id its upload was given" }),
+    fileName: S.String.annotate({
       description: "The file's name as it was chosen",
       examples: ["items_messy.csv"]
     }),
-    status: Schema.Literals(["open", "imported", "takenBack"]).annotate({
+    status: S.Literals(["open", "imported", "takenBack"]).annotate({
       description: "Under review, confirmed, or confirmed and then taken back"
     }),
     startedBy: personName("Who uploaded the file"),
     createdAt: instant("When the upload finished and the import began"),
-    rowCount: Schema.Int.annotate({ description: "Data rows the file was uploaded with", examples: [200] }),
-    storedItems: Schema.Array(ItemFields).annotate({
+    rowCount: S.Int.annotate({ description: "Data rows the file was uploaded with", examples: [200] }),
+    storedItems: S.Array(ItemFields).annotate({
       description:
         "The organization's items that share a SKU with a row of this file: the review skips a row that says the same, and asks about one that says something else"
     }),
-    mapping: Schema.Array(ColumnMatch).annotate({ description: "Which file column fills each field, and how" }),
-    choices: Schema.Array(MappingChoice).annotate({ description: "The matches people made, as the review takes them" }),
-    unusedColumns: Schema.Array(UnusedColumn).annotate({
+    mapping: S.Array(ColumnMatch).annotate({ description: "Which file column fills each field, and how" }),
+    choices: S.Array(MappingChoice).annotate({ description: "The matches people made, as the review takes them" }),
+    unusedColumns: S.Array(UnusedColumn).annotate({
       description: "File columns no field reads, each with how many rows hold a value in it. They are never stored"
     }),
-    createdRows: Schema.Array(Schema.Int).annotate({
+    createdRows: S.Array(S.Int).annotate({
       description: "Rows an earlier confirm of this import turned into items: already there when it is opened again"
     }),
-    createdIds: Schema.optionalKey(Schema.Array(Schema.String)).annotate({
+    createdIds: S.String.pipe(S.Array, S.optionalKey).annotate({
       description:
         "The items an earlier confirm of this import created, by row id (`row-7`, or `row-8.2` for the second item of row 8): what the review counts as already there",
       examples: [["row-7", "row-8.2"]]
     }),
     decisions: SavedDecisions.annotate({ description: "The saved draft: what has been decided about each row" }),
-    suggestions: Schema.Array(Suggestion).annotate({
+    suggestions: S.Array(Suggestion).annotate({
       description:
         "The stored suggestions for this import (`suggest` makes them): pass them to the review as `suggestions`, as the server does at the confirm, so each shows as a proposal on its row. A column suggestion is offered for the person to match",
       default: []
     }),
-    revision: Schema.Int.annotate({ description: "Goes up with every saved decision, from any screen", examples: [3] }),
-    progress: Schema.Struct({
-      needsAtStart: Schema.Int.annotate({ description: "Rows that needed the person when the file was staged" }),
-      needs: Schema.Int.annotate({ description: "Rows that still need the person: decision and cannot together" }),
-      decision: Schema.Int.annotate({ description: "Rows that wait for a proposal or a choice: Needs a decision" }),
-      cannot: Schema.Int.annotate({ description: "Rows that wait for a typed value: Cannot import" }),
-      ready: Schema.Int.annotate({ description: "Rows a confirm would write now" }),
-      fixedRows: Schema.Int.annotate({ description: "Rows with a value a form-only rule changed, still in force" }),
-      fixedCells: Schema.Int.annotate({ description: "Values a form-only rule changed, still in force" }),
-      rows: Schema.Int.annotate({ description: "Record rows in the file: every row but blank and total rows" })
+    revision: S.Int.annotate({ description: "Goes up with every saved decision, from any screen", examples: [3] }),
+    progress: S.Struct({
+      needsAtStart: S.Int.annotate({ description: "Rows that needed the person when the file was staged" }),
+      needs: S.Int.annotate({ description: "Rows that still need the person: decision and cannot together" }),
+      decision: S.Int.annotate({ description: "Rows that wait for a proposal or a choice: Needs a decision" }),
+      cannot: S.Int.annotate({ description: "Rows that wait for a typed value: Cannot import" }),
+      ready: S.Int.annotate({ description: "Rows a confirm would write now" }),
+      fixedRows: S.Int.annotate({ description: "Rows with a value a form-only rule changed, still in force" }),
+      fixedCells: S.Int.annotate({ description: "Values a form-only rule changed, still in force" }),
+      rows: S.Int.annotate({ description: "Record rows in the file: every row but blank and total rows" })
     }).annotate({ description: "How far the review is: rows that needed the person at first, and now" }),
-    result: Schema.NullOr(ImportResult).annotate({ description: "What the confirms did, once there has been one" }),
-    history: Schema.Array(ImportEvent).annotate({
+    result: S.NullOr(ImportResult).annotate({ description: "What the confirms did, once there has been one" }),
+    history: S.Array(ImportEvent).annotate({
       description: "Every confirm and take-back of this import, oldest first"
     }),
     takeBack: TakeBackState
@@ -431,15 +432,15 @@ export class ImportView extends Schema.Class<ImportView, { readonly brand: uniqu
  * (a model, or the rules with the reason no model did) and what happened in past-tense lines. Nothing in it has
  * changed a row: each suggestion waits in the review for the person.
  */
-export const SuggestOutcome = Schema.Struct({
-  made: Schema.Array(Suggestion).annotate({
+export const SuggestOutcome = S.Struct({
+  made: S.Array(Suggestion).annotate({
     description: "The suggestions this request stored; empty when it added none"
   }),
-  suggestions: Schema.Array(Suggestion).annotate({
+  suggestions: S.Array(Suggestion).annotate({
     description: "Every suggestion now stored for the import: what `ImportView.suggestions` holds from now on"
   }),
   answeredBy: AnsweredBy,
-  lines: Schema.Array(Schema.String).annotate({
+  lines: S.Array(S.String).annotate({
     description: "What happened, in the past tense with real counts, for the person",
     examples: [["Suggested 2 names", "Suggested 2 categories"]]
   })
@@ -451,7 +452,7 @@ export const SuggestOutcome = Schema.Struct({
 export type SuggestOutcome = typeof SuggestOutcome.Type
 
 /** The import id in the address matches nothing in the caller's organization. */
-export class ImportNotFound extends Schema.TaggedError<ImportNotFound, { readonly brand: unique symbol }>()(
+export class ImportNotFound extends S.TaggedError<ImportNotFound, { readonly brand: unique symbol }>()(
   "ImportNotFound",
   { reason: reasonForPerson },
   { description: "The import id in the address matches nothing in the caller's organization", httpApiStatus: 404 }
@@ -461,14 +462,14 @@ export class ImportNotFound extends Schema.TaggedError<ImportNotFound, { readonl
  * The column position in a match is not a column of the import's file. The screen offers only the file's own
  * columns, so this is a request no screen of ours sends: a request error, not a problem with the person's file.
  */
-export class ColumnNotFound extends Schema.TaggedError<ColumnNotFound, { readonly brand: unique symbol }>()(
+export class ColumnNotFound extends S.TaggedError<ColumnNotFound, { readonly brand: unique symbol }>()(
   "ColumnNotFound",
   { reason: reasonForPerson },
   { description: "The column position in a match is not a column of the import's file", httpApiStatus: 404 }
 ) {}
 
 /** The import was already confirmed. A second confirm is refused instead of running again. */
-export class AlreadyImported extends Schema.TaggedError<AlreadyImported, { readonly brand: unique symbol }>()(
+export class AlreadyImported extends S.TaggedError<AlreadyImported, { readonly brand: unique symbol }>()(
   "AlreadyImported",
   { reason: reasonForPerson },
   { description: "The import was already confirmed: nothing was written", httpApiStatus: 409 }
@@ -479,7 +480,7 @@ export class AlreadyImported extends Schema.TaggedError<AlreadyImported, { reado
  * opened again to finish the rows it left out. Its items, its row-by-row result and the item of who decided each
  * changed value all point at it, so it stays. Only a file nobody has confirmed yet can be removed.
  */
-export class ImportKept extends Schema.TaggedError<ImportKept, { readonly brand: unique symbol }>()(
+export class ImportKept extends S.TaggedError<ImportKept, { readonly brand: unique symbol }>()(
   "ImportKept",
   { reason: reasonForPerson },
   {
@@ -496,11 +497,11 @@ export class ImportKept extends Schema.TaggedError<ImportKept, { readonly brand:
 export const openImportsShown = 5
 
 /** The organization's imports nobody has confirmed yet, so the first screen can offer to continue or remove each. */
-export const OpenImports = Schema.Struct({
-  views: Schema.Array(ImportView).annotate({
+export const OpenImports = S.Struct({
+  views: S.Array(ImportView).annotate({
     description: `The open imports, newest first, at most ${openImportsShown}`
   }),
-  older: Schema.Int.annotate({
+  older: S.Int.annotate({
     description: "How many more open imports there are, older than those in views. Zero when every one is shown"
   })
 }).annotate({
@@ -512,7 +513,7 @@ export const OpenImports = Schema.Struct({
 export type OpenImports = typeof OpenImports.Type
 
 const importId = {
-  id: Schema.String.check(Schema.isMaxLength(64)).annotate({
+  id: S.String.check(S.isMaxLength(64)).annotate({
     description: "The id `beginUpload` answered: the upload's, and the import's once the upload has finished"
   })
 }
@@ -521,7 +522,7 @@ const importId = {
  * The upload id matches no unfinished upload of the caller: it was cancelled, it finished already, or it was left
  * for over an hour and deleted. The rows are not on the server; the file has to be chosen again.
  */
-export class UploadNotFound extends Schema.TaggedError<UploadNotFound, { readonly brand: unique symbol }>()(
+export class UploadNotFound extends S.TaggedError<UploadNotFound, { readonly brand: unique symbol }>()(
   "UploadNotFound",
   { reason: reasonForPerson },
   {
@@ -532,15 +533,15 @@ export class UploadNotFound extends Schema.TaggedError<UploadNotFound, { readonl
 ) {}
 
 /** The start of an upload: the file without its rows, and how many rows will follow in how many pieces. */
-export const UploadStart = Schema.Struct({
-  key: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64)).annotate({
+export const UploadStart = S.Struct({
+  key: S.String.check(S.isMinLength(1), S.isMaxLength(64)).annotate({
     description:
       "Chosen by the browser for this one file: a begin sent again with the same key (a retry after a lost answer) " +
       "is the same upload, not a second one"
   }),
   head: StagedHead,
-  rowCount: Schema.Int.annotate({ description: "Data rows the pieces will carry in all", examples: [13] }),
-  chunkCount: Schema.Int.annotate({ description: "Pieces that will follow, numbered from 0", examples: [1] })
+  rowCount: S.Int.annotate({ description: "Data rows the pieces will carry in all", examples: [13] }),
+  chunkCount: S.Int.annotate({ description: "Pieces that will follow, numbered from 0", examples: [1] })
 }).annotate({
   identifier: "UploadStart",
   description: "The start of an upload: the file without its rows, and how many rows will follow in how many pieces"
@@ -552,13 +553,13 @@ export type UploadStart = typeof UploadStart.Type
  * One piece of an upload's rows, in file order. `seq` is its place; sending the same piece again stores nothing new,
  * so a piece whose answer was lost on the network can simply be sent again.
  */
-export const UploadChunk = Schema.Struct({
-  seq: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)).annotate({
+export const UploadChunk = S.Struct({
+  seq: S.Int.check(S.isGreaterThanOrEqualTo(0)).annotate({
     description: "The piece's place in the file, from 0: sending a piece again with the same number stores it once",
     examples: [0]
   }),
-  rows: Schema.Array(StagedRow)
-    .check(Schema.isMinLength(1), Schema.isMaxLength(chunkRows))
+  rows: S.Array(StagedRow)
+    .check(S.isMinLength(1), S.isMaxLength(chunkRows))
     .annotate({ description: `The piece's rows, in file order: 1 to ${chunkRows}` })
 }).annotate({ identifier: "UploadChunk", description: "One piece of an upload's rows, in file order" })
 /** The decoded value of `UploadChunk`: one piece of an upload's rows, in file order. */
@@ -568,7 +569,7 @@ export type UploadChunk = typeof UploadChunk.Type
  * What changed in the draft since the last save: the rows whose decision is new or different, and the rows whose
  * decision was taken back. Only the difference travels, so two screens deciding different rows do not collide.
  */
-export const DecisionDelta = Schema.Struct({
+export const DecisionDelta = S.Struct({
   set: SavedDecisions.annotate({
     description: "Decisions that are new or different, by row id (`row-7`)",
     examples: [{ "row-55": { accepted: ["unitCost"] }, "row-142": { edits: { name: "Steel Tube 1in" } } }]
@@ -576,8 +577,8 @@ export const DecisionDelta = Schema.Struct({
     description: "The rows decided since the last save, each with its whole decision",
     messageMissingKey: "Send `set`: the decisions that are new, by row id, or {} for none."
   }),
-  clear: Schema.Array(Schema.String.check(Schema.isMaxLength(40)))
-    .check(Schema.isMaxLength(50000))
+  clear: S.Array(S.String.check(S.isMaxLength(40)))
+    .check(S.isMaxLength(50000))
     .annotate({
       description: "Row ids (`row-7`) whose decision was taken back: they go back to what the file says",
       examples: [["row-18"]]
@@ -601,21 +602,21 @@ export const pastImportsShown = 50
  * One import that was confirmed at least once, as a list shows it so the person can open its result again: the file,
  * who confirmed it last and when, and how many of its items are stored now, counted from the items themselves.
  */
-export const PastImport = Schema.Struct({
-  id: Schema.String.annotate({ description: "The import's id: its result is at `/?import=<id>&step=result`" }),
-  fileName: Schema.String.annotate({ description: "The file it came from", examples: ["items_messy.csv"] }),
-  rowCount: Schema.Int.annotate({ description: "The rows of the file", examples: [200] }),
-  status: Schema.Literals(["open", "imported", "takenBack"]).annotate({
+export const PastImport = S.Struct({
+  id: S.String.annotate({ description: "The import's id: its result is at `/?import=<id>&step=result`" }),
+  fileName: S.String.annotate({ description: "The file it came from", examples: ["items_messy.csv"] }),
+  rowCount: S.Int.annotate({ description: "The rows of the file", examples: [200] }),
+  status: S.Literals(["open", "imported", "takenBack"]).annotate({
     description:
       "imported: confirmed and in force; takenBack: its last confirm was taken back; open: confirmed once, then opened again to finish the rows it left out"
   }),
   confirmedByName: personName("Who confirmed it last"),
   confirmedAt: instant("When it was confirmed last"),
-  items: Schema.Int.annotate({
+  items: S.Int.annotate({
     description: "How many items in the system came from this import now, counted from the stored items",
     examples: [155]
   }),
-  notImported: Schema.Int.annotate({ description: "Rows its last confirm did not import", examples: [45] })
+  notImported: S.Int.annotate({ description: "Rows its last confirm did not import", examples: [45] })
 }).annotate({
   identifier: "PastImport",
   description: "One import that was confirmed at least once, so its result can be opened again"
@@ -624,29 +625,29 @@ export const PastImport = Schema.Struct({
 export type PastImport = typeof PastImport.Type
 
 /** The organization's confirmed imports, newest first, and how many older ones were left out. */
-export const PastImports = Schema.Struct({
-  imports: Schema.Array(PastImport).annotate({
+export const PastImports = S.Struct({
+  imports: S.Array(PastImport).annotate({
     description: `The confirmed imports, last confirmed first, at most ${pastImportsShown}`
   }),
-  older: Schema.Int.annotate({ description: "How many more there are, older than those listed. Zero when all are" })
+  older: S.Int.annotate({ description: "How many more there are, older than those listed. Zero when all are" })
 }).annotate({ identifier: "PastImports", description: "The organization's confirmed imports, newest first" })
 /** The decoded value of `PastImports`. */
 export type PastImports = typeof PastImports.Type
 
 /** One changed value of an imported row as the activity view shows it: the file it came from, when, and who. */
-export const ChangeRecord = Schema.Struct({
-  importId: Schema.String.annotate({ description: "The import that wrote the value" }),
-  fileName: Schema.String.annotate({ description: "That import's file" }),
-  rowNumber: Schema.Int.annotate({ description: "The row of the file, as Excel numbers it" }),
-  part: Schema.optionalKey(Schema.Int).annotate({
+export const ChangeRecord = S.Struct({
+  importId: S.String.annotate({ description: "The import that wrote the value" }),
+  fileName: S.String.annotate({ description: "That import's file" }),
+  rowNumber: S.Int.annotate({ description: "The row of the file, as Excel numbers it" }),
+  part: S.optionalKey(S.Int).annotate({
     description:
       "Which of its row's items the value went into (1, 2, ...), when the row holds several; left out for a row that is one item"
   }),
-  sku: Schema.String.annotate({ description: "The SKU of the item the value went into" }),
+  sku: S.String.annotate({ description: "The SKU of the item the value went into" }),
   ...Change.fields,
-  decidedByName: Schema.NullOr(Schema.String).annotate({ description: "The member who accepted or typed it" }),
+  decidedByName: S.NullOr(S.String).annotate({ description: "The member who accepted or typed it" }),
   createdAt: instant("When the import wrote it"),
-  takenBack: Schema.Boolean.annotate({
+  takenBack: S.Boolean.annotate({
     description:
       "True when the import was taken back and the item this value went into was removed with it, or, for a stored item it replaced, put back as it was"
   })
@@ -675,7 +676,7 @@ export class ImportsApi extends HttpApiGroup.make("imports")
         "Every import confirmed at least once, last confirmed first, so a person can open its result again: what it imported, the rows it left out and the take-back. Counts are read from the stored items. Any member may read it."
       ),
     HttpApiEndpoint.get("changes", "/changes", {
-      success: Schema.Array(ChangeRecord).annotate({
+      success: S.Array(ChangeRecord).annotate({
         description: "Every value the organization's imports wrote that differs from its file, newest first"
       })
     })
@@ -686,7 +687,7 @@ export class ImportsApi extends HttpApiGroup.make("imports")
       ),
     HttpApiEndpoint.post("beginUpload", "/uploads", {
       payload: UploadStart,
-      success: StagingOutcome(Schema.Struct({ id: Schema.String.annotate({ description: "The upload's id" }) })),
+      success: StagingOutcome(S.Struct({ id: S.String.annotate({ description: "The upload's id" }) })),
       error: Forbidden
     })
       .annotate(OpenApi.Summary, "Start an upload with the file's head")
@@ -698,9 +699,9 @@ export class ImportsApi extends HttpApiGroup.make("imports")
       params: importId,
       payload: UploadChunk,
       success: StagingOutcome(
-        Schema.Struct({
-          seq: Schema.Int.annotate({ description: "The piece stored" }),
-          rows: Schema.Int.annotate({ description: "Rows in it" })
+        S.Struct({
+          seq: S.Int.annotate({ description: "The piece stored" }),
+          rows: S.Int.annotate({ description: "Rows in it" })
         })
       ),
       error: [Forbidden, UploadNotFound]
@@ -722,8 +723,8 @@ export class ImportsApi extends HttpApiGroup.make("imports")
       ),
     HttpApiEndpoint.delete("discardUpload", "/uploads/:id", {
       params: importId,
-      success: Schema.Struct({
-        discarded: Schema.Boolean.annotate({
+      success: S.Struct({
+        discarded: S.Boolean.annotate({
           description: "True when an unfinished upload was deleted; false when there was none (finished, or gone)"
         })
       }).annotate({ description: "Whether an unfinished upload was deleted" }),
@@ -752,11 +753,11 @@ export class ImportsApi extends HttpApiGroup.make("imports")
       ),
     HttpApiEndpoint.post("match", "/:id/mapping", {
       params: importId,
-      payload: Schema.Struct({
+      payload: S.Struct({
         field: Field.annotate({ description: "The item field to fill", examples: ["uom"] }).annotateKey({
           messageMissingKey: "Say which field of the item to match."
         }),
-        column: Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))
+        column: S.NullOr(S.Int.check(S.isGreaterThanOrEqualTo(0)))
           .annotate({
             description: "The file column's position, from 0, that fills the field; null for none",
             examples: [3]
@@ -784,8 +785,8 @@ export class ImportsApi extends HttpApiGroup.make("imports")
     HttpApiEndpoint.put("decide", "/:id/decisions", {
       params: importId,
       payload: DecisionDelta,
-      success: Schema.Struct({
-        revision: Schema.Int.annotate({ description: "The draft's revision after this save" })
+      success: S.Struct({
+        revision: S.Int.annotate({ description: "The draft's revision after this save" })
       }).annotate({ description: "The decisions are saved; the draft's new revision" }),
       error: [Forbidden, ImportNotFound, AlreadyImported]
     })
@@ -807,9 +808,9 @@ export class ImportsApi extends HttpApiGroup.make("imports")
       ),
     HttpApiEndpoint.post("takeBack", "/:id/take-back", {
       params: importId,
-      payload: Schema.Struct({
-        confirms: Schema.Array(Schema.String.check(Schema.isMaxLength(64)))
-          .check(Schema.isMinLength(1), Schema.isMaxLength(1000))
+      payload: S.Struct({
+        confirms: S.Array(S.String.check(S.isMaxLength(64)))
+          .check(S.isMinLength(1), S.isMaxLength(1000))
           .annotate({ description: "The confirms the screen offered to take back (TakeBackState.confirms)" })
       }),
       success: ImportView,
@@ -832,8 +833,8 @@ export class ImportsApi extends HttpApiGroup.make("imports")
       ),
     HttpApiEndpoint.delete("remove", "/:id", {
       params: importId,
-      success: Schema.Struct({
-        removed: Schema.Boolean.annotate({ description: "True: the import and its saved decisions are gone" })
+      success: S.Struct({
+        removed: S.Boolean.annotate({ description: "True: the import and its saved decisions are gone" })
       }).annotate({ description: "The import was removed" }),
       error: [Forbidden, ImportNotFound, ImportKept]
     })
@@ -856,35 +857,35 @@ export class ImportsApi extends HttpApiGroup.make("imports")
  * JSON text, the way the data table kit writes them into a query string
  * (`?page=2&perPage=20&sort=[{"id":"name","desc":false}]&filters=[]&joinOperator=and`).
  */
-export const ItemQueryParams = Schema.Struct({
+export const ItemQueryParams = S.Struct({
   // Described on the wire side (`annotateEncoded`): the document shows what travels, and there these are text.
-  page: Schema.FiniteFromString.pipe(
-    Schema.decodeTo(ItemQuery.fields.page),
-    Schema.annotateEncoded({ description: "The page, as digits: a whole number from 1 to 100000", examples: ["1"] })
+  page: S.FiniteFromString.pipe(
+    S.decodeTo(ItemQuery.fields.page),
+    S.annotateEncoded({ description: "The page, as digits: a whole number from 1 to 100000", examples: ["1"] })
   ),
-  perPage: Schema.FiniteFromString.pipe(
-    Schema.decodeTo(ItemQuery.fields.perPage),
-    Schema.annotateEncoded({
+  perPage: S.FiniteFromString.pipe(
+    S.decodeTo(ItemQuery.fields.perPage),
+    S.annotateEncoded({
       description: "Rows on a page, as digits: a whole number from 1 to 50. The table offers 10, 20, 30, 40 and 50",
       examples: ["20"]
     })
   ),
-  sort: Schema.fromJsonString(ItemQuery.fields.sorting).pipe(
-    Schema.annotateEncoded({
+  sort: S.fromJsonString(ItemQuery.fields.sorting).pipe(
+    S.annotateEncoded({
       description:
         "The order, as JSON text: at most 5 columns, first entry first. `[]` means by SKU, or best match first while searching",
       examples: ['[{"id":"name","desc":false}]']
     })
   ),
-  filters: Schema.fromJsonString(ItemQuery.fields.filters).pipe(
-    Schema.annotateEncoded({
+  filters: S.fromJsonString(ItemQuery.fields.filters).pipe(
+    S.annotateEncoded({
       description: "The filters, as JSON text: at most 20. `[]` for none",
       examples: ["[]"]
     })
   ),
   joinOperator: ItemQuery.fields.joinOperator,
   // Optional in the address, so a client written before the search box keeps working: left out, nothing is searched.
-  search: ItemQuery.fields.search.pipe(Schema.withDecodingDefaultKey(Effect.succeed("")))
+  search: ItemQuery.fields.search.pipe(S.withDecodingDefaultKey(Effect.succeed("")))
 }).annotate({
   description:
     '`ItemQuery` as it travels in the address of a GET: the two numbers as digits, the sorting and the filters as JSON text, the way the data table kit writes them into a query string (`?page=2&perPage=20&sort=[{"id":"name","desc":false}]&filters=[]&joinOperator=and&search=steel bracket`), and the search as typed, left out for none'
@@ -893,7 +894,7 @@ export const ItemQueryParams = Schema.Struct({
 export type ItemQueryParams = typeof ItemQueryParams.Type
 
 /** The item id in the address matches no item of the caller's organization: never there, or taken back. */
-export class ItemNotFound extends Schema.TaggedError<ItemNotFound, { readonly brand: unique symbol }>()(
+export class ItemNotFound extends S.TaggedError<ItemNotFound, { readonly brand: unique symbol }>()(
   "ItemNotFound",
   { reason: reasonForPerson },
   {
@@ -907,7 +908,7 @@ export class ItemNotFound extends Schema.TaggedError<ItemNotFound, { readonly br
  * The edit was made on an older revision of the item and says something else than what is stored now: someone
  * changed it in between. Nothing was written; `item` is the item as it is now, for the screen to show.
  */
-export class ItemChanged extends Schema.TaggedError<ItemChanged, { readonly brand: unique symbol }>()(
+export class ItemChanged extends S.TaggedError<ItemChanged, { readonly brand: unique symbol }>()(
   "ItemChanged",
   { reason: reasonForPerson, item: StoredItem },
   {
@@ -921,7 +922,7 @@ export class ItemChanged extends Schema.TaggedError<ItemChanged, { readonly bran
  * The edit says something an item cannot be: a name of only spaces, a date that is not a day on the calendar, or
  * discontinued and active at once. Nothing was written; `reason` says which, for the person.
  */
-export class ItemInvalid extends Schema.TaggedError<ItemInvalid, { readonly brand: unique symbol }>()(
+export class ItemInvalid extends S.TaggedError<ItemInvalid, { readonly brand: unique symbol }>()(
   "ItemInvalid",
   { reason: reasonForPerson },
   { description: "The edit says something an item cannot be; nothing was written", httpApiStatus: 422 }
@@ -934,7 +935,7 @@ export class ItemInvalid extends Schema.TaggedError<ItemInvalid, { readonly bran
 export class ItemsApi extends HttpApiGroup.make("items")
   .add(
     HttpApiEndpoint.get("list", "/", {
-      success: Schema.Array(StoredItem).annotate({ description: "Every item of the organization, by SKU" })
+      success: S.Array(StoredItem).annotate({ description: "Every item of the organization, by SKU" })
     })
       .annotate(OpenApi.Summary, "Every item of the organization")
       .annotate(
@@ -955,7 +956,7 @@ export class ItemsApi extends HttpApiGroup.make("items")
       ),
     HttpApiEndpoint.put("edit", "/:id", {
       params: {
-        id: Schema.String.check(Schema.isMaxLength(64)).annotate({
+        id: S.String.check(S.isMaxLength(64)).annotate({
           description: "The item's id, as `items.page` gives it (`id`)"
         })
       },

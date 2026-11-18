@@ -26,6 +26,9 @@ the active goal's `PLAN.md` current as you work.
 Benjamin's rules, each with its check; the ones the person feels come first. Look up the rest, and `docs/reviewing/`
 before calling a screen done.
 
+**Before writing or changing any Effect Schema, read `docs/standards/schema-first.md`**: Benjamin's schema rules
+(SF-1 to SF-9), each with its check. They bind every new package and all code as it moves into one.
+
 ## What is there
 
 `bun install && bun run dev` is the whole setup: no key and no secret to make by hand (`bun run dev` writes the

@@ -25,7 +25,7 @@ layer(TypedApp)("a take-back after two confirms", (it) => {
       expect(first.result?.created).toBe(155)
       // Listed among the past imports at once, its items counted from what is stored.
       const listed = yield* client.imports.past().pipe(marcus)
-      expect(listed.imports.map((past) => [past.id, past.status, past.items, past.notImported])).toEqual([
+      expect(Arr.map(listed.imports, (past) => [past.id, past.status, past.items, past.notImported])).toEqual([
         [staged.id, "imported", 155, 45]
       ])
       // Opened again, one answer given (the decimal comma on row 55), confirmed again: one more item.
@@ -46,7 +46,7 @@ layer(TypedApp)("a take-back after two confirms", (it) => {
       expect((yield* client.items.list().pipe(marcus)).length).toBe(0)
       // Still listed, so its result stays one click away, with nothing of it left in the system.
       const after = yield* client.imports.past().pipe(marcus)
-      expect(after.imports.map((past) => [past.status, past.items])).toEqual([["takenBack", 0]])
+      expect(Arr.map(after.imports, (past) => [past.status, past.items])).toEqual([["takenBack", 0]])
       const trail = yield* client.activity.recent().pipe(marcus)
       const line = Option.getOrThrow(Arr.findFirst(trail, (entry) => entry.action === "Took back an import"))
       expect(Str.includes("removed 156 items")(line.detail)).toBe(true)
@@ -84,9 +84,8 @@ const replaceRow2 = Effect.fn("test.replaceRow2")(function* () {
     .commit({ params: { id: second.id }, payload: { set: { "row-2": { stored: "replace" } }, clear: [] } })
     .pipe(marcus)
   expect([replaced.result?.updated, replaced.result?.created]).toEqual([1, 0])
-  const insert = Option.getOrThrow(
-    Arr.findFirst(yield* client.items.list().pipe(marcus), (item) => item.sku === "SHH-9574")
-  )
+  const stored = yield* client.items.list().pipe(marcus)
+  const insert = Option.getOrThrow(Arr.findFirst(stored, (item) => item.sku === "SHH-9574"))
   expect([insert.name, insert.unitCost, insert.revision]).toEqual(["Oak Foam Insert XL", "14.1", 2])
   return { client, marcus, first, second, replaced, insert }
 })
@@ -117,9 +116,8 @@ layer(TypedApp)("a take-back of an import that replaced a stored item", (it) => 
       yield* client.imports
         .takeBack({ params: { id: second.id }, payload: { confirms: replaced.takeBack.confirms } })
         .pipe(marcus)
-      expect(
-        Arr.filter(yield* client.activity.recent().pipe(marcus), (e) => e.action === "Took back an import")
-      ).toHaveLength(1)
+      const recent = yield* client.activity.recent().pipe(marcus)
+      expect(Arr.filter(recent, (e) => e.action === "Took back an import")).toHaveLength(1)
     })
   )
 })
@@ -157,9 +155,8 @@ layer(TypedApp)("a take-back of an import whose replaced item was edited since",
       expect(event._tag === "TakenBack" ? [event.removed, event.restored, event.kept] : []).toEqual([0, 0, 1])
       expect([back.result?.updated, back.result?.takenBack]).toEqual([1, 0])
       expect([back.takeBack.keptCount, Arr.map(back.takeBack.kept, (item) => item.sku)]).toEqual([1, ["SHH-9574"]])
-      const after = Option.getOrThrow(
-        Arr.findFirst(yield* client.items.list().pipe(marcus), (item) => item.sku === "SHH-9574")
-      )
+      const stored = yield* client.items.list().pipe(marcus)
+      const after = Option.getOrThrow(Arr.findFirst(stored, (item) => item.sku === "SHH-9574"))
       expect([after.name, after.unitCost, after.revision]).toEqual(["Oak Foam Insert, edited", "14.1", 3])
       const trail = yield* client.activity.recent().pipe(marcus)
       const line = Option.getOrThrow(Arr.findFirst(trail, (entry) => entry.action === "Took back an import"))

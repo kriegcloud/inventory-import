@@ -1,4 +1,4 @@
 {
   "rules": ["preferEffectArray", "preferEffectString", "preferEffectRecord", "missingPipeableSignature"],
-  "ceiling": 610
+  "ceiling": 688
 }

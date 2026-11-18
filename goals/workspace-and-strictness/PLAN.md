@@ -117,12 +117,35 @@ Recommendations taken where the answered decisions leave a choice open.
   Imported 155, Already there 0, All 200; Items read "155 items"; D1 counted 155 rows in `item`. Then the same file
   again: "Leave out 2" on a SKU group, a reload, and the review still read "Left out 2" and "Already there 155", so the
   rewritten decision saver saves and the second load created nothing.
+- Merge of `main` (this branch was cut from `840a358`; `main` had 20 more commits: the beep-effect skills, the
+  known-flaw fixes and the exploration). Merged rather than rebased: step 1 moves every file, so a rebase would have
+  met the same conflicts in each of five commits, while a merge let rename detection carry each fix into
+  `apps/inventory` once (four new files placed there too). Afterwards every file the fixes touched is identical to
+  `main`'s or differs only by this goal's own edits (keys, `concurrency`, the Effect boundaries). The skills commit
+  already matched `main`, so nothing of it was dropped.
+- After the merge, `main`'s code had 10 findings under the full profile (one `JSON.parse` in the new
+  `cellDrafts.ts`, nine in `TakeBack.slow.test.ts` and `reviewParity.test.ts`), all fixed. Its new web code (the
+  Activity and People data tables, "Why flagged?", past imports) raised the stage C count from 610 to **688**
+  (preferEffectArray 478, preferEffectString 131, missingPipeableSignature 42, preferEffectRecord 37), recorded as the
+  new ceiling: the ceiling is a count of code that exists, and this code arrived with the merge.
+- Tests after the merge: 216 fast and 45 slow run, 261 in all. `main` runs 306 fast and 73 slow, 379 in all (its
+  listing shows 79 slow because it counts one entry per `layer()` block). The 118 gone are the timed-build tests,
+  fast: `test/scripts/Checkpoint.test.ts` 44, `SessionRecord.test.ts` 39, `test/tooling/Images.test.ts` 5,
+  `test/scripts/KeyScan.test.ts` 2 (its scan is now `bun run keys:check`); slow: `CheckpointBrief` 9,
+  `CheckpointCopy` 7, `Clock` 7, `Pack` 3, `test/tooling/Profiles` 2.
+- Merged branch evidence: `bun run check:full` passed (8 of 8 tasks; 216 fast, 45 slow; build; "Total: 688, ceiling
+  688"; keys and docs OK). Browser, after `bun run db:reset`: 200 rows read (Needs a decision 24, Cannot import 21,
+  Ready 155, All 200); "Why flagged?" opened with "The 2 flagged rows on screen, each with every reason", naming row
+  148 (awp-1853) and row 195 (jlk-2867) with the SKU rule, its proposal and the SKU clash; "Import 155 items"
+  confirmed; the result read Not imported 45, Imported 155, Already there 0, All 200; Items read "155 items"; D1
+  counted 155; Activity showed the data table with headings Item, Row, Field, "Was, now", Proposed by, Decided by,
+  Basis, File, When, a search box, the quick filters "Decisions 20", "Events 2", "Imports 1" and the View toggle.
 
 ## Closing note
 
 What changed: the timed-build tooling is gone and every name says `inventory`; the app is `@inventory/app` in
 `apps/inventory` of a bun + Turborepo workspace whose `check` replays from cache; the whole repository is on
-beep-effect's profile, with two recorded exceptions in the app (stage C, ceiling 610, and stage D).
+beep-effect's profile, with two recorded exceptions in the app (stage C, ceiling 688, and stage D).
 
 What was learned: Effect plugin override globs resolve from the app's folder, so per-package exceptions belong in the
 package's own config; `plugins` does not merge through `extends`, hence the parity check; `deterministicKeys`

@@ -5,7 +5,7 @@
 // @effect-diagnostics nodeBuiltinImport:off
 import { readFileSync } from "node:fs"
 import { describe, expect, it } from "@effect/vitest"
-import { Array as Arr, Effect, Order, String as Str } from "effect"
+import { Array as Arr, Effect, Option, Order, String as Str } from "effect"
 import {
   firstDecisions,
   recheckRow,
@@ -222,7 +222,9 @@ describe("a row discontinued yet active, on the screen", () => {
       const table = yield* stage(sample("items_messy.csv"))
       for (const answer of ["Not active", "No discontinued date"]) {
         const s = screen(table, "apply")
-        const view = s.derive().views.find((candidate) => candidate.row.id === "row-45")
+        const view = Option.getOrUndefined(
+          Arr.findFirst(s.derive().views, (candidate) => candidate.row.id === "row-45")
+        )
         const fix = view?.problem?.fix
         expect(fix?.why.labels).toEqual(["Not active", "No discontinued date"])
         expect(fix?.why.alternatives).toEqual([""])
@@ -234,15 +236,21 @@ describe("a row discontinued yet active, on the screen", () => {
             : { type: "edit", rowId: "row-45", column: columnFor(fix, value), value }
         )
         const { current, views } = s.agree()
-        const row = current.rows.find((candidate) => candidate.id === "row-45")
+        const row = Option.getOrUndefined(Arr.findFirst(current.rows, (candidate) => candidate.id === "row-45"))
         expect(row?.status, answer).toBe("ready")
-        expect(views.find((candidate) => candidate.row.id === "row-45")?.status, answer).toBe("ready")
+        expect(
+          Option.getOrUndefined(Arr.findFirst(views, (candidate) => candidate.row.id === "row-45"))?.status,
+          answer
+        ).toBe("ready")
         expect([row?.item?.isActive, row?.item?.discontinuedOn], answer).toEqual(
           answer === "Not active" ? [false, "2025-06-30"] : [true, null]
         )
         // Undone, the row asks again on both sides.
         s.press({ type: "undo" })
-        expect(s.agree().current.rows.find((candidate) => candidate.id === "row-45")?.outcome).toBe("decision")
+        expect(
+          Option.getOrUndefined(Arr.findFirst(s.agree().current.rows, (candidate) => candidate.id === "row-45"))
+            ?.outcome
+        ).toBe("decision")
       }
     })
   )

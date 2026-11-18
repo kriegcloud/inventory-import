@@ -68,7 +68,8 @@ Step 2, toolchain:
       section 5.
 - [x] Server, api, domain and test code pass the full profile with no override.
 - [x] Own web code passes with one commented override for `preferEffectArray`, `preferEffectString`,
-      `preferEffectRecord` and `missingPipeableSignature`; its error count is recorded as a ceiling (610), and
+      `preferEffectRecord` and `missingPipeableSignature`; its error count is recorded as a ceiling (688 after main's
+      fixes were merged in; 610 before), and
       `bun run check:strict` fails when the count rises above it.
 - [x] `components/ui` is excluded and recorded as a permanent exception.
 - [x] `bun run check:full` and the production build pass.

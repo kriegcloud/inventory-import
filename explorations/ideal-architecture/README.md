@@ -4,7 +4,7 @@ title: Ideal architecture
 description: What inventory-import becomes as a model-first Turborepo of deep packages, shipped with Alchemy.
 status: active
 stage: shape
-next: goal beep-csv (step 4) is open; step 5, kernel and drivers, is next to shape
+next: step 5, kernel and drivers, is next to shape (goal beep-csv is done)
 goals: [workspace-and-strictness, beep-csv]
 ---
 
@@ -77,6 +77,7 @@ Each step ends with the full check and an import of the messy sample in a browse
 
 ## Trail
 
+- 2026-11-18: goal `beep-csv` done: the app reads CSV through `@beep/csv`; papaparse removed.
 - 2026-11-18: goal `beep-csv` opened from BRIEF.md after "the brief matches".
 - 2026-11-18: BRIEF.md written for the goal `beep-csv` (step 4); awaiting "the brief matches".
 - 2026-11-18: goal `workspace-and-strictness` opened for steps 0 to 2 of the order of work.

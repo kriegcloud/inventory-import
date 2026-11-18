@@ -2,7 +2,7 @@
 type: Goal
 title: "@beep/csv"
 description: A canonical CSV table codec, @beep/csv, built beside the papaparse reader, proved identical to it on every fixture and both samples, then swapped into the app with papaparse removed.
-status: active
+status: done
 from: explorations/ideal-architecture
 ---
 
@@ -37,23 +37,30 @@ files in the app; no Windows-1252 writing, no delimiters beyond the four, no quo
 
 ## Acceptance
 
-- [ ] `packages/foundation/modeling/csv` exists with exactly the export subpaths the brief lists, role-suffixed files,
-      no `./internal/*` export (`package.json` read).
-- [ ] Every exported schema and `MachineState` generates only valid values (`CsvSchemas.property.test.ts`).
-- [ ] Round trip: `decode(encode(t)) = t` for generated tables, `encode(decode(s)) = s` for canonical text
-      (`Csv.property.test.ts`).
-- [ ] Chunk invariance on text and on bytes with a fixed encoding (`Csv.property.test.ts`).
-- [ ] Strict mode agrees with `effect/encoding/Csv` on generated RFC 4180 text, accepted and refused
-      (`oracle.property.test.ts`).
-- [ ] Hostile inputs fail typed, never a defect (`hostile.test.ts`).
-- [ ] Differential: old reader and adapter give identical tables and problems on the six CSV fixtures, both samples
+- [x] `packages/foundation/modeling/csv` exists with exactly the export subpaths the brief lists, role-suffixed files,
+      no `./internal/*` export (`package.json` read: `.`, `./Csv`, `./CsvPosition`, `./CsvTable`, `./CsvOptions`,
+      `./CsvDiagnostic`, `./CsvRead`, `./CsvError`).
+- [x] Every exported schema and `MachineState` generates only valid values (`CsvSchemas.property.test.ts`, 11
+      schemas, 50 runs each).
+- [x] Round trip: `decode(encode(t)) = t` for generated tables, `encode(decode(s)) = s` for canonical text
+      (`Csv.property.test.ts`: four delimiters by two terminators, 200 runs each, plus the Schema codec).
+- [x] Chunk invariance on text and on bytes with a fixed encoding (`Csv.property.test.ts`: pieces of 1 to 64
+      characters, the text channel cut anywhere, the bytes channel cut inside UTF-8 sequences; 200 runs each).
+- [x] Strict mode agrees with `effect/encoding/Csv` on generated RFC 4180 text, accepted and refused
+      (`oracle.property.test.ts`: Effect's output read by us, ours read by Effect, quote-ridden text accepted or
+      refused by both alike; 200 runs each).
+- [x] Hostile inputs fail typed, never a defect (`hostile.test.ts`: 20 MiB cell, 100,001 records over a cap of
+      100,000, an unclosed quote before 200,000 lines, 100,001 cells).
+- [x] Differential: old reader and adapter give identical tables and problems on the six CSV fixtures, both samples
       and the generated text, whole and in six piece sizes; the old reader's results are recorded under
-      `apps/inventory/test/fixtures/csv-expected/` and compared after papaparse leaves.
-- [ ] `apps/inventory`'s CSV reading goes through `@beep/csv`; `papaparse` and `@types/papaparse` are gone from every
-      `package.json` and `bun.lock`.
-- [ ] `bun run check:full` and `bun run build` pass on the last commit.
-- [ ] Browser: `items_messy.csv` imported through Confirm on the last version; rows in the file, the result screen and
-      the stored count agree (200 rows, 155 stored).
+      `apps/inventory/test/fixtures/csv-expected/` and compared after papaparse leaves (`csvDifferential.test.ts`,
+      12 inputs by 7 piece sizes; first run old against new, then against the 12 recorded files).
+- [x] `apps/inventory`'s CSV reading goes through `@beep/csv`; `papaparse` and `@types/papaparse` are gone from every
+      `package.json` and `bun.lock` (`grep -c papaparse bun.lock` is 0).
+- [x] `bun run check:full` and `bun run build` pass on the last commit (see PLAN, closing note).
+- [x] Browser: `items_messy.csv` imported through Confirm on the last version; rows in the file, the result screen and
+      the stored count agree (200 rows, 155 stored): fresh database, review "200 rows read" and "Import 155, skip 45",
+      result "Imported 155, Not imported 45, All 200", Items "155 items", D1 `item` 155 rows.
 
 ## Decisions
 

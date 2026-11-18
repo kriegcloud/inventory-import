@@ -1,0 +1,196 @@
+{
+  "$comment": "Written by scripts/vendor-beep.mjs; checked by scripts/vendor-check.mjs. sha256 is of each file without its first (provenance) line; it equals sourceSha256 unless the file lists rewrites. local files are written here, not copied.",
+  "source": {
+    "repository": "beep-effect",
+    "commit": "c5cebd5c9de7077493cb9ccaaa18e1d4f73da0b0",
+    "path": "packages/foundation/modeling/identity",
+    "license": "Apache-2.0"
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts",
+    "./Curie": "./src/Curie.ts",
+    "./Fibered": "./src/Fibered.ts",
+    "./Id": "./src/Id.ts",
+    "./IdentityRegistry": "./src/IdentityRegistry.ts",
+    "./PnLocal": "./src/PnLocal.ts",
+    "./Vocab": "./src/Vocab.ts",
+    "./index": "./src/index.ts",
+    "./packages": "./src/packages.ts"
+  },
+  "files": [
+    {
+      "path": "src/Curie.ts",
+      "sourceSha256": "f5e2589a83f55dbd8945de216c725817ddd87ffcbed04ebb89089c43c31228fe",
+      "sha256": "f5e2589a83f55dbd8945de216c725817ddd87ffcbed04ebb89089c43c31228fe",
+      "rewrites": []
+    },
+    {
+      "path": "src/Fibered.ts",
+      "sourceSha256": "02314ff4ae7672a68bef70352e19e6fa16dd045383a7b03112a7a7e6195b8c7d",
+      "sha256": "02314ff4ae7672a68bef70352e19e6fa16dd045383a7b03112a7a7e6195b8c7d",
+      "rewrites": []
+    },
+    {
+      "path": "src/Id.ts",
+      "sourceSha256": "e09b2402fb8e5375ae8a06495126c90f00408d369af87e4057d0fd47cb109835",
+      "sha256": "e09b2402fb8e5375ae8a06495126c90f00408d369af87e4057d0fd47cb109835",
+      "rewrites": []
+    },
+    {
+      "path": "src/IdentityRegistry.ts",
+      "sourceSha256": "e733a3b744e80e5689106c13b4b3968058d2232e69bf5b6b2a56ab55f9c65ac5",
+      "sha256": "e733a3b744e80e5689106c13b4b3968058d2232e69bf5b6b2a56ab55f9c65ac5",
+      "rewrites": []
+    },
+    {
+      "path": "src/PnLocal.ts",
+      "sourceSha256": "7af4f2a566292cc6991ada581f9e6d67ff56e562c18efeb9b1f1c9d7f146e825",
+      "sha256": "7af4f2a566292cc6991ada581f9e6d67ff56e562c18efeb9b1f1c9d7f146e825",
+      "rewrites": []
+    },
+    {
+      "path": "src/Vocab.ts",
+      "sourceSha256": "9d658eed5b2db48491800cc1fb2ef65ff2ecdca5e900e99fdd6ca616e3d3442f",
+      "sha256": "9d658eed5b2db48491800cc1fb2ef65ff2ecdca5e900e99fdd6ca616e3d3442f",
+      "rewrites": []
+    },
+    {
+      "path": "src/index.ts",
+      "sourceSha256": "c9aac61c8084cabe12e34920aafa9e8c95b3d7ee1845ff14e3f753c14690e3ea",
+      "sha256": "c9aac61c8084cabe12e34920aafa9e8c95b3d7ee1845ff14e3f753c14690e3ea",
+      "rewrites": []
+    },
+    {
+      "path": "src/internal/generated/SparTerms.ts",
+      "sourceSha256": "e4e7cc8aa540cdd00a45cada79eb4d1a8d80bf88d7767d0c1dc84b529038a803",
+      "sha256": "e4e7cc8aa540cdd00a45cada79eb4d1a8d80bf88d7767d0c1dc84b529038a803",
+      "rewrites": []
+    },
+    {
+      "path": "src/internal/schemaStatics.ts",
+      "sourceSha256": "6b4bf9d27c47dab580686121b11a9bf86e388d1747effe52e17425aec3dda9e4",
+      "sha256": "6b4bf9d27c47dab580686121b11a9bf86e388d1747effe52e17425aec3dda9e4",
+      "rewrites": []
+    },
+    {
+      "path": "src/packages.ts",
+      "sourceSha256": "6f14545a545f5d117fc6204cae32eac85b633c8ac14e285561edc111ec9b78ff",
+      "sha256": "6f14545a545f5d117fc6204cae32eac85b633c8ac14e285561edc111ec9b78ff",
+      "rewrites": []
+    },
+    {
+      "path": "test/AnnoteError.test.ts",
+      "sourceSha256": "fbb9ee6e130aeea4a2d8e68a42d6e8424e3f056daee903aa9b1fcf44c3d13da2",
+      "sha256": "b6b5d6b275a6db2c963cc289d62e3ee4089c8d4b987653b1cf9b64d0948441d4",
+      "rewrites": [
+        "@beep/test-runner -> @effect/vitest"
+      ]
+    },
+    {
+      "path": "test/Curie.test.ts",
+      "sourceSha256": "a916d32a32e465b9ee6d6e19114ff2ff1657900f36dcbddcd4981b89570038a6",
+      "sha256": "acf47b98d97af22993a29e3c8cc449ae298bfa8591689b820346f383cbd99e15",
+      "rewrites": [
+        "@beep/test-runner -> @effect/vitest",
+        "@beep/fc-runs -> ./support/fcRuns.ts"
+      ]
+    },
+    {
+      "path": "test/Fibered.test.ts",
+      "sourceSha256": "e1a2a78e88b8e2edd78602738b39ab664c4c05b2e2eaa2fb41fbbd4eeb4b59ac",
+      "sha256": "933f2f72239a51089b79705c48d0fba3387d13e1337f6e7f5dde0c6dc33af1c5",
+      "rewrites": [
+        "@beep/test-runner -> @effect/vitest",
+        "@beep/fc-runs -> ./support/fcRuns.ts"
+      ]
+    },
+    {
+      "path": "test/Identity.test.ts",
+      "sourceSha256": "8725f786b840af4d093760d0d39b968041d7698375db971b9a34f0f13e653a68",
+      "sha256": "9ba9251edaf54940812fe0dc8e85bd5a362d634defaad64fcb95ada6a5c5d50d",
+      "rewrites": [
+        "@beep/test-runner -> @effect/vitest",
+        "@beep/fc-runs -> ./support/fcRuns.ts"
+      ]
+    },
+    {
+      "path": "test/IdentityRegistry.test.ts",
+      "sourceSha256": "a2f499f22bdce9e6c2254ba6408255e455eeec3514fb4b6f9419add151a8d7b7",
+      "sha256": "e62f6cc073ae96ca2eaaaa088008c7e69d9f817d2712df4efea5badfc59d6f4c",
+      "rewrites": [
+        "@beep/test-runner -> @effect/vitest"
+      ]
+    },
+    {
+      "path": "test/IriBinding.test.ts",
+      "sourceSha256": "880ddf5f105174b31eb41581b485c7506b444c1b69d59d088fff8a8eb2cf4ef1",
+      "sha256": "3a703c62e0f6110892254848c50459efd4d8ac9961641df722a162e931ebe69c",
+      "rewrites": [
+        "@beep/test-runner -> @effect/vitest"
+      ]
+    },
+    {
+      "path": "test/OntologyEntrypoints.test.ts",
+      "sourceSha256": "016b19371dbbf30891c8d4f852ea916623bc61acfdde97ec876182a78aa860ca",
+      "sha256": "bb0f57d794b5ee2d6d93a7a06f918a9121b8f42437cd24d02f32d96c8057db6d",
+      "rewrites": [
+        "@beep/test-runner -> @effect/vitest"
+      ]
+    },
+    {
+      "path": "test/PnLocal.test.ts",
+      "sourceSha256": "4c91391d6d0409e32ad26000c982f7116cc1f8db82d7228c9b5343ae6e5c39e5",
+      "sha256": "288336d49c9000a18ecdf460e3da191e6d93927f0233a2518e45f8d421fd4eef",
+      "rewrites": [
+        "@beep/test-runner -> @effect/vitest",
+        "@beep/fc-runs -> ./support/fcRuns.ts"
+      ]
+    },
+    {
+      "path": "test/SchemaStatics.test.ts",
+      "sourceSha256": "9d36ff94ebb2ddf1415574e023a1a01b3aa228e78b7f87b37a2cd3cf0f486cd1",
+      "sha256": "e5761e25e0d530e47af27b43b8fabb642de952861a10063f259696a977e75cb6",
+      "rewrites": [
+        "@beep/test-runner -> @effect/vitest",
+        "@beep/identity/internal/schemaStatics -> ../src/internal/schemaStatics.ts"
+      ]
+    },
+    {
+      "path": "test/TaggedError.equivalence.test.ts",
+      "sourceSha256": "a2cb07021f7f1acc60b7ccca45ec26f511d39ddc53552246c0c71eb57856de8f",
+      "sha256": "f2f84a56c7f843ff5bdc420c8153298ac7cb5d513039a0e97b099d592f4a943c",
+      "rewrites": [
+        "@beep/test-runner -> @effect/vitest"
+      ]
+    },
+    {
+      "path": "test/TemplateGuards.test.ts",
+      "sourceSha256": "adea22e6206b66286f5357c35938422548fb8c8f16a3b4dadbb0b8a7479f7db1",
+      "sha256": "c81a1cc9ce8cccda01e0f48c7935e1948f1679410f97a7324f9ddc4b29a82e6c",
+      "rewrites": [
+        "@beep/test-runner -> @effect/vitest"
+      ]
+    },
+    {
+      "path": "test/Vocab.test.ts",
+      "sourceSha256": "9002634094d4266d2551903d5c0894a4133b00f8f202aaf518a705196f99770d",
+      "sha256": "037ba29d1d293d9038ae920bc0b6f51a2caa9219c7e4ba5d14201f2d4798bf98",
+      "rewrites": [
+        "@beep/test-runner -> @effect/vitest",
+        "@beep/fc-runs -> ./support/fcRuns.ts"
+      ]
+    },
+    {
+      "path": "test/shape-stable.test.ts",
+      "sourceSha256": "913d401691bad26367fbd9783e80cf803d86c0cf4b3cde6768f8e1b119379ddc",
+      "sha256": "384036a1b931e4d38c7b47c27d0f1ca24d9047aba76e42dd8eef22c2a361b0e3",
+      "rewrites": [
+        "@beep/test-runner -> @effect/vitest"
+      ]
+    }
+  ],
+  "local": [
+    "test/support/fcRuns.ts"
+  ]
+}

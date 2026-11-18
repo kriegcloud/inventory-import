@@ -26,6 +26,17 @@
     "dev": { "cache": false, "persistent": true },
     // Repository checks: root scripts that do not call turbo.
     "//#format:check": { "outputs": [] },
+    // Vendored kit packages still match the beep-effect files they were copied from (scripts/vendor-check.mjs).
+    "//#vendor:check": {
+      "inputs": [
+        "packages/**/vendor.json",
+        "packages/**/package.json",
+        "packages/**/src/**",
+        "packages/**/test/**",
+        "scripts/vendor-check.mjs"
+      ],
+      "outputs": []
+    },
     // Every file git would commit, so its hash is the whole repository's.
     "//#keys:check": { "outputs": [] },
     "//#docs:check": {

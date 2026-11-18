@@ -7,6 +7,10 @@
   "ignorePatterns": [
     "apps/inventory/src/web/components/ui/**",
     "apps/inventory/src/web/shadcn-utilities.css",
+    "packages/foundation/primitive/types/**",
+    "packages/foundation/modeling/identity/**",
+    "packages/foundation/modeling/schema/**",
+    "packages/foundation/modeling/utils/**",
     "**/dist/**",
     "apps/inventory/migrations/**",
     "bun.lock",

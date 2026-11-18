@@ -1,0 +1,57 @@
+{
+  "$comment": "Written by scripts/vendor-beep.mjs; checked by scripts/vendor-check.mjs. sha256 is of each file without its first (provenance) line; it equals sourceSha256 unless the file lists rewrites. local files are written here, not copied.",
+  "source": {
+    "repository": "beep-effect",
+    "commit": "c5cebd5c9de7077493cb9ccaaa18e1d4f73da0b0",
+    "path": "packages/foundation/primitive/types",
+    "license": "Apache-2.0"
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts",
+    "./TArray.types": "./src/TArray.types.ts",
+    "./TString.types": "./src/TString.types.ts",
+    "./TUnsafe.types": "./src/TUnsafe.types.ts",
+    "./TUtils.types": "./src/TUtils.types.ts",
+    "./index": "./src/index.ts"
+  },
+  "files": [
+    {
+      "path": "src/TArray.types.ts",
+      "sourceSha256": "fffd75a1b401cc9fac0295f8968434d44820c13014de4485ea6affd8e5eeab73",
+      "sha256": "fffd75a1b401cc9fac0295f8968434d44820c13014de4485ea6affd8e5eeab73",
+      "rewrites": []
+    },
+    {
+      "path": "src/TString.types.ts",
+      "sourceSha256": "1a06895d1156c5dbb4e71398342fc52ff39419dfad719be09849eb03f2973e5d",
+      "sha256": "1a06895d1156c5dbb4e71398342fc52ff39419dfad719be09849eb03f2973e5d",
+      "rewrites": []
+    },
+    {
+      "path": "src/TUnsafe.types.ts",
+      "sourceSha256": "83e351606eab2b6e8667a7efbc20549250f5009e66222e2eeb228e486d9b7443",
+      "sha256": "83e351606eab2b6e8667a7efbc20549250f5009e66222e2eeb228e486d9b7443",
+      "rewrites": []
+    },
+    {
+      "path": "src/TUtils.types.ts",
+      "sourceSha256": "e3483e9dad0cb5bc320bfa9cb6f58980074f8367153f04d2a1760feffa5a42a1",
+      "sha256": "e3483e9dad0cb5bc320bfa9cb6f58980074f8367153f04d2a1760feffa5a42a1",
+      "rewrites": []
+    },
+    {
+      "path": "src/index.ts",
+      "sourceSha256": "63b67a4e828e2084c41886769b677fb392e6017fdb4b29400409a1058a0dac99",
+      "sha256": "63b67a4e828e2084c41886769b677fb392e6017fdb4b29400409a1058a0dac99",
+      "rewrites": []
+    },
+    {
+      "path": "test/TString.test.ts",
+      "sourceSha256": "f5d3ab18f79e7c3cf0fdd8f405fa8b22fe6de8ee5e90ae777111ba39733fa2d8",
+      "sha256": "f5d3ab18f79e7c3cf0fdd8f405fa8b22fe6de8ee5e90ae777111ba39733fa2d8",
+      "rewrites": []
+    }
+  ],
+  "local": []
+}

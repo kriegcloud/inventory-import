@@ -225,7 +225,7 @@ package's task and replays it when nothing it reads has changed. The app's own s
 | Root command | What it does |
 | --- | --- |
 | `bun run dev` | Applies local migrations and the test accounts, then serves the app and API on http://localhost:5173, signed in by itself as the first test account |
-| `bun run check` | The loop check through turbo: type-check with Effect diagnostics, lint (with the two design lints), the fast tests, the format check, `docs:check` and the key scan (`keys:check`). Before every commit |
+| `bun run check` | The loop check through turbo: type-check with Effect diagnostics, lint (with the two design lints), the fast tests, the format check, `docs:check`, the key scan (`keys:check`) and the vendored-kit hash check (`vendor:check`). Before every commit |
 | `bun run check:full` | `check` plus the slow tests (`*.slow.test.ts`) and the production build. CI runs it |
 | `bun run build` | The production build through turbo |
 | `bun run test` | Every test, fast and slow (Vitest, Node) |
@@ -274,11 +274,14 @@ apps/inventory/         The app: the Worker and the SPA, one Vite build. Its own
   test/                 Unit tests (`*.slow.test.ts` need workerd, D1 or sign-in).
   public/samples/       The sample files the Upload step offers.
   scripts/              The app's development scripts (local migrations, HTTPS, deploy setup, strict count).
-packages/               Workspace packages (none yet; see explorations/ideal-architecture).
+packages/foundation/     Product-neutral packages. Today only beep-effect's kit, vendored: @beep/types (primitive/),
+                        @beep/identity, @beep/schema and @beep/utils (modeling/). Never edit them: each vendor.json
+                        records its beep-effect commit and file hashes, and `bun run vendor:check` fails on a change.
 docs/                   Standards, the kit, patterns, the glossary and sign-in (`docs/index.md` lists them); qa/ is evidence.
 explorations/           Questions being shaped: research, decisions, briefs.
 goals/                  Work with a definition of done: SPEC.md and PLAN.md.
-scripts/                Repository checks (`docs-check.sh`, `keys-check.sh`).
+scripts/                Repository checks (`docs-check.sh`, `keys-check.sh`, `vendor-check.mjs`) and `vendor-beep.mjs`,
+                        which copies the kit from a beep-effect checkout.
 turbo.json              The task graph: seven package tasks and three root tasks.
 .agents/                Skills (see above). Not application code; the check ignores it.
 ```
@@ -342,7 +345,8 @@ recorded exceptions in `apps/inventory/tsconfig.base.json`, and nothing else may
 - **Stage D, the vendored components** (`src/web/components/ui`): every rule off, permanently.
 
 The same `check` fails if the app's plugin block drifts from the root's outside `overrides`. Server, api, domain and
-test code have no exception at all.
+test code have no exception at all, and neither have the packages under `packages/`: the vendored kit passes the full
+profile, its copied tests included, with no override.
 
 **What fails the check.** Write to these from the start:
 

@@ -1,0 +1,147 @@
+{
+  "$comment": "Written by scripts/vendor-beep.mjs; checked by scripts/vendor-check.mjs. sha256 is of each file without its first (provenance) line; it equals sourceSha256 unless the file lists rewrites. local files are written here, not copied.",
+  "source": {
+    "repository": "beep-effect",
+    "commit": "c5cebd5c9de7077493cb9ccaaa18e1d4f73da0b0",
+    "path": "packages/foundation/modeling/schema",
+    "license": "Apache-2.0"
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    "./LiteralKit": "./src/LiteralKit/index.ts",
+    "./SchemaUtils": "./src/SchemaUtils/index.ts",
+    "./SchemaUtils/collectAnnotationsAt": "./src/SchemaUtils/collectAnnotationsAt.ts",
+    "./SchemaUtils/defectDiagnostics": "./src/SchemaUtils/defectDiagnostics.ts",
+    "./SchemaUtils/index": "./src/SchemaUtils/index.ts",
+    "./SchemaUtils/isCodecDataFirst": "./src/SchemaUtils/isCodecDataFirst.ts",
+    "./SchemaUtils/optionalDefect": "./src/SchemaUtils/optionalDefect.ts",
+    "./SchemaUtils/toEquivalence": "./src/SchemaUtils/toEquivalence.ts",
+    "./SchemaUtils/withKeyDefaults": "./src/SchemaUtils/withKeyDefaults.ts",
+    "./SchemaUtils/withLiteralKitStatics": "./src/SchemaUtils/withLiteralKitStatics.ts",
+    "./SchemaUtils/withStatics": "./src/SchemaUtils/withStatics.ts"
+  },
+  "files": [
+    {
+      "path": "src/LiteralKit/LiteralKit.errors.ts",
+      "sourceSha256": "818b2b6961bf5c5cc3d7e976cd636675a31c3c0e1959ddd924638a70c4c21c1b",
+      "sha256": "818b2b6961bf5c5cc3d7e976cd636675a31c3c0e1959ddd924638a70c4c21c1b",
+      "rewrites": []
+    },
+    {
+      "path": "src/LiteralKit/LiteralKit.schema.ts",
+      "sourceSha256": "a9f53fb522832a3ba78e4db1f0250ce7648ad481238a5402753c9c6f490dbe59",
+      "sha256": "a9f53fb522832a3ba78e4db1f0250ce7648ad481238a5402753c9c6f490dbe59",
+      "rewrites": []
+    },
+    {
+      "path": "src/LiteralKit/index.ts",
+      "sourceSha256": "f6786fd92145cf3aee04cb88b8a1d22b007146cd38c5d51137ca0c5bf0ab5d3a",
+      "sha256": "f6786fd92145cf3aee04cb88b8a1d22b007146cd38c5d51137ca0c5bf0ab5d3a",
+      "rewrites": []
+    },
+    {
+      "path": "src/LiteralKit/internal/builders.ts",
+      "sourceSha256": "3018080d9c5ba84cc5c43085ff7b9ee7c241c489cf93cae531bbee7b1aefc216",
+      "sha256": "3018080d9c5ba84cc5c43085ff7b9ee7c241c489cf93cae531bbee7b1aefc216",
+      "rewrites": []
+    },
+    {
+      "path": "src/SchemaUtils/collectAnnotationsAt.ts",
+      "sourceSha256": "cb475cf90304ad112a25d5269c204269d7a666fac0c34529913adfcecbe86daa",
+      "sha256": "cb475cf90304ad112a25d5269c204269d7a666fac0c34529913adfcecbe86daa",
+      "rewrites": []
+    },
+    {
+      "path": "src/SchemaUtils/defectDiagnostics.ts",
+      "sourceSha256": "bf77ce7e60f8ec21da0f633a0e8d5cccb5576ae28add9d16d8420a8d9cbd3471",
+      "sha256": "bf77ce7e60f8ec21da0f633a0e8d5cccb5576ae28add9d16d8420a8d9cbd3471",
+      "rewrites": []
+    },
+    {
+      "path": "src/SchemaUtils/index.ts",
+      "sourceSha256": "d8833c76b06600f8b137f82f24c679f6e7622d99a8558c0146b4568b29b7c636",
+      "sha256": "d8833c76b06600f8b137f82f24c679f6e7622d99a8558c0146b4568b29b7c636",
+      "rewrites": []
+    },
+    {
+      "path": "src/SchemaUtils/internal/staticDescriptors.ts",
+      "sourceSha256": "0f3f50d2154c9fcc344d81cafd7be0092d467493e2ea386d86390b858c0f46dc",
+      "sha256": "0f3f50d2154c9fcc344d81cafd7be0092d467493e2ea386d86390b858c0f46dc",
+      "rewrites": []
+    },
+    {
+      "path": "src/SchemaUtils/isCodecDataFirst.ts",
+      "sourceSha256": "61a58a9985a83e67074878dc24ecedda0c011802102f7296730dab9ea11a8c51",
+      "sha256": "61a58a9985a83e67074878dc24ecedda0c011802102f7296730dab9ea11a8c51",
+      "rewrites": []
+    },
+    {
+      "path": "src/SchemaUtils/optionalDefect.ts",
+      "sourceSha256": "6c9f5cd541d5e498f458077f68e083f2252efaae430b770bef4330ec9a78cf92",
+      "sha256": "6c9f5cd541d5e498f458077f68e083f2252efaae430b770bef4330ec9a78cf92",
+      "rewrites": []
+    },
+    {
+      "path": "src/SchemaUtils/toEquivalence.ts",
+      "sourceSha256": "35cef314f11c2027fc434c28efda38559f711a0580c37f34d3f080477b5bcf61",
+      "sha256": "35cef314f11c2027fc434c28efda38559f711a0580c37f34d3f080477b5bcf61",
+      "rewrites": []
+    },
+    {
+      "path": "src/SchemaUtils/withKeyDefaults.ts",
+      "sourceSha256": "7bda45225fd6f22e88a26f615447ec3188f4bfb17d4bc93345ec01abdef01b30",
+      "sha256": "7bda45225fd6f22e88a26f615447ec3188f4bfb17d4bc93345ec01abdef01b30",
+      "rewrites": []
+    },
+    {
+      "path": "src/SchemaUtils/withLiteralKitStatics.ts",
+      "sourceSha256": "149dfbaf6fb59664c26e0c27a0867fa0154938ca92c6e28ca7731cfa9d47007a",
+      "sha256": "149dfbaf6fb59664c26e0c27a0867fa0154938ca92c6e28ca7731cfa9d47007a",
+      "rewrites": []
+    },
+    {
+      "path": "src/SchemaUtils/withStatics.ts",
+      "sourceSha256": "8d3ed3ca46fc10a4d036a4585b054e51fdec38b38447a2ab74c35d7d682bc95b",
+      "sha256": "8d3ed3ca46fc10a4d036a4585b054e51fdec38b38447a2ab74c35d7d682bc95b",
+      "rewrites": []
+    },
+    {
+      "path": "test/LiteralKit.test.ts",
+      "sourceSha256": "4331a6c2de527e02958ddde7ca7f0316ba78a9d3edc56cef2cc108b9362cef96",
+      "sha256": "4795a499024db3c1cf939321fe5351d699bc121ff4dce9504db083b7aab88172",
+      "rewrites": [
+        "@beep/test-runner -> @effect/vitest",
+        "@beep/fc-runs -> ./support/fcRuns.ts"
+      ]
+    },
+    {
+      "path": "test/collectAnnotationsAt.test.ts",
+      "sourceSha256": "cbf98a201e051ca8da18e8acb859336665a6ee37014d1d8eccfcb6e72e3716d0",
+      "sha256": "c1953470dee892c5db139f9059602593129ab7332c5d5f8ea6848730d3b85b34",
+      "rewrites": [
+        "@beep/test-runner -> @effect/vitest"
+      ]
+    },
+    {
+      "path": "test/withKeyDefaults.test.ts",
+      "sourceSha256": "c319db19ca37cbf711e58e1e4719870234f8d2d32ed1fa45d33c6f1353b8d4b7",
+      "sha256": "c319db19ca37cbf711e58e1e4719870234f8d2d32ed1fa45d33c6f1353b8d4b7",
+      "rewrites": []
+    },
+    {
+      "path": "test/SchemaUtils/defectDiagnostics.test.ts",
+      "sourceSha256": "c46eb313a569278764cb20bce054fe78433da4cacbcf4202d78345d8370db1d0",
+      "sha256": "c46eb313a569278764cb20bce054fe78433da4cacbcf4202d78345d8370db1d0",
+      "rewrites": []
+    },
+    {
+      "path": "test/SchemaUtils/optionalDefect.test.ts",
+      "sourceSha256": "891750904da1b331eebe0b0f7ffca960a1a988f8f840c7c7cfe4cc7ae82d5777",
+      "sha256": "891750904da1b331eebe0b0f7ffca960a1a988f8f840c7c7cfe4cc7ae82d5777",
+      "rewrites": []
+    }
+  ],
+  "local": [
+    "test/support/fcRuns.ts"
+  ]
+}

@@ -147,7 +147,7 @@ What the starter held, now turned to the brief's inventory item:
 
 ## How it is put together
 
-A bun workspace driven by Turborepo, with one app so far. `bun run dev` runs a Cloudflare Worker locally in workerd,
+A bun workspace driven by Turborepo, with one app and a vendored subset of beep-effect's kit packages so far. `bun run dev` runs a Cloudflare Worker locally in workerd,
 next to the React app, both built by one Vite config in `apps/inventory`.
 
 ```
@@ -156,6 +156,7 @@ apps/inventory/src/api/      The HTTP contract, shared by server and browser (Ef
 apps/inventory/src/server/   Worker: services, handlers, identity, the AI service
 apps/inventory/src/web/      React 19, Tailwind 4, shadcn/ui, TanStack Query
 apps/inventory/migrations/   D1 (SQLite) schema
+packages/foundation/         @beep/types, @beep/identity, @beep/schema, @beep/utils: vendored from beep-effect, hash-checked
 turbo.json                   check, lint, test, test:slow, build and dev per package; format, docs and key checks at the root
 ```
 

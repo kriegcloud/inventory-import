@@ -387,27 +387,40 @@ export function ReviewRegion(props: ReviewRegionProps) {
   const facets = useMemo(
     () =>
       facetColumns.map((column) => {
-        const found = MutableHashMap.empty<string, { values: MutableHashSet.MutableHashSet<string>; n: number }>()
+        // Spellings that differ only by spaces around them or by capitals ("Packaging" and "packaging") read the
+        // same: one choice that holds both, named by the spelling most rows have.
+        const found = MutableHashMap.empty<
+          string,
+          { values: MutableHashSet.MutableHashSet<string>; n: number; spellings: Record<string, number> }
+        >()
+        const keyOf = (value: string): string => value.trim().toLowerCase()
         for (const view of views) {
           const value = view.cells[column.id] ?? ""
-          const label = value.trim()
-          if (label === "") continue
-          const entry = Option.getOrElse(MutableHashMap.get(found, label), () => ({
+          const key = keyOf(value)
+          if (key === "") continue
+          const entry = Option.getOrElse(MutableHashMap.get(found, key), () => ({
             values: MutableHashSet.empty<string>(),
-            n: 0
+            n: 0,
+            spellings: {} as Record<string, number>
           }))
           MutableHashSet.add(entry.values, value)
-          MutableHashMap.set(found, label, entry)
+          entry.spellings[value.trim()] = (entry.spellings[value.trim()] ?? 0) + 1
+          MutableHashMap.set(found, key, entry)
         }
         for (const view of list) {
-          const entry = Option.getOrUndefined(MutableHashMap.get(found, (view.cells[column.id] ?? "").trim()))
+          const entry = Option.getOrUndefined(MutableHashMap.get(found, keyOf(view.cells[column.id] ?? "")))
           if (entry !== undefined) entry.n += 1
         }
         const options = [...found]
-          .map(([label, entry]) => ({ label, values: [...entry.values], n: entry.n }))
+          .map(([key, entry]) => ({
+            key,
+            label: Object.entries(entry.spellings).sort((a, b) => b[1] - a[1])[0]?.[0] ?? key,
+            values: [...entry.values],
+            n: entry.n
+          }))
           .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }))
         // A choice whose value is no longer in the file (the person fixed the last row that had it) is dropped.
-        const picked = (facetPicked[column.id] ?? []).filter((label) => MutableHashMap.has(found, label))
+        const picked = (facetPicked[column.id] ?? []).filter((key) => MutableHashMap.has(found, key))
         return { column, options, picked }
       }),
     [facetColumns, facetPicked, views, list]
@@ -416,7 +429,7 @@ export function ReviewRegion(props: ReviewRegionProps) {
   const facetValues = JSON.stringify(
     facets.map((facet) => [
       facet.column.id,
-      facet.options.filter((option) => facet.picked.includes(option.label)).flatMap((option) => option.values)
+      facet.options.filter((option) => facet.picked.includes(option.key)).flatMap((option) => option.values)
     ])
   )
   // The table object is new on every render, so it is read through a ref: only a change of values runs this, and
@@ -979,7 +992,7 @@ export function ReviewRegion(props: ReviewRegionProps) {
               } as unknown as Column<DataTableFeatures, RowView, string>
             }
             title={facet.column.label}
-            options={facet.options.map((option) => ({ label: option.label, value: option.label, count: option.n }))}
+            options={facet.options.map((option) => ({ label: option.label, value: option.key, count: option.n }))}
             multiple
           />
         ))}

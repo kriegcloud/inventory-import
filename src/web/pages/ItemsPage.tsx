@@ -80,12 +80,12 @@ const whole = new Intl.NumberFormat()
 // Pixels, in the order the columns stand. The last number is the column's place in the queue to step aside when the
 // page is short of room (lowest first); a column without one always shows.
 const widths = {
-  name: [220],
+  name: [200],
   sku: [104],
   category: [136],
-  uom: [64],
+  uom: [84],
   unitCost: [104],
-  quantityOnHand: [108],
+  quantityOnHand: [136],
   reorderPoint: [116, 7],
   isActive: [76, 8],
   lotTracked: [100, 5],
@@ -133,8 +133,8 @@ const tableOptions = {
     unitCost: { variant: "number" },
     quantityOnHand: { variant: "number" },
     reorderPoint: {},
-    isActive: { enableSorting: false },
-    lotTracked: { enableSorting: false },
+    isActive: { variant: "select", enableSorting: false },
+    lotTracked: { variant: "select", enableSorting: false },
     tags: { enableSorting: false },
     firstReceivedOn: {},
     discontinuedOn: { enableSorting: false },
@@ -296,6 +296,13 @@ export function ItemsPage() {
       : []
     const options = (listed: ReadonlyArray<{ readonly value: string; readonly count: number }> | undefined) =>
       (listed ?? []).map((entry) => ({ label: entry.value, value: entry.value, count: entry.count }))
+    // A flag is stored as "true" or "false" and read as Yes or No, as its cells say.
+    const flagOptions = (listed: ReadonlyArray<{ readonly value: string; readonly count: number }> | undefined) =>
+      (listed ?? []).map((entry) => ({
+        label: entry.value === "true" ? "Yes" : "No",
+        value: entry.value,
+        count: entry.count
+      }))
     return col.columns([
       col.accessor("name", {
         id: "name",
@@ -368,14 +375,14 @@ export function ItemsPage() {
         id: "isActive",
         header: labels.isActive,
         cell: ({ row }) => yesNo(row.original.isActive),
-        meta: { label: labels.isActive },
+        meta: { label: labels.isActive, options: flagOptions(found?.isActive) },
         size: widths.isActive[0]
       }),
       col.accessor("lotTracked", {
         id: "lotTracked",
         header: labels.lotTracked,
         cell: ({ row }) => yesNo(row.original.lotTracked),
-        meta: { label: labels.lotTracked },
+        meta: { label: labels.lotTracked, options: flagOptions(found?.lotTracked) },
         size: widths.lotTracked[0]
       }),
       col.accessor((item) => item.tags.join(", "), {

@@ -698,6 +698,47 @@ export class Csv {
     return Channel.pipeTo(bytesToText<IE, Done>(options), decodeStringChannel<IE | CsvParseError, Done>(options))
   }
 
+  /**
+   * A channel from bytes to rows decoded with `row`, through the header view: the first record names the fields, an
+   * empty or repeated heading fails with `CsvParseError`, a row that does not decode fails with `S.SchemaError`.
+   */
+  static decodeSchema<Row extends S.Top>(row: Row) {
+    return <IE = never, Done = unknown>(
+      options: CsvReadOptions = CsvReadOptions.default
+    ): Channel.Channel<
+      A.NonEmptyReadonlyArray<Row["Type"]>,
+      IE | CsvParseError | S.SchemaError,
+      Done,
+      A.NonEmptyReadonlyArray<Uint8Array>,
+      IE,
+      Done,
+      Row["DecodingServices"]
+    > => {
+      const decodeRows = S.decodeUnknownEffect(S.Array(row))
+      return Csv.decode<IE, Done>(options).pipe(
+        Channel.mapAccum(
+          (): O.Option<CsvRecord> => O.none(),
+          (header, slices: A.NonEmptyReadonlyArray<CsvRecordSlice>) => {
+            const head = O.orElse(header, () => O.some(A.headNonEmpty(slices).cells))
+            const body = O.isNone(header) ? A.drop(slices, 1) : slices
+            return [head, A.isReadonlyArrayNonEmpty(body) ? [{ header: head, body }] : []] as const
+          }
+        ),
+        Channel.mapEffect(({ header, body }) =>
+          Effect.flatMap(
+            Effect.fromResult(
+              Result.mapError(
+                toHeaderRows({ records: [O.getOrElse(header, () => [""] as const), ...A.map(body, (s) => s.cells)] }),
+                (fatals) => CsvParseError.make({ diagnostics: fatals as A.NonEmptyReadonlyArray<CsvFatal> })
+              )
+            ),
+            (rows) => decodeRows(rows)
+          ).pipe(Effect.map((rows) => rows as A.NonEmptyReadonlyArray<Row["Type"]>))
+        )
+      )
+    }
+  }
+
   /** A channel from records to canonical text chunks. */
   static encodeString<IE = never, Done = unknown>(
     options: CsvWriteOptions = CsvWriteOptions.default

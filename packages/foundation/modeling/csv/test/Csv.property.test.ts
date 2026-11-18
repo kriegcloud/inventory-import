@@ -118,3 +118,17 @@ describe("chunk invariance", () => {
     runs
   )
 })
+
+describe("decodeSchema", () => {
+  it.effect("decodes rows through the header view", () =>
+    Effect.gen(function* () {
+      const Row = S.Struct({ SKU: S.String, Qty: S.FiniteFromString })
+      const bytes = new TextEncoder().encode("SKU,Qty\nBRK-040,12\nBLT-0042,3\n")
+      const rows = yield* Stream.make(bytes).pipe(Stream.pipeThroughChannel(Csv.decodeSchema(Row)()), Stream.runCollect)
+      expect(rows).toEqual([
+        { SKU: "BRK-040", Qty: 12 },
+        { SKU: "BLT-0042", Qty: 3 }
+      ])
+    })
+  )
+})

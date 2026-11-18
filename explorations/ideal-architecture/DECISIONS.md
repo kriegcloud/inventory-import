@@ -15,9 +15,6 @@ Answered decisions move below with the date, the answer and how to reverse it.
 
 | # | Question | Recommendation | Source |
 | --- | --- | --- | --- |
-| 7 | Byte-lossless CSV document in the first version? | No: canonical table codec first | 04 §9.7 |
-| 8 | Drop SheetJS and papaparse? | Yes, each behind fixture parity | 04 §9.8 |
-| 9 | Lenient or strict CSV by default? | Lenient for reading; strict as an option | 04 §9.16 |
 | 11 | Where is `Model.Class` used? | Stored-row schemas in host packages only | 01 §8, 03 §7.2 |
 | 12 | `Option`/`DateTime` fields or `null`/strings? | `DateTime` for timestamps only | 03 §7.2 |
 
@@ -42,7 +39,6 @@ Answered decisions move below with the date, the answer and how to reverse it.
 | 22 | Model keys outside production? | None | 02 §10.8 |
 | 23 | Email through Resend now? | Not now | 02 §10.9 |
 | 24 | Repository rules as code? | Yes, in a workstation-only stack | 02 §10.12 |
-| 26 | Where do `explorations/` and `goals/` live? | Repository root, checked by `docs:check` | 04 §9.11 |
 
 ## Answered
 
@@ -92,3 +88,22 @@ nothing is deployed, so nobody is signed out. Reverse: git history.
 Question: atoms or TanStack Query? Answer: TanStack Query for the rebuild; atoms later as their own goal. Rationale:
 undo per change, invalidate-after-last-write and keep-previous-data paging have no atom equivalent yet. Reverse: a
 goal that moves the web packages onto `@effect/atom-react`.
+
+### 2026-11-18 — packets
+
+Question: where do packets live and what gates a goal? Answer: `explorations/` and `goals/` at the repository root,
+checked by `docs:check`. `goals/workspace-and-strictness` is accepted as opened; every later goal needs a `BRIEF.md`
+and Benjamin's "the brief matches" first. Rejected were no sign-off gate and moving packets under `docs/`. Reverse:
+move the folders and the check's roots.
+
+### 2026-11-18 — CSV scope
+
+Question: what does the first `@beep/csv` round-trip? Answer: a canonical table codec; the engine keeps quoting and
+terminators internally so a byte-lossless document can be added without engine changes. Rejected: shipping the
+byte-lossless document in the first version. Reverse: add the document codec.
+
+### 2026-11-18 — CSV default
+
+Question: lenient or strict reading by default? Answer: lenient, each oddity reported as a diagnostic; strict is an
+option and is tested against Effect's own `Csv`. papaparse is removed once the old and new readers agree on every
+fixture. Rejected: strict by default. Reverse: flip the default option.

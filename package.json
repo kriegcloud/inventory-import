@@ -13,8 +13,8 @@
   ],
   "type": "module",
   "scripts": {
-    "check": "turbo run check lint test //#format:check //#docs:check //#keys:check //#vendor:check //#ceilings:check //#boundaries:check //#screens:check",
-    "check:full": "turbo run check lint test test:slow build //#format:check //#docs:check //#keys:check //#vendor:check //#ceilings:check //#boundaries:check //#screens:check",
+    "check": "turbo run check lint test //#format:check //#docs:check //#keys:check //#vendor:check //#ceilings:check //#boundaries:check //#screens:check //#imports:check",
+    "check:full": "turbo run check lint test test:slow build //#format:check //#docs:check //#keys:check //#vendor:check //#ceilings:check //#boundaries:check //#screens:check //#imports:check",
     "dev": "bun run --cwd apps/inventory dev",
     "build": "turbo run build",
     "preview": "bun run --cwd apps/inventory preview",

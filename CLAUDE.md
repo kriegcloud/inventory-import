@@ -235,7 +235,7 @@ package's task and replays it when nothing it reads has changed. The app's own s
 | Root command | What it does |
 | --- | --- |
 | `bun run dev` | Applies local migrations and the test accounts, then serves the app and API on http://localhost:5173, signed in by itself as the first test account |
-| `bun run check` | The loop check through turbo: type-check with Effect diagnostics, lint (with the two design lints), the fast tests, the format check, `docs:check`, the key scan (`keys:check`), the vendored-kit hash check (`vendor:check`), which package may import which (`boundaries:check`) and the two stylesheet lists (`screens:check`). Before every commit |
+| `bun run check` | The loop check through turbo: type-check with Effect diagnostics, lint (with the two design lints), the fast tests, the format check, `docs:check`, the key scan (`keys:check`), the vendored-kit hash check (`vendor:check`), which package may import which (`boundaries:check`), the two stylesheet lists (`screens:check`) and the Effect imports (`imports:check`; `imports:fix` repairs code). Before every commit |
 | `bun run check:full` | `check` plus the slow tests (`*.slow.test.ts`) and the production build. CI runs it |
 | `bun run build` | The production build through turbo |
 | `bun run test` | Every test, fast and slow (Vitest, Node) |
@@ -317,7 +317,7 @@ docs/                   Standards, the kit, patterns, the glossary and sign-in (
 explorations/           Questions being shaped: research, decisions, briefs.
 goals/                  Work with a definition of done: SPEC.md and PLAN.md.
 scripts/                Repository checks (`docs-check.sh`, `keys-check.sh`, `vendor-check.mjs`, `check-strict.mjs`,
-                        `check-ceilings.mjs`, `check-exports.mjs`, `check-boundaries.mjs`: which package may import which, `check-screens.mjs`: every package with screens in both stylesheet lists) and `vendor-beep.mjs`, which copies the kit from a
+                        `check-ceilings.mjs`, `check-exports.mjs`, `check-boundaries.mjs`: which package may import which, `check-screens.mjs`: every package with screens in both stylesheet lists, `check-effect-imports.mjs`: every Effect import from its own path under its one name) and `vendor-beep.mjs`, which copies the kit from a
                         beep-effect checkout.
 turbo.json              The task graph: seven package tasks and three root tasks.
 .agents/                Skills (see above). Not application code; the check ignores it.

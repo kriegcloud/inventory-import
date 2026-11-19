@@ -143,7 +143,7 @@
     "./Theme": "./src/Theme.provider.tsx",
     "./theme.css": "./src/theme.css",
     "./utilities.css": "./src/utilities.css",
-    "./ShellSlots": "./src/ShellSlots.context.ts"
+    "./ShellSlots": "./src/ShellSlots.atoms.ts"
   },
   "scripts": {
     "check": "tsrs -p tsconfig.json && beep-cli laws exports && beep-cli quality strict strict-ceiling.json",

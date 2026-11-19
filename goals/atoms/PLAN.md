@@ -17,14 +17,14 @@ from: explorations/ideal-architecture
 | 3 | `@inventory/access-web`: the session (`actor`), sign-in, People, the audit events | done |
 | 4 | The app's shell: the content width, the development sign-in, the Activity page | done |
 | 5 | `@inventory/ui`'s own pieces: the theme, the table search, content width, the run log | done |
-| 6 | `@inventory/catalog-web`: the upload, the Items page and its editor, the assistant, the import's steps | todo |
+| 6 | `@inventory/catalog-web`: the upload, the Items page and its editor, the assistant, the import's steps | done |
 | 7 | `@inventory/review`: the region's state with undo, saved progress, the grid, the queue; the A6 remodel | todo |
 | 8 | TanStack Query removed (A2); the lint everywhere; the documents the move made false | todo |
 
 ## Current blocker
 
-None. Before step 7: Benjamin has an uncommitted edit to `packages/review/src/ReviewDecision.schema.ts` in the main
-checkout; step 7 waits until it is here.
+Step 7 waits for Benjamin's uncommitted edit to `packages/review/src/ReviewDecision.schema.ts` in the main checkout to
+be here.
 
 ## The hook count
 
@@ -67,6 +67,14 @@ After each package, the same count:
   `useSyncExternalStore` 3 → 0, `useRef` 2 → 1 (the search field's element, for the caret after the cross); `useId` 1
   (each search box's own atom). The app's `src/web` now reads the ui atoms directly (`useAtomValue` 11 → 17). The ui
   strict ceiling fell from 52 to 51 (sum 652). The run log (`AgentRun`) held no hook.
+- **After step 6 (`catalog-web`)**: `catalog-web` holds no banned hook: `useEffect` 6 → 0, `useState` 23 → 0,
+  `useMemo` 10 → 0, `useCallback` 8 → 0, `useRef` 10 → 0, `useContext` 1 → 0, `useSyncExternalStore` 1 → 0, and
+  TanStack Query's 20 → 0. It keeps `useId` (14: each form's and each cell editor's own atom) and `useDeferredValue` (1:
+  the Review step draws its skeleton first, then the region) and calls `useAtomValue` 34, `useAtom` 8, `useAtomSet` 14,
+  `useAtomRefresh` 4, `useAtomMount` 1. `client` now holds no React hook at all (`useContext` 1 → 0: `useMember` went),
+  and the app's `src/web` none either. `@tanstack/react-query` is imported in 2 files (the app's `main.tsx` and the
+  client's `QueryClient.runtime.ts`), both for step 8. Strict ceilings: `catalog-web` 245 → 240, `client` 22 → 20
+  (sum 645).
 
 ## Proof
 
@@ -206,17 +214,68 @@ Caught on screen and fixed before the commit: the first version of the search bo
 the search went back to the very value it had been typed over. Typed text now counts only while the search is the last
 one the box asked for.
 
+**Step 6, `catalog-web`.** `bun run check` (74 tasks) and `bun run check:full` (76 tasks) pass; the catalog lint
+(`packages/catalog/web/.oxlintrc.json`) is on with no file excepted. New client tests (`Seed.atoms.test.ts`): a read
+given an answer shows it with no request and asks only on a refresh; a read kept for the page is not asked again when a
+screen returns to it.
+
+Browser, on a fresh database, a new browser context, the dev server on port 5220:
+
+- Upload: a file dragged over the page showed "Drop the file to load it"; dropped beside the box, it started ("Saving 0
+  of 200 rows · Cancel") and arrived at Review with no request for the import or its rows (the upload's answer is
+  given to both reads).
+- Review: "Needs a decision 24 · Cannot import 21 · Ready 155 · All 200". Accepting a fix saved once and asked for the
+  import once. "Use finished-goods for the 2 ticked": 24 → 22, 155 → 157, "Import 157, skip 43"; Undo: 24 and 155;
+  Redo: 22 and 157; Undo and Redo still offered after each save ("Undo: 2 fixes accepted"). Reloaded mid-review:
+  22, 21, 157, 200, Undo still there.
+- Two tabs on one import: tab 2 undid, then accepted the SKU fix (revision 9). Tab 1 took each new revision when its
+  window came back into view ("Updated with what changed on another screen", "Import 155, skip 45", the accepted fix's
+  button gone). In the headless browser both tabs always report `visible`, so switching tabs sends no
+  `visibilitychange`; the event was sent by hand each time, as a browser sends it on a real switch.
+- Confirm: the dialog "Import 155 items? 45 items won't be imported (Needs a decision 24, Cannot import 21)"; Import
+  155 items. Result: "Not imported 45 · Imported 155 · Already there 0 · All 200"; stored in D1 for the organization:
+  155. The three numbers agree (200 in the file, 155 on screen, 155 stored). "Imported" showed imported rows; "Already
+  there" kept the table with "No rows here. Show all 200".
+- Take back: "Take back 155 items" → "Took back items_messy.csv", "Taken back 155". Review again: "Import 155, skip
+  45", the decisions kept; confirmed again; View items: "155 items".
+- Items: 20 a page, next page `?page=2`, last page `?page=8` with 15 rows. Search "hinje oak": both Oak Hinges
+  (ALY-5698, QCZ-5391); cleared: the address clear. Unit cost, Desc: `sort=unitCost.desc,sku.asc`, $862.53 first.
+- Editor on JCQ-8999: Qty on hand 12, Save: the row read "12 EA" 60 ms later, then "Saved JCQ-8999". Saved 13 and at
+  once reopened (it showed 13) and saved 14: the row read 14, two "Saved". A refused edit: the editor open on 99 in
+  tab 1 while tab 2 saved 50; tab 1's Save showed 99 at once, then 50 with "Changed by someone else … Their values are
+  showing. Edit again" (the server's 409).
+- Assistant, with no AI key: "only packaging, cheapest first" → "Answered by Rules", the rules could not read
+  "cheapest first", and why. "only packaging and sort by unit cost" → "Filtered: Category is packaging · Sorted by
+  Unit cost, low to high", `?sort=unitCost.asc&category=packaging`, $0.20 first. Reloaded: the conversation still
+  there; Undo put the view back.
+- An open import removed: items_clean.csv loaded ("Import 25 items"), left open; on Upload, Remove → "Remove
+  items_clean.csv? This deletes the 25 rows it loaded …" → gone from the list 80 ms after the press, "Removed
+  items_clean.csv". Loaded and removed once more after the two tagged enums below.
+- Activity: "Decisions 40 · Events 11 · Imports 1"; the events list "Removed an import" and "Uploaded a file" for
+  items_clean.csv, with who and when.
+- At 390 px: no sideways scroll on the Result, Items or Review. Dark from the bar's button: `localStorage` "theme" =
+  `dark`, the page `rgb(9, 9, 11)`, still dark after a reload; the Result read well, and named the item changed after
+  the import ("JCQ-8999 Kraft Storage Bin, changed by Dana Whitfield"), which a take-back keeps.
+- Console over the whole pass: one error, the browser's own line for the expected 409 of the refused edit.
+
+Not seen on screen in this step: the sheet chooser (no sample workbook has two sheets), a refused file (the readers'
+tests cover it), a 50,000-row file (the final proof).
+
+Caught on screen and fixed before the commit: the Review step's first version took a save's own answer for someone
+else's change, and drew the region again, which emptied Undo. The step that follows the import's revision is now an
+atom that reads the review's state as it is, not as it was when the screen last drew.
+
 ## Legacy in the client
 
-The client's lint is on (`packages/client/.oxlintrc.json` extends `.oxlintrc.atoms.json`), with three files excepted by
-name (four until step 3, when `useApi` and its context went with their last caller): the React and TanStack Query forms the screens still call. None may gain a caller; each goes when its last
+The client's lint is on (`packages/client/.oxlintrc.json` extends `.oxlintrc.atoms.json`), with one file excepted by
+name (four until step 3, three until step 6): the TanStack Query client the app's root still provides. None may gain a caller; each goes when its last
 caller has moved.
 
 | File | What still calls it | Goes at step |
 | --- | --- | --- |
-| `CurrentMember.controller.ts` (`useMember`) | `catalog-web` (five screens), the app's `Workspace.tsx` | 6 |
-| `Optimistic.controller.ts` (`useOptimisticWriteVia`, `makeOptimisticWrite`, `cacheChange`) | `access-web` (People), `catalog-web`, the app's `lib/api.ts` | 6 |
-| `QueryClient.runtime.ts` | the app's `main.tsx` and `lib/queries.ts`, `Workspace.tsx`'s prefetch | 8 |
+| `CurrentMember.controller.ts` (`useMember`) | gone at step 6, with `Rollback.rules.ts` | 6 |
+| `Optimistic.controller.ts` (`useOptimisticWriteVia`, `makeOptimisticWrite`, `cacheChange`) | gone at step 6, with its test | 6 |
+| `QueryClient.runtime.ts` | the app's `main.tsx` and `lib/queries.ts` (`Workspace.tsx`'s prefetch went at step 6) | 8 |
 
 ## Hand-written discriminators in the web packages
 
@@ -233,8 +292,8 @@ package moves.
 | `review/src/ReviewRegion.types.ts` | `Entry`, `QueueEntry` | `type` | in memory | `Data.taggedEnum` | 7 |
 | `review/src/internal/ReviewGrid.tsx` | `Line` | `type` | in memory | `Data.taggedEnum` | 7 |
 | `review/src/ReviewDecision.schema.ts` | `place` of a row's history | `kind` | stored in the saved draft | already a schema; a `S.toTaggedUnion("kind")` member set, encoded bytes unchanged | 7 |
-| `catalog-web/src/internal/spreadsheet/read.ts` | what a chosen file is | `kind` | in memory | `Data.taggedEnum` | 6 |
-| `catalog-web/src/Upload.controller.ts` | `UploadEnd`, `Failure` | `_tag`, by hand | in memory | `Data.taggedEnum` (`Upload.machine.ts`'s `UploadState` is already a schema union) | 6 |
+| `catalog-web/src/internal/spreadsheet/read.ts` | what a chosen file is | `kind` | in memory | `Data.taggedEnum` (done: `Sniffed`, `Csv`, `Xlsx`, `Archive`, `Refuse`) | 6 |
+| `catalog-web/src/Upload.controller.ts` | `UploadEnd`, `Failure` | `_tag`, by hand | in memory | `Data.taggedEnum` (done: `UploadEnd`, `$match` where the Upload step hears how it ended; `Upload.machine.ts`'s `UploadState` is already a schema union) | 6 |
 | `access-web/src/SignIn.screen.tsx` | `Attempt` | `mode` | in memory | `Data.taggedEnum` (done: `SignIn`, `SignUp`, `$match` in the submit atom) | 3 |
 
 Not discriminators, and not changed: string-literal domains with no data of their own (`RowStatus`, `FilterId`,
@@ -242,6 +301,26 @@ Not discriminators, and not changed: string-literal domains with no data of thei
 
 ## Choices made
 
+- **The theme is kept in plain `localStorage`, against the brief's wording** (the lead agreed, for Benjamin to see).
+  The brief names `Atom.kvs` for it. `Atom.kvs` stores the value as JSON (`"dark"` with its quotes), and
+  `public/theme-init.js`, which sets the theme before the first paint so the page never flashes the wrong one, reads
+  the bare word; every choice already stored would also be lost. `theme` is a writable atom over `localStorage`
+  instead (`@inventory/ui`'s `Theme.provider.tsx`), with the same stored value as before.
+- **The catalog's reads are atoms, and an answer the screen already has is given to them** (step 6). Each read is a
+  `catalogApi.query` in `Imports.atoms.ts` or beside its screen, kept per import with `perKey` (a family that holds
+  its members: `Atom.family`'s weak references lost an import's read after a garbage collection). A read can be given
+  an answer (`registry.set(read, answer)`): the upload's answer, a save's, a match's, a confirm's and a take-back's
+  are given to the import's read and its rows, so the screen moves on with no request; anything the answer may have
+  changed elsewhere is asked again through its keys (`invalidate`). The staged rows are kept for as long as the page
+  is open (`keep: "page"`), as TanStack Query kept them.
+- **Writes whose outcome only the server knows do not retry** (`catalogApi.ask`): a match, a reopen, a take-back, a
+  confirm, the fix suggestions and the assistant. They were plain calls before and never retried; `send` retries, as
+  the optimistic edits did. The item editor and removing an open import are optimistic writes (`optimisticWrite`).
+- **The Review step follows the import's revision from an atom** (`followDraft`, mounted by the step): when a newer
+  revision arrives from another screen it puts the region back to it with the toast, and its own saves never count as
+  someone else's. The skeleton-first wait is `useDeferredValue`, not a timer in an effect.
+- **The draft's saver is a plain object per import** (`decisionSaver` in `Draft.controller.ts`), not a hook: it holds
+  the decisions waiting to be saved and tells the step when a save is answered.
 - **ui's own pieces are atoms** (`ContentWidth.atoms.ts`, `Route.atoms.ts`, `Theme.provider.tsx`, the search box).
   The sidebar's state, the window's width and the room the page has are atoms in `@inventory/ui/ContentWidth`, so the
   step-4 bridge in the app is gone; the address is one atom over the app's own `navigate` and the back button (A5);
@@ -254,10 +333,12 @@ Not discriminators, and not changed: string-literal domains with no data of thei
   The vendored data table and toaster were edited at vendoring to call them, and the kit is not ours to change (A1).
   Each only reads an atom (`useAtomValue`), which the A1 line allows. Our own screens read the atoms; `catalog-web` and
   `review` move at their steps.
-- **`ShellSlots` keeps its two React contexts until `catalog-web` moves**: `createContext` is not on the banned list,
-  the app provides the bar's slot from its atom, and the import page that reads them is the catalog's (step 6).
+- **`ShellSlots` is one atom now** (`@inventory/ui/ShellSlots`, `barSlot`): the shell sets it by a ref callback and the
+  import page portals its steps into it. Its second context, for the step's own actions, was never read by any screen
+  and went (step 6).
 
-- **The shell's state is in `apps/inventory/src/web/lib/shell.ts`.** The sidebar is controlled from an atom
+- **The shell's state was in `apps/inventory/src/web/lib/shell.ts`** (gone at step 6: its last piece, the bar's slot,
+  is `barSlot` in `@inventory/ui`). The sidebar is controlled from an atom
   (`sidebarExpanded`; it still writes its own cookie), whether it is a drawer is a media-query atom (the vendored
   sidebar's 768 px breakpoint), and the room it takes is derived from the two. Until the content-width store in
   `@inventory/ui` is an atom (step 5), one atom mounted by the shell passes that room on to it by subscription, never

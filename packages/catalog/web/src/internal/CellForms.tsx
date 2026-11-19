@@ -3,7 +3,10 @@ import { stringify } from "@inventory/ui/Json"
 // as the brief's own JSON; the one thing not to break: nothing is saved that the domain's readers (`readDimensions`,
 // `readVendors`) would refuse, and their sentence is what the person reads under the fields.
 import { PlusIcon, Trash2Icon } from "lucide-react"
-import { useId, useState } from "react"
+import { useAtom } from "@effect/atom-react"
+import * as O from "effect/Option"
+import * as Atom from "effect/reactivity/Atom"
+import { useId } from "react"
 import { Button } from "@inventory/ui/components/button"
 import { Field, FieldError, FieldLabel, FieldLegend, FieldSet } from "@inventory/ui/components/field"
 import { Input } from "@inventory/ui/components/input"
@@ -29,15 +32,26 @@ const dimensionsCell = (draft: DimensionsDraft): string =>
     unit: draft.unit
   })
 
+/**
+ * What one open form holds: what was typed (none until something is, the cell's value showing meanwhile) and why
+ * the last save was refused. One per form on screen, by its `useId`, let go with it.
+ */
+const formOf = Atom.family((_form: string) =>
+  Atom.make<{ readonly typed: O.Option<unknown>; readonly error: string | undefined }>({
+    typed: O.none(),
+    error: undefined
+  })
+)
+
 /** Length, width, height and their unit, saved as the cell's JSON once the three read; or no dimensions at all. */
 export function DimensionsForm(props: { value: string; onSave: (cell: string) => void }) {
   const id = useId()
-  const [draft, setDraft] = useState(() => dimensionsDraft(props.value))
-  const [error, setError] = useState<string | undefined>(undefined)
-  const set = (key: keyof DimensionsDraft, value: string) => {
-    setDraft((before) => ({ ...before, [key]: value }))
-    setError(undefined)
-  }
+  const [held, setHeld] = useAtom(formOf(id))
+  const draft = O.getOrElse(held.typed as O.Option<DimensionsDraft>, () => dimensionsDraft(props.value))
+  const { error } = held
+  const setError = (message: string) => setHeld((now) => ({ ...now, error: message }))
+  const set = (key: keyof DimensionsDraft, value: string) =>
+    setHeld({ typed: O.some({ ...draft, [key]: value }), error: undefined })
   return (
     <form
       className="flex flex-col gap-3"
@@ -105,15 +119,14 @@ const vendorsCell = (vendors: ReadonlyArray<VendorDraft>): string =>
 /** Up to three vendors, each with a name, its SKU, a unit cost and a lead time, one of them preferred; or none. */
 export function VendorsForm(props: { value: string; onSave: (cell: string) => void }) {
   const id = useId()
-  const [vendors, setVendors] = useState<ReadonlyArray<VendorDraft>>(() => {
+  const [held, setHeld] = useAtom(formOf(id))
+  const vendors = O.getOrElse(held.typed as O.Option<ReadonlyArray<VendorDraft>>, () => {
     const found = vendorsDraft(props.value)
     return found.length === 0 ? [emptyVendor] : found
   })
-  const [error, setError] = useState<string | undefined>(undefined)
-  const change = (next: ReadonlyArray<VendorDraft>) => {
-    setVendors(next)
-    setError(undefined)
-  }
+  const { error } = held
+  const setError = (message: string) => setHeld((now) => ({ ...now, error: message }))
+  const change = (next: ReadonlyArray<VendorDraft>) => setHeld({ typed: O.some(next), error: undefined })
   const set = (at: number, key: "name" | "sku" | "cost" | "lead", value: string) =>
     change(vendors.map((vendor, index) => (index === at ? { ...vendor, [key]: value } : vendor)))
   const preferred = vendors.findIndex((vendor) => vendor.preferred)

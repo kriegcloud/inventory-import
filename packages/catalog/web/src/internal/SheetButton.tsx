@@ -1,12 +1,13 @@
+import { useAtomSet } from "@effect/atom-react"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import { SheetIcon } from "lucide-react"
 import { SheetChooser } from "./SheetChooser.tsx"
 import { Button } from "@inventory/ui/components/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@inventory/ui/components/popover"
-import { workbookOf } from "../Imports.controller.ts"
+import { workbookOf } from "../Imports.atoms.ts"
 import { navigate } from "@inventory/ui/Route"
 import { importAddress } from "./route.ts"
-import { useUpload } from "../Upload.controller.ts"
+import { startUpload } from "../Upload.controller.ts"
 
 /**
  * Which sheet of the workbook was read, and a way to read another one. Shows only while the workbook chosen in
@@ -15,7 +16,7 @@ import { useUpload } from "../Upload.controller.ts"
  * to the upload screen and watches it there.
  */
 export function SheetButton(props: { importId: ImportId }) {
-  const upload = useUpload()
+  const start = useAtomSet(startUpload)
   const workbook = workbookOf(props.importId)
   if (workbook === undefined || workbook.sheets.filter((sheet) => sheet.rowCount > 0).length < 2) return null
   return (
@@ -32,7 +33,7 @@ export function SheetButton(props: { importId: ImportId }) {
           sheets={workbook.sheets}
           chosen={workbook.chosen}
           onChoose={(sheet) => {
-            upload.start(workbook.file, sheet)
+            start({ file: workbook.file, sheet })
             navigate(importAddress(props.importId, "upload"))
           }}
         />

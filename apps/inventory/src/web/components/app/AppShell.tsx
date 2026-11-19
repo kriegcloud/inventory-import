@@ -1,11 +1,10 @@
-import { useAtom } from "@effect/atom-react"
+import { useAtom, useAtomSet } from "@effect/atom-react"
 import type { ReactNode } from "react"
 import { Separator } from "@inventory/ui/components/separator"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@inventory/ui/components/sidebar"
 import { sidebarExpanded } from "@inventory/ui/ContentWidth"
-import { barSlot } from "@/lib/shell"
 import { BrandMark } from "./BrandMark.tsx"
-import { BarSlotContext } from "@inventory/ui/ShellSlots"
+import { barSlot } from "@inventory/ui/ShellSlots"
 import { ThemeToggle } from "./ThemeToggle.tsx"
 
 const skipLink = (
@@ -41,7 +40,7 @@ export function AppShell(props: {
   const frame =
     props.wide === true || props.fill === true ? "w-full px-4 sm:px-9" : "mx-auto w-full max-w-5xl px-4 sm:px-6"
   const [expanded, setExpanded] = useAtom(sidebarExpanded)
-  const [slot, setSlot] = useAtom(barSlot)
+  const setSlot = useAtomSet(barSlot)
   if (props.sidebar !== undefined) {
     return (
       <SidebarProvider
@@ -66,7 +65,7 @@ export function AppShell(props: {
             </div>
           </header>
           <div id="main" className={props.fill === true ? "min-h-0 flex-1" : `flex-1 py-8 ${frame}`}>
-            <BarSlotContext value={slot}>{props.children}</BarSlotContext>
+            {props.children}
           </div>
         </SidebarInset>
       </SidebarProvider>

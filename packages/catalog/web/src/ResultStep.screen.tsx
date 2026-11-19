@@ -1,6 +1,9 @@
+import { useAtom, useAtomSet, useAtomValue } from "@effect/atom-react"
+import * as A from "effect/Array"
+import * as Cause from "effect/Cause"
+import * as Exit from "effect/Exit"
 import * as O from "effect/Option"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { useMemo, useState } from "react"
+import * as Atom from "effect/reactivity/Atom"
 import { toast } from "sonner"
 import { Code } from "@inventory/ui/Code"
 import { PageHeader, Views } from "@inventory/ui/PageHeader"
@@ -18,9 +21,9 @@ import {
 } from "@inventory/ui/components/alert-dialog"
 import { Button } from "@inventory/ui/components/button"
 import { type RecordColumn, RecordsTable } from "@inventory/ui/components/data-table/data-table-records"
-import { call } from "./Catalog.runtime.ts"
 import { whenShort } from "@inventory/ui/Dates"
-import { useImportCache } from "./Imports.controller.ts"
+import { reopenImport, takeBackImport } from "./Imports.atoms.ts"
+import { invalidate, perKey } from "@inventory/client/Api"
 import { navigate } from "@inventory/ui/Route"
 import { importAddress } from "./internal/route.ts"
 import {
@@ -36,7 +39,7 @@ import { rowId } from "@inventory/catalog-contract/Decision"
 import { type StagedTable } from "@inventory/catalog-contract/Staged"
 import { download, importWords, notImportedColumn, OutcomePill, Text, when } from "./internal/format.tsx"
 import { toastError } from "@inventory/client/SayError"
-import { queryKeys } from "./Catalog.keys.ts"
+import { catalogKeys } from "./Catalog.keys.ts"
 import { notImportedCsv } from "@inventory/catalog-model/NotImported"
 
 type Filter = "all" | RowOutcome["outcome"]
@@ -117,6 +120,22 @@ const eventLine = (event: ImportEvent): string =>
     ? `Imported ${items(event.created)}${event.updated === 0 ? "" : `, updated ${event.updated}`}, ${event.by}, ${whenShort(event.at)}`
     : `Took back ${items(event.removed)}${event.restored === 0 ? "" : `, restored ${event.restored}`}${event.kept === 0 ? "" : `, kept ${event.kept}`}, ${event.by}, ${whenShort(event.at)}`
 
+/** The view the person chose on one import's result; none until they choose, and the step opens on its own. */
+const chosenFilter = perKey((_id: string) => Atom.make<O.Option<Filter>>(O.none()))
+
+// The rows a view shows, kept for as long as the result is the same, so the table keeps its state between draws.
+// Weak, so an entry goes with the result it was made for; Effect has no weak collection to use instead.
+const shownRows = new WeakMap<ImportResult, Partial<Record<Filter, ImportResult["rows"]>>>()
+const rowsIn = (result: ImportResult, filter: Filter): ImportResult["rows"] => {
+  const byFilter = shownRows.get(result) ?? {}
+  shownRows.set(result, byFilter)
+  const held = byFilter[filter]
+  if (held !== undefined) return held
+  const rows = A.filter(result.rows, (row) => filter === "all" || row.outcome === filter)
+  byFilter[filter] = rows
+  return rows
+}
+
 /**
  * What the import did, row by row: imported, updated, already there, not imported with the reason, or taken back. The rows
  * that were not imported can be downloaded with their reasons. While its items are as it created them, the import
@@ -125,27 +144,28 @@ const eventLine = (event: ImportEvent): string =>
  */
 export function ResultStep(props: { view: ImportView; result: ImportResult; table: StagedTable; canImport: boolean }) {
   const { view, result, table } = props
-  const cache = useImportCache()
-  const queryClient = useQueryClient()
-  const [filter, setFilter] = useState<Filter>(
+  const [chosen, choose] = useAtom(chosenFilter(view.id))
+  const filter: Filter = O.getOrElse(chosen, () =>
     view.status === "takenBack" ? "takenBack" : result.notImported > 0 ? "notImported" : "all"
   )
-  const reopen = useMutation({
-    mutationFn: () => call((api) => api.imports.reopen({ params: { id: view.id } })),
-    onSuccess: (opened) => {
-      cache.setView(opened)
-      void queryClient.invalidateQueries({ queryKey: queryKeys.openImports })
-      void queryClient.invalidateQueries({ queryKey: queryKeys.pastImports })
-      void queryClient.invalidateQueries({ queryKey: queryKeys.activity })
-      navigate(importAddress(opened.id, "review"))
-    },
-    onError: (error) => toastError(error)
-  })
-  const takeBack = useMutation({
-    mutationFn: () =>
-      call((api) => api.imports.takeBack({ params: { id: view.id }, payload: { confirms: view.takeBack.confirms } })),
-    onSuccess: (done) => {
-      cache.setView(done)
+  const setFilter = (next: Filter) => choose(O.some(next))
+  const reopening = useAtomValue(reopenImport).waiting
+  const reopenNow = useAtomSet(reopenImport, { mode: "promiseExit" })
+  const reopen = () =>
+    void reopenNow(view.id).then((exit) => {
+      if (Exit.isSuccess(exit)) navigate(importAddress(exit.value.id, "review"))
+      else toastError(exit.cause.pipe(Cause.squash))
+    })
+  const takingBack = useAtomValue(takeBackImport).waiting
+  const takeBackNow = useAtomSet(takeBackImport, { mode: "promiseExit" })
+  const takeBack = () =>
+    void takeBackNow(view).then((exit) => {
+      if (Exit.isFailure(exit)) {
+        toastError(exit.cause.pipe(Cause.squash))
+        invalidate(catalogKeys.import(view.id))
+        return
+      }
+      const done = exit.value
       const last = done.history.at(-1)
       toast.success(
         last?._tag === "TakenBack"
@@ -154,18 +174,8 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
           : `${done.fileName} has nothing left to take back`
       )
       setFilter("takenBack")
-      void queryClient.invalidateQueries({ queryKey: queryKeys.items })
-      void queryClient.invalidateQueries({ queryKey: queryKeys.changes })
-      void queryClient.invalidateQueries({ queryKey: queryKeys.activity })
-      void queryClient.invalidateQueries({ queryKey: queryKeys.openImports })
-      void queryClient.invalidateQueries({ queryKey: queryKeys.pastImports })
-    },
-    onError: (error) => {
-      toastError(error)
-      void queryClient.invalidateQueries({ queryKey: queryKeys.import(view.id) })
-    }
-  })
-  const shown = useMemo(() => result.rows.filter((row) => filter === "all" || row.outcome === filter), [result, filter])
+    })
+  const shown = rowsIn(result, filter)
   const views: ReadonlyArray<readonly [Filter, string, number]> = [
     ...(result.takenBack > 0 || filter === "takenBack"
       ? [["takenBack", importWords.takenBack, result.takenBack] as const]
@@ -228,8 +238,8 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
   const takeBackButton = canTakeBack ? (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button variant="outline" disabled={takeBack.isPending}>
-          {takeBack.isPending ? "Taking back" : "Take back this import"}
+        <Button variant="outline" disabled={takingBack}>
+          {takingBack ? "Taking back" : "Take back this import"}
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
@@ -250,7 +260,7 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Keep the items</AlertDialogCancel>
-          <AlertDialogAction onClick={() => takeBack.mutate()}>
+          <AlertDialogAction onClick={() => takeBack()}>
             {restorable === 0 ? `Take back ${items(removable)}` : "Take back this import"}
           </AlertDialogAction>
         </AlertDialogFooter>
@@ -275,8 +285,8 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
                 View items
               </Button>
               {props.canImport ? (
-                <Button disabled={reopen.isPending} onClick={() => reopen.mutate()}>
-                  {reopen.isPending ? "Opening the review" : "Review again"}
+                <Button disabled={reopening} onClick={() => reopen()}>
+                  {reopening ? "Opening the review" : "Review again"}
                 </Button>
               ) : null}
             </>
@@ -284,8 +294,8 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
             <>
               {downloadButton}
               {result.notImported === 0 || !props.canImport ? null : (
-                <Button variant="outline" disabled={reopen.isPending} onClick={() => reopen.mutate()}>
-                  {reopen.isPending ? "Opening the review" : `Fix ${result.notImported} not imported`}
+                <Button variant="outline" disabled={reopening} onClick={() => reopen()}>
+                  {reopening ? "Opening the review" : `Fix ${result.notImported} not imported`}
                 </Button>
               )}
               {takeBackButton}

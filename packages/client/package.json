@@ -11,11 +11,8 @@
     "./ApiRuntime": "./src/ApiRuntime.runtime.ts",
     "./Http": "./src/Http.runtime.ts",
     "./Early": "./src/Early.runtime.ts",
-    "./Optimistic": "./src/Optimistic.controller.ts",
-    "./Rollback": "./src/Rollback.rules.ts",
     "./SayError": "./src/SayError.controller.ts",
     "./QueryClient": "./src/QueryClient.runtime.ts",
-    "./CurrentMember": "./src/CurrentMember.controller.ts",
     "./Api": "./src/Api.atoms.ts",
     "./OptimisticAtoms": "./src/Optimistic.atoms.ts",
     "./MemberAtoms": "./src/Member.atoms.ts"

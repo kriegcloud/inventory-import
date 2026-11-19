@@ -2,7 +2,10 @@ import * as ByteSize from "effect/ByteSize"
 import * as DateTime from "effect/DateTime"
 import * as O from "effect/Option"
 import { request } from "@inventory/client/Http"
-import { useEffect, useRef, useState } from "react"
+import { useAtom, useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
+import * as Exit from "effect/Exit"
+import * as Atom from "effect/reactivity/Atom"
+import { useRef } from "react"
 import { toast } from "sonner"
 import { PageHeader } from "@inventory/ui/PageHeader"
 import { Alert, AlertDescription, AlertTitle } from "@inventory/ui/components/alert"
@@ -21,9 +24,10 @@ import { Button } from "@inventory/ui/components/button"
 import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@inventory/ui/components/item"
 import { FileUpload, FileUploadDropzone } from "@inventory/ui/components/file-upload"
 import { Progress } from "@inventory/ui/components/progress"
-import { useMember } from "@inventory/client/CurrentMember"
+import { member } from "@inventory/client/MemberAtoms"
 import { when, whenShort } from "@inventory/ui/Dates"
-import { useImportCache, useOpenImports, usePastImports, useRemoveImport } from "./Imports.controller.ts"
+import { importView, openImports as openImportsRead, pastImports, removeImport } from "./Imports.atoms.ts"
+import { resultOf } from "./internal/result.ts"
 import { ListTable } from "@inventory/ui/ListTable"
 import { pastImportColumnsShort } from "./PastImports.screen.tsx"
 import { navigate } from "@inventory/ui/Route"
@@ -31,7 +35,7 @@ import { importAddress } from "./internal/route.ts"
 import { StoredFile } from "@inventory/review/SavedProgress"
 import { useSavedProgress } from "@inventory/review/SavedProgressHook"
 import { catalogRuntime } from "./Catalog.runtime.ts"
-import { type UploadEnd, useUpload, type UploadState } from "./Upload.controller.ts"
+import { cancelUpload, startUpload, UploadEnd, uploadState, type UploadState } from "./Upload.controller.ts"
 import type { ImportView } from "@inventory/catalog-contract/Import"
 import { fileProblemTitle } from "@inventory/catalog-contract/FileProblem"
 import { progressOf } from "./Upload.machine.ts"
@@ -97,54 +101,62 @@ function UploadProgress(props: { state: UploadState; onCancel: () => void }) {
 const carriesFiles = (event: DragEvent): boolean => event.dataTransfer?.types.includes("Files") === true
 
 /**
- * Makes the whole page take a dropped file, not only the dashed box: a file let go beside the box would otherwise
- * make the browser open it and leave the app. Returns whether a file is being dragged over the page. `onFiles` is
- * called for a drop that nothing on the page took for itself (the dashed box takes its own). While `enabled` is
- * false a drop is swallowed, so the page stays, and nothing is read.
+ * Whether a file is being dragged over the page, following the window while something reads it. dragenter and
+ * dragleave fire for every element the pointer crosses: the page is left when they balance.
  */
-function usePageDrop(input: { enabled: boolean; onFiles: (files: ReadonlyArray<File>) => void }): boolean {
-  const [over, setOver] = useState(false)
-  const latest = useRef(input)
-  latest.current = input
-  useEffect(() => {
-    // dragenter and dragleave fire for every element the pointer crosses: the page is left when they balance.
-    let depth = 0
-    const enter = (event: DragEvent) => {
-      if (!carriesFiles(event)) return
-      depth += 1
-      if (latest.current.enabled) setOver(true)
-    }
-    const leave = (event: DragEvent) => {
-      if (!carriesFiles(event)) return
-      depth = Math.max(0, depth - 1)
-      if (depth === 0) setOver(false)
-    }
+const fileOverPage: Atom.Atom<boolean> = Atom.readable((get) => {
+  let depth = 0
+  const enter = (event: DragEvent) => {
+    if (!carriesFiles(event)) return
+    depth += 1
+    get.setSelf(true)
+  }
+  const leave = (event: DragEvent) => {
+    if (!carriesFiles(event)) return
+    depth = Math.max(0, depth - 1)
+    if (depth === 0) get.setSelf(false)
+  }
+  const drop = (event: DragEvent) => {
+    if (!carriesFiles(event)) return
+    depth = 0
+    get.setSelf(false)
+  }
+  window.addEventListener("dragenter", enter)
+  window.addEventListener("dragleave", leave)
+  window.addEventListener("drop", drop)
+  get.addFinalizer(() => {
+    window.removeEventListener("dragenter", enter)
+    window.removeEventListener("dragleave", leave)
+    window.removeEventListener("drop", drop)
+  })
+  return false
+})
+
+/**
+ * Makes the whole page take a dropped file, not only the dashed box: a file let go beside the box would otherwise make
+ * the browser open it and leave the app. A ref callback on the step's frame, so it is heard exactly while the step is
+ * on screen and with the step's own `enabled` and `onFiles`. While `enabled` is false a drop is swallowed, so the page
+ * stays, and nothing is read. The dashed box takes a file dropped on it itself.
+ */
+const takePageDrop =
+  (input: { enabled: boolean; onFiles: (files: ReadonlyArray<File>) => void }) => (frame: HTMLElement | null) => {
+    if (frame === null) return
+    // Without this the browser refuses the drop and opens the file instead.
     const hold = (event: DragEvent) => {
-      // Without this the browser refuses the drop and opens the file instead.
       if (carriesFiles(event)) event.preventDefault()
     }
     const drop = (event: DragEvent) => {
-      if (!carriesFiles(event)) return
-      depth = 0
-      setOver(false)
-      // The dashed box already took a file dropped on it.
-      if (event.defaultPrevented) return
+      if (!carriesFiles(event) || event.defaultPrevented) return
       event.preventDefault()
-      if (latest.current.enabled) latest.current.onFiles(Array.from(event.dataTransfer?.files ?? []))
+      if (input.enabled) input.onFiles(Array.from(event.dataTransfer?.files ?? []))
     }
-    window.addEventListener("dragenter", enter)
-    window.addEventListener("dragleave", leave)
     window.addEventListener("dragover", hold)
     window.addEventListener("drop", drop)
     return () => {
-      window.removeEventListener("dragenter", enter)
-      window.removeEventListener("dragleave", leave)
       window.removeEventListener("dragover", hold)
       window.removeEventListener("drop", drop)
     }
-  }, [])
-  return over
-}
+  }
 
 /**
  * A file somebody loaded and nobody has confirmed: continue its review, or remove it. Removing asks first, because
@@ -153,8 +165,9 @@ function usePageDrop(input: { enabled: boolean; onFiles: (files: ReadonlyArray<F
  */
 function OpenImport(props: { view: ImportView; lead: boolean; canImport: boolean }) {
   const { view } = props
-  const cache = useImportCache()
-  const remove = useRemoveImport()
+  const seedView = useAtomSet(importView(view.id))
+  const removing = useAtomValue(removeImport).waiting
+  const remove = useAtomSet(removeImport, { mode: "promiseExit" })
   return (
     <Item variant="outline" className="flex-wrap">
       <ItemContent className="min-w-56">
@@ -178,7 +191,7 @@ function OpenImport(props: { view: ImportView; lead: boolean; canImport: boolean
         {props.canImport && view.createdRows.length === 0 ? (
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="ghost" disabled={remove.isPending}>
+              <Button variant="ghost" disabled={removing}>
                 Remove<span className="sr-only"> {view.fileName}</span>
               </Button>
             </AlertDialogTrigger>
@@ -195,7 +208,9 @@ function OpenImport(props: { view: ImportView; lead: boolean; canImport: boolean
                 <AlertDialogAction
                   onClick={() =>
                     // The card goes at once; a refusal puts it back and says why (useRemoveImport).
-                    remove.mutate(view, { onSuccess: () => toast(`Removed ${view.fileName}`) })
+                    void remove(view).then((exit) => {
+                      if (Exit.isSuccess(exit)) toast(`Removed ${view.fileName}`)
+                    })
                   }
                 >
                   Remove
@@ -208,7 +223,7 @@ function OpenImport(props: { view: ImportView; lead: boolean; canImport: boolean
           // A viewer can look and cannot decide: for them it is not the screen's filled button, and it says "Open".
           variant={props.lead && props.canImport ? "default" : "outline"}
           onClick={() => {
-            cache.setView(view)
+            seedView(view)
             navigate(importAddress(view.id, "review"))
           }}
         >
@@ -225,7 +240,9 @@ function OpenImport(props: { view: ImportView; lead: boolean; canImport: boolean
  * the take-back. Shown once there is one; a failure to list them says so instead of looking like none.
  */
 function PastImports() {
-  const past = usePastImports()
+  const pastRead = useAtomValue(pastImports)
+  const past = resultOf(pastRead)
+  const askPastAgain = useAtomRefresh(pastImports)
   if (past.isError) {
     return (
       <div className="px-4 pt-6 sm:px-9">
@@ -233,7 +250,7 @@ function PastImports() {
           <AlertTitle>Past imports could not be listed</AlertTitle>
           <AlertDescription>
             <p>They are safe. {sayError(past.error).sentence}</p>
-            <Button variant="outline" size="sm" onClick={() => void past.refetch()}>
+            <Button variant="outline" size="sm" onClick={askPastAgain}>
               Try again
             </Button>
           </AlertDescription>
@@ -272,20 +289,27 @@ function PastImports() {
  * file is kept in this browser until the server has it all (`useSavedProgress`): a reload or a closed tab in the
  * middle of an upload offers Continue, which reads the same file again, instead of asking for it again.
  */
+/** A sentence for a file the screen itself could not take (a sample that would not load, a file no longer kept). */
+const uploadProblem = Atom.make<string | undefined>(undefined)
+
 export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
-  const upload = useUpload()
-  const actor = useMember()
+  const state = useAtomValue(uploadState)
+  const startOne = useAtomSet(startUpload)
+  const cancel = useAtomSet(cancelUpload)
+  const signedIn = useAtomValue(member)
+  const actor = O.getOrUndefined(signedIn)
   const progress = useSavedProgress(
     actor === undefined ? undefined : { organizationId: actor.organizationId, memberId: actor.id, screen: "upload" },
     catalogRuntime()
   )
-  const [problem, setProblem] = useState<string | undefined>(undefined)
+  const [problem, setProblem] = useAtom(uploadProblem)
   const picker = useRef<HTMLDivElement>(null)
   // Every file somebody loaded and has not confirmed, each on its own: coming back resumes one or removes it.
-  const openImports = useOpenImports()
+  const openRead = useAtomValue(openImportsRead)
+  const openImports = resultOf(openRead)
+  const askOpenAgain = useAtomRefresh(openImportsRead)
   const open = openImports.data
   const views = open?.views ?? []
-  const { state } = upload
   const busy = state._tag !== "Idle" && state._tag !== "Failed" && state._tag !== "Refused"
 
   // Keeps the file until the upload ends: arrived or cancelled, nothing is left to continue; a file that cannot be
@@ -305,8 +329,17 @@ export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
       ),
       review: O.none()
     })
-    upload.start(file, undefined, (end: UploadEnd) => {
-      if (end._tag !== "Failed" || end.step === "read") clear()
+    startOne({
+      file,
+      // A save that failed keeps the file, for Continue; any other ending lets it go.
+      onEnd: UploadEnd.$match({
+        Arrived: () => clear(),
+        Cancelled: () => clear(),
+        Refused: () => clear(),
+        Failed: ({ step }) => {
+          if (step === "read") clear()
+        }
+      })
     })
   }
   // A file whose upload stopped with the page. Not offered once an import of it exists: a reload while the server
@@ -329,11 +362,6 @@ export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
       setProblem(`${stopped.name} is no longer kept in this browser. Choose it again.`)
     })
   }
-  // While the rows are saving, fetch the review's code, so it is ready when the import is.
-  const saving = state._tag === "Saving"
-  useEffect(() => {
-    if (saving) void import("./ReviewStep.screen.tsx")
-  }, [saving])
 
   const takeSample = (sample: (typeof samples)[number]) => {
     setProblem(undefined)
@@ -350,7 +378,8 @@ export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
   const fileInput = () => picker.current?.querySelector<HTMLInputElement>('input[type="file"]') ?? null
   // A file dropped anywhere on the page goes in through the upload's own input, so it meets the same checks as a
   // chosen one and reaches `onAccept` below: one way in.
-  const dragging = usePageDrop({
+  const dragging = useAtomValue(fileOverPage) && props.canImport && !busy
+  const takeDrop = takePageDrop({
     enabled: props.canImport && !busy,
     onFiles: (files) => {
       const input = fileInput()
@@ -365,7 +394,7 @@ export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
   const failed = state._tag === "Failed" ? state : undefined
   const refused = state._tag === "Refused" ? state.problem : undefined
   return (
-    <div className="relative h-full overflow-y-auto">
+    <div ref={takeDrop} className="relative h-full overflow-y-auto">
       <div className="mx-auto flex w-full max-w-2xl flex-col pb-8">
         <PageHeader title="Import items" line=".csv or .xlsx" />
         <div className="flex flex-col gap-4 px-4 sm:px-9">
@@ -375,7 +404,7 @@ export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
               <AlertTitle>Files loaded earlier could not be listed</AlertTitle>
               <AlertDescription>
                 <p>They are safe. {sayError(openImports.error).sentence}</p>
-                <Button variant="outline" size="sm" onClick={() => void openImports.refetch()}>
+                <Button variant="outline" size="sm" onClick={askOpenAgain}>
                   Try again
                 </Button>
               </AlertDescription>
@@ -436,7 +465,7 @@ export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
             // off box takes no pointer at all: Cancel inside it could not be pressed. The progress and its Cancel
             // stand in the box's place instead, outside it.
             <div className="flex min-h-40 flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-6">
-              <UploadProgress state={state} onCancel={upload.cancel} />
+              <UploadProgress state={state} onCancel={() => cancel()} />
             </div>
           ) : (
             <FileUpload

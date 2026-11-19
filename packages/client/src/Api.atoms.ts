@@ -6,6 +6,7 @@
 // the object held, so nothing derived from it is rebuilt; a read belongs to the member who asked, so another member or
 // another organization starts from nothing instead of seeing the last one's answer.
 import * as A from "effect/Array"
+import * as Duration from "effect/Duration"
 import type * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Eq from "effect/Equal"
@@ -91,11 +92,24 @@ export const keepWhenEqual: {
 const heldSuccess = <A, E>(previous: O.Option<AsyncResult.AsyncResult<A, E>>): O.Option<A> =>
   O.flatMap(previous, AsyncResult.value)
 
-/** One member's read: the answer itself (`held`, which is what is kept) and what a screen reads (`read`). */
+/** An answer put in place by the screen, numbered so the read uses each one once. */
+interface Seed<A> {
+  readonly answer: A
+  readonly version: number
+}
+
+/**
+ * One member's read: the answer itself (`held`, which is what is kept), what a screen reads (`read`), and the answer
+ * a screen can put in place of a request (`seed`).
+ */
 interface PerMember<A, E> {
   readonly held: Atom.Atom<AsyncResult.AsyncResult<A, E>>
   readonly read: Atom.Atom<AsyncResult.AsyncResult<A, E>>
+  readonly seed: Atom.Writable<O.Option<Seed<A>>>
 }
+
+/** How long a read nobody looks at is kept: `keepUnwatched`, or the page's life for an answer that never changes. */
+export type Keeping = "unwatched" | "page"
 
 /** A hold on a read nobody looks at, and how to let it go before its time. */
 interface Keep {
@@ -106,10 +120,15 @@ interface Keep {
  * Holds `held` in `registry` for `keepUnwatched`, then lets it go and calls `done`. Letting go early stops the timer.
  * Once nothing holds a read, the registry lets it go after its own idle time (400 ms in the app).
  */
-const keepFor = (registry: AtomRegistry.AtomRegistry, held: Atom.Atom<unknown>, done: () => void): Keep => {
+const keepFor = (
+  registry: AtomRegistry.AtomRegistry,
+  held: Atom.Atom<unknown>,
+  keeping: Keeping,
+  done: () => void
+): Keep => {
   const release = registry.mount(held)
   const timer = Effect.runFork(
-    Effect.sleep(keepUnwatched).pipe(
+    Effect.sleep(keeping === "page" ? Duration.infinity : keepUnwatched).pipe(
       Effect.andThen(
         Effect.sync(() => {
           release()
@@ -141,6 +160,37 @@ export const forgetReads = (): void => {
 /** The members some read is held for, across every query: for the tests that hold `forgetReads` to its word. */
 export const heldReadMembers = (): ReadonlyArray<string> => A.flatMap(heldByQueries, (query) => query.members())
 
+/** How a read behaves beyond its request. */
+export interface QueryOptions {
+  /** What it shows, so a write that names one of these keys reads it again. */
+  readonly reactivityKeys?: Reactivity.KeysInput
+  /**
+   * "page": the answer never changes once given (a staged file's rows), so it is kept for the page's life and not
+   * asked again on a return. Otherwise kept for `keepUnwatched` and asked again behind it on every return.
+   */
+  readonly keep?: Keeping
+}
+
+/**
+ * A read. Its value is the answer as an `AsyncResult`; setting it to an answer puts that answer in place without a
+ * request (a staged file's view, a draft's new revision), until the read is asked again.
+ */
+export type Query<A, E> = Atom.Writable<AsyncResult.AsyncResult<A, E>, A>
+
+/**
+ * One atom per key, made on first use and held with an ordinary reference (`Atom.family` holds them weakly, and a
+ * read made anew after a garbage collection starts empty). For reads per import: a tab opens a handful.
+ */
+export const perKey = <K, A>(make: (key: K) => A): ((key: K) => A) => {
+  const made = MutableHashMap.empty<K, A>()
+  return (key) =>
+    O.getOrElse(MutableHashMap.get(made, key), () => {
+      const atom = make(key)
+      MutableHashMap.set(made, key, atom)
+      return atom
+    })
+}
+
 /** The atoms one web package makes against its client. */
 export interface ApiAtoms<Id, Client> {
   /**
@@ -151,8 +201,8 @@ export interface ApiAtoms<Id, Client> {
    */
   readonly query: <A, E>(
     use: (client: Client, get: Atom.AtomContext) => Effect.Effect<A, E>,
-    options?: { readonly reactivityKeys?: Reactivity.KeysInput }
-  ) => Atom.Atom<AsyncResult.AsyncResult<A, E>>
+    options?: QueryOptions
+  ) => Query<A, E>
   /**
    * A write, made by setting the atom to its input. Every press runs on its own (a second press does not interrupt
    * the first); when it succeeds the reads under `reactivityKeys` are asked again.
@@ -166,6 +216,11 @@ export interface ApiAtoms<Id, Client> {
    * (the optimistic write). It requires the client's tag, which the runtime provides.
    */
   readonly send: <A, E>(use: (client: Client) => Effect.Effect<A, E>) => Effect.Effect<A, E, Id>
+  /**
+   * One program against the API, sent once and never again: for a write that names nothing a retry could match (a
+   * confirm, a take-back), where a second send after a lost answer would be refused as already done.
+   */
+  readonly ask: <A, E>(use: (client: Client) => Effect.Effect<A, E>) => Effect.Effect<A, E, Id>
 }
 
 /**
@@ -176,28 +231,41 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
   const client = Effect.service(tag)
   function query<A, E>(
     use: (client: Client, get: Atom.AtomContext) => Effect.Effect<A, E>,
-    options?: { readonly reactivityKeys?: Reactivity.KeysInput }
-  ): Atom.Atom<AsyncResult.AsyncResult<A, E>> {
+    options?: QueryOptions
+  ): Query<A, E> {
+    const keeping = options?.keep ?? "unwatched"
     // One read per member: when the person or the organization changes, the screen shows its skeleton, never the
     // previous organization's rows marked as waiting. Held with ordinary references, not `Atom.family`'s weak ones: a
     // collected one would be made anew on a return, empty (measured: after 35 s away).
     const reads = MutableHashMap.empty<string, PerMember<A, E>>()
     const make = (): PerMember<A, E> => {
-      const held = apiRuntime.atom((get) =>
-        Effect.flatMap(client, (c) => use(c, get)).pipe(
+      const seed = Atom.make<O.Option<Seed<A>>>(O.none()).pipe(Atom.keepAlive)
+      // The last seed used: a seed is the answer once, and a later refresh asks the server.
+      let used = 0
+      const held = apiRuntime.atom((get) => {
+        const given = O.filter(get(seed), (one) => one.version > used)
+        if (O.isSome(given)) {
+          used = given.value.version
+          return Effect.succeed(given.value.answer)
+        }
+        return Effect.flatMap(client, (c) => use(c, get)).pipe(
           Effect.retry(readRetry),
           Effect.map((answer) => keepWhenEqual(heldSuccess(get.self<AsyncResult.AsyncResult<A, E>>()), answer))
         )
-      )
+      })
       // Every return to a screen asks again behind the answer it shows: `held` outlives the screen by
       // `keepUnwatched` (kept below), this wrapper does not, so a screen that mounts it again starts a new look. An
-      // answer under a second old counts as fresh, or a read answered before its first look would be asked twice.
-      const fresh = Atom.swr(held, { staleTime: "1 second" })
+      // answer under a second old counts as fresh, or a read answered before its first look would be asked twice. An
+      // answer kept for the page is never asked again.
+      const fresh = keeping === "page" ? held : Atom.swr(held, { staleTime: "1 second" })
       return {
         held,
+        seed,
         read: options?.reactivityKeys === undefined ? fresh : fresh.pipe(followKeys(options.reactivityKeys))
       }
     }
+    // Numbers each seed of this read.
+    let seeds = 0
     const forMember = (member: string): PerMember<A, E> =>
       O.getOrElse(MutableHashMap.get(reads, member), () => {
         const made = make()
@@ -219,7 +287,7 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
       MutableHashMap.set(
         kept,
         member,
-        keepFor(registry, held, () => MutableHashMap.remove(kept, member))
+        keepFor(registry, held, keeping, () => MutableHashMap.remove(kept, member))
       )
     }
     heldByQueries.push({
@@ -233,7 +301,7 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
     // The member it last read for, so a refresh of this atom (an optimistic write's, when the last one has answered)
     // reaches the read it shows. One registry holds it in the app; a test that makes several shares the key "".
     let shown = ""
-    return Atom.readable(
+    return Atom.writable(
       (get) => {
         const member = get(memberKey)
         shown = member
@@ -243,6 +311,11 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
         get.addFinalizer(() => startKeeping(get.registry, member, held))
         get.subscribe(read, (value) => get.setSelf(value))
         return get.once(read)
+      },
+      // An answer put in place for whoever is signed in now, whether or not a screen shows this read yet.
+      (ctx, answer: A) => {
+        seeds += 1
+        ctx.set(forMember(ctx.get(memberKey)).seed, O.some({ answer, version: seeds }))
       },
       (refresh) => refresh(forMember(shown).read)
     )
@@ -264,5 +337,8 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
         },
         { concurrent: true }
       )
-  return { query, write, send }
+  function ask<A, E>(use: (client: Client) => Effect.Effect<A, E>): Effect.Effect<A, E, Id> {
+    return Effect.flatMap(client, use)
+  }
+  return { query, write, send, ask }
 }

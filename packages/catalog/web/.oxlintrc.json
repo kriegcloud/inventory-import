@@ -1,0 +1,6 @@
+{
+  // The catalog screens' lint: the shared rules for code with screens, and the atoms rule (goals/atoms).
+  "$schema": "../../../node_modules/@effect/tsgo/oxlint-schema.json",
+  "extends": ["../../../.oxlintrc.web.json", "../../../.oxlintrc.atoms.json"],
+  "ignorePatterns": ["dist/**"]
+}

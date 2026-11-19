@@ -5,9 +5,9 @@
   "ignorePatterns": ["dist/**"],
   "overrides": [
     {
-      // The React and TanStack Query forms the screens still call until their package moves (goals/atoms/PLAN.md,
-      // "Legacy in the client"). Each file goes when its last caller has moved; none may gain a caller.
-      "files": ["src/CurrentMember.controller.ts", "src/Optimistic.controller.ts", "src/QueryClient.runtime.ts"],
+      // The query client, still provided at the root until TanStack Query leaves (goals/atoms, step 8). No screen reads
+      // through it; it may gain no caller.
+      "files": ["src/QueryClient.runtime.ts"],
       "rules": { "no-restricted-imports": "off" }
     }
   ]

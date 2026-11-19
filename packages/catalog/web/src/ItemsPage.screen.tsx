@@ -1,8 +1,7 @@
 import * as O from "effect/Option"
-import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { createColumnHelper, type ReactTable } from "@tanstack/react-table"
 import { ArrowDownUp, ListFilter } from "lucide-react"
-import { type ComponentType, lazy, Suspense, useEffect, useMemo, useState } from "react"
+import { type ComponentType, lazy, Suspense } from "react"
 import { Code } from "@inventory/ui/Code"
 import { PageHeader } from "@inventory/ui/PageHeader"
 import { NotSet } from "@inventory/ui/NotSet"
@@ -17,12 +16,17 @@ import type { DataTableFeatures } from "@inventory/ui/components/data-table/data
 import { DataTablePagination } from "@inventory/ui/components/data-table/data-table-pagination"
 import { DataTableToolbar } from "@inventory/ui/components/data-table/data-table-toolbar"
 import { useDataTable } from "@inventory/ui/hooks/use-data-table"
-import { useMember } from "@inventory/client/CurrentMember"
-import { call } from "./Catalog.runtime.ts"
-import { useAtomValue } from "@effect/atom-react"
-import { contentWidth, useIsNarrow } from "@inventory/ui/ContentWidth"
-import { navigate, useLocation } from "@inventory/ui/Route"
+import { member } from "@inventory/client/MemberAtoms"
+import { shown } from "@inventory/client/OptimisticAtoms"
+import { catalogApi } from "./Catalog.runtime.ts"
+import { useAtomRefresh, useAtomValue } from "@effect/atom-react"
+import * as Effect from "effect/Effect"
+import * as Atom from "effect/reactivity/Atom"
+import { contentWidth, isNarrow } from "@inventory/ui/ContentWidth"
+import { location, navigate } from "@inventory/ui/Route"
+import { resultOf } from "./internal/result.ts"
 import { hasRole } from "@inventory/kernel/Role"
+import { perKey } from "@inventory/client/Api"
 import { discontinuedOn, isActive, type StoredItem } from "@inventory/catalog-contract/Item"
 import { itemPageSizes } from "@inventory/catalog-contract/ItemQuery"
 import { day, when } from "./internal/format.tsx"
@@ -31,7 +35,7 @@ import { costOf, dimensionsText, vendorsText } from "./internal/itemText.ts"
 import { sayError } from "@inventory/client/SayError"
 import { keptVisibility, TableAssistant } from "./TableAssistant.screen.tsx"
 import { TableSearch } from "@inventory/ui/TableSearch"
-import { queryKeys } from "./Catalog.keys.ts"
+import { catalogKeys } from "./Catalog.keys.ts"
 import { maxSearch, maxSearchWords } from "@inventory/catalog-contract/ItemSearch"
 import { type CatalogColumn, type ColumnCatalog, operatorsFor } from "@inventory/catalog-contract/TableView"
 import { wordsLeftOut } from "@inventory/catalog-model/ItemSearch"
@@ -234,252 +238,313 @@ const range = (
         onSome: (min) => ({ min: Math.floor(min), max: Math.ceil(O.getOrElse(found.max, () => min)) })
       })
 
+/** The columns of the Items table: rebuilt only when the filters' values or the role change (`itemColumns`). */
+const buildColumns = (found: Found, canImport: boolean) => {
+  // An editor can change an item, from the pencil at the end of its row. A changed item stays if the import
+  // that created it is taken back.
+  const edit = canImport
+    ? [
+        col.display({
+          id: "edit",
+          header: () => <span className="sr-only">Edit</span>,
+          cell: ({ row }) => <ItemEditor item={row.original} trigger="icon" />,
+          meta: { label: "Edit" },
+          enableHiding: false,
+          size: editWidth
+        })
+      ]
+    : []
+  const options = (listed: ReadonlyArray<{ readonly value: string; readonly count: number }> | undefined) =>
+    (listed ?? []).map((entry) => ({ label: entry.value, value: entry.value, count: entry.count }))
+  // A flag is stored as "true" or "false" and read as Yes or No, as its cells say.
+  const flagOptions = (listed: ReadonlyArray<{ readonly value: string; readonly count: number }> | undefined) =>
+    (listed ?? []).map((entry) => ({
+      label: entry.value === "true" ? "Yes" : "No",
+      value: entry.value,
+      count: entry.count
+    }))
+  return col.columns([
+    col.accessor("name", {
+      id: "name",
+      header: ({ column }) => <DataTableColumnHeader column={column} />,
+      // A long name ends in an ellipsis, with the whole name on hover, instead of being cut by the next column.
+      cell: ({ row }) => (
+        <span className="block truncate font-semibold" title={row.original.name}>
+          {row.original.name}
+        </span>
+      ),
+      meta: { label: labels.name },
+      enableHiding: false,
+      size: widths.name[0]
+    }),
+    col.accessor("sku", {
+      id: "sku",
+      header: ({ column }) => <DataTableColumnHeader column={column} />,
+      cell: ({ row }) => <Code>{row.original.sku}</Code>,
+      meta: { label: labels.sku },
+      size: widths.sku[0]
+    }),
+    col.accessor("category", {
+      id: "category",
+      header: ({ column }) => <DataTableColumnHeader column={column} />,
+      meta: { label: labels.category, options: options(found?.category) },
+      size: widths.category[0]
+    }),
+    col.accessor("uom", {
+      id: "uom",
+      header: ({ column }) => <DataTableColumnHeader column={column} />,
+      meta: { label: labels.uom, options: options(found?.uom) },
+      size: widths.uom[0]
+    }),
+    col.accessor("unitCost", {
+      id: "unitCost",
+      header: ({ column }) => <DataTableColumnHeader column={column} className="justify-end" />,
+      cell: ({ row }) => <div className="text-right tabular-nums">{costOf(row.original.unitCost)}</div>,
+      // A range in whole dollars, wide enough to hold the lowest and the highest cost there is.
+      meta: { label: labels.unitCost, ...range(found?.unitCost) },
+      size: widths.unitCost[0]
+    }),
+    col.accessor("quantityOnHand", {
+      id: "quantityOnHand",
+      header: ({ column }) => <DataTableColumnHeader column={column} className="justify-end" />,
+      // The quantity carries its unit of measure: "3,911 BX".
+      cell: ({ row }) => (
+        <div className="text-right tabular-nums">
+          {whole.format(row.original.quantityOnHand)} {row.original.uom}
+        </div>
+      ),
+      meta: { label: labels.quantityOnHand, ...range(found?.quantityOnHand) },
+      size: widths.quantityOnHand[0]
+    }),
+    col.accessor("reorderPoint", {
+      id: "reorderPoint",
+      header: ({ column }) => <DataTableColumnHeader column={column} className="justify-end" />,
+      cell: ({ row }) => (
+        <div className="text-right tabular-nums">
+          {O.match(row.original.reorderPoint, {
+            onNone: () => <NotSet />,
+            onSome: (point) => <>{`${whole.format(point)} ${row.original.uom}`}</>
+          })}
+        </div>
+      ),
+      meta: { label: labels.reorderPoint },
+      size: widths.reorderPoint[0]
+    }),
+    col.accessor((item) => isActive(item.stocking), {
+      id: "isActive",
+      header: labels.isActive,
+      cell: ({ row }) => yesNo(isActive(row.original.stocking)),
+      meta: { label: labels.isActive, options: flagOptions(found?.isActive) },
+      size: widths.isActive[0]
+    }),
+    col.accessor("lotTracked", {
+      id: "lotTracked",
+      header: labels.lotTracked,
+      cell: ({ row }) => yesNo(row.original.lotTracked),
+      meta: { label: labels.lotTracked, options: flagOptions(found?.lotTracked) },
+      size: widths.lotTracked[0]
+    }),
+    col.accessor((item) => item.tags.join(", "), {
+      id: "tags",
+      header: labels.tags,
+      cell: ({ row }) =>
+        row.original.tags.length === 0 ? (
+          <NotSet />
+        ) : (
+          <span className="block truncate" title={row.original.tags.join(", ")}>
+            {row.original.tags.join(", ")}
+          </span>
+        ),
+      meta: { label: labels.tags },
+      size: widths.tags[0]
+    }),
+    col.accessor("firstReceivedOn", {
+      id: "firstReceivedOn",
+      header: ({ column }) => <DataTableColumnHeader column={column} />,
+      cell: ({ row }) =>
+        O.match(row.original.firstReceivedOn, {
+          onNone: () => <NotSet />,
+          onSome: (day) => <span className="tabular-nums">{day}</span>
+        }),
+      meta: { label: labels.firstReceivedOn },
+      size: widths.firstReceivedOn[0]
+    }),
+    col.accessor((item) => O.getOrElse(discontinuedOn(item.stocking), () => ""), {
+      id: "discontinuedOn",
+      header: labels.discontinuedOn,
+      cell: ({ row }) =>
+        O.match(discontinuedOn(row.original.stocking), {
+          onNone: () => <NotSet />,
+          onSome: (day) => <span className="tabular-nums">{day}</span>
+        }),
+      meta: { label: labels.discontinuedOn },
+      size: widths.discontinuedOn[0]
+    }),
+    col.accessor((item) => O.match(item.dimensions, { onNone: () => "", onSome: dimensionsText }), {
+      id: "dimensions",
+      header: labels.dimensions,
+      cell: ({ row }) =>
+        O.match(row.original.dimensions, {
+          onNone: () => <NotSet />,
+          onSome: (size) => <span className="tabular-nums">{dimensionsText(size)}</span>
+        }),
+      meta: { label: labels.dimensions },
+      size: widths.dimensions[0]
+    }),
+    col.accessor((item) => item.vendors.length, {
+      id: "vendors",
+      header: labels.vendors,
+      // How many, and the preferred one by name; every vendor with its cost and lead time is in the editor.
+      cell: ({ row }) => {
+        const vendors = row.original.vendors.map((vendor) => ({
+          name: vendor.vendorName,
+          preferred: vendor.isPreferred
+        }))
+        if (vendors.length === 0) return <NotSet />
+        return (
+          <span className="block truncate" title={vendors.map((vendor) => vendor.name).join(", ")}>
+            {vendorsText(vendors)}
+          </span>
+        )
+      },
+      meta: { label: labels.vendors },
+      size: widths.vendors[0]
+    }),
+    col.accessor("createdAt", {
+      id: "createdAt",
+      header: ({ column }) => <DataTableColumnHeader column={column} />,
+      cell: ({ row }) => (
+        <span title={`${when(row.original.createdAt)} · ${row.original.createdBy}`}>
+          {day(row.original.createdAt)} · {row.original.createdBy}
+        </span>
+      ),
+      meta: { label: labels.createdAt },
+      size: widths.createdAt[0]
+    }),
+    ...edit
+  ])
+}
+
+/**
+ * The question the address asks the server: the page, its size, the order, the filters and the search, read the way
+ * the table writes them. Away from the Items page it keeps the last one, so a read kept while the person is elsewhere
+ * is not asked again at every step of another page.
+ */
+const itemsQuestion = Atom.readable((get) => {
+  const { path, params } = get(location)
+  const held = get.self<ItemsQuestion>()
+  if (path !== "/items" && held._tag === "Some") return held.value
+  const searching = (params.get(itemsTable.urlKeys.search) ?? "").trim() !== ""
+  const config = searching ? searchedTable : itemsTable
+  return { searching, config, query: config.parse(params.toString()) }
+})
+type ItemsQuestion = {
+  readonly searching: boolean
+  readonly config: typeof itemsTable
+  readonly query: ReturnType<typeof itemsTable.parse>
+}
+
+/**
+ * An address somebody typed or kept from before: a page size that is not offered goes back to the usual one, and a
+ * page past the last goes to the last, instead of "Page 999 of 8" over an empty table. Said in the address, so the
+ * table and the question agree; done where the answer is read, never after a render.
+ */
+const correctAddress = (asked: ItemsQuestion["query"], pageCount: number | undefined) => {
+  if (window.location.pathname !== "/items") return
+  const next = new URLSearchParams(window.location.search)
+  const before = next.toString()
+  if (!itemPageSizes.some((size) => size === asked.perPage)) next.delete("perPage")
+  if (pageCount !== undefined && asked.page > Math.max(1, pageCount)) {
+    if (pageCount <= 1) next.delete("page")
+    else next.set("page", `${pageCount}`)
+  }
+  const after = next.toString()
+  if (after !== before) navigate(`${window.location.pathname}${after === "" ? "" : `?${after}`}`, { replace: true })
+}
+
+/**
+ * The page of items the address asks for. One read whose question comes from the address: when the question changes
+ * the rows on screen stay, marked waiting, while the next page or the next filter is fetched, so nothing blinks or
+ * jumps. Shown through an item's edit (`ItemEditor`).
+ */
+export const itemsPage = shown(
+  catalogApi.query(
+    (api, get) => {
+      const asked = get(itemsQuestion).query
+      return Effect.sync(() => correctAddress(asked, undefined)).pipe(
+        Effect.andThen(
+          api.items.page({
+            query: {
+              page: asked.page,
+              perPage: asked.perPage,
+              sort: asked.sorting,
+              filters: asked.filters,
+              joinOperator: asked.joinOperator,
+              search: asked.globalFilter
+            }
+          })
+        ),
+        Effect.tap((answer) => Effect.sync(() => correctAddress(asked, answer.pageCount)))
+      )
+    },
+    { reactivityKeys: catalogKeys.items }
+  )
+)
+
+/** What the filters offer (each column's values, the range of numbers) and how many items there are in all. */
+export const itemFacets = catalogApi.query((api) => api.items.facets(), { reactivityKeys: catalogKeys.itemFacets })
+
+type Found = Atom.Success<typeof itemFacets> | undefined
+
+/**
+ * The table's columns for an editor or a viewer, built from the filters' values: the same object while they are, so
+ * an open row editor is never rebuilt by a fetch that answered the same.
+ */
+const itemColumns = perKey((canImport: boolean) =>
+  Atom.readable((get) => buildColumns(resultOf(get(itemFacets)).data, canImport))
+)
+
+/** What the assistant knows of the columns, built from the filters' values. */
+const itemsCatalogAtom = Atom.readable((get) => itemsCatalog(resultOf(get(itemFacets)).data))
+
+/** The columns shown when the page opens: the ones it has room for; on a phone, all of them (cards). Once per visit. */
+const firstFits = Atom.readable((get) => (get.once(isNarrow) ? {} : fitting(get.once(contentWidth))))
+
+/** Columns the assistant hid or showed, kept for the person: read once per visit. */
+const keptColumns = Atom.readable((get) => {
+  const who = O.getOrUndefined(get.once(member))
+  return keptVisibility("Items", who?.organizationId, who?.id)
+})
+
 /**
  * The items the organization has now, a page at a time. The server sorts and filters them (one question in the
  * address, one answer with a page of rows and the page count), so a long list is never sent whole to be sorted
  * here. Items are created by confirming an import.
  */
 export function ItemsPage() {
-  const narrow = useIsNarrow()
-  const actor = useMember()
+  const narrow = useAtomValue(isNarrow)
+  const signedIn = useAtomValue(member)
+  const actor = O.getOrUndefined(signedIn)
   const canImport = actor !== undefined && hasRole(actor.role, "editor")
-  const { params } = useLocation()
   // The table writes its state into the address and the question for the server is read from the same address,
   // so the two cannot disagree.
-  const address = params.toString()
-  const searching = (params.get(itemsTable.urlKeys.search) ?? "").trim() !== ""
-  const config = searching ? searchedTable : itemsTable
-  const query = useMemo(() => config.parse(address), [config, address])
-  const page = useQuery({
-    queryKey: queryKeys.itemsPage({ ...query, search: query.globalFilter }),
-    queryFn: () =>
-      call((api) =>
-        api.items.page({
-          query: {
-            page: query.page,
-            perPage: query.perPage,
-            sort: query.sorting,
-            filters: query.filters,
-            joinOperator: query.joinOperator,
-            search: query.globalFilter
-          }
-        })
-      ),
-    // The rows on screen stay while the next page or the next filter is fetched: nothing blinks or jumps.
-    placeholderData: keepPreviousData
-  })
-  const facets = useQuery({ queryKey: queryKeys.itemFacets, queryFn: () => call((api) => api.items.facets()) })
-
-  // An address somebody typed or kept from before: a page size that is not offered goes back to the usual one,
-  // and a page past the last goes to the last, instead of "Page 999 of 8" over an empty table.
-  const pageCount = page.isPlaceholderData ? undefined : page.data?.pageCount
-  useEffect(() => {
-    const next = new URLSearchParams(window.location.search)
-    const before = next.toString()
-    if (!itemPageSizes.some((size) => size === query.perPage)) next.delete("perPage")
-    if (pageCount !== undefined && query.page > Math.max(1, pageCount)) {
-      if (pageCount <= 1) next.delete("page")
-      else next.set("page", `${pageCount}`)
-    }
-    const after = next.toString()
-    if (after !== before) navigate(`${window.location.pathname}${after === "" ? "" : `?${after}`}`, { replace: true })
-  }, [query.perPage, query.page, pageCount])
+  const { searching, config, query } = useAtomValue(itemsQuestion)
+  const pageRead = useAtomValue(itemsPage)
+  const page = resultOf(pageRead)
+  const askPageAgain = useAtomRefresh(itemsPage)
+  const facetsRead = useAtomValue(itemFacets)
+  const facets = resultOf(facetsRead)
 
   const found = facets.data
-  const columns = useMemo(() => {
-    // An editor can change an item, from the pencil at the end of its row. A changed item stays if the import
-    // that created it is taken back.
-    const edit = canImport
-      ? [
-          col.display({
-            id: "edit",
-            header: () => <span className="sr-only">Edit</span>,
-            cell: ({ row }) => <ItemEditor item={row.original} trigger="icon" />,
-            meta: { label: "Edit" },
-            enableHiding: false,
-            size: editWidth
-          })
-        ]
-      : []
-    const options = (listed: ReadonlyArray<{ readonly value: string; readonly count: number }> | undefined) =>
-      (listed ?? []).map((entry) => ({ label: entry.value, value: entry.value, count: entry.count }))
-    // A flag is stored as "true" or "false" and read as Yes or No, as its cells say.
-    const flagOptions = (listed: ReadonlyArray<{ readonly value: string; readonly count: number }> | undefined) =>
-      (listed ?? []).map((entry) => ({
-        label: entry.value === "true" ? "Yes" : "No",
-        value: entry.value,
-        count: entry.count
-      }))
-    return col.columns([
-      col.accessor("name", {
-        id: "name",
-        header: ({ column }) => <DataTableColumnHeader column={column} />,
-        // A long name ends in an ellipsis, with the whole name on hover, instead of being cut by the next column.
-        cell: ({ row }) => (
-          <span className="block truncate font-semibold" title={row.original.name}>
-            {row.original.name}
-          </span>
-        ),
-        meta: { label: labels.name },
-        enableHiding: false,
-        size: widths.name[0]
-      }),
-      col.accessor("sku", {
-        id: "sku",
-        header: ({ column }) => <DataTableColumnHeader column={column} />,
-        cell: ({ row }) => <Code>{row.original.sku}</Code>,
-        meta: { label: labels.sku },
-        size: widths.sku[0]
-      }),
-      col.accessor("category", {
-        id: "category",
-        header: ({ column }) => <DataTableColumnHeader column={column} />,
-        meta: { label: labels.category, options: options(found?.category) },
-        size: widths.category[0]
-      }),
-      col.accessor("uom", {
-        id: "uom",
-        header: ({ column }) => <DataTableColumnHeader column={column} />,
-        meta: { label: labels.uom, options: options(found?.uom) },
-        size: widths.uom[0]
-      }),
-      col.accessor("unitCost", {
-        id: "unitCost",
-        header: ({ column }) => <DataTableColumnHeader column={column} className="justify-end" />,
-        cell: ({ row }) => <div className="text-right tabular-nums">{costOf(row.original.unitCost)}</div>,
-        // A range in whole dollars, wide enough to hold the lowest and the highest cost there is.
-        meta: { label: labels.unitCost, ...range(found?.unitCost) },
-        size: widths.unitCost[0]
-      }),
-      col.accessor("quantityOnHand", {
-        id: "quantityOnHand",
-        header: ({ column }) => <DataTableColumnHeader column={column} className="justify-end" />,
-        // The quantity carries its unit of measure: "3,911 BX".
-        cell: ({ row }) => (
-          <div className="text-right tabular-nums">
-            {whole.format(row.original.quantityOnHand)} {row.original.uom}
-          </div>
-        ),
-        meta: { label: labels.quantityOnHand, ...range(found?.quantityOnHand) },
-        size: widths.quantityOnHand[0]
-      }),
-      col.accessor("reorderPoint", {
-        id: "reorderPoint",
-        header: ({ column }) => <DataTableColumnHeader column={column} className="justify-end" />,
-        cell: ({ row }) => (
-          <div className="text-right tabular-nums">
-            {O.match(row.original.reorderPoint, {
-              onNone: () => <NotSet />,
-              onSome: (point) => <>{`${whole.format(point)} ${row.original.uom}`}</>
-            })}
-          </div>
-        ),
-        meta: { label: labels.reorderPoint },
-        size: widths.reorderPoint[0]
-      }),
-      col.accessor((item) => isActive(item.stocking), {
-        id: "isActive",
-        header: labels.isActive,
-        cell: ({ row }) => yesNo(isActive(row.original.stocking)),
-        meta: { label: labels.isActive, options: flagOptions(found?.isActive) },
-        size: widths.isActive[0]
-      }),
-      col.accessor("lotTracked", {
-        id: "lotTracked",
-        header: labels.lotTracked,
-        cell: ({ row }) => yesNo(row.original.lotTracked),
-        meta: { label: labels.lotTracked, options: flagOptions(found?.lotTracked) },
-        size: widths.lotTracked[0]
-      }),
-      col.accessor((item) => item.tags.join(", "), {
-        id: "tags",
-        header: labels.tags,
-        cell: ({ row }) =>
-          row.original.tags.length === 0 ? (
-            <NotSet />
-          ) : (
-            <span className="block truncate" title={row.original.tags.join(", ")}>
-              {row.original.tags.join(", ")}
-            </span>
-          ),
-        meta: { label: labels.tags },
-        size: widths.tags[0]
-      }),
-      col.accessor("firstReceivedOn", {
-        id: "firstReceivedOn",
-        header: ({ column }) => <DataTableColumnHeader column={column} />,
-        cell: ({ row }) =>
-          O.match(row.original.firstReceivedOn, {
-            onNone: () => <NotSet />,
-            onSome: (day) => <span className="tabular-nums">{day}</span>
-          }),
-        meta: { label: labels.firstReceivedOn },
-        size: widths.firstReceivedOn[0]
-      }),
-      col.accessor((item) => O.getOrElse(discontinuedOn(item.stocking), () => ""), {
-        id: "discontinuedOn",
-        header: labels.discontinuedOn,
-        cell: ({ row }) =>
-          O.match(discontinuedOn(row.original.stocking), {
-            onNone: () => <NotSet />,
-            onSome: (day) => <span className="tabular-nums">{day}</span>
-          }),
-        meta: { label: labels.discontinuedOn },
-        size: widths.discontinuedOn[0]
-      }),
-      col.accessor((item) => O.match(item.dimensions, { onNone: () => "", onSome: dimensionsText }), {
-        id: "dimensions",
-        header: labels.dimensions,
-        cell: ({ row }) =>
-          O.match(row.original.dimensions, {
-            onNone: () => <NotSet />,
-            onSome: (size) => <span className="tabular-nums">{dimensionsText(size)}</span>
-          }),
-        meta: { label: labels.dimensions },
-        size: widths.dimensions[0]
-      }),
-      col.accessor((item) => item.vendors.length, {
-        id: "vendors",
-        header: labels.vendors,
-        // How many, and the preferred one by name; every vendor with its cost and lead time is in the editor.
-        cell: ({ row }) => {
-          const vendors = row.original.vendors.map((vendor) => ({
-            name: vendor.vendorName,
-            preferred: vendor.isPreferred
-          }))
-          if (vendors.length === 0) return <NotSet />
-          return (
-            <span className="block truncate" title={vendors.map((vendor) => vendor.name).join(", ")}>
-              {vendorsText(vendors)}
-            </span>
-          )
-        },
-        meta: { label: labels.vendors },
-        size: widths.vendors[0]
-      }),
-      col.accessor("createdAt", {
-        id: "createdAt",
-        header: ({ column }) => <DataTableColumnHeader column={column} />,
-        cell: ({ row }) => (
-          <span title={`${when(row.original.createdAt)} · ${row.original.createdBy}`}>
-            {day(row.original.createdAt)} · {row.original.createdBy}
-          </span>
-        ),
-        meta: { label: labels.createdAt },
-        size: widths.createdAt[0]
-      }),
-      ...edit
-    ])
-  }, [found, canImport])
+  const columns = useAtomValue(itemColumns(canImport))
 
   const rows = page.data?.data ?? none
   // The columns shown at first are the ones the page has room for (`fitting`). On a phone the rows are cards, one
   // line a value: there is room for all of them.
-  const room = useAtomValue(contentWidth)
-  const [fits] = useState(() => (narrow ? {} : fitting(room)))
+  const fits = useAtomValue(firstFits)
   // Columns the assistant hid or showed come back after a refresh; the address keeps the sort and the filters.
-  const [kept] = useState(() => keptVisibility("Items", actor?.organizationId, actor?.id))
-  const catalog = useMemo(() => itemsCatalog(found), [found])
+  const kept = useAtomValue(keptColumns)
+  const catalog = useAtomValue(itemsCatalogAtom)
   const { table } = useDataTable({
     data: rows as Array<StoredItem>,
     columns,
@@ -531,7 +596,7 @@ export function ItemsPage() {
           value={searched}
           onSearch={(text) => table.setGlobalFilter(text)}
           placeholder="Search items"
-          working={page.isFetching && page.isPlaceholderData}
+          working={page.updating}
           maxLength={maxSearch}
           shortcutHint={!narrow}
           className={narrow ? "w-auto min-w-0 flex-1" : "w-80"}
@@ -571,7 +636,7 @@ export function ItemsPage() {
             <AlertTitle>The items could not be loaded</AlertTitle>
             <AlertDescription>
               {sayError(page.error).sentence}
-              <Button variant="outline" size="sm" onClick={() => void page.refetch()}>
+              <Button variant="outline" size="sm" onClick={askPageAgain}>
                 Try again
               </Button>
             </AlertDescription>

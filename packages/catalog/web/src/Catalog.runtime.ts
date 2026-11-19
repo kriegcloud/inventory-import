@@ -3,7 +3,7 @@
 // binds them once, at start (`configureCatalog`), because an upload and a prefetch run outside any component.
 import type { AssistantApi, ImportsApi, ItemsApi } from "@inventory/catalog-contract/Catalog"
 import type { Api, Call, Fork } from "@inventory/client/ApiRuntime"
-import { makeOptimisticWrite } from "@inventory/client/Optimistic"
+import { makeApiAtoms } from "@inventory/client/Api"
 import type { SameOrigin } from "@inventory/kernel/SameOrigin"
 import * as Context from "effect/Context"
 import type * as Effect from "effect/Effect"
@@ -66,8 +66,8 @@ export const callWrite: Call<CatalogApiClient> = (use) => binding().callWrite(us
 /** Runs a longer program against the API in the background; interrupting its fiber aborts its requests. */
 export const fork: Fork<CatalogApiClient> = (use) => binding().fork(use)
 
-/** One optimistic write against the catalog groups (`@inventory/client/Optimistic` says the rule it keeps). */
-export const useOptimisticWrite = makeOptimisticWrite(callWrite)
+/** Reads, writes and the write retries against the catalog groups, as atoms on the app's one runtime. */
+export const catalogApi = makeApiAtoms(CatalogClient)
 
 /** Runs an Effect on the app's runtime, as a Promise of its exit. */
 export const runExit = <A, E>(effect: Effect.Effect<A, E>): Promise<Exit.Exit<A, E>> =>

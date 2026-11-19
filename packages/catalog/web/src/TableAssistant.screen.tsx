@@ -1,18 +1,23 @@
 import { stringify } from "@inventory/ui/Json"
-import { useMutation } from "@tanstack/react-query"
 import { ArrowUp, ChevronRight, MessageSquarePlus, Sparkles, Undo2, X } from "lucide-react"
-import { type FormEvent, useEffect, useMemo, useRef, useState } from "react"
+import { useAtom, useAtomSet } from "@effect/atom-react"
+import * as Cause from "effect/Cause"
+import * as Exit from "effect/Exit"
+import * as O from "effect/Option"
+import * as Atom from "effect/reactivity/Atom"
+import { type FormEvent, useRef } from "react"
 import * as Clock from "effect/Clock"
 import * as Effect from "effect/Effect"
-import * as O from "effect/Option"
 import * as Result from "effect/Result"
 import { Button } from "@inventory/ui/components/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@inventory/ui/components/collapsible"
 import { Input } from "@inventory/ui/components/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@inventory/ui/components/popover"
 import { Spinner } from "@inventory/ui/components/spinner"
-import { useMember } from "@inventory/client/CurrentMember"
-import { call } from "./Catalog.runtime.ts"
+import { member } from "@inventory/client/MemberAtoms"
+import { apiRuntime, perKey } from "@inventory/client/Api"
+import { useAtomValue } from "@effect/atom-react"
+import { catalogApi } from "./Catalog.runtime.ts"
 import { sayError } from "@inventory/client/SayError"
 import {
   type Conversation,
@@ -95,6 +100,42 @@ const suggestionsFor = (columns: ColumnCatalog): ReadonlyArray<string> => {
   ]
 }
 
+/** One person's conversation with the assistant about one table, kept in this browser (`writeConversation`). */
+const conversationOf = perKey((key: string) =>
+  Atom.writable(
+    () => readConversation(key),
+    (ctx, next: Conversation) => {
+      writeConversation(key, next)
+      ctx.setSelf(next)
+    }
+  )
+)
+
+/** The conversation while nobody is known yet: nothing to keep. */
+const noConversation = Atom.make<Conversation>(emptyConversation)
+
+/** One table's assistant on screen: open or not, what is typed, and the request on its way. */
+const assistantOf = perKey((_table: string) =>
+  Atom.make<{ readonly open: boolean; readonly prompt: string; readonly pending: O.Option<string> }>({
+    open: false,
+    prompt: "",
+    pending: O.none()
+  })
+)
+
+/** What the assistant is asked: the words, the table, its columns, and whether it can be searched. */
+interface Asked {
+  readonly prompt: string
+  readonly table: string
+  readonly columns: ColumnCatalog
+  readonly searchable: boolean
+}
+
+/** One request to the assistant, sent once: a model's answer is not asked for twice. */
+const askAssistant = apiRuntime.fn<Asked>()((asked: Asked) =>
+  catalogApi.ask((api) => api.assistant.view({ payload: asked }))
+)
+
 /**
  * The person types what they want to see in a table; the assistant changes the table's sort, filters and columns, and
  * lists what it changed so each change can be taken back.
@@ -108,38 +149,21 @@ export function TableAssistant(props: {
   /** The view as the table opens, which "clear" returns to. */
   readonly opened: ViewState
 }) {
-  const actor = useMember()
+  const signedIn = useAtomValue(member)
+  const actor = O.getOrUndefined(signedIn)
   const key =
     actor === undefined
       ? undefined
       : conversationKey({ organizationId: actor.organizationId, memberId: actor.id }, props.name)
-  const [conversation, setConversation] = useState<Conversation>(() =>
-    key === undefined ? emptyConversation : readConversation(key)
-  )
-  const [open, setOpen] = useState(false)
-  const [prompt, setPrompt] = useState("")
-  const [pending, setPending] = useState<string | null>(null)
+  const [conversation, save] = useAtom(key === undefined ? noConversation : conversationOf(key))
+  const [ui, setUi] = useAtom(assistantOf(props.name))
+  const { open, prompt } = ui
+  const pending = O.getOrNull(ui.pending)
+  const setOpen = (next: boolean) => setUi((now) => ({ ...now, open: next }))
+  const setPrompt = (next: string) => setUi((now) => ({ ...now, prompt: next }))
   const view = useTableView(props.table, props.searchable)
-  const end = useRef<HTMLDivElement>(null)
   const promptField = useRef<HTMLInputElement>(null)
-
-  const save = (next: Conversation) => {
-    setConversation(next)
-    if (key !== undefined) writeConversation(key, next)
-  }
-
-  useEffect(() => {
-    end.current?.scrollIntoView({ block: "nearest" })
-  }, [conversation.entries.length, pending, open])
-
-  const ask = useMutation({
-    mutationFn: (words: string) =>
-      call((api) =>
-        api.assistant.view({
-          payload: { prompt: words, table: props.name, columns: props.columns, searchable: props.searchable }
-        })
-      )
-  })
+  const ask = useAtomSet(askAssistant, { mode: "promiseExit" })
 
   const record = (entry: Entry, visibility: Readonly<Record<string, boolean>>) =>
     save({ ...conversation, entries: [...conversation.entries, entry], visibility: { ...visibility } })
@@ -147,36 +171,21 @@ export function TableAssistant(props: {
   const send = (words: string) => {
     const typed = words.trim()
     if (typed === "" || pending !== null) return
-    setPrompt("")
-    setPending(typed)
+    setUi((now) => ({ ...now, prompt: "", pending: O.some(typed) }))
     const id = `${Effect.runSync(Clock.currentTimeMillis)}`
-    ask.mutate(typed, {
-      onSettled: () => setPending(null),
-      onError: (error) => {
-        record(
-          {
-            id,
-            prompt: typed,
-            outcome: "failed",
-            answeredBy: null,
-            note: null,
-            reason: sayError(error).sentence,
-            applied: [],
-            undone: false
-          },
-          view.read().visibility
-        )
-      },
-      onSuccess: (outcome) => {
-        if (Result.isFailure(outcome)) {
-          const failure = outcome.failure
+    void ask({ prompt: typed, table: props.name, columns: props.columns, searchable: props.searchable }).then(
+      (exit) => {
+        setUi((now) => ({ ...now, pending: O.none() }))
+        if (Exit.isFailure(exit)) {
+          const error = exit.cause.pipe(Cause.squash)
           record(
             {
               id,
               prompt: typed,
-              outcome: "refused",
-              ...whoAnswered(failure),
-              reason: failure.reason,
+              outcome: "failed",
+              answeredBy: null,
+              note: null,
+              reason: sayError(error).sentence,
               applied: [],
               undone: false
             },
@@ -184,29 +193,53 @@ export function TableAssistant(props: {
           )
           return
         }
-        const answer = outcome.success
-        const before = view.read()
-        const after = applyAll({ state: before, changes: answer.changes, columns: props.columns, opened: props.opened })
-        view.write(before, after.state)
-        record(
-          {
-            id,
-            prompt: typed,
-            outcome: "applied",
-            ...whoAnswered(answer),
-            reason: null,
-            applied: answer.changes.map((change, index) => ({
-              change,
-              label: describe(props.columns, change),
-              patch: after.patches[index] ?? {},
-              removed: false
-            })),
-            undone: false
-          },
-          after.state.visibility
-        )
+        const outcome = exit.value
+        {
+          if (Result.isFailure(outcome)) {
+            const failure = outcome.failure
+            record(
+              {
+                id,
+                prompt: typed,
+                outcome: "refused",
+                ...whoAnswered(failure),
+                reason: failure.reason,
+                applied: [],
+                undone: false
+              },
+              view.read().visibility
+            )
+            return
+          }
+          const answer = outcome.success
+          const before = view.read()
+          const after = applyAll({
+            state: before,
+            changes: answer.changes,
+            columns: props.columns,
+            opened: props.opened
+          })
+          view.write(before, after.state)
+          record(
+            {
+              id,
+              prompt: typed,
+              outcome: "applied",
+              ...whoAnswered(answer),
+              reason: null,
+              applied: answer.changes.map((change, index) => ({
+                change,
+                label: describe(props.columns, change),
+                patch: after.patches[index] ?? {},
+                removed: false
+              })),
+              undone: false
+            },
+            after.state.visibility
+          )
+        }
       }
-    })
+    )
   }
 
   const update = (id: string, change: (entry: Entry, now: ViewState) => { entry: Entry; next: ViewState }) => {
@@ -266,7 +299,7 @@ export function TableAssistant(props: {
       return { entry: { ...entry, undone: true, applied }, next }
     })
 
-  const suggestions = useMemo(() => suggestionsFor(props.columns), [props.columns])
+  const suggestions = suggestionsFor(props.columns)
   const latest = pending ?? conversation.entries[conversation.entries.length - 1]?.prompt
 
   const submit = (event: FormEvent) => {
@@ -390,7 +423,11 @@ export function TableAssistant(props: {
               </li>
             )}
           </ol>
-          <div ref={end} />
+          {/* The newest line is brought into view when it arrives: a ref callback on an element made anew each time. */}
+          <div
+            key={`${conversation.entries.length}:${pending ?? ""}:${open}`}
+            ref={(node) => node?.scrollIntoView({ block: "nearest" })}
+          />
         </div>
         <div className="flex flex-col gap-2 border-t pt-2">
           <form className="flex gap-2" onSubmit={submit}>

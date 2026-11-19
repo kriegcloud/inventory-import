@@ -89,16 +89,20 @@ export const optimisticChange: {
  * the sentence put before the reason when the server refuses ("Your line was not recorded."); `retry` offers the
  * person's own input again instead of making them repeat it; `settled` names what else to read again once the last
  * write of this kind has answered; `onRefused` handles a refusal the screen says in its own place (it returns true,
- * and no toast is shown).
+ * and no toast is shown). `onAnswer`, `onRefused` and `retry` are given the registry, so what they change on screen
+ * (an editor opened again, the values someone else saved) is an atom too.
  */
 export interface OptimisticWrite<Input, A, E, R> {
   readonly send: (input: Input) => Effect.Effect<A, E, R>
   readonly changes: ReadonlyArray<OptimisticChange<Input>>
   readonly failed: (input: Input) => string
-  readonly retry?: (input: Input) => { readonly label: string; readonly onClick: () => void } | undefined
+  readonly retry?: (
+    input: Input,
+    registry: AtomRegistry.AtomRegistry
+  ) => { readonly label: string; readonly onClick: () => void } | undefined
   readonly settled?: Reactivity.KeysInput
-  readonly onAnswer?: (answer: A, input: Input) => void
-  readonly onRefused?: (error: E, input: Input) => boolean
+  readonly onAnswer?: (answer: A, input: Input, registry: AtomRegistry.AtomRegistry) => void
+  readonly onRefused?: (error: E, input: Input, registry: AtomRegistry.AtomRegistry) => boolean
 }
 
 /** Numbers each press of every write, so a change can be found again on the read it was put on. */
@@ -149,13 +153,13 @@ export const optimisticWrite = <Input, A, E, R>(
       registry.update(inFlight, (n) => n - 1)
       if (Exit.isSuccess(exit)) {
         registry.update(saved, A.append(press))
-        spec.onAnswer?.(exit.value, input)
+        spec.onAnswer?.(exit.value, input, registry)
       } else {
         // Taken back at once: the other changes still on their way keep showing.
         for (const change of spec.changes) change.takeOff(registry, [press])
         const error = Cause.findErrorOption(exit.cause)
-        if (!(O.isSome(error) && spec.onRefused?.(error.value, input) === true)) {
-          const retry = spec.retry?.(input)
+        if (!(O.isSome(error) && spec.onRefused?.(error.value, input, registry) === true)) {
+          const retry = spec.retry?.(input, registry)
           toastError(
             O.getOrElse(error, () => Cause.squash(exit.cause)),
             {

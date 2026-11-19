@@ -4,21 +4,22 @@ import * as SecureRandom from "effect/crypto/SecureRandom"
 // this module, not in a component, so it carries on while the person opens another page, and there is one per tab.
 // The one thing not to break: Cancel stops everything (the worker, every request in flight) and then deletes what
 // reached the server, and the screen says it was cancelled only once the server has answered.
-import { useQueryClient, type QueryClient } from "@tanstack/react-query"
 import * as Cause from "effect/Cause"
+import * as Data from "effect/Data"
 import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Fiber from "effect/Fiber"
 import * as HashSet from "effect/HashSet"
-import * as MutableHashSet from "effect/MutableHashSet"
 import * as O from "effect/Option"
+import * as Atom from "effect/reactivity/Atom"
+import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
+import { invalidate } from "@inventory/client/Api"
 import * as Queue from "effect/Queue"
 import * as Result from "effect/Result"
 import * as Schedule from "effect/Schedule"
 import * as Stream from "effect/Stream"
 import * as S from "effect/Schema"
-import { useCallback, useSyncExternalStore } from "react"
 import { toast } from "sonner"
 import type { ImportView } from "@inventory/catalog-contract/Import"
 import { FileProblem } from "@inventory/catalog-contract/FileProblem"
@@ -29,12 +30,12 @@ import type { SheetChoice, SheetSummary } from "@inventory/catalog-model/Spreads
 import { savedRows } from "@inventory/catalog-model/Upload"
 import { rowsOf, type UploadState } from "./Upload.machine.ts"
 import { type Client, fork, runExit, apiPrefixOf } from "./Catalog.runtime.ts"
-import { rememberWorkbook } from "./Imports.controller.ts"
+import { importTable, importView, rememberWorkbook } from "./Imports.atoms.ts"
 import { navigate } from "@inventory/ui/Route"
 import { importAddress } from "./internal/route.ts"
 import type { ReadMessage, ReadRequest } from "./internal/protocol.ts"
 import { sayError } from "@inventory/client/SayError"
-import { queryKeys } from "./Catalog.keys.ts"
+import { catalogKeys } from "./Catalog.keys.ts"
 
 export type { UploadState } from "./Upload.machine.ts"
 
@@ -66,29 +67,29 @@ const transient = (error: unknown): boolean =>
 const retrying = <A, E>(effect: Effect.Effect<A, E>) =>
   effect.pipe(Effect.retry({ schedule: Schedule.exponential("400 millis"), times: 3, while: transient }))
 
-// The store: one state, and whoever is drawing it.
-let state: UploadState = { _tag: "Idle" }
-const listeners = MutableHashSet.empty<() => void>()
+/** Where the upload of this tab stands: kept for the page, as the upload carries on across pages. */
+export const uploadState = Atom.make<UploadState>({ _tag: "Idle" }).pipe(Atom.keepAlive)
+
+// The registry the upload reports to: the tab's one, handed over when an upload starts (`startUpload`).
+let registry: AtomRegistry.AtomRegistry | undefined
+const stateNow = (): UploadState => (registry === undefined ? { _tag: "Idle" } : registry.get(uploadState))
 const set = (next: UploadState) => {
-  state = next
-  for (const listener of listeners) listener()
-}
-const subscribe = (listener: () => void) => {
-  MutableHashSet.add(listeners, listener)
-  return () => {
-    MutableHashSet.remove(listeners, listener)
-  }
+  registry?.set(uploadState, next)
+  // While the rows are saving, fetch the review's code, so it is ready when the import is.
+  if (next._tag === "Saving") void import("./ReviewStep.screen.tsx")
 }
 
 /** How an upload ended, for a caller that keeps something until it does (the chosen file, for Continue). */
-export type UploadEnd =
-  | { readonly _tag: "Arrived" }
-  | { readonly _tag: "Cancelled" }
+export type UploadEnd = Data.TaggedEnum<{
+  Arrived: {}
+  Cancelled: {}
   /** The file itself cannot be staged: reading it again would find the same. */
-  | { readonly _tag: "Refused" }
-  | Failure
-
-type Failure = { readonly _tag: "Failed"; readonly step: "read" | "save" }
+  Refused: {}
+  /** Reading the file or saving its rows failed; a save may work when tried again. */
+  Failed: { readonly step: "read" | "save" }
+}>
+/** Builds and tells apart how an upload ended. */
+export const UploadEnd = Data.taggedEnum<UploadEnd>()
 
 /** What is running now: its fiber, the server's id for it once the server has one, and who to tell how it ends. */
 let running: {
@@ -218,12 +219,12 @@ const discard = (uploadId: ImportId): Promise<boolean> =>
     .then(Exit.isSuccess)
 
 /** Puts a finished upload where the next screen looks for it, and moves on to it if the person is still here. */
-const arrive = (queryClient: QueryClient, file: File, done: Finished) => {
+const arrive = (file: File, done: Finished) => {
   const { view, table, workbook } = done
-  queryClient.setQueryData(queryKeys.import(view.id), view)
-  queryClient.setQueryData(queryKeys.importTable(view.id), table)
-  void queryClient.invalidateQueries({ queryKey: queryKeys.openImports })
-  void queryClient.invalidateQueries({ queryKey: queryKeys.activity })
+  registry?.set(importView(view.id), view)
+  registry?.set(importTable(view.id), table)
+  invalidate(catalogKeys.openImports)
+  invalidate(catalogKeys.activity)
   if (workbook !== null) rememberWorkbook(view.id, { file, sheets: workbook.sheets, chosen: workbook.chosen })
   // Straight to the review when every required field found its column by heading; to Match when one did not.
   const unmatched = view.mapping.some((entry) => O.isNone(matchedColumn(entry)) && requiredFields.includes(entry.field))
@@ -233,7 +234,7 @@ const arrive = (queryClient: QueryClient, file: File, done: Finished) => {
 }
 
 /** Starts reading and sending `file`; `onEnd` is told how it ended. Ignored while another upload is under way. */
-const start = (queryClient: QueryClient, file: File, sheet: string | null, onEnd: (end: UploadEnd) => void) => {
+const start = (file: File, sheet: string | null, onEnd: (end: UploadEnd) => void) => {
   if (running !== null) return
   set({ _tag: "Reading", fileName: file.name, rowsRead: 0, rows: rowsOf({ rowsAbout: null, exact: false }) })
   const fiber = fork((client) => program(client, { file, sheet }))
@@ -245,8 +246,8 @@ const start = (queryClient: QueryClient, file: File, sheet: string | null, onEnd
     running = null
     if (Exit.isSuccess(exit)) {
       set({ _tag: "Idle" })
-      current.onEnd({ _tag: "Arrived" })
-      arrive(queryClient, file, exit.value)
+      current.onEnd(UploadEnd.Arrived())
+      arrive(file, exit.value)
       return
     }
     const error = Cause.squash(exit.cause)
@@ -254,12 +255,12 @@ const start = (queryClient: QueryClient, file: File, sheet: string | null, onEnd
     if (current.uploadId !== null) void discard(current.uploadId)
     // The file's own problem is said as data: what is wrong with it and what to do.
     if (S.is(FileProblem)(error)) {
-      current.onEnd({ _tag: "Refused" })
+      current.onEnd(UploadEnd.Refused())
       set({ _tag: "Refused", problem: error })
       return
     }
     const read = S.is(ReadFailed)(error)
-    current.onEnd({ _tag: "Failed", step: read ? "read" : "save" })
+    current.onEnd(UploadEnd.Failed({ step: read ? "read" : "save" }))
     set({
       _tag: "Failed",
       fileName: file.name,
@@ -275,13 +276,14 @@ const start = (queryClient: QueryClient, file: File, sheet: string | null, onEnd
  */
 const cancel = (): Promise<void> => {
   const current = running
+  const state = stateNow()
   if (current === null || state._tag === "Preparing" || state._tag === "Cancelling") return Promise.resolve()
   set({ _tag: "Cancelling", fileName: current.fileName, uploadId: current.uploadId })
   return current.fiber
     .pipe(Fiber.interrupt, runExit)
     .then(() => {
       running = null
-      current.onEnd({ _tag: "Cancelled" })
+      current.onEnd(UploadEnd.Cancelled())
       return current.uploadId === null ? true : discard(current.uploadId)
     })
     .then((answered) => {
@@ -304,19 +306,30 @@ window.addEventListener("pagehide", () => {
   }).catch(() => {})
 })
 
-const ignore = () => {}
+/** What starting an upload takes: the file, the sheet of a workbook, and who to tell how the upload ended. */
+export interface UploadStart {
+  readonly file: File
+  readonly sheet?: string
+  readonly onEnd?: (end: UploadEnd) => void
+}
 
 /**
- * The upload of this tab: where it stands, and how to start or cancel one. `start` takes the file, the sheet of a
- * workbook, and who to tell how the upload ended (the upload step keeps the chosen file until then).
+ * Starts reading and sending a file, unless another upload is under way. The upload step keeps the chosen file until
+ * `onEnd` says how it ended. The upload carries on while the person opens another page.
  */
-export function useUpload() {
-  const current = useSyncExternalStore(subscribe, () => state)
-  const queryClient = useQueryClient()
-  const begin = useCallback(
-    (file: File, sheet?: string, onEnd: (end: UploadEnd) => void = ignore) =>
-      start(queryClient, file, sheet ?? null, onEnd),
-    [queryClient]
-  )
-  return { state: current, start: begin, cancel: () => void cancel(), dismiss: () => set({ _tag: "Idle" }) }
-}
+export const startUpload = Atom.fnSync((input: UploadStart, get) => {
+  registry = get.registry
+  start(input.file, input.sheet ?? null, input.onEnd ?? (() => {}))
+})
+
+/** Stops the upload under way and deletes what reached the server; not offered once the import is being prepared. */
+export const cancelUpload = Atom.fnSync((_: void, get) => {
+  registry = get.registry
+  void cancel()
+})
+
+/** Puts away what the last upload said (a problem with the file, a failure), back to choosing a file. */
+export const dismissUpload = Atom.fnSync((_: void, get) => {
+  registry = get.registry
+  set({ _tag: "Idle" })
+})

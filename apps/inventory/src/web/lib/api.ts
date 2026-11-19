@@ -15,7 +15,6 @@ import { AccessClient } from "@inventory/access-web/Access"
 import { CatalogClient, configureCatalog } from "@inventory/catalog-web/Catalog"
 import { apiPrefix } from "../../api/v1/Version.ts"
 import { makeApi } from "@inventory/client/ApiRuntime"
-import { makeOptimisticWrite } from "@inventory/client/Optimistic"
 import { browserTelemetry } from "./telemetry.ts"
 
 /** A client derived from the API contract. Methods, payloads and errors are all typed from src/api/v1/Api.ts. */
@@ -95,9 +94,6 @@ export const callWrite = api.callWrite
  * request it has in flight (the fetch is cancelled) and runs its finalizers: all a Cancel button needs.
  */
 export const fork = api.fork
-
-/** One optimistic write against this app's API (`@inventory/client/Optimistic` says the rule it keeps). */
-export const useOptimisticWrite = makeOptimisticWrite(callWrite)
 
 /** Runs an Effect on the API's runtime, as a Promise of its exit. */
 export const runExit = <A, E>(effect: Effect.Effect<A, E>): Promise<Exit.Exit<A, E>> =>

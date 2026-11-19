@@ -1,5 +1,5 @@
 import { stringify } from "@inventory/ui/Json"
-import { useCallback, useRef } from "react"
+import { perKey } from "@inventory/client/Api"
 import type { DecisionDelta } from "@inventory/catalog-contract/Decision"
 import type { SavedDecisions } from "@inventory/catalog-contract/Decision"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
@@ -18,6 +18,24 @@ export const deltaOf = (before: SavedDecisions, after: SavedDecisions): Decision
 
 const isEmpty = (delta: DecisionDelta): boolean => Object.keys(delta.set).length === 0 && delta.clear.length === 0
 
+/** Who to tell how a save went: the screen that made the change, the latest one. */
+export interface SaveListeners {
+  /** Told the draft's revision after every save, and the decisions that are now on the server. */
+  readonly onSaved: (revision: number, decisions: SavedDecisions) => void
+  /** The server refused the decisions: show what it holds, and say why. */
+  readonly onRefused: (error: unknown) => void
+}
+
+/** One import's saver: hand it the screen's decisions after each change. */
+export interface DecisionSaver {
+  /** The screen's decisions changed: remember them and save the difference. */
+  readonly change: (next: SavedDecisions, listeners: SaveListeners) => void
+  /** What the server has not been sent, or has not answered for, yet. */
+  readonly pending: () => DecisionDelta
+  /** The draft was fetched again (it changed on another screen): start from what the server holds now. */
+  readonly reset: (decisions: SavedDecisions) => void
+}
+
 /**
  * Saves the review's decisions to the server as they are made: optimistic, the decision is on screen before it is
  * sent. Each change is sent at once; while one request is on its way the next waits and then sends whatever changed
@@ -28,31 +46,27 @@ const isEmpty = (delta: DecisionDelta): boolean => Object.keys(delta.set).length
  * fails the decision stays on screen with "Save again": it is the person's work, the confirm carries it, and putting
  * it back would make them decide again. A refusal (the import was confirmed or removed meanwhile, the role was taken
  * away) is told to `onRefused`, which puts the screen back to what the server holds.
+ *
+ * One per import, outside the screen (`decisionSaver`): what it holds is the save under way, not something drawn, so
+ * it is the saver's own, not React's or an atom's. The screen resets it when it first sees the import.
  */
-export function useDecisionSaver(input: {
-  importId: ImportId
-  start: SavedDecisions
-  /** Told the draft's revision after every save, and the decisions that are now on the server. */
-  onSaved: (revision: number, decisions: SavedDecisions) => void
-  /** The server refused the decisions: show what it holds, and say why. */
-  onRefused: (error: unknown) => void
-}) {
-  const onServer = useRef(input.start)
-  const wanted = useRef(input.start)
-  const busy = useRef(false)
-  const { importId, onSaved, onRefused } = input
+const makeSaver = (importId: ImportId): DecisionSaver => {
+  let onServer: SavedDecisions = {}
+  let wanted: SavedDecisions = {}
+  let busy = false
+  let listeners: SaveListeners = { onSaved: () => {}, onRefused: () => {} }
 
-  const flush = useCallback((): Promise<void> => {
-    if (busy.current) return Promise.resolve()
-    busy.current = true
+  const flush = (): Promise<void> => {
+    if (busy) return Promise.resolve()
+    busy = true
     const saveNext = (): Promise<void> => {
-      const target = wanted.current
-      const delta = deltaOf(onServer.current, target)
+      const target = wanted
+      const delta = deltaOf(onServer, target)
       if (isEmpty(delta)) return Promise.resolve()
       return callWrite((api) => api.imports.decide({ params: { id: importId }, payload: delta })).then(
         ({ revision }) => {
-          onServer.current = target
-          onSaved(revision, target)
+          onServer = target
+          listeners.onSaved(revision, target)
           return saveNext()
         }
       )
@@ -66,29 +80,27 @@ export function useDecisionSaver(input: {
             action: { label: "Save again", onClick: () => void flush() }
           })
         } else {
-          onRefused(error)
+          listeners.onRefused(error)
         }
       })
       .finally(() => {
-        busy.current = false
+        busy = false
       })
-  }, [importId, onSaved, onRefused])
+  }
 
   return {
-    /** The screen's decisions changed: remember them and save the difference. */
-    change: useCallback(
-      (next: SavedDecisions) => {
-        wanted.current = next
-        void flush()
-      },
-      [flush]
-    ),
-    /** What the server has not been sent, or has not answered for, yet. */
-    pending: useCallback(() => deltaOf(onServer.current, wanted.current), []),
-    /** The draft was fetched again (it changed on another screen): start from what the server holds now. */
-    reset: useCallback((decisions: SavedDecisions) => {
-      onServer.current = decisions
-      wanted.current = decisions
-    }, [])
+    change: (next, told) => {
+      listeners = told
+      wanted = next
+      void flush()
+    },
+    pending: () => deltaOf(onServer, wanted),
+    reset: (decisions) => {
+      onServer = decisions
+      wanted = decisions
+    }
   }
 }
+
+/** The saver of one import, the same for the page's life. */
+export const decisionSaver = perKey(makeSaver)

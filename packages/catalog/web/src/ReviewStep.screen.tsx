@@ -1,21 +1,25 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useAtom, useAtomMount, useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
 import * as A from "effect/Array"
+import * as Cause from "effect/Cause"
 import * as Eq from "effect/Equal"
+import * as Exit from "effect/Exit"
 import * as O from "effect/Option"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import * as AsyncResult from "effect/reactivity/AsyncResult"
+import * as Atom from "effect/reactivity/Atom"
+import { useDeferredValue } from "react"
 import { TriangleAlertIcon } from "lucide-react"
 import { toast } from "sonner"
 import { ReviewSkeleton } from "@inventory/ui/Skeletons"
 import { ReviewRegion } from "@inventory/review/ReviewRegion"
 import type { Activity, Problem, ReviewRow } from "@inventory/review/ReviewTypes"
 import { Alert, AlertDescription, AlertTitle } from "@inventory/ui/components/alert"
-import { useIsNarrow } from "@inventory/ui/ContentWidth"
+import { isNarrow } from "@inventory/ui/ContentWidth"
 import { Button } from "@inventory/ui/components/button"
 import { Spinner } from "@inventory/ui/components/spinner"
-import { useMember } from "@inventory/client/CurrentMember"
-import { call } from "./Catalog.runtime.ts"
-import { useDecisionSaver } from "./Draft.controller.ts"
-import { importViewQuery, useImportCache } from "./Imports.controller.ts"
+import { member } from "@inventory/client/MemberAtoms"
+import { invalidate, perKey } from "@inventory/client/Api"
+import { decisionSaver } from "./Draft.controller.ts"
+import { confirmImport, importTable, importView, importViewShown, matchColumn, suggestFixes } from "./Imports.atoms.ts"
 import { navigate } from "@inventory/ui/Route"
 import { importAddress } from "./internal/route.ts"
 import { restoredDecisions, storedReview } from "@inventory/review/SavedProgress"
@@ -23,6 +27,7 @@ import { useSavedProgress } from "@inventory/review/SavedProgressHook"
 import type { SavedDecisions as RegionDecisions } from "@inventory/review/ReviewTypes"
 import { catalogRuntime } from "./Catalog.runtime.ts"
 import type { ImportView, SuggestOutcome } from "@inventory/catalog-contract/Import"
+import type { ImportId } from "@inventory/catalog-contract/Ids"
 import { recheckRow, review, ruleFixes } from "@inventory/catalog-model/Review"
 import { readerWarnings } from "@inventory/catalog-model/Staging"
 import { type SavedDecisions } from "@inventory/catalog-contract/Decision"
@@ -43,29 +48,10 @@ import {
   toServerDecisions
 } from "./ImportReview.controller.ts"
 import { toastError } from "@inventory/client/SayError"
-import { queryKeys } from "./Catalog.keys.ts"
+import { catalogKeys } from "./Catalog.keys.ts"
 import { offersSuggestions } from "@inventory/catalog-model/Suggest"
 
 const whole = new Intl.NumberFormat("en-US")
-
-/**
- * False for the first frame, then true. Working out a review of 50,000 rows takes the browser most of a second in
- * one go; drawing the skeleton first means the person sees what is coming instead of the last screen standing still.
- */
-function usePainted() {
-  const [painted, setPainted] = useState(false)
-  useEffect(() => {
-    let timer = 0
-    const frame = requestAnimationFrame(() => {
-      timer = window.setTimeout(() => setPainted(true))
-    })
-    return () => {
-      cancelAnimationFrame(frame)
-      window.clearTimeout(timer)
-    }
-  }, [])
-  return painted
-}
 
 /** The two cells that hold JSON are fixed in a form of their own, not as raw text in one box. */
 const cellEditor = (input: { row: ReviewRow; column: string; value: string }) =>
@@ -84,34 +70,169 @@ const cellEditor = (input: { row: ReviewRow; column: string; value: string }) =>
       : undefined
 
 /**
+ * What this screen holds for one import besides the server's view: the decisions it shows (until the first change,
+ * the server's), the revision of the draft it has caught up with (none until it first sees the import), the region's
+ * starting decisions and a count that starts the region again, what the person last typed as a SKU, whether a match
+ * made here is on its way, and the last suggestions. Let go with the screen, so the next visit starts from the server.
+ */
+interface ReviewLocal {
+  readonly known: O.Option<number>
+  readonly decisions: O.Option<SavedDecisions>
+  readonly start: O.Option<RegionDecisions>
+  readonly epoch: number
+  readonly typed: string
+  readonly matching: boolean
+  readonly putBack: boolean
+  readonly suggested: O.Option<SuggestOutcome>
+}
+
+const reviewLocal = perKey((_id: ImportId) =>
+  Atom.make<ReviewLocal>({
+    known: O.none(),
+    decisions: O.none(),
+    start: O.none(),
+    epoch: 0,
+    typed: "",
+    matching: false,
+    putBack: false,
+    suggested: O.none()
+  })
+)
+
+/** The view's answer, once there is one. */
+const viewOf = (get: Atom.AtomContext, id: ImportId): O.Option<ImportView> => AsyncResult.value(get(importView(id)))
+
+/**
+ * What the review is worked out from, besides the decisions: kept as the same object while those parts of the view
+ * are, so a new revision of the draft (after every saved decision) does not work out 50,000 rows again.
+ */
+const reviewInput = perKey((id: ImportId) =>
+  Atom.readable((get) => {
+    const view = viewOf(get, id)
+    const table = AsyncResult.value(get(importTable(id)))
+    if (O.isNone(view) || O.isNone(table)) return O.none()
+    const held = O.flatten(get.self<O.Option<ReviewInput>>())
+    const next: ReviewInput = {
+      table: table.value,
+      choices: view.value.choices,
+      storedItems: view.value.storedItems,
+      // A server that sends only the row numbers: each row is then one item.
+      createdIds: view.value.createdIds,
+      // The stored suggestions, as the server reads them at the confirm: each is a proposal on its row.
+      suggestions: view.value.suggestions
+    }
+    const same = O.exists(
+      held,
+      (before) =>
+        before.table === next.table &&
+        before.choices === next.choices &&
+        before.storedItems === next.storedItems &&
+        before.createdIds === next.createdIds &&
+        before.suggestions === next.suggestions
+    )
+    return same ? held : O.some(next)
+  })
+)
+type ReviewInput = Omit<Parameters<typeof review>[0], "decisions">
+
+/** The decisions the screen shows: its own once the person has changed one, the server's until then. */
+const shownDecisions = perKey((id: ImportId) =>
+  Atom.readable((get) =>
+    O.orElse(get(reviewLocal(id)).decisions, () => O.map(viewOf(get, id), (view) => view.decisions))
+  )
+)
+
+/** The review of every row with the decisions shown: the same pure review the server runs at the confirm. */
+const currentReview = perKey((id: ImportId) =>
+  Atom.readable((get) => {
+    const input = get(reviewInput(id))
+    const decisions = get(shownDecisions(id))
+    if (O.isNone(input) || O.isNone(decisions)) return O.none()
+    const current = review({ ...input.value, decisions: decisions.value })
+    return O.some({
+      current,
+      rows: toRegionRows(current, decisions.value),
+      columns: regionColumns(current.mapping, current.unusedColumns, input.value.table)
+    })
+  })
+)
+
+/** The check the region runs on a row as the person types: the review's own, for one row. */
+const rowRecheck = perKey((id: ImportId) =>
+  Atom.readable((get) =>
+    O.map(get(reviewInput(id)), (input) => {
+      const check = recheckRow(input)
+      return (asked: { row: ReviewRow; cells: Readonly<Record<string, string>> }): Problem | undefined => {
+        const problem = check({ id: asked.row.id, values: asked.cells })
+        // The check knows the typed values and not the keep-or-replace answer: once that is given, what is still open
+        // is what the review of every decision says (the row's own problem).
+        const answered = asked.cells[storedChoice] === "keep" || asked.cells[storedChoice] === "replace"
+        if (problem?.kind === "changed" && answered) return asked.row.problem
+        return problem === undefined ? undefined : toRegionProblem(problem)
+      }
+    })
+  )
+)
+
+/**
+ * Follows one import's draft while its review is open. The first view seen sets where the screen starts; a later one
+ * with a newer draft (another tab, another person) starts the region again from it, with the person told, and one
+ * asked for after a refusal puts the screen back to what the server holds. An atom, so it reads the screen's state as
+ * it is now: a save records its revision before its view is put in place, and is never taken for someone else's.
+ */
+const followDraft = perKey((id: ImportId) =>
+  Atom.readable((get) => {
+    get.subscribe(
+      importViewShown(id),
+      (result) => {
+        if (!AsyncResult.isSuccess(result) || result.waiting) return
+        const now = result.value
+        const local = get.registry.get(reviewLocal(id))
+        if (O.isNone(local.known)) {
+          decisionSaver(id).reset(now.decisions)
+          get.registry.set(reviewLocal(id), { ...local, known: O.some(now.revision) })
+          return
+        }
+        if (!local.putBack && now.revision <= local.known.value) return
+        decisionSaver(id).reset(now.decisions)
+        get.registry.set(reviewLocal(id), {
+          ...local,
+          known: O.some(now.revision),
+          decisions: O.some(now.decisions),
+          start: O.some(toRegionDecisions(now.decisions)),
+          epoch: local.epoch + 1,
+          matching: false,
+          putBack: false
+        })
+        if (!local.putBack && !local.matching) toast("Updated with what changed on another screen")
+      },
+      { immediate: true }
+    )
+  })
+)
+
+/**
  * The review: every row that needs the person, what the rules propose for it, and one button that says what it
- * will import. The rows and proposals come from the same pure review the server runs at the confirm.
+ * will import. The rows and proposals come from the same pure review the server runs at the confirm. Working out a
+ * review of 50,000 rows takes the browser most of a second in one go: the skeleton is drawn first (a deferred value),
+ * so the person sees what is coming instead of the last screen standing still.
  */
 export function ReviewStep(props: { view: ImportView; table: StagedTable; canImport: boolean }) {
-  const painted = usePainted()
+  const painted = useDeferredValue(true, false)
   return painted ? <ReviewBody {...props} /> : <ReviewSkeleton title={`Review ${props.view.fileName}`} />
 }
 
 function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: boolean }) {
   const { view, table } = props
-  const cache = useImportCache()
-  const queryClient = useQueryClient()
-  const input = useMemo(
-    () => ({
-      table,
-      choices: view.choices,
-      storedItems: view.storedItems,
-      // A server that sends only the row numbers: each row is then one item.
-      createdIds: view.createdIds,
-      // The stored suggestions, as the server reads them at the confirm: each is a proposal on its row.
-      suggestions: view.suggestions
-    }),
-    [table, view.choices, view.storedItems, view.createdIds, view.suggestions]
-  )
+  const [local, setLocal] = useAtom(reviewLocal(view.id))
+  const seedView = useAtomSet(importView(view.id))
+  const askViewAgain = useAtomRefresh(importView(view.id))
+  const saver = decisionSaver(view.id)
   // The decisions are the server's; the undo history behind them is kept in this browser, per person and import, so
   // a refresh brings "Undo last step" back too. It is used only while it ends at the decisions the server holds: a
   // change made on another screen since starts a new history from the server's.
-  const actor = useMember()
+  const signedIn = useAtomValue(member)
+  const actor = O.getOrUndefined(signedIn)
   const progress = useSavedProgress(
     actor === undefined
       ? undefined
@@ -119,155 +240,95 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
     catalogRuntime()
   )
   const kept = progress.saved === undefined ? null : O.getOrNull(progress.saved.review)
-  // Where the person starts: the draft the server holds, with its undo history when this browser kept it.
-  // The region holds a keep-or-replace answer as a value of its own column; the server keeps it apart
-  // (`toServerDecisions`, `toRegionDecisions`). `start` is the region's shape, `decisions` the server's.
-  const [start, setStart] = useState<RegionDecisions>(() =>
+  // Where the person starts: the draft the server holds, with its undo history when this browser kept it. The region
+  // reads it once, when it is drawn (and again after `epoch` moves). The region holds a keep-or-replace answer as a
+  // value of its own column; the server keeps it apart (`toServerDecisions`, `toRegionDecisions`).
+  const start = O.getOrElse(local.start, () =>
     kept !== null && Eq.equals(toServerDecisions(kept.decisions), view.decisions)
       ? restoredDecisions(kept)
       : toRegionDecisions(view.decisions)
   )
-  const [decisions, setDecisions] = useState<SavedDecisions>(view.decisions)
-  // The draft's revision as far as this screen has caught up with it, and a count that remounts the region.
-  const known = useRef(view.revision)
-  const typedCodes = useRef("")
-  const [epoch, setEpoch] = useState(0)
-  // Set once the saver exists (below): the region starts again from the decisions the server holds.
-  const putBack = useRef<(server: { decisions: SavedDecisions; revision: number }) => void>(() => undefined)
-  const setServerDecisions = (server: { decisions: SavedDecisions; revision: number }) => putBack.current(server)
-  const saver = useDecisionSaver({
-    importId: view.id,
-    start: view.decisions,
-    onSaved: useCallback(
-      (revision: number, saved: SavedDecisions) => {
-        // A jump of more than one means someone else saved in between: fetch their decisions too.
-        const alone = revision === known.current + 1
-        known.current = revision
+  const shownRead = useAtomValue(shownDecisions(view.id))
+  const decisions = O.getOrElse(shownRead, () => view.decisions)
+  const worked = useAtomValue(currentReview(view.id))
+  const recheckRead = useAtomValue(rowRecheck(view.id))
+
+  // Follows the import's draft while this screen is open (`followDraft`): where it starts, and a newer draft.
+  useAtomMount(followDraft(view.id))
+
+  const decided = (next: RegionDecisions) => {
+    const server = toServerDecisions(next)
+    setLocal((now) => ({ ...now, decisions: O.some(server) }))
+    saver.change(server, {
+      onSaved: (revision, saved) => {
         // A SKU the person typed may belong to an item that is already there: ask the server which are.
         const typed = Object.values(saved)
           .map((decision) => decision.edits?.sku ?? "")
           .join("|")
-        const retyped = typed !== typedCodes.current
-        typedCodes.current = typed
-        queryClient.setQueryData<ImportView>(queryKeys.import(view.id), (old) =>
-          old === undefined ? old : { ...old, decisions: saved, revision }
-        )
-        if (!alone || retyped) void queryClient.invalidateQueries({ queryKey: queryKeys.import(view.id) })
-      },
-      [queryClient, view.id]
-    ),
-    // Refused: the screen goes back to the decisions the server holds, and the toast says why.
-    onRefused: useCallback(
-      (error: unknown) => {
-        toastError(error, { lead: "Your last decision was not saved, so the review shows what was saved." })
-        void queryClient.fetchQuery({ ...importViewQuery(view.id), staleTime: 0 }).then(
-          (now) => setServerDecisions({ decisions: now.decisions, revision: now.revision }),
-          () => undefined
-        )
-      },
-      [queryClient, view.id]
-    )
-  })
-  // True between a match made on this screen and the new view it returns, so the update is not announced as
-  // someone else's.
-  const matching = useRef(false)
-  const { reset, change } = saver
-  putBack.current = (server) => {
-    known.current = server.revision
-    reset(server.decisions)
-    setStart(toRegionDecisions(server.decisions))
-    setDecisions(server.decisions)
-    setEpoch((count) => count + 1)
-  }
-  const { save, clear } = progress
-  // Stable on purpose: the region calls this from an effect that lists it as a dependency, so a new function on
-  // every render would make it call again, and again.
-  const decided = useCallback(
-    (next: RegionDecisions) => {
-      const server = toServerDecisions(next)
-      setDecisions(server)
-      change(server)
-      save({ step: "review", review: O.some(storedReview(next)), decided: Object.keys(next).length })
-    },
-    [change, save]
-  )
-  // The draft moved on somewhere else (another tab, another person): show their decisions with ours.
-  useEffect(() => {
-    if (view.revision <= known.current) return
-    known.current = view.revision
-    reset(view.decisions)
-    setStart(toRegionDecisions(view.decisions))
-    setDecisions(view.decisions)
-    setEpoch((count) => count + 1)
-    if (!matching.current) toast("Updated with what changed on another screen")
-    matching.current = false
-  }, [view.revision, view.decisions, reset])
-  const current = useMemo(() => review({ ...input, decisions }), [input, decisions])
-  const rows = useMemo(() => toRegionRows(current, decisions), [current, decisions])
-  const columns = useMemo(
-    () => regionColumns(current.mapping, current.unusedColumns, table),
-    [current.mapping, current.unusedColumns, table]
-  )
-  // The person picked a file column for a field the headings left without one, from inside the review.
-  const match = useMutation({
-    mutationFn: (pick: { field: Field; column: number }) =>
-      call((api) =>
-        api.imports.match({
-          params: { id: view.id },
-          payload: { field: pick.field, column: O.some(pick.column) }
+        // Read from the state as it is now, not as it was drawn: saves can follow each other faster than draws.
+        let alone = false
+        let retyped = false
+        setLocal((now) => {
+          // A jump of more than one means someone else saved in between: ask for their decisions too.
+          alone = O.exists(now.known, (known) => revision === known + 1)
+          retyped = typed !== now.typed
+          return { ...now, known: O.some(revision), typed }
         })
-      ),
-    // The draft's revision moves with the match; the effect below then starts the region from the new columns.
-    onSuccess: (next) => cache.setView(next),
-    onError: (error) => toastError(error)
-  })
-  // Asks for suggestions where the rules have none. Nothing it returns changes a row: each waits for the person.
-  const [suggested, setSuggested] = useState<SuggestOutcome | undefined>(undefined)
-  const suggest = useMutation({
-    mutationFn: () => call((api) => api.imports.suggest({ params: { id: view.id } })),
-    onSuccess: (outcome) => {
-      setSuggested(outcome)
-      queryClient.setQueryData<ImportView>(queryKeys.import(view.id), (old) =>
-        old === undefined ? old : { ...old, suggestions: outcome.suggestions }
-      )
-    },
-    onError: (error) => toastError(error, { lead: "No suggestions were made." })
-  })
-  const recheck = useMemo(() => {
-    const check = recheckRow(input)
-    return (asked: { row: ReviewRow; cells: Readonly<Record<string, string>> }): Problem | undefined => {
-      const problem = check({ id: asked.row.id, values: asked.cells })
-      // The check knows the typed values and not the keep-or-replace answer: once that is given, what is still open
-      // is what the review of every decision says (the row's own problem).
-      const answered = asked.cells[storedChoice] === "keep" || asked.cells[storedChoice] === "replace"
-      if (problem?.kind === "changed" && answered) return asked.row.problem
-      return problem === undefined ? undefined : toRegionProblem(problem)
-    }
-  }, [input])
+        seedView({ ...view, decisions: saved, revision })
+        if (!alone || retyped) askViewAgain()
+      },
+      // Refused: the screen goes back to the decisions the server holds, and the toast says why.
+      onRefused: (error) => {
+        toastError(error, { lead: "Your last decision was not saved, so the review shows what was saved." })
+        setLocal((now) => ({ ...now, putBack: true }))
+        askViewAgain()
+      }
+    })
+    progress.save({ step: "review", review: O.some(storedReview(next)), decided: Object.keys(next).length })
+  }
 
-  const commit = useMutation({
-    mutationFn: () =>
-      call((api) => api.imports.commit({ params: { id: view.id }, payload: { set: decisions, clear: [] } })),
-    onSuccess: (done) => {
+  // The person picked a file column for a field the headings left without one, from inside the review.
+  const matching = useAtomValue(matchColumn).waiting
+  const matchOne = useAtomSet(matchColumn, { mode: "promiseExit" })
+  const match = (pick: { field: Field; column: number }, done?: () => void) => {
+    // True between a match made on this screen and the new view it returns, so the update is not announced as
+    // someone else's.
+    setLocal((now) => ({ ...now, matching: true }))
+    void matchOne({ id: view.id, field: pick.field, column: O.some(pick.column) }).then((exit) => {
+      done?.()
+      if (Exit.isFailure(exit)) toastError(exit.cause.pipe(Cause.squash))
+    })
+  }
+  // Asks for suggestions where the rules have none. Nothing it returns changes a row: each waits for the person.
+  const suggesting = useAtomValue(suggestFixes).waiting
+  const suggestNow = useAtomSet(suggestFixes, { mode: "promiseExit" })
+  const suggest = () =>
+    void suggestNow(view).then((exit) => {
+      if (Exit.isSuccess(exit)) setLocal((now) => ({ ...now, suggested: O.some(exit.value) }))
+      else toastError(exit.cause.pipe(Cause.squash), { lead: "No suggestions were made." })
+    })
+  const suggested = O.getOrUndefined(local.suggested)
+
+  const committing = useAtomValue(confirmImport).waiting
+  const commitNow = useAtomSet(confirmImport, { mode: "promiseExit" })
+  const commit = () =>
+    void commitNow({ id: view.id, decisions }).then((exit) => {
+      if (Exit.isFailure(exit)) {
+        toastError(exit.cause.pipe(Cause.squash))
+        // Someone else confirmed it meanwhile: ask what happened, which moves this screen to the result.
+        invalidate(catalogKeys.import(view.id))
+        return
+      }
       // The confirm saved this screen's own decisions: not a change made somewhere else. Confirm ends the undo
       // history: nothing of it comes back on the next visit.
-      known.current = done.revision
-      clear()
-      cache.setView(done)
-      void queryClient.invalidateQueries({ queryKey: queryKeys.items })
-      void queryClient.invalidateQueries({ queryKey: queryKeys.changes })
-      void queryClient.invalidateQueries({ queryKey: queryKeys.activity })
-      void queryClient.invalidateQueries({ queryKey: queryKeys.openImports })
-      void queryClient.invalidateQueries({ queryKey: queryKeys.pastImports })
-      navigate(importAddress(done.id, "result"))
-    },
-    onError: (error) => {
-      toastError(error)
-      // Someone else confirmed it meanwhile: fetch what happened, which moves this screen to the result.
-      void queryClient.invalidateQueries({ queryKey: queryKeys.import(view.id) })
-    }
-  })
+      setLocal((now) => ({ ...now, known: O.some(exit.value.revision) }))
+      progress.clear()
+      navigate(importAddress(exit.value.id, "result"))
+    })
 
+  if (O.isNone(worked) || O.isNone(recheckRead)) return <ReviewSkeleton title={`Review ${view.fileName}`} />
+  const { current, rows, columns } = worked.value
+  const recheck = recheckRead.value
   const { sums, counts, fixed } = current
   // How many are already there is the region's to say (its tag and its count, in `importWords`), once.
   // Rows are what the person finds in the file, items what they decide on: two counts when a row holds several.
@@ -304,9 +365,9 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
     !props.canImport || (!canSuggest && columnSuggestions.length === 0 && suggested === undefined) ? null : (
       <>
         {!canSuggest ? null : (
-          <Button variant="outline" size="xs" disabled={suggest.isPending} onClick={() => suggest.mutate()}>
-            {suggest.isPending ? <Spinner aria-hidden /> : null}
-            {suggest.isPending ? "Suggesting fixes" : "Suggest fixes"}
+          <Button variant="outline" size="xs" disabled={suggesting} onClick={suggest}>
+            {suggesting ? <Spinner aria-hidden /> : null}
+            {suggesting ? "Suggesting fixes" : "Suggest fixes"}
           </Button>
         )}
         {columnSuggestions.map((suggestion) => (
@@ -314,16 +375,13 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
             key={suggestion.id}
             variant="outline"
             size="xs"
-            disabled={match.isPending}
-            onClick={() => {
-              matching.current = true
-              match.mutate({ field: suggestion.field, column: suggestion.column })
-            }}
+            disabled={matching}
+            onClick={() => match({ field: suggestion.field, column: suggestion.column })}
           >
             Use column “{suggestion.heading}” for {fieldLabels[suggestion.field]}
           </Button>
         ))}
-        {suggested === undefined || suggest.isPending ? null : (
+        {suggested === undefined || suggesting ? null : (
           <span role="status" className="min-w-0 text-foreground">
             {[...(suggested.lines.length === 0 ? ["Suggested nothing new"] : suggested.lines), answered].join(". ")}
           </span>
@@ -360,7 +418,7 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
     <>
       <ReaderWarnings table={table} />
       <ReviewRegion
-        key={`${view.id}:${epoch}`}
+        key={`${view.id}:${local.epoch}`}
         title={`Review ${view.fileName}`}
         noun={["item", "items"]}
         columns={columns}
@@ -388,16 +446,15 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
         importNote="Each row becomes a new item. A SKU already there is skipped; if its values differ, you choose to keep or replace it."
         // Reopened after it created its items: with nothing more to add, the person can still close it again.
         {...(view.createdRows.length > 0 ? { closingLabel: "Close this import" } : {})}
-        importing={commit.isPending}
+        importing={committing}
         onMatchColumn={(columnId, source) => {
           const column = table.columns.find((candidate) => candidate.label === source)
           const field = fields.find((candidate) => candidate === columnId)
           if (column === undefined || field === undefined) return
-          matching.current = true
           // The server decides what a new match drops (the accepts of that field): it says so while
           // it works, and the review starts again from its answer.
           const working = toast.loading(`Matching ${column.label}`)
-          match.mutate({ field, column: column.index }, { onSettled: () => toast.dismiss(working) })
+          match({ field, column: column.index }, () => toast.dismiss(working))
         }}
         onShowMatching={() => navigate(importAddress(view.id, "match"))}
         emptyAction={
@@ -405,7 +462,7 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
             Choose another file
           </Button>
         }
-        onImport={() => commit.mutate()}
+        onImport={commit}
       />
     </>
   )
@@ -418,7 +475,7 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
 function ReaderWarnings(props: { table: Pick<StagedTable, "notes"> }) {
   const warnings = readerWarnings(props.table)
   // The same side room the review below takes, from the room the page has (the sidebar is already taken off).
-  const narrow = useIsNarrow()
+  const narrow = useAtomValue(isNarrow)
   if (warnings.length === 0) return null
   return (
     <Alert className={narrow ? "mx-4 mt-3 w-auto" : "mx-6 mt-4 w-auto"}>

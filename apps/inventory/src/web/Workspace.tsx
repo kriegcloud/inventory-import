@@ -12,11 +12,11 @@ import {
 import { ReviewSkeleton, someColumns, StepsSkeleton, TablePageSkeleton, UploadSkeleton } from "@inventory/ui/Skeletons"
 import { useAtomValue } from "@effect/atom-react"
 import { sessionView } from "@inventory/access-web/Session"
-import { CurrentMember } from "@inventory/client/CurrentMember"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import { importInAddress } from "@inventory/catalog-web/Route"
-import { importTableQuery, importViewQuery, useImportView } from "@inventory/catalog-web/Imports"
-import { queryClient } from "@/lib/queries"
+import { importViewShown } from "@inventory/catalog-web/Imports"
+import * as AsyncResult from "effect/reactivity/AsyncResult"
+import * as Atom from "effect/reactivity/Atom"
 import { contentBelow } from "@inventory/ui/ContentWidth"
 import { linkTo, location } from "@inventory/ui/Route"
 
@@ -24,16 +24,9 @@ import { linkTo, location } from "@inventory/ui/Route"
 // spreadsheet reader or the other pages.
 const importPage = () => import("@inventory/catalog-web/ImportPage")
 const ImportPage = lazy(() => importPage().then((module) => ({ default: module.ImportPage })))
-// A signed-in person most likely lands on the import page: its code is fetched with this chunk, not after it. When
-// the address names an import, its view and rows are asked for now too, beside the page's code instead of after it.
-if (window.location.pathname === "/") {
-  void importPage()
-  const opened = importInAddress(new URLSearchParams(window.location.search)).id
-  if (opened !== undefined) {
-    void queryClient.prefetchQuery(importViewQuery(opened))
-    void queryClient.prefetchQuery(importTableQuery(opened))
-  }
-}
+// A signed-in person most likely lands on the import page: its code is fetched with this chunk, not after it. An
+// import the address names is already on its way (`preload.ts` asks for its view and rows early).
+if (window.location.pathname === "/") void importPage()
 const ItemsPage = lazy(() =>
   import("@inventory/catalog-web/ItemsPage").then((module) => ({ default: module.ItemsPage }))
 )
@@ -74,14 +67,18 @@ function PageSkeleton(props: { path: string; params: URLSearchParams }) {
   )
 }
 
+/** What the crumbs read while no import is open: nothing, never asked for. */
+const noImport = Atom.make(AsyncResult.initial<never, never>())
+
 /**
  * Where the person is, in the bar beside the sidebar's button: the organization, the page, and the file when an
  * import is open. The organization gives way first on a narrow screen; the sidebar already names it.
  */
 function Crumbs(props: { page: AppPage; importId: ImportId | undefined }) {
   const { actor } = useAtomValue(sessionView)
-  // The same cached answer the import page reads: no second request.
-  const fileName = useImportView(props.importId).data?.fileName
+  // The same read the import page shows: no second request.
+  const opened = useAtomValue(props.importId === undefined ? noImport : importViewShown(props.importId))
+  const fileName = AsyncResult.isSuccess(opened) ? opened.value.fileName : undefined
   const inImport = props.page.path === "/" && props.importId !== undefined
   // The organization is already named at the top of the sidebar: beside a narrow page the bar keeps its room.
   const short = useAtomValue(contentBelow(1024))
@@ -126,16 +123,10 @@ function Crumbs(props: { page: AppPage; importId: ImportId | undefined }) {
  */
 export default function Workspace() {
   const { path, params } = useAtomValue(location)
-  // The catalog screens mirror the role rule from the member the app provides here, never from a request.
-  const { actor } = useAtomValue(sessionView)
   // An address that names no page shows the first one, as before.
   const current = appPages.find((page) => page.path === path) ?? appPages[0]
   if (current === undefined) return null
-  return (
-    <CurrentMember value={actor}>
-      <WorkspaceFrame current={current} path={path} params={params} />
-    </CurrentMember>
-  )
+  return <WorkspaceFrame current={current} path={path} params={params} />
 }
 
 function WorkspaceFrame(props: { current: AppPage; path: string; params: URLSearchParams }) {

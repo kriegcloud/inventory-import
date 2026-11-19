@@ -42,7 +42,7 @@
       "inputs": ["apps/*/strict-ceiling.json", "packages/**/strict-ceiling.json", "packages/tooling/tool/cli/src/**"],
       "outputs": []
     },
-    // Which package may import which (scripts/check-boundaries.mjs): every package.json and every import under src and test.
+    // Which package may import which (`beep laws boundaries`): every package.json and every import under src and test.
     "//#boundaries:check": {
       "inputs": [
         "apps/**/package.json",
@@ -51,11 +51,11 @@
         "packages/**/package.json",
         "packages/**/src/**",
         "packages/**/test/**",
-        "scripts/check-boundaries.mjs"
+        "packages/tooling/tool/cli/src/**"
       ],
       "outputs": []
     },
-    // Every package with screens is in both lists Tailwind reads class names from (scripts/check-screens.mjs).
+    // Every package with screens is in both lists Tailwind reads class names from (`beep laws screens`).
     "//#screens:check": {
       "inputs": [
         "apps/inventory/package.json",
@@ -63,7 +63,7 @@
         "apps/inventory/vite.config.ts",
         "packages/**/package.json",
         "packages/**/src/**/*.tsx",
-        "scripts/check-screens.mjs"
+        "packages/tooling/tool/cli/src/**"
       ],
       "outputs": []
     },

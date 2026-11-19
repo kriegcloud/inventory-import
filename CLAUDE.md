@@ -299,7 +299,7 @@ packages/access/         The access context (who may do what), as four packages:
                         audit-trail schemas, their API groups, the model allowance's gateway), model/ (rules, ports,
                         in-memory twins, handlers: no SQL, no HTTP), host/ (the D1 adapters, sign-in, the session
                         identity, the endpoints) and web/ (the session controller, sign-in, People, the audit events).
-                        `scripts/check-boundaries.mjs` holds which of them may import which.
+                        `bun run beep laws boundaries` holds which of them may import which.
 packages/catalog/        The catalog context (items and the imports that write them), as four packages: contract/ (the
                         schemas of items, staged files, decisions, changes, suggestions and results, and the imports,
                         items and assistant groups), model/ (the pure rules the screen and the server both run: the
@@ -316,22 +316,22 @@ packages/foundation/     Product-neutral packages: this repository's own @beep/c
 docs/                   Standards, the kit, patterns, the glossary and sign-in (`docs/index.md` lists them); qa/ is evidence.
 explorations/           Questions being shaped: research, decisions, briefs.
 goals/                  Work with a definition of done: SPEC.md and PLAN.md.
-scripts/                Repository checks (`docs-check.sh`, `keys-check.sh`, `vendor-check.mjs`, `check-strict.mjs`,
-                        `check-boundaries.mjs`: which package may import which, `check-screens.mjs`: every package with screens in both stylesheet lists, `check-effect-imports.mjs`: every Effect import from its own path under its one name) and `vendor-beep.mjs`, which copies the kit from a
+scripts/                Repository checks (`docs-check.sh`, `beep laws keys`, `vendor-check.mjs`, `check-strict.mjs`,
+                        `beep laws boundaries`: which package may import which, `beep laws screens`: every package with screens in both stylesheet lists, `check-effect-imports.mjs`: every Effect import from its own path under its one name) and `vendor-beep.mjs`, which copies the kit from a
                         beep-effect checkout.
 turbo.json              The task graph: seven package tasks and three root tasks.
 .agents/                Skills (see above). Not application code; the check ignores it.
 ```
 
 Paths in this file and in `docs/` that start `src/`, `test/`, `migrations/` or `public/`, and every `scripts/` file but
-`docs-check.sh` and `keys-check.sh`, are inside `apps/inventory/`.
+`docs-check.sh` and `beep laws keys`, are inside `apps/inventory/`.
 
 A package with screens is named in two lists, or its classes are missing from the stylesheet and only the look is
 wrong: an `@source` line in `src/web/index.css` (development) and `screenPackages` in `vite.config.ts` (the build).
-`bun run check` holds both (`scripts/check-screens.mjs`).
+`bun run check` holds both (`bun run beep laws screens`).
 
 Dependencies point one way: a context's `web -> model -> contract` and `host -> model -> contract`, and the app composes
-them (`src/web -> src/api`, `src/server -> src/api`). `bun run check` holds it (`scripts/check-boundaries.mjs`).
+them (`src/web -> src/api`, `src/server -> src/api`). `bun run check` holds it (`bun run beep laws boundaries`).
 
 ## Adding a feature: follow the Items example
 

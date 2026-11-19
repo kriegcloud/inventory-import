@@ -182,7 +182,7 @@ server and the browser. Start with `src/api/v1/Api.ts`, then `packages/catalog/h
 - **Secrets** are read on the server only. Locally they come from `apps/inventory/.dev.vars`, which is git-ignored.
   `.dev.vars.example` explains what a real project would do instead (a secrets manager at start-up, the platform's
   encrypted store when deployed). `bun run check` fails when a string shaped like an OpenRouter or Anthropic key, or a
-  private key, appears in any file git would commit (`scripts/keys-check.sh`).
+  private key, appears in any file git would commit (`bun run beep laws keys`).
 - **Security headers** are set for every response in the production build: a content security policy with no inline
   scripts, HSTS, `nosniff`, no framing, a strict referrer policy, same-origin opener and resource policies and
   `Cross-Origin-Embedder-Policy: require-corp` (`public/_headers` for the app, `src/server/security.ts` for the API).

@@ -11,8 +11,8 @@ from: explorations/ideal-architecture
 
 | # | Step | Status |
 | --- | --- | --- |
-| 1 | `@effect/platform-bun` 4.1.4 installed and run; the package's frame; `quality ceilings` and `laws exports` | doing |
-| 2 | `laws boundaries`, `laws screens`, `laws keys` | todo |
+| 1 | `@effect/platform-bun` 4.1.4 installed and run; the package's frame; `quality ceilings` and `laws exports` | done |
+| 2 | `laws boundaries`, `laws screens`, `laws keys` | done |
 | 3 | `vendor check`, `docs check` | todo |
 | 4 | `quality strict` | todo |
 | 5 | `vendor sync` | todo |
@@ -28,6 +28,9 @@ compared on standard output, standard error and exit code.
 | --- | --- | --- |
 | `quality ceilings` | the same (7 lines, exit 0) | the sum above the cap (exit 1) |
 | `laws exports` | the same in `@inventory/ui` (exit 0) | a wildcard entry, an entry naming no file, an entry with no target, a component with no entry (exit 1) |
+| `laws boundaries` | the same (exit 0) | an undeclared import, a dynamic import of an undeclared package, a path into `apps/`; a declared package the row refuses and its import (exit 1) |
+| `laws screens` | the same (exit 0) | a package with screens missing from the `@source` lines and from `screenPackages`, an entry naming no package, a source naming no folder; no `screenPackages` block at all (exit 1) |
+| `laws keys` | the same (exit 0) | a key-shaped string and a private-key header in a new, untracked file (exit 1) |
 
 ## Current blocker
 
@@ -42,6 +45,8 @@ Where the brief left a choice open, or the code showed the brief could not be fo
   would print, in order, each for standard output or standard error, and whether it failed; the command prints it. A
   test reads those lines, which is what the parity proof compares. A union per rule would add some forty cases whose
   only use is to be turned back into the same sentences. Open to change if the findings are ever wanted as data.
+- **One row is new in `laws boundaries`**: nothing may depend on a `tooling` package, an app included. The script
+  had no such row because there was no such package. It has its own test, and is outside the parity proof.
 - **A missing argument exits 1, not 2.** `vendor-beep.mjs` exited 2 when `--from` was missing; a command's missing
   flag is reported by the CLI module, which prints its usage and exits 1.
 - **The root scripts call the bin directly** (`bun packages/tooling/tool/cli/src/bin.ts quality ceilings`), not

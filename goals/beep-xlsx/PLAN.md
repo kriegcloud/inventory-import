@@ -17,7 +17,7 @@ brief's "Order of moves".
 | 3 | Reading: container, parts, sheet; `parse`, `sheets`, `rows`; hostile tests | done |
 | 4 | Writing: `stringify`, the codecs; round-trip laws; the SheetJS oracle | done |
 | 5 | The adapter beside the SheetJS reader; parity over fixtures and generated workbooks | done |
-| 6 | Expected tables frozen; the swap; SheetJS reader and its entries removed; browser pass; documents | doing |
+| 6 | Expected tables frozen; the swap; SheetJS reader and its entries removed; browser pass; documents | done |
 
 ## Current blocker
 
@@ -87,3 +87,82 @@ Where the brief left a choice open, or the code showed the brief could not be fo
 - **The comparison that stays is against recorded tables** (`test/fixtures/xlsx-expected/`, 23 files written from
   the SheetJS reader), as the CSV swap did. `xlsxOldAgainstNew.test.ts` runs both readers, on generated workbooks
   too, and goes when the SheetJS reader does.
+- **The format sniff asks the package only about archives.** `read.ts` still tells a PDF, a picture, a web page and
+  text from the first bytes itself; a file that starts as a zip archive or an older Office file is handed to
+  `Xlsx.container`, through the workbook reader's chunk, so a CSV still never downloads it. The sentences are the
+  same lines.
+- **Progress counts the chosen sheet.** The old reader built every sheet and counted the rows of all of them; the
+  new one reads one sheet against that sheet's exact row count.
+
+## Seen in the browser
+
+Dev server on port 5200, headless Chromium, signed in as Dana Whitfield, a fresh database before each of the two
+samples. The workbooks were written with `Xlsx.stringify` from the app's own sample files (every cell as text, as a
+CSV has them), so the numbers to expect are the samples' own.
+
+- **`items_messy.xlsx`** (1440 wide): chose the file on the Upload step. Read on Review: "200 rows read · 20 values
+  fixed for you", the button "Import 155, skip 45". Pressed it; the dialog asked "Import 155 items?" with "45 items
+  won't be imported (Needs a decision 24, Cannot import 21)". Confirmed. Result read "Imported items_messy.xlsx",
+  the views "Not imported 45 · Imported 155 · Already there 0 · All 200". Items page: "155 items". Stored, read from
+  the local D1 file: 155 rows in `item`; outcomes `created` 155 and `notImported` 45.
+- **`items_clean.xlsx`** (fresh database): Review offered an import with nothing to skip, so Confirm asked nothing;
+  Result read "Not imported 0 · Imported 25 · Already there 0 · All 25"; Items page "25 items". Not read from the
+  database at that point; after the next imports it held 180, which is 25 and 155.
+- **A second load of the same items as a workbook** (`two_bays.xlsx`, whose main sheet is the clean sample): "25
+  rows read", "Already there 25", "Nothing new: this file is already in". Nothing was written.
+- **The sheet chooser** (`two_bays.xlsx`: Read me, Bay 1, Bay 2 and a hidden sheet Old): the Review step's button
+  read "Sheet: Bay 1". Opened it: "Sheet 2 of 4: Bay 1", the options "Read me · 1 row", "Bay 1 · 26 rows", "Bay 2 ·
+  6 rows", "Old (hidden) · 4 rows", and "It has the most data (26 rows, 15 columns). Other sheets also have data:
+  "Read me" (1 row) and "Bay 2" (6 rows)." Chose Bay 2: the file was read again, Review read "5 rows read", the
+  button "Sheet: Bay 2", and the chooser "Sheet 3 of 4: Bay 2 · You chose this sheet."
+- **`sheets.xlsx`**, the six-sheet fixture: landed on Match, "4 of 15 fields matched", "Match Category and Unit cost
+  to a column to review: they are required.", with the Items sheet's values as examples (BRK-040, HB-M8-30). Its
+  chooser was not seen: it shows on Review, which this file does not reach until those fields have a column.
+- **A workbook over 3 MiB** (`too_big.xlsx`, 3.4 MB): the Upload step read "This file is too large", ""too_big.xlsx"
+  is 3.4 MB, and workbooks over 3.0 MB cannot be read here.", "Split it into smaller files, or delete sheets and
+  columns that are not needed, and choose it again." The address stayed on the Upload step.
+- **Phone width** (390 by 844): `items_messy.xlsx` again through Confirm: "Import 155, skip 45", "Import 155
+  items?", then "Not imported 45 · Imported 155 · Already there 0 · All 200"; the page was 390 wide on Upload, Review
+  and Result (no sideways scroll). The sheet chooser of `two_bays.xlsx` opened from 19 to 384 across, inside the
+  screen, reading "Sheet 2 of 4: Bay 1". The line "200 rows read" was not read at this width.
+- No error in the browser console in the whole pass (45 messages, none an error).
+
+Not seen on screen: a workbook with a cell the file gets wrong or a number format that is not displayed (the two new
+Notes; no fixture or sample has either, and none was built for the browser), a date or number cell's displayed text
+on the Review step (the sample workbooks hold text only), a workbook that unpacks past 64 MB, Cancel during a
+workbook read, a hidden sheet chosen, and the dark theme.
+
+## Closing note
+
+`@beep/xlsx` is at `packages/foundation/modeling/xlsx`: ten schema and facade files, eleven internal ones, five test
+files (92 tests). The app reads every workbook through it. SheetJS is a devDependency of the package and nothing
+else; the reader's chunk in the production build is 112 kB, where SheetJS alone was 261 kB.
+
+While building, each of the six app fixtures was read, written with `Xlsx.stringify` and read again, and equalled its
+canonical form; that was a script, not a committed test, since the package may not read the app's files.
+
+What the next goal should know:
+
+- The strict profile refuses a native string or array method, an exported function of two arguments without a
+  pipeable form (take one object), a `yield*` inside a call's arguments, and a constructor with parameter
+  properties. A formatter rewrote `\ufffe` inside a pattern literal into the character itself; build such a pattern
+  with `new RegExp` from text.
+- `Arbitrary.schema` discards a whole value when any cross-field check fails. A check two fields share must be one
+  `uniqueBy` can steer, or a canonical form.
+- An `S.Opaque` field under `S.annotateKey` has the plain struct as its type, so a function over a workbook's sheets
+  takes `XlsxWorkbook["sheets"][number]`, as `@beep/csv` found.
+- Effect's `Zip.decode` reads no central directory; its entries' sizes may be absent; a body must be read before the
+  next entry is pulled. Its `Xml.decode` reports names as written.
+
+For Benjamin, not decided by this goal:
+
+- The four places the build differs from the brief (the first four entries of "Choices made"): canonical forms in
+  place of three checks, the sheet-name rule, format ids, and a file cut inside its directory.
+- The sentences of the two new Notes and of the "unpacks to more than 64 MB" problem.
+- Where the new reader is right and the old one was wrong: a declared extent that leaves rows out, rounding ties in
+  displayed numbers, and a time that rounds up to midnight.
+- `internal/numberFormat.ts` follows what SheetJS's formatter displayed for General and for date tokens; SheetJS is
+  Apache-2.0 and the package is MIT. The code is this package's own, written against the behaviour and tested
+  against it; whether that wants a notice is his call.
+- The workbook limit stays at 3 MiB (X5). Measured with the new reader: 36,000 rows of a 7-column export, 3.0 MB,
+  0.5 s and about 60 MB of heap.

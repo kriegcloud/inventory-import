@@ -26,7 +26,7 @@ brief keeps its name. Step 5's is [BRIEF-kernel-drivers.md](BRIEF-kernel-drivers
 [goals/kernel-drivers](../../goals/kernel-drivers/SPEC.md). Step 6's is [BRIEF-ui-packages.md](BRIEF-ui-packages.md)
 and step 7's [BRIEF-contexts.md](BRIEF-contexts.md); Benjamin said both match, and the goals are open at
 [goals/ui-packages](../../goals/ui-packages/SPEC.md) and [goals/contexts](../../goals/contexts/SPEC.md). Step 8's is
-[BRIEF-xlsx.md](BRIEF-xlsx.md), which Benjamin said matches; the goal is open at
+[BRIEF-xlsx.md](BRIEF-xlsx.md), which Benjamin said matches; the goal is done at
 [goals/beep-xlsx](../../goals/beep-xlsx/SPEC.md).
 
 ## Where the research disagrees with the request
@@ -83,6 +83,8 @@ Each step ends with the full check and an import of the messy sample in a browse
 
 ## Trail
 
+- 2026-11-19: goal `beep-xlsx` done: the app reads workbooks through `@beep/xlsx`; the SheetJS reader removed, and
+  SheetJS kept only as the package's test oracle.
 - 2026-11-19: goal `beep-xlsx` opened from BRIEF-xlsx.md after "The brief matches", X1 to X6 answered.
 - 2026-11-19: Benjamin answered X1, X2, X4, X5 and X6 of BRIEF-xlsx.md; X3 is open and the brief is not yet said
   to match.

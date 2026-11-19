@@ -15,6 +15,9 @@ The rule reverses the answered decision "client state" (TanStack Query for the r
 [research/03-effect-modules.md](research/03-effect-modules.md), which said three things "must be rebuilt by hand";
 this brief says how each is rebuilt.
 
+Benjamin answered A1 to A5 with the recommended option of each and said "The brief matches (Recommended)"
+([DECISIONS.md](DECISIONS.md), 2026-11-19). The goal is opened after infra is built.
+
 Nothing here is built. **This goal starts after the "Effect imports as in beep-effect" migration is merged to
 main.** That work rewrites the Effect imports of every file this goal would touch, so the two must not run together.
 

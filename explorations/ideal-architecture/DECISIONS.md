@@ -436,3 +436,37 @@ Question: in what order do the next three pieces of work go? Answer: "Imports, t
 (Recommended)": the Effect-imports migration is merged to main first; then the goal `infra` is opened and built and
 checked on this machine only, stopping before the first step that touches anything outside it, which is Benjamin's;
 then atoms. Rejected: infra now in parallel; atoms before infra. Reverse: none needed; nothing is started.
+
+### 2026-11-19 — atoms A1, what stays a hook
+
+Question: where is the line? Answer: "The brief's line (Recommended)": effects banned with no exception; the state
+hooks banned; `useRef` for a DOM node, `useId`, `useDeferredValue`, `useTransition` and the atom hooks stay; the
+vendored kit is not ours. Rejected: stricter, no `useRef` either; the same line and the vendored kit too. Reverse:
+the lint's list of names.
+
+### 2026-11-19 — atoms A2, TanStack Query
+
+Question: does TanStack Query leave the repository? Answer: "Yes, at the end of this goal (Recommended)". Rejected:
+it stays under the atoms; it stays for the Items table only. Reverse: none planned.
+
+### 2026-11-19 — atoms A3, order of packages
+
+Question: in what order do the packages move? Answer: "Smallest first (Recommended)": `client`, `access-web`, the
+app's shell, `ui`'s own pieces, `catalog-web`, then `review`. Rejected: `review` first. All at once was not offered:
+it breaks the app between commits. Reverse: reorder before a package is started.
+
+### 2026-11-19 — atoms A4, the other libraries
+
+Question: do TanStack Table, TanStack Virtual and react-hook-form stay? Answer: "They stay (Recommended)". Rejected:
+they leave too. Reverse: a goal of its own, with its own measurements.
+
+### 2026-11-19 — atoms A5, the address
+
+Question: what holds the address? Answer: "An atom over the app's navigate (Recommended)". Rejected:
+`Atom.searchParam`. Reverse: move every navigation to `Atom.searchParam` in one change.
+
+### 2026-11-19 — atoms brief
+
+Question: does `BRIEF-atoms.md` match? Answer: "The brief matches (Recommended)", with A1 to A5 as answered above.
+The goal is opened after infra is built, by the order "Imports, then infra, then atoms". Reverse: reopen the brief
+before the goal's SPEC is ticked.

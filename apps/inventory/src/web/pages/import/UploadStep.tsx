@@ -1,8 +1,8 @@
 import { request } from "../../lib/http.ts"
 import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
-import { PageHeader } from "@/components/app/PageHeader"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { PageHeader } from "@inventory/ui/PageHeader"
+import { Alert, AlertDescription, AlertTitle } from "@inventory/ui/components/alert"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,17 +13,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger
-} from "@/components/ui/alert-dialog"
-import { Button } from "@/components/ui/button"
-import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item"
-import { FileUpload, FileUploadDropzone } from "@/components/ui/file-upload"
-import { Progress } from "@/components/ui/progress"
+} from "@inventory/ui/components/alert-dialog"
+import { Button } from "@inventory/ui/components/button"
+import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@inventory/ui/components/item"
+import { FileUpload, FileUploadDropzone } from "@inventory/ui/components/file-upload"
+import { Progress } from "@inventory/ui/components/progress"
 import { useActor } from "@/lib/actor"
 import { when, whenShort } from "@/lib/dates"
 import { useImportCache, useOpenImports, usePastImports, useRemoveImport } from "@/lib/imports"
-import { ListTable } from "@/components/app/ListTable"
+import { ListTable } from "@inventory/ui/ListTable"
 import { pastImportColumnsShort } from "./pastImports.tsx"
-import { navigate } from "@/ui-kit/Route.hook"
+import { navigate } from "@inventory/ui/Route"
 import { importAddress } from "@/lib/route"
 import { useSavedProgress } from "@/lib/saved-progress"
 import { type UploadEnd, useUpload, type UploadState } from "@/lib/upload"

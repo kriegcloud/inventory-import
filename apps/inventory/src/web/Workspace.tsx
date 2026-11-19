@@ -8,19 +8,13 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator
-} from "@/components/ui/breadcrumb"
-import {
-  ReviewSkeleton,
-  someColumns,
-  StepsSkeleton,
-  TablePageSkeleton,
-  UploadSkeleton
-} from "@/components/app/Skeletons"
+} from "@inventory/ui/components/breadcrumb"
+import { ReviewSkeleton, someColumns, StepsSkeleton, TablePageSkeleton, UploadSkeleton } from "@inventory/ui/Skeletons"
 import { useActor } from "@/lib/actor"
 import { importTableQuery, importViewQuery, useImportView } from "@/lib/imports"
 import { queryClient } from "@/lib/queries"
-import { useContentBelow } from "@/ui-kit/ContentWidth.hook"
-import { linkTo, useLocation } from "@/ui-kit/Route.hook"
+import { useContentBelow } from "@inventory/ui/ContentWidth"
+import { linkTo, useLocation } from "@inventory/ui/Route"
 
 // Each page is its own chunk, fetched when it is first opened: the shell loads without the review table, the
 // spreadsheet reader or the other pages.

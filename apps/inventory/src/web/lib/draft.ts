@@ -1,4 +1,4 @@
-import { stringify } from "@/ui-kit/Json.codec"
+import { stringify } from "@inventory/ui/Json"
 import { useCallback, useRef } from "react"
 import type { DecisionDelta } from "../../api/v1/Api.ts"
 import type { SavedDecisions } from "../../domain/ItemImport.ts"

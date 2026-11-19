@@ -1,7 +1,7 @@
 // What a dimensions or vendors cell of the file holds, as the fields of the form that fixes it: read from whole JSON,
 // or found piece by piece in a cell that was cut off, so the form opens with what the file says and never empty.
 // The one thing not to break: nothing here decides a value; the domain's readers check what the form saves.
-import { parse } from "../../ui-kit/Json.codec.ts"
+import { parse } from "@inventory/ui/Json"
 
 const parsed = (text: string): unknown => {
   try {

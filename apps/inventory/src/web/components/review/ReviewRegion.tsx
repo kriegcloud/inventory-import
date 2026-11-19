@@ -1,4 +1,4 @@
-import { parse, stringify } from "@/ui-kit/Json.codec"
+import { parse, stringify } from "@inventory/ui/Json"
 import { type Column, createColumnHelper, Subscribe } from "@tanstack/react-table"
 import {
   CheckIcon,
@@ -26,8 +26,8 @@ import {
   useRef,
   useState
 } from "react"
-import { AgentRun } from "@/components/app/AgentRun"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { AgentRun } from "@inventory/ui/AgentRun"
+import { Alert, AlertDescription, AlertTitle } from "@inventory/ui/components/alert"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,27 +37,27 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle
-} from "@/components/ui/alert-dialog"
-import { Button } from "@/components/ui/button"
-import { DataTableFacetedFilter } from "@/components/ui/data-table/data-table-faceted-filter"
-import type { DataTableFeatures } from "@/components/ui/data-table/data-table-features"
-import { DataTableViewOptions } from "@/components/ui/data-table/data-table-view-options"
+} from "@inventory/ui/components/alert-dialog"
+import { Button } from "@inventory/ui/components/button"
+import { DataTableFacetedFilter } from "@inventory/ui/components/data-table/data-table-faceted-filter"
+import type { DataTableFeatures } from "@inventory/ui/components/data-table/data-table-features"
+import { DataTableViewOptions } from "@inventory/ui/components/data-table/data-table-view-options"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuTrigger
-} from "@/components/ui/dropdown-menu"
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty"
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group"
-import { Separator } from "@/components/ui/separator"
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Spinner } from "@/components/ui/spinner"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { useDataTable } from "@/hooks/use-data-table"
+} from "@inventory/ui/components/dropdown-menu"
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "@inventory/ui/components/empty"
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@inventory/ui/components/input-group"
+import { Separator } from "@inventory/ui/components/separator"
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@inventory/ui/components/sheet"
+import { Skeleton } from "@inventory/ui/components/skeleton"
+import { Spinner } from "@inventory/ui/components/spinner"
+import { ToggleGroup, ToggleGroupItem } from "@inventory/ui/components/toggle-group"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@inventory/ui/components/tooltip"
+import { useDataTable } from "@inventory/ui/hooks/use-data-table"
 import {
   type Action,
   act,
@@ -84,7 +84,7 @@ import {
   visible,
   waitingGroups
 } from "./logic.ts"
-import { useContentWidth } from "@/ui-kit/ContentWidth.hook"
+import { useContentWidth } from "@inventory/ui/ContentWidth"
 import { LayoutContext, useLayout } from "./parts.tsx"
 import {
   actionsFit,

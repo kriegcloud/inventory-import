@@ -2,10 +2,10 @@ import { useQueryClient } from "@tanstack/react-query"
 import { PencilIcon } from "lucide-react"
 import { useId, useState } from "react"
 import { toast } from "sonner"
-import { Code } from "@/components/app/Code"
-import { NotSet } from "@/components/app/NotSet"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Button } from "@/components/ui/button"
+import { Code } from "@inventory/ui/Code"
+import { NotSet } from "@inventory/ui/NotSet"
+import { Alert, AlertDescription, AlertTitle } from "@inventory/ui/components/alert"
+import { Button } from "@inventory/ui/components/button"
 import {
   Dialog,
   DialogContent,
@@ -14,12 +14,12 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger
-} from "@/components/ui/dialog"
-import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
-import { Switch } from "@/components/ui/switch"
-import { Textarea } from "@/components/ui/textarea"
+} from "@inventory/ui/components/dialog"
+import { Field, FieldError, FieldGroup, FieldLabel } from "@inventory/ui/components/field"
+import { Input } from "@inventory/ui/components/input"
+import { NativeSelect, NativeSelectOption } from "@inventory/ui/components/native-select"
+import { Switch } from "@inventory/ui/components/switch"
+import { Textarea } from "@inventory/ui/components/textarea"
 import { cacheChange, useOptimisticWrite } from "@/lib/optimistic"
 import {
   categories,

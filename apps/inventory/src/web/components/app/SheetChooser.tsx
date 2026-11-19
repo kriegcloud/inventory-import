@@ -1,6 +1,6 @@
 import { useId } from "react"
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
+import { Field, FieldDescription, FieldLabel } from "@inventory/ui/components/field"
+import { NativeSelect, NativeSelectOption } from "@inventory/ui/components/native-select"
 import type { SheetChoice, SheetSummary } from "../../../domain/Spreadsheet.ts"
 
 /**

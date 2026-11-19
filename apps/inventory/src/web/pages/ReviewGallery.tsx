@@ -3,14 +3,14 @@ import { useMemo, useState } from "react"
 import { toast } from "sonner"
 import { AppShell } from "@/components/app/AppShell"
 import { type ProblemKind, type ReviewColumn, ReviewRegion, type ReviewRow } from "@/components/review"
-import { Button } from "@/components/ui/button"
+import { Button } from "@inventory/ui/components/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuTrigger
-} from "@/components/ui/dropdown-menu"
+} from "@inventory/ui/components/dropdown-menu"
 import { activity, columns, columnsUnmatched, makeRows, problemKinds, recheck } from "./gallery/fabrication.ts"
 import { JobsReview } from "./gallery/JobsReview.tsx"
 

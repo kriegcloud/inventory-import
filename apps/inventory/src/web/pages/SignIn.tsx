@@ -1,12 +1,12 @@
 import { SecureRandom } from "effect/crypto"
 import { useMutation } from "@tanstack/react-query"
 import { type FormEvent, useId, useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item"
-import { Spinner } from "@/components/ui/spinner"
+import { Button } from "@inventory/ui/components/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@inventory/ui/components/card"
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@inventory/ui/components/field"
+import { Input } from "@inventory/ui/components/input"
+import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@inventory/ui/components/item"
+import { Spinner } from "@inventory/ui/components/spinner"
 import type { SignInFeatures, TestAccount } from "../../api/v1/Identity.ts"
 
 // The sign-in page, drawn with the first paint (components/app/SignedIn.tsx says why). Better Auth's client is loaded

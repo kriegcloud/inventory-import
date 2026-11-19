@@ -1,4 +1,4 @@
-import { parse } from "../../ui-kit/Json.codec.ts"
+import { parse } from "@inventory/ui/Json"
 // How an item's values read on screen, in one place: the Items table, the editor and the review show a cost, the
 // dimensions and the vendors the same way. The one thing not to break: nothing here decides anything. Text that is
 // not what the field expects comes back as the file has it, so the person sees what is wrong with it.

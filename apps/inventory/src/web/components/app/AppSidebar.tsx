@@ -14,7 +14,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { toastError } from "@/lib/errors"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback } from "@inventory/ui/components/avatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,7 +25,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger
-} from "@/components/ui/dropdown-menu"
+} from "@inventory/ui/components/dropdown-menu"
 import {
   Sidebar,
   SidebarContent,
@@ -38,10 +38,10 @@ import {
   SidebarMenuItem,
   SidebarRail,
   useSidebar
-} from "@/components/ui/sidebar"
+} from "@inventory/ui/components/sidebar"
 import { useActor } from "@/lib/actor"
-import { linkTo, navigate } from "@/ui-kit/Route.hook"
-import { type Theme, useTheme } from "@/ui-kit/Theme.provider"
+import { linkTo, navigate } from "@inventory/ui/Route"
+import { type Theme, useTheme } from "@inventory/ui/Theme"
 import { BrandMark } from "./BrandMark.tsx"
 
 /** A page the sidebar links to. `path` is its address; `icon` is all that shows when the sidebar is collapsed. */

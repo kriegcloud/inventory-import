@@ -1,8 +1,8 @@
 import { lazy, Suspense } from "react"
 import { AppShell } from "@/components/app/AppShell"
 import { SignedIn } from "@/components/app/SignedIn"
-import { Skeleton } from "@/components/ui/skeleton"
-import { useLocation } from "@/ui-kit/Route.hook"
+import { Skeleton } from "@inventory/ui/components/skeleton"
+import { useLocation } from "@inventory/ui/Route"
 import { workspace } from "./preload.ts"
 
 // The first download is the sign-in screen and what it needs: React, the query cache, the session request and the

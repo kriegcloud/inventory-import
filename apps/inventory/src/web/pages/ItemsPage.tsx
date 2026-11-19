@@ -2,24 +2,24 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { createColumnHelper, type ReactTable } from "@tanstack/react-table"
 import { ArrowDownUp, ListFilter } from "lucide-react"
 import { type ComponentType, lazy, Suspense, useEffect, useMemo, useState } from "react"
-import { Code } from "@/components/app/Code"
-import { PageHeader } from "@/components/app/PageHeader"
-import { NotSet } from "@/components/app/NotSet"
-import { TableSkeleton } from "@/components/app/Skeletons"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Button } from "@/components/ui/button"
-import { DataTable } from "@/components/ui/data-table/data-table"
-import { DataTableCards } from "@/components/ui/data-table/data-table-cards"
-import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header"
-import { createDataTableConfig } from "@/components/ui/data-table/data-table-config"
-import type { DataTableFeatures } from "@/components/ui/data-table/data-table-features"
-import { DataTablePagination } from "@/components/ui/data-table/data-table-pagination"
-import { DataTableToolbar } from "@/components/ui/data-table/data-table-toolbar"
-import { useDataTable } from "@/hooks/use-data-table"
+import { Code } from "@inventory/ui/Code"
+import { PageHeader } from "@inventory/ui/PageHeader"
+import { NotSet } from "@inventory/ui/NotSet"
+import { TableSkeleton } from "@inventory/ui/Skeletons"
+import { Alert, AlertDescription, AlertTitle } from "@inventory/ui/components/alert"
+import { Button } from "@inventory/ui/components/button"
+import { DataTable } from "@inventory/ui/components/data-table/data-table"
+import { DataTableCards } from "@inventory/ui/components/data-table/data-table-cards"
+import { DataTableColumnHeader } from "@inventory/ui/components/data-table/data-table-column-header"
+import { createDataTableConfig } from "@inventory/ui/components/data-table/data-table-config"
+import type { DataTableFeatures } from "@inventory/ui/components/data-table/data-table-features"
+import { DataTablePagination } from "@inventory/ui/components/data-table/data-table-pagination"
+import { DataTableToolbar } from "@inventory/ui/components/data-table/data-table-toolbar"
+import { useDataTable } from "@inventory/ui/hooks/use-data-table"
 import { useActor } from "@/lib/actor"
 import { call } from "@/lib/api"
-import { contentWidth, useIsNarrow } from "@/ui-kit/ContentWidth.hook"
-import { navigate, useLocation } from "@/ui-kit/Route.hook"
+import { contentWidth, useIsNarrow } from "@inventory/ui/ContentWidth"
+import { navigate, useLocation } from "@inventory/ui/Route"
 import { hasRole } from "@inventory/kernel/Role"
 import type { StoredItem } from "../../domain/Item.ts"
 import { itemPageSizes } from "../../domain/ItemQuery.ts"
@@ -28,7 +28,7 @@ import { ItemEditor } from "./ItemEditor.tsx"
 import { costText, dimensionsText, vendorsText } from "./import/itemText.ts"
 import { sayError } from "@/lib/errors"
 import { keptVisibility, TableAssistant } from "@/components/app/TableAssistant"
-import { TableSearch } from "@/components/app/TableSearch"
+import { TableSearch } from "@inventory/ui/TableSearch"
 import { queryKeys } from "@/lib/queries"
 import { maxSearch, maxSearchWords, wordsLeftOut } from "../../domain/ItemSearch.ts"
 import { type CatalogColumn, type ColumnCatalog, operatorsFor } from "../../domain/TableView.ts"
@@ -38,12 +38,12 @@ import { type CatalogColumn, type ColumnCatalog, operatorsFor } from "../../doma
 // words, switched off, so nothing moves when it arrives.
 type MenuProps = { readonly table: ReactTable<DataTableFeatures, StoredItem, unknown>; readonly align: "end" }
 const DataTableSortMenu = lazy(() =>
-  import("@/components/ui/data-table/data-table-sort-menu").then((module) => ({
+  import("@inventory/ui/components/data-table/data-table-sort-menu").then((module) => ({
     default: module.DataTableSortMenu as ComponentType<MenuProps>
   }))
 )
 const DataTableFilterMenu = lazy(() =>
-  import("@/components/ui/data-table/data-table-filter-menu").then((module) => ({
+  import("@inventory/ui/components/data-table/data-table-filter-menu").then((module) => ({
     default: module.DataTableFilterMenu as ComponentType<MenuProps>
   }))
 )

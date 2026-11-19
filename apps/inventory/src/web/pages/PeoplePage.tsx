@@ -2,11 +2,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Result } from "effect"
 import { useId, useState } from "react"
 import { toast } from "sonner"
-import { PageHeader } from "@/components/app/PageHeader"
-import { TableSkeleton } from "@/components/app/Skeletons"
-import { NotSet } from "@/components/app/NotSet"
-import { type ListColumn, ListTable } from "@/components/app/ListTable"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { PageHeader } from "@inventory/ui/PageHeader"
+import { TableSkeleton } from "@inventory/ui/Skeletons"
+import { NotSet } from "@inventory/ui/NotSet"
+import { type ListColumn, ListTable } from "@inventory/ui/ListTable"
+import { Alert, AlertDescription, AlertTitle } from "@inventory/ui/components/alert"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,8 +17,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger
-} from "@/components/ui/alert-dialog"
-import { Button } from "@/components/ui/button"
+} from "@inventory/ui/components/alert-dialog"
+import { Button } from "@inventory/ui/components/button"
 import {
   Dialog,
   DialogContent,
@@ -27,10 +27,10 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger
-} from "@/components/ui/dialog"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
+} from "@inventory/ui/components/dialog"
+import { Field, FieldGroup, FieldLabel } from "@inventory/ui/components/field"
+import { Input } from "@inventory/ui/components/input"
+import { NativeSelect, NativeSelectOption } from "@inventory/ui/components/native-select"
 import { useActor } from "@/lib/actor"
 import { call, callWrite } from "@/lib/api"
 import { cacheChange, useOptimisticWrite } from "@/lib/optimistic"

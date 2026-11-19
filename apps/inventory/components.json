@@ -13,10 +13,10 @@
   "iconLibrary": "lucide",
   "aliases": {
     "components": "@/components",
-    "utils": "@/lib/utils",
-    "ui": "@/components/ui",
+    "utils": "cn",
+    "ui": "@inventory/ui/components",
     "lib": "@/lib",
-    "hooks": "@/hooks"
+    "hooks": "@inventory/ui/hooks"
   },
   "registries": {
     "@diceui": "https://diceui.com/r/{style}/{name}.json",

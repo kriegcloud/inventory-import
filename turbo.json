@@ -37,6 +37,11 @@
       ],
       "outputs": []
     },
+    // The stage C ceilings of the packages with screens add up to at most 678 (scripts/check-ceilings.mjs).
+    "//#ceilings:check": {
+      "inputs": ["apps/*/strict-ceiling.json", "packages/**/strict-ceiling.json", "scripts/check-ceilings.mjs"],
+      "outputs": []
+    },
     // Every file git would commit, so its hash is the whole repository's.
     "//#keys:check": { "outputs": [] },
     "//#docs:check": {

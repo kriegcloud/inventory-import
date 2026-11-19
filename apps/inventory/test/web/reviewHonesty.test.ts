@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs"
 import { describe, expect, it } from "@effect/vitest"
 import { Array as Arr, Effect, Option, Record as Rec, String as Str } from "effect"
 import { firstDecisions, review, stageTable, type StagedTable } from "../../src/domain/ItemImport.ts"
-import { sourceLead, sourceWordsFor } from "../../src/web/components/app/proposalSource.ts"
+import { sourceLead, sourceWordsFor } from "@inventory/ui/ProposalSource"
 import {
   act,
   count,

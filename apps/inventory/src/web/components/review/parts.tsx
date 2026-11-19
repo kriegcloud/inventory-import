@@ -20,14 +20,14 @@ import {
 } from "react"
 import { cn } from "cn"
 import { Slot } from "radix-ui"
-import { ProposedChip, SourceMark } from "@/components/app/ProposedValue"
-import { sourceAndConfidence } from "@/components/app/proposalSource"
-import { StatusPill } from "@/components/app/StatusPill"
-import { Button } from "@/components/ui/button"
-import { Field, FieldLabel } from "@/components/ui/field"
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
-import { Input } from "@/components/ui/input"
-import { narrowBelow, useContentBelow } from "@/ui-kit/ContentWidth.hook"
+import { ProposedChip, SourceMark } from "@inventory/ui/ProposedValue"
+import { sourceAndConfidence } from "@inventory/ui/ProposalSource"
+import { StatusPill } from "@inventory/ui/StatusPill"
+import { Button } from "@inventory/ui/components/button"
+import { Field, FieldLabel } from "@inventory/ui/components/field"
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@inventory/ui/components/hover-card"
+import { Input } from "@inventory/ui/components/input"
+import { narrowBelow, useContentBelow } from "@inventory/ui/ContentWidth"
 import {
   Popover,
   PopoverArrow,
@@ -35,8 +35,8 @@ import {
   PopoverContent,
   PopoverTitle,
   PopoverTrigger
-} from "@/components/ui/popover"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+} from "@inventory/ui/components/popover"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@inventory/ui/components/tooltip"
 import { choicesOf, pickedChoice, spellingOf, valueWords, variantsText } from "./logic.ts"
 import type { CellMark, Fix, FixGroup, MarkSource, ProblemKind, ReviewColumn, ReviewWords, RowView } from "./types.ts"
 import { defaultReviewWords } from "./words.ts"

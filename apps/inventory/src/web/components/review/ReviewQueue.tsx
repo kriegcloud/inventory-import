@@ -1,13 +1,21 @@
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
 import { HashMap, HashSet, Option } from "effect"
 import { Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { ButtonGroup } from "@/components/ui/button-group"
-import { Label } from "@/components/ui/label"
-import { Item, ItemContent, ItemDescription, ItemFooter, ItemGroup, ItemHeader, ItemTitle } from "@/components/ui/item"
-import { Progress } from "@/components/ui/progress"
-import { Skeleton } from "@/components/ui/skeleton"
+import { Button } from "@inventory/ui/components/button"
+import { Checkbox } from "@inventory/ui/components/checkbox"
+import { ButtonGroup } from "@inventory/ui/components/button-group"
+import { Label } from "@inventory/ui/components/label"
+import {
+  Item,
+  ItemContent,
+  ItemDescription,
+  ItemFooter,
+  ItemGroup,
+  ItemHeader,
+  ItemTitle
+} from "@inventory/ui/components/item"
+import { Progress } from "@inventory/ui/components/progress"
+import { Skeleton } from "@inventory/ui/components/skeleton"
 import {
   askFor,
   choicesOf,

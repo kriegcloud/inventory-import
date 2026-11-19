@@ -11,12 +11,28 @@ const specifiers =
   /(?:import|export)\s[^"'`;]*?from\s*["']([^"']+)["']|import\s*["']([^"']+)["']|import\(\s*["']([^"']+)["']\s*\)/g
 const extensions = ["", ".ts", ".tsx", "/index.ts", "/index.tsx"]
 
+/** The file a workspace package's exact export names, or undefined when the specifier is not one of `packages`. */
+const exported = (specifier, packages) => {
+  for (const [name, dir] of Object.entries(packages)) {
+    if (specifier !== name && !specifier.startsWith(`${name}/`)) continue
+    const exports = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")).exports ?? {}
+    const key = specifier === name ? "." : `./${specifier.slice(name.length + 1)}`
+    const target = exports[key]
+    if (typeof target !== "string") throw new Error(`"${specifier}" is not an export of ${name}`)
+    return resolve(dir, target)
+  }
+  return undefined
+}
+
 /**
- * Every file under `root` reachable from `entry` by static or dynamic imports, `@/` meaning `alias`. Only files
- * inside `root` are followed; packages are left to their own stylesheets.
+ * Every file under `root`, or inside one of the workspace `packages` (name to folder), reachable from `entry` by
+ * static or dynamic imports, `@/` meaning `alias` and a package's specifier meaning the file its exact export names.
+ * Other packages are left to their own stylesheets.
  */
 export function reachableSources(input) {
   const { entry, root, alias } = input
+  const packages = Object.fromEntries(Object.entries(input.packages ?? {}).map(([name, dir]) => [name, resolve(dir)]))
+  const inside = (path) => path.startsWith(root) || Object.values(packages).some((dir) => path.startsWith(`${dir}/`))
   const seen = new Set()
   const pending = [resolve(entry)]
   while (pending.length > 0) {
@@ -30,13 +46,13 @@ export function reachableSources(input) {
         ? join(alias, specifier.slice(2))
         : specifier.startsWith(".")
           ? resolve(dirname(file), specifier)
-          : undefined
+          : exported(specifier, packages)
       if (local === undefined || /\.(css|svg|png|woff2?)$/.test(local)) continue
       const found = extensions
         .map((ext) => `${local}${ext}`)
         .find((path) => existsSync(path) && statSync(path).isFile())
       if (found === undefined) throw new Error(`${relative(root, file)} imports "${specifier}", which was not found`)
-      if (found.startsWith(root)) pending.push(found)
+      if (inside(found)) pending.push(found)
     }
   }
   return [...seen].sort()

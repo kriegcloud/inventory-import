@@ -6,7 +6,7 @@ import {
   DrawerFooter,
   DrawerHeader,
   DrawerTitle
-} from "@/components/ui/drawer"
+} from "@inventory/ui/components/drawer"
 
 /**
  * A panel that rises from the bottom of a phone's screen: the activity, or the confirm. A module of its own, so the

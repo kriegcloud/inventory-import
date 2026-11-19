@@ -1,9 +1,9 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
-import { Code } from "@/components/app/Code"
-import { PageHeader, Views } from "@/components/app/PageHeader"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Code } from "@inventory/ui/Code"
+import { PageHeader, Views } from "@inventory/ui/PageHeader"
+import { Alert, AlertDescription, AlertTitle } from "@inventory/ui/components/alert"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,13 +14,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger
-} from "@/components/ui/alert-dialog"
-import { Button } from "@/components/ui/button"
-import { type RecordColumn, RecordsTable } from "@/components/ui/data-table/data-table-records"
+} from "@inventory/ui/components/alert-dialog"
+import { Button } from "@inventory/ui/components/button"
+import { type RecordColumn, RecordsTable } from "@inventory/ui/components/data-table/data-table-records"
 import { call } from "@/lib/api"
 import { whenShort } from "@/lib/dates"
 import { useImportCache } from "@/lib/imports"
-import { navigate } from "@/ui-kit/Route.hook"
+import { navigate } from "@inventory/ui/Route"
 import { importAddress } from "@/lib/route"
 import type { ChangedItem, ImportEvent, ImportResult, ImportView, RowOutcome } from "../../../api/v1/Api.ts"
 import { notImportedCsv, rowId, rowPlace, type StagedTable } from "../../../domain/ItemImport.ts"

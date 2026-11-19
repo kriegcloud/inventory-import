@@ -1,9 +1,9 @@
 import { SheetIcon } from "lucide-react"
 import { SheetChooser } from "@/components/app/SheetChooser"
-import { Button } from "@/components/ui/button"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Button } from "@inventory/ui/components/button"
+import { Popover, PopoverContent, PopoverTrigger } from "@inventory/ui/components/popover"
 import { workbookOf } from "@/lib/imports"
-import { navigate } from "@/ui-kit/Route.hook"
+import { navigate } from "@inventory/ui/Route"
 import { importAddress } from "@/lib/route"
 import { useUpload } from "@/lib/upload"
 

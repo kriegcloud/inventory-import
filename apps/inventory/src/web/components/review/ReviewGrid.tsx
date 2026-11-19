@@ -15,18 +15,18 @@ import {
 } from "react"
 import { cn } from "cn"
 import { HashMap, HashSet, Option } from "effect"
-import { sourceWordsFor } from "@/components/app/proposalSource"
-import { StatusPill } from "@/components/app/StatusPill"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { ButtonGroup } from "@/components/ui/button-group"
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { DataTableColumnHeader } from "@/components/ui/data-table/data-table-column-header"
-import type { DataTableFeatures } from "@/components/ui/data-table/data-table-features"
+import { sourceWordsFor } from "@inventory/ui/ProposalSource"
+import { StatusPill } from "@inventory/ui/StatusPill"
+import { Badge } from "@inventory/ui/components/badge"
+import { Button } from "@inventory/ui/components/button"
+import { Checkbox } from "@inventory/ui/components/checkbox"
+import { ButtonGroup } from "@inventory/ui/components/button-group"
+import { NativeSelect, NativeSelectOption } from "@inventory/ui/components/native-select"
+import { ScrollArea } from "@inventory/ui/components/scroll-area"
+import { Skeleton } from "@inventory/ui/components/skeleton"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@inventory/ui/components/tooltip"
+import { DataTableColumnHeader } from "@inventory/ui/components/data-table/data-table-column-header"
+import type { DataTableFeatures } from "@inventory/ui/components/data-table/data-table-features"
 import {
   StickyTable,
   StickyTableBand,
@@ -38,8 +38,8 @@ import {
   StickyTableHeader,
   StickyTableRow,
   StickyTableRowHeader
-} from "@/components/ui/sticky-table"
-import { textWidth } from "@/ui-kit/TextWidth.measure"
+} from "@inventory/ui/components/sticky-table"
+import { textWidth } from "@inventory/ui/TextWidth"
 import {
   askFor,
   choicesOf,

@@ -1,8 +1,8 @@
 import { CheckIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Button } from "@/components/ui/button"
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { Button } from "@inventory/ui/components/button"
+import { ScrollArea, ScrollBar } from "@inventory/ui/components/scroll-area"
+import { ToggleGroup, ToggleGroupItem } from "@inventory/ui/components/toggle-group"
 import type { WorkItem } from "./logic.ts"
 
 const whole = new Intl.NumberFormat("en-US")

@@ -1,0 +1,120 @@
+{
+  "$schema": "./node_modules/@effect/tsgo/oxlint-schema.json",
+  "plugins": ["react", "typescript", "oxc"],
+  "rules": {
+    "react/rules-of-hooks": "error",
+    // Hand-rolling: a native control or table in feature code where a component from @inventory/ui exists.
+    // Packages extend this config; @inventory/ui ignores its vendored components, which may still render these elements.
+    "react/forbid-elements": [
+      "error",
+      {
+        "forbid": [
+          {
+            "element": "button",
+            "message": "Hand-rolled <button>. Use <Button> from @inventory/ui/components/button: its variant and size props, ghost for a quiet action."
+          },
+          {
+            "element": "input",
+            "message": "Hand-rolled <input>. Use <Input> from @inventory/ui/components/input; for a type, <Checkbox>, <RadioGroup>, <Switch>, <Slider> or <FileUpload>."
+          },
+          {
+            "element": "select",
+            "message": "Hand-rolled <select>. Use <NativeSelect> from @inventory/ui/components/native-select, or <Select> for a styled list."
+          },
+          {
+            "element": "textarea",
+            "message": "Hand-rolled <textarea>. Use <Textarea> from @inventory/ui/components/textarea."
+          },
+          {
+            "element": "label",
+            "message": "Hand-rolled <label>. Use <Label> from @inventory/ui/components/label, or <Field> and <FieldLabel> from @inventory/ui/components/field in a form."
+          },
+          {
+            "element": "table",
+            "message": "Hand-rolled <table>. Use <Table> from @inventory/ui/components/table: it already draws the grid, the 36px header and 13px text."
+          },
+          {
+            "element": "thead",
+            "message": "Hand-rolled <thead>. Use <TableHeader> from @inventory/ui/components/table."
+          },
+          {
+            "element": "tbody",
+            "message": "Hand-rolled <tbody>. Use <TableBody> from @inventory/ui/components/table."
+          },
+          {
+            "element": "tfoot",
+            "message": "Hand-rolled <tfoot>. Use <TableFooter> from @inventory/ui/components/table."
+          },
+          {
+            "element": "tr",
+            "message": "Hand-rolled <tr>. Use <TableRow> from @inventory/ui/components/table."
+          },
+          {
+            "element": "th",
+            "message": "Hand-rolled <th>. Use <TableHead> from @inventory/ui/components/table, with scope=row for a row's name."
+          },
+          {
+            "element": "td",
+            "message": "Hand-rolled <td>. Use <TableCell> from @inventory/ui/components/table."
+          },
+          {
+            "element": "caption",
+            "message": "Hand-rolled <caption>. Use <TableCaption> from @inventory/ui/components/table."
+          },
+          {
+            "element": "hr",
+            "message": "Hand-rolled <hr>. Use <Separator> from @inventory/ui/components/separator."
+          },
+          {
+            "element": "progress",
+            "message": "Hand-rolled <progress>. Use <Progress> from @inventory/ui/components/progress."
+          },
+          {
+            "element": "dialog",
+            "message": "Hand-rolled <dialog>. Use <Dialog>, <AlertDialog> or <Sheet> from @inventory/ui/components."
+          },
+          {
+            "element": "details",
+            "message": "Hand-rolled <details>. Use <Collapsible> or <Accordion> from @inventory/ui/components."
+          },
+          {
+            "element": "fieldset",
+            "message": "Hand-rolled <fieldset>. Use <FieldSet> and <FieldLegend> from @inventory/ui/components/field."
+          },
+          {
+            "element": "kbd",
+            "message": "Hand-rolled <kbd>. Use <Kbd> from @inventory/ui/components/kbd."
+          }
+        ]
+      }
+    ],
+    "react/only-export-components": [
+      "warn",
+      {
+        "allowConstantExport": true
+      }
+    ]
+  },
+  "overrides": [
+    {
+      // Effect's collections, never the native ones, in the app and its tests: HashMap and HashSet for a value handed
+      // on, MutableHashMap and MutableHashSet for one a function fills. WeakMap and WeakSet stay where an entry must go
+      // with its key (Effect has no weak collection). The vendored components in @inventory/ui are ignored by its
+      // config, as published. See "Effect" in CLAUDE.md.
+      "files": ["**/src/**", "**/test/**", "src/**", "test/**"],
+      "rules": {
+        "no-restricted-globals": [
+          "error",
+          {
+            "name": "Map",
+            "message": "Use HashMap (a value handed on) or MutableHashMap (one a function fills) from effect."
+          },
+          {
+            "name": "Set",
+            "message": "Use HashSet (a value handed on) or MutableHashSet (one a function fills) from effect."
+          }
+        ]
+      }
+    }
+  ]
+}

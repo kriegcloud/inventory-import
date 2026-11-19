@@ -1,5 +1,5 @@
-import { NotSet } from "@/components/app/NotSet"
-import { StatusPill, type Tone } from "@/components/app/StatusPill"
+import { NotSet } from "@inventory/ui/NotSet"
+import { StatusPill, type Tone } from "@inventory/ui/StatusPill"
 import type { ReviewWords } from "@/components/review"
 
 /** A cell's text, or "Not set" in grey when the file left it empty. */

@@ -1,8 +1,8 @@
 import { lazy, Suspense, useContext, useState } from "react"
 import { createPortal } from "react-dom"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Button } from "@/components/ui/button"
-import { ReviewSkeleton, someColumns, TablePageSkeleton } from "@/components/app/Skeletons"
+import { Alert, AlertDescription, AlertTitle } from "@inventory/ui/components/alert"
+import { Button } from "@inventory/ui/components/button"
+import { ReviewSkeleton, someColumns, TablePageSkeleton } from "@inventory/ui/Skeletons"
 import { BarSlotContext, StepActionsContext } from "@/components/app/slots"
 import {
   Stepper,
@@ -13,11 +13,11 @@ import {
   StepperSeparator,
   StepperTitle,
   StepperTrigger
-} from "@/components/ui/stepper"
+} from "@inventory/ui/components/stepper"
 import { useActor } from "@/lib/actor"
 import { useImportTable, useImportView } from "@/lib/imports"
-import { useIsNarrow } from "@/ui-kit/ContentWidth.hook"
-import { navigate, useLocation } from "@/ui-kit/Route.hook"
+import { useIsNarrow } from "@inventory/ui/ContentWidth"
+import { navigate, useLocation } from "@inventory/ui/Route"
 import { importAddress } from "@/lib/route"
 import { hasRole } from "@inventory/kernel/Role"
 import { SheetButton } from "./import/SheetButton.tsx"

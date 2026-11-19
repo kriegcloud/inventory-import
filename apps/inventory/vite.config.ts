@@ -66,21 +66,27 @@ const bundleReport = (): Array<PluginOption> =>
 
 // The production stylesheet holds the classes of the files the app can load, not of every component installed:
 // `@source "./"` in index.css (all of src/web, what development scans) becomes one `@source` per file reached from
-// the entry (scripts/reachable-sources.mjs). Runs before Tailwind reads the file.
+// the entry (scripts/reachable-sources.mjs), the design-system packages' files it imports included, and the
+// packages' whole-folder `@source` lines are dropped. Runs before Tailwind reads the file.
 const web = fileURLToPath(new URL("./src/web", import.meta.url))
+const screenPackages = {
+  "@inventory/ui": fileURLToPath(new URL("../../packages/ui", import.meta.url)),
+  "@inventory/review": fileURLToPath(new URL("../../packages/review", import.meta.url))
+}
 const usedSourcesOnly = (): Plugin => ({
   name: "inventory:used-sources",
   apply: "build",
   enforce: "pre",
   transform(code, id) {
     if (!Str.endsWith("/src/web/index.css")(id)) return undefined
-    const files = reachableSources({ entry: `${web}/main.tsx`, root: web, alias: web })
+    const files = reachableSources({ entry: `${web}/main.tsx`, root: web, alias: web, packages: screenPackages })
     const sources = Arr.join(
       Arr.map(files, (file) => `@source "${file}";`),
       "\n"
     )
     if (!Str.includes('@source "./";')(code)) throw new Error('index.css must name its sources with @source "./";')
-    return Str.replace('@source "./";', sources)(code)
+    const narrowed = Str.replace(/^@source "\.\.\/\.\.\/\.\.\/\.\.\/packages\/[^"]+";\n/gm, "")(code)
+    return Str.replace('@source "./";', sources)(narrowed)
   }
 })
 

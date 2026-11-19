@@ -51,9 +51,9 @@ layer(TypedApp)("an import of items", (it) => {
         expect([result.created, result.updated, result.already, result.notImported]).toEqual([155, 0, 0, 45])
         expect(result.fixed).toEqual({ rows: 16, cells: 19 })
         const outcomeOf = (n: number) => Arr.findFirst(result.rows, (row) => row.rowNumber === n)
-        expect(Option.map(outcomeOf(18), (row) => [row.outcome, row.decidedBy, row.reason])).toEqual(
-          Option.some(["notImported", "nobody", 'Unit of measure "bx" is not one of EA, BX, KG, M, L.'])
-        )
+        expect(
+          Option.map(outcomeOf(18), (row) => (row.outcome === "notImported" ? [row.decidedBy, row.reason] : row))
+        ).toEqual(Option.some([{ kind: "nobody" }, 'Unit of measure "bx" is not one of EA, BX, KG, M, L.']))
 
         // What landed, as any member reads it: nested values decoded, the cost as the digits said.
         const stored = yield* client.items.list().pipe(as("mem_priya"))

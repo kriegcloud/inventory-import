@@ -32,3 +32,27 @@ export const nullAsNone =
       .annotateKey({ description: key.description })
       .pipe(S.decodeTo(decoded, SchemaTransformation.optionFromNullOr()), S.annotateKey(key))
   }
+
+/**
+ * `S.OptionFromOptionalKey` for a struct field, with the field's description, last in the field's pipe: a key the
+ * wire leaves out is `None` in code. As with `nullAsNone`, the sentence is put on both sides, so the OpenAPI document
+ * says it.
+ *
+ * **Example** (Which of a row's items this is, left out for a row that is one item)
+ *
+ * ```ts
+ * import { absentAsNone } from "@inventory/kernel/Wire"
+ * import * as S from "effect/Schema"
+ * const Row = S.Struct({ part: S.Int.pipe(absentAsNone({ description: "Which of its row's items this is" })) })
+ * ```
+ *
+ * @category combinators
+ */
+export const absentAsNone =
+  (key: { readonly description: string }) =>
+  <Value extends S.Top>(schema: Value) => {
+    const decoded = schema.pipe(S.toType, S.Option)
+    return S.optionalKey(schema)
+      .annotateKey({ description: key.description })
+      .pipe(S.decodeTo(decoded, SchemaTransformation.optionFromOptionalKey()), S.annotateKey(key))
+  }

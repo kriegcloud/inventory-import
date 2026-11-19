@@ -157,4 +157,19 @@ None.
     (XRR-0266) "No", its editor Discontinued "2025-02-26" with Active off; switched Active on and Save: "A
     discontinued item cannot be active. Switch Active off, or clear the discontinued date."; cleared the date and
     Save: the request sent `"stocking":{"kind":"active"}`, 200, and the row reads "Yes" after a reload.
+- **catalog (d), `RowOutcome` and `DecidedBy`.** A row of the result is one of `created`, `updated`, `already`,
+  `notImported`, `takenBack` by `outcome`, each with only what it has: `already` and `notImported` a reason,
+  `notImported` who decided (`{"kind":"person","name":"..."}` or `{"kind":"nobody"}`). `part` is `Option` in code and
+  left out on the wire as before (`absentAsNone`, the optional-key twin of `nullAsNone` in `@inventory/kernel/Wire`).
+  - **`importOutcome` keeps its columns.** `outcomeOf` reads a stored row into its case; a person is named when
+    their name was kept with the row, otherwise the row reads as decided by nobody.
+  - **A reason is bounded text, not `Sentence`:** a reason stored before a rule on its form existed must still
+    read, or the whole result would answer 500.
+  - Ceilings: app 293 (one finding went with the result screen's old filter-then-map). Sum 667.
+  - Read on screen, fresh database: the review's first problem, "Leave out 2", moved the button from "Import 155,
+    skip 45" to "Import 157, skip 43" (the two rows it left out had blocked two others); confirmed: "Not imported 43
+    · Imported 157 · Already there 0 · All 200". Not imported: "Zinc-Plated Gloves L ... You left this row out.
+    (Dana Whitfield)" and "Oak Cutting Oil ... SKU YDR-8742 is also on row 10 with different values. Keep one row,
+    or leave one out." with no name; an imported row has no reason. "Download 43 not imported" made 44 records
+    (heading and 43), last columns "Row" and "Why it was not imported", no empty reason.
 

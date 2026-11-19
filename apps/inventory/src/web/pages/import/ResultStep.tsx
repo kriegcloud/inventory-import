@@ -23,7 +23,14 @@ import { whenShort } from "@inventory/ui/Dates"
 import { useImportCache } from "@/lib/imports"
 import { navigate } from "@inventory/ui/Route"
 import { importAddress } from "@/lib/route"
-import type { ChangedItem, ImportEvent, ImportResult, ImportView, RowOutcome } from "../../../api/v1/Api.ts"
+import {
+  type ChangedItem,
+  type ImportEvent,
+  type ImportResult,
+  type ImportView,
+  outcomeReasonOf,
+  type RowOutcome
+} from "../../../api/v1/Api.ts"
 import { notImportedCsv, rowId, rowPlace, type StagedTable } from "../../../domain/ItemImport.ts"
 import { download, importWords, notImportedColumn, OutcomePill, Text, when } from "./format.tsx"
 import { toastError } from "@inventory/client/SayError"
@@ -43,8 +50,12 @@ const columns: ReadonlyArray<RecordColumn<RowOutcome>> = [
   {
     id: "reason",
     label: "Reason",
-    blank: (row) => row.reason === "",
-    cell: (row) => (row.decidedByName === null ? row.reason : `${row.reason} (${row.decidedByName})`)
+    blank: (row) => Option.match(outcomeReasonOf(row), { onNone: () => true, onSome: (reason) => reason === "" }),
+    // Why, for a row that was already there or not imported; and who left it out, when someone did.
+    cell: (row) =>
+      row.outcome === "notImported" && row.decidedBy.kind === "person"
+        ? `${row.reason} (${row.decidedBy.name})`
+        : Option.getOrElse(outcomeReasonOf(row), () => "")
   },
   {
     id: "sku",
@@ -64,8 +75,8 @@ const columns: ReadonlyArray<RecordColumn<RowOutcome>> = [
     width: 80,
     align: "right",
     // One of several items on its row says which ("8 · 2"); a row that is one item shows its number alone.
-    cell: (row) => rowPlace({ rowNumber: row.rowNumber, label: row.part === undefined ? undefined : String(row.part) }),
-    sort: (row) => row.rowNumber * 1000 + (row.part ?? 0)
+    cell: (row) => rowPlace({ rowNumber: row.rowNumber, label: Option.getOrUndefined(Option.map(row.part, String)) }),
+    sort: (row) => row.rowNumber * 1000 + Option.getOrElse(row.part, () => 0)
   }
 ]
 
@@ -192,13 +203,17 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
             `not-imported-${view.fileName.replace(/\.[^.]+$/, "")}.csv`,
             notImportedCsv({
               table,
-              rows: result.rows
-                .filter((row) => row.outcome === "notImported")
-                .map((row) => ({
-                  rowNumber: row.rowNumber,
-                  ...(row.part === undefined ? {} : { label: String(row.part) }),
-                  reason: row.reason
-                }))
+              rows: result.rows.flatMap((row) =>
+                row.outcome === "notImported"
+                  ? [
+                      {
+                        rowNumber: row.rowNumber,
+                        ...Option.match(row.part, { onNone: () => ({}), onSome: (part) => ({ label: String(part) }) }),
+                        reason: row.reason
+                      }
+                    ]
+                  : []
+              )
             })
           )
         }
@@ -337,7 +352,12 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
         caption={`What happened to each row of ${view.fileName}`}
         columns={columns}
         rows={shown}
-        rowKey={(row) => rowId(row)}
+        rowKey={(row) =>
+          rowId({
+            rowNumber: row.rowNumber,
+            ...Option.match(row.part, { onNone: () => ({}), onSome: (part) => ({ part }) })
+          })
+        }
         empty={
           <>
             No rows here.{" "}

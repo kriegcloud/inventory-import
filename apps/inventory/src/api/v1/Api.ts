@@ -1,6 +1,7 @@
-import { Effect } from "effect"
+import { LiteralKit } from "@beep/schema/LiteralKit"
+import { Effect, Option, Tuple } from "effect"
 import * as S from "effect/Schema"
-import { nullAsNone } from "@inventory/kernel/Wire"
+import { absentAsNone, nullAsNone } from "@inventory/kernel/Wire"
 import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiMiddleware, OpenApi } from "effect/http-api"
 import { ActivityApi, IdentityApi, PeopleApi } from "@inventory/access-contract/Access"
 import { ModelCallsUsedUp } from "@inventory/access-contract/ModelAllowance"
@@ -27,7 +28,7 @@ import { Forbidden } from "@inventory/kernel/AccessError"
 import { Identity } from "@inventory/kernel/Identity"
 import { aiTroubles, modelSentences } from "./ModelTrouble.ts"
 import { SameOrigin } from "@inventory/kernel/SameOrigin"
-import { Instant } from "@inventory/kernel/Text"
+import { DisplayName, Instant } from "@inventory/kernel/Text"
 import { apiPrefix } from "./Version.ts"
 
 // The API contract, version 1. The server implements it (src/server) and the browser calls it through a client
@@ -189,35 +190,148 @@ export class SystemApi extends HttpApiGroup.make("system")
   .annotate(OpenApi.Title, "System")
   .annotate(OpenApi.Description, "Whether the stack works, as the current member sees it.") {}
 
-/**
- * What the confirms did with one row of the file. `reason` is empty for a created row and for one whose item a
- * take-back removed (`takenBack`).
- */
-export const RowOutcome = S.Struct({
-  rowNumber: S.Int.annotateKey({ description: "The row as Excel numbers it", examples: [7] }),
-  part: S.optionalKey(S.Int).annotateKey({
-    description:
-      "Which of its row's items this is (1, 2, ...), when the row holds several; left out for a row that is one item",
-    examples: [2]
-  }),
-  sku: S.String.annotateKey({ description: "The item's SKU as the row gives it", examples: ["RJS-3545"] }),
-  name: S.String.annotateKey({ description: "The row's name, as the result lists it", examples: ["Nylon Coil"] }),
-  outcome: S.Literals(["created", "updated", "already", "notImported", "takenBack"]).annotateKey({
-    description:
-      "Created an item, replaced a stored item as the person chose, found the SKU already there, not imported, or taken back: the item it created was removed, or the stored item it replaced was put back as it was"
-  }),
-  reason: S.String.annotateKey({
-    description:
-      "Why the row was not imported or was already there, one sentence per problem; empty for a created row and for one a take-back removed",
+/** Who settled a row that was not imported: a person left it out, or nobody had settled it yet. */
+export const DecidedByKind = LiteralKit(["person", "nobody"]).annotate({
+  identifier: "DecidedByKind",
+  description: "A person left the row out, or nobody had settled it yet"
+})
+
+class DecidedByPerson extends S.Opaque<DecidedByPerson, { readonly brand: unique symbol }>()(
+  S.Struct({
+    kind: S.tag("person"),
+    name: DisplayName.pipe(
+      S.annotateKey({
+        description: "Who left the row out: the member's name as it was then, for the screen. Not an id"
+      })
+    )
+  }).annotate({ identifier: "DecidedByPerson", description: "A person left the row out" })
+) {}
+
+class DecidedByNobody extends S.Opaque<DecidedByNobody, { readonly brand: unique symbol }>()(
+  S.Struct({ kind: S.tag("nobody") }).annotate({
+    identifier: "DecidedByNobody",
+    description: "Nobody had settled the row when the import was confirmed"
+  })
+) {}
+
+/** For a row that was not imported: the person who left it out, or that nobody had settled it yet. */
+export const DecidedBy = DecidedByKind.mapMembers(() => Tuple.make(DecidedByPerson, DecidedByNobody)).pipe(
+  S.toTaggedUnion("kind"),
+  S.annotate({ identifier: "DecidedBy", description: "Who left a row out, or that nobody had settled it" })
+)
+/** The decoded value of `DecidedBy`. */
+export type DecidedBy = typeof DecidedBy.Type
+
+/** `name` left the row out. */
+export const decidedByPerson = (name: DisplayName): DecidedBy => DecidedByPerson.make({ name })
+/** Nobody had settled the row. */
+export const decidedByNobody: DecidedBy = DecidedByNobody.make({})
+
+/** The five things a confirm can have done with a row. */
+export const OutcomeKind = LiteralKit(["created", "updated", "already", "notImported", "takenBack"]).annotate({
+  identifier: "OutcomeKind",
+  description:
+    "Created an item, replaced a stored item as the person chose, found the SKU already there, not imported, or taken back: the item it created was removed, or the stored item it replaced was put back as it was"
+})
+/** The decoded value of `OutcomeKind`. */
+export type OutcomeKind = typeof OutcomeKind.Type
+
+// What every outcome says of its row: where it is in the file and what it is called.
+const outcomeRow = {
+  rowNumber: S.Int.pipe(S.annotateKey({ description: "The row as Excel numbers it", examples: [7] })),
+  part: S.Int.pipe(
+    absentAsNone({
+      description:
+        "Which of its row's items this is (1, 2, ...), when the row holds several; left out for a row that is one item"
+    })
+  ),
+  sku: S.String.pipe(S.annotateKey({ description: "The item's SKU as the row gives it", examples: ["RJS-3545"] })),
+  name: S.String.pipe(
+    S.annotateKey({ description: "The row's name, as the result lists it", examples: ["Nylon Coil"] })
+  )
+}
+// Text as stored: a reason written before a rule on its form existed must still read, so only its length is held.
+const outcomeReason = S.String.check(S.isMaxLength(4000)).pipe(
+  S.annotateKey({
+    description: "Why the row was not imported or was already there, one sentence per problem",
     examples: ["Name is empty."]
-  }),
-  decidedBy: S.NullOr(S.Literals(["person", "nobody"])).annotateKey({
-    description: "For a row that was not imported: the person left it out, or nobody had settled it yet"
-  }),
-  decidedByName: S.NullOr(S.String).annotateKey({ description: "Who left the row out, when someone did" })
-}).annotate({ identifier: "RowOutcome", description: "What the confirms did with one row of the file" })
+  })
+)
+
+class RowCreated extends S.Opaque<RowCreated, { readonly brand: unique symbol }>()(
+  S.Struct({ outcome: S.tag("created"), ...outcomeRow }).annotate({
+    identifier: "RowCreated",
+    description: "The row created an item, which the organization still has"
+  })
+) {}
+
+class RowUpdated extends S.Opaque<RowUpdated, { readonly brand: unique symbol }>()(
+  S.Struct({ outcome: S.tag("updated"), ...outcomeRow }).annotate({
+    identifier: "RowUpdated",
+    description: "The row replaced a stored item with the same SKU, as the person chose"
+  })
+) {}
+
+class RowAlready extends S.Opaque<RowAlready, { readonly brand: unique symbol }>()(
+  S.Struct({ outcome: S.tag("already"), ...outcomeRow, reason: outcomeReason }).annotate({
+    identifier: "RowAlready",
+    description: "The row's SKU was already there: nothing was written for it"
+  })
+) {}
+
+class RowNotImported extends S.Opaque<RowNotImported, { readonly brand: unique symbol }>()(
+  S.Struct({ outcome: S.tag("notImported"), ...outcomeRow, reason: outcomeReason, decidedBy: DecidedBy }).annotate({
+    identifier: "RowNotImported",
+    description: "The row was not imported: a person left it out, or nobody had settled it"
+  })
+) {}
+
+class RowTakenBack extends S.Opaque<RowTakenBack, { readonly brand: unique symbol }>()(
+  S.Struct({ outcome: S.tag("takenBack"), ...outcomeRow }).annotate({
+    identifier: "RowTakenBack",
+    description: "A take-back removed the item the row created, or put back as it was the stored item the row replaced"
+  })
+) {}
+
+/**
+ * What the confirms did with one row of the file, by `outcome`. Only a row that was already there or not imported
+ * has a reason, and only one that was not imported says who decided. Branch with `RowOutcome.match`.
+ */
+export const RowOutcome = OutcomeKind.mapMembers(() =>
+  Tuple.make(RowCreated, RowUpdated, RowAlready, RowNotImported, RowTakenBack)
+).pipe(
+  S.toTaggedUnion("outcome"),
+  S.annotate({ identifier: "RowOutcome", description: "What the confirms did with one row of the file" })
+)
 /** The decoded value of `RowOutcome`: what the confirms did with one row of the file. */
 export type RowOutcome = typeof RowOutcome.Type
+
+/** The row's reason, for the two outcomes that have one. */
+export const outcomeReasonOf = (row: RowOutcome): Option.Option<string> =>
+  row.outcome === "already" || row.outcome === "notImported" ? Option.some(row.reason) : Option.none()
+
+/**
+ * The outcome a stored row says, from the columns `importOutcome` keeps: every outcome has every column there, so
+ * the reason and who decided are read only for the outcomes that have them.
+ */
+export const outcomeOf = (stored: {
+  readonly rowNumber: number
+  readonly part: Option.Option<number>
+  readonly sku: string
+  readonly name: string
+  readonly outcome: OutcomeKind
+  readonly reason: string
+  readonly decidedBy: DecidedBy
+}): RowOutcome => {
+  const row = { rowNumber: stored.rowNumber, part: stored.part, sku: stored.sku, name: stored.name }
+  return OutcomeKind.match(stored.outcome, {
+    created: (): RowOutcome => RowCreated.make(row),
+    updated: (): RowOutcome => RowUpdated.make(row),
+    takenBack: (): RowOutcome => RowTakenBack.make(row),
+    already: (): RowOutcome => RowAlready.make({ ...row, reason: stored.reason }),
+    notImported: (): RowOutcome => RowNotImported.make({ ...row, reason: stored.reason, decidedBy: stored.decidedBy })
+  })
+}
 
 /** What a confirmed import did, row by row, counted from the stored rows. Kept with the import, so it survives a reload. */
 export const ImportResult = S.Struct({

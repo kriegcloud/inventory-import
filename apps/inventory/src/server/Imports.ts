@@ -16,12 +16,18 @@ import {
   type DecisionDelta,
   ImportEvent,
   PastImport,
-  RowOutcome,
+  type DecidedBy,
+  decidedByNobody,
+  decidedByPerson,
+  DecidedByKind,
+  OutcomeKind,
+  outcomeOf,
+  type RowOutcome,
   type TakeBackState
 } from "../api/v1/Api.ts"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { type Member } from "@inventory/kernel/Member"
-import { Instant } from "@inventory/kernel/Text"
+import { DisplayName, Instant } from "@inventory/kernel/Text"
 import { type FileProblem, fileProblem } from "../domain/FileProblem.ts"
 import {
   Dimensions,
@@ -224,9 +230,22 @@ const ChangeRow = S.Struct({
 })
 
 // What a confirm stored for one item of the file, its part as stored: 0 for a row that is one item.
-const OutcomeRow = S.Struct({ ...RowOutcome.fields, part: S.Int }).annotate({
-  description: "What the confirms did with one item of the file, as stored"
-})
+const OutcomeRow = S.Struct({
+  rowNumber: S.Int,
+  part: S.Int,
+  sku: S.String,
+  name: S.String,
+  outcome: OutcomeKind,
+  reason: S.String,
+  decidedBy: S.NullOr(DecidedByKind),
+  decidedByName: S.NullOr(S.String)
+}).annotate({ description: "What the confirms did with one item of the file, as stored" })
+
+/** Who the stored columns say left a row out: the person, when their name was kept with it; otherwise nobody. */
+const whoDecided = (row: typeof OutcomeRow.Type): DecidedBy =>
+  row.decidedBy === "person" && row.decidedByName !== null && S.is(DisplayName)(row.decidedByName)
+    ? decidedByPerson(row.decidedByName)
+    : decidedByNobody
 
 /** A part as the API says it: left out for a row that is one item (stored as 0), so those answers are as before. */
 const partOf = (part: number): { readonly part?: number } => (part === 0 ? {} : { part })
@@ -1573,7 +1592,18 @@ export class Imports extends Context.Service<
         }),
         outcomes: Effect.fn("Imports.outcomes")(function* (organizationId: OrganizationId, importId: string) {
           const rows = yield* findOutcomes({ org: organizationId, id: importId }).pipe(Effect.orDie)
-          return Arr.map(rows, ({ part, ...row }) => ({ ...row, ...partOf(part) }))
+          return Arr.map(rows, (row) =>
+            outcomeOf({
+              rowNumber: row.rowNumber,
+              // Stored as 0 for a row that is one item, which the answer leaves out.
+              part: row.part === 0 ? Option.none() : Option.some(row.part),
+              sku: row.sku,
+              name: row.name,
+              outcome: row.outcome,
+              reason: row.reason,
+              decidedBy: whoDecided(row)
+            })
+          )
         }),
         items: Effect.fn("Imports.items")(function* (organizationId: OrganizationId) {
           return yield* findItems(organizationId).pipe(Effect.map(Arr.map(storedItem)), Effect.orDie)

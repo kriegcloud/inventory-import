@@ -93,8 +93,27 @@ Port 5200, fresh database. The dev server was restarted with `SIGN_UP` (and `TES
   signed in as "Olive Owner owner@example.test", "Owner Works · Admin"; the People page listed one person, "Olive
   Owner (you) owner@example.test", with Admin chosen.
 
-Not seen: a production build in the browser (the tests run one: `SignUp.slow.test.ts`), phone width and the dark
-theme for these two sentences, and a second named person joining an existing organization.
+## Seen in the browser: the production build
+
+`bun run preview` on port 5200 (the production build, served by the same Worker code), on a fresh database, after
+the last code commit. `SIGN_UP` was set by the same override recipe and put back.
+
+- **No setting**: opened `/`; it read "Sign in", "Use your email and password. New accounts are added by the person
+  who runs this app.", Email, Password, "Sign in". No "Create an account" and no test accounts. A sign-up posted
+  from that page answered 403 with "New accounts are not open here. Ask the person who runs this app to add your
+  email, then try again." Typed stranger@example.test and a password into Sign in: "Invalid email or password".
+- **`SIGN_UP=owner@example.test`**: the page offered "Create an account"; it read "For an email that has been
+  invited. You will be the admin of a new organization." Typed Sam Stranger, stranger@example.test, a password,
+  Stranger Co and pressed "Create account": the form read the same refusal. Typed Olive Owner, Owner@Example.test,
+  Owner Works: the app opened on the Upload step as "Olive Owner owner@example.test", "Owner Works", "Admin"; the
+  People page read "Owner Works · 1 person" and listed "Olive Owner (you) owner@example.test".
+- **Development afterwards** (`bun run dev`, fresh database, a tab with no cookie and no saved state): the Upload
+  step, signed in as "Dana Whitfield dana@example-works.test", "Example Works (test)", "Admin"; the user menu listed
+  "Sign in as a test account" with Marcus Oyelaran, Priya Raman, Elena Sokolova and Tom Becker. A tab that had
+  signed out earlier showed the sign-in page with the test accounts, as it is meant to.
+
+Not seen: phone width and the dark theme for the two new sentences, and a second named person joining an existing
+organization.
 
 ## Proved without a cloud
 
@@ -105,7 +124,7 @@ theme for these two sentences, and a second named person joining an existing org
 - `packages/infra/test/InfraStage.test.ts`: the service hands a stack the plan of `pr-42`; a deploy named
   `live_ben` or `dev_ben` stops before any resource; both stack modules load on Node from the repository alone.
 - `apps/inventory/test/server/SignUp.slow.test.ts`: a production build refuses a sign-up with 403 and the sentence;
-  a named email becomes the admin of the organization it creates. Seen in the browser, above.
+  a named email becomes the admin of the organization it creates. Seen in the browser on the production build, above.
 - The migration creates no organization and no member; development and the tests get theirs from `seeds/`.
 - The cleanup job's guard was read, not run: its `case` accepts `pr-` followed by one to six digits, the first not
   zero, and nothing else.

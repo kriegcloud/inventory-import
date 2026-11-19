@@ -576,6 +576,20 @@ None.
     again", the row still "Steel Coil"; pressed "Edit again": the editor opened with "Steel Coil, heavy" and "Steel
     coil, checked by hand." in its boxes; Save with the server back: "Saved BKM-0586", the row reads "Steel Coil,
     heavy".
+- **Suggest fixes for a heading** ("Offer it for headings too").
+  - The rule is one function, `offersSuggestions` in the model: some row cannot be imported, or a file column matched
+    no field while a field still has no column. The second half is his answer with one narrowing of mine: with every
+    field filled, a left-over column (the messy sample's "Internal Notes" once nothing else is open) is not a reason
+    to offer the button, since pressing it could only say "Suggested nothing".
+  - `Suggest.test.ts` in the model, four cases: a row that cannot be imported; a renamed heading with no such row
+    (offered, and the request has something to ask); a file whose every heading is read (not offered); a column
+    nobody reads beside a field with no column (offered) and with every field filled (not).
+  - Read on screen, fresh database, model on. The clean sample as it is: "25 rows read", no "Suggest fixes". The
+    clean sample with its heading `reorder_point` renamed "Min level", chosen as a file: "Needs a decision 0 · Ready
+    25 · All 25", "25 rows read · “Min level” is not imported (16 rows have a value)", and "Suggest fixes" beside
+    it. Pressed: "Suggested 1 column. Answered by the model anthropic/claude-haiku-5.5." (the suggestion: `column`,
+    `reorderPoint`, "Min level", medium) and the button "Use column “Min level” for Reorder point"; pressed: the
+    "is not imported" line went, "Suggest fixes" went with it, and the confirm reads "Import 25 items".
 
 ## Closing note
 

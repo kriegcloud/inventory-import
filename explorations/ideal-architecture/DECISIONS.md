@@ -237,3 +237,12 @@ Question: when a saved edit is refused before it is sent (a 33,000-character des
 went wrong... Try again" and "Edit again" opens nothing; fix it now? Answer: "Fix it now (Recommended)": the form
 names the field and its limit before saving, and "Edit again" reopens the editor with what was typed. Rejected:
 leaving it for a later goal. Reverse: none planned.
+
+### 2026-11-18 — Suggest fixes for a heading
+
+Question: "Suggest fixes" appears only when some row cannot be imported, so a file with an unmatched heading and no
+such row is never offered a column; change that? Answer: "Offer it for headings too (Recommended)": the button also
+appears when a file column matched no field. Built with one narrowing, mine: it appears for such a column only while
+some field still has no column, because with every field filled there is nothing a suggestion could do with it
+(`offersSuggestions`, `packages/catalog/model/src/Suggestion/Suggest.rules.ts`). Rejected: leaving the button to
+rows that cannot be imported. Reverse: drop the narrowing, or the heading case, in that one function.

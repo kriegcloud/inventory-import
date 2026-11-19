@@ -38,6 +38,7 @@ import {
 } from "./ImportReview.controller.ts"
 import { toastError } from "@inventory/client/SayError"
 import { queryKeys } from "./Catalog.keys.ts"
+import { offersSuggestions } from "@inventory/catalog-model/Suggest"
 
 const whole = new Intl.NumberFormat("en-US")
 
@@ -287,10 +288,16 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
       : suggested.answeredBy._tag === "Model"
         ? `Answered by the model ${suggested.answeredBy.model}.`
         : `Answered by the fixed rules, not a model: ${suggested.answeredBy.reason}`
+  // Offered for a row that cannot be imported, and for a heading no field reads while a field has no column.
+  const canSuggest = offersSuggestions({
+    cannot: counts.cannot,
+    mapping: current.mapping,
+    unusedColumns: current.unusedColumns
+  })
   const summaryAction =
-    !props.canImport || (counts.cannot === 0 && columnSuggestions.length === 0 && suggested === undefined) ? null : (
+    !props.canImport || (!canSuggest && columnSuggestions.length === 0 && suggested === undefined) ? null : (
       <>
-        {counts.cannot === 0 ? null : (
+        {!canSuggest ? null : (
           <Button variant="outline" size="xs" disabled={suggest.isPending} onClick={() => suggest.mutate()}>
             {suggest.isPending ? <Spinner aria-hidden /> : null}
             {suggest.isPending ? "Suggesting fixes" : "Suggest fixes"}

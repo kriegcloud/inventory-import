@@ -339,3 +339,17 @@ export const suggestLines = (input: {
       : [])
   ]
 }
+
+/**
+ * Whether the review offers "Suggest fixes": when some row cannot be imported as written, or when a file column
+ * matched no field while a field still has no column (the one thing a suggestion can do about a heading). A file
+ * whose every field has a column is not offered it for a column nobody reads: there would be nothing to suggest.
+ *
+ * @example offersSuggestions({ cannot: 0, mapping, unusedColumns: [{ index: 1, letter: "B", label: "Min level", filled: 16 }] })
+ * // true when `mapping` has a field with no column
+ */
+export const offersSuggestions = (
+  review: Pick<Review, "mapping" | "unusedColumns"> & { readonly cannot: number }
+): boolean =>
+  review.cannot > 0 ||
+  (review.unusedColumns.length > 0 && Arr.some(review.mapping, (match) => Option.isNone(matchedColumn(match))))

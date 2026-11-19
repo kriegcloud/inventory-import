@@ -500,3 +500,23 @@ Question: when does the Effect import migration merge into main? Answer: "Merge 
 said 155 imported and 45 not, 155 stored; one search, one edit, People, Activity and a take-back that kept the
 edited item; no console error. Not seen: the model's suggestions (no key in that copy), the `.xlsx` path, and the
 same walk on main before the migration.
+
+### 2026-11-19 — atoms A6, the review's actions as a tagged enum
+
+Benjamin pointed at the `Action` type in `packages/review/src/ReviewDraft.rules.ts` and wrote: "Prime Candidate for
+S.TaggedUnion or effect/Data TaggedEnum with Data.taggedEnum constructors".
+
+Question: which form? Answer: "Data.TaggedEnum (Recommended)". `Action` becomes a `Data.taggedEnum` keyed by `_tag`,
+with its constructors at every call site and an exhaustive `$match` in `act`, because an action is made in the
+browser and never decoded from a boundary. Rejected: `S.TaggedUnion`. Reverse: make it a schema tagged union the day
+an action is stored or sent.
+
+Question: how much, and when? Answer: "Whole review state, with the atoms goal (Recommended)". When the review
+package moves, last in the atoms goal, `Action`, `Outcome`, `UndoStep` and `RowDecision` are remodelled once:
+`Option` for absence (`focus`, `confidence`, a row's decision), no `except?:` optional arrays (an empty default on
+the type), and `revert.how` as a named literal domain. Rejected: `Action` only, now; the whole review state now, as
+its own goal. Reverse: split it out as a goal of its own before the atoms goal reaches the review package.
+
+A standing preference too: a hand-written `type` or `kind` discriminator in our code is a tagged enum when it lives
+only in memory, and a schema tagged union when anything decodes it. The atoms goal's PLAN names every other one
+found in the web packages.

@@ -240,6 +240,22 @@ The first option of each is the recommendation, with its reason.
 - **`Atom.searchParam`.** Effect's own. It does not hear the app's `navigate`, so every navigation in the app would
   move to it in the same change.
 
+### A6. What form do the review's actions take? (added after the brief was signed)
+
+Benjamin pointed at `Action` in `packages/review/src/ReviewDraft.rules.ts`, a union told apart by a hand-written
+`type`, and answered both parts.
+
+- **`Data.TaggedEnum` (chosen).** `Action` is a `Data.taggedEnum` keyed by `_tag`: its constructors at every call
+  site, an exhaustive `$match` in `act`. An action is made in the browser and never decoded from a boundary.
+  Rejected: `S.TaggedUnion`.
+- **The whole review state, with this goal (chosen).** When the review package moves (step 7), `Action`, `Outcome`,
+  `UndoStep` and `RowDecision` are remodelled once: `Option` for absence (`focus`, `confidence`, a row's decision),
+  no `except?:` optional arrays (an empty default on the type), `revert.how` as a named literal domain. Rejected:
+  `Action` only, now; the whole review state now, as its own goal.
+
+It is a standing preference: a hand-written `type` or `kind` discriminator in our code is a tagged enum (in memory)
+or a schema tagged union (anything decoded). The goal's PLAN names the others found in the web packages.
+
 ## Rabbit holes
 
 - **The review region's speed.** Its table stays fast because edits touch one row's state. Measure before and after
@@ -291,6 +307,7 @@ app working.
 4. The app's shell: the content width, the development sign-in, the Activity page.
 5. `@inventory/ui`'s own pieces: the theme, the table search, content width, the run log.
 6. `@inventory/catalog-web`: the upload, the Items page and its editor, the assistant, the import's steps.
-7. `@inventory/review`: the region's state with undo, saved progress, the grid, the queue.
+7. `@inventory/review`: the region's state with undo, saved progress, the grid, the queue. Its state is remodelled
+   in the same step (A6): `Action` as a tagged enum, `Option` for absence, no optional arrays.
 8. TanStack Query removed (A2); the lint on everywhere; the documents the move made false (`CLAUDE.md` "Adding a
    feature" step 5 and "UI", `docs/patterns.md`).

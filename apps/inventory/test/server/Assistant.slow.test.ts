@@ -2,10 +2,14 @@
 // real one would be. The claims under test are the screen's: who answered is said, an answer naming anything the table
 // does not have is refused whole, and a model's answer leaves one audit line that only its own organization sees.
 import { expect, layer } from "@effect/vitest"
-import { Array as Arr, Effect, Layer, Option, Result } from "effect"
+import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as O from "effect/Option"
+import * as Result from "effect/Result"
 import * as S from "effect/Schema"
-import { HttpApiTest } from "effect/http-api"
-import { TestClock } from "effect/testing"
+import * as HttpApiTest from "effect/http-api/HttpApiTest"
+import * as TestClock from "effect/testing/TestClock"
 import { Api } from "../../src/api/v1/Api.ts"
 import { type AnsweredBy } from "@inventory/catalog-contract/Answer"
 import { ModelId } from "@beep/openrouter/OpenRouterModel"
@@ -33,7 +37,7 @@ layer(TestApp)("the table assistant with no AI key", (it) => {
       if (Result.isSuccess(read)) {
         // Who answered is the contract's one value: the rules, with the reason no model did.
         expect(read.success.answeredBy).toEqual({ _tag: "Rules", reason: "No AI key is set, so the rules answered." })
-        expect(read.success.note).toEqual(Option.none())
+        expect(read.success.note).toEqual(O.none())
         expect(read.success.changes).toEqual([
           { kind: "sort", column: "name", direction: "desc" },
           { kind: "filter", column: "unit", operator: "inArray", values: ["Box"] }
@@ -45,7 +49,7 @@ layer(TestApp)("the table assistant with no AI key", (it) => {
         expect(refused.failure.reason).toContain("The rules could not read “show items we count with no vendor”.")
       }
       const trail = yield* client.activity.recent().pipe(as("mem_marcus"))
-      expect(Arr.filter(trail, (row) => row.action === "Asked for a view")).toEqual([])
+      expect(A.filter(trail, (row) => row.action === "Asked for a view")).toEqual([])
     })
   )
 
@@ -86,22 +90,22 @@ layer(
         if (Result.isSuccess(read)) {
           expect(read.success.answeredBy).toMatchObject({ _tag: "Model", model: "scripted/model" })
           expect(read.success.note).toEqual(
-            Option.some("This table has no vendor column, so items with no vendor could not be picked out.")
+            O.some("This table has no vendor column, so items with no vendor could not be picked out.")
           )
           expect(read.success.changes).toEqual([
             { kind: "filter", column: "counted", operator: "eq", values: ["true"] }
           ])
         }
         const trail = yield* client.activity.recent().pipe(as("mem_marcus"))
-        const lines = Arr.filter(trail, (row) => row.action === "Asked for a view")
-        expect(Arr.map(lines, (row) => [row.detail, row.agent])).toEqual([
-          ["Items: 1 change to the view, answered by scripted/model", Option.some("Table assistant")]
+        const lines = A.filter(trail, (row) => row.action === "Asked for a view")
+        expect(A.map(lines, (row) => [row.detail, row.agent])).toEqual([
+          ["Items: 1 change to the view, answered by scripted/model", O.some("Table assistant")]
         ])
         // The person's words are not in the trail.
         expect(lines[0]?.detail).not.toContain("vendor")
         // Another organization's trail never shows it.
         const elsewhere = yield* client.activity.recent().pipe(as("mem_tom"))
-        expect(Arr.filter(elsewhere, (row) => row.action === "Asked for a view")).toEqual([])
+        expect(A.filter(elsewhere, (row) => row.action === "Asked for a view")).toEqual([])
       })
   )
 })
@@ -120,7 +124,7 @@ layer(
         expect(read.failure).toMatchObject({
           reason: "The answer named a column this table does not have (“vendor”), so nothing was changed.",
           answeredBy: { _tag: "Model", model: "scripted/model" },
-          note: Option.none()
+          note: O.none()
         })
       }
     })
@@ -177,10 +181,10 @@ layer(testAppWith(answering({ changes: [{ kind: "sort", column: "name", directio
         Effect.gen(function* () {
           const client = yield* HttpApiTest.groups(Api, ["assistant", "system"])
           const ask = client.assistant.view(request("sort by name")).pipe(as("mem_priya"))
-          const answers = yield* Effect.forEach(Arr.range(1, dailyModelCalls + 1), () => ask, { concurrency: 1 })
-          const by = Arr.map(answers, (answer) => who(Result.isSuccess(answer) ? answer.success : answer.failure))
-          expect(Arr.filter(by, (who) => who === "model").length).toBe(dailyModelCalls)
-          const last = Arr.last(answers)
+          const answers = yield* Effect.forEach(A.range(1, dailyModelCalls + 1), () => ask, { concurrency: 1 })
+          const by = A.map(answers, (answer) => who(Result.isSuccess(answer) ? answer.success : answer.failure))
+          expect(A.filter(by, (who) => who === "model").length).toBe(dailyModelCalls)
+          const last = A.last(answers)
           expect(last._tag === "Some" && Result.isSuccess(last.value) ? last.value.success.answeredBy : last).toEqual({
             _tag: "Rules",
             reason: usedUpSentence(usedUpWords)

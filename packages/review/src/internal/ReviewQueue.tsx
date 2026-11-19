@@ -1,5 +1,7 @@
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
-import { HashMap, HashSet, Option } from "effect"
+import * as HashMap from "effect/HashMap"
+import * as HashSet from "effect/HashSet"
+import * as O from "effect/Option"
 import { Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@inventory/ui/components/button"
 import { Checkbox } from "@inventory/ui/components/checkbox"
@@ -119,7 +121,7 @@ function Decision(props: {
     return (
       <Item variant="outline" className="w-full min-w-0">
         <ItemHeader>
-          <ReasonTag kind={Option.getOrUndefined(HashMap.get(props.kinds, group.kind))} fallback={group.kind} />
+          <ReasonTag kind={O.getOrUndefined(HashMap.get(props.kinds, group.kind))} fallback={group.kind} />
           <span className="text-muted-foreground">{rowsWord(n)}</span>
         </ItemHeader>
         <ItemContent className="min-w-0">
@@ -213,7 +215,7 @@ function Decision(props: {
   const fix = mark !== undefined && mark.state === "proposed" ? mark.fix : undefined
   const choices = fix === undefined ? undefined : choicesOf(fix)
   const rival = problem?.rivals?.[0] === undefined ? undefined : actions.peek(problem.rivals[0])
-  const label = subject === undefined ? "" : Option.getOrElse(HashMap.get(labels, subject), () => subject)
+  const label = subject === undefined ? "" : O.getOrElse(HashMap.get(labels, subject), () => subject)
   const extra = problem === undefined ? undefined : props.rowAction?.(view.row)
   const others = otherAnswers({ view, extra })
   const picks = problem?.choices
@@ -317,7 +319,7 @@ function Decision(props: {
     <Item variant="outline" className="w-full min-w-0">
       <ItemHeader>
         <ReasonTag
-          kind={problem === undefined ? undefined : Option.getOrUndefined(HashMap.get(props.kinds, problem.kind))}
+          kind={problem === undefined ? undefined : O.getOrUndefined(HashMap.get(props.kinds, problem.kind))}
           tone={problem?.tone}
           fallback={problem?.kind ?? ""}
         />
@@ -508,7 +510,7 @@ export function ReviewQueue(props: {
                 </ItemContent>
                 {view.status === "needs" || view.status === "cannot" ? (
                   <ReasonTag
-                    kind={Option.getOrUndefined(HashMap.get(props.kinds, view.problem?.kind ?? ""))}
+                    kind={O.getOrUndefined(HashMap.get(props.kinds, view.problem?.kind ?? ""))}
                     tone={view.problem?.tone}
                     fallback={view.problem?.kind ?? ""}
                   />

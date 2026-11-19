@@ -9,8 +9,9 @@ import { actorOf } from "@inventory/access-model/SessionHandler"
 import { SignedInUser } from "@inventory/access-model/MemberDirectory"
 import { AccountEmail } from "@inventory/access-contract/SessionState"
 import { OrganizationId, UserId } from "@inventory/kernel/Ids"
-import { Effect, Layer } from "effect"
-import { SecureRandom } from "effect/crypto"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as SecureRandom from "effect/crypto/SecureRandom"
 import * as A from "effect/Array"
 import * as O from "effect/Option"
 import * as Result from "effect/Result"
@@ -106,7 +107,7 @@ describe("people", () => {
           email: AccountEmail.make("dana@example-works.test"),
           active: O.some(OrganizationId.make("org_prairie"))
         })
-        const refused = yield* Effect.flip(actorOf(O.some(user)))
+        const refused = yield* O.some(user).pipe(actorOf, Effect.flip)
         expect(refused.reason).toBe("You are no longer a member of that organization.")
         yield* reads(tag(removePerson(self).pipe(as(marcus))), "PersonNotFound")
         yield* reads(lines.pipe(as(marcus)), [

@@ -1,6 +1,9 @@
 // The browser half of saved progress: the chosen file in IndexedDB and the hook a screen uses. The rules and the
 // stored shape are in `SavedProgress.schema.ts` (tested without a browser).
-import { DateTime, Effect, type ManagedRuntime, Option } from "effect"
+import * as DateTime from "effect/DateTime"
+import * as Effect from "effect/Effect"
+import type * as ManagedRuntime from "effect/ManagedRuntime"
+import * as O from "effect/Option"
 import * as S from "effect/Schema"
 import { useCallback, useMemo, useRef, useState } from "react"
 import {
@@ -51,7 +54,7 @@ export const saveFile = Effect.fn("savedProgress.saveFile")(function* (scope: Pr
 /** The file kept for one scope, or none. */
 export const loadFile = Effect.fn("savedProgress.loadFile")(function* (scope: ProgressScope) {
   const found = yield* inFiles<unknown>("readonly", (store) => store.get(progressKey(scope)))
-  return found instanceof File ? Option.some(found) : Option.none<File>()
+  return found instanceof File ? O.some(found) : O.none<File>()
 })
 
 /** Forgets the file kept for one scope. */
@@ -123,7 +126,7 @@ export function useSavedProgress(
         ? Promise.resolve(undefined)
         : browserRuntime.runPromise(
             loadFile(scoped).pipe(
-              Effect.map(Option.getOrUndefined),
+              Effect.map(O.getOrUndefined),
               Effect.orElseSucceed(() => undefined)
             )
           ),

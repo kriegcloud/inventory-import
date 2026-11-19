@@ -17,7 +17,8 @@ Web code is type-checked under beep-effect's full Effect profile (`CLAUDE.md` "W
 explicit boolean conditions, no `JSON.parse`/`JSON.stringify`, `fetch`, `console`, `new Date()`, `async` functions or
 `crypto.randomUUID()` outside the edges the code already has. Four style rules (native array, string and record
 methods, and pipeable two-argument helpers) are only counted, against a ceiling that may only fall: write new code
-with `Arr`, `Str` and `Rec` from `effect` so the count does not rise.
+with `A`, `Str` and `R` (`import * as A from "effect/Array"`; `docs/standards/effect-imports.md`) so the count does
+not rise.
 
 ## What is already here: use it, do not build it
 

@@ -3,7 +3,7 @@
 // originals, byte for byte.
 // @effect-diagnostics nodeBuiltinImport:off
 import { readFileSync } from "node:fs"
-import { Effect } from "effect"
+import * as Effect from "effect/Effect"
 import { type StagedTable } from "@inventory/catalog-contract/Staged"
 import { readSpreadsheet } from "@inventory/catalog-web/Spreadsheet"
 import { stageTable } from "@inventory/catalog-model/Staging"

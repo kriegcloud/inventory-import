@@ -43,9 +43,9 @@ const load = Effect.fn("Items.load")(function* (actor: Member, codes: ReadonlyAr
   const rows = yield* Effect.forEach(codes, (code) =>
     Effect.flatMap(Item.insert.makeEffect({ organizationId: actor.organizationId, code }), encodeRow)
   )
-  const results = Arr.isArrayNonEmpty(rows) ? yield* sql.batch(Arr.map(rows, insertOnce)) : [] // atomic
+  const results = A.isArrayNonEmpty(rows) ? yield* sql.batch(A.map(rows, insertOnce)) : [] // atomic
   const written = yield* Effect.forEach(results, (stored) => decodeRows(stored))
-  const created = Arr.filter(written, (stored) => stored.length > 0).length
+  const created = A.filter(written, (stored) => stored.length > 0).length
   return { created, alreadyThere: codes.length - created }
 }, Effect.orDie)
 ```
@@ -129,12 +129,12 @@ const suggest = Effect.fn("records.suggest")(function* (line: string, codes: Rea
   const answer = yield* askModel(openRouter, {
     name: "match",
     schema: Match,
-    prompt: `Line: ${line}\nKnown codes:\n${Arr.join(codes, "\n")}`,
+    prompt: `Line: ${line}\nKnown codes:\n${A.join(codes, "\n")}`,
     system:
       "Suggest a code only when it is the same thing: same type, size and pack. " +
       "A near miss is NOT a match: answer null and say which code is close and how it differs."
   }).pipe(answeredByRules((error) => ({ code: null, reason: `No suggestion: ${error.reason}` })))
-  const known = answer.value.code !== null && Arr.contains(codes, answer.value.code)
+  const known = answer.value.code !== null && A.contains(codes, answer.value.code)
   return { ...(known ? answer.value : { code: null, reason: answer.value.reason }), answeredBy: answer.answeredBy }
 })
 ```
@@ -432,7 +432,7 @@ the confirm, the result and the take-back key each record on its own id. Files: 
   record is one per code and month, the month is a field of the record and part of its key.
 
 In `packages/catalog/model/src/Review/Review.rules.ts`, for a file of items by month, in place of its `itemsOfRow` (the file
-already imports `Arr` and `Str`; checked: this type-checks there):
+already imports `A` and `Str`; checked: this type-checks there):
 
 ```ts
 // The file's shape: one row per item, one quantity column per month, each month its own record.
@@ -444,7 +444,7 @@ const months = [
 
 /** Each month with a quantity is its own record of its row. A row with none is kept as one entry by the review. */
 export const byMonth: ItemsOfRow = ({ row, file }) =>
-  Arr.flatMap(months, (month) => {
+  A.flatMap(months, (month) => {
     const quantity = Str.trim(row.cells[month.column]?.text ?? "")
     return quantity === "" ? [] : [{ part: month.part, label: month.label, file: { ...file, quantity } }]
   })

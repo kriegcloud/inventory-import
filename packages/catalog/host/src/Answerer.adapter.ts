@@ -4,7 +4,9 @@ import { AnsweredBy } from "@inventory/catalog-contract/Answer"
 import { ModelStatus, ModelAnswered, ModelPrompt } from "@beep/openrouter/OpenRouterModel"
 import { ModelUnavailable } from "@beep/openrouter/OpenRouterError"
 import { AiUnavailable, aiUnavailable } from "@inventory/catalog-contract/AiUnavailable"
-import { Effect, Layer, Option } from "effect"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as O from "effect/Option"
 import type * as S from "effect/Schema"
 import { OpenRouter } from "@beep/openrouter/OpenRouter"
 import { ModelAvailability, Answerer, type ModelQuestion } from "@inventory/catalog-model/Answerer"
@@ -48,8 +50,8 @@ export const askModel = Effect.fn("Model.ask")(function* <Sc extends AnswerSchem
   const prompt = ModelPrompt.make({
     name: options.name,
     prompt: options.prompt,
-    system: Option.fromUndefinedOr(options.system),
-    maxOutputTokens: Option.fromUndefinedOr(options.maxOutputTokens)
+    system: O.fromUndefinedOr(options.system),
+    maxOutputTokens: O.fromUndefinedOr(options.maxOutputTokens)
   })
   const answer = yield* openRouter.generateObject(prompt, options.schema).pipe(Effect.mapError(aiUnavailableOf))
   const result: AiAnswer<Sc["Type"]> = { value: answer.value, answeredBy: answeredByModel(answer.answered) }
@@ -71,8 +73,8 @@ export const AnswererOpenRouter = Layer.effect(
           name: question.name,
           prompt: question.prompt,
           schema,
-          ...Option.match(question.system, { onNone: () => ({}), onSome: (system) => ({ system }) }),
-          ...Option.match(question.maxOutputTokens, {
+          ...O.match(question.system, { onNone: () => ({}), onSome: (system) => ({ system }) }),
+          ...O.match(question.maxOutputTokens, {
             onNone: () => ({}),
             onSome: (maxOutputTokens) => ({ maxOutputTokens })
           })

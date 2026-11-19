@@ -38,22 +38,20 @@ import type { Suggestion } from "@inventory/catalog-contract/Suggestion"
 import { Activity } from "@inventory/kernel/Activity"
 import { ActivityId, type MemberId, type OrganizationId } from "@inventory/kernel/Ids"
 import type { Member } from "@inventory/kernel/Member"
-import {
-  Array as Arr,
-  BigDecimal,
-  Context,
-  DateTime,
-  Effect,
-  Equal,
-  Layer,
-  Option,
-  Order,
-  Record as Rec,
-  Ref,
-  Result,
-  String as Str
-} from "effect"
-import { SecureRandom } from "effect/crypto"
+import * as A from "effect/Array"
+import * as BigDecimal from "effect/BigDecimal"
+import * as Context from "effect/Context"
+import * as DateTime from "effect/DateTime"
+import * as Effect from "effect/Effect"
+import * as Eq from "effect/Equal"
+import * as Layer from "effect/Layer"
+import * as O from "effect/Option"
+import * as Order from "effect/Order"
+import * as R from "effect/Record"
+import * as Ref from "effect/Ref"
+import * as Result from "effect/Result"
+import * as Str from "effect/String"
+import * as SecureRandom from "effect/crypto/SecureRandom"
 import * as S from "effect/Schema"
 import { Answerer } from "./Answer/Answerer.external.ts"
 import { ModelAllowance } from "./Answer/ModelAllowance.external.ts"
@@ -116,8 +114,8 @@ type MemItem = {
   readonly confirm: ConfirmId
   readonly rowNumber: number
   readonly part: number
-  readonly updatedBy: Option.Option<string>
-  readonly updatedAt: Option.Option<DateTime.Utc>
+  readonly updatedBy: O.Option<string>
+  readonly updatedAt: O.Option<DateTime.Utc>
 }
 
 type MemConfirm = {
@@ -130,7 +128,7 @@ type MemConfirm = {
   readonly updated: number
   readonly already: number
   readonly notImported: number
-  readonly takeBack: Option.Option<{ readonly id: string; readonly byName: string; readonly at: DateTime.Utc }>
+  readonly takeBack: O.Option<{ readonly id: string; readonly byName: string; readonly at: DateTime.Utc }>
   readonly removed: number
   readonly restored: number
   readonly kept: number
@@ -156,7 +154,7 @@ type MemChange = {
   readonly part: number
   readonly sku: string
   readonly change: Change
-  readonly decidedByName: Option.Option<string>
+  readonly decidedByName: O.Option<string>
   readonly createdAt: DateTime.Utc
 }
 
@@ -237,11 +235,11 @@ const line = (input: {
     actorName: input.actorName,
     action: input.action,
     detail: input.detail,
-    agent: Option.none(),
+    agent: O.none(),
     createdAt: input.at
   })
 
-const inForce = (confirm: MemConfirm): boolean => Option.isNone(confirm.takeBack)
+const inForce = (confirm: MemConfirm): boolean => O.isNone(confirm.takeBack)
 
 const sameDraft = (organizationId: OrganizationId, id: string) => (entry: MemDraft) =>
   entry.organizationId === organizationId && entry.draft.id === id
@@ -253,11 +251,11 @@ const mapDraft = (
   change: (entry: MemDraft) => MemDraft
 ): CatalogState => ({
   ...state,
-  drafts: Arr.map(state.drafts, (entry) => (sameDraft(organizationId, id)(entry) ? change(entry) : entry))
+  drafts: A.map(state.drafts, (entry) => (sameDraft(organizationId, id)(entry) ? change(entry) : entry))
 })
 
 const isOpen = (state: CatalogState, organizationId: OrganizationId, id: string): boolean =>
-  Arr.some(state.drafts, (entry) => sameDraft(organizationId, id)(entry) && entry.draft.status === "open")
+  A.some(state.drafts, (entry) => sameDraft(organizationId, id)(entry) && entry.draft.status === "open")
 
 const byMoment = Order.mapInput(DateTime.Order, (confirm: MemConfirm) => confirm.at)
 
@@ -289,38 +287,38 @@ const commitStep = (state: CatalogState, write: ConfirmWrite): readonly [Confirm
   if (!isOpen(state, org, write.draft)) return [confirmClosed, state]
   const at = audit.createdAt
   const written = plannedItems(write.plan)
-  const ready = Arr.filter(written, (row) => row.status === "ready")
-  const replacing = Arr.filter(written, (row) => row.status === "update")
+  const ready = A.filter(written, (row) => row.status === "ready")
+  const replacing = A.filter(written, (row) => row.status === "update")
   const ownedKey = (entry: MemItem): string => skuKey(entry.item)
 
   // New items: a code the organization already has is left as it is.
-  const created = Arr.reduce(Arr.zip(ready, write.itemIds), state.items, (items, [row, id]) =>
-    Arr.some(items, (entry) => entry.organizationId === org && ownedKey(entry) === skuKey(row.item))
+  const created = A.reduce(A.zip(ready, write.itemIds), state.items, (items, [row, id]) =>
+    A.some(items, (entry) => entry.organizationId === org && ownedKey(entry) === skuKey(row.item))
       ? items
-      : Arr.append(items, {
+      : A.append(items, {
           organizationId: org,
           item: { id, ...row.item, createdAt: at, createdBy: audit.actorName, revision: 1 },
           importId: write.draft,
           confirm: write.confirm,
           rowNumber: row.rowNumber,
           part: row.part,
-          updatedBy: Option.none(),
-          updatedAt: Option.none()
+          updatedBy: O.none(),
+          updatedAt: O.none()
         })
   )
   // The copies first, one per item, then the replaces.
-  const copies = Arr.reduce(replacing, state.replaced, (replaced, row) =>
-    Option.match(
-      Arr.findFirst(created, (entry) => entry.organizationId === org && ownedKey(entry) === skuKey(row.item)),
+  const copies = A.reduce(replacing, state.replaced, (replaced, row) =>
+    O.match(
+      A.findFirst(created, (entry) => entry.organizationId === org && ownedKey(entry) === skuKey(row.item)),
       {
         onNone: () => replaced,
         onSome: (stored) =>
-          Arr.some(
+          A.some(
             replaced,
             (copy) => copy.organizationId === org && copy.confirm === write.confirm && copy.itemId === stored.item.id
           )
             ? replaced
-            : Arr.append(replaced, {
+            : A.append(replaced, {
                 organizationId: org,
                 importId: write.draft,
                 confirm: write.confirm,
@@ -334,21 +332,21 @@ const commitStep = (state: CatalogState, write: ConfirmWrite): readonly [Confirm
       }
     )
   )
-  const items = Arr.reduce(replacing, created, (list, row) =>
-    Arr.map(list, (entry) =>
+  const items = A.reduce(replacing, created, (list, row) =>
+    A.map(list, (entry) =>
       entry.organizationId === org && ownedKey(entry) === skuKey(row.item)
         ? {
             ...entry,
             item: { ...withFields(entry.item, row.item), revision: entry.item.revision + 1 },
-            updatedBy: Option.some<string>(audit.actorName),
-            updatedAt: Option.some(at)
+            updatedBy: O.some<string>(audit.actorName),
+            updatedAt: O.some(at)
           }
         : entry
     )
   )
   // A row counts as created only if its item is really there.
   const landed = (row: PlannedRow): boolean =>
-    Arr.some(
+    A.some(
       items,
       (entry) =>
         entry.organizationId === org &&
@@ -371,18 +369,18 @@ const commitStep = (state: CatalogState, write: ConfirmWrite): readonly [Confirm
     if (row.status === "already") return { ...at, outcome: "already", reason: row.reason, decidedBy: decidedByNobody }
     return { ...at, outcome: "notImported", reason: row.reason, decidedBy: row.decidedBy }
   }
-  const fresh = Arr.map(write.plan.rows, outcomeFor)
+  const fresh = A.map(write.plan.rows, outcomeFor)
   const sameRow = (a: MemOutcome, b: MemOutcome): boolean =>
     a.organizationId === b.organizationId &&
     a.importId === b.importId &&
     a.rowNumber === b.rowNumber &&
     a.part === b.part
-  const outcomes = [...Arr.filter(state.outcomes, (old) => !Arr.some(fresh, (next) => sameRow(old, next))), ...fresh]
+  const outcomes = [...A.filter(state.outcomes, (old) => !A.some(fresh, (next) => sameRow(old, next))), ...fresh]
   // A changed value is recorded only for a row this confirm really wrote, and only once.
-  const changes = Arr.reduce(written, state.changes, (list, row) => {
+  const changes = A.reduce(written, state.changes, (list, row) => {
     const wrote =
       row.status === "update" ||
-      Arr.some(
+      A.some(
         items,
         (entry) =>
           entry.organizationId === org &&
@@ -391,8 +389,8 @@ const commitStep = (state: CatalogState, write: ConfirmWrite): readonly [Confirm
           entry.part === row.part
       )
     if (!wrote) return list
-    return Arr.reduce(row.changes, list, (all, entry) =>
-      Arr.some(
+    return A.reduce(row.changes, list, (all, entry) =>
+      A.some(
         all,
         (old) =>
           old.organizationId === org &&
@@ -402,7 +400,7 @@ const commitStep = (state: CatalogState, write: ConfirmWrite): readonly [Confirm
           old.change.field === entry.change.field
       )
         ? all
-        : Arr.append(all, {
+        : A.append(all, {
             organizationId: org,
             importId: write.draft,
             confirm: write.confirm,
@@ -416,7 +414,7 @@ const commitStep = (state: CatalogState, write: ConfirmWrite): readonly [Confirm
     )
   })
   const count = (outcome: OutcomeKind): number =>
-    Arr.filter(outcomes, (row) => row.organizationId === org && row.importId === write.draft && row.outcome === outcome)
+    A.filter(outcomes, (row) => row.organizationId === org && row.importId === write.draft && row.outcome === outcome)
       .length
   const confirm: MemConfirm = {
     organizationId: org,
@@ -424,11 +422,11 @@ const commitStep = (state: CatalogState, write: ConfirmWrite): readonly [Confirm
     id: write.confirm,
     byName: audit.actorName,
     at,
-    created: Arr.filter(items, (entry) => entry.organizationId === org && entry.confirm === write.confirm).length,
+    created: A.filter(items, (entry) => entry.organizationId === org && entry.confirm === write.confirm).length,
     updated: count("updated"),
     already: count("already"),
     notImported: count("notImported"),
-    takeBack: Option.none(),
+    takeBack: O.none(),
     removed: 0,
     restored: 0,
     kept: 0
@@ -445,8 +443,8 @@ const commitStep = (state: CatalogState, write: ConfirmWrite): readonly [Confirm
       replaced: copies,
       outcomes,
       changes,
-      confirms: Arr.append(state.confirms, confirm),
-      activity: Arr.append(state.activity, said)
+      confirms: A.append(state.confirms, confirm),
+      activity: A.append(state.activity, said)
     },
     org,
     write.draft,
@@ -455,8 +453,8 @@ const commitStep = (state: CatalogState, write: ConfirmWrite): readonly [Confirm
       draft: {
         ...entry.draft,
         status: "imported",
-        importedBy: Option.some<string>(audit.actorName),
-        importedAt: Option.some(at)
+        importedBy: O.some<string>(audit.actorName),
+        importedAt: O.some(at)
       }
     })
   )
@@ -473,10 +471,10 @@ const takeBackStep = (state: CatalogState, write: TakeBackWrite): readonly [Took
     confirm.organizationId === org &&
     confirm.importId === write.draft &&
     inForce(confirm) &&
-    Arr.contains(write.confirms, confirm.id)
-  const marked = Arr.map(Arr.filter(state.confirms, mine), (confirm) => confirm.id)
+    A.contains(write.confirms, confirm.id)
+  const marked = A.map(A.filter(state.confirms, mine), (confirm) => confirm.id)
   if (marked.length === 0) return [nothingInForce, state]
-  const isMarked = (confirm: ConfirmId): boolean => Arr.contains(marked, confirm)
+  const isMarked = (confirm: ConfirmId): boolean => A.contains(marked, confirm)
 
   // One pass marks the copies it will use, then writes them; a second pass reaches an item two confirms of this
   // take-back replaced in turn.
@@ -485,19 +483,19 @@ const takeBackStep = (state: CatalogState, write: TakeBackWrite): readonly [Took
     readonly replaced: ReadonlyArray<MemReplaced>
   }): { readonly items: ReadonlyArray<MemItem>; readonly replaced: ReadonlyArray<MemReplaced> } => {
     const usable = (copy: MemReplaced, items: ReadonlyArray<MemItem>): boolean =>
-      Arr.some(
+      A.some(
         items,
         (entry) =>
           entry.organizationId === org && entry.item.id === copy.itemId && entry.item.revision === copy.revisionAfter
       )
-    const replaced = Arr.map(from.replaced, (copy) =>
+    const replaced = A.map(from.replaced, (copy) =>
       copy.organizationId === org && !copy.restored && isMarked(copy.confirm) && usable(copy, from.items)
         ? { ...copy, restored: true }
         : copy
     )
-    const items = Arr.map(from.items, (entry) =>
-      Option.match(
-        Arr.findFirst(
+    const items = A.map(from.items, (entry) =>
+      O.match(
+        A.findFirst(
           replaced,
           (copy) =>
             copy.organizationId === org &&
@@ -520,28 +518,28 @@ const takeBackStep = (state: CatalogState, write: TakeBackWrite): readonly [Took
     return { items, replaced }
   }
   const passes = Math.min(Math.max(write.confirms.length, 1), 10)
-  const put = Arr.reduce(Arr.range(1, passes), { items: state.items, replaced: state.replaced }, pass)
+  const put = A.reduce(A.range(1, passes), { items: state.items, replaced: state.replaced }, pass)
 
   const ofConfirm = (confirm: ConfirmId) => (entry: MemItem) =>
     entry.organizationId === org && entry.confirm === confirm
   const copiesOf = (confirm: ConfirmId) => (copy: MemReplaced) =>
     copy.organizationId === org && copy.confirm === confirm
-  const confirms = Arr.map(state.confirms, (confirm) =>
+  const confirms = A.map(state.confirms, (confirm) =>
     isMarked(confirm.id) && confirm.organizationId === org
       ? {
           ...confirm,
-          takeBack: Option.some({ id: write.takeBack, byName: audit.actorName as string, at }),
-          removed: Arr.filter(put.items, (entry) => ofConfirm(confirm.id)(entry) && entry.item.revision === 1).length,
-          restored: Arr.filter(put.replaced, (copy) => copiesOf(confirm.id)(copy) && copy.restored).length,
+          takeBack: O.some({ id: write.takeBack, byName: audit.actorName as string, at }),
+          removed: A.filter(put.items, (entry) => ofConfirm(confirm.id)(entry) && entry.item.revision === 1).length,
+          restored: A.filter(put.replaced, (copy) => copiesOf(confirm.id)(copy) && copy.restored).length,
           kept:
-            Arr.filter(put.items, (entry) => ofConfirm(confirm.id)(entry) && entry.item.revision > 1).length +
-            Arr.filter(put.replaced, (copy) => copiesOf(confirm.id)(copy) && !copy.restored).length
+            A.filter(put.items, (entry) => ofConfirm(confirm.id)(entry) && entry.item.revision > 1).length +
+            A.filter(put.replaced, (copy) => copiesOf(confirm.id)(copy) && !copy.restored).length
         }
       : confirm
   )
   const sum = (read: (confirm: MemConfirm) => number): number =>
-    Arr.reduce(
-      Arr.filter(confirms, (confirm) => isMarked(confirm.id) && confirm.organizationId === org),
+    A.reduce(
+      A.filter(confirms, (confirm) => isMarked(confirm.id) && confirm.organizationId === org),
       0,
       (total, confirm) => total + read(confirm)
     )
@@ -560,11 +558,11 @@ const takeBackStep = (state: CatalogState, write: TakeBackWrite): readonly [Took
     }${kept === 0 ? "" : kept === 1 ? ", kept 1 that had changed since" : `, kept ${kept} that had changed since`}`
   })
   // The rows whose items go, while the items are still there to say which rows they are.
-  const outcomes = Arr.map(state.outcomes, (row): MemOutcome => {
+  const outcomes = A.map(state.outcomes, (row): MemOutcome => {
     if (row.organizationId !== org || row.importId !== write.draft) return row
     const going =
       row.outcome === "created" &&
-      Arr.some(
+      A.some(
         put.items,
         (entry) =>
           entry.organizationId === org &&
@@ -576,7 +574,7 @@ const takeBackStep = (state: CatalogState, write: TakeBackWrite): readonly [Took
       )
     const undone =
       row.outcome === "updated" &&
-      Arr.some(
+      A.some(
         put.replaced,
         (copy) =>
           copy.organizationId === org &&
@@ -588,16 +586,16 @@ const takeBackStep = (state: CatalogState, write: TakeBackWrite): readonly [Took
       )
     return going || undone ? { ...row, outcome: "takenBack", reason: "", decidedBy: decidedByNobody } : row
   })
-  const items = Arr.filter(
+  const items = A.filter(
     put.items,
     (entry) => !(entry.organizationId === org && entry.item.revision === 1 && isMarked(entry.confirm))
   )
-  const anyInForce = Arr.some(
+  const anyInForce = A.some(
     confirms,
     (confirm) => confirm.organizationId === org && confirm.importId === write.draft && inForce(confirm)
   )
   const next = mapDraft(
-    { ...state, items, replaced: put.replaced, confirms, outcomes, activity: Arr.append(state.activity, said) },
+    { ...state, items, replaced: put.replaced, confirms, outcomes, activity: A.append(state.activity, said) },
     org,
     write.draft,
     (entry) => ({
@@ -614,80 +612,76 @@ const takeBackStep = (state: CatalogState, write: TakeBackWrite): readonly [Took
 
 // -- Items: the page's questions, answered over a list --------------------------------------------------------
 
-const textOf = (item: StoredItem, column: ItemFilter["id"]): Option.Option<string> => {
+const textOf = (item: StoredItem, column: ItemFilter["id"]): O.Option<string> => {
   switch (column) {
     case "name":
-      return Option.some(item.name)
+      return O.some(item.name)
     case "sku":
-      return Option.some(item.sku)
+      return O.some(item.sku)
     case "description":
       return item.description
     case "category":
-      return Option.some(item.category)
+      return O.some(item.category)
     case "uom":
-      return Option.some(item.uom)
+      return O.some(item.uom)
     case "isActive":
-      return Option.some(`${isActive(item.stocking)}`)
+      return O.some(`${isActive(item.stocking)}`)
     case "lotTracked":
-      return Option.some(`${item.lotTracked}`)
+      return O.some(`${item.lotTracked}`)
     case "quantityOnHand":
-      return Option.some(`${item.quantityOnHand}`)
+      return O.some(`${item.quantityOnHand}`)
     case "unitCost":
-      return Option.some(costDigits(item.unitCost))
+      return item.unitCost.pipe(costDigits, O.some)
   }
 }
 
-const numberOf = (item: StoredItem, column: ItemFilter["id"]): Option.Option<number> =>
+const numberOf = (item: StoredItem, column: ItemFilter["id"]): O.Option<number> =>
   column === "quantityOnHand"
-    ? Option.some(item.quantityOnHand)
+    ? O.some(item.quantityOnHand)
     : column === "unitCost"
-      ? Option.some(Number(costDigits(item.unitCost)))
-      : Option.none()
+      ? O.some(Number(costDigits(item.unitCost)))
+      : O.none()
 
 const listOf = (value: ItemFilter["value"]): ReadonlyArray<string> => (typeof value === "string" ? [value] : value)
 
-const asNumber = (text: string): Option.Option<number> =>
-  Str.trim(text) === "" || !Number.isFinite(Number(text)) ? Option.none() : Option.some(Number(text))
+const asNumber = (text: string): O.Option<number> =>
+  Str.trim(text) === "" || !Number.isFinite(Number(text)) ? O.none() : O.some(Number(text))
 
 // None: the filter is half-typed or does not suit its column, and is left out, as the adapter leaves it out.
-const passes = (item: StoredItem, filter: ItemFilter): Option.Option<boolean> => {
+const passes = (item: StoredItem, filter: ItemFilter): O.Option<boolean> => {
   const has = textOf(item, filter.id)
   const values = listOf(filter.value)
-  const first = Option.getOrElse(Arr.head(values), () => "")
-  if (filter.operator === "isEmpty") return Option.some(Option.isNone(has) || Option.getOrElse(has, () => "") === "")
-  if (filter.operator === "isNotEmpty") return Option.some(Option.isSome(has) && Option.getOrElse(has, () => "") !== "")
-  const text = Str.toLowerCase(Option.getOrElse(has, () => ""))
+  const first = O.getOrElse(A.head(values), () => "")
+  if (filter.operator === "isEmpty") return O.some(O.isNone(has) || O.getOrElse(has, () => "") === "")
+  if (filter.operator === "isNotEmpty") return O.some(O.isSome(has) && O.getOrElse(has, () => "") !== "")
+  const text = Str.toLowerCase(O.getOrElse(has, () => ""))
   switch (filter.operator) {
     case "iLike":
-      return first === "" ? Option.none() : Option.some(Str.includes(Str.toLowerCase(first))(text))
+      return first === "" ? O.none() : O.some(Str.includes(Str.toLowerCase(first))(text))
     case "notILike":
-      return first === "" ? Option.none() : Option.some(!Str.includes(Str.toLowerCase(first))(text))
+      return first === "" ? O.none() : O.some(!Str.includes(Str.toLowerCase(first))(text))
     case "inArray":
-      return values.length === 0
-        ? Option.none()
-        : Option.some(Arr.some(values, (value) => Str.toLowerCase(value) === text))
+      return values.length === 0 ? O.none() : O.some(A.some(values, (value) => Str.toLowerCase(value) === text))
     case "notInArray":
-      return values.length === 0
-        ? Option.none()
-        : Option.some(!Arr.some(values, (value) => Str.toLowerCase(value) === text))
+      return values.length === 0 ? O.none() : O.some(!A.some(values, (value) => Str.toLowerCase(value) === text))
     default: {
       const number = numberOf(item, filter.id)
-      if (Option.isNone(number)) {
-        if (filter.operator === "eq") return first === "" ? Option.none() : Option.some(Str.toLowerCase(first) === text)
-        if (filter.operator === "ne") return first === "" ? Option.none() : Option.some(Str.toLowerCase(first) !== text)
-        return Option.none()
+      if (O.isNone(number)) {
+        if (filter.operator === "eq") return first === "" ? O.none() : O.some(Str.toLowerCase(first) === text)
+        if (filter.operator === "ne") return first === "" ? O.none() : O.some(Str.toLowerCase(first) !== text)
+        return O.none()
       }
       const n = number.value
       if (filter.operator === "isBetween") {
-        const low = Option.flatMap(Arr.get(values, 0), asNumber)
-        const high = Option.flatMap(Arr.get(values, 1), asNumber)
-        if (Option.isNone(low) && Option.isNone(high)) return Option.none()
-        return Option.some(
-          Option.match(low, { onNone: () => true, onSome: (min) => n >= min }) &&
-            Option.match(high, { onNone: () => true, onSome: (max) => n <= max })
+        const low = O.flatMap(A.get(values, 0), asNumber)
+        const high = O.flatMap(A.get(values, 1), asNumber)
+        if (O.isNone(low) && O.isNone(high)) return O.none()
+        return O.some(
+          O.match(low, { onNone: () => true, onSome: (min) => n >= min }) &&
+            O.match(high, { onNone: () => true, onSome: (max) => n <= max })
         )
       }
-      return Option.map(asNumber(first), (wanted) => {
+      return O.map(asNumber(first), (wanted) => {
         switch (filter.operator) {
           case "eq":
             return n === wanted
@@ -722,9 +716,9 @@ const sortKey = (item: StoredItem, column: ItemSort["id"]): string | number => {
     case "quantityOnHand":
       return item.quantityOnHand
     case "reorderPoint":
-      return Option.getOrElse(item.reorderPoint, () => -1)
+      return O.getOrElse(item.reorderPoint, () => -1)
     case "firstReceivedOn":
-      return Option.getOrElse(item.firstReceivedOn, () => "")
+      return O.getOrElse(item.firstReceivedOn, () => "")
     case "createdAt":
       return DateTime.toEpochMillis(item.createdAt)
   }
@@ -745,24 +739,21 @@ const compareBy =
   }
 
 const pageOf = (items: ReadonlyArray<StoredItem>, query: ItemQuery): ItemPage => {
-  const words = Arr.map(searchWords(query.search), Str.toLowerCase)
+  const words = A.map(searchWords(query.search), Str.toLowerCase)
   const haystack = (item: StoredItem): string =>
     Str.toLowerCase(
-      Arr.join(
-        [item.sku, item.name, Option.getOrElse(item.description, () => ""), item.category, Arr.join(item.tags, " ")],
-        " "
-      )
+      A.join([item.sku, item.name, O.getOrElse(item.description, () => ""), item.category, A.join(item.tags, " ")], " ")
     )
-  const searched = Arr.filter(items, (item) => Arr.every(words, (word) => Str.includes(word)(haystack(item))))
-  const narrowed = Arr.filter(searched, (item) => {
-    const verdicts = Arr.getSomes(Arr.map(query.filters, (filter) => passes(item, filter)))
+  const searched = A.filter(items, (item) => A.every(words, (word) => Str.includes(word)(haystack(item))))
+  const narrowed = A.filter(searched, (item) => {
+    const verdicts = A.getSomes(A.map(query.filters, (filter) => passes(item, filter)))
     if (verdicts.length === 0) return true
-    return query.joinOperator === "and" ? Arr.every(verdicts, (ok) => ok) : Arr.some(verdicts, (ok) => ok)
+    return query.joinOperator === "and" ? A.every(verdicts, (ok) => ok) : A.some(verdicts, (ok) => ok)
   })
-  const sorted = Arr.sort(narrowed, Order.make(compareBy(query.sorting)))
+  const sorted = A.sort(narrowed, Order.make(compareBy(query.sorting)))
   const from = (query.page - 1) * query.perPage
   return {
-    data: Arr.take(Arr.drop(sorted, from), query.perPage),
+    data: A.take(A.drop(sorted, from), query.perPage),
     pageCount: Math.ceil(sorted.length / query.perPage),
     total: sorted.length
   }
@@ -770,18 +761,18 @@ const pageOf = (items: ReadonlyArray<StoredItem>, query: ItemQuery): ItemPage =>
 
 const facetsOf = (items: ReadonlyArray<StoredItem>): ItemFacets => {
   const counts = (read: (item: StoredItem) => string) =>
-    Arr.map(
-      Arr.sort(
-        Rec.toEntries(Arr.groupBy(items, read)),
+    A.map(
+      A.sort(
+        R.toEntries(A.groupBy(items, read)),
         Order.mapInput(Order.String, ([value]: readonly [string, unknown]) => value)
       ),
       ([value, group]) => ({ value, count: group.length })
     )
   const range = (read: (item: StoredItem) => number) => {
-    const values = Arr.map(items, read)
-    return Arr.isReadonlyArrayNonEmpty(values)
-      ? { min: Option.some(Math.min(...values)), max: Option.some(Math.max(...values)) }
-      : { min: Option.none<number>(), max: Option.none<number>() }
+    const values = A.map(items, read)
+    return A.isReadonlyArrayNonEmpty(values)
+      ? { min: O.some(Math.min(...values)), max: O.some(Math.max(...values)) }
+      : { min: O.none<number>(), max: O.none<number>() }
   }
   return {
     total: items.length,
@@ -796,16 +787,16 @@ const facetsOf = (items: ReadonlyArray<StoredItem>): ItemFacets => {
 
 const sameAsEdit = (item: StoredItem, edit: ItemEdit): boolean =>
   item.name === edit.name &&
-  Equal.equals(item.description, edit.description) &&
+  Eq.equals(item.description, edit.description) &&
   item.category === edit.category &&
   item.uom === edit.uom &&
   BigDecimal.equals(item.unitCost, edit.unitCost) &&
   item.quantityOnHand === edit.quantityOnHand &&
-  Equal.equals(item.reorderPoint, edit.reorderPoint) &&
+  Eq.equals(item.reorderPoint, edit.reorderPoint) &&
   item.stocking.kind === edit.stocking.kind &&
-  Equal.equals(discontinuedOn(item.stocking), discontinuedOn(edit.stocking)) &&
+  Eq.equals(discontinuedOn(item.stocking), discontinuedOn(edit.stocking)) &&
   item.lotTracked === edit.lotTracked &&
-  Equal.equals(item.firstReceivedOn, edit.firstReceivedOn)
+  Eq.equals(item.firstReceivedOn, edit.firstReceivedOn)
 
 // -- The twins ------------------------------------------------------------------------------------------------------
 
@@ -816,15 +807,15 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
     const ref = yield* CatalogMemoryRef
     const random = yield* SecureRandom.SecureRandom
     const itemsOfOrg = (state: CatalogState, organizationId: OrganizationId): ReadonlyArray<StoredItem> =>
-      Arr.sort(
-        Arr.map(
-          Arr.filter(state.items, (entry) => entry.organizationId === organizationId),
+      A.sort(
+        A.map(
+          A.filter(state.items, (entry) => entry.organizationId === organizationId),
           (entry) => entry.item
         ),
         Order.mapInput(Order.String, (item: StoredItem) => item.sku)
       )
-    const uploadOf = (state: CatalogState, actor: Member, id: string): Option.Option<MemUpload> =>
-      Arr.findFirst(
+    const uploadOf = (state: CatalogState, actor: Member, id: string): O.Option<MemUpload> =>
+      A.findFirst(
         state.uploads,
         (upload) => upload.organizationId === actor.organizationId && upload.actorId === actor.id && upload.id === id
       )
@@ -848,17 +839,17 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
       const headJson = yield* S.encodeEffect(HeadJson)(head)
       const id = yield* Ref.modify(ref, (state): readonly [ImportId, CatalogState] => {
         // An upload left unfinished for an hour is gone before the next one of its organization starts.
-        const kept = Arr.filter(
+        const kept = A.filter(
           state.uploads,
           (upload) =>
             upload.organizationId !== actor.organizationId || DateTime.isGreaterThanOrEqualTo(upload.createdAt, before)
         )
-        const same = Arr.findFirst(
+        const same = A.findFirst(
           kept,
           (upload) =>
             upload.organizationId === actor.organizationId && upload.actorId === actor.id && upload.key === key
         )
-        if (Option.isSome(same)) return [same.value.id, { ...state, uploads: kept }]
+        if (O.isSome(same)) return [same.value.id, { ...state, uploads: kept }]
         const upload: MemUpload = {
           organizationId: actor.organizationId,
           actorId: actor.id,
@@ -872,7 +863,7 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
           createdAt: now,
           chunks: []
         }
-        return [upload.id, { ...state, uploads: Arr.append(kept, upload) }]
+        return [upload.id, { ...state, uploads: A.append(kept, upload) }]
       })
       const answer: Result.Result<ImportId, FileProblem> = Result.succeed(id)
       return answer
@@ -886,13 +877,13 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
     ) {
       yield* Ref.update(ref, (state) => ({
         ...state,
-        uploads: Arr.map(state.uploads, (entry) =>
+        uploads: A.map(state.uploads, (entry) =>
           entry.organizationId === actor.organizationId &&
           entry.actorId === actor.id &&
           entry.id === upload.id &&
           // The first copy of a piece stays.
-          !Arr.some(entry.chunks, (chunk) => chunk.seq === seq)
-            ? { ...entry, chunks: Arr.append(entry.chunks, { seq, rows }) }
+          !A.some(entry.chunks, (chunk) => chunk.seq === seq)
+            ? { ...entry, chunks: A.append(entry.chunks, { seq, rows }) }
             : entry
         )
       }))
@@ -905,7 +896,7 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
       const at = yield* DateTime.now
       return yield* Ref.modify(ref, (state): readonly [boolean, CatalogState] => {
         const found = uploadOf(state, actor, upload.id)
-        if (Option.isNone(found)) return [false, state]
+        if (O.isNone(found)) return [false, state]
         const staged = found.value
         const draft: MemDraft = {
           organizationId: actor.organizationId,
@@ -917,14 +908,14 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
             status: "open",
             actorName: staged.actorName,
             createdAt: at,
-            importedBy: Option.none(),
-            importedAt: Option.none(),
+            importedBy: O.none(),
+            importedAt: O.none(),
             revision: 0,
             needsAtStart,
             choicesJson: "[]"
           },
-          rows: Arr.flatMap(
-            Arr.sort(
+          rows: A.flatMap(
+            A.sort(
               staged.chunks,
               Order.mapInput(Order.Number, (chunk: { readonly seq: number }) => chunk.seq)
             ),
@@ -936,9 +927,9 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
           true,
           {
             ...state,
-            uploads: Arr.filter(state.uploads, (entry) => entry !== staged),
-            drafts: Arr.append(state.drafts, draft),
-            activity: Arr.append(
+            uploads: A.filter(state.uploads, (entry) => entry !== staged),
+            drafts: A.append(state.drafts, draft),
+            activity: A.append(
               state.activity,
               line({
                 id,
@@ -957,39 +948,39 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
 
     const decide = Effect.fnUntraced(function* (actor: Member, draft: Draft, delta: DecisionDelta) {
       const sets = yield* Effect.forEach(
-        Rec.toEntries(delta.set),
+        R.toEntries(delta.set),
         ([rowId, decision]) =>
           Effect.map(S.encodeEffect(DecisionJson)(decision), (json) => ({ rowId, json, decision })),
         { concurrency: 1 }
       )
-      return yield* Ref.modify(ref, (state): readonly [Option.Option<number>, CatalogState] => {
+      return yield* Ref.modify(ref, (state): readonly [O.Option<number>, CatalogState] => {
         const org = actor.organizationId
-        const found = Arr.findFirst(state.drafts, sameDraft(org, draft.id))
-        if (Option.isNone(found) || found.value.draft.status !== "open") return [Option.none(), state]
+        const found = A.findFirst(state.drafts, sameDraft(org, draft.id))
+        if (O.isNone(found) || found.value.draft.status !== "open") return [O.none(), state]
         const stored = found.value
-        const differs = Arr.some(
+        const differs = A.some(
           sets,
-          (set) => !Arr.some(stored.decisions, (old) => old.rowId === set.rowId && old.json === set.json)
+          (set) => !A.some(stored.decisions, (old) => old.rowId === set.rowId && old.json === set.json)
         )
-        const clears = Arr.some(stored.decisions, (old) => Arr.contains(delta.clear, old.rowId))
+        const clears = A.some(stored.decisions, (old) => A.contains(delta.clear, old.rowId))
         const revision = stored.draft.revision + (differs || clears ? 1 : 0)
         // The same decision sent again leaves the row, and who made it, as it is.
-        const kept = Arr.map(stored.decisions, (old) =>
-          Option.match(
-            Arr.findFirst(sets, (set) => set.rowId === old.rowId),
+        const kept = A.map(stored.decisions, (old) =>
+          O.match(
+            A.findFirst(sets, (set) => set.rowId === old.rowId),
             {
               onNone: () => old,
               onSome: (set) => (set.json === old.json ? old : { ...set, author: actor.name as string })
             }
           )
         )
-        const added = Arr.map(
-          Arr.filter(sets, (set) => !Arr.some(stored.decisions, (old) => old.rowId === set.rowId)),
+        const added = A.map(
+          A.filter(sets, (set) => !A.some(stored.decisions, (old) => old.rowId === set.rowId)),
           (set) => ({ ...set, author: actor.name as string })
         )
-        const decisions = Arr.filter([...kept, ...added], (entry) => !Arr.contains(delta.clear, entry.rowId))
+        const decisions = A.filter([...kept, ...added], (entry) => !A.contains(delta.clear, entry.rowId))
         return [
-          Option.some(revision),
+          O.some(revision),
           mapDraft(state, org, draft.id, (entry) => ({
             ...entry,
             decisions,
@@ -1010,8 +1001,8 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
       const json = yield* S.encodeEffect(ChoicesJson)(list)
       return yield* Ref.modify(ref, (state): readonly [ChoicesSaved, CatalogState] => {
         const org = actor.organizationId
-        const found = Arr.findFirst(state.drafts, sameDraft(org, draft.id))
-        if (Option.isNone(found) || found.value.draft.status !== "open") return ["closed", state]
+        const found = A.findFirst(state.drafts, sameDraft(org, draft.id))
+        if (O.isNone(found) || found.value.draft.status !== "open") return ["closed", state]
         // Choices that are already so are not a change: no audit line and no new revision.
         if (found.value.draft.choicesJson === json) return ["same", state]
         const next = mapDraft(state, org, draft.id, (entry) => ({
@@ -1022,7 +1013,7 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
           "saved",
           {
             ...next,
-            activity: Arr.append(
+            activity: A.append(
               next.activity,
               line({
                 id,
@@ -1041,7 +1032,7 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
 
     const rewriteDecisions = Effect.fnUntraced(function* (actor: Member, draft: Draft, set: SavedDecisions) {
       const entries = yield* Effect.forEach(
-        Rec.toEntries(set),
+        R.toEntries(set),
         ([rowId, decision]) =>
           Effect.map(S.encodeEffect(DecisionJson)(decision), (json) => ({ rowId, json, decision })),
         { concurrency: 1 }
@@ -1051,9 +1042,9 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
         mapDraft(state, actor.organizationId, draft.id, (entry) => ({
           ...entry,
           // Only rows that already have a decision, keeping who made it.
-          decisions: Arr.map(entry.decisions, (old) =>
-            Option.match(
-              Arr.findFirst(entries, (next) => next.rowId === old.rowId),
+          decisions: A.map(entry.decisions, (old) =>
+            O.match(
+              A.findFirst(entries, (next) => next.rowId === old.rowId),
               { onNone: () => old, onSome: (next) => ({ ...old, json: next.json, decision: next.decision }) }
             )
           ),
@@ -1067,15 +1058,15 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
       const at = yield* DateTime.now
       yield* Ref.update(ref, (state) => {
         const org = actor.organizationId
-        const found = Arr.findFirst(state.drafts, sameDraft(org, draft.id))
-        if (Option.isNone(found) || found.value.draft.status === "open") return state
+        const found = A.findFirst(state.drafts, sameDraft(org, draft.id))
+        if (O.isNone(found) || found.value.draft.status === "open") return state
         const next = mapDraft(state, org, draft.id, (entry) => ({
           ...entry,
           draft: { ...entry.draft, status: "open", revision: entry.draft.revision + 1 }
         }))
         return {
           ...next,
-          activity: Arr.append(
+          activity: A.append(
             next.activity,
             line({
               id,
@@ -1104,23 +1095,23 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
         // An import may be removed while it is open and has no item in force, and no replace in force either.
         const removable =
           isOpen(state, org, draft.id) &&
-          !Arr.some(state.items, of) &&
-          !Arr.some(
+          !A.some(state.items, of) &&
+          !A.some(
             state.replaced,
-            (copy) => of(copy) && Arr.some(state.confirms, (confirm) => confirm.id === copy.confirm && inForce(confirm))
+            (copy) => of(copy) && A.some(state.confirms, (confirm) => confirm.id === copy.confirm && inForce(confirm))
           )
         if (!removable) return [false, state]
         return [
           true,
           {
             ...state,
-            drafts: Arr.filter(state.drafts, (entry) => !sameDraft(org, draft.id)(entry)),
-            suggestions: Arr.filter(state.suggestions, (entry) => !of(entry)),
-            changes: Arr.filter(state.changes, (entry) => !of(entry)),
-            outcomes: Arr.filter(state.outcomes, (entry) => !of(entry)),
-            replaced: Arr.filter(state.replaced, (entry) => !of(entry)),
-            confirms: Arr.filter(state.confirms, (entry) => !of(entry)),
-            activity: Arr.append(
+            drafts: A.filter(state.drafts, (entry) => !sameDraft(org, draft.id)(entry)),
+            suggestions: A.filter(state.suggestions, (entry) => !of(entry)),
+            changes: A.filter(state.changes, (entry) => !of(entry)),
+            outcomes: A.filter(state.outcomes, (entry) => !of(entry)),
+            replaced: A.filter(state.replaced, (entry) => !of(entry)),
+            confirms: A.filter(state.confirms, (entry) => !of(entry)),
+            activity: A.append(
               state.activity,
               line({
                 id,
@@ -1128,7 +1119,7 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
                 actorId: actor.id,
                 actorName: actor.name,
                 action: "Removed an import",
-                detail: `${draft.fileName}: ${plural(draft.rowCount, "row", "rows")}, ${Option.isNone(draft.importedAt) ? "nothing had been imported" : "every item it created had been taken back"}`,
+                detail: `${draft.fileName}: ${plural(draft.rowCount, "row", "rows")}, ${O.isNone(draft.importedAt) ? "nothing had been imported" : "every item it created had been taken back"}`,
                 at
               })
             )
@@ -1139,22 +1130,18 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
 
     const history = Effect.fnUntraced(function* (organizationId: OrganizationId, importId: string) {
       const state = yield* Ref.get(ref)
-      const confirms = Arr.sort(
-        Arr.filter(
+      const confirms = A.sort(
+        A.filter(
           state.confirms,
           (confirm) => confirm.organizationId === organizationId && confirm.importId === importId
         ),
         byMoment
       )
-      const takeBackId = (confirm: MemConfirm): Option.Option<string> =>
-        Option.map(confirm.takeBack, (taken) => taken.id)
+      const takeBackId = (confirm: MemConfirm): O.Option<string> => O.map(confirm.takeBack, (taken) => taken.id)
       // One take-back can reverse several confirms: it is one event, with the sums over every confirm it reversed.
       const sameTakeBack = (row: MemConfirm) =>
-        Arr.filter(
-          confirms,
-          (other) => Option.isSome(takeBackId(row)) && Equal.equals(takeBackId(other), takeBackId(row))
-        )
-      const events = Arr.flatMap(confirms, (row): ReadonlyArray<ImportEvent> => [
+        A.filter(confirms, (other) => O.isSome(takeBackId(row)) && Eq.equals(takeBackId(other), takeBackId(row)))
+      const events = A.flatMap(confirms, (row): ReadonlyArray<ImportEvent> => [
         ImportEvent.cases.Confirmed.make({
           batchId: row.id,
           by: row.byName,
@@ -1164,24 +1151,24 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
           already: row.already,
           notImported: row.notImported
         }),
-        ...Option.match(row.takeBack, {
+        ...O.match(row.takeBack, {
           onNone: (): ReadonlyArray<ImportEvent> => [],
           onSome: (taken): ReadonlyArray<ImportEvent> =>
-            Option.exists(Arr.head(sameTakeBack(row)), (first) => first.id === row.id)
+            O.exists(A.head(sameTakeBack(row)), (first) => first.id === row.id)
               ? [
                   ImportEvent.cases.TakenBack.make({
                     batchId: row.id,
                     by: taken.byName,
                     at: taken.at,
-                    removed: Arr.reduce(sameTakeBack(row), 0, (total, other) => total + other.removed),
-                    restored: Arr.reduce(sameTakeBack(row), 0, (total, other) => total + other.restored),
-                    kept: Arr.reduce(sameTakeBack(row), 0, (total, other) => total + other.kept)
+                    removed: A.reduce(sameTakeBack(row), 0, (total, other) => total + other.removed),
+                    restored: A.reduce(sameTakeBack(row), 0, (total, other) => total + other.restored),
+                    kept: A.reduce(sameTakeBack(row), 0, (total, other) => total + other.kept)
                   })
                 ]
               : []
         })
       ])
-      return Arr.sort(
+      return A.sort(
         events,
         Order.mapInput(DateTime.Order, (event: ImportEvent) => event.at)
       )
@@ -1189,39 +1176,37 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
 
     const takeBackState = Effect.fnUntraced(function* (organizationId: OrganizationId, importId: string) {
       const state = yield* Ref.get(ref)
-      const confirms = Arr.sort(
-        Arr.filter(
+      const confirms = A.sort(
+        A.filter(
           state.confirms,
           (confirm) => confirm.organizationId === organizationId && confirm.importId === importId && inForce(confirm)
         ),
         byMoment
       )
-      const live = (confirm: ConfirmId): boolean => Arr.some(confirms, (entry) => entry.id === confirm)
-      const mine = Arr.filter(
+      const live = (confirm: ConfirmId): boolean => A.some(confirms, (entry) => entry.id === confirm)
+      const mine = A.filter(
         state.items,
         (entry) => entry.organizationId === organizationId && entry.importId === importId
       )
-      const copies = Arr.filter(
+      const copies = A.filter(
         state.replaced,
         (copy) => copy.organizationId === organizationId && copy.importId === importId
       )
-      const itemOf = (copy: MemReplaced): Option.Option<MemItem> =>
-        Arr.findFirst(state.items, (entry) => entry.organizationId === organizationId && entry.item.id === copy.itemId)
+      const itemOf = (copy: MemReplaced): O.Option<MemItem> =>
+        A.findFirst(state.items, (entry) => entry.organizationId === organizationId && entry.item.id === copy.itemId)
       const changedOf = (kept: boolean): ReadonlyArray<MemItem> => {
-        const created = Arr.filter(mine, (entry) => entry.item.revision > 1 && live(entry.confirm) !== kept)
-        const replaced = Arr.getSomes(
-          Arr.map(
-            Arr.filter(copies, (copy) => live(copy.confirm) !== kept),
+        const created = A.filter(mine, (entry) => entry.item.revision > 1 && live(entry.confirm) !== kept)
+        const replaced = A.getSomes(
+          A.map(
+            A.filter(copies, (copy) => live(copy.confirm) !== kept),
             (copy) =>
-              Option.filter(itemOf(copy), (entry) =>
-                kept ? !copy.restored : entry.item.revision !== copy.revisionAfter
-              )
+              O.filter(itemOf(copy), (entry) => (kept ? !copy.restored : entry.item.revision !== copy.revisionAfter))
           )
         )
-        const all = Arr.dedupeWith([...created, ...replaced], (a, b) => a.item.id === b.item.id)
+        const all = A.dedupeWith([...created, ...replaced], (a, b) => a.item.id === b.item.id)
         const when = (entry: MemItem): number =>
-          Option.match(entry.updatedAt, { onNone: () => 0, onSome: DateTime.toEpochMillis })
-        return Arr.sort(
+          O.match(entry.updatedAt, { onNone: () => 0, onSome: DateTime.toEpochMillis })
+        return A.sort(
           all,
           Order.combine(
             Order.flip(Order.mapInput(Order.Number, when)),
@@ -1230,7 +1215,7 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
         )
       }
       const named = (rows: ReadonlyArray<MemItem>) =>
-        Arr.map(Arr.take(rows, changedItemsShown), (entry) =>
+        A.map(A.take(rows, changedItemsShown), (entry) =>
           ChangedItem.make({
             sku: entry.item.sku,
             name: entry.item.name,
@@ -1241,12 +1226,11 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
       const changed = changedOf(false)
       const kept = changedOf(true)
       const answer: TakeBackState = {
-        confirms: Arr.map(confirms, (confirm) => confirm.id),
-        removable: Arr.filter(mine, (entry) => entry.item.revision === 1 && live(entry.confirm)).length,
-        restorable: Arr.filter(
+        confirms: A.map(confirms, (confirm) => confirm.id),
+        removable: A.filter(mine, (entry) => entry.item.revision === 1 && live(entry.confirm)).length,
+        restorable: A.filter(
           copies,
-          (copy) =>
-            live(copy.confirm) && Option.exists(itemOf(copy), (entry) => entry.item.revision === copy.revisionAfter)
+          (copy) => live(copy.confirm) && O.exists(itemOf(copy), (entry) => entry.item.revision === copy.revisionAfter)
         ).length,
         changed: named(changed),
         changedCount: changed.length,
@@ -1260,15 +1244,15 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
       beginUpload,
       findUpload: Effect.fnUntraced(function* (actor: Member, id: string) {
         const state = yield* Ref.get(ref)
-        return Option.map(uploadOf(state, actor, id), asUpload)
+        return O.map(uploadOf(state, actor, id), asUpload)
       }),
       putChunk,
       uploadChunks: Effect.fnUntraced(function* (actor: Member, upload: Upload) {
         const state = yield* Ref.get(ref)
-        return Option.match(uploadOf(state, actor, upload.id), {
+        return O.match(uploadOf(state, actor, upload.id), {
           onNone: () => [],
           onSome: (found) =>
-            Arr.sort(
+            A.sort(
               found.chunks,
               Order.mapInput(Order.Number, (chunk: { readonly seq: number }) => chunk.seq)
             )
@@ -1277,39 +1261,36 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
       finishUpload,
       discardUpload: Effect.fnUntraced(function* (actor: Member, id: string) {
         return yield* Ref.modify(ref, (state): readonly [boolean, CatalogState] =>
-          Option.match(uploadOf(state, actor, id), {
+          O.match(uploadOf(state, actor, id), {
             onNone: () => [false, state],
-            onSome: (found) => [true, { ...state, uploads: Arr.filter(state.uploads, (entry) => entry !== found) }]
+            onSome: (found) => [true, { ...state, uploads: A.filter(state.uploads, (entry) => entry !== found) }]
           })
         )
       }),
       find: Effect.fnUntraced(function* (organizationId: OrganizationId, id: string) {
         const state = yield* Ref.get(ref)
-        return Option.map(Arr.findFirst(state.drafts, sameDraft(organizationId, id)), (entry) => entry.draft)
+        return O.map(A.findFirst(state.drafts, sameDraft(organizationId, id)), (entry) => entry.draft)
       }),
       listOpen: Effect.fnUntraced(function* (organizationId: OrganizationId, limit: number) {
         const state = yield* Ref.get(ref)
-        const open = Arr.reverse(
-          Arr.sort(
-            Arr.filter(
-              state.drafts,
-              (entry) => entry.organizationId === organizationId && entry.draft.status === "open"
-            ),
+        const open = A.reverse(
+          A.sort(
+            A.filter(state.drafts, (entry) => entry.organizationId === organizationId && entry.draft.status === "open"),
             Order.mapInput(DateTime.Order, (entry: MemDraft) => entry.draft.createdAt)
           )
         )
-        return { drafts: Arr.map(Arr.take(open, limit), (entry) => entry.draft), total: open.length }
+        return { drafts: A.map(A.take(open, limit), (entry) => entry.draft), total: open.length }
       }),
       listPast: Effect.fnUntraced(function* (organizationId: OrganizationId, limit: number) {
         const state = yield* Ref.get(ref)
-        const past = Arr.getSomes(
-          Arr.map(
-            Arr.filter(state.drafts, (entry) => entry.organizationId === organizationId),
+        const past = A.getSomes(
+          A.map(
+            A.filter(state.drafts, (entry) => entry.organizationId === organizationId),
             (entry) =>
-              Option.map(
-                Arr.last(
-                  Arr.sort(
-                    Arr.filter(
+              O.map(
+                A.last(
+                  A.sort(
+                    A.filter(
                       state.confirms,
                       (confirm) => confirm.organizationId === organizationId && confirm.importId === entry.draft.id
                     ),
@@ -1320,20 +1301,20 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
               )
           )
         )
-        const newest = Arr.reverse(
-          Arr.sort(
+        const newest = A.reverse(
+          A.sort(
             past,
             Order.mapInput(DateTime.Order, (row: { readonly last: MemConfirm }) => row.last.at)
           )
         )
-        const imports = Arr.map(Arr.take(newest, limit), ({ entry, last }): PastImport => ({
+        const imports = A.map(A.take(newest, limit), ({ entry, last }): PastImport => ({
           id: entry.draft.id,
           fileName: entry.draft.fileName,
           rowCount: entry.draft.rowCount,
           status: entry.draft.status,
           confirmedByName: last.byName,
           confirmedAt: last.at,
-          items: Arr.filter(
+          items: A.filter(
             state.items,
             (item) => item.organizationId === organizationId && item.importId === entry.draft.id
           ).length,
@@ -1344,13 +1325,13 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
       remove,
       decisions: Effect.fnUntraced(function* (organizationId: OrganizationId, importId: string) {
         const state = yield* Ref.get(ref)
-        const stored = Option.match(Arr.findFirst(state.drafts, sameDraft(organizationId, importId)), {
+        const stored = O.match(A.findFirst(state.drafts, sameDraft(organizationId, importId)), {
           onNone: (): ReadonlyArray<MemDecision> => [],
           onSome: (entry) => entry.decisions
         })
         return {
-          decisions: Rec.fromEntries(Arr.map(stored, (entry) => [entry.rowId, entry.decision] as const)),
-          authors: Rec.fromEntries(Arr.map(stored, (entry) => [entry.rowId, entry.author] as const))
+          decisions: R.fromEntries(A.map(stored, (entry) => [entry.rowId, entry.decision] as const)),
+          authors: R.fromEntries(A.map(stored, (entry) => [entry.rowId, entry.author] as const))
         }
       }),
       decide,
@@ -1360,8 +1341,8 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
       setChoices,
       createdRows: Effect.fnUntraced(function* (organizationId: OrganizationId, importId: string) {
         const state = yield* Ref.get(ref)
-        return Arr.map(
-          Arr.filter(
+        return A.map(
+          A.filter(
             state.outcomes,
             (row) => row.organizationId === organizationId && row.importId === importId && row.outcome === "created"
           ),
@@ -1372,22 +1353,22 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
       reopen,
       changes: Effect.fnUntraced(function* (organizationId: OrganizationId) {
         const state = yield* Ref.get(ref)
-        const mine = Arr.filter(state.changes, (entry) => entry.organizationId === organizationId)
-        return Arr.getSomes(
-          Arr.map(Arr.reverse(mine), (entry): Option.Option<ChangeRecord> =>
-            Option.map(Arr.findFirst(state.drafts, sameDraft(organizationId, entry.importId)), (draft) => ({
+        const mine = A.filter(state.changes, (entry) => entry.organizationId === organizationId)
+        return A.getSomes(
+          A.map(A.reverse(mine), (entry): O.Option<ChangeRecord> =>
+            O.map(A.findFirst(state.drafts, sameDraft(organizationId, entry.importId)), (draft) => ({
               importId: entry.importId,
               fileName: draft.draft.fileName,
               rowNumber: entry.rowNumber,
-              part: entry.part === 0 ? Option.none() : Option.some(entry.part),
+              part: entry.part === 0 ? O.none() : O.some(entry.part),
               sku: entry.sku,
               change: entry.change,
               decidedByName: entry.decidedByName,
               createdAt: entry.createdAt,
               // Taken back when its confirm was and the item it went into is gone, or was put back as it was.
               takenBack:
-                Arr.some(state.confirms, (confirm) => confirm.id === entry.confirm && !inForce(confirm)) &&
-                !Arr.some(
+                A.some(state.confirms, (confirm) => confirm.id === entry.confirm && !inForce(confirm)) &&
+                !A.some(
                   state.items,
                   (item) =>
                     item.organizationId === organizationId &&
@@ -1395,7 +1376,7 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
                     item.rowNumber === entry.rowNumber &&
                     item.part === entry.part
                 ) &&
-                !Arr.some(
+                !A.some(
                   state.replaced,
                   (copy) =>
                     copy.organizationId === organizationId &&
@@ -1413,7 +1394,7 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
         const head = yield* S.decodeEffect(HeadJson)(draft.headJson)
         const table: StagedTable = {
           ...head,
-          rows: Option.match(Arr.findFirst(state.drafts, sameDraft(organizationId, draft.id)), {
+          rows: O.match(A.findFirst(state.drafts, sameDraft(organizationId, draft.id)), {
             onNone: () => [],
             onSome: (entry) => entry.rows
           })
@@ -1422,18 +1403,18 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
       }, Effect.orDie),
       storedAmong: Effect.fnUntraced(function* (organizationId: OrganizationId, keys: ReadonlyArray<string>) {
         const state = yield* Ref.get(ref)
-        return Arr.filter(itemsOfOrg(state, organizationId), (item) => Arr.contains(keys, skuKey(item)))
+        return A.filter(itemsOfOrg(state, organizationId), (item) => A.contains(keys, skuKey(item)))
       }),
       fixed: Effect.fnUntraced(function* (organizationId: OrganizationId, importId: string) {
         const state = yield* Ref.get(ref)
-        const written = Arr.filter(
+        const written = A.filter(
           state.changes,
           (entry) =>
             entry.organizationId === organizationId &&
             entry.importId === importId &&
             changeDecidedBy(entry.change) === "rule" &&
             entry.change.how === "appliedByRule" &&
-            Arr.some(
+            A.some(
               state.outcomes,
               (row) =>
                 row.organizationId === organizationId &&
@@ -1444,7 +1425,7 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
             )
         )
         return {
-          rows: Arr.dedupe(Arr.map(written, (entry) => `${entry.rowNumber}.${entry.part}`)).length,
+          rows: A.dedupe(A.map(written, (entry) => `${entry.rowNumber}.${entry.part}`)).length,
           cells: written.length
         }
       }),
@@ -1458,17 +1439,17 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
       takeBackState,
       outcomes: Effect.fnUntraced(function* (organizationId: OrganizationId, importId: string) {
         const state = yield* Ref.get(ref)
-        const rows = Arr.sort(
-          Arr.filter(state.outcomes, (row) => row.organizationId === organizationId && row.importId === importId),
+        const rows = A.sort(
+          A.filter(state.outcomes, (row) => row.organizationId === organizationId && row.importId === importId),
           Order.combine(
             Order.mapInput(Order.Number, (row: MemOutcome) => row.rowNumber),
             Order.mapInput(Order.Number, (row: MemOutcome) => row.part)
           )
         )
-        return Arr.map(rows, (row): RowOutcome =>
+        return A.map(rows, (row): RowOutcome =>
           outcomeOf({
             rowNumber: row.rowNumber,
-            part: row.part === 0 ? Option.none() : Option.some(row.part),
+            part: row.part === 0 ? O.none() : O.some(row.part),
             sku: row.sku,
             name: row.name,
             outcome: row.outcome,
@@ -1492,8 +1473,8 @@ export const ItemStoreMemory: Layer.Layer<ItemStore, never, CatalogMemoryRef> = 
     const ref = yield* CatalogMemoryRef
     const random = yield* SecureRandom.SecureRandom
     const of = (state: CatalogState, organizationId: OrganizationId): ReadonlyArray<StoredItem> =>
-      Arr.map(
-        Arr.filter(state.items, (entry) => entry.organizationId === organizationId),
+      A.map(
+        A.filter(state.items, (entry) => entry.organizationId === organizationId),
         (entry) => entry.item
       )
     const edit = Effect.fnUntraced(function* (actor: Member, id: string, change: ItemEdit) {
@@ -1501,8 +1482,8 @@ export const ItemStoreMemory: Layer.Layer<ItemStore, never, CatalogMemoryRef> = 
       const at = yield* DateTime.now
       return yield* Ref.modify(ref, (state): readonly [EditOutcome, CatalogState] => {
         const org = actor.organizationId
-        const found = Arr.findFirst(state.items, (entry) => entry.organizationId === org && entry.item.id === id)
-        if (Option.isNone(found)) return [{ _tag: "Missing" }, state]
+        const found = A.findFirst(state.items, (entry) => entry.organizationId === org && entry.item.id === id)
+        if (O.isNone(found)) return [{ _tag: "Missing" }, state]
         const stored = found.value.item
         const same = sameAsEdit(stored, change)
         // Written only while the item is at the revision the edit was made on and holds something else.
@@ -1527,12 +1508,12 @@ export const ItemStoreMemory: Layer.Layer<ItemStore, never, CatalogMemoryRef> = 
           { _tag: "Edited", item },
           {
             ...state,
-            items: Arr.map(state.items, (entry) =>
+            items: A.map(state.items, (entry) =>
               entry === found.value
-                ? { ...entry, item, updatedBy: Option.some<string>(actor.name), updatedAt: Option.some(at) }
+                ? { ...entry, item, updatedBy: O.some<string>(actor.name), updatedAt: O.some(at) }
                 : entry
             ),
-            activity: Arr.append(
+            activity: A.append(
               state.activity,
               line({
                 id: lineId,
@@ -1572,8 +1553,8 @@ export const SuggestionStoreMemory: Layer.Layer<SuggestionStore, never, CatalogM
     return SuggestionStore.of({
       list: Effect.fnUntraced(function* (organizationId: OrganizationId, importId: ImportId) {
         const state = yield* Ref.get(ref)
-        return Arr.map(
-          Arr.filter(
+        return A.map(
+          A.filter(
             state.suggestions,
             (entry) => entry.organizationId === organizationId && entry.importId === importId
           ),
@@ -1586,17 +1567,17 @@ export const SuggestionStoreMemory: Layer.Layer<SuggestionStore, never, CatalogM
           // The audit line is written whatever is stored; a suggestion only while the import is open, and only where
           // the row and field have none yet.
           const open = isOpen(state, org, write.draft)
-          const made = Arr.reduce(write.suggestions, Arr.empty<Suggestion>(), (kept, suggestion) =>
+          const made = A.reduce(write.suggestions, A.empty<Suggestion>(), (kept, suggestion) =>
             open &&
-            !Arr.some(
+            !A.some(
               state.suggestions,
               (old) =>
                 old.organizationId === org &&
                 old.importId === write.draft &&
                 where(old.suggestion) === where(suggestion)
             ) &&
-            !Arr.some(kept, (other) => where(other) === where(suggestion))
-              ? Arr.append(kept, suggestion)
+            !A.some(kept, (other) => where(other) === where(suggestion))
+              ? A.append(kept, suggestion)
               : kept
           )
           return [
@@ -1605,9 +1586,9 @@ export const SuggestionStoreMemory: Layer.Layer<SuggestionStore, never, CatalogM
               ...state,
               suggestions: [
                 ...state.suggestions,
-                ...Arr.map(made, (suggestion) => ({ organizationId: org, importId: write.draft, suggestion }))
+                ...A.map(made, (suggestion) => ({ organizationId: org, importId: write.draft, suggestion }))
               ],
-              activity: Arr.append(state.activity, write.audit)
+              activity: A.append(state.activity, write.audit)
             }
           ]
         })
@@ -1623,7 +1604,7 @@ export const AssistantLogMemory: Layer.Layer<AssistantLog, never, CatalogMemoryR
     const ref = yield* CatalogMemoryRef
     return AssistantLog.of({
       record: Effect.fnUntraced(function* (entry: Activity) {
-        yield* Ref.update(ref, (state) => ({ ...state, activity: Arr.append(state.activity, entry) }))
+        yield* Ref.update(ref, (state) => ({ ...state, activity: A.append(state.activity, entry) }))
       })
     })
   })

@@ -1,5 +1,7 @@
 // The browser's settings: the public `VITE_*` flags, decoded once, here and nowhere else.
-import { Config, ConfigProvider, Effect } from "effect"
+import * as Config from "effect/Config"
+import * as ConfigProvider from "effect/ConfigProvider"
+import * as Effect from "effect/Effect"
 
 /**
  * The browser's settings: public `VITE_*` flags only, read here and nowhere else. Vite compiles every `VITE_*` value

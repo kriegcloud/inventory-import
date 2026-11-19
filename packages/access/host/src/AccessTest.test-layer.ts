@@ -1,6 +1,8 @@
-import { Effect, Layer, Option } from "effect"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as O from "effect/Option"
 import * as S from "effect/Schema"
-import { HttpServerRequest } from "effect/http"
+import * as HttpServerRequest from "effect/http/HttpServerRequest"
 import { actingAsHeader } from "@inventory/access-contract/Access"
 import { NotSignedIn } from "@inventory/kernel/AccessError"
 import { CurrentActor } from "@inventory/kernel/Actor"
@@ -37,8 +39,8 @@ export const HeaderIdentity = /* @__PURE__ */ Layer.effect(
         const request = yield* HttpServerRequest.HttpServerRequest
         const header = request.headers[actingAsHeader]
         const id = yield* S.decodeEffect(MemberId)(header ?? defaultMemberId).pipe(Effect.option)
-        const member = Option.isSome(id) ? yield* directory.byId(id.value) : Option.none()
-        if (Option.isNone(member)) {
+        const member = O.isSome(id) ? yield* directory.byId(id.value) : O.none()
+        if (O.isNone(member)) {
           // The header's value is not echoed: what a request sent is not repeated to the screen or the log.
           return yield* NotSignedIn.make({ reason: "The test identity names no member of this app." })
         }
@@ -70,17 +72,17 @@ export const actingAs = (options: { readonly member: Member; readonly lines?: Re
       return MemberDirectory.of({
         ...memory,
         byId: Effect.fn("Members.findById")(function* () {
-          return Option.some(options.member)
+          return O.some(options.member)
         }),
         actorFor: Effect.fn("Members.findByUser")(function* () {
-          return Option.some(options.member)
+          return O.some(options.member)
         })
       })
     })
   ).pipe(
     Layer.provideMerge(
       accessMemory({
-        memberships: [{ member: options.member, userId: Option.none(), joinedAt: Option.none(), removed: false }],
+        memberships: [{ member: options.member, userId: O.none(), joinedAt: O.none(), removed: false }],
         lines: options.lines ?? []
       })
     )

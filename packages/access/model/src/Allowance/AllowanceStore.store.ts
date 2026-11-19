@@ -6,7 +6,11 @@
  */
 import { ModelCallPurpose } from "@inventory/access-contract/ModelAllowance"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
-import { Context, DateTime, Effect, Layer, Ref } from "effect"
+import * as Context from "effect/Context"
+import * as DateTime from "effect/DateTime"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Ref from "effect/Ref"
 import * as A from "effect/Array"
 import * as S from "effect/Schema"
 import { $AccessModelId } from "../internal/identity.ts"

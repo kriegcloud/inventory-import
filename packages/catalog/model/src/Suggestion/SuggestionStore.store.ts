@@ -5,7 +5,8 @@ import { Suggestion } from "@inventory/catalog-contract/Suggestion"
 import { Activity } from "@inventory/kernel/Activity"
 import { ImportId as ImportIdSchema } from "@inventory/catalog-contract/Ids"
 import type { OrganizationId } from "@inventory/kernel/Ids"
-import { Context, type Effect } from "effect"
+import * as Context from "effect/Context"
+import type * as Effect from "effect/Effect"
 import * as S from "effect/Schema"
 
 /** New suggestions for one import and the audit line of the request that made them: stored together or not at all. */

@@ -3,7 +3,8 @@
 // forces no layout pass. Until the app's faces have loaded the browser measures its fallback face, which is a
 // little narrower; callers leave a few pixels of room.
 
-import { MutableHashMap, Option } from "effect"
+import * as MutableHashMap from "effect/MutableHashMap"
+import * as O from "effect/Option"
 
 let context: CanvasRenderingContext2D | null | undefined
 let families: { sans: string; mono: string } | undefined
@@ -20,7 +21,7 @@ export const textWidth = (text: string, options?: { medium?: boolean; mono?: boo
   const medium = options?.medium === true
   const mono = options?.mono === true
   const key = `${medium ? "m" : "r"}${mono ? "c" : "t"}${text}`
-  const known = Option.getOrUndefined(MutableHashMap.get(cache, key))
+  const known = O.getOrUndefined(MutableHashMap.get(cache, key))
   if (known !== undefined) return known
   if (context === undefined) context = document.createElement("canvas").getContext("2d")
   if (context === null) return text.length * 7.5

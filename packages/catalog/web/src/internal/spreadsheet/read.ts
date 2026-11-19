@@ -1,6 +1,8 @@
 // Decides what a chosen file really is from its bytes, not its name, then hands it to the CSV or workbook reader.
 // Each reader is its own lazily loaded chunk, so choosing a CSV never downloads the workbook reader.
-import { Array as Arr, Effect, Option } from "effect"
+import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as O from "effect/Option"
 import { type FileProblem, fileProblem } from "@inventory/catalog-contract/FileProblem"
 import type { XlsxContainer } from "@beep/xlsx/XlsxDiagnostic"
 import { maxFileBytes, type Note, type SpreadsheetTable } from "@inventory/catalog-model/Spreadsheet"
@@ -126,7 +128,7 @@ const looksLikeTable = (table: SpreadsheetTable): boolean => {
   if (table.rows.length === 0 || width < 2) return false
   if (table.columns.some((column) => column.label.trim().length > 60)) return false
   // Rows come padded to the heading's width; the reader's notes name the ones that were short or too long.
-  const ragged = Arr.dedupe(
+  const ragged = A.dedupe(
     table.notes.filter((note) => note.kind === "shortRows" || note.kind === "extraCells").flatMap((note) => note.rows)
   )
   return (table.rows.length - ragged.length) * 2 > table.rows.length
@@ -198,5 +200,5 @@ export const readSpreadsheet = Effect.fn("readSpreadsheet")(function* (
   // Opening a workbook is one step with nothing to count until it is done.
   onProgress({ rowsRead: 0, rowsAbout: null, exact: false })
   const { readXlsx } = yield* Effect.promise(() => import("./xlsx.ts"))
-  return yield* readXlsx({ fileName, bytes, notes, sheet: Option.fromUndefinedOr(input.sheet), onProgress })
+  return yield* readXlsx({ fileName, bytes, notes, sheet: O.fromUndefinedOr(input.sheet), onProgress })
 })

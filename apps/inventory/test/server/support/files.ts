@@ -1,7 +1,7 @@
 // @effect-diagnostics nodeBuiltinImport:off
 // The sample files, read through the reader the browser uses and trimmed the way the browser stages them.
 import { readFileSync } from "node:fs"
-import { Effect } from "effect"
+import * as Effect from "effect/Effect"
 import { type StagedTable } from "@inventory/catalog-contract/Staged"
 import { readSpreadsheet } from "@inventory/catalog-web/Spreadsheet"
 import { stageTable } from "@inventory/catalog-model/Staging"

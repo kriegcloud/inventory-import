@@ -19,7 +19,7 @@ import {
 } from "@inventory/catalog-contract/Suggestion"
 import { ViewChange } from "@inventory/catalog-contract/TableView"
 import { UploadDiscard } from "@inventory/catalog-contract/Upload"
-import { Effect } from "effect"
+import * as Effect from "effect/Effect"
 import * as Arbitrary from "effect/Arbitrary"
 import * as O from "effect/Option"
 import * as R from "effect/Record"

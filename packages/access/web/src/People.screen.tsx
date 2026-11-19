@@ -1,5 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { DateTime, Effect, Option, Result } from "effect"
+import * as DateTime from "effect/DateTime"
+import * as Effect from "effect/Effect"
+import * as O from "effect/Option"
+import * as Result from "effect/Result"
 import * as S from "effect/Schema"
 import { type ReactNode, useId, useState } from "react"
 import { toast } from "sonner"
@@ -235,10 +238,10 @@ export function PeoplePage() {
     {
       id: "email",
       label: "Email",
-      value: (person) => Option.getOrElse(person.email, () => ""),
-      cell: (person) => Option.match(person.email, { onNone: (): ReactNode => <NotSet />, onSome: (email) => email }),
-      title: (person) => Option.getOrElse(person.email, () => "Not set"),
-      blank: (person) => Option.isNone(person.email)
+      value: (person) => O.getOrElse(person.email, () => ""),
+      cell: (person) => O.match(person.email, { onNone: (): ReactNode => <NotSet />, onSome: (email) => email }),
+      title: (person) => O.getOrElse(person.email, () => "Not set"),
+      blank: (person) => O.isNone(person.email)
     },
     {
       id: "role",
@@ -248,7 +251,7 @@ export function PeoplePage() {
       value: (person) => roleWords[person.role],
       facet: true,
       cell: (person) =>
-        admin && Option.isSome(person.email) ? (
+        admin && O.isSome(person.email) ? (
           <NativeSelect
             size="sm"
             aria-label={`Role of ${person.name}`}
@@ -272,11 +275,11 @@ export function PeoplePage() {
       label: "Joined",
       width: 190,
       // Sorted by the moment itself, as ISO text.
-      value: (person) => Option.match(person.joinedAt, { onNone: () => "", onSome: DateTime.formatIso }),
+      value: (person) => O.match(person.joinedAt, { onNone: () => "", onSome: DateTime.formatIso }),
       searchable: false,
-      cell: (person) => Option.match(person.joinedAt, { onNone: (): ReactNode => <NotSet />, onSome: when }),
-      title: (person) => Option.match(person.joinedAt, { onNone: () => "Not set", onSome: when }),
-      blank: (person) => Option.isNone(person.joinedAt)
+      cell: (person) => O.match(person.joinedAt, { onNone: (): ReactNode => <NotSet />, onSome: when }),
+      title: (person) => O.match(person.joinedAt, { onNone: () => "Not set", onSome: when }),
+      blank: (person) => O.isNone(person.joinedAt)
     },
     ...(admin
       ? [

@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import { DateTime } from "effect"
+import * as DateTime from "effect/DateTime"
 import type { Activity } from "@inventory/kernel/Activity"
 import { when, whenShort } from "@inventory/ui/Dates"
 import { type ListColumn, ListTable } from "@inventory/ui/ListTable"

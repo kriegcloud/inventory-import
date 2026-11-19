@@ -5,7 +5,7 @@ import { SignedInUser } from "@inventory/access-model/MemberDirectory"
 import { accessMemory } from "@inventory/access-model/Memory"
 import { actorOf, membersOfActor, sessionState } from "@inventory/access-model/SessionHandler"
 import { OrganizationId, UserId } from "@inventory/kernel/Ids"
-import { Effect } from "effect"
+import * as Effect from "effect/Effect"
 import * as A from "effect/Array"
 import * as O from "effect/Option"
 import { as, elena, seed } from "./support.ts"
@@ -23,7 +23,7 @@ const user = (id: string, email: string, active: O.Option<string>) =>
 layer(accessMemory(seed))("the session", (it) => {
   it.effect("nobody signed in: sign in to continue, and an answer with nothing but the features", () =>
     Effect.gen(function* () {
-      const refused = yield* Effect.flip(actorOf(O.none()))
+      const refused = yield* O.none().pipe(actorOf, Effect.flip)
       expect(refused.reason).toBe("Sign in to continue.")
       const state = yield* sessionState({ user: O.none(), features })
       expect(state).toEqual({ status: "signed-out", features })
@@ -47,13 +47,14 @@ layer(accessMemory(seed))("the session", (it) => {
   it.effect("signed up and in no organization: said so, and the answer has an email and no actor", () =>
     Effect.gen(function* () {
       const sam = user("usr_sam", "Sam@Example.test", O.none())
-      const refused = yield* Effect.flip(actorOf(sam))
+      const refused = yield* sam.pipe(actorOf, Effect.flip)
       expect(refused.reason).toBe("You are signed in but not part of an organization yet.")
       const state = yield* sessionState({ user: sam, features })
       expect(state).toEqual({ status: "no-organization", email: "Sam@Example.test", organizations: [], features })
       // Not a member of the organization the session names: no access there, and it is said without naming it.
-      const elsewhere = yield* Effect.flip(
-        actorOf(user("usr_marcus", "marcus@example-works.test", O.some("org_northline")))
+      const elsewhere = yield* user("usr_marcus", "marcus@example-works.test", O.some("org_northline")).pipe(
+        actorOf,
+        Effect.flip
       )
       expect(elsewhere.reason).toBe("You are no longer a member of that organization.")
     })

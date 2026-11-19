@@ -67,6 +67,21 @@
       ],
       "outputs": []
     },
+    // Every Effect import from its own path under its own name (scripts/check-effect-imports.mjs,
+    // docs/standards/effect-imports.md): code, the examples in its comments, and the standing documents.
+    "//#imports:check": {
+      "inputs": [
+        "apps/**/*.{ts,tsx,mts,mjs}",
+        "packages/**/*.{ts,tsx,mts,mjs}",
+        "packages/**/vendor.json",
+        "scripts/**",
+        "*.md",
+        "docs/**/*.md",
+        ".claude/agents/*.md",
+        "bun.lock"
+      ],
+      "outputs": []
+    },
     // Every file git would commit, so its hash is the whole repository's.
     "//#keys:check": { "outputs": [] },
     "//#docs:check": {

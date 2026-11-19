@@ -1,4 +1,4 @@
-import { Option } from "effect"
+import * as O from "effect/Option"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
@@ -53,12 +53,12 @@ const columns: ReadonlyArray<RecordColumn<RowOutcome>> = [
   {
     id: "reason",
     label: "Reason",
-    blank: (row) => Option.match(outcomeReasonOf(row), { onNone: () => true, onSome: (reason) => reason === "" }),
+    blank: (row) => O.match(outcomeReasonOf(row), { onNone: () => true, onSome: (reason) => reason === "" }),
     // Why, for a row that was already there or not imported; and who left it out, when someone did.
     cell: (row) =>
       row.outcome === "notImported" && row.decidedBy.kind === "person"
         ? `${row.reason} (${row.decidedBy.name})`
-        : Option.getOrElse(outcomeReasonOf(row), () => "")
+        : O.getOrElse(outcomeReasonOf(row), () => "")
   },
   {
     id: "sku",
@@ -78,8 +78,8 @@ const columns: ReadonlyArray<RecordColumn<RowOutcome>> = [
     width: 80,
     align: "right",
     // One of several items on its row says which ("8 · 2"); a row that is one item shows its number alone.
-    cell: (row) => rowPlace({ rowNumber: row.rowNumber, label: Option.getOrUndefined(Option.map(row.part, String)) }),
-    sort: (row) => row.rowNumber * 1000 + Option.getOrElse(row.part, () => 0)
+    cell: (row) => rowPlace({ rowNumber: row.rowNumber, label: O.getOrUndefined(O.map(row.part, String)) }),
+    sort: (row) => row.rowNumber * 1000 + O.getOrElse(row.part, () => 0)
   }
 ]
 
@@ -90,9 +90,9 @@ function Changed(props: { item: ChangedItem }) {
   return (
     <>
       <Code>{props.item.sku}</Code> {props.item.name}
-      {Option.match(props.item.changedBy, { onNone: () => ", changed since", onSome: (who) => `, changed by ${who}` })}
+      {O.match(props.item.changedBy, { onNone: () => ", changed since", onSome: (who) => `, changed by ${who}` })}
       {/* The moment is said when it was stored. */}
-      {Option.match(props.item.changedAt, { onNone: () => "", onSome: (at) => ` on ${whenShort(at)}` })}
+      {O.match(props.item.changedAt, { onNone: () => "", onSome: (at) => ` on ${whenShort(at)}` })}
     </>
   )
 }
@@ -211,7 +211,7 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
                   ? [
                       {
                         rowNumber: row.rowNumber,
-                        ...Option.match(row.part, { onNone: () => ({}), onSome: (part) => ({ label: String(part) }) }),
+                        ...O.match(row.part, { onNone: () => ({}), onSome: (part) => ({ label: String(part) }) }),
                         reason: row.reason
                       }
                     ]
@@ -358,7 +358,7 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
         rowKey={(row) =>
           rowId({
             rowNumber: row.rowNumber,
-            ...Option.match(row.part, { onNone: () => ({}), onSome: (part) => ({ part }) })
+            ...O.match(row.part, { onNone: () => ({}), onSome: (part) => ({ part }) })
           })
         }
         empty={

@@ -1,4 +1,6 @@
-import { Array as Arr, Option, String as Str } from "effect"
+import * as A from "effect/Array"
+import * as O from "effect/Option"
+import * as Str from "effect/String"
 import { categories, maxNameLength } from "@inventory/catalog-contract/Item"
 import * as S from "effect/Schema"
 import { type Review, type ReviewedRow } from "../Review/Review.rules.ts"
@@ -59,10 +61,10 @@ export type SuggestSource = {
 }
 
 const has = (source: SuggestSource, row: ReviewedRow, field: Field): boolean =>
-  Arr.some(source.suggestions, (s) => s.kind !== "column" && s.rowId === row.id && s.kind === field)
+  A.some(source.suggestions, (s) => s.kind !== "column" && s.rowId === row.id && s.kind === field)
 
 const open = (row: ReviewedRow, kind: "missing" | "category", field: Field): boolean =>
-  Arr.some(row.problems, (problem) => problem.kind === kind && problem.field === field && problem.proposal === null)
+  A.some(row.problems, (problem) => problem.kind === kind && problem.field === field && problem.proposal === null)
 
 /**
  * What a model is sent instead of the file: the few rows it must answer for, each with only the cells that bear on
@@ -72,42 +74,42 @@ const open = (row: ReviewedRow, kind: "missing" | "category", field: Field): boo
  */
 export const digest = (source: SuggestSource) => {
   const rows = source.review.rows
-  const nameless = Arr.filter(
+  const nameless = A.filter(
     rows,
     (row) => open(row, "missing", "name") && Str.trim(row.file.description) !== "" && !has(source, row, "name")
   )
-  const uncategorised = Arr.filter(rows, (row) => open(row, "category", "category") && !has(source, row, "category"))
-  const unmatched = Arr.filter(
+  const uncategorised = A.filter(rows, (row) => open(row, "category", "category") && !has(source, row, "category"))
+  const unmatched = A.filter(
     source.review.mapping,
     (match) =>
-      Option.isNone(matchedColumn(match)) &&
-      !Arr.some(source.suggestions, (s) => s.kind === "column" && s.field === match.field)
+      O.isNone(matchedColumn(match)) &&
+      !A.some(source.suggestions, (s) => s.kind === "column" && s.field === match.field)
   )
   return {
-    rowsWithoutName: Arr.map(Arr.take(nameless, suggestCap), (row) => ({
+    rowsWithoutName: A.map(A.take(nameless, suggestCap), (row) => ({
       rowNumber: row.rowNumber,
       sku: Str.slice(0, 40)(Str.trim(row.file.sku)),
       description: Str.slice(0, 200)(Str.trim(row.file.description)),
       category: Str.slice(0, 40)(row.values.category)
     })),
-    rowsWithoutCategory: Arr.map(Arr.take(uncategorised, suggestCap), (row) => ({
+    rowsWithoutCategory: A.map(A.take(uncategorised, suggestCap), (row) => ({
       rowNumber: row.rowNumber,
       written: Str.slice(0, 60)(Str.trim(row.file.category)),
       name: Str.slice(0, 120)(Str.trim(row.values.name)),
       description: Str.slice(0, 200)(Str.trim(row.file.description))
     })),
     categories,
-    fieldsWithoutColumn: Arr.map(unmatched, (match) => ({ field: match.field, label: fieldLabels[match.field] })),
+    fieldsWithoutColumn: A.map(unmatched, (match) => ({ field: match.field, label: fieldLabels[match.field] })),
     unusedHeadings:
       unmatched.length === 0
         ? []
-        : Arr.map(Arr.take(source.review.unusedColumns, 30), (column) => ({
+        : A.map(A.take(source.review.unusedColumns, 30), (column) => ({
             heading: Str.slice(0, 80)(column.label),
             filled: column.filled,
-            examples: Arr.take(
-              Arr.dedupe(
-                Arr.filter(
-                  Arr.map(source.table.rows, (row) =>
+            examples: A.take(
+              A.dedupe(
+                A.filter(
+                  A.map(source.table.rows, (row) =>
                     Str.slice(0, 40)(Str.trim(row.cells[column.index]?.shown ?? row.cells[column.index]?.text ?? ""))
                   ),
                   (text) => text !== ""
@@ -128,24 +130,24 @@ export const questions = (input: SuggestDigest): number =>
   (input.unusedHeadings.length === 0 ? 0 : input.fieldsWithoutColumn.length)
 
 const words = (text: string): ReadonlyArray<string> =>
-  Arr.filter(Str.split(/[^a-z0-9/]+/)(Str.toLowerCase(text)), (word) => word !== "")
+  A.filter(Str.split(/[^a-z0-9/]+/)(Str.toLowerCase(text)), (word) => word !== "")
 
 /**
  * A name read from a description by rule: its words before " for ", a comma or a full stop, each starting with a
  * capital. None when that leaves nothing or more than a name holds.
  *
- * @example nameFromDescription("Nylon coil for general use.") // Option.some("Nylon Coil")
+ * @example nameFromDescription("Nylon coil for general use.") // O.some("Nylon Coil")
  */
-export const nameFromDescription = (description: string): Option.Option<string> => {
+export const nameFromDescription = (description: string): O.Option<string> => {
   const lead = Str.trim(Str.split(/\s+for\s+|[,.;:](?:\s|$)/i)(Str.trim(description))[0] ?? "")
-  const name = Arr.join(
-    Arr.map(
-      Arr.filter(Str.split(/\s+/)(lead), (word) => word !== ""),
+  const name = A.join(
+    A.map(
+      A.filter(Str.split(/\s+/)(lead), (word) => word !== ""),
       (word) => `${Str.toUpperCase(Str.slice(0, 1)(word))}${Str.slice(1)(word)}`
     ),
     " "
   )
-  return name === "" || name.length > maxNameLength ? Option.none() : Option.some(name)
+  return name === "" || name.length > maxNameLength ? O.none() : O.some(name)
 }
 
 /**
@@ -153,9 +155,9 @@ export const nameFromDescription = (description: string): Option.Option<string> 
  * rule does not guess a category or a column.
  */
 export const answerByRules = (input: SuggestDigest): SuggestAnswer => ({
-  names: Arr.getSomes(
-    Arr.map(input.rowsWithoutName, (row) =>
-      Option.map(nameFromDescription(row.description), (name) => ({ rowNumber: row.rowNumber, name }))
+  names: A.getSomes(
+    A.map(input.rowsWithoutName, (row) =>
+      O.map(nameFromDescription(row.description), (name) => ({ rowNumber: row.rowNumber, name }))
     )
   ),
   categories: [],
@@ -183,21 +185,20 @@ export const guard = (input: {
   const { source, by } = input
   const asked = digest(source)
   const rows = source.review.rows
-  const rowOf = (rowNumber: number): Option.Option<ReviewedRow> =>
-    Arr.findFirst(rows, (row) => row.rowNumber === rowNumber)
-  type Judged = { readonly kept: Option.Option<NewSuggestion>; readonly refused: Option.Option<Refused> }
-  const no = (what: string, why: string): Judged => ({ kept: Option.none(), refused: Option.some({ what, why }) })
-  const yes = (kept: NewSuggestion): Judged => ({ kept: Option.some(kept), refused: Option.none() })
+  const rowOf = (rowNumber: number): O.Option<ReviewedRow> => A.findFirst(rows, (row) => row.rowNumber === rowNumber)
+  type Judged = { readonly kept: O.Option<NewSuggestion>; readonly refused: O.Option<Refused> }
+  const no = (what: string, why: string): Judged => ({ kept: O.none(), refused: O.some({ what, why }) })
+  const yes = (kept: NewSuggestion): Judged => ({ kept: O.some(kept), refused: O.none() })
 
-  const names = Arr.map(
-    Arr.dedupeWith(input.answer.names, (a, b) => a.rowNumber === b.rowNumber),
+  const names = A.map(
+    A.dedupeWith(input.answer.names, (a, b) => a.rowNumber === b.rowNumber),
     (entry): Judged => {
       const to = Str.trim(entry.name)
       const what = `Name "${Str.slice(0, 60)(to)}" for row ${entry.rowNumber}`
-      const row = Option.filter(rowOf(entry.rowNumber), (found) =>
-        Arr.some(asked.rowsWithoutName, (shown) => shown.rowNumber === found.rowNumber)
+      const row = O.filter(rowOf(entry.rowNumber), (found) =>
+        A.some(asked.rowsWithoutName, (shown) => shown.rowNumber === found.rowNumber)
       )
-      if (Option.isNone(row)) return no(what, "It is not a row with an empty name and a description.")
+      if (O.isNone(row)) return no(what, "It is not a row with an empty name and a description.")
       if (to === "") return no(what, "It is empty.")
       if (to.length > maxNameLength) {
         return no(what, `It is ${to.length} characters long. A name has at most ${maxNameLength}.`)
@@ -206,7 +207,7 @@ export const guard = (input: {
       const description = Str.trim(row.value.file.description)
       const told = words(description)
       // Medium only when every word of the name is a word of the description: then it says nothing the file does not.
-      const drawn = by.kind === "model" && Arr.every(words(to), (word) => Arr.contains(told, word))
+      const drawn = by.kind === "model" && A.every(words(to), (word) => A.contains(told, word))
       return yes({
         kind: "name",
         rowId: row.value.id,
@@ -226,29 +227,29 @@ export const guard = (input: {
     }
   )
 
-  const cats = Arr.map(
-    Arr.dedupeWith(input.answer.categories, (a, b) => a.rowNumber === b.rowNumber),
+  const cats = A.map(
+    A.dedupeWith(input.answer.categories, (a, b) => a.rowNumber === b.rowNumber),
     (entry): Judged => {
       const what = `Category "${Str.slice(0, 60)(entry.category)}" for row ${entry.rowNumber}`
-      const row = Option.filter(rowOf(entry.rowNumber), (found) =>
-        Arr.some(asked.rowsWithoutCategory, (shown) => shown.rowNumber === found.rowNumber)
+      const row = O.filter(rowOf(entry.rowNumber), (found) =>
+        A.some(asked.rowsWithoutCategory, (shown) => shown.rowNumber === found.rowNumber)
       )
-      if (Option.isNone(row)) return no(what, "It is not a row whose category is off the list.")
-      const to = Arr.findFirst(categories, (category) => category === Str.trim(entry.category))
-      if (Option.isNone(to) || !suggestionFits({ kind: "category", to: to.value, file: row.value.file })) {
+      if (O.isNone(row)) return no(what, "It is not a row whose category is off the list.")
+      const to = A.findFirst(categories, (category) => category === Str.trim(entry.category))
+      if (O.isNone(to) || !suggestionFits({ kind: "category", to: to.value, file: row.value.file })) {
         return no(what, `It is not one of the ${categories.length} categories.`)
       }
       // The evidence a person would look at: the other rows whose name starts with the same word, and what they say.
       const first = words(row.value.values.name)[0] ?? ""
-      const kin = Arr.filter(
+      const kin = A.filter(
         rows,
         (other) =>
           other.id !== row.value.id &&
           first !== "" &&
           words(other.values.name)[0] === first &&
-          Arr.contains(categories as ReadonlyArray<string>, other.values.category)
+          A.contains(categories as ReadonlyArray<string>, other.values.category)
       )
-      const agree = Arr.filter(kin, (other) => other.values.category === to.value).length
+      const agree = A.filter(kin, (other) => other.values.category === to.value).length
       const written = Str.trim(row.value.file.category)
       return yes({
         kind: "category",
@@ -266,20 +267,17 @@ export const guard = (input: {
     }
   )
 
-  const columns = Arr.map(
-    Arr.dedupeWith(input.answer.columns, (a, b) => a.field === b.field),
+  const columns = A.map(
+    A.dedupeWith(input.answer.columns, (a, b) => a.field === b.field),
     (entry): Judged => {
       const what = `Column "${Str.slice(0, 60)(entry.heading)}" for ${entry.field}`
-      const field = Arr.findFirst(fields, (candidate) => candidate === entry.field)
-      if (Option.isNone(field) || !Arr.some(asked.fieldsWithoutColumn, (open) => open.field === field.value)) {
+      const field = A.findFirst(fields, (candidate) => candidate === entry.field)
+      if (O.isNone(field) || !A.some(asked.fieldsWithoutColumn, (open) => open.field === field.value)) {
         return no(what, "That field already has a column, or is not a field.")
       }
-      const column = Arr.findFirst(source.review.unusedColumns, (candidate) => candidate.label === entry.heading)
-      if (Option.isNone(column)) return no(what, "That heading is not in the file, or a field already reads it.")
-      const shown = Arr.findFirst(
-        asked.unusedHeadings,
-        (heading) => heading.heading === Str.slice(0, 80)(entry.heading)
-      )
+      const column = A.findFirst(source.review.unusedColumns, (candidate) => candidate.label === entry.heading)
+      if (O.isNone(column)) return no(what, "That heading is not in the file, or a field already reads it.")
+      const shown = A.findFirst(asked.unusedHeadings, (heading) => heading.heading === Str.slice(0, 80)(entry.heading))
       const total = source.review.counts.fileRows
       return yes({
         kind: "column",
@@ -288,11 +286,11 @@ export const guard = (input: {
         heading: column.value.label,
         by,
         confidence: column.value.filled * 2 > total ? "medium" : "low",
-        basis: `No heading matched ${fieldLabels[field.value]}; "${column.value.label}" has a value on ${column.value.filled} of ${plural(total, "row", "rows")}${Option.match(
+        basis: `No heading matched ${fieldLabels[field.value]}; "${column.value.label}" has a value on ${column.value.filled} of ${plural(total, "row", "rows")}${O.match(
           shown,
           {
             onNone: () => "",
-            onSome: (heading) => (heading.examples.length === 0 ? "" : `, such as ${Arr.join(heading.examples, ", ")}`)
+            onSome: (heading) => (heading.examples.length === 0 ? "" : `, such as ${A.join(heading.examples, ", ")}`)
           }
         )}.`
       })
@@ -301,8 +299,8 @@ export const guard = (input: {
 
   const judged = [...names, ...cats, ...columns]
   return {
-    suggestions: Arr.getSomes(Arr.map(judged, (entry) => entry.kept)),
-    refused: Arr.getSomes(Arr.map(judged, (entry) => entry.refused))
+    suggestions: A.getSomes(A.map(judged, (entry) => entry.kept)),
+    refused: A.getSomes(A.map(judged, (entry) => entry.refused))
   }
 }
 
@@ -318,14 +316,14 @@ export const suggestLines = (input: {
   readonly asked: SuggestDigest
   readonly by: "model" | "rule"
 }): ReadonlyArray<string> => {
-  const count = (kind: SuggestionKind): number => Arr.filter(input.made, (s) => s.kind === kind).length
+  const count = (kind: SuggestionKind): number => A.filter(input.made, (s) => s.kind === kind).length
   const made = [
     { n: count("name"), words: ["name", "names"] as const, from: " from the description" },
     { n: count("category"), words: ["category", "categories"] as const, from: "" },
     { n: count("column"), words: ["column", "columns"] as const, from: "" }
   ]
-  const lines = Arr.map(
-    Arr.filter(made, (entry) => entry.n > 0),
+  const lines = A.map(
+    A.filter(made, (entry) => entry.n > 0),
     (entry) => `Suggested ${plural(entry.n, entry.words[0], entry.words[1])}${input.by === "rule" ? entry.from : ""}`
   )
   const left = input.asked.rowsWithoutCategory.length - count("category")
@@ -352,4 +350,4 @@ export const offersSuggestions = (
   review: Pick<Review, "mapping" | "unusedColumns"> & { readonly cannot: number }
 ): boolean =>
   review.cannot > 0 ||
-  (review.unusedColumns.length > 0 && Arr.some(review.mapping, (match) => Option.isNone(matchedColumn(match))))
+  (review.unusedColumns.length > 0 && A.some(review.mapping, (match) => O.isNone(matchedColumn(match))))

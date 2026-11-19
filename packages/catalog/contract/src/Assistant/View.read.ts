@@ -2,7 +2,7 @@ import * as S from "effect/Schema"
 import { AnsweredBy } from "../Answer/AnsweredBy.read.ts"
 import { nullAsNone } from "@inventory/kernel/Wire"
 import { LiteralKit } from "@beep/schema/LiteralKit"
-import { Tuple } from "effect"
+import * as Tuple from "effect/Tuple"
 
 // WHAT THE TABLE ASSISTANT MAY ASK OF A TABLE, AND NOTHING MORE. A person types what they want to see; a model (or the
 // fixed rules) answers with a `ViewCommand`: sort, filter, search, show or hide a column, clear. The command changes

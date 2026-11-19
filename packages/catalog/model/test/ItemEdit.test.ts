@@ -3,7 +3,8 @@
 import { describe, expect, it } from "@effect/vitest"
 import { ItemEdit, maxDescriptionLength } from "@inventory/catalog-contract/Item"
 import { type ItemForm, readItemForm } from "@inventory/catalog-model/ItemEdit"
-import { Effect, String as Str } from "effect"
+import * as Effect from "effect/Effect"
+import * as Str from "effect/String"
 import * as S from "effect/Schema"
 
 const form: ItemForm = {

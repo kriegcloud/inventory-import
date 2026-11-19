@@ -1,5 +1,7 @@
 import { expect, layer } from "@effect/vitest"
-import { Array as Arr, Effect, String as Str } from "effect"
+import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as Str from "effect/String"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
 import { ModelId } from "@beep/openrouter/OpenRouterModel"
@@ -22,8 +24,8 @@ const sha256 = (text: string) =>
   Effect.promise(() => crypto.subtle.digest("SHA-256", new TextEncoder().encode(text))).pipe(
     Effect.map((digest) =>
       btoa(
-        Arr.join(
-          Arr.map(Arr.fromIterable(new Uint8Array(digest)), (byte) => String.fromCharCode(byte)),
+        A.join(
+          A.map(A.fromIterable(new Uint8Array(digest)), (byte) => String.fromCharCode(byte)),
           ""
         )
       )
@@ -40,16 +42,16 @@ layer(
       const page = yield* send({ path: "/api/v1/docs" })
       expect(page.status).toBe(200)
       expect(page.headers.get("content-type")).toContain("text/html")
-      const scripts = Arr.map(
-        Arr.fromIterable(Str.matchAll(/<script>([\s\S]*?)<\/script>/g)(page.text)),
+      const scripts = A.map(
+        A.fromIterable(Str.matchAll(/<script>([\s\S]*?)<\/script>/g)(page.text)),
         (match) => match[1] ?? ""
       )
       expect(scripts.length).toBe(2)
       const hashes = yield* Effect.forEach(scripts, sha256, { concurrency: 1 })
       const policy = page.headers.get("content-security-policy") ?? ""
       expect(policy).toContain(
-        `script-src ${Arr.join(
-          Arr.map(hashes, (hash) => `'sha256-${hash}'`),
+        `script-src ${A.join(
+          A.map(hashes, (hash) => `'sha256-${hash}'`),
           " "
         )};`
       )

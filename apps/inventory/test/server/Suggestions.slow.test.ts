@@ -2,8 +2,9 @@
 // are stored once however often they are asked for, nothing about the rows changes until the person accepts one,
 // and a viewer cannot ask.
 import { expect, layer } from "@effect/vitest"
-import { Array as Arr, Effect } from "effect"
-import { HttpApiTest } from "effect/http-api"
+import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as HttpApiTest from "effect/http-api/HttpApiTest"
 import messy from "../../public/samples/items_messy.csv?raw"
 import { Api } from "../../src/api/v1/Api.ts"
 import { decisionFromFlags } from "@inventory/catalog-contract/Decision"
@@ -23,7 +24,7 @@ layer(TypedApp)("suggestions for an import", (it) => {
       const first = yield* client.imports.suggest({ params: { id: staged.id } }).pipe(marcus)
       expect(first.answeredBy._tag).toBe("Rules")
       expect(
-        Arr.map(first.made, (s) => (s.kind === "column" ? [] : [s.rowId, s.kind, s.to, s.by.kind, s.confidence]))
+        A.map(first.made, (s) => (s.kind === "column" ? [] : [s.rowId, s.kind, s.to, s.by.kind, s.confidence]))
       ).toEqual([
         ["row-7", "name", "Nylon Coil", "rule", "low"],
         ["row-83", "name", "Copper Plate 1/4in", "rule", "low"]

@@ -19,8 +19,12 @@ import { MemberDirectory, SignedInUser } from "@inventory/access-model/MemberDir
 import { CurrentActor } from "@inventory/kernel/Actor"
 import { Identity } from "@inventory/kernel/Identity"
 import { OrganizationId, UserId } from "@inventory/kernel/Ids"
-import { Array as Arr, Context, Effect, Layer, Option } from "effect"
-import { HttpServerRequest } from "effect/http"
+import * as A from "effect/Array"
+import * as Context from "effect/Context"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as O from "effect/Option"
+import * as HttpServerRequest from "effect/http/HttpServerRequest"
 import { authSettings } from "./Config.ts"
 import { $AccessHostId } from "./internal/identity.ts"
 import { seededAccounts, testAccountPassword } from "./internal/TestAccounts.ts"
@@ -32,7 +36,7 @@ const signedIn = (session: AuthSession): SignedInUser =>
   SignedInUser.make({
     userId: UserId.make(session.userId),
     email: AccountEmail.make(session.email),
-    active: Option.map(session.activeOrganizationId, (id) => OrganizationId.make(id))
+    active: O.map(session.activeOrganizationId, (id) => OrganizationId.make(id))
   })
 
 /**
@@ -51,7 +55,7 @@ export const SessionIdentityLive: Layer.Layer<Identity, never, BetterAuth | Memb
         // A Better Auth failure is no fault of the request: it ends as a 500, as before the driver typed it.
         const session = yield* auth.session(new Headers(request.headers)).pipe(Effect.orDie)
         const member = yield* accessHandlers
-          .actorOf(Option.map(session, signedIn))
+          .actorOf(O.map(session, signedIn))
           .pipe(Effect.provideService(MemberDirectory, directory))
         // Ids only, never a name or an email: every span and log line inside the request carries who acted.
         const who = {
@@ -89,20 +93,20 @@ export class Sessions extends Context.Service<
         const auth = yield* BetterAuth
         const directory = yield* MemberDirectory
         const settings = yield* authSettings(build)
-        const userIds = Arr.map(seededAccounts, (account) => UserId.make(account.userId))
+        const userIds = A.map(seededAccounts, (account) => UserId.make(account.userId))
         return Sessions.of({
           state: Effect.fn("Sessions.state")(function* (headers: Headers) {
             const found = settings.testAccounts ? yield* directory.testAccounts(userIds) : []
-            const accounts = settings.testAccounts ? Option.some(found) : Option.none()
+            const accounts = settings.testAccounts ? O.some(found) : O.none()
             const features = SignInFeatures.make({
-              testAccounts: Option.map(accounts, (offered) =>
+              testAccounts: O.map(accounts, (offered) =>
                 TestAccountsOffer.make({ password: testAccountPassword, accounts: offered })
               ),
               pwnedPasswordCheck: settings.pwnedPasswordCheck
             })
             const session = yield* auth.session(headers).pipe(Effect.orDie)
             return yield* accessHandlers
-              .sessionState({ user: Option.map(session, signedIn), features })
+              .sessionState({ user: O.map(session, signedIn), features })
               .pipe(Effect.provideService(MemberDirectory, directory))
           })
         })

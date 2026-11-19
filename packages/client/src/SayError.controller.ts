@@ -2,8 +2,9 @@
 // protects: the screen never shows a status code, a stack, a URL or a provider's own text. Those go to the console,
 // once per failure, for whoever is debugging; the person reads a sentence. Every screen calls `sayError`, so a new
 // kind of failure is worded here once, not in each component.
-import { Effect, Predicate } from "effect"
-import { HttpClientError } from "effect/http"
+import * as Effect from "effect/Effect"
+import * as P from "effect/Predicate"
+import * as HttpClientError from "effect/http/HttpClientError"
 import { toast } from "sonner"
 
 /** A failure as the person reads it: a short title, one or two sentences, and every problem when there are several. */
@@ -29,12 +30,10 @@ const troubleSentence = (kind: string): string =>
   "The model is not answering right now. Try again later."
 
 const reasonOf = (error: unknown): string | undefined =>
-  Predicate.hasProperty(error, "reason") && Predicate.isString(error.reason) && error.reason.trim() !== ""
-    ? error.reason
-    : undefined
+  P.hasProperty(error, "reason") && P.isString(error.reason) && error.reason.trim() !== "" ? error.reason : undefined
 
 const tagOf = (error: unknown): string | undefined =>
-  Predicate.hasProperty(error, "_tag") && Predicate.isString(error._tag) ? error._tag : undefined
+  P.hasProperty(error, "_tag") && P.isString(error._tag) ? error._tag : undefined
 
 const statusOf = (error: HttpClientError.HttpClientError): number | undefined =>
   "response" in error.reason ? error.reason.response.status : undefined
@@ -50,10 +49,10 @@ const fieldWords = (path: ReadonlyArray<string | number>): string => {
  * words (`{ action: "Action" }`); a field it does not name is said from its key.
  */
 const requestProblems = (error: unknown, fields: Readonly<Record<string, string>>): ReadonlyArray<string> => {
-  if (!Predicate.hasProperty(error, "errors") || !Array.isArray(error.errors)) return []
+  if (!P.hasProperty(error, "errors") || !Array.isArray(error.errors)) return []
   const seen: Array<string> = []
   for (const issue of error.errors) {
-    if (!Predicate.hasProperty(issue, "path") || !Array.isArray(issue.path)) continue
+    if (!P.hasProperty(issue, "path") || !Array.isArray(issue.path)) continue
     const path = issue.path.filter((segment): segment is string | number => typeof segment !== "object")
     const key = [...path].reverse().find((segment): segment is string => typeof segment === "string") ?? ""
     const label = Object.hasOwn(fields, key) ? (fields[key] ?? key) : fieldWords(path)
@@ -104,7 +103,7 @@ export const sayError = (
     case "AiUnavailable": {
       // Said by its kind, from the sentences the app installed (the contract's `modelSentences`), never by the error's
       // own text: a provider's words never reach the screen.
-      const kind = Predicate.hasProperty(error, "kind") && Predicate.isString(error.kind) ? error.kind : "down"
+      const kind = P.hasProperty(error, "kind") && P.isString(error.kind) ? error.kind : "down"
       return said("The model did not answer", troubleSentence(kind))
     }
     case "BadRequestProblem": {
@@ -143,12 +142,12 @@ export const sayError = (
     return said("The server's answer could not be read", "Reload the page and try again.")
   }
   // A file's own problem (`FileProblem`, read by its tag) is written for the person: what is wrong, then what to do.
-  if (tag === "FileProblem" && Predicate.hasProperty(error, "problem") && Predicate.hasProperty(error, "todo")) {
-    if (Predicate.isString(error.problem) && Predicate.isString(error.todo))
+  if (tag === "FileProblem" && P.hasProperty(error, "problem") && P.hasProperty(error, "todo")) {
+    if (P.isString(error.problem) && P.isString(error.todo))
       return said("The file was not read", `${error.problem} ${error.todo}`)
   }
   // The reader itself failed: its sentence says what to do.
-  if (tag === "ReadFailed" && Predicate.hasProperty(error, "message") && Predicate.isString(error.message)) {
+  if (tag === "ReadFailed" && P.hasProperty(error, "message") && P.isString(error.message)) {
     return said("The file was not read", error.message)
   }
   if (tag === "FileNotKept") {

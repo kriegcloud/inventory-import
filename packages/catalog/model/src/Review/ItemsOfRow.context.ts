@@ -2,7 +2,7 @@
 // screen reviews with `itemsOfRow` too, so this default stays that function. Change the function in
 // `Review.rules.ts`, never this default: a different one here would make the server and the screen disagree about
 // which items a file holds. A test provides its own to try a file whose rows hold several.
-import { Context } from "effect"
+import * as Context from "effect/Context"
 import { type ItemsOfRow as ItemsOfRowShape, itemsOfRow } from "./Review.rules.ts"
 
 /**

@@ -11,13 +11,14 @@
  * @packageDocumentation
  */
 import type { D1Database } from "@cloudflare/workers-types"
-import { D1Client } from "@effect/sql-d1"
+import * as D1Client from "@effect/sql-d1/D1Client"
 import * as A from "effect/Array"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as S from "effect/Schema"
-import type { SqlClient, Statement } from "effect/sql"
+import type * as SqlClient from "effect/sql/SqlClient"
+import type * as Statement from "effect/sql/Statement"
 import { D1Error } from "./D1.errors.ts"
 import { $D1Id } from "./internal/identity.ts"
 

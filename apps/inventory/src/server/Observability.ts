@@ -1,4 +1,9 @@
-import { Cause, Effect, ErrorReporter, Layer, Logger, References } from "effect"
+import * as Cause from "effect/Cause"
+import * as Effect from "effect/Effect"
+import * as ErrorReporter from "effect/ErrorReporter"
+import * as Layer from "effect/Layer"
+import * as Logger from "effect/Logger"
+import * as References from "effect/References"
 import { type LogFormat, logSettings } from "./Settings.ts"
 
 /**
@@ -65,7 +70,9 @@ export const logReporter: ErrorReporter.ErrorReporter = (() => {
     if (written.has(cause)) return
     written.add(cause)
     const defect = Cause.hasDies(cause)
-    const line = Effect.logWithLevel(defect ? "Error" : severity)(Cause.pretty(cause)).pipe(
+    const line = cause.pipe(
+      Cause.pretty,
+      Effect.logWithLevel(defect ? "Error" : severity),
       Effect.annotateLogs({ ...attributes, "error.kind": defect ? "defect" : "failure" })
     )
     Effect.runSyncExitWith(fiber.context)(line)

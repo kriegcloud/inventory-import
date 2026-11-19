@@ -13,8 +13,8 @@
   ],
   "type": "module",
   "scripts": {
-    "check": "turbo run check lint test //#format:check //#docs:check //#keys:check //#vendor:check //#ceilings:check //#boundaries:check //#screens:check",
-    "check:full": "turbo run check lint test test:slow build //#format:check //#docs:check //#keys:check //#vendor:check //#ceilings:check //#boundaries:check //#screens:check",
+    "check": "turbo run check lint test //#format:check //#docs:check //#keys:check //#vendor:check //#ceilings:check //#boundaries:check //#screens:check //#imports:check",
+    "check:full": "turbo run check lint test test:slow build //#format:check //#docs:check //#keys:check //#vendor:check //#ceilings:check //#boundaries:check //#screens:check //#imports:check",
     "dev": "bun run --cwd apps/inventory dev",
     "build": "turbo run build",
     "preview": "bun run --cwd apps/inventory preview",
@@ -35,10 +35,13 @@
     "vendor:check": "node scripts/vendor-check.mjs",
     "ceilings:check": "node scripts/check-ceilings.mjs",
     "boundaries:check": "node scripts/check-boundaries.mjs",
-    "screens:check": "node scripts/check-screens.mjs"
+    "screens:check": "node scripts/check-screens.mjs",
+    "imports:check": "node scripts/check-effect-imports.mjs",
+    "imports:fix": "node scripts/check-effect-imports.mjs --write"
   },
   "devDependencies": {
     "@effect/tsgo": "0.70.0",
+    "oxc-parser": "0.148.0",
     "oxfmt": "^0.78.0",
     "oxlint": "1.93.0",
     "syncpack": "^15.3.3",

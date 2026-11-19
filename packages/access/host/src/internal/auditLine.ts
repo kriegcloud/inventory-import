@@ -4,7 +4,8 @@ import { D1, NoRows } from "@beep/d1/D1"
 import { Activity } from "@inventory/kernel/Activity"
 import { MemberId } from "@inventory/kernel/Ids"
 import * as S from "effect/Schema"
-import type { SqlClient, Statement } from "effect/sql"
+import type * as SqlClient from "effect/sql/SqlClient"
+import type * as Statement from "effect/sql/Statement"
 
 /** An audit line and the member its change is about, for the guard. */
 const Guarded = S.Struct({ line: Activity, member: MemberId })

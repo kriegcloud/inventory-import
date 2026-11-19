@@ -1,8 +1,10 @@
 // What the person reads when something fails. The rule that would hurt if wrong: no status code, URL, stack or
 // provider text ever reaches the screen, and a request refused for several fields names every one of them at once.
-import { HttpClientError, HttpClientRequest, HttpClientResponse } from "effect/http"
-import { HttpApiError } from "effect/http-api"
-import { Array as Arr } from "effect"
+import * as HttpClientError from "effect/http/HttpClientError"
+import * as HttpClientRequest from "effect/http/HttpClientRequest"
+import * as HttpClientResponse from "effect/http/HttpClientResponse"
+import * as HttpApiError from "effect/http-api/HttpApiError"
+import * as A from "effect/Array"
 import { describe, expect, it, vi } from "vitest"
 import { installTroubleSentences, sayError } from "@inventory/client/SayError"
 
@@ -38,7 +40,7 @@ describe("saying a failure", () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined)
     for (const [what, error] of failures) {
       const said = sayError(error)
-      const words = Arr.join([said.title, said.sentence, ...said.problems], " ")
+      const words = A.join([said.title, said.sentence, ...said.problems], " ")
       expect(words, what).not.toMatch(/\b(4\d\d|5\d\d)\b|https?:|\/api|Error|\{|\bat \w+\.tsx?/)
       expect(said.sentence.length, what).toBeGreaterThan(10)
     }

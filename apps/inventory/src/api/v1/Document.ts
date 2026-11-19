@@ -1,7 +1,9 @@
 // What the OpenAPI document says that the contract's own types cannot: corrections made to the generated document
 // only (`OpenApi.Transform` on the `Api`, applied last). Nothing here changes a route, a payload or an answer; the
 // one thing not to break is that every line below states what the server already does, never what it should do.
-import { Array as Arr, Record as Rec, String as Str } from "effect"
+import * as A from "effect/Array"
+import * as R from "effect/Record"
+import * as Str from "effect/String"
 
 /** The name of the security scheme every signed-in endpoint lists: the session cookie Better Auth sets. */
 export const sessionCookieScheme = "sessionCookie"
@@ -28,7 +30,7 @@ const methods = ["get", "put", "post", "delete", "patch", "head", "options"]
 /** Every operation of the document, with its method. */
 const operationsOf = (spec: Json): Array<{ readonly method: string; readonly operation: Json }> => {
   const found: Array<{ readonly method: string; readonly operation: Json }> = []
-  for (const item of Rec.values<string, Json>(spec["paths"] ?? {})) {
+  for (const item of R.values<string, Json>(spec["paths"] ?? {})) {
     for (const method of methods) {
       const operation = item[method]
       if (operation !== undefined) found.push({ method, operation })
@@ -41,7 +43,7 @@ const refPrefix = "#/components/schemas/"
 
 /** Every `$ref` to a component schema, anywhere in the document, pointed at the component's new name. */
 const renameRefs = (node: unknown, renamed: Readonly<Record<string, string>>): void => {
-  if (Arr.isArray(node)) {
+  if (A.isArray(node)) {
     for (const item of node) renameRefs(item, renamed)
     return
   }
@@ -50,9 +52,9 @@ const renameRefs = (node: unknown, renamed: Readonly<Record<string, string>>): v
   const ref = object["$ref"]
   if (typeof ref === "string" && Str.startsWith(refPrefix)(ref)) {
     const name = Str.slice(refPrefix.length)(ref)
-    if (Rec.has(renamed, name)) object["$ref"] = `${refPrefix}${renamed[name]}`
+    if (R.has(renamed, name)) object["$ref"] = `${refPrefix}${renamed[name]}`
   }
-  for (const value of Rec.values(object)) renameRefs(value, renamed)
+  for (const value of R.values(object)) renameRefs(value, renamed)
 }
 
 /**
@@ -65,16 +67,16 @@ const renameRefs = (node: unknown, renamed: Readonly<Record<string, string>>): v
  */
 /** True when two parts of the document say the same thing: the same keys and values, whatever order the keys are in. */
 const sameShape = (a: unknown, b: unknown): boolean => {
-  if (Arr.isArray(a) || Arr.isArray(b)) {
-    return Arr.isArray(a) && Arr.isArray(b) && a.length === b.length && Arr.every(a, (item, i) => sameShape(item, b[i]))
+  if (A.isArray(a) || A.isArray(b)) {
+    return A.isArray(a) && A.isArray(b) && a.length === b.length && A.every(a, (item, i) => sameShape(item, b[i]))
   }
   if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return a === b
   const left = a as Json
   const right = b as Json
-  const keys = Rec.keys(left)
+  const keys = R.keys(left)
   return (
-    keys.length === Rec.keys(right).length &&
-    Arr.every(keys, (key) => Rec.has(right, key) && sameShape(left[key], right[key]))
+    keys.length === R.keys(right).length &&
+    A.every(keys, (key) => R.has(right, key) && sameShape(left[key], right[key]))
   )
 }
 
@@ -82,28 +84,28 @@ const sameShape = (a: unknown, b: unknown): boolean => {
 const nameOnce = (spec: Json): boolean => {
   const schemas: Json = spec["components"]["schemas"]
   const renamed: Record<string, string> = {}
-  for (const name of Rec.keys(schemas)) {
+  for (const name of R.keys(schemas)) {
     const copy = /^(.+)_\d+$/.exec(name)
     const original = copy?.[1]
-    if (original !== undefined && Rec.has(schemas, original) && sameShape(schemas[name], schemas[original])) {
+    if (original !== undefined && R.has(schemas, original) && sameShape(schemas[name], schemas[original])) {
       renamed[name] = original
       continue
     }
     const unsuffixed = /^(.+)Encoded$/.exec(name)?.[1] ?? name
     const plain = /^_beep_(?:[A-Za-z0-9]+_)+([A-Za-z0-9]+)$/.exec(unsuffixed)?.[1] ?? unsuffixed
     // Its own name when that is free, or when what holds it is the very same shape.
-    if (plain !== name && (!Rec.has(schemas, plain) || sameShape(schemas[name], schemas[plain]))) {
+    if (plain !== name && (!R.has(schemas, plain) || sameShape(schemas[name], schemas[plain]))) {
       renamed[name] = plain
     }
   }
   const next: Json = {}
-  for (const [name, schema] of Rec.toEntries(schemas)) {
+  for (const [name, schema] of R.toEntries(schemas)) {
     const to = renamed[name] ?? name
-    if (!Rec.has(next, to)) next[to] = schema
+    if (!R.has(next, to)) next[to] = schema
   }
   spec["components"]["schemas"] = next
   renameRefs(spec, renamed)
-  return !Rec.isEmptyRecord(renamed)
+  return !R.isEmptyRecord(renamed)
 }
 
 // A copy that points at another copy is identical to its original only once that one has been folded, so the

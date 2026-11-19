@@ -1,5 +1,10 @@
 import { expect, layer } from "@effect/vitest"
-import { Array as Arr, Effect, Exit, Layer, Order, Record as Rec } from "effect"
+import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as Exit from "effect/Exit"
+import * as Layer from "effect/Layer"
+import * as Order from "effect/Order"
+import * as R from "effect/Record"
 import { signIn } from "@inventory/access-host/SignIn"
 import { testAccountPassword } from "@inventory/access-host/TestAccounts"
 import { D1Binding } from "@beep/d1/D1"
@@ -83,7 +88,7 @@ layer(signInApp(), { timeout: "60 seconds" })("sign-in with Better Auth", (it) =
       expect(state.status).toBe(200)
       expect(state.json).toMatchObject({ status: "signed-out", features: { pwnedPasswordCheck: false } })
       // Nobody is signed in: the answer has no email, actor or organizations to be null or empty.
-      expect(Arr.sort(Rec.keys(state.json), Order.String)).toEqual(["features", "status"])
+      expect(A.sort(R.keys(state.json), Order.String)).toEqual(["features", "status"])
       expect(state.json.features.testAccounts.password).toBe(password)
       // Two organizations and all three roles, read from the database, in the order the page lists them.
       expect(state.json.features.testAccounts.accounts).toEqual([
@@ -344,7 +349,7 @@ layer(signInApp(), { timeout: "60 seconds" })("sign-in with Better Auth", (it) =
         })
         statuses.push(answer.status)
       }
-      expect(Arr.every(Arr.take(statuses, 10), (status) => status === 401)).toBe(true)
+      expect(A.every(A.take(statuses, 10), (status) => status === 401)).toBe(true)
       expect(statuses[10]).toBe(429)
       // Another address is not affected.
       expect((yield* browser("10.0.0.12").signIn("dana@example-works.test")).status).toBe(200)
@@ -373,13 +378,9 @@ layer(settingsLayer({ ...testSettings, BETTER_AUTH_SECRET: "" }), { timeout: "60
   (it) => {
     it.effect("a production build refuses to start, and says how to set one", () =>
       Effect.gen(function* () {
-        const started = yield* Layer.build(
-          Layer.unwrap(
-            Effect.gen(function* () {
-              return signIn({ database: yield* D1Binding, production: true })
-            })
-          ).pipe(Layer.provide(TestDatabase))
-        ).pipe(Effect.scoped, Effect.exit)
+        const started = yield* Effect.gen(function* () {
+          return signIn({ database: yield* D1Binding, production: true })
+        }).pipe(Layer.unwrap, Layer.provide(TestDatabase), Layer.build, Effect.scoped, Effect.exit)
         expect(Exit.isFailure(started)).toBe(true)
         expect(String(Exit.isFailure(started) ? started.cause : "")).toContain(
           "BETTER_AUTH_SECRET is not set. Set it with `wrangler secret put BETTER_AUTH_SECRET`"

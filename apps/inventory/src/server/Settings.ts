@@ -1,4 +1,8 @@
-import { Array as Arr, Config, Option, Redacted, String as Str } from "effect"
+import * as A from "effect/Array"
+import * as Config from "effect/Config"
+import * as O from "effect/Option"
+import * as Redacted from "effect/Redacted"
+import * as Str from "effect/String"
 import * as S from "effect/Schema"
 
 // SETTINGS. Every setting and secret the server reads is declared here, as an `effect/Config`, and nowhere else reads
@@ -37,7 +41,7 @@ export const logSettings = (defaults: { readonly format: LogFormat }) =>
 export const optionalUrl = (name: string) =>
   Config.schema(S.Union([S.Literal(""), S.URL]), name).pipe(
     Config.withDefault(""),
-    Config.map((url) => (url === "" ? Option.none() : Option.some(url)))
+    Config.map((url) => (url === "" ? O.none() : O.some(url)))
   )
 
 /**
@@ -48,8 +52,8 @@ export const optionalUrl = (name: string) =>
 export const devToolsSettings = optionalUrl("EFFECT_DEVTOOLS_URL")
 
 /** A key that is set but blank (`OPENROUTER_API_KEY=" "`) is the same as no key. */
-const present = (key: Option.Option<Redacted.Redacted<string>>) =>
-  Option.filter(key, (value) => Str.trim(Redacted.value(value)) !== "")
+const present = (key: O.Option<Redacted.Redacted<string>>) =>
+  O.filter(key, (value) => value.pipe(Redacted.value, Str.trim) !== "")
 
 /**
  * The model settings. AI is on only when a key is set and `AI_ENABLED` is not false; otherwise every feature uses
@@ -65,7 +69,7 @@ export const aiSettings = Config.all({
   enabled: Config.Boolean("AI_ENABLED").pipe(Config.withDefault(true)),
   model: Config.schema(S.Trim.check(S.isNonEmpty()), "AI_MODEL"),
   fallbackModels: Config.Array(S.Trim, "AI_FALLBACK_MODELS").pipe(
-    Config.map(Arr.filter((model) => model !== "")),
+    Config.map(A.filter((model) => model !== "")),
     Config.withDefault<ReadonlyArray<string>>([])
   ),
   openRouterKey: Config.Redacted("OPENROUTER_API_KEY").pipe(Config.option, Config.map(present))

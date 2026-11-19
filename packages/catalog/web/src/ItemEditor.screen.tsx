@@ -1,4 +1,4 @@
-import { Option } from "effect"
+import * as O from "effect/Option"
 import { useQueryClient } from "@tanstack/react-query"
 import { PencilIcon } from "lucide-react"
 import { useId, useState } from "react"
@@ -40,16 +40,16 @@ import { type ItemForm, type ItemFormProblems, readItemForm } from "@inventory/c
 
 const formOf = (item: StoredItem): ItemForm => ({
   name: item.name,
-  description: Option.getOrElse(item.description, () => ""),
+  description: O.getOrElse(item.description, () => ""),
   category: item.category,
   uom: item.uom,
   unitCost: costDigits(item.unitCost),
   quantityOnHand: `${item.quantityOnHand}`,
-  reorderPoint: Option.match(item.reorderPoint, { onNone: () => "", onSome: (point) => `${point}` }),
+  reorderPoint: O.match(item.reorderPoint, { onNone: () => "", onSome: (point) => `${point}` }),
   isActive: isActive(item.stocking),
   lotTracked: item.lotTracked,
-  firstReceivedOn: Option.getOrElse(item.firstReceivedOn, () => ""),
-  discontinuedOn: Option.getOrElse(discontinuedOn(item.stocking), () => "")
+  firstReceivedOn: O.getOrElse(item.firstReceivedOn, () => ""),
+  discontinuedOn: O.getOrElse(discontinuedOn(item.stocking), () => "")
 })
 
 /** The item with an edit's values in it: what the table shows the moment the person saves. */
@@ -82,7 +82,7 @@ function FromTheFile(props: { item: StoredItem }) {
       <div className="flex gap-2">
         <dt className="w-24 shrink-0 text-muted-foreground">Dimensions</dt>
         <dd className="tabular-nums">
-          {Option.match(item.dimensions, { onNone: () => <NotSet />, onSome: (size) => <>{dimensionsText(size)}</> })}
+          {O.match(item.dimensions, { onNone: () => <NotSet />, onSome: (size) => <>{dimensionsText(size)}</> })}
         </dd>
       </div>
       <div className="flex gap-2">
@@ -98,8 +98,8 @@ function FromTheFile(props: { item: StoredItem }) {
                   {vendor.isPreferred ? " · preferred" : ""}
                   <span className="block text-muted-foreground tabular-nums">
                     {costOf(vendor.unitCost)}
-                    {Option.match(vendor.leadTimeDays, { onNone: () => "", onSome: (days) => ` · ${days} days` })}
-                    {Option.match(vendor.vendorSku, {
+                    {O.match(vendor.leadTimeDays, { onNone: () => "", onSome: (days) => ` · ${days} days` })}
+                    {O.match(vendor.vendorSku, {
                       onNone: () => null,
                       onSome: (code) => (
                         <>

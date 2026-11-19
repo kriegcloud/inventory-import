@@ -6,6 +6,7 @@
       "name": "inventory-import",
       "devDependencies": {
         "@effect/tsgo": "0.70.0",
+        "oxc-parser": "0.148.0",
         "oxfmt": "^0.78.0",
         "oxlint": "1.93.0",
         "syncpack": "^15.3.3",

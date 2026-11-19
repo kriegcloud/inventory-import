@@ -4,7 +4,7 @@
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import { FileProblem } from "@inventory/catalog-contract/FileProblem"
 import { ImportId } from "@inventory/catalog-contract/Ids"
-import { Tuple } from "effect"
+import * as Tuple from "effect/Tuple"
 import * as S from "effect/Schema"
 
 /** What is known of how many rows a file has while it is read. */

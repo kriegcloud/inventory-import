@@ -19,10 +19,11 @@ import * as Layer from "effect/Layer"
 import * as O from "effect/Option"
 import * as Redacted from "effect/Redacted"
 import * as S from "effect/Schema"
-import { SecureRandom } from "effect/crypto"
+import * as SecureRandom from "effect/crypto/SecureRandom"
 import * as Base64 from "effect/encoding/Base64"
-import { HttpRouter, type HttpServerRequest, HttpServerResponse } from "effect/http"
-import * as HttpServerRequestModule from "effect/http/HttpServerRequest"
+import * as HttpRouter from "effect/http/HttpRouter"
+import * as HttpServerRequest from "effect/http/HttpServerRequest"
+import * as HttpServerResponse from "effect/http/HttpServerResponse"
 import type { BetterAuthSettings } from "./BetterAuth.config.ts"
 import { BetterAuthConfigError, BetterAuthError } from "./BetterAuth.errors.ts"
 import { AuthSecret, AuthSession, AuthSessionAnswer, authEndpointOf, resolveAuthSecret } from "./BetterAuth.schema.ts"
@@ -152,7 +153,7 @@ export class BetterAuth extends Context.Service<
           Effect.fn("BetterAuth.route")(function* (request: HttpServerRequest.HttpServerRequest) {
             const refused = yield* options.guard(request, auth.publicOrigin)
             if (O.isSome(refused)) return refused.value
-            const web = yield* HttpServerRequestModule.toWeb(request).pipe(Effect.orDie)
+            const web = yield* HttpServerRequest.toWeb(request).pipe(Effect.orDie)
             const response = yield* auth.handle(web).pipe(Effect.orDie)
             return HttpServerResponse.fromWeb(response)
           })

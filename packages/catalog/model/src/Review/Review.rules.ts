@@ -33,7 +33,12 @@ import {
   Vendor
 } from "@inventory/catalog-contract/Item"
 import { ColumnMatch, UnusedColumn, MappingChoice, matchedColumn } from "@inventory/catalog-contract/Mapping"
-import { Array as Arr, HashMap, HashSet, Option, Record as Rec, String as Str } from "effect"
+import * as A from "effect/Array"
+import * as HashMap from "effect/HashMap"
+import * as HashSet from "effect/HashSet"
+import * as O from "effect/Option"
+import * as R from "effect/Record"
+import * as Str from "effect/String"
 import {
   canonicalTags,
   readDate,
@@ -76,19 +81,19 @@ const storedTextFields: ReadonlyArray<Field> = ["unitCost", "firstReceivedOn", "
  * "00123". Spaces round a value are kept: trimming them is a proposal.
  */
 const cellText = (field: Field, cell: StagedCell | undefined): string => {
-  const text = cell === undefined ? "" : Arr.contains(storedTextFields, field) ? cell.text : (cell.shown ?? cell.text)
+  const text = cell === undefined ? "" : A.contains(storedTextFields, field) ? cell.text : (cell.shown ?? cell.text)
   // A cell holding only spaces is an empty cell: the screen then says "Empty" instead of showing nothing.
   return Str.trim(text) === "" ? "" : text
 }
 
 const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`
 
-/** Maps and keeps the values that exist. Effect 4's `Arr.filterMap` takes a Result, not an Option. */
-const keepSome = <A, B>(list: ReadonlyArray<A>, f: (a: A, index: number) => Option.Option<B>): Array<B> =>
-  Arr.getSomes(Arr.map(list, f))
+/** Maps and keeps the values that exist. Effect 4's `A.filterMap` takes a Result, not an Option. */
+const keepSome = <A, B>(list: ReadonlyArray<A>, f: (a: A, index: number) => O.Option<B>): Array<B> =>
+  A.getSomes(A.map(list, f))
 
 const preferredOf = (vendors: ReadonlyArray<Vendor>): ReadonlyArray<Vendor> =>
-  Arr.filter(vendors, (vendor) => vendor.isPreferred)
+  A.filter(vendors, (vendor) => vendor.isPreferred)
 
 /**
  * Whether the rules' form-only fixes (spaces round a SKU or a name, "bx" for BX, a "$" before a cost, yes for true,
@@ -344,14 +349,14 @@ const canonical = (field: Field, text: string): string => {
   if (field === "sku") return skuPattern.test(Str.toUpperCase(trimmed)) ? Str.toUpperCase(trimmed) : trimmed
   if (field === "uom") return isUom(Str.toUpperCase(trimmed)) ? Str.toUpperCase(trimmed) : trimmed
   if (field === "category") return isCategory(categoryKey(trimmed)) ? categoryKey(trimmed) : trimmed
-  if (isBooleanField(field)) return Option.getOrElse(booleanWord(trimmed), () => trimmed)
+  if (isBooleanField(field)) return O.getOrElse(booleanWord(trimmed), () => trimmed)
   if (field === "tags") return canonicalTags(trimmed)
   return trimmed
 }
 
 /** True when the row says it is discontinued and active at once: a date that reads, and Active true or left empty. */
 const discontinuedYetActive = (values: Readonly<Record<Field, string>>): boolean =>
-  Option.isSome(readDate(values.discontinuedOn)) && (Str.trim(values.isActive) === "" || values.isActive === "true")
+  O.isSome(readDate(values.discontinuedOn)) && (Str.trim(values.isActive) === "" || values.isActive === "true")
 
 /**
  * The fixed rules' form-only reading of one cell that does not read as written, or none: spaces round a SKU or a
@@ -364,56 +369,56 @@ const discontinuedYetActive = (values: Readonly<Record<Field, string>>): boolean
 export const ruleFor = (input: {
   readonly field: Field
   readonly text: string
-}): Option.Option<{ readonly to: string; readonly rule: string }> => {
+}): O.Option<{ readonly to: string; readonly rule: string }> => {
   const { field, text } = input
   const trimmed = Str.trim(text)
-  if (trimmed === "") return Option.none()
+  if (trimmed === "") return O.none()
   if (field === "sku") {
     return text !== trimmed && skuPattern.test(trimmed)
-      ? Option.some({ to: trimmed, rule: "spaces around the value" })
-      : Option.none()
+      ? O.some({ to: trimmed, rule: "spaces around the value" })
+      : O.none()
   }
   if (field === "name") {
     return text !== trimmed && trimmed.length <= maxNameLength
-      ? Option.some({ to: trimmed, rule: "spaces around the value" })
-      : Option.none()
+      ? O.some({ to: trimmed, rule: "spaces around the value" })
+      : O.none()
   }
   if (field === "uom") {
     const upper = Str.toUpperCase(trimmed)
-    return !isUom(text) && isUom(upper) ? Option.some({ to: upper, rule: "the same unit in capitals" }) : Option.none()
+    return !isUom(text) && isUom(upper) ? O.some({ to: upper, rule: "the same unit in capitals" }) : O.none()
   }
   if (field === "category") {
     const key = categoryKey(text)
     return !isCategory(text) && isCategory(key)
-      ? Option.some({ to: key, rule: "the same category in the list's own form" })
-      : Option.none()
+      ? O.some({ to: key, rule: "the same category in the list's own form" })
+      : O.none()
   }
   if (field === "unitCost") {
     const bare = Str.trim(Str.replace(/^\$/, "")(trimmed))
-    return Str.startsWith("$")(trimmed) && Option.isSome(readDecimal(bare))
-      ? Option.some({ to: bare, rule: "the same amount without the $" })
-      : Option.none()
+    return Str.startsWith("$")(trimmed) && O.isSome(readDecimal(bare))
+      ? O.some({ to: bare, rule: "the same amount without the $" })
+      : O.none()
   }
   if (isBooleanField(field)) {
     return text === "true" || text === "false"
-      ? Option.none()
-      : Option.map(booleanWord(text), (to) => ({ to, rule: `a usual way to write ${to}` }))
+      ? O.none()
+      : O.map(booleanWord(text), (to) => ({ to, rule: `a usual way to write ${to}` }))
   }
   if (field === "tags") {
     const to = canonicalTags(text)
-    return to !== text && to !== "" ? Option.some({ to, rule: "lower case, each tag once" }) : Option.none()
+    return to !== text && to !== "" ? O.some({ to, rule: "lower case, each tag once" }) : O.none()
   }
   // A year written with two digits is a guess at the century: never a form-only fix, and never proposed at all.
-  if (isDateField(field) && Option.isNone(readDate(text)) && !twoDigitYear(text)) {
+  if (isDateField(field) && O.isNone(readDate(text)) && !twoDigitYear(text)) {
     const { dayFirst, monthFirst } = dateReadings(text)
-    if (Option.isSome(dayFirst) && Option.isNone(monthFirst)) {
-      return Option.some({ to: dayFirst.value, rule: "the same date written year-month-day" })
+    if (O.isSome(dayFirst) && O.isNone(monthFirst)) {
+      return O.some({ to: dayFirst.value, rule: "the same date written year-month-day" })
     }
-    if (Option.isNone(dayFirst) && Option.isSome(monthFirst)) {
-      return Option.some({ to: monthFirst.value, rule: "the same date written year-month-day" })
+    if (O.isNone(dayFirst) && O.isSome(monthFirst)) {
+      return O.some({ to: monthFirst.value, rule: "the same date written year-month-day" })
     }
   }
-  return Option.none()
+  return O.none()
 }
 
 /** One item of the file before any decision: where it is, and its values by field. */
@@ -434,7 +439,7 @@ type Context = {
   /** Rows of the file the items come from, total rows not counted. */
   readonly fileRows: number
   /** The item the organization already has under this SKU key, if any. A hash lookup: a file can hold 50,000 rows. */
-  readonly storedOf: (key: string) => Option.Option<ItemFields>
+  readonly storedOf: (key: string) => O.Option<ItemFields>
   /** How many rows have exactly this text in this field. */
   readonly countOf: (field: Field, text: string) => number
   /** How many rows have a value in this field at all. */
@@ -456,34 +461,34 @@ const makeContext = (input: {
 }): Context & { readonly totals: ReadonlyArray<StagedRow>; readonly unusedColumns: ReadonlyArray<UnusedColumn> } => {
   const mapping = matchColumns(input)
   const columnOf = (field: Field): number | null =>
-    Option.getOrNull(
-      Option.map(
-        Option.flatMap(
-          Arr.findFirst(mapping, (match) => match.field === field),
+    O.getOrNull(
+      O.map(
+        O.flatMap(
+          A.findFirst(mapping, (match) => match.field === field),
           matchedColumn
         ),
         (column) => column.index
       )
     )
   const totalNumbers = totalRowNumbers({ table: input.table, skuColumn: columnOf("sku") })
-  const columns = Rec.fromEntries(Arr.map(fields, (field) => [field, columnOf(field)] as const))
+  const columns = R.fromEntries(A.map(fields, (field) => [field, columnOf(field)] as const))
   const read = (row: StagedRow): Readonly<Record<Field, string>> =>
-    Rec.fromEntries(
-      Arr.map(fields, (field) => {
+    R.fromEntries(
+      A.map(fields, (field) => {
         const column = columns[field]
         return [field, column === null || column === undefined ? "" : cellText(field, row.cells[column])] as const
       })
     ) as Record<Field, string>
   const itemsOf = input.itemsOf ?? itemsOfRow
-  const fileRows = Arr.filter(input.table.rows, (row) => !Arr.contains(totalNumbers, row.rowNumber))
+  const fileRows = A.filter(input.table.rows, (row) => !A.contains(totalNumbers, row.rowNumber))
   // Each row of the file is behind at least one item: a row that holds none is one entry, part 0, never dropped.
-  const parts = Arr.flatMap(fileRows, (row) => {
+  const parts = A.flatMap(fileRows, (row) => {
     const file = read(row)
     const found = itemsOf({ row, file })
     const held: ReadonlyArray<RowItem> = found.length > 0 ? found : [{ part: 0, label: null, file }]
-    return Arr.map(held, (item) => ({ row, item }))
+    return A.map(held, (item) => ({ row, item }))
   })
-  const rows = Arr.map(parts, ({ row, item }, order): FileRow => ({
+  const rows = A.map(parts, ({ row, item }, order): FileRow => ({
     rowNumber: row.rowNumber,
     part: item.part,
     label: item.part === 0 ? null : item.label,
@@ -492,13 +497,13 @@ const makeContext = (input: {
     file: item.file
   }))
   // Counted once per field and text, so evidence for 5,000 rows is not 5,000 passes over the file.
-  const tallies = Rec.fromEntries(
-    Arr.map(fields, (field) => [field, Arr.groupBy(rows, (row) => `v:${row.file[field]}`)] as const)
+  const tallies = R.fromEntries(
+    A.map(fields, (field) => [field, A.groupBy(rows, (row) => `v:${row.file[field]}`)] as const)
   )
   const countOf = (field: Field, text: string): number =>
-    Option.getOrElse(
-      Option.map(
-        Option.flatMap(Rec.get(tallies, field), (tally) => Rec.get(tally, `v:${text}`)),
+    O.getOrElse(
+      O.map(
+        O.flatMap(R.get(tallies, field), (tally) => R.get(tally, `v:${text}`)),
         (group) => group.length
       ),
       () => 0
@@ -506,17 +511,17 @@ const makeContext = (input: {
   const filledOf = (field: Field): number => rows.length - countOf(field, "")
   const orderOf = (field: DateField) => {
     // Only dates written in numbers say which comes first: "Jun 19, 2024" has one reading and settles nothing.
-    const readings = Arr.map(
-      Arr.filter(rows, (row) => /^\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}$/.test(Str.trim(row.file[field]))),
+    const readings = A.map(
+      A.filter(rows, (row) => /^\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}$/.test(Str.trim(row.file[field]))),
       (row) => dateReadings(row.file[field])
     )
     return {
-      dayFirst: Arr.filter(readings, (r) => Option.isSome(r.dayFirst) && Option.isNone(r.monthFirst)).length,
-      monthFirst: Arr.filter(readings, (r) => Option.isNone(r.dayFirst) && Option.isSome(r.monthFirst)).length
+      dayFirst: A.filter(readings, (r) => O.isSome(r.dayFirst) && O.isNone(r.monthFirst)).length,
+      monthFirst: A.filter(readings, (r) => O.isNone(r.dayFirst) && O.isSome(r.monthFirst)).length
     }
   }
-  const used = keepSome(mapping, (match) => Option.map(matchedColumn(match), (column) => column.index))
-  const stored = HashMap.fromIterable(Arr.map(input.storedItems, (item) => [skuKey(item), item] as const))
+  const used = keepSome(mapping, (match) => O.map(matchedColumn(match), (column) => column.index))
+  const stored = HashMap.fromIterable(A.map(input.storedItems, (item) => [skuKey(item), item] as const))
   return {
     mapping,
     rows,
@@ -525,14 +530,14 @@ const makeContext = (input: {
     countOf,
     filledOf,
     dateOrder: { firstReceivedOn: orderOf("firstReceivedOn"), discontinuedOn: orderOf("discontinuedOn") },
-    pointCosts: Arr.filter(rows, (row) => /^\d+\.\d+$/.test(Str.trim(row.file.unitCost))).length,
+    pointCosts: A.filter(rows, (row) => /^\d+\.\d+$/.test(Str.trim(row.file.unitCost))).length,
     suggestions: input.suggestions ?? [],
-    totals: Arr.filter(input.table.rows, (row) => Arr.contains(totalNumbers, row.rowNumber)),
-    unusedColumns: Arr.map(
-      Arr.filter(input.table.columns, (column) => !Arr.contains(used, column.index)),
+    totals: A.filter(input.table.rows, (row) => A.contains(totalNumbers, row.rowNumber)),
+    unusedColumns: A.map(
+      A.filter(input.table.columns, (column) => !A.contains(used, column.index)),
       (column) => ({
         ...column,
-        filled: Arr.filter(fileRows, (row) => Str.trim(shownText(row.cells[column.index])) !== "").length
+        filled: A.filter(fileRows, (row) => Str.trim(shownText(row.cells[column.index])) !== "").length
       })
     )
   }
@@ -576,17 +581,17 @@ const ruleKind = (field: Field): ProblemKindId =>
  * likely reading to accept or reject; low, a question with the other reading in `alternatives` and nothing
  * preselected, unless the column's own rows settle it, and then the whole column is one medium proposal.
  */
-const proposeFor = (ctx: Context, row: FileRow, field: Field): Option.Option<Proposal> =>
-  Option.orElse(proposeByRule(ctx, row, field), () => proposeStored(ctx, row, field))
+const proposeFor = (ctx: Context, row: FileRow, field: Field): O.Option<Proposal> =>
+  O.orElse(proposeByRule(ctx, row, field), () => proposeStored(ctx, row, field))
 
 /**
  * The stored suggestion for a field of a row as a proposal, where no rule answers: only for the exact cell it was
  * made for, and only while it still fits the row (`suggestionFits`). Never lossless, so it is in force only once
  * the person accepts it, and its group is the row's own, so one accept settles one row.
  */
-const proposeStored = (ctx: Context, row: FileRow, field: Field): Option.Option<Proposal> =>
-  Option.map(
-    Arr.findLast(
+const proposeStored = (ctx: Context, row: FileRow, field: Field): O.Option<Proposal> =>
+  O.map(
+    A.findLast(
       ctx.suggestions,
       // A row's suggestion for this very cell: a column's is offered beside the review, not on a row.
       (s): s is Exclude<Suggestion, { readonly kind: "column" }> =>
@@ -612,13 +617,13 @@ const proposeStored = (ctx: Context, row: FileRow, field: Field): Option.Option<
     })
   )
 
-const proposeByRule = (ctx: Context, row: FileRow, field: Field): Option.Option<Proposal> => {
+const proposeByRule = (ctx: Context, row: FileRow, field: Field): O.Option<Proposal> => {
   const text = row.file[field]
   const trimmed = Str.trim(text)
   const label = fieldLabels[field]
   const rows = plural(ctx.countOf(field, text), "row", "rows")
   const rule = ruleFor({ field, text })
-  if (Option.isSome(rule)) {
+  if (O.isSome(rule)) {
     const { to } = rule.value
     const others = plural(ctx.countOf(field, to), "row says", "rows say")
     const basis =
@@ -631,7 +636,7 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): Option.Option<
             : field === "unitCost"
               ? `${quoted(trimmed)} on ${rows} carries a "$"; costs are in US dollars already, and ${plural(ctx.pointCosts, "row writes", "rows write")} the digits alone.`
               : `${quoted(trimmed)} on ${rows}; ${others} ${to}.`
-    return Option.some(
+    return O.some(
       proposal({
         field,
         kind: ruleKind(field),
@@ -643,12 +648,12 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): Option.Option<
       })
     )
   }
-  if (trimmed === "" && field !== "isActive") return Option.none()
+  if (trimmed === "" && field !== "isActive") return O.none()
   if (field === "sku") {
     const upper = Str.toUpperCase(trimmed)
     if (!skuPattern.test(trimmed) && skuPattern.test(upper)) {
       const also = ctx.countOf("sku", upper)
-      return Option.some(
+      return O.some(
         proposal({
           field,
           kind: "sku",
@@ -662,9 +667,9 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): Option.Option<
     }
   }
   if (field === "category" && !isCategory(text)) {
-    const near = Arr.findFirst(categories, (category) => categoryStem(category) === categoryStem(text))
-    if (Option.isSome(near)) {
-      return Option.some(
+    const near = A.findFirst(categories, (category) => categoryStem(category) === categoryStem(text))
+    if (O.isSome(near)) {
+      return O.some(
         proposal({
           field,
           kind: "category",
@@ -677,14 +682,14 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): Option.Option<
       )
     }
   }
-  if (field === "unitCost" && Option.isNone(readDecimal(text))) {
+  if (field === "unitCost" && O.isNone(readDecimal(text))) {
     const bare = Str.trim(Str.replace(/^\$/, "")(trimmed))
     if (thousandsComma.test(bare)) {
       const digits = Str.replaceAll(",", "")(bare)
       const asDecimal = Str.replace(",", ".")(bare)
       const once = Str.split(",")(bare).length === 2 && !Str.includes(".")(bare)
-      if (once && Option.isSome(readDecimal(asDecimal))) {
-        return Option.some(
+      if (once && O.isSome(readDecimal(asDecimal))) {
+        return O.some(
           proposal({
             field,
             kind: "cost",
@@ -697,8 +702,8 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): Option.Option<
           })
         )
       }
-      if (Option.isSome(readDecimal(digits))) {
-        return Option.some(
+      if (O.isSome(readDecimal(digits))) {
+        return O.some(
           proposal({
             field,
             kind: "cost",
@@ -713,8 +718,8 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): Option.Option<
     }
     if (decimalComma.test(bare)) {
       const asDecimal = Str.replace(",", ".")(bare)
-      if (Option.isSome(readDecimal(asDecimal))) {
-        return Option.some(
+      if (O.isSome(readDecimal(asDecimal))) {
+        return O.some(
           proposal({
             field,
             kind: "cost",
@@ -730,7 +735,7 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): Option.Option<
   }
   if (isCountField(field) && /^\d{1,3}(?:,\d{3})+$/.test(trimmed)) {
     const digits = Str.replaceAll(",", "")(trimmed)
-    return Option.some(
+    return O.some(
       proposal({
         field,
         kind: "number",
@@ -743,7 +748,7 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): Option.Option<
     )
   }
   if (isBooleanField(field) && trimmed !== "" && text !== "true" && text !== "false") {
-    return Option.some(
+    return O.some(
       proposal({
         field,
         kind: "boolean",
@@ -756,15 +761,15 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): Option.Option<
       })
     )
   }
-  if (isDateField(field) && trimmed !== "" && Option.isNone(readDate(text))) {
+  if (isDateField(field) && trimmed !== "" && O.isNone(readDate(text))) {
     const { dayFirst, monthFirst } = dateReadings(text)
     // A year written with two digits is never proposed: which century it means is the person's to say.
-    if (twoDigitYear(text)) return Option.none()
-    if (Option.isSome(dayFirst) && Option.isSome(monthFirst)) {
+    if (twoDigitYear(text)) return O.none()
+    if (O.isSome(dayFirst) && O.isSome(monthFirst)) {
       const { dayFirst: byDay, monthFirst: byMonth } = ctx.dateOrder[field]
       // The column's own rows settle the order only when they all point one way.
       if (byDay > 0 && byMonth === 0) {
-        return Option.some(
+        return O.some(
           proposal({
             field,
             kind: "date",
@@ -777,7 +782,7 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): Option.Option<
         )
       }
       if (byMonth > 0 && byDay === 0) {
-        return Option.some(
+        return O.some(
           proposal({
             field,
             kind: "date",
@@ -789,7 +794,7 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): Option.Option<
           })
         )
       }
-      return Option.some(
+      return O.some(
         proposal({
           field,
           kind: "date",
@@ -808,7 +813,7 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): Option.Option<
   // for the person. The second reading is a value of another cell (an empty Discontinued on), so `targets` names it.
   if (field === "isActive" && discontinuedYetActive(row.file)) {
     const date = Str.trim(row.file.discontinuedOn)
-    return Option.some(
+    return O.some(
       proposal({
         field,
         kind: "discontinued",
@@ -830,27 +835,27 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): Option.Option<
       if (preferred.length > 1) {
         const picks = keepSome(read.value, (vendor, index) =>
           vendor.isPreferred
-            ? Option.map(withPreferred({ text, keep: index }), (to) => ({
+            ? O.map(withPreferred({ text, keep: index }), (to) => ({
                 to,
                 label: `${vendor.vendorName} preferred`
               }))
-            : Option.none()
+            : O.none()
         )
         const head = picks[0]
         if (head !== undefined) {
-          return Option.some(
+          return O.some(
             proposal({
               field,
               kind: "vendors",
               to: head.to,
               lossless: false,
               confidence: "low",
-              basis: `${preferred.length} vendors are marked preferred (${Arr.join(
-                Arr.map(preferred, (vendor) => vendor.vendorName),
+              basis: `${preferred.length} vendors are marked preferred (${A.join(
+                A.map(preferred, (vendor) => vendor.vendorName),
                 ", "
               )}); an item has at most one.`,
-              alternatives: Arr.map(Arr.drop(picks, 1), (pick) => pick.to),
-              labels: Arr.map(picks, (pick) => pick.label),
+              alternatives: A.map(A.drop(picks, 1), (pick) => pick.to),
+              labels: A.map(picks, (pick) => pick.label),
               group: `vendors:preferred:${row.id}`
             })
           )
@@ -858,7 +863,7 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): Option.Option<
       }
     }
   }
-  return Option.none()
+  return O.none()
 }
 
 type Wrong = {
@@ -875,9 +880,9 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
   const lower = Str.toLowerCase(label)
   // What the edit button names: "SKU" keeps its capitals.
   const asked = field === "sku" ? label : lower
-  const hasColumn = Arr.some(ctx.mapping, (match) => match.field === field && Option.isSome(matchedColumn(match)))
+  const hasColumn = A.some(ctx.mapping, (match) => match.field === field && O.isSome(matchedColumn(match)))
   const empty = Str.trim(text) === ""
-  const required = Arr.contains(requiredFields, field)
+  const required = A.contains(requiredFields, field)
   if (!hasColumn && required && empty) {
     return { kind: "column", message: `The file has no column for ${label}.`, ask: `Type the ${asked}` }
   }
@@ -927,13 +932,13 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
       ? undefined
       : {
           kind: "uom",
-          message: `Unit of measure "${text}" is not one of ${Arr.join(uoms, ", ")}.`,
+          message: `Unit of measure "${text}" is not one of ${A.join(uoms, ", ")}.`,
           ask: "Pick a unit",
           choices: uoms
         }
   }
   if (field === "unitCost") {
-    if (Option.isSome(readDecimal(text))) return undefined
+    if (O.isSome(readDecimal(text))) return undefined
     const shown = Str.trim(text)
     return {
       kind: "cost",
@@ -946,7 +951,7 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
     }
   }
   if (isCountField(field)) {
-    if (Option.isSome(readCount(text))) return undefined
+    if (O.isSome(readCount(text))) return undefined
     const shown = Str.trim(text)
     return {
       kind: "number",
@@ -975,7 +980,7 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
       : { kind: "tags", message: `Tags "${text}" are not lower case, each once.`, ask: "Type the tags" }
   }
   if (isDateField(field)) {
-    return Option.isSome(readDate(text))
+    return O.isSome(readDate(text))
       ? undefined
       : {
           kind: "date",
@@ -1002,8 +1007,8 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
     return preferred.length > 1
       ? {
           kind: "vendors",
-          message: `${preferred.length} vendors are marked preferred (${Arr.join(
-            Arr.map(preferred, (vendor) => vendor.vendorName),
+          message: `${preferred.length} vendors are marked preferred (${A.join(
+            A.map(preferred, (vendor) => vendor.vendorName),
             ", "
           )}). An item has at most one.`,
           ask: "Choose the preferred vendor"
@@ -1017,15 +1022,14 @@ const emptyDecision: RowDecision = decisionOf()
 
 /** Whether a proposal is in force for a row: the person accepted it, or it is a form-only rule fix nobody undid. */
 const inForce = (proposed: Proposal, decision: RowDecision): boolean =>
-  Arr.contains(decision.accepted, proposed.field) ||
-  (proposed.lossless && !Arr.contains(decision.reverted, proposed.field))
+  A.contains(decision.accepted, proposed.field) || (proposed.lossless && !A.contains(decision.reverted, proposed.field))
 
-const typedValue = (decision: RowDecision, field: Field): Option.Option<string> => Rec.get(decision.edits, field)
+const typedValue = (decision: RowDecision, field: Field): O.Option<string> => R.get(decision.edits, field)
 
 type Rival = { readonly id: string; readonly place: string; readonly same: boolean }
 
 const sameValues = (a: Readonly<Record<Field, string>>, b: Readonly<Record<Field, string>>): boolean =>
-  Arr.every(fields, (field) => Str.trim(a[field]) === Str.trim(b[field]))
+  A.every(fields, (field) => Str.trim(a[field]) === Str.trim(b[field]))
 
 /** Kinds that are a choice between things the screen already shows, even with no proposal attached. */
 const choiceKinds: ReadonlyArray<ProblemKindId> = ["clash", "duplicate", "changed", "discontinued"]
@@ -1033,7 +1037,7 @@ const choiceKinds: ReadonlyArray<ProblemKindId> = ["clash", "duplicate", "change
 // A stored suggestion beside a blocker does not change the row's outcome: a name nobody typed is still missing, and
 // the row is counted under Cannot import with the suggestion offered beside it, until the person accepts it.
 const toneOf = (kind: ProblemKindId, proposed: Proposal | null): "blocker" | "decision" =>
-  (proposed !== null && proposed.suggestionId === undefined) || Arr.contains(choiceKinds, kind) ? "decision" : "blocker"
+  (proposed !== null && proposed.suggestionId === undefined) || A.contains(choiceKinds, kind) ? "decision" : "blocker"
 
 /**
  * The problems of one row given the values it would be imported with. A value that still reads as the file has it
@@ -1048,14 +1052,14 @@ const problemsOf = (
   rivals: ReadonlyArray<Rival>,
   changed: Problem | null
 ): ReadonlyArray<Problem> => {
-  const found = keepSome(fields, (field): Option.Option<Problem> => {
+  const found = keepSome(fields, (field): O.Option<Problem> => {
     const wrong = fault(ctx, field, values)
-    if (wrong === undefined) return Option.none()
+    if (wrong === undefined) return O.none()
     const proposed =
       values[field] === row.file[field]
-        ? Option.getOrNull(Option.filter(proposeFor(ctx, row, field), (p) => p.kind === wrong.kind))
+        ? O.getOrNull(O.filter(proposeFor(ctx, row, field), (p) => p.kind === wrong.kind))
         : null
-    return Option.some({
+    return O.some({
       kind: wrong.kind,
       tone: toneOf(wrong.kind, proposed),
       field,
@@ -1069,7 +1073,7 @@ const problemsOf = (
   })
   const key = skuKey({ sku: values.sku })
   const taken: ReadonlyArray<Problem> =
-    key !== "" && Option.isSome(ctx.storedOf(key)) && skuKey({ sku: row.file.sku }) !== key
+    key !== "" && O.isSome(ctx.storedOf(key)) && skuKey({ sku: row.file.sku }) !== key
       ? [
           {
             kind: "stored",
@@ -1084,13 +1088,13 @@ const problemsOf = (
           }
         ]
       : []
-  const ids = Arr.map(rivals, (rival) => rival.id)
-  const where = Arr.join(
-    Arr.map(rivals, (rival) => rival.place),
+  const ids = A.map(rivals, (rival) => rival.id)
+  const where = A.join(
+    A.map(rivals, (rival) => rival.place),
     ", "
   )
   // Rows that agree in every field are copies; rows that share only the SKU are two items clashing over it.
-  const copies = Arr.every(rivals, (rival) => rival.same)
+  const copies = A.every(rivals, (rival) => rival.same)
   const twice: ReadonlyArray<Problem> =
     rivals.length === 0
       ? []
@@ -1111,11 +1115,11 @@ const problemsOf = (
         ]
   const safe = (problem: Problem): boolean => problem.proposal !== null && problem.proposal.lossless
   return [
-    ...Arr.filter(found, (p) => !safe(p)),
+    ...A.filter(found, (p) => !safe(p)),
     ...taken,
     ...(changed === null ? [] : [changed]),
     ...twice,
-    ...Arr.filter(found, safe)
+    ...A.filter(found, safe)
   ]
 }
 
@@ -1125,23 +1129,22 @@ const problemsOf = (
  */
 const toItem = (values: Readonly<Record<Field, string>>): ItemFields | null => {
   const blank = (field: Field): boolean => Str.trim(values[field]) === ""
-  const category = Arr.findFirst(categories, (candidate) => candidate === values.category)
-  const uom = Arr.findFirst(uoms, (candidate) => candidate === values.uom)
+  const category = A.findFirst(categories, (candidate) => candidate === values.category)
+  const uom = A.findFirst(uoms, (candidate) => candidate === values.uom)
   const cost = readUnitCost(values.unitCost)
-  const quantity = blank("quantityOnHand") ? Option.some(0) : readCount(values.quantityOnHand)
-  const reorder = blank("reorderPoint") ? Option.some(null) : readCount(values.reorderPoint)
-  const flag = (field: "isActive" | "lotTracked", byDefault: boolean): Option.Option<boolean> =>
+  const quantity = blank("quantityOnHand") ? O.some(0) : readCount(values.quantityOnHand)
+  const reorder = blank("reorderPoint") ? O.some(null) : readCount(values.reorderPoint)
+  const flag = (field: "isActive" | "lotTracked", byDefault: boolean): O.Option<boolean> =>
     blank(field)
-      ? Option.some(byDefault)
+      ? O.some(byDefault)
       : values[field] === "true"
-        ? Option.some(true)
+        ? O.some(true)
         : values[field] === "false"
-          ? Option.some(false)
-          : Option.none()
+          ? O.some(false)
+          : O.none()
   const active = flag("isActive", true)
   const lot = flag("lotTracked", false)
-  const date = (field: DateField): Option.Option<string | null> =>
-    blank(field) ? Option.some(null) : readDate(values[field])
+  const date = (field: DateField): O.Option<string | null> => (blank(field) ? O.some(null) : readDate(values[field]))
   const received = date("firstReceivedOn")
   const discontinued = date("discontinuedOn")
   const dimensions = readDimensions(values.dimensions)
@@ -1151,15 +1154,15 @@ const toItem = (values: Readonly<Record<Field, string>>): ItemFields | null => {
     values.name === "" ||
     values.name !== Str.trim(values.name) ||
     values.name.length > maxNameLength ||
-    Option.isNone(category) ||
-    Option.isNone(uom) ||
-    Option.isNone(cost) ||
-    Option.isNone(quantity) ||
-    Option.isNone(reorder) ||
-    Option.isNone(active) ||
-    Option.isNone(lot) ||
-    Option.isNone(received) ||
-    Option.isNone(discontinued) ||
+    O.isNone(category) ||
+    O.isNone(uom) ||
+    O.isNone(cost) ||
+    O.isNone(quantity) ||
+    O.isNone(reorder) ||
+    O.isNone(active) ||
+    O.isNone(lot) ||
+    O.isNone(received) ||
+    O.isNone(discontinued) ||
     dimensions._tag === "bad" ||
     vendors._tag === "bad" ||
     preferredOf(vendors.value).length > 1 ||
@@ -1171,17 +1174,17 @@ const toItem = (values: Readonly<Record<Field, string>>): ItemFields | null => {
   return {
     sku: values.sku,
     name: values.name,
-    description: blank("description") ? Option.none() : Option.some(values.description),
+    description: blank("description") ? O.none() : O.some(values.description),
     category: category.value,
     uom: uom.value,
     unitCost: cost.value,
     quantityOnHand: quantity.value,
-    reorderPoint: Option.fromNullOr(reorder.value),
-    stocking: stockingOf({ isActive: active.value, discontinuedOn: Option.fromNullOr(discontinued.value) }),
+    reorderPoint: O.fromNullOr(reorder.value),
+    stocking: stockingOf({ isActive: active.value, discontinuedOn: O.fromNullOr(discontinued.value) }),
     lotTracked: lot.value,
     tags: tagsOf(values.tags),
-    firstReceivedOn: Option.fromNullOr(received.value),
-    dimensions: Option.fromNullOr(dimensions.value),
+    firstReceivedOn: O.fromNullOr(received.value),
+    dimensions: O.fromNullOr(dimensions.value),
     vendors: vendors.value
   }
 }
@@ -1191,20 +1194,17 @@ const differences = (stored: ItemFields, item: ItemFields): ReadonlyArray<Stored
   const was = itemText(stored)
   const now = itemText(item)
   return keepSome(fields, (field) =>
-    was[field] === now[field] ? Option.none() : Option.some({ field, stored: was[field], file: now[field] })
+    was[field] === now[field] ? O.none() : O.some({ field, stored: was[field], file: now[field] })
   )
 }
 
 /** Unit cost times quantity on hand over the rows where both read, in ten-thousandths of a dollar. */
 const stockValue = (rows: ReadonlyArray<ReviewedRow>): string =>
   unitsToDecimal(
-    Arr.reduce(rows, 0n, (total, row) => {
+    A.reduce(rows, 0n, (total, row) => {
       const cost = readUnitCost(row.values.unitCost)
-      const quantity =
-        Str.trim(row.values.quantityOnHand) === "" ? Option.some(0) : readCount(row.values.quantityOnHand)
-      return Option.isSome(cost) && Option.isSome(quantity)
-        ? total + decimalUnits(cost.value) * BigInt(quantity.value)
-        : total
+      const quantity = Str.trim(row.values.quantityOnHand) === "" ? O.some(0) : readCount(row.values.quantityOnHand)
+      return O.isSome(cost) && O.isSome(quantity) ? total + decimalUnits(cost.value) * BigInt(quantity.value) : total
     })
   )
 
@@ -1236,28 +1236,27 @@ export const review = (input: {
 }): Review => {
   const ctx = makeContext(input)
   const created = HashSet.fromIterable(input.createdIds ?? [])
-  const decisionOf = (row: FileRow): RowDecision =>
-    Option.getOrElse(Rec.get(input.decisions, rowId(row)), () => emptyDecision)
+  const decisionOf = (row: FileRow): RowDecision => O.getOrElse(R.get(input.decisions, rowId(row)), () => emptyDecision)
 
-  const first = Arr.map(ctx.rows, (row) => {
+  const first = A.map(ctx.rows, (row) => {
     const decision = decisionOf(row)
     const proposals = keepSome(fields, (field) => proposeFor(ctx, row, field))
     const changes: Array<Change> = []
-    const values = Rec.fromEntries(
-      Arr.map(fields, (field) => {
+    const values = R.fromEntries(
+      A.map(fields, (field) => {
         const typed = typedValue(decision, field)
-        const proposed = Arr.findFirst(proposals, (p) => p.field === field)
+        const proposed = A.findFirst(proposals, (p) => p.field === field)
         const text = row.file[field]
-        if (Option.isSome(typed)) {
+        if (O.isSome(typed)) {
           const to = canonical(field, typed.value)
           if (to !== text) {
             changes.push(typedChange({ field, from: text, to }))
           }
           return [field, to] as const
         }
-        if (Option.isSome(proposed) && inForce(proposed.value, decision)) {
+        if (O.isSome(proposed) && inForce(proposed.value, decision)) {
           const p = proposed.value
-          const accepted = Arr.contains(decision.accepted, field)
+          const accepted = A.contains(decision.accepted, field)
           const proposal = { field, from: text, to: p.to, basis: p.basis, confidence: p.confidence }
           // In force without an accept only when it is a form-only rule's fix: `inForce` says so.
           changes.push(accepted ? acceptedProposal({ ...proposal, source: p.by }) : appliedByRule(proposal))
@@ -1270,16 +1269,15 @@ export const review = (input: {
     const mine = HashSet.has(created, row.id)
     // The file's own SKU is stored. Compared by key, so a SKU whose spaces were trimmed is still the file's SKU.
     const storedItem =
-      !mine && key !== "" && skuKey({ sku: row.file.sku }) === key ? ctx.storedOf(key) : Option.none<ItemFields>()
+      !mine && key !== "" && skuKey({ sku: row.file.sku }) === key ? ctx.storedOf(key) : O.none<ItemFields>()
     const item = toItem(values)
     // It differs only when the row reads as an item and that item says something else than what is stored. A row
     // that does not read yet is not compared and is not "already there": it keeps its own problems, and once it
     // reads it is skipped (it says what is stored) or asks (it says something else).
-    const stored = Option.isSome(storedItem) && item !== null ? differences(storedItem.value, item) : []
+    const stored = O.isSome(storedItem) && item !== null ? differences(storedItem.value, item) : []
     const differs = stored.length > 0
     const replace = differs && decision.stored.kind === "replace"
-    const already =
-      mine || (Option.isSome(storedItem) && item !== null && (!differs || decision.stored.kind === "keep"))
+    const already = mine || (O.isSome(storedItem) && item !== null && (!differs || decision.stored.kind === "keep"))
     return {
       row,
       decision,
@@ -1299,20 +1297,19 @@ export const review = (input: {
   })
 
   // One item per SKU: rows that share a key are rivals, whatever the person has done to them so far.
-  const groups = Arr.groupBy(
-    Arr.filter(first, (entry) => entry.key !== "" && !entry.already),
+  const groups = A.groupBy(
+    A.filter(first, (entry) => entry.key !== "" && !entry.already),
     (entry) => `sku:${entry.key}`
   )
-  const rows = Arr.map(first, (entry): ReviewedRow => {
-    const twins = Arr.filter(
-      Option.getOrElse(Rec.get(groups, `sku:${entry.key}`), () => []),
+  const rows = A.map(first, (entry): ReviewedRow => {
+    const twins = A.filter(
+      O.getOrElse(R.get(groups, `sku:${entry.key}`), () => []),
       (other) => other.row.id !== entry.row.id
     )
-    const live = Arr.filter(twins, (other) => !other.out)
+    const live = A.filter(twins, (other) => !other.out)
     // Kept wins over a twin still in the file only for the first row the person kept.
     const keptFirst =
-      hasKeep(entry.decision) &&
-      !Arr.some(live, (other) => hasKeep(other.decision) && other.row.order < entry.row.order)
+      hasKeep(entry.decision) && !A.some(live, (other) => hasKeep(other.decision) && other.row.order < entry.row.order)
     const sku = Str.trim(entry.values.sku)
     const changed: Problem | null =
       entry.differs && entry.decision.stored.kind === "undecided"
@@ -1320,8 +1317,8 @@ export const review = (input: {
             kind: "changed",
             tone: "decision",
             field: "sku",
-            message: `SKU ${sku} is already there with other values (${Arr.join(
-              Arr.map(entry.stored, (difference) => fieldLabels[difference.field]),
+            message: `SKU ${sku} is already there with other values (${A.join(
+              A.map(entry.stored, (difference) => fieldLabels[difference.field]),
               ", "
             )}). Keep the stored item, or replace it with this row.`,
             ask: null,
@@ -1337,7 +1334,7 @@ export const review = (input: {
       entry.values,
       entry.already
         ? []
-        : Arr.map(twins, (other) => ({
+        : A.map(twins, (other) => ({
             id: other.row.id,
             place: rowPlace(other.row),
             same: sameValues(entry.values, other.values)
@@ -1345,7 +1342,7 @@ export const review = (input: {
       changed
     )
     const twice = (problem: Problem): boolean => problem.kind === "duplicate" || problem.kind === "clash"
-    const problems = Arr.filter(all, (problem) => !twice(problem) || !(live.length === 0 || keptFirst))
+    const problems = A.filter(all, (problem) => !twice(problem) || !(live.length === 0 || keptFirst))
     const open: RowStatus = entry.out ? "out" : entry.already ? "already" : problems.length > 0 ? "needs" : "ready"
     const item = open === "ready" ? entry.item : null
     const status: RowStatus = open === "ready" && item === null ? "needs" : open
@@ -1378,7 +1375,7 @@ export const review = (input: {
       outcome:
         status !== "needs"
           ? status
-          : shown.length === 0 || Arr.some(shown, (problem) => problem.tone === "blocker")
+          : shown.length === 0 || A.some(shown, (problem) => problem.tone === "blocker")
             ? "cannot"
             : "decision",
       kept: hasKeep(entry.decision),
@@ -1390,33 +1387,33 @@ export const review = (input: {
       // Every problem of a row that waits, in the order the screen asks them: a row with two names both.
       reasons:
         status === "needs" && problems.length > 0
-          ? Arr.dedupe(Arr.map(problems, (problem) => problem.message))
+          ? A.dedupe(A.map(problems, (problem) => problem.message))
           : reason === null
             ? []
             : [reason]
     }
   })
 
-  const count = (status: RowStatus): number => Arr.filter(rows, (row) => row.status === status).length
-  const outcome = (wanted: RowOutcome): number => Arr.filter(rows, (row) => row.outcome === wanted).length
-  const ready = Arr.filter(rows, (row) => row.status === "ready")
-  const readyItems = keepSome(ready, (row) => Option.fromNullishOr(row.item))
-  const readyQuantities = keepSome(uoms, (unit): Option.Option<UnitTotal> => {
-    const inUnit = Arr.filter(readyItems, (item) => item.uom === unit)
+  const count = (status: RowStatus): number => A.filter(rows, (row) => row.status === status).length
+  const outcome = (wanted: RowOutcome): number => A.filter(rows, (row) => row.outcome === wanted).length
+  const ready = A.filter(rows, (row) => row.status === "ready")
+  const readyItems = keepSome(ready, (row) => O.fromNullishOr(row.item))
+  const readyQuantities = keepSome(uoms, (unit): O.Option<UnitTotal> => {
+    const inUnit = A.filter(readyItems, (item) => item.uom === unit)
     return inUnit.length === 0
-      ? Option.none()
-      : Option.some({ unit, quantity: Arr.reduce(inUnit, 0, (total, item) => total + item.quantityOnHand) })
+      ? O.none()
+      : O.some({ unit, quantity: A.reduce(inUnit, 0, (total, item) => total + item.quantityOnHand) })
   })
-  const byRule = Arr.map(
-    Arr.filter(rows, (row) => row.status === "ready" || row.status === "needs"),
-    (row) => Arr.filter(row.changes, (change) => change.how === "appliedByRule").length
+  const byRule = A.map(
+    A.filter(rows, (row) => row.status === "ready" || row.status === "needs"),
+    (row) => A.filter(row.changes, (change) => change.how === "appliedByRule").length
   )
 
   return {
     mapping: ctx.mapping,
     unusedColumns: ctx.unusedColumns,
     rows,
-    totalRows: Arr.map(ctx.totals, (row) => row.rowNumber),
+    totalRows: A.map(ctx.totals, (row) => row.rowNumber),
     counts: {
       rows: rows.length,
       fileRows: ctx.fileRows,
@@ -1426,11 +1423,11 @@ export const review = (input: {
       cannot: outcome("cannot"),
       out: count("out"),
       already: count("already"),
-      updates: Arr.filter(rows, (row) => row.update).length
+      updates: A.filter(rows, (row) => row.update).length
     },
     fixed: {
-      rows: Arr.filter(byRule, (cells) => cells > 0).length,
-      cells: Arr.reduce(byRule, 0, (total, cells) => total + cells)
+      rows: A.filter(byRule, (cells) => cells > 0).length,
+      cells: A.reduce(byRule, 0, (total, cells) => total + cells)
     },
     sums: {
       fileStockValue: stockValue(rows),
@@ -1454,25 +1451,25 @@ export const recheckRow = (input: {
 }): ((row: { readonly id: string; readonly values: Readonly<Record<string, string>> }) => Problem | undefined) => {
   const ctx = makeContext(input)
   // Keyed by plain text: the screen asks by the key its region holds for the row.
-  const byId: Readonly<Record<string, (typeof ctx.rows)[number]>> = Rec.fromEntries(
-    Arr.map(ctx.rows, (row) => [row.id, row] as const)
+  const byId: Readonly<Record<string, (typeof ctx.rows)[number]>> = R.fromEntries(
+    A.map(ctx.rows, (row) => [row.id, row] as const)
   )
-  const byKey = Arr.groupBy(
-    Arr.filter(ctx.rows, (row) => skuKey({ sku: row.file.sku }) !== ""),
+  const byKey = A.groupBy(
+    A.filter(ctx.rows, (row) => skuKey({ sku: row.file.sku }) !== ""),
     (row) => `sku:${skuKey({ sku: row.file.sku })}`
   )
   return (row) => {
-    const known = Rec.get(byId, row.id)
-    if (Option.isNone(known)) return undefined
-    const values = Rec.fromEntries(
-      Arr.map(fields, (field) => {
-        const text = Option.getOrElse(Rec.get(row.values, field), () => "")
+    const known = R.get(byId, row.id)
+    if (O.isNone(known)) return undefined
+    const values = R.fromEntries(
+      A.map(fields, (field) => {
+        const text = O.getOrElse(R.get(row.values, field), () => "")
         return [field, text === known.value.file[field] ? text : canonical(field, text)] as const
       })
     ) as Record<Field, string>
-    const rivals = Arr.map(
-      Arr.filter(
-        Option.getOrElse(Rec.get(byKey, `sku:${skuKey({ sku: values.sku })}`), () => []),
+    const rivals = A.map(
+      A.filter(
+        O.getOrElse(R.get(byKey, `sku:${skuKey({ sku: values.sku })}`), () => []),
         (other) => other.id !== row.id
       ),
       (other) => ({ id: other.id, place: rowPlace(other), same: sameValues(values, other.file) })
@@ -1498,13 +1495,13 @@ export const firstDecisions = (input: {
 }): SavedDecisions => {
   if (input.mode === "apply") return {}
   const current = review({ ...input, decisions: {}, storedItems: [] })
-  return Rec.fromEntries(
+  return R.fromEntries(
     keepSome(current.rows, (row) => {
-      const safe = Arr.map(
-        Arr.filter(row.proposals, (proposal) => proposal.lossless),
+      const safe = A.map(
+        A.filter(row.proposals, (proposal) => proposal.lossless),
         (proposal) => proposal.field
       )
-      return safe.length === 0 ? Option.none() : Option.some([row.id, decisionOf({ reverted: safe })] as const)
+      return safe.length === 0 ? O.none() : O.some([row.id, decisionOf({ reverted: safe })] as const)
     })
   )
 }
@@ -1522,16 +1519,13 @@ export const carryDecisions = (input: {
 }): SavedDecisions => {
   const fresh = firstDecisions(input)
   const kept = input.decisions
-  const merged = Arr.map(Arr.dedupe([...Rec.keys(fresh), ...Rec.keys(kept)]), (id) => {
-    const before = Option.getOrElse(Rec.get(kept, id), () => emptyDecision)
-    const held = Option.getOrElse(Rec.get(fresh, id), () => emptyDecision).reverted
-    const reverted = Arr.dedupe([
-      ...before.reverted,
-      ...Arr.filter(held, (field) => !Arr.contains(before.accepted, field))
-    ])
+  const merged = A.map(A.dedupe([...R.keys(fresh), ...R.keys(kept)]), (id) => {
+    const before = O.getOrElse(R.get(kept, id), () => emptyDecision)
+    const held = O.getOrElse(R.get(fresh, id), () => emptyDecision).reverted
+    const reverted = A.dedupe([...before.reverted, ...A.filter(held, (field) => !A.contains(before.accepted, field))])
     return [id, { ...before, reverted }] as const
   })
-  return Rec.fromEntries(merged)
+  return R.fromEntries(merged)
 }
 
 /**
@@ -1549,15 +1543,15 @@ export const dropAccepted = (input: {
   readonly rows: ReadonlyArray<ReviewedRow>
   readonly drop: (proposal: Proposal) => boolean
 }): SavedDecisions =>
-  Rec.fromEntries(
+  R.fromEntries(
     keepSome(input.rows, (row) => {
-      const decision = Rec.get(input.decisions, row.id)
-      if (Option.isNone(decision)) return Option.none()
+      const decision = R.get(input.decisions, row.id)
+      if (O.isNone(decision)) return O.none()
       const accepted = decision.value.accepted
-      const kept = Arr.filter(accepted, (field) =>
-        Arr.some(row.proposals, (proposal) => proposal.field === field && !input.drop(proposal))
+      const kept = A.filter(accepted, (field) =>
+        A.some(row.proposals, (proposal) => proposal.field === field && !input.drop(proposal))
       )
-      if (kept.length === accepted.length) return Option.none()
-      return Option.some([row.id, { ...decision.value, accepted: kept }] as const)
+      if (kept.length === accepted.length) return O.none()
+      return O.some([row.id, { ...decision.value, accepted: kept }] as const)
     })
   )

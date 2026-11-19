@@ -1,5 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Array as Arr, Effect, Option } from "effect"
+import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as O from "effect/Option"
 import {
   columnLetter,
   dateText,
@@ -15,7 +17,7 @@ import type { Cell } from "../src/Reading/Spreadsheet.rules.ts"
 const t = (text: string): Cell => (text === "" ? emptyCell : { type: "text", text })
 const n = (value: number): Cell => ({ type: "number", text: numberText(value) })
 const grid = (rows: ReadonlyArray<ReadonlyArray<Cell>>, extra: Partial<SheetGrid> = {}): SheetGrid => ({
-  rows: Arr.map(rows, (cells, i): GridRow => ({ rowNumber: i + 1, cells, hidden: false })),
+  rows: A.map(rows, (cells, i): GridRow => ({ rowNumber: i + 1, cells, hidden: false })),
   merges: [],
   hiddenColumns: [],
   ...extra
@@ -50,7 +52,7 @@ describe("dateText", () => {
 
 describe("columnLetter and describeRows", () => {
   it("names columns and rows the way a person reads them", () => {
-    expect(Arr.map([0, 25, 26, 27, 701, 702], columnLetter)).toEqual(["A", "Z", "AA", "AB", "ZZ", "AAA"])
+    expect(A.map([0, 25, 26, 27, 701, 702], columnLetter)).toEqual(["A", "Z", "AA", "AB", "ZZ", "AAA"])
     expect(describeRows([9])).toBe("row 9")
     expect(describeRows([9, 12])).toBe("rows 9 and 12")
     expect(describeRows([9, 12, 15, 20, 30])).toBe("rows 9, 12, 15 and 2 more")
@@ -63,7 +65,7 @@ describe("describeWorkbook", () => {
       const table = yield* describeWorkbook({
         fileName: "stock.xlsx",
         sheets: [sheet("Sheet1", grid([])), sheet("Items", items)],
-        sheet: Option.none(),
+        sheet: O.none(),
         notes: []
       })
       if (table.format._tag !== "xlsx") throw new Error("expected a workbook")
@@ -79,11 +81,11 @@ describe("describeWorkbook", () => {
 
   it.effect("prefers a wide table over a longer one-column notes sheet", () =>
     Effect.gen(function* () {
-      const notes = grid(Arr.makeBy(5, (i) => [t(`Note ${i}`)]))
+      const notes = grid(A.makeBy(5, (i) => [t(`Note ${i}`)]))
       const table = yield* describeWorkbook({
         fileName: "stock.xlsx",
         sheets: [sheet("Read me", notes), sheet("Items", items)],
-        sheet: Option.none(),
+        sheet: O.none(),
         notes: []
       })
       if (table.format._tag !== "xlsx") throw new Error("expected a workbook")
@@ -108,10 +110,10 @@ describe("describeWorkbook", () => {
       const table = yield* describeWorkbook({
         fileName: "x.xlsx",
         sheets: [sheet("S", g)],
-        sheet: Option.none(),
+        sheet: O.none(),
         notes: []
       })
-      const kinds = Arr.map(table.notes, (note) => note.kind)
+      const kinds = A.map(table.notes, (note) => note.kind)
       expect(kinds).toEqual(["formulaWithoutResult", "hiddenColumns", "mergedCells"])
       expect(table.notes[0]?.message).toBe(
         "1 formula has no saved result (C2), so it reads as empty. Open the file in Excel, save it, and choose it again."
@@ -125,7 +127,7 @@ describe("describeWorkbook", () => {
       const table = yield* describeWorkbook({
         fileName: "skus.xlsx",
         sheets: [sheet("S", grid([[t("SKU")], [t("BRK-040")], [t("FW-M8")]]))],
-        sheet: Option.none(),
+        sheet: O.none(),
         notes: []
       })
       expect(table.headerRowNumber).toBe(1)

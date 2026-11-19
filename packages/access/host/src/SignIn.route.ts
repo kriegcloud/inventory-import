@@ -8,8 +8,11 @@ import type { D1Database } from "@cloudflare/workers-types"
 import { BetterAuth } from "@beep/better-auth/BetterAuth"
 import { BetterAuthSettings } from "@beep/better-auth/BetterAuthConfig"
 import { RequestSource } from "@inventory/kernel/SameOrigin"
-import { Effect, Layer, Option } from "effect"
-import { HttpServerRequest, HttpServerResponse } from "effect/http"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as O from "effect/Option"
+import * as HttpServerRequest from "effect/http/HttpServerRequest"
+import * as HttpServerResponse from "effect/http/HttpServerResponse"
 import type { CrossSiteRequest } from "@inventory/kernel/AccessError"
 import { authSettings } from "./Config.ts"
 import { authOptions } from "./internal/authOptions.ts"
@@ -41,7 +44,7 @@ export const signIn = (options: {
           authOptions({
             database: options.database,
             secret: resolved.secret,
-            baseURL: Option.getOrUndefined(resolved.baseURL),
+            baseURL: O.getOrUndefined(resolved.baseURL),
             // Secure cookies in a production build, unless the configured address is plain http (a private network
             // without TLS: a browser drops a Secure cookie there, and nobody could sign in); and under
             // `bun run dev:https` once BETTER_AUTH_URL names its https address.
@@ -69,20 +72,17 @@ export const SignInRoute = BetterAuth.route({
   guard: Effect.fn("SignIn.guard")(function* (request: HttpServerRequest.HttpServerRequest, publicOrigin) {
     const source = RequestSource.make({
       method: request.method,
-      fetchSite: Option.fromUndefinedOr(request.headers["sec-fetch-site"]),
-      origin: Option.fromUndefinedOr(request.headers["origin"]),
-      own: [
-        ...Option.toArray(Option.map(HttpServerRequest.toURL(request), (url) => url.origin)),
-        ...Option.toArray(publicOrigin)
-      ]
+      fetchSite: O.fromUndefinedOr(request.headers["sec-fetch-site"]),
+      origin: O.fromUndefinedOr(request.headers["origin"]),
+      own: [...O.toArray(O.map(HttpServerRequest.toURL(request), (url) => url.origin)), ...O.toArray(publicOrigin)]
     })
-    if (RequestSource.allows(source)) return Option.none()
+    if (RequestSource.allows(source)) return O.none()
     yield* Effect.logWarning("Refused a sign-in request from another site").pipe(
       Effect.annotateLogs({
-        "http.origin": Option.getOrElse(source.origin, () => ""),
-        "http.sec_fetch_site": Option.getOrElse(source.fetchSite, () => "")
+        "http.origin": O.getOrElse(source.origin, () => ""),
+        "http.sec_fetch_site": O.getOrElse(source.fetchSite, () => "")
       })
     )
-    return Option.some(refused)
+    return O.some(refused)
   })
 })

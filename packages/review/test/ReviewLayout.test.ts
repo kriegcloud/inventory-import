@@ -2,7 +2,10 @@
 // that brings back something other than what was undone, a work list whose counts do not add up, a button that reads
 // "Type a item #", and a row already in the system offered "Leave out".
 import { describe, expect, it } from "@effect/vitest"
-import { Array as Arr, HashSet, Option, Record as Rec } from "effect"
+import * as A from "effect/Array"
+import * as HashSet from "effect/HashSet"
+import * as O from "effect/Option"
+import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import {
   act,
@@ -25,7 +28,7 @@ import { columns, makeRows, problemKinds, recheck } from "./fixtures/fabrication
 
 const rows = makeRows({ size: 178 })
 const views = (state: ReviewState) => viewRows({ rows, state, recheck })
-const plain = (state: ReviewState) => Rec.fromEntries(state.decisions)
+const plain = (state: ReviewState) => R.fromEntries(state.decisions)
 
 describe("column sizing", () => {
   const name: SizedColumn = { id: "name", size: "fill", need: 200, priority: 9, keep: true }
@@ -65,9 +68,9 @@ describe("column sizing", () => {
     expect(plan.folded).toEqual([])
     expect(plan.scrolls).toBe(true)
     expect(plan.minWidth).toBe(240 + 200 + 120 + 90)
-    expect(
-      Arr.findFirst(plan.shown, (column) => column.id === "sku").pipe(Option.map((column) => column.width))
-    ).toEqual(Option.some(120))
+    expect(A.findFirst(plan.shown, (column) => column.id === "sku").pipe(O.map((column) => column.width))).toEqual(
+      O.some(120)
+    )
   })
 
   it.prop(
@@ -80,7 +83,7 @@ describe("column sizing", () => {
       room: S.Int.check(S.isBetween({ minimum: 300, maximum: 2400 }))
     },
     ({ needs, room }) => {
-      const sized = Arr.map(needs, (need, index): SizedColumn => ({
+      const sized = A.map(needs, (need, index): SizedColumn => ({
         id: `c${index}`,
         size: index === 0 ? "fill" : "fit",
         need,
@@ -89,7 +92,7 @@ describe("column sizing", () => {
       }))
       const plan = planColumns({ columns: sized, fixed: 200, room })
       for (const shown of plan.shown) {
-        const column = Option.getOrUndefined(Arr.findFirst(sized, (candidate) => candidate.id === shown.id))
+        const column = O.getOrUndefined(A.findFirst(sized, (candidate) => candidate.id === shown.id))
         if (column?.size === "fit") expect(shown.width).toBe(column.need)
         else expect(shown.width).toBeGreaterThanOrEqual(column?.need ?? 0)
       }
@@ -105,8 +108,8 @@ describe("column sizing", () => {
 })
 
 describe("undo and redo", () => {
-  const ready = Arr.filter(rows, (row) => row.problem === undefined)
-  const needing = Arr.filter(rows, (row) => row.problem !== undefined)
+  const ready = A.filter(rows, (row) => row.problem === undefined)
+  const needing = A.filter(rows, (row) => row.problem !== undefined)
   const Pick = S.Struct({
     kind: S.Literals(["leaveOut", "edit", "accept", "undo", "redo"]),
     at: S.Int.check(S.isBetween({ minimum: 0, maximum: 40 }))
@@ -128,7 +131,7 @@ describe("undo and redo", () => {
     }
   }
   const play = (picks: ReadonlyArray<typeof Pick.Type>): ReviewState =>
-    Arr.reduce(picks, emptyState, (state, pick) => act({ rows, state, action: actionOf(pick), recheck }).state)
+    A.reduce(picks, emptyState, (state, pick) => act({ rows, state, action: actionOf(pick), recheck }).state)
 
   it.prop(
     "a redo right after an undo brings back exactly the decisions that were undone",
@@ -180,21 +183,21 @@ describe("undo and redo", () => {
 describe("the work list", () => {
   it("lists each kind with rows left, keeps a finished one ticked, and its counts add up to Needs you", () => {
     const counts = count(views(emptyState))
-    const seen = HashSet.fromIterable(Arr.map(problemKinds, (kind) => kind.id))
+    const seen = HashSet.fromIterable(A.map(problemKinds, (kind) => kind.id))
     const list = workList({ counts, problemKinds, seen })
-    expect(Arr.reduce(list, 0, (sum, item) => sum + item.left)).toBe(counts.needs)
+    expect(A.reduce(list, 0, (sum, item) => sum + item.left)).toBe(counts.needs)
     // Leave every row of the first kind out: it stays on the list, ticked, with none left.
     const first = list[0]!
-    const ids = Arr.map(
-      Arr.filter(rows, (row) => row.problem?.kind === first.kind.id),
+    const ids = A.map(
+      A.filter(rows, (row) => row.problem?.kind === first.kind.id),
       (row) => row.id
     )
     const state = act({ rows, state: emptyState, action: { type: "leaveOut", rowIds: ids } }).state
     const after = workList({ counts: count(views(state)), problemKinds, seen })
     expect(after[0]).toEqual({ kind: first.kind, left: 0, done: true })
-    expect(Arr.reduce(after, 0, (sum, item) => sum + item.left)).toBe(count(views(state)).needs)
+    expect(A.reduce(after, 0, (sum, item) => sum + item.left)).toBe(count(views(state)).needs)
     // A kind that never had rows is not listed.
-    expect(Arr.every(workList({ counts, problemKinds, seen: HashSet.empty() }), (item) => item.left > 0)).toBe(true)
+    expect(A.every(workList({ counts, problemKinds, seen: HashSet.empty() }), (item) => item.left > 0)).toBe(true)
   })
 
   it("next problem goes down the list to the next kind with rows left, then from the top", () => {
@@ -203,7 +206,7 @@ describe("the work list", () => {
     const [a, b] = list
     expect(nextKind({ list, from: a?.kind.id })).toBe(b?.kind.id)
     expect(nextKind({ list, from: list[list.length - 1]?.kind.id })).toBe(a?.kind.id)
-    const done = Arr.map(list, (item) => ({ ...item, left: 0, done: true }))
+    const done = A.map(list, (item) => ({ ...item, left: 0, done: true }))
     expect(nextKind({ list: done, from: a?.kind.id })).toBeUndefined()
   })
 
@@ -237,11 +240,11 @@ describe("a row already in the system", () => {
     expect(counts.stored).toBe(1)
     expect(counts.needs + counts.ready + counts.out + counts.stored).toBe(counts.total)
     const shows = (filter: "all" | "needs" | "ready" | "out") =>
-      Arr.some(visible({ views: viewsOf(emptyState), filter }), (view) => view.row.id === stored.id)
+      A.some(visible({ views: viewsOf(emptyState), filter }), (view) => view.row.id === stored.id)
     expect(shows("all")).toBe(true)
     for (const filter of ["needs", "ready", "out"] as const) expect(shows(filter)).toBe(false)
-    const held = Arr.findFirst(result({ views: viewsOf(emptyState), problemKinds }).held, (row) => row.id === stored.id)
-    expect(held).toEqual(Option.some({ id: stored.id, line: 900, reason: "Already there", decidedBy: "stored" }))
+    const held = A.findFirst(result({ views: viewsOf(emptyState), problemKinds }).held, (row) => row.id === stored.id)
+    expect(held).toEqual(O.some({ id: stored.id, line: 900, reason: "Already there", decidedBy: "stored" }))
     expect(
       heldCsv({ views: viewsOf(emptyState), columns, problemKinds, words: { ...defaultReviewWords, stored: "Stored" } })
     ).toContain("900,Stored,Hex bolt M6")

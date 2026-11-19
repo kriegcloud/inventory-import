@@ -1,7 +1,7 @@
 // The one door to the spreadsheet reader. Importing this costs the first page load nothing: the reader, @beep/csv
 // and @beep/xlsx are separate chunks fetched when a file is chosen. Import types from the domain, values from here.
 // The upload screen calls it inside a worker (packages/catalog/web/src/Upload.controller.ts), so the read never holds up the page.
-import { Effect } from "effect"
+import * as Effect from "effect/Effect"
 import type { FileProblem } from "@inventory/catalog-contract/FileProblem"
 import type { SpreadsheetTable } from "@inventory/catalog-model/Spreadsheet"
 import type { ReadSpreadsheetInput } from "./read.ts"

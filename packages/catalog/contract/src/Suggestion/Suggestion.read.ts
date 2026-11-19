@@ -1,7 +1,10 @@
 // A suggestion for something the fixed rules cannot settle: a name, a category, or a file column for a field. It
 // never applies itself; the person accepts or rejects it. Its table's columns are read and written by the two
 // mappers here, so the stored rows keep their shape.
-import { Array as Arr, Option, String as Str, Tuple } from "effect"
+import * as A from "effect/Array"
+import * as O from "effect/Option"
+import * as Str from "effect/String"
+import * as Tuple from "effect/Tuple"
 import * as S from "effect/Schema"
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import { RowId, SuggestionId } from "../Catalog.id.ts"
@@ -205,14 +208,14 @@ export const suggestionToStored = (suggestion: Suggestion): StoredSuggestionRow 
  * The suggestion the stored columns say, or none for a row that says no whole suggestion (a column with no
  * position, a row's suggestion with no row): such a row is never shown.
  */
-export const suggestionFromStored = (row: StoredSuggestionRow): Option.Option<Suggestion> => {
+export const suggestionFromStored = (row: StoredSuggestionRow): O.Option<Suggestion> => {
   const by =
     row.by === "model" && row.model !== null && row.model !== "" ? suggestedByModel(row.model) : suggestedByRule
   const said = { by, confidence: row.confidence, basis: row.basis }
   if (row.kind === "column") {
     return row.column === null
-      ? Option.none()
-      : Option.some(
+      ? O.none()
+      : O.some(
           storedSuggestion({
             id: row.id,
             made: { kind: "column", field: row.field, column: row.column, heading: row.to, ...said }
@@ -220,8 +223,8 @@ export const suggestionFromStored = (row: StoredSuggestionRow): Option.Option<Su
         )
   }
   return row.rowId === "" || row.rowNumber === null
-    ? Option.none()
-    : Option.some(
+    ? O.none()
+    : O.some(
         storedSuggestion({
           id: row.id,
           made: { kind: row.kind, rowId: row.rowId, rowNumber: row.rowNumber, from: row.from, to: row.to, ...said }
@@ -245,8 +248,8 @@ export const suggestionFits = (input: {
   }
   if (input.kind === "category") {
     return (
-      Arr.contains(categories as ReadonlyArray<string>, input.to) &&
-      !Arr.contains(categories as ReadonlyArray<string>, input.file.category)
+      A.contains(categories as ReadonlyArray<string>, input.to) &&
+      !A.contains(categories as ReadonlyArray<string>, input.file.category)
     )
   }
   return false

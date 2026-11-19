@@ -3,10 +3,16 @@
 // can say what is wrong and what to do; a 4xx would reach the screen as "This was not accepted". Sent through a real
 // HttpApi in memory, so the status and the body are what a browser gets.
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Layer, Result } from "effect"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Result from "effect/Result"
 import * as S from "effect/Schema"
-import { HttpRouter, HttpServer } from "effect/http"
-import { HttpApi, HttpApiBuilder, HttpApiEndpoint, HttpApiGroup } from "effect/http-api"
+import * as HttpRouter from "effect/http/HttpRouter"
+import * as HttpServer from "effect/http/HttpServer"
+import * as HttpApi from "effect/http-api/HttpApi"
+import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder"
+import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint"
+import * as HttpApiGroup from "effect/http-api/HttpApiGroup"
 import { FileProblem, fileProblem, fileProblemTitles, StagingOutcome } from "@inventory/catalog-contract/FileProblem"
 const Staged = S.Struct({ rows: S.Int })
 
@@ -33,8 +39,11 @@ const FilesLive = HttpApiBuilder.group(StagingApi, "files", (handlers) =>
 const send = (body: unknown) =>
   Effect.acquireUseRelease(
     Effect.sync(() =>
-      HttpRouter.toWebHandler(
-        HttpApiBuilder.layer(StagingApi).pipe(Layer.provide(FilesLive), Layer.provide(HttpServer.layerServices))
+      StagingApi.pipe(
+        HttpApiBuilder.layer,
+        Layer.provide(FilesLive),
+        Layer.provide(HttpServer.layerServices),
+        HttpRouter.toWebHandler
       )
     ),
     ({ handler }) =>

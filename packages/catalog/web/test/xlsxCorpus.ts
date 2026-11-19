@@ -1,7 +1,10 @@
 // The workbooks the parity test reads: the fixtures, for the sheet the reader would pick and for every sheet a person
 // could choose, and files built here from hand-written parts, each named for what it holds.
-import { Array as Arr, Effect, Option, Stream } from "effect"
-import { Zip } from "effect/encoding"
+import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as O from "effect/Option"
+import * as Stream from "effect/Stream"
+import * as Zip from "effect/encoding/Zip"
 
 const head = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
 const main = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
@@ -18,14 +21,14 @@ export const built = (input: {
   const codes = input.codes ?? []
   const styles =
     `${head}<styleSheet xmlns="${main}"><numFmts count="${codes.length}">` +
-    Arr.join(
-      Arr.map(codes, (code, i) => `<numFmt numFmtId="${164 + i}" formatCode="${code}"/>`),
+    A.join(
+      A.map(codes, (code, i) => `<numFmt numFmtId="${164 + i}" formatCode="${code}"/>`),
       ""
     ) +
     `</numFmts><fonts count="1"><font/></fonts><fills count="1"><fill/></fills><borders count="1"><border/></borders>` +
     `<cellXfs count="${codes.length + 1}"><xf numFmtId="0"/>` +
-    Arr.join(
-      Arr.map(codes, (_, i) => `<xf numFmtId="${164 + i}" applyNumberFormat="1"/>`),
+    A.join(
+      A.map(codes, (_, i) => `<xf numFmtId="${164 + i}" applyNumberFormat="1"/>`),
       ""
     ) +
     "</cellXfs></styleSheet>"
@@ -57,11 +60,11 @@ export const built = (input: {
     ["xl/sharedStrings.xml", input.strings ?? `${head}<sst xmlns="${main}"/>`],
     ["xl/worksheets/sheet1.xml", input.sheet]
   ]
-  return Stream.fromIterable(Arr.map(parts, ([path, text]) => Zip.file(path, text))).pipe(
+  return Stream.fromIterable(A.map(parts, ([path, text]) => Zip.file(path, text))).pipe(
     Stream.pipeThroughChannel(Zip.encode()),
     Stream.runCollect,
     Effect.map((chunks) => {
-      const out = new Uint8Array(Arr.reduce(chunks, 0, (n, chunk) => n + chunk.length))
+      const out = new Uint8Array(A.reduce(chunks, 0, (n, chunk) => n + chunk.length))
       let at = 0
       for (const chunk of chunks) {
         out.set(chunk, at)
@@ -92,13 +95,13 @@ const textRows =
   `<row r="3"><c r="A3" t="s"><v>3</v></c>${text("B3", "a &amp; b &lt;c&gt;")}<c r="C3" t="inlineStr"><is><r><t>rich </t></r><r><t>inline</t></r></is></c><c r="D3" t="b"><v>0</v></c></row>`
 
 const formatCodes = ["yyyy-mm-dd", "h:mm:ss", "00000", "$#,##0.00", "0%", "m/d/yy h:mm", "d-mmm-yy"]
-const formatRows = Arr.join(
-  Arr.map(
+const formatRows = A.join(
+  A.map(
     [59, 60, 61, 0.75, 46_085.604_166_666_66, 123, 1234.5, 0.5],
     (value, i) =>
       `<row r="${i + 2}">${text(`A${i + 2}`, `S-${i}`)}` +
-      Arr.join(
-        Arr.map(formatCodes, (_, style) => `<c r="${"BCDEFGH"[style]}${i + 2}" s="${style + 1}"><v>${value}</v></c>`),
+      A.join(
+        A.map(formatCodes, (_, style) => `<c r="${"BCDEFGH"[style]}${i + 2}" s="${style + 1}"><v>${value}</v></c>`),
         ""
       ) +
       "</row>"
@@ -119,8 +122,8 @@ const prefixed =
 /** A workbook whose sheet declares rows 1 to 3 and holds rows 1 to 5. */
 export const lyingExtent = built({
   sheet: sheetOf(
-    Arr.join(
-      Arr.map(
+    A.join(
+      A.map(
         [2, 3, 4, 5],
         (r) => `<row r="${r}">${text(`A${r}`, `A-${r}`)}${text(`B${r}`, "Bolt")}<c r="C${r}"><v>${r}</v></c></row>`
       ),
@@ -144,19 +147,19 @@ export const fixtureNames = [
 export interface XlsxCase {
   readonly name: string
   readonly bytes: Effect.Effect<Uint8Array>
-  readonly sheet: Option.Option<string>
+  readonly sheet: O.Option<string>
 }
 
 /** The files built by hand, and a fixture cut short. `read` loads a fixture's bytes. */
 export const builtCases = (read: (name: string) => Uint8Array): ReadonlyArray<XlsxCase> => [
-  { name: "built-shared-formulas", bytes: built({ sheet: sheetOf(sharedFormulas) }), sheet: Option.none() },
-  { name: "built-text", bytes: built({ sheet: sheetOf(textRows), strings: textStrings }), sheet: Option.none() },
-  { name: "built-formats", bytes: built({ sheet: sheetOf(formatRows), codes: formatCodes }), sheet: Option.none() },
+  { name: "built-shared-formulas", bytes: built({ sheet: sheetOf(sharedFormulas) }), sheet: O.none() },
+  { name: "built-text", bytes: built({ sheet: sheetOf(textRows), strings: textStrings }), sheet: O.none() },
+  { name: "built-formats", bytes: built({ sheet: sheetOf(formatRows), codes: formatCodes }), sheet: O.none() },
   {
     name: "built-bare-references",
     bytes: built({ sheet: sheetOf(bareRows, '<cols><col min="2" max="2" hidden="1"/></cols>') }),
-    sheet: Option.none()
+    sheet: O.none()
   },
-  { name: "built-prefixed", bytes: built({ sheet: prefixed }), sheet: Option.none() },
-  { name: "cut-short", bytes: Effect.sync(() => read("messy.xlsx").subarray(0, 3000)), sheet: Option.none() }
+  { name: "built-prefixed", bytes: built({ sheet: prefixed }), sheet: O.none() },
+  { name: "cut-short", bytes: Effect.sync(() => read("messy.xlsx").subarray(0, 3000)), sheet: O.none() }
 ]

@@ -1,4 +1,4 @@
-import { Option } from "effect"
+import * as O from "effect/Option"
 import { useMutation } from "@tanstack/react-query"
 import { PageHeader } from "@inventory/ui/PageHeader"
 import { NotSet } from "@inventory/ui/NotSet"
@@ -37,7 +37,7 @@ export function MatchStep(props: { view: ImportView; table: StagedTable; canImpo
       call((api) =>
         api.imports.match({
           params: { id: view.id },
-          payload: { field: input.field, column: Option.fromNullOr(input.column) }
+          payload: { field: input.field, column: O.fromNullOr(input.column) }
         })
       ),
     onSuccess: cache.setView,
@@ -65,7 +65,7 @@ export function MatchStep(props: { view: ImportView; table: StagedTable; canImpo
         <NativeSelect
           size="sm"
           aria-label={`File column for ${fieldLabels[entry.field]}`}
-          value={Option.match(matchedColumn(entry), { onNone: () => "", onSome: (column) => `${column.index}` })}
+          value={O.match(matchedColumn(entry), { onNone: () => "", onSome: (column) => `${column.index}` })}
           disabled={!props.canImport || match.isPending}
           onChange={(event) =>
             match.mutate({ field: entry.field, column: event.target.value === "" ? null : Number(event.target.value) })
@@ -85,15 +85,15 @@ export function MatchStep(props: { view: ImportView; table: StagedTable; canImpo
       id: "examples",
       label: "Examples",
       cell: ({ match: entry }) => {
-        const examples = Option.match(matchedColumn(entry), { onNone: () => [], onSome: (column) => column.examples })
+        const examples = O.match(matchedColumn(entry), { onNone: () => [], onSome: (column) => column.examples })
         return examples.length === 0 ? <NotSet /> : examples.join(" · ")
       }
     }
   ]
 
-  const matched = view.mapping.filter((entry) => Option.isSome(matchedColumn(entry))).length
+  const matched = view.mapping.filter((entry) => O.isSome(matchedColumn(entry))).length
   const missing = view.mapping
-    .filter((entry) => Option.isNone(matchedColumn(entry)) && requiredFields.includes(entry.field))
+    .filter((entry) => O.isNone(matchedColumn(entry)) && requiredFields.includes(entry.field))
     .map((entry) => fieldLabels[entry.field])
   const names =
     missing.length < 2 ? (missing[0] ?? "") : `${missing.slice(0, -1).join(", ")} and ${missing[missing.length - 1]}`

@@ -3,7 +3,9 @@
  * the app imports this. The shape of the mess is fixed per block of 178 rows: 136 ready (17 of them with a
  * spelling fix already applied) and 42 that need the person, across five kinds.
  */
-import { Array as Arr, MutableHashMap, Option } from "effect"
+import * as A from "effect/Array"
+import * as MutableHashMap from "effect/MutableHashMap"
+import * as O from "effect/Option"
 import type { Activity, Fix, Problem, ProblemKind, ReviewColumn, ReviewRow } from "@inventory/review/ReviewTypes"
 
 export const problemKinds: ReadonlyArray<ProblemKind> = [
@@ -464,7 +466,7 @@ export function makeRows(input: { size: number; clean?: boolean; withoutUnit?: b
             ? families.filter((family) => family.unit === "kg")
             : families
     const family = pool[position % pool.length] ?? families[0]!
-    const turn = Option.getOrElse(MutableHashMap.get(used, family.code), () => 0)
+    const turn = O.getOrElse(MutableHashMap.get(used, family.code), () => 0)
     MutableHashMap.set(used, family.code, turn + 1)
     const size = family.sizes[turn % family.sizes.length] ?? family.sizes[0]!
     const series = Math.floor(turn / family.sizes.length)
@@ -571,9 +573,9 @@ export function makeRows(input: { size: number; clean?: boolean; withoutUnit?: b
   // categories use decides what is suggested, and the count is the basis shown to the person.
   const guessed = rows.filter((row) => row.problem?.fix?.group === "unit:length")
   if (guessed.length > 0) {
-    const categories = Arr.dedupe(guessed.map((row) => row.cells.category ?? ""))
+    const categories = A.dedupe(guessed.map((row) => row.cells.category ?? ""))
     const tally = MutableHashMap.empty<string, number>()
-    const counted = (unit: string): number => Option.getOrElse(MutableHashMap.get(tally, unit), () => 0)
+    const counted = (unit: string): number => O.getOrElse(MutableHashMap.get(tally, unit), () => 0)
     for (const row of rows) {
       const unit = row.cells.unit ?? ""
       if (row.problem !== undefined || row.applied !== undefined) continue
@@ -600,7 +602,7 @@ export function makeRows(input: { size: number; clean?: boolean; withoutUnit?: b
   const byId = MutableHashMap.fromIterable(rows.map((row) => [row.id, row] as const))
   return rows.map((row) => {
     const rival = row.problem?.rivals?.[0]
-    const other = rival === undefined ? undefined : Option.getOrUndefined(MutableHashMap.get(byId, rival))
+    const other = rival === undefined ? undefined : O.getOrUndefined(MutableHashMap.get(byId, rival))
     if (other === undefined || other.line > row.line) return row
     return { ...row, cells: { ...row.cells, sku: other.cells.sku ?? "" } }
   })

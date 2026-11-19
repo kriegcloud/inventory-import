@@ -10,7 +10,12 @@ import type { XlsxParseError } from "@beep/xlsx/XlsxError"
 import { XlsxLimits, XlsxReadOptions } from "@beep/xlsx/XlsxOptions"
 import { XlsxCalendar, type XlsxDateSystem } from "@beep/xlsx/XlsxSerial"
 import type { XlsxRow } from "@beep/xlsx/XlsxWorkbook"
-import { Array as Arr, ByteSize, Effect, MutableHashMap, Option, Stream } from "effect"
+import * as A from "effect/Array"
+import * as ByteSize from "effect/ByteSize"
+import * as Effect from "effect/Effect"
+import * as MutableHashMap from "effect/MutableHashMap"
+import * as O from "effect/Option"
+import * as Stream from "effect/Stream"
 import { type FileProblem, fileProblem } from "@inventory/catalog-contract/FileProblem"
 import {
   dateText,
@@ -30,12 +35,12 @@ const options = XlsxReadOptions.make({
   })
 })
 
-const withShown = (cell: Cell, shown: Option.Option<string>, formula: Option.Option<string>): Cell => {
-  const display = Option.filter(shown, (text) => text !== cell.text)
+const withShown = (cell: Cell, shown: O.Option<string>, formula: O.Option<string>): Cell => {
+  const display = O.filter(shown, (text) => text !== cell.text)
   return {
     ...cell,
-    ...(Option.isSome(display) ? { shown: display.value } : {}),
-    ...(Option.isSome(formula) ? { formula: `=${formula.value}` } : {})
+    ...(O.isSome(display) ? { shown: display.value } : {}),
+    ...(O.isSome(formula) ? { formula: `=${formula.value}` } : {})
   }
 }
 
@@ -44,11 +49,11 @@ const toCell = (cell: XlsxRow["cells"][number], system: XlsxDateSystem): Cell =>
   const value: XlsxValue = cell.value
   switch (value.kind) {
     case "Text":
-      return withShown(value.text === "" ? emptyCell : { type: "text", text: value.text }, Option.none(), cell.formula)
+      return withShown(value.text === "" ? emptyCell : { type: "text", text: value.text }, O.none(), cell.formula)
     case "Boolean":
-      return withShown({ type: "boolean", text: value.value ? "TRUE" : "FALSE" }, Option.none(), cell.formula)
+      return withShown({ type: "boolean", text: value.value ? "TRUE" : "FALSE" }, O.none(), cell.formula)
     case "Error":
-      return withShown({ type: "error", text: value.code }, Option.none(), cell.formula)
+      return withShown({ type: "error", text: value.code }, O.none(), cell.formula)
     case "Number":
       return withShown({ type: "number", text: numberText(value.value) }, XlsxCell.shown(cell, system), cell.formula)
     case "Date": {
@@ -66,7 +71,7 @@ const toCell = (cell: XlsxRow["cells"][number], system: XlsxDateSystem): Cell =>
     }
     case "Blank":
     case "Unreadable":
-      return withShown(emptyCell, Option.none(), cell.formula)
+      return withShown(emptyCell, O.none(), cell.formula)
   }
 }
 
@@ -97,15 +102,13 @@ const reportEvery = 2000
 
 const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`
 const listed = (items: ReadonlyArray<string>, limit = 5): string =>
-  items.length <= limit
-    ? Arr.join(items, ", ")
-    : `${Arr.join(Arr.take(items, limit), ", ")} and ${items.length - limit} more`
+  items.length <= limit ? A.join(items, ", ") : `${A.join(A.take(items, limit), ", ")} and ${items.length - limit} more`
 
 /** Reads a workbook the person chose into a table from one sheet (`sheet`, or the one with the most data). */
 export const readXlsx = Effect.fn("readXlsx")(function* (input: {
   fileName: string
   bytes: Uint8Array
-  sheet: Option.Option<string>
+  sheet: O.Option<string>
   notes: ReadonlyArray<Note>
   onProgress?: (progress: ReadProgress) => void
 }) {
@@ -115,7 +118,7 @@ export const readXlsx = Effect.fn("readXlsx")(function* (input: {
   const system = outline.dateSystem
   return yield* describeSheets({
     fileName,
-    sheets: Arr.map(outline.sheets, (sheet) => ({
+    sheets: A.map(outline.sheets, (sheet) => ({
       name: sheet.count.info.name,
       visibility: sheet.count.info.state,
       rowCount: sheet.count.rowsWithValues,
@@ -149,8 +152,8 @@ export const readXlsx = Effect.fn("readXlsx")(function* (input: {
       input.onProgress?.({ rowsRead: total, rowsAbout: total, exact: true })
       // The grid runs from A1 to the last cell the sheet writes, whatever extent the file declares for itself.
       const width = lastColumn + 1
-      const blank = (): Array<Cell> => Arr.makeBy(width, () => emptyCell)
-      const rows: Array<GridRow> = Arr.makeBy(lastRow, (i) => ({ rowNumber: i + 1, cells: blank(), hidden: false }))
+      const blank = (): Array<Cell> => A.makeBy(width, () => emptyCell)
+      const rows: Array<GridRow> = A.makeBy(lastRow, (i) => ({ rowNumber: i + 1, cells: blank(), hidden: false }))
       const filled = MutableHashMap.empty<number, true>()
       const unreadable: Array<string> = []
       const unreadableRows: Array<number> = []
@@ -163,14 +166,14 @@ export const readXlsx = Effect.fn("readXlsx")(function* (input: {
           cells[cell.column] = toCell(cell, system)
           if (cell.value.kind === "Unreadable") {
             unreadable.push(`${columnLetters(cell.column)}${row.number}`)
-            if (!Arr.contains(unreadableRows, row.number)) unreadableRows.push(row.number)
+            if (!A.contains(unreadableRows, row.number)) unreadableRows.push(row.number)
           } else if (
             (cell.value.kind === "Number" || cell.value.kind === "Date") &&
-            Option.isNone(XlsxCell.shown(cell, system)) &&
+            O.isNone(XlsxCell.shown(cell, system)) &&
             XlsxNumberFormat.kind(cell.format).kind !== "General"
           ) {
             const code = cell.format.code
-            MutableHashMap.set(notShown, code, Option.getOrElse(MutableHashMap.get(notShown, code), () => 0) + 1)
+            MutableHashMap.set(notShown, code, O.getOrElse(MutableHashMap.get(notShown, code), () => 0) + 1)
           }
         }
         rows[row.number - 1] = { rowNumber: row.number, cells, hidden: row.hidden }
@@ -192,7 +195,7 @@ export const readXlsx = Effect.fn("readXlsx")(function* (input: {
           rows: []
         })
       }
-      const merges: Array<MergedRange> = Arr.map(sheet.merges, (range) => ({
+      const merges: Array<MergedRange> = A.map(sheet.merges, (range) => ({
         firstRow: range.first.row,
         lastRow: range.last.row,
         firstColumn: range.first.column,

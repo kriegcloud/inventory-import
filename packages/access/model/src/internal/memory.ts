@@ -6,7 +6,11 @@ import type { Activity } from "@inventory/kernel/Activity"
 import type { MemberId, OrganizationId, UserId } from "@inventory/kernel/Ids"
 import type { Member } from "@inventory/kernel/Member"
 import type { DisplayName } from "@inventory/kernel/Text"
-import { Context, type DateTime, Layer, type Option, Ref } from "effect"
+import * as Context from "effect/Context"
+import type * as DateTime from "effect/DateTime"
+import * as Layer from "effect/Layer"
+import type * as O from "effect/Option"
+import * as Ref from "effect/Ref"
 import { $AccessModelId } from "./identity.ts"
 
 const $I = $AccessModelId.create("internal/memory")
@@ -17,8 +21,8 @@ export type MemoryAccount = { readonly userId: UserId; readonly name: DisplayNam
 /** A membership row: the member, the account linked to it (none once removed), and when it began. */
 export type MemoryMembership = {
   readonly member: Member
-  readonly userId: Option.Option<UserId>
-  readonly joinedAt: Option.Option<DateTime.Utc>
+  readonly userId: O.Option<UserId>
+  readonly joinedAt: O.Option<DateTime.Utc>
   readonly removed: boolean
 }
 

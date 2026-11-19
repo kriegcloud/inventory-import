@@ -6,7 +6,7 @@
 import type { SignInFeatures } from "@inventory/access-contract/SessionState"
 import { NotSignedIn } from "@inventory/kernel/AccessError"
 import { CurrentActor } from "@inventory/kernel/Actor"
-import { Effect } from "effect"
+import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import { MemberDirectory, type SignedInUser } from "./MemberDirectory.store.ts"
 import { noActorSentence, sessionStateOf, signInSentence } from "./Session.rules.ts"

@@ -1,5 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { Array as Arr, Equal, Option } from "effect"
+import * as A from "effect/Array"
+import * as Eq from "effect/Equal"
+import * as O from "effect/Option"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { TriangleAlertIcon } from "lucide-react"
 import { toast } from "sonner"
@@ -116,12 +118,12 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
       : { organizationId: actor.organizationId, memberId: actor.id, screen: `import:${view.id}` },
     catalogRuntime()
   )
-  const kept = progress.saved === undefined ? null : Option.getOrNull(progress.saved.review)
+  const kept = progress.saved === undefined ? null : O.getOrNull(progress.saved.review)
   // Where the person starts: the draft the server holds, with its undo history when this browser kept it.
   // The region holds a keep-or-replace answer as a value of its own column; the server keeps it apart
   // (`toServerDecisions`, `toRegionDecisions`). `start` is the region's shape, `decisions` the server's.
   const [start, setStart] = useState<RegionDecisions>(() =>
-    kept !== null && Equal.equals(toServerDecisions(kept.decisions), view.decisions)
+    kept !== null && Eq.equals(toServerDecisions(kept.decisions), view.decisions)
       ? restoredDecisions(kept)
       : toRegionDecisions(view.decisions)
   )
@@ -185,7 +187,7 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
       const server = toServerDecisions(next)
       setDecisions(server)
       change(server)
-      save({ step: "review", review: Option.some(storedReview(next)), decided: Object.keys(next).length })
+      save({ step: "review", review: O.some(storedReview(next)), decided: Object.keys(next).length })
     },
     [change, save]
   )
@@ -212,7 +214,7 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
       call((api) =>
         api.imports.match({
           params: { id: view.id },
-          payload: { field: pick.field, column: Option.some(pick.column) }
+          payload: { field: pick.field, column: O.some(pick.column) }
         })
       ),
     // The draft's revision moves with the match; the effect below then starts the region from the new columns.
@@ -284,7 +286,7 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
   const columnSuggestions = view.suggestions.filter(
     (suggestion): suggestion is Extract<Suggestion, { readonly kind: "column" }> =>
       suggestion.kind === "column" &&
-      current.mapping.some((matched) => matched.field === suggestion.field && Option.isNone(matchedColumn(matched)))
+      current.mapping.some((matched) => matched.field === suggestion.field && O.isNone(matchedColumn(matched)))
   )
   const answered =
     suggested === undefined
@@ -347,7 +349,7 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
     ],
     facts: [
       { label: "File", value: view.fileName },
-      ...Option.match(table.sheet, { onNone: () => [], onSome: (sheet) => [{ label: "Sheet", value: sheet }] }),
+      ...O.match(table.sheet, { onNone: () => [], onSome: (sheet) => [{ label: "Sheet", value: sheet }] }),
       { label: "Uploaded by", value: view.startedBy },
       { label: "Prepared by", value: "The fixed rules" },
       { label: "Stock value in the file", value: totalText(sums.fileStockValue) }
@@ -431,7 +433,7 @@ function ReaderWarnings(props: { table: Pick<StagedTable, "notes"> }) {
           <p>{warnings[0]?.message}</p>
         ) : (
           <ul className="list-disc pl-4">
-            {Arr.map(warnings, (warning) => (
+            {A.map(warnings, (warning) => (
               <li key={warning.message}>{warning.message}</li>
             ))}
           </ul>

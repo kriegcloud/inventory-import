@@ -1,6 +1,7 @@
 // A value an import wrote that differs from its file: by a rule, by a proposal the person accepted, or typed. The
 // stored columns are read and written by the two mappers here.
-import { Option, Tuple } from "effect"
+import * as O from "effect/Option"
+import * as Tuple from "effect/Tuple"
 import * as S from "effect/Schema"
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import { Field } from "../Staging/Staged.read.ts"
@@ -88,12 +89,12 @@ export const changeDecidedBy = (change: Change): "rule" | "person" =>
   change.how === "appliedByRule" ? "rule" : "person"
 
 /** What a proposal rested on; none for a value the person typed. */
-export const changeBasis = (change: Change): Option.Option<string> =>
-  change.how === "typed" ? Option.none() : Option.some(change.basis)
+export const changeBasis = (change: Change): O.Option<string> =>
+  change.how === "typed" ? O.none() : O.some(change.basis)
 
 /** How sure a proposal's source was; none for a value the person typed. */
-export const changeConfidence = (change: Change): Option.Option<Confidence> =>
-  change.how === "typed" ? Option.none() : Option.some(change.confidence)
+export const changeConfidence = (change: Change): O.Option<Confidence> =>
+  change.how === "typed" ? O.none() : O.some(change.confidence)
 
 /** The words `importChange.how` has always held for each case, and the activity view shows where there is no basis. */
 export const changeHowWords = {
@@ -136,8 +137,8 @@ export const changeToStored = (change: Change): StoredChange & { readonly decide
   source: changeSource(change),
   decidedBy: changeDecidedBy(change),
   how: changeHowWords[change.how],
-  basis: Option.getOrNull(changeBasis(change)),
-  confidence: Option.getOrNull(changeConfidence(change))
+  basis: O.getOrNull(changeBasis(change)),
+  confidence: O.getOrNull(changeConfidence(change))
 })
 
 /** A value a form-only rule wrote. */

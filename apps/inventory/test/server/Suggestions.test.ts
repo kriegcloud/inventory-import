@@ -2,7 +2,12 @@
 // suggestion never applies itself, with no model the rules answer and say so, and a model's answer is rated by the
 // guard, never by the model.
 import { describe, expect, it, layer } from "@effect/vitest"
-import { Array as Arr, Effect, Layer, Option, Record as Rec, Ref } from "effect"
+import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as O from "effect/Option"
+import * as R from "effect/Record"
+import * as Ref from "effect/Ref"
 import { SuggestionId } from "@inventory/catalog-contract/Ids"
 import messy from "../../public/samples/items_messy.csv?raw"
 import { review } from "@inventory/catalog-model/Review"
@@ -26,7 +31,7 @@ const sourceOf = (
     review: review({
       table,
       choices: [],
-      decisions: Rec.map(flags, decisionFromFlags),
+      decisions: R.map(flags, decisionFromFlags),
       storedItems: [],
       suggestions
     }),
@@ -34,15 +39,15 @@ const sourceOf = (
   }))
 
 const rowOf = (source: SuggestSource, rowNumber: number) =>
-  Option.getOrThrow(Arr.findFirst(source.review.rows, (row) => row.rowNumber === rowNumber))
+  O.getOrThrow(A.findFirst(source.review.rows, (row) => row.rowNumber === rowNumber))
 
 describe("the guard", () => {
   it.effect("turns down a category outside the five, a name over 120 characters and a row nobody asked about", () =>
     Effect.gen(function* () {
       const source = yield* sourceOf()
       // Rows 7 and 83 have no name and a description; row 142 has neither, so nothing is asked about it.
-      expect(Arr.map(digest(source).rowsWithoutName, (row) => row.rowNumber)).toEqual([7, 83])
-      expect(Arr.map(digest(source).rowsWithoutCategory, (row) => row.rowNumber)).toEqual([40, 116])
+      expect(A.map(digest(source).rowsWithoutName, (row) => row.rowNumber)).toEqual([7, 83])
+      expect(A.map(digest(source).rowsWithoutCategory, (row) => row.rowNumber)).toEqual([40, 116])
       const checked = guard({
         source,
         by: suggestedByModel("scripted/model"),
@@ -50,8 +55,8 @@ describe("the guard", () => {
           names: [
             {
               rowNumber: 7,
-              name: Arr.join(
-                Arr.makeBy(41, () => "Nylon"),
+              name: A.join(
+                A.makeBy(41, () => "Nylon"),
                 " "
               )
             },
@@ -67,12 +72,12 @@ describe("the guard", () => {
         }
       })
       expect(
-        Arr.map(checked.suggestions, (s) => (s.kind === "column" ? [] : [s.rowNumber, s.kind, s.to, s.by.kind]))
+        A.map(checked.suggestions, (s) => (s.kind === "column" ? [] : [s.rowNumber, s.kind, s.to, s.by.kind]))
       ).toEqual([
         [83, "name", "Copper Plate 1/4in", "model"],
         [116, "category", "packaging", "model"]
       ])
-      expect(Arr.map(checked.refused, (refused) => refused.why)).toEqual([
+      expect(A.map(checked.refused, (refused) => refused.why)).toEqual([
         "It is 245 characters long. A name has at most 120.",
         "It is not a row with an empty name and a description.",
         "It is not a row with an empty name and a description.",
@@ -80,7 +85,7 @@ describe("the guard", () => {
         "That field already has a column, or is not a field."
       ])
       // The guard rates: never high, and the evidence is the file's own description.
-      expect(Arr.every(checked.suggestions, (s) => s.confidence === "medium" || s.confidence === "low")).toBe(true)
+      expect(A.every(checked.suggestions, (s) => s.confidence === "medium" || s.confidence === "low")).toBe(true)
       expect(checked.suggestions[0]?.basis).toContain("Copper plate 1/4in for general use.")
     })
   )
@@ -95,7 +100,7 @@ describe("a stored suggestion", () => {
         by: suggestedByModel("scripted/model"),
         answer: { names: [{ rowNumber: 7, name: "Nylon Coil" }], categories: [], columns: [] }
       }).suggestions
-      const stored = Arr.map(made, (suggestion, index): Suggestion =>
+      const stored = A.map(made, (suggestion, index): Suggestion =>
         storedSuggestion({ id: SuggestionId.make(`00000000-0000-4000-8000-00000000000${index}`), made: suggestion })
       )
       const waiting = yield* sourceOf(stored)
@@ -133,9 +138,7 @@ layer(AnswererOpenRouter.pipe(Layer.provide(OpenRouterTest.off("noKey", ModelId.
         const calls = yield* Ref.get(taken)
         expect(calls).toBe(0)
         expect(
-          Arr.map(proposed.suggestions, (s) =>
-            s.kind === "column" ? [] : [s.rowNumber, s.to, s.by.kind, s.confidence]
-          )
+          A.map(proposed.suggestions, (s) => (s.kind === "column" ? [] : [s.rowNumber, s.to, s.by.kind, s.confidence]))
         ).toEqual([
           [7, "Nylon Coil", "rule", "low"],
           [83, "Copper Plate 1/4in", "rule", "low"]
@@ -168,7 +171,7 @@ layer(AnswererOpenRouter.pipe(Layer.provide(scripted.layer)))("with a model", (i
       })
       expect([proposed.answeredBy._tag, yield* Ref.get(taken)]).toEqual(["Model", 1])
       expect(
-        Arr.map(proposed.suggestions, (s) => (s.kind === "column" ? [] : [s.rowNumber, s.to, s.by.kind, s.confidence]))
+        A.map(proposed.suggestions, (s) => (s.kind === "column" ? [] : [s.rowNumber, s.to, s.by.kind, s.confidence]))
       ).toEqual([
         [7, "Nylon Coil", "model", "medium"],
         [40, "finished-goods", "model", "low"]
@@ -184,7 +187,7 @@ layer(AnswererOpenRouter.pipe(Layer.provide(scripted.layer)))("with a model", (i
         take: Effect.succeed(callsUsedUp(usedUpWords))
       })
       expect(usedUp.answeredBy).toMatchObject({ _tag: "Rules", reason: expect.stringContaining("AI calls are used") })
-      expect(Arr.every(usedUp.suggestions, (s) => s.by.kind === "rule")).toBe(true)
+      expect(A.every(usedUp.suggestions, (s) => s.by.kind === "rule")).toBe(true)
     })
   )
 })

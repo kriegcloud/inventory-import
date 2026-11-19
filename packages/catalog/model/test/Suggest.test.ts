@@ -5,15 +5,15 @@ import { digest, offersSuggestions, questions } from "@inventory/catalog-model/S
 import { review } from "@inventory/catalog-model/Review"
 import { fields, type StagedTable } from "@inventory/catalog-contract/Staged"
 import { matchedByHeading } from "@inventory/catalog-contract/Mapping"
-import { Array as Arr } from "effect"
+import * as A from "effect/Array"
 import { fiveLines, type Line, tableOf } from "./support.ts"
 
-const ready: ReadonlyArray<Line> = Arr.take(fiveLines, 3)
+const ready: ReadonlyArray<Line> = A.take(fiveLines, 3)
 
 /** The table with one heading renamed, so the field it filled has no column and the column no field. */
 const renamed = (table: StagedTable, from: string, to: string): StagedTable => ({
   ...table,
-  columns: Arr.map(table.columns, (column) => (column.label === from ? { ...column, label: to } : column))
+  columns: A.map(table.columns, (column) => (column.label === from ? { ...column, label: to } : column))
 })
 
 const offered = (table: StagedTable) => {
@@ -51,14 +51,14 @@ describe("Suggest fixes is offered", () => {
     const noted: StagedTable = {
       ...table,
       columns: [...table.columns, { index: table.columns.length, letter: "H", label: "Internal Notes" }],
-      rows: Arr.map(table.rows, (row) => ({ ...row, cells: [...row.cells, { text: "ask purchasing" }] }))
+      rows: A.map(table.rows, (row) => ({ ...row, cells: [...row.cells, { text: "ask purchasing" }] }))
     }
     const current = review({ table: noted, choices: [], decisions: {}, storedItems: [] })
-    expect(Arr.map(current.unusedColumns, (column) => column.label)).toEqual(["Internal Notes"])
+    expect(A.map(current.unusedColumns, (column) => column.label)).toEqual(["Internal Notes"])
     // This small file has no column for tags, vendors and the rest: a heading could be one of them.
     expect(offersSuggestions({ cannot: 0, mapping: current.mapping, unusedColumns: current.unusedColumns })).toBe(true)
     // With every field filled, the notes column is all that is left over, and nothing can be suggested for it.
-    const everyField = Arr.map(fields, (field, index) =>
+    const everyField = A.map(fields, (field, index) =>
       matchedByHeading({ field, column: { index, header: field, examples: [] } })
     )
     expect(offersSuggestions({ cannot: 0, mapping: everyField, unusedColumns: current.unusedColumns })).toBe(false)

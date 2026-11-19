@@ -1,4 +1,4 @@
-import { Option } from "effect"
+import * as O from "effect/Option"
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { createColumnHelper, type ReactTable } from "@tanstack/react-table"
 import { ArrowDownUp, ListFilter } from "lucide-react"
@@ -224,13 +224,13 @@ const none: ReadonlyArray<StoredItem> = []
 const yesNo = (value: boolean) => (value ? "Yes" : "No")
 /** A number of a range filter's ends, from the lowest and highest value there is. */
 const range = (
-  found: { readonly min: Option.Option<number>; readonly max: Option.Option<number> } | undefined
+  found: { readonly min: O.Option<number>; readonly max: O.Option<number> } | undefined
 ): { readonly min?: number; readonly max?: number } =>
   found === undefined
     ? {}
-    : Option.match(found.min, {
+    : O.match(found.min, {
         onNone: () => ({}),
-        onSome: (min) => ({ min: Math.floor(min), max: Math.ceil(Option.getOrElse(found.max, () => min)) })
+        onSome: (min) => ({ min: Math.floor(min), max: Math.ceil(O.getOrElse(found.max, () => min)) })
       })
 
 /**
@@ -367,7 +367,7 @@ export function ItemsPage() {
         header: ({ column }) => <DataTableColumnHeader column={column} className="justify-end" />,
         cell: ({ row }) => (
           <div className="text-right tabular-nums">
-            {Option.match(row.original.reorderPoint, {
+            {O.match(row.original.reorderPoint, {
               onNone: () => <NotSet />,
               onSome: (point) => <>{`${whole.format(point)} ${row.original.uom}`}</>
             })}
@@ -408,29 +408,29 @@ export function ItemsPage() {
         id: "firstReceivedOn",
         header: ({ column }) => <DataTableColumnHeader column={column} />,
         cell: ({ row }) =>
-          Option.match(row.original.firstReceivedOn, {
+          O.match(row.original.firstReceivedOn, {
             onNone: () => <NotSet />,
             onSome: (day) => <span className="tabular-nums">{day}</span>
           }),
         meta: { label: labels.firstReceivedOn },
         size: widths.firstReceivedOn[0]
       }),
-      col.accessor((item) => Option.getOrElse(discontinuedOn(item.stocking), () => ""), {
+      col.accessor((item) => O.getOrElse(discontinuedOn(item.stocking), () => ""), {
         id: "discontinuedOn",
         header: labels.discontinuedOn,
         cell: ({ row }) =>
-          Option.match(discontinuedOn(row.original.stocking), {
+          O.match(discontinuedOn(row.original.stocking), {
             onNone: () => <NotSet />,
             onSome: (day) => <span className="tabular-nums">{day}</span>
           }),
         meta: { label: labels.discontinuedOn },
         size: widths.discontinuedOn[0]
       }),
-      col.accessor((item) => Option.match(item.dimensions, { onNone: () => "", onSome: dimensionsText }), {
+      col.accessor((item) => O.match(item.dimensions, { onNone: () => "", onSome: dimensionsText }), {
         id: "dimensions",
         header: labels.dimensions,
         cell: ({ row }) =>
-          Option.match(row.original.dimensions, {
+          O.match(row.original.dimensions, {
             onNone: () => <NotSet />,
             onSome: (size) => <span className="tabular-nums">{dimensionsText(size)}</span>
           }),
@@ -548,11 +548,11 @@ export function ItemsPage() {
   )
   // A card has no empty lines: a value the item does not have is left off it.
   const blank = (columnId: string, item: StoredItem) =>
-    (columnId === "reorderPoint" && Option.isNone(item.reorderPoint)) ||
+    (columnId === "reorderPoint" && O.isNone(item.reorderPoint)) ||
     (columnId === "tags" && item.tags.length === 0) ||
-    (columnId === "firstReceivedOn" && Option.isNone(item.firstReceivedOn)) ||
-    (columnId === "discontinuedOn" && Option.isNone(discontinuedOn(item.stocking))) ||
-    (columnId === "dimensions" && Option.isNone(item.dimensions)) ||
+    (columnId === "firstReceivedOn" && O.isNone(item.firstReceivedOn)) ||
+    (columnId === "discontinuedOn" && O.isNone(discontinuedOn(item.stocking))) ||
+    (columnId === "dimensions" && O.isNone(item.dimensions)) ||
     (columnId === "vendors" && item.vendors.length === 0)
 
   return (

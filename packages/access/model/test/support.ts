@@ -6,7 +6,8 @@ import { CurrentActor } from "@inventory/kernel/Actor"
 import { MemberId, OrganizationId, UserId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
 import type { Role } from "@inventory/kernel/Role"
-import { DateTime, Effect } from "effect"
+import * as DateTime from "effect/DateTime"
+import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 
 const joined = DateTime.makeUnsafe("2026-01-01T00:00:00.000Z")

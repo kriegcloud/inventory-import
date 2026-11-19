@@ -1,4 +1,7 @@
-import { Array as Arr, Option, Result, String as Str } from "effect"
+import * as A from "effect/Array"
+import * as O from "effect/Option"
+import * as Result from "effect/Result"
+import * as Str from "effect/String"
 import {
   ColumnCatalog,
   ViewChange,
@@ -15,9 +18,9 @@ import {
 const nothing = "so nothing was changed."
 const quoted = (text: string) => `“${text}”`
 
-const findColumn = (columns: ColumnCatalog, id: string) => Arr.findFirst(columns, (column) => column.id === id)
+const findColumn = (columns: ColumnCatalog, id: string) => A.findFirst(columns, (column) => column.id === id)
 
-const isNumber = (text: string) => Option.isSome(Str.match(/^-?\d+(\.\d+)?$/)(Str.trim(text)))
+const isNumber = (text: string) => O.isSome(Str.match(/^-?\d+(\.\d+)?$/)(Str.trim(text)))
 
 /**
  * Checks a command against the catalog the request carried and returns the changes to apply, with each list value
@@ -50,7 +53,7 @@ export const checkCommand = (input: {
       continue
     }
     const found = findColumn(input.columns, change.column)
-    if (Option.isNone(found)) {
+    if (O.isNone(found)) {
       return Result.fail(`The answer named a column this table does not have (${quoted(change.column)}), ${nothing}`)
     }
     const column = found.value
@@ -65,7 +68,7 @@ export const checkCommand = (input: {
       continue
     }
     const allowed =
-      Arr.contains(column.operators, change.operator) && Arr.contains(operatorsFor[column.type], change.operator)
+      A.contains(column.operators, change.operator) && A.contains(operatorsFor[column.type], change.operator)
     if (!allowed) {
       return Result.fail(`${column.label} cannot be compared that way (${quoted(change.operator)}), ${nothing}`)
     }
@@ -79,16 +82,13 @@ export const checkCommand = (input: {
     if (column.type === "select") {
       const spelled: Array<string> = []
       for (const value of change.values) {
-        const match = Arr.findFirst(
-          column.values,
-          (known) => Str.toLowerCase(known) === Str.toLowerCase(Str.trim(value))
-        )
-        if (Option.isNone(match)) {
+        const match = A.findFirst(column.values, (known) => Str.toLowerCase(known) === Str.toLowerCase(Str.trim(value)))
+        if (O.isNone(match)) {
           return Result.fail(`${quoted(value)} is not one of the values of ${column.label}, ${nothing}`)
         }
         spelled.push(match.value)
       }
-      checked.push({ ...change, values: Arr.dedupe(spelled) })
+      checked.push({ ...change, values: A.dedupe(spelled) })
       continue
     }
     const first = Str.trim(change.values[0] ?? "")
@@ -113,10 +113,10 @@ export const rulesRead =
 
 const clean = (text: string) => Str.trim(Str.replace(/[.!?]+$/, "")(Str.trim(Str.toLowerCase(text))))
 
-const columnNamed = (columns: ColumnCatalog, words: string): Option.Option<CatalogColumn> => {
+const columnNamed = (columns: ColumnCatalog, words: string): O.Option<CatalogColumn> => {
   const wanted = clean(Str.replace(/^the\s+/, "")(Str.replace(/\s+column$/, "")(words)))
   const plain = Str.replace(/s$/, "")(wanted)
-  return Arr.findFirst(columns, (column) => {
+  return A.findFirst(columns, (column) => {
     const label = Str.toLowerCase(column.label)
     const id = Str.toLowerCase(column.id)
     return label === wanted || id === wanted || label === plain || id === plain
@@ -137,38 +137,38 @@ const yesWords = ["yes", "true", "y"]
  * heading (or its heading's first words), kept to its yes rows or, after "not" or "non", its no rows. A list column
  * whose values are Yes and No reads the same way. None when no such column has that name.
  *
- * @example flagNamed(columns, "preferred") // Option.some({ kind: "filter", column: "preferred", operator: "eq", values: ["true"] })
+ * @example flagNamed(columns, "preferred") // O.some({ kind: "filter", column: "preferred", operator: "eq", values: ["true"] })
  */
-const flagNamed = (columns: ColumnCatalog, words: string): Option.Option<ViewChange> => {
-  const negated = Option.isSome(Str.match(/^(?:not |non-|non )/)(words))
+const flagNamed = (columns: ColumnCatalog, words: string): O.Option<ViewChange> => {
+  const negated = O.isSome(Str.match(/^(?:not |non-|non )/)(words))
   const rest = Str.replace(/^(?:the )?(?:not |non-|non )?(?:the )?/, "")(words)
   // A noun after the name is the rows themselves ("preferred ones", "preferred links"): the name is what is left.
-  const names = Arr.dedupe([rest, Str.replace(/\s+\w+$/, "")(rest), Str.replace(/s$/, "")(rest)])
+  const names = A.dedupe([rest, Str.replace(/\s+\w+$/, "")(rest), Str.replace(/s$/, "")(rest)])
   for (const name of names) {
     if (name === "") continue
-    const flag = Arr.findFirst(
+    const flag = A.findFirst(
       columns,
-      (column) => column.type === "boolean" && Arr.contains(column.operators, "eq") && headedBy(column, name)
+      (column) => column.type === "boolean" && A.contains(column.operators, "eq") && headedBy(column, name)
     )
-    if (Option.isSome(flag)) {
-      return Option.some({
+    if (O.isSome(flag)) {
+      return O.some({
         kind: "filter",
         column: flag.value.id,
         operator: "eq",
         values: [negated ? "false" : "true"]
       })
     }
-    const listed = Arr.findFirst(
+    const listed = A.findFirst(
       columns,
       (column) =>
         column.type === "select" &&
-        Arr.contains(column.operators, "inArray") &&
+        A.contains(column.operators, "inArray") &&
         headedBy(column, name) &&
-        Arr.some(column.values, (value) => Arr.contains(yesWords, Str.toLowerCase(value)))
+        A.some(column.values, (value) => A.contains(yesWords, Str.toLowerCase(value)))
     )
-    if (Option.isSome(listed)) {
-      const yes = Arr.filter(listed.value.values, (value) => Arr.contains(yesWords, Str.toLowerCase(value)))
-      return Option.some({
+    if (O.isSome(listed)) {
+      const yes = A.filter(listed.value.values, (value) => A.contains(yesWords, Str.toLowerCase(value)))
+      return O.some({
         kind: "filter",
         column: listed.value.id,
         operator: negated ? "notInArray" : "inArray",
@@ -176,20 +176,20 @@ const flagNamed = (columns: ColumnCatalog, words: string): Option.Option<ViewCha
       })
     }
   }
-  return Option.none()
+  return O.none()
 }
 
 const descending = /\s+(descending|desc|reversed|in reverse|high to low|largest first|z to a|newest first)$/
 const ascending = /\s+(ascending|asc|low to high|smallest first|a to z|oldest first)$/
 
-const readClause = (clause: string, columns: ColumnCatalog): Option.Option<ViewChange> => {
+const readClause = (clause: string, columns: ColumnCatalog): O.Option<ViewChange> => {
   if (/^(clear|reset)( all| everything| the view| it)?$/.test(clause) || /^show (all|everything)$/.test(clause)) {
-    return Option.some({ kind: "clear", what: "everything" })
+    return O.some({ kind: "clear", what: "everything" })
   }
   const clearPart = Str.match(/^(?:clear|reset) (?:the )?(filters?|sort|sorting|order|search|columns)$/)(clause)
-  if (Option.isSome(clearPart)) {
+  if (O.isSome(clearPart)) {
     const part = clearPart.value[1] ?? ""
-    return Option.some({
+    return O.some({
       kind: "clear",
       what: Str.startsWith("filter")(part)
         ? "filters"
@@ -203,47 +203,47 @@ const readClause = (clause: string, columns: ColumnCatalog): Option.Option<ViewC
   // "Find the steel brackets", "search for gaskets", "look for BRK-04": the words after go into the table's search box,
   // which matches each of them in any order. A table without a search box refuses it in `checkCommand`.
   const find = Str.match(/^(?:find|search(?: for)?|look for|look up)\s+(?:(?:all|every)\s+)?(?:the\s+)?(.+)$/)(clause)
-  if (Option.isSome(find)) return Option.some({ kind: "search", text: find.value[1] ?? "" })
+  if (O.isSome(find)) return O.some({ kind: "search", text: find.value[1] ?? "" })
   const sort = Str.match(/^(?:sort|order)(?: it| them| the items| items| the rows| rows| the table)? by (.+)$/)(clause)
-  if (Option.isSome(sort)) {
+  if (O.isSome(sort)) {
     const rest = sort.value[1] ?? ""
     const desc = descending.test(rest)
     const named = Str.replace(ascending, "")(Str.replace(descending, "")(rest))
-    return Option.map(
-      Option.filter(columnNamed(columns, named), (column) => column.sortable),
+    return O.map(
+      O.filter(columnNamed(columns, named), (column) => column.sortable),
       (column): ViewChange => ({ kind: "sort", column: column.id, direction: desc ? "desc" : "asc" })
     )
   }
   const hide = Str.match(/^hide (.+)$/)(clause)
-  if (Option.isSome(hide)) {
-    return Option.map(
-      Option.filter(columnNamed(columns, hide.value[1] ?? ""), (column) => column.hideable),
+  if (O.isSome(hide)) {
+    return O.map(
+      O.filter(columnNamed(columns, hide.value[1] ?? ""), (column) => column.hideable),
       (column): ViewChange => ({ kind: "hide", column: column.id })
     )
   }
   const show = Str.match(/^show (.+)$/)(clause)
-  if (Option.isSome(show)) {
+  if (O.isSome(show)) {
     const column = columnNamed(columns, show.value[1] ?? "")
-    if (Option.isSome(column)) return Option.some({ kind: "show", column: column.value.id })
+    if (O.isSome(column)) return O.some({ kind: "show", column: column.value.id })
   }
   const weDo = Str.match(/^(?:show |list )?(?:only )?(?:the )?(?:items|rows) (?:that )?we (\w+)$/)(clause)
   const only = Str.match(/^(?:show |keep )?(?:only|just) (.+)$/)(clause)
-  const wanted = Option.isSome(weDo) ? (weDo.value[1] ?? "") : Option.isSome(only) ? (only.value[1] ?? "") : ""
-  if (wanted === "") return Option.none()
+  const wanted = O.isSome(weDo) ? (weDo.value[1] ?? "") : O.isSome(only) ? (only.value[1] ?? "") : ""
+  if (wanted === "") return O.none()
   const flag = flagNamed(columns, wanted)
-  if (Option.isSome(flag)) return Option.some(flag.value)
-  const valued = Arr.findFirst(
+  if (O.isSome(flag)) return O.some(flag.value)
+  const valued = A.findFirst(
     columns,
     (column) =>
       column.type === "select" &&
-      Arr.contains(column.operators, "inArray") &&
-      Arr.some(column.values, (value) => Str.toLowerCase(value) === wanted)
+      A.contains(column.operators, "inArray") &&
+      A.some(column.values, (value) => Str.toLowerCase(value) === wanted)
   )
-  return Option.map(valued, (column): ViewChange => ({
+  return O.map(valued, (column): ViewChange => ({
     kind: "filter",
     column: column.id,
     operator: "inArray",
-    values: Arr.filter(column.values, (value) => Str.toLowerCase(value) === wanted)
+    values: A.filter(column.values, (value) => Str.toLowerCase(value) === wanted)
   }))
 }
 
@@ -259,15 +259,15 @@ export const readByRules = (input: {
   readonly prompt: string
   readonly columns: ColumnCatalog
 }): Result.Result<ReadonlyArray<ViewChange>, string> => {
-  const clauses = Arr.filter(
-    Arr.map(Str.split(/\s*(?:,|;|\band then\b|\bthen\b|\band\b)\s*/)(clean(input.prompt)), clean),
+  const clauses = A.filter(
+    A.map(Str.split(/\s*(?:,|;|\band then\b|\bthen\b|\band\b)\s*/)(clean(input.prompt)), clean),
     (clause) => clause !== ""
   )
   if (clauses.length === 0) return Result.fail(`Type what you want to see. ${rulesRead}`)
   const changes: Array<ViewChange> = []
   for (const clause of clauses) {
     const read = readClause(clause, input.columns)
-    if (Option.isNone(read)) return Result.fail(`The rules could not read ${quoted(clause)}.`)
+    if (O.isNone(read)) return Result.fail(`The rules could not read ${quoted(clause)}.`)
     changes.push(read.value)
   }
   return Result.succeed(changes)

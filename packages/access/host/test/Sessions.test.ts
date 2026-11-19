@@ -5,7 +5,9 @@ import { expect, layer } from "@effect/vitest"
 import { accessServices } from "@inventory/access-host/Host"
 import { Sessions } from "@inventory/access-host/SessionIdentity"
 import { accessMemory } from "@inventory/access-model/Memory"
-import { ConfigProvider, Effect, Layer } from "effect"
+import * as ConfigProvider from "effect/ConfigProvider"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
 import * as O from "effect/Option"
 
 const app = (build: { readonly production: boolean }, settings: Record<string, string> = {}) =>

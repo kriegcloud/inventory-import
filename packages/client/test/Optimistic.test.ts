@@ -2,7 +2,7 @@
 // value in a cached list: a member's role set at once, put back when the server refuses. Inputs are drawn from the
 // app's Role schema.
 import { describe, expect, it } from "@effect/vitest"
-import { Array as Arr } from "effect"
+import * as A from "effect/Array"
 import * as S from "effect/Schema"
 import { Role } from "@inventory/kernel/Role"
 import { rollback } from "@inventory/client/Rollback"
@@ -11,13 +11,13 @@ type Person = { readonly memberId: string; readonly role: Role }
 
 /** What a role change does to a cached list of members. */
 const setRole = (list: ReadonlyArray<Person>, memberId: string, role: Role): ReadonlyArray<Person> =>
-  Arr.map(list, (person) => (person.memberId === memberId ? { ...person, role } : person))
+  A.map(list, (person) => (person.memberId === memberId ? { ...person, role } : person))
 
 /** Its undo: that person's role as it was before, put into the list as it is now. */
 const undoRole =
   (memberId: string) =>
   (now: ReadonlyArray<Person>, before: ReadonlyArray<Person>): ReadonlyArray<Person> => {
-    const was = Arr.findFirst(before, (person) => person.memberId === memberId)
+    const was = A.findFirst(before, (person) => person.memberId === memberId)
     return was._tag === "None" ? now : setRole(now, memberId, was.value.role)
   }
 

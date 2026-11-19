@@ -14,14 +14,23 @@ import {
   ItemQuery
 } from "@inventory/catalog-contract/ItemQuery"
 import { ItemRow, itemColumns, storedItem } from "./internal/itemRow.ts"
-import { Array as Arr, BigDecimal, DateTime, Effect, Equal, Layer, Option, String as Str } from "effect"
-import { type Statement, SqlClient, SqlSchema } from "effect/sql"
+import * as A from "effect/Array"
+import * as BigDecimal from "effect/BigDecimal"
+import * as DateTime from "effect/DateTime"
+import * as Effect from "effect/Effect"
+import * as Eq from "effect/Equal"
+import * as Layer from "effect/Layer"
+import * as O from "effect/Option"
+import * as Str from "effect/String"
+import type * as Statement from "effect/sql/Statement"
+import * as SqlClient from "effect/sql/SqlClient"
+import * as SqlSchema from "effect/sql/SqlSchema"
 import * as S from "effect/Schema"
 import { OrganizationId, MemberId } from "@inventory/kernel/Ids"
 import { ItemEdit, StoredItem, discontinuedOn } from "@inventory/catalog-contract/Item"
 import { ItemStore } from "@inventory/catalog-model/ItemStore"
 import { D1, NoRows } from "@beep/d1/D1"
-import { SecureRandom } from "effect/crypto"
+import * as SecureRandom from "effect/crypto/SecureRandom"
 import { Member } from "@inventory/kernel/Member"
 import { type WordMatch, wordsToCheck, plan, phrase, searchWords } from "@inventory/catalog-model/ItemSearch"
 
@@ -58,23 +67,23 @@ const sortColumns: {
 const bySku: ReadonlyArray<ItemSort> = [{ id: "sku", desc: false }]
 // What narrows the items: the search and the filters' group, either of which may be absent.
 type Narrowed = {
-  readonly search: Option.Option<Statement.Fragment>
-  readonly filters: Option.Option<Statement.Fragment>
+  readonly search: O.Option<Statement.Fragment>
+  readonly filters: O.Option<Statement.Fragment>
 }
 
 /**
  * Dollars as typed into a unit cost filter ("12.50", "12", ".5", "$4"), or none, which drops the filter. The stored
  * cost is exact text; a filter and an order compare it as a number, which is enough to narrow and sort by.
  */
-const dollarsOf = (text: string): Option.Option<number> => {
+const dollarsOf = (text: string): O.Option<number> => {
   const cleaned = Str.replace(/^\$/, "")(Str.trim(text))
-  return /^(?:\d{1,12}(?:\.\d{0,4})?|\.\d{1,4})$/.test(cleaned) ? Option.some(Number(cleaned)) : Option.none()
+  return /^(?:\d{1,12}(?:\.\d{0,4})?|\.\d{1,4})$/.test(cleaned) ? O.some(Number(cleaned)) : O.none()
 }
 
 /** A quantity as typed into a filter ("12", "2.5", ".5"), or none, which drops the filter. */
-const quantityOf = (text: string): Option.Option<number> => {
+const quantityOf = (text: string): O.Option<number> => {
   const cleaned = Str.trim(text)
-  return /^(?:\d{1,12}(?:\.\d*)?|\.\d+)$/.test(cleaned) ? Option.some(Number(cleaned)) : Option.none()
+  return /^(?:\d{1,12}(?:\.\d*)?|\.\d+)$/.test(cleaned) ? O.some(Number(cleaned)) : O.none()
 }
 
 // "Contains" as a LIKE pattern: the value's own %, _ and \ are escaped, so "50%" finds the text "50%" and not "50"
@@ -135,8 +144,8 @@ export const ItemStoreD1 = Layer.effect(
     const scoped = (org: string, narrowed: Narrowed) =>
       sql.and([
         sql`organizationId = ${org}`,
-        ...Option.toArray(narrowed.search),
-        ...Option.match(narrowed.filters, { onNone: () => [], onSome: (group) => [sql`(${group})`] })
+        ...O.toArray(narrowed.search),
+        ...O.match(narrowed.filters, { onNone: () => [], onSome: (group) => [sql`(${group})`] })
       ])
     const pageRows = (narrowed: Narrowed, order: Statement.Fragment) =>
       D1.statement({
@@ -169,7 +178,7 @@ export const ItemStoreD1 = Layer.effect(
       columns: ReadonlyArray<"name" | "sku" | "description">
     ) {
       const json = yield* S.encodeEffect(StringList)(patterns).pipe(Effect.orDie)
-      const tests = Arr.map(columns, (column) => sql`${sql(column)} LIKE value ESCAPE '\\'`)
+      const tests = A.map(columns, (column) => sql`${sql(column)} LIKE value ESCAPE '\\'`)
       return sql`EXISTS (SELECT 1 FROM json_each(${json}) WHERE ${sql.or(tests)})`
     })
     // Items whose index row holds an FTS5 query, in this organization. The subquery is read once, not per item.
@@ -182,17 +191,17 @@ export const ItemStoreD1 = Layer.effect(
       org: string,
       words: ReadonlyArray<WordMatch>
     ) {
-      const indexed = Arr.flatMap(words, (word) => (word._tag === "Indexed" ? [word.phrase] : []))
+      const indexed = A.flatMap(words, (word) => (word._tag === "Indexed" ? [word.phrase] : []))
       const texts = yield* Effect.forEach(
         words,
         (word) => (word._tag === "Indexed" ? Effect.succeedNone : Effect.asSome(anyLike(word.patterns, everywhere))),
         { concurrency: 1 }
       )
       const all = [
-        ...(Arr.isReadonlyArrayNonEmpty(indexed) ? [inIndex(org, Arr.join(indexed, " AND "))] : []),
-        ...Arr.getSomes(texts)
+        ...(A.isReadonlyArrayNonEmpty(indexed) ? [inIndex(org, A.join(indexed, " AND "))] : []),
+        ...A.getSomes(texts)
       ]
-      return Arr.isReadonlyArrayNonEmpty(all) ? Option.some(sql.and(all)) : Option.none<Statement.Fragment>()
+      return A.isReadonlyArrayNonEmpty(all) ? O.some(sql.and(all)) : O.none<Statement.Fragment>()
     })
 
     // How many of the words one column holds, for the order of a search: 1 for each word found in it.
@@ -237,8 +246,8 @@ export const ItemStoreD1 = Layer.effect(
 
     const emptyCondition = (column: Statement.Fragment, operator: FilterOperator) =>
       operator === "isEmpty"
-        ? Option.some(sql`(${column} IS NULL OR ${column} = '')`)
-        : Option.some(sql`(${column} IS NOT NULL AND ${column} <> '')`)
+        ? O.some(sql`(${column} IS NULL OR ${column} = '')`)
+        : O.some(sql`(${column} IS NOT NULL AND ${column} <> '')`)
 
     // Name, SKU and description. "Is not" and "does not contain" include an item with no description: it does not contain the
     // text either.
@@ -246,20 +255,20 @@ export const ItemStoreD1 = Layer.effect(
       column: Statement.Fragment,
       operator: FilterOperator,
       value: ItemFilter["value"]
-    ): Option.Option<Statement.Fragment> => {
+    ): O.Option<Statement.Fragment> => {
       if (operator === "isEmpty" || operator === "isNotEmpty") return emptyCondition(column, operator)
-      if (typeof value !== "string" || value === "") return Option.none()
+      if (typeof value !== "string" || value === "") return O.none()
       switch (operator) {
         case "iLike":
-          return Option.some(sql`(${column} LIKE ${containsPattern(value)} ESCAPE '\\')`)
+          return O.some(sql`(${column} LIKE ${containsPattern(value)} ESCAPE '\\')`)
         case "notILike":
-          return Option.some(sql`(${column} IS NULL OR ${column} NOT LIKE ${containsPattern(value)} ESCAPE '\\')`)
+          return O.some(sql`(${column} IS NULL OR ${column} NOT LIKE ${containsPattern(value)} ESCAPE '\\')`)
         case "eq":
-          return Option.some(sql`(${column} = ${value})`)
+          return O.some(sql`(${column} = ${value})`)
         case "ne":
-          return Option.some(sql`(${column} IS NOT ${value})`)
+          return O.some(sql`(${column} IS NOT ${value})`)
         default:
-          return Option.none()
+          return O.none()
       }
     }
 
@@ -272,13 +281,13 @@ export const ItemStoreD1 = Layer.effect(
     ) {
       if (operator === "isEmpty" || operator === "isNotEmpty") return emptyCondition(column, operator)
       if (operator === "eq" || operator === "ne") {
-        if (typeof value !== "string" || value === "") return Option.none()
-        return Option.some(operator === "eq" ? sql`(${column} = ${value})` : sql`(${column} <> ${value})`)
+        if (typeof value !== "string" || value === "") return O.none()
+        return O.some(operator === "eq" ? sql`(${column} = ${value})` : sql`(${column} <> ${value})`)
       }
-      if (operator !== "inArray" && operator !== "notInArray") return Option.none()
-      if (typeof value === "string" || !Arr.isReadonlyArrayNonEmpty(value)) return Option.none()
+      if (operator !== "inArray" && operator !== "notInArray") return O.none()
+      if (typeof value === "string" || !A.isReadonlyArrayNonEmpty(value)) return O.none()
       const json = yield* S.encodeEffect(StringList)(value).pipe(Effect.orDie)
-      return Option.some(
+      return O.some(
         operator === "inArray"
           ? sql`(${column} IN (SELECT value FROM json_each(${json})))`
           : sql`(${column} NOT IN (SELECT value FROM json_each(${json})))`
@@ -291,20 +300,20 @@ export const ItemStoreD1 = Layer.effect(
       column: Statement.Fragment,
       operator: FilterOperator,
       value: ItemFilter["value"]
-    ): Option.Option<Statement.Fragment> => {
-      const bit = (text: string): Option.Option<number> =>
-        text === "true" ? Option.some(1) : text === "false" ? Option.some(0) : Option.none()
+    ): O.Option<Statement.Fragment> => {
+      const bit = (text: string): O.Option<number> =>
+        text === "true" ? O.some(1) : text === "false" ? O.some(0) : O.none()
       if (operator === "eq" || operator === "ne") {
-        if (typeof value !== "string") return Option.none()
-        return Option.map(bit(value), (flag) =>
+        if (typeof value !== "string") return O.none()
+        return O.map(bit(value), (flag) =>
           operator === "eq" ? sql`(${column} = ${flag})` : sql`(${column} <> ${flag})`
         )
       }
-      if (operator !== "inArray" && operator !== "notInArray") return Option.none()
-      if (typeof value === "string") return Option.none()
-      const flags = Arr.dedupe(Arr.getSomes(Arr.map(value, bit)))
-      if (!Arr.isReadonlyArrayNonEmpty(flags)) return Option.none()
-      return Option.some(
+      if (operator !== "inArray" && operator !== "notInArray") return O.none()
+      if (typeof value === "string") return O.none()
+      const flags = A.dedupe(A.getSomes(A.map(value, bit)))
+      if (!A.isReadonlyArrayNonEmpty(flags)) return O.none()
+      return O.some(
         operator === "inArray" ? sql`(${column} IN ${sql.in(flags)})` : sql`(${column} NOT IN ${sql.in(flags)})`
       )
     }
@@ -315,41 +324,40 @@ export const ItemStoreD1 = Layer.effect(
       column: Statement.Fragment,
       operator: FilterOperator,
       value: ItemFilter["value"],
-      read: (text: string) => Option.Option<number>
-    ): Option.Option<Statement.Fragment> => {
-      if (operator === "isEmpty") return Option.some(sql`(${column} IS NULL)`)
-      if (operator === "isNotEmpty") return Option.some(sql`(${column} IS NOT NULL)`)
+      read: (text: string) => O.Option<number>
+    ): O.Option<Statement.Fragment> => {
+      if (operator === "isEmpty") return O.some(sql`(${column} IS NULL)`)
+      if (operator === "isNotEmpty") return O.some(sql`(${column} IS NOT NULL)`)
       if (operator === "isBetween") {
-        if (typeof value === "string" || value.length !== 2) return Option.none()
+        if (typeof value === "string" || value.length !== 2) return O.none()
         const [low = "", high = ""] = value
         // An empty end is open. Both empty is no range at all, and an end that is not an amount spoils the range.
-        const end = (text: string) =>
-          Str.trim(text) === "" ? Option.some(Option.none<number>()) : Option.map(read(text), Option.some)
-        return Option.flatMap(Option.all([end(low), end(high)]), ([from, to]) => {
+        const end = (text: string) => (Str.trim(text) === "" ? O.some(O.none<number>()) : O.map(read(text), O.some))
+        return O.flatMap(O.all([end(low), end(high)]), ([from, to]) => {
           const clauses = [
-            ...Option.match(from, { onNone: () => [], onSome: (cents) => [sql`${column} >= ${cents}`] }),
-            ...Option.match(to, { onNone: () => [], onSome: (cents) => [sql`${column} <= ${cents}`] })
+            ...O.match(from, { onNone: () => [], onSome: (cents) => [sql`${column} >= ${cents}`] }),
+            ...O.match(to, { onNone: () => [], onSome: (cents) => [sql`${column} <= ${cents}`] })
           ]
-          return Arr.isReadonlyArrayNonEmpty(clauses) ? Option.some(sql`(${sql.and(clauses)})`) : Option.none()
+          return A.isReadonlyArrayNonEmpty(clauses) ? O.some(sql`(${sql.and(clauses)})`) : O.none()
         })
       }
-      if (typeof value !== "string") return Option.none()
-      return Option.flatMap(read(value), (cents) => {
+      if (typeof value !== "string") return O.none()
+      return O.flatMap(read(value), (cents) => {
         switch (operator) {
           case "eq":
-            return Option.some(sql`(${column} = ${cents})`)
+            return O.some(sql`(${column} = ${cents})`)
           case "ne":
-            return Option.some(sql`(${column} IS NOT ${cents})`)
+            return O.some(sql`(${column} IS NOT ${cents})`)
           case "lt":
-            return Option.some(sql`(${column} < ${cents})`)
+            return O.some(sql`(${column} < ${cents})`)
           case "lte":
-            return Option.some(sql`(${column} <= ${cents})`)
+            return O.some(sql`(${column} <= ${cents})`)
           case "gt":
-            return Option.some(sql`(${column} > ${cents})`)
+            return O.some(sql`(${column} > ${cents})`)
           case "gte":
-            return Option.some(sql`(${column} >= ${cents})`)
+            return O.some(sql`(${column} >= ${cents})`)
           default:
-            return Option.none()
+            return O.none()
         }
       })
     }
@@ -394,10 +402,10 @@ export const ItemStoreD1 = Layer.effect(
     const searchPlan = Effect.fn("Items.searchPlan")(function* (organizationId: OrganizationId, search: string) {
       const words = searchWords(search)
       const checks = wordsToCheck(words)
-      if (!Arr.isReadonlyArrayNonEmpty(checks)) return plan({ words, found: [] })
-      const answers = yield* asTyped({ org: organizationId, phrases: Arr.map(checks, phrase) })
-      const found = Arr.filter(checks, (word) =>
-        Arr.some(answers, (answer) => answer.found && answer.phrase === phrase(word))
+      if (!A.isReadonlyArrayNonEmpty(checks)) return plan({ words, found: [] })
+      const answers = yield* asTyped({ org: organizationId, phrases: A.map(checks, phrase) })
+      const found = A.filter(checks, (word) =>
+        A.some(answers, (answer) => answer.found && answer.phrase === phrase(word))
       )
       // The count only: a word a person typed is theirs, and stays out of the logs.
       const close = checks.length - found.length
@@ -407,34 +415,34 @@ export const ItemStoreD1 = Layer.effect(
 
     const page = Effect.fn("Items.page")(function* (organizationId: OrganizationId, query: ItemQuery) {
       const read = yield* Effect.forEach(query.filters, condition, { concurrency: 1 })
-      const conditions = Arr.getSomes(read)
-      const filters = Arr.isReadonlyArrayNonEmpty(conditions)
-        ? Option.some(query.joinOperator === "and" ? sql.and(conditions) : sql.or(conditions))
-        : Option.none<Statement.Fragment>()
+      const conditions = A.getSomes(read)
+      const filters = A.isReadonlyArrayNonEmpty(conditions)
+        ? O.some(query.joinOperator === "and" ? sql.and(conditions) : sql.or(conditions))
+        : O.none<Statement.Fragment>()
       const words = yield* searchPlan(organizationId, query.search)
       const search = yield* searchCondition(organizationId, words)
       const narrowed: Narrowed = { search, filters }
       // A person's chosen order wins. With none, a search puts its best matches first; otherwise by SKU.
       const ranked =
-        Arr.isReadonlyArrayNonEmpty(query.sorting) || Option.isNone(search)
+        A.isReadonlyArrayNonEmpty(query.sorting) || O.isNone(search)
           ? []
           : [
               sql`${yield* hitsIn(organizationId, words, "name")} DESC`,
               sql`${yield* hitsIn(organizationId, words, "sku")} DESC`
             ]
-      const sorting = Arr.isReadonlyArrayNonEmpty(query.sorting) ? query.sorting : bySku
+      const sorting = A.isReadonlyArrayNonEmpty(query.sorting) ? query.sorting : bySku
       // The id last, so items that tie on every chosen column keep one order and no page repeats or skips one. It
       // runs the way the last column does, so code Z to A is the index `record_org_code` read backwards, not a sort.
-      const tieBreak = Arr.last(sorting).pipe(Option.exists((entry) => entry.desc)) ? sql`id DESC` : sql`id ASC`
-      const order = sql.csv([...ranked, ...Arr.map(sorting, orderBy), tieBreak])
+      const tieBreak = A.last(sorting).pipe(O.exists((entry) => entry.desc)) ? sql`id DESC` : sql`id ASC`
+      const order = sql.csv([...ranked, ...A.map(sorting, orderBy), tieBreak])
       const offset = (query.page - 1) * query.perPage
       // One batch, so the page and the count describe the same moment.
       const [data, count] = yield* batch([
         pageRows(narrowed, order)({ org: organizationId, perPage: query.perPage, offset }),
         pageCount(narrowed)(organizationId)
       ])
-      const total = Option.match(Arr.head(count), { onNone: () => 0, onSome: (row) => row.n })
-      return { data: Arr.map(data, storedItem), total, pageCount: Math.ceil(total / query.perPage) }
+      const total = O.match(A.head(count), { onNone: () => 0, onSome: (row) => row.n })
+      return { data: A.map(data, storedItem), total, pageCount: Math.ceil(total / query.perPage) }
     }, Effect.orDie)
 
     const facets = Effect.fn("Items.facets")(function* (organizationId: OrganizationId) {
@@ -446,7 +454,7 @@ export const ItemStoreD1 = Layer.effect(
         totals(organizationId)
       ])
       // An aggregate without GROUP BY always answers one row; the fallback is for the type, not a real case.
-      const summary = Option.getOrElse(Arr.head(summaries), () => ({
+      const summary = O.getOrElse(A.head(summaries), () => ({
         total: 0,
         quantityMin: null,
         quantityMax: null,
@@ -455,12 +463,12 @@ export const ItemStoreD1 = Layer.effect(
       }))
       return {
         total: summary.total,
-        category: Arr.map(category, (row) => ({ value: row.value, count: row.n })),
-        uom: Arr.map(uom, (row) => ({ value: row.value, count: row.n })),
-        isActive: Arr.map(isActive, (row) => ({ value: row.value, count: row.n })),
-        lotTracked: Arr.map(lotTracked, (row) => ({ value: row.value, count: row.n })),
-        quantityOnHand: { min: Option.fromNullOr(summary.quantityMin), max: Option.fromNullOr(summary.quantityMax) },
-        unitCost: { min: Option.fromNullOr(summary.costMin), max: Option.fromNullOr(summary.costMax) }
+        category: A.map(category, (row) => ({ value: row.value, count: row.n })),
+        uom: A.map(uom, (row) => ({ value: row.value, count: row.n })),
+        isActive: A.map(isActive, (row) => ({ value: row.value, count: row.n })),
+        lotTracked: A.map(lotTracked, (row) => ({ value: row.value, count: row.n })),
+        quantityOnHand: { min: O.fromNullOr(summary.quantityMin), max: O.fromNullOr(summary.quantityMax) },
+        unitCost: { min: O.fromNullOr(summary.costMin), max: O.fromNullOr(summary.costMax) }
       }
     }, Effect.orDie)
 
@@ -505,27 +513,27 @@ export const ItemStoreD1 = Layer.effect(
     const same = (item: StoredItem, edit: ItemEdit): boolean =>
       item.name === edit.name &&
       // An optional value is an Option: compared by what it holds, never by identity.
-      Equal.equals(item.description, edit.description) &&
+      Eq.equals(item.description, edit.description) &&
       item.category === edit.category &&
       item.uom === edit.uom &&
       BigDecimal.equals(item.unitCost, edit.unitCost) &&
       item.quantityOnHand === edit.quantityOnHand &&
-      Equal.equals(item.reorderPoint, edit.reorderPoint) &&
+      Eq.equals(item.reorderPoint, edit.reorderPoint) &&
       item.stocking.kind === edit.stocking.kind &&
-      Equal.equals(discontinuedOn(item.stocking), discontinuedOn(edit.stocking)) &&
+      Eq.equals(discontinuedOn(item.stocking), discontinuedOn(edit.stocking)) &&
       item.lotTracked === edit.lotTracked &&
-      Equal.equals(item.firstReceivedOn, edit.firstReceivedOn)
+      Eq.equals(item.firstReceivedOn, edit.firstReceivedOn)
 
     const edit = Effect.fn("Items.edit")(function* (actor: Member, id: string, change: ItemEdit) {
       const at = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
       const activity = yield* random.uuidV4()
       const request = { org: actor.organizationId, actor: actor.id, name: actor.name, id, activity, at, edit: change }
       const [, edited] = yield* batch([editedLine(request), editItem(request)])
-      const written = Arr.head(edited)
-      if (Option.isSome(written)) return { _tag: "Edited" as const, item: storedItem(written.value) }
+      const written = A.head(edited)
+      if (O.isSome(written)) return { _tag: "Edited" as const, item: storedItem(written.value) }
       // Nothing was written: the item is gone, already says what the edit says, or was changed by someone else.
       const now = yield* findItem({ org: actor.organizationId, id })
-      if (Option.isNone(now)) return { _tag: "Missing" as const }
+      if (O.isNone(now)) return { _tag: "Missing" as const }
       const stored = storedItem(now.value)
       return same(stored, change) ? { _tag: "Same" as const, item: stored } : { _tag: "Changed" as const, item: stored }
     }, Effect.orDie)

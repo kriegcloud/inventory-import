@@ -1,7 +1,8 @@
 // The Activity page's "Decisions" list: every value an import wrote that differs from its file, what it was, what it
 // became, who proposed it and who accepted or typed it. The app's Activity page shows it beside the audit trail.
 import { useQuery } from "@tanstack/react-query"
-import { DateTime, Option } from "effect"
+import * as DateTime from "effect/DateTime"
+import * as O from "effect/Option"
 import { Code } from "@inventory/ui/Code"
 import { ProposedValue } from "@inventory/ui/ProposedValue"
 import { type ListColumn, ListTable } from "@inventory/ui/ListTable"
@@ -24,9 +25,9 @@ const sourceWords = { rule: "Rule", model: "Model", person: "Person" } as const
 
 const proposedBy = (record: ChangeRecord): string => sourceWords[changeSource(record.change)]
 const decidedBy = (record: ChangeRecord): string =>
-  changeDecidedBy(record.change) === "rule" ? "Rule" : Option.getOrElse(record.decidedByName, () => "Person")
+  changeDecidedBy(record.change) === "rule" ? "Rule" : O.getOrElse(record.decidedByName, () => "Person")
 /** How sure the proposal's source was, when the value came from a proposal. */
-const confidenceOf = (record: ChangeRecord): string | null => Option.getOrNull(changeConfidence(record.change))
+const confidenceOf = (record: ChangeRecord): string | null => O.getOrNull(changeConfidence(record.change))
 
 /** The columns of the decisions list. */
 export const importDecisionColumns: ReadonlyArray<ListColumn<ChangeRecord>> = [
@@ -52,7 +53,7 @@ export const importDecisionColumns: ReadonlyArray<ListColumn<ChangeRecord>> = [
     width: 64,
     align: "right",
     cell: (change) =>
-      Option.match(change.part, {
+      O.match(change.part, {
         onNone: () => `${change.rowNumber}`,
         onSome: (part) => `${change.rowNumber} · ${part}`
       }),
@@ -105,7 +106,7 @@ export const importDecisionColumns: ReadonlyArray<ListColumn<ChangeRecord>> = [
     id: "basis",
     label: "Basis",
     // What the proposal rested on; for a value the person typed, the words that say so.
-    value: ({ change }) => Option.getOrElse(changeBasis(change), () => changeHowWords[change.how]),
+    value: ({ change }) => O.getOrElse(changeBasis(change), () => changeHowWords[change.how]),
     sortable: false,
     wrap: true
   },
@@ -151,7 +152,7 @@ export function ImportDecisions(props: { rows: ReadonlyArray<ChangeRecord> }) {
       columns={importDecisionColumns}
       rows={props.rows}
       rowKey={(change) =>
-        `${change.importId}:${change.rowNumber}.${Option.getOrElse(change.part, () => 0)}:${change.change.field}:${DateTime.formatIso(change.createdAt)}`
+        `${change.importId}:${change.rowNumber}.${O.getOrElse(change.part, () => 0)}:${change.change.field}:${DateTime.formatIso(change.createdAt)}`
       }
       empty="No decisions yet. They appear here once an import with accepted or typed values is confirmed."
     />

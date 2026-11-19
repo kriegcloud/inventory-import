@@ -1,7 +1,8 @@
 // What the catalog keeps about items, as its handlers ask for it: a page of them sorted and filtered where they are
 // stored, the facets, and the one edit a person makes by hand. The D1 adapter is in `catalog-host`.
 import { StoredItem, ItemEdit } from "@inventory/catalog-contract/Item"
-import { Context, Effect } from "effect"
+import * as Context from "effect/Context"
+import * as Effect from "effect/Effect"
 import { OrganizationId } from "@inventory/kernel/Ids"
 import { ItemQuery, ItemPage, ItemFacets } from "@inventory/catalog-contract/ItemQuery"
 import { Member } from "@inventory/kernel/Member"

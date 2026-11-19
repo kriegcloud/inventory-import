@@ -1,6 +1,8 @@
 // Every schema the package exports generates only values it accepts (SF-7), and every stored form round-trips.
 import { describe, expect, it } from "@effect/vitest"
-import { ByteSize, Effect, Option } from "effect"
+import * as ByteSize from "effect/ByteSize"
+import * as Effect from "effect/Effect"
+import * as O from "effect/Option"
 import * as Arbitrary from "effect/Arbitrary"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
@@ -61,9 +63,9 @@ describe("stored forms round-trip", () => {
   // A file's size as the browser gives it is a safe integer; the decoded ByteSize admits more, which the stored
   // number cannot hold, so the round trip is asked of sizes a File can have.
   const fileSized = Arbitrary.filter(Arbitrary.schema(SavedProgress), (progress) =>
-    Option.match(progress.file, {
+    O.match(progress.file, {
       onNone: () => true,
-      onSome: (file) => Option.isSome(ByteSize.toNumber(file.size))
+      onSome: (file) => O.isSome(ByteSize.toNumber(file.size))
     })
   )
   it.effect.prop(

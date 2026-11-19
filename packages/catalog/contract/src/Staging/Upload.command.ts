@@ -1,6 +1,6 @@
 // An upload as the browser sends it: its start, its pieces, and what cancelling one answers. An upload is not an
 // import: its rows are kept apart until every piece has arrived, and only then become an import, in one step.
-import { Tuple } from "effect"
+import * as Tuple from "effect/Tuple"
 import * as S from "effect/Schema"
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import { UploadKey } from "../Catalog.id.ts"

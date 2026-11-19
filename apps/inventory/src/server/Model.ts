@@ -6,9 +6,12 @@
 import { OpenRouter } from "@beep/openrouter/OpenRouter"
 import { OpenRouterSettings } from "@beep/openrouter/OpenRouterConfig"
 import { ModelId, ModelStatus, OffReason } from "@beep/openrouter/OpenRouterModel"
-import { Array as Arr, Effect, Layer } from "effect"
+import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
 import * as S from "effect/Schema"
-import { FetchHttpClient, type HttpClient } from "effect/http"
+import * as FetchHttpClient from "effect/http/FetchHttpClient"
+import type * as HttpClient from "effect/http/HttpClient"
 import { AiRoute, AiStatus } from "../api/v1/Api.ts"
 import { aiSettings } from "./Settings.ts"
 
@@ -44,7 +47,7 @@ export const aiStatusOf = (status: ModelStatus): AiStatus =>
         provider: "openrouter",
         model,
         routes: [AiRoute.make({ provider: "openrouter", model, fallbackModels })],
-        reason: `Answers come from OpenRouter (${Arr.join([model, ...fallbackModels], ", then ")}); then the non-AI path.`
+        reason: `Answers come from OpenRouter (${A.join([model, ...fallbackModels], ", then ")}); then the non-AI path.`
       }),
     off: ({ why, model }) =>
       AiStatus.make({

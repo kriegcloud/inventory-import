@@ -1,6 +1,7 @@
 // Which file column fills which field: a choice the person made, a match as the review found or was given it, and
 // a file column no field reads.
-import { Option, Tuple } from "effect"
+import * as O from "effect/Option"
+import * as Tuple from "effect/Tuple"
 import * as S from "effect/Schema"
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import { Field, StagedColumn } from "../Staging/Staged.read.ts"
@@ -81,10 +82,10 @@ export type ColumnMatch = typeof ColumnMatch.Type
 /**
  * The file column that fills the field, when one does, however it was settled.
  *
- * @example matchedColumn(match) // Option.some({ index: 3, header: "Unit", examples: ["EA", "BX"] })
+ * @example matchedColumn(match) // O.some({ index: 3, header: "Unit", examples: ["EA", "BX"] })
  */
-export const matchedColumn = (match: ColumnMatch): Option.Option<ColumnPick> =>
-  match.how === "heading" ? Option.some(match.column) : match.how === "person" ? match.column : Option.none()
+export const matchedColumn = (match: ColumnMatch): O.Option<ColumnPick> =>
+  match.how === "heading" ? O.some(match.column) : match.how === "person" ? match.column : O.none()
 
 /** A file column no field reads, and how many rows hold a value in it: said on screen, never stored. */
 export const UnusedColumn = S.Struct({
@@ -102,10 +103,8 @@ export const matchedByHeading = (match: { readonly field: Field; readonly column
   MatchedByHeading.make(match)
 
 /** A field whose column a person chose, or chose to leave without one. */
-export const matchedByPerson = (match: {
-  readonly field: Field
-  readonly column: Option.Option<ColumnPick>
-}): ColumnMatch => MatchedByPerson.make(match)
+export const matchedByPerson = (match: { readonly field: Field; readonly column: O.Option<ColumnPick> }): ColumnMatch =>
+  MatchedByPerson.make(match)
 
 /** A field no heading names and nobody has chosen a column for. */
 export const notMatched = (match: { readonly field: Field }): ColumnMatch => NotMatched.make(match)

@@ -7,7 +7,10 @@
 /** The agent that suggests. It only proposes, and the most it may do is what an editor may do. */
 import { AgentRun } from "@inventory/kernel/AgentRun"
 import * as S from "effect/Schema"
-import { Array as Arr, DateTime, Effect, Option } from "effect"
+import * as A from "effect/Array"
+import * as DateTime from "effect/DateTime"
+import * as Effect from "effect/Effect"
+import * as O from "effect/Option"
 import {
   type NewSuggestion,
   suggestedByRule,
@@ -31,7 +34,7 @@ import { asAgent } from "@inventory/kernel/Agent"
 import { ImportId, SuggestionId } from "@inventory/catalog-contract/Ids"
 import { CurrentActor } from "@inventory/kernel/Actor"
 import { SuggestionStore, StoreSuggestions } from "./SuggestionStore.store.ts"
-import { SecureRandom } from "effect/crypto"
+import * as SecureRandom from "effect/crypto/SecureRandom"
 import { Activity } from "@inventory/kernel/Activity"
 import { ActivityId } from "@inventory/kernel/Ids"
 export const suggester = AgentRun.make({ agent: "Suggestions", maxRole: "editor" })
@@ -45,7 +48,7 @@ export const nothingToAsk = "Nothing was left to suggest, so no model was asked.
 const toJson = S.encodeUnknownEffect(S.fromJsonString(S.Unknown))
 
 // What the model is told. It picks and names; it is never asked to count or to rate itself.
-const system = Arr.join(
+const system = A.join(
   [
     "You help a person review a spreadsheet of inventory items. You only suggest: a person accepts or rejects every suggestion, and nothing you say is stored as an item.",
     "names: for each row in rowsWithoutName, a short name for the item taken from its description: the thing itself, in title case, without phrases like 'for general use'. Use only words the description has. Leave a row out when the description does not say what the item is.",
@@ -101,8 +104,8 @@ export const propose = Effect.fn("Suggestions.propose")(function* <R>(input: {
       ModelQuestion.make({
         name: "suggest",
         prompt: `What is open in the file "${input.fileName}":\n${sent}`,
-        system: Option.some(system),
-        maxOutputTokens: Option.some(2000)
+        system: O.some(system),
+        maxOutputTokens: O.some(2000)
       }),
       SuggestAnswer
     )
@@ -163,7 +166,7 @@ export const suggest = Effect.fn("Suggestions.suggest")(function* (input: {
         actorName: actor.name,
         action: "Asked for suggestions",
         detail: `${input.fileName}: ${n} ${n === 1 ? "suggestion" : "suggestions"} for the review, answered by ${who}; nothing was changed`,
-        agent: Option.some(suggester.agent),
+        agent: O.some(suggester.agent),
         createdAt
       })
     })

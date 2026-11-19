@@ -1,5 +1,8 @@
-import { Array as Arr, Effect, Layer, Option } from "effect"
-import { HttpServerRequest } from "effect/http"
+import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as O from "effect/Option"
+import * as HttpServerRequest from "effect/http/HttpServerRequest"
 import { CrossSiteRequest } from "@inventory/kernel/AccessError"
 import { RequestSource, SameOrigin } from "@inventory/kernel/SameOrigin"
 
@@ -18,15 +21,12 @@ export const SameOriginLive = Layer.succeed(
       const request = yield* HttpServerRequest.HttpServerRequest
       const source = RequestSource.make({
         method: request.method,
-        fetchSite: Option.fromUndefinedOr(request.headers["sec-fetch-site"]),
-        origin: Option.fromUndefinedOr(request.headers["origin"]),
+        fetchSite: O.fromUndefinedOr(request.headers["sec-fetch-site"]),
+        origin: O.fromUndefinedOr(request.headers["origin"]),
         // The address the request was sent to, from the URL the runtime received and from its Host header.
-        own: Arr.dedupe(
-          Arr.map(
-            Arr.getSomes([
-              Option.liftThrowable(() => new URL(request.originalUrl))(),
-              HttpServerRequest.toURL(request)
-            ]),
+        own: A.dedupe(
+          A.map(
+            A.getSomes([O.liftThrowable(() => new URL(request.originalUrl))(), HttpServerRequest.toURL(request)]),
             (url) => url.origin
           )
         )
@@ -34,8 +34,8 @@ export const SameOriginLive = Layer.succeed(
       if (!RequestSource.allows(source)) {
         yield* Effect.logWarning("Refused a write from another site").pipe(
           Effect.annotateLogs({
-            "http.origin": Option.getOrElse(source.origin, () => ""),
-            "http.sec_fetch_site": Option.getOrElse(source.fetchSite, () => "")
+            "http.origin": O.getOrElse(source.origin, () => ""),
+            "http.sec_fetch_site": O.getOrElse(source.fetchSite, () => "")
           })
         )
         return yield* CrossSiteRequest.make({

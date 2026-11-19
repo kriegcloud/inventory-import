@@ -6,7 +6,11 @@
 import { readFileSync } from "node:fs"
 import { cost } from "./support/cost.ts"
 import { describe, expect, it } from "@effect/vitest"
-import { Array as Arr, Effect, Option, Order, String as Str } from "effect"
+import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as O from "effect/Option"
+import * as Order from "effect/Order"
+import * as Str from "effect/String"
 import { firstDecisions, recheckRow, review } from "@inventory/catalog-model/Review"
 import { changeToStored } from "@inventory/catalog-contract/Change"
 import { decisionToFlags, type SavedDecisions } from "@inventory/catalog-contract/Decision"
@@ -76,8 +80,8 @@ const screen = (table: StagedTable, mode: "propose" | "apply", storedItems: Read
     agree() {
       const { current, views } = derive()
       // The region's word for a row that is already there is `stored`.
-      const region = Arr.map(views, (view) => [view.row.line, view.status === "stored" ? "already" : view.status])
-      const domain = Arr.map(current.rows, (row) => [row.rowNumber, row.status])
+      const region = A.map(views, (view) => [view.row.line, view.status === "stored" ? "already" : view.status])
+      const domain = A.map(current.rows, (row) => [row.rowNumber, row.status])
       expect(region).toEqual(domain)
       return { current, views }
     }
@@ -96,7 +100,7 @@ describe("the screen and the server apply decisions the same way", () => {
         // Take every group that is not a question, as the person would with "Use BX for the 2 ticked", until
         // none is left. Each accept can uncover the next problem of the same rows.
         for (let round = 0; round < 60; round += 1) {
-          const group = Arr.findFirst(
+          const group = A.findFirst(
             waitingGroups({ views: s.derive().views }),
             (candidate) => candidate.confidence !== "low"
           )
@@ -105,14 +109,14 @@ describe("the screen and the server apply decisions the same way", () => {
           s.agree()
         }
         // What is left are the rows only a person can settle. One of each answer the screen offers, on real rows.
-        const left = Arr.filter(s.derive().views, (view) => view.status === "needs")
+        const left = A.filter(s.derive().views, (view) => view.status === "needs")
         expect(left.length).toBeGreaterThan(0)
-        const typed = Arr.findFirst(left, (view) => view.problem?.column === "sku" && view.problem.rivals === undefined)
+        const typed = A.findFirst(left, (view) => view.problem?.column === "sku" && view.problem.rivals === undefined)
         if (typed._tag === "Some") {
           s.press({ type: "edit", rowId: typed.value.row.id, column: "sku", value: "ZZZ-9999" })
           s.agree()
         }
-        const picked = Arr.findFirst(
+        const picked = A.findFirst(
           s.derive().views,
           (view) => view.status === "needs" && view.problem?.choices !== undefined && view.problem.column !== undefined
         )
@@ -124,7 +128,7 @@ describe("the screen and the server apply decisions the same way", () => {
             s.agree()
           }
         }
-        const rivals = Arr.findFirst(
+        const rivals = A.findFirst(
           s.derive().views,
           (view) => view.status === "needs" && view.problem?.rivals !== undefined
         )
@@ -138,7 +142,7 @@ describe("the screen and the server apply decisions the same way", () => {
             s.agree()
           }
         }
-        const out = Arr.findFirst(s.derive().views, (view) => view.status === "needs")
+        const out = A.findFirst(s.derive().views, (view) => view.status === "needs")
         if (out._tag === "Some") {
           s.press({ type: "leaveOut", rowIds: [out.value.row.id] })
           s.agree()
@@ -156,19 +160,19 @@ describe("the screen and the server apply decisions the same way", () => {
 
         // What the screen would hand over is what the server would write: the same rows, values and provenance.
         const handed = result({ views, problemKinds: regionKinds })
-        const ready = Arr.filter(current.rows, (row) => row.status === "ready")
-        expect(Arr.map(handed.ready, (row) => row.line)).toEqual(Arr.map(ready, (row) => row.rowNumber))
-        expect(Arr.map(handed.ready, (row) => row.cells)).toEqual(Arr.map(ready, (row) => row.values))
+        const ready = A.filter(current.rows, (row) => row.status === "ready")
+        expect(A.map(handed.ready, (row) => row.line)).toEqual(A.map(ready, (row) => row.rowNumber))
+        expect(A.map(handed.ready, (row) => row.cells)).toEqual(A.map(ready, (row) => row.values))
         type Line = { column: string; from: string; to: string; source: string; decidedBy: string; how: string }
         const byColumn = (list: ReadonlyArray<Line>) =>
-          Arr.sort(
+          A.sort(
             list,
             Order.mapInput(Order.String, (line: Line) => line.column)
           )
         expect(
-          Arr.map(handed.ready, (row) =>
+          A.map(handed.ready, (row) =>
             byColumn(
-              Arr.map(row.changes, (change) => ({
+              A.map(row.changes, (change) => ({
                 column: change.column,
                 from: change.from,
                 to: change.to,
@@ -179,10 +183,10 @@ describe("the screen and the server apply decisions the same way", () => {
             )
           )
         ).toEqual(
-          Arr.map(ready, (row) =>
+          A.map(ready, (row) =>
             byColumn(
               // In the stored words, which are the region's own: who proposed, who decided, and how.
-              Arr.map(Arr.map(row.changes, changeToStored), (change) => ({
+              A.map(A.map(row.changes, changeToStored), (change) => ({
                 column: change.field,
                 from: change.from,
                 to: change.to,
@@ -194,19 +198,19 @@ describe("the screen and the server apply decisions the same way", () => {
           )
         )
         expect(
-          Arr.map(
-            Arr.filter(handed.ready, (row) => row.kept),
+          A.map(
+            A.filter(handed.ready, (row) => row.kept),
             (row) => row.line
           )
         ).toEqual(
-          Arr.map(
-            Arr.filter(ready, (row) => row.kept),
+          A.map(
+            A.filter(ready, (row) => row.kept),
             (row) => row.rowNumber
           )
         )
-        const held = Arr.filter(current.rows, (row) => row.status !== "ready")
-        expect(Arr.map(handed.held, (row) => [row.line, row.decidedBy])).toEqual(
-          Arr.map(held, (row) => [row.rowNumber, row.status === "out" ? "person" : "nobody"])
+        const held = A.filter(current.rows, (row) => row.status !== "ready")
+        expect(A.map(handed.held, (row) => [row.line, row.decidedBy])).toEqual(
+          A.map(held, (row) => [row.rowNumber, row.status === "out" ? "person" : "nobody"])
         )
       })
     )
@@ -221,9 +225,7 @@ describe("a row discontinued yet active, on the screen", () => {
       const table = yield* stage(sample("items_messy.csv"))
       for (const answer of ["Not active", "No discontinued date"]) {
         const s = screen(table, "apply")
-        const view = Option.getOrUndefined(
-          Arr.findFirst(s.derive().views, (candidate) => candidate.row.id === "row-45")
-        )
+        const view = O.getOrUndefined(A.findFirst(s.derive().views, (candidate) => candidate.row.id === "row-45"))
         const fix = view?.problem?.fix
         expect(fix?.why.labels).toEqual(["Not active", "No discontinued date"])
         expect(fix?.why.alternatives).toEqual([""])
@@ -235,20 +237,18 @@ describe("a row discontinued yet active, on the screen", () => {
             : { type: "edit", rowId: "row-45", column: columnFor(fix, value), value }
         )
         const { current, views } = s.agree()
-        const row = Option.getOrUndefined(Arr.findFirst(current.rows, (candidate) => candidate.id === "row-45"))
+        const row = O.getOrUndefined(A.findFirst(current.rows, (candidate) => candidate.id === "row-45"))
         expect(row?.status, answer).toBe("ready")
-        expect(
-          Option.getOrUndefined(Arr.findFirst(views, (candidate) => candidate.row.id === "row-45"))?.status,
-          answer
-        ).toBe("ready")
+        expect(O.getOrUndefined(A.findFirst(views, (candidate) => candidate.row.id === "row-45"))?.status, answer).toBe(
+          "ready"
+        )
         expect(row?.item?.stocking, answer).toEqual(
           answer === "Not active" ? { kind: "discontinued", on: "2025-06-30" } : { kind: "active" }
         )
         // Undone, the row asks again on both sides.
         s.press({ type: "undo" })
         expect(
-          Option.getOrUndefined(Arr.findFirst(s.agree().current.rows, (candidate) => candidate.id === "row-45"))
-            ?.outcome
+          O.getOrUndefined(A.findFirst(s.agree().current.rows, (candidate) => candidate.id === "row-45"))?.outcome
         ).toBe("decision")
       }
     })
@@ -264,18 +264,18 @@ describe("what the review screen is handed for a pick, for spaces and for a stor
       const decisions = firstDecisions({ table, choices: [], mode: "propose" })
       const current = review({ table, choices: [], decisions, storedItems: [] })
       const rows = toRegionRows(current, decisions)
-      const picks = Arr.filter(rows, (row) => row.problem?.column === "category")
+      const picks = A.filter(rows, (row) => row.problem?.column === "category")
       expect(picks.length).toBe(1)
       for (const row of picks) {
         expect(row.problem?.fix).toBeUndefined()
-        expect(Arr.map(row.problem?.choices ?? [], (choice) => choice.value)).toEqual([
+        expect(A.map(row.problem?.choices ?? [], (choice) => choice.value)).toEqual([
           "raw-materials",
           "components",
           "finished-goods",
           "packaging",
           "supplies"
         ])
-        expect(Arr.some(row.problem?.choices ?? [], (choice) => choice.suggested === true)).toBe(false)
+        expect(A.some(row.problem?.choices ?? [], (choice) => choice.suggested === true)).toBe(false)
       }
     })
   )
@@ -286,17 +286,17 @@ describe("what the review screen is handed for a pick, for spaces and for a stor
         new File([`${heading}\n ABC-0001,One,packaging,EA,1.00\nABC-0002 ,Two,packaging,EA,1.00\n`], "items.csv")
       )
       const s = screen(table, "propose")
-      const groups = Arr.filter(waitingGroups({ views: s.derive().views }), (group) => group.kind === "spaces")
-      expect(Arr.map(groups, (group) => [group.id, group.label, group.rowIds.length > 1])).toEqual([
+      const groups = A.filter(waitingGroups({ views: s.derive().views }), (group) => group.kind === "spaces")
+      expect(A.map(groups, (group) => [group.id, group.label, group.rowIds.length > 1])).toEqual([
         ["sku:trim", "the value without its spaces", true]
       ])
       const group = groups[0]
       if (group === undefined) return
       s.press({ type: "acceptGroup", groupId: group.id })
       const { current } = s.agree()
-      const trimmed = Arr.filter(current.rows, (row) => Arr.contains(group.rowIds, row.id))
-      expect(Arr.map(trimmed, (row) => row.values.sku)).toEqual(Arr.map(trimmed, (row) => Str.trim(row.file.sku)))
-      expect(Arr.dedupe(Arr.map(trimmed, (row) => row.values.sku)).length).toBe(trimmed.length)
+      const trimmed = A.filter(current.rows, (row) => A.contains(group.rowIds, row.id))
+      expect(A.map(trimmed, (row) => row.values.sku)).toEqual(A.map(trimmed, (row) => Str.trim(row.file.sku)))
+      expect(A.dedupe(A.map(trimmed, (row) => row.values.sku)).length).toBe(trimmed.length)
     })
   )
 
@@ -306,17 +306,17 @@ describe("what the review screen is handed for a pick, for spaces and for a stor
       const stored: ItemFields = {
         sku: "ABC-0001",
         name: "One",
-        description: Option.none(),
+        description: O.none(),
         category: "packaging",
         uom: "EA",
         unitCost: cost("1"),
         quantityOnHand: 0,
-        reorderPoint: Option.none(),
+        reorderPoint: O.none(),
         stocking: active,
         lotTracked: false,
         tags: [],
-        firstReceivedOn: Option.none(),
-        dimensions: Option.none(),
+        firstReceivedOn: O.none(),
+        dimensions: O.none(),
         vendors: []
       }
       for (const answer of ["keep", "replace"] as const) {
@@ -327,7 +327,7 @@ describe("what the review screen is handed for a pick, for spaces and for a stor
         expect(view?.problem?.column).toBe(storedChoice)
         // The button says what the choice is, not the SKU column the problem sits on.
         expect(view?.problem?.ask).toBe("Keep or replace")
-        expect(Arr.map(view?.problem?.choices ?? [], (choice) => choice.value)).toEqual(["keep", "replace"])
+        expect(A.map(view?.problem?.choices ?? [], (choice) => choice.value)).toEqual(["keep", "replace"])
         s.press({ type: "edit", rowId: "row-2", column: storedChoice, value: answer })
         // As the server stores it: the one flag, and nothing else said about the row.
         const sent = s.decisions["row-2"]

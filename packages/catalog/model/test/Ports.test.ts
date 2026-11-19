@@ -3,7 +3,8 @@
 import { describe, expect, it } from "@effect/vitest"
 import { handlersOf } from "@inventory/catalog-model/Ports"
 import { ImportStore } from "@inventory/catalog-model/ImportStore"
-import { Context, Effect } from "effect"
+import * as Context from "effect/Context"
+import * as Effect from "effect/Effect"
 
 class Elsewhere extends Context.Service<Elsewhere, { readonly n: number }>()(
   "@inventory/catalog-model/test/Ports.test/Elsewhere"

@@ -5,7 +5,11 @@
 // @effect-diagnostics nodeBuiltinImport:off
 import { readFileSync } from "node:fs"
 import { describe, expect, it } from "@effect/vitest"
-import { Array as Arr, Effect, Option, Record as Rec, String as Str } from "effect"
+import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as O from "effect/Option"
+import * as R from "effect/Record"
+import * as Str from "effect/String"
 import { firstDecisions, review } from "@inventory/catalog-model/Review"
 import { type StagedTable } from "@inventory/catalog-contract/Staged"
 import { sourceLead, sourceWordsFor } from "@inventory/ui/ProposalSource"
@@ -67,11 +71,11 @@ describe("who is behind a suggestion", () => {
 
   it.effect("calls the sample's low-confidence date reading a rule's, never a model's", () =>
     Effect.map(sampleRows(), ({ rows }) => {
-      const fixes = Arr.flatMap(rows, (row) => [
+      const fixes = A.flatMap(rows, (row) => [
         ...(row.applied ?? []),
         ...(row.problem?.fix === undefined ? [] : [row.problem.fix])
       ])
-      const questions = Arr.filter(fixes, (fix) => fix.confidence === "low")
+      const questions = A.filter(fixes, (fix) => fix.confidence === "low")
       expect(questions.length).toBeGreaterThan(0)
       for (const fix of fixes) expect(fix.by).toBe("rule")
       for (const fix of questions) expect(Str.toLowerCase(sourceLead(fix))).not.toContain("model")
@@ -84,13 +88,13 @@ describe("every row says why", () => {
     Effect.map(sampleRows(), ({ current, decisions, rows }) => {
       const views = viewRows({ rows, state: restored(toRegionDecisions(decisions)) })
       const kinds = kindsOf(regionKinds)
-      const open = Arr.filter(views, (view) => view.status === "needs")
+      const open = A.filter(views, (view) => view.status === "needs")
       expect(open.length).toBe(current.counts.needs)
       // A row with an empty SKU has no fix, only a refusal: it still says why, in the domain's own sentence.
-      const noFix = Arr.filter(open, (view) => view.problem?.fix === undefined)
+      const noFix = A.filter(open, (view) => view.problem?.fix === undefined)
       expect(noFix.length).toBeGreaterThan(0)
       for (const view of open) {
-        const domain = Option.getOrUndefined(Arr.findFirst(current.rows, (row) => row.id === view.row.id))
+        const domain = O.getOrUndefined(A.findFirst(current.rows, (row) => row.id === view.row.id))
         // The first problem's sentence, and how many more the row has behind it.
         expect(reasonOf({ view, kinds })).toBe(reasonShown(domain?.reason ?? "", domain?.reasons.length ?? 0))
       }
@@ -123,9 +127,9 @@ describe("rows that cannot be fixed here", () => {
     expect([counts.ready, counts.needs, counts.cannot, counts.out]).toEqual([1, 1, 2, 0])
     expect(counts.needs + counts.cannot + counts.ready + counts.out + counts.stored).toBe(counts.total)
     expect(decisionsLeft(views)).toBe(1)
-    expect(Arr.map(visible({ views, filter: "cannot" }), (view) => view.row.line)).toEqual([3, 4])
-    expect(Arr.map(visible({ views, filter: "needs" }), (view) => view.row.line)).toEqual([5])
-    const cannot = Option.getOrUndefined(Arr.findFirst(views, (view) => view.row.line === 3))
+    expect(A.map(visible({ views, filter: "cannot" }), (view) => view.row.line)).toEqual([3, 4])
+    expect(A.map(visible({ views, filter: "needs" }), (view) => view.row.line)).toEqual([5])
+    const cannot = O.getOrUndefined(A.findFirst(views, (view) => view.row.line === 3))
     expect(cannot === undefined ? "" : reasonOf({ view: cannot, kinds: kindsOf(kinds) })).toBe(
       "Item 3 is not in the system yet."
     )
@@ -162,7 +166,7 @@ describe("a button that could do nothing is never offered", () => {
     Effect.gen(function* () {
       // Every item of the clean sample is stored, as after a first import of every row.
       const first = yield* sampleRows("items_clean.csv")
-      const items = Arr.flatMap(first.current.rows, (each) => (each.item === null ? [] : [each.item]))
+      const items = A.flatMap(first.current.rows, (each) => (each.item === null ? [] : [each.item]))
       expect(items.length).toBe(25)
       const { rows } = yield* sampleRows("items_clean.csv", items)
       const counts = count(viewRows({ rows, state: emptyState }))
@@ -190,8 +194,8 @@ describe("status words", () => {
   })
 
   it("keep the current words as defaults, each said once", () => {
-    const values = Rec.values(defaultReviewWords)
-    expect(Arr.dedupe(values)).toHaveLength(values.length)
+    const values = R.values(defaultReviewWords)
+    expect(A.dedupe(values)).toHaveLength(values.length)
     expect(reviewWords(undefined)).toEqual(defaultReviewWords)
   })
 })
@@ -230,7 +234,7 @@ describe("the table fits at 1440", () => {
     const plan = planColumns({ columns, fixed: 360 + 120, room })
     expect(plan.scrolls).toBe(false)
     expect(plan.minWidth).toBeLessThanOrEqual(room)
-    expect(Arr.map(plan.shown, (column) => column.id)).toContain("reason")
+    expect(A.map(plan.shown, (column) => column.id)).toContain("reason")
   })
 })
 
@@ -278,8 +282,8 @@ describe("a cost, the dimensions and the vendors in the review", () => {
         current: review({ table, choices: [], decisions: {}, storedItems: [] })
       })),
       ({ table, current }) => {
-        const cost = Option.getOrUndefined(
-          Arr.findFirst(
+        const cost = O.getOrUndefined(
+          A.findFirst(
             regionColumns(current.mapping, current.unusedColumns, table),
             (column) => column.id === "unitCost"
           )

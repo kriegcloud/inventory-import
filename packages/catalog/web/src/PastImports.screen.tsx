@@ -1,7 +1,7 @@
 // The imports that were confirmed, as the columns of a list: the way back to a past import's result, from the first
 // screen and from Activity. Every confirmed import is listed, whatever it changed: a clean file's has a line too.
 // The one thing not to break: the count of items is the server's, read from the stored items, never the confirm's.
-import { DateTime } from "effect"
+import * as DateTime from "effect/DateTime"
 import { StatusPill, type Tone } from "@inventory/ui/StatusPill"
 import { type ListColumn, ListTable } from "@inventory/ui/ListTable"
 import { whenShort } from "@inventory/ui/Dates"

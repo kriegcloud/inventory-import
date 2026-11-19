@@ -6,7 +6,9 @@ import { CurrentActor } from "@inventory/kernel/Actor"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
 import type { Role } from "@inventory/kernel/Role"
-import { Array as Arr, Effect, Option } from "effect"
+import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as O from "effect/Option"
 
 const member = (id: string, name: string, role: Role, organization: string): Member =>
   Member.make({
@@ -38,17 +40,17 @@ export type Line = Partial<Record<(typeof headings)[number], string>>
 export const tableOf = (input: { readonly fileName: string; readonly lines: ReadonlyArray<Line> }): StagedTable => ({
   fileName: input.fileName,
   kind: "csv",
-  sheet: Option.none(),
+  sheet: O.none(),
   headerRowNumber: 1,
-  columns: Arr.map(headings, (label, index) => ({
+  columns: A.map(headings, (label, index) => ({
     index,
-    letter: Option.getOrElse(Arr.get(letters, index), () => "A"),
+    letter: O.getOrElse(A.get(letters, index), () => "A"),
     label
   })),
   notes: [],
-  rows: Arr.map(input.lines, (line, index) => ({
+  rows: A.map(input.lines, (line, index) => ({
     rowNumber: index + 2,
-    cells: Arr.map(headings, (heading) => ({ text: line[heading] ?? "" }))
+    cells: A.map(headings, (heading) => ({ text: line[heading] ?? "" }))
   }))
 })
 

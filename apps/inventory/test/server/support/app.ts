@@ -6,23 +6,22 @@
 // (`SignedOutAuth`), and the header identity names the actor.
 import { D1Binding } from "@beep/d1/D1"
 import { D1Test, D1TestOptions } from "@beep/d1/D1Test"
-import {
-  Array as Arr,
-  Config,
-  ConfigProvider,
-  Context,
-  DateTime,
-  Effect,
-  Layer,
-  MutableRef,
-  Option,
-  Record as Rec,
-  String as Str
-} from "effect"
+import * as A from "effect/Array"
+import * as Config from "effect/Config"
+import * as ConfigProvider from "effect/ConfigProvider"
+import * as Context from "effect/Context"
+import * as DateTime from "effect/DateTime"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as MutableRef from "effect/MutableRef"
+import * as O from "effect/Option"
+import * as R from "effect/Record"
+import * as Str from "effect/String"
 import * as S from "effect/Schema"
-import { DevTools } from "effect/devtools"
-import { type HttpRouter, HttpServer } from "effect/http"
-import { HttpApiMiddleware } from "effect/http-api"
+import * as DevTools from "effect/devtools/DevTools"
+import type * as HttpRouter from "effect/http/HttpRouter"
+import * as HttpServer from "effect/http/HttpServer"
+import * as HttpApiMiddleware from "effect/http-api/HttpApiMiddleware"
 import { actingAs, directoryFollowing, HeaderIdentity } from "@inventory/access-host/AccessTest"
 import { accessServices } from "@inventory/access-host/Host"
 import { SessionIdentityLive } from "@inventory/access-host/SessionIdentity"
@@ -72,7 +71,7 @@ export const DevToolsWhenAsked = Layer.unwrap(
   Effect.gen(function* () {
     // Read from the process environment itself: the app's own settings are the test's, not the shell's.
     const url = yield* Config.option(Config.String("EFFECT_DEVTOOLS_URL")).parse(ConfigProvider.fromEnv())
-    return Option.match(url, { onNone: () => Layer.empty, onSome: (address) => DevTools.layer(address) })
+    return O.match(url, { onNone: () => Layer.empty, onSome: (address) => DevTools.layer(address) })
   })
 ).pipe(Layer.orDie)
 
@@ -115,7 +114,7 @@ export const TestApp = makeApp({
  * itself is tested on D1.
  */
 const seededLines = (at: DateTime.Utc): ReadonlyArray<Activity> =>
-  Arr.map(["org_prairie", "org_northline"] as const, (org, index) =>
+  A.map(["org_prairie", "org_northline"] as const, (org, index) =>
     Activity.make({
       id: ActivityId.make(`00000000-0000-4000-8000-00000000000${index}`),
       organizationId: org as OrganizationId,
@@ -123,7 +122,7 @@ const seededLines = (at: DateTime.Utc): ReadonlyArray<Activity> =>
       actorName: "Seeded",
       action: "Uploaded a file",
       detail: "items.csv: 13 rows staged, nothing imported yet",
-      agent: Option.none(),
+      agent: O.none(),
       createdAt: at
     })
   )
@@ -345,13 +344,13 @@ export const browser = (address: string) => {
       handle(
         new Request(`${testOrigin}${path}`, {
           method,
-          headers: Rec.filter(headers, (value) => value !== ""),
+          headers: R.filter(headers, (value) => value !== ""),
           ...(payload === undefined ? {} : { body: payload })
         })
       )
     )
-    const setCookie = Option.getOrUndefined(
-      Arr.findFirst(response.headers.getSetCookie(), (line) => Str.includes("inventory.session_token=")(line))
+    const setCookie = O.getOrUndefined(
+      A.findFirst(response.headers.getSetCookie(), (line) => Str.includes("inventory.session_token=")(line))
     )
     if (setCookie !== undefined) cookie = Str.split(setCookie, ";")[0] ?? ""
     const text = yield* Effect.promise(() => response.text())

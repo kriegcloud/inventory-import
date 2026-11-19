@@ -4,8 +4,11 @@
 // stored rows, a second load creates nothing twice, and the server reviews with the same rules as the screen.
 import { expect, layer } from "@effect/vitest"
 import { cost, digits } from "../support/cost.ts"
-import { Array as Arr, Effect, Option, String as Str } from "effect"
-import { HttpApiTest } from "effect/http-api"
+import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as O from "effect/Option"
+import * as Str from "effect/String"
+import * as HttpApiTest from "effect/http-api/HttpApiTest"
 import clean from "../../public/samples/items_clean.csv?raw"
 import messy from "../../public/samples/items_messy.csv?raw"
 import { Api } from "../../src/api/v1/Api.ts"
@@ -55,19 +58,19 @@ layer(TypedApp)("an import of items", (it) => {
         const confirmed = yield* client.imports
           .commit({ params: { id: staged.id }, payload: { set: {}, clear: [] } })
           .pipe(marcus)
-        const result = Option.getOrThrow(confirmed.result)
+        const result = O.getOrThrow(confirmed.result)
         expect([result.created, result.updated, result.already, result.notImported]).toEqual([155, 0, 0, 45])
         expect(result.fixed).toEqual({ rows: 16, cells: 19 })
-        const outcomeOf = (n: number) => Arr.findFirst(result.rows, (row) => row.rowNumber === n)
+        const outcomeOf = (n: number) => A.findFirst(result.rows, (row) => row.rowNumber === n)
         expect(
-          Option.map(outcomeOf(18), (row) => (row.outcome === "notImported" ? [row.decidedBy, row.reason] : row))
-        ).toEqual(Option.some([{ kind: "nobody" }, 'Unit of measure "bx" is not one of EA, BX, KG, M, L.']))
+          O.map(outcomeOf(18), (row) => (row.outcome === "notImported" ? [row.decidedBy, row.reason] : row))
+        ).toEqual(O.some([{ kind: "nobody" }, 'Unit of measure "bx" is not one of EA, BX, KG, M, L.']))
 
         // What landed, as any member reads it: nested values decoded, the cost as the digits said.
         const stored = yield* client.items.list().pipe(as("mem_priya"))
         expect(stored.length).toBe(155)
-        const bySku = (sku: string) => Option.getOrThrow(Arr.findFirst(stored, (item) => item.sku === sku))
-        const comma = Option.getOrThrow(outcomeOf(55))
+        const bySku = (sku: string) => O.getOrThrow(A.findFirst(stored, (item) => item.sku === sku))
+        const comma = O.getOrThrow(outcomeOf(55))
         expect([comma.outcome, digits(bySku(comma.sku).unitCost)]).toEqual(["created", "35.82"])
         const crate = bySku("XRR-0266")
         expect(crate).toMatchObject({
@@ -75,21 +78,21 @@ layer(TypedApp)("an import of items", (it) => {
           lotTracked: false,
           stocking: { kind: "discontinued", on: "2025-02-26" },
           tags: ["fragile"],
-          dimensions: Option.some({ length: 97.4, width: 6.9, height: 4.4, unit: "cm" })
+          dimensions: O.some({ length: 97.4, width: 6.9, height: 4.4, unit: "cm" })
         })
         // A cost is compared by its digits: a decimal caches its shortest form once it has been written.
-        const vendor = Option.getOrThrow(Arr.get(crate.vendors, 1))
+        const vendor = O.getOrThrow(A.get(crate.vendors, 1))
         expect({ ...vendor, unitCost: digits(vendor.unitCost) }).toEqual({
           vendorName: "Tidewater Fasteners",
-          vendorSku: Option.none(),
+          vendorSku: O.none(),
           unitCost: "3.87",
-          leadTimeDays: Option.some(43),
+          leadTimeDays: O.some(43),
           isPreferred: false
         })
         // "Internal Notes" was never stored: no item carries the text.
-        expect(
-          Arr.some(stored, (item) => Str.includes("purchasing")(Option.getOrElse(item.description, () => "")))
-        ).toBe(false)
+        expect(A.some(stored, (item) => Str.includes("purchasing")(O.getOrElse(item.description, () => "")))).toBe(
+          false
+        )
 
         // The Items table's questions run in SQL: a cost filter, a select, a search and the facets.
         const page = yield* client.items
@@ -109,10 +112,10 @@ layer(TypedApp)("an import of items", (it) => {
           .pipe(marcus)
         expect(page.total).toBeGreaterThan(0)
         expect(
-          Arr.every(page.data, (item) => Number(digits(item.unitCost)) > 500 && item.category === "finished-goods")
+          A.every(page.data, (item) => Number(digits(item.unitCost)) > 500 && item.category === "finished-goods")
         ).toBe(true)
         const facets = yield* client.items.facets().pipe(marcus)
-        expect([facets.total, Arr.reduce(facets.uom, 0, (n, row) => n + row.count)]).toEqual([155, 155])
+        expect([facets.total, A.reduce(facets.uom, 0, (n, row) => n + row.count)]).toEqual([155, 155])
 
         // The same file again: nothing is created twice. 154 of the 155 items it created are already there; row 55,
         // imported after its "35,82" was accepted as 35.82, does not read as written, so it is not "already there":
@@ -124,9 +127,9 @@ layer(TypedApp)("an import of items", (it) => {
           .commit({ params: { id: again.id }, payload: { set: {}, clear: [] } })
           .pipe(marcus)
         expect([
-          Option.getOrUndefined(second.result)?.created,
-          Option.getOrUndefined(second.result)?.already,
-          Option.getOrUndefined(second.result)?.notImported
+          O.getOrUndefined(second.result)?.created,
+          O.getOrUndefined(second.result)?.already,
+          O.getOrUndefined(second.result)?.notImported
         ]).toEqual([1, 154, 45])
         expect((yield* client.items.list().pipe(marcus)).length).toBe(156)
 
@@ -145,12 +148,12 @@ layer(TypedApp)("an import of items", (it) => {
           })
           .pipe(marcus)
         expect([
-          Option.getOrUndefined(replaced.result)?.updated,
-          Option.getOrUndefined(replaced.result)?.already,
-          Option.getOrUndefined(replaced.result)?.created
+          O.getOrUndefined(replaced.result)?.updated,
+          O.getOrUndefined(replaced.result)?.already,
+          O.getOrUndefined(replaced.result)?.created
         ]).toEqual([1, 24, 0])
         const after = yield* client.items.list().pipe(marcus)
-        const insert = Option.getOrThrow(Arr.findFirst(after, (item) => item.sku === "SHH-9574"))
+        const insert = O.getOrThrow(A.findFirst(after, (item) => item.sku === "SHH-9574"))
         expect([insert.name, insert.revision, after.length]).toEqual(["Oak Foam Insert XL", 2, 181])
 
         // An edit by hand, then the take-back of the clean import: 24 removed, the replaced item kept and named.
@@ -185,8 +188,8 @@ layer(TypedApp)("an import of items", (it) => {
           .pipe(marcus)
         expect([
           taken.status,
-          Option.getOrUndefined(taken.result)?.takenBack,
-          Option.getOrUndefined(taken.result)?.created
+          O.getOrUndefined(taken.result)?.takenBack,
+          O.getOrUndefined(taken.result)?.created
         ]).toEqual(["takenBack", 24, 1])
         expect((yield* client.items.list().pipe(marcus)).length).toBe(157)
       })

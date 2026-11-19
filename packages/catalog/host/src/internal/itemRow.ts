@@ -1,8 +1,8 @@
 // An item row as SQLite stores it, and its reading into an item: shared by the two stores of this host.
 import * as S from "effect/Schema"
-import { Struct } from "effect"
+import * as Struct from "effect/Struct"
 import { StoredItem, Dimensions, Vendor, stockingOf } from "@inventory/catalog-contract/Item"
-import { SqlClient } from "effect/sql"
+import * as SqlClient from "effect/sql/SqlClient"
 
 /**
  * An item as SQLite stores it, decoded by the services that read `item` (here and `Items`): the two switches are 0 or

@@ -2,7 +2,9 @@
 import { expect, it } from "@effect/vitest"
 import { betterAuth } from "better-auth"
 import { memoryAdapter } from "better-auth/adapters/memory"
-import { Array as Arr, Effect, String as Str } from "effect"
+import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as Str from "effect/String"
 import * as S from "effect/Schema"
 import { vi } from "vitest"
 import { authOptions } from "@inventory/access-host/AuthOptions"
@@ -94,6 +96,6 @@ it.effect("on and unreachable: sign-up is refused, and only a hash prefix was se
       message: "Failed to check password. Please try again later."
     })
     // Only the first five characters of the SHA-1 hash go out: never the password.
-    expect(Arr.map(calls, Str.replace(/[0-9A-F]{5}$/, "XXXXX"))).toEqual(["https://api.pwnedpasswords.com/range/XXXXX"])
+    expect(A.map(calls, Str.replace(/[0-9A-F]{5}$/, "XXXXX"))).toEqual(["https://api.pwnedpasswords.com/range/XXXXX"])
   })
 )

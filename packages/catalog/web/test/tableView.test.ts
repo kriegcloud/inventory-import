@@ -1,7 +1,7 @@
 // The pure part of applying an assistant's answer: a request's changes land in the table's own state, removing one
 // change takes back only that change, and undoing the request puts the view back as it was before it.
 import { describe, expect, it } from "@effect/vitest"
-import { Array as Arr } from "effect"
+import * as A from "effect/Array"
 import type { CatalogColumn, ColumnCatalog, ViewChange } from "@inventory/catalog-contract/TableView"
 import {
   applyAll,
@@ -55,7 +55,7 @@ describe("applying an answer to a table's view", () => {
       visibility: { note: true },
       search: ""
     })
-    expect(Arr.map(changes, (change) => say(records, change))).toEqual([
+    expect(A.map(changes, (change) => say(records, change))).toEqual([
       "Sorted by Name, Z to A",
       "Filtered: Unit is Box",
       "Showed Note"

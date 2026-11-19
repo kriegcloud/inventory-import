@@ -3,7 +3,9 @@
 // public/samples through the same entry point the browser uses. Each case is listed in docs/patterns.md section 7.
 import { readFileSync } from "node:fs"
 import { describe, expect, it } from "@effect/vitest"
-import { Array as Arr, Effect, Option } from "effect"
+import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as O from "effect/Option"
 import type { Note, NoteKind, Row, SpreadsheetTable } from "@inventory/catalog-model/Spreadsheet"
 import { sayError } from "@inventory/client/SayError"
 import { readSpreadsheet } from "@inventory/catalog-web/Spreadsheet"
@@ -13,15 +15,15 @@ const bytesOf = (path: string): Uint8Array<ArrayBuffer> =>
 const fixture = (name: string, as: string = name): File => new File([bytesOf(`fixtures/spreadsheet/${name}`)], as)
 const textFile = (text: string, name = "items.csv"): File => new File([text], name)
 
-const noteOf = (table: SpreadsheetTable, kind: NoteKind): Option.Option<Note> =>
-  Arr.findFirst(table.notes, (note) => note.kind === kind)
+const noteOf = (table: SpreadsheetTable, kind: NoteKind): O.Option<Note> =>
+  A.findFirst(table.notes, (note) => note.kind === kind)
 const rowAt = (table: SpreadsheetTable, rowNumber: number): Row => {
-  const row = Arr.findFirst(table.rows, (r) => r.rowNumber === rowNumber)
-  if (Option.isNone(row)) throw new Error(`no row ${rowNumber}`)
+  const row = A.findFirst(table.rows, (r) => r.rowNumber === rowNumber)
+  if (O.isNone(row)) throw new Error(`no row ${rowNumber}`)
   return row.value
 }
-const texts = (row: Row): ReadonlyArray<string> => Arr.map(row.cells, (cell) => cell.text)
-const rowNumbers = (table: SpreadsheetTable): ReadonlyArray<number> => Arr.map(table.rows, (row) => row.rowNumber)
+const texts = (row: Row): ReadonlyArray<string> => A.map(row.cells, (cell) => cell.text)
+const rowNumbers = (table: SpreadsheetTable): ReadonlyArray<number> => A.map(table.rows, (row) => row.rowNumber)
 
 describe("CSV", () => {
   it.effect("reads UTF-8 with a byte-order mark, dropping only the mark", () =>
@@ -48,7 +50,7 @@ describe("CSV", () => {
       expect(texts(rowAt(table, 5))[1]).toBe("Round bar Ø 12 mm")
       expect(texts(rowAt(table, 6))[1]).toBe("Washer ½ inch")
       const note = noteOf(table, "notUtf8")
-      expect(Option.map(note, (n) => [n.level, n.rows])).toEqual(Option.some(["warning", [5, 6]]))
+      expect(O.map(note, (n) => [n.level, n.rows])).toEqual(O.some(["warning", [5, 6]]))
     })
   )
 
@@ -57,7 +59,7 @@ describe("CSV", () => {
       const table = yield* readSpreadsheet({ file: fixture("semicolon-crlf.csv") })
       expect(table.format).toEqual({ _tag: "csv", delimiter: ";", encoding: "utf-8" })
       expect(texts(rowAt(table, 2))).toEqual(["BRK-040", "Steel bracket 40 mm", "Each", "120", "2,35"])
-      expect(Option.isSome(noteOf(table, "delimiter"))).toBe(true)
+      expect(O.isSome(noteOf(table, "delimiter"))).toBe(true)
     })
   )
 
@@ -94,7 +96,7 @@ describe("CSV", () => {
   it.effect("names duplicate and empty headers, keeps spaces, pads short rows and keeps extra cells apart", () =>
     Effect.gen(function* () {
       const table = yield* readSpreadsheet({ file: fixture("ragged.csv") })
-      expect(Arr.map(table.columns, (c) => c.label)).toEqual([
+      expect(A.map(table.columns, (c) => c.label)).toEqual([
         "SKU",
         "Item",
         "Quantity",
@@ -109,7 +111,7 @@ describe("CSV", () => {
         { letter: "G", cell: { type: "text", text: "extra one" } },
         { letter: "H", cell: { type: "text", text: "extra two" } }
       ])
-      const kinds = Arr.map(table.notes, (n) => n.kind)
+      const kinds = A.map(table.notes, (n) => n.kind)
       expect(kinds).toEqual([
         "duplicateHeader",
         "emptyHeader",
@@ -119,7 +121,7 @@ describe("CSV", () => {
         "extraCells",
         "cellSpaces"
       ])
-      expect(Option.map(noteOf(table, "blankRows"), (n) => n.rows)).toEqual(Option.some([4]))
+      expect(O.map(noteOf(table, "blankRows"), (n) => n.rows)).toEqual(O.some([4]))
     })
   )
 
@@ -159,7 +161,7 @@ describe("Workbook", () => {
     Effect.gen(function* () {
       const table = yield* readSpreadsheet({ file: fixture("sheets.xlsx") })
       if (table.format._tag !== "xlsx") throw new Error("expected a workbook")
-      expect(Arr.map(table.format.sheets, (s) => [s.name, s.visibility, s.rowCount])).toEqual([
+      expect(A.map(table.format.sheets, (s) => [s.name, s.visibility, s.rowCount])).toEqual([
         ["Read me", "visible", 2],
         ["Empty", "visible", 0],
         ["Items", "visible", 7],
@@ -169,8 +171,8 @@ describe("Workbook", () => {
       ])
       expect(table.format.chosen).toMatchObject({ name: "Items", position: 3, sheetCount: 6, reason: "mostData" })
       expect(table.format.chosen.explanation).toContain('"Bay 2" (3 rows)')
-      expect(Option.map(noteOf(table, "hiddenSheets"), (n) => n.message)).toEqual(
-        Option.some(
+      expect(O.map(noteOf(table, "hiddenSheets"), (n) => n.message)).toEqual(
+        O.some(
           'Hidden sheets hold data that was not read: "Lookup" (hidden, 8 rows) and "Old prices" (hidden so that only a macro can show it, 2 rows). Choose one if it holds what you meant to import.'
         )
       )
@@ -201,13 +203,13 @@ describe("Workbook", () => {
       const table = yield* messy
       expect(table.headerRowNumber).toBe(4)
       const above = noteOf(table, "rowsAboveHeader")
-      expect(Option.map(above, (n) => n.message)).toEqual(
-        Option.some(
+      expect(O.map(above, (n) => n.message)).toEqual(
+        O.some(
           'Rows 1 and 2, above the column names, were not read as data: "Stock count - Bay 4" and "Counted 4 March 2026 by the night shift".'
         )
       )
-      expect(Option.map(noteOf(table, "mergedCells"), (n) => n.message)).toEqual(
-        Option.some("Merged cells: A1:H1. Nothing was filled in.")
+      expect(O.map(noteOf(table, "mergedCells"), (n) => n.message)).toEqual(
+        O.some("Merged cells: A1:H1. Nothing was filled in.")
       )
     })
   )
@@ -236,7 +238,7 @@ describe("Workbook", () => {
       expect(rowAt(table, 7).cells[2]).toEqual({ type: "text", text: "2000" })
       expect(rowAt(table, 7).cells[7]).toEqual({ type: "text", text: "4006381333931" })
       expect(rowAt(table, 6).cells[7]).toEqual({ type: "number", text: "123", shown: "00123" })
-      expect(Option.map(noteOf(table, "leadingZeros"), (n) => n.rows)).toEqual(Option.some([6]))
+      expect(O.map(noteOf(table, "leadingZeros"), (n) => n.rows)).toEqual(O.some([6]))
     })
   )
 
@@ -247,7 +249,7 @@ describe("Workbook", () => {
       expect(rowAt(table, 6).cells[3]).toEqual({ type: "number", text: "0.3", formula: "=0.1+0.2" })
       expect(rowAt(table, 6).cells[4]).toEqual({ type: "number", text: "450", shown: "$450.00", formula: "=C6*D6" })
       expect(rowAt(table, 7).cells[4]).toEqual({ type: "number", text: "123456789012346000", shown: "1.23457E+17" })
-      expect(Option.map(noteOf(table, "longNumbers"), (n) => n.rows)).toEqual(Option.some([7]))
+      expect(O.map(noteOf(table, "longNumbers"), (n) => n.rows)).toEqual(O.some([7]))
     })
   )
 
@@ -255,8 +257,8 @@ describe("Workbook", () => {
     Effect.gen(function* () {
       const table = yield* messy
       expect(rowAt(table, 5).cells[4]).toEqual({ type: "number", text: "1500", shown: "$1,500.00", formula: "=C5*D5" })
-      expect(Option.map(noteOf(table, "formulas"), (n) => n.message)).toEqual(
-        Option.some("9 cells hold formulas (columns C, D and E); the result saved in the file was read.")
+      expect(O.map(noteOf(table, "formulas"), (n) => n.message)).toEqual(
+        O.some("9 cells hold formulas (columns C, D and E); the result saved in the file was read.")
       )
     })
   )
@@ -266,7 +268,7 @@ describe("Workbook", () => {
       const table = yield* messy
       expect(rowAt(table, 8).cells[2]).toEqual({ type: "error", text: "#N/A", formula: "=NA()" })
       expect(rowAt(table, 8).cells[4]).toEqual({ type: "error", text: "#DIV/0!", formula: "=C8/0" })
-      expect(Option.map(noteOf(table, "errorCells"), (n) => [n.level, n.rows])).toEqual(Option.some(["warning", [8]]))
+      expect(O.map(noteOf(table, "errorCells"), (n) => [n.level, n.rows])).toEqual(O.some(["warning", [8]]))
     })
   )
 
@@ -274,7 +276,7 @@ describe("Workbook", () => {
     Effect.gen(function* () {
       const table = yield* messy
       expect(rowNumbers(table)).toEqual([5, 6, 7, 8, 10, 11, 12])
-      expect(Option.map(noteOf(table, "blankRows"), (n) => n.rows)).toEqual(Option.some([9]))
+      expect(O.map(noteOf(table, "blankRows"), (n) => n.rows)).toEqual(O.some([9]))
     })
   )
 
@@ -282,7 +284,7 @@ describe("Workbook", () => {
     Effect.gen(function* () {
       const table = yield* messy
       expect(rowAt(table, 10).hidden).toBe(true)
-      expect(Option.map(noteOf(table, "hiddenRows"), (n) => n.rows)).toEqual(Option.some([10]))
+      expect(O.map(noteOf(table, "hiddenRows"), (n) => n.rows)).toEqual(O.some([10]))
     })
   )
 
@@ -290,10 +292,8 @@ describe("Workbook", () => {
     Effect.gen(function* () {
       const table = yield* messy
       expect(texts(rowAt(table, 12))[0]).toBe("Total")
-      expect(Option.map(noteOf(table, "totalRow"), (n) => n.rows)).toEqual(Option.some([12]))
-      expect(Option.map(noteOf(table, "secondTable"), (n) => [n.level, n.rows])).toEqual(
-        Option.some(["warning", [15, 16, 17]])
-      )
+      expect(O.map(noteOf(table, "totalRow"), (n) => n.rows)).toEqual(O.some([12]))
+      expect(O.map(noteOf(table, "secondTable"), (n) => [n.level, n.rows])).toEqual(O.some(["warning", [15, 16, 17]]))
     })
   )
 
@@ -301,7 +301,7 @@ describe("Workbook", () => {
     Effect.gen(function* () {
       const table = yield* messy
       expect(table.columns.length).toBe(8)
-      expect(Arr.some(table.rows, (row) => row.extra !== undefined)).toBe(false)
+      expect(A.some(table.rows, (row) => row.extra !== undefined)).toBe(false)
     })
   )
 
@@ -419,8 +419,8 @@ describe("A file whose name lies about its content", () => {
     Effect.gen(function* () {
       const table = yield* readSpreadsheet({ file: fixture("sheets.xlsx", "items.csv") })
       expect(table.kind).toBe("xlsx")
-      expect(Option.map(noteOf(table, "wrongExtension"), (n) => n.message)).toEqual(
-        Option.some('The file is named ".csv" but holds an Excel workbook; it was read as .xlsx.')
+      expect(O.map(noteOf(table, "wrongExtension"), (n) => n.message)).toEqual(
+        O.some('The file is named ".csv" but holds an Excel workbook; it was read as .xlsx.')
       )
     })
   )
@@ -429,7 +429,7 @@ describe("A file whose name lies about its content", () => {
     Effect.gen(function* () {
       const table = yield* readSpreadsheet({ file: fixture("utf8-bom.csv", "items.xlsx") })
       expect(table.kind).toBe("csv")
-      expect(Option.isSome(noteOf(table, "wrongExtension"))).toBe(true)
+      expect(O.isSome(noteOf(table, "wrongExtension"))).toBe(true)
     })
   )
 })
@@ -444,7 +444,7 @@ describe("The sample files", () => {
         file: new File([bytesOf("fixtures/samples/items_messy.csv")], "items_messy.csv")
       })
       expect(clean.rows.length).toBe(25)
-      expect(Arr.map(clean.columns, (c) => c.header)[0]).toBe("sku")
+      expect(A.map(clean.columns, (c) => c.header)[0]).toBe("sku")
       expect(clean.columns.length).toBe(15)
       expect(messy.columns.length).toBe(16)
       expect(messy.rows.length).toBe(200)

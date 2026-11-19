@@ -1,6 +1,7 @@
 // What the person decided for one row of a file, as code holds it and as it is stored and sent (its flags), the
 // id of one item of a file, and the change to the saved decisions a screen sends.
-import { Record as Rec, Tuple } from "effect"
+import * as R from "effect/Record"
+import * as Tuple from "effect/Tuple"
 import * as S from "effect/Schema"
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as SchemaTransformation from "effect/SchemaTransformation"
@@ -165,7 +166,7 @@ const flagsOf = (parts: DecisionShape): RowDecisionFlags => ({
   ...(parts.place.kind === "kept" || (parts.place.kind === "leftOut" && parts.place.wasKept) ? { kept: true } : {}),
   ...(parts.accepted.length === 0 ? {} : { accepted: parts.accepted }),
   ...(parts.reverted.length === 0 ? {} : { reverted: parts.reverted }),
-  ...(Rec.isEmptyRecord(parts.edits) ? {} : { edits: parts.edits }),
+  ...(R.isEmptyRecord(parts.edits) ? {} : { edits: parts.edits }),
   ...(parts.stored.kind === "undecided" ? {} : { stored: parts.stored.kind })
 })
 

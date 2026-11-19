@@ -1,4 +1,4 @@
-import { Option } from "effect"
+import * as O from "effect/Option"
 import { lazy, Suspense, useContext, useState } from "react"
 import { createPortal } from "react-dom"
 import { Alert, AlertDescription, AlertTitle } from "@inventory/ui/components/alert"
@@ -170,7 +170,7 @@ export function ImportPage() {
         </StepperContent>
         <StepperContent value="result" className="min-h-0 flex-1">
           {body(() =>
-            view.data === undefined || Option.isNone(view.data.result) || table.data === undefined ? null : (
+            view.data === undefined || O.isNone(view.data.result) || table.data === undefined ? null : (
               <ResultStep view={view.data} result={view.data.result.value} table={table.data} canImport={canImport} />
             )
           )}

@@ -1,4 +1,5 @@
-import { Effect, Option } from "effect"
+import * as Effect from "effect/Effect"
+import * as O from "effect/Option"
 import { type ReactNode, useEffect, useState } from "react"
 import { Alert, AlertDescription, AlertTitle } from "@inventory/ui/components/alert"
 import { Button } from "@inventory/ui/components/button"
@@ -26,7 +27,7 @@ const Waiting = () => <Skeleton className="mx-auto h-80 w-full max-w-sm" aria-la
 function useDevelopmentSignIn(): "idle" | "signing-in" | "failed" {
   const { status, features, refresh } = useActor()
   const [state, setState] = useState<"idle" | "signing-in" | "failed">("idle")
-  const offer = features === undefined ? undefined : Option.getOrUndefined(features.testAccounts)
+  const offer = features === undefined ? undefined : O.getOrUndefined(features.testAccounts)
   const first = offer?.accounts[0]
   const password = offer?.password
   const wanted =

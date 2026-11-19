@@ -4,19 +4,22 @@
  *
  * @packageDocumentation
  */
-import { Config, Option, Redacted, String as Str } from "effect"
+import * as Config from "effect/Config"
+import * as O from "effect/Option"
+import * as Redacted from "effect/Redacted"
+import * as Str from "effect/String"
 import * as S from "effect/Schema"
 
 /** An address setting: unset or blank is none, anything else must be a URL. */
 const optionalUrl = (name: string) =>
   Config.schema(S.Union([S.Literal(""), S.URL]), name).pipe(
     Config.withDefault(""),
-    Config.map((url) => (url === "" ? Option.none() : Option.some(url)))
+    Config.map((url) => (url === "" ? O.none() : O.some(url)))
   )
 
 /** A secret that is set but blank is the same as none. */
-const present = (key: Option.Option<Redacted.Redacted<string>>) =>
-  Option.filter(key, (value) => Str.trim(Redacted.value(value)) !== "")
+const present = (key: O.Option<Redacted.Redacted<string>>) =>
+  O.filter(key, (value) => value.pipe(Redacted.value, Str.trim) !== "")
 
 /**
  * The sign-in settings. The shortest secret accepted, 32 characters, is `@beep/better-auth`'s rule. `production` is

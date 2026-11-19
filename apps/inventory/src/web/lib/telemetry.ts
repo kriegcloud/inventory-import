@@ -1,6 +1,11 @@
-import { Effect, Layer, Logger, Tracer } from "effect"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Logger from "effect/Logger"
+import * as Tracer from "effect/Tracer"
 import * as S from "effect/Schema"
-import { FetchHttpClient, HttpClient, HttpClientResponse } from "effect/http"
+import * as FetchHttpClient from "effect/http/FetchHttpClient"
+import * as HttpClient from "effect/http/HttpClient"
+import * as HttpClientResponse from "effect/http/HttpClientResponse"
 import { sendTraceContext, traceContextGate } from "./traceContext.ts"
 
 // THE BROWSER'S TRACES AND LOGS, to the collector when the server says telemetry is on (src/server/Telemetry.ts).

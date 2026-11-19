@@ -7,7 +7,9 @@
 // change of the table's shape that is meant.
 import { readFileSync, writeFileSync } from "node:fs"
 import { describe, expect, it } from "@effect/vitest"
-import { Array as Arr, Effect, Option } from "effect"
+import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as O from "effect/Option"
 import * as Config from "effect/Config"
 import * as Result from "effect/Result"
 import * as S from "effect/Schema"
@@ -38,12 +40,12 @@ const sheetsOf: { readonly [name: string]: ReadonlyArray<string> } = {
 }
 
 const cases: ReadonlyArray<XlsxCase> = [
-  ...Arr.flatMap(fixtureNames, (name) => [
-    { name, bytes: Effect.sync(() => bytesOf(name)), sheet: Option.none<string>() },
-    ...Arr.map(sheetsOf[name] ?? [], (sheet) => ({
+  ...A.flatMap(fixtureNames, (name) => [
+    { name, bytes: Effect.sync(() => bytesOf(name)), sheet: O.none<string>() },
+    ...A.map(sheetsOf[name] ?? [], (sheet) => ({
       name: `${name} sheet ${sheet}`,
       bytes: Effect.sync(() => bytesOf(name)),
-      sheet: Option.some(sheet)
+      sheet: O.some(sheet)
     }))
   ]),
   ...builtCases(bytesOf)
@@ -75,8 +77,8 @@ describe("@beep/xlsx reads every workbook as the SheetJS reader did", () => {
   it.effect("and reads the rows a sheet's declared extent leaves out", () =>
     Effect.gen(function* () {
       const bytes = yield* lyingExtent
-      const table = yield* readXlsx({ fileName: "lying.xlsx", bytes, sheet: Option.none(), notes: [] })
-      expect(Arr.map(table.rows, (row) => row.rowNumber)).toEqual([2, 3, 4, 5])
+      const table = yield* readXlsx({ fileName: "lying.xlsx", bytes, sheet: O.none(), notes: [] })
+      expect(A.map(table.rows, (row) => row.rowNumber)).toEqual([2, 3, 4, 5])
     })
   )
 })

@@ -1,7 +1,8 @@
 // An import as the screens read it: its view, its result row by row, its history of confirms and take-backs, what
 // a take-back would do, the open and the past imports, and the changed values the activity view lists. Every number
 // here is read back from what is stored.
-import { Option, Tuple } from "effect"
+import * as O from "effect/Option"
+import * as Tuple from "effect/Tuple"
 import * as S from "effect/Schema"
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import { AnsweredBy } from "../Answer/AnsweredBy.read.ts"
@@ -132,8 +133,8 @@ export const RowOutcome = OutcomeKind.mapMembers(() =>
 export type RowOutcome = typeof RowOutcome.Type
 
 /** The row's reason, for the two outcomes that have one. */
-export const outcomeReasonOf = (row: RowOutcome): Option.Option<string> =>
-  row.outcome === "already" || row.outcome === "notImported" ? Option.some(row.reason) : Option.none()
+export const outcomeReasonOf = (row: RowOutcome): O.Option<string> =>
+  row.outcome === "already" || row.outcome === "notImported" ? O.some(row.reason) : O.none()
 
 /**
  * The outcome a stored row says, from the columns `importOutcome` keeps: every outcome has every column there, so
@@ -141,7 +142,7 @@ export const outcomeReasonOf = (row: RowOutcome): Option.Option<string> =>
  */
 export const outcomeOf = (stored: {
   readonly rowNumber: number
-  readonly part: Option.Option<number>
+  readonly part: O.Option<number>
   readonly sku: string
   readonly name: string
   readonly outcome: OutcomeKind

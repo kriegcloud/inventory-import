@@ -6,7 +6,10 @@
  */
 import type { Activity } from "@inventory/kernel/Activity"
 import type { OrganizationId } from "@inventory/kernel/Ids"
-import { Context, Effect, Layer, Ref } from "effect"
+import * as Context from "effect/Context"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Ref from "effect/Ref"
 import * as A from "effect/Array"
 import { $AccessModelId } from "../internal/identity.ts"
 import { AccessMemoryRef } from "../internal/memory.ts"

@@ -1,7 +1,8 @@
 // The table assistant's audit line, on D1.
-import { Effect, Layer } from "effect"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
 import { AssistantLog } from "@inventory/catalog-model/AssistantLog"
-import { SqlClient } from "effect/sql"
+import * as SqlClient from "effect/sql/SqlClient"
 import { D1 } from "@beep/d1/D1"
 import { auditLine, lineOf } from "./internal/auditLine.ts"
 import { Activity } from "@inventory/kernel/Activity"

@@ -1,6 +1,10 @@
 import { expect, layer } from "@effect/vitest"
-import { Array as Arr, Effect, Formatter, Layer, Tracer } from "effect"
-import { HttpApiTest } from "effect/http-api"
+import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as Formatter from "effect/Formatter"
+import * as Layer from "effect/Layer"
+import * as Tracer from "effect/Tracer"
+import * as HttpApiTest from "effect/http-api/HttpApiTest"
 import { Api } from "../../src/api/v1/Api.ts"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
@@ -52,8 +56,8 @@ layer(
       })
       yield* client.system.status()
       // `Members.findById` is the identity lookup itself: it runs before there is an actor to name.
-      const services = Arr.filter(ended, (span) => /^(Activities|TableAssistant|Ai)\./.test(span.name))
-      expect(Arr.map(services, (span) => span.name)).toEqual([
+      const services = A.filter(ended, (span) => /^(Activities|TableAssistant|Ai)\./.test(span.name))
+      expect(A.map(services, (span) => span.name)).toEqual([
         "Activities.recent",
         "TableAssistant.view",
         "Activities.count"

@@ -5,7 +5,7 @@ import { describe, expect, it } from "@effect/vitest"
 import { ImportId } from "@inventory/catalog-contract/Ids"
 import { rowsAbout, savedRows } from "@inventory/catalog-model/Upload"
 import { progressOf, rowsOf, type UploadState } from "@inventory/catalog-web/UploadMachine"
-import { Array as Arr } from "effect"
+import * as A from "effect/Array"
 import * as S from "effect/Schema"
 import { chunkRows } from "@inventory/catalog-contract/Upload"
 
@@ -76,11 +76,11 @@ describe("progress", () => {
       acknowledged: S.Array(S.Int.check(S.isBetween({ minimum: 0, maximum: 11 }))).check(S.isMaxLength(40))
     },
     ({ sizes, acknowledged }) => {
-      const rows = Arr.reduce(sizes, 0, (a, b) => a + b)
-      const seen = Arr.filter(acknowledged, (seq) => seq < sizes.length)
+      const rows = A.reduce(sizes, 0, (a, b) => a + b)
+      const seen = A.filter(acknowledged, (seq) => seq < sizes.length)
       expect(savedRows({ chunkSizes: sizes, acknowledged: seen })).toBeLessThanOrEqual(rows)
       // Every piece acknowledged, in any order and any number of times: exactly the file's rows.
-      const all = [...seen, ...Arr.makeBy(sizes.length, (seq) => seq)]
+      const all = [...seen, ...A.makeBy(sizes.length, (seq) => seq)]
       expect(savedRows({ chunkSizes: sizes, acknowledged: all })).toBe(rows)
     }
   )

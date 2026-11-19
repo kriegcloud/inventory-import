@@ -1,7 +1,8 @@
 // The table assistant's one trace: an audit line when a model answered. It changes nothing else, so this port has
 // one method and no read.
 import type { Activity } from "@inventory/kernel/Activity"
-import { Context, type Effect } from "effect"
+import * as Context from "effect/Context"
+import type * as Effect from "effect/Effect"
 
 /** Where the table assistant's audit line goes. */
 export class AssistantLog extends Context.Service<

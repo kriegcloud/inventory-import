@@ -4,7 +4,7 @@
  * @packageDocumentation
  */
 import { CurrentActor } from "@inventory/kernel/Actor"
-import { Effect } from "effect"
+import * as Effect from "effect/Effect"
 import { AuditTrailStore } from "./AuditTrailStore.store.ts"
 
 /**

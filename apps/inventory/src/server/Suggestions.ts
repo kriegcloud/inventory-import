@@ -12,7 +12,19 @@ import type { AnsweredBy } from "../api/v1/Api.ts"
 import { AgentRun } from "@inventory/kernel/AgentRun"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { type Member } from "@inventory/kernel/Member"
-import { type NewSuggestion, Suggestion } from "../domain/ItemImport.ts"
+import {
+  Field,
+  type NewSuggestion,
+  storedSuggestion,
+  suggestedByModel,
+  suggestedByRule,
+  type Suggestion,
+  SuggestionByKind,
+  suggestionFromStored,
+  SuggestionKind,
+  suggestionToStored
+} from "../domain/ItemImport.ts"
+import { LiteralKit } from "@beep/schema/LiteralKit"
 import {
   answerByRules,
   digest,
@@ -83,7 +95,7 @@ export const propose = Effect.fn("Suggestions.propose")(function* (input: {
   // One call from the day's allowance, taken before the call is made, and only when there is a model to ask.
   const allowed = modelIsOn(openRouter.status) ? yield* input.take : true
   const byRules = (reason: string): Proposed => {
-    const checked = guard({ source: input.source, answer: answerByRules(asked), by: "rule", model: null })
+    const checked = guard({ source: input.source, answer: answerByRules(asked), by: suggestedByRule })
     return {
       suggestions: checked.suggestions,
       answeredBy: { _tag: "Rules", reason },
@@ -107,7 +119,7 @@ export const propose = Effect.fn("Suggestions.propose")(function* (input: {
     const why = answer.answeredBy._tag === "Rules" ? answer.answeredBy.reason : "No model answered."
     return byRules(`${why} The rules answered instead.`)
   }
-  const checked = guard({ source: input.source, answer: answer.value, by: "model", model: answer.answeredBy.model })
+  const checked = guard({ source: input.source, answer: answer.value, by: suggestedByModel(answer.answeredBy.model) })
   const proposed: Proposed = {
     suggestions: checked.suggestions,
     answeredBy: answer.answeredBy,
@@ -116,12 +128,21 @@ export const propose = Effect.fn("Suggestions.propose")(function* (input: {
   return proposed
 })
 
+// A suggestion as its table's columns hold it; `suggestionFromStored` reads it and `suggestionToStored` writes it.
 const Stored = S.Struct({
-  ...Suggestion.fields,
-  rowId: S.String.annotateKey({ description: "The row's id; empty for a column" })
+  id: S.String,
+  kind: SuggestionKind,
+  rowId: S.String,
+  rowNumber: S.NullOr(S.Int),
+  field: Field,
+  from: S.String,
+  to: S.String,
+  column: S.NullOr(S.Int),
+  by: SuggestionByKind,
+  model: S.NullOr(S.String),
+  confidence: LiteralKit(["medium", "low"]),
+  basis: S.String
 }).annotate({ description: "A suggestion as its table holds it: the row id is empty, not null, for a column" })
-
-const toSuggestion = (row: typeof Stored.Type): Suggestion => ({ ...row, rowId: row.rowId === "" ? null : row.rowId })
 
 /** The suggestions of an import: reading them for the review, and asking for more. */
 export class Suggestions extends Context.Service<
@@ -200,7 +221,7 @@ export class Suggestions extends Context.Service<
 
       const list = Effect.fn("Suggestions.list")(function* (organizationId: OrganizationId, importId: string) {
         const rows = yield* findAll({ org: organizationId, id: importId })
-        return Arr.map(rows, toSuggestion)
+        return Arr.getSomes(Arr.map(rows, suggestionFromStored))
       }, Effect.orDie)
 
       const suggest = Effect.fn("Suggestions.suggest")(function* (
@@ -222,7 +243,7 @@ export class Suggestions extends Context.Service<
         const at = DateTime.formatIso(now)
         const rows = yield* Effect.forEach(
           proposed.suggestions,
-          (suggestion) => Effect.map(random.uuidV4(), (id) => ({ ...suggestion, id, rowId: suggestion.rowId ?? "" })),
+          (made) => Effect.map(random.uuidV4(), (id) => storedSuggestion({ id, made })),
           { concurrency: 1 }
         )
         const activity = yield* random.uuidV4()
@@ -239,15 +260,18 @@ export class Suggestions extends Context.Service<
             at
           }),
           ...Arr.map(rows, (row) =>
-            insert({ org: actor.organizationId, importId: input.importId, actor: actor.id, at, row })
+            insert({
+              org: actor.organizationId,
+              importId: input.importId,
+              actor: actor.id,
+              at,
+              row: suggestionToStored(row)
+            })
           )
         ])
         // Only the rows this batch wrote: one another request stored first is not counted as made here.
         const written = Arr.flatMap(Arr.drop(answers, 1), (rowsBack) => Arr.map(rowsBack, (row) => row.id))
-        const made = Arr.map(
-          Arr.filter(rows, (row) => Arr.contains(written, row.id)),
-          toSuggestion
-        )
+        const made = Arr.filter(rows, (row) => Arr.contains(written, row.id))
         return { made, answeredBy: proposed.answeredBy, lines: proposed.lines }
       }, Effect.orDie)
 

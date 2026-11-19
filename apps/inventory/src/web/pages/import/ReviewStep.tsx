@@ -28,7 +28,8 @@ import {
   ruleFixes,
   type SavedDecisions,
   type StagedTable,
-  matchedColumn
+  matchedColumn,
+  type Suggestion
 } from "../../../domain/ItemImport.ts"
 import { WhyFlagged } from "./WhyFlagged.tsx"
 import { DimensionsForm, VendorsForm } from "./CellForms.tsx"
@@ -284,9 +285,8 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
   ]
   // A file column suggested for a field that still has none: offered, matched only when the person presses it.
   const columnSuggestions = view.suggestions.filter(
-    (suggestion) =>
+    (suggestion): suggestion is Extract<Suggestion, { readonly kind: "column" }> =>
       suggestion.kind === "column" &&
-      suggestion.column !== null &&
       current.mapping.some((matched) => matched.field === suggestion.field && Option.isNone(matchedColumn(matched)))
   )
   const answered =
@@ -311,12 +311,11 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
             size="xs"
             disabled={match.isPending}
             onClick={() => {
-              if (suggestion.column === null) return
               matching.current = true
               match.mutate({ field: suggestion.field, column: suggestion.column })
             }}
           >
-            Use column “{suggestion.to}” for {fieldLabels[suggestion.field]}
+            Use column “{suggestion.heading}” for {fieldLabels[suggestion.field]}
           </Button>
         ))}
         {suggested === undefined || suggest.isPending ? null : (

@@ -18,6 +18,8 @@ import {
   type ReviewedRow,
   type StagedTable,
   type Suggestion,
+  type SuggestionBy,
+  type SuggestionKind,
   suggestionFits,
   matchedColumn
 } from "./ItemImport.ts"
@@ -61,7 +63,7 @@ export type SuggestSource = {
 }
 
 const has = (source: SuggestSource, row: ReviewedRow, field: Field): boolean =>
-  Arr.some(source.suggestions, (s) => s.rowId === row.id && s.field === field)
+  Arr.some(source.suggestions, (s) => s.kind !== "column" && s.rowId === row.id && s.kind === field)
 
 const open = (row: ReviewedRow, kind: "missing" | "category", field: Field): boolean =>
   Arr.some(row.problems, (problem) => problem.kind === kind && problem.field === field && problem.proposal === null)
@@ -174,16 +176,15 @@ export type Refused = { readonly what: string; readonly why: string }
  * medium: a model's own rating is not asked for and would not be used. The basis is counted here too.
  *
  * @example
- * guard({ source, answer: { names: [], categories: [{ rowNumber: 40, category: "widgets" }], columns: [] }, by: "model", model: "m" })
+ * guard({ source, answer: { names: [], categories: [{ rowNumber: 40, category: "widgets" }], columns: [] }, by: suggestedByModel("m") })
  * // { suggestions: [], refused: [{ what: 'Category "widgets" for row 40', why: "It is not one of the 5 categories." }] }
  */
 export const guard = (input: {
   readonly source: SuggestSource
   readonly answer: SuggestAnswer
-  readonly by: "model" | "rule"
-  readonly model: string | null
+  readonly by: SuggestionBy
 }): { readonly suggestions: ReadonlyArray<NewSuggestion>; readonly refused: ReadonlyArray<Refused> } => {
-  const { source, by, model } = input
+  const { source, by } = input
   const asked = digest(source)
   const rows = source.review.rows
   const rowOf = (rowNumber: number): Option.Option<ReviewedRow> =>
@@ -209,20 +210,17 @@ export const guard = (input: {
       const description = Str.trim(row.value.file.description)
       const told = words(description)
       // Medium only when every word of the name is a word of the description: then it says nothing the file does not.
-      const drawn = by === "model" && Arr.every(words(to), (word) => Arr.contains(told, word))
+      const drawn = by.kind === "model" && Arr.every(words(to), (word) => Arr.contains(told, word))
       return yes({
         kind: "name",
         rowId: row.value.id,
         rowNumber: row.value.rowNumber,
-        field: "name",
         from: row.value.file.name,
         to,
-        column: null,
         by,
-        model,
         confidence: drawn ? "medium" : "low",
         basis: `Name is empty on row ${row.value.rowNumber}; its description says "${Str.slice(0, 200)(description)}"${
-          by === "rule"
+          by.kind === "rule"
             ? ", and the name is its first words."
             : drawn
               ? ", and every word of the name is in it."
@@ -260,12 +258,9 @@ export const guard = (input: {
         kind: "category",
         rowId: row.value.id,
         rowNumber: row.value.rowNumber,
-        field: "category",
         from: row.value.file.category,
         to: to.value,
-        column: null,
         by,
-        model,
         confidence: kin.length >= 2 && agree * 2 > kin.length ? "medium" : "low",
         basis:
           kin.length === 0
@@ -292,14 +287,10 @@ export const guard = (input: {
       const total = source.review.counts.fileRows
       return yes({
         kind: "column",
-        rowId: null,
-        rowNumber: null,
         field: field.value,
-        from: "",
-        to: column.value.label,
         column: column.value.index,
+        heading: column.value.label,
         by,
-        model,
         confidence: column.value.filled * 2 > total ? "medium" : "low",
         basis: `No heading matched ${fieldLabels[field.value]}; "${column.value.label}" has a value on ${column.value.filled} of ${plural(total, "row", "rows")}${Option.match(
           shown,
@@ -331,7 +322,7 @@ export const suggestLines = (input: {
   readonly asked: SuggestDigest
   readonly by: "model" | "rule"
 }): ReadonlyArray<string> => {
-  const count = (kind: Suggestion["kind"]): number => Arr.filter(input.made, (s) => s.kind === kind).length
+  const count = (kind: SuggestionKind): number => Arr.filter(input.made, (s) => s.kind === kind).length
   const made = [
     { n: count("name"), words: ["name", "names"] as const, from: " from the description" },
     { n: count("category"), words: ["category", "categories"] as const, from: "" },

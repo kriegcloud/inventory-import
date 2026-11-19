@@ -257,3 +257,19 @@ None.
     a decimal comma ..." and the answer `"change":{"how":"acceptedProposal",...,"source":"rule",...,
     "confidence":"medium"},"decidedByName":"Dana Whitfield"`. Not seen on screen: a typed value in Decisions.
 
+- **catalog (f), second half: `Suggestion`.** A stored suggestion is one of `name` and `category`
+  (`{ id, rowId, rowNumber, from, to, by, confidence, basis }`) or `column`
+  (`{ id, field, column, heading, by, confidence, basis }`), by `kind`; who made it is `by`:
+  `model { model }` or `rule`. A suggestion for a row's cell has no column and one for a column has no row, so the
+  five nullable keys of the old struct are gone.
+  - The table `importSuggestion` is not changed: `suggestionToStored` and `suggestionFromStored`
+    (`src/domain/ItemImport.ts`) write and read its columns (an empty `rowId` and the heading in `toValue` for a
+    column). A stored row that says no whole suggestion (a column with no position) is not listed.
+  - `guard` takes `by: SuggestionBy` in place of `by` and `model`; `storedSuggestion({ id, made })` gives a new
+    suggestion its id. A proposal on a row still says `by: "model" | "rule"`.
+  - Read on screen, fresh database, model on: "Suggest fixes" on the messy sample: "Suggested 2 names. Suggested 2
+    categories. Answered by the model anthropic/claude-haiku-5.5."; the answer's first entry
+    `{"kind":"name","rowId":"row-7","rowNumber":7,"from":"","to":"Nylon Coil","by":{"kind":"model","model":...},
+    "confidence":"medium",...}`. After a refresh, "Cannot import 21", row 7 reads "was empty proposed Nylon Coil
+    (suggested by the model)"; "Use Nylon Coil for row 7" pressed: "Import 156, skip 44", "Cannot import 20". Not
+    seen on screen: a suggested column (the samples leave no required field without a column).

@@ -4,7 +4,14 @@
 import { describe, expect, it, layer } from "@effect/vitest"
 import { Array as Arr, Effect, Option, Record as Rec, Ref } from "effect"
 import messy from "../../public/samples/items_messy.csv?raw"
-import { decisionFromFlags, review, type RowDecisionFlags, type Suggestion } from "../../src/domain/ItemImport.ts"
+import {
+  decisionFromFlags,
+  review,
+  type RowDecisionFlags,
+  storedSuggestion,
+  suggestedByModel,
+  type Suggestion
+} from "../../src/domain/ItemImport.ts"
 import { digest, guard, type SuggestSource } from "../../src/domain/Suggest.ts"
 import { ModelId } from "@beep/openrouter/OpenRouterModel"
 import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
@@ -39,8 +46,7 @@ describe("the guard", () => {
       expect(Arr.map(digest(source).rowsWithoutCategory, (row) => row.rowNumber)).toEqual([40, 116])
       const checked = guard({
         source,
-        by: "model",
-        model: "scripted/model",
+        by: suggestedByModel("scripted/model"),
         answer: {
           names: [
             {
@@ -61,7 +67,9 @@ describe("the guard", () => {
           columns: [{ field: "sku", heading: "Internal Notes" }]
         }
       })
-      expect(Arr.map(checked.suggestions, (s) => [s.rowNumber, s.field, s.to, s.by])).toEqual([
+      expect(
+        Arr.map(checked.suggestions, (s) => (s.kind === "column" ? [] : [s.rowNumber, s.kind, s.to, s.by.kind]))
+      ).toEqual([
         [83, "name", "Copper Plate 1/4in", "model"],
         [116, "category", "packaging", "model"]
       ])
@@ -85,11 +93,12 @@ describe("a stored suggestion", () => {
       const blank = yield* sourceOf()
       const made = guard({
         source: blank,
-        by: "model",
-        model: "scripted/model",
+        by: suggestedByModel("scripted/model"),
         answer: { names: [{ rowNumber: 7, name: "Nylon Coil" }], categories: [], columns: [] }
       }).suggestions
-      const stored = Arr.map(made, (suggestion, index): Suggestion => ({ ...suggestion, id: `sug_${index}` }))
+      const stored = Arr.map(made, (suggestion, index): Suggestion =>
+        storedSuggestion({ id: `sug_${index}`, made: suggestion })
+      )
       const waiting = yield* sourceOf(stored)
       const row = rowOf(waiting, 7)
       expect([row.outcome, row.values.name, row.item, row.changes]).toEqual(["cannot", "", null, []])
@@ -122,7 +131,9 @@ layer(OpenRouterTest.off("noKey", ModelId.make("test/model")))("with no model", 
       expect(proposed.answeredBy._tag).toBe("Rules")
       const calls = yield* Ref.get(taken)
       expect(calls).toBe(0)
-      expect(Arr.map(proposed.suggestions, (s) => [s.rowNumber, s.to, s.by, s.confidence])).toEqual([
+      expect(
+        Arr.map(proposed.suggestions, (s) => (s.kind === "column" ? [] : [s.rowNumber, s.to, s.by.kind, s.confidence]))
+      ).toEqual([
         [7, "Nylon Coil", "rule", "low"],
         [83, "Copper Plate 1/4in", "rule", "low"]
       ])
@@ -152,7 +163,9 @@ layer(scripted.layer)("with a model", (it) => {
         )
       })
       expect([proposed.answeredBy._tag, yield* Ref.get(taken)]).toEqual(["Model", 1])
-      expect(Arr.map(proposed.suggestions, (s) => [s.rowNumber, s.to, s.by, s.confidence])).toEqual([
+      expect(
+        Arr.map(proposed.suggestions, (s) => (s.kind === "column" ? [] : [s.rowNumber, s.to, s.by.kind, s.confidence]))
+      ).toEqual([
         [7, "Nylon Coil", "model", "medium"],
         [40, "finished-goods", "model", "low"]
       ])
@@ -163,7 +176,7 @@ layer(scripted.layer)("with a model", (it) => {
       ])
       const usedUp = yield* propose({ source, fileName: "items_messy.csv", take: Effect.succeed(false) })
       expect(usedUp.answeredBy).toMatchObject({ _tag: "Rules", reason: expect.stringContaining("AI calls are used") })
-      expect(Arr.every(usedUp.suggestions, (s) => s.by === "rule")).toBe(true)
+      expect(Arr.every(usedUp.suggestions, (s) => s.by.kind === "rule")).toBe(true)
     })
   )
 })

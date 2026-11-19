@@ -16,7 +16,7 @@ from: explorations/ideal-architecture
 | 3 | `@beep/d1` with `D1Test`; the app switched; proof | done |
 | 4 | `@beep/better-auth`; the app switched; proof with sign-out and sign-in | done |
 | 5 | `@beep/openrouter`; the AI SDK removed; proof with and without a model | done |
-| 6 | Closing note | todo |
+| 6 | Closing note | done |
 
 ## Current blocker
 
@@ -116,4 +116,36 @@ Where the brief left a choice open, or the code showed the brief could not be fo
   anthropic/claude-haiku-5.5", agent "Table assistant"; the allowance counted every attempt (6 `view` calls, three of
   them before the strict fix). With `AI_ENABLED=false`: status "AI suggestions are off: AI_ENABLED is set to false.";
   "sort by name descending" set `?sort=name.desc` and said "Answered by Rules".
+
+## Closing note
+
+The app now runs on four packages of its own beside the format packages: `@inventory/kernel` (`d4233ec`), `@beep/d1`
+(`03b1a8b`), `@beep/better-auth` (`f076416`) and `@beep/openrouter` (`3395a1f`), each under the full strict profile
+with no override, and the app was proved after each one by the full check, the build and the messy sample through
+Confirm in a browser. Test counts on the last commit: kernel 26, d1 8, better-auth 12, openrouter 26, app 215 fast and
+45 slow.
+
+What was learned:
+
+- The browser found what no test did: Claude through OpenRouter fences its JSON unless the schema is sent strict. A
+  scripted model cannot show that; one live call per model change should stay part of the proof.
+- The vendored `LiteralKit` pulls Node types into anything the Worker compiles; until `@beep/schema` imports
+  `@beep/utils/Array` upstream, Worker-side packages use `S.Literals` and `S.toTaggedUnion` directly.
+- `$I` identifiers name OpenAPI components by their whole path; `Document.ts` shortens them. Any context that moves
+  schemas with identity annotations into the contract relies on that pass.
+
+What the contexts goal (step 7) should know:
+
+- Import `CurrentActor`, `requireRole`, `Identity`, `SameOrigin`, `Member`, ids and `Activity` from `@inventory/kernel`;
+  the implementations (`SessionIdentityLive`, `IdentityLive`, `SameOriginLive`, `SignIn.ts`, `Model.ts`) are app
+  composition and move to the hosts that own them.
+- Host stores take `D1` from `@beep/d1/D1` (`D1.statement`, `run`, `batch`); slow tests take `D1Test` with the app's
+  migrations folder, and seeds as `D1Test.seed(url)` layers.
+- Still to move with their contexts (decision "rules reach"): the contract's `instant()` string fields onto kernel
+  `Instant`, `SessionState`'s status and nullable actor (one struct with parts per case) onto a tagged union, the
+  people contract's `memberId` path parameter onto `MemberId`, and the model-status wire types (`AiStatus`,
+  `AnsweredBy`, `AiUnavailable`, `modelSentences`) into whichever context owns the model features.
+- `Activity.agent` is an `Option` now; a screen that shows the agent reads `Option`.
+- `TableAssistant` says "No AI key is set, so the rules answered." even when `AI_ENABLED=false` is the reason (it was
+  so before this goal); its sentence could come from `aiStatusOf(...).reason`.
 

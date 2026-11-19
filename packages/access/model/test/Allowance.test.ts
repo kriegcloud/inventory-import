@@ -5,10 +5,12 @@ import { AllowanceAnswer, dailyModelCalls, ModelAllowanceGateway } from "@invent
 import { ModelAllowanceGatewayLive } from "@inventory/access-model/AllowanceHandler"
 import { windowStart } from "@inventory/access-model/AllowanceRules"
 import { accessMemory } from "@inventory/access-model/Memory"
-import { DateTime, Effect, Layer } from "effect"
-import { SecureRandom } from "effect/crypto"
+import * as DateTime from "effect/DateTime"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as SecureRandom from "effect/crypto/SecureRandom"
 import * as A from "effect/Array"
-import { TestClock } from "effect/testing"
+import * as TestClock from "effect/testing/TestClock"
 import { as, dana, elena, marcus, seed } from "./support.ts"
 
 const App = ModelAllowanceGatewayLive.pipe(

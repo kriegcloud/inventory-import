@@ -9,7 +9,8 @@ import { OrganizationId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
 import { Role } from "@inventory/kernel/Role"
 import { DisplayName } from "@inventory/kernel/Text"
-import { Option, Tuple } from "effect"
+import * as O from "effect/Option"
+import * as Tuple from "effect/Tuple"
 import * as S from "effect/Schema"
 import { nullAsNone } from "@inventory/kernel/Wire"
 import { $AccessContractId } from "../internal/identity.ts"
@@ -214,10 +215,10 @@ export type SessionState = typeof SessionState.Type
  *
  * ```ts
  * import { actorOfSession, SignedOut } from "@inventory/access-contract/SessionState"
- * actorOfSession(SignedOut.make({ features })) // Option.none()
+ * actorOfSession(SignedOut.make({ features })) // O.none()
  * ```
  *
  * @category getters
  */
-export const actorOfSession = (state: SessionState): Option.Option<Member> =>
-  state.status === "ready" ? Option.some(state.actor) : Option.none()
+export const actorOfSession = (state: SessionState): O.Option<Member> =>
+  state.status === "ready" ? O.some(state.actor) : O.none()

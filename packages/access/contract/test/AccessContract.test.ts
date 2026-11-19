@@ -15,7 +15,7 @@ import {
   SignInFeatures,
   TestAccount
 } from "@inventory/access-contract/SessionState"
-import { Effect } from "effect"
+import * as Effect from "effect/Effect"
 import * as Arbitrary from "effect/Arbitrary"
 import * as O from "effect/Option"
 import * as R from "effect/Record"

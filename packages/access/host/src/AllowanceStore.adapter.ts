@@ -6,9 +6,11 @@
  */
 import { D1 } from "@beep/d1/D1"
 import { AllowanceStore, Reservation } from "@inventory/access-model/AllowanceStore"
-import { Array as Arr, Effect, Layer } from "effect"
+import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
 import * as S from "effect/Schema"
-import { SqlClient } from "effect/sql"
+import * as SqlClient from "effect/sql/SqlClient"
 
 /** A reservation as the statement binds it: its two moments as the ISO text the `modelCall` table holds. */
 const ReservationRow = S.Struct({
@@ -41,7 +43,7 @@ export const AllowanceStoreD1: Layer.Layer<AllowanceStore, never, SqlClient.SqlC
     return AllowanceStore.of({
       take: Effect.fn("ModelCalls.take")(function* (reservation: Reservation) {
         const rows = yield* run(reserve(reservation))
-        return Arr.isReadonlyArrayNonEmpty(rows)
+        return A.isReadonlyArrayNonEmpty(rows)
       }, Effect.orDie)
     })
   })

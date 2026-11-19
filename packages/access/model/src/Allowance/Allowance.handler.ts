@@ -11,8 +11,10 @@ import {
   usedUp
 } from "@inventory/access-contract/ModelAllowance"
 import { CurrentActor } from "@inventory/kernel/Actor"
-import { DateTime, Effect, Layer } from "effect"
-import { SecureRandom } from "effect/crypto"
+import * as DateTime from "effect/DateTime"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as SecureRandom from "effect/crypto/SecureRandom"
 import { windowStart, usedUpSentence } from "./Allowance.rules.ts"
 import { AllowanceStore, Reservation } from "./AllowanceStore.store.ts"
 

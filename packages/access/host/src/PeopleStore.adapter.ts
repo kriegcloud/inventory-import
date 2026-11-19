@@ -13,9 +13,12 @@ import { Account, AddWrite, PeopleStore, RemoveWrite, RoleWrite } from "@invento
 import { MemberId, OrganizationId, UserId } from "@inventory/kernel/Ids"
 import { Role } from "@inventory/kernel/Role"
 import { DisplayName, Instant } from "@inventory/kernel/Text"
-import { Effect, Layer, Option } from "effect"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as O from "effect/Option"
 import * as S from "effect/Schema"
-import { SqlClient, SqlSchema } from "effect/sql"
+import * as SqlClient from "effect/sql/SqlClient"
+import * as SqlSchema from "effect/sql/SqlSchema"
 import { auditLine } from "./internal/auditLine.ts"
 
 const Scope = S.Struct({ org: OrganizationId, id: MemberId }).annotate({
@@ -149,8 +152,8 @@ export const PeopleStoreD1: Layer.Layer<PeopleStore, never, SqlClient.SqlClient 
         }
         const person = yield* find({ organization: org, member: write.member })
         // Removed again between the write and the read: reported as a member who is no longer there.
-        return Option.match(person, {
-          onNone: (): AddWrite => AddWrite.cases.alreadyMember.make({ existing: Option.none() }),
+        return O.match(person, {
+          onNone: (): AddWrite => AddWrite.cases.alreadyMember.make({ existing: O.none() }),
           onSome: (added): AddWrite => AddWrite.cases.added.make({ person: added })
         })
       }),
@@ -161,7 +164,7 @@ export const PeopleStoreD1: Layer.Layer<PeopleStore, never, SqlClient.SqlClient 
           roleLine(write.role, write.before)({ line: write.audit, member: write.member })
         ]).pipe(Effect.orDie)
         const person = yield* find({ organization: org, member: write.member })
-        if (Option.isNone(person)) return RoleWrite.cases.missing.make({})
+        if (O.isNone(person)) return RoleWrite.cases.missing.make({})
         return updated.length === 0
           ? RoleWrite.cases.lastAdmin.make({})
           : RoleWrite.cases.changed.make({ person: person.value })
@@ -177,7 +180,7 @@ export const PeopleStoreD1: Layer.Layer<PeopleStore, never, SqlClient.SqlClient 
         ]).pipe(Effect.orDie)
         if (unlinked.length > 0) return RemoveWrite.cases.removed.make({})
         const still = yield* find({ organization: org, member: write.member })
-        return Option.isSome(still) ? RemoveWrite.cases.lastAdmin.make({}) : RemoveWrite.cases.missing.make({})
+        return O.isSome(still) ? RemoveWrite.cases.lastAdmin.make({}) : RemoveWrite.cases.missing.make({})
       })
     })
   })

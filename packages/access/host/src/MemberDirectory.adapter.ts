@@ -10,9 +10,13 @@ import { MemberId, OrganizationId, UserId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
 import { Role } from "@inventory/kernel/Role"
 import { DisplayName } from "@inventory/kernel/Text"
-import { Array as Arr, Effect, Layer, Option } from "effect"
+import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as O from "effect/Option"
 import * as S from "effect/Schema"
-import { SqlClient, SqlSchema } from "effect/sql"
+import * as SqlClient from "effect/sql/SqlClient"
+import * as SqlSchema from "effect/sql/SqlSchema"
 
 /** One membership row of a test account, as the database holds it. */
 const AccountRow = S.Struct({
@@ -90,7 +94,7 @@ export const MemberDirectoryD1: Layer.Layer<MemberDirectory, never, SqlClient.Sq
       actorFor: Effect.fn("Members.findByUser")(function* (user: SignedInUser) {
         return yield* findMembership({
           userId: user.userId,
-          organizationId: Option.getOrNull(user.active)
+          organizationId: O.getOrNull(user.active)
         }).pipe(Effect.orDie)
       }),
       inOrganization: Effect.fn("Members.inOrganization")(function* (organizationId: OrganizationId) {
@@ -100,17 +104,17 @@ export const MemberDirectoryD1: Layer.Layer<MemberDirectory, never, SqlClient.Sq
         return yield* findOrganizations(userId).pipe(Effect.orDie)
       }),
       testAccounts: Effect.fn("Members.testAccounts")(function* (userIds: ReadonlyArray<UserId>) {
-        if (!Arr.isReadonlyArrayNonEmpty(userIds)) return []
-        const rows = yield* findAccounts(Arr.copy(userIds)).pipe(Effect.orDie)
+        if (!A.isReadonlyArrayNonEmpty(userIds)) return []
+        const rows = yield* findAccounts(A.copy(userIds)).pipe(Effect.orDie)
         // In the order asked for, each with its memberships, earliest first.
-        return Arr.getSomes(
-          Arr.map(userIds, (userId) => {
-            const mine = Arr.filter(rows, (row) => row.userId === userId)
-            return Option.map(Arr.head(mine), (first) =>
+        return A.getSomes(
+          A.map(userIds, (userId) => {
+            const mine = A.filter(rows, (row) => row.userId === userId)
+            return O.map(A.head(mine), (first) =>
               TestAccount.make({
                 email: first.email,
                 name: first.name,
-                memberships: Arr.map(mine, (row) =>
+                memberships: A.map(mine, (row) =>
                   Membership.make({ organizationName: row.organizationName, role: row.role })
                 )
               })

@@ -7,8 +7,8 @@
  */
 import type { CurrentActor } from "@inventory/kernel/Actor"
 import type { CurrentAgent } from "@inventory/kernel/Agent"
-import type { Effect } from "effect"
-import type { SecureRandom } from "effect/crypto"
+import type * as Effect from "effect/Effect"
+import type * as SecureRandom from "effect/crypto/SecureRandom"
 import type { AuditTrailStore } from "./Activity/AuditTrailStore.store.ts"
 import type { AllowanceStore } from "./Allowance/AllowanceStore.store.ts"
 import type { PeopleStore } from "./People/PeopleStore.store.ts"

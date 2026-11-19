@@ -3,7 +3,7 @@
  *
  * @packageDocumentation
  */
-import { Layer } from "effect"
+import * as Layer from "effect/Layer"
 import { AllowanceStoreD1 } from "./AllowanceStore.adapter.ts"
 import { AuditTrailStoreD1 } from "./AuditTrailStore.adapter.ts"
 import { MemberDirectoryD1 } from "./MemberDirectory.adapter.ts"

@@ -4,8 +4,9 @@ import type { ActivityApi, IdentityApi, PeopleApi } from "@inventory/access-cont
 import { type Api, useApi } from "@inventory/client/ApiRuntime"
 import { type OptimisticWrite, useOptimisticWriteVia } from "@inventory/client/Optimistic"
 import type { SameOrigin } from "@inventory/kernel/SameOrigin"
-import { Context } from "effect"
-import type { HttpApiClient, HttpApiMiddleware } from "effect/http-api"
+import * as Context from "effect/Context"
+import type * as HttpApiClient from "effect/http-api/HttpApiClient"
+import type * as HttpApiMiddleware from "effect/http-api/HttpApiMiddleware"
 import { $AccessWebId } from "./internal/identity.ts"
 
 export { accessKeys } from "./Access.keys.ts"

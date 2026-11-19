@@ -4,7 +4,7 @@
  *
  * @packageDocumentation
  */
-import { Layer } from "effect"
+import * as Layer from "effect/Layer"
 import type { AccessPorts } from "./Access.ports.ts"
 import { AuditTrailStore } from "./Activity/AuditTrailStore.store.ts"
 import { AllowanceStore } from "./Allowance/AllowanceStore.store.ts"

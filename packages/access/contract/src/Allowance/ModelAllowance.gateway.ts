@@ -7,7 +7,9 @@
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import type { CurrentActor } from "@inventory/kernel/Actor"
 import { Sentence } from "@inventory/kernel/Text"
-import { Context, type Effect, Tuple } from "effect"
+import * as Context from "effect/Context"
+import type * as Effect from "effect/Effect"
+import * as Tuple from "effect/Tuple"
 import * as S from "effect/Schema"
 import { $AccessContractId } from "../internal/identity.ts"
 

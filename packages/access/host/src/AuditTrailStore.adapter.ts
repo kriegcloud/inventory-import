@@ -7,9 +7,12 @@
 import { AuditTrailStore } from "@inventory/access-model/AuditTrailStore"
 import { Activity } from "@inventory/kernel/Activity"
 import { OrganizationId } from "@inventory/kernel/Ids"
-import { Effect, Layer, Option } from "effect"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as O from "effect/Option"
 import * as S from "effect/Schema"
-import { SqlClient, SqlSchema } from "effect/sql"
+import * as SqlClient from "effect/sql/SqlClient"
+import * as SqlSchema from "effect/sql/SqlSchema"
 
 /** How many lines of the audit trail one organization has, as the count query answers it. */
 const ActivityCount = S.Struct({ n: S.Int }).annotate({
@@ -44,7 +47,7 @@ export const AuditTrailStoreD1: Layer.Layer<AuditTrailStore, never, SqlClient.Sq
       }, Effect.orDie),
       count: Effect.fn("Activities.count")(function* (organization: OrganizationId) {
         const found = yield* countOf(organization)
-        return Option.match(found, { onNone: () => 0, onSome: (row) => row.n })
+        return O.match(found, { onNone: () => 0, onSome: (row) => row.n })
       }, Effect.orDie)
     })
   })

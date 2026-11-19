@@ -14,9 +14,9 @@ import { MemberDirectory } from "@inventory/access-model/MemberDirectory"
 import { PeopleStore } from "@inventory/access-model/PeopleStore"
 import { CurrentActor } from "@inventory/kernel/Actor"
 import type { MemberId } from "@inventory/kernel/Ids"
-import { Effect } from "effect"
-import { SecureRandom } from "effect/crypto"
-import { HttpServerRequest } from "effect/http"
+import * as Effect from "effect/Effect"
+import * as SecureRandom from "effect/crypto/SecureRandom"
+import * as HttpServerRequest from "effect/http/HttpServerRequest"
 import { Sessions } from "./SessionIdentity.adapter.ts"
 
 /**

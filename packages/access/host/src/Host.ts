@@ -5,8 +5,8 @@
  * @packageDocumentation
  */
 import { ModelAllowanceGatewayLive } from "@inventory/access-model/AllowanceHandler"
-import { Layer } from "effect"
-import { SecureRandom } from "effect/crypto"
+import * as Layer from "effect/Layer"
+import * as SecureRandom from "effect/crypto/SecureRandom"
 import { AccessAdaptersD1 } from "./Adapters.ts"
 import { Sessions } from "./SessionIdentity.adapter.ts"
 

@@ -9,7 +9,7 @@ import { Button } from "@inventory/ui/components/button"
 import { type RecordColumn, RecordsTable } from "@inventory/ui/components/data-table/data-table-records"
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@inventory/ui/components/item"
 import { ToggleGroup, ToggleGroupItem } from "@inventory/ui/components/toggle-group"
-import { useIsNarrow } from "@inventory/ui/ContentWidth"
+import { isNarrow } from "@inventory/ui/ContentWidth"
 import {
   type JobReview,
   lineColumns,
@@ -67,7 +67,7 @@ const leaveJobAction = Atom.readable((get) => (row: ReviewRow) => {
  * on every row. Switching views unmounts the region; its decisions and its undo come back through `savedDecisions`.
  */
 export function JobsReview() {
-  const narrow = useIsNarrow()
+  const narrow = useAtomValue(isNarrow)
   const [view, setView] = useAtom(jobsView)
   const [filter, setFilter] = useAtom(jobsFilter)
   const [decisions, setDecisions] = useAtom(jobDecisions)

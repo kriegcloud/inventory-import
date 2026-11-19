@@ -11,7 +11,8 @@ import {
   StickyTableRow,
   StickyTableRowHeader
 } from "@inventory/ui/components/sticky-table"
-import { useIsNarrow } from "@inventory/ui/ContentWidth"
+import { useAtomValue } from "@effect/atom-react"
+import { isNarrow } from "@inventory/ui/ContentWidth"
 
 // Skeletons of what is on its way, each drawn in the same boxes as the real thing (the same frame, header row and
 // 36px rows; the same page header; the review's own bands), so nothing on the screen moves when the data arrives.
@@ -85,7 +86,7 @@ function CardsSkeleton(props: { lines: number }) {
  * the page knows them), then rows of grey bars, enough to fill the screen. On a phone, the cards it draws there.
  */
 export function TableSkeleton(props: { caption: string; columns: ReadonlyArray<SkeletonColumn>; rows?: number }) {
-  const narrow = useIsNarrow()
+  const narrow = useAtomValue(isNarrow)
   if (narrow) return <CardsSkeleton lines={Math.min(4, Math.max(1, props.columns.length - 1))} />
   return (
     <DataTableFrameSkeleton
@@ -184,7 +185,7 @@ export const someColumns = (count: number): ReadonlyArray<SkeletonColumn> =>
  * the grid with its header and 36px rows, and the bar with the import button. On a phone, the one-decision queue.
  */
 export function ReviewSkeleton(props: { title?: string }) {
-  const narrow = useIsNarrow()
+  const narrow = useAtomValue(isNarrow)
   const gutter = "px-4 sm:px-9"
   const title =
     props.title === undefined ? (
@@ -263,7 +264,7 @@ export function UploadSkeleton() {
 /** The import's step bar while the import page's code is on its way: the same band, 48px, 56 on a phone. */
 export function StepsSkeleton() {
   // On a desk the steps are in the shell's top bar, so the page has no band to hold a place for.
-  const narrow = useIsNarrow()
+  const narrow = useAtomValue(isNarrow)
   if (!narrow) return null
   return (
     <div className="flex h-14 flex-none items-center gap-4 border-b px-4 sm:px-9 md:h-12">

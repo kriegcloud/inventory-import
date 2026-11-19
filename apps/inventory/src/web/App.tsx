@@ -2,7 +2,8 @@ import { lazy, Suspense } from "react"
 import { AppShell } from "@/components/app/AppShell"
 import { SignedIn } from "@/components/app/SignedIn"
 import { Skeleton } from "@inventory/ui/components/skeleton"
-import { useLocation } from "@inventory/ui/Route"
+import { useAtomValue } from "@effect/atom-react"
+import { location } from "@inventory/ui/Route"
 import { workspace } from "./preload.ts"
 
 // The first download is the sign-in screen and what it needs: React, the query cache, the session request and the
@@ -16,7 +17,7 @@ const ReviewGallery = import.meta.env.DEV ? lazy(() => import("@/pages/ReviewGal
 
 /** The app: the sign-in screen for anyone not signed in, the workspace for a member of an organization. */
 export default function App() {
-  const { path } = useLocation()
+  const { path } = useAtomValue(location)
   if (ReviewGallery !== undefined && path.startsWith("/gallery/review")) {
     return (
       <Suspense fallback={null}>

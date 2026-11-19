@@ -1,5 +1,7 @@
 import { createColumnHelper, type ColumnDef, type FilterFn, type RowData } from "@tanstack/react-table"
-import { type ReactNode, useMemo } from "react"
+import * as MutableHashMap from "effect/MutableHashMap"
+import * as O from "effect/Option"
+import type { ReactNode } from "react"
 import { TableSearch } from "@inventory/ui/TableSearch"
 import { Button } from "@inventory/ui/components/button"
 import { DataTable } from "@inventory/ui/components/data-table/data-table"
@@ -11,7 +13,8 @@ import { DataTablePagination } from "@inventory/ui/components/data-table/data-ta
 import { DataTableToolbar } from "@inventory/ui/components/data-table/data-table-toolbar"
 import type { ColumnSelectOption, DataTableColumnConfig } from "@inventory/ui/components/data-table/data-table-types"
 import { useDataTable } from "@inventory/ui/hooks/use-data-table"
-import { useContentWidth, useIsNarrow } from "@inventory/ui/ContentWidth"
+import { useAtomValue } from "@effect/atom-react"
+import { contentWidth, isNarrow } from "@inventory/ui/ContentWidth"
 
 // A list the page already holds whole (the activity, the people), on the same data table as the Items page: sortable
 // headings, the column toggle, the one search box and the quick filters. The Items page asks the server for each
@@ -101,6 +104,31 @@ const optionsOf = <Row,>(rows: ReadonlyArray<Row>, value: (row: Row) => string |
     .map((text) => ({ label: text === "" ? "Not set" : text, value: text, count: counts[text] ?? 0 }))
 }
 
+// The table's config and its columns are kept for as long as what they are made from is the same, so the vendored
+// table keeps its state (its sort, its page, an open row) across draws. Without a hook: the config by the columns'
+// shape, which a page has a handful of; the columns by the very arrays they are made from, held weakly, so they go
+// with those arrays.
+const configs = MutableHashMap.empty<string, unknown>()
+const configFor = <A,>(shape: string, make: () => A): A =>
+  O.getOrElse(MutableHashMap.get(configs, shape) as O.Option<A>, () => {
+    const made = make()
+    MutableHashMap.set(configs, shape, made)
+    return made
+  })
+
+// Weak, so an entry goes with the columns and rows it was made for; Effect has no weak collection to use instead.
+const madeColumns = new WeakMap<object, WeakMap<object, { readonly flexible: number; readonly made: unknown }>>()
+const columnsFor = <A,>(columns: object, rows: object, flexible: number, make: () => A): A => {
+  const byRows =
+    madeColumns.get(columns) ?? new WeakMap<object, { readonly flexible: number; readonly made: unknown }>()
+  madeColumns.set(columns, byRows)
+  const held = byRows.get(rows)
+  if (held !== undefined && held.flexible === flexible) return held.made as A
+  const made = make()
+  byRows.set(rows, { flexible, made })
+  return made
+}
+
 /**
  * A list the page already holds, as a data table the person sorts from its headings, searches, filters by the
  * values a column has, and narrows to the columns they want; on a page as narrow as a phone, the same rows as cards.
@@ -120,8 +148,8 @@ export function ListTable<Row extends RowData>(props: {
   /** The rows shown are being asked for again (a return to the page, a change being saved): the search box says so. */
   readonly updating?: boolean
 }) {
-  const narrow = useIsNarrow()
-  const room = Math.min(useContentWidth(), props.maxWidth ?? Number.POSITIVE_INFINITY)
+  const narrow = useAtomValue(isNarrow)
+  const room = Math.min(useAtomValue(contentWidth), props.maxWidth ?? Number.POSITIVE_INFINITY)
   const { columns, rows } = props
   // The column without a width takes the room the others leave, never less than `leastFlexible`: only then does
   // the table scroll sideways inside its frame.
@@ -135,25 +163,23 @@ export function ListTable<Row extends RowData>(props: {
         `${column.id}:${column.value !== undefined && column.sortable !== false ? "sort" : ""}:${column.value !== undefined && column.facet === true ? "facet" : ""}`
     )
     .join("|")
-  const config = useMemo(
-    () =>
-      createDataTableConfig({
-        columns: Object.fromEntries(
-          shape.split("|").map((entry): [string, DataTableColumnConfig] => {
-            const [id = "", sorts, facet] = entry.split(":")
-            return [
-              id,
-              { ...(sorts === "" ? { enableSorting: false } : {}), ...(facet === "" ? {} : { variant: "select" }) }
-            ]
-          })
-        ),
-        defaultPageSize: pageSizes[1],
-        pageSizeOptions: pageSizes,
-        enableGlobalFilter: true
-      }),
-    [shape]
+  const config = configFor(shape, () =>
+    createDataTableConfig({
+      columns: Object.fromEntries(
+        shape.split("|").map((entry): [string, DataTableColumnConfig] => {
+          const [id = "", sorts, facet] = entry.split(":")
+          return [
+            id,
+            { ...(sorts === "" ? { enableSorting: false } : {}), ...(facet === "" ? {} : { variant: "select" }) }
+          ]
+        })
+      ),
+      defaultPageSize: pageSizes[1],
+      pageSizeOptions: pageSizes,
+      enableGlobalFilter: true
+    })
   )
-  const tableColumns = useMemo(() => {
+  const tableColumns = columnsFor(columns, rows, flexible, () => {
     const col = createColumnHelper<DataTableFeatures, Row>()
     const first = columns[0]?.id
     return columns.map((column): ColumnDef<DataTableFeatures, Row, unknown> => {
@@ -202,7 +228,7 @@ export function ListTable<Row extends RowData>(props: {
         size
       }) as ColumnDef<DataTableFeatures, Row, unknown>
     })
-  }, [columns, flexible, rows])
+  })
   const first = columns[0]?.id
   const ends = columns.filter((column) => column.end === true).map((column) => column.id)
   const { table } = useDataTable({

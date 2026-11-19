@@ -34,10 +34,10 @@ const initialAtoms = [provideApi(appLayer), provideMember(actor)]
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <ThemeProvider>
-      {/* The atoms' registry, beside the query cache while the screens move to atoms (goals/atoms). An atom nobody reads
+    {/* The atoms' registry, beside the query cache while the screens move to atoms (goals/atoms). An atom nobody reads
         is dropped 400 ms later; a read of the API is kept for `keepUnwatched` (@inventory/client/Api). */}
-      <RegistryProvider initialValues={initialAtoms} defaultIdleTTL={400}>
+    <RegistryProvider initialValues={initialAtoms} defaultIdleTTL={400}>
+      <ThemeProvider>
         <QueryClientProvider client={queryClient}>
           <TooltipProvider delayDuration={300}>
             <App />
@@ -46,7 +46,7 @@ createRoot(document.getElementById("root")!).render(
             <Toaster position="top-center" offset={64} richColors closeButton />
           </TooltipProvider>
         </QueryClientProvider>
-      </RegistryProvider>
-    </ThemeProvider>
+      </ThemeProvider>
+    </RegistryProvider>
   </StrictMode>
 )

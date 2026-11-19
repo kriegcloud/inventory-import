@@ -44,6 +44,7 @@
     "@beep/csv": "workspace:*",
     "@beep/schema": "workspace:*",
     "@beep/xlsx": "workspace:*",
+    "@effect/atom-react": "4.1.4",
     "@inventory/catalog-contract": "workspace:*",
     "@inventory/catalog-model": "workspace:*",
     "@inventory/client": "workspace:*",

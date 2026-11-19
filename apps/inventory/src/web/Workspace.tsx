@@ -17,8 +17,8 @@ import type { ImportId } from "@inventory/catalog-contract/Ids"
 import { importInAddress } from "@inventory/catalog-web/Route"
 import { importTableQuery, importViewQuery, useImportView } from "@inventory/catalog-web/Imports"
 import { queryClient } from "@/lib/queries"
-import { useContentBelow } from "@inventory/ui/ContentWidth"
-import { linkTo, useLocation } from "@inventory/ui/Route"
+import { contentBelow } from "@inventory/ui/ContentWidth"
+import { linkTo, location } from "@inventory/ui/Route"
 
 // Each page is its own chunk, fetched when it is first opened: the shell loads without the review table, the
 // spreadsheet reader or the other pages.
@@ -84,7 +84,7 @@ function Crumbs(props: { page: AppPage; importId: ImportId | undefined }) {
   const fileName = useImportView(props.importId).data?.fileName
   const inImport = props.page.path === "/" && props.importId !== undefined
   // The organization is already named at the top of the sidebar: beside a narrow page the bar keeps its room.
-  const short = useContentBelow(1024)
+  const short = useAtomValue(contentBelow(1024))
   return (
     <Breadcrumb>
       <BreadcrumbList className="flex-nowrap">
@@ -125,7 +125,7 @@ function Crumbs(props: { page: AppPage; importId: ImportId | undefined }) {
  * page beside it. Its own chunk, with the API client and every page's skeleton: the sign-in screen loads without it.
  */
 export default function Workspace() {
-  const { path, params } = useLocation()
+  const { path, params } = useAtomValue(location)
   // The catalog screens mirror the role rule from the member the app provides here, never from a request.
   const { actor } = useAtomValue(sessionView)
   // An address that names no page shows the first one, as before.

@@ -19,6 +19,7 @@ import { DataTableToolbar } from "@inventory/ui/components/data-table/data-table
 import { useDataTable } from "@inventory/ui/hooks/use-data-table"
 import { useMember } from "@inventory/client/CurrentMember"
 import { call } from "./Catalog.runtime.ts"
+import { useAtomValue } from "@effect/atom-react"
 import { contentWidth, useIsNarrow } from "@inventory/ui/ContentWidth"
 import { navigate, useLocation } from "@inventory/ui/Route"
 import { hasRole } from "@inventory/kernel/Role"
@@ -474,7 +475,8 @@ export function ItemsPage() {
   const rows = page.data?.data ?? none
   // The columns shown at first are the ones the page has room for (`fitting`). On a phone the rows are cards, one
   // line a value: there is room for all of them.
-  const [fits] = useState(() => (narrow ? {} : fitting(contentWidth())))
+  const room = useAtomValue(contentWidth)
+  const [fits] = useState(() => (narrow ? {} : fitting(room)))
   // Columns the assistant hid or showed come back after a refresh; the address keeps the sort and the filters.
   const [kept] = useState(() => keptVisibility("Items", actor?.organizationId, actor?.id))
   const catalog = useMemo(() => itemsCatalog(found), [found])

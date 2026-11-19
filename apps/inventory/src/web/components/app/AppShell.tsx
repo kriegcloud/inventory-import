@@ -1,8 +1,9 @@
-import { useAtom, useAtomMount } from "@effect/atom-react"
+import { useAtom } from "@effect/atom-react"
 import type { ReactNode } from "react"
 import { Separator } from "@inventory/ui/components/separator"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@inventory/ui/components/sidebar"
-import { barSlot, contentInsetFollower, sidebarExpanded } from "@/lib/shell"
+import { sidebarExpanded } from "@inventory/ui/ContentWidth"
+import { barSlot } from "@/lib/shell"
 import { BrandMark } from "./BrandMark.tsx"
 import { BarSlotContext } from "@inventory/ui/ShellSlots"
 import { ThemeToggle } from "./ThemeToggle.tsx"
@@ -15,16 +16,6 @@ const skipLink = (
     Skip to content
   </a>
 )
-
-/**
- * Tells the page how much room the sidebar leaves it, so a table knows whether it fits (`@inventory/ui/ContentWidth`),
- * while the shell with a sidebar is on screen: the room is derived from the sidebar's state and the window
- * (`@/lib/shell`), and known before the first draw from the cookie the sidebar keeps.
- */
-function SidebarRoom() {
-  useAtomMount(contentInsetFollower)
-  return null
-}
 
 /**
  * The page frame. Signed in, it is the sidebar beside a slim bar (the sidebar's button, where the person is, the
@@ -59,7 +50,6 @@ export function AppShell(props: {
         className={props.fill === true ? "h-svh overflow-hidden" : undefined}
       >
         {skipLink}
-        <SidebarRoom />
         {props.sidebar}
         {/* min-w-0: a wide table scrolls inside its own frame instead of pushing the page past the screen. */}
         <SidebarInset className={props.fill === true ? "min-h-0 min-w-0 overflow-hidden" : "min-w-0"}>

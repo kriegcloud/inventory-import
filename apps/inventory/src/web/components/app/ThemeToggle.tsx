@@ -1,11 +1,12 @@
 import { MoonIcon, SunIcon } from "lucide-react"
-import { useTheme } from "@inventory/ui/Theme"
+import { useAtomSet, useAtomValue } from "@effect/atom-react"
+import { resolvedTheme, theme } from "@inventory/ui/Theme"
 import { Button } from "@inventory/ui/components/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@inventory/ui/components/tooltip"
 
 export function ThemeToggle() {
-  const { resolvedTheme, setTheme } = useTheme()
-  const next = resolvedTheme === "dark" ? "light" : "dark"
+  const setTheme = useAtomSet(theme)
+  const next = useAtomValue(resolvedTheme) === "dark" ? "light" : "dark"
   return (
     <Tooltip>
       <TooltipTrigger asChild>

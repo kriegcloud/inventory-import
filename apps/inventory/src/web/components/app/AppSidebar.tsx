@@ -45,7 +45,7 @@ import {
 } from "@inventory/ui/components/sidebar"
 import { sessionView, signInAs, signOut, switchOrganization } from "@inventory/access-web/Session"
 import { linkTo, navigate } from "@inventory/ui/Route"
-import { type Theme, useTheme } from "@inventory/ui/Theme"
+import { type Theme, theme as themeChoice } from "@inventory/ui/Theme"
 import { BrandMark } from "./BrandMark.tsx"
 
 /** A page the sidebar links to. `path` is its address; `icon` is all that shows when the sidebar is collapsed. */
@@ -153,7 +153,8 @@ function OrganizationPicker() {
  */
 function UserMenu() {
   const { actor, email, features } = useAtomValue(sessionView)
-  const { theme, setTheme } = useTheme()
+  const theme = useAtomValue(themeChoice)
+  const setTheme = useAtomSet(themeChoice)
   const { isMobile } = useSidebar()
   if (actor === undefined) return null
   const testAccounts = features === undefined ? undefined : O.getOrUndefined(features.testAccounts)

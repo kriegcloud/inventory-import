@@ -1,7 +1,7 @@
 {
-  // The design system's lint: the shared rules for code with screens, except on the vendored components and hooks,
-  // which render native elements and are kept as published.
+  // The design system's lint: the shared rules for code with screens and the atoms rule (goals/atoms), except on the
+  // vendored components and hooks, which render native elements, hold their own React state and are kept as published.
   "$schema": "../../node_modules/@effect/tsgo/oxlint-schema.json",
-  "extends": ["../../.oxlintrc.web.json"],
+  "extends": ["../../.oxlintrc.web.json", "../../.oxlintrc.atoms.json"],
   "ignorePatterns": ["src/components/**", "src/hooks/**", "dist/**"]
 }

@@ -16,7 +16,7 @@ from: explorations/ideal-architecture
 | 2 | `@inventory/client`: the runtime, the API atoms with typed failures, the optimistic write as an atom, `member` | done |
 | 3 | `@inventory/access-web`: the session (`actor`), sign-in, People, the audit events | done |
 | 4 | The app's shell: the content width, the development sign-in, the Activity page | done |
-| 5 | `@inventory/ui`'s own pieces: the theme, the table search, content width, the run log | todo |
+| 5 | `@inventory/ui`'s own pieces: the theme, the table search, content width, the run log | done |
 | 6 | `@inventory/catalog-web`: the upload, the Items page and its editor, the assistant, the import's steps | todo |
 | 7 | `@inventory/review`: the region's state with undo, saved progress, the grid, the queue; the A6 remodel | todo |
 | 8 | TanStack Query removed (A2); the lint everywhere; the documents the move made false | todo |
@@ -63,6 +63,10 @@ After each package, the same count:
   It calls `useAtomValue` 11, `useAtom` 8, `useAtomSet` 2, `useAtomMount` 1, `useAtomRefresh` 2, and still `ui`'s own
   `useContentBelow`, `useIsNarrow`, `useTheme` and `useLocation` (step 5) and the catalog's query hooks (step 6). The
   app's strict ceiling fell from 38 to 37 (sum 653); access-web's two stand-in hooks went.
+- **After step 5 (`ui`'s own pieces)**: `useEffect` 4 → 0, `useState` 4 → 0, `useMemo` 4 → 0, `useContext` 1 → 0,
+  `useSyncExternalStore` 3 → 0, `useRef` 2 → 1 (the search field's element, for the caret after the cross); `useId` 1
+  (each search box's own atom). The app's `src/web` now reads the ui atoms directly (`useAtomValue` 11 → 17). The ui
+  strict ceiling fell from 52 to 51 (sum 652). The run log (`AgentRun`) held no hook.
 
 ## Proof
 
@@ -177,6 +181,31 @@ view (3 people, no role menus, no Add: he is an Editor); no admin control of Dan
 or warning. The sign-out reloads the page, so in the browser `forgetReads` and the reload drop the same things; the
 test holds `forgetReads` without the reload.
 
+**Step 5, `ui`'s own pieces.** `bun run check` (74 tasks) and `bun run check:full` (76 tasks) pass; the ui lint
+refuses a planted `useEffect`.
+
+Browser, on a fresh database, a new browser context, the dev server on port 5220:
+
+- Theme: the bar's button turned the page dark, `localStorage` "theme" = `dark` (the bare word the pre-paint script
+  reads), the bar colour `#09090b`; reloaded: still dark. Chose System with the device light: no `dark` class, stored
+  `system`; the device switched to dark: the `dark` class and `#09090b`, with no reload.
+- The address: the messy sample through Confirm ("Not imported 45 · Imported 155 · Already there 0 · All 200"); Back
+  from the result: `step=review` in the address, the page still on the result ("Imported items_messy.csv": a confirmed
+  import shows its result whatever the step, `ImportPage.screen.tsx`); Items, then Back: the import page, its crumbs
+  "Example Works (test) / Import / items_messy.csv".
+- The Items search box: "/" put the caret in it; typed "oak ": `?search=oak`, "23 of 155 items, best matches first",
+  the box still "oak " (its own echo kept the space); Reset: the box empty, the address clear, "155 items"; typed
+  "bolt": `?search=bolt`, "2 of 155"; the cross: empty, "155 items", the caret still in the box; Escape emptied it;
+  Ctrl+K put the caret back. One letter set from the page: "Searching" and `aria-busy` within 50 ms, `?search=hinge`
+  after the pause, the spinner gone.
+- The content width at 1000 px on People: open 744 px and cards; folded 952 px and a table; reloaded still folded;
+  opened again cards. People's own search "priya": one row, Priya Raman. Resized to 375 px: 375 px, cards, no sideways
+  scroll; back to 1440 px: the sidebar open, the page 1184 px, the table. Console: no error or warning.
+
+Caught on screen and fixed before the commit: the first version of the search box kept "oak " after Reset, because
+the search went back to the very value it had been typed over. Typed text now counts only while the search is the last
+one the box asked for.
+
 ## Legacy in the client
 
 The client's lint is on (`packages/client/.oxlintrc.json` extends `.oxlintrc.atoms.json`), with three files excepted by
@@ -212,6 +241,21 @@ Not discriminators, and not changed: string-literal domains with no data of thei
 `ColumnSize`, `AgentRun`'s `status`), which are `LiteralKit`s where a schema needs them.
 
 ## Choices made
+
+- **ui's own pieces are atoms** (`ContentWidth.atoms.ts`, `Route.atoms.ts`, `Theme.provider.tsx`, the search box).
+  The sidebar's state, the window's width and the room the page has are atoms in `@inventory/ui/ContentWidth`, so the
+  step-4 bridge in the app is gone; the address is one atom over the app's own `navigate` and the back button (A5);
+  each search box keeps what was typed in its own atom (by `useId`), the change from elsewhere worked out at draw time
+  instead of in an effect, and "/" and Ctrl+K heard by a ref callback on the field. The theme is a writable atom over
+  `localStorage`, not `Atom.kvs`: `Atom.kvs` stores JSON (`"dark"` in quotes), which `public/theme-init.js` does not
+  read before the first paint, and every choice already stored would be lost. `ListTable` keeps its config by the
+  columns' shape and its columns by the arrays they are made from (a `WeakMap`), with no hook.
+- **Four readers of ui atoms stay as hooks for good**: `useLocation`, `useIsNarrow`, `useContentWidth` and `useTheme`.
+  The vendored data table and toaster were edited at vendoring to call them, and the kit is not ours to change (A1).
+  Each only reads an atom (`useAtomValue`), which the A1 line allows. Our own screens read the atoms; `catalog-web` and
+  `review` move at their steps.
+- **`ShellSlots` keeps its two React contexts until `catalog-web` moves**: `createContext` is not on the banned list,
+  the app provides the bar's slot from its atom, and the import page that reads them is the catalog's (step 6).
 
 - **The shell's state is in `apps/inventory/src/web/lib/shell.ts`.** The sidebar is controlled from an atom
   (`sidebarExpanded`; it still writes its own cookie), whether it is a drawer is a media-query atom (the vendored

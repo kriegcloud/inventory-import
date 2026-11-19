@@ -3,7 +3,7 @@
 // The one thing not to break: the count of items is the server's, read from the stored items, never the confirm's.
 import { DateTime } from "effect"
 import { StatusPill, type Tone } from "@inventory/ui/StatusPill"
-import type { ListColumn } from "@inventory/ui/ListTable"
+import { type ListColumn, ListTable } from "@inventory/ui/ListTable"
 import { whenShort } from "@inventory/ui/Dates"
 import { importAddress } from "./internal/route.ts"
 import type { PastImport } from "@inventory/catalog-contract/Import"
@@ -107,3 +107,29 @@ export const pastImportColumnsShort: ReadonlyArray<ListColumn<PastImport>> = [
   itemsColumn,
   whenColumn
 ]
+
+/** What the imports list is, for its caption and its skeleton. */
+export const pastImportsCaption = "Imports that were confirmed"
+
+/** The Activity page's "Imports" list: every confirmed import, each a link back to its result. */
+export function PastImportsList(props: { rows: ReadonlyArray<PastImport>; older: number }) {
+  const { older } = props
+  return (
+    <>
+      <ListTable
+        key="imports"
+        caption={pastImportsCaption}
+        searchLabel="Search imports"
+        columns={pastImportColumns}
+        rows={props.rows}
+        rowKey={(entry) => entry.id}
+        empty="No import has been confirmed yet. Each one confirmed appears here, with a link to its result."
+      />
+      {older === 0 ? null : (
+        <p className="px-4 py-2 text-sm text-muted-foreground sm:px-9">
+          {older} older {older === 1 ? "import is" : "imports are"} not listed.
+        </p>
+      )}
+    </>
+  )
+}

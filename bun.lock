@@ -386,6 +386,22 @@
         "vitest": "^5.1.0",
       },
     },
+    "packages/foundation/modeling/xlsx": {
+      "name": "@beep/xlsx",
+      "version": "0.0.0",
+      "dependencies": {
+        "@beep/identity": "workspace:*",
+        "@beep/schema": "workspace:*",
+        "@beep/utils": "workspace:*",
+        "effect": "4.1.4",
+      },
+      "devDependencies": {
+        "@effect/vitest": "4.1.4",
+        "@types/node": "^24.19.2",
+        "vitest": "^5.1.0",
+        "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
+      },
+    },
     "packages/foundation/primitive/types": {
       "name": "@beep/types",
       "version": "0.0.1",
@@ -513,6 +529,8 @@
     "@beep/types": ["@beep/types@workspace:packages/foundation/primitive/types"],
 
     "@beep/utils": ["@beep/utils@workspace:packages/foundation/modeling/utils"],
+
+    "@beep/xlsx": ["@beep/xlsx@workspace:packages/foundation/modeling/xlsx"],
 
     "@better-auth/core": ["@better-auth/core@1.7.22", "", { "dependencies": { "@standard-schema/spec": "^1.1.0", "zod": "^4.5.4" }, "peerDependencies": { "@better-auth/utils": "^0.4.2 || ^0.5.0", "@better-fetch/fetch": "1.3.3", "@opentelemetry/api": "^1.9.0", "better-call": "1.4.5", "jose": "^6.1.0", "kysely": "^0.28.5 || ^0.29.0", "nanostores": "^1.0.1" }, "optionalPeers": ["@opentelemetry/api"] }, "sha512-SnXqxtrf9Ns8GSGzDzqKuf80Ve9m2UTPdBPpPqCvp0XgzFmHQ8aa5dXoeEoyXPc/GXpuxUu9S1Ug97tYnMITkQ=="],
 

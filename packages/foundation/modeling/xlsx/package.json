@@ -1,0 +1,43 @@
+{
+  "name": "@beep/xlsx",
+  "version": "0.0.0",
+  "private": true,
+  "description": "An Excel workbook as an Effect Schema codec: .xlsx bytes read into one workbook model with findings, written back by value",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": [],
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts",
+    "./Xlsx": "./src/Xlsx.codec.ts",
+    "./XlsxAddress": "./src/XlsxAddress.schema.ts",
+    "./XlsxSerial": "./src/XlsxSerial.schema.ts",
+    "./XlsxCell": "./src/XlsxCell.schema.ts",
+    "./XlsxWorkbook": "./src/XlsxWorkbook.schema.ts",
+    "./XlsxOptions": "./src/XlsxOptions.schema.ts",
+    "./XlsxDiagnostic": "./src/XlsxDiagnostic.schema.ts",
+    "./XlsxRead": "./src/XlsxRead.schema.ts",
+    "./XlsxError": "./src/XlsxError.errors.ts"
+  },
+  "scripts": {
+    "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",
+    "lint": "oxlint --quiet src test",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@beep/identity": "workspace:*",
+    "@beep/schema": "workspace:*",
+    "@beep/utils": "workspace:*",
+    "effect": "4.1.4"
+  },
+  "devDependencies": {
+    "@effect/vitest": "4.1.4",
+    "@types/node": "^24.19.2",
+    "vitest": "^5.1.0",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  },
+  "beep": {
+    "family": "foundation",
+    "kind": "modeling"
+  }
+}

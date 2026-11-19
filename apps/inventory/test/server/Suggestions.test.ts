@@ -3,16 +3,11 @@
 // guard, never by the model.
 import { describe, expect, it, layer } from "@effect/vitest"
 import { Array as Arr, Effect, Option, Record as Rec, Ref } from "effect"
-import { SuggestionId } from "../../src/domain/Ids.ts"
+import { SuggestionId } from "@inventory/catalog-contract/Ids"
 import messy from "../../public/samples/items_messy.csv?raw"
-import {
-  decisionFromFlags,
-  review,
-  type RowDecisionFlags,
-  storedSuggestion,
-  suggestedByModel,
-  type Suggestion
-} from "../../src/domain/ItemImport.ts"
+import { review } from "../../src/domain/ItemImport.ts"
+import { decisionFromFlags, type RowDecisionFlags } from "@inventory/catalog-contract/Decision"
+import { storedSuggestion, suggestedByModel, type Suggestion } from "@inventory/catalog-contract/Suggestion"
 import { digest, guard, type SuggestSource } from "../../src/domain/Suggest.ts"
 import { ModelId } from "@beep/openrouter/OpenRouterModel"
 import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"

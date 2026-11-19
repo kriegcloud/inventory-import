@@ -1,7 +1,7 @@
 import * as S from "effect/Schema"
+import { StoredItem } from "./Item.read.ts"
+import { ItemSearchText } from "./ItemSearch.read.ts"
 import { nullAsNone } from "@inventory/kernel/Wire"
-import { StoredItem } from "./Item.ts"
-import { ItemSearchText } from "./ItemSearch.ts"
 
 // ONE QUESTION ABOUT THE ITEMS: which page, in what order, and narrowed how. The table on the Items page asks
 // it and the server answers it in SQL, so a list of 50,000 items is never sent to the browser to be sorted there. The

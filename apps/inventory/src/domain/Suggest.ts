@@ -7,23 +7,18 @@
  * Nothing here changes a row: a suggestion is a proposal the person accepts or rejects in the review.
  */
 import { Array as Arr, Option, String as Str } from "effect"
-import { categories, maxNameLength } from "./Item.ts"
+import { categories, maxNameLength } from "@inventory/catalog-contract/Item"
 import * as S from "effect/Schema"
+import { type Review, type ReviewedRow } from "./ItemImport.ts"
+import { matchedColumn } from "@inventory/catalog-contract/Mapping"
+import { type Field, fieldLabels, fields, type StagedTable } from "@inventory/catalog-contract/Staged"
 import {
-  type Field,
-  fieldLabels,
-  fields,
   type NewSuggestion,
-  type Review,
-  type ReviewedRow,
-  type StagedTable,
   type Suggestion,
   type SuggestionBy,
   type SuggestionKind,
-  suggestionFits,
-  matchedColumn
-} from "./ItemImport.ts"
-
+  suggestionFits
+} from "@inventory/catalog-contract/Suggestion"
 /** The most rows of one kind a single request asks about; the rest wait for the next press. */
 export const suggestCap = 20
 

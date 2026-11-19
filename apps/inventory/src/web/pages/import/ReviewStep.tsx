@@ -17,20 +17,12 @@ import { restoredDecisions, storedReview } from "@inventory/review/SavedProgress
 import { useSavedProgress } from "@inventory/review/SavedProgressHook"
 import type { SavedDecisions as RegionDecisions } from "@inventory/review/ReviewTypes"
 import { browserRuntime } from "@/lib/runtime"
-import type { ImportView, SuggestOutcome } from "../../../api/v1/Api.ts"
-import {
-  type Field,
-  fieldLabels,
-  fields,
-  recheckRow,
-  review,
-  rowId,
-  ruleFixes,
-  type SavedDecisions,
-  type StagedTable,
-  matchedColumn,
-  type Suggestion
-} from "../../../domain/ItemImport.ts"
+import type { ImportView, SuggestOutcome } from "@inventory/catalog-contract/Import"
+import { recheckRow, review, ruleFixes } from "../../../domain/ItemImport.ts"
+import { rowId, type SavedDecisions } from "@inventory/catalog-contract/Decision"
+import { matchedColumn } from "@inventory/catalog-contract/Mapping"
+import { type Field, fieldLabels, fields, type StagedTable } from "@inventory/catalog-contract/Staged"
+import { type Suggestion } from "@inventory/catalog-contract/Suggestion"
 import { WhyFlagged } from "./WhyFlagged.tsx"
 import { DimensionsForm, VendorsForm } from "./CellForms.tsx"
 import { notImportedColumn, reviewStepWords } from "./format.tsx"

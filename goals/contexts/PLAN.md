@@ -306,3 +306,23 @@ None.
     imported 43 · Imported 0", Items "0 items". `/?import=nope&step=review`: "This import could not be opened. The
     address does not name an import. Check the link, or choose a file."; an id no import has: "No import with that
     id in your organization." Asked directly: `GET /imports/nope` 400, an unknown UUID 404, `PUT /items/nope` 400.
+- **`catalog-contract` (`packages/catalog/contract`).** The catalog's schemas and its three groups (`ImportsApi`,
+  `ItemsApi`, `AssistantApi`) on the full profile with no override; the app's `Api` adds the groups, and `src/api/v1`
+  keeps only the system group, the assembled `Api`, the document and the version. 19 modules, 31 tests (28 schemas
+  generate only values they accept; a cost's digits, a decision's flags and a stored suggestion's and change's
+  columns keep their bytes). Exports: `./Ids`, `./Answer`, `./AiUnavailable`, `./Described`, `./Item`,
+  `./ItemSearch`, `./ItemQuery`, `./FileProblem`, `./Staged`, `./Upload`, `./Mapping`, `./Suggestion`, `./Decision`,
+  `./Change`, `./Import`, `./ImportRejection`, `./TableView`, `./ViewRequest`, `./Catalog`.
+  - Where it differs from the brief, and why. (1) `Item/Item.read.ts` keeps the cell readers (`readDecimal`,
+    `readCount`, `readDate`, `readItemForm`, `skuKey`) beside the schemas: `UnitCost` and the calendar-day check call
+    them, and a contract may not import its model. (2) `Item/ItemSearch.read.ts` is the whole of
+    `domain/ItemSearch.ts` (`ItemQuery` needs its `ItemSearchText`), and `Staging/FileProblem.read.ts` keeps the
+    `fileProblem` sentences beside `FileProblem`. (3) Identifiers stay the plain names they were (`"ImportView"`,
+    not an identity composer's), so no component of the OpenAPI document changes its name. (4) `ViewChange` is not
+    yet split into `show` and `hide` cases. (5) `Mapping.read.ts` exports three constructors (`matchedByHeading`,
+    `matchedByPerson`, `notMatched`) because the match classes are private to it.
+  - The app's `src/domain` keeps the rules for now (`ItemImport.ts`, `Suggest.ts`, `TableView.ts`, `Upload.ts`,
+    `Spreadsheet.ts`, `SheetLayout.ts`): they move with `catalog-model`.
+  - Read on screen, fresh database: the messy sample "Import 155, skip 45", "Import 155 items?", "Not imported 45 ·
+    Imported 155 · Already there 0 · All 200", Items "155 items", People "Dana Whitfield (you), Marcus Oyelaran,
+    Priya Raman".

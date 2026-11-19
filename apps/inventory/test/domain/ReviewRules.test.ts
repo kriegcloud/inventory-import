@@ -5,7 +5,14 @@ import { describe, expect, it } from "@effect/vitest"
 import { digits } from "../support/cost.ts"
 import { Array as Arr, Effect, Option, String as Str } from "effect"
 import * as S from "effect/Schema"
-import { discontinued, inactive, ItemEdit, type ItemFields, stockingOf, UnitCost } from "../../src/domain/Item.ts"
+import {
+  discontinued,
+  inactive,
+  ItemEdit,
+  type ItemFields,
+  stockingOf,
+  UnitCost
+} from "@inventory/catalog-contract/Item"
 import { type Review, review } from "../../src/domain/ItemImport.ts"
 import { stage, textFile } from "../server/support/files.ts"
 

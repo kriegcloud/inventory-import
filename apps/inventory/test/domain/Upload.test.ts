@@ -1,13 +1,12 @@
 // What the upload screen says about how far it is. The rule that would hurt most if wrong: the screen never says more
 // rows are done than there are ("Saving 51,000 of 50,000 rows"), whatever the estimate did and however often a piece
 // was sent again.
-import { ImportId } from "../../src/domain/Ids.ts"
+import { ImportId } from "@inventory/catalog-contract/Ids"
 import { describe, expect, it } from "@effect/vitest"
 import { Array as Arr } from "effect"
 import * as S from "effect/Schema"
 import {
   chunkProblem,
-  chunkRows,
   fitsChunks,
   progressOf,
   rowsAbout,
@@ -15,7 +14,7 @@ import {
   type UploadState,
   uploadChunks
 } from "../../src/domain/Upload.ts"
-
+import { chunkRows } from "@inventory/catalog-contract/Upload"
 const reading = (rowsRead: number, about: number | null): UploadState => ({
   _tag: "Reading",
   fileName: "items.csv",

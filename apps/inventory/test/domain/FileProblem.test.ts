@@ -7,8 +7,7 @@ import { Effect, Layer, Result } from "effect"
 import * as S from "effect/Schema"
 import { HttpRouter, HttpServer } from "effect/http"
 import { HttpApi, HttpApiBuilder, HttpApiEndpoint, HttpApiGroup } from "effect/http-api"
-import { FileProblem, fileProblem, fileProblemTitles, StagingOutcome } from "../../src/domain/FileProblem.ts"
-
+import { FileProblem, fileProblem, fileProblemTitles, StagingOutcome } from "@inventory/catalog-contract/FileProblem"
 const Staged = S.Struct({ rows: S.Int })
 
 class StagingApi extends HttpApi.make("staging").add(

@@ -1,8 +1,7 @@
 // Where an import's step lives in the address. The address helpers themselves are in @/ui-kit/Route.hook.
 import { Option } from "effect"
 import * as S from "effect/Schema"
-import { ImportId } from "../../domain/Ids.ts"
-
+import { ImportId } from "@inventory/catalog-contract/Ids"
 /**
  * The import an address names, if it names one: `import=` holds an import's id, and anything else there (a link cut
  * short, a typed word) names none and is said so, never sent to the server.

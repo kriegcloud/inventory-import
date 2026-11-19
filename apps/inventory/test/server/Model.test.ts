@@ -7,7 +7,7 @@ import { OpenRouter } from "@beep/openrouter/OpenRouter"
 import { Array as Arr, Effect, Formatter, Layer, MutableRef } from "effect"
 import * as S from "effect/Schema"
 import { HttpClient, HttpClientResponse } from "effect/http"
-import { modelSentences } from "../../src/api/v1/ModelTrouble.ts"
+import { modelSentences } from "@inventory/catalog-contract/AiUnavailable"
 import { aiStatusOf, answeredByRules, askModel, modelLayer } from "../../src/server/Model.ts"
 import { settingsLayer } from "./support/app.ts"
 

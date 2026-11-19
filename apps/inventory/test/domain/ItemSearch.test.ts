@@ -4,8 +4,8 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Array as Arr, Effect, String as Str } from "effect"
 import * as S from "effect/Schema"
-import { ItemQueryParams } from "../../src/api/v1/Api.ts"
-import { ItemQuery } from "../../src/domain/ItemQuery.ts"
+import { ItemQueryParams } from "@inventory/catalog-contract/Catalog"
+import { ItemQuery } from "@inventory/catalog-contract/ItemQuery"
 import {
   closeMatches,
   contains,
@@ -15,8 +15,7 @@ import {
   searchWords,
   wordsLeftOut,
   wordsToCheck
-} from "../../src/domain/ItemSearch.ts"
-
+} from "@inventory/catalog-contract/ItemSearch"
 const decodeQuery = S.decodeUnknownEffect(ItemQuery)
 const decodeParams = S.decodeUnknownEffect(ItemQueryParams)
 const asked = { page: 1, perPage: 20, sorting: [], filters: [], joinOperator: "and" }

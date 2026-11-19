@@ -22,8 +22,8 @@ import { call } from "@/lib/api"
 import { contentWidth, useIsNarrow } from "@inventory/ui/ContentWidth"
 import { navigate, useLocation } from "@inventory/ui/Route"
 import { hasRole } from "@inventory/kernel/Role"
-import { discontinuedOn, isActive, type StoredItem } from "../../domain/Item.ts"
-import { itemPageSizes } from "../../domain/ItemQuery.ts"
+import { discontinuedOn, isActive, type StoredItem } from "@inventory/catalog-contract/Item"
+import { itemPageSizes } from "@inventory/catalog-contract/ItemQuery"
 import { day, when } from "./import/format.tsx"
 import { ItemEditor } from "./ItemEditor.tsx"
 import { costOf, dimensionsText, vendorsText } from "./import/itemText.ts"
@@ -31,9 +31,8 @@ import { sayError } from "@inventory/client/SayError"
 import { keptVisibility, TableAssistant } from "@/components/app/TableAssistant"
 import { TableSearch } from "@inventory/ui/TableSearch"
 import { queryKeys } from "@/lib/queries"
-import { maxSearch, maxSearchWords, wordsLeftOut } from "../../domain/ItemSearch.ts"
-import { type CatalogColumn, type ColumnCatalog, operatorsFor } from "../../domain/TableView.ts"
-
+import { maxSearch, maxSearchWords, wordsLeftOut } from "@inventory/catalog-contract/ItemSearch"
+import { type CatalogColumn, type ColumnCatalog, operatorsFor } from "@inventory/catalog-contract/TableView"
 // The sort and filter menus carry a calendar, a date library and drag-and-drop for reordering: more code than the
 // rest of the page. They are fetched after the table is drawn; until then each is its own button, the same size and
 // words, switched off, so nothing moves when it arrives.

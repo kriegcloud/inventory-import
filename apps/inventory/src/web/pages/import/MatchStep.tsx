@@ -10,15 +10,9 @@ import { call } from "@/lib/api"
 import { useImportCache } from "@/lib/imports"
 import { navigate } from "@inventory/ui/Route"
 import { importAddress } from "@/lib/route"
-import type { ImportView } from "../../../api/v1/Api.ts"
-import {
-  type ColumnMatch,
-  type Field,
-  fieldLabels,
-  requiredFields,
-  type StagedTable,
-  matchedColumn
-} from "../../../domain/ItemImport.ts"
+import type { ImportView } from "@inventory/catalog-contract/Import"
+import { type ColumnMatch, matchedColumn } from "@inventory/catalog-contract/Mapping"
+import { type Field, fieldLabels, requiredFields, type StagedTable } from "@inventory/catalog-contract/Staged"
 import { toastError } from "@inventory/client/SayError"
 import { notImportedColumn } from "./format.tsx"
 

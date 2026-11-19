@@ -1,8 +1,8 @@
 import { stringify } from "@inventory/ui/Json"
 import { useCallback, useRef } from "react"
-import type { DecisionDelta } from "../../api/v1/Api.ts"
-import type { SavedDecisions } from "../../domain/ItemImport.ts"
-import type { ImportId } from "../../domain/Ids.ts"
+import type { DecisionDelta } from "@inventory/catalog-contract/Decision"
+import type { SavedDecisions } from "@inventory/catalog-contract/Decision"
+import type { ImportId } from "@inventory/catalog-contract/Ids"
 import { callWrite } from "./api.ts"
 import { isTransient, toastError } from "@inventory/client/SayError"
 

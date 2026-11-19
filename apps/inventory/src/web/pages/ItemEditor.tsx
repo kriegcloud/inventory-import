@@ -34,8 +34,8 @@ import {
   type StoredItem,
   uoms,
   costDigits
-} from "../../domain/Item.ts"
-import type { ItemPage } from "../../domain/ItemQuery.ts"
+} from "@inventory/catalog-contract/Item"
+import type { ItemPage } from "@inventory/catalog-contract/ItemQuery"
 import { sayError } from "@inventory/client/SayError"
 import { queryKeys } from "@/lib/queries"
 import { costOf, dimensionsText } from "./import/itemText.ts"

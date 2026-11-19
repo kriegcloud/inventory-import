@@ -15,7 +15,7 @@ import {
   type MergedRange,
   type WorkbookSheet
 } from "../../../domain/SheetLayout.ts"
-import { fileProblem } from "../../../domain/FileProblem.ts"
+import { fileProblem } from "@inventory/catalog-contract/FileProblem"
 import type { Cell, Note } from "../../../domain/Spreadsheet.ts"
 import type { ReadProgress } from "./read.ts"
 

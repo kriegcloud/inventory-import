@@ -5,13 +5,11 @@
  * failed upload never leaves rows anyone could confirm.
  */
 import { Array as Arr } from "effect"
-import { FileProblem, fileProblem } from "./FileProblem.ts"
-import { ImportId } from "./Ids.ts"
-import { maxStagedRows, type StagedRow } from "./ItemImport.ts"
+import { FileProblem, fileProblem } from "@inventory/catalog-contract/FileProblem"
+import { ImportId } from "@inventory/catalog-contract/Ids"
+import { maxStagedRows, type StagedRow } from "@inventory/catalog-contract/Staged"
 import * as S from "effect/Schema"
-
-/** Rows in one piece of an upload, and in one stored chunk of an import: the two are the same chunks. */
-export const chunkRows = 500
+import { chunkRows } from "@inventory/catalog-contract/Upload"
 
 /**
  * The most characters of JSON one stored chunk may hold. D1 refuses a value over 2 MB; past this the person is told

@@ -20,9 +20,9 @@ import {
   writeConversation
 } from "@/lib/table-assistant/conversation"
 import { applyAll, describe, overtaken, takeBack, type ViewFilter, type ViewState } from "@/lib/table-assistant/view"
-import type { AnsweredBy } from "../../../domain/Answer.ts"
-import { type ColumnCatalog, maxPrompt, rulesRead } from "../../../domain/TableView.ts"
-
+import type { AnsweredBy } from "@inventory/catalog-contract/Answer"
+import { rulesRead } from "../../../domain/TableView.ts"
+import { type ColumnCatalog, maxPrompt } from "@inventory/catalog-contract/TableView"
 /**
  * Who answered and the line under it, as the conversation keeps them: "Rules" with the reason no model answered, or
  * the model's name with what it said it could not do.

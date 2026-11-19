@@ -6,7 +6,7 @@ import { StatusPill, type Tone } from "@inventory/ui/StatusPill"
 import type { ListColumn } from "@inventory/ui/ListTable"
 import { whenShort } from "@inventory/ui/Dates"
 import { importAddress } from "@/lib/route"
-import type { PastImport } from "../../../api/v1/Api.ts"
+import type { PastImport } from "@inventory/catalog-contract/Import"
 import { when } from "./format.tsx"
 
 const statusWords: Readonly<Record<PastImport["status"], { readonly words: string; readonly tone: Tone }>> = {

@@ -11,7 +11,7 @@ import {
 } from "@inventory/ui/components/breadcrumb"
 import { ReviewSkeleton, someColumns, StepsSkeleton, TablePageSkeleton, UploadSkeleton } from "@inventory/ui/Skeletons"
 import { useActor } from "@/lib/actor"
-import type { ImportId } from "../domain/Ids.ts"
+import type { ImportId } from "@inventory/catalog-contract/Ids"
 import { importInAddress } from "@/lib/route"
 import { importTableQuery, importViewQuery, useImportView } from "@/lib/imports"
 import { queryClient } from "@/lib/queries"

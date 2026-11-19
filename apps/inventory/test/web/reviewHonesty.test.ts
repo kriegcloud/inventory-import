@@ -6,7 +6,8 @@
 import { readFileSync } from "node:fs"
 import { describe, expect, it } from "@effect/vitest"
 import { Array as Arr, Effect, Option, Record as Rec, String as Str } from "effect"
-import { firstDecisions, review, stageTable, type StagedTable } from "../../src/domain/ItemImport.ts"
+import { firstDecisions, review, stageTable } from "../../src/domain/ItemImport.ts"
+import { type StagedTable } from "@inventory/catalog-contract/Staged"
 import { sourceLead, sourceWordsFor } from "@inventory/ui/ProposalSource"
 import {
   act,
@@ -27,7 +28,7 @@ import { planColumns, type SizedColumn } from "../../../../packages/review/src/i
 import type { ProblemKind, ReviewColumn, ReviewRow } from "@inventory/review/ReviewTypes"
 import { defaultReviewWords, reviewWords } from "@inventory/review/ReviewWords"
 import { readSpreadsheet } from "../../src/web/lib/spreadsheet/index.ts"
-import type { ItemFields } from "../../src/domain/Item.ts"
+import type { ItemFields } from "@inventory/catalog-contract/Item"
 import { costText, dimensionsCellText, vendorsCellText } from "../../src/web/pages/import/itemText.ts"
 import { vendorsDraft } from "../../src/web/pages/import/cellDrafts.ts"
 import {

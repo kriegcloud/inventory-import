@@ -10,7 +10,9 @@ import type { ModelUnavailable } from "@beep/openrouter/OpenRouterError"
 import { Array as Arr, Effect, Layer, Option } from "effect"
 import * as S from "effect/Schema"
 import { FetchHttpClient, type HttpClient } from "effect/http"
-import { AiRoute, AiStatus, type AiUnavailable, aiUnavailable, type AnsweredBy } from "../api/v1/Api.ts"
+import { AiRoute, AiStatus } from "../api/v1/Api.ts"
+import { type AiUnavailable, aiUnavailable } from "@inventory/catalog-contract/AiUnavailable"
+import { type AnsweredBy } from "@inventory/catalog-contract/Answer"
 import { aiSettings } from "./Settings.ts"
 
 /** A schema a model answers with: an object on the wire, decoded with no services. */

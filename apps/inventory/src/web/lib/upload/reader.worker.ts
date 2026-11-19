@@ -4,7 +4,7 @@ import { stringify } from "@inventory/ui/Json"
 // library that made one hung here). It runs the same `readSpreadsheet` the tests run, then trims the table to what
 // the server stages and hands it to the page in the chunks the server stores. Every file takes this path.
 import { Effect, Option, Result } from "effect"
-import { type FileProblem, fileProblem } from "../../../domain/FileProblem.ts"
+import { type FileProblem, fileProblem } from "@inventory/catalog-contract/FileProblem"
 import { stageTable, stagingProblem } from "../../../domain/ItemImport.ts"
 import { maxChunkChars, uploadChunks } from "../../../domain/Upload.ts"
 import { readSpreadsheet } from "../spreadsheet/read.ts"

@@ -4,10 +4,9 @@
 import { Effect, MutableRef } from "effect"
 import type { HttpApiClient } from "effect/http-api"
 import type { Api } from "../../../src/api/v1/Api.ts"
-import type { StagedTable } from "../../../src/domain/ItemImport.ts"
+import type { StagedTable } from "@inventory/catalog-contract/Staged"
 import { uploadChunks } from "../../../src/domain/Upload.ts"
-import { type ImportId, UploadKey } from "../../../src/domain/Ids.ts"
-
+import { type ImportId, UploadKey } from "@inventory/catalog-contract/Ids"
 type Client = HttpApiClient.ForApi<typeof Api>
 
 // Each upload a test starts gets its own key, as each file the browser starts to send does.

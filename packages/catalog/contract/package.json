@@ -1,0 +1,51 @@
+{
+  "name": "@inventory/catalog-contract",
+  "version": "0.0.0",
+  "private": true,
+  "description": "What the browser may ask about items and the imports that write them: the staged file, the review's decisions, the confirm and its result, suggestions and the table assistant",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": [],
+  "exports": {
+    "./package.json": "./package.json",
+    "./AiUnavailable": "./src/Answer/AiUnavailable.rejection.ts",
+    "./Answer": "./src/Answer/AnsweredBy.read.ts",
+    "./Catalog": "./src/Catalog.contract.ts",
+    "./Change": "./src/Import/Change.read.ts",
+    "./Decision": "./src/Import/Decision.command.ts",
+    "./Described": "./src/internal/Described.ts",
+    "./FileProblem": "./src/Staging/FileProblem.read.ts",
+    "./Ids": "./src/Catalog.id.ts",
+    "./Import": "./src/Import/Import.read.ts",
+    "./ImportRejection": "./src/Import/Import.rejection.ts",
+    "./Item": "./src/Item/Item.read.ts",
+    "./ItemQuery": "./src/Item/ItemQuery.command.ts",
+    "./ItemSearch": "./src/Item/ItemSearch.read.ts",
+    "./Mapping": "./src/Import/Mapping.read.ts",
+    "./Staged": "./src/Staging/Staged.read.ts",
+    "./Suggestion": "./src/Suggestion/Suggestion.read.ts",
+    "./TableView": "./src/Assistant/View.read.ts",
+    "./Upload": "./src/Staging/Upload.command.ts",
+    "./ViewRequest": "./src/Assistant/View.command.ts"
+  },
+  "scripts": {
+    "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",
+    "lint": "oxlint --quiet src test",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@beep/schema": "workspace:*",
+    "@inventory/kernel": "workspace:*",
+    "effect": "4.1.4"
+  },
+  "devDependencies": {
+    "@effect/vitest": "4.1.4",
+    "@types/node": "^24.19.2",
+    "vitest": "^5.1.0"
+  },
+  "beep": {
+    "family": "context",
+    "context": "catalog",
+    "layer": "contract"
+  }
+}

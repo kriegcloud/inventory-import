@@ -7,16 +7,10 @@ import { readFileSync } from "node:fs"
 import { cost } from "../support/cost.ts"
 import { describe, expect, it } from "@effect/vitest"
 import { Array as Arr, Effect, Option, Order, String as Str } from "effect"
-import {
-  changeToStored,
-  decisionToFlags,
-  firstDecisions,
-  recheckRow,
-  review,
-  type SavedDecisions,
-  stageTable,
-  type StagedTable
-} from "../../src/domain/ItemImport.ts"
+import { firstDecisions, recheckRow, review, stageTable } from "../../src/domain/ItemImport.ts"
+import { changeToStored } from "@inventory/catalog-contract/Change"
+import { decisionToFlags, type SavedDecisions } from "@inventory/catalog-contract/Decision"
+import { type StagedTable } from "@inventory/catalog-contract/Staged"
 import { readSpreadsheet } from "../../src/web/lib/spreadsheet/index.ts"
 import {
   act,
@@ -30,7 +24,7 @@ import {
   waitingGroups
 } from "@inventory/review/ReviewDraft"
 import type { ReviewRow, ReviewState } from "@inventory/review/ReviewTypes"
-import { active, type ItemFields } from "../../src/domain/Item.ts"
+import { active, type ItemFields } from "@inventory/catalog-contract/Item"
 import {
   regionKinds,
   storedChoice,

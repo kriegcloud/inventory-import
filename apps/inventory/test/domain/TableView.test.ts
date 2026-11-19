@@ -3,15 +3,8 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Array as Arr, Result, String as Str } from "effect"
 import * as S from "effect/Schema"
-import {
-  type CatalogColumn,
-  checkCommand,
-  type ColumnCatalog,
-  readByRules,
-  ViewChange,
-  ViewCommand
-} from "../../src/domain/TableView.ts"
-
+import { checkCommand, readByRules } from "../../src/domain/TableView.ts"
+import { type CatalogColumn, type ColumnCatalog, ViewChange, ViewCommand } from "@inventory/catalog-contract/TableView"
 const column = (input: Partial<CatalogColumn> & Pick<CatalogColumn, "id" | "label" | "type">): CatalogColumn => ({
   sortable: true,
   hideable: true,

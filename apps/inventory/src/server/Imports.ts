@@ -9,11 +9,11 @@ import { Array as Arr, Context, DateTime, Effect, Layer, Option, Order, Record a
 import * as S from "effect/Schema"
 import { SecureRandom } from "effect/crypto"
 import { SqlClient, SqlSchema, type Statement } from "effect/sql"
+import { type DecisionDelta } from "@inventory/catalog-contract/Decision"
 import {
   ChangedItem,
   ChangeRecord,
   changedItemsShown,
-  type DecisionDelta,
   ImportEvent,
   PastImport,
   type DecidedBy,
@@ -24,11 +24,11 @@ import {
   outcomeOf,
   type RowOutcome,
   type TakeBackState
-} from "../api/v1/Api.ts"
+} from "@inventory/catalog-contract/Import"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { type Member } from "@inventory/kernel/Member"
 import { DisplayName, Instant } from "@inventory/kernel/Text"
-import { type FileProblem, fileProblem } from "../domain/FileProblem.ts"
+import { type FileProblem, fileProblem } from "@inventory/catalog-contract/FileProblem"
 import {
   Dimensions,
   type ItemFields,
@@ -37,25 +37,21 @@ import {
   stockingOf,
   StoredItem,
   Vendor
-} from "../domain/Item.ts"
+} from "@inventory/catalog-contract/Item"
 import {
   type Change,
   changeFromStored,
   ChangeSource,
   changeToStored,
-  Confidence,
-  Field,
-  MappingChoice,
-  RowDecision,
-  type SavedDecisions,
-  StagedHead,
-  StagedRow,
-  type StagedTable
-} from "../domain/ItemImport.ts"
-import { abandonedAfterMinutes, chunkRows, maxChunkChars } from "../domain/Upload.ts"
+  Confidence
+} from "@inventory/catalog-contract/Change"
+import { RowDecision, type SavedDecisions } from "@inventory/catalog-contract/Decision"
+import { MappingChoice } from "@inventory/catalog-contract/Mapping"
+import { Field, StagedHead, StagedRow, type StagedTable } from "@inventory/catalog-contract/Staged"
+import { abandonedAfterMinutes, maxChunkChars } from "../domain/Upload.ts"
+import { chunkRows } from "@inventory/catalog-contract/Upload"
 import { D1, NoRows } from "@beep/d1/D1"
-import { ConfirmId, ImportId } from "../domain/Ids.ts"
-
+import { ConfirmId, ImportId } from "@inventory/catalog-contract/Ids"
 /** An import as stored, without its rows. */
 export const Draft = S.Struct({
   id: ImportId,

@@ -1,8 +1,7 @@
 // Who answered a result a model may have helped with, in words for the screen. The sentences are the contract's
 // (`src/api/v1/ModelTrouble.ts`), so the server words its `AiUnavailable` with the same ones.
-import type { AnsweredBy } from "../../api/v1/Api.ts"
-import { type ModelTrouble, modelSentences } from "../../api/v1/ModelTrouble.ts"
-
+import type { AnsweredBy } from "@inventory/catalog-contract/Answer"
+import { type ModelTrouble, modelSentences } from "@inventory/catalog-contract/AiUnavailable"
 /**
  * Why a model did not answer, in five words the screen knows (`ModelTrouble`), and the five sentences
  * (`modelSentences`). Both are the contract's (`src/api/v1/ModelTrouble.ts`), so the server words its `AiUnavailable`

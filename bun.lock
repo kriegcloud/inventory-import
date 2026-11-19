@@ -35,6 +35,7 @@
         "@inventory/access-contract": "workspace:*",
         "@inventory/access-host": "workspace:*",
         "@inventory/access-web": "workspace:*",
+        "@inventory/catalog-contract": "workspace:*",
         "@inventory/client": "workspace:*",
         "@inventory/kernel": "workspace:*",
         "@inventory/review": "workspace:*",
@@ -164,6 +165,20 @@
       "peerDependencies": {
         "react": "^19.3.1",
         "react-dom": "^19.3.1",
+      },
+    },
+    "packages/catalog/contract": {
+      "name": "@inventory/catalog-contract",
+      "version": "0.0.0",
+      "dependencies": {
+        "@beep/schema": "workspace:*",
+        "@inventory/kernel": "workspace:*",
+        "effect": "4.1.4",
+      },
+      "devDependencies": {
+        "@effect/vitest": "4.1.4",
+        "@types/node": "^24.19.2",
+        "vitest": "^5.1.0",
       },
     },
     "packages/client": {
@@ -643,6 +658,8 @@
     "@inventory/access-web": ["@inventory/access-web@workspace:packages/access/web"],
 
     "@inventory/app": ["@inventory/app@workspace:apps/inventory"],
+
+    "@inventory/catalog-contract": ["@inventory/catalog-contract@workspace:packages/catalog/contract"],
 
     "@inventory/client": ["@inventory/client@workspace:packages/client"],
 

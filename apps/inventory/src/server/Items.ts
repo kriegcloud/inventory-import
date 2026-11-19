@@ -10,7 +10,7 @@ import { SecureRandom } from "effect/crypto"
 import { SqlClient, SqlSchema, type Statement } from "effect/sql"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { type Member } from "@inventory/kernel/Member"
-import { discontinuedOn, ItemEdit, type StoredItem } from "../domain/Item.ts"
+import { discontinuedOn, ItemEdit, type StoredItem } from "@inventory/catalog-contract/Item"
 import {
   type FilterOperator,
   type ItemFacets,
@@ -21,8 +21,8 @@ import {
   type ItemQuery,
   type ItemSort,
   type ItemSortColumn
-} from "../domain/ItemQuery.ts"
-import { phrase, plan, searchWords, type WordMatch, wordsToCheck } from "../domain/ItemSearch.ts"
+} from "@inventory/catalog-contract/ItemQuery"
+import { phrase, plan, searchWords, type WordMatch, wordsToCheck } from "@inventory/catalog-contract/ItemSearch"
 import { itemColumns, ItemRow, storedItem } from "./Imports.ts"
 import { D1, NoRows } from "@beep/d1/D1"
 

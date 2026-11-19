@@ -2,8 +2,7 @@
 // that takes back just that change. The table's own state is read and written by `useTableView`, so the sort and filter
 // menus show exactly what the assistant set: it is the same state, never a copy beside it.
 import * as S from "effect/Schema"
-import type { CatalogColumn, ColumnCatalog, ViewChange, ViewOperator } from "../../../domain/TableView.ts"
-
+import type { CatalogColumn, ColumnCatalog, ViewChange, ViewOperator } from "@inventory/catalog-contract/TableView"
 const Sort = S.Struct({ id: S.String, desc: S.Boolean })
 const FilterItem = S.Struct({
   id: S.String,

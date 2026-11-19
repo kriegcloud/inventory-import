@@ -4,40 +4,34 @@
 import { Array as Arr, Effect, Option, Record as Rec, Result } from "effect"
 import * as S from "effect/Schema"
 import { HttpApiBuilder } from "effect/http-api"
+import { Api } from "../api/v1/Api.ts"
+import { ItemChanged, ItemNotFound } from "@inventory/catalog-contract/Catalog"
+import { ImportView, openImportsShown, pastImportsShown } from "@inventory/catalog-contract/Import"
 import {
   AlreadyImported,
-  Api,
   ColumnNotFound,
   ImportKept,
   ImportNotFound,
-  ImportView,
-  openImportsShown,
-  pastImportsShown,
-  ItemChanged,
-  ItemNotFound,
-  uploadDiscard,
   UploadNotFound
-} from "../api/v1/Api.ts"
+} from "@inventory/catalog-contract/ImportRejection"
+import { uploadDiscard } from "@inventory/catalog-contract/Upload"
 import { CurrentActor } from "@inventory/kernel/Actor"
-import { fileProblem } from "../domain/FileProblem.ts"
+import { fileProblem } from "@inventory/catalog-contract/FileProblem"
 import type { Member } from "@inventory/kernel/Member"
-import { fieldsOf, skuKey } from "../domain/Item.ts"
+import { fieldsOf, skuKey } from "@inventory/catalog-contract/Item"
 import {
-  changeDecidedBy,
   carryDecisions,
   dropAccepted,
-  fieldLabels,
   firstDecisions,
-  type MappingChoice,
   type Proposal,
   review,
   ruleFixes,
-  rowId,
-  type SavedDecisions,
-  StagedHead,
-  type StagedTable,
   stagingProblem
 } from "../domain/ItemImport.ts"
+import { changeDecidedBy } from "@inventory/catalog-contract/Change"
+import { rowId, type SavedDecisions } from "@inventory/catalog-contract/Decision"
+import { type MappingChoice } from "@inventory/catalog-contract/Mapping"
+import { fieldLabels, StagedHead, type StagedTable } from "@inventory/catalog-contract/Staged"
 import { chunkProblem, fitsChunks } from "../domain/Upload.ts"
 import { requireRole } from "@inventory/kernel/Actor"
 import { ItemsOfRow } from "./ImportShape.ts"

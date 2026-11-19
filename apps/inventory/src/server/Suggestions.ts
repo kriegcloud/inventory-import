@@ -8,12 +8,12 @@ import { Array as Arr, Context, DateTime, Effect, Layer } from "effect"
 import * as S from "effect/Schema"
 import { SecureRandom } from "effect/crypto"
 import { SqlClient, SqlSchema } from "effect/sql"
-import type { AnsweredBy } from "../api/v1/Api.ts"
+import type { AnsweredBy } from "@inventory/catalog-contract/Answer"
 import { AgentRun } from "@inventory/kernel/AgentRun"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { type Member } from "@inventory/kernel/Member"
+import { Field } from "@inventory/catalog-contract/Staged"
 import {
-  Field,
   type NewSuggestion,
   storedSuggestion,
   suggestedByModel,
@@ -23,9 +23,9 @@ import {
   suggestionFromStored,
   SuggestionKind,
   suggestionToStored
-} from "../domain/ItemImport.ts"
+} from "@inventory/catalog-contract/Suggestion"
 import { LiteralKit } from "@beep/schema/LiteralKit"
-import { RowId, SuggestionId } from "../domain/Ids.ts"
+import { RowId, SuggestionId } from "@inventory/catalog-contract/Ids"
 import {
   answerByRules,
   digest,

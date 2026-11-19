@@ -1,4 +1,4 @@
-import type { ImportId } from "../../../domain/Ids.ts"
+import type { ImportId } from "@inventory/catalog-contract/Ids"
 import { SheetIcon } from "lucide-react"
 import { SheetChooser } from "@/components/app/SheetChooser"
 import { Button } from "@inventory/ui/components/button"

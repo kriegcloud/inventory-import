@@ -10,16 +10,16 @@ import { Alert, AlertDescription, AlertTitle } from "@inventory/ui/components/al
 import { TableSkeleton } from "@inventory/ui/Skeletons"
 import { Button } from "@inventory/ui/components/button"
 import { call } from "@/lib/api"
-import type { ChangeRecord } from "../../api/v1/Api.ts"
+import type { ChangeRecord } from "@inventory/catalog-contract/Import"
 import { AuditEvents, auditEventColumns, auditEventsCaption, useAuditEvents } from "@inventory/access-web/AuditEvents"
 import {
   changeBasis,
   changeConfidence,
   changeDecidedBy,
   changeHowWords,
-  changeSource,
-  fieldLabels
-} from "../../domain/ItemImport.ts"
+  changeSource
+} from "@inventory/catalog-contract/Change"
+import { fieldLabels } from "@inventory/catalog-contract/Staged"
 import { whenShort } from "@inventory/ui/Dates"
 import { when } from "./import/format.tsx"
 import { sayError } from "@inventory/client/SayError"

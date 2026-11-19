@@ -14,25 +14,28 @@ import type {
 } from "@inventory/review/ReviewTypes"
 import { fromFlags, toFlags } from "@inventory/review/ReviewDecision"
 import {
-  type ColumnMatch,
-  decisionFromFlags,
-  decisionOf,
-  decisionToFlags,
-  type Field,
-  fieldLabels,
-  hasKeep,
   type Problem,
   problemKinds,
   type Proposal,
-  requiredFields,
   type Review,
   type ReviewedRow,
-  rowPlace,
-  type SavedDecisions,
-  type StagedColumn,
-  type StagedTable,
-  matchedColumn
+  rowPlace
 } from "../../../domain/ItemImport.ts"
+import {
+  decisionFromFlags,
+  decisionOf,
+  decisionToFlags,
+  hasKeep,
+  type SavedDecisions
+} from "@inventory/catalog-contract/Decision"
+import { type ColumnMatch, matchedColumn } from "@inventory/catalog-contract/Mapping"
+import {
+  type Field,
+  fieldLabels,
+  requiredFields,
+  type StagedColumn,
+  type StagedTable
+} from "@inventory/catalog-contract/Staged"
 import { costText, countText, dimensionsCellText, tagsCellText, vendorsCellText } from "./itemText.ts"
 
 /** The problem kinds in the region's shape, in the order their headings show. */

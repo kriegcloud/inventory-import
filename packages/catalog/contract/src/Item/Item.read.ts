@@ -3,21 +3,13 @@
 // switches, tags, two dates, and two nested values (dimensions and up to three vendors). The one thing not to break:
 // every value is read from the text as written (a cost from its digits as a decimal string, never through a float; a
 // date only when it has one reading), never through a guess.
-import {
-  Array as Arr,
-  BigDecimal,
-  Option,
-  Record as Rec,
-  Result,
-  SchemaTransformation,
-  String as Str,
-  Tuple
-} from "effect"
-import { Instant } from "@inventory/kernel/Text"
-import { personName } from "./Described.ts"
+import { Array as Arr, BigDecimal, Option, Record as Rec, Result, String as Str, Tuple } from "effect"
 import * as S from "effect/Schema"
-import { ItemId } from "./Ids.ts"
 import { LiteralKit } from "@beep/schema/LiteralKit"
+import * as SchemaTransformation from "effect/SchemaTransformation"
+import { personName } from "../internal/Described.ts"
+import { ItemId } from "../Catalog.id.ts"
+import { Instant } from "@inventory/kernel/Text"
 import { nullAsNone } from "@inventory/kernel/Wire"
 
 /** The categories an item may be filed under: the list the category column is checked against. */

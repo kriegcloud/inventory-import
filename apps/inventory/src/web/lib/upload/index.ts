@@ -22,17 +22,12 @@ import {
 import * as S from "effect/Schema"
 import { useCallback, useSyncExternalStore } from "react"
 import { toast } from "sonner"
-import type { ImportView } from "../../../api/v1/Api.ts"
+import type { ImportView } from "@inventory/catalog-contract/Import"
 import { apiPrefix } from "../../../api/v1/Version.ts"
-import { FileProblem } from "../../../domain/FileProblem.ts"
-import { type ImportId, UploadKey } from "../../../domain/Ids.ts"
-import {
-  matchedColumn,
-  requiredFields,
-  type StagedHead,
-  type StagedRow,
-  type StagedTable
-} from "../../../domain/ItemImport.ts"
+import { FileProblem } from "@inventory/catalog-contract/FileProblem"
+import { type ImportId, UploadKey } from "@inventory/catalog-contract/Ids"
+import { matchedColumn } from "@inventory/catalog-contract/Mapping"
+import { requiredFields, type StagedHead, type StagedRow, type StagedTable } from "@inventory/catalog-contract/Staged"
 import type { SheetChoice, SheetSummary } from "../../../domain/Spreadsheet.ts"
 import { savedRows, type UploadState } from "../../../domain/Upload.ts"
 import { type Client, fork, runExit } from "../api.ts"

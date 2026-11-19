@@ -2,7 +2,7 @@
 // who answered, and the changes it made with what takes each back. It is keyed like the import's saved progress
 // (`progressKey`: per person, organization and screen) and decoded on the way back, so an older shape is dropped.
 import * as S from "effect/Schema"
-import { ViewChange } from "../../../domain/TableView.ts"
+import { ViewChange } from "@inventory/catalog-contract/TableView"
 import { progressKey, type ProgressScope } from "@inventory/review/SavedProgress"
 import { Patch } from "./view.ts"
 

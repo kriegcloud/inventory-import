@@ -1,7 +1,7 @@
+// What the table assistant is sent: the person's request in words and the table's columns, which every answer is
+// checked against.
 import * as S from "effect/Schema"
-import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/http-api"
-import { ColumnCatalog, maxPrompt, ViewOutcome } from "../../domain/TableView.ts"
-import { Identity } from "@inventory/kernel/Identity"
+import { ColumnCatalog, maxPrompt } from "./View.read.ts"
 
 // The table assistant: a request typed in words becomes a checked change to the person's own view of a table. Any
 // signed-in member may use it, because it changes nothing stored; it is still a POST under the identity middleware,
@@ -24,21 +24,3 @@ export const ViewRequest = S.Struct({
 }).annotate({ identifier: "ViewRequest", description: "A request for a view of a table, with the table's columns" })
 /** The decoded value of `ViewRequest`. */
 export type ViewRequest = typeof ViewRequest.Type
-
-/** The table assistant's endpoint. */
-export class AssistantApi extends HttpApiGroup.make("assistant")
-  .add(
-    HttpApiEndpoint.post("view", "/view", { payload: ViewRequest, success: ViewOutcome })
-      .annotate(OpenApi.Summary, "Turn a request in words into checked changes to a table's view")
-      .annotate(
-        OpenApi.Description,
-        "A request typed in words becomes a checked change to the person's own view of a table: a sort, a filter, a search, a column shown or hidden. Any signed-in member may use it, because it changes nothing stored. Answers 200 with the changes, or with a refusal worded for the person; the answer says whether a model or the fixed rules read the request. With no model, or with the day's model calls used up, the rules answer."
-      )
-  )
-  .middleware(Identity)
-  .prefix("/assistant")
-  .annotate(OpenApi.Title, "Table assistant")
-  .annotate(
-    OpenApi.Description,
-    "A request typed in words becomes a checked change to the person's own view of a table. It changes nothing stored, so any signed-in member may use it."
-  ) {}

@@ -2,8 +2,7 @@
 // screens' own come from `@inventory/access-web`), so a write invalidates exactly what it changed. How fetched data is
 // cached is `@inventory/client/QueryClient`'s.
 import { accessKeys } from "@inventory/access-web/Access"
-import type { ItemQuery } from "../../domain/ItemQuery.ts"
-
+import type { ItemQuery } from "@inventory/catalog-contract/ItemQuery"
 export { freshFor, queryClient } from "@inventory/client/QueryClient"
 export { sessionQuery } from "@inventory/access-web/Session"
 

@@ -1,7 +1,7 @@
 // Decides what a chosen file really is from its bytes, not its name, then hands it to the CSV or workbook reader.
 // Each reader is its own lazily loaded chunk, so choosing a CSV never downloads the workbook library.
 import { Array as Arr, Effect, Option } from "effect"
-import { type FileProblem, fileProblem } from "../../../domain/FileProblem.ts"
+import { type FileProblem, fileProblem } from "@inventory/catalog-contract/FileProblem"
 import { maxFileBytes, type Note, type SpreadsheetTable } from "../../../domain/Spreadsheet.ts"
 
 /**

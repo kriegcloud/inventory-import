@@ -2,7 +2,7 @@
 // change takes back only that change, and undoing the request puts the view back as it was before it.
 import { describe, expect, it } from "@effect/vitest"
 import { Array as Arr } from "effect"
-import type { CatalogColumn, ColumnCatalog, ViewChange } from "../../src/domain/TableView.ts"
+import type { CatalogColumn, ColumnCatalog, ViewChange } from "@inventory/catalog-contract/TableView"
 import {
   applyAll,
   describe as say,

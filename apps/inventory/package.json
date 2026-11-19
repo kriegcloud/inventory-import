@@ -50,6 +50,7 @@
     "@inventory/access-contract": "workspace:*",
     "@inventory/access-host": "workspace:*",
     "@inventory/access-web": "workspace:*",
+    "@inventory/catalog-contract": "workspace:*",
     "@inventory/client": "workspace:*",
     "@inventory/kernel": "workspace:*",
     "@inventory/review": "workspace:*",

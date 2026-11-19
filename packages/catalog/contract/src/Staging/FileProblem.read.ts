@@ -6,8 +6,8 @@
  * `FileProblem`; request errors stay for what is not the person's file (not signed in, not allowed, an upload that is
  * gone, the server broke).
  */
-import { dual } from "effect/Function"
 import * as S from "effect/Schema"
+import { dual } from "effect/Function"
 
 /**
  * The ways a file can be wrong as a whole. `wrongType`: not a .csv or .xlsx, whatever its name says. `empty`: no

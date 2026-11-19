@@ -1,11 +1,3 @@
-/**
- * "Suggest what the rules cannot": what is sent to a model about an import, and the guard on what comes back. Three
- * kinds only: a name for a row with an empty name, from its description; a category for a row whose category is not
- * one of the listed ones, from the item's name and description; a file column for a field no heading matched. The
- * one thing a reader must not break: every answer, a model's or a rule's, passes `guard` before it is stored, and
- * the guard, never the model, sets the confidence (medium at most) and writes the evidence from the file's own rows.
- * Nothing here changes a row: a suggestion is a proposal the person accepts or rejects in the review.
- */
 import { Array as Arr, Option, String as Str } from "effect"
 import { categories, maxNameLength } from "@inventory/catalog-contract/Item"
 import * as S from "effect/Schema"
@@ -19,6 +11,15 @@ import {
   type SuggestionKind,
   suggestionFits
 } from "@inventory/catalog-contract/Suggestion"
+
+/**
+ * "Suggest what the rules cannot": what is sent to a model about an import, and the guard on what comes back. Three
+ * kinds only: a name for a row with an empty name, from its description; a category for a row whose category is not
+ * one of the listed ones, from the item's name and description; a file column for a field no heading matched. The
+ * one thing a reader must not break: every answer, a model's or a rule's, passes `guard` before it is stored, and
+ * the guard, never the model, sets the confidence (medium at most) and writes the evidence from the file's own rows.
+ * Nothing here changes a row: a suggestion is a proposal the person accepts or rejects in the review.
+ */
 /** The most rows of one kind a single request asks about; the rest wait for the next press. */
 export const suggestCap = 20
 

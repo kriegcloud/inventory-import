@@ -1,15 +1,16 @@
-/**
- * A file on its way to the server: the states the screen shows while it is read and saved, and the rules for the
- * pieces it travels in. The one thing a reader must not break: an upload is not an import. Its rows are kept apart
- * until every piece has arrived and been checked, and only then become an import, whole, in one step; a cancelled or
- * failed upload never leaves rows anyone could confirm.
- */
 import { Array as Arr } from "effect"
 import { FileProblem, fileProblem } from "@inventory/catalog-contract/FileProblem"
 import { ImportId } from "@inventory/catalog-contract/Ids"
 import { maxStagedRows, type StagedRow } from "@inventory/catalog-contract/Staged"
 import * as S from "effect/Schema"
 import { chunkRows } from "@inventory/catalog-contract/Upload"
+
+/**
+ * A file on its way to the server: the states the screen shows while it is read and saved, and the rules for the
+ * pieces it travels in. The one thing a reader must not break: an upload is not an import. Its rows are kept apart
+ * until every piece has arrived and been checked, and only then become an import, whole, in one step; a cancelled or
+ * failed upload never leaves rows anyone could confirm.
+ */
 
 /**
  * The most characters of JSON one stored chunk may hold. D1 refuses a value over 2 MB; past this the person is told

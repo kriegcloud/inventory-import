@@ -37,10 +37,11 @@ import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
 import { makeApp, makeRoutes, servicesWith, toFetch } from "../../../src/server/App.ts"
 import { BetterAuthTest } from "@beep/better-auth/BetterAuthTest"
 import { Handlers } from "../../../src/server/handlers.ts"
-import { Imports } from "../../../src/server/Imports.ts"
-import { Items } from "../../../src/server/Items.ts"
-import { Suggestions } from "../../../src/server/Suggestions.ts"
-import { answerByRules, TableAssistant } from "../../../src/server/TableAssistant.ts"
+import { ImportStore } from "@inventory/catalog-model/ImportStore"
+import { ItemStore } from "@inventory/catalog-model/ItemStore"
+import { Suggestions } from "@inventory/catalog-model/Suggestions"
+import { answerByRules } from "@inventory/catalog-host/TableAssistant"
+import { TableAssistant } from "@inventory/catalog-model/TableAssistant"
 import * as Observability from "../../../src/server/Observability.ts"
 import { SameOriginLive } from "../../../src/server/SameOrigin.ts"
 import { testAccountPassword } from "@inventory/access-host/TestAccounts"
@@ -149,8 +150,8 @@ const notInMemory = <I, S extends object>(tag: Context.Key<I, S>, name: string) 
  * key reads by its rules and touches no table, exactly as the real one does then.
  */
 const InMemoryStorage = Layer.mergeAll(
-  notInMemory(Imports, "Imports"),
-  notInMemory(Items, "Items"),
+  notInMemory(ImportStore, "ImportStore"),
+  notInMemory(ItemStore, "ItemStore"),
   notInMemory(Suggestions, "Suggestions"),
   Layer.succeed(
     TableAssistant,

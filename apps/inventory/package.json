@@ -51,6 +51,7 @@
     "@inventory/access-host": "workspace:*",
     "@inventory/access-web": "workspace:*",
     "@inventory/catalog-contract": "workspace:*",
+    "@inventory/catalog-host": "workspace:*",
     "@inventory/catalog-model": "workspace:*",
     "@inventory/client": "workspace:*",
     "@inventory/kernel": "workspace:*",

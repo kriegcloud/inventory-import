@@ -11,7 +11,7 @@ import { storedSuggestion, suggestedByModel, type Suggestion } from "@inventory/
 import { digest, guard, type SuggestSource } from "@inventory/catalog-model/Suggest"
 import { ModelId } from "@beep/openrouter/OpenRouterModel"
 import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
-import { propose } from "../../src/server/Suggestions.ts"
+import { propose } from "@inventory/catalog-host/Suggestions"
 import { stage } from "./support/files.ts"
 
 const sourceOf = (

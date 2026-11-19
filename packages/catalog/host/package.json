@@ -1,0 +1,45 @@
+{
+  "name": "@inventory/catalog-host",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The catalog on Cloudflare: its stores on D1, suggestions and the table assistant on the model service, and what each endpoint does",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": [],
+  "exports": {
+    "./package.json": "./package.json",
+    "./Host": "./src/Host.ts",
+    "./Http": "./src/Catalog.http.ts",
+    "./ImportStoreD1": "./src/ImportStore.adapter.ts",
+    "./ItemStoreD1": "./src/ItemStore.adapter.ts",
+    "./Suggestions": "./src/Suggestions.adapter.ts",
+    "./TableAssistant": "./src/TableAssistant.adapter.ts",
+    "./Model": "./src/Answerer.adapter.ts",
+    "./ItemRow": "./src/internal/itemRow.ts"
+  },
+  "scripts": {
+    "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",
+    "lint": "oxlint --quiet src test",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@beep/d1": "workspace:*",
+    "@beep/openrouter": "workspace:*",
+    "@beep/schema": "workspace:*",
+    "@inventory/access-contract": "workspace:*",
+    "@inventory/catalog-contract": "workspace:*",
+    "@inventory/catalog-model": "workspace:*",
+    "@inventory/kernel": "workspace:*",
+    "effect": "4.1.4"
+  },
+  "devDependencies": {
+    "@effect/vitest": "4.1.4",
+    "@types/node": "^24.19.2",
+    "vitest": "^5.1.0"
+  },
+  "beep": {
+    "family": "context",
+    "context": "catalog",
+    "layer": "host"
+  }
+}

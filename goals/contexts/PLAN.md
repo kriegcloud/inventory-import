@@ -342,3 +342,27 @@ None.
   - Read on screen, fresh database: the messy sample "Import 155, skip 45"; "Leave out 2": "Import 157, skip 43",
     the same after a refresh; confirmed "Not imported 43 · Imported 157 · Already there 0 · All 200"; taken back
     "Taken back 157 · Not imported 43 · Imported 0", Items "0 items".
+- **`catalog-model`, second part, and `catalog-host` (`packages/catalog/host`).** The four server services are split
+  at their seam: the port is the service's interface with the schemas it speaks (`./ImportStore`, `./ItemStore`,
+  `./Suggestions`, `./TableAssistant` in the model), the adapter is its Layer in the host (`ImportStoreD1`,
+  `ItemStoreD1`, `SuggestionsLive`, `TableAssistantLive`; every statement as it was). The endpoints of the three
+  groups are the model's (`./ImportsHandler`, `./ItemsHandler`, `./AssistantHandler`: an Effect that resolves the
+  ports once and answers the object for `handlers.handleAll`), handed on by the host's `./Http`; the app builds
+  the three group Layers against its `Api` and composes the four Layers. Asking the model (`askModel`,
+  `answeredByRules`, `modelIsOn`) is the host's `./Model`; the app's `Model.ts` keeps the settings and `AiStatus`.
+  The app's `src/server` no longer holds `Imports.ts`, `Items.ts`, `Suggestions.ts`, `TableAssistant.ts`,
+  `ImportHandlers.ts` or `ImportShape.ts`.
+  - **Not built, and still owed by decision (C6) and the brief:** the in-memory twins of the four ports
+    (`CatalogTest.memory`), `ConfirmPlan` in place of `CommitRow`, the ports the brief names for the model and the
+    allowance (`Answerer`, `ModelAllowance` behind `ModelAllowanceViaAccess`: the two features that ask a model sit
+    whole in the host, model call and storage together, and take from the access gateway directly),
+    `SuggestionStore` and `AssistantLog` as storage-only ports, `handlersOf`, the audit line in one
+    `internal/auditLine.ts`, and tests of the handlers over twins. The server tests stay in the app, on D1.
+  - Read on screen, fresh database: the messy sample "Import 155, skip 45"; "Leave out 2": "Import 157, skip 43";
+    Undo: "Import 155, skip 45"; Redo: "Import 157, skip 43" (three saves sent, the second a clear of both rows);
+    after a refresh "Import 157, skip 43" and "Undo: 2 rows left out"; "Import 157 items? 43 items won't be
+    imported (Needs a decision 20, Cannot import 21, Left out 2)..."; "Not imported 43 · Imported 157 · Already
+    there 0 · All 200"; Items "157 items". Searched "washr brass": "1 of 157 items, best matches first", Brass
+    Washer M6. Asked the assistant "only kilograms, cheapest first": "Answered by anthropic/claude-haiku-5.5",
+    "Filtered: UoM is KG", "Sorted by Unit cost, low to high", "20 of 157 items", first row Nylon Tube 1in $10.71,
+    address `?sort=unitCost.asc&uom=KG`.

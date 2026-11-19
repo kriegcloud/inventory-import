@@ -12,14 +12,14 @@ import type { OpenRouter } from "@beep/openrouter/OpenRouter"
 import { ModelLive } from "./Model.ts"
 import type { BetterAuth } from "@beep/better-auth/BetterAuth"
 import { Handlers } from "./handlers.ts"
-import { Imports } from "./Imports.ts"
+import { ImportStoreD1 } from "@inventory/catalog-host/ImportStoreD1"
+import { ItemStoreD1 } from "@inventory/catalog-host/ItemStoreD1"
+import { SuggestionsLive } from "@inventory/catalog-host/Suggestions"
+import { TableAssistantLive } from "@inventory/catalog-host/TableAssistant"
 import * as Observability from "./Observability.ts"
 import { RequestTelemetry } from "./RequestTelemetry.ts"
 import { SameOriginLive } from "./SameOrigin.ts"
 import { withSecurityHeaders } from "./security.ts"
-import { Items } from "./Items.ts"
-import { Suggestions } from "./Suggestions.ts"
-import { TableAssistant } from "./TableAssistant.ts"
 import { HttpTracing, OtlpProxyRoute, RequestMetrics } from "./Telemetry.ts"
 
 // The app as layers, without the Cloudflare runtime: worker.ts gives it the D1 binding and the environment, and the
@@ -90,13 +90,13 @@ export const servicesWith = <E, R>(options: {
   readonly production: boolean
 }) => {
   // The access context: its ports on D1, the session answer, and the gateway to the day's model allowance.
-  const storage = Layer.mergeAll(AccessLive(options), Imports.layer, Items.layer, options.ai)
+  const storage = Layer.mergeAll(AccessLive(options), ImportStoreD1, ItemStoreD1, options.ai)
   // The table assistant and the import's suggestions use the model and the day's allowance; everything else uses
   // storage only.
   return Layer.mergeAll(
     storage,
-    TableAssistant.layer.pipe(Layer.provide(storage)),
-    Suggestions.layer.pipe(Layer.provide(storage))
+    TableAssistantLive.pipe(Layer.provide(storage)),
+    SuggestionsLive.pipe(Layer.provide(storage))
   )
 }
 

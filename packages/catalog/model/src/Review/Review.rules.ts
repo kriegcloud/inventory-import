@@ -1,14 +1,3 @@
-/**
- * The review of a file of inventory items: one pure function that turns the staged table, the column choices and the
- * person's decisions into rows that are ready, need a decision, cannot be imported as written, are left out or are
- * already there. The screen and the commit both call `review`, so the server can never write a row the screen
- * refused. The one thing a reader must not break: nothing here changes a value without saying so. A different reading
- * of a cell is in force only through a decision the person made or, with `ruleFixes` set to "apply", through a
- * form-only rule with one reading (spaces, capitals, a "$", yes for true), which is listed as a change, counted in
- * `fixed` and undone by one decision.
- *
- * Each rule is one kind of problem (`problemKinds`), one check (`fault`) and at most one proposal (`proposeFor`).
- */
 import { RowId } from "@inventory/catalog-contract/Ids"
 import { Array as Arr, HashMap, HashSet, Option, Record as Rec, String as Str } from "effect"
 import { type FileProblem, fileProblem } from "@inventory/catalog-contract/FileProblem"
@@ -67,6 +56,18 @@ import {
   isLeftOut,
   hasKeep
 } from "@inventory/catalog-contract/Decision"
+
+/**
+ * The review of a file of inventory items: one pure function that turns the staged table, the column choices and the
+ * person's decisions into rows that are ready, need a decision, cannot be imported as written, are left out or are
+ * already there. The screen and the commit both call `review`, so the server can never write a row the screen
+ * refused. The one thing a reader must not break: nothing here changes a value without saying so. A different reading
+ * of a cell is in force only through a decision the person made or, with `ruleFixes` set to "apply", through a
+ * form-only rule with one reading (spaces, capitals, a "$", yes for true), which is listed as a change, counted in
+ * `fixed` and undone by one decision.
+ *
+ * Each rule is one kind of problem (`problemKinds`), one check (`fault`) and at most one proposal (`proposeFor`).
+ */
 
 /**
  * Whether the rules' form-only fixes (spaces round a SKU or a name, "bx" for BX, a "$" before a cost, yes for true,

@@ -36,6 +36,7 @@
         "@inventory/access-host": "workspace:*",
         "@inventory/access-web": "workspace:*",
         "@inventory/catalog-contract": "workspace:*",
+        "@inventory/catalog-host": "workspace:*",
         "@inventory/catalog-model": "workspace:*",
         "@inventory/client": "workspace:*",
         "@inventory/kernel": "workspace:*",
@@ -173,6 +174,25 @@
       "version": "0.0.0",
       "dependencies": {
         "@beep/schema": "workspace:*",
+        "@inventory/kernel": "workspace:*",
+        "effect": "4.1.4",
+      },
+      "devDependencies": {
+        "@effect/vitest": "4.1.4",
+        "@types/node": "^24.19.2",
+        "vitest": "^5.1.0",
+      },
+    },
+    "packages/catalog/host": {
+      "name": "@inventory/catalog-host",
+      "version": "0.0.0",
+      "dependencies": {
+        "@beep/d1": "workspace:*",
+        "@beep/openrouter": "workspace:*",
+        "@beep/schema": "workspace:*",
+        "@inventory/access-contract": "workspace:*",
+        "@inventory/catalog-contract": "workspace:*",
+        "@inventory/catalog-model": "workspace:*",
         "@inventory/kernel": "workspace:*",
         "effect": "4.1.4",
       },
@@ -676,6 +696,8 @@
     "@inventory/app": ["@inventory/app@workspace:apps/inventory"],
 
     "@inventory/catalog-contract": ["@inventory/catalog-contract@workspace:packages/catalog/contract"],
+
+    "@inventory/catalog-host": ["@inventory/catalog-host@workspace:packages/catalog/host"],
 
     "@inventory/catalog-model": ["@inventory/catalog-model@workspace:packages/catalog/model"],
 

@@ -4,12 +4,11 @@ import { HttpApiBuilder } from "effect/http-api"
 import { ModelAllowanceGateway, ModelCallsUsedUp } from "@inventory/access-contract/ModelAllowance"
 import { activityCount, activityEndpoints, identityEndpoints, peopleEndpoints } from "@inventory/access-host/Http"
 import { AiCheck, Api, SystemStatus } from "../api/v1/Api.ts"
-import { CurrentActor } from "@inventory/kernel/Actor"
 import { OpenRouter } from "@beep/openrouter/OpenRouter"
-import { aiStatusOf, askModel, modelIsOn } from "./Model.ts"
+import { askModel, modelIsOn } from "@inventory/catalog-host/Model"
+import { assistantEndpoints, importsEndpoints, itemsEndpoints } from "@inventory/catalog-host/Http"
+import { aiStatusOf } from "./Model.ts"
 import { requireRole } from "@inventory/kernel/Actor"
-import { ImportHandlers, ItemHandlers } from "./ImportHandlers.ts"
-import { TableAssistant } from "./TableAssistant.ts"
 
 // Handlers read the actor with `yield* CurrentActor` (from the identity middleware, never from the request) and call
 // one service each. Every write starts with `requireRole`; the cross-site check has already run (SameOrigin.ts).
@@ -77,19 +76,30 @@ const PeopleHandlers = HttpApiBuilder.group(
   })
 )
 
-// The table assistant: any member may ask, because it changes only their own view.
+// The catalog's three groups, built the same way: what each endpoint does is the catalog's (`catalog-model`, handed on
+// by its host); the Layer is built here, against `Api`.
+const ImportHandlers = HttpApiBuilder.group(
+  Api,
+  "imports",
+  Effect.fn(function* (handlers) {
+    const endpoints = yield* importsEndpoints
+    return handlers.handleAll(endpoints)
+  })
+)
+const ItemHandlers = HttpApiBuilder.group(
+  Api,
+  "items",
+  Effect.fn(function* (handlers) {
+    const endpoints = yield* itemsEndpoints
+    return handlers.handleAll(endpoints)
+  })
+)
 const AssistantHandlers = HttpApiBuilder.group(
   Api,
   "assistant",
   Effect.fn(function* (handlers) {
-    const assistant = yield* TableAssistant
-    return handlers.handle(
-      "view",
-      Effect.fn("assistant.view")(function* ({ payload }) {
-        const actor = yield* CurrentActor
-        return yield* assistant.view(actor, payload)
-      })
-    )
+    const endpoints = yield* assistantEndpoints
+    return handlers.handleAll(endpoints)
   })
 )
 

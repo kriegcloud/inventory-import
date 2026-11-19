@@ -8,7 +8,8 @@ import { Array as Arr, Effect, Formatter, Layer, MutableRef } from "effect"
 import * as S from "effect/Schema"
 import { HttpClient, HttpClientResponse } from "effect/http"
 import { modelSentences } from "@inventory/catalog-contract/AiUnavailable"
-import { aiStatusOf, answeredByRules, askModel, modelLayer } from "../../src/server/Model.ts"
+import { answeredByRules, askModel } from "@inventory/catalog-host/Model"
+import { aiStatusOf, modelLayer } from "../../src/server/Model.ts"
 import { settingsLayer } from "./support/app.ts"
 
 const Greeting = S.Struct({ greeting: S.String })

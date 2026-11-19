@@ -14,7 +14,14 @@
     "./Spreadsheet": "./src/Reading/Spreadsheet.rules.ts",
     "./Suggest": "./src/Suggestion/Suggest.rules.ts",
     "./TableViewRules": "./src/Assistant/TableView.rules.ts",
-    "./Upload": "./src/Staging/Upload.rules.ts"
+    "./Upload": "./src/Staging/Upload.rules.ts",
+    "./ImportStore": "./src/Import/ImportStore.store.ts",
+    "./ItemStore": "./src/Item/ItemStore.store.ts",
+    "./Suggestions": "./src/Suggestion/Suggestions.store.ts",
+    "./TableAssistant": "./src/Assistant/TableAssistant.store.ts",
+    "./ImportsHandler": "./src/Import/Imports.handler.ts",
+    "./ItemsHandler": "./src/Item/Items.handler.ts",
+    "./AssistantHandler": "./src/Assistant/Assistant.handler.ts"
   },
   "scripts": {
     "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",

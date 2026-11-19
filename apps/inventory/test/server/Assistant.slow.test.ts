@@ -11,7 +11,7 @@ import { type AnsweredBy } from "@inventory/catalog-contract/Answer"
 import { ModelId } from "@beep/openrouter/OpenRouterModel"
 import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
 import { dailyModelCalls } from "@inventory/access-contract/ModelAllowance"
-import { usedUp } from "../../src/server/TableAssistant.ts"
+import { usedUp } from "@inventory/catalog-host/TableAssistant"
 import { items } from "./support/columns.ts"
 import { as, TypedApp as TestApp, testAppWith } from "./support/app.ts"
 

@@ -6,7 +6,7 @@ import { Array as Arr, Effect, Layer, Option, Result } from "effect"
 import * as S from "effect/Schema"
 import { HttpApiTest } from "effect/http-api"
 import { TestClock } from "effect/testing"
-import { Api } from "../../src/api/v1/Api.ts"
+import { type AnsweredBy, Api } from "../../src/api/v1/Api.ts"
 import { ModelId } from "@beep/openrouter/OpenRouterModel"
 import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
 import { dailyModelCalls } from "@inventory/access-contract/ModelAllowance"
@@ -15,6 +15,12 @@ import { items } from "../domain/TableView.test.ts"
 import { as, TypedApp as TestApp, testAppWith } from "./support/app.ts"
 
 const request = (prompt: string) => ({ payload: { prompt, table: "Items", columns: items, searchable: false } })
+/** Who read a request, in a word: the rules or a model. */
+const who = (answer: { readonly answeredBy: AnsweredBy }): "rules" | "model" =>
+  answer.answeredBy._tag === "Rules" ? "rules" : "model"
+/** The model that read it, when one did. */
+const modelOf = (answer: { readonly answeredBy: AnsweredBy }): string | null =>
+  answer.answeredBy._tag === "Model" ? answer.answeredBy.model : null
 
 layer(TestApp)("the table assistant with no AI key", (it) => {
   it.effect("the rules answer the plain cases, say that they did, and write nothing", () =>
@@ -23,9 +29,9 @@ layer(TestApp)("the table assistant with no AI key", (it) => {
       const read = yield* client.assistant.view(request("Sort by name descending and only Box")).pipe(as("mem_priya"))
       expect(Result.isSuccess(read)).toBe(true)
       if (Result.isSuccess(read)) {
-        expect(read.success.by).toBe("rules")
-        expect(read.success.model).toBe(null)
-        expect(read.success.note).toContain("No AI key is set, so the rules answered.")
+        // Who answered is the contract's one value: the rules, with the reason no model did.
+        expect(read.success.answeredBy).toEqual({ _tag: "Rules", reason: "No AI key is set, so the rules answered." })
+        expect(read.success.note).toEqual(Option.none())
         expect(read.success.changes).toEqual([
           { kind: "sort", column: "name", direction: "desc" },
           { kind: "filter", column: "unit", operator: "inArray", values: ["Box"] }
@@ -76,9 +82,9 @@ layer(
         const read = yield* client.assistant.view(request("show items we count with no vendor")).pipe(as("mem_priya"))
         expect(Result.isSuccess(read)).toBe(true)
         if (Result.isSuccess(read)) {
-          expect([read.success.by, read.success.model]).toEqual(["model", "scripted/model"])
-          expect(read.success.note).toBe(
-            "This table has no vendor column, so items with no vendor could not be picked out."
+          expect(read.success.answeredBy).toMatchObject({ _tag: "Model", model: "scripted/model" })
+          expect(read.success.note).toEqual(
+            Option.some("This table has no vendor column, so items with no vendor could not be picked out.")
           )
           expect(read.success.changes).toEqual([
             { kind: "filter", column: "counted", operator: "eq", values: ["true"] }
@@ -109,11 +115,10 @@ layer(
       const read = yield* client.assistant.view(request("items with no vendor")).pipe(as("mem_priya"))
       expect(Result.isFailure(read)).toBe(true)
       if (Result.isFailure(read)) {
-        expect(read.failure).toEqual({
+        expect(read.failure).toMatchObject({
           reason: "The answer named a column this table does not have (“vendor”), so nothing was changed.",
-          by: "model",
-          model: "scripted/model",
-          note: null
+          answeredBy: { _tag: "Model", model: "scripted/model" },
+          note: Option.none()
         })
       }
     })
@@ -129,7 +134,7 @@ layer(TestApp)("the table assistant filling a table's search box, with no AI key
     Effect.gen(function* () {
       const client = yield* HttpApiTest.groups(Api, ["assistant"])
       const read = yield* client.assistant.view(searchable("find the steel brackets")).pipe(as("mem_priya"))
-      expect(Result.isSuccess(read) ? [read.success.by, read.success.changes] : read).toEqual([
+      expect(Result.isSuccess(read) ? [who(read.success), read.success.changes] : read).toEqual([
         "rules",
         [{ kind: "search", text: "steel brackets" }]
       ])
@@ -146,13 +151,11 @@ layer(testAppWith(answering({ changes: [{ kind: "search", text: "  steel bracket
       Effect.gen(function* () {
         const client = yield* HttpApiTest.groups(Api, ["assistant"])
         const read = yield* client.assistant.view(searchable("show me the steel brackets")).pipe(as("mem_priya"))
-        expect(Result.isSuccess(read) ? [read.success.by, read.success.model, read.success.changes] : read).toEqual([
-          "model",
-          "scripted/model",
-          [{ kind: "search", text: "steel bracket" }]
-        ])
+        expect(
+          Result.isSuccess(read) ? [who(read.success), modelOf(read.success), read.success.changes] : read
+        ).toEqual(["model", "scripted/model", [{ kind: "search", text: "steel bracket" }]])
         const none = yield* client.assistant.view(request("show me the steel brackets")).pipe(as("mem_priya"))
-        expect(Result.isFailure(none) ? [none.failure.by, none.failure.reason] : none).toEqual([
+        expect(Result.isFailure(none) ? [who(none.failure), none.failure.reason] : none).toEqual([
           "model",
           "This table has no search box; ask for a filter on a column instead, so nothing was changed."
         ])
@@ -173,14 +176,13 @@ layer(testAppWith(answering({ changes: [{ kind: "sort", column: "name", directio
           const client = yield* HttpApiTest.groups(Api, ["assistant", "system"])
           const ask = client.assistant.view(request("sort by name")).pipe(as("mem_priya"))
           const answers = yield* Effect.forEach(Arr.range(1, dailyModelCalls + 1), () => ask, { concurrency: 1 })
-          const by = Arr.map(answers, (answer) => (Result.isSuccess(answer) ? answer.success.by : answer.failure.by))
+          const by = Arr.map(answers, (answer) => who(Result.isSuccess(answer) ? answer.success : answer.failure))
           expect(Arr.filter(by, (who) => who === "model").length).toBe(dailyModelCalls)
           const last = Arr.last(answers)
-          expect(
-            last._tag === "Some" && Result.isSuccess(last.value)
-              ? [last.value.success.by, last.value.success.note]
-              : last
-          ).toEqual(["rules", usedUp])
+          expect(last._tag === "Some" && Result.isSuccess(last.value) ? last.value.success.answeredBy : last).toEqual({
+            _tag: "Rules",
+            reason: usedUp
+          })
           // The rules still do the work: the same sort, read from the words.
           expect(last._tag === "Some" && Result.isSuccess(last.value) ? last.value.success.changes : last).toEqual([
             { kind: "sort", column: "name", direction: "asc" }
@@ -192,10 +194,10 @@ layer(testAppWith(answering({ changes: [{ kind: "sort", column: "name", directio
           )
           // Another organization has its own allowance.
           const elsewhere = yield* client.assistant.view(request("sort by name")).pipe(as("mem_tom"))
-          expect(Result.isSuccess(elsewhere) ? elsewhere.success.by : elsewhere).toBe("model")
+          expect(Result.isSuccess(elsewhere) ? who(elsewhere.success) : elsewhere).toBe("model")
           yield* TestClock.adjust("25 hours")
           const later = yield* ask
-          expect(Result.isSuccess(later) ? later.success.by : later).toBe("model")
+          expect(Result.isSuccess(later) ? who(later.success) : later).toBe("model")
         })
     )
   }

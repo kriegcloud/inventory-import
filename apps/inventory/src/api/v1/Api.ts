@@ -5,6 +5,7 @@ import { absentAsNone, nullAsNone } from "@inventory/kernel/Wire"
 import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiMiddleware, OpenApi } from "effect/http-api"
 import { ActivityApi, IdentityApi, PeopleApi } from "@inventory/access-contract/Access"
 import { ModelCallsUsedUp } from "@inventory/access-contract/ModelAllowance"
+import { AiProvider, AnsweredBy } from "../../domain/Answer.ts"
 import { personName, reasonForPerson } from "../../domain/Described.ts"
 import { StagingOutcome } from "../../domain/FileProblem.ts"
 import { ItemEdit, ItemFields, StoredItem } from "../../domain/Item.ts"
@@ -43,13 +44,6 @@ export const openApiPath = `${apiPrefix}/openapi.json` as const
 /** The API reference page (Scalar). Served in development only: a production build has no such route. */
 export const docsPath = `${apiPrefix}/docs` as const
 
-/** The model provider the server can reach. A union of one, so the wire keeps naming it. */
-export const AiProvider = S.Literals(["openrouter"]).annotate({
-  description: "The model provider: OpenRouter (OPENROUTER_API_KEY)."
-})
-/** One of the `AiProvider` names. */
-export type AiProvider = typeof AiProvider.Type
-
 /** One step of the model plan: a provider, the model asked first, and the models that provider falls back to. */
 export class AiRoute extends S.Class<AiRoute, { readonly brand: unique symbol }>("AiRoute")(
   {
@@ -80,25 +74,6 @@ export class AiStatus extends S.Class<AiStatus, { readonly brand: unique symbol 
   { description: "What will answer a model call, so nobody waits on a missing key." }
 ) {}
 
-/**
- * Who produced a result that a model may have helped with: a model (which provider and model, and whether it was a
- * fallback) or the rules (the non-AI path, with the reason the model was not used). The screen says which.
- */
-export const AnsweredBy = S.Union([
-  S.TaggedStruct("Model", {
-    provider: AiProvider,
-    model: S.String.annotateKey({ description: "The model that answered, as the provider reported it." }),
-    fallback: S.Boolean.annotateKey({
-      description: "True when it was not the first model of the first provider: a fallback answered."
-    })
-  }),
-  S.TaggedStruct("Rules", {
-    reason: S.String.annotateKey({ description: "Why no model answered, in words for the person." })
-  })
-]).annotate({ identifier: "AnsweredBy", description: "Which one answered: a model, or the rules when no model could." })
-/** An `AnsweredBy` value. */
-export type AnsweredBy = typeof AnsweredBy.Type
-
 /** Health of the stack as the current member sees it. The activity count is their organization's only. */
 export class SystemStatus extends S.Class<SystemStatus, { readonly brand: unique symbol }>("SystemStatus")(
   {
@@ -128,6 +103,7 @@ export class AiCheck extends S.Class<AiCheck, { readonly brand: unique symbol }>
   { description: "The model's answer to a short test prompt, and how long it took." }
 ) {}
 
+export { AiProvider, AnsweredBy } from "../../domain/Answer.ts"
 export { modelSentences } from "./ModelTrouble.ts"
 
 /** Why no model answered, in the five cases the screens have words for (`modelSentences`). */

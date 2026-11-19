@@ -1,5 +1,7 @@
 import { Array as Arr, Option, Result, String as Str } from "effect"
 import * as S from "effect/Schema"
+import { nullAsNone } from "@inventory/kernel/Wire"
+import { AnsweredBy } from "./Answer.ts"
 
 // WHAT THE TABLE ASSISTANT MAY ASK OF A TABLE, AND NOTHING MORE. A person types what they want to see; a model (or the
 // fixed rules) answers with a `ViewCommand`: sort, filter, search, show or hide a column, clear. The command changes
@@ -151,21 +153,16 @@ export const ViewCommand = S.Struct({
 /** The decoded value of `ViewCommand`. */
 export type ViewCommand = typeof ViewCommand.Type
 
-/** Who answered a request: the fixed rules, or a model. */
-export const AnsweredBy = S.Literals(["rules", "model"]).annotate({
-  description: "rules: the fixed reader that needs no key. model: a language model"
-})
-
 /** A request the assistant could turn into changes, and who read it. */
 export const ViewAnswer = S.Struct({
   changes: S.Array(ViewChange).annotateKey({
     description: "The changes to make to the view, in order; each was checked against the table's columns"
   }),
-  by: AnsweredBy,
-  model: S.NullOr(S.String).annotateKey({ description: "The model that answered; null for the rules" }),
-  note: S.NullOr(S.String).annotateKey({
-    description: "A sentence for the person: what was not done, or why the rules answered. Null when there is none"
-  })
+  // Who read the request: a model, or the rules with the reason no model did.
+  answeredBy: AnsweredBy,
+  note: S.String.pipe(
+    nullAsNone({ description: "A sentence for the person about what was not done. Null when there is none" })
+  )
 }).annotate({ identifier: "ViewAnswer", description: "The changes a request asked for, and who read it" })
 /** The decoded value of `ViewAnswer`. */
 export type ViewAnswer = typeof ViewAnswer.Type
@@ -173,11 +170,11 @@ export type ViewAnswer = typeof ViewAnswer.Type
 /** A request the assistant would not apply, said for the person. Nothing in the view changes. */
 export const ViewRefusal = S.Struct({
   reason: S.String.annotateKey({ description: "What could not be done and what to try, for the person" }),
-  by: AnsweredBy,
-  model: S.NullOr(S.String).annotateKey({ description: "The model that answered; null for the rules" }),
-  note: S.NullOr(S.String).annotateKey({
-    description: "A sentence for the person, such as why the rules answered. Null when there is none"
-  })
+  // Who read the request: a model, or the rules with the reason no model did.
+  answeredBy: AnsweredBy,
+  note: S.String.pipe(
+    nullAsNone({ description: "A sentence for the person about what was not done. Null when there is none" })
+  )
 }).annotate({ identifier: "ViewRefusal", description: "A request the assistant would not apply, said for the person" })
 /** The decoded value of `ViewRefusal`. */
 export type ViewRefusal = typeof ViewRefusal.Type

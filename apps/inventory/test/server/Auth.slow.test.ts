@@ -293,7 +293,7 @@ layer(signInApp(), { timeout: "60 seconds" })("sign-in with Better Auth", (it) =
       expect(view.status).toBe(200)
       expect(view.json).toMatchObject({
         _tag: "Success",
-        success: { by: "rules", changes: [{ kind: "sort", column: "name", direction: "asc" }] }
+        success: { answeredBy: { _tag: "Rules" }, changes: [{ kind: "sort", column: "name", direction: "asc" }] }
       })
       expect((yield* priya.send("GET", "/api/v1/activity")).json.length).toBe(before)
     })

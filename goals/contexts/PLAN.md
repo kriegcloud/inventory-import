@@ -186,4 +186,22 @@ None.
     "A: sku": "By a person" with that column's examples, the answer `{"how":"person","field":"description",
     "column":{"index":0,"header":"sku","examples":[...]}}`. Then, fresh database, the messy sample through Confirm:
     the three numbers.
+- **catalog (h), the assistant says who answered with the contract's one value.** `ViewAnswer` and `ViewRefusal`
+  carry `answeredBy` (`Model { provider, model, fallback }` or `Rules { reason }`) in place of `by` beside a nullable
+  `model`, and `note` is `Option`. `AnsweredBy` and `AiProvider` moved to `src/domain/Answer.ts` (the contract
+  re-exports them), so the table view's rules can name them. Taken before (f) and (g): it is self-contained, and
+  (f) reaches about 250 places in the review rules.
+  - **The reason the rules answered is `answeredBy.reason`, not the note.** The screen and the stored conversation
+    are unchanged: the entry keeps "Rules" and that sentence, or the model's name and what it could not do.
+  - Read on screen, model on (status: "Answers come from OpenRouter (anthropic/claude-haiku-5.5, then
+    google/gemini-3.8-flash); then the non-AI path."): asked "show only packaging, most expensive first"; the answer
+    carried `"answeredBy":{"_tag":"Model","provider":"openrouter","model":"anthropic/claude-haiku-5.5",
+    "fallback":false},"note":null`; the panel read "Answered by anthropic/claude-haiku-5.5 · Applied changes ·
+    Filtered: Category is packaging · Sorted by Unit cost, high to low", the table "28 of 155 items", first row
+    "Zinc-Plated Box 12x12x8 ... $12.82".
+  - Read on screen, AI turned off by the recipe in CLAUDE.md (status: "AI suggestions are off: AI_ENABLED is set to
+    false."): asked "sort by name descending": "Answered by Rules · No AI key is set, so the rules answered. ·
+    Applied changes · Sorted by Name, Z to A", first row "Zinc-Plated Workbench"; asked "which items are slow
+    movers": "Answered by Rules · The rules could not read “which items are slow movers”." The settings file was put
+    back afterwards.
 

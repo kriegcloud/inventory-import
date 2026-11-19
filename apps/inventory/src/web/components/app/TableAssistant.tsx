@@ -2,7 +2,7 @@ import { stringify } from "@inventory/ui/Json"
 import { useMutation } from "@tanstack/react-query"
 import { ArrowUp, ChevronRight, MessageSquarePlus, Sparkles, Undo2, X } from "lucide-react"
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react"
-import { Clock, Effect, Result } from "effect"
+import { Clock, Effect, Option, Result } from "effect"
 import { Button } from "@inventory/ui/components/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@inventory/ui/components/collapsible"
 import { Input } from "@inventory/ui/components/input"
@@ -20,7 +20,20 @@ import {
   writeConversation
 } from "@/lib/table-assistant/conversation"
 import { applyAll, describe, overtaken, takeBack, type ViewFilter, type ViewState } from "@/lib/table-assistant/view"
+import type { AnsweredBy } from "../../../domain/Answer.ts"
 import { type ColumnCatalog, maxPrompt, rulesRead } from "../../../domain/TableView.ts"
+
+/**
+ * Who answered and the line under it, as the conversation keeps them: "Rules" with the reason no model answered, or
+ * the model's name with what it said it could not do.
+ */
+const whoAnswered = (answer: {
+  readonly answeredBy: AnsweredBy
+  readonly note: Option.Option<string>
+}): { readonly answeredBy: string; readonly note: string | null } =>
+  answer.answeredBy._tag === "Rules"
+    ? { answeredBy: "Rules", note: answer.answeredBy.reason }
+    : { answeredBy: answer.answeredBy.model, note: Option.getOrNull(answer.note) }
 
 /** The parts of a TanStack table the assistant reads and writes: the table's own state, never a copy of it. */
 export type AssistedTable = {
@@ -159,8 +172,7 @@ export function TableAssistant(props: {
               id,
               prompt: typed,
               outcome: "refused",
-              answeredBy: failure.by === "rules" ? "Rules" : failure.model,
-              note: failure.note,
+              ...whoAnswered(failure),
               reason: failure.reason,
               applied: [],
               undone: false
@@ -178,8 +190,7 @@ export function TableAssistant(props: {
             id,
             prompt: typed,
             outcome: "applied",
-            answeredBy: answer.by === "rules" ? "Rules" : answer.model,
-            note: answer.note,
+            ...whoAnswered(answer),
             reason: null,
             applied: answer.changes.map((change, index) => ({
               change,

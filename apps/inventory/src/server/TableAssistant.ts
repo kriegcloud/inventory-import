@@ -6,13 +6,14 @@
 // daily allowance first (the access context's `ModelAllowanceGateway`), the one every model feature draws on; when it is used up the rules answer
 // and say so. The one thing not to break: nothing here writes anything but that count and the audit line of a
 // model's answer, so it never needs more than the viewer role.
-import { Array as Arr, Context, DateTime, Effect, Layer, Result } from "effect"
+import { Array as Arr, Context, DateTime, Effect, Layer, Option, Result } from "effect"
 import * as S from "effect/Schema"
 import { SecureRandom } from "effect/crypto"
 import { SqlClient } from "effect/sql"
 import type { ViewRequest } from "../api/v1/Assistant.ts"
 import { AgentRun } from "@inventory/kernel/AgentRun"
 import { Member } from "@inventory/kernel/Member"
+import type { AnsweredBy } from "../domain/Answer.ts"
 import { checkCommand, readByRules, type ViewChange, ViewCommand, type ViewOutcome } from "../domain/TableView.ts"
 import { asAgent } from "@inventory/kernel/Agent"
 import { OpenRouter } from "@beep/openrouter/OpenRouter"
@@ -31,6 +32,9 @@ export const usedUp = `${usedUpWords}, so the rules answered.`
  * The fixed rules' answer to a request, checked against its catalog like a model's, with the sentence that says why
  * the rules answered. Pure: it needs no key and touches no table.
  */
+/** The rules answered, and why no model did. */
+const answeredByRules = (reason: string): AnsweredBy => ({ _tag: "Rules", reason })
+
 export const answerByRules = (input: { readonly request: ViewRequest; readonly why: string }): ViewOutcome => {
   const { request, why } = input
   const read = readByRules({ prompt: request.prompt, columns: request.columns })
@@ -38,8 +42,8 @@ export const answerByRules = (input: { readonly request: ViewRequest; readonly w
     ? checkCommand({ changes: read.success, columns: request.columns, searchable: request.searchable })
     : read
   return Result.isSuccess(checked)
-    ? Result.succeed({ changes: checked.success, by: "rules" as const, model: null, note: why })
-    : Result.fail({ reason: checked.failure, by: "rules" as const, model: null, note: why })
+    ? Result.succeed({ changes: checked.success, answeredBy: answeredByRules(why), note: Option.none() })
+    : Result.fail({ reason: checked.failure, answeredBy: answeredByRules(why), note: Option.none() })
 }
 
 /** The agent that reads table requests. It changes a person's view only, so it never acts above a viewer. */
@@ -146,7 +150,8 @@ export class TableAssistant extends Context.Service<
         if (Result.isFailure(asked)) {
           return answerByRules({ request, why: `${asked.failure.reason} The rules answered instead.` })
         }
-        const model = asked.success.answeredBy.model
+        const answeredBy = asked.success.answeredBy
+        const model = answeredBy.model
         const command = asked.success.value
         const checked = checkCommand({
           changes: command.changes,
@@ -154,19 +159,18 @@ export class TableAssistant extends Context.Service<
           searchable: request.searchable
         })
         yield* item(actor, request, model, Result.isSuccess(checked) ? checked.success : []).pipe(asAgent(viewReader))
-        const cannot = command.cannot === "" ? null : command.cannot
+        const cannot = command.cannot === "" ? Option.none() : Option.some(command.cannot)
         if (Result.isFailure(checked)) {
-          return Result.fail({ reason: checked.failure, by: "model" as const, model, note: cannot })
+          return Result.fail({ reason: checked.failure, answeredBy, note: cannot })
         }
         if (checked.success.length === 0) {
           return Result.fail({
-            reason: cannot ?? "The model found nothing in that request to change in the view.",
-            by: "model" as const,
-            model,
-            note: null
+            reason: Option.getOrElse(cannot, () => "The model found nothing in that request to change in the view."),
+            answeredBy,
+            note: Option.none()
           })
         }
-        return Result.succeed({ changes: checked.success, by: "model" as const, model, note: cannot })
+        return Result.succeed({ changes: checked.success, answeredBy, note: cannot })
       })
 
       return TableAssistant.of({ view })

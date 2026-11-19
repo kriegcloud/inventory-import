@@ -246,3 +246,12 @@ appears when a file column matched no field. Built with one narrowing, mine: it 
 some field still has no column, because with every field filled there is nothing a suggestion could do with it
 (`offersSuggestions`, `packages/catalog/model/src/Suggestion/Suggest.rules.ts`). Rejected: leaving the button to
 rows that cannot be imported. Reverse: drop the narrowing, or the heading case, in that one function.
+
+### 2026-11-19 — next goal
+
+Question: which goal follows `contexts`? Answer: "@beep/xlsx (Recommended)": a foundation package beside `@beep/csv`,
+in the same fashion, his words for these packages being "representing the entire decoding <-> encoding two way
+transformation as an effect/Schema codec". It replaces the SheetJS reader in `catalog-web`'s `internal/spreadsheet`,
+which becomes the parity test and is then removed. The brief is [BRIEF-xlsx.md](BRIEF-xlsx.md); no goal is open
+until he says it matches, and its six decisions (X1 to X6) are his. Rejected: the answer came
+without the options he passed over, so none is recorded. Reverse: take step 9 first; nothing of step 8 is built.

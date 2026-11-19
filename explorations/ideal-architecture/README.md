@@ -25,7 +25,8 @@ The brief for `beep-csv` (step 4) is [BRIEF.md](BRIEF.md); Benjamin said it matc
 brief keeps its name. Step 5's is [BRIEF-kernel-drivers.md](BRIEF-kernel-drivers.md); Benjamin said it matches, and the goal is done at
 [goals/kernel-drivers](../../goals/kernel-drivers/SPEC.md). Step 6's is [BRIEF-ui-packages.md](BRIEF-ui-packages.md)
 and step 7's [BRIEF-contexts.md](BRIEF-contexts.md); Benjamin said both match, and the goals are open at
-[goals/ui-packages](../../goals/ui-packages/SPEC.md) and [goals/contexts](../../goals/contexts/SPEC.md).
+[goals/ui-packages](../../goals/ui-packages/SPEC.md) and [goals/contexts](../../goals/contexts/SPEC.md). Step 8's is
+[BRIEF-xlsx.md](BRIEF-xlsx.md), written and waiting for "the brief matches"; no goal is open for it.
 
 ## Where the research disagrees with the request
 
@@ -81,6 +82,8 @@ Each step ends with the full check and an import of the messy sample in a browse
 
 ## Trail
 
+- 2026-11-19: BRIEF-xlsx.md written for the goal `beep-xlsx` (step 8); awaiting "the brief matches" and its six
+  decisions.
 - 2026-11-18: goal `contexts` built: `access` and `catalog` each as `contract`, `model`, `host` and `web`, with
   `@inventory/client` between the screens and the API; the app composes them. Its PLAN's closing note says what
   still differs from the brief, and what `@beep/xlsx` and `@beep/infra` should know.

@@ -109,3 +109,6 @@ Each step ends with the full check and an import of the messy sample in a browse
 - 2026-11-18: BRIEF.md written for the goal `beep-csv` (step 4); awaiting "the brief matches".
 - 2026-11-18: goal `workspace-and-strictness` opened for steps 0 to 2 of the order of work.
 - 2026-11-18: four research reports written; decisions put to Benjamin.
+- 2026-11-19: BRIEF-tooling-cli.md written for a goal `tooling-cli`: a CLI package at `packages/tooling/tool/cli`
+  as beep-effect has, and the ten scripts under `scripts/` ported to commands on it. Outside the nine steps; nothing
+  built; awaiting "the brief matches" and answers T1 to T8.

@@ -3,7 +3,6 @@
 // writes `member`, always inside the actor's own organization. The rule not to break: an organization never ends
 // up without an admin, and the check and the write are one statement, so two admins demoting each other at the
 // same moment cannot both succeed.
-import { D1Client } from "@effect/sql-d1"
 import { Context, DateTime, Effect, Layer, Option, Result, String as Str } from "effect"
 import * as S from "effect/Schema"
 import { SecureRandom } from "effect/crypto"
@@ -13,7 +12,7 @@ import { AddPersonProblem } from "../api/v1/People.ts"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { type Member } from "@inventory/kernel/Member"
 import { Role } from "@inventory/kernel/Role"
-import { batchOn, NoRows, statement } from "./Sql.ts"
+import { D1, NoRows } from "@beep/d1/D1"
 
 const Scope = S.Struct({ org: OrganizationId, id: S.String }).annotate({
   description: "One member of one organization, by id"
@@ -37,8 +36,8 @@ export class People extends Context.Service<
     People,
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
-      const d1 = yield* D1Client.D1Client
-      const batch = batchOn(d1)
+      const d1 = yield* D1
+      const { batch } = d1
       const random = yield* SecureRandom.SecureRandom
       const now = DateTime.now.pipe(Effect.map(DateTime.formatIso))
 
@@ -73,7 +72,7 @@ export class People extends Context.Service<
 
       // The audit line of a change, written only when `guard` holds: the same condition as the change it records.
       const auditLine = (guard: (r: { readonly org: string; readonly member: string }) => Statement.Fragment) =>
-        statement({
+        D1.statement({
           Request: S.Struct({
             ...Acting,
             id: S.String,
@@ -93,7 +92,7 @@ export class People extends Context.Service<
         sql`EXISTS (SELECT 1 FROM member WHERE organizationId = ${org} AND role = 'admin' AND id != ${memberId}
           AND userId IS NOT NULL)`
 
-      const insertMember = statement({
+      const insertMember = D1.statement({
         Request: S.Struct({
           org: OrganizationId,
           id: S.String,
@@ -111,7 +110,7 @@ export class People extends Context.Service<
         (r) => sql`EXISTS (SELECT 1 FROM member WHERE organizationId = ${r.org} AND id = ${r.member})`
       )
 
-      const updateRole = statement({
+      const updateRole = D1.statement({
         Request: S.Struct({ org: OrganizationId, member: S.String, role: Role }),
         Result: Ids,
         execute: (r) => sql`UPDATE member SET role = ${r.role}
@@ -132,7 +131,7 @@ export class People extends Context.Service<
         sql`EXISTS (SELECT 1 FROM member WHERE organizationId = ${r.org} AND id = ${r.member} AND removedAt IS NULL
           AND (role != 'admin' OR ${anotherAdmin(r.org, r.member)}))`
       const removedLine = auditLine(removable)
-      const unlinkMember = statement({
+      const unlinkMember = D1.statement({
         Request: S.Struct({ org: OrganizationId, member: S.String, at: S.String }),
         Result: Ids,
         execute: (r) => sql`UPDATE member SET userId = NULL, removedAt = ${r.at}

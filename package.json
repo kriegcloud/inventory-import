@@ -6,6 +6,7 @@
   "workspaces": [
     "apps/*",
     "packages/*",
+    "packages/drivers/*",
     "packages/foundation/*/*"
   ],
   "type": "module",

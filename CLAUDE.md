@@ -306,7 +306,7 @@ Design in this order. Do not start from the UI.
    payloads, every expected failure as a `Schema.TaggedError` with an `httpApiStatus`. Pattern 2 in
    `docs/patterns.md` has a path parameter and several failures.
 3. **Service** in `src/server/` (`Items.ts`): a `Context.Service` with a `layer`. SQL lives here only, every
-   statement through a Schema (`SqlSchema` for a read, `statement` and `run` from `src/server/Sql.ts` for a write).
+   statement through a Schema (`SqlSchema` for a read, `D1.statement` run with `run` or `batch` of `@beep/d1/D1` for a write).
 4. **Handler** in `src/server/handlers.ts` (or its own file, as `ImportHandlers.ts`), and the service added to
    `Services` in `src/server/App.ts`.
 5. **UI** in `src/web/` (`ItemsPage.tsx`): `call((api) => api.group.endpoint(...))` inside TanStack Query, with

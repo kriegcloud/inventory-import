@@ -9,7 +9,7 @@ import { SecureRandom } from "effect/crypto"
 import { SqlClient } from "effect/sql"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { type Member } from "@inventory/kernel/Member"
-import { run, statement } from "./Sql.ts"
+import { D1 } from "@beep/d1/D1"
 
 /** How many model calls one organization may make in any 24 hours. Past it the rules answer until calls come back. */
 export const dailyModelCalls = 40
@@ -43,9 +43,10 @@ export class ModelCalls extends Context.Service<
     ModelCalls,
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
+      const { run } = yield* D1
       const random = yield* SecureRandom.SecureRandom
 
-      const reserve = statement({
+      const reserve = D1.statement({
         Request: S.Struct({
           id: S.String,
           org: OrganizationId,

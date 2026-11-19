@@ -1,4 +1,4 @@
-import type { D1Client } from "@effect/sql-d1"
+import type { D1 } from "@beep/d1/D1"
 import { Effect, Layer, ManagedRuntime } from "effect"
 import { HttpRouter, HttpServer } from "effect/http"
 import { HttpApiBuilder, HttpApiMiddleware, HttpApiScalar } from "effect/http-api"
@@ -116,7 +116,7 @@ export const Services = servicesWith(Ai.layer)
  * is Better Auth on the D1 binding (`Auth.layer`), which the identity, the session answer and /api/auth/* share.
  */
 export const makeApp = <E, R, IE, IR, AE, AR>(options: {
-  readonly database: Layer.Layer<D1Client.D1Client | SqlClient.SqlClient, E, R>
+  readonly database: Layer.Layer<D1 | SqlClient.SqlClient, E, R>
   readonly identity: Layer.Layer<Identity, IE, IR>
   readonly auth: Layer.Layer<Auth, AE, AR>
   readonly production: boolean

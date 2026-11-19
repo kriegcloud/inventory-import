@@ -4,9 +4,8 @@
 // the handlers and middleware (fast). Settings come from a ConfigProvider, the same way the Worker gets them. Sign-in
 // is real on the D1 database (`TestAuth`, Better Auth on the same binding); in memory nobody is signed in to it
 // (`SignedOutAuth`), and the header identity names the actor.
-import { readdirSync, readFileSync } from "node:fs"
-import type { D1Database } from "@cloudflare/workers-types"
-import { D1Client } from "@effect/sql-d1"
+import { D1Binding } from "@beep/d1/D1"
+import { D1Test, D1TestOptions } from "@beep/d1/D1Test"
 import {
   Array as Arr,
   Config,
@@ -25,7 +24,6 @@ import * as S from "effect/Schema"
 import { DevTools } from "effect/devtools"
 import { type HttpRouter, HttpServer } from "effect/http"
 import { HttpApiMiddleware } from "effect/http-api"
-import { getPlatformProxy, unstable_splitSqlQuery } from "wrangler"
 import { OrganizationChoice } from "../../../src/api/v1/Identity.ts"
 import { Activity } from "@inventory/kernel/Activity"
 import { ActivityId } from "@inventory/kernel/Ids"
@@ -76,43 +74,11 @@ export const DevToolsWhenAsked = Layer.unwrap(
 ).pipe(Layer.orDie)
 
 /**
- * A fresh D1 database (local workerd, nothing persisted) with every migration applied, in filename order, as the raw
- * binding: Better Auth takes it directly. `TestDatabase` and `TestAuth` share the one this layer opens.
+ * A fresh D1 database (local workerd, nothing persisted) with every migration applied, in filename order. One value,
+ * so the SQL client, Better Auth (which takes the raw binding, `D1Binding`) and the seeding share the database one
+ * layer build opens.
  */
-export class TestD1 extends Context.Service<TestD1, D1Database>()("@inventory/app/test/server/support/app/TestD1") {
-  static readonly layer = Layer.effect(
-    TestD1,
-    Effect.gen(function* () {
-      const proxy = yield* Effect.acquireRelease(
-        Effect.promise(() =>
-          getPlatformProxy<{ DB: D1Database }>({
-            configPath: new URL("./wrangler.test.jsonc", import.meta.url).pathname,
-            persist: false
-          })
-        ),
-        (open) => Effect.promise(() => open.dispose())
-      )
-      const db = proxy.env.DB
-      const files = Arr.sort(
-        Arr.filter(readdirSync(migrations), (name) => Str.endsWith(".sql")(name)),
-        Str.Order
-      )
-      yield* Effect.forEach(files, (name) => runSqlFile(db, new URL(name, migrations)), { concurrency: 1 })
-      return db
-    })
-  )
-}
-
-/** Runs one SQL file against the binding, statement by statement, in one batch. */
-const runSqlFile = (db: D1Database, file: URL) =>
-  Effect.promise(() => db.batch(Arr.map(unstable_splitSqlQuery(readFileSync(file, "utf8")), (sql) => db.prepare(sql))))
-
-/** The SQL client on the test database. */
-export const TestDatabase = Layer.unwrap(
-  Effect.gen(function* () {
-    return D1Client.layer({ db: yield* TestD1 })
-  })
-).pipe(Layer.provide(TestD1.layer), Layer.orDie)
+export const TestDatabase = D1Test.layer(D1TestOptions.make({ migrations })).pipe(Layer.orDie)
 
 /**
  * Better Auth on the test database, as the Worker builds it: no `waitUntil`, rate limits off unless asked for, and a
@@ -122,12 +88,12 @@ export const TestAuth = (options: { readonly rateLimit?: boolean; readonly produ
   Layer.unwrap(
     Effect.gen(function* () {
       return Auth.layer({
-        database: yield* TestD1,
+        database: yield* D1Binding,
         production: options.production ?? false,
         rateLimit: options.rateLimit ?? false
       })
     })
-  ).pipe(Layer.provide(TestD1.layer))
+  ).pipe(Layer.provide(TestDatabase))
 
 /** Sign-in for the in-memory app: nobody is ever signed in, and /api/auth/* is not there. A test double. */
 export const SignedOutAuth = Layer.succeed(
@@ -403,12 +369,10 @@ export const send = Effect.fn("test.send")(function* (options: {
 })
 
 /** The local test accounts, written into the test database the way `bun run dev` writes them. */
-export const SeededAccounts = Layer.effectDiscard(
-  Effect.gen(function* () {
-    const db = yield* TestD1
-    yield* runSqlFile(db, new URL("../../../scripts/dev-accounts.sql", import.meta.url))
-  })
-).pipe(Layer.provide(TestD1.layer))
+export const SeededAccounts = D1Test.seed(new URL("../../../scripts/dev-accounts.sql", import.meta.url)).pipe(
+  Layer.provide(TestDatabase),
+  Layer.orDie
+)
 
 /**
  * Sign-in end to end: the app exactly as the Worker builds it (the session identity, Better Auth's routes beside the

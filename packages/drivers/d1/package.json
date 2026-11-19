@@ -1,0 +1,49 @@
+{
+  "name": "@beep/d1",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Cloudflare D1 through Effect SQL: every statement encoded and decoded by Schemas, atomic batches, and a fresh in-memory database for tests",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": [],
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts",
+    "./D1": "./src/D1.service.ts",
+    "./D1Error": "./src/D1.errors.ts",
+    "./D1Test": "./src/D1.test-layer.ts"
+  },
+  "scripts": {
+    "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",
+    "lint": "oxlint --quiet src test",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@beep/identity": "workspace:*",
+    "@effect/sql-d1": "4.1.4",
+    "effect": "4.1.4"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261113.1",
+    "@effect/platform-node": "4.1.4",
+    "@effect/vitest": "4.1.4",
+    "@types/node": "^24.19.2",
+    "vitest": "^5.1.0",
+    "wrangler": "^4.161.0"
+  },
+  "peerDependencies": {
+    "@effect/platform-node": "4.1.4",
+    "wrangler": "^4.161.0"
+  },
+  "peerDependenciesMeta": {
+    "@effect/platform-node": {
+      "optional": true
+    },
+    "wrangler": {
+      "optional": true
+    }
+  },
+  "beep": {
+    "family": "drivers"
+  }
+}

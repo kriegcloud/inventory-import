@@ -52,8 +52,8 @@ const load = Effect.fn("Items.load")(function* (actor: Member, codes: ReadonlyAr
 
 Put the `Activity` row in the same batch, so the audit trail cannot disagree with the data. When the rows have no
 natural key, the request does: the browser makes one id per Confirm (`newRequestId()` in `src/web/lib/api.ts`), and
-each row's key is that id and its line number. Every statement goes through a Schema both ways: `statement` and
-`run` from `src/server/Sql.ts` for a write, `SqlSchema` for a read.
+each row's key is that id and its line number. Every statement goes through a Schema both ways: `D1.statement`,
+run with `run` or `batch` of the `D1` service (`@beep/d1/D1`), for a write; `SqlSchema` for a read.
 
 ## 2. An endpoint with a path parameter and more than one failure
 

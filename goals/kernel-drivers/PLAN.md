@@ -13,8 +13,8 @@ from: explorations/ideal-architecture
 | --- | --- | --- |
 | 1 | Decisions recorded; SPEC and PLAN | done |
 | 2 | `@inventory/kernel`; the app switched; proof | done |
-| 3 | `@beep/d1` with `D1Test`; the app switched; proof | doing |
-| 4 | `@beep/better-auth`; the app switched; proof with sign-out and sign-in | todo |
+| 3 | `@beep/d1` with `D1Test`; the app switched; proof | done |
+| 4 | `@beep/better-auth`; the app switched; proof with sign-out and sign-in | doing |
 | 5 | `@beep/openrouter`; the AI SDK removed; proof with and without a model | todo |
 | 6 | Closing note | todo |
 
@@ -43,4 +43,24 @@ Where the brief left a choice open, or the code showed the brief could not be fo
   check:full. Browser on port 5199, fresh database: review "200 rows read", "Import 155, skip 45"; confirm dialog
   "Import 155 items"; result "Imported 155 · Not imported 45 · All 200"; Items "155 items"; D1 `item` 155 rows;
   Activity lists the import's lines.
+- **`D1Error` replaces `SqlError | SchemaError`** in every statement's error channel, with the stage (`encode`,
+  `execute`, `decode`) and the statement's place in its batch. No service named either old error, so the switch
+  changed only imports and the `d1.batch`/`d1.run` calls.
+- **One assertion stays in `D1.batch`.** The decoded answers are named as the batch's `Answers` tuple once
+  (`as unknown as`); the type system cannot follow a mapped tuple through `forEach`. The brief said "without the cast";
+  the cast moved from the whole Effect to the one value.
+- **`D1Test` ships its own wrangler file** (`wrangler.d1-test.jsonc` in the package) instead of a compatibility-date
+  option; the app's `test/server/support/wrangler.test.jsonc` is gone. Seeds are layers (`D1Test.seed(url)`), because
+  the strict profile refuses `Effect.provide` with a Layer outside an entry point; the brief's `runSqlFile` became it.
+- **`TestDatabase` is one value** (`D1Test.layer(...)`), so the SQL client, Better Auth's raw binding (`D1Binding`) and
+  the seeds share the database one layer build opens, as `TestD1.layer` did.
+- **Drizzle out** (decision "D1 driver"): `drizzle-orm` and `drizzle-kit` left `apps/inventory/package.json`; the
+  `drizzle` server left `.mcp.json`; `.grok/config.toml`, whose only entry it was, is deleted. `bun.lock` still names
+  `drizzle-orm`/`drizzle-kit` only as optional peers of `better-auth` itself. `.agents/skills/drizzle` and its
+  `.claude`/`.codex` links stay.
+- **Docs the move made false**: `CLAUDE.md` (the service step), `docs/patterns.md` (pattern 1's last sentence) and
+  `.claude/agents/backend.md` now name `D1.statement` from `@beep/d1/D1` instead of `src/server/Sql.ts`.
+- **D1 proof**: check:full 26/26 tasks (d1 8 tests; app 217 fast + 45 slow on `D1Test`). Browser on a fresh database:
+  "200 rows read", "Import 155, skip 45", result "Imported 155 · Not imported 45 · All 200", Items "155 items", D1
+  `item` 155 rows.
 

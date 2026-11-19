@@ -18,8 +18,8 @@ short list of what goes wrong most.
 ## Order
 
 Schema in `src/domain`, then the contract in `src/api`, then the service and handler in `src/server`, then the test.
-Copy the shape of the Records example (`src/domain/Item.ts`, `ItemQuery.ts`, `src/server/Items.ts`, a `statement`
-from `src/server/Sql.ts` for every write). Do not start from a handler. When the Schemas and the contract are already
+Copy the shape of the Records example (`src/domain/Item.ts`, `ItemQuery.ts`, `src/server/Items.ts`, a
+`D1.statement` from `@beep/d1/D1` for every write). Do not start from a handler. When the Schemas and the contract are already
 committed, start from them and change them only if the brief says so: the screens are being built against them.
 
 ## What fails the check, most frequent first

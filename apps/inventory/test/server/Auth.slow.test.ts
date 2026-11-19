@@ -2,7 +2,8 @@ import { expect, layer } from "@effect/vitest"
 import { Array as Arr, Effect, Exit, Layer } from "effect"
 import { Auth } from "../../src/server/Auth.ts"
 import { testAccountPassword } from "../../src/server/TestAccounts.ts"
-import { browser, settingsLayer, signInApp, TestD1, testSettings } from "./support/app.ts"
+import { D1Binding } from "@beep/d1/D1"
+import { browser, settingsLayer, signInApp, TestDatabase, testSettings } from "./support/app.ts"
 
 // Sign-in end to end: real requests through the Worker's own composition (`makeApp`, the session identity, Better
 // Auth's routes beside the HttpApi) on a real D1 database in workerd, with the migrations and the local test accounts
@@ -369,9 +370,9 @@ layer(settingsLayer({ ...testSettings, BETTER_AUTH_SECRET: "" }), { timeout: "60
         const started = yield* Layer.build(
           Layer.unwrap(
             Effect.gen(function* () {
-              return Auth.layer({ database: yield* TestD1, production: true })
+              return Auth.layer({ database: yield* D1Binding, production: true })
             })
-          ).pipe(Layer.provide(TestD1.layer))
+          ).pipe(Layer.provide(TestDatabase))
         ).pipe(Effect.scoped, Effect.exit)
         expect(Exit.isFailure(started)).toBe(true)
         expect(String(Exit.isFailure(started) ? started.cause : "")).toContain(

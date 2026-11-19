@@ -4,7 +4,6 @@
 // answer passes the guard in src/domain/Suggest.ts, which sets the confidence and the evidence itself, and is only
 // stored in `importSuggestion`: no item and no decision is touched, and the review shows each one as a proposal the
 // person accepts or rejects. One call is taken from the organization's allowance before the model is asked.
-import { D1Client } from "@effect/sql-d1"
 import { Array as Arr, Context, DateTime, Effect, Layer } from "effect"
 import * as S from "effect/Schema"
 import { SecureRandom } from "effect/crypto"
@@ -26,7 +25,7 @@ import {
 import { asAgent } from "@inventory/kernel/Agent"
 import { Ai, answeredByRules } from "./Ai.ts"
 import { ModelCalls, usedUpWords } from "./ModelCalls.ts"
-import { batchOn, NoRows, statement } from "./Sql.ts"
+import { D1, NoRows } from "@beep/d1/D1"
 
 /** The agent that suggests. It only proposes, and the most it may do is what an editor may do. */
 export const suggester = AgentRun.make({ agent: "Suggestions", maxRole: "editor" })
@@ -149,8 +148,8 @@ export class Suggestions extends Context.Service<
     Suggestions,
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
-      const d1 = yield* D1Client.D1Client
-      const batch = batchOn(d1)
+      const d1 = yield* D1
+      const { batch } = d1
       const random = yield* SecureRandom.SecureRandom
       const ai = yield* Ai
       const calls = yield* ModelCalls
@@ -164,7 +163,7 @@ export class Suggestions extends Context.Service<
       })
 
       // Written only while the import is open, and only where the row and field have no suggestion yet.
-      const insert = statement({
+      const insert = D1.statement({
         Request: S.Struct({
           org: OrganizationId,
           importId: S.String,
@@ -183,7 +182,7 @@ export class Suggestions extends Context.Service<
           ON CONFLICT (organizationId, importId, rowId, field) DO NOTHING RETURNING id`
       })
 
-      const line = statement({
+      const line = D1.statement({
         Request: S.Struct({
           id: S.String,
           org: OrganizationId,

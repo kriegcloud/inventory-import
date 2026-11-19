@@ -1,4 +1,4 @@
-import { D1Client } from "@effect/sql-d1"
+import { D1 } from "@beep/d1/D1"
 import { env, waitUntil } from "cloudflare:workers"
 import { ConfigProvider, Layer } from "effect"
 import { makeApp, toTracedFetch } from "./App.ts"
@@ -15,7 +15,7 @@ import { collector } from "./Telemetry.ts"
 const settings = ConfigProvider.layer(ConfigProvider.fromUnknown(env))
 
 const app = makeApp({
-  database: D1Client.layer({ db: env.DB }).pipe(Layer.orDie),
+  database: D1.layer({ db: env.DB }),
   // Sign-in: the actor comes from the session cookie (SessionIdentity.ts), and Better Auth answers /api/auth/*.
   identity: SessionIdentityLive,
   // Better Auth takes the D1 binding itself. Its work after an answer (rate-limit updates, cleanup) is handed to

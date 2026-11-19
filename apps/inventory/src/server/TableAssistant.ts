@@ -16,7 +16,7 @@ import { checkCommand, readByRules, type ViewChange, ViewCommand, type ViewOutco
 import { asAgent } from "@inventory/kernel/Agent"
 import { Ai } from "./Ai.ts"
 import { ModelCalls, usedUpWords } from "./ModelCalls.ts"
-import { NoRows, run, statement } from "./Sql.ts"
+import { D1, NoRows } from "@beep/d1/D1"
 
 /** What an answer says when there is no key; the panel says once what the rules read (`rulesRead`). */
 export const noKey = "No AI key is set, so the rules answered."
@@ -75,10 +75,11 @@ export class TableAssistant extends Context.Service<
     Effect.gen(function* () {
       const ai = yield* Ai
       const sql = yield* SqlClient.SqlClient
+      const { run } = yield* D1
       const random = yield* SecureRandom.SecureRandom
       const calls = yield* ModelCalls
 
-      const line = statement({
+      const line = D1.statement({
         Request: S.Struct({
           id: S.String,
           org: S.String,

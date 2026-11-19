@@ -1,6 +1,6 @@
 {
-  // Used only by the tests: a D1 database in memory, with no assets, no variables and no secrets file beside it.
-  "name": "inventory-test",
+  // Used only by D1Test: a D1 database in memory, with no assets, no variables and no secrets file beside it.
+  "name": "beep-d1-test",
   "compatibility_date": "2026-11-01",
   "d1_databases": [{ "binding": "DB", "database_name": "test", "database_id": "00000000-0000-0000-0000-000000000000" }]
 }

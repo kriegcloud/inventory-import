@@ -1,11 +1,10 @@
 // Storage for imports: the staged file, what each confirm did with each row, the items it created, and taking a
 // confirm back. SQL lives here only; every statement filters on the organization, and goes through a Schema both ways
-// (`SqlSchema` for a read, `statement` from ./Sql.ts for a write). The rules not to break: a confirm is the only
+// (`SqlSchema` for a read, `D1.statement` from @beep/d1 for a write). The rules not to break: a confirm is the only
 // statement that adds to `item` (and keeps a copy of each item it replaces, in `importReplaced`), and a take-back the
 // only one that deletes from it or puts a replaced item back; each is one atomic batch whose
 // every statement checks the same condition (the import is still open; the confirm is still in force), so a second
 // press, a retry or another tab writes nothing.
-import { D1Client } from "@effect/sql-d1"
 import { Array as Arr, Context, DateTime, Effect, Layer, Option, Order, Record as Rec, Result } from "effect"
 import * as S from "effect/Schema"
 import { SecureRandom } from "effect/crypto"
@@ -41,7 +40,7 @@ import {
   type StagedTable
 } from "../domain/ItemImport.ts"
 import { abandonedAfterMinutes, chunkRows, maxChunkChars } from "../domain/Upload.ts"
-import { batchOn, NoRows, run, statement } from "./Sql.ts"
+import { D1, NoRows } from "@beep/d1/D1"
 
 /** An import as stored, without its rows. */
 export const Draft = S.Struct({
@@ -387,8 +386,8 @@ export class Imports extends Context.Service<
     Imports,
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
-      const d1 = yield* D1Client.D1Client
-      const batch = batchOn(d1)
+      const d1 = yield* D1
+      const { batch, run } = d1
       const random = yield* SecureRandom.SecureRandom
       const now = DateTime.now.pipe(Effect.map(DateTime.formatIso))
       const acting = (actor: Member) => ({ org: actor.organizationId, actor: actor.id, name: actor.name })
@@ -512,18 +511,18 @@ export class Imports extends Context.Service<
       // -- Uploads ---------------------------------------------------------------------------------------------
 
       const UploadScope = S.Struct({ org: OrganizationId, actor: MemberId, id: S.String })
-      const dropAbandonedChunks = statement({
+      const dropAbandonedChunks = D1.statement({
         Request: S.Struct({ org: OrganizationId, before: S.String }),
         Result: NoRows,
         execute: (r) => sql`DELETE FROM importUploadChunk WHERE organizationId = ${r.org}
           AND uploadId IN (SELECT id FROM importUpload WHERE organizationId = ${r.org} AND createdAt < ${r.before})`
       })
-      const dropAbandonedUploads = statement({
+      const dropAbandonedUploads = D1.statement({
         Request: S.Struct({ org: OrganizationId, before: S.String }),
         Result: NoRows,
         execute: (r) => sql`DELETE FROM importUpload WHERE organizationId = ${r.org} AND createdAt < ${r.before}`
       })
-      const insertUpload = statement({
+      const insertUpload = D1.statement({
         Request: S.Struct({
           ...Acting,
           id: S.String,
@@ -568,7 +567,7 @@ export class Imports extends Context.Service<
         return Result.succeed(started.id)
       })
 
-      const insertChunk = statement({
+      const insertChunk = D1.statement({
         Request: S.Struct({
           ...UploadScope.fields,
           seq: S.Int,
@@ -609,7 +608,7 @@ export class Imports extends Context.Service<
         )
       }, Effect.orDie)
 
-      const draftFromUpload = statement({
+      const draftFromUpload = D1.statement({
         Request: S.Struct({ ...UploadScope.fields, at: S.String, needsAtStart: S.Int }),
         Result: NoRows,
         execute: (r) => sql`INSERT INTO importDraft (id, organizationId, actorId, actorName, fileName, headJson,
@@ -617,14 +616,14 @@ export class Imports extends Context.Service<
           SELECT id, organizationId, actorId, actorName, fileName, headJson, rowCount, 'open', ${r.at}, ${r.needsAtStart}
           FROM importUpload WHERE organizationId = ${r.org} AND id = ${r.id} AND actorId = ${r.actor}`
       })
-      const chunksFromUpload = statement({
+      const chunksFromUpload = D1.statement({
         Request: UploadScope,
         Result: NoRows,
         execute: (r) => sql`INSERT INTO importChunk (importId, organizationId, seq, rowsJson)
           SELECT uploadId, organizationId, seq, rowsJson FROM importUploadChunk
           WHERE organizationId = ${r.org} AND uploadId = ${r.id} AND ${stillUploading(r.org, r.actor, r.id)}`
       })
-      const uploadedLine = statement({
+      const uploadedLine = D1.statement({
         Request: S.Struct({
           ...Acting,
           upload: S.String,
@@ -637,13 +636,13 @@ export class Imports extends Context.Service<
           SELECT ${r.activity}, ${r.org}, ${r.actor}, ${r.name}, 'Uploaded a file', ${r.detail}, ${r.at}
           WHERE ${stillUploading(r.org, r.actor, r.upload)}`
       })
-      const dropUploadChunks = statement({
+      const dropUploadChunks = D1.statement({
         Request: UploadScope,
         Result: NoRows,
         execute: (r) => sql`DELETE FROM importUploadChunk WHERE organizationId = ${r.org} AND uploadId = ${r.id}
           AND ${stillUploading(r.org, r.actor, r.id)}`
       })
-      const dropUpload = statement({
+      const dropUpload = D1.statement({
         Request: UploadScope,
         Result: Ids,
         execute: (r) => sql`DELETE FROM importUpload
@@ -719,7 +718,7 @@ export class Imports extends Context.Service<
         clears: S.Array(IdList)
       })
       // Bumps the revision only when the delta changes something, before the writes below make it true.
-      const bumpRevision = statement({
+      const bumpRevision = D1.statement({
         Request: DeltaRequest,
         Result: NoRows,
         execute: (r) => {
@@ -731,7 +730,7 @@ export class Imports extends Context.Service<
             WHERE organizationId = ${r.org} AND id = ${r.id} AND status = 'open' AND (${sql.or(changes)})`
         }
       })
-      const upsertDecisions = statement({
+      const upsertDecisions = D1.statement({
         Request: S.Struct({ ...Acting, id: S.String, entries: DecisionEntries, at: S.String }),
         Result: NoRows,
         // The same decision sent again leaves the row (and who made it) as it is.
@@ -744,13 +743,13 @@ export class Imports extends Context.Service<
             decidedById = excluded.decidedById, decidedByName = excluded.decidedByName, updatedAt = excluded.updatedAt
           WHERE importDecision.decisionJson IS NOT excluded.decisionJson`
       })
-      const clearDecisions = statement({
+      const clearDecisions = D1.statement({
         Request: S.Struct({ org: OrganizationId, id: S.String, rowIds: IdList }),
         Result: NoRows,
         execute: (r) => sql`DELETE FROM importDecision WHERE organizationId = ${r.org} AND importId = ${r.id}
           AND rowId IN (SELECT value FROM json_each(${r.rowIds})) AND ${stillOpen(r.org, r.id)}`
       })
-      const openRevision = statement({
+      const openRevision = D1.statement({
         Request: Scope,
         Result: S.Array(S.Struct({ revision: S.Int })),
         execute: (r) => sql`SELECT revision FROM importDraft
@@ -787,7 +786,7 @@ export class Imports extends Context.Service<
         detail: S.String,
         at: S.String
       })
-      const reopenedLine = statement({
+      const reopenedLine = D1.statement({
         Request: ReopenRequest,
         Result: NoRows,
         execute: (r) => sql`INSERT INTO activity (id, organizationId, actorId, actorName, action, detail, createdAt)
@@ -795,7 +794,7 @@ export class Imports extends Context.Service<
           WHERE EXISTS (SELECT 1 FROM importDraft
             WHERE organizationId = ${r.org} AND id = ${r.id} AND status IN ('imported', 'takenBack'))`
       })
-      const reopenDraft = statement({
+      const reopenDraft = D1.statement({
         Request: Scope,
         Result: NoRows,
         execute: (r) => sql`UPDATE importDraft SET status = 'open', revision = revision + 1
@@ -865,7 +864,7 @@ export class Imports extends Context.Service<
         detail: S.String,
         at: S.String
       })
-      const removedLine = statement({
+      const removedLine = D1.statement({
         Request: RemoveRequest,
         Result: NoRows,
         execute: (r) => sql`INSERT INTO activity (id, organizationId, actorId, actorName, action, detail, createdAt)
@@ -874,13 +873,13 @@ export class Imports extends Context.Service<
       })
       // The children in the order their foreign keys need, each under the same condition, the import last.
       const removeFrom = (from: Statement.Fragment) =>
-        statement({
+        D1.statement({
           Request: Scope,
           Result: NoRows,
           execute: (r) => sql`DELETE FROM ${from} WHERE organizationId = ${r.org} AND importId = ${r.id}
             AND ${removable(r.org, r.id)}`
         })
-      const removeDraft = statement({
+      const removeDraft = D1.statement({
         Request: Scope,
         Result: Ids,
         execute: (r) => sql`DELETE FROM importDraft WHERE organizationId = ${r.org} AND id = ${r.id}
@@ -934,14 +933,14 @@ export class Imports extends Context.Service<
       const choicesDiffer = (r: { readonly org: string; readonly id: string; readonly choices: string }) =>
         sql`EXISTS (SELECT 1 FROM importDraft WHERE organizationId = ${r.org} AND id = ${r.id} AND status = 'open'
           AND choicesJson IS NOT ${r.choices})`
-      const matchedLine = statement({
+      const matchedLine = D1.statement({
         Request: ChoicesRequest,
         Result: NoRows,
         execute: (r) => sql`INSERT INTO activity (id, organizationId, actorId, actorName, action, detail, createdAt)
           SELECT ${r.activity}, ${r.org}, ${r.actor}, ${r.name}, 'Matched a column', ${r.detail}, ${r.at}
           WHERE ${choicesDiffer(r)}`
       })
-      const saveChoices = statement({
+      const saveChoices = D1.statement({
         Request: ChoicesRequest,
         Result: Ids,
         execute: (r) => sql`UPDATE importDraft SET choicesJson = ${r.choices}, revision = revision + 1
@@ -976,7 +975,7 @@ export class Imports extends Context.Service<
       // One pass over the list, each entry finding its stored row by the primary key: an upsert that only ever
       // updates, since it reads only rows that exist, and keeps who decided each. `CROSS JOIN` keeps the list on the
       // outside; an UPDATE that looks each row up in the list reads the whole list once per row.
-      const rewriteRows = statement({
+      const rewriteRows = D1.statement({
         Request: S.Struct({ org: OrganizationId, id: S.String, entries: DecisionEntries }),
         Result: NoRows,
         execute: (r) => sql`INSERT INTO importDecision
@@ -989,7 +988,7 @@ export class Imports extends Context.Service<
           WHERE true
           ON CONFLICT (organizationId, importId, rowId) DO UPDATE SET decisionJson = excluded.decisionJson`
       })
-      const bumpOpen = statement({
+      const bumpOpen = D1.statement({
         Request: Scope,
         Result: NoRows,
         execute: (r) => sql`UPDATE importDraft SET revision = revision + 1
@@ -1042,7 +1041,7 @@ export class Imports extends Context.Service<
       // The confirm's own row is written first and only while the import is open; the import is closed next. Every
       // statement after them checks that this confirm's row exists, so a second confirm (a double click, a retry,
       // another tab) finds the import closed, writes no row of its own, and so writes nothing at all.
-      const insertBatch = statement({
+      const insertBatch = D1.statement({
         Request: CommitScope,
         Result: Ids,
         execute: (r) => sql`INSERT INTO importBatch (id, organizationId, importId, confirmedById, confirmedByName,
@@ -1052,7 +1051,7 @@ export class Imports extends Context.Service<
       })
       const thisConfirm = (org: string, batchId: string) =>
         sql`EXISTS (SELECT 1 FROM importBatch WHERE organizationId = ${org} AND id = ${batchId})`
-      const closeDraft = statement({
+      const closeDraft = D1.statement({
         Request: CommitScope,
         Result: Ids,
         execute: (r) => sql`UPDATE importDraft SET status = 'imported', importedBy = ${r.name}, importedAt = ${r.at}
@@ -1061,7 +1060,7 @@ export class Imports extends Context.Service<
       })
       // One statement per 500 rows, the rows as one JSON value read with json_each: a handful of bound values a
       // statement however many rows it writes. A stored code is left as it is (ON CONFLICT DO NOTHING).
-      const insertItems = statement({
+      const insertItems = D1.statement({
         Request: S.Struct({ ...CommitScope.fields, items: ItemInserts }),
         Result: NoRows,
         execute: (r) => sql`INSERT INTO item (id, organizationId, sku, skuKey, name, description, category, uom,
@@ -1080,7 +1079,7 @@ export class Imports extends Context.Service<
       })
       // Before a replace, in the same batch: the stored item as it is, so a take-back of this confirm can put it back.
       // revisionAfter is the revision the replace below gives it; one copy per item, however many rows name it.
-      const keepReplaced = statement({
+      const keepReplaced = D1.statement({
         Request: S.Struct({ ...CommitScope.fields, items: ItemInserts }),
         Result: NoRows,
         execute: (r) => sql`INSERT INTO importReplaced (organizationId, importId, batchId, itemId, sourceRow,
@@ -1098,7 +1097,7 @@ export class Imports extends Context.Service<
       })
       // A stored item the person chose to replace with the file's row: every value but its SKU and its origin is
       // written over, and its revision goes up, so the import that created it can no longer take it back.
-      const replaceItems = statement({
+      const replaceItems = D1.statement({
         Request: S.Struct({ ...CommitScope.fields, items: ItemInserts }),
         Result: NoRows,
         execute: (r) => sql`UPDATE item SET name = json_extract(j.value, '$.name'),
@@ -1120,7 +1119,7 @@ export class Imports extends Context.Service<
       const landed = (org: string, id: string) => sql`EXISTS (SELECT 1 FROM item r WHERE r.organizationId = ${org}
         AND r.importId = ${id} AND r.sourceRow = json_extract(value, '$.rowNumber')
         AND r.sourcePart = json_extract(value, '$.part'))`
-      const insertOutcomes = statement({
+      const insertOutcomes = D1.statement({
         Request: S.Struct({ ...CommitScope.fields, outcomes: OutcomeInserts }),
         Result: NoRows,
         execute: (r) => sql`INSERT INTO importOutcome (importId, organizationId, rowNumber, part, sku, name, outcome,
@@ -1146,7 +1145,7 @@ export class Imports extends Context.Service<
             decidedByName = excluded.decidedByName`
       })
       // A changed value is recorded only for a row this confirm really created, and only once.
-      const insertChanges = statement({
+      const insertChanges = D1.statement({
         Request: S.Struct({ ...CommitScope.fields, changes: ChangeInserts }),
         Result: NoRows,
         execute: (r) => sql`INSERT INTO importChange (importId, batchId, organizationId, rowNumber, part, sku, field,
@@ -1165,7 +1164,7 @@ export class Imports extends Context.Service<
           ON CONFLICT (organizationId, batchId, rowNumber, part, field) DO NOTHING`
       })
       // What the confirm did, counted from the rows it stored above, in the same batch.
-      const countBatch = statement({
+      const countBatch = D1.statement({
         Request: CommitScope,
         Result: NoRows,
         execute: (r) => sql`UPDATE importBatch SET
@@ -1178,7 +1177,7 @@ export class Imports extends Context.Service<
               WHERE organizationId = ${r.org} AND importId = ${r.id} AND outcome = 'notImported')
           WHERE organizationId = ${r.org} AND id = ${r.batch}`
       })
-      const importedLine = statement({
+      const importedLine = D1.statement({
         Request: S.Struct({ ...CommitScope.fields, activity: S.String, fileName: S.String }),
         Result: NoRows,
         execute: (r) => sql`INSERT INTO activity (id, organizationId, actorId, actorName, action, detail, createdAt)
@@ -1270,7 +1269,7 @@ export class Imports extends Context.Service<
         sql`(SELECT id FROM importBatch WHERE organizationId = ${org} AND takeBackId = ${takeBack})`
       // First: mark the confirms in force that were asked for. Every later statement acts only on the confirms this
       // take-back marked, so a second press, which marks none, writes nothing.
-      const markConfirms = statement({
+      const markConfirms = D1.statement({
         Request: TakeBackScope,
         Result: Ids,
         execute: (r) => sql`UPDATE importBatch SET takeBackId = ${r.takeBack}, takenBackById = ${r.actor},
@@ -1283,7 +1282,7 @@ export class Imports extends Context.Service<
       // revision the replace gave it: one someone edited, or a later import replaced again, is kept as it is. A pass
       // marks the copies it will use, then writes them; a second pass reaches an item two confirms of this take-back
       // replaced in turn, now back at the revision the earlier replace gave it.
-      const flagRestorable = statement({
+      const flagRestorable = D1.statement({
         Request: TakeBackScope,
         Result: NoRows,
         execute: (r) => sql`UPDATE importReplaced SET restored = 1
@@ -1291,7 +1290,7 @@ export class Imports extends Context.Service<
             AND EXISTS (SELECT 1 FROM item WHERE item.organizationId = ${r.org} AND item.id = importReplaced.itemId
               AND item.revision = importReplaced.revisionAfter)`
       })
-      const restoreItems = statement({
+      const restoreItems = D1.statement({
         Request: TakeBackScope,
         Result: NoRows,
         execute: (r) => sql`UPDATE item SET name = p.name, description = p.description, category = p.category,
@@ -1306,7 +1305,7 @@ export class Imports extends Context.Service<
       })
       // Counted once the items are put back and before any is removed: what this take-back removes (items still at
       // revision 1), restores (copies it used) and keeps (items it created, or replaced, that someone changed since).
-      const countTakeBack = statement({
+      const countTakeBack = D1.statement({
         Request: TakeBackScope,
         Result: NoRows,
         execute: (r) => sql`UPDATE importBatch SET
@@ -1320,7 +1319,7 @@ export class Imports extends Context.Service<
                 WHERE organizationId = ${r.org} AND batchId = importBatch.id AND restored = 0)
           WHERE organizationId = ${r.org} AND takeBackId = ${r.takeBack}`
       })
-      const takenBackLine = statement({
+      const takenBackLine = D1.statement({
         Request: S.Struct({ ...TakeBackScope.fields, activity: S.String, fileName: S.String }),
         Result: NoRows,
         execute: (r) => {
@@ -1344,7 +1343,7 @@ export class Imports extends Context.Service<
         }
       })
       // The rows whose items go, while the items are still there to say which rows they are.
-      const markOutcomes = statement({
+      const markOutcomes = D1.statement({
         Request: TakeBackScope,
         Result: NoRows,
         execute: (r) => sql`UPDATE importOutcome SET outcome = 'takenBack', reason = '', decidedBy = NULL,
@@ -1355,7 +1354,7 @@ export class Imports extends Context.Service<
               AND item.revision = 1 AND item.batchId IN ${ofTakeBack(r.org, r.takeBack)})`
       })
       // The rows whose replace was undone, from the copies this take-back used.
-      const markReplacedOutcomes = statement({
+      const markReplacedOutcomes = D1.statement({
         Request: TakeBackScope,
         Result: NoRows,
         execute: (r) => sql`UPDATE importOutcome SET outcome = 'takenBack', reason = '', decidedBy = NULL,
@@ -1365,14 +1364,14 @@ export class Imports extends Context.Service<
               AND p.sourceRow = importOutcome.rowNumber AND p.sourcePart = importOutcome.part AND p.restored = 1
               AND p.batchId IN ${ofTakeBack(r.org, r.takeBack)})`
       })
-      const removeItems = statement({
+      const removeItems = D1.statement({
         Request: TakeBackScope,
         Result: NoRows,
         execute: (r) => sql`DELETE FROM item WHERE organizationId = ${r.org} AND revision = 1
           AND batchId IN ${ofTakeBack(r.org, r.takeBack)}`
       })
       // Taken back once nothing of it is in force; a confirm made in between (another tab) keeps it imported.
-      const settleDraft = statement({
+      const settleDraft = D1.statement({
         Request: TakeBackScope,
         Result: NoRows,
         execute: (r) => sql`UPDATE importDraft SET revision = revision + 1,
@@ -1448,20 +1447,20 @@ export class Imports extends Context.Service<
       // What a take-back would do now: four reads in one batch, so they describe the same moment.
       const inForce = (org: string, id: string) => sql`(SELECT id FROM importBatch
         WHERE organizationId = ${org} AND importId = ${id} AND takeBackId IS NULL)`
-      const confirmsInForce = statement({
+      const confirmsInForce = D1.statement({
         Request: Scope,
         Result: Ids,
         execute: (r) => sql`SELECT id FROM importBatch WHERE organizationId = ${r.org} AND importId = ${r.id}
           AND takeBackId IS NULL ORDER BY confirmedAt, rowid`
       })
-      const removableCount = statement({
+      const removableCount = D1.statement({
         Request: Scope,
         Result: Count,
         execute: (r) => sql`SELECT COUNT(*) AS n FROM item WHERE organizationId = ${r.org} AND importId = ${r.id}
           AND revision = 1 AND batchId IN ${inForce(r.org, r.id)}`
       })
       // A stored item a confirm in force replaced, still as the replace left it: a take-back puts it back.
-      const restorableCount = statement({
+      const restorableCount = D1.statement({
         Request: Scope,
         Result: Count,
         execute: (r) => sql`SELECT COUNT(*) AS n FROM importReplaced p
@@ -1472,7 +1471,7 @@ export class Imports extends Context.Service<
       // Items the import created that changed since, and stored items it replaced that changed since the replace.
       // `kept`: those an earlier take-back kept; otherwise those a take-back now would keep.
       const changedItems = (kept: boolean) =>
-        statement({
+        D1.statement({
           Request: Scope,
           Result: S.Array(ChangedItemRow),
           execute: (r) => sql`SELECT sku, name, updatedBy AS changedBy, updatedAt AS changedAt FROM item

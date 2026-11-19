@@ -4,7 +4,6 @@
 // organization's condition and the search are AND-ed outside the filters' group, so an "or" between filters can never
 // reach another organization or bring back an item the search left out. What a search word matches is decided in
 // `src/domain/ItemSearch.ts`; this file only turns that decision into SQL over the `itemSearch` index.
-import { D1Client } from "@effect/sql-d1"
 import { Array as Arr, Context, DateTime, Effect, Layer, Option, String as Str } from "effect"
 import * as S from "effect/Schema"
 import { SecureRandom } from "effect/crypto"
@@ -25,7 +24,7 @@ import {
 } from "../domain/ItemQuery.ts"
 import { phrase, plan, searchWords, type WordMatch, wordsToCheck } from "../domain/ItemSearch.ts"
 import { itemColumns, ItemRow } from "./Imports.ts"
-import { batchOn, NoRows, statement } from "./Sql.ts"
+import { D1, NoRows } from "@beep/d1/D1"
 
 // The stored column behind each id the table may send. Typed as a field of a stored item, so a column that does not
 // exist is a type error here rather than a query that fails, or matches nothing, at run time.
@@ -162,8 +161,8 @@ export class Items extends Context.Service<
     Items,
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
-      const d1 = yield* D1Client.D1Client
-      const batch = batchOn(d1)
+      const d1 = yield* D1
+      const { batch } = d1
       const random = yield* SecureRandom.SecureRandom
 
       // The organization's condition first, then the search, then the filters' group in parentheses after AND,
@@ -175,14 +174,14 @@ export class Items extends Context.Service<
           ...Option.match(narrowed.filters, { onNone: () => [], onSome: (group) => [sql`(${group})`] })
         ])
       const pageRows = (narrowed: Narrowed, order: Statement.Fragment) =>
-        statement({
+        D1.statement({
           Request: PageRequest,
           Result: S.Array(ItemRow),
           execute: (r) => sql`SELECT ${itemColumns(sql)}
             FROM item WHERE ${scoped(r.org, narrowed)} ORDER BY ${order} LIMIT ${r.perPage} OFFSET ${r.offset}`
         })
       const pageCount = (narrowed: Narrowed) =>
-        statement({
+        D1.statement({
           Request: OrganizationId,
           Result: PageCount,
           execute: (org) => sql`SELECT COUNT(*) AS n FROM item WHERE ${scoped(org, narrowed)}`
@@ -248,7 +247,7 @@ export class Items extends Context.Service<
         return sql.join(" + ", true, "0")(hits)
       })
       const countsOf = (column: "category" | "uom") =>
-        statement({
+        D1.statement({
           Request: OrganizationId,
           Result: Counts,
           execute: (org) => sql`SELECT ${sql(column)} AS value, COUNT(*) AS n FROM item WHERE organizationId = ${org}
@@ -256,13 +255,13 @@ export class Items extends Context.Service<
         })
       // Active and lot tracked are stored as 1 and 0 and offered as "true" and "false", the words a filter sends back.
       const flagCountsOf = (column: "isActive" | "lotTracked") =>
-        statement({
+        D1.statement({
           Request: OrganizationId,
           Result: Counts,
           execute: (org) => sql`SELECT CASE WHEN ${sql(column)} = 1 THEN 'true' ELSE 'false' END AS value, COUNT(*) AS n
             FROM item WHERE organizationId = ${org} GROUP BY ${sql(column)} ORDER BY ${sql(column)} DESC`
         })
-      const totals = statement({
+      const totals = D1.statement({
         Request: OrganizationId,
         Result: Totals,
         execute: (org) => sql`SELECT COUNT(*) AS total, MIN(quantityOnHand) AS quantityMin,
@@ -515,7 +514,7 @@ export class Items extends Context.Service<
             OR isActive IS NOT ${r.edit.isActive ? 1 : 0} OR lotTracked IS NOT ${r.edit.lotTracked ? 1 : 0}
             OR firstReceivedOn IS NOT ${r.edit.firstReceivedOn} OR discontinuedOn IS NOT ${r.edit.discontinuedOn}))`
       // The audit line first, while the condition can still be true, then the change under the same condition.
-      const editedLine = statement({
+      const editedLine = D1.statement({
         Request: EditRequest,
         Result: NoRows,
         execute: (r) => sql`INSERT INTO activity (id, organizationId, actorId, actorName, action, detail, createdAt)
@@ -523,7 +522,7 @@ export class Items extends Context.Service<
             ${r.at}
           FROM item WHERE organizationId = ${r.org} AND id = ${r.id} AND ${editable(r)}`
       })
-      const editItem = statement({
+      const editItem = D1.statement({
         Request: EditRequest,
         Result: S.Array(ItemRow),
         execute: (r) => sql`UPDATE item SET name = ${r.edit.name}, description = ${r.edit.description},

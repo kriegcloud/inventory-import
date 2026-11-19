@@ -548,6 +548,35 @@ None.
   `Rows.test.ts` in the host: the `item` row the database held reads into its item (the cost's digits, the tags,
   the stocking), and the same row as a discontinued or an inactive item is stored reads into that.
 
+## After the merge: three answers of Benjamin's
+
+- **The edit refused before it is sent** ("Fix it now").
+  - Does it predate the moves? Checked on `5e7fed7`, the last commit before them, in a worktree of its own with its
+    own install and database: the clean sample imported, 33,000 characters typed in Steel Coil's Description, Save.
+    There too no request left the browser and the toast read "Something went wrong. Steel Coil was not saved. Try
+    again, and reload the page if it keeps happening." **That part predates the moves.** There "Edit again" opened
+    the editor; on the merged code it opened nothing. **That part is mine.**
+  - Why it broke: the Items table's columns are rebuilt when the facets object changes, and a rebuilt column
+    remounts every row's editor, losing the one the toast would reopen. A save refetches the facets. TanStack Query
+    hands back the object it held when a refetch answers the same, but only for plain JSON; since the facets hold
+    `Option`s (catalog (b)) every refetch was a new object. The same would close an editor someone was typing in
+    whenever the facets were fetched again.
+  - The fix: the query client keeps the held object when Effect's equality says the answer is the same
+    (`sameWhenEqual`, `packages/client/src/QueryClient.runtime.ts`), for every query. And the form names the
+    description and its limit before anything is sent (`readItemForm`, with `maxDescriptionLength` from the
+    contract): the one limit of the edit's schema a box let through.
+  - Tests: `ItemEdit.test.ts` (the sentence; a form at its limits reads into an edit the contract encodes),
+    `QueryClient.test.ts` (an equal answer with an `Option`, a `BigDecimal` and a `DateTime` in it keeps the held
+    object).
+  - Read on screen, fresh database, the clean sample imported: on Steel Coil typed 33,000 characters in Description,
+    Save: the sheet stayed open, under the box "Description is 33,000 characters long. It can hold 32,767: shorten
+    it.", no request sent, no toast. Then typed "Steel coil, checked by hand." in Description and "Steel Coil,
+    heavy" in Name and saved with the request made to fail on its way: toast "The server could not be reached.
+    Steel Coil was not saved. Check the connection and try again. Nothing was lost on this page." with "Edit
+    again", the row still "Steel Coil"; pressed "Edit again": the editor opened with "Steel Coil, heavy" and "Steel
+    coil, checked by hand." in its boxes; Save with the server back: "Saved BKM-0586", the row reads "Steel Coil,
+    heavy".
+
 ## Closing note
 
 **What stands.** Two contexts, eight packages, and an app that composes them: `access` and `catalog`, each as

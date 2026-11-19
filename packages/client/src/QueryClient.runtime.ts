@@ -1,11 +1,27 @@
 // How the browser caches what it fetched. The rules this file protects: data fetched a moment ago is shown as it is
 // (a screen change or a remount does not ask the server again); a refusal is never retried; a mutation is never
-// retried by the client. The query keys are each web package's own.
-import { QueryClient } from "@tanstack/react-query"
+// retried by the client; a refetch that answers what is already held keeps the object already held. The query keys
+// are each web package's own.
+import { QueryClient, replaceEqualDeep } from "@tanstack/react-query"
+import { Equal } from "effect"
+import { dual } from "effect/Function"
 import { isTransient } from "@inventory/client/SayError"
 
 /** How long fetched data is shown as it is before a screen that mounts asks again. */
 export const freshFor = 30_000
+
+/**
+ * What a refetch keeps: the data already held when the answer says the same thing. TanStack Query does this by
+ * itself for plain JSON, and gives up at the first value that is not (an `Option`, a `DateTime`, a `BigDecimal`), so
+ * an answer holding one was a new object on every refetch, and everything memoized on it was rebuilt: the Items
+ * table's columns, and with them every open row editor. Effect's equality reads those values, so it is asked first.
+ */
+export const sameWhenEqual: {
+  (answered: unknown): (held: unknown) => unknown
+  (held: unknown, answered: unknown): unknown
+} = dual(2, (held: unknown, answered: unknown): unknown =>
+  Equal.equals(held, answered) ? held : replaceEqualDeep(held, answered)
+)
 
 /**
  * The tab's one query client. Queries: fresh for `freshFor`, no refetch when the window regains focus, one more try
@@ -17,6 +33,7 @@ export const queryClient = new QueryClient({
     queries: {
       staleTime: freshFor,
       refetchOnWindowFocus: false,
+      structuralSharing: sameWhenEqual,
       retry: (failures, error) => failures < 1 && isTransient(error)
     },
     mutations: { retry: false }

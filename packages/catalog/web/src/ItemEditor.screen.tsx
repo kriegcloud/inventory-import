@@ -398,7 +398,9 @@ export function ItemEditor(props: {
                 rows={2}
                 value={form.description}
                 onChange={(event) => set("description", event.target.value)}
+                {...invalid("description")}
               />
+              <FieldError>{problems.description}</FieldError>
             </Field>
             <FromTheFile item={base} />
             {save.error === null || notice !== null ? null : (

@@ -41,6 +41,9 @@ export const decimalPattern = /^\d{1,12}(?:\.\d{1,4})?$/
 /** The most a stock number may be, so it stays an exact integer in JavaScript and SQLite. */
 export const maxCount = 999_999_999_999
 
+/** The longest description an item may be given by an edit, in characters. */
+export const maxDescriptionLength = 32_767
+
 /** The longest name an item may have, after trimming. */
 export const maxNameLength = 120
 
@@ -333,7 +336,7 @@ export const ItemEdit = S.Struct({
     messageMissingKey: "Send the revision of the item the change was made on."
   }),
   name: ItemFields.fields.name.annotateKey({ messageMissingKey: "Give the item a name." }),
-  description: S.String.check(S.isMaxLength(32767)).pipe(
+  description: S.String.check(S.isMaxLength(maxDescriptionLength)).pipe(
     nullAsNone({
       description: "Free text about the item; null for none",
       messageMissingKey: "Give a description, or null for none."

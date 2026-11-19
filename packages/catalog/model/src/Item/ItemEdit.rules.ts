@@ -1,7 +1,14 @@
 // The editor's form for one item, read into an edit or into a sentence per box that cannot be read. The same
 // readers the import uses on a file's cells, so an edit cannot store what a file could not.
 /** The edit form as the person filled it in: the text of each box, and the choices as they are. */
-import { Category, Uom, ItemEdit, maxNameLength, stockingOf } from "@inventory/catalog-contract/Item"
+import {
+  Category,
+  Uom,
+  ItemEdit,
+  maxDescriptionLength,
+  maxNameLength,
+  stockingOf
+} from "@inventory/catalog-contract/Item"
 import { Array as Arr, BigDecimal, Option, Record as Rec, Result, String as Str } from "effect"
 import { readUnitCost, readCount, readDate } from "../Review/CellReading.rules.ts"
 export type ItemForm = {
@@ -21,10 +28,19 @@ export type ItemForm = {
 /** A field of the edit form that can hold a problem, and the sentence that says what to do about it. */
 export type ItemFormProblems = Partial<
   Record<
-    "name" | "unitCost" | "quantityOnHand" | "reorderPoint" | "firstReceivedOn" | "discontinuedOn" | "isActive",
+    | "name"
+    | "description"
+    | "unitCost"
+    | "quantityOnHand"
+    | "reorderPoint"
+    | "firstReceivedOn"
+    | "discontinuedOn"
+    | "isActive",
     string
   >
 >
+
+const count = new Intl.NumberFormat("en-US")
 
 /**
  * Reads the edit form into the values an item is stored with, or every problem in it at once, each a sentence that
@@ -58,6 +74,13 @@ export const readItemForm = (input: {
         : name.length > maxNameLength
           ? `Name is longer than ${maxNameLength} characters. Shorten it.`
           : undefined
+    ],
+    [
+      "description",
+      // The one limit the edit's schema has that a box lets through: said here, with the number, before anything is sent.
+      description.length > maxDescriptionLength
+        ? `Description is ${count.format(description.length)} characters long. It can hold ${count.format(maxDescriptionLength)}: shorten it.`
+        : undefined
     ],
     [
       "unitCost",

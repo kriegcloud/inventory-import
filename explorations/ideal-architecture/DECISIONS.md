@@ -223,3 +223,17 @@ Question: `Option`/`DateTime` fields or `null`/strings? Answer: `DateTime` for e
 absence, the wire keeping its `null`s (`S.OptionFromNullOr`) and its ISO text (contexts brief, settled with "the brief
 matches"). Rejected: `DateTime` for timestamps only. Reverse: none planned; a field goes back to text only with a
 recorded deviation.
+
+### 2026-11-18 — an address that names no import
+
+Question: the import page says, for an address whose `import=` is no id, "The address does not name an import. Check
+the link, or choose a file."; keep the sentence, which the contexts brief did not have? Answer: "Keep it
+(Recommended)". Rejected: sending the text to the server for its 400. Reverse: change the sentence in
+`packages/catalog/web/src/ImportPage.screen.tsx`.
+
+### 2026-11-18 — an edit refused before it is sent
+
+Question: when a saved edit is refused before it is sent (a 33,000-character description), the toast says "Something
+went wrong... Try again" and "Edit again" opens nothing; fix it now? Answer: "Fix it now (Recommended)": the form
+names the field and its limit before saving, and "Edit again" reopens the editor with what was typed. Rejected:
+leaving it for a later goal. Reverse: none planned.

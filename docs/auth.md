@@ -16,10 +16,10 @@ exists: they read `CurrentActor` and call `requireRole`, as before. The rules it
 
 ```
 browser ── cookie inventory.session_token ──> Worker
-  /api/auth/*  -> SignInRoute (src/server/SignIn.ts, on @beep/better-auth): our cross-site check, then Better Auth's handler
+  /api/auth/*  -> SignInRoute (@inventory/access-host/SignIn, on @beep/better-auth): our cross-site check, then Better Auth's handler
                   (sign-up, sign-in, sign-out, organizations). Never versioned: Better Auth's own contract.
   /api/v1/*    -> HttpApi: SameOrigin, then the Identity middleware
-                  = SessionIdentityLive (src/server/SessionIdentity.ts)
+                  = SessionIdentityLive (@inventory/access-host/SessionIdentity)
                     Better Auth getSession(cookie) -> { userId, email, activeOrganizationId }
                     Members.findByUser(userId, activeOrganizationId) -> Member { id, name, role, organization }
                     no session or no membership -> NotSignedIn (401) with a sentence
@@ -28,20 +28,20 @@ browser ── cookie inventory.session_token ──> Worker
 
 - **Identity is the id.** `CurrentActor.id` (the member: one user in one organization) and the session's user id
   are who someone is. Display names are never compared for permissions: a rule such as "nobody approves their own
-  count" compares ids. Better Auth's `update-user` is off (`disabledPaths` in `src/server/authOptions.ts`), so
+  count" compares ids. Better Auth's `update-user` is off (`disabledPaths` in `packages/access/host/src/internal/authOptions.ts`), so
   nobody renames themselves through the API either.
 - **Organizations and roles are the app's own.** Better Auth's organization plugin uses the existing `organization`
-  and `member` tables, and its roles are `admin`, `editor` and `viewer` (`src/server/authOptions.ts`). `admin`
+  and `member` tables, and its roles are `admin`, `editor` and `viewer` (`packages/access/host/src/internal/authOptions.ts`). `admin`
   holds the plugin's owner permissions (change roles, add members); `editor` and `viewer` hold none. What an editor
   may do and a viewer may not is `requireRole` in the handlers. `member.role` keeps its CHECK constraint, so no other
   role can be stored. Leaving and deleting an organization are off. Removing a member is the People page's own
-  (`src/server/People.ts`): the row stays, with `userId` emptied and `removedAt` set, because the audit trail, the
+  (`packages/access/host/src/PeopleStore.adapter.ts`): the row stays, with `userId` emptied and `removedAt` set, because the audit trail, the
   imports and the decisions they made point at it; every read of members skips a removed one.
 - **The active organization** is on the session. A new session opens in the person's earliest membership; the
   organization picker at the top of the sidebar switches with the plugin's `set-active`, which checks membership
   on the server. A refused switch
   clears the active organization (Better Auth's behaviour); the person then acts in their earliest one.
-- **The browser** (`src/web/lib/actor.ts`) asks once per page load: `GET /api/v1/identity/session` answers status,
+- **The browser** (`@inventory/access-web/Session`, set up by the app's `src/web/lib/actor.ts`) asks once per page load: `GET /api/v1/identity/session` answers status,
   email, actor, organizations and the sign-in features, cached with `sessionQuery` (never refetched on its own). A
   signed-out visit logs no failed request. Signing in, creating an organization or switching drops every cached query
   and asks again; signing out reloads the page, so nothing the previous person saw stays in memory. `SignedIn` shows
@@ -55,10 +55,10 @@ browser ── cookie inventory.session_token ──> Worker
   there), and `TEST_ACCOUNTS` is off there, so it always shows the sign-in page.
 - **Drawn at once, loaded when needed.** For a browser that was not signed in last time (a hint in local storage
   that grants nothing), the sign-in page is drawn with the first paint, before the session answer; the test accounts
-  appear with the answer. Better Auth's browser client (`src/web/lib/auth-client.ts`, 14 kB gzip) is imported with
+  appear with the answer. Better Auth's browser client (`packages/access/web/src/internal/authClient.ts`, 14 kB gzip) is imported with
   `import()` only when a person signs in, switches or signs out, so the first page does not carry it. Measured with
   Lighthouse on a phone: mobile Performance 76 for a sign-in page drawn only after the answer, 97 drawn at once.
-- **`src/server/Identity.ts`** (a header names the member) is for tests only. It is marked pure, the Worker never
+- **`HeaderIdentity`** in `@inventory/access-host/AccessTest` (a header names the member) is for tests only. It is marked pure, the Worker never
   provides it, and `bun run build` fails if it appears in the Worker bundle (`scripts/check-production-identity.mjs`).
 
 ## Settings
@@ -84,7 +84,7 @@ are in `.dev.vars.example`.
 | CSRF and origins | our cross-site check first (`RequestSource.allows` from `@inventory/kernel/SameOrigin`, as on the API), then Better Auth's origin, callback and Fetch Metadata checks, on even under test (`disableOriginCheck: false`); trusted origins from `BETTER_AUTH_URL` | test "refuses sign-in and sign-out sent from another site, and a foreign callback address" |
 | Rate limits | stored in D1 (`rateLimit` table; Workers keep no memory between isolates), per address from `cf-connecting-ip`: sign-in 10 a minute, sign-up 5 a minute, the rest 100 a minute | test "limits sign-in attempts" (the 11th is 429) |
 | Breached passwords | Have I Been Pwned at sign-up and password change, behind `PWNED_PASSWORD_CHECK`; only the first five characters of the SHA-1 hash leave the Worker | `test/server/Pwned.test.ts` (off: never called; on and unreachable: refused), `Pwned.slow.test.ts` (the real service) |
-| Usage telemetry | off (`telemetry: { enabled: false }`): it reports to Better Auth's servers | `src/server/authOptions.ts` |
+| Usage telemetry | off (`telemetry: { enabled: false }`): it reports to Better Auth's servers | `packages/access/host/src/internal/authOptions.ts` |
 | Tracing | Better Auth's own instrumentation does nothing inside a Worker, so every call into it is an Effect span: `BetterAuth.handle` (endpoint and status) and `BetterAuth.session` | `@beep/better-auth` (`BetterAuth.service.ts`) |
 | Changing one's own name or picture | off: `POST /api/auth/update-user` answers 404 (`disabledPaths`) | test "refuses a rename through Better Auth's update-user" |
 | Headers | the API's security headers apply to `/api/auth/*` too | `curl -I` on `bun run preview` |
@@ -128,7 +128,7 @@ credential) is not covered.
 
 Better Auth's command line cannot reach D1, so its tables are migrations like any other:
 
-1. Change `src/server/authOptions.ts` (add the plugin, or a field under `additionalFields`).
+1. Change `packages/access/host/src/internal/authOptions.ts` (add the plugin, or a field under `additionalFields`).
 2. `bun run auth:schema` applies `migrations/` to an in-memory SQLite database and prints what Better Auth still
    needs, as SQL. It needs Node 22.18 or newer.
 3. Before any data has to be kept, put the output into `migrations/0001_init.sql` (part 1 holds Better Auth's
@@ -141,7 +141,7 @@ Better Auth's tables come first in `0001_init.sql`, because `member.userId` refe
 
 ## Test accounts and a deployed database
 
-The accounts are listed once, in `src/server/TestAccounts.ts`. `scripts/dev-accounts.sql` (written by
+The accounts are listed once, in `packages/access/host/src/internal/TestAccounts.ts`. `scripts/dev-accounts.sql` (written by
 `bun scripts/dev-accounts.mjs > scripts/dev-accounts.sql`) adds a user and a password for each seeded person, and makes
 Dana a viewer in Sample Supply so switching can be seen. `bun run dev` applies it after the migrations. It is not a
 migration, so a deployed database has no accounts: the first person signs up and creates their organization, and an
@@ -157,7 +157,7 @@ whatever headers it sends.
 ## Not done
 
 - No email: no verification, password reset or invitation links (each needs an email provider). An admin adds a
-  person who has already signed up, by their email, on the People page (`src/web/pages/PeoplePage.tsx`); someone with
+  person who has already signed up, by their email, on the People page (`@inventory/access-web/People`); someone with
   no account yet cannot be invited.
 - No second factor, passkeys or social sign-in, and no list of sessions a person can see and end. The write-up's
   "To make this production-ready" says why, and what would come first.

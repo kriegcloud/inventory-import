@@ -3,7 +3,7 @@ import { haveIBeenPwned } from "better-auth/plugins/haveibeenpwned"
 import { organization } from "better-auth/plugins/organization"
 import { memberAc, ownerAc } from "better-auth/plugins/organization/access"
 
-// Better Auth's configuration, in one place for the Worker (src/server/SignIn.ts), the schema script
+// Better Auth's configuration, in one place for the Worker (SignIn.route.ts), the schema script
 // (scripts/auth-schema.mjs) and the tests, so the tables the migration creates are the tables this config needs.
 //
 // The one thing not to break: the organisation plugin shares the app's `organization` and `member` tables, and

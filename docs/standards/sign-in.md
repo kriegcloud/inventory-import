@@ -14,7 +14,7 @@ page, where nobody has an account yet. How it is wired is in [sign-in](../auth.m
 
 - **Better Auth on D1 through its built-in D1 support**: the D1 binding is passed as the database. Its SQLite adapter
   page does not apply (that adapter cannot run inside a Worker), and `better-auth/minimal` is not used (it cannot
-  take a direct D1 connection). Check: `src/server/authOptions.ts` passes the binding.
+  take a direct D1 connection). Check: `packages/access/host/src/internal/authOptions.ts` passes the binding.
 - **Organizations through its organization plugin** on the app's own organization and member tables: that is the
   tenancy ([security](security.md)). Check: a new account gets its own organization.
 - **Email and password for now.** The write-up says why it is not what production should use (phishing, reuse,

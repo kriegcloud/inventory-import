@@ -66,9 +66,9 @@ sign-in secret into `.dev.vars` the first time).
   it says so.
 - **Activity** (`src/web/pages/ActivityPage.tsx`): every value an import wrote that differs from its file, who decided
   it, and the audit trail of uploads, imports, take-backs and changes of role.
-- **People** (`src/web/pages/PeoplePage.tsx`): who is in the organization; an admin adds a person by the email they
+- **People** (`@inventory/access-web/People`): who is in the organization; an admin adds a person by the email they
   signed up with, changes a role or removes someone, and the organization always keeps an admin.
-- **One model service** (`@beep/openrouter`, met by the app in `src/server/Model.ts`) with **one daily allowance** (`src/server/ModelCalls.ts`, 40 calls a
+- **One model service** (`@beep/openrouter`, met by the app in `src/server/Model.ts`) with **one daily allowance** (the access context's `ModelAllowanceGateway`, 40 calls a
   day per organization, taken before each call): every model feature draws on it, and when it is used up the feature
   says so in plain words and its rules answer. `GET /api/v1/system/status` says whether a model is on.
 
@@ -285,7 +285,12 @@ packages/ui/             @inventory/ui: the vendored shadcn, Dice UI and tablecn
                         exact export each), the theme (`theme.css`, the Tailwind entry) and the shared screen pieces.
 packages/review/         @inventory/review: the review region and its saved progress.
 packages/client/         @inventory/client: the browser's seam to the API with no contract in it (calls bound to a client,
-                        optimistic writes, `sayError`, the early requests).
+                        the runtime context, the query client, optimistic writes, `sayError`, the early requests).
+packages/access/         The access context (who may do what), as four packages: contract/ (the session, people and
+                        audit-trail schemas, their API groups, the model allowance's gateway), model/ (rules, ports,
+                        in-memory twins, handlers: no SQL, no HTTP), host/ (the D1 adapters, sign-in, the session
+                        identity, the endpoints) and web/ (the session controller, sign-in, People, the audit events).
+                        `scripts/check-boundaries.mjs` holds which of them may import which.
 packages/kernel/, packages/drivers/   @inventory/kernel and the @beep drivers (d1, better-auth, openrouter).
 packages/foundation/     Product-neutral packages. Today only beep-effect's kit, vendored: @beep/types (primitive/),
                         @beep/identity, @beep/schema and @beep/utils (modeling/). Never edit them: each vendor.json
@@ -454,8 +459,9 @@ The API runs in workerd, locally and deployed. Measured in this repo:
 
 ## Identity and permissions
 
-Sign-in is Better Auth: `src/server/SessionIdentity.ts` turns the session cookie into the actor
-([docs/auth.md](docs/auth.md)). `src/server/Identity.ts` (a header names the member) is for tests only. The browser
+Sign-in is Better Auth: `@inventory/access-host/SessionIdentity` turns the session cookie into the actor
+([docs/auth.md](docs/auth.md)). `HeaderIdentity` in `@inventory/access-host/AccessTest` (a header names the member) is
+for tests only. The browser
 asks who is signed in once (`useActor`, `GET /api/v1/identity/session`); sign-in, a switch of organization and
 sign-out drop every cached query. What must stay real in every new endpoint:
 
@@ -489,8 +495,8 @@ what to send a small model, cost and tool loops, and model-written HTML. The mod
 to `AI_MODEL` in `wrangler.jsonc`, and `AI_MODEL` in `.dev.vars` can override it, so read it from
 `/api/v1/system/status`; do not hardcode a model name. One retry policy, `ModelPolicy` in `@beep/openrouter`: never add another; end every AI
 feature with `answeredByRules(...)` and show `answeredBy` on screen. **Every model call takes one call from the day's
-allowance first** (`ModelCalls.take(actor, kind)` in `src/server/ModelCalls.ts`, before the call): a new model feature
-adds its kind there and in the `modelCall` table's check, and when the allowance is used up it says so and its rules
+allowance first** (`ModelAllowanceGateway.take(purpose)` from `@inventory/access-contract/ModelAllowance`, before the
+call): a new model feature adds its purpose there (`ModelCallPurpose`) and in the `modelCall` table's check, and when the allowance is used up it says so and its rules
 answer, as the table assistant does (`src/server/TableAssistant.ts`).
 
 ## UI
@@ -575,7 +581,7 @@ Comments are for the next person who has to change this, not for the compiler.
   document's and the model's. Required on every new schema.
 - **`@example` on exported pure helpers** whose use is not obvious, showing a real value from the sample data.
 - **A file that holds a decision opens with it**: two or three lines on the file's role and the one thing a reader
-  must not break (see `src/server/Identity.ts`).
+  must not break (see `packages/access/host/src/AccessTest.test-layer.ts`).
 - **React components**: one line on what the person does with it. Document a prop only when its name is not enough.
 - Explain *why*, and what was rejected. No commented-out code, no `TODO` without a name and a reason, no
   `@since`, `@category` or `@author` tags: there is no doc pipeline here to read them.

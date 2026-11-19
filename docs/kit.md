@@ -242,7 +242,7 @@ return (
   removable, each request undoable. The page hands it a catalog of its columns (`recordsCatalog` in
   `ItemsPage.tsx`); the server checks every answer against that catalog (`checkCommand` in `src/domain/TableView.ts`).
   With no key the fixed rules answer "find", "sort by", "hide", "show", "only" and "clear" and the panel says so; a
-  model's call comes from the day's allowance (`src/server/ModelCalls.ts`), and once that is used up the rules answer
+  model's call comes from the day's allowance (`ModelAllowanceGateway`, `@inventory/access-contract/ModelAllowance`), and once that is used up the rules answer
   and the panel says why.
 
 ## Point and ask, proposals, undo

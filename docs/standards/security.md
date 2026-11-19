@@ -39,7 +39,7 @@ status: draft
 ## Tenancy
 
 - **The actor and organization come only from the session** (`CurrentActor`), never from a payload, header or URL.
-  The header identity in `src/server/Identity.ts` is for tests only, and `bun run build` fails if it reaches the
+  The header identity (`HeaderIdentity` in `@inventory/access-host/AccessTest`) is for tests only, and `bun run build` fails if it reaches the
   Worker. People are told apart by
   id, never by name. Check: no handler reads an organization or member id from its payload.
 - **Tenancy is enforced in the app and in SQL**: every tenant table has `organizationId`, its indexes start with it,

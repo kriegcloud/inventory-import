@@ -2,6 +2,9 @@
 // Excel would display for the formats decision X3 covers (dates and times, zero-padding, one plain number pattern,
 // and General). A code it does not render is refused, never guessed. The General rule and the date tokens follow
 // what the reader this package replaced (SheetJS SSF) displayed, so a swap changes no displayed text.
+//
+// Notice: the format behaviour here follows SheetJS (https://sheetjs.com, Apache License 2.0), which is also this
+// package's test oracle (test/oracle.property.test.ts). The code is this package's own.
 import * as A from "effect/Array"
 import * as O from "effect/Option"
 import * as Str from "effect/String"

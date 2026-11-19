@@ -316,3 +316,28 @@ ticked.
 Question: who builds `@beep/xlsx`? Answer: "The same session (Recommended)", the one that wrote the brief, on its own
 branch `claude/beep-xlsx`. Rejected: a fresh session. Reverse: hand the branch and `goals/beep-xlsx/PLAN.md` to
 another builder.
+
+### 2026-11-19 — xlsx merge
+
+Question: how does `claude/beep-xlsx` reach main? Answer: "Merge locally, I push (Recommended)"; merged into local
+main at `3253f2f`. Reverse: none planned.
+
+### 2026-11-19 — where the new workbook reader differs from the old
+
+Question: the new reader differs from the SheetJS reader in three places on purpose; which are accepted (an
+unticked one is changed back)? Answer: all three ticked: "Rows outside the declared extent are read", "Displayed
+numbers round half away from zero", "A time rounding up to midnight shows no PM". Nothing is changed back. Reverse:
+the extent in the adapter's grid (`packages/catalog/web/src/internal/spreadsheet/xlsx.ts`), the rounding and the
+carry in `packages/foundation/modeling/xlsx/src/internal/numberFormat.ts`.
+
+### 2026-11-19 — the workbook reader's three new sentences
+
+Question: keep the sentences for a cell that could not be read, a number format that is not shown, and a workbook
+that unpacks to more than 64 MB? Answer: "Keep all three (Recommended)". Rejected: reword. Reverse: the two Notes and
+the problem are written in `packages/catalog/web/src/internal/spreadsheet/xlsx.ts`.
+
+### 2026-11-19 — xlsx licence notice
+
+Question: `@beep/xlsx`'s number formats follow what SheetJS (Apache-2.0) displayed; say so? Answer: "Add a short
+notice (Recommended)": one line in the package's README and in the number-format file's header, saying the format
+behaviour follows SheetJS, which is also the test oracle. Rejected: no notice. Reverse: remove the two lines.

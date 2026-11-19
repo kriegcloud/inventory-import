@@ -47,6 +47,8 @@ its checksum.
 Any other format gives none, and the read reports it (`FormatNotShown`). The General rule and the date tokens follow
 what SheetJS's formatter displayed, which this package's oracle test compares it with.
 
+Notice: the number-format behaviour follows SheetJS (Apache License 2.0), which is also this package's test oracle.
+
 ## Tests
 
 `test/oracle.property.test.ts` is the only file that imports SheetJS (`xlsx`, a devDependency, Apache-2.0): it reads

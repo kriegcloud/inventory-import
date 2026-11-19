@@ -1,7 +1,9 @@
 # Agent instructions
 
 Read `CLAUDE.md`. It is the single source of standing context for any coding agent in this repo. Before writing or
-changing any Effect Schema, read `docs/standards/schema-first.md`.
+changing any Effect Schema, read `docs/standards/schema-first.md`. Every Effect import follows
+`docs/standards/effect-imports.md`: each module whole from its own path under its one name, never from `"effect"`;
+`bun run check` fails on anything else.
 
 Skills are in `.agents/skills/` (one folder each, with a `SKILL.md`). `.claude/skills/` and `.codex/skills/` hold
 links to the same folders, so Claude Code, Codex and other agents that read the Agent Skills layout all find the same

@@ -41,9 +41,9 @@ Write these correctly the first time. Each one costs a fix cycle.
 Before using an Effect API you have not seen in this repository, read it in `node_modules/effect/src/`. Models write
 Effect 3 from memory; this is Effect 4.
 
-**Style the check enforces** (beep-effect's full profile; the back end has no exception). The Effect modules for strings, arrays and records (`import { Array as Arr, Record as Rec, String as Str } from
-"effect"`: `Str.includes("x")(name)`, `Str.toLowerCase(Str.trim(s))`, `Arr.map(xs, f)`, `Arr.findFirst(xs, p)` and
-`Rec.get(table, key)`, both Options); `Effect.fn("Service.method")(function* (...) { ... })` for Effect-returning
+**Style the check enforces** (beep-effect's full profile; the back end has no exception). The Effect modules for strings, arrays and records (`A`, `R` and `Str`, each imported whole from its own path under that name, as
+`docs/standards/effect-imports.md` says: `import * as A from "effect/Array"`, never from `"effect"`: `Str.includes("x")(name)`, `Str.toLowerCase(Str.trim(s))`, `A.map(xs, f)`, `A.findFirst(xs, p)` and
+`R.get(table, key)`, both Options); `Effect.fn("Service.method")(function* (...) { ... })` for Effect-returning
 functions; `const now = yield* DateTime.now` before `DateTime.formatIso(now)` rather than `yield*` inside a call;
 `Effect.succeedNone` and `Effect.orElseSucceed` over hand-written equivalents; `{ concurrency: 1 }` (or the
 concurrency you mean) on every `Effect.forEach` and `Effect.all`. `bun run check` fails on any of these.

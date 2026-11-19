@@ -29,6 +29,12 @@ before calling a screen done.
 **Before writing or changing any Effect Schema, read `docs/standards/schema-first.md`**: Benjamin's schema rules
 (SF-1 to SF-9), each with its check. They bind every new package and all code as it moves into one.
 
+**Every Effect import follows `docs/standards/effect-imports.md`** (beep-effect's rules): each module whole from its
+own path under its one name (`import * as O from "effect/Option"`, `import * as HttpClient from
+"effect/http/HttpClient"`), never from `"effect"` or a folder of modules such as `effect/http`; only `pipe`, `flow`,
+`identity` and `dual` are picked by name, from `effect/Function`. `bun run check` fails on anything else and prints
+the line to write; `bun run imports:fix` repairs code.
+
 ## What is there
 
 `bun install && bun run dev` is the whole setup: no key and no secret to make by hand (`bun run dev` writes the
@@ -365,7 +371,8 @@ this repo, check it in `node_modules/effect/src/` or the guides in `node_modules
 - Resolve services once, in the Layer or the handler group's constructor (`const x = yield* X` above
   `handlers.handleAll`). A service yielded inside a request handler must be provided per request, and only
   `CurrentActor` is.
-- Modules: `effect/http`, `effect/http-api`, `effect/sql`, `effect/schema`, `effect/ai`. Not `@effect/platform`.
+- Modules live under `effect/http/`, `effect/http-api/`, `effect/sql/`, `effect/schema/`, `effect/ai/`, each imported
+  from its own path (`effect/sql/SqlClient`; `docs/standards/effect-imports.md`). Not `@effect/platform`.
 - Literal unions are `Schema.Literals([...])`. Classes are `Schema.Class`, `Model.Class`, `Schema.TaggedError`.
 - `bun run typecheck` catches wiring mistakes (a missing Layer shows as a type error in `worker.ts`). Run it early.
 - A route beside the HttpApi (a frame document, a stream) has its own shape: pattern 6 in `docs/patterns.md`.
@@ -411,21 +418,21 @@ profile, its copied tests included, with no override.
 - **Effect 4 only**: an API that Effect 4 removed or renamed is an error.
 - **Effect's collections, never `Map` or `Set`**, anywhere in `src` and `test` (oxlint refuses them): `HashMap` and
   `HashSet` for a value handed on (React state included), `MutableHashMap` and `MutableHashSet` for one a function
-  fills, or a `Record` or `Arr.dedupe`. `WeakMap` and `WeakSet` stay where an entry must go with its key. Only
+  fills, or a `Record` or `A.dedupe`. `WeakMap` and `WeakSet` stay where an entry must go with its key. Only
   `packages/ui/src/components` (`@inventory/ui`) (vendored, as published) keeps its own.
 
 **Also enforced, beyond the list above** (the full profile): the Effect modules for strings, arrays and records
-(`import { Array as Arr, String as Str } from "effect"`: `Arr.map(xs, f)`, `Arr.findFirst` (an Option),
-`Str.trim(x)`, `Record.toEntries(r)`); `concurrency` stated on every `Effect.forEach` and `Effect.all`
+(`A`, `Str` and `R`, imported as `docs/standards/effect-imports.md` says: `A.map(xs, f)`, `A.findFirst` (an Option),
+`Str.trim(x)`, `R.toEntries(r)`); `concurrency` stated on every `Effect.forEach` and `Effect.all`
 (`{ concurrency: 1 }` keeps them sequential); no `yield*` inside a call's arguments (yield, then call); time from
-`Clock` or `DateTime`, randomness from `Random`, ids from `effect/crypto`, logs through `Effect.log`, never
+`Clock` or `DateTime`, randomness from `Random`, ids from `effect/crypto/SecureRandom`, logs through `Effect.log`, never
 `console`; service keys that follow the package and path (`"@inventory/app/server/Activities"`, as the
 `deterministicKeys` rule derives it); a two-argument exported helper is dual (data-first and pipeable, `dual` from
 `effect/Function`; see `hasRole`). Schema classes carry a brand and are built with `.make`.
 
 **Not checked by the profile**, and still rules:
 
-- **Look up file content with `Record.get(table, key)`** (an Option; `import { Record as Rec } from "effect"`, so
+- **Look up file content with `R.get(table, key)`** (an Option; `import * as R from "effect/Record"`, so
   TypeScript's `Record<K, V>` stays usable). A plain `table[key]` finds `constructor` and `toString` when a cell
   says so: that is an HTTP 500 the type-check does not see.
 

@@ -19,7 +19,7 @@ Answered decisions move below with the date, the answer and how to reverse it.
 | 15 | Do model-preselected values count as Ready? | No | 03 §7.8 |
 | 16 | MCP for agents? | Own tools: reads plus proposal-only writes that need approval | 01 §3 |
 
-### Round four: shipping
+### Round four: shipping (answered 2026-11-19, entries "infra I1" to "infra I9" below)
 
 | # | Question | Recommendation | Source |
 | --- | --- | --- | --- |
@@ -366,3 +366,73 @@ state" of 2026-11-18, which kept TanStack Query for the rebuild and left atoms f
 file, the exact line of what stays a hook, and the five questions it leaves are in
 [BRIEF-atoms.md](BRIEF-atoms.md); nothing is built, and the goal starts after the Effect-imports migration is merged.
 Reverse: none planned.
+
+### 2026-11-19 — infra I1, deploy unit (18)
+
+Question: what is the deploy unit? Answer: "Cloudflare.Website.Vite, exact pin (Recommended)". Rejected:
+`Cloudflare.Worker` with assets; keep wrangler with Alchemy for GitHub only. Reverse: swap the one resource in
+`Inventory.stack.ts` for a `Worker` with `assets.directory`.
+
+### 2026-11-19 — infra I2, state store (19)
+
+Question: where is Alchemy's state kept? Answer: "Cloudflare.state() (Recommended)". Rejected: a Postgres database;
+local files. Reverse: `alchemy state migrate` to another store.
+
+### 2026-11-19 — infra I3, sign-in tables and secret (20)
+
+Question: who owns the sign-in tables and the sign-in secret? Answer: "Hand migration, minted secret
+(Recommended)". Rejected: the secret in 1Password; `@alchemy.run/better-auth` owns both. Reverse: bind the secret
+from a reference instead; everyone is signed out once.
+
+### 2026-11-19 — infra I4, previews (21)
+
+Question: where do previews live, and at what address? Answer: "Separate account, workers.dev (Recommended)".
+Rejected: the same account on `workers.dev`; the same account on `inventory-pr-N`; no previews. Reverse: point the
+preview token at the production account.
+
+### 2026-11-19 — infra I5, model keys (22, and 13 for a deploy)
+
+Question: which stages get a model key? Answer: "Production only, one vendor (Recommended)". Rejected: no key
+anywhere at first; production and previews. Reverse: add or remove the key in the stage plan.
+
+The reference `op://BEEP_SECRETS/BEEP_SECRETS/TYPESAFE_AI_API_KEY`: "Not deployed for now (Recommended)". It is
+reserved for a later confidence-score goal; no stage gets it, and it is not in `env/op.env`. Rejected: declare it,
+unused. It is never resolved by an agent.
+
+### 2026-11-19 — infra I6, email (23)
+
+Question: does the app send email now? Answer: "Not now (Recommended)". Rejected: Resend for reset only; Resend for
+reset, verification and invitations. Reverse: a later goal adds the sending domain and its key.
+
+### 2026-11-19 — infra I7, repository rules (24)
+
+Question: are the repository's rules declared as code? Answer: "Yes, with an admin bypass (Recommended)". Rejected:
+environments and secrets only; nothing declared. Reverse: remove the ruleset from `GitHub.stack.ts`; it is kept in
+GitHub until deleted there.
+
+### 2026-11-19 — infra I8, sign-up
+
+Question: who may make an account on the public address? Answer: "Close sign-up; I add accounts (Recommended)".
+Rejected: leave sign-up open; behind Cloudflare Access. Reverse: open sign-up again in the sign-in settings.
+
+### 2026-11-19 — infra I9, Workers plan
+
+Question: which Workers plan? Answer: "Workers Paid, $5 a month (Recommended)". Rejected: Workers Free, measure
+first. Reverse: change the plan in Cloudflare; measure a sign-in and a large confirm first.
+
+### 2026-11-19 — the Review warning's headings
+
+Question: keep "Check this before you import" and "Check these N things before you import"? Answer: "Keep them
+(Recommended)". Reverse: the two strings in `ReaderWarnings`, `packages/catalog/web/src/ReviewStep.screen.tsx`.
+
+### 2026-11-19 — infra brief
+
+Question: does `BRIEF-infra.md` match? Answer: "The brief matches (Recommended)", with I1 to I9 as answered above.
+No goal is open yet: see "order of work after xlsx". Reverse: reopen the brief before the goal's SPEC is ticked.
+
+### 2026-11-19 — order of work after xlsx
+
+Question: in what order do the next three pieces of work go? Answer: "Imports, then infra, then atoms
+(Recommended)": the Effect-imports migration is merged to main first; then the goal `infra` is opened and built and
+checked on this machine only, stopping before the first step that touches anything outside it, which is Benjamin's;
+then atoms. Rejected: infra now in parallel; atoms before infra. Reverse: none needed; nothing is started.

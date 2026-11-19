@@ -27,8 +27,9 @@ brief keeps its name. Step 5's is [BRIEF-kernel-drivers.md](BRIEF-kernel-drivers
 and step 7's [BRIEF-contexts.md](BRIEF-contexts.md); Benjamin said both match, and the goals are open at
 [goals/ui-packages](../../goals/ui-packages/SPEC.md) and [goals/contexts](../../goals/contexts/SPEC.md). Step 8's is
 [BRIEF-xlsx.md](BRIEF-xlsx.md), which Benjamin said matches; the goal is done at
-[goals/beep-xlsx](../../goals/beep-xlsx/SPEC.md). Step 9's is [BRIEF-infra.md](BRIEF-infra.md), written and waiting
-for "the brief matches" and its nine decisions; no goal is open for it.
+[goals/beep-xlsx](../../goals/beep-xlsx/SPEC.md). Step 9's is [BRIEF-infra.md](BRIEF-infra.md), which Benjamin
+said matches; its goal is opened after the Effect-imports migration is merged. [BRIEF-atoms.md](BRIEF-atoms.md)
+follows infra and waits for "the brief matches".
 
 ## Where the research disagrees with the request
 
@@ -84,6 +85,8 @@ Each step ends with the full check and an import of the messy sample in a browse
 
 ## Trail
 
+- 2026-11-19: Benjamin answered BRIEF-infra.md (I1 to I9) and said it matches; order of work: the Effect-imports
+  migration, then infra, then atoms.
 - 2026-11-19: BRIEF-atoms.md written after Benjamin's rule "useEffect banned with no exceptions"; the decision
   "client state" is reversed; nothing built.
 - 2026-11-19: BRIEF-infra.md written for the goal `infra` (step 9); nothing built or deployed; awaiting "the brief

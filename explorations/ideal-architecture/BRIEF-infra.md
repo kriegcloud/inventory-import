@@ -11,6 +11,12 @@ Step 9 of the order of work in [README.md](README.md), the last. It rests on
 "Where the research disagrees with the request". It turns round four of [DECISIONS.md](DECISIONS.md) (18 to 24) into
 questions, and round three (13, 15, 16) only where a deploy needs them.
 
+Benjamin answered I1 to I9 with the recommended option of each and said "The brief matches (Recommended)"
+([DECISIONS.md](DECISIONS.md), 2026-11-19). The goal is opened only after the Effect-imports migration is merged to
+main, and is then built and checked on this machine only, stopping before the first step that touches anything
+outside it. The reference `op://BEEP_SECRETS/BEEP_SECRETS/TYPESAFE_AI_API_KEY` is reserved for a later
+confidence-score goal: no stage gets it.
+
 Nothing here is built. No account was opened, no login command run, no DNS record, GitHub setting or secret read or
 changed, and nothing was deployed. No goal is open.
 

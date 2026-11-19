@@ -392,7 +392,7 @@ None of this can be done by an agent, and none was started.
 | `.github/workflows/ci.yml` | unchanged; `deploy.yml` beside it |
 | nothing | `packages/infra`, `alchemy.run.ts`, `.alchemy/` git-ignored |
 | `docs/` and `CLAUDE.md` "Commands": `deploy:setup`, `deploy` | rewritten for the stack where the move makes them false |
-| `scripts/check-boundaries.mjs` | a family `infra` that nothing in the app may import |
+| `packages/tooling/tool/cli/src/commands/Laws/Boundaries.rules.ts` (`bun run beep laws boundaries`) | a family `infra` that nothing in the app may import |
 
 ## Order of moves
 

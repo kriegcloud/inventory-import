@@ -7,12 +7,7 @@
     {
       // The React and TanStack Query forms the screens still call until their package moves (goals/atoms/PLAN.md,
       // "Legacy in the client"). Each file goes when its last caller has moved; none may gain a caller.
-      "files": [
-        "src/ApiRuntime.runtime.ts",
-        "src/CurrentMember.controller.ts",
-        "src/Optimistic.controller.ts",
-        "src/QueryClient.runtime.ts"
-      ],
+      "files": ["src/CurrentMember.controller.ts", "src/Optimistic.controller.ts", "src/QueryClient.runtime.ts"],
       "rules": { "no-restricted-imports": "off" }
     }
   ]

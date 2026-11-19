@@ -1,8 +1,8 @@
 // The access screens' way to the API: the client for the identity, people and activity groups, as a tag the app's
-// runtime provides, and the calls bound to it. A screen here can reach these three groups and nothing else.
+// runtime provides, and the read and write atoms made against it. A screen here can reach these three groups and
+// nothing else.
 import type { ActivityApi, IdentityApi, PeopleApi } from "@inventory/access-contract/Access"
-import { type Api, useApi } from "@inventory/client/ApiRuntime"
-import { type OptimisticWrite, useOptimisticWriteVia } from "@inventory/client/Optimistic"
+import { makeApiAtoms } from "@inventory/client/Api"
 import type { SameOrigin } from "@inventory/kernel/SameOrigin"
 import * as Context from "effect/Context"
 import type * as HttpApiClient from "effect/http-api/HttpApiClient"
@@ -28,11 +28,5 @@ export type AccessApiClient = HttpApiClient.Client<
 /** The access client, as the app's runtime provides it (from its one client for the whole API). */
 export class AccessClient extends Context.Service<AccessClient, AccessApiClient>()($I`AccessClient`) {}
 
-/** `call`, `callWrite` and `fork` against the access groups, over the app's runtime. */
-export const useAccess = (): Api<AccessApiClient> => useApi(AccessClient)
-
-/** One optimistic write against the access groups (`@inventory/client/Optimistic` says the rule it keeps). */
-export const useAccessWrite = <Input, A, E>(spec: OptimisticWrite<AccessApiClient, Input, A, E>) => {
-  const { callWrite } = useAccess()
-  return useOptimisticWriteVia({ ...spec, callWrite })
-}
+/** Reads, writes and the write retries against the access groups, as atoms on the app's one runtime. */
+export const accessApi = makeApiAtoms(AccessClient)

@@ -1,7 +1,13 @@
+import { useAtom, useAtomSet, useAtomValue } from "@effect/atom-react"
+import * as Data from "effect/Data"
+import * as Effect from "effect/Effect"
+import * as Exit from "effect/Exit"
 import * as O from "effect/Option"
+import * as S from "effect/Schema"
 import * as SecureRandom from "effect/crypto/SecureRandom"
-import { useMutation } from "@tanstack/react-query"
-import { type FormEvent, useId, useState } from "react"
+import * as AsyncResult from "effect/reactivity/AsyncResult"
+import * as Atom from "effect/reactivity/Atom"
+import { type FormEvent, useId } from "react"
 import { Button } from "@inventory/ui/components/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@inventory/ui/components/card"
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@inventory/ui/components/field"
@@ -9,6 +15,9 @@ import { Input } from "@inventory/ui/components/input"
 import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@inventory/ui/components/item"
 import { Spinner } from "@inventory/ui/components/spinner"
 import type { SignInFeatures, TestAccount } from "@inventory/access-contract/SessionState"
+import { $AccessWebId } from "./internal/identity.ts"
+
+const $I = $AccessWebId.create("SignIn")
 
 // The sign-in page, drawn with the first paint (the app's sign-in gate says why). Better Auth's client is loaded
 // only when a person reaches for the page or presses, so the first page of the app does not carry it.
@@ -32,55 +41,118 @@ const roleWord = { admin: "Admin", editor: "Editor", viewer: "Viewer" } as const
 const membershipsOf = (account: TestAccount) =>
   account.memberships.map((membership) => `${roleWord[membership.role]}, ${membership.organizationName}`)
 
-type Attempt =
-  | { readonly mode: "sign-in"; readonly email: string; readonly password: string }
-  | {
-      readonly mode: "sign-up"
-      readonly name: string
-      readonly email: string
-      readonly password: string
-      readonly organization: string
-    }
+/** What the person asked for: to sign in to an account, or to make one and its organization. */
+type Attempt = Data.TaggedEnum<{
+  SignIn: { readonly email: string; readonly password: string }
+  SignUp: { readonly name: string; readonly email: string; readonly password: string; readonly organization: string }
+}>
+const Attempt = Data.taggedEnum<Attempt>()
+
+/** Better Auth said no, in a sentence already written for the person ("Invalid email or password"). */
+class AuthRefused extends S.TaggedError<AuthRefused, { readonly brand: unique symbol }>()(
+  "AuthRefused",
+  { message: S.String },
+  $I.annote("AuthRefused", { description: "Better Auth refused a sign-in, a sign-up or a new organization." })
+) {}
+
+/** A Better Auth step as an Effect: its refusal is `AuthRefused` with Better Auth's own sentence. */
+const authStep = (step: () => Promise<unknown>): Effect.Effect<void, AuthRefused> =>
+  Effect.tryPromise({
+    try: () => step().then(() => undefined),
+    catch: (cause) =>
+      AuthRefused.make({
+        message: cause instanceof Error ? cause.message : "Something went wrong. Try again."
+      })
+  })
+
+/** Sends one attempt to Better Auth: a sign-in, or a sign-up followed by the new organization. */
+const submitAttempt = Atom.fn((attempt: Attempt) =>
+  Attempt.$match(attempt, {
+    SignIn: ({ email, password }) =>
+      authStep(() =>
+        authClient().then(({ authClient: client, orThrow }) =>
+          client.signIn.email({ email, password }).then((answer) => orThrow(answer))
+        )
+      ),
+    SignUp: ({ name, email, password, organization }) =>
+      authStep(() =>
+        authClient().then(({ authClient: client, orThrow }) =>
+          client.signUp
+            .email({ name, email, password })
+            .then((answer) => orThrow(answer))
+            .then(() => client.organization.create({ name: organization, slug: slugFor(organization) }))
+            .then((answer) => orThrow(answer))
+        )
+      )
+  })
+)
+
+/** The attempt last sent, so the button pressed shows that it is working. */
+const lastAttempt = Atom.make<O.Option<Attempt>>(O.none())
+
+/** The sign-in form: which form it is, and what is typed in it. */
+const mode = Atom.make<"sign-in" | "sign-up">("sign-in")
+const emailTyped = Atom.make("")
+const passwordTyped = Atom.make("")
+const nameTyped = Atom.make("")
+const organizationTyped = Atom.make("")
+
+/** Making the first organization of an account that has none. */
+const createOrganization = Atom.fn((name: string) =>
+  authStep(() =>
+    authClient().then(({ authClient: client, orThrow }) =>
+      client.organization.create({ name, slug: slugFor(name) }).then((answer) => orThrow(answer))
+    )
+  )
+)
+const organizationName = Atom.make("")
+
+/**
+ * What to say under the form after a refusal, while nothing is on its way: Better Auth's own sentence, or a general one
+ * for a failure that is not a refusal.
+ */
+const refusalOf = (result: AsyncResult.AsyncResult<void, AuthRefused>): string | undefined =>
+  result._tag !== "Failure" || result.waiting
+    ? undefined
+    : O.match(AsyncResult.error(result), {
+        onNone: () => "Something went wrong. Try again.",
+        onSome: (refused) => refused.message
+      })
 
 /** The first screen when nobody is signed in: the test accounts in one click, sign in, or create an account. */
 export function SignIn(props: { features: SignInFeatures | undefined; onSignedIn: () => void }) {
   const id = useId()
-  const [mode, setMode] = useState<"sign-in" | "sign-up">("sign-in")
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [name, setName] = useState("")
-  const [organization, setOrganization] = useState("")
+  const [current, setMode] = useAtom(mode)
+  const [email, setEmail] = useAtom(emailTyped)
+  const [password, setPassword] = useAtom(passwordTyped)
+  const [name, setName] = useAtom(nameTyped)
+  const [organization, setOrganization] = useAtom(organizationTyped)
+  const result = useAtomValue(submitAttempt)
+  const submit = useAtomSet(submitAttempt, { mode: "promiseExit" })
+  const reset = useAtomSet(submitAttempt)
+  const [last, setLast] = useAtom(lastAttempt)
   const testAccounts = props.features === undefined ? null : O.getOrNull(props.features.testAccounts)
   // Until the features are known nothing is offered that may then be refused.
   const offer = props.features === undefined ? "closed" : props.features.signUp
 
-  const submit = useMutation({
-    mutationFn: (attempt: Attempt) =>
-      authClient().then(({ authClient: client, orThrow }) => {
-        if (attempt.mode === "sign-in") {
-          return client.signIn.email({ email: attempt.email, password: attempt.password }).then((answer) => {
-            orThrow(answer)
-          })
-        }
-        return client.signUp
-          .email({ name: attempt.name, email: attempt.email, password: attempt.password })
-          .then((answer) => {
-            orThrow(answer)
-          })
-          .then(() => client.organization.create({ name: attempt.organization, slug: slugFor(attempt.organization) }))
-          .then((answer) => {
-            orThrow(answer)
-          })
-      }),
-    onSuccess: props.onSignedIn
-  })
-
+  const send = (attempt: Attempt) => {
+    setLast(O.some(attempt))
+    void submit(attempt).then((exit) => {
+      if (Exit.isSuccess(exit)) props.onSignedIn()
+    })
+  }
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    submit.mutate(mode === "sign-in" ? { mode, email, password } : { mode, name, email, password, organization })
+    send(
+      current === "sign-in"
+        ? Attempt.SignIn({ email, password })
+        : Attempt.SignUp({ name, email, password, organization })
+    )
   }
-  const signUp = mode === "sign-up"
-  const pendingEmail = submit.isPending ? submit.variables.email : undefined
+  const signUp = current === "sign-up"
+  const pending = result.waiting
+  const pendingEmail = pending ? O.getOrUndefined(O.map(last, (attempt) => attempt.email)) : undefined
+  const refused = refusalOf(result)
 
   return (
     <div
@@ -165,10 +237,10 @@ export function SignIn(props: { features: SignInFeatures | undefined; onSignedIn
                   />
                 </Field>
               )}
-              {submit.error !== null && <FieldError>{submit.error.message}</FieldError>}
+              {refused !== undefined && <FieldError>{refused}</FieldError>}
               <Field>
-                <Button type="submit" disabled={submit.isPending}>
-                  {submit.isPending && pendingEmail === email ? <Spinner /> : null}
+                <Button type="submit" disabled={pending}>
+                  {pending && pendingEmail === email ? <Spinner /> : null}
                   {signUp ? "Create account" : "Sign in"}
                 </Button>
                 {/* Offered only where an account can be made: closed, the page is sign-in alone. */}
@@ -177,7 +249,7 @@ export function SignIn(props: { features: SignInFeatures | undefined; onSignedIn
                     type="button"
                     variant="ghost"
                     onClick={() => {
-                      submit.reset()
+                      reset(Atom.Reset)
                       setMode(signUp ? "sign-in" : "sign-up")
                     }}
                   >
@@ -221,10 +293,8 @@ export function SignIn(props: { features: SignInFeatures | undefined; onSignedIn
                       <Button
                         variant="outline"
                         size="sm"
-                        disabled={submit.isPending}
-                        onClick={() =>
-                          submit.mutate({ mode: "sign-in", email: account.email, password: testAccounts.password })
-                        }
+                        disabled={pending}
+                        onClick={() => send(Attempt.SignIn({ email: account.email, password: testAccounts.password }))}
                       >
                         {pendingEmail === account.email ? <Spinner /> : null}
                         Sign in<span className="sr-only"> as {account.name}</span>
@@ -244,16 +314,10 @@ export function SignIn(props: { features: SignInFeatures | undefined; onSignedIn
 /** Signed in, but in no organization yet (an account whose organization was not created): create one. */
 export function CreateOrganization(props: { onCreated: () => void; onSignOut: () => void }) {
   const id = useId()
-  const [name, setName] = useState("")
-  const create = useMutation({
-    mutationFn: () =>
-      authClient().then(({ authClient: client, orThrow }) =>
-        client.organization.create({ name, slug: slugFor(name) }).then((answer) => {
-          orThrow(answer)
-        })
-      ),
-    onSuccess: props.onCreated
-  })
+  const [name, setName] = useAtom(organizationName)
+  const result = useAtomValue(createOrganization)
+  const create = useAtomSet(createOrganization, { mode: "promiseExit" })
+  const refused = refusalOf(result)
   return (
     <Card className="mx-auto w-full max-w-sm">
       <CardHeader>
@@ -266,7 +330,9 @@ export function CreateOrganization(props: { onCreated: () => void; onSignOut: ()
         <form
           onSubmit={(event) => {
             event.preventDefault()
-            create.mutate()
+            void create(name).then((exit) => {
+              if (Exit.isSuccess(exit)) props.onCreated()
+            })
           }}
         >
           <FieldGroup>
@@ -281,10 +347,10 @@ export function CreateOrganization(props: { onCreated: () => void; onSignOut: ()
                 onChange={(event) => setName(event.target.value)}
               />
             </Field>
-            {create.error !== null && <FieldError>{create.error.message}</FieldError>}
+            {refused !== undefined && <FieldError>{refused}</FieldError>}
             <Field>
-              <Button type="submit" disabled={create.isPending}>
-                {create.isPending && <Spinner />}
+              <Button type="submit" disabled={result.waiting}>
+                {result.waiting && <Spinner />}
                 Create organization
               </Button>
               <Button type="button" variant="ghost" onClick={props.onSignOut}>

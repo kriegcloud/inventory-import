@@ -4,7 +4,6 @@
 import { accessKeys } from "@inventory/access-web/Access"
 import { catalogKeys } from "@inventory/catalog-web/Keys"
 export { freshFor, queryClient } from "@inventory/client/QueryClient"
-export { sessionQuery } from "@inventory/access-web/Session"
 
 /**
  * Every query key, in one place. A write invalidates the keys of what it changed: a confirm changes the items,

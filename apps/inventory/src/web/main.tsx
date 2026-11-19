@@ -9,7 +9,8 @@ import { modelSentences } from "@inventory/catalog-web/AnsweredByWords"
 import { queryClient } from "@/lib/queries"
 import { startTelemetry } from "@/lib/telemetry"
 import { provideApi } from "@inventory/client/Api"
-import { ApiRuntime } from "@inventory/client/ApiRuntime"
+import { provideMember } from "@inventory/client/MemberAtoms"
+import { actor } from "@inventory/access-web/Session"
 import { installTroubleSentences } from "@inventory/client/SayError"
 import { ThemeProvider } from "@inventory/ui/Theme"
 import App from "./App.tsx"
@@ -27,8 +28,9 @@ installTroubleSentences(modelSentences)
 // Traces and logs to a collector when the server says telemetry is on (@/lib/telemetry); off, one small request.
 void appRuntime.runPromise(startTelemetry)
 
-// What the atoms of every web package read the API through: the app's one runtime, given to the registry once.
-const initialAtoms = [provideApi(appLayer)]
+// What the atoms of every web package read the API through (the app's one runtime), and who they read it for (the
+// session's member): given to the registry once.
+const initialAtoms = [provideApi(appLayer), provideMember(actor)]
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -37,15 +39,12 @@ createRoot(document.getElementById("root")!).render(
         is dropped 400 ms later; a read of the API is kept for `freshFor` (@inventory/client/Api). */}
       <RegistryProvider initialValues={initialAtoms} defaultIdleTTL={400}>
         <QueryClientProvider client={queryClient}>
-          {/* The one runtime every web package's screens call the API on. */}
-          <ApiRuntime.Provider value={appRuntime as never}>
-            <TooltipProvider delayDuration={300}>
-              <App />
-              {/* Top centre, under the bar: between a page's title and its buttons, so a message never covers the table's
+          <TooltipProvider delayDuration={300}>
+            <App />
+            {/* Top centre, under the bar: between a page's title and its buttons, so a message never covers the table's
               page controls or a confirm button. */}
-              <Toaster position="top-center" offset={64} richColors closeButton />
-            </TooltipProvider>
-          </ApiRuntime.Provider>
+            <Toaster position="top-center" offset={64} richColors closeButton />
+          </TooltipProvider>
         </QueryClientProvider>
       </RegistryProvider>
     </ThemeProvider>

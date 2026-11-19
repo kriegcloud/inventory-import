@@ -1,9 +1,12 @@
-import { useQuery } from "@tanstack/react-query"
+import { useAtomRefresh, useAtomValue } from "@effect/atom-react"
+import * as Cause from "effect/Cause"
 import * as DateTime from "effect/DateTime"
+import * as O from "effect/Option"
+import * as AsyncResult from "effect/reactivity/AsyncResult"
 import type { Activity } from "@inventory/kernel/Activity"
 import { when, whenShort } from "@inventory/ui/Dates"
 import { type ListColumn, ListTable } from "@inventory/ui/ListTable"
-import { accessKeys, useAccess } from "./Access.runtime.ts"
+import { accessApi, accessKeys } from "./Access.runtime.ts"
 
 type AuditEvent = (typeof Activity.json)["Type"]
 
@@ -27,10 +30,24 @@ export const auditEventColumns: ReadonlyArray<ListColumn<AuditEvent>> = [
 /** What the audit trail's list is called, for its table and for the placeholder shown while it loads. */
 export const auditEventsCaption = "Uploads and imports"
 
-/** The audit trail of the signed-in member's organization, newest first, fetched once and shared. */
+/**
+ * The audit trail of the signed-in member's organization, newest first, fetched once and shared. Anything that writes
+ * an audit line says `accessKeys.activity` changed, and it is asked again.
+ */
+export const auditEvents = accessApi.query((api) => api.activity.recent(), { reactivityKeys: accessKeys.activity })
+
+/**
+ * The audit trail as the Activity page reads it until that page moves to atoms (goals/atoms, step 4): only the atom
+ * hooks, with the fields of the query it replaced.
+ */
 export const useAuditEvents = () => {
-  const { call } = useAccess()
-  return useQuery({ queryKey: accessKeys.activity, queryFn: () => call((api) => api.activity.recent()) })
+  const result = useAtomValue(auditEvents)
+  const refetch = useAtomRefresh(auditEvents)
+  return {
+    data: result.pipe(AsyncResult.value, O.getOrUndefined),
+    error: result._tag === "Failure" ? Cause.squash(result.cause) : null,
+    refetch
+  }
 }
 
 /** The audit trail as a list a person searches and filters: every upload, import, take-back and change of role. */

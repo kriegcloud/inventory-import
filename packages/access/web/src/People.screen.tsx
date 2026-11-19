@@ -1,10 +1,16 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useAtom, useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
+import * as Cause from "effect/Cause"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
+import * as Exit from "effect/Exit"
+import * as HashSet from "effect/HashSet"
 import * as O from "effect/Option"
 import * as Result from "effect/Result"
 import * as S from "effect/Schema"
-import { type ReactNode, useId, useState } from "react"
+import * as AsyncResult from "effect/reactivity/AsyncResult"
+import * as Atom from "effect/reactivity/Atom"
+import * as AtomRegistry from "effect/reactivity/AtomRegistry"
+import { type ReactNode, useId } from "react"
 import { toast } from "sonner"
 import { PageHeader } from "@inventory/ui/PageHeader"
 import { TableSkeleton } from "@inventory/ui/Skeletons"
@@ -35,14 +41,15 @@ import {
 import { Field, FieldGroup, FieldLabel } from "@inventory/ui/components/field"
 import { Input } from "@inventory/ui/components/input"
 import { NativeSelect, NativeSelectOption } from "@inventory/ui/components/native-select"
-import { cacheChange } from "@inventory/client/Optimistic"
+import { optimisticChange, optimisticWrite, shown } from "@inventory/client/OptimisticAtoms"
 import { AddPerson as AddPersonCommand, ChangeRole } from "@inventory/access-contract/PeopleCommand"
 import { Person } from "@inventory/access-contract/Person"
+import type { MemberId } from "@inventory/kernel/Ids"
 import { hasRole, type Role } from "@inventory/kernel/Role"
 import { when } from "@inventory/ui/Dates"
 import { sayError } from "@inventory/client/SayError"
-import { accessKeys, useAccess, useAccessWrite } from "./Access.runtime.ts"
-import { useSession } from "./Session.controller.ts"
+import { accessApi, accessKeys } from "./Access.runtime.ts"
+import { actor as signedIn } from "./Session.atoms.ts"
 
 /** A person as the table shows them: with whether their role is being saved. */
 type PersonRow = Person & { readonly saving: boolean }
@@ -59,39 +66,92 @@ const roles: ReadonlyArray<{ value: Role; label: string }> = [
   { value: "admin", label: "Admin: can manage people" }
 ]
 
+/** The people of the organization, as the server has them, with each optimistic change on top while it is saved. */
+const people = shown(accessApi.query((api) => api.people.list(), { reactivityKeys: accessKeys.people }))
+
+/** The people whose role is on its way to the server: their row shows the new role, and waits for it. */
+const savingRoles = Atom.make(HashSet.empty<MemberId>())
+
+/** A role change the person made on one row. */
+type RoleChange = { readonly person: Person; readonly role: Role }
+
+/**
+ * A role change, shown at once and put back, with the reason, if the server refuses (the last admin of an
+ * organization cannot become a viewer). It writes an audit line, so the activity is asked again.
+ */
+const sendRoleChange = Effect.fn("People.setRole")(function* (input: RoleChange) {
+  const registry = yield* AtomRegistry.AtomRegistry
+  const memberId = input.person.memberId
+  registry.update(savingRoles, HashSet.add(memberId))
+  return yield* accessApi
+    .send((api) => api.people.setRole({ params: { memberId }, payload: ChangeRole.make({ role: input.role }) }))
+    .pipe(Effect.ensuring(Effect.sync(() => registry.update(savingRoles, HashSet.remove(memberId)))))
+})
+
+const setRole = optimisticWrite({
+  send: sendRoleChange,
+  changes: [
+    optimisticChange(people, (list: ReadonlyArray<Person>, input: RoleChange) =>
+      list.map((entry) =>
+        entry.memberId === input.person.memberId ? Person.make({ ...entry, role: input.role }) : entry
+      )
+    )
+  ],
+  failed: (input) => `${input.person.name}'s role was not changed.`,
+  settled: accessKeys.activity
+})
+
+/** A removal, shown at once and put back, with the reason, if the server refuses (an organization keeps an admin). */
+const remove = optimisticWrite({
+  send: (person: Person) => accessApi.send((api) => api.people.remove({ params: { memberId: person.memberId } })),
+  changes: [
+    optimisticChange(people, (list: ReadonlyArray<Person>, person: Person) =>
+      list.filter((entry) => entry.memberId !== person.memberId)
+    )
+  ],
+  failed: (person) => `${person.name} was not removed.`,
+  settled: accessKeys.activity
+})
+
+/** The add form: whether it is open, and what is typed in it. */
+const addOpen = Atom.make(false)
+const addEmail = Atom.make("")
+const addRole = Atom.make<Role>("editor")
+
+/**
+ * Adding a person. Not optimistic: only the server knows whose email it is. Through the command's schema, which trims
+ * the email and lower-cases it: the rule is said once, there. Who is in the organization and the audit trail change.
+ */
+const addPerson = accessApi.write<{ readonly email: string; readonly role: Role }>()(
+  (api, input) =>
+    S.decodeEffect(AddPersonCommand)(input).pipe(Effect.flatMap((payload) => api.people.add({ payload }))),
+  { reactivityKeys: [...accessKeys.people, ...accessKeys.activity] }
+)
+
 /**
  * The form that adds a person by the email they signed up with. Not optimistic: only the server knows whose email it
  * is. The button says it is adding while it waits, and an email nobody signed up with comes back as data, said
  * beside the email so it can be corrected in place.
  */
-function AddPerson(props: { onAdded: () => void }) {
+function AddPerson() {
   const emailId = useId()
   const roleId = useId()
-  const [open, setOpen] = useState(false)
-  const [email, setEmail] = useState("")
-  const [role, setRole] = useState<Role>("editor")
-  const { callWrite } = useAccess()
-  const add = useMutation({
-    mutationFn: () =>
-      callWrite((api) =>
-        // Through the command's schema, which trims the email and lower-cases it: the rule is said once, there.
-        S.decodeEffect(AddPersonCommand)({ email, role }).pipe(Effect.flatMap((payload) => api.people.add({ payload })))
-      ),
-    onSuccess: (outcome) => {
-      if (Result.isFailure(outcome)) return
-      toast.success(`${outcome.success.name} added as ${outcome.success.role}`)
-      setOpen(false)
-      setEmail("")
-      props.onAdded()
-    }
-  })
-  const problem = add.data !== undefined && Result.isFailure(add.data) ? add.data.failure : undefined
+  const [open, setOpen] = useAtom(addOpen)
+  const [email, setEmail] = useAtom(addEmail)
+  const [role, setRole] = useAtom(addRole)
+  const result = useAtomValue(addPerson)
+  const add = useAtomSet(addPerson, { mode: "promiseExit" })
+  const reset = useAtomSet(addPerson)
+  const pending = result.waiting
+  const outcome = result.pipe(AsyncResult.value, O.getOrUndefined)
+  const problem = !pending && outcome !== undefined && Result.isFailure(outcome) ? outcome.failure : undefined
+  const failed = !pending && result._tag === "Failure" ? Cause.squash(result.cause) : null
   return (
     <Dialog
       open={open}
       onOpenChange={(next) => {
         setOpen(next)
-        add.reset()
+        reset(Atom.Reset)
       }}
     >
       <DialogTrigger asChild>
@@ -101,7 +161,12 @@ function AddPerson(props: { onAdded: () => void }) {
         <form
           onSubmit={(event) => {
             event.preventDefault()
-            add.mutate()
+            void add({ email, role }).then((exit) => {
+              if (!Exit.isSuccess(exit) || Result.isFailure(exit.value)) return
+              toast.success(`${exit.value.success.name} added as ${exit.value.success.role}`)
+              setOpen(false)
+              setEmail("")
+            })
           }}
         >
           <DialogHeader>
@@ -139,16 +204,16 @@ function AddPerson(props: { onAdded: () => void }) {
                 </AlertDescription>
               </Alert>
             )}
-            {add.error === null ? null : (
+            {failed === null ? null : (
               <Alert variant="destructive">
                 <AlertTitle>Not added</AlertTitle>
-                <AlertDescription>{sayError(add.error).sentence}</AlertDescription>
+                <AlertDescription>{sayError(failed).sentence}</AlertDescription>
               </Alert>
             )}
           </FieldGroup>
           <DialogFooter>
-            <Button type="submit" disabled={add.isPending}>
-              {add.isPending ? "Adding" : "Add"}
+            <Button type="submit" disabled={pending}>
+              {pending ? "Adding" : "Add"}
             </Button>
           </DialogFooter>
         </form>
@@ -159,64 +224,21 @@ function AddPerson(props: { onAdded: () => void }) {
 
 /** Who is in the organization and with what role. An admin adds people, changes roles and removes members here. */
 export function PeoplePage() {
-  const queryClient = useQueryClient()
-  const { actor } = useSession()
-  const { call } = useAccess()
+  const who = useAtomValue(signedIn)
+  const actor = O.getOrUndefined(who)
   const admin = actor !== undefined && hasRole(actor.role, "admin")
-  const people = useQuery({ queryKey: accessKeys.people, queryFn: () => call((api) => api.people.list()) })
-  // Every change to a membership writes an audit line beside it.
-  const refresh = () => {
-    void queryClient.invalidateQueries({ queryKey: accessKeys.people })
-    void queryClient.invalidateQueries({ queryKey: accessKeys.activity })
-  }
-  // A role change and a removal show at once and are put back, with the reason, if the server refuses (the last
-  // admin of an organization cannot become a viewer or go). Each writes an audit line, so the activity is fetched too.
-  const setRole = useAccessWrite({
-    name: "people",
-    write: (client, input: { person: Person; role: Role }) =>
-      client.people.setRole({
-        params: { memberId: input.person.memberId },
-        payload: ChangeRole.make({ role: input.role })
-      }),
-    changes: (input) => [
-      cacheChange<ReadonlyArray<Person>, { person: Person; role: Role }>({
-        key: accessKeys.people,
-        apply: (list) =>
-          list.map((entry) =>
-            entry.memberId === input.person.memberId ? Person.make({ ...entry, role: input.role }) : entry
-          ),
-        undo: (now) =>
-          now.map((entry) =>
-            entry.memberId === input.person.memberId ? Person.make({ ...entry, role: input.person.role }) : entry
-          )
-      })
-    ],
-    failed: (input) => `${input.person.name}'s role was not changed.`,
-    settled: () => [accessKeys.activity]
-  })
-  const remove = useAccessWrite({
-    name: "people",
-    write: (client, person: Person) => client.people.remove({ params: { memberId: person.memberId } }),
-    changes: (person) => [
-      cacheChange<ReadonlyArray<Person>, Person>({
-        key: accessKeys.people,
-        apply: (list) => list.filter((entry) => entry.memberId !== person.memberId),
-        // Back in the place they had, unless the list fetched meanwhile already has them.
-        undo: (now, before) => {
-          const at = before.findIndex((entry) => entry.memberId === person.memberId)
-          if (at < 0 || now.some((entry) => entry.memberId === person.memberId)) return now
-          return [...now.slice(0, at), person, ...now.slice(at)]
-        }
-      })
-    ],
-    failed: (person) => `${person.name} was not removed.`,
-    settled: () => [accessKeys.activity]
-  })
+  const list = useAtomValue(people)
+  const askAgain = useAtomRefresh(people)
+  const saving = useAtomValue(savingRoles)
+  const changeRole = useAtomSet(setRole)
+  const removePerson = useAtomSet(remove)
+  const data = list.pipe(AsyncResult.value, O.getOrUndefined)
+  const error = list._tag === "Failure" && !list.waiting ? Cause.squash(list.cause) : null
   // Each row says whether its role is on its way to the server. Carried in the row itself: the table redraws a row
   // when its data changes, and the list the server sends back after a change can be the very object shown before.
-  const rows: ReadonlyArray<PersonRow> = (people.data ?? []).map((person) => ({
+  const rows: ReadonlyArray<PersonRow> = (data ?? []).map((person) => ({
     ...person,
-    saving: setRole.isPending && setRole.variables?.person.memberId === person.memberId
+    saving: HashSet.has(saving, person.memberId)
   }))
 
   const columns: ReadonlyArray<ListColumn<PersonRow>> = [
@@ -258,7 +280,7 @@ export function PeoplePage() {
             value={person.role}
             // This person's role is on its way to the server: the new one shows, and a second change waits for it.
             disabled={person.saving}
-            onChange={(event) => setRole.mutate({ person: personOf(person), role: event.target.value as Role })}
+            onChange={(event) => changeRole({ person: personOf(person), role: event.target.value as Role })}
           >
             {roles.map((entry) => (
               <NativeSelectOption key={entry.value} value={entry.value}>
@@ -304,7 +326,7 @@ export function PeoplePage() {
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Keep</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => remove.mutate(personOf(person))}>Remove</AlertDialogAction>
+                    <AlertDialogAction onClick={() => removePerson(personOf(person))}>Remove</AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
@@ -314,33 +336,33 @@ export function PeoplePage() {
       : [])
   ]
 
-  const count = people.data?.length ?? 0
+  const count = data?.length ?? 0
   return (
     <div className="flex h-full flex-col">
       <PageHeader
         title="People"
         line={
-          actor !== undefined && people.data !== undefined
+          actor !== undefined && data !== undefined
             ? `${actor.organizationName} · ${count} ${count === 1 ? "person" : "people"}`
-            : people.error === null
+            : error === null
               ? "loading"
               : undefined
         }
-        actions={admin ? <AddPerson onAdded={refresh} /> : undefined}
+        actions={admin ? <AddPerson /> : undefined}
       />
-      {people.error !== null ? (
+      {error !== null ? (
         <div className="px-4 sm:px-9">
           <Alert variant="destructive">
             <AlertTitle>The people could not be loaded</AlertTitle>
             <AlertDescription>
-              {sayError(people.error).sentence}
-              <Button variant="outline" size="sm" onClick={() => void people.refetch()}>
+              {sayError(error).sentence}
+              <Button variant="outline" size="sm" onClick={askAgain}>
                 Try again
               </Button>
             </AlertDescription>
           </Alert>
         </div>
-      ) : people.data === undefined ? (
+      ) : data === undefined ? (
         <TableSkeleton caption="People in the organization" columns={columns} />
       ) : (
         <ListTable

@@ -1,4 +1,4 @@
-// Who is signed in, for the app's shell: the access screens' session controller (`@inventory/access-web/Session`),
+// Who is signed in, for the app's shell: the access screens' session atoms (`@inventory/access-web/Session`),
 // told once where this app asks for the session and what it starts for a signed-in member. This module is in the
 // first download: it brings neither the API client nor the contract.
 import {

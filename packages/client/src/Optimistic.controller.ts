@@ -57,8 +57,8 @@ export interface OptimisticWrite<Client, Input, A, E> {
 }
 
 /**
- * One optimistic write through a client's `callWrite`: the hook itself, for a screen that gets its client from
- * `useApi`. `makeOptimisticWrite` binds it to one `callWrite` once.
+ * One optimistic write through a client's `callWrite`: the hook itself. `makeOptimisticWrite` binds it to one
+ * `callWrite` once.
  */
 export function useOptimisticWriteVia<Client, Input, A, E>(
   write: OptimisticWrite<Client, Input, A, E> & { readonly callWrite: Call<Client> }

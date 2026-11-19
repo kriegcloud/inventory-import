@@ -13,8 +13,8 @@
   ],
   "type": "module",
   "scripts": {
-    "check": "turbo run check lint test //#format:check //#docs:check //#keys:check //#vendor:check //#ceilings:check //#boundaries:check",
-    "check:full": "turbo run check lint test test:slow build //#format:check //#docs:check //#keys:check //#vendor:check //#ceilings:check //#boundaries:check",
+    "check": "turbo run check lint test //#format:check //#docs:check //#keys:check //#vendor:check //#ceilings:check //#boundaries:check //#screens:check",
+    "check:full": "turbo run check lint test test:slow build //#format:check //#docs:check //#keys:check //#vendor:check //#ceilings:check //#boundaries:check //#screens:check",
     "dev": "bun run --cwd apps/inventory dev",
     "build": "turbo run build",
     "preview": "bun run --cwd apps/inventory preview",
@@ -34,7 +34,8 @@
     "keys:check": "bash scripts/keys-check.sh",
     "vendor:check": "node scripts/vendor-check.mjs",
     "ceilings:check": "node scripts/check-ceilings.mjs",
-    "boundaries:check": "node scripts/check-boundaries.mjs"
+    "boundaries:check": "node scripts/check-boundaries.mjs",
+    "screens:check": "node scripts/check-screens.mjs"
   },
   "devDependencies": {
     "@effect/tsgo": "0.70.0",

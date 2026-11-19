@@ -495,6 +495,13 @@ None.
     "Decisions 20 · Events 2 · Imports 1", the first decision "YYE-9806 8 First received was Jun 19, 2024 now
     2024-06-19 · Rule · high · Rule ...", the import "items_messy.csv Imported 155 45 200 Dana Whitfield", the
     event "Imported items · Dana Whitfield · Created 155 items from items_messy.csv".
+- **4. A check for the two stylesheet lists.** `scripts/check-screens.mjs`, in the root `check` and `check:full`
+  (`//#screens:check`): every package the app declares that has a `.tsx` under `src` must have its `@source` line in
+  `apps/inventory/src/web/index.css` and its entry in `screenPackages` in `apps/inventory/vite.config.ts`. Tried on
+  each list: with the `@source` line of `catalog-web` taken out it fails with "@inventory/catalog-web has screens
+  (packages/catalog/web/src) and no `@source` line in apps/inventory/src/web/index.css: add @source ...", and with
+  the `screenPackages` entry taken out with "... is not in `screenPackages` ... the production stylesheet would lack
+  its classes"; both put back, "check-screens OK  4 packages with screens, each in both lists".
 
 ## Closing note
 
@@ -551,8 +558,8 @@ decisions, the editor and a take-back.
   stored row rewritten by this goal: every reshaped value is mapped where it is read and written.
   `Tenancy.slow.test.ts` reads the schema and covers both contexts' tables.
 - A package with screens is named in two lists, `@source` in `src/web/index.css` and `screenPackages` in
-  `vite.config.ts`, or its classes are missing from the stylesheet with nothing failing. A check for that would
-  have caught the one defect this goal shipped between two commits.
+  `vite.config.ts`, or its classes are missing from the stylesheet. `scripts/check-screens.mjs` holds both now; it
+  was written after the one defect this goal shipped between two commits.
 - The group Layers are built in the app, against the assembled `Api`: its prefix and middleware change every
   endpoint's type, so a host exports what each endpoint does and not a Layer.
 - `beep.family`, `beep.context` and `beep.layer` in each package.json are what `check-boundaries.mjs` reads; a new

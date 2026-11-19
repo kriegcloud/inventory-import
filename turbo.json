@@ -55,6 +55,18 @@
       ],
       "outputs": []
     },
+    // Every package with screens is in both lists Tailwind reads class names from (scripts/check-screens.mjs).
+    "//#screens:check": {
+      "inputs": [
+        "apps/inventory/package.json",
+        "apps/inventory/src/web/index.css",
+        "apps/inventory/vite.config.ts",
+        "packages/**/package.json",
+        "packages/**/src/**/*.tsx",
+        "scripts/check-screens.mjs"
+      ],
+      "outputs": []
+    },
     // Every file git would commit, so its hash is the whole repository's.
     "//#keys:check": { "outputs": [] },
     "//#docs:check": {

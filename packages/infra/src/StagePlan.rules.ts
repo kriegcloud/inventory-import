@@ -1,8 +1,8 @@
 /**
  * The plan of a stage, from its name. This is the one place that says what differs between stages, as Benjamin
  * decided it (decisions "infra I4", "I5" and "I8"): production alone answers at the real address and holds a model
- * key; it is never seeded; a preview and a test stage live on `workers.dev`; nobody signs up anywhere but by the
- * owner's list. A name that is none of the four kinds is refused, `live_<user>` among them, which is what a deploy
+ * key; it is never seeded; a preview and a test stage live on `workers.dev` with the test accounts and no sign-up, so
+ * no real email is ever stored outside production; production takes the owner's list. A name that is none of the four kinds is refused, `live_<user>` among them, which is what a deploy
  * without `--stage` would use.
  *
  * @packageDocumentation
@@ -61,7 +61,7 @@ const nowhere = NotGiven.make({})
  * The plan of a stage.
  *
  * @example planFor("prod") // production: inventory.beep-effect.com, no seed, OPENROUTER_API_KEY and SIGN_UP from the environment
- * @example planFor("pr-42") // preview: workers.dev, the two test organizations, no model key
+ * @example planFor("pr-42") // preview: workers.dev, the test organizations and accounts, sign-up closed, no model key
  */
 export const planFor = (stage: string): Result.Result<StagePlan, UnknownStage> =>
   Result.map(kindOf(stage), (kind) => {
@@ -81,9 +81,9 @@ export const planFor = (stage: string): Result.Result<StagePlan, UnknownStage> =
           stage,
           kind,
           address: OnWorkersDev.make({}),
-          seeds: ["organizations"],
+          seeds: ["organizations", "accounts"],
           modelKey: nowhere,
-          signUp: FromEnvironment.make({ variable: "SIGN_UP" }),
+          signUp: nowhere,
           deployed: true
         })
       case "test":

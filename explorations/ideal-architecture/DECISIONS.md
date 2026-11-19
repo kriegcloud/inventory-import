@@ -596,3 +596,9 @@ vendor sync`, `bun run beep vendor check`) and the kit is synced again at its re
 90 vendored files, the four READMEs and the four `vendor.json` comments change, and nothing else in the kit.
 Reverse: the three strings in `packages/tooling/tool/cli/src/commands/Vendor/VendorSync.rules.ts`, and one sync.
 
+### 2026-11-19 — infra, who may sign up on a preview
+
+Question: a preview reads the same `SIGN_UP` list as production; who may sign up on a preview? Answer: "Nobody; test
+accounts only (Recommended)": a preview is seeded with the test accounts and sign-up is closed on it; no real email
+is stored in the preview account. Rejected: the same list as production; its own list. Reverse: give the preview's
+plan a sign-up source again and write the variable to the `preview` environment.

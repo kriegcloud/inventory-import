@@ -23,12 +23,13 @@ describe("the plan of a stage", () => {
     })
   })
 
-  it("a preview is on workers.dev with the two test organizations and no accounts, and no model key", () => {
+  it("a preview is on workers.dev with the test accounts, no model key, and sign-up closed to everyone", () => {
     expect(plan("pr-42")).toMatchObject({
       kind: "preview",
       address: { at: "workersDev" },
-      seeds: ["organizations"],
-      modelKey: { from: "nowhere" }
+      seeds: ["organizations", "accounts"],
+      modelKey: { from: "nowhere" },
+      signUp: { from: "nowhere" }
     })
   })
 

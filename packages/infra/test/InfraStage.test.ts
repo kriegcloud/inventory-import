@@ -25,7 +25,11 @@ describe("InfraStage", () => {
     Effect.gen(function* () {
       const exit = yield* built("pr-42")
       const plan = Exit.isSuccess(exit) ? Context.get(exit.value, InfraStage) : undefined
-      expect([plan?.kind, plan?.address.at, plan?.seeds]).toEqual(["preview", "workersDev", ["organizations"]])
+      expect([plan?.kind, plan?.address.at, plan?.seeds]).toEqual([
+        "preview",
+        "workersDev",
+        ["organizations", "accounts"]
+      ])
     })
   )
 

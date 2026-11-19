@@ -8,7 +8,7 @@
  * one process: `op run --env-file packages/infra/env/op.env -- bunx alchemy deploy packages/infra/src/GitHub.stack.ts
  * --stage prod`. No workflow deploys it: a job that could rewrite its own approval rule would have none.
  *
- * Must not break: a preview job holds no model key and no token for production's account.
+ * Must not break: a preview job holds no model key, no sign-up list and no token for production's account.
  *
  * @packageDocumentation
  */
@@ -128,7 +128,6 @@ export default Alchemy.Stack(
       name: "CLOUDFLARE_ACCOUNT_ID",
       value: previewAccount
     })
-    yield* GitHub.Variable("PreviewSignUp", { ...repository, environment: preview, name: "SIGN_UP", value: signUp })
 
     // Decision I7: the rule on main, as code, with the admin bypass that is the way out of a check that never ran.
     yield* GitHub.Ruleset("Main", {

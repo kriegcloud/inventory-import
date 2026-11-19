@@ -9,12 +9,14 @@
     "packages/catalog/*",
     "packages/access/*",
     "packages/drivers/*",
-    "packages/foundation/*/*"
+    "packages/foundation/*/*",
+    "packages/tooling/*/*"
   ],
   "type": "module",
   "scripts": {
     "check": "turbo run check lint test //#format:check //#docs:check //#keys:check //#vendor:check //#ceilings:check //#boundaries:check //#screens:check //#imports:check",
     "check:full": "turbo run check lint test test:slow build //#format:check //#docs:check //#keys:check //#vendor:check //#ceilings:check //#boundaries:check //#screens:check //#imports:check",
+    "beep": "bun run packages/tooling/tool/cli/src/bin.ts --",
     "dev": "bun run --cwd apps/inventory dev",
     "build": "turbo run build",
     "preview": "bun run --cwd apps/inventory preview",
@@ -33,13 +35,14 @@
     "prepare": "effect-tsgo patch --typescript --oxlint --tsrs",
     "keys:check": "bash scripts/keys-check.sh",
     "vendor:check": "node scripts/vendor-check.mjs",
-    "ceilings:check": "node scripts/check-ceilings.mjs",
+    "ceilings:check": "bun packages/tooling/tool/cli/src/bin.ts quality ceilings",
     "boundaries:check": "node scripts/check-boundaries.mjs",
     "screens:check": "node scripts/check-screens.mjs",
     "imports:check": "node scripts/check-effect-imports.mjs",
     "imports:fix": "node scripts/check-effect-imports.mjs --write"
   },
   "devDependencies": {
+    "@beep/repo-cli": "workspace:*",
     "@effect/tsgo": "0.70.0",
     "oxc-parser": "0.148.0",
     "oxfmt": "^0.78.0",

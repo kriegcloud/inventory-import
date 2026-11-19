@@ -398,7 +398,7 @@ bun run check
   `package-lock.json` is updated and `bun.lock` is not until the line above.
 - **Add into `@inventory/ui`.** Run the CLI in `packages/ui` (`--cwd packages/ui`); its `components.json` writes to
   `src/components/` and `src/hooks/` with `@inventory/ui/components/...` imports. Give each new file its exact entry in
-  `packages/ui/package.json` (`scripts/check-exports.mjs` in the package's `check` names a missing one). There is no
+  `packages/ui/package.json` (`beep-cli laws exports` in the package's `check` names a missing one). There is no
   `@/lib/utils` here: `import { cn } from "cn"`.
 - **A new dependency is a decision.** An item that brings a second schema library or a second state model (the Dice UI
   data table brings `zod` and `nuqs`) is written down with its cost, or is not added.

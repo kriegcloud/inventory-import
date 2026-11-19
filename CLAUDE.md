@@ -317,7 +317,7 @@ docs/                   Standards, the kit, patterns, the glossary and sign-in (
 explorations/           Questions being shaped: research, decisions, briefs.
 goals/                  Work with a definition of done: SPEC.md and PLAN.md.
 scripts/                Repository checks (`docs-check.sh`, `keys-check.sh`, `vendor-check.mjs`, `check-strict.mjs`,
-                        `check-ceilings.mjs`, `check-exports.mjs`, `check-boundaries.mjs`: which package may import which, `check-screens.mjs`: every package with screens in both stylesheet lists, `check-effect-imports.mjs`: every Effect import from its own path under its one name) and `vendor-beep.mjs`, which copies the kit from a
+                        `check-boundaries.mjs`: which package may import which, `check-screens.mjs`: every package with screens in both stylesheet lists, `check-effect-imports.mjs`: every Effect import from its own path under its one name) and `vendor-beep.mjs`, which copies the kit from a
                         beep-effect checkout.
 turbo.json              The task graph: seven package tasks and three root tasks.
 .agents/                Skills (see above). Not application code; the check ignores it.
@@ -388,7 +388,7 @@ exceptions exist, and nothing else may:
   gallery fixtures included): `preferEffectArray`, `preferEffectString`, `preferEffectRecord` and
   `missingPipeableSignature` are off, in each package's `tsconfig.base.json`. Each package counts them against the
   ceiling in its `strict-ceiling.json` (`scripts/check-strict.mjs`, part of its `check`), which fails when the count
-  is above it, and when it is below it until the ceiling is lowered; `scripts/check-ceilings.mjs` keeps the sum at
+  is above it, and when it is below it until the ceiling is lowered; `bun run beep quality ceilings` keeps the sum at
   most 678. The numbers only fall. Write new web code the Effect way anyway.
 - **Stage D, the vendored components and hooks** (`packages/ui/src/components`, `packages/ui/src/hooks`): every rule
   off, permanently.

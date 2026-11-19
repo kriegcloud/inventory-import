@@ -37,9 +37,9 @@
       ],
       "outputs": []
     },
-    // The stage C ceilings of the packages with screens add up to at most 678 (scripts/check-ceilings.mjs).
+    // The stage C ceilings of the packages with screens add up to at most 678 (`beep quality ceilings`).
     "//#ceilings:check": {
-      "inputs": ["apps/*/strict-ceiling.json", "packages/**/strict-ceiling.json", "scripts/check-ceilings.mjs"],
+      "inputs": ["apps/*/strict-ceiling.json", "packages/**/strict-ceiling.json", "packages/tooling/tool/cli/src/**"],
       "outputs": []
     },
     // Which package may import which (scripts/check-boundaries.mjs): every package.json and every import under src and test.

@@ -8,9 +8,9 @@ import * as S from "effect/Schema"
 import { SecureRandom } from "effect/crypto"
 import * as Base64 from "effect/encoding/Base64"
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http"
-import { CrossSiteRequest } from "../api/v1/Security.ts"
+import { CrossSiteRequest } from "@inventory/kernel/AccessError"
 import { authOptions } from "./authOptions.ts"
-import { allowsRequest } from "./SameOrigin.ts"
+import { RequestSource } from "@inventory/kernel/SameOrigin"
 import { authSettings, minimumSecretLength } from "./Settings.ts"
 
 // Sign-in, sessions and organisations, by Better Auth. This file wraps it in an Effect service and mounts its HTTP
@@ -172,18 +172,21 @@ export const AuthRoute = withRouter(
       "*",
       "/api/auth/*",
       Effect.fn("Auth.handle")(function* (request: HttpServerRequest.HttpServerRequest) {
-        const source = {
+        const source = RequestSource.make({
           method: request.method,
-          fetchSite: request.headers["sec-fetch-site"],
-          origin: request.headers["origin"],
+          fetchSite: Option.fromUndefinedOr(request.headers["sec-fetch-site"]),
+          origin: Option.fromUndefinedOr(request.headers["origin"]),
           own: [
             ...Option.toArray(Option.map(HttpServerRequest.toURL(request), (url) => url.origin)),
             ...Option.toArray(auth.publicOrigin)
           ]
-        }
-        if (!allowsRequest(source)) {
+        })
+        if (!RequestSource.allows(source)) {
           yield* Effect.logWarning("Refused a sign-in request from another site").pipe(
-            Effect.annotateLogs({ "http.origin": source.origin ?? "", "http.sec_fetch_site": source.fetchSite ?? "" })
+            Effect.annotateLogs({
+              "http.origin": Option.getOrElse(source.origin, () => ""),
+              "http.sec_fetch_site": Option.getOrElse(source.fetchSite, () => "")
+            })
           )
           return refused
         }

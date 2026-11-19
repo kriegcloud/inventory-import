@@ -2,7 +2,9 @@ import { Array as Arr, Context, Effect, Layer, Option } from "effect"
 import * as S from "effect/Schema"
 import { SqlClient, SqlSchema } from "effect/sql"
 import { OrganizationChoice, TestAccount } from "../api/v1/Identity.ts"
-import { Member, MemberId, OrganizationId, Role } from "../domain/Identity.ts"
+import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
+import { Member } from "@inventory/kernel/Member"
+import { Role } from "@inventory/kernel/Role"
 
 /** One membership row of a test account, as the database holds it. */
 const AccountRow = S.Struct({

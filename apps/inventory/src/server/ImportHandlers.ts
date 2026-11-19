@@ -18,9 +18,9 @@ import {
   ItemNotFound,
   UploadNotFound
 } from "../api/v1/Api.ts"
-import { CurrentActor } from "../api/v1/Identity.ts"
+import { CurrentActor } from "@inventory/kernel/Actor"
 import { fileProblem } from "../domain/FileProblem.ts"
-import type { Member } from "../domain/Identity.ts"
+import type { Member } from "@inventory/kernel/Member"
 import { editProblem, fieldsOf, skuKey } from "../domain/Item.ts"
 import {
   carryDecisions,
@@ -38,7 +38,7 @@ import {
   stagingProblem
 } from "../domain/ItemImport.ts"
 import { chunkProblem, fitsChunks } from "../domain/Upload.ts"
-import { requireRole } from "./Identity.ts"
+import { requireRole } from "@inventory/kernel/Actor"
 import { ItemsOfRow } from "./ImportShape.ts"
 import { type CommitRow, type Draft, Imports } from "./Imports.ts"
 import { Items } from "./Items.ts"

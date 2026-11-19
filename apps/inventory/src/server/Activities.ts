@@ -1,8 +1,8 @@
 import { Context, Effect, Layer, Option } from "effect"
 import * as S from "effect/Schema"
 import { SqlClient, SqlSchema } from "effect/sql"
-import { Activity } from "../domain/Activity.ts"
-import { OrganizationId } from "../domain/Identity.ts"
+import { Activity } from "@inventory/kernel/Activity"
+import { OrganizationId } from "@inventory/kernel/Ids"
 
 /** How many lines of the audit trail one organization has, as the count query answers it. */
 const ActivityCount = S.Struct({ n: S.Int }).annotate({
@@ -40,7 +40,7 @@ export class Activities extends Context.Service<
         execute: (organizationId) => sql`SELECT COUNT(*) AS n FROM activity WHERE organizationId = ${organizationId}`
       })
 
-      // Inside an agent run (src/server/Agent.ts) the row names the agent; the actor is still the person it acted for.
+      // Inside an agent run (`asAgent`, @inventory/kernel/Agent) the row names the agent; the actor is still the person it acted for.
       const recent = Effect.fn("Activities.recent")(function* (organizationId: OrganizationId) {
         return yield* findRecent(organizationId)
       }, Effect.orDie)

@@ -1,6 +1,7 @@
 import { expect, it } from "@effect/vitest"
 import { Array as Arr, Context, Effect, Layer, Option, Scope, Tracer } from "effect"
-import { Member, MemberId, OrganizationId } from "../../src/domain/Identity.ts"
+import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
+import { Member } from "@inventory/kernel/Member"
 import { Ai } from "../../src/server/Ai.ts"
 import { toTracedFetch } from "../../src/server/App.ts"
 import { Collector, RequestTelemetry } from "../../src/server/RequestTelemetry.ts"

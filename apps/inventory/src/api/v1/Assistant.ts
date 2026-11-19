@@ -1,7 +1,7 @@
 import * as S from "effect/Schema"
 import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/http-api"
 import { ColumnCatalog, maxPrompt, ViewOutcome } from "../../domain/TableView.ts"
-import { Identity } from "./Identity.ts"
+import { Identity } from "@inventory/kernel/Identity"
 
 // The table assistant: a request typed in words becomes a checked change to the person's own view of a table. Any
 // signed-in member may use it, because it changes nothing stored; it is still a POST under the identity middleware,

@@ -1,8 +1,11 @@
 import { Effect, Layer, Option } from "effect"
+import * as S from "effect/Schema"
 import { HttpServerRequest } from "effect/http"
-import { actingAsHeader, CurrentActor, Forbidden, Identity, NotSignedIn } from "../api/v1/Identity.ts"
-import { hasRole, MemberId, type Role } from "../domain/Identity.ts"
-import { CurrentAgent } from "./Agent.ts"
+import { actingAsHeader } from "../api/v1/Identity.ts"
+import { NotSignedIn } from "@inventory/kernel/AccessError"
+import { CurrentActor } from "@inventory/kernel/Actor"
+import { Identity } from "@inventory/kernel/Identity"
+import { MemberId } from "@inventory/kernel/Ids"
 import { Members } from "./Members.ts"
 
 // TEST IDENTITY. There are no credentials: the `x-acting-as` header names a member, and a request without it acts
@@ -11,7 +14,7 @@ import { Members } from "./Members.ts"
 // layer is not in the Worker bundle (scripts/check-production-identity.mjs), and test/server/Auth.slow.test.ts
 // checks the header changes nothing there.
 //
-// `requireRole` below is shared by both: role checks run on the server whichever identity is in place.
+// `requireRole` (@inventory/kernel/Actor) is shared by both: role checks run on the server whichever identity is in place.
 
 /** Who a request without the header acts as in a test. */
 const defaultMemberId = "mem_dana"
@@ -29,7 +32,8 @@ export const IdentityLive = /* @__PURE__ */ Layer.effect(
       Effect.fn("Identity")(function* (httpEffect) {
         const request = yield* HttpServerRequest.HttpServerRequest
         const header = request.headers[actingAsHeader]
-        const member = yield* members.findById(MemberId.make(header ?? defaultMemberId))
+        const id = yield* S.decodeEffect(MemberId)(header ?? defaultMemberId).pipe(Effect.option)
+        const member = Option.isSome(id) ? yield* members.findById(id.value) : Option.none()
         if (Option.isNone(member)) {
           // The header's value is not echoed: what a request sent is not repeated to the screen or the log.
           return yield* NotSignedIn.make({ reason: "The test identity names no member of this app." })
@@ -49,26 +53,3 @@ export const IdentityLive = /* @__PURE__ */ Layer.effect(
     )
   })
 )
-
-/**
- * Fails with `Forbidden` unless the current actor has at least `minimum`, and, when an agent is acting for them
- * (src/server/Agent.ts), unless the agent's `maxRole` allows it too. Call it first in any handler that writes. The
- * reason speaks to the person ("You are a viewer …") and never names them, so it is safe in a log too.
- */
-export const requireRole = Effect.fn("requireRole")(function* (minimum: Role) {
-  const actor = yield* CurrentActor
-  if (!hasRole(actor.role, minimum)) {
-    return yield* Forbidden.make({
-      reason: `You are a ${actor.role} in ${actor.organizationName}. This needs the ${minimum} role: ask an admin there.`,
-      required: minimum
-    })
-  }
-  const agent = yield* Effect.serviceOption(CurrentAgent)
-  if (Option.isSome(agent) && !hasRole(agent.value.maxRole, minimum)) {
-    return yield* Forbidden.make({
-      reason: `${agent.value.agent} acts for you with at most the ${agent.value.maxRole} role. This needs the ${minimum} role.`,
-      required: minimum
-    })
-  }
-  return actor
-})

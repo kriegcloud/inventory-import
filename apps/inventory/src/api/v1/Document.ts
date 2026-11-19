@@ -57,9 +57,11 @@ const renameRefs = (node: unknown, renamed: Readonly<Record<string, string>>): v
 
 /**
  * Component names a reader and a generated client can use. Effect names the wire side of a `Schema.Class` or a
- * `Schema.TaggedError` with `Encoded` appended (`MemberEncoded`), and emits a second copy (`RowDecision_1`) of a
- * named schema it meets through two routes. Here a class takes its own name when that name is free, and a numbered
- * copy that is identical to the original is folded into it. A copy that differs keeps its number.
+ * `Schema.TaggedError` with `Encoded` appended (`MemberEncoded`), names a schema with an identity identifier by its
+ * whole path (`_beep_inventory_kernel_AccessError_Forbidden`, from `@inventory/kernel`), and emits a second copy
+ * (`RowDecision_1`) of a named schema it meets through two routes. Here a schema takes its own name (the last part of
+ * the path) when that name is free, and a numbered copy that is identical to the original is folded into it. A copy
+ * that differs keeps its number.
  */
 const nameComponents = (spec: Json): void => {
   const schemas: Json = spec["components"]["schemas"]
@@ -71,8 +73,9 @@ const nameComponents = (spec: Json): void => {
       renamed[name] = original
       continue
     }
-    const plain = /^(.+)Encoded$/.exec(name)?.[1]
-    if (plain !== undefined && !Rec.has(schemas, plain)) renamed[name] = plain
+    const unsuffixed = /^(.+)Encoded$/.exec(name)?.[1] ?? name
+    const plain = /^_beep_(?:[A-Za-z0-9]+_)+([A-Za-z0-9]+)$/.exec(unsuffixed)?.[1] ?? unsuffixed
+    if (plain !== name && !Rec.has(schemas, plain)) renamed[name] = plain
   }
   const next: Json = {}
   for (const [name, schema] of Rec.toEntries(schemas)) {
@@ -86,7 +89,7 @@ const nameComponents = (spec: Json): void => {
 /**
  * Responses the server can never send, taken off the operations that list them. `SameOrigin` and `ProblemDetails`
  * cover the whole API, so Effect documents their errors on every operation; but `SameOrigin` lets every read through
- * (`allowsRequest` in src/server/SameOrigin.ts), so a GET never answers `CrossSiteRequest`, and an operation with no
+ * (`RequestSource.allows` in @inventory/kernel/SameOrigin), so a GET never answers `CrossSiteRequest`, and an operation with no
  * path parameter, no query and no body has nothing a caller sent that could fail its Schema with a 400. A 403 that
  * also covers `Forbidden` (a role too low) is shared by both errors and is left as it is.
  */

@@ -1,49 +1,12 @@
-import { Context } from "effect"
 import * as S from "effect/Schema"
-import { HttpApiEndpoint, HttpApiGroup, HttpApiMiddleware, OpenApi } from "effect/http-api"
-import { Member, OrganizationId, Role } from "../../domain/Identity.ts"
-
-/** The member making this request. Handlers read it; they never trust an id from the payload. */
-export class CurrentActor extends Context.Service<CurrentActor, Member>()(
-  "@inventory/app/api/v1/Identity/CurrentActor"
-) {}
-
-/** No member could be resolved for this request. The reason says what to do, without echoing what was sent. */
-export class NotSignedIn extends S.TaggedError<NotSignedIn, { readonly brand: unique symbol }>()(
-  "NotSignedIn",
-  { reason: S.String.annotateKey({ description: "What to do next, in words for the person." }) },
-  { httpApiStatus: 401, description: "The request has no session, or its person is in no organization yet." }
-) {}
-
-/** The member is known but their role is too low for this action. `required` is the role that would be allowed. */
-export class Forbidden extends S.TaggedError<Forbidden, { readonly brand: unique symbol }>()(
-  "Forbidden",
-  {
-    reason: S.String.annotateKey({
-      description: "Which role the person has and which one this needs. It never names the person."
-    }),
-    required: Role.annotateKey({ description: "The lowest role that may do this." })
-  },
-  { httpApiStatus: 403, description: "The member's role is too low for this action." }
-) {}
+import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/http-api"
+import { Identity } from "@inventory/kernel/Identity"
+import { OrganizationId } from "@inventory/kernel/Ids"
+import { Member } from "@inventory/kernel/Member"
+import { Role } from "@inventory/kernel/Role"
 
 /** The request header the test identity reads (src/server/Identity.ts). The Worker ignores it: see SessionIdentity.ts. */
 export const actingAsHeader = "x-acting-as"
-
-/**
- * Resolves the acting member and provides `CurrentActor` to every endpoint it is attached to.
- * This is the single seam for identity: the Worker's implementation reads the session cookie
- * (src/server/SessionIdentity.ts), and handlers do not know which one is in place.
- */
-export class Identity extends HttpApiMiddleware.Service<
-  Identity,
-  {
-    provides: CurrentActor
-    requires: never
-  }
->()("@inventory/app/api/v1/Identity", {
-  error: NotSignedIn
-}) {}
 
 /** A seeded test account the sign-in page offers in one click: who it is, and where it belongs as what. */
 export class TestAccount extends S.Class<TestAccount, { readonly brand: unique symbol }>("TestAccount")(

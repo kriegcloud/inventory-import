@@ -3,7 +3,7 @@ import { Cause, Context, Effect, Exit, type Fiber, Layer, ManagedRuntime, Schedu
 import { FetchHttpClient, HttpClient, HttpClientError, HttpClientResponse } from "effect/http"
 import { HttpApiClient } from "effect/http-api"
 import { Api } from "../../api/v1/Api.ts"
-import { RequestId } from "../../domain/Activity.ts"
+import { RequestId } from "@inventory/kernel/Ids"
 import { devToolsLayer } from "./devtools.ts"
 import { takeEarly } from "./early.ts"
 import { isTransient } from "./errors.ts"

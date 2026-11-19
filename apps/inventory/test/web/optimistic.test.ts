@@ -4,7 +4,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Array as Arr } from "effect"
 import * as S from "effect/Schema"
-import { Role } from "../../src/domain/Identity.ts"
+import { Role } from "@inventory/kernel/Role"
 import { rollback } from "../../src/web/lib/rollback.ts"
 
 type Person = { readonly memberId: string; readonly role: Role }

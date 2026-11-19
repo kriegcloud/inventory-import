@@ -27,8 +27,10 @@ import { type HttpRouter, HttpServer } from "effect/http"
 import { HttpApiMiddleware } from "effect/http-api"
 import { getPlatformProxy, unstable_splitSqlQuery } from "wrangler"
 import { OrganizationChoice } from "../../../src/api/v1/Identity.ts"
-import { Activity, ActivityId } from "../../../src/domain/Activity.ts"
-import { type Member, MemberId, type OrganizationId } from "../../../src/domain/Identity.ts"
+import { Activity } from "@inventory/kernel/Activity"
+import { ActivityId } from "@inventory/kernel/Ids"
+import { MemberId, type OrganizationId } from "@inventory/kernel/Ids"
+import { type Member } from "@inventory/kernel/Member"
 import { Activities } from "../../../src/server/Activities.ts"
 import { Ai } from "../../../src/server/Ai.ts"
 import { makeApp, makeRoutes, servicesWith, toFetch } from "../../../src/server/App.ts"
@@ -161,12 +163,13 @@ export const InMemoryActivities = Layer.effect(
     const rows = yield* Ref.make<ReadonlyArray<Activity>>(
       Arr.map(["org_prairie", "org_northline"] as const, (org, index) =>
         Activity.make({
-          id: ActivityId.make(`act_${index}`),
+          id: ActivityId.make(`00000000-0000-4000-8000-00000000000${index}`),
           organizationId: org as OrganizationId,
           actorId: MemberId.make(org === "org_prairie" ? "mem_dana" : "mem_elena"),
           actorName: "Seeded",
           action: "Uploaded a file",
           detail: "items.csv: 13 rows staged, nothing imported yet",
+          agent: Option.none(),
           createdAt: at
         })
       )

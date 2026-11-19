@@ -1,6 +1,7 @@
 import { expect, layer } from "@effect/vitest"
 import { Array as Arr, Effect, String as Str } from "effect"
-import { Member, MemberId, OrganizationId } from "../../src/domain/Identity.ts"
+import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
+import { Member } from "@inventory/kernel/Member"
 import { Ai } from "../../src/server/Ai.ts"
 import { inMemoryApp, send, TestFetch } from "./support/app.ts"
 

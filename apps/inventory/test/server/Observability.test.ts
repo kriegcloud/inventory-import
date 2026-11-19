@@ -1,7 +1,7 @@
 import { expect, layer } from "@effect/vitest"
 import { Array as Arr, Cause, Effect, ErrorReporter, Exit, Formatter, Layer, Predicate, Redacted } from "effect"
 import { TestConsole } from "effect/testing"
-import { Forbidden } from "../../src/api/v1/Identity.ts"
+import { Forbidden } from "@inventory/kernel/AccessError"
 import * as Observability from "../../src/server/Observability.ts"
 import { settingsLayer } from "./support/app.ts"
 

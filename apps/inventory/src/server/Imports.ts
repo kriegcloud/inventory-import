@@ -20,7 +20,8 @@ import {
   RowOutcome,
   type TakeBackState
 } from "../api/v1/Api.ts"
-import { type Member, MemberId, OrganizationId } from "../domain/Identity.ts"
+import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
+import { type Member } from "@inventory/kernel/Member"
 import { type FileProblem, fileProblem } from "../domain/FileProblem.ts"
 import {
   Dimensions,

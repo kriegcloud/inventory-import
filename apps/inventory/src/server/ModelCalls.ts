@@ -7,7 +7,8 @@ import { Array as Arr, Context, DateTime, Effect, Layer } from "effect"
 import * as S from "effect/Schema"
 import { SecureRandom } from "effect/crypto"
 import { SqlClient } from "effect/sql"
-import { type Member, MemberId, OrganizationId } from "../domain/Identity.ts"
+import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
+import { type Member } from "@inventory/kernel/Member"
 import { run, statement } from "./Sql.ts"
 
 /** How many model calls one organization may make in any 24 hours. Past it the rules answer until calls come back. */

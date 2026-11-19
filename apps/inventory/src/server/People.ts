@@ -9,7 +9,10 @@ import * as S from "effect/Schema"
 import { SecureRandom } from "effect/crypto"
 import { SqlClient, SqlSchema, type Statement } from "effect/sql"
 import { LastAdmin, Person, PersonNotFound } from "../api/v1/People.ts"
-import { AddPersonProblem, type Member, MemberId, OrganizationId, Role } from "../domain/Identity.ts"
+import { AddPersonProblem } from "../api/v1/People.ts"
+import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
+import { type Member } from "@inventory/kernel/Member"
+import { Role } from "@inventory/kernel/Role"
 import { batchOn, NoRows, statement } from "./Sql.ts"
 
 const Scope = S.Struct({ org: OrganizationId, id: S.String }).annotate({

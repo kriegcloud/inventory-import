@@ -81,7 +81,7 @@ are in `.dev.vars.example`.
 | Password length | 12 to 128 | test "refuses a short password" |
 | Session cookie | `inventory.session_token`, HttpOnly, SameSite=Lax, Path=/, 7 days; production: `__Secure-` prefix and Secure | tests check HttpOnly and SameSite, and a production build's `__Secure-` and Secure; `curl -I` on `bun run preview` |
 | Session expiry | 7 days, extended once a day while used; no cookie cache, so sign-out applies at once in every tab | test "signs out, and the session ends at once" |
-| CSRF and origins | our cross-site check first (`allowsRequest`, as on the API), then Better Auth's origin, callback and Fetch Metadata checks, on even under test (`disableOriginCheck: false`); trusted origins from `BETTER_AUTH_URL` | test "refuses sign-in and sign-out sent from another site, and a foreign callback address" |
+| CSRF and origins | our cross-site check first (`RequestSource.allows` from `@inventory/kernel/SameOrigin`, as on the API), then Better Auth's origin, callback and Fetch Metadata checks, on even under test (`disableOriginCheck: false`); trusted origins from `BETTER_AUTH_URL` | test "refuses sign-in and sign-out sent from another site, and a foreign callback address" |
 | Rate limits | stored in D1 (`rateLimit` table; Workers keep no memory between isolates), per address from `cf-connecting-ip`: sign-in 10 a minute, sign-up 5 a minute, the rest 100 a minute | test "limits sign-in attempts" (the 11th is 429) |
 | Breached passwords | Have I Been Pwned at sign-up and password change, behind `PWNED_PASSWORD_CHECK`; only the first five characters of the SHA-1 hash leave the Worker | `test/server/Pwned.test.ts` (off: never called; on and unreachable: refused), `Pwned.slow.test.ts` (the real service) |
 | Usage telemetry | off (`telemetry: { enabled: false }`): it reports to Better Auth's servers | `src/server/authOptions.ts` |
@@ -108,7 +108,7 @@ Better Auth's performance guide, item by item:
 ## Agents act for a person
 
 An agent (a model's tool loop, or rules) runs on the server inside `asAgent(AgentRun.make({ agent, maxRole }))`
-(`src/server/Agent.ts`, `src/domain/Agent.ts`):
+(`asAgent` and `AgentRun` in `@inventory/kernel`):
 
 - It acts for the signed-in person: `CurrentActor` stays that person, so every query is scoped to their
   organization. Nothing in a payload can name another person or organization.

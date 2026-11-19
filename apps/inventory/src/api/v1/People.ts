@@ -1,8 +1,26 @@
 import * as S from "effect/Schema"
 import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/http-api"
 import { reasonForPerson } from "../../domain/Described.ts"
-import { AddPersonProblem, Role } from "../../domain/Identity.ts"
-import { Forbidden, Identity } from "./Identity.ts"
+import { Role } from "@inventory/kernel/Role"
+import { Forbidden } from "@inventory/kernel/AccessError"
+import { Identity } from "@inventory/kernel/Identity"
+
+/**
+ * Why an admin's "add a person" could not add them, as data the form shows beside the email typed: nobody has
+ * signed up with that email (`noAccount`), or they are already in the organization with another role
+ * (`alreadyMember`). A problem with what the person typed, so never a request error.
+ */
+export class AddPersonProblem extends S.TaggedClass<AddPersonProblem, { readonly brand: unique symbol }>()(
+  "AddPersonProblem",
+  {
+    kind: S.Literals(["noAccount", "alreadyMember"]).annotateKey({
+      description: "Nobody has signed up with the email, or they are already a member with another role"
+    }),
+    problem: S.String.annotateKey({ description: "What is wrong with the email given, in a sentence" }),
+    todo: S.String.annotateKey({ description: "What the admin can do instead, in a sentence" })
+  },
+  { description: "Why a person could not be added, as data the form shows beside the email typed" }
+) {}
 
 // The limit is checked after the trim, so the document's own `maxLength` cannot state it: the sentence does.
 const emailDescription =

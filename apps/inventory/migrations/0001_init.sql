@@ -81,7 +81,7 @@ CREATE UNIQUE INDEX member_organizationId_userId_uidx ON member (organizationId,
 -- organization is known: the one index of a tenant table that does not start with organizationId.
 CREATE INDEX member_userId_idx ON member (userId);
 
--- Append-only record of who did what and when. `agent` names the agent that acted for the person (src/server/Agent.ts);
+-- Append-only record of who did what and when. `agent` names the agent that acted for the person (`asAgent` in @inventory/kernel/Agent);
 -- null when the person did it themselves.
 CREATE TABLE activity (
   id TEXT NOT NULL,

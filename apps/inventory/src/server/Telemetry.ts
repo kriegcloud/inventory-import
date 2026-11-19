@@ -23,7 +23,7 @@ import {
 import { OtlpExporter, OtlpLogger, OtlpMetrics, OtlpProxy, OtlpSerialization, OtlpTracer } from "effect/observability"
 import { loggers } from "./Observability.ts"
 import { Collector } from "./RequestTelemetry.ts"
-import { allowsRequest } from "./SameOrigin.ts"
+import { RequestSource } from "@inventory/kernel/SameOrigin"
 import { logSettings, telemetrySettings } from "./Settings.ts"
 
 // TRACES, METRICS AND LOGS TO A COLLECTOR (the telemetry module), when OTEL_EXPORTER_OTLP_ENDPOINT names one
@@ -199,12 +199,14 @@ export const OtlpProxyRoute = withRouter(
           const own = Option.toArray(Option.map(HttpServerRequest.toURL(request), (url) => url.origin))
           const fromOurPage =
             request.headers["sec-fetch-site"] !== undefined || request.headers["origin"] !== undefined
-              ? allowsRequest({
-                  method: request.method,
-                  fetchSite: request.headers["sec-fetch-site"],
-                  origin: request.headers["origin"],
-                  own
-                })
+              ? RequestSource.allows(
+                  RequestSource.make({
+                    method: request.method,
+                    fetchSite: Option.fromUndefinedOr(request.headers["sec-fetch-site"]),
+                    origin: Option.fromUndefinedOr(request.headers["origin"]),
+                    own
+                  })
+                )
               : false
           if (!fromOurPage) return HttpServerResponse.empty({ status: 403 })
           const forwarded = yield* handlers[signal]

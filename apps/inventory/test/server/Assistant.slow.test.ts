@@ -3,7 +3,7 @@
 // does not have is refused whole, and a model's answer leaves one audit line that only its own organization sees.
 import { expect, layer } from "@effect/vitest"
 import { MockLanguageModelV4 } from "ai/test"
-import { Array as Arr, Effect, Layer, Result } from "effect"
+import { Array as Arr, Effect, Layer, Option, Result } from "effect"
 import * as S from "effect/Schema"
 import { HttpApiTest } from "effect/http-api"
 import { TestClock } from "effect/testing"
@@ -108,7 +108,7 @@ layer(
         const trail = yield* client.activity.recent().pipe(as("mem_marcus"))
         const lines = Arr.filter(trail, (row) => row.action === "Asked for a view")
         expect(Arr.map(lines, (row) => [row.detail, row.agent])).toEqual([
-          ["Items: 1 change to the view, answered by scripted/model", "Table assistant"]
+          ["Items: 1 change to the view, answered by scripted/model", Option.some("Table assistant")]
         ])
         // The person's words are not in the trail.
         expect(lines[0]?.detail).not.toContain("vendor")

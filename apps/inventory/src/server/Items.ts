@@ -9,7 +9,8 @@ import { Array as Arr, Context, DateTime, Effect, Layer, Option, String as Str }
 import * as S from "effect/Schema"
 import { SecureRandom } from "effect/crypto"
 import { SqlClient, SqlSchema, type Statement } from "effect/sql"
-import { type Member, MemberId, OrganizationId } from "../domain/Identity.ts"
+import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
+import { type Member } from "@inventory/kernel/Member"
 import { ItemEdit, type StoredItem } from "../domain/Item.ts"
 import {
   type FilterOperator,

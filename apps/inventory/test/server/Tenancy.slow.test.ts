@@ -100,7 +100,7 @@ layer(TestDatabase)("tenancy in the database", (it) => {
       const errors = [
         yield* refused(
           sql`INSERT INTO activity (id, organizationId, actorId, actorName, action, detail, createdAt)
-            VALUES ('act_n', 'org_northline', 'mem_dana', 'Dana Whitfield', 'Imported items', '', ${at})`
+            VALUES ('00000000-0000-4000-8000-0000000000aa', 'org_northline', 'mem_dana', 'Dana Whitfield', 'Imported items', '', ${at})`
         ),
         yield* refused(
           sql`INSERT INTO importDecision (organizationId, importId, rowId, decisionJson, decidedById, decidedByName,

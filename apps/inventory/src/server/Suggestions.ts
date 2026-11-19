@@ -10,8 +10,9 @@ import * as S from "effect/Schema"
 import { SecureRandom } from "effect/crypto"
 import { SqlClient, SqlSchema } from "effect/sql"
 import type { AnsweredBy } from "../api/v1/Api.ts"
-import { AgentRun } from "../domain/Agent.ts"
-import { type Member, MemberId, OrganizationId } from "../domain/Identity.ts"
+import { AgentRun } from "@inventory/kernel/AgentRun"
+import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
+import { type Member } from "@inventory/kernel/Member"
 import { type NewSuggestion, Suggestion } from "../domain/ItemImport.ts"
 import {
   answerByRules,
@@ -22,7 +23,7 @@ import {
   suggestLines,
   type SuggestSource
 } from "../domain/Suggest.ts"
-import { asAgent } from "./Agent.ts"
+import { asAgent } from "@inventory/kernel/Agent"
 import { Ai, answeredByRules } from "./Ai.ts"
 import { ModelCalls, usedUpWords } from "./ModelCalls.ts"
 import { batchOn, NoRows, statement } from "./Sql.ts"

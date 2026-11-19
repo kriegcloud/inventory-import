@@ -1,14 +1,11 @@
 import { Array as Arr, Context, Effect, Layer, Option } from "effect"
 import { HttpServerRequest } from "effect/http"
-import {
-  CurrentActor,
-  Identity,
-  NotSignedIn,
-  SessionState,
-  SignInFeatures,
-  type OrganizationChoice
-} from "../api/v1/Identity.ts"
-import { type Member, OrganizationId } from "../domain/Identity.ts"
+import { SessionState, SignInFeatures, type OrganizationChoice } from "../api/v1/Identity.ts"
+import { NotSignedIn } from "@inventory/kernel/AccessError"
+import { CurrentActor } from "@inventory/kernel/Actor"
+import { Identity } from "@inventory/kernel/Identity"
+import { OrganizationId } from "@inventory/kernel/Ids"
+import { type Member } from "@inventory/kernel/Member"
 import { Auth, type AuthSession } from "./Auth.ts"
 import { Members } from "./Members.ts"
 import { authSettings } from "./Settings.ts"

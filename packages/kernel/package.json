@@ -1,0 +1,41 @@
+{
+  "name": "@inventory/kernel",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The language every part of the inventory app shares: ids, roles, the member, the agent run, the audit line, and the sign-in and cross-site middleware declarations",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": [],
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts",
+    "./Ids": "./src/Ids.id.ts",
+    "./Role": "./src/Role.schema.ts",
+    "./Text": "./src/Text.schema.ts",
+    "./Member": "./src/Member.schema.ts",
+    "./AgentRun": "./src/AgentRun.schema.ts",
+    "./Activity": "./src/Activity.schema.ts",
+    "./AccessError": "./src/AccessError.errors.ts",
+    "./Actor": "./src/Actor.context.ts",
+    "./Agent": "./src/Agent.context.ts",
+    "./Identity": "./src/Identity.middleware.ts",
+    "./SameOrigin": "./src/SameOrigin.middleware.ts"
+  },
+  "scripts": {
+    "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",
+    "lint": "oxlint --quiet src test",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@beep/identity": "workspace:*",
+    "effect": "4.1.4"
+  },
+  "devDependencies": {
+    "@effect/vitest": "4.1.4",
+    "@types/node": "^24.19.2",
+    "vitest": "^5.1.0"
+  },
+  "beep": {
+    "family": "kernel"
+  }
+}

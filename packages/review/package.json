@@ -17,7 +17,7 @@
     "./SavedProgressHook": "./src/SavedProgress.hook.ts"
   },
   "scripts": {
-    "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json && node ../../scripts/check-strict.mjs strict-ceiling.json",
+    "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json && beep-cli quality strict strict-ceiling.json",
     "lint": "oxlint --quiet src test; lint=$?; oxlint --disable-nested-config --deny-warnings -c ../../.oxlintrc.shadcn.json src && exit $lint",
     "test": "vitest run"
   },

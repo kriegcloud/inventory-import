@@ -22,11 +22,11 @@
     "dev:portless": "node scripts/migrate-local.mjs && portless inventory vite",
     "dev:https": "node scripts/migrate-local.mjs && node scripts/dev-https.mjs",
     "typecheck:tsc": "effect-tsgo tsc -b",
-    "check:strict": "node ../../scripts/check-strict.mjs strict-ceiling.json",
+    "check:strict": "beep-cli quality strict strict-ceiling.json",
     "telemetry": "node scripts/telemetry.mjs",
     "telemetry:down": "node scripts/telemetry.mjs down",
     "auth:schema": "node scripts/auth-schema.mjs",
-    "check": "tsrs -b --fast && node ../../scripts/check-strict.mjs strict-ceiling.json",
+    "check": "tsrs -b --fast && beep-cli quality strict strict-ceiling.json",
     "test:slow": "vitest run --project slow",
     "test:all": "vitest run",
     "test:watch": "vitest"

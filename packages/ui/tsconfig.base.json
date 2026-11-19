@@ -2,7 +2,7 @@
   // The design system's profile: the repository profile (../../tsconfig.base.json, beep-effect's) with the two recorded
   // exceptions the app's web code has (decision "ui-packages brief", (d)).
   // `plugins` replaces the inherited plugin list as a whole, so the block below repeats the root's options;
-  // the check (../../scripts/check-strict.mjs) fails when it differs from the root's anywhere but `overrides`.
+  // the check (../../bun run beep quality strict) fails when it differs from the root's anywhere but `overrides`.
   //
   // `paths` lets the shadcn CLI resolve components.json's aliases when it adds a component here.
   // Stage C, own code (src outside components and hooks): beep-effect's profile has no per-file overrides; this one is

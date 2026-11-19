@@ -1,7 +1,7 @@
 {
   // The app's profile: the repository profile (../../tsconfig.base.json, beep-effect's) with one recorded exception.
   // `plugins` replaces the inherited plugin list as a whole, so the block below repeats the root's options;
-  // the check (../../scripts/check-strict.mjs) fails when it differs from the root's anywhere but `overrides`.
+  // the check (../../bun run beep quality strict) fails when it differs from the root's anywhere but `overrides`.
   //
   // Stage C, own web code (src/web): beep-effect's profile has no per-file overrides; this one is deliberate. Four
   // style rules are off here: preferEffectArray, preferEffectString, preferEffectRecord and missingPipeableSignature.

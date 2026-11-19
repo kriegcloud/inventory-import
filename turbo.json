@@ -14,7 +14,12 @@
     // source and never build, so `check` has no `^build` edge to do this.
     "transit": { "dependsOn": ["^transit"], "inputs": ["$TURBO_DEFAULT$", "!**/*.md", "!test/**"] },
     // Type-check with the Effect diagnostics.
-    "check": { "dependsOn": ["transit"], "outputs": [] },
+    // A package's check may run the repository's own commands (quality strict, laws exports): their source is an input.
+    "check": {
+      "dependsOn": ["transit"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/tooling/tool/cli/src/**"],
+      "outputs": []
+    },
     // oxlint, and the design-system lint in packages with screens.
     "lint": { "outputs": [] },
     // The fast tests.

@@ -316,7 +316,7 @@ packages/foundation/     Product-neutral packages: this repository's own @beep/c
 docs/                   Standards, the kit, patterns, the glossary and sign-in (`docs/index.md` lists them); qa/ is evidence.
 explorations/           Questions being shaped: research, decisions, briefs.
 goals/                  Work with a definition of done: SPEC.md and PLAN.md.
-scripts/                Repository checks (`beep docs check`, `beep laws keys`, `beep vendor check`, `check-strict.mjs`,
+scripts/                Repository checks (`beep docs check`, `beep laws keys`, `beep vendor check`, `beep quality strict`,
                         `beep laws boundaries`: which package may import which, `beep laws screens`: every package with screens in both stylesheet lists, `check-effect-imports.mjs`: every Effect import from its own path under its one name) and `vendor-beep.mjs`, which copies the kit from a
                         beep-effect checkout.
 turbo.json              The task graph: seven package tasks and three root tasks.
@@ -387,7 +387,7 @@ exceptions exist, and nothing else may:
 - **Stage C, own code with screens** (the app's `src/web`; `@inventory/ui`'s own pieces; `@inventory/review`, its
   gallery fixtures included): `preferEffectArray`, `preferEffectString`, `preferEffectRecord` and
   `missingPipeableSignature` are off, in each package's `tsconfig.base.json`. Each package counts them against the
-  ceiling in its `strict-ceiling.json` (`scripts/check-strict.mjs`, part of its `check`), which fails when the count
+  ceiling in its `strict-ceiling.json` (`bun run beep quality strict`, part of its `check`), which fails when the count
   is above it, and when it is below it until the ceiling is lowered; `bun run beep quality ceilings` keeps the sum at
   most 678. The numbers only fall. Write new web code the Effect way anyway.
 - **Stage D, the vendored components and hooks** (`packages/ui/src/components`, `packages/ui/src/hooks`): every rule

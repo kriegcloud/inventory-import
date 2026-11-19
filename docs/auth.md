@@ -16,7 +16,7 @@ exists: they read `CurrentActor` and call `requireRole`, as before. The rules it
 
 ```
 browser ── cookie inventory.session_token ──> Worker
-  /api/auth/*  -> AuthRoute (src/server/Auth.ts): our cross-site check, then Better Auth's handler
+  /api/auth/*  -> SignInRoute (src/server/SignIn.ts, on @beep/better-auth): our cross-site check, then Better Auth's handler
                   (sign-up, sign-in, sign-out, organizations). Never versioned: Better Auth's own contract.
   /api/v1/*    -> HttpApi: SameOrigin, then the Identity middleware
                   = SessionIdentityLive (src/server/SessionIdentity.ts)
@@ -85,7 +85,7 @@ are in `.dev.vars.example`.
 | Rate limits | stored in D1 (`rateLimit` table; Workers keep no memory between isolates), per address from `cf-connecting-ip`: sign-in 10 a minute, sign-up 5 a minute, the rest 100 a minute | test "limits sign-in attempts" (the 11th is 429) |
 | Breached passwords | Have I Been Pwned at sign-up and password change, behind `PWNED_PASSWORD_CHECK`; only the first five characters of the SHA-1 hash leave the Worker | `test/server/Pwned.test.ts` (off: never called; on and unreachable: refused), `Pwned.slow.test.ts` (the real service) |
 | Usage telemetry | off (`telemetry: { enabled: false }`): it reports to Better Auth's servers | `src/server/authOptions.ts` |
-| Tracing | Better Auth's own instrumentation does nothing inside a Worker, so every call into it is an Effect span: `Auth.handler` (endpoint and status) and `Auth.session` | `src/server/Auth.ts` |
+| Tracing | Better Auth's own instrumentation does nothing inside a Worker, so every call into it is an Effect span: `BetterAuth.handle` (endpoint and status) and `BetterAuth.session` | `@beep/better-auth` (`BetterAuth.service.ts`) |
 | Changing one's own name or picture | off: `POST /api/auth/update-user` answers 404 (`disabledPaths`) | test "refuses a rename through Better Auth's update-user" |
 | Headers | the API's security headers apply to `/api/auth/*` too | `curl -I` on `bun run preview` |
 
@@ -103,7 +103,7 @@ Better Auth's performance guide, item by item:
   cache would save that one D1 read per request and keep a revoked session working until it expires;
   `{ enabled: true, maxAge: 60 }` accepts up to a minute of that. A production choice, written beside the setting.
 - **`better-auth/minimal` is not used**: it cannot take a direct D1 connection and has no migration planner. The
-  reason is beside the import in `src/server/Auth.ts`.
+  reason is beside the import in `@beep/better-auth` (`BetterAuth.service.ts`).
 
 ## Agents act for a person
 

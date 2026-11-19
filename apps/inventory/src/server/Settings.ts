@@ -89,11 +89,9 @@ export const telemetrySettings = Config.all({
   serviceName: Config.String("OTEL_SERVICE_NAME").pipe(Config.withDefault("inventory"))
 })
 
-/** The shortest `BETTER_AUTH_SECRET` accepted: Better Auth's own warning threshold. */
-export const minimumSecretLength = 32
-
 /**
- * The sign-in settings (src/server/Auth.ts, docs/auth.md). `production` is the build's: a production build turns the
+ * The sign-in settings (src/server/SignIn.ts, docs/auth.md). The shortest secret accepted, 32 characters, is
+ * `@beep/better-auth`'s rule. `production` is the build's: a production build turns the
  * breached-password check on and the test accounts off unless a variable says otherwise.
  *
  * - `BETTER_AUTH_SECRET`: secret. Signs the session cookies; at least 32 characters (`openssl rand -base64 32`).

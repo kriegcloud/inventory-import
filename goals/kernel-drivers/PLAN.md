@@ -14,8 +14,8 @@ from: explorations/ideal-architecture
 | 1 | Decisions recorded; SPEC and PLAN | done |
 | 2 | `@inventory/kernel`; the app switched; proof | done |
 | 3 | `@beep/d1` with `D1Test`; the app switched; proof | done |
-| 4 | `@beep/better-auth`; the app switched; proof with sign-out and sign-in | doing |
-| 5 | `@beep/openrouter`; the AI SDK removed; proof with and without a model | todo |
+| 4 | `@beep/better-auth`; the app switched; proof with sign-out and sign-in | done |
+| 5 | `@beep/openrouter`; the AI SDK removed; proof with and without a model | doing |
 | 6 | Closing note | todo |
 
 ## Current blocker
@@ -63,4 +63,22 @@ Where the brief left a choice open, or the code showed the brief could not be fo
 - **D1 proof**: check:full 26/26 tasks (d1 8 tests; app 217 fast + 45 slow on `D1Test`). Browser on a fresh database:
   "200 rows read", "Import 155, skip 45", result "Imported 155 · Not imported 45 · All 200", Items "155 items", D1
   `item` 155 rows.
+- **`src/server/SignIn.ts` composes the driver.** The brief had `worker.ts` compose `BetterAuth.layer` and its route;
+  the Worker and the tests both need the same composition (settings read through `authSettings`, `authOptions`, the
+  cross-site guard), so it is one module, `signIn(...)` and `SignInRoute`, which replaces `src/server/Auth.ts`.
+- **The route's guard is an Effect** returning `Option<HttpServerResponse>`, so the refusal is logged inside its span.
+- **No `LiteralKit` in the drivers.** For the same Node-types reason as the kernel's `Role`, `AuthSecret` is
+  `S.Union([...]).pipe(S.toTaggedUnion("kind"))` (allowed by SF-6's check) and the error fields are `S.Literals`.
+  `AuthSecret`'s policy is the exported `resolveAuthSecret` beside it; `AuthEndpoint`'s is `authEndpointOf`.
+- **Better Auth failures are typed** (`BetterAuthError`); the identity middleware and the session answer end them with
+  `Effect.orDie`, so a person still sees a 500, as before. `BetterAuthConfigError` is the layer's typed failure; the
+  Auth slow test ("a production build refuses to start, and says how to set one") passes unchanged.
+- **Spans renamed** `Auth.handler`/`Auth.session` to `BetterAuth.handle`/`BetterAuth.session` (`authOptions.ts`'s
+  comment and `docs/auth.md` say so); no test asserted the old names.
+- **`minimumSecretLength`** left `Settings.ts`: the driver owns the 32-character rule.
+- **Better Auth proof**: check:full 29/29 tasks (better-auth 12 tests; app 217 fast + 45 slow, sign-in end to end on
+  `D1Test` with the seeded accounts). Browser on a fresh database: "200 rows read", "Import 155, skip 45", result
+  "Imported 155 · Not imported 45 · All 200", Items "155 items", D1 `item` 155 rows. Then the user menu's "Sign out":
+  the sign-in page with "Test accounts"; "Sign in as Dana Whitfield": the Import page, and
+  `/api/v1/identity/session` answers `ready`, Dana Whitfield, admin, Example Works (test).
 

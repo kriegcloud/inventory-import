@@ -6,7 +6,8 @@ import { CurrentActor } from "@inventory/kernel/Actor"
 import { Identity } from "@inventory/kernel/Identity"
 import { OrganizationId } from "@inventory/kernel/Ids"
 import { type Member } from "@inventory/kernel/Member"
-import { Auth, type AuthSession } from "./Auth.ts"
+import { BetterAuth } from "@beep/better-auth/BetterAuth"
+import type { AuthSession } from "@beep/better-auth/BetterAuthSession"
 import { Members } from "./Members.ts"
 import { authSettings } from "./Settings.ts"
 import { seededAccounts, testAccountPassword } from "./TestAccounts.ts"
@@ -14,7 +15,7 @@ import { seededAccounts, testAccountPassword } from "./TestAccounts.ts"
 // SIGNED-IN IDENTITY. The Worker's `Identity` middleware: the session cookie names a user and their active
 // organization, and their membership there is the actor. Nothing in a request header or payload can choose who the
 // actor is. Handlers are unchanged: they read `CurrentActor` and call `requireRole`, as before. Writes from another
-// site have already been refused (`SameOrigin` on the whole API, and the same rule on /api/auth/* in Auth.ts).
+// site have already been refused (`SameOrigin` on the whole API, and the same rule on /api/auth/* in SignIn.ts).
 
 /**
  * The member a session acts as: in the active organization, or, with none chosen yet (or Better Auth cleared it after
@@ -27,19 +28,20 @@ const actorOf = (
 ): Effect.Effect<Option.Option<Member>> =>
   members.findByUser(
     session.userId,
-    session.activeOrganizationId === null ? null : OrganizationId.make(session.activeOrganizationId)
+    Option.match(session.activeOrganizationId, { onNone: () => null, onSome: (id) => OrganizationId.make(id) })
   )
 
 /** Resolves `CurrentActor` from the Better Auth session on the request, or fails with `NotSignedIn` (401). */
 export const SessionIdentityLive = Layer.effect(
   Identity,
   Effect.gen(function* () {
-    const auth = yield* Auth
+    const auth = yield* BetterAuth
     const members = yield* Members
     return Identity.of(
       Effect.fn("Identity")(function* (httpEffect) {
         const request = yield* HttpServerRequest.HttpServerRequest
-        const session = yield* auth.session(new Headers(request.headers))
+        // A Better Auth failure is no fault of the request: it ends as a 500, as before the driver typed it.
+        const session = yield* auth.session(new Headers(request.headers)).pipe(Effect.orDie)
         if (Option.isNone(session)) {
           return yield* NotSignedIn.make({ reason: "Sign in to continue." })
         }
@@ -47,10 +49,9 @@ export const SessionIdentityLive = Layer.effect(
         if (Option.isNone(member)) {
           // No request value in the reason: what a request sent is not repeated to the screen or the log.
           return yield* NotSignedIn.make({
-            reason:
-              session.value.activeOrganizationId === null
-                ? "You are signed in but not part of an organization yet."
-                : "You are no longer a member of that organization."
+            reason: Option.isNone(session.value.activeOrganizationId)
+              ? "You are signed in but not part of an organization yet."
+              : "You are no longer a member of that organization."
           })
         }
         // Ids only, never a name or an email: every span and log line inside the request carries who acted.
@@ -82,7 +83,7 @@ export class Sessions extends Context.Service<Sessions, { state(headers: Headers
     Layer.effect(
       Sessions,
       Effect.gen(function* () {
-        const auth = yield* Auth
+        const auth = yield* BetterAuth
         const members = yield* Members
         const settings = yield* authSettings(build)
         const userIds = Arr.map(seededAccounts, (account) => account.userId)
@@ -94,7 +95,7 @@ export class Sessions extends Context.Service<Sessions, { state(headers: Headers
                 : null,
               pwnedPasswordCheck: settings.pwnedPasswordCheck
             })
-            const session = yield* auth.session(headers)
+            const session = yield* auth.session(headers).pipe(Effect.orDie)
             if (Option.isNone(session)) {
               return SessionState.make({ status: "signed-out", email: null, actor: null, organizations: [], features })
             }

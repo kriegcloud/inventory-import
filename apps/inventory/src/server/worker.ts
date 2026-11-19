@@ -2,9 +2,9 @@ import { D1 } from "@beep/d1/D1"
 import { env, waitUntil } from "cloudflare:workers"
 import { ConfigProvider, Layer } from "effect"
 import { makeApp, toTracedFetch } from "./App.ts"
-import { Auth } from "./Auth.ts"
 import { RequestTelemetry } from "./RequestTelemetry.ts"
 import { SessionIdentityLive } from "./SessionIdentity.ts"
+import { signIn } from "./SignIn.ts"
 import { collector } from "./Telemetry.ts"
 
 // Cloudflare Worker entry: the app (App.ts) on the D1 binding, with every setting and secret read through one
@@ -20,7 +20,7 @@ const app = makeApp({
   identity: SessionIdentityLive,
   // Better Auth takes the D1 binding itself. Its work after an answer (rate-limit updates, cleanup) is handed to
   // `waitUntil`, so the answer does not wait for it and the Worker is not stopped before it is done.
-  auth: Auth.layer({ database: env.DB, production: import.meta.env.PROD, backgroundTasks: waitUntil }),
+  auth: signIn({ database: env.DB, production: import.meta.env.PROD, backgroundTasks: waitUntil }),
   production: import.meta.env.PROD,
   docs: import.meta.env.DEV
 }).pipe(Layer.provide(settings))

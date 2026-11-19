@@ -3,7 +3,7 @@ import { haveIBeenPwned } from "better-auth/plugins/haveibeenpwned"
 import { organization } from "better-auth/plugins/organization"
 import { memberAc, ownerAc } from "better-auth/plugins/organization/access"
 
-// Better Auth's configuration, in one place for the Worker (src/server/Auth.ts), the schema script
+// Better Auth's configuration, in one place for the Worker (src/server/SignIn.ts), the schema script
 // (scripts/auth-schema.mjs) and the tests, so the tables the migration creates are the tables this config needs.
 //
 // The one thing not to break: the organisation plugin shares the app's `organization` and `member` tables, and
@@ -27,7 +27,7 @@ export const pwnedPasswordMessage =
 /**
  * The full Better Auth configuration for this app. `database` is the D1 binding in the Worker and an in-memory
  * SQLite database in the schema script and the fast tests. The rest comes from the settings (`authSettings` in
- * Settings.ts) through `Auth.layer`.
+ * Settings.ts) through `signIn` (SignIn.ts).
  */
 export const authOptions = (input: {
   readonly database: NonNullable<BetterAuthOptions["database"]>
@@ -61,7 +61,7 @@ export const authOptions = (input: {
     disabledPaths: ["/update-user", "/organization/remove-member", "/organization/leave", "/organization/delete"],
     // Better Auth's usage telemetry reports to Better Auth's own servers: off, nothing about this app leaves it. Its
     // OpenTelemetry instrumentation does nothing inside a Worker (the `workerd` build of @better-auth/core has no
-    // tracer), so the spans the telemetry sees around sign-in are the app's own (`Auth.handler`, `Auth.session`).
+    // tracer), so the spans the telemetry sees around sign-in are the app's own (`BetterAuth.handle`, `BetterAuth.session`).
     telemetry: { enabled: false },
     emailAndPassword: {
       enabled: true,

@@ -1,0 +1,36 @@
+{
+  "name": "@beep/better-auth",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Better Auth as an Effect service: built once from the app's options, its HTTP handler mounted on the router, and a typed session lookup",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": [],
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts",
+    "./BetterAuth": "./src/BetterAuth.service.ts",
+    "./BetterAuthSession": "./src/BetterAuth.schema.ts",
+    "./BetterAuthConfig": "./src/BetterAuth.config.ts",
+    "./BetterAuthError": "./src/BetterAuth.errors.ts",
+    "./BetterAuthTest": "./src/BetterAuth.test-layer.ts"
+  },
+  "scripts": {
+    "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",
+    "lint": "oxlint --quiet src test",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@beep/identity": "workspace:*",
+    "better-auth": "1.7.22",
+    "effect": "4.1.4"
+  },
+  "devDependencies": {
+    "@effect/vitest": "4.1.4",
+    "@types/node": "^24.19.2",
+    "vitest": "^5.1.0"
+  },
+  "beep": {
+    "family": "drivers"
+  }
+}

@@ -8,7 +8,7 @@ import { Api, docsPath, openApiPath } from "../api/v1/Api.ts"
 import { sessionCookieScheme } from "../api/v1/Document.ts"
 import { Activities } from "./Activities.ts"
 import { Ai } from "./Ai.ts"
-import { type Auth, AuthRoute } from "./Auth.ts"
+import type { BetterAuth } from "@beep/better-auth/BetterAuth"
 import { Handlers } from "./handlers.ts"
 import { Imports } from "./Imports.ts"
 import { Members } from "./Members.ts"
@@ -16,6 +16,7 @@ import { ModelCalls } from "./ModelCalls.ts"
 import * as Observability from "./Observability.ts"
 import { RequestTelemetry } from "./RequestTelemetry.ts"
 import { SameOriginLive } from "./SameOrigin.ts"
+import { SignInRoute } from "./SignIn.ts"
 import { withSecurityHeaders } from "./security.ts"
 import { People } from "./People.ts"
 import { Items } from "./Items.ts"
@@ -64,15 +65,15 @@ export const DocsRoute = import.meta.env.DEV
   : Layer.empty
 
 /**
- * The HttpApi with its OpenAPI document, Better Auth's routes at /api/auth/* beside it (Auth.ts), and the middleware
- * every request passes through, needing the services and `Auth`. `identity` is the `Identity` middleware's
+ * The HttpApi with its OpenAPI document, Better Auth's routes at /api/auth/* beside it (SignIn.ts), and the middleware
+ * every request passes through, needing the services and `BetterAuth`. `identity` is the `Identity` middleware's
  * implementation: the caller chooses it (worker.ts passes `SessionIdentityLive`, which reads the session; the tests
  * pass the header identity, `IdentityLive`), so this file never pulls one into a build.
  */
 export const makeRoutes = <E, R>(options: { readonly docs: boolean; readonly identity: Layer.Layer<Identity, E, R> }) =>
   Layer.mergeAll(
     HttpApiBuilder.layer(Api, { openapiPath: openApiPath }),
-    AuthRoute,
+    SignInRoute,
     options.docs ? DocsRoute : Layer.empty,
     OtlpProxyRoute,
     RequestMetrics
@@ -113,12 +114,12 @@ export const Services = servicesWith(Ai.layer)
  * The whole app on a given database, identity and sign-in. Settings come from the ConfigProvider the caller provides
  * (src/server/Settings.ts).
  * `production` picks the log format's default and the sign-in defaults; `docs` mounts the API reference page; `auth`
- * is Better Auth on the D1 binding (`Auth.layer`), which the identity, the session answer and /api/auth/* share.
+ * is Better Auth on the D1 binding (`signIn` in SignIn.ts), which the identity, the session answer and /api/auth/* share.
  */
 export const makeApp = <E, R, IE, IR, AE, AR>(options: {
   readonly database: Layer.Layer<D1 | SqlClient.SqlClient, E, R>
   readonly identity: Layer.Layer<Identity, IE, IR>
-  readonly auth: Layer.Layer<Auth, AE, AR>
+  readonly auth: Layer.Layer<BetterAuth, AE, AR>
   readonly production: boolean
   readonly docs: boolean
 }) =>

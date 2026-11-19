@@ -32,7 +32,8 @@ import { type Member } from "@inventory/kernel/Member"
 import { Activities } from "../../../src/server/Activities.ts"
 import { Ai } from "../../../src/server/Ai.ts"
 import { makeApp, makeRoutes, servicesWith, toFetch } from "../../../src/server/App.ts"
-import { Auth } from "../../../src/server/Auth.ts"
+import { BetterAuthTest } from "@beep/better-auth/BetterAuthTest"
+import { signIn } from "../../../src/server/SignIn.ts"
 import { Handlers } from "../../../src/server/handlers.ts"
 import { IdentityLive } from "../../../src/server/Identity.ts"
 import { Imports } from "../../../src/server/Imports.ts"
@@ -87,7 +88,7 @@ export const TestDatabase = D1Test.layer(D1TestOptions.make({ migrations })).pip
 export const TestAuth = (options: { readonly rateLimit?: boolean; readonly production?: boolean } = {}) =>
   Layer.unwrap(
     Effect.gen(function* () {
-      return Auth.layer({
+      return signIn({
         database: yield* D1Binding,
         production: options.production ?? false,
         rateLimit: options.rateLimit ?? false
@@ -96,18 +97,7 @@ export const TestAuth = (options: { readonly rateLimit?: boolean; readonly produ
   ).pipe(Layer.provide(TestDatabase))
 
 /** Sign-in for the in-memory app: nobody is ever signed in, and /api/auth/* is not there. A test double. */
-export const SignedOutAuth = Layer.succeed(
-  Auth,
-  Auth.of({
-    handle: Effect.fn("Auth.handler")(function* () {
-      return new Response(null, { status: 404 })
-    }),
-    session: Effect.fn("Auth.session")(function* () {
-      return Option.none()
-    }),
-    publicOrigin: Option.none()
-  })
-)
+export const SignedOutAuth = BetterAuthTest.signedOut
 
 /** The whole app on a fresh test database, as the Worker composes it, with the header identity naming the actor. */
 export const TestApp = makeApp({

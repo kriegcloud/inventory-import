@@ -3,7 +3,11 @@
 // switches, tags, two dates, and two nested values (dimensions and up to three vendors). The one thing not to break:
 // every value is read from the text as written (a cost from its digits as a decimal string, never through a float; a
 // date only when it has one reading), never through a guess.
-import { Array as Arr, BigDecimal, Option, String as Str, Tuple } from "effect"
+import * as A from "effect/Array"
+import * as BigDecimal from "effect/BigDecimal"
+import * as O from "effect/Option"
+import * as Str from "effect/String"
+import * as Tuple from "effect/Tuple"
 import * as S from "effect/Schema"
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as SchemaTransformation from "effect/SchemaTransformation"
@@ -94,9 +98,7 @@ const Count = S.Int.check(S.isGreaterThanOrEqualTo(0), S.isLessThanOrEqualTo(max
 // Hoisted: the schema below is evaluated before `isoDate` is defined.
 function isCalendarDay(text: string): boolean {
   const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text)
-  return (
-    parts !== null && Option.isSome(isoDate({ year: Number(parts[1]), month: Number(parts[2]), day: Number(parts[3]) }))
-  )
+  return parts !== null && O.isSome(isoDate({ year: Number(parts[1]), month: Number(parts[2]), day: Number(parts[3]) }))
 }
 const IsoDate = S.String.check(
   S.isPattern(/^\d{4}-\d{2}-\d{2}$/),
@@ -213,13 +215,13 @@ export const discontinued = (on: string): Stocking => Discontinued.make({ on })
 /**
  * The stocking the two stored values say: discontinued when there is a date, else active or not as the flag says.
  *
- * @example stockingOf({ isActive: false, discontinuedOn: Option.some("2024-06-19") }).kind // "discontinued"
+ * @example stockingOf({ isActive: false, discontinuedOn: O.some("2024-06-19") }).kind // "discontinued"
  */
 export const stockingOf = (stored: {
   readonly isActive: boolean
-  readonly discontinuedOn: Option.Option<string>
+  readonly discontinuedOn: O.Option<string>
 }): Stocking =>
-  Option.match(stored.discontinuedOn, {
+  O.match(stored.discontinuedOn, {
     onNone: () => (stored.isActive ? active : inactive),
     onSome: discontinued
   })
@@ -228,8 +230,8 @@ export const stockingOf = (stored: {
 export const isActive = (stocking: Stocking): boolean => stocking.kind === "active"
 
 /** The day the item stopped being stocked, when it did. */
-export const discontinuedOn = (stocking: Stocking): Option.Option<string> =>
-  stocking.kind === "discontinued" ? Option.some(stocking.on) : Option.none()
+export const discontinuedOn = (stocking: Stocking): O.Option<string> =>
+  stocking.kind === "discontinued" ? O.some(stocking.on) : O.none()
 
 /**
  * What one item needs before it can be stored. A row of the file becomes this only when every value was read without
@@ -391,22 +393,22 @@ const daysIn = (year: number, month: number): number =>
     ? year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
       ? 29
       : 28
-    : Arr.contains([4, 6, 9, 11], month)
+    : A.contains([4, 6, 9, 11], month)
       ? 30
       : 31
 
 /**
  * The ISO date for a year, month and day, or none when there is no such day.
  *
- * @example isoDate({ year: 2026, month: 3, day: 4 }) // Option.some("2026-03-04")
- * @example isoDate({ year: 2026, month: 2, day: 30 }) // Option.none()
+ * @example isoDate({ year: 2026, month: 3, day: 4 }) // O.some("2026-03-04")
+ * @example isoDate({ year: 2026, month: 2, day: 30 }) // O.none()
  */
 export const isoDate = (input: { readonly year: number; readonly month: number; readonly day: number }) => {
   const { year, month, day } = input
   if (year < 1000 || year > 9999 || month < 1 || month > 12 || day < 1 || day > daysIn(year, month)) {
-    return Option.none<string>()
+    return O.none<string>()
   }
-  return Option.some(`${year}-${Str.padStart(2, "0")(`${month}`)}-${Str.padStart(2, "0")(`${day}`)}`)
+  return O.some(`${year}-${Str.padStart(2, "0")(`${month}`)}-${Str.padStart(2, "0")(`${day}`)}`)
 }
 
 /**

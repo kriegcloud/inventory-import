@@ -1,5 +1,5 @@
 // Where an import's step lives in the address. The address helpers themselves are in @/ui-kit/Route.hook.
-import { Option } from "effect"
+import * as O from "effect/Option"
 import * as S from "effect/Schema"
 import { ImportId } from "@inventory/catalog-contract/Ids"
 /**
@@ -11,7 +11,7 @@ export const importInAddress = (
 ): { readonly id: ImportId | undefined; readonly malformed: boolean } => {
   const text = params.get("import")
   if (text === null) return { id: undefined, malformed: false }
-  const id = Option.getOrUndefined(S.decodeOption(ImportId)(text))
+  const id = O.getOrUndefined(S.decodeOption(ImportId)(text))
   return { id, malformed: id === undefined }
 }
 

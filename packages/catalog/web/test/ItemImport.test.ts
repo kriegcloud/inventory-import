@@ -3,7 +3,10 @@
 // and undoable while everything else waits for the person, and a stored item is never changed without a choice.
 import { describe, expect, it } from "@effect/vitest"
 import { cost, digits } from "./support/cost.ts"
-import { Array as Arr, Effect, Option, Record as Rec } from "effect"
+import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as O from "effect/Option"
+import * as R from "effect/Record"
 import clean from "./fixtures/samples/items_clean.csv?raw"
 import messy from "./fixtures/samples/items_messy.csv?raw"
 import type { ItemFields } from "@inventory/catalog-contract/Item"
@@ -18,14 +21,14 @@ const reviewOf = (
   table: StagedTable,
   decisions: Readonly<Record<string, RowDecisionFlags>> = {},
   storedItems: ReadonlyArray<ItemFields> = []
-) => review({ table, choices: [], decisions: Rec.map(decisions, decisionFromFlags), storedItems })
+) => review({ table, choices: [], decisions: R.map(decisions, decisionFromFlags), storedItems })
 
 const rowOf = (result: Review, rowNumber: number) =>
-  Option.getOrThrow(Arr.findFirst(result.rows, (row) => row.rowNumber === rowNumber))
+  O.getOrThrow(A.findFirst(result.rows, (row) => row.rowNumber === rowNumber))
 
 const numbers = (result: Review, outcome: string) =>
-  Arr.map(
-    Arr.filter(result.rows, (row) => row.outcome === outcome),
+  A.map(
+    A.filter(result.rows, (row) => row.outcome === outcome),
     (row) => row.rowNumber
   )
 
@@ -39,7 +42,7 @@ describe("items_clean.csv", () => {
       const result = reviewOf(table)
       expect(result.counts).toMatchObject({ rows: 25, ready: 25, needs: 0, decision: 0, cannot: 0, out: 0, already: 0 })
       expect(result.fixed).toEqual({ rows: 0, cells: 0 })
-      expect(Arr.flatMap(result.rows, (row) => row.proposals)).toEqual([])
+      expect(A.flatMap(result.rows, (row) => row.proposals)).toEqual([])
       // Row 2 of the file: SHH-9574, 12.33 a unit, 3845 on hand, two vendors, dimensions in cm.
       const first = rowOf(result, 2).item
       expect(first).toMatchObject({
@@ -48,17 +51,17 @@ describe("items_clean.csv", () => {
         quantityOnHand: 3845,
         stocking: { kind: "active" },
         tags: ["fragile"],
-        dimensions: Option.some({ length: 78.8, width: 56.9, height: 2.6, unit: "cm" })
+        dimensions: O.some({ length: 78.8, width: 56.9, height: 2.6, unit: "cm" })
       })
       expect(first?.vendors[0]).toEqual({
         vendorName: "Tidewater Fasteners",
-        vendorSku: Option.some("TI-12311"),
+        vendorSku: O.some("TI-12311"),
         unitCost: cost("7.59"),
-        leadTimeDays: Option.some(54),
+        leadTimeDays: O.some(54),
         isPreferred: false
       })
       // An empty quantity is the brief's default, 0, not a problem.
-      expect(rowOf(result, 6).item).toMatchObject({ sku: "UZS-4663", quantityOnHand: 0, reorderPoint: Option.none() })
+      expect(rowOf(result, 6).item).toMatchObject({ sku: "UZS-4663", quantityOnHand: 0, reorderPoint: O.none() })
     })
   )
 })
@@ -103,7 +106,7 @@ describe("items_messy.csv", () => {
       expect(head(56)?.proposal?.labels).toEqual(["Ridgeline Metals preferred", "Acme Industrial preferred"])
       // "Internal Notes" is no field: it is reported with how many rows hold a value, and read by nothing.
       expect(result.unusedColumns).toEqual([{ index: 15, letter: "P", label: "Internal Notes", filled: 20 }])
-      expect(Arr.every(result.mapping, (match) => Option.isSome(matchedColumn(match)))).toBe(true)
+      expect(A.every(result.mapping, (match) => O.isSome(matchedColumn(match)))).toBe(true)
     })
   )
 
@@ -112,14 +115,14 @@ describe("items_messy.csv", () => {
       const table = yield* messyTable
       const result = reviewOf(table)
       expect(result.fixed).toEqual({ rows: 17, cells: 20 })
-      const fixed = Arr.filter(result.rows, (row) => Arr.some(row.changes, (c) => c.how === "appliedByRule"))
-      expect(Arr.map(fixed, (row) => row.rowNumber)).toEqual([
+      const fixed = A.filter(result.rows, (row) => A.some(row.changes, (c) => c.how === "appliedByRule"))
+      expect(A.map(fixed, (row) => row.rowNumber)).toEqual([
         8, 9, 18, 48, 60, 63, 69, 75, 111, 136, 173, 179, 182, 183, 190, 197, 198
       ])
-      expect(Arr.every(fixed, (row) => row.status === "ready")).toBe(true)
+      expect(A.every(fixed, (row) => row.status === "ready")).toBe(true)
       expect(
-        Arr.every(
-          Arr.flatMap(fixed, (row) => row.changes),
+        A.every(
+          A.flatMap(fixed, (row) => row.changes),
           (c) => c.how === "appliedByRule" && c.confidence === "high"
         )
       ).toBe(true)
@@ -160,7 +163,7 @@ describe("items_messy.csv", () => {
       })
       expect(digits(rowOf(result, 55).item?.unitCost)).toBe("35.82")
       expect(rowOf(result, 85).item?.quantityOnHand).toBe(1200)
-      expect(rowOf(result, 44).item?.firstReceivedOn).toEqual(Option.some("2024-06-04"))
+      expect(rowOf(result, 44).item?.firstReceivedOn).toEqual(O.some("2024-06-04"))
       expect([rowOf(result, 4).status, rowOf(result, 10).status]).toEqual(["ready", "out"])
       expect(rowOf(result, 45).item).toMatchObject({ stocking: { kind: "discontinued", on: "2025-06-30" } })
       expect(digits(rowOf(result, 184).item?.unitCost)).toBe("12.5")
@@ -175,7 +178,7 @@ describe("a row discontinued yet active", () => {
       const table = yield* messyTable
       for (const line of [45, 164]) {
         const asked = rowOf(reviewOf(table), line)
-        const about = Arr.filter(asked.problems, (problem) => problem.kind === "discontinued")
+        const about = A.filter(asked.problems, (problem) => problem.kind === "discontinued")
         expect(about.length, `row ${line}`).toBe(1)
         expect(about[0]?.proposal, `row ${line}`).toMatchObject({
           field: "isActive",
@@ -192,7 +195,7 @@ describe("a row discontinued yet active", () => {
           asked.file.discontinuedOn
         ])
         expect(
-          Arr.filter(asked.changes, (change) => change.field === "isActive" || change.field === "discontinuedOn")
+          A.filter(asked.changes, (change) => change.field === "isActive" || change.field === "discontinuedOn")
         ).toEqual([])
         expect(asked.item).toBeNull()
       }
@@ -214,11 +217,11 @@ describe("a second import", () => {
   it.effect("adds nothing for a row that says what is stored, and asks before a stored item changes", () =>
     Effect.gen(function* () {
       const table = yield* cleanTable
-      const stored = Arr.getSomes(Arr.map(reviewOf(table).rows, (row) => Option.fromNullishOr(row.item)))
+      const stored = A.getSomes(A.map(reviewOf(table).rows, (row) => O.fromNullishOr(row.item)))
       const again = reviewOf(table, {}, stored)
       expect([again.counts.already, again.counts.ready, again.counts.needs]).toEqual([25, 0, 0])
       // The stored SHH-9574 has another name and cost than the file's row 2: the row waits, and says where.
-      const other = Arr.map(stored, (item) =>
+      const other = A.map(stored, (item) =>
         item.sku === "SHH-9574" ? { ...item, name: "Oak Insert", unitCost: cost("11") } : item
       )
       const asked = reviewOf(table, {}, other)

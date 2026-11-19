@@ -2,7 +2,10 @@ import { stringify } from "@inventory/ui/Json"
 import { useMutation } from "@tanstack/react-query"
 import { ArrowUp, ChevronRight, MessageSquarePlus, Sparkles, Undo2, X } from "lucide-react"
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react"
-import { Clock, Effect, Option, Result } from "effect"
+import * as Clock from "effect/Clock"
+import * as Effect from "effect/Effect"
+import * as O from "effect/Option"
+import * as Result from "effect/Result"
 import { Button } from "@inventory/ui/components/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@inventory/ui/components/collapsible"
 import { Input } from "@inventory/ui/components/input"
@@ -29,11 +32,11 @@ import { type ColumnCatalog, maxPrompt } from "@inventory/catalog-contract/Table
  */
 const whoAnswered = (answer: {
   readonly answeredBy: AnsweredBy
-  readonly note: Option.Option<string>
+  readonly note: O.Option<string>
 }): { readonly answeredBy: string; readonly note: string | null } =>
   answer.answeredBy._tag === "Rules"
     ? { answeredBy: "Rules", note: answer.answeredBy.reason }
-    : { answeredBy: answer.answeredBy.model, note: Option.getOrNull(answer.note) }
+    : { answeredBy: answer.answeredBy.model, note: O.getOrNull(answer.note) }
 
 /** The parts of a TanStack table the assistant reads and writes: the table's own state, never a copy of it. */
 export type AssistedTable = {

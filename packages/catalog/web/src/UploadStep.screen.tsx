@@ -1,4 +1,6 @@
-import { ByteSize, DateTime, Option } from "effect"
+import * as ByteSize from "effect/ByteSize"
+import * as DateTime from "effect/DateTime"
+import * as O from "effect/Option"
 import { request } from "@inventory/client/Http"
 import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
@@ -293,15 +295,15 @@ export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
     keepFile(file)
     save({
       step: "upload",
-      file: Option.some(
+      file: O.some(
         StoredFile.make({
           name: file.name,
           size: ByteSize.bytes(file.size),
           lastModified: DateTime.makeUnsafe(file.lastModified),
-          sheet: Option.none()
+          sheet: O.none()
         })
       ),
-      review: Option.none()
+      review: O.none()
     })
     upload.start(file, undefined, (end: UploadEnd) => {
       if (end._tag !== "Failed" || end.step === "read") clear()
@@ -310,7 +312,7 @@ export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
   // A file whose upload stopped with the page. Not offered once an import of it exists: a reload while the server
   // was preparing it still finished it, and it is in the list above.
   const saved = progress.saved
-  const stopped = saved?.step === "upload" ? Option.getOrNull(saved.file) : null
+  const stopped = saved?.step === "upload" ? O.getOrNull(saved.file) : null
   const landed =
     stopped !== null &&
     saved !== undefined &&

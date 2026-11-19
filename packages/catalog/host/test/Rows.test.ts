@@ -4,7 +4,8 @@
 import { describe, expect, it } from "@effect/vitest"
 import { costDigits } from "@inventory/catalog-contract/Item"
 import { ItemRow, storedItem } from "@inventory/catalog-host/ItemRow"
-import { DateTime, Effect } from "effect"
+import * as DateTime from "effect/DateTime"
+import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as S from "effect/Schema"
 

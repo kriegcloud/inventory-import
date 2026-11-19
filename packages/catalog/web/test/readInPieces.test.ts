@@ -2,7 +2,8 @@
 // reading in pieces gives exactly the rows, Notes and delimiter of reading at once, wherever a piece ends (inside a
 // quoted line break, between \r and \n, on a doubled quote; csvDifferential.test.ts proves that over the corpus). And
 // the progress it reports never passes its total.
-import { Array as Arr, Effect } from "effect"
+import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
 import { describe, expect, it } from "vitest"
 import { readSpreadsheet, type ReadProgress } from "@inventory/catalog-web/Spreadsheet"
 import { progressOf, rowsOf } from "@inventory/catalog-web/UploadMachine"
@@ -12,8 +13,8 @@ describe("reading CSV text in pieces", () => {
     Effect.runPromise(
       Effect.gen(function* () {
         const reports: Array<ReadProgress> = []
-        const big = `SKU,Name\n${Arr.join(
-          Arr.makeBy(40_000, (i) => `SKU-${i},Bolt ${i}`),
+        const big = `SKU,Name\n${A.join(
+          A.makeBy(40_000, (i) => `SKU-${i},Bolt ${i}`),
           "\n"
         )}\n`
         const table = yield* readSpreadsheet({
@@ -22,7 +23,7 @@ describe("reading CSV text in pieces", () => {
         })
         expect(table.rows.length).toBe(40_000)
         expect(reports.length).toBeGreaterThan(1)
-        for (const [before, after] of Arr.zip(reports, reports.slice(1))) {
+        for (const [before, after] of A.zip(reports, reports.slice(1))) {
           expect(after.rowsRead).toBeGreaterThanOrEqual(before.rowsRead)
         }
         for (const report of reports) {

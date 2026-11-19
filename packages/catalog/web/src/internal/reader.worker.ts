@@ -3,7 +3,9 @@ import { stringify } from "@inventory/ui/Json"
 // so the content security policy's `script-src 'self'` covers it; never a blob: worker, which the policy blocks (a
 // library that made one hung here). It runs the same `readSpreadsheet` the tests run, then trims the table to what
 // the server stages and hands it to the page in the chunks the server stores. Every file takes this path.
-import { Effect, Option, Result } from "effect"
+import * as Effect from "effect/Effect"
+import * as O from "effect/Option"
+import * as Result from "effect/Result"
 import { type FileProblem, fileProblem } from "@inventory/catalog-contract/FileProblem"
 import { maxChunkChars, uploadChunks } from "@inventory/catalog-model/Upload"
 import { readSpreadsheet } from "./spreadsheet/read.ts"
@@ -37,33 +39,37 @@ const throttle = (send: (message: ReadMessage) => void) => {
 }
 
 const read = ({ file, sheet }: ReadRequest) =>
-  Effect.runPromise(
-    Effect.result(readSpreadsheet({ file, ...(sheet === null ? {} : { sheet }), onProgress: throttle(post) }))
-  ).then((result) => {
-    if (Result.isFailure(result)) return refuse(result.failure)
-    const table = result.success
-    const { rows, sheet: sheetName, ...rest } = stageTable({ table })
-    // Plain fields for the copy between threads (protocol.ts): the page makes the Option again.
-    const head = { ...rest, sheet: Option.getOrNull(sheetName) }
-    const problem = stagingProblem({ fileName: head.fileName, rowCount: rows.length, columnCount: head.columns.length })
-    if (problem !== null) return refuse(problem)
-    const chunks = uploadChunks({ rows })
-    // The server refuses a chunk or a head over this size with the same words; saying it here sends nothing.
-    if (stringify(head).length > maxChunkChars) {
-      return refuse(fileProblem.tooLong({ fileName: head.fileName, part: "headings" }))
-    }
-    if (chunks.some((chunk) => stringify(chunk).length > maxChunkChars)) {
-      return refuse(fileProblem.tooLong({ fileName: head.fileName, part: "cells" }))
-    }
-    post({
-      _tag: "Head",
-      head,
-      chunkSizes: chunks.map((chunk) => chunk.length),
-      workbook: table.format._tag === "xlsx" ? { sheets: table.format.sheets, chosen: table.format.chosen } : null
+  readSpreadsheet({ file, ...(sheet === null ? {} : { sheet }), onProgress: throttle(post) })
+    .pipe(Effect.result, Effect.runPromise)
+    .then((result) => {
+      if (Result.isFailure(result)) return refuse(result.failure)
+      const table = result.success
+      const { rows, sheet: sheetName, ...rest } = stageTable({ table })
+      // Plain fields for the copy between threads (protocol.ts): the page makes the Option again.
+      const head = { ...rest, sheet: O.getOrNull(sheetName) }
+      const problem = stagingProblem({
+        fileName: head.fileName,
+        rowCount: rows.length,
+        columnCount: head.columns.length
+      })
+      if (problem !== null) return refuse(problem)
+      const chunks = uploadChunks({ rows })
+      // The server refuses a chunk or a head over this size with the same words; saying it here sends nothing.
+      if (stringify(head).length > maxChunkChars) {
+        return refuse(fileProblem.tooLong({ fileName: head.fileName, part: "headings" }))
+      }
+      if (chunks.some((chunk) => stringify(chunk).length > maxChunkChars)) {
+        return refuse(fileProblem.tooLong({ fileName: head.fileName, part: "cells" }))
+      }
+      post({
+        _tag: "Head",
+        head,
+        chunkSizes: chunks.map((chunk) => chunk.length),
+        workbook: table.format._tag === "xlsx" ? { sheets: table.format.sheets, chosen: table.format.chosen } : null
+      })
+      chunks.forEach((chunk, seq) => post({ _tag: "Chunk", seq, rows: chunk }))
+      post({ _tag: "Done" })
     })
-    chunks.forEach((chunk, seq) => post({ _tag: "Chunk", seq, rows: chunk }))
-    post({ _tag: "Done" })
-  })
 
 self.onmessage = (event: MessageEvent<ReadRequest>) => {
   // The reader itself broke (not the file): a sentence about the page, not a problem with the file.

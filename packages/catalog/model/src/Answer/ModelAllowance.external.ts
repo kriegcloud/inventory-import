@@ -3,7 +3,11 @@
 // calls a day there are or where they are counted.
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import { CurrentActor } from "@inventory/kernel/Actor"
-import { Context, Effect, Layer, Ref, Tuple } from "effect"
+import * as Context from "effect/Context"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Ref from "effect/Ref"
+import * as Tuple from "effect/Tuple"
 import * as S from "effect/Schema"
 
 /** What the catalog takes a model call for: reading a table request, or suggesting for an import. */

@@ -8,7 +8,10 @@ import { ItemFields } from "@inventory/catalog-contract/Item"
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import type { Member } from "@inventory/kernel/Member"
 import { DisplayName } from "@inventory/kernel/Text"
-import { Array as Arr, Option, Record as Rec, Tuple } from "effect"
+import * as A from "effect/Array"
+import * as O from "effect/Option"
+import * as R from "effect/Record"
+import * as Tuple from "effect/Tuple"
 import * as S from "effect/Schema"
 import type { Review } from "../Review/Review.rules.ts"
 
@@ -98,7 +101,7 @@ export class ConfirmPlan extends S.Opaque<ConfirmPlan, { readonly brand: unique 
 export const plannedItems = (
   plan: ConfirmPlan
 ): ReadonlyArray<Extract<PlannedRow, { readonly status: "ready" | "update" }>> =>
-  Arr.filter(
+  A.filter(
     plan.rows,
     (row): row is Extract<PlannedRow, { readonly status: "ready" | "update" }> =>
       row.status === "ready" || row.status === "update"
@@ -116,21 +119,21 @@ export const confirmPlan = (input: {
   readonly actor: Member
 }): ConfirmPlan => {
   const { review, authors, actor } = input
-  const who = (rowId: string): string => Option.getOrElse(Rec.get(authors, rowId), () => actor.name)
+  const who = (rowId: string): string => O.getOrElse(R.get(authors, rowId), () => actor.name)
   const person = (rowId: string): DecidedBy =>
-    decidedByPerson(Option.getOrElse(S.decodeOption(DisplayName)(who(rowId)), () => actor.name))
-  const rows = Arr.map(review.rows, (row): PlannedRow => {
+    decidedByPerson(O.getOrElse(S.decodeOption(DisplayName)(who(rowId)), () => actor.name))
+  const rows = A.map(review.rows, (row): PlannedRow => {
     const at = { rowNumber: row.rowNumber, part: row.part ?? 0, sku: row.values.sku, name: row.values.name }
     // Every problem of the row, so the not-imported rows and their download name each one.
-    const why = Arr.join(row.reasons, " ")
+    const why = A.join(row.reasons, " ")
     if (row.status === "ready" && row.item !== null) {
       const made = {
         ...at,
         item: row.item,
-        changes: Arr.map(row.changes, (change) =>
+        changes: A.map(row.changes, (change) =>
           PlannedChange.make({
             change,
-            decidedByName: changeDecidedBy(change) === "person" ? Option.some(who(row.id)) : Option.none()
+            decidedByName: changeDecidedBy(change) === "person" ? O.some(who(row.id)) : O.none()
           })
         )
       }

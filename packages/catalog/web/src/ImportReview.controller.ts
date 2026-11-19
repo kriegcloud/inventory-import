@@ -2,7 +2,7 @@
 // holds no rules. The one thing a reader must not break: a row's `problem` is always the first thing still open
 // *given the decisions so far*, because the region re-checks a row only after the person types, not after they
 // accept a fix.
-import { Option } from "effect"
+import * as O from "effect/Option"
 import type {
   Choice,
   Fix,
@@ -303,13 +303,13 @@ const itemColumns = (
 ): ReadonlyArray<ReviewColumn> =>
   order.map((field) => {
     const match = mapping.find((candidate) => candidate.field === field)
-    const column = match === undefined ? Option.none() : matchedColumn(match)
-    const missing = match !== undefined && Option.isNone(column) && requiredFields.includes(field) && unused.length > 0
+    const column = match === undefined ? O.none() : matchedColumn(match)
+    const missing = match !== undefined && O.isNone(column) && requiredFields.includes(field) && unused.length > 0
     return {
       id: field,
       label: fieldLabels[field],
       ...layout[field],
-      ...(Option.isNone(column)
+      ...(O.isNone(column)
         ? missing
           ? {
               match: {

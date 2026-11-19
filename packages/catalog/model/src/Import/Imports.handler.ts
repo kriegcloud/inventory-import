@@ -1,7 +1,11 @@
 // The import and item endpoints. The one thing a reader must not break: the browser never sends a row to write. `commit`
 // reads the staged file back from storage and runs the same pure `review` the screen ran, so a row the screen
 // refused cannot be written by a crafted request.
-import { Array as Arr, Effect, Option, Record as Rec, Result } from "effect"
+import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as O from "effect/Option"
+import * as R from "effect/Record"
+import * as Result from "effect/Result"
 import { ConfirmWrite, ImportStore, Draft, TakeBackWrite } from "./ImportStore.store.ts"
 import { SuggestionStore } from "../Suggestion/SuggestionStore.store.ts"
 import { suggest } from "../Suggestion/Suggestions.handler.ts"
@@ -11,8 +15,8 @@ import { ModelAllowance } from "../Answer/ModelAllowance.external.ts"
 import { Activity } from "@inventory/kernel/Activity"
 import { ActivityId } from "@inventory/kernel/Ids"
 import { ConfirmId as ConfirmIdSchema, ItemId } from "@inventory/catalog-contract/Ids"
-import { SecureRandom } from "effect/crypto"
-import { DateTime } from "effect"
+import * as SecureRandom from "effect/crypto/SecureRandom"
+import * as DateTime from "effect/DateTime"
 import { ItemsOfRow } from "../Review/ItemsOfRow.context.ts"
 import { Member } from "@inventory/kernel/Member"
 import { StagedTable, StagedHead, Field, fieldLabels } from "@inventory/catalog-contract/Staged"
@@ -68,7 +72,7 @@ export const importsEndpoints = Effect.gen(function* () {
       actorName: actor.name,
       action,
       detail: "",
-      agent: Option.none(),
+      agent: O.none(),
       createdAt
     })
   })
@@ -82,15 +86,15 @@ export const importsEndpoints = Effect.gen(function* () {
     decisions: SavedDecisions
   ) {
     const blank = review({ table, choices, decisions: {}, storedItems: [], itemsOf })
-    const typed = Arr.getSomes(Arr.map(Rec.values(decisions), (decision) => Rec.get(decision.edits, "sku")))
-    const keys = Arr.dedupe(
-      Arr.filter(
-        [...Arr.map(blank.rows, (row) => skuKey({ sku: row.file.sku })), ...Arr.map(typed, (sku) => skuKey({ sku }))],
+    const typed = A.getSomes(A.map(R.values(decisions), (decision) => R.get(decision.edits, "sku")))
+    const keys = A.dedupe(
+      A.filter(
+        [...A.map(blank.rows, (row) => skuKey({ sku: row.file.sku })), ...A.map(typed, (sku) => skuKey({ sku }))],
         (key) => key !== ""
       )
     )
     const found = yield* imports.storedAmong(actor.organizationId, keys)
-    return Arr.map(found, fieldsOf)
+    return A.map(found, fieldsOf)
   })
 
   // The one place a review is worked out on the server, so the commit applies decisions exactly as the screen did.
@@ -102,9 +106,9 @@ export const importsEndpoints = Effect.gen(function* () {
     const stored = yield* imports.decisions(actor.organizationId, draft.id)
     const storedItems = yield* storedFor(actor, table, choices, stored.decisions)
     const created = yield* imports.createdRows(actor.organizationId, draft.id)
-    const createdIds = Arr.map(created, rowId)
+    const createdIds = A.map(created, rowId)
     // The rows behind them, as the view has always said them: one number per row, however many items it holds.
-    const createdRows = Arr.dedupe(Arr.map(created, (item) => item.rowNumber))
+    const createdRows = A.dedupe(A.map(created, (item) => item.rowNumber))
     const decisions = carryDecisions({ table, choices, decisions: stored.decisions, mode: ruleFixes, itemsOf })
     // The stored suggestions: the review turns each into a proposal that waits, here exactly as on the screen.
     const suggestions = yield* suggestionStore.list(actor.organizationId, draft.id)
@@ -131,7 +135,7 @@ export const importsEndpoints = Effect.gen(function* () {
     )
     const confirmed = draft.status !== "open"
     const outcomes = confirmed ? yield* imports.outcomes(actor.organizationId, draft.id) : []
-    const tally = (outcome: string): number => Arr.filter(outcomes, (row) => row.outcome === outcome).length
+    const tally = (outcome: string): number => A.filter(outcomes, (row) => row.outcome === outcome).length
     const history = yield* imports.history(actor.organizationId, draft.id)
     const takeBack = yield* imports.takeBackState(actor.organizationId, draft.id)
     const fixed = confirmed ? yield* imports.fixed(actor.organizationId, draft.id) : { rows: 0, cells: 0 }
@@ -163,8 +167,8 @@ export const importsEndpoints = Effect.gen(function* () {
       },
       // A confirm stamps who and when in one statement: there is a result once both are stored.
       result:
-        Option.isSome(draft.importedAt) && Option.isSome(draft.importedBy)
-          ? Option.some({
+        O.isSome(draft.importedAt) && O.isSome(draft.importedBy)
+          ? O.some({
               importedBy: draft.importedBy.value,
               importedAt: draft.importedAt.value,
               created: tally("created"),
@@ -175,7 +179,7 @@ export const importsEndpoints = Effect.gen(function* () {
               fixed,
               rows: outcomes
             })
-          : Option.none(),
+          : O.none(),
       history,
       takeBack
     })
@@ -183,7 +187,7 @@ export const importsEndpoints = Effect.gen(function* () {
 
   const find = Effect.fn("imports.find")(function* (actor: Member, id: string) {
     const draft = yield* imports.find(actor.organizationId, id)
-    if (Option.isNone(draft)) {
+    if (O.isNone(draft)) {
       return yield* ImportNotFound.make({ reason: "No import with that id in your organization." })
     }
     return draft.value
@@ -208,7 +212,7 @@ export const importsEndpoints = Effect.gen(function* () {
   // The caller's own unfinished upload, or the error that says it is gone.
   const findUpload = Effect.fn("imports.findUpload")(function* (actor: Member, id: string) {
     const upload = yield* imports.findUpload(actor, id)
-    if (Option.isNone(upload)) return yield* gone()
+    if (O.isNone(upload)) return yield* gone()
     return upload.value
   })
 
@@ -259,11 +263,11 @@ export const importsEndpoints = Effect.gen(function* () {
       const actor = yield* requireRole("editor")
       // Finished already (a retry whose first answer was lost): the import has the upload's id.
       const finished = yield* imports.find(actor.organizationId, params.id)
-      if (Option.isSome(finished)) return yield* Effect.map(viewOf(actor, finished.value), Result.succeed)
+      if (O.isSome(finished)) return yield* Effect.map(viewOf(actor, finished.value), Result.succeed)
       const upload = yield* findUpload(actor, params.id)
       const head = yield* S.decodeEffect(S.fromJsonString(StagedHead))(upload.headJson).pipe(Effect.orDie)
       const chunks = yield* imports.uploadChunks(actor, upload)
-      const table: StagedTable = { ...head, rows: Arr.flatMap(chunks, (chunk) => chunk.rows) }
+      const table: StagedTable = { ...head, rows: A.flatMap(chunks, (chunk) => chunk.rows) }
       const problem =
         chunkProblem({
           fileName: upload.fileName,
@@ -283,7 +287,7 @@ export const importsEndpoints = Effect.gen(function* () {
       // Another request finished it in between (a double send): either way the import now exists, or the upload
       // was cancelled meanwhile and there is nothing.
       const draft = yield* imports.find(actor.organizationId, upload.id)
-      if (Option.isNone(draft)) return yield* gone()
+      if (O.isNone(draft)) return yield* gone()
       return yield* Effect.map(viewOf(actor, draft.value, table), Result.succeed)
     }),
     discardUpload: Effect.fn("imports.discardUpload")(function* ({
@@ -300,25 +304,25 @@ export const importsEndpoints = Effect.gen(function* () {
       payload
     }: {
       readonly params: { readonly id: ImportId }
-      readonly payload: { readonly field: Field; readonly column: Option.Option<number> }
+      readonly payload: { readonly field: Field; readonly column: O.Option<number> }
     }) {
       const actor = yield* requireRole("editor")
       const draft = yield* find(actor, params.id)
       if (draft.status !== "open") return yield* closed(draft)
       const table = yield* imports.table(actor.organizationId, draft)
-      const asked = Option.getOrNull(payload.column)
-      const column = Arr.findFirst(table.columns, (candidate) => candidate.index === asked)
-      if (Option.isSome(payload.column) && Option.isNone(column)) {
+      const asked = O.getOrNull(payload.column)
+      const column = A.findFirst(table.columns, (candidate) => candidate.index === asked)
+      if (O.isSome(payload.column) && O.isNone(column)) {
         return yield* ColumnNotFound.make({ reason: `${draft.fileName} has no column at that position.` })
       }
       const before = yield* imports.choices(draft)
       // The same match again (a second press, a retry) is the same match: nothing is taken back, dropped or
       // written to the audit trail a second time.
-      if (Arr.some(before, (choice) => choice.field === payload.field && choice.column === asked)) {
+      if (A.some(before, (choice) => choice.field === payload.field && choice.column === asked)) {
         return yield* viewOf(actor, draft)
       }
       const next: ReadonlyArray<MappingChoice> = [
-        ...Arr.filter(before, (choice) => choice.field !== payload.field),
+        ...A.filter(before, (choice) => choice.field !== payload.field),
         { field: payload.field, column: asked, by: "person" }
       ]
       // This field will read another column: an accept of a proposal about it goes.
@@ -328,7 +332,7 @@ export const importsEndpoints = Effect.gen(function* () {
         actor,
         draft,
         next,
-        Option.match(column, {
+        O.match(column, {
           onNone: () => `${label}: no column, in ${draft.fileName}`,
           onSome: (found) => `${label} reads column ${found.letter} "${found.label}" in ${draft.fileName}`
         })
@@ -393,7 +397,7 @@ export const importsEndpoints = Effect.gen(function* () {
       const actor = yield* requireRole("editor")
       const draft = yield* find(actor, params.id)
       const revision = yield* imports.decide(actor, draft, payload)
-      if (Option.isNone(revision)) return yield* closed(draft)
+      if (O.isNone(revision)) return yield* closed(draft)
       return { revision: revision.value }
     }),
     commit: Effect.fn("imports.commit")(function* ({
@@ -407,16 +411,16 @@ export const importsEndpoints = Effect.gen(function* () {
       const draft = yield* find(actor, params.id)
       if (draft.status !== "open") return yield* closed(draft)
       // Decisions made a moment before the confirm, not saved yet, are saved first.
-      if (Rec.keys(payload.set).length > 0 || payload.clear.length > 0) {
+      if (R.keys(payload.set).length > 0 || payload.clear.length > 0) {
         const saved = yield* imports.decide(actor, draft, payload)
-        if (Option.isNone(saved)) return yield* closed(draft)
+        if (O.isNone(saved)) return yield* closed(draft)
       }
       const { current, authors } = yield* reviewOf(actor, draft)
       const plan = confirmPlan({ draft: draft.id, review: current, authors, actor })
       // The ids of the confirm and of each item it creates are made here, so the store only writes.
       const confirm = yield* random.uuidV4()
       const itemIds = yield* Effect.forEach(
-        Arr.filter(plannedItems(plan), (row) => row.status === "ready"),
+        A.filter(plannedItems(plan), (row) => row.status === "ready"),
         () => Effect.map(random.uuidV4(), (id) => ItemId.make(id)),
         { concurrency: 1 }
       )

@@ -5,7 +5,8 @@ import { decisionFromFlags, type SavedDecisions } from "@inventory/catalog-contr
 import { ImportId } from "@inventory/catalog-contract/Ids"
 import { confirmPlan } from "@inventory/catalog-model/Confirm"
 import { review } from "@inventory/catalog-model/Review"
-import { Array as Arr, Record as Rec } from "effect"
+import * as A from "effect/Array"
+import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import { marcus, tableOf } from "./support.ts"
 
@@ -26,27 +27,27 @@ describe("confirmPlan", () => {
     [S.Array(Line).check(S.isMaxLength(12))],
     ([lines]) => {
       const table = tableOf({ fileName: "any.csv", lines })
-      const decisions: SavedDecisions = Rec.fromEntries(
-        Arr.flatMap(lines, (line, index) =>
+      const decisions: SavedDecisions = R.fromEntries(
+        A.flatMap(lines, (line, index) =>
           line.out ? [[`row-${index + 2}`, decisionFromFlags({ out: true })] as const] : []
         )
       )
       const current = review({ table, choices: [], decisions, storedItems: [] })
       const plan = confirmPlan({ draft, review: current, authors: {}, actor: marcus })
-      const count = (status: string) => Arr.filter(plan.rows, (row) => row.status === status).length
-      const reviewed = (status: string) => Arr.filter(current.rows, (row) => row.status === status).length
-      expect(Arr.map(plan.rows, (row) => row.rowNumber)).toEqual(Arr.map(current.rows, (row) => row.rowNumber))
+      const count = (status: string) => A.filter(plan.rows, (row) => row.status === status).length
+      const reviewed = (status: string) => A.filter(current.rows, (row) => row.status === status).length
+      expect(A.map(plan.rows, (row) => row.rowNumber)).toEqual(A.map(current.rows, (row) => row.rowNumber))
       expect(count("ready") + count("update")).toBe(reviewed("ready"))
       expect(count("already")).toBe(reviewed("already"))
       expect(count("notImported")).toBe(reviewed("needs") + reviewed("out"))
       // A row the person left out says who; a row nobody settled says nobody.
-      const deciders = Arr.map(
-        Arr.filter(plan.rows, (row) => row.status === "notImported"),
+      const deciders = A.map(
+        A.filter(plan.rows, (row) => row.status === "notImported"),
         (row) => (row.status === "notImported" ? row.decidedBy.kind : "")
       )
-      expect(Arr.filter(deciders, (kind) => kind === "person").length).toBe(reviewed("out"))
+      expect(A.filter(deciders, (kind) => kind === "person").length).toBe(reviewed("out"))
       // A row that is written carries an item; nothing else does.
-      expect(Arr.every(plan.rows, (row) => (row.status === "ready" || row.status === "update") === "item" in row)).toBe(
+      expect(A.every(plan.rows, (row) => (row.status === "ready" || row.status === "update") === "item" in row)).toBe(
         true
       )
     },

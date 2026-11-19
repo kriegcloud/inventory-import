@@ -1,12 +1,15 @@
 // The rows a confirm did not import, as a file the person can open and fix: each with its reason.
-import { Array as Arr, Option, Record as Rec, String as Str } from "effect"
+import * as A from "effect/Array"
+import * as O from "effect/Option"
+import * as R from "effect/Record"
+import * as Str from "effect/String"
 import { StagedTable } from "@inventory/catalog-contract/Staged"
 import { rowPlace } from "./Review.rules.ts"
 import { shownText } from "./Mapping.rules.ts"
 
-/** Maps and keeps the values that exist. Effect 4's `Arr.filterMap` takes a Result, not an Option. */
-const keepSome = <A, B>(list: ReadonlyArray<A>, f: (a: A, index: number) => Option.Option<B>): Array<B> =>
-  Arr.getSomes(Arr.map(list, f))
+/** Maps and keeps the values that exist. Effect 4's `A.filterMap` takes a Result, not an Option. */
+const keepSome = <A, B>(list: ReadonlyArray<A>, f: (a: A, index: number) => O.Option<B>): Array<B> =>
+  A.getSomes(A.map(list, f))
 
 const csvCell = (cell: string): string => (/[",\r\n]/.test(cell) ? `"${Str.replaceAll('"', '""')(cell)}"` : cell)
 
@@ -24,17 +27,17 @@ export const notImportedCsv = (input: {
   readonly table: StagedTable
   readonly rows: ReadonlyArray<{ readonly rowNumber: number; readonly label?: string; readonly reason: string }>
 }): string => {
-  const head = [...Arr.map(input.table.columns, (column) => column.label), "Row", "Why it was not imported"]
-  const byNumber = Rec.fromEntries(Arr.map(input.table.rows, (row) => [`${row.rowNumber}`, row] as const))
+  const head = [...A.map(input.table.columns, (column) => column.label), "Row", "Why it was not imported"]
+  const byNumber = R.fromEntries(A.map(input.table.rows, (row) => [`${row.rowNumber}`, row] as const))
   const body = keepSome(input.rows, (held) =>
-    Option.map(Rec.get(byNumber, `${held.rowNumber}`), (row) => [
-      ...Arr.map(input.table.columns, (column) => shownText(row.cells[column.index])),
+    O.map(R.get(byNumber, `${held.rowNumber}`), (row) => [
+      ...A.map(input.table.columns, (column) => shownText(row.cells[column.index])),
       rowPlace(held),
       held.reason
     ])
   )
-  return Arr.join(
-    Arr.map([head, ...body], (cells) => Arr.join(Arr.map(cells, csvCell), ",")),
+  return A.join(
+    A.map([head, ...body], (cells) => A.join(A.map(cells, csvCell), ",")),
     "\r\n"
   )
 }

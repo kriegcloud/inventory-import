@@ -3,7 +3,10 @@
 // quotes, and what an edit of one item may not say.
 import { describe, expect, it } from "@effect/vitest"
 import { digits } from "./support/cost.ts"
-import { Array as Arr, Effect, Option, String as Str } from "effect"
+import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as O from "effect/Option"
+import * as Str from "effect/String"
 import * as S from "effect/Schema"
 import {
   discontinued,
@@ -28,7 +31,7 @@ const line = (values: {
   readonly received?: string
   readonly vendors?: string
 }): string =>
-  Arr.join(
+  A.join(
     [
       values.sku ?? "ABC-0001",
       values.name ?? "Steel Tube",
@@ -50,18 +53,18 @@ const line = (values: {
   )
 
 const reviewed = (rows: ReadonlyArray<string>, storedItems: ReadonlyArray<ItemFields> = []) =>
-  Effect.map(stage(textFile(Arr.join([head, ...rows], "\n"))), (table) =>
+  Effect.map(stage(textFile(A.join([head, ...rows], "\n"))), (table) =>
     review({ table, choices: [], decisions: {}, storedItems })
   )
 
 const rowOf = (result: Review, rowNumber: number) =>
-  Option.getOrThrow(Arr.findFirst(result.rows, (row) => row.rowNumber === rowNumber))
+  O.getOrThrow(A.findFirst(result.rows, (row) => row.rowNumber === rowNumber))
 
 describe("a second import", () => {
   it.effect("keeps a row whose SKU is stored but which does not read yet out of Already there, with its reason", () =>
     Effect.gen(function* () {
       const first = yield* reviewed([line({ sku: "AWP-1853" }), line({ sku: "TBD-0002" })])
-      const stored = Arr.getSomes(Arr.map(first.rows, (row) => Option.fromNullishOr(row.item)))
+      const stored = A.getSomes(A.map(first.rows, (row) => O.fromNullishOr(row.item)))
       expect(stored.length).toBe(2)
       // The same two SKUs again: one in lower case (a proposal is open), one with a cost nobody can read.
       const again = yield* reviewed([line({ sku: "awp-1853" }), line({ sku: "TBD-0002", cost: "TBD" })], stored)
@@ -167,10 +170,8 @@ describe("an edit of one item", () => {
     })
   )
   it("the two values an item is stored with read as one: a date wins over the flag, so no item is both", () => {
-    expect(stockingOf({ isActive: true, discontinuedOn: Option.some("2024-06-19") })).toEqual(
-      discontinued("2024-06-19")
-    )
-    expect([stockingOf({ isActive: true, discontinuedOn: Option.none() }).kind, inactive.kind]).toEqual([
+    expect(stockingOf({ isActive: true, discontinuedOn: O.some("2024-06-19") })).toEqual(discontinued("2024-06-19"))
+    expect([stockingOf({ isActive: true, discontinuedOn: O.none() }).kind, inactive.kind]).toEqual([
       "active",
       "inactive"
     ])

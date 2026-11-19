@@ -7,14 +7,18 @@ import { AnsweredBy } from "@inventory/catalog-contract/Answer"
 import { ViewRequest } from "@inventory/catalog-contract/ViewRequest"
 import { ViewOutcome, ViewCommand } from "@inventory/catalog-contract/TableView"
 import { readByRules, checkCommand } from "./TableView.rules.ts"
-import { Array as Arr, DateTime, Effect, Option, Result } from "effect"
+import * as A from "effect/Array"
+import * as DateTime from "effect/DateTime"
+import * as Effect from "effect/Effect"
+import * as O from "effect/Option"
+import * as Result from "effect/Result"
 import { AgentRun } from "@inventory/kernel/AgentRun"
 import * as S from "effect/Schema"
 import { CurrentActor } from "@inventory/kernel/Actor"
 import { Answerer, modelIsOn, ModelQuestion } from "../Answer/Answerer.external.ts"
 import { ModelAllowance } from "../Answer/ModelAllowance.external.ts"
 import { AssistantLog } from "./AssistantLog.store.ts"
-import { SecureRandom } from "effect/crypto"
+import * as SecureRandom from "effect/crypto/SecureRandom"
 import { asAgent } from "@inventory/kernel/Agent"
 import { Activity } from "@inventory/kernel/Activity"
 import { ActivityId } from "@inventory/kernel/Ids"
@@ -37,8 +41,8 @@ export const answerByRules = (input: { readonly request: ViewRequest; readonly w
     ? checkCommand({ changes: read.success, columns: request.columns, searchable: request.searchable })
     : read
   return Result.isSuccess(checked)
-    ? Result.succeed({ changes: checked.success, answeredBy: answeredByRules(why), note: Option.none() })
-    : Result.fail({ reason: checked.failure, answeredBy: answeredByRules(why), note: Option.none() })
+    ? Result.succeed({ changes: checked.success, answeredBy: answeredByRules(why), note: O.none() })
+    : Result.fail({ reason: checked.failure, answeredBy: answeredByRules(why), note: O.none() })
 }
 
 /** The agent that reads table requests. It changes a person's view only, so it never acts above a viewer. */
@@ -47,7 +51,7 @@ export const viewReader = AgentRun.make({ agent: "Table assistant", maxRole: "vi
 const toJson = S.encodeUnknownEffect(S.fromJsonString(S.Unknown))
 
 // What the model is told. The catalog travels as JSON in the prompt; the answer's Schema says the rest.
-const system = Arr.join(
+const system = A.join(
   [
     "You turn what a person wants to see in a table into changes to the table's view: sort, filter, search, show or hide a column, or clear.",
     "When the table is searchable and the person asks to find rows by words (part of a name, a code, a note), use one search change with just those words, without filler like 'the' or 'all'; its box finds every word in any order and forgives one wrong letter. Use a column filter only when they name the column.",
@@ -87,8 +91,8 @@ export const view = Effect.fn("TableAssistant.view")(function* (request: ViewReq
       ModelQuestion.make({
         name: "view",
         prompt: `The table and its columns:\n${catalog}\n\nThe person asks: ${request.prompt}`,
-        system: Option.some(system),
-        maxOutputTokens: Option.some(1200)
+        system: O.some(system),
+        maxOutputTokens: O.some(1200)
       }),
       ViewCommand
     )
@@ -116,19 +120,19 @@ export const view = Effect.fn("TableAssistant.view")(function* (request: ViewReq
       actorName: actor.name,
       action: "Asked for a view",
       detail: `${request.table}: ${n} ${n === 1 ? "change" : "changes"} to the view, answered by ${model}`,
-      agent: Option.some(viewReader.agent),
+      agent: O.some(viewReader.agent),
       createdAt
     })
   )
-  const cannot = command.cannot === "" ? Option.none() : Option.some(command.cannot)
+  const cannot = command.cannot === "" ? O.none() : O.some(command.cannot)
   if (Result.isFailure(checked)) {
     return Result.fail({ reason: checked.failure, answeredBy, note: cannot })
   }
   if (checked.success.length === 0) {
     return Result.fail({
-      reason: Option.getOrElse(cannot, () => "The model found nothing in that request to change in the view."),
+      reason: O.getOrElse(cannot, () => "The model found nothing in that request to change in the view."),
       answeredBy,
-      note: Option.none()
+      note: O.none()
     })
   }
   return Result.succeed({ changes: checked.success, answeredBy, note: cannot })

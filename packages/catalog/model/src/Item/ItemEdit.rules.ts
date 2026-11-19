@@ -9,7 +9,12 @@ import {
   maxNameLength,
   stockingOf
 } from "@inventory/catalog-contract/Item"
-import { Array as Arr, BigDecimal, Option, Record as Rec, Result, String as Str } from "effect"
+import * as A from "effect/Array"
+import * as BigDecimal from "effect/BigDecimal"
+import * as O from "effect/Option"
+import * as R from "effect/Record"
+import * as Result from "effect/Result"
+import * as Str from "effect/String"
 import { readUnitCost, readCount, readDate } from "../Review/CellReading.rules.ts"
 export type ItemForm = {
   readonly name: string
@@ -60,9 +65,9 @@ export const readItemForm = (input: {
   const description = Str.trim(form.description)
   const cost = readUnitCost(form.unitCost)
   // None: the box holds something that cannot be read. Some(none): the box is empty, which an optional value may be.
-  const optional = <A>(text: string, read: (text: string) => Option.Option<A>): Option.Option<Option.Option<A>> =>
-    Str.trim(text) === "" ? Option.some(Option.none()) : Option.map(read(text), Option.some)
-  const quantity = Str.trim(form.quantityOnHand) === "" ? Option.some(0) : readCount(form.quantityOnHand)
+  const optional = <A>(text: string, read: (text: string) => O.Option<A>): O.Option<O.Option<A>> =>
+    Str.trim(text) === "" ? O.some(O.none()) : O.map(read(text), O.some)
+  const quantity = Str.trim(form.quantityOnHand) === "" ? O.some(0) : readCount(form.quantityOnHand)
   const reorder = optional(form.reorderPoint, readCount)
   const received = optional(form.firstReceivedOn, readDate)
   const discontinued = optional(form.discontinuedOn, readDate)
@@ -84,29 +89,25 @@ export const readItemForm = (input: {
     ],
     [
       "unitCost",
-      Option.isNone(cost)
+      O.isNone(cost)
         ? "Unit cost is not an amount in dollars with up to 4 decimals. Write it as digits, for example 12.50."
         : undefined
     ],
     [
       "quantityOnHand",
-      Option.isNone(quantity)
-        ? "Quantity on hand is not a whole number. Write it as digits, for example 120."
-        : undefined
+      O.isNone(quantity) ? "Quantity on hand is not a whole number. Write it as digits, for example 120." : undefined
     ],
     [
       "reorderPoint",
-      Option.isNone(reorder) ? "Reorder point is not a whole number. Write it as digits, or leave it empty." : undefined
+      O.isNone(reorder) ? "Reorder point is not a whole number. Write it as digits, or leave it empty." : undefined
     ],
     [
       "firstReceivedOn",
-      Option.isNone(received) ? "First received is not a date. Write it as year, month and day: 2026-03-04." : undefined
+      O.isNone(received) ? "First received is not a date. Write it as year, month and day: 2026-03-04." : undefined
     ],
     [
       "discontinuedOn",
-      Option.isNone(discontinued)
-        ? "Discontinued on is not a date. Write it as year, month and day: 2026-03-04."
-        : undefined
+      O.isNone(discontinued) ? "Discontinued on is not a date. Write it as year, month and day: 2026-03-04." : undefined
     ],
     [
       "isActive",
@@ -115,24 +116,24 @@ export const readItemForm = (input: {
         : undefined
     ]
   ]
-  const problems = Arr.filterMap(found, ([field, message]) =>
+  const problems = A.filterMap(found, ([field, message]) =>
     message === undefined ? Result.failVoid : Result.succeed([field, message] as const)
   )
-  if (Arr.isReadonlyArrayNonEmpty(problems)) return { _tag: "Problems", problems: Rec.fromEntries(problems) }
+  if (A.isReadonlyArrayNonEmpty(problems)) return { _tag: "Problems", problems: R.fromEntries(problems) }
   return {
     _tag: "Edit",
     edit: {
       revision: input.revision,
       name,
-      description: description === "" ? Option.none() : Option.some(description),
+      description: description === "" ? O.none() : O.some(description),
       category: form.category,
       uom: form.uom,
-      unitCost: Option.getOrElse(cost, () => BigDecimal.fromBigInt(0n)),
-      quantityOnHand: Option.getOrElse(quantity, () => 0),
-      reorderPoint: Option.flatten(reorder),
-      stocking: stockingOf({ isActive: form.isActive, discontinuedOn: Option.flatten(discontinued) }),
+      unitCost: O.getOrElse(cost, () => BigDecimal.fromBigInt(0n)),
+      quantityOnHand: O.getOrElse(quantity, () => 0),
+      reorderPoint: O.flatten(reorder),
+      stocking: stockingOf({ isActive: form.isActive, discontinuedOn: O.flatten(discontinued) }),
       lotTracked: form.lotTracked,
-      firstReceivedOn: Option.flatten(received)
+      firstReceivedOn: O.flatten(received)
     }
   }
 }

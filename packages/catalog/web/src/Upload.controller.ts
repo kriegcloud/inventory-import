@@ -1,24 +1,22 @@
 import { request } from "@inventory/client/Http"
-import { SecureRandom } from "effect/crypto"
+import * as SecureRandom from "effect/crypto/SecureRandom"
 // One file on its way in: read in a worker, sent to the server in chunks, turned into an import. The upload lives in
 // this module, not in a component, so it carries on while the person opens another page, and there is one per tab.
 // The one thing not to break: Cancel stops everything (the worker, every request in flight) and then deletes what
 // reached the server, and the screen says it was cancelled only once the server has answered.
 import { useQueryClient, type QueryClient } from "@tanstack/react-query"
-import {
-  Cause,
-  Deferred,
-  Effect,
-  Exit,
-  Fiber,
-  HashSet,
-  MutableHashSet,
-  Option,
-  Queue,
-  Result,
-  Schedule,
-  Stream
-} from "effect"
+import * as Cause from "effect/Cause"
+import * as Deferred from "effect/Deferred"
+import * as Effect from "effect/Effect"
+import * as Exit from "effect/Exit"
+import * as Fiber from "effect/Fiber"
+import * as HashSet from "effect/HashSet"
+import * as MutableHashSet from "effect/MutableHashSet"
+import * as O from "effect/Option"
+import * as Queue from "effect/Queue"
+import * as Result from "effect/Result"
+import * as Schedule from "effect/Schedule"
+import * as Stream from "effect/Stream"
 import * as S from "effect/Schema"
 import { useCallback, useSyncExternalStore } from "react"
 import { toast } from "sonner"
@@ -161,7 +159,7 @@ const program = Effect.fn("upload.program")(function* (client: Client, request: 
       case "Head":
         return Effect.gen(function* () {
           // The sheet crossed the threads as its name or null: the Option is made again here.
-          const read: StagedHead = { ...message.head, sheet: Option.fromNullOr(message.head.sheet) }
+          const read: StagedHead = { ...message.head, sheet: O.fromNullOr(message.head.sheet) }
           head = read
           workbook = message.workbook
           const rows = message.chunkSizes.reduce((sum, size) => sum + size, 0)
@@ -215,7 +213,9 @@ const program = Effect.fn("upload.program")(function* (client: Client, request: 
 
 /** Asks the server to delete an upload. Resolves to whether it answered. */
 const discard = (uploadId: ImportId): Promise<boolean> =>
-  runExit(Fiber.join(fork((client) => client.imports.discardUpload({ params: { id: uploadId } })))).then(Exit.isSuccess)
+  fork((client) => client.imports.discardUpload({ params: { id: uploadId } }))
+    .pipe(Fiber.join, runExit)
+    .then(Exit.isSuccess)
 
 /** Puts a finished upload where the next screen looks for it, and moves on to it if the person is still here. */
 const arrive = (queryClient: QueryClient, file: File, done: Finished) => {
@@ -226,9 +226,7 @@ const arrive = (queryClient: QueryClient, file: File, done: Finished) => {
   void queryClient.invalidateQueries({ queryKey: queryKeys.activity })
   if (workbook !== null) rememberWorkbook(view.id, { file, sheets: workbook.sheets, chosen: workbook.chosen })
   // Straight to the review when every required field found its column by heading; to Match when one did not.
-  const unmatched = view.mapping.some(
-    (entry) => Option.isNone(matchedColumn(entry)) && requiredFields.includes(entry.field)
-  )
+  const unmatched = view.mapping.some((entry) => O.isNone(matchedColumn(entry)) && requiredFields.includes(entry.field))
   const next = importAddress(view.id, unmatched ? "match" : "review")
   if (window.location.pathname === "/") navigate(next)
   else toast(`${view.fileName} is ready to review`, { action: { label: "Open", onClick: () => navigate(next) } })
@@ -279,7 +277,8 @@ const cancel = (): Promise<void> => {
   const current = running
   if (current === null || state._tag === "Preparing" || state._tag === "Cancelling") return Promise.resolve()
   set({ _tag: "Cancelling", fileName: current.fileName, uploadId: current.uploadId })
-  return runExit(Fiber.interrupt(current.fiber))
+  return current.fiber
+    .pipe(Fiber.interrupt, runExit)
     .then(() => {
       running = null
       current.onEnd({ _tag: "Cancelled" })

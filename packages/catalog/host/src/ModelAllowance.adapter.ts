@@ -1,6 +1,7 @@
 // The catalog's allowance port, met by the access context's gateway. The catalog's model never imports the access
 // contract; this is the one place the two unions meet.
-import { Effect, Layer } from "effect"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
 import { ModelAllowance, taken, usedUp, type CatalogModelPurpose } from "@inventory/catalog-model/ModelAllowance"
 import { ModelAllowanceGateway, usedUpWords } from "@inventory/access-contract/ModelAllowance"
 

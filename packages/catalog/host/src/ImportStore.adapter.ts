@@ -6,7 +6,14 @@
 // every statement checks the same condition (the import is still open; the confirm is still in force), so a second
 // press, a retry or another tab writes nothing.
 import { ItemFields, skuKey } from "@inventory/catalog-contract/Item"
-import { Array as Arr, DateTime, Effect, Layer, Option, Order, Record as Rec, Result } from "effect"
+import * as A from "effect/Array"
+import * as DateTime from "effect/DateTime"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as O from "effect/Option"
+import * as Order from "effect/Order"
+import * as R from "effect/Record"
+import * as Result from "effect/Result"
 import { chunkRows } from "@inventory/catalog-contract/Upload"
 import * as S from "effect/Schema"
 import { StagedHead, StagedRow, Field } from "@inventory/catalog-contract/Staged"
@@ -40,9 +47,11 @@ import {
   tookBack,
   nothingInForce
 } from "@inventory/catalog-model/ImportStore"
-import { SqlClient, SqlSchema, type Statement } from "effect/sql"
+import * as SqlClient from "effect/sql/SqlClient"
+import * as SqlSchema from "effect/sql/SqlSchema"
+import type * as Statement from "effect/sql/Statement"
 import { D1, NoRows } from "@beep/d1/D1"
-import { SecureRandom } from "effect/crypto"
+import * as SecureRandom from "effect/crypto/SecureRandom"
 import { Member } from "@inventory/kernel/Member"
 import { ItemRow, itemColumns, storedItem } from "./internal/itemRow.ts"
 import { abandonedAfterMinutes, maxChunkChars } from "@inventory/catalog-model/Upload"
@@ -54,9 +63,9 @@ const textOf = (item: ItemFields | null): number =>
     ? 0
     : 600 +
       item.name.length +
-      Option.getOrElse(item.description, () => "").length +
-      Arr.reduce(item.tags, 0, (total, tag) => total + tag.length + 3) +
-      Arr.reduce(item.vendors, 0, (total, vendor) => total + vendor.vendorName.length + 120)
+      O.getOrElse(item.description, () => "").length +
+      A.reduce(item.tags, 0, (total, tag) => total + tag.length + 3) +
+      A.reduce(item.vendors, 0, (total, vendor) => total + vendor.vendorName.length + 120)
 
 /**
  * Splits rows into groups for one statement each: at most `chunkRows` rows and about 600,000 characters of text,
@@ -511,7 +520,7 @@ export const ImportStoreD1 = Layer.effect(
       const rows = yield* Effect.forEach(chunks, (chunk) => S.decodeEffect(RowsJson)(chunk.rowsJson), {
         concurrency: 1
       })
-      return { ...head, rows: Arr.flatten(rows) }
+      return { ...head, rows: A.flatten(rows) }
     }, Effect.orDie)
 
     const decisions = Effect.fn("Imports.decisions")(function* (organizationId: OrganizationId, importId: string) {
@@ -523,8 +532,8 @@ export const ImportStoreD1 = Layer.effect(
         { concurrency: 1 }
       )
       return {
-        decisions: Rec.fromEntries(decoded),
-        authors: Rec.fromEntries(Arr.map(rows, (row) => [row.rowId, row.decidedByName] as const))
+        decisions: R.fromEntries(decoded),
+        authors: R.fromEntries(A.map(rows, (row) => [row.rowId, row.decidedByName] as const))
       }
     }, Effect.orDie)
 
@@ -546,8 +555,8 @@ export const ImportStoreD1 = Layer.effect(
       Result: NoRows,
       execute: (r) => {
         const changes: ReadonlyArray<Statement.Fragment> = [
-          ...Arr.map(r.sets, (entries) => differs(r.org, r.id, entries)),
-          ...Arr.map(r.clears, (rowIds) => clears(r.org, r.id, rowIds))
+          ...A.map(r.sets, (entries) => differs(r.org, r.id, entries)),
+          ...A.map(r.clears, (rowIds) => clears(r.org, r.id, rowIds))
         ]
         return sql`UPDATE importDraft SET revision = revision + 1
           WHERE organizationId = ${r.org} AND id = ${r.id} AND status = 'open' AND (${sql.or(changes)})`
@@ -582,24 +591,24 @@ export const ImportStoreD1 = Layer.effect(
     const decide = Effect.fn("Imports.decide")(function* (actor: Member, draft: Draft, delta: DecisionDelta) {
       const at = yield* now
       const org = actor.organizationId
-      const sets = Arr.chunksOf(
-        Arr.map(Rec.toEntries(delta.set), ([rowId, json]) => ({ rowId, json })),
+      const sets = A.chunksOf(
+        A.map(R.toEntries(delta.set), ([rowId, json]) => ({ rowId, json })),
         2000
       )
-      const cleared = Arr.chunksOf(delta.clear, 5000)
+      const cleared = A.chunksOf(delta.clear, 5000)
       if (sets.length + cleared.length === 0) {
         const open = yield* run(openRevision({ org, id: draft.id }))
-        return Option.map(Arr.head(open), (row) => row.revision)
+        return O.map(A.head(open), (row) => row.revision)
       }
       // The revision moves first, and only for a delta that changes something; read right after it, it is the
       // revision these decisions are saved under. The writes after it change no revision.
       const [, revision] = yield* batch([
         bumpRevision({ org, id: draft.id, sets, clears: cleared }),
         openRevision({ org, id: draft.id }),
-        ...Arr.map(sets, (entries) => upsertDecisions({ ...acting(actor), id: draft.id, entries, at })),
-        ...Arr.map(cleared, (rowIds) => clearDecisions({ org, id: draft.id, rowIds }))
+        ...A.map(sets, (entries) => upsertDecisions({ ...acting(actor), id: draft.id, entries, at })),
+        ...A.map(cleared, (rowIds) => clearDecisions({ org, id: draft.id, rowIds }))
       ])
-      return Option.map(Arr.head(revision), (row) => row.revision)
+      return O.map(A.head(revision), (row) => row.revision)
     }, Effect.orDie)
 
     const ReopenRequest = S.Struct({
@@ -722,7 +731,7 @@ export const ImportStoreD1 = Layer.effect(
           ...acting(actor),
           id: draft.id,
           activity,
-          detail: `${draft.fileName}: ${rows}, ${Option.isNone(draft.importedAt) ? "nothing had been imported" : "every item it created had been taken back"}`,
+          detail: `${draft.fileName}: ${rows}, ${O.isNone(draft.importedAt) ? "nothing had been imported" : "every item it created had been taken back"}`,
           at
         }),
         removeFrom(sql`importSuggestion`)(scope),
@@ -735,7 +744,7 @@ export const ImportStoreD1 = Layer.effect(
         removeDraft(scope)
       ])
       // The last statement returns the import's id only when this batch was the one that removed it.
-      return Option.isSome(Arr.last(answers[8]))
+      return O.isSome(A.last(answers[8]))
     }, Effect.orDie)
 
     // -- Columns ---------------------------------------------------------------------------------------------------
@@ -820,13 +829,13 @@ export const ImportStoreD1 = Layer.effect(
       draft: Draft,
       set: SavedDecisions
     ) {
-      const entries = Arr.map(Rec.toEntries(set), ([rowId, json]) => ({ rowId, json }))
+      const entries = A.map(R.toEntries(set), ([rowId, json]) => ({ rowId, json }))
       if (entries.length === 0) return
       const org = actor.organizationId
-      const chunks = Arr.chunksOf(entries, 2000)
+      const chunks = A.chunksOf(entries, 2000)
       // One atomic batch: every chunk and the new revision land together, or none of them does.
       yield* batch([
-        ...Arr.map(chunks, (chunk) => rewriteRows({ org, id: draft.id, entries: chunk })),
+        ...A.map(chunks, (chunk) => rewriteRows({ org, id: draft.id, entries: chunk })),
         bumpOpen({ org, id: draft.id })
       ])
     }, Effect.orDie)
@@ -837,11 +846,11 @@ export const ImportStoreD1 = Layer.effect(
     ) {
       // The keys travel as one JSON value per 5,000, so the statement never nears D1's 100 bound parameters.
       const found = yield* Effect.forEach(
-        Arr.chunksOf(keys, 5000),
+        A.chunksOf(keys, 5000),
         (some) => findStored({ org: organizationId, keys: some }),
         { concurrency: 1 }
       )
-      return Arr.map(Arr.flatten(found), storedItem)
+      return A.map(A.flatten(found), storedItem)
     }, Effect.orDie)
 
     const findFixed = SqlSchema.findOne({
@@ -1024,13 +1033,13 @@ export const ImportStoreD1 = Layer.effect(
       }
       const rows = write.plan.rows
       const written = plannedItems(write.plan)
-      const ready = Arr.filter(written, (row) => row.status === "ready")
-      const replacing = Arr.filter(written, (row) => row.status === "update")
+      const ready = A.filter(written, (row) => row.status === "ready")
+      const replacing = A.filter(written, (row) => row.status === "update")
       const entries = (list: ReadonlyArray<readonly [(typeof written)[number], string]>) =>
-        Arr.map(
+        A.map(
           bySize(list, ([row]) => textOf(row.item)),
           (chunk) =>
-            Arr.map(chunk, ([row, id]) => ({
+            A.map(chunk, ([row, id]) => ({
               ...row.item,
               id,
               rowNumber: row.rowNumber,
@@ -1038,8 +1047,8 @@ export const ImportStoreD1 = Layer.effect(
               skuKey: skuKey(row.item)
             }))
         )
-      const items = entries(Arr.zip(ready, write.itemIds))
-      const replacements = entries(Arr.map(replacing, (row) => [row, ""] as const))
+      const items = entries(A.zip(ready, write.itemIds))
+      const replacements = entries(A.map(replacing, (row) => [row, ""] as const))
       // What the outcome rows store: the reason of a row that is not written, and who left it out.
       const reasonOf = (row: PlannedRow): string =>
         row.status === "ready" || row.status === "update" ? "" : row.reason
@@ -1047,10 +1056,10 @@ export const ImportStoreD1 = Layer.effect(
         row.status === "notImported" ? row.decidedBy.kind : null
       const decidedByName = (row: PlannedRow): string | null =>
         row.status === "notImported" && row.decidedBy.kind === "person" ? row.decidedBy.name : null
-      const outcomes = Arr.map(
+      const outcomes = A.map(
         bySize(rows, (row) => row.sku.length + row.name.length + reasonOf(row).length),
         (chunk) =>
-          Arr.map(chunk, (row) => ({
+          A.map(chunk, (row) => ({
             rowNumber: row.rowNumber,
             part: row.part,
             sku: row.sku,
@@ -1062,10 +1071,10 @@ export const ImportStoreD1 = Layer.effect(
           }))
       )
       const changes = bySize(
-        Arr.flatMap(written, (row) =>
-          Arr.map(row.changes, (entry) => ({
+        A.flatMap(written, (row) =>
+          A.map(row.changes, (entry) => ({
             ...changeToStored(entry.change),
-            decidedByName: Option.getOrNull(entry.decidedByName),
+            decidedByName: O.getOrNull(entry.decidedByName),
             rowNumber: row.rowNumber,
             part: row.part,
             sku: row.sku,
@@ -1077,11 +1086,11 @@ export const ImportStoreD1 = Layer.effect(
       const [confirmed] = yield* batch([
         insertBatch(scope),
         closeDraft(scope),
-        ...Arr.map(items, (chunk) => insertItems({ ...scope, items: chunk })),
-        ...Arr.map(replacements, (chunk) => keepReplaced({ ...scope, items: chunk })),
-        ...Arr.map(replacements, (chunk) => replaceItems({ ...scope, items: chunk })),
-        ...Arr.map(outcomes, (chunk) => insertOutcomes({ ...scope, outcomes: chunk })),
-        ...Arr.map(changes, (chunk) => insertChanges({ ...scope, changes: chunk })),
+        ...A.map(items, (chunk) => insertItems({ ...scope, items: chunk })),
+        ...A.map(replacements, (chunk) => keepReplaced({ ...scope, items: chunk })),
+        ...A.map(replacements, (chunk) => replaceItems({ ...scope, items: chunk })),
+        ...A.map(outcomes, (chunk) => insertOutcomes({ ...scope, outcomes: chunk })),
+        ...A.map(changes, (chunk) => insertChanges({ ...scope, changes: chunk })),
         countBatch(scope),
         importedLine({ ...scope, activity: audit.id, fileName: write.fileName })
       ])
@@ -1227,7 +1236,7 @@ export const ImportStoreD1 = Layer.effect(
         at: audit.at
       }
       // One restore pass per confirm asked for (at most 10): enough for an item each of them replaced in turn.
-      const passes = Arr.flatMap(Arr.range(1, Math.min(Math.max(confirms.length, 1), 10)), () => [
+      const passes = A.flatMap(A.range(1, Math.min(Math.max(confirms.length, 1), 10)), () => [
         flagRestorable(scope),
         restoreItems(scope)
       ])
@@ -1249,9 +1258,9 @@ export const ImportStoreD1 = Layer.effect(
       // One take-back can reverse several confirms of the import. It is one event, and its numbers are the sums
       // over every confirm it reversed, so "removed" is every item that take-back removed, not the last confirm's.
       const sameTakeBack = (row: (typeof confirms)[number]) =>
-        Arr.filter(confirms, (other) => other.takeBackId !== null && other.takeBackId === row.takeBackId)
+        A.filter(confirms, (other) => other.takeBackId !== null && other.takeBackId === row.takeBackId)
       const firstOf = (row: (typeof confirms)[number]): boolean => sameTakeBack(row)[0]?.id === row.id
-      const events = Arr.flatMap(confirms, (row): ReadonlyArray<ImportEvent> => [
+      const events = A.flatMap(confirms, (row): ReadonlyArray<ImportEvent> => [
         ImportEvent.cases.Confirmed.make({
           batchId: row.id,
           by: row.confirmedByName,
@@ -1262,20 +1271,20 @@ export const ImportStoreD1 = Layer.effect(
           notImported: row.notImported
         }),
         // A take-back stamps who and when in one statement: an event is said only when both are stored.
-        ...(Option.isNone(row.takenBackAt) || Option.isNone(row.takenBackByName) || !firstOf(row)
+        ...(O.isNone(row.takenBackAt) || O.isNone(row.takenBackByName) || !firstOf(row)
           ? []
           : [
               ImportEvent.cases.TakenBack.make({
                 batchId: row.id,
                 by: row.takenBackByName.value,
                 at: row.takenBackAt.value,
-                removed: Arr.reduce(sameTakeBack(row), 0, (total, other) => total + other.removed),
-                restored: Arr.reduce(sameTakeBack(row), 0, (total, other) => total + other.restored),
-                kept: Arr.reduce(sameTakeBack(row), 0, (total, other) => total + other.kept)
+                removed: A.reduce(sameTakeBack(row), 0, (total, other) => total + other.removed),
+                restored: A.reduce(sameTakeBack(row), 0, (total, other) => total + other.restored),
+                kept: A.reduce(sameTakeBack(row), 0, (total, other) => total + other.kept)
               })
             ])
       ])
-      return Arr.sort(
+      return A.sort(
         events,
         Order.mapInput(DateTime.Order, (event: ImportEvent) => event.at)
       )
@@ -1339,7 +1348,7 @@ export const ImportStoreD1 = Layer.effect(
         changedItems(true)(scope)
       ])
       const named = (rows: typeof changed) =>
-        Arr.map(Arr.take(rows, changedItemsShown), (row) =>
+        A.map(A.take(rows, changedItemsShown), (row) =>
           ChangedItem.make({
             sku: row.sku,
             name: row.name,
@@ -1348,9 +1357,9 @@ export const ImportStoreD1 = Layer.effect(
           })
         )
       return {
-        confirms: Arr.map(confirms, (row) => row.id),
-        removable: Option.match(Arr.head(removable), { onNone: () => 0, onSome: (row) => row.n }),
-        restorable: Option.match(Arr.head(restorable), { onNone: () => 0, onSome: (row) => row.n }),
+        confirms: A.map(confirms, (row) => row.id),
+        removable: O.match(A.head(removable), { onNone: () => 0, onSome: (row) => row.n }),
+        restorable: O.match(A.head(restorable), { onNone: () => 0, onSome: (row) => row.n }),
         changed: named(changed),
         changedCount: changed.length,
         kept: named(kept),
@@ -1388,15 +1397,15 @@ export const ImportStoreD1 = Layer.effect(
       rewriteDecisions,
       changes: Effect.fn("Imports.changes")(function* (organizationId: OrganizationId) {
         const rows = yield* findChanges(organizationId).pipe(Effect.orDie)
-        return Arr.map(rows, (row): ChangeRecord => ({
+        return A.map(rows, (row): ChangeRecord => ({
           importId: row.importId,
           fileName: row.fileName,
           rowNumber: row.rowNumber,
           // Stored as 0 for a row that is one item, which the answer leaves out.
-          part: row.part === 0 ? Option.none() : Option.some(row.part),
+          part: row.part === 0 ? O.none() : O.some(row.part),
           sku: row.sku,
           change: changeFromStored(row),
-          decidedByName: Option.fromNullOr(row.decidedByName),
+          decidedByName: O.fromNullOr(row.decidedByName),
           createdAt: row.createdAt,
           takenBack: row.takenBack
         }))
@@ -1406,11 +1415,11 @@ export const ImportStoreD1 = Layer.effect(
       }),
       outcomes: Effect.fn("Imports.outcomes")(function* (organizationId: OrganizationId, importId: string) {
         const rows = yield* findOutcomes({ org: organizationId, id: importId }).pipe(Effect.orDie)
-        return Arr.map(rows, (row) =>
+        return A.map(rows, (row) =>
           outcomeOf({
             rowNumber: row.rowNumber,
             // Stored as 0 for a row that is one item, which the answer leaves out.
-            part: row.part === 0 ? Option.none() : Option.some(row.part),
+            part: row.part === 0 ? O.none() : O.some(row.part),
             sku: row.sku,
             name: row.name,
             outcome: row.outcome,
@@ -1420,7 +1429,7 @@ export const ImportStoreD1 = Layer.effect(
         )
       }),
       items: Effect.fn("Imports.items")(function* (organizationId: OrganizationId) {
-        return yield* findItems(organizationId).pipe(Effect.map(Arr.map(storedItem)), Effect.orDie)
+        return yield* findItems(organizationId).pipe(Effect.map(A.map(storedItem)), Effect.orDie)
       })
     })
   })

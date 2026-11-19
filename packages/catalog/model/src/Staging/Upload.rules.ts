@@ -1,4 +1,4 @@
-import { Array as Arr } from "effect"
+import * as A from "effect/Array"
 import { FileProblem, fileProblem } from "@inventory/catalog-contract/FileProblem"
 import { maxStagedRows, type StagedRow } from "@inventory/catalog-contract/Staged"
 import { chunkRows } from "@inventory/catalog-contract/Upload"
@@ -57,7 +57,7 @@ export const rowsAbout = (input: {
 export const savedRows = (input: {
   readonly chunkSizes: ReadonlyArray<number>
   readonly acknowledged: ReadonlyArray<number>
-}): number => Arr.reduce(Arr.dedupe(input.acknowledged), 0, (sum, seq) => sum + (input.chunkSizes[seq] ?? 0))
+}): number => A.reduce(A.dedupe(input.acknowledged), 0, (sum, seq) => sum + (input.chunkSizes[seq] ?? 0))
 
 /**
  * The rows of a staged file in the pieces they travel and are stored in, in order.
@@ -67,7 +67,7 @@ export const savedRows = (input: {
  */
 export const uploadChunks = (input: {
   readonly rows: ReadonlyArray<StagedRow>
-}): ReadonlyArray<ReadonlyArray<StagedRow>> => Arr.chunksOf(input.rows, chunkRows)
+}): ReadonlyArray<ReadonlyArray<StagedRow>> => A.chunksOf(input.rows, chunkRows)
 
 /**
  * Why the pieces that arrived do not make the whole file, as a `FileProblem`, or null when they do: every piece from
@@ -88,9 +88,9 @@ export const chunkProblem = (input: {
   const { fileName, rowCount, chunkCount, chunks } = input
   const missing = fileProblem.incomplete({ fileName, how: "missing" })
   if (chunks.length !== chunkCount) return missing
-  if (!Arr.every(chunks, (chunk, index) => chunk.seq === index)) return missing
-  const rows = Arr.flatMap(chunks, (chunk) => chunk.rows)
+  if (!A.every(chunks, (chunk, index) => chunk.seq === index)) return missing
+  const rows = A.flatMap(chunks, (chunk) => chunk.rows)
   if (rows.length !== rowCount) return missing
-  const rising = Arr.every(rows, (row, index) => index === 0 || (rows[index - 1]?.rowNumber ?? 0) < row.rowNumber)
+  const rising = A.every(rows, (row, index) => index === 0 || (rows[index - 1]?.rowNumber ?? 0) < row.rowNumber)
   return rising ? null : fileProblem.incomplete({ fileName, how: "order" })
 }

@@ -9,9 +9,12 @@ import {
   suggestionToStored
 } from "@inventory/catalog-contract/Suggestion"
 import { Field } from "@inventory/catalog-contract/Staged"
-import { Array as Arr, Effect, Layer } from "effect"
+import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
 import { SuggestionStore, StoreSuggestions } from "@inventory/catalog-model/SuggestionStore"
-import { SqlClient, SqlSchema } from "effect/sql"
+import * as SqlClient from "effect/sql/SqlClient"
+import * as SqlSchema from "effect/sql/SqlSchema"
 import { D1 } from "@beep/d1/D1"
 import { auditLine, lineOf } from "./internal/auditLine.ts"
 import { OrganizationId, MemberId } from "@inventory/kernel/Ids"
@@ -71,7 +74,7 @@ export const SuggestionStoreD1 = Layer.effect(
 
     const list = Effect.fn("Suggestions.list")(function* (organizationId: OrganizationId, importId: ImportId) {
       const rows = yield* findAll({ org: organizationId, id: importId })
-      return Arr.getSomes(Arr.map(rows, suggestionFromStored))
+      return A.getSomes(A.map(rows, suggestionFromStored))
     }, Effect.orDie)
 
     const store = Effect.fn("Suggestions.store")(function* (write: StoreSuggestions) {
@@ -79,7 +82,7 @@ export const SuggestionStoreD1 = Layer.effect(
       // One batch: the audit line and every suggestion land together or not at all.
       const answers = yield* batch([
         line(audit),
-        ...Arr.map(write.suggestions, (suggestion) =>
+        ...A.map(write.suggestions, (suggestion) =>
           insert({
             org: audit.org,
             importId: write.draft,
@@ -90,8 +93,8 @@ export const SuggestionStoreD1 = Layer.effect(
         )
       ])
       // Only the rows this batch wrote: one another request stored first is not counted as made here.
-      const written = Arr.flatMap(Arr.drop(answers, 1), (rowsBack) => Arr.map(rowsBack, (row) => row.id))
-      return Arr.filter(write.suggestions, (suggestion) => Arr.contains(written, suggestion.id))
+      const written = A.flatMap(A.drop(answers, 1), (rowsBack) => A.map(rowsBack, (row) => row.id))
+      return A.filter(write.suggestions, (suggestion) => A.contains(written, suggestion.id))
     }, Effect.orDie)
 
     return SuggestionStore.of({ list, store })

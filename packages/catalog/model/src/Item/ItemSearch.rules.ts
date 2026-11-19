@@ -2,18 +2,19 @@
 // one letter off), and in what order the items that hold them come. Nothing here is SQL: the host turns the plan
 // into statements.
 // Commas and semicolons around a word are how people list words ("nut, bolt"), not part of what they look for.
-import { Array as Arr, String as Str } from "effect"
+import * as A from "effect/Array"
+import * as Str from "effect/String"
 import { maxSearchWords, closeFrom, indexedFrom } from "@inventory/catalog-contract/ItemSearch"
 const edges = /^[,;]+|[,;]+$/g
 
 const everyWord = (text: string): ReadonlyArray<string> => {
   const plain = Str.toLowerCase(Str.replace(/\p{M}+/gu, "")(Str.normalize("NFD")(text)))
   const spaced = Str.replace(/\p{Cc}+/gu, " ")(plain)
-  const words = Arr.filter(
-    Arr.map(Str.split(/\s+/)(Str.trim(spaced)), (word) => Str.replace(edges, "")(word)),
+  const words = A.filter(
+    A.map(Str.split(/\s+/)(Str.trim(spaced)), (word) => Str.replace(edges, "")(word)),
     (word) => word !== ""
   )
-  return Arr.dedupe(words)
+  return A.dedupe(words)
 }
 
 /**
@@ -22,7 +23,7 @@ const everyWord = (text: string): ReadonlyArray<string> => {
  *
  * @example searchWords("  Split  LOCK, washer m8 lock ") // ["split", "lock", "washer", "m8"]
  */
-export const searchWords = (text: string): ReadonlyArray<string> => Arr.take(everyWord(text), maxSearchWords)
+export const searchWords = (text: string): ReadonlyArray<string> => A.take(everyWord(text), maxSearchWords)
 
 /**
  * How many words of a search are left out because it has more than `maxSearchWords`.
@@ -32,7 +33,7 @@ export const searchWords = (text: string): ReadonlyArray<string> => Arr.take(eve
 export const wordsLeftOut = (text: string): number => Math.max(0, everyWord(text).length - maxSearchWords)
 
 /** A word's length in characters, as the index and LIKE count them (an accented letter is one). */
-export const characters = (word: string): number => Arr.fromIterable(word).length
+export const characters = (word: string): number => A.fromIterable(word).length
 
 /**
  * A word as one FTS5 string: in double quotes, a double quote inside doubled. Whatever the word holds (`*`, `^`,
@@ -61,23 +62,23 @@ export const contains = (word: string): string => `%${literal(word)}%`
  * @example closeMatches("nutt") // ["%utt%", "%ntt%", "%nut%", "%n_tt%", "%nu_t%", "%n_utt%", ...]
  */
 export const closeMatches = (word: string): ReadonlyArray<string> => {
-  const letters = Arr.map(Arr.fromIterable(word), literal)
+  const letters = A.map(A.fromIterable(word), literal)
   const n = letters.length
   if (n < 2) return []
-  const join = (parts: ReadonlyArray<string>) => `%${Arr.join(parts, "")}%`
-  const before = (i: number) => Arr.take(letters, i)
-  const after = (i: number) => Arr.drop(letters, i)
-  // `Arr.range` is never empty (a range that runs backwards is its start), so an empty one is said here.
-  const indices = (from: number, to: number): ReadonlyArray<number> => (from > to ? [] : Arr.range(from, to))
-  const dropped = Arr.map(indices(0, n - 1), (i) => join([...before(i), ...after(i + 1)]))
-  const wrong = Arr.map(indices(1, n - 2), (i) => join([...before(i), "_", ...after(i + 1)]))
-  const missing = Arr.map(indices(1, n - 1), (i) => join([...before(i), "_", ...after(i)]))
-  const swapped = Arr.flatMap(indices(0, n - 2), (i) => {
+  const join = (parts: ReadonlyArray<string>) => `%${A.join(parts, "")}%`
+  const before = (i: number) => A.take(letters, i)
+  const after = (i: number) => A.drop(letters, i)
+  // `A.range` is never empty (a range that runs backwards is its start), so an empty one is said here.
+  const indices = (from: number, to: number): ReadonlyArray<number> => (from > to ? [] : A.range(from, to))
+  const dropped = A.map(indices(0, n - 1), (i) => join([...before(i), ...after(i + 1)]))
+  const wrong = A.map(indices(1, n - 2), (i) => join([...before(i), "_", ...after(i + 1)]))
+  const missing = A.map(indices(1, n - 1), (i) => join([...before(i), "_", ...after(i)]))
+  const swapped = A.flatMap(indices(0, n - 2), (i) => {
     const a = letters[i] ?? ""
     const b = letters[i + 1] ?? ""
     return a === b ? [] : [join([...before(i), b, a, ...after(i + 2)])]
   })
-  return Arr.dedupe([...dropped, ...wrong, ...missing, ...swapped])
+  return A.dedupe([...dropped, ...wrong, ...missing, ...swapped])
 }
 
 /**
@@ -95,7 +96,7 @@ export type WordMatch =
  * read with one letter different if they do not.
  */
 export const wordsToCheck = (words: ReadonlyArray<string>): ReadonlyArray<string> =>
-  Arr.filter(words, (word) => characters(word) >= closeFrom)
+  A.filter(words, (word) => characters(word) >= closeFrom)
 
 /**
  * How each word is compared, given which words the organization's items contain as typed (`found`, from the
@@ -109,9 +110,9 @@ export const plan = (input: {
   readonly words: ReadonlyArray<string>
   readonly found: ReadonlyArray<string>
 }): ReadonlyArray<WordMatch> =>
-  Arr.map(input.words, (word): WordMatch => {
+  A.map(input.words, (word): WordMatch => {
     const n = characters(word)
     if (n < indexedFrom) return { _tag: "Contains", word, patterns: [contains(word)] }
-    if (n < closeFrom || Arr.contains(input.found, word)) return { _tag: "Indexed", word, phrase: phrase(word) }
+    if (n < closeFrom || A.contains(input.found, word)) return { _tag: "Indexed", word, phrase: phrase(word) }
     return { _tag: "Close", word, patterns: closeMatches(word) }
   })

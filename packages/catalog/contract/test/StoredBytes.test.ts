@@ -6,7 +6,7 @@ import { RowDecision } from "@inventory/catalog-contract/Decision"
 import { discontinuedOn, isActive, Stocking, stockingOf } from "@inventory/catalog-contract/Item"
 import { MappingChoice } from "@inventory/catalog-contract/Mapping"
 import { StagedHead, StagedRow } from "@inventory/catalog-contract/Staged"
-import { Effect } from "effect"
+import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as S from "effect/Schema"
 

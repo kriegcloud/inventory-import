@@ -1,6 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
-import { Effect, MutableHashMap, Option } from "effect"
+import * as Effect from "effect/Effect"
+import * as MutableHashMap from "effect/MutableHashMap"
+import * as O from "effect/Option"
 import type { ImportView, OpenImports } from "@inventory/catalog-contract/Import"
 import type { StagedTable } from "@inventory/catalog-contract/Staged"
 import type { SheetChoice, SheetSummary } from "@inventory/catalog-model/Spreadsheet"
@@ -59,7 +61,7 @@ export const rememberWorkbook = (importId: string, workbook: OpenWorkbook) => {
 
 /** The workbook behind an import, when it was chosen in this tab. */
 export const workbookOf = (importId: string): OpenWorkbook | undefined =>
-  Option.getOrUndefined(MutableHashMap.get(workbooks, importId))
+  O.getOrUndefined(MutableHashMap.get(workbooks, importId))
 
 /**
  * The imports nobody has confirmed yet, newest first, each a file of its own: the first screen offers to continue

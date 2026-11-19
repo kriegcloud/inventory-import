@@ -6,7 +6,11 @@ import { ImportId, ConfirmId, ItemId } from "@inventory/catalog-contract/Ids"
 import { Instant } from "@inventory/kernel/Text"
 import { StoredItem } from "@inventory/catalog-contract/Item"
 import { SavedDecisions, DecisionDelta } from "@inventory/catalog-contract/Decision"
-import { Context, Effect, Option, Result, Tuple } from "effect"
+import * as Context from "effect/Context"
+import * as Effect from "effect/Effect"
+import * as O from "effect/Option"
+import * as Result from "effect/Result"
+import * as Tuple from "effect/Tuple"
 import { Member } from "@inventory/kernel/Member"
 import { StagedHead, StagedRow, StagedTable } from "@inventory/catalog-contract/Staged"
 import { FileProblem } from "@inventory/catalog-contract/FileProblem"
@@ -161,7 +165,7 @@ export class ImportStore extends Context.Service<
       counts: { readonly rowCount: number; readonly chunkCount: number }
     ): Effect.Effect<Result.Result<ImportId, FileProblem>>
     /** The caller's own unfinished upload with this id. Another member's, or one that finished, is none. */
-    findUpload(actor: Member, id: string): Effect.Effect<Option.Option<Upload>>
+    findUpload(actor: Member, id: string): Effect.Effect<O.Option<Upload>>
     /**
      * Stores one piece of an upload. Storing the same piece again stores nothing (the first stays), and a piece for
      * an upload that is gone (cancelled meanwhile) stores nothing either. A piece too large to store is the file's
@@ -186,7 +190,7 @@ export class ImportStore extends Context.Service<
     /** Deletes an unfinished upload and its pieces. Returns false when there was none (finished, or already gone). */
     discardUpload(actor: Member, id: string): Effect.Effect<boolean>
     /** One import of the organization, without its rows. */
-    find(organizationId: OrganizationId, id: string): Effect.Effect<Option.Option<Draft>>
+    find(organizationId: OrganizationId, id: string): Effect.Effect<O.Option<Draft>>
     /**
      * The organization's open imports, newest first, at most `limit` of them, and how many are open in all, so the
      * first screen can say how many it left out.
@@ -216,7 +220,7 @@ export class ImportStore extends Context.Service<
      * delta that changes nothing (the same save sent again) writes nothing and leaves the revision as it is. None when
      * the import is no longer open (nothing is saved then).
      */
-    decide(actor: Member, draft: Draft, delta: DecisionDelta): Effect.Effect<Option.Option<number>>
+    decide(actor: Member, draft: Draft, delta: DecisionDelta): Effect.Effect<O.Option<number>>
     /** The columns people chose for fields, as stored with the draft. */
     choices(draft: Draft): Effect.Effect<ReadonlyArray<MappingChoice>>
     /**

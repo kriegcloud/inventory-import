@@ -1,8 +1,11 @@
 // The catalog's HTTP contract: imports, items and the table assistant. The app adds these groups to its `Api`,
 // which gives them the `/api/v1` prefix, the same-origin rule and the problem documents.
-import { Effect } from "effect"
+import * as Effect from "effect/Effect"
 import * as S from "effect/Schema"
-import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/http-api"
+import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint"
+import * as HttpApiGroup from "effect/http-api/HttpApiGroup"
+import * as HttpApiSchema from "effect/http-api/HttpApiSchema"
+import * as OpenApi from "effect/http-api/OpenApi"
 import { DecisionDelta } from "./Import/Decision.command.ts"
 import { reasonForPerson } from "./internal/Described.ts"
 import { StagingOutcome } from "./Staging/FileProblem.read.ts"

@@ -10,8 +10,15 @@ import { usedUpSentence } from "@inventory/catalog-model/AssistantHandler"
 import { memoryUsedUpWords } from "@inventory/catalog-model/ModelAllowance"
 import { decisionFromFlags } from "@inventory/catalog-contract/Decision"
 import type { ColumnCatalog } from "@inventory/catalog-contract/TableView"
-import { Array as Arr, BigDecimal, Effect, Layer, Option, Ref, Result, String as Str } from "effect"
-import { SecureRandom } from "effect/crypto"
+import * as A from "effect/Array"
+import * as BigDecimal from "effect/BigDecimal"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as O from "effect/Option"
+import * as Ref from "effect/Ref"
+import * as Result from "effect/Result"
+import * as Str from "effect/String"
+import * as SecureRandom from "effect/crypto/SecureRandom"
 import * as S from "effect/Schema"
 import { as, dana, elena, fiveLines, marcus, priya, stage, tableOf } from "./support.ts"
 
@@ -22,9 +29,9 @@ const tag = <A, E extends { readonly _tag: string }, R>(effect: Effect.Effect<A,
 const lines = Effect.gen(function* () {
   const ref = yield* CatalogMemoryRef
   const state = yield* Ref.get(ref)
-  return Arr.map(state.activity, (line) => `${line.actorName}: ${line.action}: ${line.detail}`)
+  return A.map(state.activity, (line) => `${line.actorName}: ${line.action}: ${line.detail}`)
 })
-const said = (word: string) => Effect.map(lines, Arr.filter(Str.includes(word)))
+const said = (word: string) => Effect.map(lines, A.filter(Str.includes(word)))
 const none = { set: {}, clear: [] }
 
 describe("an import, over the twins", () => {
@@ -47,9 +54,9 @@ describe("an import, over the twins", () => {
           const imports = yield* importsEndpoints
           const items = yield* itemsEndpoints
           const open = yield* imports.open().pipe(as(marcus))
-          const id = Option.getOrThrow(Arr.head(open.views)).id
+          const id = O.getOrThrow(A.head(open.views)).id
           const confirmed = yield* imports.commit({ params: { id }, payload: none }).pipe(as(marcus))
-          const result = Option.getOrThrow(confirmed.result)
+          const result = O.getOrThrow(confirmed.result)
           expect([confirmed.status, result.created, result.updated, result.already, result.notImported]).toEqual([
             "imported",
             3,
@@ -59,7 +66,7 @@ describe("an import, over the twins", () => {
           ])
           const stored = yield* items.list().pipe(as(priya))
           expect(
-            Arr.map(stored, (item) => [item.sku, item.name, BigDecimal.format(item.unitCost), item.revision])
+            A.map(stored, (item) => [item.sku, item.name, BigDecimal.format(item.unitCost), item.revision])
           ).toEqual([
             ["AAA-0001", "Oak Crate", "12.5", 1],
             ["AAA-0002", "Steel Bolt", "3", 1],
@@ -81,7 +88,7 @@ describe("an import, over the twins", () => {
       Effect.gen(function* () {
         const items = yield* itemsEndpoints
         const stored = yield* items.list().pipe(as(marcus))
-        const crate = Option.getOrThrow(Arr.findFirst(stored, (item) => item.sku === "AAA-0001"))
+        const crate = O.getOrThrow(A.findFirst(stored, (item) => item.sku === "AAA-0001"))
         const edit = {
           revision: crate.revision,
           name: "Oak Crate, large",
@@ -117,19 +124,19 @@ describe("an import, over the twins", () => {
           const imports = yield* importsEndpoints
           const items = yield* itemsEndpoints
           const past = yield* imports.past().pipe(as(marcus))
-          const id = Option.getOrThrow(Arr.head(past.imports)).id
+          const id = O.getOrThrow(A.head(past.imports)).id
           const before = yield* imports.get({ params: { id } }).pipe(as(marcus))
           expect([before.takeBack.removable, before.takeBack.changedCount]).toEqual([2, 1])
-          expect(Arr.map(before.takeBack.changed, (item) => item.sku)).toEqual(["AAA-0001"])
+          expect(A.map(before.takeBack.changed, (item) => item.sku)).toEqual(["AAA-0001"])
           const payload = { confirms: before.takeBack.confirms }
           const back = yield* imports.takeBack({ params: { id }, payload }).pipe(as(marcus))
-          expect([back.status, Option.getOrUndefined(back.result)?.takenBack, back.takeBack.keptCount]).toEqual([
+          expect([back.status, O.getOrUndefined(back.result)?.takenBack, back.takeBack.keptCount]).toEqual([
             "takenBack",
             2,
             1
           ])
           const got14 = yield* items.list().pipe(as(marcus))
-          expect(Arr.map(got14, (item) => item.sku)).toEqual(["AAA-0001"])
+          expect(A.map(got14, (item) => item.sku)).toEqual(["AAA-0001"])
           yield* imports.takeBack({ params: { id }, payload }).pipe(as(marcus))
           const got3 = yield* said("Took back an import")
           expect(got3).toEqual([
@@ -177,7 +184,7 @@ describe("suggestions, over the twins", () => {
         expect(got9).toBe("Forbidden")
         const first = yield* imports.suggest({ params }).pipe(as(marcus))
         expect(first.answeredBy._tag).toBe("Rules")
-        expect(Arr.map(first.made, (s) => (s.kind === "column" ? [] : [s.rowId, s.kind, s.to, s.by.kind]))).toEqual([
+        expect(A.map(first.made, (s) => (s.kind === "column" ? [] : [s.rowId, s.kind, s.to, s.by.kind]))).toEqual([
           ["row-5", "name", "Copper Plate", "rule"]
         ])
         const second = yield* imports.suggest({ params }).pipe(as(marcus))
@@ -242,7 +249,7 @@ describe("the table assistant, over the twins", () => {
             reason: usedUpSentence(memoryUsedUpWords)
           })
           // The rules still do the work: the same sort, read from the words.
-          expect(Result.isSuccess(second) ? Arr.map(second.success.changes, (change) => change.kind) : second).toEqual([
+          expect(Result.isSuccess(second) ? A.map(second.success.changes, (change) => change.kind) : second).toEqual([
             "sort"
           ])
           const got10 = yield* Ref.get(asked)

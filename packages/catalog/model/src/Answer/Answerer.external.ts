@@ -4,7 +4,11 @@
 import { type AiUnavailable, aiUnavailable, type AiTrouble } from "@inventory/catalog-contract/AiUnavailable"
 import type { AnsweredBy } from "@inventory/catalog-contract/Answer"
 import { LiteralKit } from "@beep/schema/LiteralKit"
-import { Context, Effect, Layer, Option, Ref } from "effect"
+import * as Context from "effect/Context"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as O from "effect/Option"
+import * as Ref from "effect/Ref"
 import * as S from "effect/Schema"
 
 /** Whether a model can be asked. With none, a feature goes straight to its rules and takes no call. */
@@ -84,8 +88,8 @@ export class Answerer extends Context.Service<
         const left = yield* Ref.make(input.answers)
         const ask = Effect.fnUntraced(function* <Sc extends AnswerSchema>(_question: ModelQuestion, schema: Sc) {
           const script = yield* Ref.getAndUpdate(left, (answers) => answers.slice(1))
-          const next = Option.fromUndefinedOr(script[0])
-          if (Option.isNone(next)) return yield* aiUnavailable({ kind: "down", retryable: true })
+          const next = O.fromUndefinedOr(script[0])
+          if (O.isNone(next)) return yield* aiUnavailable({ kind: "down", retryable: true })
           if (next.value.kind === "trouble") {
             return yield* aiUnavailable({ kind: next.value.trouble, retryable: next.value.retryable })
           }

@@ -5,8 +5,12 @@ import type { AssistantApi, ImportsApi, ItemsApi } from "@inventory/catalog-cont
 import type { Api, Call, Fork } from "@inventory/client/ApiRuntime"
 import { makeOptimisticWrite } from "@inventory/client/Optimistic"
 import type { SameOrigin } from "@inventory/kernel/SameOrigin"
-import { Context, type Effect, type Exit, type ManagedRuntime } from "effect"
-import type { HttpApiClient, HttpApiMiddleware } from "effect/http-api"
+import * as Context from "effect/Context"
+import type * as Effect from "effect/Effect"
+import type * as Exit from "effect/Exit"
+import type * as ManagedRuntime from "effect/ManagedRuntime"
+import type * as HttpApiClient from "effect/http-api/HttpApiClient"
+import type * as HttpApiMiddleware from "effect/http-api/HttpApiMiddleware"
 
 /**
  * What the whole API can answer on any endpoint, whatever its group: the errors of the two middlewares the app puts

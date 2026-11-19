@@ -2,7 +2,9 @@
 // longer than the box allows is refused, not cut; a word's quotes, `%` and `_` are text, never syntax; and a word
 // with one letter missing, extra, wrong or swapped is always found by one of its near spellings.
 import { describe, expect, it } from "@effect/vitest"
-import { Array as Arr, Effect, String as Str } from "effect"
+import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as Str from "effect/String"
 import * as S from "effect/Schema"
 import { ItemQueryParams } from "@inventory/catalog-contract/Catalog"
 import { ItemQuery } from "@inventory/catalog-contract/ItemQuery"
@@ -23,7 +25,7 @@ const asked = { page: 1, perPage: 20, sorting: [], filters: [], joinOperator: "a
 /** SQLite's LIKE with `ESCAPE '\'`, ignoring case: what the server compares a pattern with. */
 const like = (pattern: string, text: string): boolean => {
   let source = ""
-  const characters = Arr.fromIterable(pattern)
+  const characters = A.fromIterable(pattern)
   for (let i = 0; i < characters.length; i++) {
     const character = characters[i] ?? ""
     if (character === "\\") {
@@ -75,12 +77,12 @@ describe("the words of a search", () => {
     expect(like(contains("50%"), "Rag 50% cotton")).toBe(true)
     expect(like(contains("50%"), "Rag 500 cotton")).toBe(false)
     expect(like(contains("_"), "Cable tie")).toBe(false)
-    expect(Arr.every(closeMatches("50%x"), (pattern) => !like(pattern, "50 pack"))).toBe(true)
+    expect(A.every(closeMatches("50%x"), (pattern) => !like(pattern, "50 pack"))).toBe(true)
   })
 
   it("are read by length and by whether the items hold them as typed", () => {
     expect(wordsToCheck(["m8", "nut", "washr", "lock"])).toEqual(["washr", "lock"])
-    expect(Arr.map(plan({ words: ["m8", "nut", "washr", "lock"], found: ["lock"] }), (word) => word._tag)).toEqual([
+    expect(A.map(plan({ words: ["m8", "nut", "washr", "lock"], found: ["lock"] }), (word) => word._tag)).toEqual([
       "Contains",
       "Indexed",
       "Close",
@@ -106,24 +108,24 @@ describe("a word with one letter different", () => {
       const i = Math.min(at, n - 1)
       const typed =
         edit === "missing"
-          ? [...Arr.take(stored, i), ...Arr.drop(stored, i + 1)]
+          ? [...A.take(stored, i), ...A.drop(stored, i + 1)]
           : edit === "extra"
-            ? [...Arr.take(stored, i), letter, ...Arr.drop(stored, i)]
+            ? [...A.take(stored, i), letter, ...A.drop(stored, i)]
             : edit === "wrong"
-              ? [...Arr.take(stored, i), letter, ...Arr.drop(stored, i + 1)]
+              ? [...A.take(stored, i), letter, ...A.drop(stored, i + 1)]
               : i + 1 < n
-                ? [...Arr.take(stored, i), stored[i + 1] ?? "", stored[i] ?? "", ...Arr.drop(stored, i + 2)]
+                ? [...A.take(stored, i), stored[i + 1] ?? "", stored[i] ?? "", ...A.drop(stored, i + 2)]
                 : stored
-      const word = Arr.join(typed, "")
-      const text = `Item ${Arr.join(stored, "")} M8`
+      const word = A.join(typed, "")
+      const text = `Item ${A.join(stored, "")} M8`
       // Typed as stored (a wrong letter that is the same letter, a swap of two equal ones), it is simply contained.
-      const found = like(contains(word), text) || Arr.some(closeMatches(word), (pattern) => like(pattern, text))
+      const found = like(contains(word), text) || A.some(closeMatches(word), (pattern) => like(pattern, text))
       expect({ word, text, found }).toEqual({ word, text, found: true })
     }
   )
 
   it("covers the misspellings people type", () => {
-    const finds = (typed: string, text: string) => Arr.some(closeMatches(typed), (pattern) => like(pattern, text))
+    const finds = (typed: string, text: string) => A.some(closeMatches(typed), (pattern) => like(pattern, text))
     expect(finds("washr", "Split lock washer M8")).toBe(true)
     expect(finds("gasgket", "Flange gasket 2 in")).toBe(true)
     expect(finds("swivle", "Swivel caster 3")).toBe(true)

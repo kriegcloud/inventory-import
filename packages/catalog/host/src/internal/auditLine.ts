@@ -4,8 +4,9 @@
 import * as S from "effect/Schema"
 import { OrganizationId, MemberId } from "@inventory/kernel/Ids"
 import { Activity } from "@inventory/kernel/Activity"
-import { DateTime, Option } from "effect"
-import { SqlClient } from "effect/sql"
+import * as DateTime from "effect/DateTime"
+import * as O from "effect/Option"
+import * as SqlClient from "effect/sql/SqlClient"
 import { D1, NoRows } from "@beep/d1/D1"
 
 const Line = S.Struct({
@@ -27,7 +28,7 @@ export const lineOf = (activity: Activity): typeof Line.Type => ({
   name: activity.actorName,
   action: activity.action,
   detail: activity.detail,
-  agent: Option.getOrNull(activity.agent),
+  agent: O.getOrNull(activity.agent),
   at: DateTime.formatIso(activity.createdAt)
 })
 

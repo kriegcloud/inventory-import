@@ -39,12 +39,18 @@ change to the import's rules or counts; no third context; drivers and the vendor
 - [x] `@inventory/client` with the app switched to it. Proof: `check:full` 42 of 42 tasks; on a fresh database
   the messy sample reads "Import 155, skip 45", then "Not imported 45 · Imported 155 · Already there 0 · All 200",
   and Items says "155 items".
-- [ ] `access-contract`, `access-model`, `access-host`, `access-web`, each with its proof from the brief.
+- [x] `access-contract`, `access-model`, `access-host`, `access-web`, each with its proof from the brief. Proof:
+  commits `1136292`, `c9a4c67`, `f2ce1e3`, `c31b00a`; 16, 11 and 3 tests in the first three; `check:full` 53 of 53
+  tasks after the last; PLAN's "Choices made" has what was read on screen after each.
 - [ ] `catalog-contract`, `catalog-model`, `catalog-host`, `catalog-web`, each with its proof from the brief.
 - [ ] Every wire change in the brief's two tables made, and no other.
 - [ ] The existing slow tests (`Tenancy`, `Imports`, `TakeBack`, `People`, `Suggestions`, `Assistant`, `Auth`) pass.
 - [ ] `bun run check:full` and the build pass on the last commit.
-- [ ] Browser after `access`: People (add, change role, last-admin refusal, remove) and Activity.
+- [x] Browser after `access`: People (add, change role, last-admin refusal, remove) and Activity. Proof: on a fresh
+  database, an unknown email read "Nobody has signed up with nobody@example.test yet."; Sam Okafor was added as
+  editor and changed to viewer; Dana's demotion was refused ("Dana Whitfield is the only admin of Example Works
+  (test). Make someone else an admin first.") and the select went back to admin; Sam was removed (204); Activity,
+  Events listed "Removed a person", "Changed a role", "Added a person" above "Imported items" and "Uploaded a file".
 - [ ] Browser after `catalog`: the full import with a decision made, undone and redone, a refresh mid-review, Confirm, result, take-back, Items (search, filter, editor), the table assistant with the model and by rules, the same at phone width.
 
 ## Decisions

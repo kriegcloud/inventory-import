@@ -1,3 +1,4 @@
+import { Option } from "effect"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
@@ -74,8 +75,9 @@ const items = (n: number) => `${n} ${n === 1 ? "item" : "items"}`
 function Changed(props: { item: ChangedItem }) {
   return (
     <>
-      <Code>{props.item.sku}</Code> {props.item.name}, changed by {props.item.changedBy} on{" "}
-      {whenShort(props.item.changedAt)}
+      <Code>{props.item.sku}</Code> {props.item.name}, changed by {props.item.changedBy}
+      {/* The moment is said when it was stored. */}
+      {Option.match(props.item.changedAt, { onNone: () => "", onSome: (at) => ` on ${whenShort(at)}` })}
     </>
   )
 }

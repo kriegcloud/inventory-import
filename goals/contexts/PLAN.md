@@ -105,4 +105,13 @@ None.
     moved sign-in screen, signed in as Dana from the test accounts, and the People pass and Events read as after
     `access-host`. Not read this time: Sam's own People list right after sign-up (the script read the placeholder
     rows before the list arrived).
+- **catalog (a), timestamps.** `ImportResult.importedAt`, `ImportEvent.at`, `ImportView.createdAt`,
+  `PastImport.confirmedAt`, `ChangeRecord.createdAt` and the item's `createdAt` are `Instant`; the rows read from SQL
+  decode them, and the history is ordered by the moment itself. `ChangedItem.changedAt` could not wait for (b): it
+  was `""` when not stored, which is no instant, so it is `Option<Instant>` (null on the wire) already, and a changed
+  item with no stored moment reads "changed by ..." without a trailing "on". `src/domain/Item.ts` imports the
+  kernel's `Instant`. The wire keeps its text: 197 app tests pass unchanged. Read on screen: Activity, Decisions
+  "Nov 18, 9:10 PM" (title "Nov 18, 2026, 9:10 PM"); Imports "Nov 18, 9:10 PM"; the result "Dana Whitfield · Nov
+  18, 2026, 9:10 PM"; "Imported before" on the first screen. Not seen on screen: the Items table's created cell
+  (the column is not shown by default).
 

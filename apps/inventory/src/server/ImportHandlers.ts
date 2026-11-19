@@ -146,10 +146,11 @@ export const ImportHandlers = HttpApiBuilder.group(
           fixedCells: current.fixed.cells,
           rows: current.counts.rows
         },
-        result: confirmed
+        // A confirmed import always has the moment of its confirm: the same statement writes both.
+        result: Option.isSome(draft.importedAt)
           ? {
               importedBy: draft.importedBy ?? "",
-              importedAt: draft.importedAt ?? "",
+              importedAt: draft.importedAt.value,
               created: tally("created"),
               updated: tally("updated"),
               already: tally("already"),

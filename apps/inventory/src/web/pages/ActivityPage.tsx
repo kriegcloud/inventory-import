@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
+import { DateTime } from "effect"
 import { useState } from "react"
 import { Code } from "@inventory/ui/Code"
 import { importAddress } from "@/lib/route"
@@ -117,7 +118,7 @@ const changeColumns: ReadonlyArray<ListColumn<ChangeRecord>> = [
     width: 124,
     cell: (change) => whenShort(change.createdAt),
     title: (change) => when(change.createdAt),
-    value: (change) => change.createdAt,
+    value: (change) => DateTime.formatIso(change.createdAt),
     searchable: false
   }
 ]
@@ -199,7 +200,7 @@ export function ActivityPage() {
           columns={changeColumns}
           rows={changes.data ?? []}
           rowKey={(change) =>
-            `${change.importId}:${change.rowNumber}.${change.part ?? 0}:${change.field}:${change.createdAt}`
+            `${change.importId}:${change.rowNumber}.${change.part ?? 0}:${change.field}:${DateTime.formatIso(change.createdAt)}`
           }
           empty="No decisions yet. They appear here once an import with accepted or typed values is confirmed."
         />

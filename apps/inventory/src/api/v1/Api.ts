@@ -3,7 +3,7 @@ import * as S from "effect/Schema"
 import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiMiddleware, OpenApi } from "effect/http-api"
 import { ActivityApi, IdentityApi, PeopleApi } from "@inventory/access-contract/Access"
 import { ModelCallsUsedUp } from "@inventory/access-contract/ModelAllowance"
-import { instant, personName, reasonForPerson } from "../../domain/Described.ts"
+import { personName, reasonForPerson } from "../../domain/Described.ts"
 import { StagingOutcome } from "../../domain/FileProblem.ts"
 import { ItemEdit, ItemFields, StoredItem } from "../../domain/Item.ts"
 import {
@@ -26,6 +26,7 @@ import { Forbidden } from "@inventory/kernel/AccessError"
 import { Identity } from "@inventory/kernel/Identity"
 import { aiTroubles, modelSentences } from "./ModelTrouble.ts"
 import { SameOrigin } from "@inventory/kernel/SameOrigin"
+import { Instant } from "@inventory/kernel/Text"
 import { apiPrefix } from "./Version.ts"
 
 // The API contract, version 1. The server implements it (src/server) and the browser calls it through a client
@@ -220,7 +221,7 @@ export type RowOutcome = typeof RowOutcome.Type
 /** What a confirmed import did, row by row, counted from the stored rows. Kept with the import, so it survives a reload. */
 export const ImportResult = S.Struct({
   importedBy: personName("Who confirmed the import"),
-  importedAt: instant("When it was confirmed"),
+  importedAt: Instant.pipe(S.annotateKey({ description: "When it was confirmed" })),
   created: S.Int.annotateKey({ description: "Rows whose item this import created and still has", examples: [11] }),
   updated: S.Int.annotateKey({
     description: "Rows that replaced a stored item with the same SKU, because the person chose to",
@@ -263,7 +264,7 @@ export const ImportEvent = S.TaggedUnion({
   Confirmed: {
     batchId: S.String.annotateKey({ description: "The confirm's id: what a take-back names in `confirms`" }),
     by: personName("Who confirmed"),
-    at: instant("When"),
+    at: Instant.pipe(S.annotateKey({ description: "When" })),
     created: S.Int.annotateKey({ description: "Items this confirm created" }),
     updated: S.Int.annotateKey({ description: "Stored items this confirm replaced, as the person chose" }),
     already: S.Int.annotateKey({ description: "Rows it found already there" }),
@@ -274,7 +275,7 @@ export const ImportEvent = S.TaggedUnion({
       description: "The first confirm the take-back reversed; one take-back of several confirms is one event"
     }),
     by: personName("Who took it back"),
-    at: instant("When"),
+    at: Instant.pipe(S.annotateKey({ description: "When" })),
     removed: S.Int.annotateKey({
       description: "Every item the take-back removed, across all the confirms it reversed"
     }),
@@ -296,7 +297,10 @@ export const ChangedItem = S.Struct({
   sku: S.String.annotateKey({ description: "The item's SKU" }),
   name: S.String.annotateKey({ description: "The item's name, for the list" }),
   changedBy: personName("Who changed it last"),
-  changedAt: instant("When it was last changed")
+  changedAt: Instant.pipe(
+    S.annotateKey({ description: "When it was last changed; null when that was not stored" }),
+    S.OptionFromNullOr
+  )
 }).annotate({ identifier: "ChangedItem", description: "An item changed after the import that created it" })
 /** The decoded value of `ChangedItem`: an item an import created that someone changed afterwards. */
 export type ChangedItem = typeof ChangedItem.Type
@@ -346,7 +350,7 @@ export class ImportView extends S.Class<ImportView, { readonly brand: unique sym
       description: "Under review, confirmed, or confirmed and then taken back"
     }),
     startedBy: personName("Who uploaded the file"),
-    createdAt: instant("When the upload finished and the import began"),
+    createdAt: Instant.pipe(S.annotateKey({ description: "When the upload finished and the import began" })),
     rowCount: S.Int.annotateKey({ description: "Data rows the file was uploaded with", examples: [200] }),
     storedItems: S.Array(ItemFields).annotateKey({
       description:
@@ -578,7 +582,7 @@ export const PastImport = S.Struct({
       "imported: confirmed and in force; takenBack: its last confirm was taken back; open: confirmed once, then opened again to finish the rows it left out"
   }),
   confirmedByName: personName("Who confirmed it last"),
-  confirmedAt: instant("When it was confirmed last"),
+  confirmedAt: Instant.pipe(S.annotateKey({ description: "When it was confirmed last" })),
   items: S.Int.annotateKey({
     description: "How many items in the system came from this import now, counted from the stored items",
     examples: [155]
@@ -613,7 +617,7 @@ export const ChangeRecord = S.Struct({
   sku: S.String.annotateKey({ description: "The SKU of the item the value went into" }),
   ...Change.fields,
   decidedByName: S.NullOr(S.String).annotateKey({ description: "The member who accepted or typed it" }),
-  createdAt: instant("When the import wrote it"),
+  createdAt: Instant.pipe(S.annotateKey({ description: "When the import wrote it" })),
   takenBack: S.Boolean.annotateKey({
     description:
       "True when the import was taken back and the item this value went into was removed with it, or, for a stored item it replaced, put back as it was"

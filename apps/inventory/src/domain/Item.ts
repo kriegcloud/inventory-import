@@ -4,7 +4,8 @@
 // every value is read from the text as written (a cost from its digits as a decimal string, never through a float; a
 // date only when it has one reading), never through a guess.
 import { Array as Arr, Option, Record as Rec, Result, String as Str } from "effect"
-import { instant, personName } from "./Described.ts"
+import { Instant } from "@inventory/kernel/Text"
+import { personName } from "./Described.ts"
 import * as S from "effect/Schema"
 
 /** The categories an item may be filed under: the list the category column is checked against. */
@@ -177,7 +178,7 @@ export type ItemFields = typeof ItemFields.Type
 export const StoredItem = S.Struct({
   id: S.String.annotateKey({ description: "The item's id, given when the import created it" }),
   ...ItemFields.fields,
-  createdAt: instant("When the import created the item"),
+  createdAt: Instant.pipe(S.annotateKey({ description: "When the import created the item" })),
   createdBy: personName("Who confirmed the import that created the item"),
   revision: S.Int.annotateKey({
     description:

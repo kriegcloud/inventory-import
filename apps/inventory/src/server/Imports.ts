@@ -21,6 +21,7 @@ import {
 } from "../api/v1/Api.ts"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { type Member } from "@inventory/kernel/Member"
+import { Instant } from "@inventory/kernel/Text"
 import { type FileProblem, fileProblem } from "../domain/FileProblem.ts"
 import {
   Dimensions,
@@ -50,9 +51,9 @@ export const Draft = S.Struct({
   rowCount: S.Int,
   status: S.Literals(["open", "imported", "takenBack"]),
   actorName: S.String,
-  createdAt: S.String,
+  createdAt: Instant,
   importedBy: S.NullOr(S.String),
-  importedAt: S.NullOr(S.String),
+  importedAt: S.OptionFromNullOr(Instant),
   revision: S.Int,
   needsAtStart: S.Int,
   choicesJson: S.String
@@ -222,13 +223,13 @@ const partOf = (part: number): { readonly part?: number } => (part === 0 ? {} : 
 const BatchRow = S.Struct({
   id: S.String,
   confirmedByName: S.String,
-  confirmedAt: S.String,
+  confirmedAt: Instant,
   created: S.Int,
   updated: S.Int,
   already: S.Int,
   notImported: S.Int,
   takenBackByName: S.NullOr(S.String),
-  takenBackAt: S.NullOr(S.String),
+  takenBackAt: S.OptionFromNullOr(Instant),
   takeBackId: S.NullOr(S.String),
   removed: S.Int,
   restored: S.Int,
@@ -239,7 +240,7 @@ const ChangedItemRow = S.Struct({
   sku: S.String,
   name: S.String,
   changedBy: S.NullOr(S.String),
-  changedAt: S.NullOr(S.String)
+  changedAt: S.OptionFromNullOr(Instant)
 }).annotate({ description: "An item someone changed after the import, with who and when as stored" })
 
 /** Data access for imports and the items they create. */
@@ -899,7 +900,7 @@ export class Imports extends Context.Service<
             ...acting(actor),
             id: draft.id,
             activity,
-            detail: `${draft.fileName}: ${rows}, ${draft.importedAt === null ? "nothing had been imported" : "every item it created had been taken back"}`,
+            detail: `${draft.fileName}: ${rows}, ${Option.isNone(draft.importedAt) ? "nothing had been imported" : "every item it created had been taken back"}`,
             at
           }),
           removeFrom(sql`importSuggestion`)(scope),
@@ -1425,13 +1426,13 @@ export class Imports extends Context.Service<
             already: row.already,
             notImported: row.notImported
           }),
-          ...(row.takenBackAt === null || !firstOf(row)
+          ...(Option.isNone(row.takenBackAt) || !firstOf(row)
             ? []
             : [
                 ImportEvent.cases.TakenBack.make({
                   batchId: row.id,
                   by: row.takenBackByName ?? "",
-                  at: row.takenBackAt,
+                  at: row.takenBackAt.value,
                   removed: Arr.reduce(sameTakeBack(row), 0, (total, other) => total + other.removed),
                   restored: Arr.reduce(sameTakeBack(row), 0, (total, other) => total + other.restored),
                   kept: Arr.reduce(sameTakeBack(row), 0, (total, other) => total + other.kept)
@@ -1440,7 +1441,7 @@ export class Imports extends Context.Service<
         ])
         return Arr.sort(
           events,
-          Order.mapInput(Order.String, (event: ImportEvent) => event.at)
+          Order.mapInput(DateTime.Order, (event: ImportEvent) => event.at)
         )
       }, Effect.orDie)
 
@@ -1507,7 +1508,7 @@ export class Imports extends Context.Service<
               sku: row.sku,
               name: row.name,
               changedBy: row.changedBy ?? "",
-              changedAt: row.changedAt ?? ""
+              changedAt: row.changedAt
             })
           )
         return {

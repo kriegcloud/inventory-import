@@ -31,11 +31,11 @@ export const whenShort = (at: string | DateTime.Utc): string => {
 const dayOnly = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" })
 const dayAndYear = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" })
 
-/** An ISO timestamp as the person's own date, for a column too narrow for the time. The year shows once it is not this one. */
-export const day = (iso: string): string => {
-  const parsed = DateTime.make(iso)
+/** A moment as the person's own date, for a column too narrow for the time. The year shows once it is not this one. */
+export const day = (at: string | DateTime.Utc): string => {
+  const parsed = DateTime.make(at)
   const date = Option.isSome(parsed) ? DateTime.toDateUtc(parsed.value) : undefined
-  if (date === undefined) return iso
+  if (date === undefined) return String(at)
   return (date.getFullYear() === DateTime.toDateUtc(DateTime.nowUnsafe()).getFullYear() ? dayOnly : dayAndYear).format(
     date
   )

@@ -314,7 +314,9 @@ export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
   const landed =
     stopped !== null &&
     saved !== undefined &&
-    views.some((view) => view.fileName === stopped.name && view.createdAt >= DateTime.formatIso(saved.savedAt))
+    views.some(
+      (view) => view.fileName === stopped.name && DateTime.isGreaterThanOrEqualTo(view.createdAt, saved.savedAt)
+    )
   // One filled button on the screen: Continue when a file stopped, else the first open import, else Choose file.
   const offered = stopped !== null && !landed && !busy && props.canImport
   const resume = () => {

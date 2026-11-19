@@ -1,12 +1,13 @@
 // Asking the model, as the catalog's features do: one call through the one retry policy, its answer decoded through a
-// schema, who answered said in the contract's words, and the rules' answer when no model could.
+// schema, and who answered said in the contract's words. `AnswererOpenRouter` is the catalog's `Answerer` on it.
 import { AnsweredBy } from "@inventory/catalog-contract/Answer"
 import { ModelStatus, ModelAnswered, ModelPrompt } from "@beep/openrouter/OpenRouterModel"
 import { ModelUnavailable } from "@beep/openrouter/OpenRouterError"
 import { AiUnavailable, aiUnavailable } from "@inventory/catalog-contract/AiUnavailable"
-import { Effect, Option } from "effect"
+import { Effect, Layer, Option } from "effect"
 import type * as S from "effect/Schema"
 import { OpenRouter } from "@beep/openrouter/OpenRouter"
+import { ModelAvailability, Answerer, type ModelQuestion } from "@inventory/catalog-model/Answerer"
 
 /** A schema a model answers with: an object on the wire, decoded with no services. */
 type AnswerSchema = S.Codec<unknown, Record<string, unknown>, never, never>
@@ -55,18 +56,28 @@ export const askModel = Effect.fn("Model.ask")(function* <Sc extends AnswerSchem
   return result
 })
 
-/**
- * The last step of every feature: when no model could answer, the caller's non-AI result, marked as the rules' answer
- * with the reason, so the screen can say which one answered.
- */
-export const answeredByRules =
-  <B>(rules: (error: AiUnavailable) => B) =>
-  <A, R>(
-    self: Effect.Effect<AiAnswer<A>, AiUnavailable, R>
-  ): Effect.Effect<{ readonly value: A | B; readonly answeredBy: AnsweredBy }, never, R> =>
-    self.pipe(
-      Effect.map((answer): { readonly value: A | B; readonly answeredBy: AnsweredBy } => answer),
-      Effect.catchTag("AiUnavailable", (error) =>
-        Effect.succeed({ value: rules(error), answeredBy: { _tag: "Rules" as const, reason: error.reason } })
-      )
-    )
+/** Whether a model can be asked, in the catalog's words. */
+const availabilityOf = (status: ModelStatus): ModelAvailability => (modelIsOn(status) ? "on" : "off")
+
+/** `Answerer` on the app's model service: OpenRouter, through the driver's one retry policy. */
+export const AnswererOpenRouter = Layer.effect(
+  Answerer,
+  Effect.gen(function* () {
+    const openRouter = yield* OpenRouter
+    return Answerer.of({
+      status: availabilityOf(openRouter.status),
+      ask: Effect.fnUntraced(function* <Sc extends AnswerSchema>(question: ModelQuestion, schema: Sc) {
+        return yield* askModel(openRouter, {
+          name: question.name,
+          prompt: question.prompt,
+          schema,
+          ...Option.match(question.system, { onNone: () => ({}), onSome: (system) => ({ system }) }),
+          ...Option.match(question.maxOutputTokens, {
+            onNone: () => ({}),
+            onSome: (maxOutputTokens) => ({ maxOutputTokens })
+          })
+        })
+      })
+    })
+  })
+)

@@ -17,11 +17,17 @@
     "./Upload": "./src/Staging/Upload.rules.ts",
     "./ImportStore": "./src/Import/ImportStore.store.ts",
     "./ItemStore": "./src/Item/ItemStore.store.ts",
-    "./Suggestions": "./src/Suggestion/Suggestions.store.ts",
-    "./TableAssistant": "./src/Assistant/TableAssistant.store.ts",
     "./ImportsHandler": "./src/Import/Imports.handler.ts",
     "./ItemsHandler": "./src/Item/Items.handler.ts",
-    "./AssistantHandler": "./src/Assistant/Assistant.handler.ts"
+    "./AssistantHandler": "./src/Assistant/Assistant.handler.ts",
+    "./Ports": "./src/Catalog.ports.ts",
+    "./Handlers": "./src/Catalog.handlers.ts",
+    "./Confirm": "./src/Confirm/Confirm.rules.ts",
+    "./Answerer": "./src/Answer/Answerer.external.ts",
+    "./ModelAllowance": "./src/Answer/ModelAllowance.external.ts",
+    "./SuggestionStore": "./src/Suggestion/SuggestionStore.store.ts",
+    "./SuggestionsHandler": "./src/Suggestion/Suggestions.handler.ts",
+    "./AssistantLog": "./src/Assistant/AssistantLog.store.ts"
   },
   "scripts": {
     "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",

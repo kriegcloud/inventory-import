@@ -2,18 +2,20 @@
 // decisions, the confirm and the take-back (each one atomic write), and what is read back from what they stored.
 // The one thing not to break: nothing here says how it is stored. The D1 adapter is in `catalog-host`.
 import * as S from "effect/Schema"
-import { ImportId } from "@inventory/catalog-contract/Ids"
+import { ImportId, ConfirmId, ItemId } from "@inventory/catalog-contract/Ids"
 import { Instant } from "@inventory/kernel/Text"
-import { ItemFields, StoredItem } from "@inventory/catalog-contract/Item"
-import { Change } from "@inventory/catalog-contract/Change"
+import { StoredItem } from "@inventory/catalog-contract/Item"
 import { SavedDecisions, DecisionDelta } from "@inventory/catalog-contract/Decision"
-import { Context, Effect, Option, Result } from "effect"
+import { Context, Effect, Option, Result, Tuple } from "effect"
 import { Member } from "@inventory/kernel/Member"
 import { StagedHead, StagedRow, StagedTable } from "@inventory/catalog-contract/Staged"
 import { FileProblem } from "@inventory/catalog-contract/FileProblem"
 import { OrganizationId } from "@inventory/kernel/Ids"
 import { PastImport, ChangeRecord, ImportEvent, TakeBackState, RowOutcome } from "@inventory/catalog-contract/Import"
 import { MappingChoice } from "@inventory/catalog-contract/Mapping"
+import { ConfirmPlan } from "../Confirm/Confirm.rules.ts"
+import { Activity } from "@inventory/kernel/Activity"
+import { LiteralKit } from "@beep/schema/LiteralKit"
 
 /** An import as stored, without its rows. */
 export const Draft = S.Struct({
@@ -33,23 +35,94 @@ export const Draft = S.Struct({
 /** The decoded value of `Draft`: an import as stored, without its rows. */
 export type Draft = typeof Draft.Type
 
-/** What the commit is told about one item of the file: the review's verdict, and the item when it is ready. */
-export type CommitRow = {
-  readonly rowNumber: number
-  /** Which of its row's items it is: 0 when the row is one item, 1, 2, ... when it holds several. */
-  readonly part: number
-  readonly sku: string
-  readonly name: string
-  /** `update`: ready, and it replaces the stored item with its SKU, as the person chose. */
-  readonly status: "ready" | "update" | "already" | "notImported"
-  readonly reason: string
-  readonly decidedBy: "person" | "nobody" | null
-  /** Who left the row out, when someone did. */
-  readonly decidedByName: string | null
-  readonly item: ItemFields | null
-  /** The values that differ from the file, for a row that is ready. */
-  readonly changes: ReadonlyArray<{ readonly change: Change; readonly decidedByName: string | null }>
-}
+/** One confirm, as it is written: its plan, the ids its new items take, and its audit line, in one atomic batch. */
+export class ConfirmWrite extends S.Opaque<ConfirmWrite, { readonly brand: unique symbol }>()(
+  S.Struct({
+    draft: ImportId,
+    fileName: S.String.pipe(S.annotateKey({ description: "The import's file, for the audit line" })),
+    confirm: ConfirmId,
+    plan: ConfirmPlan,
+    itemIds: S.Array(ItemId).pipe(
+      S.annotateKey({ description: "One id per row the plan creates, in the plan's order, made by the handler" })
+    ),
+    audit: Activity.pipe(
+      S.annotateKey({ description: '"Imported items": its detail is filled in by the batch from what it counted' })
+    )
+  }).annotate({ identifier: "ConfirmWrite", description: "One confirm of an import, as it is written" })
+) {}
+
+/** What a confirm's write did. */
+export const ConfirmedKind = LiteralKit(["confirmed", "closed"]).annotate({
+  identifier: "ConfirmedKind",
+  description: "The confirm was written, or the import was no longer open and nothing was"
+})
+class ConfirmWritten extends S.Opaque<ConfirmWritten, { readonly brand: unique symbol }>()(
+  S.Struct({ kind: S.tag("confirmed") }).annotate({
+    identifier: "ConfirmWritten",
+    description: "This write confirmed the import"
+  })
+) {}
+class ConfirmClosed extends S.Opaque<ConfirmClosed, { readonly brand: unique symbol }>()(
+  S.Struct({ kind: S.tag("closed") }).annotate({
+    identifier: "ConfirmClosed",
+    description: "Another confirm won, or the import was not open: nothing was written"
+  })
+) {}
+/** Whether a confirm's write was the one that confirmed the import. */
+export const Confirmed = ConfirmedKind.mapMembers(() => Tuple.make(ConfirmWritten, ConfirmClosed)).pipe(
+  S.toTaggedUnion("kind"),
+  S.annotate({ identifier: "Confirmed", description: "Whether a confirm's write confirmed the import" })
+)
+/** The decoded value of `Confirmed`. */
+export type Confirmed = typeof Confirmed.Type
+/** This write confirmed the import. */
+export const confirmWritten: Confirmed = ConfirmWritten.make({})
+/** The import was no longer open: nothing was written. */
+export const confirmClosed: Confirmed = ConfirmClosed.make({})
+
+/** One take-back, as it is written: the confirms it reverses and its audit line, in one atomic batch. */
+export class TakeBackWrite extends S.Opaque<TakeBackWrite, { readonly brand: unique symbol }>()(
+  S.Struct({
+    draft: ImportId,
+    fileName: S.String.pipe(S.annotateKey({ description: "The import's file, for the audit line" })),
+    takeBack: S.String.check(S.isUUID()).pipe(S.annotateKey({ description: "This take-back's own id" })),
+    confirms: S.Array(ConfirmId).pipe(
+      S.annotateKey({ description: "The confirms the person was shown; only those still in force are reversed" })
+    ),
+    audit: Activity.pipe(
+      S.annotateKey({ description: '"Took back an import": its detail is filled in by the batch from what it counted' })
+    )
+  }).annotate({ identifier: "TakeBackWrite", description: "One take-back of an import, as it is written" })
+) {}
+
+/** What a take-back's write did. */
+export const TookBackKind = LiteralKit(["tookBack", "nothingInForce"]).annotate({
+  identifier: "TookBackKind",
+  description: "Confirms were taken back, or none of those named was in force any more"
+})
+class TakenBack extends S.Opaque<TakenBack, { readonly brand: unique symbol }>()(
+  S.Struct({ kind: S.tag("tookBack") }).annotate({
+    identifier: "TakenBack",
+    description: "At least one of the confirms was in force and is taken back"
+  })
+) {}
+class NothingInForce extends S.Opaque<NothingInForce, { readonly brand: unique symbol }>()(
+  S.Struct({ kind: S.tag("nothingInForce") }).annotate({
+    identifier: "NothingInForce",
+    description: "None of the confirms was in force any more (a second press): nothing was written"
+  })
+) {}
+/** Whether a take-back's write reversed anything. */
+export const TookBack = TookBackKind.mapMembers(() => Tuple.make(TakenBack, NothingInForce)).pipe(
+  S.toTaggedUnion("kind"),
+  S.annotate({ identifier: "TookBack", description: "Whether a take-back's write reversed anything" })
+)
+/** The decoded value of `TookBack`. */
+export type TookBack = typeof TookBack.Type
+/** At least one confirm was taken back. */
+export const tookBack: TookBack = TakenBack.make({})
+/** None of the confirms was in force any more. */
+export const nothingInForce: TookBack = NothingInForce.make({})
 
 /** The saved draft of a review, and who last decided each row. */
 export type StoredDecisions = {
@@ -189,18 +262,18 @@ export class ImportStore extends Context.Service<
       importId: string
     ): Effect.Effect<{ readonly rows: number; readonly cells: number }>
     /**
-     * Items a confirm and writes its ready items, each row's outcome, the changed values and the audit line, in
-     * one atomic batch. Returns false when the import was no longer open, in which case nothing was written.
+     * Writes a confirm: its new items, the stored items it replaces (each with a kept copy), every row's outcome,
+     * the changed values and the audit line, in one atomic batch. `closed` when the import was no longer open, in
+     * which case nothing was written.
      */
-    commit(actor: Member, draft: Draft, rows: ReadonlyArray<CommitRow>): Effect.Effect<boolean>
+    commit(write: ConfirmWrite): Effect.Effect<Confirmed>
     /**
-     * Takes back the import's confirms named in `confirms` that are still in force, in one atomic batch: removes
-     * their items that nobody has changed since (revision 1), puts back the stored items they replaced that nobody
-     * has changed since (from the copy each replace kept), keeps the ones someone changed, marks the rows of the
-     * removed and restored items, records who took them back with the counts, and writes the audit line. Returns false, having
-     * written nothing, when none of those confirms is in force any more (taken back already: a second press).
+     * Takes back the confirms named that are still in force, in one atomic batch: removes their items nobody has
+     * changed since, puts back the stored items they replaced that nobody has changed since, keeps the ones someone
+     * changed, marks the rows of the removed and restored items, records who took them back with the counts, and
+     * writes the audit line. `nothingInForce`, having written nothing, when none of them is in force any more.
      */
-    takeBack(actor: Member, draft: Draft, confirms: ReadonlyArray<string>): Effect.Effect<boolean>
+    takeBack(write: TakeBackWrite): Effect.Effect<TookBack>
     /** Every confirm and take-back of the import, oldest first, with the numbers they stored. */
     history(organizationId: OrganizationId, importId: string): Effect.Effect<ReadonlyArray<ImportEvent>>
     /** What taking the import back would do now, read from the items and confirms as stored. */

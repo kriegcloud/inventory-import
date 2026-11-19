@@ -39,9 +39,10 @@ import { BetterAuthTest } from "@beep/better-auth/BetterAuthTest"
 import { Handlers } from "../../../src/server/handlers.ts"
 import { ImportStore } from "@inventory/catalog-model/ImportStore"
 import { ItemStore } from "@inventory/catalog-model/ItemStore"
-import { Suggestions } from "@inventory/catalog-model/Suggestions"
-import { answerByRules } from "@inventory/catalog-host/TableAssistant"
-import { TableAssistant } from "@inventory/catalog-model/TableAssistant"
+import { SuggestionStore } from "@inventory/catalog-model/SuggestionStore"
+import { AssistantLog } from "@inventory/catalog-model/AssistantLog"
+import { AnswererOpenRouter } from "@inventory/catalog-host/Model"
+import { ModelAllowanceViaAccess } from "@inventory/catalog-host/ModelAllowance"
 import * as Observability from "../../../src/server/Observability.ts"
 import { SameOriginLive } from "../../../src/server/SameOrigin.ts"
 import { testAccountPassword } from "@inventory/access-host/TestAccounts"
@@ -146,21 +147,17 @@ const notInMemory = <I, S extends object>(tag: Context.Key<I, S>, name: string) 
   )
 
 /**
- * The services that keep their rows in SQL, for the in-memory app: absent, except the table assistant, which with no
- * key reads by its rules and touches no table, exactly as the real one does then.
+ * The services that keep their rows in SQL, for the in-memory app: absent. The table assistant with no key reads by
+ * its rules and touches no table, so it works here as it does on D1.
  */
 const InMemoryStorage = Layer.mergeAll(
   notInMemory(ImportStore, "ImportStore"),
   notInMemory(ItemStore, "ItemStore"),
-  notInMemory(Suggestions, "Suggestions"),
-  Layer.succeed(
-    TableAssistant,
-    TableAssistant.of({
-      view: Effect.fn("TableAssistant.view")(function* (_actor: Member, request) {
-        return answerByRules({ request, why: "No AI key is set, so the rules answered." })
-      })
-    })
-  )
+  notInMemory(SuggestionStore, "SuggestionStore"),
+  notInMemory(AssistantLog, "AssistantLog"),
+  // The model and the allowance are the real adapters, on the test's model service and the in-memory access context.
+  AnswererOpenRouter,
+  ModelAllowanceViaAccess
 )
 
 /**
@@ -181,7 +178,7 @@ export const inMemoryApp = <E, R>({
   readonly settings?: Record<string, string>
 }) =>
   makeRoutes({ docs, identity: HeaderIdentity }).pipe(
-    Layer.provide(InMemoryStorage),
+    Layer.provide(InMemoryStorage.pipe(Layer.provide(Layer.mergeAll(InMemoryAccess(member), ai)))),
     Layer.provide(InMemoryAccess(member)),
     Layer.provide(SignedOutAuth),
     Layer.provide(ai),
@@ -203,7 +200,7 @@ export const inMemoryHandlers = <E, R>({
     Layer.provideMerge(HeaderIdentity),
     Layer.provideMerge(SameOriginLive),
     Layer.provideMerge(HttpApiMiddleware.layerProblemDetails({ includeDetails: true })),
-    Layer.provide(InMemoryStorage),
+    Layer.provide(InMemoryStorage.pipe(Layer.provide(Layer.mergeAll(InMemoryAccess(member), ai)))),
     Layer.provideMerge(InMemoryAccess(member)),
     Layer.provide(SignedOutAuth),
     Layer.provide(ai),

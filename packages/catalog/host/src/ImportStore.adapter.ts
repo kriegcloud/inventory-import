@@ -29,7 +29,17 @@ import {
   ChangeRecord,
   outcomeOf
 } from "@inventory/catalog-contract/Import"
-import { ImportStore, Draft, Upload, type CommitRow } from "@inventory/catalog-model/ImportStore"
+import {
+  ImportStore,
+  Draft,
+  Upload,
+  ConfirmWrite,
+  confirmWritten,
+  confirmClosed,
+  TakeBackWrite,
+  tookBack,
+  nothingInForce
+} from "@inventory/catalog-model/ImportStore"
 import { SqlClient, SqlSchema, type Statement } from "effect/sql"
 import { D1, NoRows } from "@beep/d1/D1"
 import { SecureRandom } from "effect/crypto"
@@ -37,6 +47,8 @@ import { Member } from "@inventory/kernel/Member"
 import { ItemRow, itemColumns, storedItem } from "./internal/itemRow.ts"
 import { abandonedAfterMinutes, maxChunkChars } from "@inventory/catalog-model/Upload"
 import { fileProblem } from "@inventory/catalog-contract/FileProblem"
+import { lineOf } from "./internal/auditLine.ts"
+import { plannedItems, PlannedRow } from "@inventory/catalog-model/Confirm"
 const textOf = (item: ItemFields | null): number =>
   item === null
     ? 0
@@ -1000,28 +1012,43 @@ export const ImportStoreD1 = Layer.effect(
         WHERE ${thisConfirm(r.org, r.batch)}`
     })
 
-    const commit = Effect.fn("Imports.commit")(function* (actor: Member, draft: Draft, rows: ReadonlyArray<CommitRow>) {
-      const at = yield* now
-      const activity = yield* random.uuidV4()
-      const batchId = yield* random.uuidV4()
-      const scope = { ...acting(actor), id: draft.id, batch: batchId, at }
-      const ready = Arr.filter(rows, (row) => row.item !== null && row.status === "ready")
-      const replacing = Arr.filter(rows, (row) => row.item !== null && row.status === "update")
-      const ids = yield* Effect.forEach(ready, () => random.uuidV4(), { concurrency: 1 })
-      const entries = (list: ReadonlyArray<readonly [CommitRow, string]>) =>
+    const commit = Effect.fn("Imports.commit")(function* (write: ConfirmWrite) {
+      const audit = lineOf(write.audit)
+      const scope = {
+        org: audit.org,
+        actor: audit.actor,
+        name: audit.name,
+        id: write.draft,
+        batch: write.confirm,
+        at: audit.at
+      }
+      const rows = write.plan.rows
+      const written = plannedItems(write.plan)
+      const ready = Arr.filter(written, (row) => row.status === "ready")
+      const replacing = Arr.filter(written, (row) => row.status === "update")
+      const entries = (list: ReadonlyArray<readonly [(typeof written)[number], string]>) =>
         Arr.map(
           bySize(list, ([row]) => textOf(row.item)),
           (chunk) =>
-            Arr.flatMap(chunk, ([row, id]) =>
-              row.item === null
-                ? []
-                : [{ ...row.item, id, rowNumber: row.rowNumber, part: row.part, skuKey: skuKey(row.item) }]
-            )
+            Arr.map(chunk, ([row, id]) => ({
+              ...row.item,
+              id,
+              rowNumber: row.rowNumber,
+              part: row.part,
+              skuKey: skuKey(row.item)
+            }))
         )
-      const items = entries(Arr.zip(ready, ids))
+      const items = entries(Arr.zip(ready, write.itemIds))
       const replacements = entries(Arr.map(replacing, (row) => [row, ""] as const))
+      // What the outcome rows store: the reason of a row that is not written, and who left it out.
+      const reasonOf = (row: PlannedRow): string =>
+        row.status === "ready" || row.status === "update" ? "" : row.reason
+      const decidedBy = (row: PlannedRow): "person" | "nobody" | null =>
+        row.status === "notImported" ? row.decidedBy.kind : null
+      const decidedByName = (row: PlannedRow): string | null =>
+        row.status === "notImported" && row.decidedBy.kind === "person" ? row.decidedBy.name : null
       const outcomes = Arr.map(
-        bySize(rows, (row) => row.sku.length + row.name.length + row.reason.length),
+        bySize(rows, (row) => row.sku.length + row.name.length + reasonOf(row).length),
         (chunk) =>
           Arr.map(chunk, (row) => ({
             rowNumber: row.rowNumber,
@@ -1029,16 +1056,16 @@ export const ImportStoreD1 = Layer.effect(
             sku: row.sku,
             name: row.name,
             status: row.status,
-            reason: row.reason,
-            decidedBy: row.decidedBy,
-            decidedByName: row.decidedByName
+            reason: reasonOf(row),
+            decidedBy: decidedBy(row),
+            decidedByName: decidedByName(row)
           }))
       )
       const changes = bySize(
-        Arr.flatMap(rows, (row) =>
+        Arr.flatMap(written, (row) =>
           Arr.map(row.changes, (entry) => ({
             ...changeToStored(entry.change),
-            decidedByName: entry.decidedByName,
+            decidedByName: Option.getOrNull(entry.decidedByName),
             rowNumber: row.rowNumber,
             part: row.part,
             sku: row.sku,
@@ -1056,10 +1083,10 @@ export const ImportStoreD1 = Layer.effect(
         ...Arr.map(outcomes, (chunk) => insertOutcomes({ ...scope, outcomes: chunk })),
         ...Arr.map(changes, (chunk) => insertChanges({ ...scope, changes: chunk })),
         countBatch(scope),
-        importedLine({ ...scope, activity, fileName: draft.fileName })
+        importedLine({ ...scope, activity: audit.id, fileName: write.fileName })
       ])
       // The first statement returns the confirm's id only when this batch was the one that confirmed the import.
-      return confirmed.length > 0
+      return confirmed.length > 0 ? confirmWritten : confirmClosed
     }, Effect.orDie)
 
     // -- Taking a confirm back -----------------------------------------------------------------------------
@@ -1187,15 +1214,18 @@ export const ImportStoreD1 = Layer.effect(
         WHERE organizationId = ${r.org} AND id = ${r.id} AND EXISTS ${ofTakeBack(r.org, r.takeBack)}`
     })
 
-    const takeBack = Effect.fn("Imports.takeBack")(function* (
-      actor: Member,
-      draft: Draft,
-      confirms: ReadonlyArray<string>
-    ) {
-      const at = yield* now
-      const activity = yield* random.uuidV4()
-      const takeBackId = yield* random.uuidV4()
-      const scope = { ...acting(actor), id: draft.id, takeBack: takeBackId, confirms, at }
+    const takeBack = Effect.fn("Imports.takeBack")(function* (write: TakeBackWrite) {
+      const audit = lineOf(write.audit)
+      const confirms = write.confirms
+      const scope = {
+        org: audit.org,
+        actor: audit.actor,
+        name: audit.name,
+        id: write.draft,
+        takeBack: write.takeBack,
+        confirms,
+        at: audit.at
+      }
       // One restore pass per confirm asked for (at most 10): enough for an item each of them replaced in turn.
       const passes = Arr.flatMap(Arr.range(1, Math.min(Math.max(confirms.length, 1), 10)), () => [
         flagRestorable(scope),
@@ -1205,13 +1235,13 @@ export const ImportStoreD1 = Layer.effect(
         markConfirms(scope),
         ...passes,
         countTakeBack(scope),
-        takenBackLine({ ...scope, activity, fileName: draft.fileName }),
+        takenBackLine({ ...scope, activity: audit.id, fileName: write.fileName }),
         markOutcomes(scope),
         markReplacedOutcomes(scope),
         removeItems(scope),
         settleDraft(scope)
       ])
-      return marked.length > 0
+      return marked.length > 0 ? tookBack : nothingInForce
     }, Effect.orDie)
 
     const history = Effect.fn("Imports.history")(function* (organizationId: OrganizationId, importId: string) {

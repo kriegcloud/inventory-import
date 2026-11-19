@@ -12,10 +12,12 @@
     "./Http": "./src/Catalog.http.ts",
     "./ImportStoreD1": "./src/ImportStore.adapter.ts",
     "./ItemStoreD1": "./src/ItemStore.adapter.ts",
-    "./Suggestions": "./src/Suggestions.adapter.ts",
-    "./TableAssistant": "./src/TableAssistant.adapter.ts",
     "./Model": "./src/Answerer.adapter.ts",
-    "./ItemRow": "./src/internal/itemRow.ts"
+    "./ItemRow": "./src/internal/itemRow.ts",
+    "./SuggestionStoreD1": "./src/SuggestionStore.adapter.ts",
+    "./AssistantLogD1": "./src/AssistantLog.adapter.ts",
+    "./ModelAllowance": "./src/ModelAllowance.adapter.ts",
+    "./AuditLine": "./src/internal/auditLine.ts"
   },
   "scripts": {
     "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",

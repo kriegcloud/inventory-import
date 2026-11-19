@@ -2,7 +2,7 @@
 // suggestion never applies itself, with no model the rules answer and say so, and a model's answer is rated by the
 // guard, never by the model.
 import { describe, expect, it, layer } from "@effect/vitest"
-import { Array as Arr, Effect, Option, Record as Rec, Ref } from "effect"
+import { Array as Arr, Effect, Layer, Option, Record as Rec, Ref } from "effect"
 import { SuggestionId } from "@inventory/catalog-contract/Ids"
 import messy from "../../public/samples/items_messy.csv?raw"
 import { review } from "@inventory/catalog-model/Review"
@@ -11,7 +11,10 @@ import { storedSuggestion, suggestedByModel, type Suggestion } from "@inventory/
 import { digest, guard, type SuggestSource } from "@inventory/catalog-model/Suggest"
 import { ModelId } from "@beep/openrouter/OpenRouterModel"
 import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
-import { propose } from "@inventory/catalog-host/Suggestions"
+import { propose } from "@inventory/catalog-model/SuggestionsHandler"
+import { taken as callTaken, usedUp as callsUsedUp } from "@inventory/catalog-model/ModelAllowance"
+import { AnswererOpenRouter } from "@inventory/catalog-host/Model"
+import { usedUpWords } from "@inventory/access-contract/ModelAllowance"
 import { stage } from "./support/files.ts"
 
 const sourceOf = (
@@ -111,41 +114,46 @@ describe("a stored suggestion", () => {
   )
 })
 
-layer(OpenRouterTest.off("noKey", ModelId.make("test/model")))("with no model", (it) => {
-  it.effect("the rules answer and say so: a name from each description, no category, and no call is taken", () =>
-    Effect.gen(function* () {
-      const source = yield* sourceOf()
-      const taken = yield* Ref.make(0)
-      const proposed = yield* propose({
-        source,
-        fileName: "items_messy.csv",
-        take: Effect.as(
-          Ref.update(taken, (n) => n + 1),
-          true
-        )
+layer(AnswererOpenRouter.pipe(Layer.provide(OpenRouterTest.off("noKey", ModelId.make("test/model")))))(
+  "with no model",
+  (it) => {
+    it.effect("the rules answer and say so: a name from each description, no category, and no call is taken", () =>
+      Effect.gen(function* () {
+        const source = yield* sourceOf()
+        const taken = yield* Ref.make(0)
+        const proposed = yield* propose({
+          source,
+          fileName: "items_messy.csv",
+          take: Effect.as(
+            Ref.update(taken, (n) => n + 1),
+            callTaken
+          )
+        })
+        expect(proposed.answeredBy._tag).toBe("Rules")
+        const calls = yield* Ref.get(taken)
+        expect(calls).toBe(0)
+        expect(
+          Arr.map(proposed.suggestions, (s) =>
+            s.kind === "column" ? [] : [s.rowNumber, s.to, s.by.kind, s.confidence]
+          )
+        ).toEqual([
+          [7, "Nylon Coil", "rule", "low"],
+          [83, "Copper Plate 1/4in", "rule", "low"]
+        ])
+        expect(proposed.lines).toEqual([
+          "Suggested 2 names from the description",
+          "Left 2 categories for you: a rule does not guess a category"
+        ])
       })
-      expect(proposed.answeredBy._tag).toBe("Rules")
-      const calls = yield* Ref.get(taken)
-      expect(calls).toBe(0)
-      expect(
-        Arr.map(proposed.suggestions, (s) => (s.kind === "column" ? [] : [s.rowNumber, s.to, s.by.kind, s.confidence]))
-      ).toEqual([
-        [7, "Nylon Coil", "rule", "low"],
-        [83, "Copper Plate 1/4in", "rule", "low"]
-      ])
-      expect(proposed.lines).toEqual([
-        "Suggested 2 names from the description",
-        "Left 2 categories for you: a rule does not guess a category"
-      ])
-    })
-  )
-})
+    )
+  }
+)
 
 const answer =
   '{"names":[{"rowNumber":7,"name":"Nylon Coil"}],"categories":[{"rowNumber":40,"category":"finished-goods"},{"rowNumber":116,"category":"Misc"}],"columns":[]}'
 const scripted = OpenRouterTest.scripted([{ text: answer }], { model: ModelId.make("scripted/model") })
 
-layer(scripted.layer)("with a model", (it) => {
+layer(AnswererOpenRouter.pipe(Layer.provide(scripted.layer)))("with a model", (it) => {
   it.effect("one call is taken, the answer goes through the guard, and with the allowance used the rules answer", () =>
     Effect.gen(function* () {
       const source = yield* sourceOf()
@@ -155,7 +163,7 @@ layer(scripted.layer)("with a model", (it) => {
         fileName: "items_messy.csv",
         take: Effect.as(
           Ref.update(taken, (n) => n + 1),
-          true
+          callTaken
         )
       })
       expect([proposed.answeredBy._tag, yield* Ref.get(taken)]).toEqual(["Model", 1])
@@ -170,7 +178,11 @@ layer(scripted.layer)("with a model", (it) => {
         "Suggested 1 category",
         "Turned down 1 suggestion that did not pass the checks"
       ])
-      const usedUp = yield* propose({ source, fileName: "items_messy.csv", take: Effect.succeed(false) })
+      const usedUp = yield* propose({
+        source,
+        fileName: "items_messy.csv",
+        take: Effect.succeed(callsUsedUp(usedUpWords))
+      })
       expect(usedUp.answeredBy).toMatchObject({ _tag: "Rules", reason: expect.stringContaining("AI calls are used") })
       expect(Arr.every(usedUp.suggestions, (s) => s.by.kind === "rule")).toBe(true)
     })

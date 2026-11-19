@@ -2,8 +2,17 @@
 // reads the staged file back from storage and runs the same pure `review` the screen ran, so a row the screen
 // refused cannot be written by a crafted request.
 import { Array as Arr, Effect, Option, Record as Rec, Result } from "effect"
-import { ImportStore, Draft, type CommitRow } from "./ImportStore.store.ts"
-import { Suggestions } from "../Suggestion/Suggestions.store.ts"
+import { ConfirmWrite, ImportStore, Draft, TakeBackWrite } from "./ImportStore.store.ts"
+import { SuggestionStore } from "../Suggestion/SuggestionStore.store.ts"
+import { suggest } from "../Suggestion/Suggestions.handler.ts"
+import { confirmPlan, plannedItems } from "../Confirm/Confirm.rules.ts"
+import { Answerer } from "../Answer/Answerer.external.ts"
+import { ModelAllowance } from "../Answer/ModelAllowance.external.ts"
+import { Activity } from "@inventory/kernel/Activity"
+import { ActivityId } from "@inventory/kernel/Ids"
+import { ConfirmId as ConfirmIdSchema, ItemId } from "@inventory/catalog-contract/Ids"
+import { SecureRandom } from "effect/crypto"
+import { DateTime } from "effect"
 import { ItemsOfRow } from "../Review/ItemsOfRow.context.ts"
 import { Member } from "@inventory/kernel/Member"
 import { StagedTable, StagedHead, Field, fieldLabels } from "@inventory/catalog-contract/Staged"
@@ -33,7 +42,6 @@ import { fitsChunks, chunkProblem } from "../Staging/Upload.rules.ts"
 import { fileProblem } from "@inventory/catalog-contract/FileProblem"
 import { ImportId, ConfirmId } from "@inventory/catalog-contract/Ids"
 import * as S from "effect/Schema"
-import { changeDecidedBy } from "@inventory/catalog-contract/Change"
 
 /**
  * What each endpoint of the imports group does: staging, reading and confirming an import. The ports are resolved once,
@@ -41,9 +49,29 @@ import { changeDecidedBy } from "@inventory/catalog-contract/Change"
  */
 export const importsEndpoints = Effect.gen(function* () {
   const imports = yield* ImportStore
-  const suggester = yield* Suggestions
+  const suggestionStore = yield* SuggestionStore
+  // What asking for suggestions needs beyond the stores: resolved once, here, like the stores.
+  const asking = yield* Effect.context<SuggestionStore | Answerer | ModelAllowance | SecureRandom.SecureRandom>()
+  const random = yield* SecureRandom.SecureRandom
   // How a row becomes items: the screen's own `itemsOfRow`, so both review the same items.
   const itemsOf = yield* ItemsOfRow
+
+  // The audit line of something the actor did to an import, stamped now. Its detail is the store's to fill in, from
+  // what the write counted.
+  const auditLine = Effect.fnUntraced(function* (actor: Member, action: string) {
+    const id = yield* random.uuidV4()
+    const createdAt = yield* DateTime.now
+    return Activity.make({
+      id: ActivityId.make(id),
+      organizationId: actor.organizationId,
+      actorId: actor.id,
+      actorName: actor.name,
+      action,
+      detail: "",
+      agent: Option.none(),
+      createdAt
+    })
+  })
 
   // Which codes of this import the organization already has: the file's own, and any the person typed. Asked
   // with the keys, never by listing every item.
@@ -79,7 +107,7 @@ export const importsEndpoints = Effect.gen(function* () {
     const createdRows = Arr.dedupe(Arr.map(created, (item) => item.rowNumber))
     const decisions = carryDecisions({ table, choices, decisions: stored.decisions, mode: ruleFixes, itemsOf })
     // The stored suggestions: the review turns each into a proposal that waits, here exactly as on the screen.
-    const suggestions = yield* suggester.list(actor.organizationId, draft.id)
+    const suggestions = yield* suggestionStore.list(actor.organizationId, draft.id)
     return {
       table,
       suggestions,
@@ -343,14 +371,14 @@ export const importsEndpoints = Effect.gen(function* () {
       const draft = yield* find(actor, params.id)
       if (draft.status !== "open") return yield* closed(draft)
       const { table, current, suggestions } = yield* reviewOf(actor, draft)
-      const done = yield* suggester.suggest(actor, {
+      const done = yield* suggest({
         importId: draft.id,
         fileName: draft.fileName,
         source: { table, review: current, suggestions }
-      })
+      }).pipe(Effect.provideContext(asking))
       return {
         made: done.made,
-        suggestions: yield* suggester.list(actor.organizationId, draft.id),
+        suggestions: yield* suggestionStore.list(actor.organizationId, draft.id),
         answeredBy: done.answeredBy,
         lines: done.lines
       }
@@ -384,35 +412,26 @@ export const importsEndpoints = Effect.gen(function* () {
         if (Option.isNone(saved)) return yield* closed(draft)
       }
       const { current, authors } = yield* reviewOf(actor, draft)
-      const who = (row: { readonly id: string }): string => Option.getOrElse(Rec.get(authors, row.id), () => actor.name)
-      const rows = Arr.map(current.rows, (row): CommitRow => ({
-        rowNumber: row.rowNumber,
-        part: row.part ?? 0,
-        sku: row.values.sku,
-        name: row.values.name,
-        status:
-          row.status === "ready"
-            ? row.update
-              ? "update"
-              : "ready"
-            : row.status === "already"
-              ? "already"
-              : "notImported",
-        // Every problem of the row, so the not-imported rows and their download name each one.
-        reason: Arr.join(row.reasons, " "),
-        decidedBy: row.status === "out" ? "person" : row.status === "needs" ? "nobody" : null,
-        decidedByName: row.status === "out" ? who(row) : null,
-        item: row.item,
-        changes:
-          row.item === null
-            ? []
-            : Arr.map(row.changes, (change) => ({
-                change,
-                decidedByName: changeDecidedBy(change) === "person" ? who(row) : null
-              }))
-      }))
-      const won = yield* imports.commit(actor, draft, rows)
-      if (!won) return yield* closed(draft)
+      const plan = confirmPlan({ draft: draft.id, review: current, authors, actor })
+      // The ids of the confirm and of each item it creates are made here, so the store only writes.
+      const confirm = yield* random.uuidV4()
+      const itemIds = yield* Effect.forEach(
+        Arr.filter(plannedItems(plan), (row) => row.status === "ready"),
+        () => Effect.map(random.uuidV4(), (id) => ItemId.make(id)),
+        { concurrency: 1 }
+      )
+      const audit = yield* auditLine(actor, "Imported items")
+      const done = yield* imports.commit(
+        ConfirmWrite.make({
+          draft: draft.id,
+          fileName: draft.fileName,
+          confirm: ConfirmIdSchema.make(confirm),
+          plan,
+          itemIds,
+          audit
+        })
+      )
+      if (done.kind === "closed") return yield* closed(draft)
       const after = yield* find(actor, draft.id)
       return yield* viewOf(actor, after)
     }),
@@ -427,7 +446,11 @@ export const importsEndpoints = Effect.gen(function* () {
     }) {
       const actor = yield* requireRole("editor")
       const draft = yield* find(actor, params.id)
-      yield* imports.takeBack(actor, draft, payload.confirms)
+      const takeBack = yield* random.uuidV4()
+      const audit = yield* auditLine(actor, "Took back an import")
+      yield* imports.takeBack(
+        TakeBackWrite.make({ draft: draft.id, fileName: draft.fileName, takeBack, confirms: payload.confirms, audit })
+      )
       const after = yield* find(actor, draft.id)
       return yield* viewOf(actor, after)
     }),

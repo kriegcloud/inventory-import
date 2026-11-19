@@ -414,6 +414,33 @@ None.
 - **The app composes the catalog through one Layer**, `CatalogLive` (`@inventory/catalog-host/Host`), given the
   access context and the model service; the database stays the app's to provide.
 
+## What was owed, as it was paid
+
+- **1. The ports the brief names (decision (C4)).** In the model: `ConfirmPlan` and `confirmPlan`
+  (`Confirm/Confirm.rules.ts`; `PlannedRow` by `status`: `ready`, `update`, `already`, `notImported`), which
+  replaces the `CommitRow` type; `Answerer` (`Answer/Answerer.external.ts`: `status`, `ask(question, schema)`,
+  `answeredByRules`); `ModelAllowance` (`Answer/ModelAllowance.external.ts`: `take(purpose)`, its own union of
+  `taken` and `usedUp`); `SuggestionStore` (`list`, `store(StoreSuggestions)`); `AssistantLog` (`record(Activity)`);
+  `Catalog.ports.ts` with `CatalogPorts` and `handlersOf`, and `Catalog.handlers.ts` registering every handler
+  through it. The import store's two writes are `commit(ConfirmWrite) → Confirmed` and
+  `takeBack(TakeBackWrite) → TookBack`: the handler makes the confirm's id, one id per new item and the audit
+  line, and the store only writes. Suggesting (`Suggestion/Suggestions.handler.ts`: `propose`, `suggest`) and
+  reading a table request (`Assistant/Assistant.handler.ts`: `view`) are the model's now, on the ports. In the
+  host: `SuggestionStoreD1`, `AssistantLogD1`, `AnswererOpenRouter`, `ModelAllowanceViaAccess`, one
+  `internal/auditLine.ts`; `Suggestions.adapter.ts` and `TableAssistant.adapter.ts` are gone.
+  - Stored bytes are as they were: the plan is mapped to the same outcome rows (an empty reason for a row that is
+    written, `decidedBy` null for one already there), the SQL text is unchanged.
+  - One departure from the brief's sketch, to keep a sentence as it was: `ModelAllowanceViaAccess` hands a used-up
+    allowance on as the access contract's short words (`usedUpWords`), which the handlers finish ("The day's 40 AI
+    calls are used, so the rules answered."), not as the gateway's own sentence.
+  - Not reshaped: the import store's other methods keep today's arguments (the brief names `UploadBegin`, `Owner`,
+    `DecideWrite`, `ChoicesWrite`, `RemoveWrite`, `SkuKey` for them), and `ItemStore.edit` still answers by `_tag`.
+  - Read on screen, fresh database, model on: "Suggest fixes": "Suggested 2 names. Suggested 2 categories. Answered
+    by the model anthropic/claude-haiku-5.5."; the messy sample "Import 155, skip 45", "Leave out 2": 157 / 43,
+    Undo: 155 / 45, Redo: 157 / 43, the same after a refresh; "Import 157 items? ..."; "Not imported 43 · Imported
+    157 · Already there 0 · All 200"; Items "157 items"; the assistant, "only kilograms, cheapest first":
+    "Answered by anthropic/claude-haiku-5.5", "Filtered: UoM is KG", "20 of 157 items".
+
 ## Closing note
 
 **What stands.** Two contexts, eight packages, and an app that composes them: `access` and `catalog`, each as

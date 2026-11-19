@@ -11,7 +11,8 @@ import { type AnsweredBy } from "@inventory/catalog-contract/Answer"
 import { ModelId } from "@beep/openrouter/OpenRouterModel"
 import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
 import { dailyModelCalls } from "@inventory/access-contract/ModelAllowance"
-import { usedUp } from "@inventory/catalog-host/TableAssistant"
+import { usedUpSentence } from "@inventory/catalog-model/AssistantHandler"
+import { usedUpWords } from "@inventory/access-contract/ModelAllowance"
 import { items } from "./support/columns.ts"
 import { as, TypedApp as TestApp, testAppWith } from "./support/app.ts"
 
@@ -182,7 +183,7 @@ layer(testAppWith(answering({ changes: [{ kind: "sort", column: "name", directio
           const last = Arr.last(answers)
           expect(last._tag === "Some" && Result.isSuccess(last.value) ? last.value.success.answeredBy : last).toEqual({
             _tag: "Rules",
-            reason: usedUp
+            reason: usedUpSentence(usedUpWords)
           })
           // The rules still do the work: the same sort, read from the words.
           expect(last._tag === "Some" && Result.isSuccess(last.value) ? last.value.success.changes : last).toEqual([

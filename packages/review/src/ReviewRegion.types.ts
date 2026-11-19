@@ -4,6 +4,7 @@ import type { ReviewDecision } from "@inventory/review/ReviewDecision"
  * words or rules of its own. Do not add one product's vocabulary to this file.
  */
 import type * as HashMap from "effect/HashMap"
+import type * as O from "effect/Option"
 import type { ReactNode } from "react"
 
 /** Amber for a choice only the person can make, red for a value that cannot be imported as it is. */
@@ -111,6 +112,9 @@ export type Why = {
   targets?: ReadonlyArray<string>
 }
 
+/** How sure the source of a fix is, in a word, never a percentage. */
+export type Confidence = "high" | "medium" | "low"
+
 /** Who prepared a fix: a fixed rule or a model. */
 export type FixSource = "rule" | "model"
 
@@ -127,10 +131,10 @@ export type Fix = {
    */
   by?: FixSource
   /**
-   * How sure the source is, in a word, never a percentage. A `low` fix is a question: the person picks between
-   * `to` and `why.alternatives`, and it is never accepted for a group in one press.
+   * How sure the source is, in a word, never a percentage; none when the source did not say. A `low` fix is a
+   * question: the person picks between `to` and `why.alternatives`, and it is never accepted for a group in one press.
    */
-  confidence?: "high" | "medium" | "low"
+  confidence: O.Option<Confidence>
   /** The problem kind this change settles. */
   kind: string
   /** Identical changes share a group, and one accept settles the whole group. Never mix reasons in a group. */
@@ -227,21 +231,21 @@ export type ReviewRow = {
 export type RowDecision = ReviewDecision
 
 export type UndoStep = {
-  label: string
-  /** The decisions these rows had before the step. */
-  before: HashMap.HashMap<string, RowDecision | undefined>
-  /** The row to return focus to when the step is undone. */
-  focus: string | undefined
+  readonly label: string
+  /** The decisions these rows had before the step: none for a row that had none. */
+  readonly before: HashMap.HashMap<string, O.Option<RowDecision>>
+  /** The row to return focus to when the step is undone; none when the step names no row. */
+  readonly focus: O.Option<string>
 }
 
 export type ReviewState = {
-  decisions: HashMap.HashMap<string, RowDecision>
-  undo: ReadonlyArray<UndoStep>
+  readonly decisions: HashMap.HashMap<string, RowDecision>
+  readonly undo: ReadonlyArray<UndoStep>
   /**
    * Steps taken back, the latest last: a redo puts the last one in force again. Any new decision empties it. Each is
    * shaped like an undo step: `before` holds the decisions its rows had when it was undone.
    */
-  redo?: ReadonlyArray<UndoStep>
+  readonly redo: ReadonlyArray<UndoStep>
 }
 
 /** `cannot`: the row's problem is of a kind nothing on this screen can settle (`ProblemKind.fixable: false`). */
@@ -311,7 +315,8 @@ export type FixGroup = {
    */
   mixed?: boolean
   by: MarkSource
-  confidence?: "high" | "medium" | "low"
+  /** The fix's `confidence`. */
+  confidence: O.Option<Confidence>
   /** The file's spellings and how many rows have each, most common first. */
   variants: ReadonlyArray<{ from: string; count: number }>
   rowIds: ReadonlyArray<string>
@@ -360,7 +365,7 @@ export type ImportChange = {
   decidedBy: "person" | "rule"
   how: "accepted a proposal" | "typed or chose a value" | "applied by a rule"
   basis?: string
-  confidence?: "high" | "medium" | "low"
+  confidence: O.Option<Confidence>
 }
 
 export type ImportResult = {

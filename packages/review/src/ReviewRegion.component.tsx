@@ -63,7 +63,7 @@ import { ToggleGroup, ToggleGroupItem } from "@inventory/ui/components/toggle-gr
 import { Tooltip, TooltipContent, TooltipTrigger } from "@inventory/ui/components/tooltip"
 import { useDataTable } from "@inventory/ui/hooks/use-data-table"
 import {
-  type Action,
+  Action,
   act,
   appliedGroups,
   confirmLine,
@@ -662,7 +662,8 @@ export function ReviewRegion(props: ReviewRegionProps) {
     if (outcome.label === "") return
     // On a phone the queue moves focus to the card that takes the decided one's place.
     if (now.narrow) wanted.current = undefined
-    else if (action.type === "undo" || action.type === "redo") wanted.current = { rowId: outcome.focus }
+    else if (Action.$is("Undo")(action) || Action.$is("Redo")(action))
+      wanted.current = { rowId: O.getOrUndefined(outcome.focus) }
     else {
       // The next place on screen that still needs a decision after this one, in the order the table shows them
       // (a folded kind is opened to reach its rows); failing that, the row itself when it still needs one.
@@ -689,7 +690,7 @@ export function ReviewRegion(props: ReviewRegionProps) {
     setState(outcome.state)
     // A step that settled several rows at once can be taken back from where the eye is: a toast with Undo. It takes
     // back that step only, and only while it is still the last one.
-    const bulk = action.type !== "undo" && action.type !== "redo" && outcome.changed.length > 1
+    const bulk = !Action.$is("Undo")(action) && !Action.$is("Redo")(action) && outcome.changed.length > 1
     const step = outcome.state.undo[outcome.state.undo.length - 1]
     if (bulk && step !== undefined && !now.narrow) {
       toast(outcome.label, {
@@ -697,7 +698,7 @@ export function ReviewRegion(props: ReviewRegionProps) {
           label: "Undo",
           onClick: () => {
             const undo = latest.current.state.undo
-            if (undo[undo.length - 1] === step) latest.current.run({ type: "undo" })
+            if (undo[undo.length - 1] === step) latest.current.run(Action.Undo())
           }
         }
       })
@@ -708,14 +709,14 @@ export function ReviewRegion(props: ReviewRegionProps) {
 
   const actions = useMemo<RowActions>(
     () => ({
-      accept: (rowId) => run({ type: "accept", rowIds: [rowId] }, rowId),
-      keep: (rowId) => run({ type: "keep", rowId }, rowId),
-      leaveOut: (rowId) => run({ type: "leaveOut", rowIds: [rowId] }, rowId),
-      putBack: (rowId) => run({ type: "putBack", rowId }, rowId),
-      edit: (rowId, column, value) => run({ type: "edit", rowId, column, value }, rowId),
-      undoFix: (rowId, column) => run({ type: "revert", rowId, column, how: "undo" }, rowId),
+      accept: (rowId) => run(Action.Accept({ rowIds: [rowId] }), rowId),
+      keep: (rowId) => run(Action.Keep({ rowId }), rowId),
+      leaveOut: (rowId) => run(Action.LeaveOut({ rowIds: [rowId] }), rowId),
+      putBack: (rowId) => run(Action.PutBack({ rowId }), rowId),
+      edit: (rowId, column, value) => run(Action.Edit({ rowId, column, value }), rowId),
+      undoFix: (rowId, column) => run(Action.Revert({ rowId, column, how: "undo" }), rowId),
       ...(rejects
-        ? { reject: (rowId: string, column: string) => run({ type: "revert", rowId, column, how: "reject" }, rowId) }
+        ? { reject: (rowId: string, column: string) => run(Action.Revert({ rowId, column, how: "reject" }), rowId) }
         : {}),
       peek: (rowId) => latest.current.views.find((view) => view.row.id === rowId)
     }),
@@ -725,11 +726,11 @@ export function ReviewRegion(props: ReviewRegionProps) {
   excludedNow.current = excluded
   const groupActions = useMemo<GroupActions>(
     () => ({
-      accept: (groupId) => run({ type: "acceptGroup", groupId, except: [...excludedNow.current] }),
-      choose: (groupId, value) => run({ type: "chooseGroup", groupId, value, except: [...excludedNow.current] }),
-      leaveOut: (rowIds) => run({ type: "leaveOut", rowIds }),
-      revert: (groupId) => run({ type: "revertGroup", groupId }),
-      acceptRows: (rowIds) => run({ type: "accept", rowIds }),
+      accept: (groupId) => run(Action.AcceptGroup({ groupId, except: [...excludedNow.current] })),
+      choose: (groupId, value) => run(Action.ChooseGroup({ groupId, value, except: [...excludedNow.current] })),
+      leaveOut: (rowIds) => run(Action.LeaveOut({ rowIds })),
+      revert: (groupId) => run(Action.RevertGroup({ groupId })),
+      acceptRows: (rowIds) => run(Action.Accept({ rowIds })),
       toggle: (rowId) => setExcluded((before) => flip(before, rowId)),
       fold: (kindId) => setFolded((before) => flip(before, kindId))
     }),
@@ -776,12 +777,12 @@ export function ReviewRegion(props: ReviewRegionProps) {
       const key = event.key.toLowerCase()
       if ((event.ctrlKey || event.metaKey) && !event.altKey && key === "z") {
         event.preventDefault()
-        run({ type: event.shiftKey ? "redo" : "undo" })
+        run(event.shiftKey ? Action.Redo() : Action.Undo())
         return
       }
       if (event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && key === "y") {
         event.preventDefault()
-        run({ type: "redo" })
+        run(Action.Redo())
         return
       }
       if (event.ctrlKey || event.metaKey || event.altKey || latest.current.narrow) return
@@ -900,7 +901,7 @@ export function ReviewRegion(props: ReviewRegionProps) {
         tip={lastStep === undefined ? "Nothing to undo" : `Undo: ${lastStep.label.toLowerCase()} (${undoKeys})`}
         narrow={narrow}
         disabled={lastStep === undefined}
-        onClick={() => run({ type: "undo" })}
+        onClick={() => run(Action.Undo())}
       >
         <Undo2Icon aria-hidden />
       </ToolButton>
@@ -909,7 +910,7 @@ export function ReviewRegion(props: ReviewRegionProps) {
         tip={nextRedo === undefined ? "Nothing to redo" : `Redo: ${nextRedo.label.toLowerCase()} (${redoKeys})`}
         narrow={narrow}
         disabled={nextRedo === undefined}
-        onClick={() => run({ type: "redo" })}
+        onClick={() => run(Action.Redo())}
       >
         <Redo2Icon aria-hidden />
       </ToolButton>

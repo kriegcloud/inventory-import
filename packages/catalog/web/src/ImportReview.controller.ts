@@ -55,7 +55,7 @@ const toFix = (proposal: Proposal, reason?: string): Fix => ({
   column: proposal.field,
   to: proposal.to,
   by: proposal.by,
-  confidence: proposal.confidence,
+  confidence: O.some(proposal.confidence),
   kind: proposal.kind,
   ...(proposal.kind === "spaces" ? { group: `${proposal.field}:trim`, label: trimLabel } : { group: proposal.group }),
   why: {

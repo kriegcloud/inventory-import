@@ -1,3 +1,4 @@
+import * as O from "effect/Option"
 import {
   ArrowRightIcon,
   CheckIcon,
@@ -507,7 +508,7 @@ export function GroupChange(props: {
  * `brief` keeps it to one line: who is behind it and the reason, without the evidence.
  */
 export function Reason(props: {
-  fix: { by?: MarkSource | undefined; confidence?: Fix["confidence"]; why: Fix["why"] }
+  fix: { by?: MarkSource | undefined; confidence: Fix["confidence"]; why: Fix["why"] }
   brief?: boolean
   className?: string
 }) {
@@ -517,7 +518,7 @@ export function Reason(props: {
     // The whole reason on hover: in a heading of one line it is the part that is cut.
     <span className={cn("text-muted-foreground", props.className)}>
       <span className="font-medium text-foreground">
-        {sourceAndConfidence({ by, confidence: props.fix.confidence })}.
+        {sourceAndConfidence({ by, confidence: O.getOrUndefined(props.fix.confidence) })}.
       </span>{" "}
       {why.basis}
       {why.detail === undefined || props.brief === true ? null : ` ${why.detail}`}

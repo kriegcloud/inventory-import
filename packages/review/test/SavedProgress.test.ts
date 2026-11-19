@@ -11,7 +11,7 @@ import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import { describe, expect, it as plain } from "vitest"
 import { ReviewDecision } from "@inventory/review/ReviewDecision"
-import { act, emptyState, restored, saved } from "@inventory/review/ReviewDraft"
+import { Action, act, emptyState, restored, saved } from "@inventory/review/ReviewDraft"
 import type { ReviewRow, ReviewState } from "@inventory/review/ReviewTypes"
 import {
   clearProgress,
@@ -119,13 +119,13 @@ describe("saved progress", () => {
           const row = rows[step.row]
           if (row === undefined) continue
           const action = step.leaveOut
-            ? ({ type: "leaveOut", rowIds: [row.id] } as const)
-            : ({ type: "edit", rowId: row.id, column: "qty", value: step.value } as const)
+            ? Action.LeaveOut({ rowIds: [row.id] })
+            : Action.Edit({ rowId: row.id, column: "qty", value: step.value })
           state = act({ rows, state, action }).state
         }
-        for (let i = 0; i < undos; i++) state = act({ rows, state, action: { type: "undo" } }).state
+        for (let i = 0; i < undos; i++) state = act({ rows, state, action: Action.Undo() }).state
         // And one redo, so the redo history makes the trip too.
-        if (undos > 1) state = act({ rows, state, action: { type: "redo" } }).state
+        if (undos > 1) state = act({ rows, state, action: Action.Redo() }).state
         // What a refresh does: the decisions handed out, kept as JSON text, decoded and handed back.
         const text = yield* S.encodeEffect(asText)(storedReview(saved(state)))
         const stored = yield* S.decodeEffect(asText)(text)
@@ -140,8 +140,8 @@ describe("saved progress", () => {
         expect(redoHistory(back)).toEqual(redoHistory(state))
         // Undo after the refresh takes back the same step it would have taken before it.
         if (state.undo.length > 0) {
-          expect(plainOf(act({ rows, state: back, action: { type: "undo" } }).state.decisions)).toEqual(
-            plainOf(act({ rows, state, action: { type: "undo" } }).state.decisions)
+          expect(plainOf(act({ rows, state: back, action: Action.Undo() }).state.decisions)).toEqual(
+            plainOf(act({ rows, state, action: Action.Undo() }).state.decisions)
           )
         }
       })

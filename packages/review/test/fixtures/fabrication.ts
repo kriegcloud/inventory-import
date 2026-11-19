@@ -418,7 +418,7 @@ const eachFix = (from: string): Fix => ({
   column: "unit",
   to: "pcs",
   by: "rule",
-  confidence: "high",
+  confidence: O.some("high"),
   kind: "unit",
   group: "unit:each",
   why: { basis: `"${from}" means each: one piece.`, detail: "Matched against your unit list: pcs, kg, m, L." }
@@ -428,7 +428,7 @@ const lengthFix: Fix = {
   column: "unit",
   to: "pcs",
   by: "model",
-  confidence: "low",
+  confidence: O.some("low"),
   kind: "unit",
   group: "unit:length",
   why: {
@@ -442,7 +442,7 @@ const caseFix = (to: "kg" | "pcs"): Fix => ({
   column: "unit",
   to,
   by: "rule",
-  confidence: "high",
+  confidence: O.some("high"),
   kind: "unit",
   group: `unit:case:${to}`,
   why: { basis: `The same unit as ${to}, spelled another way.` }
@@ -533,7 +533,7 @@ export function makeRows(input: { size: number; clean?: boolean; withoutUnit?: b
             column: "name",
             to: cells.sku ?? "",
             by: "rule",
-            confidence: "medium",
+            confidence: O.some("medium"),
             kind: "name",
             why: {
               basis: "The file has no name for this row.",

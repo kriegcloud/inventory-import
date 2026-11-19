@@ -14,6 +14,7 @@ import { firstDecisions, review } from "@inventory/catalog-model/Review"
 import { type StagedTable } from "@inventory/catalog-contract/Staged"
 import { sourceLead, sourceWordsFor } from "@inventory/ui/ProposalSource"
 import {
+  Action,
   act,
   count,
   decisionsLeft,
@@ -75,10 +76,13 @@ describe("who is behind a suggestion", () => {
         ...(row.applied ?? []),
         ...(row.problem?.fix === undefined ? [] : [row.problem.fix])
       ])
-      const questions = A.filter(fixes, (fix) => fix.confidence === "low")
+      const questions = A.filter(fixes, (fix) => O.contains(fix.confidence, "low"))
       expect(questions.length).toBeGreaterThan(0)
       for (const fix of fixes) expect(fix.by).toBe("rule")
-      for (const fix of questions) expect(Str.toLowerCase(sourceLead(fix))).not.toContain("model")
+      for (const fix of questions)
+        expect(Str.toLowerCase(sourceLead({ by: fix.by, confidence: O.getOrUndefined(fix.confidence) }))).not.toContain(
+          "model"
+        )
     })
   )
 })
@@ -133,7 +137,7 @@ describe("rows that cannot be fixed here", () => {
     expect(cannot === undefined ? "" : reasonOf({ view: cannot, kinds: kindsOf(kinds) })).toBe(
       "Item 3 is not in the system yet."
     )
-    expect(act({ rows, state: emptyState, action: { type: "leaveOut", rowIds: ["row-3"] }, fixable }).label).toBe("")
+    expect(act({ rows, state: emptyState, action: Action.LeaveOut({ rowIds: ["row-3"] }), fixable }).label).toBe("")
     expect(heldLine(counts)).toBe("3 won't be imported: Needs a decision 1, Cannot import 2")
   })
 
@@ -184,7 +188,7 @@ describe("status words", () => {
   it("are set once by the caller and said everywhere they show", () => {
     const words = reviewWords({ out: "Skipped", stored: "In stock already", needs: "Waiting on you" })
     const rows = [row(2, { problem: { kind: "unit", column: "name" } }), row(3), row(4, { stored: true })]
-    const left = act({ rows, state: emptyState, action: { type: "leaveOut", rowIds: ["row-3"] } }).state
+    const left = act({ rows, state: emptyState, action: Action.LeaveOut({ rowIds: ["row-3"] }) }).state
     const views = viewRows({ rows, state: left })
     const csv = heldCsv({ views, columns, problemKinds: kinds, words })
     expect(csv).toContain("3,Skipped,Item 3")

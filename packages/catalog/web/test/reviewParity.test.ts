@@ -20,7 +20,7 @@ import {
   act,
   columnFor,
   count,
-  type Action,
+  Action,
   restored,
   result,
   saved,
@@ -102,10 +102,10 @@ describe("the screen and the server apply decisions the same way", () => {
         for (let round = 0; round < 60; round += 1) {
           const group = A.findFirst(
             waitingGroups({ views: s.derive().views }),
-            (candidate) => candidate.confidence !== "low"
+            (candidate) => !O.contains(candidate.confidence, "low")
           )
           if (group._tag === "None") break
-          s.press({ type: "acceptGroup", groupId: group.value.id })
+          s.press(Action.AcceptGroup({ groupId: group.value.id, except: [] }))
           s.agree()
         }
         // What is left are the rows only a person can settle. One of each answer the screen offers, on real rows.
@@ -113,7 +113,7 @@ describe("the screen and the server apply decisions the same way", () => {
         expect(left.length).toBeGreaterThan(0)
         const typed = A.findFirst(left, (view) => view.problem?.column === "sku" && view.problem.rivals === undefined)
         if (typed._tag === "Some") {
-          s.press({ type: "edit", rowId: typed.value.row.id, column: "sku", value: "ZZZ-9999" })
+          s.press(Action.Edit({ rowId: typed.value.row.id, column: "sku", value: "ZZZ-9999" }))
           s.agree()
         }
         const picked = A.findFirst(
@@ -124,7 +124,7 @@ describe("the screen and the server apply decisions the same way", () => {
           const choice = picked.value.problem?.choices?.[0]
           const column = picked.value.problem?.column
           if (choice !== undefined && column !== undefined) {
-            s.press({ type: "edit", rowId: picked.value.row.id, column, value: choice.value })
+            s.press(Action.Edit({ rowId: picked.value.row.id, column, value: choice.value }))
             s.agree()
           }
         }
@@ -133,22 +133,22 @@ describe("the screen and the server apply decisions the same way", () => {
           (view) => view.status === "needs" && view.problem?.rivals !== undefined
         )
         if (rivals._tag === "Some") {
-          s.press({ type: "keep", rowId: rivals.value.row.id })
+          s.press(Action.Keep({ rowId: rivals.value.row.id }))
           s.agree()
           // Only the first kept row may win: keeping its rival too must not make both ready.
           const rival = rivals.value.problem?.rivals?.[0]
           if (rival !== undefined) {
-            s.press({ type: "keep", rowId: rival })
+            s.press(Action.Keep({ rowId: rival }))
             s.agree()
           }
         }
         const out = A.findFirst(s.derive().views, (view) => view.status === "needs")
         if (out._tag === "Some") {
-          s.press({ type: "leaveOut", rowIds: [out.value.row.id] })
+          s.press(Action.LeaveOut({ rowIds: [out.value.row.id] }))
           s.agree()
-          s.press({ type: "undo" })
+          s.press(Action.Undo())
           s.agree()
-          s.press({ type: "redo" })
+          s.press(Action.Redo())
         }
         const { current, views } = s.agree()
         const { counts } = current
@@ -233,8 +233,8 @@ describe("a row discontinued yet active, on the screen", () => {
         const value = answer === "Not active" ? fix.to : ""
         s.press(
           value === fix.to
-            ? { type: "accept", rowIds: ["row-45"] }
-            : { type: "edit", rowId: "row-45", column: columnFor(fix, value), value }
+            ? Action.Accept({ rowIds: ["row-45"] })
+            : Action.Edit({ rowId: "row-45", column: columnFor(fix, value), value })
         )
         const { current, views } = s.agree()
         const row = O.getOrUndefined(A.findFirst(current.rows, (candidate) => candidate.id === "row-45"))
@@ -246,7 +246,7 @@ describe("a row discontinued yet active, on the screen", () => {
           answer === "Not active" ? { kind: "discontinued", on: "2025-06-30" } : { kind: "active" }
         )
         // Undone, the row asks again on both sides.
-        s.press({ type: "undo" })
+        s.press(Action.Undo())
         expect(
           O.getOrUndefined(A.findFirst(s.agree().current.rows, (candidate) => candidate.id === "row-45"))?.outcome
         ).toBe("decision")
@@ -292,7 +292,7 @@ describe("what the review screen is handed for a pick, for spaces and for a stor
       ])
       const group = groups[0]
       if (group === undefined) return
-      s.press({ type: "acceptGroup", groupId: group.id })
+      s.press(Action.AcceptGroup({ groupId: group.id, except: [] }))
       const { current } = s.agree()
       const trimmed = A.filter(current.rows, (row) => A.contains(group.rowIds, row.id))
       expect(A.map(trimmed, (row) => row.values.sku)).toEqual(A.map(trimmed, (row) => Str.trim(row.file.sku)))
@@ -328,14 +328,14 @@ describe("what the review screen is handed for a pick, for spaces and for a stor
         // The button says what the choice is, not the SKU column the problem sits on.
         expect(view?.problem?.ask).toBe("Keep or replace")
         expect(A.map(view?.problem?.choices ?? [], (choice) => choice.value)).toEqual(["keep", "replace"])
-        s.press({ type: "edit", rowId: "row-2", column: storedChoice, value: answer })
+        s.press(Action.Edit({ rowId: "row-2", column: storedChoice, value: answer }))
         // As the server stores it: the one flag, and nothing else said about the row.
         const sent = s.decisions["row-2"]
         expect(sent === undefined ? sent : decisionToFlags(sent)).toEqual({ stored: answer })
         const { current } = s.agree()
         expect(current.rows[0]?.status).toBe(answer === "keep" ? "already" : "ready")
         expect(current.rows[0]?.update).toBe(answer === "replace")
-        s.press({ type: "undo" })
+        s.press(Action.Undo())
         expect(s.agree().current.rows[0]?.status).toBe("needs")
       }
     })

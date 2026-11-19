@@ -50,6 +50,8 @@ import { SameOriginLive } from "../../../src/server/SameOrigin.ts"
 import { testAccountPassword } from "@inventory/access-host/TestAccounts"
 
 const migrations = new URL("../../../migrations/", import.meta.url)
+// The two test organizations and their people: a seed, not a migration, so a production database starts empty.
+const organizations = new URL("../../../seeds/organizations.sql", import.meta.url)
 
 /** Settings as the tests see them: no AI key, the model id wrangler.jsonc sets, a sign-in secret, and quiet logs. */
 export const testSettings = {
@@ -80,7 +82,7 @@ export const DevToolsWhenAsked = Layer.unwrap(
  * so the SQL client, Better Auth (which takes the raw binding, `D1Binding`) and the seeding share the database one
  * layer build opens.
  */
-export const TestDatabase = D1Test.layer(D1TestOptions.make({ migrations })).pipe(Layer.orDie)
+export const TestDatabase = D1Test.layer(D1TestOptions.make({ migrations, seeds: [organizations] })).pipe(Layer.orDie)
 
 /**
  * Better Auth on the test database, as the Worker builds it: no `waitUntil`, rate limits off unless asked for, and a
@@ -287,7 +289,7 @@ export const send = Effect.fn("test.send")(function* (options: {
 })
 
 /** The local test accounts, written into the test database the way `bun run dev` writes them. */
-export const SeededAccounts = D1Test.seed(new URL("../../../scripts/dev-accounts.sql", import.meta.url)).pipe(
+export const SeededAccounts = D1Test.seed(new URL("../../../seeds/accounts.sql", import.meta.url)).pipe(
   Layer.provide(TestDatabase),
   Layer.orDie
 )

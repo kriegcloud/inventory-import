@@ -39,20 +39,20 @@ if (result.status !== 0) {
 const applied = /No migrations to apply/.test(result.stdout) ? 0 : (result.stdout.match(/✅/g) ?? []).length
 console.log(applied > 0 ? `Local database: applied ${applied} migration(s).` : "Local database: up to date.")
 
-// Sign-in accounts for the seeded people (local only; see scripts/dev-accounts.mjs). Safe to apply on every start.
-const seed = spawnSync(
-  process.execPath,
-  [wrangler, "d1", "execute", "DB", "--local", "--file", "scripts/dev-accounts.sql"],
-  {
+// The seeds, after the migrations: the two test organizations and their people, then sign-in accounts for them
+// (seeds/; scripts/dev-accounts.mjs writes the second). Local only: a deployed stage gets the seeds its plan names
+// (packages/infra), and production gets none. Both are safe to apply on every start.
+for (const file of ["seeds/organizations.sql", "seeds/accounts.sql"]) {
+  const seed = spawnSync(process.execPath, [wrangler, "d1", "execute", "DB", "--local", "--file", file], {
     stdio: ["ignore", "pipe", "pipe"],
     env: { ...process.env, CI: "true", WRANGLER_SEND_METRICS: "false" },
     encoding: "utf8"
+  })
+  if (seed.status !== 0) {
+    process.stderr.write(seed.stdout ?? "")
+    process.stderr.write(seed.stderr ?? "")
+    process.exit(seed.status ?? 1)
   }
-)
-if (seed.status !== 0) {
-  process.stderr.write(seed.stdout ?? "")
-  process.stderr.write(seed.stderr ?? "")
-  process.exit(seed.status ?? 1)
 }
 console.log('Local database: test accounts ready (README.md, "Signing in").')
 

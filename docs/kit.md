@@ -434,7 +434,7 @@ relative to the folder the server started in: a side session in a git worktree t
 starts in that worktree, not in the main checkout.
 
 **A production build** (`bun run preview`) opens on the sign-in page and offers no test accounts, as a deployed copy
-does. Its local database has the test accounts all the same (migrate applies `scripts/dev-accounts.sql`): sign in
+does. Its local database has the test accounts all the same (migrate applies `seeds/accounts.sql`): sign in
 with the first one's email and the test password (`README.md` lists them all). The dev server opens signed in.
 
 It is pinned (`0.0.85`) and started through `bunx` from bun's cache like the shadcn server: 0.2 to 0.4 s to answer

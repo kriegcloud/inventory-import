@@ -1,4 +1,4 @@
--- Local test accounts, written by scripts/dev-accounts.mjs. Applied by scripts/migrate-local.mjs, never deployed.
+-- Test accounts, written by scripts/dev-accounts.mjs. Applied locally by scripts/migrate-local.mjs; never to production.
 -- Every account's password is 'local-test-password'. Re-running it changes nothing (INSERT OR IGNORE, guarded UPDATE).
 INSERT OR IGNORE INTO "user" (id, name, email, emailVerified, image, createdAt, updatedAt) VALUES ('usr_dana', 'Dana Whitfield', 'dana@example-works.test', 1, NULL, '2026-11-13T00:00:00.000Z', '2026-11-13T00:00:00.000Z');
 INSERT OR IGNORE INTO account (id, accountId, providerId, userId, password, createdAt, updatedAt) VALUES ('acc_dana', 'usr_dana', 'credential', 'usr_dana', 'c13aa8fc78a2a96574e46bef7fc25fc3:ce58d2e1527c5a7b2c2d1d3512bee629da2f303b63eaa2dbe7b452160d586df9b95905e73920cd04723b0827be4e2df150a411a61a6192a37b5b72aeb9f5470e', '2026-11-13T00:00:00.000Z', '2026-11-13T00:00:00.000Z');

@@ -1,6 +1,6 @@
 // LOCAL TEST ACCOUNTS. Five real accounts in the two seeded organizations, all three roles, and one person in both,
 // so nobody who runs the app has to sign up to see it. `bun run dev` writes them into the local database
-// (scripts/migrate-local.mjs applies scripts/dev-accounts.sql, which scripts/dev-accounts.mjs writes from the list
+// (scripts/migrate-local.mjs applies seeds/accounts.sql, which scripts/dev-accounts.mjs writes from the list
 // below), and the sign-in page offers them in one click while TEST_ACCOUNTS is on (development; off in a production
 // build). They are ordinary Better Auth accounts with a scrypt password hash: nothing about signing in as one differs
 // from signing in as anyone else.
@@ -11,7 +11,7 @@
 /** The one password of every test account. Written in README.md; it opens nothing outside a local database. */
 export const testAccountPassword = "local-test-password"
 
-/** One membership of a test account: `role` null for a member 0001_init.sql seeded, linked to the account. */
+/** One membership of a test account: `role` null for a member seeds/organizations.sql holds, linked to the account. */
 type SeededMembership = {
   readonly memberId: string
   readonly organizationId: string

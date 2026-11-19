@@ -1,5 +1,5 @@
-// Writes scripts/dev-accounts.sql: sign-in accounts for the seeded people, for local development only.
-//   bun scripts/dev-accounts.mjs > scripts/dev-accounts.sql
+// Writes seeds/accounts.sql: sign-in accounts for the seeded people, for local development only.
+//   bun scripts/dev-accounts.mjs > seeds/accounts.sql
 // `bun run dev` (scripts/migrate-local.mjs) applies that file to the local database after the migrations. It is not a
 // migration, so a deployed database never gets these accounts. Passwords are hashed with Better Auth's own
 // hashPassword (scrypt), so the rows are what its sign-up would have written. The accounts and their password are
@@ -10,7 +10,7 @@ import { seededAccounts, testAccountPassword } from "../../../packages/access/ho
 const at = "2026-11-13T00:00:00.000Z"
 const q = (value) => `'${String(value).replaceAll("'", "''")}'`
 const lines = [
-  "-- Local test accounts, written by scripts/dev-accounts.mjs. Applied by scripts/migrate-local.mjs, never deployed.",
+  "-- Test accounts, written by scripts/dev-accounts.mjs. Applied locally by scripts/migrate-local.mjs; never to production.",
   `-- Every account's password is ${q(testAccountPassword)}. Re-running it changes nothing (INSERT OR IGNORE, guarded UPDATE).`
 ]
 for (const account of seededAccounts) {
@@ -21,7 +21,7 @@ for (const account of seededAccounts) {
   )
   for (const membership of account.memberships) {
     if (membership.role === null) {
-      // One of the people 0001 seeded: link the existing member row to the account.
+      // One of the people seeds/organizations.sql holds: link the existing member row to the account.
       lines.push(
         `UPDATE member SET userId = ${q(account.userId)} WHERE id = ${q(membership.memberId)} AND userId IS NULL;`
       )

@@ -52,7 +52,7 @@ OPENROUTER_API_KEY=
 # refused while the service cannot be reached.
 # PWNED_PASSWORD_CHECK=true
 # true or false. Offer the local test accounts in one click on the sign-in page. Default: on in development, off in a
-# production build. Only `bun run dev` writes those accounts (scripts/dev-accounts.sql, password local-test-password),
+# production build. Only `bun run dev` writes those accounts (seeds/accounts.sql, password local-test-password),
 # so a deployed database has none whatever this says.
 # TEST_ACCOUNTS=false
 # --- Developer tools ----------------------------------------------------------------------------------------------

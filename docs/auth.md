@@ -141,8 +141,8 @@ Better Auth's tables come first in `0001_init.sql`, because `member.userId` refe
 
 ## Test accounts and a deployed database
 
-The accounts are listed once, in `packages/access/host/src/internal/TestAccounts.ts`. `scripts/dev-accounts.sql` (written by
-`bun scripts/dev-accounts.mjs > scripts/dev-accounts.sql`) adds a user and a password for each seeded person, and makes
+The accounts are listed once, in `packages/access/host/src/internal/TestAccounts.ts`. `seeds/accounts.sql` (written by
+`bun scripts/dev-accounts.mjs > seeds/accounts.sql`) adds a user and a password for each seeded person, and makes
 Dana a viewer in Sample Supply so switching can be seen. `bun run dev` applies it after the migrations. It is not a
 migration, so a deployed database has no accounts: the first person signs up and creates their organization, and an
 admin adds others.

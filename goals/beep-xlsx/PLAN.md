@@ -14,9 +14,9 @@ brief's "Order of moves".
 | --- | --- | --- |
 | 1 | The package's frame beside `@beep/csv`: manifest, tsconfigs, identity, an empty barrel | done |
 | 2 | Schemas in the order of the Sketch, their behaviour, `XlsxSchemas.property.test.ts` | done |
-| 3 | Reading: container, parts, sheet; `parse`, `sheets`, `rows`; hostile tests | doing |
-| 4 | Writing: `stringify`, the codecs; round-trip laws; the SheetJS oracle | todo |
-| 5 | The adapter beside the SheetJS reader; parity over fixtures and generated workbooks | todo |
+| 3 | Reading: container, parts, sheet; `parse`, `sheets`, `rows`; hostile tests | done |
+| 4 | Writing: `stringify`, the codecs; round-trip laws; the SheetJS oracle | done |
+| 5 | The adapter beside the SheetJS reader; parity over fixtures and generated workbooks | doing |
 | 6 | Expected tables frozen; the swap; SheetJS reader and its entries removed; browser pass; documents | todo |
 
 ## Current blocker
@@ -51,3 +51,22 @@ Where the brief left a choice open, or the code showed the brief could not be fo
   where it showed PM for a time that rounds up to midnight and lost the 1904 system on that same carry.
 - **A serial's time is cut to 15 significant digits before it is read**, as a workbook stores it and as the old
   reader did, so 0.6041666666666666 is 14:30:00 and not 14:29:59.
+- **Three passes at most, usually two.** The brief had two passes with the sheets skipped on the first. Which part
+  is the workbook is known only from the relationships, which can come anywhere, so the first pass holds every
+  `.rels` part and every `.xml` part outside a `worksheets` folder and counts every part against the caps; a second
+  pass runs only when the workbook, styles or shared text sit somewhere that pass did not hold; the last reads the
+  sheets asked for. Measured in Node 26 on 50,000 rows by 15 columns (9.7 MB): 449 ms against the old reader's
+  1,129 ms, and counting every sheet without keeping it 399 ms.
+- **The reader builds cells without `make`.** `make` on each of 750,000 cells cost more than reading the file
+  (2,300 ms). `internal/trusted.ts` is the one place a value takes its brand from parts the reader has just checked;
+  the tests hold every workbook read, from a fixture, a generated file or the oracle, to `S.is(XlsxWorkbook)`.
+- **A cell's text is copied out of the XML it was cut from** (`detached`), or one kept string holds a whole parsed
+  chunk in memory.
+- **A file cut inside its directory still reads.** The hostile test cuts a file at every hundredth byte: a cut
+  inside an entry is a typed failure; a cut after the last entry reads to exactly the whole file's values, since the
+  zip reader never needs the directory. The brief expected every cut to fail.
+- **No file in the package is a binary fixture.** The brief had fixtures "built by one committed script"; they are
+  built in the tests from the parts in `test/support/workbooks.ts`.
+- **`sheetFromBytes` takes a row schema over `XlsxRecord`** (each heading to the `XlsxValue` its cell holds), and
+  `recordsFromBytes` is the codec under it. A heading that is not text, or is used twice, is a schema issue.
+- **`XlsxContainer` is defined beside the findings** (`NotAWorkbook` carries it) and exported from `XlsxRead` too.

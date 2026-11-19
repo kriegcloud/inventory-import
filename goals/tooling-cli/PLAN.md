@@ -70,13 +70,18 @@ None.
 
 Where the brief left a choice open, or the code showed the brief could not be followed as written.
 
-- **A rule hands back its lines, not a union of findings.** The brief asked for each rule's findings as a tagged
-  union with one case per failure sentence, rendered in one place. Each rule here returns a `Report`: the lines it
-  would print, in order, each for standard output or standard error, and whether it failed; the command prints it. A
-  test reads those lines, which is what the parity proof compares. A union per rule would add some forty cases whose
-  only use is to be turned back into the same sentences. Open to change if the findings are ever wanted as data.
-- **One row is new in `laws boundaries`**: nothing may depend on a `tooling` package, an app included. The script
-  had no such row because there was no such package. It has its own test, and is outside the parity proof.
+- **A rule hands back typed findings** (decision "tooling CLI: what a rule returns"). The first build returned the
+  lines each rule prints. Each rule now returns values of its own tagged union (`CeilingsFinding`, `StrictFinding`,
+  `ExportsFinding`, `KeysFinding`, `BoundariesFinding`, `ScreensFinding`, `VendorCheckFinding`, `VendorSyncFinding`,
+  `OkfFinding`, and for the imports rule `EffectImportsFinding` over `ImportFault` and `RepairLeft`), each with its
+  `sentence`, and one renderer (`render` and `emit` in `Report.schema.ts`) prints them; a rule failed when a finding
+  goes to standard error. Proved unchanged: all 37 cases of the proofs above (every command on the unchanged tree and
+  on every plant) were captured before and after, and standard output, standard error and exit code are the same
+  byte for byte, but for the file count in the imports rule's own line, which rose by one for the new schema file.
+  A sentence that was one print of several lines (`check-exports FAIL` and its problems, and the same in
+  `laws boundaries` and `laws keys`) is now one finding per line; three tests' expectations were split to match.
+  Every member of every union has its own test (`test/Findings.test.ts`), keyed by the union's tags so that a new
+  member without one does not compile.
 - **`quality strict` exits 1 on two refusals where the script exited 0.** When no tsconfig had the plugin, or no
   ceiling file was named, the script printed its FAIL sentence and returned before it set the exit code, so the
   check passed. The command fails. The second sentence now names the command instead of the script's path.
@@ -100,7 +105,7 @@ Where the brief left a choice open, or the code showed the brief could not be fo
 ## Closing note
 
 `scripts/` is gone: the ten rules are commands of `@beep/repo-cli`, type-checked under the full profile with no
-override, with 31 tests. `bun run check` and `bun run check:full` run them under the same root script names and
+override, with 106 tests. `bun run check` and `bun run check:full` run them under the same root script names and
 turbo task names. What was learned:
 
 - Two rules read source text by pattern (`laws boundaries`, and the comment and document half of `laws

@@ -28,7 +28,7 @@ import * as R from "effect/Record"
 import * as Str from "effect/String"
 import type { RepoError } from "../../Cli.errors.ts"
 import { Repo } from "../../Repo.service.ts"
-import { err, failed, type Line, out, passed } from "../../Report.schema.ts"
+import type { EffectImportsFinding } from "./EffectImports.schema.ts"
 import { judgeCode, repairCode } from "./internal/effectImportsCode.ts"
 import { type Installed, judgeText, lineOf } from "./internal/effectImportsJudge.ts"
 
@@ -129,20 +129,24 @@ export const effectImports = Effect.fn("EffectImports.effectImports")(function* 
   const perCode = yield* Effect.forEach(
     codeFiles,
     Effect.fnUntraced(function* (file): Effect.fn.Return<
-      { readonly problems: ReadonlyArray<string>; readonly changed: boolean },
+      { readonly problems: ReadonlyArray<EffectImportsFinding>; readonly changed: boolean },
       RepoError
     > {
       const absolute = repo.join(repo.root, file)
       const original = yield* repo.text(absolute)
-      const repaired = write ? repairCode(installed)(file, original) : { text: original, left: A.empty<string>() }
+      const repaired = write ? repairCode(installed)(file, original) : { text: original, left: [] }
       if (repaired.text !== original) yield* repo.write(absolute, repaired.text)
+      const line = lineOf(repaired.text)
       return {
-        problems: A.appendAll(
-          A.map(repaired.left, (sentence) => `${file}  ${sentence}`),
-          A.map(
-            judgeCode(installed)(file, repaired.text),
-            (hit) => `${file}:${lineOf(repaired.text)(hit.offset)}  ${hit.sentence}`
-          )
+        problems: A.appendAll<EffectImportsFinding, EffectImportsFinding>(
+          A.map(repaired.left, (left) => ({ _tag: "Left", file, left })),
+          A.map(judgeCode(installed)(file, repaired.text), (hit) => ({
+            _tag: "Fault",
+            file,
+            line: line(hit.offset),
+            inComment: hit.inComment,
+            fault: hit.fault
+          }))
         ),
         changed: repaired.text !== original
       }
@@ -153,7 +157,13 @@ export const effectImports = Effect.fn("EffectImports.effectImports")(function* 
     textFiles,
     (file) =>
       Effect.map(repo.text(repo.join(repo.root, file)), (text) =>
-        A.map(judgeText(installed)(text), (hit) => `${file}:${lineOf(text)(hit.offset)}  ${hit.sentence}`)
+        A.map(judgeText(installed)(text), (hit): EffectImportsFinding => ({
+          _tag: "Fault",
+          file,
+          line: lineOf(text)(hit.offset),
+          inComment: hit.inComment,
+          fault: hit.fault
+        }))
       ),
     { concurrency: 1 }
   )
@@ -162,21 +172,14 @@ export const effectImports = Effect.fn("EffectImports.effectImports")(function* 
     A.flatMap(perCode, (one) => one.problems),
     A.flatten(perText)
   )
-  const wrote: ReadonlyArray<Line> = write
-    ? [out(`check-effect-imports wrote ${A.filter(perCode, (one) => one.changed).length} of ${files} files`)]
+  const wrote: ReadonlyArray<EffectImportsFinding> = write
+    ? [{ _tag: "Wrote", changed: A.filter(perCode, (one) => one.changed).length, files }]
     : []
   return A.isReadonlyArrayNonEmpty(problems)
-    ? failed(
-        A.flatten([
-          wrote,
-          [err(`check-effect-imports FAIL  ${problems.length} in ${files} files (docs/standards/effect-imports.md)`)],
-          A.map(problems, (problem) => err(`  ${problem}`))
-        ])
-      )
-    : passed(
-        A.append(
-          wrote,
-          out(`check-effect-imports OK  ${files} files, every Effect import from its own path under its own name`)
-        )
-      )
+    ? A.flatten<ReadonlyArray<ReadonlyArray<EffectImportsFinding>>>([
+        wrote,
+        [{ _tag: "Refused", problems: problems.length, files }],
+        problems
+      ])
+    : A.append<EffectImportsFinding, EffectImportsFinding>(wrote, { _tag: "Held", files })
 })

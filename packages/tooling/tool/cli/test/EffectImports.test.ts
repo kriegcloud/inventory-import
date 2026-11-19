@@ -2,7 +2,8 @@ import { describe, expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as HashSet from "effect/HashSet"
 import { judgeCode, repairCode } from "../src/commands/Laws/internal/effectImportsCode.ts"
-import { type Installed, judgeText } from "../src/commands/Laws/internal/effectImportsJudge.ts"
+import { faultSentence, leftSentence } from "../src/commands/Laws/EffectImports.schema.ts"
+import { type Hit, type Installed, judgeText } from "../src/commands/Laws/internal/effectImportsJudge.ts"
 
 // A small installed world: enough modules for every kind of sentence.
 const installed: Installed = {
@@ -25,7 +26,8 @@ const installed: Installed = {
 // The statements are put together from two halves, so the rule does not read this file's fixtures as its imports.
 const from = (clause: string, source: string) => `import ${clause} from "${source}"`
 const lines = (all: ReadonlyArray<string>) => A.join(all, "\n")
-const sentences = (source: string) => A.map(judgeCode(installed)("a.ts", source), (hit) => hit.sentence)
+const said = (hit: Hit) => `${hit.inComment ? "in a comment, " : ""}${faultSentence(hit.fault)}`
+const sentences = (source: string) => A.map(judgeCode(installed)("a.ts", source), said)
 
 describe("laws effect-imports", () => {
   it("passes the house form, the functions by name and the test runner's root", () => {
@@ -77,7 +79,7 @@ describe("laws effect-imports", () => {
     expect(sentences(`/**\n * ${from("{ Record as Rec }", "effect")}\n */\nexport const x = 1\n`)).toEqual([
       `in a comment, root-barrel: Record from "effect". Write: ${from("* as R", "effect/Record")}`
     ])
-    expect(A.map(judgeText(installed)(`Write \`${from("{ Effect }", "effect")}\`.`), (hit) => hit.sentence)).toEqual([
+    expect(A.map(judgeText(installed)(`Write \`${from("{ Effect }", "effect")}\`.`), said)).toEqual([
       `root-barrel: Effect from "effect". Write: ${from("* as Effect", "effect/Effect")}`
     ])
   })
@@ -115,7 +117,7 @@ describe("laws effect-imports", () => {
 
   it("leaves a renamed name used as a shorthand property for a person, as the script did", () => {
     const repaired = repairCode(installed)("a.ts", `${from("{ Option }", "effect")}\nexport const keep = { Option }\n`)
-    expect(repaired.left).toEqual(["overlapping edits: repair this file by hand"])
+    expect(A.map(repaired.left, leftSentence)).toEqual(["overlapping edits: repair this file by hand"])
   })
 
   it("leaves a name that is declared again inside the file, and says so", () => {
@@ -123,6 +125,8 @@ describe("laws effect-imports", () => {
       "a.ts",
       `${from("{ Option }", "effect")}\nexport const f = (Option: number) => Option + 1\n`
     )
-    expect(repaired.left).toEqual(["Option is declared again inside the file: rename its uses to O by hand"])
+    expect(A.map(repaired.left, leftSentence)).toEqual([
+      "Option is declared again inside the file: rename its uses to O by hand"
+    ])
   })
 })

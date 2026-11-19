@@ -7,13 +7,46 @@
  *
  * @packageDocumentation
  */
+import { $RepoCliId } from "@beep/identity/packages"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
+import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import { Repo } from "../../Repo.service.ts"
-import { err, failed, out, passed } from "../../Report.schema.ts"
+import { err, type Line, out } from "../../Report.schema.ts"
 
 const pattern = "sk-or-[A-Za-z0-9_-]{16,}|sk-ant-[A-Za-z0-9_-]{16,}|-----BEGIN [A-Z ]*PRIVATE KEY"
+
+const $I = $RepoCliId.create("commands/Laws/Keys.rules")
+
+/**
+ * What `laws keys` finds: nothing, or a refusal and each place a key-shaped string is. Never the string.
+ *
+ * @category schemas
+ */
+export const KeysFinding = S.TaggedUnion({
+  Clean: {},
+  Refused: {},
+  At: { place: S.String.pipe(S.annotateKey({ description: "The file and line, as file:line" })) }
+}).pipe($I.annoteSchema("KeysFinding", { description: "No key-shaped string, or a refusal and each place one is" }))
+
+/**
+ * The decoded value of `KeysFinding`.
+ *
+ * @category models
+ */
+export type KeysFinding = typeof KeysFinding.Type
+
+/**
+ * The line each finding prints.
+ *
+ * @category rendering
+ */
+export const keysSentence: (finding: KeysFinding) => Line = KeysFinding.match({
+  Clean: () => out("keys:check OK  no key-shaped string in any file git would commit"),
+  Refused: () => err("keys:check FAIL  a key-shaped string is in:"),
+  At: ({ place }) => err(place)
+})
 
 /**
  * Searches the repository from its root.
@@ -28,6 +61,9 @@ export const keys = Effect.fn("Keys.keys")(function* () {
     (line) => A.join(A.take(Str.split(":")(line), 2), ":")
   )
   return A.isArrayNonEmpty(found)
-    ? failed([err(`keys:check FAIL  a key-shaped string is in:\n${A.join(found, "\n")}`)])
-    : passed([out("keys:check OK  no key-shaped string in any file git would commit")])
+    ? A.prepend<KeysFinding, KeysFinding>(
+        A.map(found, (place) => ({ _tag: "At", place })),
+        { _tag: "Refused" }
+      )
+    : A.of<KeysFinding>({ _tag: "Clean" })
 })

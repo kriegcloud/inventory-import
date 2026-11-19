@@ -8,14 +8,78 @@
  *
  * @packageDocumentation
  */
+import { $RepoCliId } from "@beep/identity/packages"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
+import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import { Repo } from "../../Repo.service.ts"
 import { Manifest } from "../../Repo.schema.ts"
-import { err, failed, out, passed } from "../../Report.schema.ts"
+import { err, type Line, out } from "../../Report.schema.ts"
+
+const $I = $RepoCliId.create("commands/Laws/Screens.rules")
+
+/**
+ * What `laws screens` finds: every package with screens in both lists, or a refusal and each thing missing.
+ *
+ * @category schemas
+ */
+export const ScreensFinding = S.TaggedUnion({
+  Listed: {
+    names: S.Array(S.String).pipe(S.annotateKey({ description: "The packages with screens, each in both lists" }))
+  },
+  Refused: {},
+  NoBlock: {},
+  NoSource: {
+    name: S.String.pipe(S.annotateKey({ description: "The package with screens" })),
+    where: S.String.pipe(S.annotateKey({ description: "Its folder, from the root" })),
+    add: S.String.pipe(S.annotateKey({ description: "The path the missing @source line names" }))
+  },
+  NotListed: {
+    name: S.String.pipe(S.annotateKey({ description: "The package with screens" })),
+    where: S.String.pipe(S.annotateKey({ description: "Its folder, from the root" }))
+  },
+  NoPackage: {
+    name: S.String.pipe(S.annotateKey({ description: "The name screenPackages lists" })),
+    where: S.String.pipe(S.annotateKey({ description: "The folder it points at, which holds no package" }))
+  },
+  NoFolder: {
+    where: S.String.pipe(S.annotateKey({ description: "The folder an @source line names, which does not exist" }))
+  }
+}).pipe(
+  $I.annoteSchema("ScreensFinding", { description: "Every package with screens in both lists, or what is missing" })
+)
+
+/**
+ * The decoded value of `ScreensFinding`.
+ *
+ * @category models
+ */
+export type ScreensFinding = typeof ScreensFinding.Type
+
+/**
+ * The line each finding prints.
+ *
+ * @category rendering
+ */
+export const screensSentence: (finding: ScreensFinding) => Line = ScreensFinding.match({
+  Listed: ({ names }) =>
+    out(`check-screens OK  ${names.length} packages with screens, each in both lists: ${A.join(names, ", ")}`),
+  Refused: () => err("check-screens FAIL"),
+  NoBlock: () => err("  apps/inventory/vite.config.ts has no `const screenPackages = { ... }` to read"),
+  NoSource: ({ name, where, add }) =>
+    err(
+      `  ${name} has screens (${where}/src) and no \`@source\` line in apps/inventory/src/web/index.css: add @source "${add}";`
+    ),
+  NotListed: ({ name, where }) =>
+    err(
+      `  ${name} has screens and is not in \`screenPackages\` in apps/inventory/vite.config.ts with its folder (${where}): the production stylesheet would lack its classes`
+    ),
+  NoPackage: ({ name, where }) => err(`  screenPackages names ${name} at ${where}, which is no package`),
+  NoFolder: ({ where }) => err(`  index.css names the source ${where}, which does not exist`)
+})
 
 /**
  * Compares the packages with screens against both lists.
@@ -63,23 +127,17 @@ export const screens = Effect.fn("Screens.screens")(function* () {
     })
   )
 
-  const missingBlock = O.isNone(block)
-    ? A.of("apps/inventory/vite.config.ts has no `const screenPackages = { ... }` to read")
-    : A.empty<string>()
+  const missingBlock = O.isNone(block) ? A.of<ScreensFinding>({ _tag: "NoBlock" }) : A.empty<ScreensFinding>()
   const perPackage = A.flatMap(withScreens, (workspace) => {
     const name = String(workspace.manifest.name)
     const where = repo.relative(repo.root, workspace.dir)
     const src = repo.join(workspace.dir, "src")
     const noSource = A.contains(sources, src)
-      ? A.empty<string>()
-      : A.of(
-          `${name} has screens (${where}/src) and no \`@source\` line in apps/inventory/src/web/index.css: add @source "${repo.relative(repo.dirname(css), src)}";`
-        )
+      ? A.empty<ScreensFinding>()
+      : A.of<ScreensFinding>({ _tag: "NoSource", name, where, add: repo.relative(repo.dirname(css), src) })
     const notListed = O.contains(R.get(listed, name), workspace.dir)
-      ? A.empty<string>()
-      : A.of(
-          `${name} has screens and is not in \`screenPackages\` in apps/inventory/vite.config.ts with its folder (${where}): the production stylesheet would lack its classes`
-        )
+      ? A.empty<ScreensFinding>()
+      : A.of<ScreensFinding>({ _tag: "NotListed", name, where })
     return A.appendAll(noSource, notListed)
   })
   const noPackage = yield* Effect.forEach(
@@ -90,8 +148,8 @@ export const screens = Effect.fn("Screens.screens")(function* () {
         .pipe(
           Effect.map((present) =>
             present
-              ? A.empty<string>()
-              : A.of(`screenPackages names ${name} at ${repo.relative(repo.root, dir)}, which is no package`)
+              ? A.empty<ScreensFinding>()
+              : A.of<ScreensFinding>({ _tag: "NoPackage", name, where: repo.relative(repo.root, dir) })
           )
         ),
     { concurrency: 1 }
@@ -104,8 +162,8 @@ export const screens = Effect.fn("Screens.screens")(function* () {
         .pipe(
           Effect.map((present) =>
             present
-              ? A.empty<string>()
-              : A.of(`index.css names the source ${repo.relative(repo.root, dir)}, which does not exist`)
+              ? A.empty<ScreensFinding>()
+              : A.of<ScreensFinding>({ _tag: "NoFolder", where: repo.relative(repo.root, dir) })
           )
         ),
     { concurrency: 1 }
@@ -115,18 +173,9 @@ export const screens = Effect.fn("Screens.screens")(function* () {
     A.appendAll(A.flatten(noPackage), A.flatten(noSourceFolder))
   )
   return A.isArrayNonEmpty(problems)
-    ? failed(
-        A.prepend(
-          A.map(problems, (problem) => err(`  ${problem}`)),
-          err("check-screens FAIL")
-        )
-      )
-    : passed([
-        out(
-          `check-screens OK  ${withScreens.length} packages with screens, each in both lists: ${A.join(
-            A.map(withScreens, (workspace) => String(workspace.manifest.name)),
-            ", "
-          )}`
-        )
-      ])
+    ? A.prepend<ScreensFinding, ScreensFinding>(problems, { _tag: "Refused" })
+    : A.of<ScreensFinding>({
+        _tag: "Listed",
+        names: A.map(withScreens, (workspace) => String(workspace.manifest.name))
+      })
 })

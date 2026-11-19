@@ -7,7 +7,7 @@ import * as Effect from "effect/Effect"
 import * as Command from "effect/cli/Command"
 import * as Flag from "effect/cli/Flag"
 import { emit } from "../../Report.schema.ts"
-import { okf } from "./Okf.rules.ts"
+import { okf, okfSentence } from "./Okf.rules.ts"
 
 const verbose = Flag.Boolean("verbose").pipe(
   Flag.withDescription("Print the validator's full report for every bundle"),
@@ -16,7 +16,7 @@ const verbose = Flag.Boolean("verbose").pipe(
 
 /** `docs check`: `docs/`, `explorations/` and `goals/` are each a conformant OKF bundle. */
 export const docsCheckCommand = Command.make("check", { verbose }, (flags) =>
-  Effect.flatMap(okf(flags.verbose), emit)
+  Effect.flatMap(okf(flags.verbose), emit(okfSentence))
 ).pipe(Command.withDescription("docs/, explorations/ and goals/ are each a conformant OKF v0.2 bundle"))
 
 /** The `docs` group. */

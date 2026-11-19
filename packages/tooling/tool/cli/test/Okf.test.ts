@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
-import { okf } from "../src/commands/Docs/Okf.rules.ts"
+import { okf, okfSentence } from "../src/commands/Docs/Okf.rules.ts"
+import { render } from "../src/Report.schema.ts"
 import { inTree, printed } from "./support/tree.ts"
 
 const validatorPath = ".agents/skills/okf-open-knowledge-format/scripts/validate.sh"
@@ -25,7 +26,7 @@ describe("docs check", () => {
           ...bundle("explorations", good),
           ...bundle("goals", good)
         },
-        okf(false)
+        Effect.map(okf(false), render(okfSentence))
       )
       expect(report.failed).toBe(false)
       expect(printed(report)).toEqual([
@@ -48,7 +49,7 @@ describe("docs check", () => {
           ...bundle("explorations", "E1: no frontmatter\nFiles scanned: 1\n", "1"),
           ...bundle("goals", good)
         },
-        okf(false)
+        Effect.map(okf(false), render(okfSentence))
       )
       expect(report.failed).toBe(true)
       const lines = printed(report)
@@ -62,7 +63,7 @@ describe("docs check", () => {
     Effect.gen(function* () {
       const report = yield* inTree(
         { [validatorPath]: validator, ...bundle("docs", "Files scanned: 0\nBundle is OKF v0.2 conformant\n") },
-        okf(false)
+        Effect.map(okf(false), render(okfSentence))
       )
       expect(printed(report).at(-1)).toBe(
         "err: docs:check FAIL  the validator scanned 0 files of the 1 in docs/, so it did not run properly."
@@ -72,9 +73,12 @@ describe("docs check", () => {
 
   it.effect("refuses a bundle with no markdown, and a repository without the validator", () =>
     Effect.gen(function* () {
-      const empty = yield* inTree({ [validatorPath]: validator, "docs/a.txt": "" }, okf(false))
+      const empty = yield* inTree(
+        { [validatorPath]: validator, "docs/a.txt": "" },
+        Effect.map(okf(false), render(okfSentence))
+      )
       expect(printed(empty)).toEqual(["err: docs:check FAIL  there are no markdown files under docs/."])
-      const none = yield* inTree({ "docs/a.md": "" }, okf(false))
+      const none = yield* inTree({ "docs/a.md": "" }, Effect.map(okf(false), render(okfSentence)))
       expect(printed(none)[0]).toMatch(
         /^err: docs:check FAIL {2}the OKF validator is missing \(.*validate\.sh\): the okf-open-knowledge-format skill is not installed\.$/
       )

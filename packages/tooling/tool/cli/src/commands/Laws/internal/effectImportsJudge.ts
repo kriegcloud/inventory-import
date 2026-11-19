@@ -5,6 +5,7 @@ import * as HashSet from "effect/HashSet"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as Str from "effect/String"
+import type { ImportFault } from "../EffectImports.schema.ts"
 
 /** The modules whose namespace name is not the module's own. beep-effect: effect-laws-v1 law 1, EF-4. */
 const aliases: Readonly<Record<string, ReadonlyArray<string>>> = {
@@ -53,10 +54,11 @@ export interface Specifier {
   readonly type: boolean
 }
 
-/** A wrong import: where it starts, and its sentence. */
+/** A wrong import: where it starts, what is wrong with it, and whether it is an example in a comment. */
 export interface Hit {
   readonly offset: number
-  readonly sentence: string
+  readonly fault: ImportFault
+  readonly inComment: boolean
 }
 
 /** "barrel" for a package root or a folder of modules, "leaf" for one module, "missing" for neither. */
@@ -90,45 +92,57 @@ export const importLine = (line: { readonly local: string; readonly source: stri
   `import ${line.type ? "type " : ""}* as ${line.local} from "${line.source}"`
 
 /**
- * What is wrong with one import, as a list of sentences. `taken` says whether a name is bound by something else in
- * the file.
+ * What is wrong with one import. `taken` says whether a name is bound by something else in the file.
  */
 export const judge =
   (installed: Installed) =>
-  (source: string, specifiers: ReadonlyArray<Specifier>, taken: (name: string) => boolean): ReadonlyArray<string> => {
+  (
+    source: string,
+    specifiers: ReadonlyArray<Specifier>,
+    taken: (name: string) => boolean
+  ): ReadonlyArray<ImportFault> => {
     const shape = shapeOf(installed)(source)
-    if (shape === "missing") return [`unknown-path: "${source}" is not a path of the installed ${packageOf(source)}`]
+    if (shape === "missing") return [{ _tag: "UnknownPath", source, package: packageOf(source) }]
     if (shape === "barrel") {
       if (A.contains(namedRoots, source)) return []
       const kind = source === "effect" ? "root-barrel" : "nested-barrel"
-      if (specifiers.length === 0) return [`${kind}: "${source}" is a barrel. Import each module from its own path`]
-      return A.map(specifiers, (specifier) => {
-        if (specifier.kind !== "named") {
-          return `${kind}: "${source}" is a barrel and cannot be imported whole. Import each module from its own path`
-        }
-        const leaf = `${source}/${specifier.imported}`
+      if (specifiers.length === 0) return [{ _tag: "BarrelBare", kind, source }]
+      return A.map(specifiers, (specifier): ImportFault => {
+        if (specifier.kind !== "named") return { _tag: "BarrelWhole", kind, source }
+        const imported = specifier.imported
+        const leaf = `${source}/${imported}`
         if (shapeOf(installed)(leaf) === "leaf") {
-          return `${kind}: ${specifier.imported} from "${source}". Write: ${importLine({ local: canonicalOf(leaf)[0], source: leaf, type: specifier.type })}`
+          const write = importLine({ local: canonicalOf(leaf)[0], source: leaf, type: specifier.type })
+          return { _tag: "BarrelModule", kind, imported, source, write }
         }
-        if (source === "effect" && isFunctionExport(installed)(specifier.imported)) {
-          return `${kind}: ${specifier.imported} from "effect". Write: import { ${specifier.imported} } from "effect/Function"`
-        }
-        return `${kind}: ${specifier.imported} from "${source}", and "${leaf}" is not a module. Find its module and import that`
+        if (source === "effect" && isFunctionExport(installed)(imported))
+          return { _tag: "BarrelFunction", kind, imported }
+        return { _tag: "BarrelNoModule", kind, imported, source, leaf }
       })
     }
-    return A.flatMap(specifiers, (specifier) => {
+    return A.flatMap(specifiers, (specifier): ReadonlyArray<ImportFault> => {
       const names = canonicalOf(source)
       if (specifier.kind === "namespace") {
         if (A.contains(names, specifier.local) || A.every(names, taken)) return []
         return [
-          `alias: "${source}" as ${specifier.local}. Write: ${importLine({ local: names[0], source: source, type: specifier.type })}` +
-            (names.length > 1 ? ` (or ${A.join(A.drop(names, 1), ", ")})` : "")
+          {
+            _tag: "Alias",
+            source,
+            local: specifier.local,
+            write: importLine({ local: names[0], source, type: specifier.type }),
+            others: A.drop(names, 1)
+          }
         ]
       }
       if (specifier.type || A.contains(namedLeaves, source) || !Str.startsWith("effect/")(source)) return []
       return [
-        `named-import: ${specifier.imported} from "${source}". Write: ${importLine({ local: names[0], source: source, type: false })}` +
-          ` and ${names[0]}.${specifier.imported}`
+        {
+          _tag: "NamedImport",
+          imported: specifier.imported,
+          source,
+          write: importLine({ local: names[0], source, type: false }),
+          name: names[0]
+        }
       ]
     })
   }
@@ -183,7 +197,7 @@ export const judgeText =
     A.flatMap(statementsIn(text), (found) =>
       A.map(
         judge(installed)(found.source, found.specifiers, () => false),
-        (sentence) => ({ offset: found.offset, sentence })
+        (fault) => ({ offset: found.offset, fault, inComment: false })
       )
     )
 

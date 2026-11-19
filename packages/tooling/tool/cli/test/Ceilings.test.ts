@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
-import { ceilings } from "../src/commands/Quality/Ceilings.rules.ts"
+import { ceilings, ceilingsSentence } from "../src/commands/Quality/Ceilings.rules.ts"
+import { render } from "../src/Report.schema.ts"
 import { inTree, json, printed } from "./support/tree.ts"
 
 const ceilingFile = (ceiling: number) =>
@@ -14,7 +15,7 @@ describe("quality ceilings", () => {
           "apps/shop/strict-ceiling.json": ceilingFile(600),
           "packages/ui/strict-ceiling.json": ceilingFile(78)
         },
-        ceilings()
+        Effect.map(ceilings(), render(ceilingsSentence))
       )
       expect(report.failed).toBe(false)
       expect(printed(report)).toEqual([
@@ -32,7 +33,7 @@ describe("quality ceilings", () => {
           "apps/shop/strict-ceiling.json": ceilingFile(600),
           "packages/ui/strict-ceiling.json": ceilingFile(79)
         },
-        ceilings()
+        Effect.map(ceilings(), render(ceilingsSentence))
       )
       expect(report.failed).toBe(true)
       expect(printed(report).at(-1)).toBe("err: ceilings:check FAIL  the stage C ceilings add up to 679, above 678")

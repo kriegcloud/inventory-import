@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
-import { boundaries } from "../src/commands/Laws/Boundaries.rules.ts"
+import { boundaries, boundariesSentence } from "../src/commands/Laws/Boundaries.rules.ts"
+import { render } from "../src/Report.schema.ts"
 import { inTree, json, printed } from "./support/tree.ts"
 
 const pkg = (name: string, beep: Record<string, string>, dependencies: Record<string, string> = {}) =>
@@ -24,7 +25,7 @@ describe("laws boundaries", () => {
           "apps/shop/package.json": pkg("@x/shop", {}, { "@x/ui": "workspace:*", "@x/kernel": "workspace:*" }),
           "apps/shop/src/main.ts": 'import { a } from "@x/ui/button"\nimport { b } from "@x/kernel"\nexport { a, b }\n'
         },
-        boundaries()
+        Effect.map(boundaries(), render(boundariesSentence))
       )
       expect(printed(report)).toEqual(["out: check-boundaries OK  4 workspaces"])
     })
@@ -39,15 +40,15 @@ describe("laws boundaries", () => {
           "packages/kernel/src/a.ts": `import "@x/ui/button"\n${intoApps}\n`,
           "packages/ui/src/b.ts": 'export const k = import("@x/kernel")\n'
         },
-        boundaries()
+        Effect.map(boundaries(), render(boundariesSentence))
       )
       expect(report.failed).toBe(true)
       expect(printed(report)).toEqual([
-        "err: check-boundaries FAIL\n" +
-          "  @x/kernel declares @x/ui, which its layer may not use\n" +
-          "  packages/kernel/src/a.ts imports @x/ui, which its layer may not use\n" +
-          '  packages/kernel/src/a.ts imports "../../../apps/shop/src/x": a package never reaches into apps/\n' +
-          "  packages/ui/src/b.ts imports @x/kernel, which @x/ui does not declare"
+        "err: check-boundaries FAIL",
+        "err:   @x/kernel declares @x/ui, which its layer may not use",
+        "err:   packages/kernel/src/a.ts imports @x/ui, which its layer may not use",
+        'err:   packages/kernel/src/a.ts imports "../../../apps/shop/src/x": a package never reaches into apps/',
+        "err:   packages/ui/src/b.ts imports @x/kernel, which @x/ui does not declare"
       ])
     })
   )
@@ -56,10 +57,11 @@ describe("laws boundaries", () => {
     Effect.gen(function* () {
       const report = yield* inTree(
         { ...base, "apps/shop/package.json": pkg("@x/shop", {}, { "@x/cli": "workspace:*" }) },
-        boundaries()
+        Effect.map(boundaries(), render(boundariesSentence))
       )
       expect(printed(report)).toEqual([
-        "err: check-boundaries FAIL\n  @x/shop declares @x/cli, which its layer may not use"
+        "err: check-boundaries FAIL",
+        "err:   @x/shop declares @x/cli, which its layer may not use"
       ])
     })
   )

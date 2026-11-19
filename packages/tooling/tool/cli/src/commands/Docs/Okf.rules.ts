@@ -9,23 +9,90 @@
  *
  * @packageDocumentation
  */
+import { $RepoCliId } from "@beep/identity/packages"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
+import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import type { RepoError } from "../../Cli.errors.ts"
 import { Repo } from "../../Repo.service.ts"
-import { err, failed, type Line, out, passed } from "../../Report.schema.ts"
+import { err, type Line, out } from "../../Report.schema.ts"
 
 const bundles = ["docs", "explorations", "goals"] as const
 const tools = ["find", "sort", "grep", "sed", "awk", "xargs", "date"] as const
 
+const $I = $RepoCliId.create("commands/Docs/Okf.rules")
+const bundleKey = S.String.pipe(S.annotateKey({ description: "The bundle's folder" }))
+
+/**
+ * What `docs check` finds: per bundle, the validator's warnings and that it conforms; or the one refusal it stops at.
+ *
+ * @category schemas
+ */
+export const OkfFinding = S.TaggedUnion({
+  ValidatorMissing: {
+    validator: S.String.pipe(S.annotateKey({ description: "Where the validator should be, absolute" }))
+  },
+  ToolMissing: { tool: S.String.pipe(S.annotateKey({ description: "The tool the validator needs and did not find" })) },
+  SortWithoutZ: {},
+  NoMarkdown: { bundle: bundleKey },
+  Printed: { text: S.String.pipe(S.annotateKey({ description: "The validator's report, or one warning line of it" })) },
+  NotConformant: { bundle: bundleKey },
+  ScannedWrong: {
+    bundle: bundleKey,
+    scanned: S.String.pipe(
+      S.annotateKey({ description: "How many files the validator said it scanned; empty when it said none" })
+    ),
+    expected: S.Int.pipe(S.annotateKey({ description: "How many markdown files the bundle has" }))
+  },
+  Conformant: {
+    bundle: bundleKey,
+    files: S.Int.pipe(S.annotateKey({ description: "How many markdown files it has" }))
+  }
+}).pipe(
+  $I.annoteSchema("OkfFinding", { description: "A conformant bundle with its warnings, or the refusal it stops at" })
+)
+
+/**
+ * The decoded value of `OkfFinding`.
+ *
+ * @category models
+ */
+export type OkfFinding = typeof OkfFinding.Type
+
 /** The sentence every refusal starts with. */
 const fail = (text: string): Line => err(`docs:check FAIL  ${text}`)
 
-/** What one step found: the lines so far, and whether to stop there. */
+/**
+ * The line each finding prints.
+ *
+ * @category rendering
+ */
+export const okfSentence: (finding: OkfFinding) => Line = OkfFinding.match({
+  ValidatorMissing: ({ validator }) =>
+    fail(`the OKF validator is missing (${validator}): the okf-open-knowledge-format skill is not installed.`),
+  ToolMissing: ({ tool }) => fail(`'${tool}' is not installed. The OKF validator needs it.`),
+  SortWithoutZ: () => fail("this 'sort' has no -z option. The OKF validator needs GNU or BSD sort."),
+  NoMarkdown: ({ bundle }) => fail(`there are no markdown files under ${bundle}/.`),
+  Printed: ({ text }) => out(text),
+  NotConformant: ({ bundle }) =>
+    fail(
+      `${bundle}/ is not a conformant OKF bundle. Fix each E line above: a file outside index.md and log.md starts on\n` +
+        "    line 1 with a --- frontmatter block that has type:, and only docs/index.md may have frontmatter among the\n" +
+        "    index.md files. The okf-open-knowledge-format skill has the rules; any file in docs/standards/ shows the fields."
+    ),
+  ScannedWrong: ({ bundle, scanned, expected }) =>
+    fail(
+      `the validator scanned ${scanned === "" ? "no" : scanned} files of the ${expected} in ${bundle}/, so it did not run properly.`
+    ),
+  Conformant: ({ bundle, files }) =>
+    out(`docs:check OK  all ${files} markdown files in ${bundle}/ conform to OKF v0.2 (--verbose for the full report)`)
+})
+
+/** What one bundle found, and whether to stop there. */
 interface Step {
-  readonly lines: ReadonlyArray<Line>
+  readonly found: ReadonlyArray<OkfFinding>
   readonly stop: boolean
 }
 
@@ -39,9 +106,7 @@ export const okf = Effect.fn("Okf.okf")(function* (verbose: boolean) {
   const repo = yield* Repo
   const validator = repo.join(repo.root, ".agents/skills/okf-open-knowledge-format/scripts/validate.sh")
   if (!(yield* repo.exists(validator))) {
-    return failed([
-      fail(`the OKF validator is missing (${validator}): the okf-open-knowledge-format skill is not installed.`)
-    ])
+    return A.of<OkfFinding>({ _tag: "ValidatorMissing", validator })
   }
   const present = yield* Effect.forEach(
     tools,
@@ -50,17 +115,17 @@ export const okf = Effect.fn("Okf.okf")(function* (verbose: boolean) {
   )
   const missing = A.findFirst(A.zip(tools, present), ([, found]) => !found)
   if (O.isSome(missing)) {
-    return failed([fail(`'${missing.value[0]}' is not installed. The OKF validator needs it.`)])
+    return A.of<OkfFinding>({ _tag: "ToolMissing", tool: missing.value[0] })
   }
   const sortZ = yield* repo.run("bash", ["-c", "printf 'a\\0' | sort -z"])
   if (sortZ.code !== 0) {
-    return failed([fail("this 'sort' has no -z option. The OKF validator needs GNU or BSD sort.")])
+    return A.of<OkfFinding>({ _tag: "SortWithoutZ" })
   }
 
   const checkBundle = Effect.fn("Okf.checkBundle")(function* (bundle: string): Effect.fn.Return<Step, RepoError> {
     const files = yield* repo.files(repo.join(repo.root, bundle))
     const expected = A.filter(files, Str.endsWith(".md")).length
-    if (expected === 0) return { lines: [fail(`there are no markdown files under ${bundle}/.`)], stop: true }
+    if (expected === 0) return { found: [{ _tag: "NoMarkdown", bundle }], stop: true }
     // Both of the validator's streams as one, in the order it wrote them.
     const answer = yield* repo.run("bash", ["-c", 'bash "$0" "$1" 2>&1', validator, bundle])
     const report = Str.replace(/\n+$/, "")(answer.stdout)
@@ -74,50 +139,35 @@ export const okf = Effect.fn("Okf.okf")(function* (verbose: boolean) {
     )
     if (answer.code !== 0 || !Str.includes("Bundle is OKF v0.2 conformant")(report)) {
       return {
-        lines: [
-          out(report),
-          fail(
-            `${bundle}/ is not a conformant OKF bundle. Fix each E line above: a file outside index.md and log.md starts on\n` +
-              "    line 1 with a --- frontmatter block that has type:, and only docs/index.md may have frontmatter among the\n" +
-              "    index.md files. The okf-open-knowledge-format skill has the rules; any file in docs/standards/ shows the fields."
-          )
+        found: [
+          { _tag: "Printed", text: report },
+          { _tag: "NotConformant", bundle }
         ],
         stop: true
       }
     }
     if (scanned !== String(expected)) {
       return {
-        lines: [
-          out(report),
-          fail(
-            `the validator scanned ${scanned === "" ? "no" : scanned} files of the ${expected} in ${bundle}/, so it did not run properly.`
-          )
+        found: [
+          { _tag: "Printed", text: report },
+          { _tag: "ScannedWrong", bundle, scanned, expected }
         ],
         stop: true
       }
     }
-    const shown = verbose
-      ? A.of(out(report))
+    const shown: ReadonlyArray<OkfFinding> = verbose
+      ? [{ _tag: "Printed", text: report }]
       : A.map(
           A.filter(reportLines, (line) => /W[0-9]*: /.test(line)),
-          out
+          (text) => ({ _tag: "Printed", text })
         )
-    return {
-      lines: A.append(
-        shown,
-        out(
-          `docs:check OK  all ${expected} markdown files in ${bundle}/ conform to OKF v0.2 (--verbose for the full report)`
-        )
-      ),
-      stop: false
-    }
+    return { found: A.append(shown, { _tag: "Conformant", bundle, files: expected }), stop: false }
   })
 
   const first = yield* checkBundle(bundles[0])
-  if (first.stop) return failed(first.lines)
+  if (first.stop) return first.found
   const second = yield* checkBundle(bundles[1])
-  if (second.stop) return failed(A.appendAll(first.lines, second.lines))
+  if (second.stop) return A.appendAll(first.found, second.found)
   const third = yield* checkBundle(bundles[2])
-  const lines = A.flatten([first.lines, second.lines, third.lines])
-  return third.stop ? failed(lines) : passed(lines)
+  return A.flatten([first.found, second.found, third.found])
 })

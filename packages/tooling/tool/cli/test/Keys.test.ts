@@ -1,15 +1,17 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Str from "effect/String"
-import { keys } from "../src/commands/Laws/Keys.rules.ts"
+import { keys, keysSentence } from "../src/commands/Laws/Keys.rules.ts"
 import { Repo } from "../src/Repo.service.ts"
+import { render } from "../src/Report.schema.ts"
 import { inTree, printed } from "./support/tree.ts"
 
 // git answers "every file git would commit", so the folder is made a repository first.
 const inRepository = Effect.gen(function* () {
   const repo = yield* Repo
   yield* repo.run("git", ["init", "-q"])
-  return yield* keys()
+  const found = yield* keys()
+  return render(keysSentence)(found)
 })
 
 // Put together at run time, so this file holds no key-shaped string itself.
@@ -30,7 +32,7 @@ describe("laws keys", () => {
         inRepository
       )
       expect(report.failed).toBe(true)
-      expect(printed(report)).toEqual(["err: keys:check FAIL  a key-shaped string is in:\nsrc/a.ts:2"])
+      expect(printed(report)).toEqual(["err: keys:check FAIL  a key-shaped string is in:", "err: src/a.ts:2"])
     })
   )
 })

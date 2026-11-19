@@ -2,7 +2,8 @@ import { describe, expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
-import { Finding, groupFindings, strict, stripJsonc } from "../src/commands/Quality/Strict.rules.ts"
+import { Finding, groupFindings, strict, strictSentence, stripJsonc } from "../src/commands/Quality/Strict.rules.ts"
+import { render } from "../src/Report.schema.ts"
 import { inTree, json, printed } from "./support/tree.ts"
 
 const finding = (file: string, line: number, name: string) => Finding.make({ file, line, column: 1, name })
@@ -41,7 +42,7 @@ describe("quality strict", () => {
           "packages/ui/package.json": json({ name: "@x/ui" }),
           "packages/ui/tsconfig.base.json": plugin({ strict: false })
         },
-        strict(O.none(), false),
+        Effect.map(strict(O.none(), false), render(strictSentence)),
         "packages/ui"
       )
       expect(report.failed).toBe(true)
@@ -60,7 +61,7 @@ describe("quality strict", () => {
           "packages/ui/package.json": json({ name: "@x/ui" }),
           "packages/ui/tsconfig.base.json": '{\n  // inherits\n  "extends": "../../tsconfig.base.json",\n}'
         },
-        strict(O.some("strict-ceiling.json"), false),
+        Effect.map(strict(O.some("strict-ceiling.json"), false), render(strictSentence)),
         "packages/ui"
       )
       expect(printed(report)).toEqual([

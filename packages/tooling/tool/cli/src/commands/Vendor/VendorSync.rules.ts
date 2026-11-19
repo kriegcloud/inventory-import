@@ -14,6 +14,7 @@
  *
  * @packageDocumentation
  */
+import { $RepoCliId } from "@beep/identity/packages"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
@@ -24,7 +25,7 @@ import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import { RepoError } from "../../Cli.errors.ts"
 import { Repo } from "../../Repo.service.ts"
-import { type Line, out, passed } from "../../Report.schema.ts"
+import { type Line, out } from "../../Report.schema.ts"
 import {
   allowedOutside,
   entries,
@@ -35,6 +36,41 @@ import {
   testRewrites,
   tests
 } from "./VendorSubset.data.ts"
+
+const $I = $RepoCliId.create("commands/Vendor/VendorSync.rules")
+
+/**
+ * What `vendor sync` says: each package it wrote, then the commit it copied from.
+ *
+ * @category schemas
+ */
+export const VendorSyncFinding = S.TaggedUnion({
+  Vendored: {
+    name: S.String.pipe(S.annotateKey({ description: "The kit package" })),
+    sources: S.Int.pipe(S.annotateKey({ description: "How many source files were copied" })),
+    tests: S.Int.pipe(S.annotateKey({ description: "How many tests were copied" }))
+  },
+  From: { commit: S.String.pipe(S.annotateKey({ description: "The beep-effect commit the files were copied at" })) }
+}).pipe(
+  $I.annoteSchema("VendorSyncFinding", { description: "A package that was vendored, or the commit it came from" })
+)
+
+/**
+ * The decoded value of `VendorSyncFinding`.
+ *
+ * @category models
+ */
+export type VendorSyncFinding = typeof VendorSyncFinding.Type
+
+/**
+ * The line each finding prints.
+ *
+ * @category rendering
+ */
+export const vendorSyncSentence: (finding: VendorSyncFinding) => Line = VendorSyncFinding.match({
+  Vendored: ({ name, sources, tests: copied }) => out(`${name}: ${sources} source files, ${copied} tests`),
+  From: ({ commit }) => out(`from beep-effect ${commit}`)
+})
 
 const decoder = new TextDecoder()
 const encoder = new TextEncoder()
@@ -406,8 +442,13 @@ here under the same name and the same export subpaths, and is replaced by the pu
       local
     }).pipe(Effect.orDie)
     yield* repo.write(repo.join(target, "vendor.json"), `${manifest}\n`)
-    return out(`${pkg.name}: ${sources.length} source files, ${(tests[pkg.name] ?? []).length} tests`)
+    return {
+      _tag: "Vendored",
+      name: pkg.name,
+      sources: sources.length,
+      tests: (tests[pkg.name] ?? []).length
+    } satisfies VendorSyncFinding
   })
-  const lines: ReadonlyArray<Line> = yield* Effect.forEach(packages, vendorPackage, { concurrency: 1 })
-  return passed(A.append(lines, out(`from beep-effect ${commit}`)))
+  const written: ReadonlyArray<VendorSyncFinding> = yield* Effect.forEach(packages, vendorPackage, { concurrency: 1 })
+  return A.append<VendorSyncFinding, VendorSyncFinding>(written, { _tag: "From", commit })
 })

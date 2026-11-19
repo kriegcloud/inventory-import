@@ -12,13 +12,68 @@
  *
  * @packageDocumentation
  */
+import { $RepoCliId } from "@beep/identity/packages"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
+import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import { Repo, type Workspace } from "../../Repo.service.ts"
-import { err, failed, out, passed } from "../../Report.schema.ts"
+import { err, type Line, out } from "../../Report.schema.ts"
+
+const $I = $RepoCliId.create("commands/Laws/Boundaries.rules")
+
+/**
+ * What `laws boundaries` finds: every workspace within its row, or a refusal and each import or declaration against
+ * it.
+ *
+ * @category schemas
+ */
+export const BoundariesFinding = S.TaggedUnion({
+  Held: { workspaces: S.Int.pipe(S.annotateKey({ description: "How many workspaces were read" })) },
+  Refused: {},
+  DeclaredAgainstRow: {
+    name: S.String.pipe(S.annotateKey({ description: "The workspace that declares it" })),
+    dependency: S.String.pipe(S.annotateKey({ description: "The workspace package its row refuses" }))
+  },
+  IntoApps: {
+    where: S.String.pipe(S.annotateKey({ description: "The file, from the root" })),
+    specifier: S.String.pipe(S.annotateKey({ description: "The relative path that reaches into apps/" }))
+  },
+  Undeclared: {
+    where: S.String.pipe(S.annotateKey({ description: "The file, from the root" })),
+    imported: S.String.pipe(S.annotateKey({ description: "The workspace package it imports" })),
+    name: S.String.pipe(S.annotateKey({ description: "The workspace that does not declare it" }))
+  },
+  ImportedAgainstRow: {
+    where: S.String.pipe(S.annotateKey({ description: "The file, from the root" })),
+    imported: S.String.pipe(S.annotateKey({ description: "The workspace package its row refuses" }))
+  }
+}).pipe(
+  $I.annoteSchema("BoundariesFinding", { description: "Every workspace within its row, or each import against it" })
+)
+
+/**
+ * The decoded value of `BoundariesFinding`.
+ *
+ * @category models
+ */
+export type BoundariesFinding = typeof BoundariesFinding.Type
+
+/**
+ * The line each finding prints.
+ *
+ * @category rendering
+ */
+export const boundariesSentence: (finding: BoundariesFinding) => Line = BoundariesFinding.match({
+  Held: ({ workspaces }) => out(`check-boundaries OK  ${workspaces} workspaces`),
+  Refused: () => err("check-boundaries FAIL"),
+  DeclaredAgainstRow: ({ name, dependency }) => err(`  ${name} declares ${dependency}, which its layer may not use`),
+  IntoApps: ({ where, specifier }) => err(`  ${where} imports "${specifier}": a package never reaches into apps/`),
+  Undeclared: ({ where, imported, name }) => err(`  ${where} imports ${imported}, which ${name} does not declare`),
+  ImportedAgainstRow: ({ where, imported }) => err(`  ${where} imports ${imported}, which its layer may not use`)
+})
 
 interface Kind {
   readonly family: string
@@ -109,7 +164,9 @@ export const boundaries = Effect.fn("Boundaries.boundaries")(function* () {
         (dependency) => R.has(byName, dependency)
       )
       const fromManifest = A.flatMap(declared, (dependency) =>
-        may(dependency) ? A.empty<string>() : A.of(`${name} declares ${dependency}, which its layer may not use`)
+        may(dependency)
+          ? A.empty<BoundariesFinding>()
+          : A.of<BoundariesFinding>({ _tag: "DeclaredAgainstRow", name, dependency })
       )
       const inSrc = yield* sources(repo.join(workspace.dir, "src"))
       const inTest = yield* sources(repo.join(workspace.dir, "test"))
@@ -122,16 +179,16 @@ export const boundaries = Effect.fn("Boundaries.boundaries")(function* () {
               return A.flatMap(A.fromIterable(Str.matchAll(specifiers)(text)), (match) => {
                 const specifier = match[1] ?? match[2] ?? match[3] ?? ""
                 if (kind.family !== "app" && Str.startsWith(".")(specifier) && Str.includes("apps/")(specifier)) {
-                  return A.of(`${where} imports "${specifier}": a package never reaches into apps/`)
+                  return A.of<BoundariesFinding>({ _tag: "IntoApps", where, specifier })
                 }
                 const imported = packageOf(specifier)
-                if (!R.has(byName, imported) || imported === name) return A.empty<string>()
+                if (!R.has(byName, imported) || imported === name) return A.empty<BoundariesFinding>()
                 if (!A.contains(declared, imported)) {
-                  return A.of(`${where} imports ${imported}, which ${name} does not declare`)
+                  return A.of<BoundariesFinding>({ _tag: "Undeclared", where, imported, name })
                 }
                 return may(imported)
-                  ? A.empty<string>()
-                  : A.of(`${where} imports ${imported}, which its layer may not use`)
+                  ? A.empty<BoundariesFinding>()
+                  : A.of<BoundariesFinding>({ _tag: "ImportedAgainstRow", where, imported })
               })
             })
           ),
@@ -141,8 +198,12 @@ export const boundaries = Effect.fn("Boundaries.boundaries")(function* () {
     }),
     { concurrency: 1 }
   )
-  const problems = A.dedupe(A.flatten(perWorkspace))
+  // One line per problem, as the person reads it: the same import twice in a file is said once.
+  const problems = A.dedupeWith(
+    A.flatten(perWorkspace),
+    (a, b) => boundariesSentence(a).text === boundariesSentence(b).text
+  )
   return A.isArrayNonEmpty(problems)
-    ? failed([err(`check-boundaries FAIL\n  ${A.join(problems, "\n  ")}`)])
-    : passed([out(`check-boundaries OK  ${workspaces.length} workspaces`)])
+    ? A.prepend<BoundariesFinding, BoundariesFinding>(problems, { _tag: "Refused" })
+    : A.of<BoundariesFinding>({ _tag: "Held", workspaces: workspaces.length })
 })

@@ -26,7 +26,7 @@ import * as Str from "effect/String"
 import { RepoError } from "../../Cli.errors.ts"
 import { Repo } from "../../Repo.service.ts"
 import { StrictCeiling } from "../../Repo.schema.ts"
-import { err, failed, type Line, out, passed } from "../../Report.schema.ts"
+import { err, type Line, out } from "../../Report.schema.ts"
 
 const $I = $RepoCliId.create("commands/Quality/Strict.rules")
 
@@ -47,6 +47,72 @@ export class Finding extends S.Class<Finding, { readonly brand: unique symbol }>
   },
   $I.annote("Finding", { description: "One finding of the Effect diagnostics: where, and which rule" })
 ) {}
+
+/**
+ * What `quality strict` finds: the ledger's counts by rule with where each finding is, and the total against the
+ * ceiling; or a refusal.
+ *
+ * @category schemas
+ */
+export const StrictFinding = S.TaggedUnion({
+  NoPlugin: {},
+  Drift: {},
+  NoCeilingFile: {},
+  Ledger: {
+    rules: S.Array(S.String).pipe(S.annotateKey({ description: "The rules that are counted" })),
+    own: S.Array(S.String).pipe(S.annotateKey({ description: "The folders that are the package's own code" }))
+  },
+  RuleCount: {
+    rule: S.String.pipe(S.annotateKey({ description: "The rule" })),
+    count: S.Int.pipe(S.annotateKey({ description: "How many findings it has in own code" }))
+  },
+  At: {
+    file: S.String.pipe(S.annotateKey({ description: "The file, from the package" })),
+    line: S.Finite.pipe(S.annotateKey({ description: "The line, from 1" })),
+    column: S.Finite.pipe(S.annotateKey({ description: "The column, from 1" }))
+  },
+  More: { count: S.Int.pipe(S.annotateKey({ description: "How many findings of the rule are not listed" })) },
+  Total: {
+    total: S.Int.pipe(S.annotateKey({ description: "Every counted finding" })),
+    ceiling: S.Int.pipe(S.annotateKey({ description: "The recorded ceiling" })),
+    seconds: S.String.pipe(S.annotateKey({ description: "How long the count took, to one decimal" }))
+  },
+  Above: { by: S.Int.pipe(S.annotateKey({ description: "How many findings are above the ceiling" })) },
+  Below: {
+    total: S.Int.pipe(S.annotateKey({ description: "The count, now below the ceiling" })),
+    ceilingFile: S.String.pipe(S.annotateKey({ description: "The ceiling file to lower" }))
+  }
+}).pipe(
+  $I.annoteSchema("StrictFinding", { description: "The style findings counted against the ceiling, or a refusal" })
+)
+
+/**
+ * The decoded value of `StrictFinding`.
+ *
+ * @category models
+ */
+export type StrictFinding = typeof StrictFinding.Type
+
+const fail = (message: string): Line => err(`check:strict FAIL  ${message}`)
+
+/**
+ * The line each finding prints.
+ *
+ * @category rendering
+ */
+export const strictSentence: (finding: StrictFinding) => Line = StrictFinding.match({
+  NoPlugin: () => fail("no @effect/language-service plugin in tsconfig.base.json"),
+  Drift: () =>
+    fail("the package's plugin options differ from the root's outside `overrides`: copy the root's block again"),
+  NoCeilingFile: () => fail("name the ceiling file: beep-cli quality strict strict-ceiling.json"),
+  Ledger: ({ rules, own }) => out(`Stage C ledger: ${A.join(rules, ", ")} in own code (${A.join(own, ", ")}).`),
+  RuleCount: ({ rule, count }) => out(`  ${rule}: ${count}`),
+  At: ({ file, line, column }) => out(`    ${file}:${line}:${column}`),
+  More: ({ count }) => out(`    and ${count} more (--all lists them)`),
+  Total: ({ total, ceiling, seconds }) => out(`Total: ${total}, ceiling ${ceiling} (${seconds} s).`),
+  Above: ({ by }) => fail(`${by} new finding(s) above the ceiling: write them the Effect way`),
+  Below: ({ total, ceilingFile }) => fail(`the count fell to ${total}: set "ceiling" to ${total} in ${ceilingFile}`)
+})
 
 const Diagnostics = S.Struct({
   diagnostics: S.Array(Finding).pipe(S.annotateKey({ description: "Every finding in the project" }))
@@ -122,7 +188,6 @@ const withoutLedger = (plugin: Record<string, unknown>, rules: ReadonlyArray<str
 export const strict = Effect.fn("Strict.strict")(function* (ceilingFile: O.Option<string>, all: boolean) {
   const repo = yield* Repo
   const started = yield* Clock.currentTimeMillis
-  const fail = (message: string): Line => err(`check:strict FAIL  ${message}`)
 
   /** The plugin options a project resolves to: its own, or the first found up its `extends` chain. */
   const pluginOf: (tsconfig: string) => Effect.Effect<O.Option<Record<string, unknown>>, RepoError> = Effect.fn(
@@ -147,20 +212,13 @@ export const strict = Effect.fn("Strict.strict")(function* (ceilingFile: O.Optio
   const own = yield* pluginOf(repo.join(repo.cwd, "tsconfig.base.json"))
   const root = yield* pluginOf(repo.join(repo.root, "tsconfig.base.json"))
   if (O.isNone(own) || O.isNone(root)) {
-    return failed([fail("no @effect/language-service plugin in tsconfig.base.json")])
+    return A.of<StrictFinding>({ _tag: "NoPlugin" })
   }
   const ownText = yield* asJson({ ...own.value, overrides: [] }).pipe(Effect.orDie)
   const rootText = yield* asJson({ ...root.value, overrides: [] }).pipe(Effect.orDie)
-  const drift =
-    ownText === rootText
-      ? A.empty<Line>()
-      : A.of(
-          fail("the package's plugin options differ from the root's outside `overrides`: copy the root's block again")
-        )
+  const drift = ownText === rootText ? A.empty<StrictFinding>() : A.of<StrictFinding>({ _tag: "Drift" })
 
-  if (O.isNone(ceilingFile)) {
-    return failed(A.append(drift, fail("name the ceiling file: beep-cli quality strict strict-ceiling.json")))
-  }
+  if (O.isNone(ceilingFile)) return A.append<StrictFinding, StrictFinding>(drift, { _tag: "NoCeilingFile" })
   const ledger = yield* repo.json(StrictCeiling)(repo.join(repo.cwd, ceilingFile.value))
   const tsgo = repo.join(repo.root, "node_modules", "@effect/tsgo/dist/effect-tsgo.cjs")
   if (!(yield* repo.exists(tsgo))) {
@@ -199,27 +257,27 @@ export const strict = Effect.fn("Strict.strict")(function* (ceilingFile: O.Optio
   const { total, rules } = groupFindings(
     A.filter(report.diagnostics, (finding) => inOwn(finding) && A.contains(ledger.rules, finding.name))
   )
-  const perRule = A.flatMap(rules, ([rule, found]) => {
+  const perRule = A.flatMap(rules, ([rule, found]): ReadonlyArray<StrictFinding> => {
     const shown = all ? found : A.take(found, 3)
-    return A.flatten([
-      A.of(out(`  ${rule}: ${found.length}`)),
-      A.map(shown, (finding) => out(`    ${repo.relative(repo.cwd, finding.file)}:${finding.line}:${finding.column}`)),
-      found.length > shown.length ? A.of(out(`    and ${found.length - shown.length} more (--all lists them)`)) : []
+    return A.flatten<ReadonlyArray<ReadonlyArray<StrictFinding>>>([
+      [{ _tag: "RuleCount", rule, count: found.length }],
+      A.map(shown, (finding) => ({
+        _tag: "At",
+        file: repo.relative(repo.cwd, finding.file),
+        line: finding.line,
+        column: finding.column
+      })),
+      found.length > shown.length ? [{ _tag: "More", count: found.length - shown.length }] : []
     ])
   })
   const finished = yield* Clock.currentTimeMillis
   const seconds = Num.round((finished - started) / 1000, 1).toFixed(1)
-  const lines = A.flatten([
+  return A.flatten<ReadonlyArray<ReadonlyArray<StrictFinding>>>([
     drift,
-    A.of(out(`Stage C ledger: ${A.join(ledger.rules, ", ")} in own code (${A.join(ledger.own, ", ")}).`)),
+    [{ _tag: "Ledger", rules: ledger.rules, own: ledger.own }],
     perRule,
-    A.of(out(`Total: ${total}, ceiling ${ledger.ceiling} (${seconds} s).`)),
-    total > ledger.ceiling
-      ? A.of(fail(`${total - ledger.ceiling} new finding(s) above the ceiling: write them the Effect way`))
-      : [],
-    total < ledger.ceiling
-      ? A.of(fail(`the count fell to ${total}: set "ceiling" to ${total} in ${ceilingFile.value}`))
-      : []
+    [{ _tag: "Total", total, ceiling: ledger.ceiling, seconds }],
+    total > ledger.ceiling ? [{ _tag: "Above", by: total - ledger.ceiling }] : [],
+    total < ledger.ceiling ? [{ _tag: "Below", total, ceilingFile: ceilingFile.value }] : []
   ])
-  return A.isReadonlyArrayNonEmpty(drift) || total !== ledger.ceiling ? failed(lines) : passed(lines)
 })

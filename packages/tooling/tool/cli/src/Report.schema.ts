@@ -1,6 +1,7 @@
 /**
- * What a rule hands back: the lines it would print, in order, each to standard output or standard error, and whether
- * it failed. A rule never prints; the command does, so a test reads the same lines the person would.
+ * What a rule's findings become when they are printed. A rule hands back typed findings, a tagged union of its own,
+ * and never prints; the one renderer here turns them into lines, in order, each for standard output or standard
+ * error, and the command prints those. A test reads the findings, and the same lines the person would.
  *
  * @packageDocumentation
  */
@@ -37,7 +38,7 @@ export class Line extends S.Class<Line, { readonly brand: unique symbol }>($I`Li
 ) {}
 
 /**
- * A rule's whole answer.
+ * A rule's findings, rendered: the lines, and whether the rule failed.
  *
  * @category schemas
  */
@@ -55,23 +56,34 @@ export const out = (text: string): Line => Line.make({ to: "out", text })
 /** A line for standard error. */
 export const err = (text: string): Line => Line.make({ to: "err", text })
 
-/** The report of a rule that found nothing wrong. */
-export const passed = (lines: ReadonlyArray<Line>): Report => Report.make({ lines, failed: false })
-
-/** The report of a rule that found a problem. */
-export const failed = (lines: ReadonlyArray<Line>): Report => Report.make({ lines, failed: true })
+/**
+ * The one renderer: a rule's findings as the lines they print, each by the rule's own `sentence`. A rule failed when
+ * any of its findings goes to standard error.
+ *
+ * @category rendering
+ */
+export const render =
+  <Finding>(sentence: (finding: Finding) => Line) =>
+  (findings: ReadonlyArray<Finding>): Report => {
+    const lines = A.map(findings, sentence)
+    return Report.make({ lines, failed: A.some(lines, (line) => line.to === "err") })
+  }
 
 /**
- * Prints a report as the script it replaces did, and fails with `CheckFailed` when the rule failed.
+ * Prints a rule's findings as the script it replaces did, and fails with `CheckFailed` when the rule failed.
  *
  * @category commands
  */
-export const emit = Effect.fn("Report.emit")(function* (answer: Report) {
-  yield* Effect.forEach(
-    answer.lines,
-    (line) => (line.to === "out" ? Console.log(line.text) : Console.error(line.text)),
-    { concurrency: 1, discard: true }
-  )
-  if (answer.failed) return yield* CheckFailed.make({})
-  return A.length(answer.lines)
-})
+export const emit = <Finding>(sentence: (finding: Finding) => Line) => {
+  const toReport = render(sentence)
+  return Effect.fn("Report.emit")(function* (findings: ReadonlyArray<Finding>) {
+    const answer = toReport(findings)
+    yield* Effect.forEach(
+      answer.lines,
+      (line) => (line.to === "out" ? Console.log(line.text) : Console.error(line.text)),
+      { concurrency: 1, discard: true }
+    )
+    if (answer.failed) return yield* CheckFailed.make({})
+    return A.length(answer.lines)
+  })
+}

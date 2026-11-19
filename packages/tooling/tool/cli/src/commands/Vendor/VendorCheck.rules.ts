@@ -14,6 +14,7 @@
  *
  * @packageDocumentation
  */
+import { $RepoCliId } from "@beep/identity/packages"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
@@ -22,20 +23,102 @@ import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import type { RepoError } from "../../Cli.errors.ts"
 import { Repo } from "../../Repo.service.ts"
-import { err, failed, type Line, out, passed } from "../../Report.schema.ts"
+import { err, type Line, out } from "../../Report.schema.ts"
 import { ExportsOnly, type VendorFile, VendorRecord } from "./Vendor.schema.ts"
+
+const $I = $RepoCliId.create("commands/Vendor/VendorCheck.rules")
+
+/**
+ * What `vendor check` finds: every file matching its record (and each file patched on purpose), or each problem and
+ * their count.
+ *
+ * @category schemas
+ */
+export const VendorCheckFinding = S.TaggedUnion({
+  Matched: {
+    files: S.Int.pipe(S.annotateKey({ description: "How many vendored files were checked" })),
+    packages: S.Int.pipe(S.annotateKey({ description: "In how many packages" })),
+    againstSource: S.Boolean.pipe(
+      S.annotateKey({ description: "Whether each source hash was also proved against a beep-effect checkout" })
+    )
+  },
+  Patched: {
+    file: S.String.pipe(S.annotateKey({ description: "The vendored file, from the root" })),
+    patches: S.Int.pipe(S.annotateKey({ description: "How many patches it lists" })),
+    commit: S.String.pipe(S.annotateKey({ description: "The beep-effect commit, shortened" }))
+  },
+  Missing: { file: S.String.pipe(S.annotateKey({ description: "The vendored file, from the root" })) },
+  NoProvenance: {
+    file: S.String.pipe(S.annotateKey({ description: "The vendored file, from the root" })),
+    expected: S.String.pipe(S.annotateKey({ description: "How its first line must start" }))
+  },
+  Changed: {
+    file: S.String.pipe(S.annotateKey({ description: "The vendored file, from the root" })),
+    sha256: S.String.pipe(S.annotateKey({ description: "What the file hashes to now" }))
+  },
+  HashDiffers: { file: S.String.pipe(S.annotateKey({ description: "The vendored file, from the root" })) },
+  PatchEqualsUpstream: { file: S.String.pipe(S.annotateKey({ description: "The vendored file, from the root" })) },
+  PatchWithoutReason: { file: S.String.pipe(S.annotateKey({ description: "The vendored file, from the root" })) },
+  PatchUnsaid: { file: S.String.pipe(S.annotateKey({ description: "The vendored file, from the root" })) },
+  SourceHashWrong: {
+    file: S.String.pipe(S.annotateKey({ description: "The vendored file, from the root" })),
+    commit: S.String.pipe(S.annotateKey({ description: "The beep-effect commit, shortened" }))
+  },
+  Stray: {
+    file: S.String.pipe(S.annotateKey({ description: "A file that is neither vendored nor local, from the root" }))
+  },
+  ExportsDiffer: { where: S.String.pipe(S.annotateKey({ description: "The package's folder, from the root" })) },
+  Failed: { problems: S.Int.pipe(S.annotateKey({ description: "How many problems were found" })) }
+}).pipe(
+  $I.annoteSchema("VendorCheckFinding", { description: "The kit matching its record, or each way a file does not" })
+)
+
+/**
+ * The decoded value of `VendorCheckFinding`.
+ *
+ * @category models
+ */
+export type VendorCheckFinding = typeof VendorCheckFinding.Type
+
+/**
+ * The line each finding prints.
+ *
+ * @category rendering
+ */
+export const vendorCheckSentence: (finding: VendorCheckFinding) => Line = VendorCheckFinding.match({
+  Matched: ({ files, packages, againstSource }) =>
+    out(
+      `vendor:check: ${files} vendored files in ${packages} packages match their recorded hashes` +
+        (againstSource ? " and beep-effect" : "")
+    ),
+  Patched: ({ file, patches, commit }) =>
+    out(
+      `vendor:check: patched on purpose: ${file} (${patches} patch${patches === 1 ? "" : "es"}, against beep-effect ${commit})`
+    ),
+  Missing: ({ file }) => err(`${file}: listed in vendor.json but missing`),
+  NoProvenance: ({ file, expected }) => err(`${file}: the first line is not its provenance line (${expected} …)`),
+  Changed: ({ file, sha256 }) => err(`${file}: changed since it was vendored (sha256 ${sha256})`),
+  HashDiffers: ({ file }) => err(`${file}: copied without rewrites, yet its hash differs from its source hash`),
+  PatchEqualsUpstream: ({ file }) => err(`${file}: lists a patch, yet equals upstream`),
+  PatchWithoutReason: ({ file }) => err(`${file}: a patch has no reason`),
+  PatchUnsaid: ({ file }) => err(`${file}: patched, but its first line does not say so`),
+  SourceHashWrong: ({ file, commit }) => err(`${file}: the recorded source hash is not that of beep-effect ${commit}`),
+  Stray: ({ file }) => err(`${file}: not vendored and not a local file`),
+  ExportsDiffer: ({ where }) => err(`${where}/package.json: exports differ from those recorded in vendor.json`),
+  Failed: ({ problems }) => err(`vendor:check failed: ${problems} problem${problems === 1 ? "" : "s"}`)
+})
 
 const decoder = new TextDecoder()
 const asJson = S.encodeEffect(S.fromJsonString(S.Unknown))
 
 interface Checked {
-  readonly problems: ReadonlyArray<string>
-  readonly patched: ReadonlyArray<string>
+  readonly problems: ReadonlyArray<VendorCheckFinding>
+  readonly patched: ReadonlyArray<VendorCheckFinding>
   readonly counted: number
 }
 
 const nothing: Checked = { problems: [], patched: [], counted: 0 }
-const problem = (text: string): Checked => ({ problems: [text], patched: [], counted: 0 })
+const problem = (finding: VendorCheckFinding): Checked => ({ problems: [finding], patched: [], counted: 0 })
 const merge = (all: ReadonlyArray<Checked>): Checked => ({
   problems: A.flatMap(all, (one) => one.problems),
   patched: A.flatMap(all, (one) => one.patched),
@@ -81,13 +164,13 @@ export const vendorCheck = Effect.fn("VendorCheck.vendorCheck")(function* (sourc
       const checkFile = Effect.fnUntraced(function* (entry: VendorFile) {
         const name = `${where}/${entry.path}`
         const file = repo.join(dir, entry.path)
-        if (!(yield* repo.exists(file))) return problem(`${name}: listed in vendor.json but missing`)
+        if (!(yield* repo.exists(file))) return problem({ _tag: "Missing", file: name })
         const content = yield* repo.bytes(file)
         const newline = content.indexOf(0x0a)
         const first = decoder.decode(content.subarray(0, newline))
         const expectedFirst = `// Vendored from beep-effect ${commit}:${upstreamDir}/${entry.path} `
         if (newline === -1 || !Str.startsWith(expectedFirst)(first)) {
-          return problem(`${name}: the first line is not its provenance line (${Str.trim(expectedFirst)} …)`)
+          return problem({ _tag: "NoProvenance", file: name, expected: Str.trim(expectedFirst) })
         }
         const actual = yield* repo.sha256(content.subarray(newline + 1))
         const patches = entry.patches ?? []
@@ -99,30 +182,28 @@ export const vendorCheck = Effect.fn("VendorCheck.vendorCheck")(function* (sourc
               Effect.asSome
             )
         })
-        const problems = A.flatten<ReadonlyArray<ReadonlyArray<string>>>([
-          actual !== entry.sha256 ? A.of(`${name}: changed since it was vendored (sha256 ${actual})`) : [],
+        const one = (finding: VendorCheckFinding) => A.of(finding)
+        const none = A.empty<VendorCheckFinding>()
+        const problems = A.flatten([
+          actual !== entry.sha256 ? one({ _tag: "Changed", file: name, sha256: actual }) : none,
           entry.rewrites.length === 0 && patches.length === 0 && entry.sha256 !== entry.sourceSha256
-            ? A.of(`${name}: copied without rewrites, yet its hash differs from its source hash`)
-            : [],
+            ? one({ _tag: "HashDiffers", file: name })
+            : none,
           patches.length > 0 && entry.sha256 === entry.sourceSha256
-            ? A.of(`${name}: lists a patch, yet equals upstream`)
-            : [],
+            ? one({ _tag: "PatchEqualsUpstream", file: name })
+            : none,
           patches.length > 0 && !A.every(patches, (patch) => P.isString(patch.reason) && patch.reason.length > 0)
-            ? A.of(`${name}: a patch has no reason`)
-            : [],
+            ? one({ _tag: "PatchWithoutReason", file: name })
+            : none,
           patches.length > 0 && !Str.includes("Patched on purpose")(first)
-            ? A.of(`${name}: patched, but its first line does not say so`)
-            : [],
+            ? one({ _tag: "PatchUnsaid", file: name })
+            : none,
           O.exists(upstreamHash, (hash) => hash !== entry.sourceSha256)
-            ? A.of(`${name}: the recorded source hash is not that of beep-effect ${commit}`)
-            : []
+            ? one({ _tag: "SourceHashWrong", file: name, commit })
+            : none
         ])
         const patched =
-          patches.length > 0
-            ? A.of(
-                `${name} (${patches.length} patch${patches.length === 1 ? "" : "es"}, against beep-effect ${commit})`
-              )
-            : A.empty<string>()
+          patches.length > 0 ? one({ _tag: "Patched", file: name, patches: patches.length, commit }) : none
         return { problems, patched, counted: 1 } satisfies Checked
       })
       const files = yield* Effect.forEach(manifest.files, checkFile, { concurrency: 1 })
@@ -135,8 +216,8 @@ export const vendorCheck = Effect.fn("VendorCheck.vendorCheck")(function* (sourc
               A.flatMap(found, (file) => {
                 const inside = repo.relative(dir, file)
                 return A.contains(listed, inside)
-                  ? A.empty<string>()
-                  : A.of(`${where}/${inside}: not vendored and not a local file`)
+                  ? A.empty<VendorCheckFinding>()
+                  : A.of<VendorCheckFinding>({ _tag: "Stray", file: `${where}/${inside}` })
               })
             )
           ),
@@ -146,30 +227,26 @@ export const vendorCheck = Effect.fn("VendorCheck.vendorCheck")(function* (sourc
       const own = yield* repo.json(ExportsOnly)(repo.join(dir, "package.json"))
       const ownExports = yield* asJson(own.exports).pipe(Effect.orDie)
       const recorded = yield* asJson(manifest.exports).pipe(Effect.orDie)
-      const exportsDiffer =
-        ownExports === recorded
-          ? nothing
-          : problem(`${where}/package.json: exports differ from those recorded in vendor.json`)
-      return merge([...files, { problems: A.flatten(strays), patched: A.empty<string>(), counted: 0 }, exportsDiffer])
+      const exportsDiffer = ownExports === recorded ? nothing : problem({ _tag: "ExportsDiffer", where })
+      return merge([
+        ...files,
+        { problems: A.flatten(strays), patched: A.empty<VendorCheckFinding>(), counted: 0 },
+        exportsDiffer
+      ])
     }),
     { concurrency: 1 }
   )
   const all = merge(perPackage)
   if (A.isReadonlyArrayNonEmpty(all.problems)) {
-    return failed(
-      A.append(
-        A.map(all.problems, err),
-        err(`vendor:check failed: ${all.problems.length} problem${all.problems.length === 1 ? "" : "s"}`)
-      )
-    )
+    return A.append<VendorCheckFinding, VendorCheckFinding>(all.problems, {
+      _tag: "Failed",
+      problems: all.problems.length
+    })
   }
-  return passed(
-    A.prepend(
-      A.map(all.patched, (file): Line => out(`vendor:check: patched on purpose: ${file}`)),
-      out(
-        `vendor:check: ${all.counted} vendored files in ${manifests.length} packages match their recorded hashes` +
-          (O.isSome(source) ? " and beep-effect" : "")
-      )
-    )
-  )
+  return A.prepend<VendorCheckFinding, VendorCheckFinding>(all.patched, {
+    _tag: "Matched",
+    files: all.counted,
+    packages: manifests.length,
+    againstSource: O.isSome(source)
+  })
 })

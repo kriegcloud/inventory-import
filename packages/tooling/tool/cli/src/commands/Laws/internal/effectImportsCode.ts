@@ -7,6 +7,7 @@ import * as P from "effect/Predicate"
 import * as R from "effect/Record"
 import * as Str from "effect/String"
 import { parseSync } from "oxc-parser"
+import type { RepairLeft } from "../EffectImports.schema.ts"
 import {
   canonicalOf,
   type Hit,
@@ -114,18 +115,14 @@ export const judgeCode =
             : []
         )
         const taken = (name: string) => A.contains(bound, name) || A.contains(others, name)
-        return A.map(judge(installed)(from.value, specifiersOf(node), taken), (sentence) => ({
+        return A.map(judge(installed)(from.value, specifiersOf(node), taken), (fault) => ({
           offset: node.start,
-          sentence
+          fault,
+          inComment: false
         }))
       }
       return shape(from.value) !== "leaf"
-        ? [
-            {
-              offset: node.start,
-              sentence: `re-export from "${from.value}", a barrel. Re-export from the module's own path`
-            }
-          ]
+        ? [{ offset: node.start, fault: { _tag: "ReExport", source: from.value }, inComment: false }]
         : []
     })
     let dynamic: ReadonlyArray<Hit> = []
@@ -141,14 +138,16 @@ export const judgeCode =
       ) {
         dynamic = A.append(dynamic, {
           offset: node.start,
-          sentence: `import("${from.value}") loads a barrel. Load the module's own path`
+          fault: { _tag: "DynamicImport", source: from.value },
+          inComment: false
         })
       }
     })
     const inComments = A.flatMap(parsed.comments, (comment) =>
       A.map(judgeText(installed)(comment.value), (hit) => ({
         offset: comment.start + hit.offset,
-        sentence: `in a comment, ${hit.sentence}`
+        fault: hit.fault,
+        inComment: true
       }))
     )
     return A.flatten([fromBody, dynamic, inComments])
@@ -229,7 +228,7 @@ const latestFirst = Order.mapInput(Order.flip(Order.Number), (edit: { readonly s
  */
 export const repairCode =
   (installed: Installed) =>
-  (path: string, source: string): { readonly text: string; readonly left: ReadonlyArray<string> } => {
+  (path: string, source: string): { readonly text: string; readonly left: ReadonlyArray<RepairLeft> } => {
     const parsed = parse(path, source)
     if (O.isNone(parsed.program)) return { text: source, left: [] }
     const program = parsed.program.value
@@ -298,7 +297,7 @@ export const repairCode =
     // A module's name must not collide with another module's in the same file.
     const finals = A.map(named, (entry) => entry.final)
     if (A.dedupe(finals).length !== finals.length) {
-      return { text: source, left: ["two modules would share one name: repair this file by hand"] }
+      return { text: source, left: [{ _tag: "SharedName" }] }
     }
     const moduleOf = (modulePath: string) => A.findFirst(named, (entry) => entry.path === modulePath)
 
@@ -354,10 +353,11 @@ export const repairCode =
       const shorthand = O.exists(parent, (above) => above.type === "Property" && above["shorthand"] === true)
       return [{ start: node.start, end: node.end, replacement: shorthand ? `${name}: ${next}` : next }]
     })
-    const left = A.map(
-      A.dedupe(shadowed),
-      (name) => `${name} is declared again inside the file: rename its uses to ${renames[name] ?? name} by hand`
-    )
+    const left = A.map(A.dedupe(shadowed), (name): RepairLeft => ({
+      _tag: "DeclaredAgain",
+      name,
+      to: renames[name] ?? name
+    }))
     // Examples in comments follow the names of the file they sit in.
     const commentEdits = A.isReadonlyArrayNonEmpty(renamed)
       ? A.flatMap(parsed.comments, (comment): ReadonlyArray<Edit> => {
@@ -378,7 +378,7 @@ export const repairCode =
       const before = sorted[index - 1]
       return index > 0 && before !== undefined && edit.end > before.start
     })
-    if (overlapping) return { text: source, left: ["overlapping edits: repair this file by hand"] }
+    if (overlapping) return { text: source, left: [{ _tag: "Overlap" }] }
     const edited = A.reduce(
       sorted,
       source,

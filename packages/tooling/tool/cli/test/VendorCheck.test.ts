@@ -1,7 +1,8 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
-import { vendorCheck } from "../src/commands/Vendor/VendorCheck.rules.ts"
+import { vendorCheck, vendorCheckSentence } from "../src/commands/Vendor/VendorCheck.rules.ts"
+import { render } from "../src/Report.schema.ts"
 import { inTree, json, printed } from "./support/tree.ts"
 
 const commit = "c5cebd5c9de7077493cb9ccaaa18e1d4f73da0b0"
@@ -36,7 +37,7 @@ describe("vendor check", () => {
           "packages/kit/src/stray.ts": "",
           "packages/kit/package.json": json({ name: "@x/kit", exports: { ".": "./src/B.ts" } })
         }),
-        vendorCheck(O.none())
+        Effect.map(vendorCheck(O.none()), render(vendorCheckSentence))
       )
       expect(report.failed).toBe(true)
       const lines = printed(report)
@@ -55,10 +56,13 @@ describe("vendor check", () => {
     Effect.gen(function* () {
       const lost = yield* inTree(
         tree({ "packages/kit/vendor.json": record({ path: "src/Gone.ts" }) }),
-        vendorCheck(O.none())
+        Effect.map(vendorCheck(O.none()), render(vendorCheckSentence))
       )
       expect(printed(lost)[0]).toBe("err: packages/kit/src/Gone.ts: listed in vendor.json but missing")
-      const bare = yield* inTree(tree({ "packages/kit/src/A.ts": body }), vendorCheck(O.none()))
+      const bare = yield* inTree(
+        tree({ "packages/kit/src/A.ts": body }),
+        Effect.map(vendorCheck(O.none()), render(vendorCheckSentence))
+      )
       expect(printed(bare)[0]).toBe(
         "err: packages/kit/src/A.ts: the first line is not its provenance line (// Vendored from beep-effect c5cebd5c9de7:packages/kit/src/A.ts …)"
       )
@@ -69,7 +73,7 @@ describe("vendor check", () => {
     Effect.gen(function* () {
       const report = yield* inTree(
         tree({ "packages/kit/vendor.json": record({ patches: [{ reason: "" }] }) }),
-        vendorCheck(O.none())
+        Effect.map(vendorCheck(O.none()), render(vendorCheckSentence))
       )
       expect(printed(report)).toEqual([
         "err: packages/kit/src/A.ts: lists a patch, yet equals upstream",

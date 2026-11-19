@@ -5,17 +5,59 @@
  *
  * @packageDocumentation
  */
+import { $RepoCliId } from "@beep/identity/packages"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Num from "effect/Number"
+import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import type { RepoError } from "../../Cli.errors.ts"
 import { Repo } from "../../Repo.service.ts"
 import { StrictCeiling } from "../../Repo.schema.ts"
-import { err, failed, out, passed } from "../../Report.schema.ts"
+import { err, type Line, out } from "../../Report.schema.ts"
+
+const $I = $RepoCliId.create("commands/Quality/Ceilings.rules")
 
 /** The sum the ceilings may not pass. */
 export const cap = 678
+
+/**
+ * What `quality ceilings` finds: each package's ceiling, their sum, and the sum above the cap.
+ *
+ * @category schemas
+ */
+export const CeilingsFinding = S.TaggedUnion({
+  Ceiling: {
+    where: S.String.pipe(S.annotateKey({ description: "The package's folder, from the root" })),
+    ceiling: S.Int.pipe(S.annotateKey({ description: "Its recorded ceiling" }))
+  },
+  Sum: {
+    sum: S.Int.pipe(S.annotateKey({ description: "The ceilings added up" })),
+    cap: S.Int.pipe(S.annotateKey({ description: "The number the sum may not pass" }))
+  },
+  AboveCap: {
+    sum: S.Int.pipe(S.annotateKey({ description: "The ceilings added up" })),
+    cap: S.Int.pipe(S.annotateKey({ description: "The number the sum passed" }))
+  }
+}).pipe($I.annoteSchema("CeilingsFinding", { description: "A package's ceiling, the sum, or the sum above the cap" }))
+
+/**
+ * The decoded value of `CeilingsFinding`.
+ *
+ * @category models
+ */
+export type CeilingsFinding = typeof CeilingsFinding.Type
+
+/**
+ * The line each finding prints.
+ *
+ * @category rendering
+ */
+export const ceilingsSentence: (finding: CeilingsFinding) => Line = CeilingsFinding.match({
+  Ceiling: ({ where, ceiling }) => out(`  ${where}: ${ceiling}`),
+  Sum: ({ sum, cap: limit }) => out(`ceilings:check  sum ${sum}, cap ${limit}`),
+  AboveCap: ({ sum, cap: limit }) => err(`ceilings:check FAIL  the stage C ceilings add up to ${sum}, above ${limit}`)
+})
 
 /**
  * Reads every `strict-ceiling.json` under `apps` and `packages` (at most four folders deep) and reports each, their
@@ -58,11 +100,9 @@ export const ceilings = Effect.fn("Ceilings.ceilings")(function* () {
     { concurrency: 1 }
   )
   const sum = Num.sumAll(A.map(rows, (row) => row.ceiling))
-  const lines = A.append(
-    A.map(rows, (row) => out(`  ${row.where}: ${row.ceiling}`)),
-    out(`ceilings:check  sum ${sum}, cap ${cap}`)
+  const said = A.append<CeilingsFinding, CeilingsFinding>(
+    A.map(rows, (row): CeilingsFinding => ({ _tag: "Ceiling", where: row.where, ceiling: row.ceiling })),
+    { _tag: "Sum", sum, cap }
   )
-  return sum > cap
-    ? failed(A.append(lines, err(`ceilings:check FAIL  the stage C ceilings add up to ${sum}, above ${cap}`)))
-    : passed(lines)
+  return sum > cap ? A.append<CeilingsFinding, CeilingsFinding>(said, { _tag: "AboveCap", sum, cap }) : said
 })

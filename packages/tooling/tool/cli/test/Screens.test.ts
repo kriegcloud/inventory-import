@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
-import { screens } from "../src/commands/Laws/Screens.rules.ts"
+import { screens, screensSentence } from "../src/commands/Laws/Screens.rules.ts"
+import { render } from "../src/Report.schema.ts"
 import { inTree, json, printed } from "./support/tree.ts"
 
 const tree = (css: string, vite: string) => ({
@@ -22,7 +23,7 @@ const vite = 'const screenPackages = {\n  "@x/ui": fileURLToPath(new URL("../../
 describe("laws screens", () => {
   it.effect("passes when every package with screens is in both lists", () =>
     Effect.gen(function* () {
-      const report = yield* inTree(tree(css, vite), screens())
+      const report = yield* inTree(tree(css, vite), Effect.map(screens(), render(screensSentence)))
       expect(printed(report)).toEqual(["out: check-screens OK  1 packages with screens, each in both lists: @x/ui"])
     })
   )
@@ -34,7 +35,7 @@ describe("laws screens", () => {
           '@source "../../../../packages/gone/src";\n',
           'const screenPackages = {\n  "@x/ghost": fileURLToPath(new URL("../../packages/ghost", import.meta.url))\n}\n'
         ),
-        screens()
+        Effect.map(screens(), render(screensSentence))
       )
       expect(report.failed).toBe(true)
       expect(printed(report)).toEqual([
@@ -49,7 +50,7 @@ describe("laws screens", () => {
 
   it.effect("says so when the build file has no list to read", () =>
     Effect.gen(function* () {
-      const report = yield* inTree(tree(css, "export default {}\n"), screens())
+      const report = yield* inTree(tree(css, "export default {}\n"), Effect.map(screens(), render(screensSentence)))
       expect(printed(report).slice(0, 2)).toEqual([
         "err: check-screens FAIL",
         "err:   apps/inventory/vite.config.ts has no `const screenPackages = { ... }` to read"

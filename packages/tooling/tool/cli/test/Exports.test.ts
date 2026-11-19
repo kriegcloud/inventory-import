@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
-import { exactExports } from "../src/commands/Laws/Exports.rules.ts"
+import { exactExports, exportsSentence } from "../src/commands/Laws/Exports.rules.ts"
+import { render } from "../src/Report.schema.ts"
 import { inTree, json, printed } from "./support/tree.ts"
 
 const manifest = (exports: Record<string, unknown>) => json({ name: "@inventory/ui", exports })
@@ -17,7 +18,7 @@ describe("laws exports", () => {
           "packages/ui/src/components/button.tsx": "",
           "packages/ui/src/hooks/use-thing.ts": ""
         },
-        exactExports(),
+        Effect.map(exactExports(), render(exportsSentence)),
         "packages/ui"
       )
       expect(printed(report)).toEqual(["out: check-exports OK  @inventory/ui: 2 exact entries"])
@@ -36,16 +37,16 @@ describe("laws exports", () => {
           }),
           "packages/ui/src/components/nested/card.tsx": ""
         },
-        exactExports(),
+        Effect.map(exactExports(), render(exportsSentence)),
         "packages/ui"
       )
       expect(report.failed).toBe(true)
       expect(printed(report)).toEqual([
-        "err: check-exports FAIL  @inventory/ui\n" +
-          "  ./components/*: a wildcard export\n" +
-          "  ./gone: names no file\n" +
-          "  ./odd: names no file\n" +
-          "  src/components/nested/card.tsx: no export entry"
+        "err: check-exports FAIL  @inventory/ui",
+        "err:   ./components/*: a wildcard export",
+        "err:   ./gone: names no file",
+        "err:   ./odd: names no file",
+        "err:   src/components/nested/card.tsx: no export entry"
       ])
     })
   )

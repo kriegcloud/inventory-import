@@ -13,7 +13,7 @@ diagram is a name in that code. Where the code and this page disagree, the code 
 
 ## 1. What is stored
 
-From `migrations/0001_init.sql` and `src/domain/Item.ts`.
+From `migrations/0001_init.sql` and `packages/catalog/contract/src/Item/Item.read.ts`.
 
 ```mermaid
 erDiagram
@@ -137,8 +137,8 @@ whole, and then becomes an `importDraft` with the same id.
 
 ## 2. One row through the import
 
-From `src/domain/ItemImport.ts` (`RowOutcome`, `Proposal.confidence`, `RowDecision`), `src/server/Imports.ts` and the
-words in `packages/review/src/ReviewWords.words.ts` and `src/web/pages/import/format.tsx`.
+From `packages/catalog/model/src/Review/Review.rules.ts` (`RowOutcome`, `Proposal.confidence`, `RowDecision`), `packages/catalog/host/src/ImportStore.adapter.ts` and the
+words in `packages/review/src/ReviewWords.words.ts` and `packages/catalog/web/src/internal/format.tsx`.
 
 ```mermaid
 stateDiagram-v2
@@ -182,8 +182,8 @@ turns `created` into `takenBack` only where nobody has changed the item since.
 
 ## 3. One import through its steps
 
-From `src/server/Imports.ts` (`importDraft.status`, `commit`, `takeBack`, `reopen`, `remove`) and
-`src/web/pages/ImportPage.tsx` (the steps Upload, Match, Review, Result).
+From `packages/catalog/host/src/ImportStore.adapter.ts` (`importDraft.status`, `commit`, `takeBack`, `reopen`, `remove`) and
+`packages/catalog/web/src/ImportPage.screen.tsx` (the steps Upload, Match, Review, Result).
 
 ```mermaid
 stateDiagram-v2
@@ -214,27 +214,27 @@ force. Reopening puts it back in Review, where rows an earlier confirm created c
 
 ## 4. How the parts depend on each other
 
-From the imports in `src/`, `packages/access/host/src/AllowanceStore.adapter.ts`, `src/server/TableAssistant.ts` and the two callers of `review`
-(`src/web/pages/import/ReviewStep.tsx`, `src/server/ImportHandlers.ts`).
+From the imports in `src/`, `packages/access/host/src/AllowanceStore.adapter.ts`, `packages/catalog/host/src/TableAssistant.adapter.ts` and the two callers of `review`
+(`packages/catalog/web/src/ReviewStep.screen.tsx`, `packages/catalog/model/src/Import/Imports.handler.ts`).
 
 ```mermaid
 flowchart LR
-  web["src/web<br/>React screens, in the browser"]
+  web["catalog-web, access-web and src/web<br/>React screens, in the browser"]
   subgraph Worker["Cloudflare Worker"]
-    server["src/server<br/>services and handlers"]
+    server["catalog-host, access-host and src/server<br/>adapters, group Layers, composition"]
     assistant["TableAssistant"]
     calls["ModelCalls<br/>40 calls a day per organization"]
     ai["Ai<br/>the one model service"]
   end
-  api["src/api/v1<br/>the HTTP contract"]
-  domain["src/domain<br/>Schemas and pure functions<br/>review"]
+  api["catalog-contract, access-contract and src/api/v1<br/>the HTTP contract"]
+  domain["catalog-model<br/>pure rules, ports and what each endpoint does<br/>review"]
   d1[("D1 (SQLite)")]
   web -->|imports| api
   server -->|imports| api
-  api -->|imports| domain
+  domain -->|imports| api
   web -. "calls /api/v1" .-> server
   web -->|"ReviewStep runs review"| domain
-  server -->|"ImportHandlers runs review"| domain
+  server -->|"the imports endpoints run review"| domain
   server --> d1
   assistant --> calls
   calls -->|"take, before each call"| d1

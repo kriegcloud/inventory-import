@@ -3,7 +3,7 @@
 // by our content security policy, and the read then never finishes) and which turns error cells into empty ones.
 // SheetJS keeps each cell's type, number format, formula and error code, and reports hidden sheets, rows, columns
 // and merged cells. It starts no worker and uses no eval; the upload screen runs it inside its own module worker
-// (src/web/lib/upload), a file from our own origin.
+// (packages/catalog/web/src/Upload.controller.ts), a file from our own origin.
 import { Effect, Option } from "effect"
 import { read, SSF, type CellObject, type WorkSheet } from "xlsx/dist/xlsx.mini.min.js"
 import {

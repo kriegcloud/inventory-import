@@ -19,7 +19,7 @@ import type { SavedDecisions as RegionDecisions } from "@inventory/review/Review
 import { catalogRuntime } from "./Catalog.runtime.ts"
 import type { ImportView, SuggestOutcome } from "@inventory/catalog-contract/Import"
 import { recheckRow, review, ruleFixes } from "@inventory/catalog-model/Review"
-import { rowId, type SavedDecisions } from "@inventory/catalog-contract/Decision"
+import { type SavedDecisions } from "@inventory/catalog-contract/Decision"
 import { matchedColumn } from "@inventory/catalog-contract/Mapping"
 import { type Field, fieldLabels, fields, type StagedTable } from "@inventory/catalog-contract/Staged"
 import { type Suggestion } from "@inventory/catalog-contract/Suggestion"
@@ -95,11 +95,11 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
       choices: view.choices,
       storedItems: view.storedItems,
       // A server that sends only the row numbers: each row is then one item.
-      createdIds: view.createdIds ?? view.createdRows.map((rowNumber) => rowId({ rowNumber })),
+      createdIds: view.createdIds,
       // The stored suggestions, as the server reads them at the confirm: each is a proposal on its row.
       suggestions: view.suggestions
     }),
-    [table, view.choices, view.storedItems, view.createdIds, view.createdRows, view.suggestions]
+    [table, view.choices, view.storedItems, view.createdIds, view.suggestions]
   )
   // The decisions are the server's; the undo history behind them is kept in this browser, per person and import, so
   // a refresh brings "Undo last step" back too. It is used only while it ends at the decisions the server holds: a

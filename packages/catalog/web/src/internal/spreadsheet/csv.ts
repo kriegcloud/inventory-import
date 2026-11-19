@@ -1,5 +1,5 @@
 // CSV bytes -> a grid of text cells, with @beep/csv. The upload screen runs this inside its own module worker
-// (src/web/lib/upload). A CSV has no types, so every cell is text or empty; the app decides what "12" or
+// (packages/catalog/web/src/Upload.controller.ts). A CSV has no types, so every cell is text or empty; the app decides what "12" or
 // "03/04/2026" means. The reader's findings become the same Notes and problems the person saw before.
 import { Csv } from "@beep/csv/Csv"
 import { CsvReadOptions, delimiterName } from "@beep/csv/CsvOptions"

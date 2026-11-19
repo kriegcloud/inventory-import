@@ -45,30 +45,30 @@ sign-in secret into `.dev.vars` the first time).
   through a real session (`useDevelopmentSignIn` in `src/web/components/app/SignedIn.tsx`); the other test accounts are
   one click away in the user menu ("Sign in as a test account"). After a sign-out that tab shows the sign-in page. A
   production build always shows the sign-in page, and offers no test accounts.
-- **The import of a file of items**, in four steps, each its own file under `src/web/pages/import/`, on the page
-  `src/web/pages/ImportPage.tsx` (the import and its step are in the address, so a refresh lands on the same step):
+- **The import of a file of items**, in four steps, each its own file in `@inventory/catalog-web` (`packages/catalog/web/src/`), on the page
+  `packages/catalog/web/src/ImportPage.screen.tsx` (the import and its step are in the address, so a refresh lands on the same step):
 
   | Step | File | What it does |
   | --- | --- | --- |
-  | Upload | `UploadStep.tsx` | A .csv or .xlsx read in a worker and sent up in pieces, with progress and Cancel (`useUpload`, `@/lib/upload`); "Use items_messy.csv" (each sample its own button) and a download link; the open imports with Continue and Remove |
-  | Match | `MatchStep.tsx` | Which file column fills which field, by heading, changed by hand; shown when a required field found no column. Review waits until every required field has a column and names the ones left |
-  | Review | `ReviewStep.tsx`, `reviewAdapter.ts` | The review region (`@inventory/review`, `packages/review`) on the rows: accept a proposal for a row or a group, pick one of two readings, type a value, keep one of two rows, leave a row out, undo and redo; the confirm button says what it will import |
-  | Result | `ResultStep.tsx` | What the confirm did, counted from what is stored, the rows not imported downloadable with their reasons, and the take-back (a changed record is kept and named) |
+  | Upload | `UploadStep.screen.tsx` | A .csv or .xlsx read in a worker and sent up in pieces, with progress and Cancel (`useUpload`, `@inventory/catalog-web/Upload`); "Use items_messy.csv" (each sample its own button) and a download link; the open imports with Continue and Remove |
+  | Match | `MatchStep.screen.tsx` | Which file column fills which field, by heading, changed by hand; shown when a required field found no column. Review waits until every required field has a column and names the ones left |
+  | Review | `ReviewStep.screen.tsx`, `ImportReview.controller.ts` | The review region (`@inventory/review`, `packages/review`) on the rows: accept a proposal for a row or a group, pick one of two readings, type a value, keep one of two rows, leave a row out, undo and redo; the confirm button says what it will import |
+  | Result | `ResultStep.screen.tsx` | What the confirm did, counted from what is stored, the rows not imported downloadable with their reasons, and the take-back (a changed record is kept and named) |
 
-  The server stages the file and runs the same pure `review` (`src/domain/ItemImport.ts`) at the confirm
-  (`src/server/Imports.ts`, `ImportHandlers.ts`). Loading the same file again creates nothing: its rows are "Already
+  The server stages the file and runs the same pure `review` (`packages/catalog/model/src/Review/Review.rules.ts`) at the confirm
+  (`packages/catalog/host/src/ImportStore.adapter.ts`, and `packages/catalog/model/src/Import/Imports.handler.ts`). Loading the same file again creates nothing: its rows are "Already
   there", counted from the stored SKU keys.
-- **The Items page** (`src/web/pages/ItemsPage.tsx`): the data table paged, sorted and filtered by the server
-  (`src/server/Items.ts`), one search box that finds every word in any order and forgives one wrong letter (a
-  full-text index in the migration, `src/domain/ItemSearch.ts`), the table assistant (a request in words becomes a
-  checked change to the view: `src/web/components/app/TableAssistant.tsx`, `src/server/TableAssistant.ts`), and an
-  editor for one item (`ItemEditor.tsx`, editors and admins). With no key the assistant's fixed rules answer and
+- **The Items page** (`packages/catalog/web/src/ItemsPage.screen.tsx`): the data table paged, sorted and filtered by the server
+  (`packages/catalog/host/src/ItemStore.adapter.ts`), one search box that finds every word in any order and forgives one wrong letter (a
+  full-text index in the migration, `packages/catalog/contract/src/Item/ItemSearch.read.ts`), the table assistant (a request in words becomes a
+  checked change to the view: `packages/catalog/web/src/TableAssistant.screen.tsx`, `packages/catalog/host/src/TableAssistant.adapter.ts`), and an
+  editor for one item (`ItemEditor.screen.tsx`, editors and admins). With no key the assistant's fixed rules answer and
   it says so.
 - **Activity** (`src/web/pages/ActivityPage.tsx`): every value an import wrote that differs from its file, who decided
   it, and the audit trail of uploads, imports, take-backs and changes of role.
 - **People** (`@inventory/access-web/People`): who is in the organization; an admin adds a person by the email they
   signed up with, changes a role or removes someone, and the organization always keeps an admin.
-- **One model service** (`@beep/openrouter`, met by the app in `src/server/Model.ts`) with **one daily allowance** (the access context's `ModelAllowanceGateway`, 40 calls a
+- **One model service** (`@beep/openrouter`, set up by the app in `src/server/Model.ts` and asked through `@inventory/catalog-host/Model`) with **one daily allowance** (the access context's `ModelAllowanceGateway`, 40 calls a
   day per organization, taken before each call): every model feature draws on it, and when it is used up the feature
   says so in plain words and its rules answer. `GET /api/v1/system/status` says whether a model is on.
 
@@ -145,9 +145,10 @@ one you can run yourself, to put open decisions to him as questions.
 
 The agents in `.claude/agents/` each read their own rules: a brief never restates them.
 
-- **`backend`** builds everything outside the browser: `src/domain`, `src/api`, `src/server`, `migrations` and their
-  tests. **`frontend`** builds screens in `src/web` from the installed components.
-- **Who writes what.** Write the Schemas and the contract in `src/api/` yourself and commit them first; then screens
+- **`backend`** builds everything outside the browser: the contract, model and host packages of a context
+  (`packages/catalog`, `packages/access`), `src/api`, `src/server`, `migrations` and their tests. **`frontend`**
+  builds screens in a context's web package and in `src/web` from the installed components.
+- **Who writes what.** Write the Schemas and the contract (a context's contract package) yourself and commit them first; then screens
   and server can be built at once. A single service with a few queries, or a rule you can write in less time than a
   brief takes, write yourself.
 - **A brief is three lines.** No standards, no rules from this file, no code: the agent file holds them.
@@ -197,7 +198,7 @@ goes wrong.
   parts with counts and reasons that add up to the rows in the file, each number read back from what is stored
   (`docs/standards/after-confirm.md`).
 - **A confirmed import can be taken back** while its records are unchanged: one atomic write, a changed record kept
-  and named, the take-back recorded (`takeBack` in `src/server/Imports.ts`, the Result step's button).
+  and named, the take-back recorded (`takeBack` in `packages/catalog/host/src/ImportStore.adapter.ts`, the Result step's button).
 - **A second import of the same file adds nothing** and says so, counted from what is stored. Keys are normalised
   before comparing (case, spaces, punctuation). Whether a re-import of a changed row updates it, keeps what is stored
   or asks is Benjamin's decision (recorded in `DECISIONS.md`), and is said before Confirm.
@@ -273,10 +274,12 @@ then reports `"available": false` and "AI_ENABLED is set to false". The shell do
 
 ```
 apps/inventory/         The app: the Worker and the SPA, one Vite build. Its own package.json, tsconfigs, wrangler.jsonc.
-  src/domain/           Schemas and pure functions. Imports only `effect`. No I/O.
-  src/api/v1/           The HTTP contract (Effect HttpApi), served at /api/v1. Imports domain. Shared by server and browser.
-  src/server/           Cloudflare Worker: services (Context.Service + Layer), handlers, App.ts composition, worker.ts entry.
-  src/web/              React app. Calls the API through a client derived from src/api. Never imports src/server.
+  src/api/v1/           The assembled HTTP contract (Effect HttpApi), served at /api/v1: the contexts' groups, the
+                        system group, the OpenAPI document. Shared by server and browser.
+  src/server/           Cloudflare Worker: the composition (App.ts), the group Layers (handlers.ts), settings, the model
+                        service's setup, telemetry, security headers, worker.ts entry.
+  src/web/              React app: the shell, the Activity page, the composition of the contexts' screens. Calls the
+                        API through a client derived from src/api. Never imports src/server.
   migrations/           D1 (SQLite) migrations, applied in filename order.
   test/                 Unit tests (`*.slow.test.ts` need workerd, D1 or sign-in).
   public/samples/       The sample files the Upload step offers.
@@ -291,6 +294,12 @@ packages/access/         The access context (who may do what), as four packages:
                         in-memory twins, handlers: no SQL, no HTTP), host/ (the D1 adapters, sign-in, the session
                         identity, the endpoints) and web/ (the session controller, sign-in, People, the audit events).
                         `scripts/check-boundaries.mjs` holds which of them may import which.
+packages/catalog/        The catalog context (items and the imports that write them), as four packages: contract/ (the
+                        schemas of items, staged files, decisions, changes, suggestions and results, and the imports,
+                        items and assistant groups), model/ (the pure rules the screen and the server both run: the
+                        review, suggestions, the table view's checks, sheet layout, upload pieces; the four ports and
+                        what each endpoint does: no SQL, no HTTP), host/ (the D1 adapters, the two features that ask a
+                        model) and web/ (the import's steps, the Items page, the editor, the assistant, the upload).
 packages/kernel/, packages/drivers/   @inventory/kernel and the @beep drivers (d1, better-auth, openrouter).
 packages/foundation/     Product-neutral packages. Today only beep-effect's kit, vendored: @beep/types (primitive/),
                         @beep/identity, @beep/schema and @beep/utils (modeling/). Never edit them: each vendor.json
@@ -308,26 +317,34 @@ turbo.json              The task graph: seven package tasks and three root tasks
 Paths in this file and in `docs/` that start `src/`, `test/`, `migrations/` or `public/`, and every `scripts/` file but
 `docs-check.sh` and `keys-check.sh`, are inside `apps/inventory/`.
 
-Dependencies point one way: `web -> api -> domain` and `server -> api -> domain`.
+A package with screens is named in two lists, or its classes are missing from the stylesheet and nothing fails but the
+look: an `@source` line in `src/web/index.css` (development) and `screenPackages` in `vite.config.ts` (the build).
+
+Dependencies point one way: a context's `web -> model -> contract` and `host -> model -> contract`, and the app composes
+them (`src/web -> src/api`, `src/server -> src/api`). `bun run check` holds it (`scripts/check-boundaries.mjs`).
 
 ## Adding a feature: follow the Items example
 
 Design in this order. Do not start from the UI.
 
-1. **Schema** in `src/domain/` (`Item.ts`, `ItemQuery.ts`): the data and its rules, as Effect Schemas. Parse,
+1. **Schema** in the context's contract package (`packages/catalog/contract/src/Item/Item.read.ts`,
+   `ItemQuery.command.ts`): the data and its rules, as Effect Schemas. Parse,
    don't validate: payloads, database rows and model output are decoded through a Schema. File cells are read by
    small functions that return a value or a reason naming the column and value: a Schema error is not a sentence
    for the person.
-2. **Contract** in `src/api/v1/` (`Api.ts`): endpoints under `/api/v1` (sign-in's `/api/auth/*` never),
+2. **Contract** in the same package (`Catalog.contract.ts`; `src/api/v1/Api.ts` adds the group): endpoints under
+   `/api/v1` (sign-in's `/api/auth/*` never),
    payloads, every expected failure as a `Schema.TaggedError` with an `httpApiStatus`. Pattern 2 in
    `docs/patterns.md` has a path parameter and several failures.
-3. **Service** in `src/server/` (`Items.ts`): a `Context.Service` with a `layer`. SQL lives here only, every
+3. **Port and adapter**: the port (a `Context.Service` with no Layer) in the model package
+   (`Item/ItemStore.store.ts`), its Layer on D1 in the host package (`ItemStore.adapter.ts`). SQL lives in the host only, every
    statement through a Schema (`SqlSchema` for a read, `D1.statement` run with `run` or `batch` of `@beep/d1/D1` for a write).
-4. **Handler** in `src/server/handlers.ts` (or its own file, as `ImportHandlers.ts`), and the service added to
-   `Services` in `src/server/App.ts`.
-5. **UI** in `src/web/` (`ItemsPage.tsx`): `call((api) => api.group.endpoint(...))` inside TanStack Query, with
+4. **Handler** in the model package (`Item/Items.handler.ts`: what each endpoint does, the ports resolved once);
+   the group Layer is built in `src/server/handlers.ts`, and the adapter added to `servicesWith` in
+   `src/server/App.ts`.
+5. **UI** in the web package (`ItemsPage.screen.tsx`): `call((api) => api.group.endpoint(...))` inside TanStack Query, with
    loading, empty and error states. A write of a value the person chose is optimistic through `useOptimisticWrite`
-   (`@/lib/api`, bound from `@inventory/client/Optimistic`; copy `ItemEditor.tsx` or the People page's role change); a write whose outcome only the
+   (the package's `Catalog.runtime.ts`, bound from `@inventory/client/Optimistic`; copy `ItemEditor.screen.tsx` or the People page's role change); a write whose outcome only the
    server knows (a confirm, a take-back) shows its progress instead. A new page is one line in `appPages` and one
    branch in `Workspace.tsx`.
 6. **Test** the rule that would hurt most if it were wrong ("Tests" below).
@@ -438,11 +455,11 @@ The API runs in workerd, locally and deployed. Measured in this repo:
   nothing, and you can tell the person how many rows were already there. Pattern 1 in `docs/patterns.md` has the code.
 - **No filesystem.** Read uploaded files in the browser, or send their text in a JSON payload. Do not use multipart
   persistence.
-- **Spreadsheets (.csv, .xlsx)**: the reader is installed; do not write another. `useUpload` from `@/lib/upload`
+- **Spreadsheets (.csv, .xlsx)**: the reader is installed; do not write another. `useUpload` from `@inventory/catalog-web/Upload`
   reads a chosen .csv or .xlsx in a worker into one table with typed cells and Notes, then sends its rows to the
   server in pieces (`POST /api/v1/imports/uploads`, then the chunks, then finish), with its progress and Cancel;
   `SheetChooser` picks the sheet. Pattern 7 in `docs/patterns.md` has the shape, the limits and the samples.
-  A file that cannot be read or staged is a `FileProblem` (`src/domain/FileProblem.ts`), data the screen shows; a
+  A file that cannot be read or staged is a `FileProblem` (`packages/catalog/contract/src/Staging/FileProblem.read.ts`), data the screen shows; a
   server step that stages a file answers 200 with `StagingOutcome`, what it made or that problem.
 - **PDFs**: `unpdf` reads text from a PDF in the browser and in the Worker. Nothing for PDFs is installed.
 - **Secrets** and settings come from `wrangler.jsonc` `vars` and `.dev.vars` locally, `wrangler secret put` deployed,
@@ -497,7 +514,7 @@ to `AI_MODEL` in `wrangler.jsonc`, and `AI_MODEL` in `.dev.vars` can override it
 feature with `answeredByRules(...)` and show `answeredBy` on screen. **Every model call takes one call from the day's
 allowance first** (`ModelAllowanceGateway.take(purpose)` from `@inventory/access-contract/ModelAllowance`, before the
 call): a new model feature adds its purpose there (`ModelCallPurpose`) and in the `modelCall` table's check, and when the allowance is used up it says so and its rules
-answer, as the table assistant does (`src/server/TableAssistant.ts`).
+answer, as the table assistant does (`packages/catalog/host/src/TableAssistant.adapter.ts`).
 
 ## UI
 
@@ -529,8 +546,8 @@ only where it means something.
   `warning`, Cannot import `danger`, Imported `success`, Already there `neutral`, Draft `outline`. The words are each set once: the review region's defaults (Needs you, Can't fix
   here, Ready, Left out, All, Already there, …) in `defaultReviewWords` (`packages/review/src/ReviewWords.words.ts`), passed as
   `words` on the region, and the import's (Created, Already there, Not imported, Taken back, All) in `importWords`
-  (`pages/import/format.tsx`): change them there, and nowhere else.
-- **An import reads as steps**, and the app's already does (`src/web/pages/ImportPage.tsx`): Upload, Match (our field
+  (`packages/catalog/web/src/internal/format.tsx`): change them there, and nowhere else.
+- **An import reads as steps**, and the app's already does (`packages/catalog/web/src/ImportPage.screen.tsx`): Upload, Match (our field
   on the left, the file's column on the right, required fields marked; headers are matched by name, ignoring case,
   spaces and punctuation, and the step opens by itself only when a required field found no column; Review waits
   until every required field has a column and names the ones left), Review (the views "Needs you N · Can't fix here
@@ -574,7 +591,7 @@ only where it means something.
 
 Comments are for the next person who has to change this, not for the compiler.
 
-- **Every export in `src/domain`, `src/api` and `src/server` has a JSDoc block.** First sentence: what it is for, in
+- **Every export in a contract, model or host package, `src/api` and `src/server` has a JSDoc block.** First sentence: what it is for, in
   the business's words. Then the rule it protects or the decision it records, and why. Never restate the type.
 - **Every exported schema has `.annotate({ description })`**, and an API payload field a person can leave out, or
   whose name is unclear, has `annotateKey` (with `messageMissingKey`): the same text is the code's doc, the OpenAPI

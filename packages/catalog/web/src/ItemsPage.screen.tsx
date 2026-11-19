@@ -121,7 +121,7 @@ const fitting = (room: number): Partial<Record<ColumnId, boolean>> => {
 
 /**
  * What the Items table can be sorted and filtered by, and how its state reads in the address
- * (`?page=2&sort=...&category=...`). The ids are the server's (`src/domain/ItemQuery.ts`): a column listed here with a
+ * (`?page=2&sort=...&category=...`). The ids are the server's (`packages/catalog/contract/src/Item/ItemQuery.command.ts`): a column listed here with a
  * `variant` can be filtered, and one with `enableSorting: false` gets no sort menu.
  */
 const tableOptions = {

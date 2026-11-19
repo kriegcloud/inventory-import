@@ -127,7 +127,7 @@ What the starter held, now turned to the brief's inventory item:
 
 - The frame (sidebar, breadcrumb, page header; the sidebar lists only screens that exist), and sign-in with Better
   Auth on D1: organizations, roles, sessions, rate limits, one-click test accounts.
-- An import in four steps (`src/web/pages/import/`): upload in pieces, match columns, review every row with the
+- An import in four steps (`packages/catalog/web/src/`): upload in pieces, match columns, review every row with the
   review region (`docs/review-table.md`), and a result counted from what is stored, with a take-back.
 - The Items page (paged by the server, one forgiving search box, a table assistant), Activity and People.
 - One AI service on `effect/ai` and OpenRouter (`@beep/openrouter`) with one daily allowance of model calls; without a
@@ -152,9 +152,11 @@ packages so far. `bun run dev` runs a Cloudflare Worker locally in workerd,
 next to the React app, both built by one Vite config in `apps/inventory`.
 
 ```
-apps/inventory/src/domain/   Schemas and pure rules (Effect Schema)
+packages/catalog/            The catalog context: contract (schemas, API groups), model (pure rules, ports),
+                             host (D1 adapters) and web (screens)
+packages/access/             The access context, in the same four packages
 apps/inventory/src/api/      The HTTP contract, shared by server and browser (Effect HttpApi)
-apps/inventory/src/server/   Worker: services, handlers, identity, the AI service
+apps/inventory/src/server/   Worker: composition, group Layers, settings, the model service's setup
 apps/inventory/src/web/      React 19, Tailwind 4, shadcn/ui, TanStack Query
 apps/inventory/migrations/   D1 (SQLite) schema
 packages/foundation/         @beep/csv (the CSV reader and writer) and @beep/types, @beep/identity, @beep/schema,
@@ -172,7 +174,7 @@ Effect runs the server because it gives a lot for little code. Every request and
 the log format (`src/server/Observability.ts`). In development Effect DevTools can show the spans, the browser's and the
 Worker's (`.dev.vars.example`), and `bun run telemetry` sends them to a local Grafana. Errors a caller can act on
 are part of each function's type, so a missing case fails the type-check, not a request. One contract serves the
-server and the browser. Start with `src/api/v1/Api.ts`, then `src/server/Items.ts`, then
+server and the browser. Start with `src/api/v1/Api.ts`, then `packages/catalog/host/src/ItemStore.adapter.ts`, then
 `src/server/handlers.ts` (all under `apps/inventory/`).
 
 ## Secrets and security

@@ -3,7 +3,7 @@
 // text. A column id becomes a column only through the fixed tables below, every value is a bound parameter, and the
 // organization's condition and the search are AND-ed outside the filters' group, so an "or" between filters can never
 // reach another organization or bring back an item the search left out. What a search word matches is decided in
-// `src/domain/ItemSearch.ts`; this file only turns that decision into SQL over the `itemSearch` index.
+// `packages/catalog/contract/src/Item/ItemSearch.read.ts`; this file only turns that decision into SQL over the `itemSearch` index.
 import {
   ItemFilterColumn,
   ItemSortColumn,

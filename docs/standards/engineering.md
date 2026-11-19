@@ -39,7 +39,7 @@ My engineering rules are in `CLAUDE.md` and [patterns](../patterns.md). This pag
 - **Every query and mutation has its inputs and outputs decoded by an Effect Schema** (`SqlSchema`, `Model`), never
   a type cast on a raw row. Check: no `sql<...>` result is used without a Schema.
 - **Errors are values**: a failure a caller can act on is a `Schema.TaggedError` in the function's type, everything
-  else a defect. Check: no `throw` and no class extending `Error` in `src/domain`, `src/api` or `src/server`.
+  else a defect. Check: no `throw` and no class extending `Error` in a context's contract, model or host package, `src/api` or `src/server`.
 - **Writes that must land together are one batch, and running a write twice adds nothing** (`D1Client.batch`,
   `INSERT ... ON CONFLICT ... DO NOTHING`). Check: a test sends the same write twice and finds one row.
 - **Every string in a payload is bounded and every number is finite or an integer** (`Schema.isMaxLength`,
@@ -59,7 +59,7 @@ My engineering rules are in `CLAUDE.md` and [patterns](../patterns.md). This pag
 
 ## Documentation
 
-- **JSDoc on every export in `src/domain`, `src/api` and `src/server`**: what it is for and the rule it protects;
+- **JSDoc on every export in a context's contract, model or host package, `src/api` and `src/server`**: what it is for and the rule it protects;
   `@example` on pure helpers whose use is not obvious. Check: read the exports of a changed file.
 - **`.annotate({ description })` on every exported schema**, and `annotateKey` (with `messageMissingKey` where a
   person can see it) on API payload fields a person can leave out and on fields whose name is unclear. The

@@ -20,7 +20,7 @@ stops being true.
   as they were before it. Once someone has changed one of them, the screen says so and why it can no longer be taken
   back ("2 of these records were edited after the import"). The take-back is one atomic write, recorded with who did it;
   a second press changes nothing; a viewer cannot do it and another organization cannot see it. The import's take-back
-  is the worked example (`takeBack` in `src/server/Imports.ts`, the Result step). Check: import the sample, edit one
+  is the worked example (`takeBack` in `packages/catalog/host/src/ImportStore.adapter.ts`, the Result step). Check: import the sample, edit one
   record on the Records page, take the import back from its result: the others go, the edited one stays and is named,
   and the history's take-back line is read back from what is stored; import a file of one row, edit that record, and the
   result says the import can no longer be taken back.

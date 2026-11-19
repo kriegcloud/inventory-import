@@ -46,7 +46,7 @@ month its own row of the region, labelled "3 · Feb").
 
 ## From the spreadsheet reader to the review
 
-`readSpreadsheet({ file })` (`src/web/lib/spreadsheet`, pattern 7) returns a `SpreadsheetTable`: columns with the
+`readSpreadsheet({ file })` (`packages/catalog/web/src/internal/spreadsheet`, pattern 7) returns a `SpreadsheetTable`: columns with the
 header as found, rows with the row number the person sees in Excel, and notes. The review takes it from there:
 
 ```tsx
@@ -95,7 +95,7 @@ const kinds = [
   { id: "unit", label: "Unknown unit", tone: "decision" },
   { id: "qty", label: "Below zero", tone: "blocker" }
 ] as const
-const spellings: Record<string, string> = { ea: "pcs", each: "pcs" } // your rule table; Record.get in src/domain
+const spellings: Record<string, string> = { ea: "pcs", each: "pcs" } // your rule table; Record.get in the model package
 
 // The same pure function the server runs. One problem per row: the first rule that fails.
 const check = (cells: Readonly<Record<string, string>>): Problem | undefined => {
@@ -274,8 +274,8 @@ const [draft, setDraft] = useState<SavedDecisions | undefined>(() => readDraft(f
 
 ## Wired to the example Record
 
-The app's own Review step is the worked example: `src/web/pages/import/ReviewStep.tsx` draws the region, and
-`src/web/pages/import/reviewAdapter.ts` turns the pure review (`review` in `src/domain/ItemImport.ts`) into its rows,
+The app's own Review step is the worked example: `packages/catalog/web/src/ReviewStep.screen.tsx` draws the region, and
+`packages/catalog/web/src/ImportReview.controller.ts` turns the pure review (`review` in `packages/catalog/model/src/Review/Review.rules.ts`) into its rows,
 columns and problem kinds and the region's decisions back into the saved draft. The region holds no record words and
 the adapter holds no rules: a different kind of record changes `ItemImport.ts` and the adapter's columns, never the
 region. `test/web/reviewParity.test.ts` drives the region's logic and `review` side by side on `items_messy.csv` and

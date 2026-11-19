@@ -23,7 +23,7 @@ several records.
 D1 has no interactive transactions and allows 100 bound parameters per statement. One batch of single-row statements
 is atomic (every row lands or none does), and `ON CONFLICT ... DO NOTHING RETURNING` tells you which rows were new,
 so a repeated request adds nothing and says how many were already there. The working version is the import's
-confirm (`commit` in `src/server/Imports.ts`), tested on D1 in `test/server/Imports.slow.test.ts`: its records go in
+confirm (`commit` in `packages/catalog/host/src/ImportStore.adapter.ts`), tested on D1 in `test/server/Imports.slow.test.ts`: its records go in
 500 to a statement as one JSON value read with `json_each` (a handful of bound values however many rows), each
 statement `ON CONFLICT (organizationId, codeKey) DO NOTHING`, and a row counts as created only when its record is
 there afterwards. The smaller shape, one statement per row, is below.
@@ -98,7 +98,7 @@ Model I/O is `effect/ai` with `@effect/ai-openrouter`, behind the `OpenRouter` s
   then the rules answer. Do not add a retry around `askModel`: that would be a second policy. The plan has one step on
   purpose: a step whose `while` refuses hands over to the next one, which would re-ask after a bad answer.
 - **Errors**: `AiUnavailable.reason` is the contract's sentence for its `kind` (`modelSentences` in
-  `src/api/v1/ModelTrouble.ts`), the same five sentences every screen shows; the driver's `ModelUnavailable.trouble`
+  `packages/catalog/contract/src/Answer/AiUnavailable.rejection.ts`), the same five sentences every screen shows; the driver's `ModelUnavailable.trouble`
   is mapped to it by `aiUnavailableOf`. An empty OpenRouter credit (HTTP 402) is `refused`. The provider's own words
   are logged once per failed attempt (`ai.detail`), never sent to the screen.
 - The driver has no streaming or tool-calling call: nothing uses one. Adding one is a driver change (a method beside
@@ -173,10 +173,10 @@ A route beside the HttpApi (a frame document, a stream):
 ## 7. Reading a spreadsheet (.csv and .xlsx)
 
 The reader exists; do not write another. A file the person chooses is read with `useUpload().start(file, sheet?)`
-(`@/lib/upload`, [the kit](kit.md) "Steps and upload"): a module worker runs the reader, so the page never freezes, and
+(`@inventory/catalog-web/Upload`, [the kit](kit.md) "Steps and upload"): a module worker runs the reader, so the page never freezes, and
 the screen shows its progress and Cancel. Inside the worker and in tests, `readSpreadsheet({ file, sheet?,
-onProgress? })` from `@/lib/spreadsheet` returns an `Effect<SpreadsheetTable, FileProblem>` (shapes in
-`src/domain/Spreadsheet.ts` and `src/domain/FileProblem.ts`): `columns` (header as found, a
+onProgress? })` from `@inventory/catalog-web/Spreadsheet` returns an `Effect<SpreadsheetTable, FileProblem>` (shapes in
+`packages/catalog/model/src/Reading/Spreadsheet.rules.ts` and `packages/catalog/contract/src/Staging/FileProblem.read.ts`): `columns` (header as found, a
 unique `label`, the file's column `letter`), `rows` (each with `rowNumber` as Excel shows it, and one `Cell` per column:
 `type` text, number, date, boolean, empty or error, and `text` with nothing coerced), `headerRowNumber`, `format`
 (CSV delimiter and encoding, or every sheet and which one was chosen and why) and `notes`: what was skipped or needs a
@@ -263,9 +263,9 @@ the row, never a 400 or a 500. The import shows the whole shape.
 - **The payload bounds sizes only** (`StagedRow`, `UploadChunk`: every string `Schema.isMaxLength`, every number
   `Schema.Int` or `Schema.Finite`, a chunk at most 500 rows), looser than the rules, so an odd value reaches the
   review instead of failing the request.
-- **A file that cannot be staged is a `FileProblem`** (`src/domain/FileProblem.ts`), answered with 200 inside a
+- **A file that cannot be staged is a `FileProblem`** (`packages/catalog/contract/src/Staging/FileProblem.read.ts`), answered with 200 inside a
   `StagingOutcome` by each upload step, so the screen titles it by kind wherever it was found.
-- **A pure review states the rules** (`review` in `src/domain/ItemImport.ts`): for every row its status, its
+- **A pure review states the rules** (`review` in `packages/catalog/model/src/Review/Review.rules.ts`): for every row its status, its
   problems in order, each a sentence naming the column and the value, and what the rules propose. The browser's
   review screen and the server's confirm run the same function, so a crafted request cannot write a row the screen
   refused (`test/server/Imports.slow.test.ts`, "writes only what the review says is ready").
@@ -358,7 +358,7 @@ transforms (a trim, digits to a number) does not either: put it on the wire side
 - **Names**: a struct used in more than one place gets `identifier` in its `.annotate`, so the document holds it once
   as a component. Not on the schema a model is shown (`ViewCommand` and its changes): a model gets inline shapes.
 - **Fields**: a moment is `instant("When ...")`, a person's name `personName("Who ...")` and an error's reason
-  `reasonForPerson` (`src/domain/Described.ts`); `examples` come from the sample file and the seeded accounts.
+  `reasonForPerson` (`packages/catalog/contract/src/internal/Described.ts`); `examples` come from the sample file and the seeded accounts.
 - **What only the document can say** is in `src/api/v1/Document.ts`, an `OpenApi.Transform` on the `Api`: the session
   cookie as the security scheme, required on every operation that can answer 401; component names without Effect's
   `Encoded` suffix; and no 403 `CrossSiteRequest` on a GET or 400 on an operation with no input, which the server
@@ -372,9 +372,9 @@ transforms (a trim, digits to a number) does not either: put it on the wire side
 
 A confirmed import can be taken back while the records it created are unchanged. The import has the whole shape:
 `POST /api/v1/imports/:id/commit` is the Confirm, `POST /api/v1/imports/:id/take-back` the take-back, and the Result
-step (`src/web/pages/import/ResultStep.tsx`) says what it will do and shows what it did. Files:
-`migrations/0001_init.sql` (`importBatch`, `record.batchId` and `revision`), `src/server/Imports.ts` (`commit`,
-`takeBack`, the `TakeBackState` in each view), `src/server/Items.ts` (`edit`), `test/server/Imports.slow.test.ts`.
+step (`packages/catalog/web/src/ResultStep.screen.tsx`) says what it will do and shows what it did. Files:
+`migrations/0001_init.sql` (`importBatch`, `record.batchId` and `revision`), `packages/catalog/host/src/ImportStore.adapter.ts` (`commit`,
+`takeBack`, the `TakeBackState` in each view), `packages/catalog/host/src/ItemStore.adapter.ts` (`edit`), `test/server/Imports.slow.test.ts`.
 
 - **Each Confirm is a recorded batch.** One `importBatch` row per Confirm; each record it creates names it
   (`batchId`) and starts at `revision` 1. Records, outcomes, changes, the audit line and the import's status are one
@@ -399,14 +399,14 @@ step (`src/web/pages/import/ResultStep.tsx`) says what it will do and shows what
 
 A file with a row per item and a quantity column per month, or a row that lists two lots, holds several records in
 one row. The import does this end to end: one function says how a row becomes records, and the review, the screen,
-the confirm, the result and the take-back key each record on its own id. Files: `src/domain/ItemImport.ts`
-(`ItemsOfRow`, `recordsOfRow`, `rowId`, `rowPlace`), `src/server/ImportShape.ts`, `src/server/Imports.ts`,
-`migrations/0001_init.sql` (`part`, `sourcePart`), `src/web/pages/import/reviewAdapter.ts`,
+the confirm, the result and the take-back key each record on its own id. Files: `packages/catalog/model/src/Review/Review.rules.ts`
+(`ItemsOfRow`, `recordsOfRow`, `rowId`, `rowPlace`), `packages/catalog/model/src/Review/ItemsOfRow.context.ts`, `packages/catalog/host/src/ImportStore.adapter.ts`,
+`migrations/0001_init.sql` (`part`, `sourcePart`), `packages/catalog/web/src/ImportReview.controller.ts`,
 `test/domain/RowParts.test.ts` and `test/server/RowParts.slow.test.ts`. The gallery's "One line, several records"
 (`/gallery/review?state=months`) shows the region with it.
 
 - **Say it once, in the domain.** `itemsOfRow` in `ItemImport.ts` says how a row becomes items; the review screen
-  uses it, and the server reviews with `ItemsOfRow` (`src/server/ImportShape.ts`), which defaults to it. Never give the server another in the app: the
+  uses it, and the server reviews with `ItemsOfRow` (`packages/catalog/model/src/Review/ItemsOfRow.context.ts`), which defaults to it. Never give the server another in the app: the
   confirm would then write records the screen never showed. A test provides its own (`Layer.succeed(ItemsOfRow,
   byMonth)`).
 - **A record has its own id; its row keeps its number.** Each record of a row has a `part` (1, 2, ...) and the
@@ -431,7 +431,7 @@ the confirm, the result and the take-back key each record on its own id. Files: 
 - **One record per code still holds.** Records of one row that share a code are rivals like any two rows: when a
   record is one per code and month, the month is a field of the record and part of its key.
 
-In `src/domain/ItemImport.ts`, for a file of items by month, in place of its `itemsOfRow` (the file
+In `packages/catalog/model/src/Review/Review.rules.ts`, for a file of items by month, in place of its `itemsOfRow` (the file
 already imports `Arr` and `Str`; checked: this type-checks there):
 
 ```ts

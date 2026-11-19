@@ -12,8 +12,8 @@ can do about it.
 - **What went wrong, and what to do instead**: "The file has no SKU column. Add one, or pick the sheet that has it."
   Never a code, a stack trace, an HTTP status, a field path or a provider's own message. `sayError(error)` from
   `@inventory/client/SayError` is the one place a failure becomes words; `modelSentences` are the model's five (the contract's,
-  `src/api/v1/ModelTrouble.ts`, so the server's `AiUnavailable` says the same), `answeredByLine`
-  says which path answered, and `formProblems` (`@/lib/form`) and the pure `review` (`src/domain/ItemImport.ts`) say
+  `packages/catalog/contract/src/Answer/AiUnavailable.rejection.ts`, so the server's `AiUnavailable` says the same), `answeredByLine`
+  says which path answered, and `formProblems` (`@/lib/form`) and the pure `review` (`packages/catalog/model/src/Review/Review.rules.ts`) say
   every problem at once, a form's and a file's rows'. Check: cause each refusal
   the app has (a wrong file, a viewer pressing Import, the model unavailable) and read every sentence; none uses a
   word the person would not.
@@ -24,11 +24,11 @@ can do about it.
   error (an import's upload steps answer 200 with a `StagingOutcome`, and its review gives every row its reason).
   Request errors stay for what is not the person's data: signed out, not allowed, a record that is gone, the server
   broken. Check: an import with bad rows answers 200 and lists each row's reason. A file that cannot be read or staged
-  is a `FileProblem` (`src/domain/FileProblem.ts`: its kind, what is wrong, what to do), from the browser's reader and
+  is a `FileProblem` (`packages/catalog/contract/src/Staging/FileProblem.read.ts`: its kind, what is wrong, what to do), from the browser's reader and
   from the server alike. A server step that stages a file answers 200 with `StagingOutcome(made)`, a `Schema.Result` of
   what it made or the `FileProblem`, and its endpoint's errors keep only what is not the file. Copy the endpoints and
-  their handler from the import's upload steps (`src/server/ImportHandlers.ts`), and the screen from the Upload step
-  (`src/web/pages/import/UploadStep.tsx`: `fileProblemTitles[kind]`, then the problem, then what to do). Check: a bad
+  their handler from the import's upload steps (`packages/catalog/model/src/Import/Imports.handler.ts`), and the screen from the Upload step
+  (`packages/catalog/web/src/UploadStep.screen.tsx`: `fileProblemTitles[kind]`, then the problem, then what to do). Check: a bad
   file sent to the step answers 200 with `"_tag":"Failure"` holding the `FileProblem`, and the screen says what is
   wrong, then what to do.
 - **The model's failures have plain sentences**: no key, a key refused or out of credit (not "try again": it says AI

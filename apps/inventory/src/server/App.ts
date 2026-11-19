@@ -12,10 +12,7 @@ import type { OpenRouter } from "@beep/openrouter/OpenRouter"
 import { ModelLive } from "./Model.ts"
 import type { BetterAuth } from "@beep/better-auth/BetterAuth"
 import { Handlers } from "./handlers.ts"
-import { ImportStoreD1 } from "@inventory/catalog-host/ImportStoreD1"
-import { ItemStoreD1 } from "@inventory/catalog-host/ItemStoreD1"
-import { SuggestionsLive } from "@inventory/catalog-host/Suggestions"
-import { TableAssistantLive } from "@inventory/catalog-host/TableAssistant"
+import { CatalogLive } from "@inventory/catalog-host/Host"
 import * as Observability from "./Observability.ts"
 import { RequestTelemetry } from "./RequestTelemetry.ts"
 import { SameOriginLive } from "./SameOrigin.ts"
@@ -89,15 +86,10 @@ export const servicesWith = <E, R>(options: {
   readonly ai: Layer.Layer<OpenRouter, E, R>
   readonly production: boolean
 }) => {
-  // The access context: its ports on D1, the session answer, and the gateway to the day's model allowance.
-  const storage = Layer.mergeAll(AccessLive(options), ImportStoreD1, ItemStoreD1, options.ai)
-  // The table assistant and the import's suggestions use the model and the day's allowance; everything else uses
-  // storage only.
-  return Layer.mergeAll(
-    storage,
-    TableAssistantLive.pipe(Layer.provide(storage)),
-    SuggestionsLive.pipe(Layer.provide(storage))
-  )
+  // The access context (its ports on D1, the session answer, the gateway to the day's model allowance) and the model.
+  const base = Layer.mergeAll(AccessLive(options), options.ai)
+  // The catalog: its two stores on D1, and suggestions and the table assistant, which use the model and the allowance.
+  return Layer.mergeAll(base, CatalogLive.pipe(Layer.provide(base)))
 }
 
 /**

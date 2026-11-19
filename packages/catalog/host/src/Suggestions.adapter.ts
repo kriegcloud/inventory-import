@@ -1,7 +1,7 @@
 // SUGGEST WHAT THE RULES CANNOT. For an open import, a model (or the fixed rules when there is no key, or the day's
 // model calls are used) suggests a name for a row with none, a category for a row whose category is not listed, and
 // a file column for a field no heading matched. The one thing not to break: a model proposes and never writes. Every
-// answer passes the guard in src/domain/Suggest.ts, which sets the confidence and the evidence itself, and is only
+// answer passes the guard in packages/catalog/model/src/Suggestion/Suggest.rules.ts, which sets the confidence and the evidence itself, and is only
 // stored in `importSuggestion`: no item and no decision is touched, and the review shows each one as a proposal the
 // person accepts or rejects. One call is taken from the organization's allowance before the model is asked.
 import { AgentRun } from "@inventory/kernel/AgentRun"

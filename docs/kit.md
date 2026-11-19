@@ -10,14 +10,14 @@ tags: [ui, components, import]
 What is ready for an import screen and a list of records, and when to use each piece. Each was checked in the
 production build under the content security policy, in both themes, at 1440, 768 and 390 px, with the keyboard, and
 with Lighthouse (Accessibility 100). `CLAUDE.md` "UI" and [patterns](patterns.md) section 8 still win over anything here.
-Nothing here is product logic: what a row means and which rule applies are written in `src/domain/ItemImport.ts`,
+Nothing here is product logic: what a row means and which rule applies are written in `packages/catalog/model/src/Review/Review.rules.ts`,
 and the decisions behind them in `DECISIONS.md`.
 
 | Need | Use | File |
 | --- | --- | --- |
 | Upload, Match, Review, Result | `Stepper`, its value in `?step=`, each screen in a `StepperContent`; the import page draws its steps into the shell's top bar (`BarSlotContext`) | `components/ui/stepper.tsx`, `pages/ImportPage.tsx` |
-| Choose the file | `FileUpload` (Dice UI): a labelled file input, drag and drop on its box, Enter opens the picker; a file dropped anywhere else on the page goes to the same input (`UploadStep.tsx`); then `useUpload().start(file)`, which reads in a worker and stages in chunks, with progress and Cancel | `components/ui/file-upload.tsx`, `lib/upload/`, `pages/import/UploadStep.tsx` |
-| Which sheet of a workbook | `SheetChooser`: "Sheet 3 of 6: Records", why, and a select; nothing when one sheet has data | `components/app/SheetChooser.tsx` |
+| Choose the file | `FileUpload` (Dice UI): a labelled file input, drag and drop on its box, Enter opens the picker; a file dropped anywhere else on the page goes to the same input (`UploadStep.screen.tsx`); then `useUpload().start(file)`, which reads in a worker and stages in chunks, with progress and Cancel | `components/ui/file-upload.tsx`, `lib/upload/`, `pages/import/UploadStep.tsx` |
+| Which sheet of a workbook | `SheetChooser`: "Sheet 3 of 6: Records", why, and a select; nothing when one sheet has data | `packages/catalog/web/src/internal/SheetChooser.tsx` |
 | A refresh loses nothing | `useSavedProgress(scope, browserRuntime)`: the chosen file until the server has it, and the review's undo history beside the decisions the server keeps, for one person in one organization; cleared on Confirm | `lib/saved-progress/` |
 | A table of rows to decide on | `ReviewRegion`: one card with one toolbar (search, views, Undo and Redo, column, filter, row height, download and activity icons, the counted Import button), a work list of the problem kinds beside the table, columns sized to their values (`fit`) or sharing the rest (`fill`), cut text in a hover card, one decision per group, one decision at a time on a phone. Read [the review region](review-table.md) | `components/review/` |
 | A list the server pages (records, anything a second import adds to) | `DataTable` + `useDataTable` with `urlState`, the toolbar's one search box (`TableSearch`), sort and filter menus, the table assistant | `packages/ui/src/components/data-table/`, `pages/ItemsPage.tsx` |
@@ -60,7 +60,7 @@ and the decisions behind them in `DECISIONS.md`.
   `<StepperItem disabled>`.
 - Take the chosen file from `onAccept`, not `onValueChange`: with a controlled `value` the component calls
   `onValueChange` twice for one choice, which staged every file twice here. Hand it to `useUpload().start(file)` from
-  `@/lib/upload`, which reads it in a worker with `readSpreadsheet` (.csv and .xlsx, [patterns](patterns.md) section 7),
+  `@inventory/catalog-web/Upload`, which reads it in a worker with `readSpreadsheet` (.csv and .xlsx, [patterns](patterns.md) section 7),
   stages it in chunks and shows progress with a Cancel. A "Use the sample file" ghost button beside "Choose file" is
   the demo path.
 
@@ -173,7 +173,7 @@ already holds (People, Activity, a result's rows, the columns to match): the sam
 sorting from the headings, a page at a time and cards on a phone. Choose `ReviewRegion` for rows to decide on. Every
 table in the app is one of these three; nothing outside `@inventory/ui` draws a table of its own.
 
-The pattern is tablecn's own, in three pieces (`src/web/pages/ItemsPage.tsx` is the worked example):
+The pattern is tablecn's own, in three pieces (`packages/catalog/web/src/ItemsPage.screen.tsx` is the worked example):
 
 ```tsx
 // 1. What can be sorted and filtered, and how the state reads in the address. A `variant` gives the column a filter.
@@ -209,8 +209,8 @@ return (
   "is between", "is empty") and joins them with "and" or "or"; `DataTableSortMenu` sorts by several columns in an
   order the person can drag. Both write the same state as the toolbar and the headings, so they can be mixed.
 
-- The server's half is `src/domain/ItemQuery.ts` (the query as a Schema), `GET /api/v1/records/page` and
-  `src/server/Items.ts`:
+- The server's half is `packages/catalog/contract/src/Item/ItemQuery.command.ts` (the query as a Schema), `GET /api/v1/records/page` and
+  `packages/catalog/host/src/ItemStore.adapter.ts`:
   a column id becomes a column name only through a fixed table and every value is a bound parameter. Copy that file
   for another list; do not build SQL from a column id the browser sent.
 - Options for a `select` filter and the range for a `number` filter come from a second, small request (`GET
@@ -236,11 +236,11 @@ return (
   same table instance) between the toolbar and `DataTablePagination`: a table wider than the screen fails the phone
   standard. `DataTable` takes `empty` (what an empty body says) and `withPagination` as local changes.
 
-- **The table assistant** (`components/app/TableAssistant.tsx`, `lib/table-assistant/`): a sparkle button in the
+- **The table assistant** (`packages/catalog/web/src/TableAssistant.screen.tsx`, `Conversation.machine.ts`, `internal/view.ts`): a sparkle button in the
   toolbar opens a panel where a person types what they want to see ("sort by quantity descending and only
   Kilogram"); the answer is a change to the table's own sort, filters, search and columns, listed one by one, each
   removable, each request undoable. The page hands it a catalog of its columns (`recordsCatalog` in
-  `ItemsPage.tsx`); the server checks every answer against that catalog (`checkCommand` in `src/domain/TableView.ts`).
+  `ItemsPage.tsx`); the server checks every answer against that catalog (`checkCommand` in `packages/catalog/model/src/Assistant/TableView.rules.ts`).
   With no key the fixed rules answer "find", "sort by", "hide", "show", "only" and "clear" and the panel says so; a
   model's call comes from the day's allowance (`ModelAllowanceGateway`, `@inventory/access-contract/ModelAllowance`), and once that is used up the rules answer
   and the panel says why.
@@ -282,10 +282,10 @@ review's undo history beside the decisions (localStorage, written before the nex
 and the step are on the server and in the address. The scope is the acting member, organization and screen, from the
 session, never from the address: another member, or the same person in another organization, never sees it.
 
-- **The upload step** (`pages/import/UploadStep.tsx`) keeps the chosen file until the server has it; after a reload
+- **The upload step** (`packages/catalog/web/src/UploadStep.screen.tsx`) keeps the chosen file until the server has it; after a reload
   or a closed tab it offers "Continue", which reads the same file again; once an import of that file exists it is not
   offered. A save that failed on the network keeps the file, so Continue is there.
-- **The review step** (`pages/import/ReviewStep.tsx`) keeps the undo and redo history per import, used only while it
+- **The review step** (`packages/catalog/web/src/ReviewStep.screen.tsx`) keeps the undo and redo history per import, used only while it
   ends at the decisions the server holds (`toDraft` and `fromDraft` of the region). Confirm clears it.
 - A draft that no longer decodes (an older version) is dropped, never shown half. When the browser refuses to store (a
   private window), `progress.refused` turns true: say so once with `sayError({ _tag: "FileNotKept" })`.
@@ -293,7 +293,7 @@ session, never from the address: another member, or the same person in another o
 
 ## Reading and writing: the cache, the buttons, the errors
 
-The Records page and its editor (`src/web/pages/ItemsPage.tsx`, `ItemEditor.tsx`) are the worked example of a
+The Records page and its editor (`packages/catalog/web/src/ItemsPage.screen.tsx`, `ItemEditor.tsx`) are the worked example of a
 screen that reads and writes; the People page's role change is a second one.
 
 ```tsx
@@ -314,13 +314,13 @@ const save = useOptimisticWrite({ write: (api, edit) => api.items.edit(edit), ch
   answers is optimistic (`useOptimisticWrite` from `lib/api.ts`, built by `@inventory/client/Optimistic`); one only the server knows (a confirm, a
   take-back, adding a person by email) shows its progress instead. Mutations are retried only through `callWrite`,
   and only for a failure that may pass.
-- **Every problem of a form at once**: run every field's check (`readRecordForm` in `src/domain/Item.ts`, or
+- **Every problem of a form at once**: run every field's check (`readRecordForm` in `packages/catalog/contract/src/Item/Item.read.ts`, or
   `formProblems` from `lib/form.ts`), show each under its field with `FieldError`, and send nothing while one is
   open. In the record editor an empty Name and a price with three decimals are both named after one press.
 - **A failure in words**: `sayError(error)` gives `{ title, sentence, problems }` for any failure the browser can
   meet (a typed API error, a refused request with every field named, the network, a server error, an answer that
   could not be read, a file's problem). The screen shows those; the raw failure goes to the console once. A
-  model's trouble is one of five sentences (`modelSentences`, the contract's in `src/api/v1/ModelTrouble.ts`, which
+  model's trouble is one of five sentences (`modelSentences`, the contract's in `packages/catalog/contract/src/Answer/AiUnavailable.rejection.ts`, which
   the server words `AiUnavailable` with too: no key, a key refused or out of credit, busy, a bad answer, not
   answering), and
   `answeredByLine(answeredBy)` says which path answered ("Answered by the rules: …").

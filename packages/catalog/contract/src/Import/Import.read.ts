@@ -306,7 +306,7 @@ export class ImportView extends S.Class<ImportView, { readonly brand: unique sym
     createdRows: S.Array(S.Int).annotateKey({
       description: "Rows an earlier confirm of this import turned into items: already there when it is opened again"
     }),
-    createdIds: RowId.pipe(S.Array, S.optionalKey).annotateKey({
+    createdIds: S.Array(RowId).annotateKey({
       description:
         "The items an earlier confirm of this import created, by row id (`row-7`, or `row-8.2` for the second item of row 8): what the review counts as already there",
       examples: [[RowId.make("row-7"), RowId.make("row-8.2")]]

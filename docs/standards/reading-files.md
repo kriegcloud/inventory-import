@@ -15,7 +15,7 @@ them too.
   cells are never filled down. Check: a test gives an ambiguous date and gets a question, not a value.
 - **What the reader noticed reaches the person**: rows above the header, a total row, hidden rows or sheets,
   formulas. Check: the sample workbook's notes are on screen or one click away.
-- **A refused file says why and what to do**: the reader fails with a `FileProblem` (`src/domain/FileProblem.ts`),
+- **A refused file says why and what to do**: the reader fails with a `FileProblem` (`packages/catalog/contract/src/Staging/FileProblem.read.ts`),
   data the screen shows under its kind's heading, what is wrong, then what to do ([errors](errors.md)). Check: an
   `.xls` file shows "This file is not a spreadsheet" and "save it as "Excel Workbook (.xlsx)" or "CSV UTF-8"".
 - **Row numbers are the file's own**, so a row named on screen can be found in the spreadsheet. Check: compare one.

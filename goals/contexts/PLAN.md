@@ -14,8 +14,8 @@ from: explorations/ideal-architecture
 | 1 | Decisions recorded; SPEC and PLAN | done |
 | 2 | Boundaries check; `@inventory/client` | done |
 | 3 | access: shapes in place, then contract, model, host, web | done |
-| 4 | catalog: shapes in place, then contract, model, host, web | doing |
-| 5 | Closing note | todo |
+| 4 | catalog: shapes in place, then contract, model, host, web | done, with what is owed listed in the closing note |
+| 5 | Closing note | done |
 
 ## Current blocker
 
@@ -407,3 +407,71 @@ None.
     "clear" sent with the Send button. Looked at as pictures: the result and the review at desk width, Items at
     phone width. Not seen at phone width: the review's decisions, "Suggest fixes" (its button is not on the phone
     review as I looked for it), the editor, a take-back.
+- **`createdIds` is always there** (the last row of the brief's table of wire changes that was open): an import's
+  view lists the items an earlier confirm created, an empty list when none. Read on screen: "Fix 45 not imported" on
+  a confirmed import answered 155 ids (`row-2`, `row-3`, ...), and the review read "Needs a decision 24 · Cannot
+  import 21 · Ready 0 · Already there 155 · All 200", "No items ready yet".
+- **The app composes the catalog through one Layer**, `CatalogLive` (`@inventory/catalog-host/Host`), given the
+  access context and the model service; the database stays the app's to provide.
+
+## Closing note
+
+**What stands.** Two contexts, eight packages, and an app that composes them: `access` and `catalog`, each as
+`contract`, `model`, `host` and `web`; `@inventory/client` between the screens and the API; `check-boundaries.mjs`
+in the root check holding which may import which (21 workspaces). The app's `src/domain` is gone; its `src/server`
+holds composition, settings and telemetry; its `src/web` holds the shell, the Activity page and the gallery.
+`check:full` runs 64 tasks. Tests: the app 155 (fast and slow), `catalog-contract` 40, `catalog-model` 25, the
+access packages 30 as before. Stage C findings: app 38, `catalog-web` 254, review 283, ui 52, client 22,
+`access-web` 17: 666 of the cap's 678.
+
+**What is owed** (each is in the brief or a recorded decision, and is not built):
+
+1. The in-memory twins of the catalog's four ports and `CatalogTest.memory` (decision (C6)), and with them tests of
+   the endpoints over twins. The catalog's server tests still run in the app, on D1.
+2. `ConfirmPlan` in place of the `CommitRow` type; `handlersOf` for the catalog; the storage-only ports
+   `SuggestionStore` and `AssistantLog`; the `Answerer` and `ModelAllowance` ports with `ModelAllowanceViaAccess`
+   (decision (C4)): suggestions and the table assistant sit whole in the host and take from the access gateway.
+3. The model's `Review.rules.ts` as four files; the cell readers and `ItemSearch` out of the contract;
+   `ViewChange` split into `show` and `hide`; `UploadState` in `catalog-web` with `RowEstimate`; the assistant's
+   conversation with `Option`s; identity-composer identifiers for the catalog's schemas.
+4. `ImportDecisions.screen.tsx` out of the app's Activity page; the web tests in `catalog-web`.
+5. One `internal/auditLine.ts` per host for the guarded audit insert.
+
+**Not seen on screen**, in either turn: a suggested column; Cancel during an upload; the editor showing a 400; a
+typed value in Activity's Decisions; a member's own People list after signing up; at phone width, the review's
+decisions, the editor and a take-back.
+
+**What `@beep/xlsx` should know.**
+
+- The .xlsx reader is `packages/catalog/web/src/internal/spreadsheet/xlsx.ts`, beside `csv.ts` (which already goes
+  through `@beep/csv`), `read.ts` and `index.ts` (`readSpreadsheet`), exported as `@inventory/catalog-web/Spreadsheet`.
+  It runs in a module worker (`internal/reader.worker.ts`, loaded with `new URL(..., import.meta.url)`), and SheetJS
+  is loaded as a chunk of its own (`xlsx/dist/xlsx.mini.min.js`, listed in the app's `optimizeDeps.include`, or the
+  first file on a cold dev server is lost to a reload).
+- What it answers is the model's: `SpreadsheetTable`, `Cell`, `SheetSummary`, `SheetChoice` and the note kinds are in
+  `packages/catalog/model/src/Reading/Spreadsheet.rules.ts`, the layout guesses in `SheetLayout.rules.ts`, and a file
+  that cannot be read is a `FileProblem` (`packages/catalog/contract/src/Staging/FileProblem.read.ts`). A driver that
+  returns those shapes drops in behind `read.ts`.
+- A screens package may import a foundation package and not a drivers one (`check-boundaries.mjs`): `@beep/xlsx`
+  belongs to the family `@beep/csv` is in.
+- Nothing with a class crosses the worker: an `Option` or a `DateTime` arrives as a plain object. The reader hands
+  the head over as plain fields (`PlainHead`, `internal/protocol.ts`) and the page rebuilds it.
+- Its tests are `readSpreadsheet.test.ts`, `readInPieces.test.ts` and `csvDifferential.test.ts` in the app's
+  `test/web`, with the app's sample files.
+
+**What `@beep/infra` should know.**
+
+- The Worker is composed in `apps/inventory/src/server/App.ts`: `servicesWith` merges `AccessLive(options)`, the
+  model service and `CatalogLive`; `makeRoutes` builds the `Api` with the group Layers of `handlers.ts`. A host
+  reads no setting and no binding itself: `Settings.ts` and `worker.ts` are the only readers, and a host's Layer
+  states what it needs in its type (`SqlClient | D1`, `OpenRouter`, `ModelAllowanceGateway`, `BetterAuth`).
+- The migrations stay one folder, `apps/inventory/migrations`, applied in file order. No migration was added and no
+  stored row rewritten by this goal: every reshaped value is mapped where it is read and written.
+  `Tenancy.slow.test.ts` reads the schema and covers both contexts' tables.
+- A package with screens is named in two lists, `@source` in `src/web/index.css` and `screenPackages` in
+  `vite.config.ts`, or its classes are missing from the stylesheet with nothing failing. A check for that would
+  have caught the one defect this goal shipped between two commits.
+- The group Layers are built in the app, against the assembled `Api`: its prefix and middleware change every
+  endpoint's type, so a host exports what each endpoint does and not a Layer.
+- `beep.family`, `beep.context` and `beep.layer` in each package.json are what `check-boundaries.mjs` reads; a new
+  package without them is refused.

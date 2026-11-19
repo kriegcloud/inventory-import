@@ -2,7 +2,7 @@
 okf_version: "0.2"
 ---
 
-Paths here that start `src/`, `test/`, `migrations/`, `public/` or `scripts/` (but `scripts/docs-check.sh` and `bun run beep laws keys`) are inside
+Paths here that start `src/`, `test/`, `migrations/`, `public/` or `scripts/` (but `bun run beep docs check` and `bun run beep laws keys`) are inside
 `apps/inventory/`, the app's workspace.
 
 # Read before building

@@ -316,7 +316,7 @@ packages/foundation/     Product-neutral packages: this repository's own @beep/c
 docs/                   Standards, the kit, patterns, the glossary and sign-in (`docs/index.md` lists them); qa/ is evidence.
 explorations/           Questions being shaped: research, decisions, briefs.
 goals/                  Work with a definition of done: SPEC.md and PLAN.md.
-scripts/                Repository checks (`docs-check.sh`, `beep laws keys`, `vendor-check.mjs`, `check-strict.mjs`,
+scripts/                Repository checks (`beep docs check`, `beep laws keys`, `beep vendor check`, `check-strict.mjs`,
                         `beep laws boundaries`: which package may import which, `beep laws screens`: every package with screens in both stylesheet lists, `check-effect-imports.mjs`: every Effect import from its own path under its one name) and `vendor-beep.mjs`, which copies the kit from a
                         beep-effect checkout.
 turbo.json              The task graph: seven package tasks and three root tasks.
@@ -324,7 +324,7 @@ turbo.json              The task graph: seven package tasks and three root tasks
 ```
 
 Paths in this file and in `docs/` that start `src/`, `test/`, `migrations/` or `public/`, and every `scripts/` file but
-`docs-check.sh` and `beep laws keys`, are inside `apps/inventory/`.
+`beep docs check` and `beep laws keys`, are inside `apps/inventory/`.
 
 A package with screens is named in two lists, or its classes are missing from the stylesheet and only the look is
 wrong: an `@source` line in `src/web/index.css` (development) and `screenPackages` in `vite.config.ts` (the build).

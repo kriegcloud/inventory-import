@@ -13,11 +13,13 @@ import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
+import * as Num from "effect/Number"
 import * as O from "effect/Option"
 import * as Path from "effect/Path"
 import * as S from "effect/Schema"
 import * as Stream from "effect/Stream"
 import * as Str from "effect/String"
+import * as Digest from "effect/crypto/Digest"
 import * as ChildProcess from "effect/process/ChildProcess"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import { RepoError } from "./Cli.errors.ts"
@@ -33,6 +35,8 @@ export interface Workspace {
 
 /** What a tool answered: its two streams as text and its exit code. */
 export interface ToolAnswer {
+  /** Standard output as the bytes the tool wrote. */
+  readonly bytes: Uint8Array
   readonly stdout: string
   readonly stderr: string
   readonly code: number
@@ -43,6 +47,18 @@ export interface Entry {
   readonly name: string
   readonly path: string
   readonly directory: boolean
+}
+
+const decoder = new TextDecoder()
+
+/** Chunks of bytes as one array. */
+const joined = (chunks: ReadonlyArray<Uint8Array>): Uint8Array => {
+  const whole = new Uint8Array(Num.sumAll(A.map(chunks, (chunk) => chunk.length)))
+  A.reduce(chunks, 0, (offset, chunk) => {
+    whole.set(chunk, offset)
+    return offset + chunk.length
+  })
+  return whole
 }
 
 const unreadable = (path: string) => (cause: unknown) =>
@@ -86,6 +102,8 @@ export class Repo extends Context.Service<
     readonly files: (dir: string) => Effect.Effect<ReadonlyArray<string>, RepoError>
     /** Every workspace under `apps` and `packages`: a folder with a `package.json`, found at most five folders deep. */
     readonly workspaces: Effect.Effect<ReadonlyArray<Workspace>, RepoError>
+    /** The SHA-256 of some bytes, in hexadecimal. */
+    readonly sha256: (data: Uint8Array) => Effect.Effect<string>
     /** Runs a tool and waits for it. A tool that cannot be started is a `RepoError`; a non-zero exit is an answer. */
     readonly run: (
       command: string,
@@ -100,13 +118,18 @@ export class Repo extends Context.Service<
    */
   static readonly layer = (
     options: { readonly cwd?: string } = {}
-  ): Layer.Layer<Repo, RepoError, FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner> =>
+  ): Layer.Layer<
+    Repo,
+    RepoError,
+    FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner | Digest.Digest
+  > =>
     Layer.effect(
       Repo,
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem
         const path = yield* Path.Path
         const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+        const digest = yield* Digest.Digest
         const cwd = path.resolve(options.cwd ?? ".")
 
         const exists = (file: string) => fs.exists(file).pipe(Effect.orElseSucceed(() => false))
@@ -208,15 +231,16 @@ export class Repo extends Context.Service<
             const handle = yield* spawner.spawn(
               ChildProcess.make(command, args, { cwd: O.getOrElse(O.fromUndefinedOr(runOptions?.cwd), () => root) })
             )
-            const [stdout, stderr, code] = yield* Effect.all(
+            const [chunks, stderr, code] = yield* Effect.all(
               [
-                handle.stdout.pipe(Stream.decodeText, Stream.mkString),
+                Stream.runCollect(handle.stdout),
                 handle.stderr.pipe(Stream.decodeText, Stream.mkString),
                 handle.exitCode
               ],
               { concurrency: "unbounded" }
             )
-            return { stdout, stderr, code }
+            const bytes = joined(chunks)
+            return { bytes, stdout: decoder.decode(bytes), stderr, code }
           }).pipe(
             Effect.scoped,
             Effect.mapError((cause) =>
@@ -239,6 +263,7 @@ export class Repo extends Context.Service<
           entries,
           files,
           workspaces,
+          sha256: Effect.fn("Repo.sha256")((data: Uint8Array) => digest.digestHex(Digest.sha256, data)),
           run
         }
       })

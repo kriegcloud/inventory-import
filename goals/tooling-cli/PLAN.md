@@ -13,7 +13,7 @@ from: explorations/ideal-architecture
 | --- | --- | --- |
 | 1 | `@effect/platform-bun` 4.1.4 installed and run; the package's frame; `quality ceilings` and `laws exports` | done |
 | 2 | `laws boundaries`, `laws screens`, `laws keys` | done |
-| 3 | `vendor check`, `docs check` | todo |
+| 3 | `vendor check`, `docs check` | done |
 | 4 | `quality strict` | todo |
 | 5 | `vendor sync` | todo |
 | 6 | `laws effect-imports` | todo |
@@ -31,6 +31,8 @@ compared on standard output, standard error and exit code.
 | `laws boundaries` | the same (exit 0) | an undeclared import, a dynamic import of an undeclared package, a path into `apps/`; a declared package the row refuses and its import (exit 1) |
 | `laws screens` | the same (exit 0) | a package with screens missing from the `@source` lines and from `screenPackages`, an entry naming no package, a source naming no folder; no `screenPackages` block at all (exit 1) |
 | `laws keys` | the same (exit 0) | a key-shaped string and a private-key header in a new, untracked file (exit 1) |
+| `vendor check` | the same, and with `--source` against a beep-effect checkout (exit 0) | a changed file, a lost provenance line, a missing file, a stray file, changed exports; in the record, a patch with no reason on a file equal to upstream and a source hash that differs; with `--source`, a recorded source hash that is not upstream's (exit 1) |
+| `docs check` | the same, and with `--verbose` (exit 0) | a document with no frontmatter (exit 1). A bundle with no markdown, a validator that scanned nothing, and a missing validator are tested against a stand-in validator, not compared: planting them means moving a whole bundle or the vendored skill |
 
 ## Current blocker
 

@@ -5,10 +5,12 @@
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
+import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import * as A from "effect/Array"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
+import * as Digest from "effect/crypto/Digest"
 import type { RepoError } from "../../src/Cli.errors.ts"
 import { Repo } from "../../src/Repo.service.ts"
 
@@ -36,7 +38,9 @@ export const inTree = <A, E>(tree: Tree, rule: Effect.Effect<A, E, Repo>, cwd = 
           .pipe(Effect.andThen(fs.writeFileString(path.join(root, file), content)), Effect.orDie),
       { concurrency: 1, discard: true }
     )
-    return yield* rule.pipe(Effect.provide(Repo.layer({ cwd: path.join(root, cwd) })))
+    return yield* rule.pipe(
+      Effect.provide(Repo.layer({ cwd: path.join(root, cwd) }).pipe(Layer.provide(Digest.layerWebCrypto)))
+    )
   }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
 
 /** A report's lines as plain text, each with the stream it goes to. */

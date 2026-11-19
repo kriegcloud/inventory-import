@@ -87,6 +87,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@beep/identity": "workspace:*",
+        "@beep/schema": "workspace:*",
         "better-auth": "1.7.22",
         "effect": "4.1.4",
       },
@@ -101,6 +102,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@beep/identity": "workspace:*",
+        "@beep/schema": "workspace:*",
         "@effect/sql-d1": "4.1.4",
         "effect": "4.1.4",
       },
@@ -126,6 +128,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@beep/identity": "workspace:*",
+        "@beep/schema": "workspace:*",
         "@effect/ai-openrouter": "4.1.4",
         "effect": "4.1.4",
       },
@@ -211,6 +214,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@beep/identity": "workspace:*",
+        "@beep/schema": "workspace:*",
         "effect": "4.1.4",
       },
       "devDependencies": {

@@ -3,11 +3,13 @@
  *
  * @packageDocumentation
  */
+import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as O from "effect/Option"
 import * as Redacted from "effect/Redacted"
 import * as Result from "effect/Result"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
+import * as Tuple from "effect/Tuple"
 import type { BetterAuthSettings } from "./BetterAuth.config.ts"
 import { BetterAuthConfigError } from "./BetterAuth.errors.ts"
 import { $BetterAuthId } from "./internal/identity.ts"
@@ -147,10 +149,9 @@ class EphemeralSecret extends S.Opaque<EphemeralSecret, { readonly brand: unique
  *
  * @category schemas
  */
-export const AuthSecret = S.Union([ConfiguredSecret, EphemeralSecret]).pipe(
-  S.toTaggedUnion("kind"),
-  $I.annoteSchema("AuthSecret", { description: "How sessions are signed" })
-)
+export const AuthSecret = LiteralKit(["configured", "ephemeral"])
+  .mapMembers(() => Tuple.make(ConfiguredSecret, EphemeralSecret))
+  .pipe(S.toTaggedUnion("kind"), $I.annoteSchema("AuthSecret", { description: "How sessions are signed" }))
 
 /**
  * The decoded value of `AuthSecret`.

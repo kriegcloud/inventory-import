@@ -5,7 +5,7 @@
 // The day's allowance is not here: every feature takes a call from it (ModelCalls.ts) before it asks.
 import { OpenRouter } from "@beep/openrouter/OpenRouter"
 import { OpenRouterSettings } from "@beep/openrouter/OpenRouterConfig"
-import { ModelId, type ModelAnswered, ModelPrompt, type ModelStatus } from "@beep/openrouter/OpenRouterModel"
+import { ModelId, type ModelAnswered, ModelPrompt, ModelStatus, OffReason } from "@beep/openrouter/OpenRouterModel"
 import type { ModelUnavailable } from "@beep/openrouter/OpenRouterError"
 import { Array as Arr, Effect, Layer, Option } from "effect"
 import * as S from "effect/Schema"
@@ -46,28 +46,32 @@ export const modelLayer: Layer.Layer<OpenRouter, never, HttpClient.HttpClient> =
 export const ModelLive = modelLayer.pipe(Layer.provide(FetchHttpClient.layer))
 
 /** True when a model can be asked; with none, a feature goes straight to its rules and takes no call. */
-export const modelIsOn = (status: ModelStatus): boolean => status.kind === "on"
+export const modelIsOn = (status: ModelStatus): boolean =>
+  ModelStatus.match(status, { on: () => true, off: () => false })
 
 /** What will answer a model call, in the contract's words, for `/api/v1/system/status`. */
 export const aiStatusOf = (status: ModelStatus): AiStatus =>
-  status.kind === "on"
-    ? AiStatus.make({
+  ModelStatus.match(status, {
+    on: ({ model, fallbackModels }) =>
+      AiStatus.make({
         available: true,
         provider: "openrouter",
-        model: status.model,
-        routes: [AiRoute.make({ provider: "openrouter", model: status.model, fallbackModels: status.fallbackModels })],
-        reason: `Answers come from OpenRouter (${Arr.join([status.model, ...status.fallbackModels], ", then ")}); then the non-AI path.`
-      })
-    : AiStatus.make({
+        model,
+        routes: [AiRoute.make({ provider: "openrouter", model, fallbackModels })],
+        reason: `Answers come from OpenRouter (${Arr.join([model, ...fallbackModels], ", then ")}); then the non-AI path.`
+      }),
+    off: ({ why, model }) =>
+      AiStatus.make({
         available: false,
         provider: "none",
-        model: status.model,
+        model,
         routes: [],
-        reason:
-          status.why === "disabled"
-            ? "AI suggestions are off: AI_ENABLED is set to false."
-            : "AI suggestions are off: no AI key is set."
+        reason: OffReason.match(why, {
+          disabled: () => "AI suggestions are off: AI_ENABLED is set to false.",
+          noKey: () => "AI suggestions are off: no AI key is set."
+        })
       })
+  })
 
 /** Who answered, in the contract's words. */
 export const answeredByModel = (answered: ModelAnswered): AiAnswer<unknown>["answeredBy"] => ({

@@ -5,7 +5,12 @@
  * @packageDocumentation
  */
 export { BetterAuthSettings } from "./BetterAuth.config.ts"
-export { BetterAuthConfigError, BetterAuthError } from "./BetterAuth.errors.ts"
+export {
+  BetterAuthConfigError,
+  BetterAuthConfigProblem,
+  BetterAuthError,
+  BetterAuthOperation
+} from "./BetterAuth.errors.ts"
 export {
   AuthEmail,
   AuthEndpoint,

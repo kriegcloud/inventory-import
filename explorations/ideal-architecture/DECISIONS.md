@@ -177,3 +177,22 @@ guarded so a bad answer does not move to it.
 Question: where do the model-status wire types (`AiStatus`, `AnsweredBy`, `AiTrouble`, `AiUnavailable`, the screen
 sentences) live? Answer: "In the app's contract", until the contexts goal. Rejected: the kernel, and the driver.
 Reverse: move them with the context that owns them.
+
+### 2026-11-18 — LiteralKit in Worker code
+
+Question: the vendored `LiteralKit` imports the `@beep/utils` root, which names Node types that clash with the Workers
+ones, so `kernel-drivers` used `S.Literals` and `S.Union` in Worker-side packages; what now? Answer: "Fix the import,
+then use LiteralKit". The vendored `LiteralKit.schema.ts` and `internal/builders.ts` import `@beep/utils/Array` and
+`@beep/utils/Record` instead of the root: a deliberate patch against beep-effect `c5cebd5c9de7`, applied by
+`scripts/vendor-beep.mjs` (`SOURCE_PATCHES`), recorded with its reason under `patches` in the package's `vendor.json`,
+named in each file's first line, and reported by `vendor:check`. Every literal union and tagged union in
+`@inventory/kernel`, `@beep/d1`, `@beep/better-auth` and `@beep/openrouter` is a `LiteralKit` again, with `.match`
+holding the behaviour; the app's web profile no longer needs Node types either. Rejected: keeping `S.Literals` in
+Worker code. Reverse: the patch disappears when beep-effect's `LiteralKit` imports the subpaths itself; re-vendor and
+`patchSource` then fails loudly, which is the signal to delete the two `SOURCE_PATCHES` entries.
+
+### 2026-11-18 — Drizzle skill
+
+Question: keep the Drizzle agent skill now that Drizzle is out of the app? Answer: "Remove it". Rejected: keeping it
+for a later Drizzle decision. Reverse: re-add it from its source with the skills tool.
+

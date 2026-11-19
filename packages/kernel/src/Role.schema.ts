@@ -1,11 +1,10 @@
 /**
- * What a member may do, and the one comparison of roles the server decides with. A union of three scalars, so a
- * plain `S.Literals` (rule SF-6 asks for a `LiteralKit` only where a set names the cases of a tagged union).
+ * What a member may do, and the one comparison of roles the server decides with.
  *
  * @packageDocumentation
  */
+import { LiteralKit } from "@beep/schema/LiteralKit"
 import { dual } from "effect/Function"
-import * as S from "effect/Schema"
 import { $KernelId } from "./internal/identity.ts"
 
 const $I = $KernelId.create("Role")
@@ -16,7 +15,7 @@ const $I = $KernelId.create("Role")
  *
  * @category schemas
  */
-export const Role = S.Literals(["viewer", "editor", "admin"]).pipe(
+export const Role = LiteralKit(["viewer", "editor", "admin"]).pipe(
   $I.annoteSchema("Role", {
     description: "What a member may do: a viewer reads, an editor also writes, an admin also manages people.",
     examples: ["editor"]
@@ -31,16 +30,7 @@ export const Role = S.Literals(["viewer", "editor", "admin"]).pipe(
 export type Role = typeof Role.Type
 
 /** The role's place in `Role`'s list: 0 for a viewer, 2 for an admin. */
-const rank = (role: Role): number => {
-  switch (role) {
-    case "viewer":
-      return 0
-    case "editor":
-      return 1
-    case "admin":
-      return 2
-  }
-}
+const rank = (role: Role): number => Role.match(role, { viewer: () => 0, editor: () => 1, admin: () => 2 })
 
 /**
  * True when `role` is at least `minimum`. The server is the only place this decides anything; the browser uses it to

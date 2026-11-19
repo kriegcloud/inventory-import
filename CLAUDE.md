@@ -261,9 +261,13 @@ another. Start one with `bun run dev -- --port 5174 --strictPort & echo $! > .de
 Never `pkill -f` or `pgrep -f` a string that is also in the command you are typing (`pkill -f vite`): it matches your
 shell. After a change to `migrations/0001_init.sql`, a copy that has run the dev server needs `bun run db:reset` once.
 
-**Running without the AI key**, leaving `apps/inventory/.dev.vars` alone:
-`CLOUDFLARE_INCLUDE_PROCESS_ENV=true AI_ENABLED=false bun run dev -- --port 5174 --strictPort`. `/api/v1/system/status`
-then reports `"available": false` and why. Without `CLOUDFLARE_INCLUDE_PROCESS_ENV=true` the Worker ignores the shell.
+**Running with AI turned off**, without opening `apps/inventory/.dev.vars`: back it up, append the override (a later line
+wins), run, and put the backup back. From `apps/inventory`:
+`cp .dev.vars .dev.vars.backup && printf '\nAI_ENABLED=false\n' >> .dev.vars`, then
+`bun run dev -- --port 5174 --strictPort`, and afterwards `mv -f .dev.vars.backup .dev.vars`. `/api/v1/system/status`
+then reports `"available": false` and "AI_ENABLED is set to false". The shell does not reach the Worker while
+`.dev.vars` exists: wrangler reads `CLOUDFLARE_INCLUDE_PROCESS_ENV` only when it falls back to `.env` files
+(`getVarsForDev` in wrangler 4.161), so `CLOUDFLARE_INCLUDE_PROCESS_ENV=true AI_ENABLED=false` changes nothing here.
 
 ## Layout
 

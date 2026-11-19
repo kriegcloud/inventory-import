@@ -3,10 +3,29 @@
  *
  * @packageDocumentation
  */
+import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as S from "effect/Schema"
 import { $BetterAuthId } from "./internal/identity.ts"
 
 const $I = $BetterAuthId.create("BetterAuthError")
+
+/**
+ * Which call into Better Auth failed: answering an /api/auth request, or looking a session up.
+ *
+ * @category schemas
+ */
+export const BetterAuthOperation = LiteralKit(["handle", "session"]).pipe(
+  $I.annoteSchema("BetterAuthOperation", { description: "Answering an /api/auth request, or looking a session up" })
+)
+
+/**
+ * What is wrong with the sign-in secret in production: not set, or shorter than 32 characters.
+ *
+ * @category schemas
+ */
+export const BetterAuthConfigProblem = LiteralKit(["missingSecret", "shortSecret"]).pipe(
+  $I.annoteSchema("BetterAuthConfigProblem", { description: "The secret is not set, or is shorter than 32 characters" })
+)
 
 /**
  * A call into Better Auth threw or rejected. `operation` names which; `cause` keeps what it threw, for the log. A host
@@ -19,7 +38,7 @@ export class BetterAuthError extends S.TaggedError<BetterAuthError, { readonly b
 )(
   "BetterAuthError",
   {
-    operation: S.Literals(["handle", "session"]).pipe(
+    operation: BetterAuthOperation.pipe(
       S.annotateKey({ description: "Answering an /api/auth request, or looking a session up" })
     ),
     cause: S.Defect().pipe(S.annotateKey({ description: "What Better Auth threw or rejected with" }))
@@ -38,7 +57,7 @@ export class BetterAuthConfigError extends S.TaggedError<BetterAuthConfigError, 
 )(
   "BetterAuthConfigError",
   {
-    problem: S.Literals(["missingSecret", "shortSecret"]).pipe(
+    problem: BetterAuthConfigProblem.pipe(
       S.annotateKey({ description: "The secret is not set, or is shorter than 32 characters" })
     )
   },
@@ -49,8 +68,10 @@ export class BetterAuthConfigError extends S.TaggedError<BetterAuthConfigError, 
   /** What is wrong and how to fix it, in one sentence for whoever deploys. */
   override get message(): string {
     return (
-      `BETTER_AUTH_SECRET is ${this.problem === "missingSecret" ? "not set" : "shorter than 32 characters"}. ` +
-      "Set it with `wrangler secret put BETTER_AUTH_SECRET` (a value from `openssl rand -base64 32`)."
+      `BETTER_AUTH_SECRET is ${BetterAuthConfigProblem.match(this.problem, {
+        missingSecret: () => "not set",
+        shortSecret: () => "shorter than 32 characters"
+      })}. ` + "Set it with `wrangler secret put BETTER_AUTH_SECRET` (a value from `openssl rand -base64 32`)."
     )
   }
 }

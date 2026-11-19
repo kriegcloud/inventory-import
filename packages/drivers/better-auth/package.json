@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@beep/identity": "workspace:*",
+    "@beep/schema": "workspace:*",
     "better-auth": "1.7.22",
     "effect": "4.1.4"
   },

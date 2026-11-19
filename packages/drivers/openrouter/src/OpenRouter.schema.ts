@@ -4,11 +4,13 @@
  *
  * @packageDocumentation
  */
+import { LiteralKit } from "@beep/schema/LiteralKit"
 import type * as AiError from "effect/ai/AiError"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import type * as Redacted from "effect/Redacted"
 import * as S from "effect/Schema"
+import * as Tuple from "effect/Tuple"
 import type { OpenRouterSettings } from "./OpenRouter.config.ts"
 import { $OpenrouterId } from "./internal/identity.ts"
 
@@ -45,7 +47,7 @@ export const ModelName = S.String.check(S.isMinLength(1), S.isMaxLength(200)).pi
  *
  * @category schemas
  */
-export const OffReason = S.Literals(["noKey", "disabled"]).pipe(
+export const OffReason = LiteralKit(["noKey", "disabled"]).pipe(
   $I.annoteSchema("OffReason", { description: "noKey: no key is set. disabled: turned off with a key set" })
 )
 
@@ -71,10 +73,12 @@ class AccessOff extends S.Opaque<AccessOff, { readonly brand: unique symbol }>()
  *
  * @category schemas
  */
-export const ModelAccess = S.Union([AccessOn, AccessOff]).pipe(
-  S.toTaggedUnion("kind"),
-  $I.annoteSchema("ModelAccess", { description: "Whether a model can be called, and with what" })
-)
+export const ModelAccess = LiteralKit(["on", "off"])
+  .mapMembers(() => Tuple.make(AccessOn, AccessOff))
+  .pipe(
+    S.toTaggedUnion("kind"),
+    $I.annoteSchema("ModelAccess", { description: "Whether a model can be called, and with what" })
+  )
 
 /**
  * The decoded value of `ModelAccess`.
@@ -118,10 +122,9 @@ class StatusOff extends S.Opaque<StatusOff, { readonly brand: unique symbol }>()
  *
  * @category schemas
  */
-export const ModelStatus = S.Union([StatusOn, StatusOff]).pipe(
-  S.toTaggedUnion("kind"),
-  $I.annoteSchema("ModelStatus", { description: "What will answer a model call" })
-)
+export const ModelStatus = LiteralKit(["on", "off"])
+  .mapMembers(() => Tuple.make(StatusOn, StatusOff))
+  .pipe(S.toTaggedUnion("kind"), $I.annoteSchema("ModelStatus", { description: "What will answer a model call" }))
 
 /**
  * The decoded value of `ModelStatus`.
@@ -147,7 +150,7 @@ export const modelStatusOf = (access: ModelAccess): ModelStatus =>
  *
  * @category schemas
  */
-export const ModelTrouble = S.Literals(["noKey", "refused", "busy", "badAnswer", "down"]).pipe(
+export const ModelTrouble = LiteralKit(["noKey", "refused", "busy", "badAnswer", "down"]).pipe(
   $I.annoteSchema("ModelTrouble", { description: "noKey, refused, busy, badAnswer or down" })
 )
 

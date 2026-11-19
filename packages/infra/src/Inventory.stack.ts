@@ -18,9 +18,11 @@ import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as Path from "effect/Path"
 import * as Redacted from "effect/Redacted"
+import * as Result from "effect/Result"
+import * as Str from "effect/String"
 import { InfraStage } from "./InfraStage.context.ts"
 import type { SettingSource } from "./Stage.schema.ts"
-import { hasOwnTestPassword } from "./StagePlan.rules.ts"
+import { hasOwnTestPassword, modelKeyFor, withoutModelKeyFlag } from "./StagePlan.rules.ts"
 
 /**
  * The model the app asks, and the one it falls back to. The same two values as `apps/inventory/wrangler.jsonc`,
@@ -28,11 +30,12 @@ import { hasOwnTestPassword } from "./StagePlan.rules.ts"
  */
 const model = { AI_MODEL: "anthropic/claude-haiku-5.5", AI_FALLBACK_MODELS: "google/gemini-3.8-flash" } as const
 
-/** The variable a plan names, when the deploy's environment holds it. A stage whose plan names none gets none. */
-const secretFrom = Effect.fnUntraced(function* (source: SettingSource) {
-  if (source.from === "nowhere") return O.none()
-  return yield* Config.option(Config.Redacted(source.variable))
-})
+/** A variable the deploy's environment holds, when it holds anything: a workflow sets a missing one to nothing. */
+const secretOf = (variable: string) =>
+  Config.Redacted(variable).pipe(
+    Config.option,
+    Config.map(O.filter((value) => value.pipe(Redacted.value, Str.trim) !== ""))
+  )
 
 const textFrom = Effect.fnUntraced(function* (source: SettingSource) {
   if (source.from === "nowhere") return O.none()
@@ -59,7 +62,14 @@ export default Alchemy.Stack(
 
     // Decision I3: minted once and kept in Alchemy's state. Losing the state signs every person out.
     const signInSecret = yield* Alchemy.Random("SignInSecret", { bytes: 32 })
-    const modelKey = yield* secretFrom(plan.modelKey)
+    // Decision "infra, a missing model key": a stage whose plan names a key stops without one, unless the flag
+    // says it is meant. A stage whose plan names none never reads the variable.
+    const given = plan.modelKey.from === "nowhere" ? O.none() : yield* secretOf(plan.modelKey.variable)
+    const onPurpose = yield* Config.String(withoutModelKeyFlag).pipe(Config.withDefault(""))
+    const modelKey = yield* Result.match(
+      modelKeyFor({ stage: plan.stage, source: plan.modelKey, key: given, withoutOnPurpose: onPurpose === "true" }),
+      { onFailure: Effect.die, onSuccess: Effect.succeed }
+    )
     const signUp = yield* textFrom(plan.signUp)
 
     // The test accounts of a deployed stage take a password of the stage's own, minted once and kept in state.

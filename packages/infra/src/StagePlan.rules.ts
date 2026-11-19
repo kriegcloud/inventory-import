@@ -8,9 +8,18 @@
  * @packageDocumentation
  */
 import * as A from "effect/Array"
+import * as O from "effect/Option"
 import * as Result from "effect/Result"
 import * as S from "effect/Schema"
-import { FromEnvironment, NotGiven, OnHostname, OnWorkersDev, StagePlan, type StageKind } from "./Stage.schema.ts"
+import {
+  FromEnvironment,
+  NotGiven,
+  OnHostname,
+  OnWorkersDev,
+  StagePlan,
+  type SettingSource,
+  type StageKind
+} from "./Stage.schema.ts"
 import { $InfraId } from "./internal/identity.ts"
 
 const $I = $InfraId.create("StagePlan")
@@ -119,3 +128,57 @@ export const planFor = (stage: string): Result.Result<StagePlan, UnknownStage> =
  * @example hasOwnTestPassword(planOfProduction) // false: it has no test account
  */
 export const hasOwnTestPassword = (plan: StagePlan): boolean => plan.deployed && A.contains(plan.seeds, "accounts")
+
+/**
+ * The variable that deploys a stage without its model key on purpose, when set to `true`.
+ *
+ * @category constants
+ */
+export const withoutModelKeyFlag = "DEPLOY_WITHOUT_MODEL_KEY"
+
+/**
+ * A stage whose plan names a model key was deployed with none, and nobody said that was meant.
+ *
+ * @category errors
+ */
+export class MissingModelKey extends S.TaggedError<MissingModelKey, { readonly brand: unique symbol }>(
+  $I`MissingModelKey`
+)(
+  "MissingModelKey",
+  {
+    stage: S.String.pipe(S.annotateKey({ description: "The stage being deployed" })),
+    variable: S.String.pipe(S.annotateKey({ description: "The variable that should hold the key" }))
+  },
+  $I.annoteError<MissingModelKey>("MissingModelKey", {
+    description: "A stage whose plan names a model key, deployed with none and without the flag that means it"
+  })
+) {
+  /** What is missing, where it is written, and the way to deploy without it on purpose. */
+  override get message(): string {
+    return (
+      `Stage "${this.stage}" has no model key: ${this.variable} is not set, so every model feature would be answered ` +
+      `by rules. Write the reference ${this.variable}=op://<vault>/<item>/<field> in packages/infra/env/op.env and ` +
+      `deploy the repository's stack under \`op run\`, which gives the key to the production environment. ` +
+      `To deploy without a model on purpose, set ${withoutModelKeyFlag}=true.`
+    )
+  }
+}
+
+/**
+ * The model key a stage is deployed with. A stage whose plan names none gets none, whatever the environment holds.
+ * A stage whose plan names one stops without it (decision "infra, a missing model key"): a mistyped name would
+ * otherwise show only as "answered by rules". The flag deploys without one on purpose.
+ *
+ * @example modelKeyFor({ stage: "prod", source: FromEnvironment.make({ variable: "OPENROUTER_API_KEY" }), key: O.none(), withoutOnPurpose: false }) // Result.fail(MissingModelKey)
+ * @example modelKeyFor({ stage: "pr-42", source: NotGiven.make({}), key: O.some(key), withoutOnPurpose: false }) // Result.succeed(O.none())
+ */
+export const modelKeyFor = <Key>(input: {
+  readonly stage: string
+  readonly source: SettingSource
+  readonly key: O.Option<Key>
+  readonly withoutOnPurpose: boolean
+}): Result.Result<O.Option<Key>, MissingModelKey> => {
+  if (input.source.from === "nowhere") return Result.succeed(O.none())
+  if (O.isSome(input.key) || input.withoutOnPurpose) return Result.succeed(input.key)
+  return Result.fail(MissingModelKey.make({ stage: input.stage, variable: input.source.variable }))
+}

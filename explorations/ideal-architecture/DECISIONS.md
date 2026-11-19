@@ -615,3 +615,10 @@ repository's password again.
 As built: the stack mints it and shows it in the deploy's output only to a person deploying from their own machine.
 A workflow's log in a public repository is public, so a pull request's deploy output does not show it; how a
 preview's password reaches its reviewer is asked of Benjamin and not yet answered.
+
+### 2026-11-19 — infra, a missing model key
+
+Question: production deploys without a key when none is given, so a mistyped name shows as "answered by rules";
+change that? Answer: "Fail the production deploy (Recommended)": a production deploy with no key stops with a
+sentence naming the missing reference; a flag deploys without one on purpose. Rejected: deploy and warn; leave as
+built. The flag is the variable `DEPLOY_WITHOUT_MODEL_KEY=true`. Reverse: let `modelKeyFor` succeed with no key.

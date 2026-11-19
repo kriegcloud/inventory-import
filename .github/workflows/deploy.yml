@@ -87,6 +87,8 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      # true only when the repository's stack was deployed without a model key on purpose.
+      DEPLOY_WITHOUT_MODEL_KEY: ${{ vars.DEPLOY_WITHOUT_MODEL_KEY }}
       SIGN_UP: ${{ vars.SIGN_UP }}
     steps:
       - uses: actions/checkout@v4

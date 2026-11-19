@@ -19,7 +19,11 @@ import * as Config from "effect/Config"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as O from "effect/Option"
+import * as Redacted from "effect/Redacted"
+import * as Result from "effect/Result"
+import * as Str from "effect/String"
 import { InfraStage } from "./InfraStage.context.ts"
+import { modelKeyFor, planFor, withoutModelKeyFlag } from "./StagePlan.rules.ts"
 
 /** The repository the deploy workflow runs in. */
 const repository = { owner: "kriegcloud", repository: "inventory-import" } as const
@@ -70,7 +74,19 @@ export default Alchemy.Stack(
     const previewAccount = yield* Config.String("PREVIEW_CLOUDFLARE_ACCOUNT_ID")
     const approver = yield* Config.String("PRODUCTION_APPROVER")
     const signUp = yield* Config.String("SIGN_UP").pipe(Config.withDefault("closed"))
-    const modelKey = yield* Config.option(Config.Redacted("OPENROUTER_API_KEY"))
+    // Production's plan says where its model key comes from. With none given this stack stops, as production's own
+    // deploy would, unless the flag says a deploy without a model is meant; the flag is then handed on to it.
+    const prod = yield* Result.match(planFor("prod"), { onFailure: Effect.die, onSuccess: Effect.succeed })
+    const given = yield* Config.Redacted("OPENROUTER_API_KEY").pipe(
+      Config.option,
+      Config.map(O.filter((value) => value.pipe(Redacted.value, Str.trim) !== ""))
+    )
+    const onPurpose = yield* Config.String(withoutModelKeyFlag).pipe(Config.withDefault(""))
+    const withoutOnPurpose = onPurpose === "true"
+    const modelKey = yield* Result.match(
+      modelKeyFor({ stage: prod.stage, source: prod.modelKey, key: given, withoutOnPurpose }),
+      { onFailure: Effect.die, onSuccess: Effect.succeed }
+    )
 
     const production = yield* GitHub.Environment("Production", {
       ...repository,
@@ -106,6 +122,12 @@ export default Alchemy.Stack(
       environment: production,
       name: "SIGN_UP",
       value: signUp
+    })
+    yield* GitHub.Variable("ProductionWithoutModelKey", {
+      ...repository,
+      environment: production,
+      name: withoutModelKeyFlag,
+      value: O.isNone(modelKey) && withoutOnPurpose ? "true" : "false"
     })
     if (O.isSome(modelKey)) {
       yield* GitHub.Secret("ProductionModelKey", {
@@ -145,7 +167,7 @@ export default Alchemy.Stack(
 
     return {
       environments: ["preview", "production"],
-      modelKey: O.isSome(modelKey) ? "written to production" : "not given: production's rules answer",
+      modelKey: O.isSome(modelKey) ? "written to production" : "none, on purpose: production's rules answer",
       signUp
     }
     // The stack is the entry point the CLI runs: this is where its one layer is provided.

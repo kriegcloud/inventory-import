@@ -3,10 +3,11 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Arbitrary from "effect/Arbitrary"
+import * as O from "effect/Option"
 import * as Result from "effect/Result"
 import * as S from "effect/Schema"
 import { StagePlan } from "@beep/infra/Stage"
-import { hasOwnTestPassword, kindOf, planFor } from "@beep/infra/StagePlan"
+import { hasOwnTestPassword, kindOf, modelKeyFor, planFor } from "@beep/infra/StagePlan"
 
 const plan = (stage: string) => Result.getOrThrow(planFor(stage))
 
@@ -99,5 +100,31 @@ describe("the plan of a stage", () => {
       ["test_ben", true],
       ["dev_ben", false]
     ])
+  })
+
+  describe("the model key a stage is deployed with", () => {
+    const keyFor = (stage: string, key: O.Option<string>, withoutOnPurpose: boolean) =>
+      modelKeyFor({ stage, source: plan(stage).modelKey, key, withoutOnPurpose })
+
+    it("stops a production deploy that has none, with a sentence naming the reference and the flag", () => {
+      const stopped = keyFor("prod", O.none(), false)
+      expect(Result.isFailure(stopped)).toBe(true)
+      expect(Result.isFailure(stopped) ? stopped.failure.message : "").toBe(
+        'Stage "prod" has no model key: OPENROUTER_API_KEY is not set, so every model feature would be answered by ' +
+          "rules. Write the reference OPENROUTER_API_KEY=op://<vault>/<item>/<field> in packages/infra/env/op.env " +
+          "and deploy the repository's stack under `op run`, which gives the key to the production environment. To " +
+          "deploy without a model on purpose, set DEPLOY_WITHOUT_MODEL_KEY=true."
+      )
+    })
+
+    it("deploys production with its key, and without one only when the flag says it is meant", () => {
+      expect(keyFor("prod", O.some("key"), false)).toEqual(Result.succeed(O.some("key")))
+      expect(keyFor("prod", O.none(), true)).toEqual(Result.succeed(O.none()))
+    })
+
+    it("gives a preview and a test stage no key, whatever the environment holds", () => {
+      expect(keyFor("pr-42", O.some("key"), false)).toEqual(Result.succeed(O.none()))
+      expect(keyFor("test_ben", O.none(), false)).toEqual(Result.succeed(O.none()))
+    })
   })
 })

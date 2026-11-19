@@ -11,13 +11,6 @@ Answered decisions move below with the date, the answer and how to reverse it.
 
 ## Open
 
-### Round two: packages and the client
-
-| # | Question | Recommendation | Source |
-| --- | --- | --- | --- |
-| 11 | Where is `Model.Class` used? | Stored-row schemas in host packages only | 01 §8, 03 §7.2 |
-| 12 | `Option`/`DateTime` fields or `null`/strings? | `DateTime` for timestamps only | 03 §7.2 |
-
 ### Round three: the model path
 
 | # | Question | Recommendation | Source |
@@ -196,3 +189,37 @@ Worker code. Reverse: the patch disappears when beep-effect's `LiteralKit` impor
 Question: keep the Drizzle agent skill now that Drizzle is out of the app? Answer: "Remove it". Rejected: keeping it
 for a later Drizzle decision. Reverse: re-add it from its source with the skills tool.
 
+### 2026-11-18 — ui-packages brief
+
+Question: does `BRIEF-ui-packages.md` for the goal `ui-packages` match? Answer: "Matches, all recommendations": (a)
+the review region's decision becomes the `RowPlace` tagged union in this goal, the stored draft keeping its bytes; (b)
+exact exports for every vendored component and hook, checked by a script; (c) the shared screen pieces (`PageHeader`,
+`Skeletons`, `ListTable`, `TableSearch`, `StatusPill`, `Code`, `NotSet`, `ProposedValue`, `proposalSource`,
+`AgentRun`) go to `@inventory/ui` and the unused `RowCards.tsx` is deleted; (d) the stage C override per package with
+the ceilings split and their sum capped at 678, the vendored hooks joining stage D; (e) the review gallery's fixtures
+stay test data in the review package; (f) the theme tokens move to `@inventory/ui/theme.css`. Rejected: the union in
+step 7, a wildcard export, the pieces split between review and the app, fixing every moved finding now, a fixtures
+subpath, the tokens left in the app. Reverse: reopen the brief before the goal's SPEC is ticked.
+
+### 2026-11-18 — contexts brief
+
+Question: does `BRIEF-contexts.md` for the goal `contexts` match? Answer: "The brief matches", with every
+recommendation: (C1) a ninth package, `@inventory/client`, holds the browser's contract-free plumbing; (A1) the
+Activity page's shell stays in the app and each context supplies its views; (A2) removals answer "204 No Content";
+(A3) "Accept both" wording changes (the add-person sentence names the email lower-cased; a join date that is not a
+date reads "Not set"); (C2) "BigDecimal, canonical text" for the unit cost; (C3) "Remove it, 400 names the field" for
+`ItemInvalid`; (C4) `access-contract` names the model-call purposes; (C5) `Model.Class` "Nowhere new"; (C6) every port
+has a memory twin, `ImportStore`'s included. Reverse: reopen the brief before the goal's SPEC is ticked.
+
+### 2026-11-18 — Model.Class (decision 11)
+
+Question: where is `Model.Class` used? Answer: "Nowhere new" (contexts brief, C5): stored rows decode through each
+host's private row schemas; the kernel's `Activity` stays the only `Model.Class`. Rejected: `Item` as a `Model.Class`
+(research 03 §3.1), which cannot carry the brand. Reverse: give `Item` its variants in `catalog-host`.
+
+### 2026-11-18 — Option and DateTime (decision 12)
+
+Question: `Option`/`DateTime` fields or `null`/strings? Answer: `DateTime` for every timestamp and `Option` for every
+absence, the wire keeping its `null`s (`S.OptionFromNullOr`) and its ISO text (contexts brief, settled with "the brief
+matches"). Rejected: `DateTime` for timestamps only. Reverse: none planned; a field goes back to text only with a
+recorded deviation.

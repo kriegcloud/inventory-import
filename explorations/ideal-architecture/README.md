@@ -4,8 +4,8 @@ title: Ideal architecture
 description: What inventory-import becomes as a model-first Turborepo of deep packages, shipped with Alchemy.
 status: active
 stage: shape
-next: BRIEF-ui-packages.md and BRIEF-contexts.md (steps 6 and 7) await "the brief matches"
-goals: [workspace-and-strictness, beep-csv, kernel-drivers]
+next: goals ui-packages, then contexts, are being built
+goals: [workspace-and-strictness, beep-csv, kernel-drivers, ui-packages, contexts]
 ---
 
 # Ideal architecture
@@ -24,7 +24,8 @@ The brief for `beep-csv` (step 4) is [BRIEF.md](BRIEF.md); Benjamin said it matc
 [goals/beep-csv](../../goals/beep-csv/SPEC.md). Each later goal's brief is its own file, `BRIEF-<goal>.md`; the first
 brief keeps its name. Step 5's is [BRIEF-kernel-drivers.md](BRIEF-kernel-drivers.md); Benjamin said it matches, and the goal is done at
 [goals/kernel-drivers](../../goals/kernel-drivers/SPEC.md). Step 6's is [BRIEF-ui-packages.md](BRIEF-ui-packages.md)
-and step 7's [BRIEF-contexts.md](BRIEF-contexts.md); both await "the brief matches".
+and step 7's [BRIEF-contexts.md](BRIEF-contexts.md); Benjamin said both match, and the goals are open at
+[goals/ui-packages](../../goals/ui-packages/SPEC.md) and [goals/contexts](../../goals/contexts/SPEC.md).
 
 ## Where the research disagrees with the request
 
@@ -80,6 +81,7 @@ Each step ends with the full check and an import of the messy sample in a browse
 
 ## Trail
 
+- 2026-11-18: goals `ui-packages` and `contexts` opened after "the brief matches" for both.
 - 2026-11-18: BRIEF-ui-packages.md and BRIEF-contexts.md written for the goals `ui-packages` (step 6) and
   `contexts` (step 7); awaiting "the brief matches".
 - 2026-11-18: goal `kernel-drivers` done: the app runs on `@inventory/kernel`, `@beep/d1`, `@beep/better-auth` and

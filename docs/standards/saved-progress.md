@@ -7,7 +7,7 @@ status: stable
 ---
 
 - **A hard refresh does not lose work.** The step is in the URL (`?step=`) and each decision is saved when it is
-  made, not on Confirm. `useSavedProgress(scope)` from `@/lib/saved-progress` keeps the chosen file until the
+  made, not on Confirm. `useSavedProgress(scope, browserRuntime)` from `@inventory/review/SavedProgressHook` (it takes the app's `browserRuntime` too) keeps the chosen file until the
   server has it and the review's undo history beside the decisions the server keeps, for the acting member and
   organization ([the kit](../kit.md), "Saved progress"); `progress.clear()` on Import. Check: on Import, the sample
   file, three decisions in Review, Ctrl+Shift+R, the three are there and Undo takes back the last.

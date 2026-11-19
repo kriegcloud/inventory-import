@@ -21,7 +21,7 @@ with `Arr`, `Str` and `Rec` from `effect` so the count does not rise.
 
 ## What is already here: use it, do not build it
 
-Every component below is installed in `src/web/components/ui`. Compose them. Never add another UI library and never
+Every component below is installed in `packages/ui/src/components` (`@inventory/ui`). Compose them. Never add another UI library and never
 write a raw `button`, `input`, `select`, `textarea`, `label` or table.
 
 - **Layout and navigation:** sidebar, breadcrumb, tabs, navigation-menu, menubar, separator, resizable, scroll-area,
@@ -40,13 +40,13 @@ page's title row), `StatusPill` (status as words and colour), `TableSearch`, `Ta
 `ThemeToggle`. The pages to copy from are in `src/web/pages`: `ItemsPage.tsx` (a list the server pages, with search
 and the assistant), `ItemEditor.tsx` (an optimistic edit), `PeoplePage.tsx`, `ActivityPage.tsx`, and the import's
 four steps in `pages/import/`.
-`src/web/components/review` holds the review grid and the one-decision-at-a-time queue for a phone: use it before
+`@inventory/review` (`packages/review`) holds the review grid and the one-decision-at-a-time queue for a phone: use it before
 writing anything similar.
 `useUpload` in `src/web/lib/upload` reads a chosen CSV or Excel file in a worker and sends its rows to the server in
 pieces, with its progress, Cancel and `SheetChooser` for the sheet: never write another reader.
 `src/web/lib` has the rest of a screen's behaviour: `useSavedProgress` (a refresh loses nothing), `sayError` (words for
 any failure), `queryClient` and `queryKeys` (the cache), `newRequestId` (one write per press), and
-`components/app/Skeletons.tsx` (loading in the real boxes). Use them before writing your own.
+`@inventory/ui/Skeletons` (`packages/ui/src/Skeletons.component.tsx`) (loading in the real boxes). Use them before writing your own.
 
 For how a component is meant to be used, ask the shadcn tools (`mcp__shadcn`) or the `shadcn` skill before guessing
 at props. For a screen people work in all day, the `design-taste-frontend` skill has the house rules

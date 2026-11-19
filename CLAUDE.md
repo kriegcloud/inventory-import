@@ -52,7 +52,7 @@ sign-in secret into `.dev.vars` the first time).
   | --- | --- | --- |
   | Upload | `UploadStep.tsx` | A .csv or .xlsx read in a worker and sent up in pieces, with progress and Cancel (`useUpload`, `@/lib/upload`); "Use items_messy.csv" (each sample its own button) and a download link; the open imports with Continue and Remove |
   | Match | `MatchStep.tsx` | Which file column fills which field, by heading, changed by hand; shown when a required field found no column. Review waits until every required field has a column and names the ones left |
-  | Review | `ReviewStep.tsx`, `reviewAdapter.ts` | The review region (`src/web/components/review/`) on the rows: accept a proposal for a row or a group, pick one of two readings, type a value, keep one of two rows, leave a row out, undo and redo; the confirm button says what it will import |
+  | Review | `ReviewStep.tsx`, `reviewAdapter.ts` | The review region (`@inventory/review`, `packages/review`) on the rows: accept a proposal for a row or a group, pick one of two readings, type a value, keep one of two rows, leave a row out, undo and redo; the confirm button says what it will import |
   | Result | `ResultStep.tsx` | What the confirm did, counted from what is stored, the rows not imported downloadable with their reasons, and the take-back (a changed record is kept and named) |
 
   The server stages the file and runs the same pure `review` (`src/domain/ItemImport.ts`) at the confirm
@@ -281,14 +281,19 @@ apps/inventory/         The app: the Worker and the SPA, one Vite build. Its own
   test/                 Unit tests (`*.slow.test.ts` need workerd, D1 or sign-in).
   public/samples/       The sample files the Upload step offers.
   scripts/              The app's development scripts (local migrations, HTTPS, deploy setup, strict count).
+packages/ui/             @inventory/ui: the vendored shadcn, Dice UI and tablecn components and hooks (as published, one
+                        exact export each), the theme (`theme.css`, the Tailwind entry) and the shared screen pieces.
+packages/review/         @inventory/review: the review region and its saved progress.
+packages/kernel/, packages/drivers/   @inventory/kernel and the @beep drivers (d1, better-auth, openrouter).
 packages/foundation/     Product-neutral packages. Today only beep-effect's kit, vendored: @beep/types (primitive/),
                         @beep/identity, @beep/schema and @beep/utils (modeling/). Never edit them: each vendor.json
                         records its beep-effect commit and file hashes, and `bun run vendor:check` fails on a change.
 docs/                   Standards, the kit, patterns, the glossary and sign-in (`docs/index.md` lists them); qa/ is evidence.
 explorations/           Questions being shaped: research, decisions, briefs.
 goals/                  Work with a definition of done: SPEC.md and PLAN.md.
-scripts/                Repository checks (`docs-check.sh`, `keys-check.sh`, `vendor-check.mjs`) and `vendor-beep.mjs`,
-                        which copies the kit from a beep-effect checkout.
+scripts/                Repository checks (`docs-check.sh`, `keys-check.sh`, `vendor-check.mjs`, `check-strict.mjs`,
+                        `check-ceilings.mjs`, `check-exports.mjs`) and `vendor-beep.mjs`, which copies the kit from a
+                        beep-effect checkout.
 turbo.json              The task graph: seven package tasks and three root tasks.
 .agents/                Skills (see above). Not application code; the check ignores it.
 ```
@@ -341,17 +346,19 @@ this repo, check it in `node_modules/effect/src/` or the guides in `node_modules
 
 One profile for the whole repository: the root `tsconfig.base.json`, beep-effect's compiler flags and Effect
 language-service severities copied verbatim (the source commit is in its header comment). Every Effect diagnostic is
-an error and suggestions fail the exit code too. Everything new starts on it with no exception. The app adds two
-recorded exceptions in `apps/inventory/tsconfig.base.json`, and nothing else may:
+an error and suggestions fail the exit code too. Everything new starts on it with no exception. Two recorded
+exceptions exist, and nothing else may:
 
-- **Stage C, own web code** (`src/web` outside `components/ui`): `preferEffectArray`, `preferEffectString`,
-  `preferEffectRecord` and `missingPipeableSignature` are off. Their count is a ceiling in
-  `apps/inventory/scripts/strict-ceiling.json`, and the app's `check` (`check:strict`) fails when the count is above
-  it, and when it is below it until the ceiling is lowered: the number only falls. Write new web code the Effect way
-  anyway.
-- **Stage D, the vendored components** (`src/web/components/ui`): every rule off, permanently.
+- **Stage C, own code with screens** (the app's `src/web`; `@inventory/ui`'s own pieces; `@inventory/review`, its
+  gallery fixtures included): `preferEffectArray`, `preferEffectString`, `preferEffectRecord` and
+  `missingPipeableSignature` are off, in each package's `tsconfig.base.json`. Each package counts them against the
+  ceiling in its `strict-ceiling.json` (`scripts/check-strict.mjs`, part of its `check`), which fails when the count
+  is above it, and when it is below it until the ceiling is lowered; `scripts/check-ceilings.mjs` keeps the sum at
+  most 678. The numbers only fall. Write new web code the Effect way anyway.
+- **Stage D, the vendored components and hooks** (`packages/ui/src/components`, `packages/ui/src/hooks`): every rule
+  off, permanently.
 
-The same `check` fails if the app's plugin block drifts from the root's outside `overrides`. Server, api, domain and
+The same `check` fails if a package's plugin block drifts from the root's outside `overrides`. Server, api, domain and
 test code have no exception at all, and neither have the packages under `packages/`: the vendored kit passes the full
 profile, its copied tests included, with no override.
 
@@ -377,7 +384,7 @@ profile, its copied tests included, with no override.
 - **Effect's collections, never `Map` or `Set`**, anywhere in `src` and `test` (oxlint refuses them): `HashMap` and
   `HashSet` for a value handed on (React state included), `MutableHashMap` and `MutableHashSet` for one a function
   fills, or a `Record` or `Arr.dedupe`. `WeakMap` and `WeakSet` stay where an entry must go with its key. Only
-  `src/web/components/ui` (vendored, as published) keeps its own.
+  `packages/ui/src/components` (`@inventory/ui`) (vendored, as published) keeps its own.
 
 **Also enforced, beyond the list above** (the full profile): the Effect modules for strings, arrays and records
 (`import { Array as Arr, String as Str } from "effect"`: `Arr.map(xs, f)`, `Arr.findFirst` (an Option),
@@ -407,7 +414,7 @@ profile, its copied tests included, with no override.
   layers with `layer(...)` from `@effect/vitest`, not `Effect.provide` inside the test.
 
 In `src/web` the same compiler flags apply, but the rules that forbid native array methods, truthiness checks,
-`async` and browser globals are off. The vendored components in `src/web/components/ui` are not checked by the Effect
+`async` and browser globals are off. The vendored components in `packages/ui/src/components` (`@inventory/ui`) are not checked by the Effect
 diagnostics at all.
 
 ## Platform: Cloudflare Workers and D1
@@ -489,10 +496,10 @@ answer, as the table assistant does (`src/server/TableAssistant.ts`).
 The house style for screens of dense business tables: quiet chrome, a hairline grid, numbers that line up, and colour
 only where it means something.
 
-- Components are in `src/web/components/ui` (shadcn, all installed). Compose them. Do not add another UI library.
+- Components are in `packages/ui/src/components` (`@inventory/ui`) (shadcn, all installed). Compose them. Do not add another UI library.
   `bun run check` holds this: a raw `button`, `input`, `select`, `textarea`, `label` or table outside `ui/` fails, and so
   does a colour, size or restyle that does not come from the theme (`docs/kit.md`, "The two design lints").
-- Colour comes from tokens in `src/web/index.css` (`bg-background`, `text-muted-foreground`, `bg-success
+- Colour comes from tokens in `packages/ui/src/theme.css` (`bg-background`, `text-muted-foreground`, `bg-success
   text-success-foreground`, and so on). No hex values, no Tailwind palette colours like `text-red-500`. Both themes
   must work. Colour carries meaning only: status, errors, negatives. The filled button, the mark and the focus ring
   are the brand's forest green; ticks, links and progress are ink. Nothing decorative: no glow, gradient or
@@ -512,7 +519,7 @@ only where it means something.
   "Not set" in muted text. Never show "null", "N/A" or "-".
 - **Status** is words plus colour, never colour alone: `StatusPill`, mapped once: Ready `info`, Needs a decision
   `warning`, Cannot import `danger`, Imported `success`, Already there `neutral`, Draft `outline`. The words are each set once: the review region's defaults (Needs you, Can't fix
-  here, Ready, Left out, All, Already there, …) in `defaultReviewWords` (`components/review/words.ts`), passed as
+  here, Ready, Left out, All, Already there, …) in `defaultReviewWords` (`packages/review/src/ReviewWords.words.ts`), passed as
   `words` on the region, and the import's (Created, Already there, Not imported, Taken back, All) in `importWords`
   (`pages/import/format.tsx`): change them there, and nowhere else.
 - **An import reads as steps**, and the app's already does (`src/web/pages/ImportPage.tsx`): Upload, Match (our field
@@ -524,7 +531,7 @@ only where it means something.
 - **AI output is a proposal.** It lands as Draft or Needs a decision, shows its reason, and the person confirms it.
   Show what the model did as past-tense lines ("Mapped 12 columns", "Flagged 3 rows").
 - Every async view has four states: loading (skeleton), empty (what to do next), error (what happened and what to
-  try), and data. Skeletons in the real boxes are in `components/app/Skeletons.tsx`.
+  try), and data. Skeletons in the real boxes are in `@inventory/ui/Skeletons` (`packages/ui/src/Skeletons.component.tsx`).
 - **Codes in `font-mono`**: a record's code, a SKU, a part number, a barcode, a lot or serial, a document number,
   anything a person compares character by character, wherever a table or card shows it. In `ReviewRegion` that is
   `code: true` on the column; elsewhere wrap the value in `Code`. Names, descriptions, quantities and money stay in the text face.
@@ -538,7 +545,7 @@ only where it means something.
 - **Title row**: `PageHeader` (`flex flex-wrap justify-between gap-4`, title block `min-w-0 flex-1 basis-60`, actions
   `flex flex-wrap gap-2`).
 - **Decide a layout from the room the page has**, not the window: `useIsNarrow()` and `useContentBelow(px)` from
-  `@/lib/content-width` already subtract the sidebar. A `md:` class or `useIsMobile()` in a page is wrong on a tablet
+  `@inventory/ui/ContentWidth` already subtract the sidebar. A `md:` class or `useIsMobile()` in a page is wrong on a tablet
   with the sidebar open.
 - **Saved views** ("All 30", "Needs attention 7") are ghost `Button size="sm"` with `aria-pressed`; the button draws the
   selected one (`bg-muted`), so pass no class for it.

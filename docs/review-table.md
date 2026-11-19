@@ -7,13 +7,13 @@ tags: [ui, components, import, review]
 
 # The review region
 
-`ReviewRegion` (`src/web/components/review`) is the Review step of an import as one region that fills the screen and
+`ReviewRegion` (`@inventory/review` (`packages/review`)) is the Review step of an import as one region that fills the screen and
 never scrolls the page: the title and one line, then one card holding a toolbar (the search at the left, then Undo and
 Redo and the icon buttons for columns, filter, row height, the download of the rows not imported and the activity, at
 fixed places; the views "Needs you 42 · Can't fix here 3 · Ready 133 · All 178" as a button group and one button at the
 far right, "Import 133, skip 45"), a work list
 of the problem kinds beside the table, the rows with each problem and a button that says what it will do about it, and a
-footer with what will not be imported and how many decisions are left. It is built only from `components/ui` parts
+footer with what will not be imported and how many decisions are left. It is built only from `@inventory/ui` parts
 (`sticky-table`, `data-table` headers, `Button` variants) and passes both design lints. It holds no product words and
 fetches nothing: you give it rows and it gives you back what to write. See it at `/gallery/review` while `bun run dev`
 runs (states in the grid icon, top right; "Records with a parent", `?state=parent`, is a page of jobs with the region
@@ -51,7 +51,7 @@ header as found, rows with the row number the person sees in Excel, and notes. T
 
 ```tsx
 import type { SpreadsheetTable } from "../../domain/Spreadsheet.ts"
-import type { Activity, ReviewRow } from "@/components/review"
+import type { Activity, ReviewRow } from "@inventory/review/ReviewTypes"
 
 const headers = { name: "Name", unit: "UOM", qty: "Qty on hand" } // our field id -> the file's header
 
@@ -83,7 +83,8 @@ file does not have is a `match: { state: "unmatched", candidates }` on that colu
 
 ```tsx
 import { AppShell } from "@/components/app/AppShell"
-import { ReviewRegion, type Problem, type ReviewColumn, type ReviewRow } from "@/components/review"
+import { ReviewRegion } from "@inventory/review/ReviewRegion"
+import type { Problem, ReviewColumn, ReviewRow } from "@inventory/review/ReviewTypes"
 
 const columns: ReadonlyArray<ReviewColumn> = [
   { id: "name", label: "Name", width: 220, core: true },
@@ -139,7 +140,7 @@ order and its lines, an invoice and its items), the screen is split this way (th
 holds several records, is [patterns](patterns.md) section 16):
 
 - **The table by parent is the project's own**: one row per order and what it becomes (its lines, its total, ready
-  or waiting), in the app's data table (`RecordsTable` in `components/ui/data-table/data-table-records.tsx`: every
+  or waiting), in the app's data table (`RecordsTable` in `packages/ui/src/components/data-table/data-table-records.tsx`: every
   table here is the data table or this region). The page's counts and its import button live
   there, and a waiting order opens its questions.
 - **The questions go on `ReviewRegion`**: one region row per line (or per question) that needs the person, with its
@@ -193,7 +194,7 @@ choice suggested), a decimal comma under one labelled group, a SKU not in stock,
   pause on hover as well as on click, Enter and tap; it is a popover, so a screen reader meets it as a dialog.
 - Widths (`sizing.ts`, `planColumns`, tested): every `fit` column is as wide as its header and the widest value it
   shows in the rows in view, a proposed change included ("ea.", an arrow, the new value in a chip, its "Why?"),
-  measured on a canvas by `@/lib/text-width`, never on an element; the `fill` columns share the rest. The Status
+  measured on a canvas by `@inventory/ui/TextWidth`, never on an element; the `fill` columns share the rest. The Status
   column is as wide as its widest tag. Short of room the lowest-priority `fit` column moves into the row's detail,
   opened by a button before the row number (an `under` column moves under the name instead), before any value is cut.
   A column the person turned on in the Columns menu and the column the kind on screen is about never move: when they
@@ -221,7 +222,7 @@ choice suggested), a decimal comma under one labelled group, a SKU not in stock,
 - A column with `match: { state: "unmatched", candidates }` turns the Columns icon amber, puts a select in that
   column's header and changes the button to "Match Unit to import".
 - Widths are the page's own room, not the window's: the window less a sidebar beside the page, which the shell
-  reports with `setContentInset` (`@/lib/content-width`; without one it is the window), less the card's margins and
+  reports with `setContentInset` (`@inventory/ui/ContentWidth`; without one it is the window), less the card's margins and
   the rail. From 1101 px a full toolbar and the rail; 768 to 1100 px the toolbar on two lines (the search and the
   import, then the views and the tools) and the work list as chips; under 768 px one decision at a time (a group is
   one decision), with "Decision 3 of 14" counted the same way as the footer's "decisions left", Undo and Redo, 44 px

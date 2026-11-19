@@ -18,20 +18,20 @@ and the decisions behind them in `DECISIONS.md`.
 | Upload, Match, Review, Result | `Stepper`, its value in `?step=`, each screen in a `StepperContent`; the import page draws its steps into the shell's top bar (`BarSlotContext`) | `components/ui/stepper.tsx`, `pages/ImportPage.tsx` |
 | Choose the file | `FileUpload` (Dice UI): a labelled file input, drag and drop on its box, Enter opens the picker; a file dropped anywhere else on the page goes to the same input (`UploadStep.tsx`); then `useUpload().start(file)`, which reads in a worker and stages in chunks, with progress and Cancel | `components/ui/file-upload.tsx`, `lib/upload/`, `pages/import/UploadStep.tsx` |
 | Which sheet of a workbook | `SheetChooser`: "Sheet 3 of 6: Records", why, and a select; nothing when one sheet has data | `components/app/SheetChooser.tsx` |
-| A refresh loses nothing | `useSavedProgress(scope)`: the chosen file until the server has it, and the review's undo history beside the decisions the server keeps, for one person in one organization; cleared on Confirm | `lib/saved-progress/` |
+| A refresh loses nothing | `useSavedProgress(scope, browserRuntime)`: the chosen file until the server has it, and the review's undo history beside the decisions the server keeps, for one person in one organization; cleared on Confirm | `lib/saved-progress/` |
 | A table of rows to decide on | `ReviewRegion`: one card with one toolbar (search, views, Undo and Redo, column, filter, row height, download and activity icons, the counted Import button), a work list of the problem kinds beside the table, columns sized to their values (`fit`) or sharing the rest (`fill`), cut text in a hover card, one decision per group, one decision at a time on a phone. Read [the review region](review-table.md) | `components/review/` |
-| A list the server pages (records, anything a second import adds to) | `DataTable` + `useDataTable` with `urlState`, the toolbar's one search box (`TableSearch`), sort and filter menus, the table assistant | `components/ui/data-table/`, `pages/ItemsPage.tsx` |
-| A list the page already holds (people, a result's rows) | `RecordsTable`: the same data table in client mode, cards on a phone | `components/ui/data-table/data-table-records.tsx` |
-| A spreadsheet to edit in bulk | `DataGrid` + `useDataGrid` from the tablecn registry (TanStack Table 9, virtualised) | `components/ui/data-grid/` |
-| Something on its way | `PageHeaderSkeleton`, `TableSkeleton`, `TablePageSkeleton`, `ReviewSkeleton`, `UploadSkeleton`, `StepsSkeleton` in the real boxes | `components/app/Skeletons.tsx` |
+| A list the server pages (records, anything a second import adds to) | `DataTable` + `useDataTable` with `urlState`, the toolbar's one search box (`TableSearch`), sort and filter menus, the table assistant | `packages/ui/src/components/data-table/`, `pages/ItemsPage.tsx` |
+| A list the page already holds (people, a result's rows) | `RecordsTable`: the same data table in client mode, cards on a phone | `packages/ui/src/components/data-table/data-table-records.tsx` |
+| A spreadsheet to edit in bulk | `DataGrid` + `useDataGrid` from the tablecn registry (TanStack Table 9, virtualised) | `packages/ui/src/components/data-grid/` |
+| Something on its way | `PageHeaderSkeleton`, `TableSkeleton`, `TablePageSkeleton`, `ReviewSkeleton`, `UploadSkeleton`, `StepsSkeleton` in the real boxes | `@inventory/ui/Skeletons` (`packages/ui/src/Skeletons.component.tsx`) |
 | A failure, in words | `sayError(error)`: title, sentence and every problem; `toastError`; `answeredByLine` for which path answered | `lib/errors.ts` |
 | Every problem of a form at once | `formProblems` and `problemOf`, shown with `FieldError` under each field (the record editor reads its form with `readRecordForm` from the domain instead) | `lib/form.ts`, `pages/ItemEditor.tsx` |
 | Cache keys and fetch rules | `queryKeys`, `freshFor`, `sessionQuery`; the one `queryClient` | `lib/queries.ts` |
-| Act on selected rows or cells | `ActionBar`, passed to `DataGrid` as `actionBar` | `components/ui/action-bar.tsx` |
-| A change before it happens | `ProposedValue`: `<del>` and `<ins>` with hidden "was" and "now" | `components/app/ProposedValue.tsx` |
-| What a run did | `AgentRun`: past-tense steps that open to show what each read and returned | `components/app/AgentRun.tsx` |
-| A two-minute walk | `Tour`: spotlight steps over real elements, a dialog with a title | `components/ui/tour.tsx` |
-| Undo, phone sheets, filters | `toast(..., { action })`, `Drawer` or `Sheet side="bottom"`, `ToggleGroup` | `components/ui/` |
+| Act on selected rows or cells | `ActionBar`, passed to `DataGrid` as `actionBar` | `packages/ui/src/components/action-bar.tsx` |
+| A change before it happens | `ProposedValue`: `<del>` and `<ins>` with hidden "was" and "now" | `packages/ui/src/ProposedValue.component.tsx` |
+| What a run did | `AgentRun`: past-tense steps that open to show what each read and returned | `packages/ui/src/AgentRun.component.tsx` |
+| A two-minute walk | `Tour`: spotlight steps over real elements, a dialog with a title | `packages/ui/src/components/tour.tsx` |
+| Undo, phone sheets, filters | `toast(..., { action })`, `Drawer` or `Sheet side="bottom"`, `ToggleGroup` | `packages/ui/src/components/` |
 
 ## Steps and upload
 
@@ -165,13 +165,13 @@ return <DataGrid {...grid} table={table} height={560} actionBar={<ReviewActions 
 
 ## Data table (tablecn), for a list the server pages
 
-`components/ui/data-table/` with `useDataTable` (`hooks/use-data-table.ts`) is the tablecn data table: a toolbar of
+`packages/ui/src/components/data-table/` with `useDataTable` (`packages/ui/src/hooks/use-data-table.ts`) is the tablecn data table: a toolbar of
 filters, sort menus in the headings, a column chooser and paging. Choose it for a list that can grow past what a
 browser should hold (the Records page): the server sorts, filters and pages in SQL, and the table only shows a page.
-Choose `RecordsTable` (`components/ui/data-table/data-table-records.tsx`, a local addition) for a list the page
+Choose `RecordsTable` (`packages/ui/src/components/data-table/data-table-records.tsx`, a local addition) for a list the page
 already holds (People, Activity, a result's rows, the columns to match): the same data table in client mode, with
 sorting from the headings, a page at a time and cards on a phone. Choose `ReviewRegion` for rows to decide on. Every
-table in the app is one of these three; nothing outside `components/ui` draws a table of its own.
+table in the app is one of these three; nothing outside `@inventory/ui` draws a table of its own.
 
 The pattern is tablecn's own, in three pieces (`src/web/pages/ItemsPage.tsx` is the worked example):
 
@@ -276,7 +276,7 @@ come from rules and say `rule`; the model's say `AI`.
 
 ## Saved progress: a refresh loses nothing
 
-`useSavedProgress(scope)` keeps in this browser what a refresh must bring back and the server does not keep: the
+`useSavedProgress(scope, browserRuntime)` keeps in this browser what a refresh must bring back and the server does not keep: the
 chosen file until the server has all of it (a Blob in IndexedDB, read again by the worker on "Continue"), and the
 review's undo history beside the decisions (localStorage, written before the next frame). The decisions themselves
 and the step are on the server and in the address. The scope is the acting member, organization and screen, from the
@@ -324,7 +324,7 @@ const save = useOptimisticWrite({ write: (api, edit) => api.items.edit(edit), ch
   the server words `AiUnavailable` with too: no key, a key refused or out of credit, busy, a bad answer, not
   answering), and
   `answeredByLine(answeredBy)` says which path answered ("Answered by the rules: …").
-- **Loading, empty, error, data**: a skeleton in the real boxes while it loads (`components/app/Skeletons.tsx`: the page
+- **Loading, empty, error, data**: a skeleton in the real boxes while it loads (`@inventory/ui/Skeletons` (`packages/ui/src/Skeletons.component.tsx`): the page
   header, a table's frame and header with 36px rows, the review's bands, the upload), a sentence and what to do when
   empty, `sayError` with "Try again" (disabled while it refetches) on error.
 
@@ -333,7 +333,7 @@ const save = useOptimisticWrite({ write: (api, edit) => api.items.edit(edit), ch
 Every table is one of three: tablecn's `DataTable` paged by the server (the Records page), `RecordsTable` for a list
 the page already holds (People, a result's rows, the parent table of records with a parent), or the `ReviewRegion`
 (rows to decide on; `embedded` beside a parent table, [the review region](review-table.md)). The lint refuses a
-hand-rolled `table`, `tr` or `td` outside `components/ui`. Each page is its own chunk (`Workspace.tsx`), so the
+hand-rolled `table`, `tr` or `td` outside `@inventory/ui`. Each page is its own chunk (`Workspace.tsx`), so the
 table code loads with the first page that has one.
 
 ## Effect DevTools (development only)
@@ -384,8 +384,8 @@ Without the server, the CLI does the same: `bunx shadcn@latest search @diceui -q
 **Add it.**
 
 ```sh
-bunx shadcn@latest add @diceui/data-table --dry-run   # each file: created, skipped (identical) or overwritten
-yes n | bunx shadcn@latest add @diceui/data-table     # answers "no" to every "overwrite?" question
+bunx shadcn@latest add @diceui/data-table --cwd packages/ui --dry-run   # each file: created, skipped or overwritten
+yes n | bunx shadcn@latest add @diceui/data-table --cwd packages/ui     # answers "no" to every "overwrite?"
 bun install --lockfile-only                                 # the CLI ran npm install; bring bun.lock along
 bun run check
 ```
@@ -396,8 +396,9 @@ bun run check
   refuses an `allow-scripts` setting handed down as an environment variable). `bunx` without `--bun` still runs the
   CLI on Node. The CLI installs with npm here, so
   `package-lock.json` is updated and `bun.lock` is not until the line above.
-- **Move what lands outside `src/web`.** Items with their own target paths write to `src/components/` and
-  `src/hooks/`: move them to `src/web/components/ui/<name>/` and `src/web/hooks/` and fix the imports. There is no
+- **Add into `@inventory/ui`.** Run the CLI in `packages/ui` (`--cwd packages/ui`); its `components.json` writes to
+  `src/components/` and `src/hooks/` with `@inventory/ui/components/...` imports. Give each new file its exact entry in
+  `packages/ui/package.json` (`scripts/check-exports.mjs` in the package's `check` names a missing one). There is no
   `@/lib/utils` here: `import { cn } from "cn"`.
 - **A new dependency is a decision.** An item that brings a second schema library or a second state model (the Dice UI
   data table brings `zod` and `nuqs`) is written down with its cost, or is not added.
@@ -445,30 +446,30 @@ together.
 ## The two design lints
 
 Both run in `bun run check`, both report every finding before the check fails, and both name the fix in the message.
-Fix in the code or in the theme (`src/web/index.css`). No disable comments, no allow-lists.
+Fix in the code or in the theme (`packages/ui/src/theme.css`). No disable comments, no allow-lists.
 
 ```sh
 bun run lint:shadcn                                                                          # the design-system lint
-bunx oxlint --disable-nested-config --deny-warnings -c .oxlintrc.shadcn.json src/web/pages   # it, on one folder
+bunx oxlint --disable-nested-config --deny-warnings -c ../../.oxlintrc.shadcn.json src/web/pages   # it, on one folder (from apps/inventory)
 bunx oxlint --quiet src/web/pages                                                            # hand-rolled elements, one folder
 ```
 
-**Design-system lint** (`@shadcn/lint` 0.2.5 in `.oxlintrc.shadcn.json`; every rule an error):
+**Design-system lint** (`@shadcn/lint` 0.2.5 in the root `.oxlintrc.shadcn.json`, run by the app, `@inventory/ui` and `@inventory/review`; every rule an error):
 
 | Rule | What it catches | Fix |
 | --- | --- | --- |
-| `no-raw-colors` | A palette colour (`bg-zinc-100`, `text-red-500`, `fill="#fff"`) | The token for that meaning (`bg-muted`, `text-destructive`, `bg-success text-success-foreground`); a new meaning gets a token in `src/web/index.css` |
+| `no-raw-colors` | A palette colour (`bg-zinc-100`, `text-red-500`, `fill="#fff"`) | The token for that meaning (`bg-muted`, `text-destructive`, `bg-success text-success-foreground`); a new meaning gets a token in `packages/ui/src/theme.css` |
 | `no-arbitrary-values` | A bracket value (`p-[3px]`, `rounded-[4px]`, `grid-cols-[auto_1fr]`) | The scale step the message names (`p-0.75`), else a token in `@theme` and its utility (`rounded-chip`, `grid-cols-label-value`) |
 | `no-restyle` | A non-layout class on a `ui` component (`<Button className="px-2">`, `<TableCell className="font-medium">`) | A variant, size or prop; else move the class to a plain child or wrapper element. Layout (margin, width, flex, position, `hidden`, `text-right`) is allowed |
 | `no-inline-styles` | `style={{ ... }}` | Classes; a dynamic value goes in a CSS variable on `style`, read by a class (`w-(--bar)`) |
 | `require-static-classes` | A class on a `ui` component that cannot be read statically (`` `bg-${tone}` ``) | The component's variant prop, or a constant in the same file |
-| `no-unknown-classes` | A class Tailwind cannot generate (a typo, `origin-top-center`) | Fix the spelling, delete it, or declare it with `@utility` in `src/web/index.css` |
+| `no-unknown-classes` | A class Tailwind cannot generate (a typo, `origin-top-center`) | Fix the spelling, delete it, or declare it with `@utility` in `packages/ui/src/theme.css` |
 
 String maps count too (`scanAllStrings`): `const tones = { bad: "bg-red-100" }` fails like a `className`. Inside
-`src/web/components/ui` the components own their look, so `no-restyle`, `require-static-classes`,
+`packages/ui/src/components` (`@inventory/ui`) the components own their look, so `no-restyle`, `require-static-classes`,
 `no-arbitrary-values` and `no-inline-styles` are off there; raw colours and unknown classes still fail.
 
-**Hand-rolled elements** (`react/forbid-elements` in `.oxlintrc.json`, outside `src/web/components/ui`): `button`
+**Hand-rolled elements** (`react/forbid-elements` in the root `.oxlintrc.web.json`, which each package's `.oxlintrc.json` extends, outside `packages/ui/src/components` (`@inventory/ui`)): `button`
 -> `Button`; `input` -> `Input` (`Checkbox`, `RadioGroup`, `Switch`, `Slider`, `FileUpload` by type); `select` ->
 `NativeSelect` or `Select`; `textarea` -> `Textarea`; `label` -> `Label`, or `Field` and `FieldLabel`; `table`,
 `thead`, `tbody`, `tfoot`, `tr`, `th`, `td`, `caption` -> `Table` and its parts; `hr` -> `Separator`; `progress` ->
@@ -478,5 +479,5 @@ String maps count too (`scanAllStrings`): `const tones = { bad: "bg-red-100" }` 
 Starter patches that make the conventions pass: `data-sticky="end"` on a `TableHead` and its `TableCell`s keeps a
 row-actions column in reach (`table.tsx`); a ghost `Button` with `aria-pressed` draws the selected saved view
 (`button.tsx`); `rounded-chip`, `grid-cols-label-value`, `grid-cols-field-value` and `cv-auto` are theme tokens in
-`src/web/index.css`; `src/web/shadcn-utilities.css` holds the `scroll-fade` and `shimmer` utilities the chat
+`packages/ui/src/theme.css`; `packages/ui/src/utilities.css` holds the `scroll-fade` and `shimmer` utilities the chat
 components use.

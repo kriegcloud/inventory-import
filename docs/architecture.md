@@ -138,7 +138,7 @@ whole, and then becomes an `importDraft` with the same id.
 ## 2. One row through the import
 
 From `src/domain/ItemImport.ts` (`RowOutcome`, `Proposal.confidence`, `RowDecision`), `src/server/Imports.ts` and the
-words in `src/web/components/review/words.ts` and `src/web/pages/import/format.tsx`.
+words in `packages/review/src/ReviewWords.words.ts` and `src/web/pages/import/format.tsx`.
 
 ```mermaid
 stateDiagram-v2

@@ -15,7 +15,7 @@ from: explorations/ideal-architecture
 | 2 | The four ui → app imports turned around | done |
 | 3 | `@inventory/ui`; the app switched; proof | done |
 | 4 | `@inventory/review`; the app switched; proof with a draft from before the move | done |
-| 5 | Closing note | todo |
+| 5 | Closing note | done |
 
 ## Current blocker
 
@@ -69,3 +69,30 @@ None.
   accepted" and "Redo: 2 rows left out"; Redo, then a hard refresh: "Undo: 2 rows left out", "Left out 2"; Undo, and
   at 375 px the queue shows "Undo: 2 fixes accepted" and "Redo: 2 rows left out". Not re-checked here: Confirm
   clearing a draft (the import holding this draft has no ready rows left).
+- **The shadcn CLI in the package** needs `paths` in `packages/ui/tsconfig.json` (`"@inventory/ui/*": ["./src/*"]`)
+  to resolve its aliases; with it, `bunx shadcn@latest add badge --dry-run` in `packages/ui` names
+  `src/components/badge.tsx`. `docs/kit.md` says to add with `--cwd packages/ui`.
+- **Proof after move 3 on a fresh database**: 200 rows read, "Import 155, skip 45", "Import 155 items?", result
+  "Not imported 45 · Imported 155 · Already there 0 · All 200", Items "155 items", D1 `item` 155.
+- **Documents the moves made false**, changed: `CLAUDE.md` (the review region's path, stage C and D, the layout, the
+  tokens, `defaultReviewWords`, `Skeletons`, content width), `.claude/agents/frontend.md`, `docs/kit.md` (paths, the
+  two lints, adding a component), `docs/review-table.md`, `docs/architecture.md`, `docs/standards/building-screens.md`,
+  `engineering.md`, `saved-progress.md`.
+
+## Closing note
+
+The components, their hooks, the theme and the shared screen pieces are `@inventory/ui` (`18ef69e`), and the review
+region with its saved progress is `@inventory/review` (`ddfb75b`), after the four component-to-app imports were turned
+around inside the app (`2d4ff1b`). Tests: review 74 (moved region tests plus the draft-format and property tests), app
+158 fast and 45 slow. Ceilings: app 332, review 283, ui 52, sum 667 of 678.
+
+What was learned:
+
+- The type-check of a project applies its own per-file overrides to every file it compiles, packages imported by
+  path included, so a package's files that the app imports by relative path need the app's override to name them.
+- Formatters rewrite JSON fixtures; a byte-exact stored format is kept as `.txt`.
+- The shadcn CLI resolves its aliases through `tsconfig` `paths`, not package exports.
+
+What the contexts goal should know: the region's decision is `ReviewDecision` (`RowPlace`), and
+`apps/inventory/src/web/pages/import/reviewAdapter.ts` converts it to and from the server's flags; when the server's
+`RowDecision` becomes the same union, that conversion shrinks to the `stored` choice.

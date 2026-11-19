@@ -2,7 +2,7 @@
 type: Goal
 title: "UI packages"
 description: The vendored components, their hooks, the theme and the shared screen pieces become @inventory/ui, and the review region with its saved progress becomes @inventory/review, with the app switched over after each one and a draft saved before the move still restored after it.
-status: active
+status: done
 from: explorations/ideal-architecture
 ---
 
@@ -33,15 +33,15 @@ From the brief's No-gos: no context packages, no `@inventory/client`; no change 
 
 ## Acceptance
 
-- [ ] The four ui → app imports turned around (move 1): `rg '@/lib' apps/inventory/src/web/components/ui apps/inventory/src/web/hooks` finds none.
-- [ ] `@inventory/ui` exists with exact exports, checked by `check-exports.mjs` in its `check`.
-- [ ] `lint:shadcn` runs and passes in the app, `packages/ui` and `packages/review`.
-- [ ] The production CSS holds a class used only in a vendored component a screen loads, and no class of `tour.tsx`.
-- [ ] `@inventory/review` exists; `ReviewDecision.property.test.ts` and `SavedProgress.property.test.ts` pass; a draft captured before the move decodes and encodes back to the same bytes.
-- [ ] `RowCards.tsx` is deleted.
-- [ ] `bun run check:full` and the build pass on the last commit; the ceilings' sum is at most 678.
-- [ ] Browser, after each package: the messy sample through Confirm with the three numbers agreeing on 155.
-- [ ] Browser, after `@inventory/review`: a draft made on the build before the move restored, undo and redo, a refresh mid-review losing nothing, the same at phone width.
+- [x] The four ui → app imports turned around (move 1, `2d4ff1b`): both folders are gone; `rg '@/lib' packages/ui/src` finds none.
+- [x] `@inventory/ui` exists with exact exports, checked by `check-exports.mjs` in its `check` (133 entries, `18ef69e`).
+- [x] The design lint runs and passes in the app, `packages/ui` and `packages/review` (each `lint`); a planted `text-red-500` is refused in the app and in the ui package, a raw `<button>` in a screen.
+- [x] The production CSS holds `data-sticky` (`table.tsx`) and not `.pe-6` (only `tour.tsx`); 124,359 bytes before and after move 2.
+- [x] `@inventory/review` exists (`ddfb75b`); `ReviewDecision.property.test.ts` covers the decision and saved-progress schemas (one file, not two); `DraftFormat.test.ts` decodes the captured draft and encodes it back to the same bytes.
+- [x] `RowCards.tsx` is deleted.
+- [x] `bun run check:full` and the build pass on the last commit; the ceilings are app 332, review 283, ui 52: 667.
+- [x] Browser, after each package: the messy sample through Confirm, 200 rows read, result "Imported 155 · Not imported 45 · All 200", Items "155 items", D1 155 (PLAN).
+- [x] Browser, after `@inventory/review`: the draft made before the move restored with its undo and redo, a refresh mid-review lost nothing, the same at 375 px (PLAN). Confirm clearing a draft was not re-checked.
 
 ## Decisions
 

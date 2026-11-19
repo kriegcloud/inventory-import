@@ -3,12 +3,12 @@
 // writes `member`, always inside the actor's own organization. The rule not to break: an organization never ends
 // up without an admin, and the check and the write are one statement, so two admins demoting each other at the
 // same moment cannot both succeed.
-import { Context, DateTime, Effect, Layer, Option, Result, String as Str } from "effect"
+import { Context, DateTime, Effect, Layer, Option, Result } from "effect"
 import * as S from "effect/Schema"
 import { SecureRandom } from "effect/crypto"
 import { SqlClient, SqlSchema, type Statement } from "effect/sql"
-import { LastAdmin, Person, PersonNotFound } from "../api/v1/People.ts"
-import { AddPersonProblem } from "../api/v1/People.ts"
+import type { AccountEmail } from "../api/v1/Identity.ts"
+import { AddPersonProblem, LastAdmin, Person, PersonNotFound } from "../api/v1/People.ts"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { type Member } from "@inventory/kernel/Member"
 import { Role } from "@inventory/kernel/Role"
@@ -26,10 +26,10 @@ export class People extends Context.Service<
   People,
   {
     list(organizationId: OrganizationId): Effect.Effect<ReadonlyArray<Person>>
-    /** Adds the person who signed up with `email` to the actor's organization. */
-    add(actor: Member, email: string, role: Role): Effect.Effect<Result.Result<Person, AddPersonProblem>>
-    setRole(actor: Member, memberId: string, role: Role): Effect.Effect<Person, PersonNotFound | LastAdmin>
-    remove(actor: Member, memberId: string): Effect.Effect<void, PersonNotFound | LastAdmin>
+    /** Adds the person who signed up with `email` (already lower-cased by the request's schema) to the actor's organization. */
+    add(actor: Member, email: AccountEmail, role: Role): Effect.Effect<Result.Result<Person, AddPersonProblem>>
+    setRole(actor: Member, memberId: MemberId, role: Role): Effect.Effect<Person, PersonNotFound | LastAdmin>
+    remove(actor: Member, memberId: MemberId): Effect.Effect<void, PersonNotFound | LastAdmin>
   }
 >()("@inventory/app/server/People") {
   static readonly layer = Layer.effect(
@@ -140,7 +140,7 @@ export class People extends Context.Service<
           RETURNING id`
       })
 
-      const one = Effect.fn("People.one")(function* (organizationId: OrganizationId, memberId: string) {
+      const one = Effect.fn("People.one")(function* (organizationId: OrganizationId, memberId: MemberId) {
         const found = yield* findOne({ org: organizationId, id: memberId }).pipe(Effect.orDie)
         if (Option.isNone(found)) {
           return yield* PersonNotFound.make({ reason: "That person is not a member of your organization." })
@@ -148,8 +148,8 @@ export class People extends Context.Service<
         return found.value
       })
 
-      const add = Effect.fn("People.add")(function* (actor: Member, email: string, role: Role) {
-        const user = yield* findUser(Str.toLowerCase(email)).pipe(Effect.orDie)
+      const add = Effect.fn("People.add")(function* (actor: Member, email: AccountEmail, role: Role) {
+        const user = yield* findUser(email).pipe(Effect.orDie)
         if (Option.isNone(user)) {
           return Result.fail(
             AddPersonProblem.make({
@@ -187,10 +187,10 @@ export class People extends Context.Service<
             })
           )
         }
-        return yield* one(org, id).pipe(Effect.map(Result.succeed), Effect.orDie)
+        return yield* one(org, MemberId.make(id)).pipe(Effect.map(Result.succeed), Effect.orDie)
       })
 
-      const setRole = Effect.fn("People.setRole")(function* (actor: Member, memberId: string, role: Role) {
+      const setRole = Effect.fn("People.setRole")(function* (actor: Member, memberId: MemberId, role: Role) {
         const before = yield* one(actor.organizationId, memberId)
         const activityId = yield* random.uuidV4()
         const at = yield* now
@@ -217,7 +217,7 @@ export class People extends Context.Service<
         return yield* one(org, memberId)
       })
 
-      const remove = Effect.fn("People.remove")(function* (actor: Member, memberId: string) {
+      const remove = Effect.fn("People.remove")(function* (actor: Member, memberId: MemberId) {
         const before = yield* one(actor.organizationId, memberId)
         const activityId = yield* random.uuidV4()
         const at = yield* now

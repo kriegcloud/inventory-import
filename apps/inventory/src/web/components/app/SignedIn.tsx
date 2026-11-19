@@ -1,4 +1,4 @@
-import { Effect } from "effect"
+import { Effect, Option } from "effect"
 import { type ReactNode, useEffect, useState } from "react"
 import { Alert, AlertDescription, AlertTitle } from "@inventory/ui/components/alert"
 import { Button } from "@inventory/ui/components/button"
@@ -26,8 +26,9 @@ const Waiting = () => <Skeleton className="mx-auto h-80 w-full max-w-sm" aria-la
 function useDevelopmentSignIn(): "idle" | "signing-in" | "failed" {
   const { status, features, refresh } = useActor()
   const [state, setState] = useState<"idle" | "signing-in" | "failed">("idle")
-  const first = features?.testAccounts?.accounts[0]
-  const password = features?.testAccounts?.password
+  const offer = features === undefined ? undefined : Option.getOrUndefined(features.testAccounts)
+  const first = offer?.accounts[0]
+  const password = offer?.password
   const wanted =
     import.meta.env.DEV && status === "signed-out" && first !== undefined && password !== undefined && !signedOutHere()
   useEffect(() => {

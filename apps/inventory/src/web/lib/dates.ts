@@ -4,11 +4,11 @@ import { DateTime, Option } from "effect"
 
 const dateTime = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" })
 
-/** An ISO timestamp from the server as the person's own date and time. */
-export const when = (iso: string): string => {
-  const parsed = DateTime.make(iso)
+/** A moment from the server (an instant, or its ISO text) as the person's own date and time. */
+export const when = (at: string | DateTime.Utc): string => {
+  const parsed = DateTime.make(at)
   const date = Option.isSome(parsed) ? DateTime.toDateUtc(parsed.value) : undefined
-  return date === undefined ? iso : dateTime.format(date)
+  return date === undefined ? String(at) : dateTime.format(date)
 }
 
 const dayTime = new Intl.DateTimeFormat(undefined, {

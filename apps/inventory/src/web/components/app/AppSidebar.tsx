@@ -1,3 +1,4 @@
+import { Option } from "effect"
 import {
   CheckIcon,
   ChevronsUpDownIcon,
@@ -152,7 +153,7 @@ function UserMenu() {
   const { theme, setTheme } = useTheme()
   const { isMobile } = useSidebar()
   if (actor === undefined) return null
-  const testAccounts = features?.testAccounts
+  const testAccounts = features === undefined ? undefined : Option.getOrUndefined(features.testAccounts)
   const otherAccounts = (testAccounts?.accounts ?? []).filter((account) => account.email !== email)
   const who = (
     <>
@@ -207,7 +208,7 @@ function UserMenu() {
                 ))}
               </DropdownMenuRadioGroup>
             </DropdownMenuGroup>
-            {otherAccounts.length === 0 || testAccounts === undefined || testAccounts === null ? null : (
+            {otherAccounts.length === 0 || testAccounts === undefined ? null : (
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>

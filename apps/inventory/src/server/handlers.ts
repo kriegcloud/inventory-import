@@ -112,7 +112,6 @@ const PeopleHandlers = HttpApiBuilder.group(
       remove: Effect.fn("people.remove")(function* ({ params }) {
         const actor = yield* requireRole("admin")
         yield* people.remove(actor, params.memberId)
-        return { removed: true }
       })
     })
   })

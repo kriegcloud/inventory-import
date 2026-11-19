@@ -1,17 +1,18 @@
 import { Array as Arr, Context, Effect, Layer, Option } from "effect"
 import * as S from "effect/Schema"
 import { SqlClient, SqlSchema } from "effect/sql"
-import { OrganizationChoice, TestAccount } from "../api/v1/Identity.ts"
+import { AccountEmail, Membership, OrganizationChoice, TestAccount } from "../api/v1/Identity.ts"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
 import { Role } from "@inventory/kernel/Role"
+import { DisplayName } from "@inventory/kernel/Text"
 
 /** One membership row of a test account, as the database holds it. */
 const AccountRow = S.Struct({
   userId: S.String,
-  email: S.String,
-  name: S.String,
-  organizationName: S.String,
+  email: AccountEmail,
+  name: DisplayName,
+  organizationName: DisplayName,
   role: Role
 }).annotate({ description: "A test account's membership, read from user, member and organization." })
 
@@ -115,7 +116,9 @@ export class Members extends Context.Service<
                 TestAccount.make({
                   email: first.email,
                   name: first.name,
-                  memberships: Arr.map(mine, (row) => ({ organizationName: row.organizationName, role: row.role }))
+                  memberships: Arr.map(mine, (row) =>
+                    Membership.make({ organizationName: row.organizationName, role: row.role })
+                  )
                 })
               )
             })

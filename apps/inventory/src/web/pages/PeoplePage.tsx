@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Result } from "effect"
-import { useId, useState } from "react"
+import { DateTime, Effect, Option, Result } from "effect"
+import * as S from "effect/Schema"
+import { type ReactNode, useId, useState } from "react"
 import { toast } from "sonner"
 import { PageHeader } from "@inventory/ui/PageHeader"
 import { TableSkeleton } from "@inventory/ui/Skeletons"
@@ -34,7 +35,7 @@ import { NativeSelect, NativeSelectOption } from "@inventory/ui/components/nativ
 import { useActor } from "@/lib/actor"
 import { call, callWrite, useOptimisticWrite } from "@/lib/api"
 import { cacheChange } from "@inventory/client/Optimistic"
-import type { Person } from "../../api/v1/People.ts"
+import { AddPerson as AddPersonCommand, ChangeRole, Person } from "../../api/v1/People.ts"
 import { hasRole, type Role } from "@inventory/kernel/Role"
 import { when } from "./import/format.tsx"
 import { sayError } from "@inventory/client/SayError"
@@ -44,7 +45,7 @@ import { queryKeys } from "@/lib/queries"
 type PersonRow = Person & { readonly saving: boolean }
 
 /** The person a row shows, as the server and the cache have them. */
-const personOf = ({ saving: _saving, ...person }: PersonRow): Person => person
+const personOf = ({ saving: _saving, ...person }: PersonRow): Person => Person.make(person)
 
 /** A role as one word, as the Role column's filter and the rows of people who cannot change it show it. */
 const roleWords: Record<Role, string> = { viewer: "Viewer", editor: "Editor", admin: "Admin" }
@@ -67,7 +68,11 @@ function AddPerson(props: { onAdded: () => void }) {
   const [email, setEmail] = useState("")
   const [role, setRole] = useState<Role>("editor")
   const add = useMutation({
-    mutationFn: () => callWrite((api) => api.people.add({ payload: { email, role } })),
+    mutationFn: () =>
+      callWrite((api) =>
+        // Through the command's schema, which trims the email and lower-cases it: the rule is said once, there.
+        S.decodeEffect(AddPersonCommand)({ email, role }).pipe(Effect.flatMap((payload) => api.people.add({ payload })))
+      ),
     onSuccess: (outcome) => {
       if (Result.isFailure(outcome)) return
       toast.success(`${outcome.success.name} added as ${outcome.success.role}`)
@@ -164,14 +169,21 @@ export function PeoplePage() {
   const setRole = useOptimisticWrite({
     name: "people",
     write: (client, input: { person: Person; role: Role }) =>
-      client.people.setRole({ params: { memberId: input.person.memberId }, payload: { role: input.role } }),
+      client.people.setRole({
+        params: { memberId: input.person.memberId },
+        payload: ChangeRole.make({ role: input.role })
+      }),
     changes: (input) => [
       cacheChange<ReadonlyArray<Person>, { person: Person; role: Role }>({
         key: queryKeys.people,
         apply: (list) =>
-          list.map((entry) => (entry.memberId === input.person.memberId ? { ...entry, role: input.role } : entry)),
+          list.map((entry) =>
+            entry.memberId === input.person.memberId ? Person.make({ ...entry, role: input.role }) : entry
+          ),
         undo: (now) =>
-          now.map((entry) => (entry.memberId === input.person.memberId ? { ...entry, role: input.person.role } : entry))
+          now.map((entry) =>
+            entry.memberId === input.person.memberId ? Person.make({ ...entry, role: input.person.role }) : entry
+          )
       })
     ],
     failed: (input) => `${input.person.name}'s role was not changed.`,
@@ -221,10 +233,10 @@ export function PeoplePage() {
     {
       id: "email",
       label: "Email",
-      value: (person) => person.email ?? "",
-      cell: (person) => person.email ?? <NotSet />,
-      title: (person) => person.email ?? "Not set",
-      blank: (person) => person.email === null
+      value: (person) => Option.getOrElse(person.email, () => ""),
+      cell: (person) => Option.match(person.email, { onNone: (): ReactNode => <NotSet />, onSome: (email) => email }),
+      title: (person) => Option.getOrElse(person.email, () => "Not set"),
+      blank: (person) => Option.isNone(person.email)
     },
     {
       id: "role",
@@ -234,7 +246,7 @@ export function PeoplePage() {
       value: (person) => roleWords[person.role],
       facet: true,
       cell: (person) =>
-        admin && person.email !== null ? (
+        admin && Option.isSome(person.email) ? (
           <NativeSelect
             size="sm"
             aria-label={`Role of ${person.name}`}
@@ -257,11 +269,12 @@ export function PeoplePage() {
       id: "joined",
       label: "Joined",
       width: 190,
-      value: (person) => person.joinedAt ?? "",
+      // Sorted by the moment itself, as ISO text.
+      value: (person) => Option.match(person.joinedAt, { onNone: () => "", onSome: DateTime.formatIso }),
       searchable: false,
-      cell: (person) => (person.joinedAt === null ? <NotSet /> : when(person.joinedAt)),
-      title: (person) => (person.joinedAt === null ? "Not set" : when(person.joinedAt)),
-      blank: (person) => person.joinedAt === null
+      cell: (person) => Option.match(person.joinedAt, { onNone: (): ReactNode => <NotSet />, onSome: when }),
+      title: (person) => Option.match(person.joinedAt, { onNone: () => "Not set", onSome: when }),
+      blank: (person) => Option.isNone(person.joinedAt)
     },
     ...(admin
       ? [

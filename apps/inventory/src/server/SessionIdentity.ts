@@ -1,6 +1,15 @@
 import { Array as Arr, Context, Effect, Layer, Option } from "effect"
 import { HttpServerRequest } from "effect/http"
-import { SessionState, SignInFeatures, type OrganizationChoice } from "../api/v1/Identity.ts"
+import {
+  AccountEmail,
+  NoOrganization,
+  type OrganizationChoice,
+  Ready,
+  type SessionState,
+  SignedOut,
+  SignInFeatures,
+  TestAccountsOffer
+} from "../api/v1/Identity.ts"
 import { NotSignedIn } from "@inventory/kernel/AccessError"
 import { CurrentActor } from "@inventory/kernel/Actor"
 import { Identity } from "@inventory/kernel/Identity"
@@ -91,24 +100,27 @@ export class Sessions extends Context.Service<Sessions, { state(headers: Headers
           state: Effect.fn("Sessions.state")(function* (headers: Headers) {
             const features = SignInFeatures.make({
               testAccounts: settings.testAccounts
-                ? { password: testAccountPassword, accounts: yield* members.testAccounts(userIds) }
-                : null,
+                ? Option.some(
+                    TestAccountsOffer.make({
+                      password: testAccountPassword,
+                      accounts: yield* members.testAccounts(userIds)
+                    })
+                  )
+                : Option.none(),
               pwnedPasswordCheck: settings.pwnedPasswordCheck
             })
             const session = yield* auth.session(headers).pipe(Effect.orDie)
             if (Option.isNone(session)) {
-              return SessionState.make({ status: "signed-out", email: null, actor: null, organizations: [], features })
+              return SignedOut.make({ features })
             }
             const organizations: ReadonlyArray<OrganizationChoice> = yield* members.organizationsOf(
               session.value.userId
             )
             const actor = yield* actorOf(members, session.value)
-            return SessionState.make({
-              status: Option.isSome(actor) ? "ready" : "no-organization",
-              email: session.value.email,
-              actor: Option.getOrNull(actor),
-              organizations,
-              features
+            const email = AccountEmail.make(session.value.email)
+            return Option.match(actor, {
+              onNone: (): SessionState => NoOrganization.make({ email, organizations, features }),
+              onSome: (member): SessionState => Ready.make({ email, actor: member, organizations, features })
             })
           })
         })

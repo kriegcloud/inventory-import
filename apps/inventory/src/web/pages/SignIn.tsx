@@ -1,3 +1,4 @@
+import { Option } from "effect"
 import { SecureRandom } from "effect/crypto"
 import { useMutation } from "@tanstack/react-query"
 import { type FormEvent, useId, useState } from "react"
@@ -49,7 +50,7 @@ export function SignIn(props: { features: SignInFeatures | undefined; onSignedIn
   const [password, setPassword] = useState("")
   const [name, setName] = useState("")
   const [organization, setOrganization] = useState("")
-  const testAccounts = props.features?.testAccounts ?? null
+  const testAccounts = props.features === undefined ? null : Option.getOrNull(props.features.testAccounts)
 
   const submit = useMutation({
     mutationFn: (attempt: Attempt) =>

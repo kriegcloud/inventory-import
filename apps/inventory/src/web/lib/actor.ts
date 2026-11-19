@@ -96,9 +96,9 @@ export function useActor() {
   return {
     /** loading, then signed-out, no-organization or ready (`actor` is set only when ready). */
     status: state?.status ?? "loading",
-    actor: state?.actor ?? undefined,
-    email: state?.email ?? undefined,
-    organizations: state?.organizations ?? [],
+    actor: state?.status === "ready" ? state.actor : undefined,
+    email: state === undefined || state.status === "signed-out" ? undefined : state.email,
+    organizations: state === undefined || state.status === "signed-out" ? [] : state.organizations,
     features: state?.features,
     /** No answer yet, and this browser was not signed in last time: draw the sign-in page without waiting. */
     probablySignedOut: state === undefined && !wasSignedIn(),

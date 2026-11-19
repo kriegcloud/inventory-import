@@ -1,5 +1,5 @@
 import { expect, layer } from "@effect/vitest"
-import { Array as Arr, Effect, Exit, Layer } from "effect"
+import { Array as Arr, Effect, Exit, Layer, Order, Record as Rec } from "effect"
 import { signIn } from "../../src/server/SignIn.ts"
 import { testAccountPassword } from "../../src/server/TestAccounts.ts"
 import { D1Binding } from "@beep/d1/D1"
@@ -43,7 +43,6 @@ layer(signInApp(), { timeout: "60 seconds" })("sign-in with Better Auth", (it) =
       expect((yield* ada.send("GET", "/api/v1/identity/session")).json).toMatchObject({
         status: "no-organization",
         email: "ada@example.test",
-        actor: null,
         organizations: []
       })
 
@@ -51,6 +50,11 @@ layer(signInApp(), { timeout: "60 seconds" })("sign-in with Better Auth", (it) =
       expect(created.status).toBe(200)
       const me = yield* ada.send("GET", "/api/v1/identity/me")
       expect(me.json).toMatchObject({ name: "Ada Park", role: "admin", organizationName: "Ada Works" })
+      // The membership Better Auth wrote reads back as a person: its `createdAt` decodes as an instant.
+      const people = yield* ada.send("GET", "/api/v1/people")
+      expect(people.status).toBe(200)
+      expect(people.json).toMatchObject([{ name: "Ada Park", email: "ada@example.test", role: "admin" }])
+      expect(Number.isNaN(Date.parse(people.json[0].joinedAt))).toBe(false)
     })
   )
 
@@ -77,7 +81,9 @@ layer(signInApp(), { timeout: "60 seconds" })("sign-in with Better Auth", (it) =
       const stranger = browser("10.0.0.20")
       const state = yield* stranger.send("GET", "/api/v1/identity/session")
       expect(state.status).toBe(200)
-      expect(state.json).toMatchObject({ status: "signed-out", actor: null, features: { pwnedPasswordCheck: false } })
+      expect(state.json).toMatchObject({ status: "signed-out", features: { pwnedPasswordCheck: false } })
+      // Nobody is signed in: the answer has no email, actor or organizations to be null or empty.
+      expect(Arr.sort(Rec.keys(state.json), Order.String)).toEqual(["features", "status"])
       expect(state.json.features.testAccounts.password).toBe(password)
       // Two organizations and all three roles, read from the database, in the order the page lists them.
       expect(state.json.features.testAccounts.accounts).toEqual([

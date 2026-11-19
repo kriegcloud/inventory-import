@@ -34,3 +34,16 @@ None.
   override and its own ceiling (22); the app's fell from 332 to 311. Sum 668, cap 678.
 - **`QueryClient.runtime.ts` and `CurrentMember.controller.ts` wait for the first web package**, which is the first
   code that cannot import the app's `lib/queries.ts` and `lib/actor.ts`.
+- **access, shapes in place.** `SessionState` is a union by `status` (`SignedOut`, `NoOrganization`, `Ready`);
+  `Person` carries `MemberId`, `Option<AccountEmail>` and `Option<Instant>`; `AddPerson.email` is `EmailToFind`
+  (trimmed and lower-cased by the schema); `people.remove` answers 204. The sign-in gate and `useActor` narrow on
+  `status` and do not call `SessionState.match`: both are in the first download, which carries no Schema code. A
+  screen sends a command through its schema (`S.decodeEffect(AddPerson)`), so the trim and the lower-casing are said
+  once.
+- **`joinedAt` as Better Auth writes it decodes.** Checked in `Auth.slow.test.ts` (a member created through
+  `/api/auth/organization/create`) and on screen ("Nov 18, 2026, 8:48 PM" for an account made in the browser).
+- **Two limits of the generated document, left as they are.** A key's description does not reach the document for
+  an `Option` field (`Person.email`, `Person.joinedAt`, `SignInFeatures.testAccounts`): the property is the value's
+  component or null, and the sentence stays on the schema. `people.add`'s answer names a second copy of the person
+  (`Person_1`): inside `S.Result` the instant is written as plain text, so `Document.ts` keeps the copy that differs.
+

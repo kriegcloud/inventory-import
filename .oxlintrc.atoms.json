@@ -1,0 +1,45 @@
+{
+  // Benjamin's rule (goals/atoms, decision "atoms A1"): "Also no react hooks where effect/reactivity +
+  // @effect/react-atom should can be used." and "useEffect banned with no exceptions." A web package extends this once
+  // its state has moved to atoms; at the end every package does, the vendored kit (packages/ui/src/components,
+  // packages/ui/src/hooks) excepted. What stays: the hooks of @effect/atom-react, useRef for a DOM node only (not
+  // checkable here; `rg useRef` in the PLAN), useId, useDeferredValue and useTransition. A namespace import of react is
+  // refused too, and so is the default import, so React.useEffect cannot be reached through either.
+  "$schema": "./node_modules/@effect/tsgo/oxlint-schema.json",
+  "rules": {
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          {
+            "name": "react",
+            "importNames": ["useEffect", "useLayoutEffect", "useInsertionEffect"],
+            "message": "No effects, with no exception: an atom subscribes (get.addFinalizer cleans up), a ref callback measures or focuses, useAtomSubscribe follows a value (goals/atoms)."
+          },
+          {
+            "name": "react",
+            "importNames": [
+              "useState",
+              "useReducer",
+              "useMemo",
+              "useCallback",
+              "useContext",
+              "useSyncExternalStore",
+              "useImperativeHandle"
+            ],
+            "message": "State lives in atoms: Atom.make for a value, Atom.readable or Atom.map for a derived one, the registry for what a provider held; read it with useAtomValue (goals/atoms)."
+          },
+          {
+            "name": "react",
+            "importNames": ["default"],
+            "message": "Import from react by name: through a default import, React.useEffect would get past this rule (goals/atoms)."
+          },
+          {
+            "name": "@tanstack/react-query",
+            "message": "Server state is an atom: makeApiAtoms(tag).query for a read, .write for a write, optimisticWrite for one the screen shows at once (@inventory/client)."
+          }
+        ]
+      }
+    ]
+  }
+}

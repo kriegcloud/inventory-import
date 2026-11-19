@@ -182,7 +182,7 @@ unique `label`, the file's column `letter`), `rows` (each with `rowNumber` as Ex
 (CSV delimiter and encoding, or every sheet and which one was chosen and why) and `notes`: what was skipped or needs a
 look, as sentences to show. A file that cannot be read is a `FileProblem`, data and not an error: its `kind`, `problem`
 (what is wrong, naming the file) and `todo` (what to do), shown as they are under `fileProblemTitles[kind]`. Cases
-and tests: `test/web/readSpreadsheet.test.ts`.
+and tests: `packages/catalog/web/test/readSpreadsheet.test.ts`.
 
 ```tsx
 const upload = useUpload()
@@ -203,7 +203,7 @@ upload.start(file)                       // returns at once; upload.state: Readi
   `blob:` Workers for sheets over 512 KiB, which the policy blocks, and the read never finishes; it also empties error
   cells.
 - **Progress.** A CSV is parsed in pieces of 256 KiB (`Csv.parseBytesInPiecesResult`), giving the same rows, Notes and
-  delimiter as parsing it at once (`test/web/csvDifferential.test.ts`, every piece size from 5 characters), with a row
+  delimiter as parsing it at once (`packages/catalog/web/test/csvDifferential.test.ts`, every piece size from 5 characters), with a row
   estimate from how much text is read; a workbook says "Opening the file" while SheetJS opens it, then counts its rows
   exactly.
 - **Limits.** CSV 10 MB, .xlsx 3 MB (about 70,000 rows; 50,000 rows read in 0.7 s). `.xls`, `.xlsb`, `.ods`,
@@ -334,7 +334,7 @@ and its foreign keys, so a new table joins it without editing a list. The actor 
 - **SQL**: on a real D1 database with the real migrations, `TestApp` or `TestDatabase` from
   `test/server/support/app.ts`. These start workerd, so the file is `*.slow.test.ts`.
 - **A pure rule with many inputs**: a property test, `it.prop(name, [Schema, ...], ([a, ...]) => ...)`, inputs generated
-  from the Schema itself (`test/domain/ItemSearch.test.ts`, `TableView.test.ts`). Raise `size` until the generator
+  from the Schema itself (`packages/catalog/model/test/ItemSearch.test.ts`, `TableView.test.ts`). Raise `size` until the generator
   reaches the rule's limits.
 - **Anything timed** (retries, timeouts, polling): the `TestClock`, never real waiting. Fork the work, then move the
   clock; `settle` in `test/server/Ai.test.ts` does it for work that also waits on a promise.

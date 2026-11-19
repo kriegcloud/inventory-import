@@ -4,7 +4,7 @@ title: Ideal architecture
 description: What inventory-import becomes as a model-first Turborepo of deep packages, shipped with Alchemy.
 status: active
 stage: shape
-next: goals ui-packages, then contexts, are being built
+next: step 8, `@beep/xlsx`; goals ui-packages and contexts are built
 goals: [workspace-and-strictness, beep-csv, kernel-drivers, ui-packages, contexts]
 ---
 
@@ -81,6 +81,10 @@ Each step ends with the full check and an import of the messy sample in a browse
 
 ## Trail
 
+- 2026-11-18: goal `contexts` built: `access` and `catalog` each as `contract`, `model`, `host` and `web`, with
+  `@inventory/client` between the screens and the API; the app composes them. Its PLAN's closing note says what
+  still differs from the brief, and what `@beep/xlsx` and `@beep/infra` should know.
+- 2026-11-18: goal `ui-packages` built: `@inventory/ui` and `@inventory/review`.
 - 2026-11-18: goals `ui-packages` and `contexts` opened after "the brief matches" for both.
 - 2026-11-18: BRIEF-ui-packages.md and BRIEF-contexts.md written for the goals `ui-packages` (step 6) and
   `contexts` (step 7); awaiting "the brief matches".

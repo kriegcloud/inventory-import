@@ -2,7 +2,7 @@
 type: Goal
 title: "Contexts"
 description: The app's product code is cut into the bounded contexts access and catalog, each as contract, model, host and web packages, with @inventory/client shared by the two web packages and the HTTP contract brought to the schema rules on the way.
-status: active
+status: done
 from: explorations/ideal-architecture
 ---
 
@@ -42,11 +42,13 @@ change to the import's rules or counts; no third context; drivers and the vendor
 - [x] `access-contract`, `access-model`, `access-host`, `access-web`, each with its proof from the brief. Proof:
   commits `1136292`, `c9a4c67`, `f2ce1e3`, `c31b00a`; 16, 11 and 3 tests in the first three; `check:full` 53 of 53
   tasks after the last; PLAN's "Choices made" has what was read on screen after each.
-- [ ] `catalog-contract`, `catalog-model`, `catalog-host`, `catalog-web`, each with its proof from the brief.
-  **Partly.** The four packages exist and the app runs on them (commits `f73b665`, `673618e`, `4e15f64`, `01954e9`;
-  40 and 25 tests in the first two; `check:full` 64 of 64 tasks). Not built: the ports' in-memory twins and the
-  tests over them (decision (C6)), `ConfirmPlan`, the `Answerer` and `ModelAllowance` ports, and the rest of
-  PLAN's closing note, "What is owed".
+- [x] `catalog-contract`, `catalog-model`, `catalog-host`, `catalog-web`, each with its proof from the brief. Proof:
+  contract: the property test over 28 schemas and `StoredBytes.test.ts` (captured stored JSON keeps its bytes);
+  model: `confirmPlan`'s property, the endpoints over the in-memory twins (a second confirm `AlreadyImported`, a
+  take-back pressed twice writing once, a used-up allowance asking no model), `Ports.test.ts`; host: `Rows.test.ts`
+  and the app's slow tests on D1, with `ImportsTwin.test.ts` holding the twins to D1's numbers; web: the moved
+  tests (94) and a clean `lint:shadcn`. Where a package still differs from the brief is listed in PLAN's closing
+  note, "What is still not as the brief has it".
 - [x] Every wire change in the brief's two tables made, and no other. Proof: PLAN's "Choices made" has one entry
   per row of the catalog's table (timestamps, `Option`, `Stocking`, `RowOutcome`, `ColumnMatch`, `Suggestion`,
   `Change`, `RowDecision`'s flags unchanged, `ViewAnswer`, `UploadDiscard`, the 204, the 400 for `ItemInvalid`,
@@ -60,10 +62,11 @@ change to the import's rules or counts; no third context; drivers and the vendor
   editor and changed to viewer; Dana's demotion was refused ("Dana Whitfield is the only admin of Example Works
   (test). Make someone else an admin first.") and the select went back to admin; Sam was removed (204); Activity,
   Events listed "Removed a person", "Changed a role", "Added a person" above "Imported items" and "Uploaded a file".
-- [ ] Browser after `catalog`: the full import with a decision made, undone and redone, a refresh mid-review, Confirm, result, take-back, Items (search, filter, editor), the table assistant with the model and by rules, the same at phone width.
-  **Partly.** At desk width all of it was read (PLAN, "`catalog-web`"). At phone width: the import through Confirm,
-  Items as cards, and the assistant by rules. Not seen at phone width: a decision undone and redone, the editor, a
-  take-back, the assistant with the model.
+- [x] Browser after `catalog`: the full import with a decision made, undone and redone, a refresh mid-review, Confirm, result, take-back, Items (search, filter, editor), the table assistant with the model and by rules, the same at phone width.
+  Proof: PLAN, "`catalog-web`" (desk width, and by rules at phone width) and "What was owed, as it was paid", item 5
+  (phone width: a decision undone and redone, the editor, a take-back, the assistant with the model; a suggested
+  column; Cancel during an upload). One thing asked for could not be shown and is said there: the editor never
+  shows a 400.
 
 ## Decisions
 

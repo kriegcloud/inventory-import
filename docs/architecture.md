@@ -214,7 +214,7 @@ force. Reopening puts it back in Review, where rows an earlier confirm created c
 
 ## 4. How the parts depend on each other
 
-From the imports in `src/`, `packages/access/host/src/AllowanceStore.adapter.ts`, `packages/catalog/host/src/TableAssistant.adapter.ts` and the two callers of `review`
+From the imports in `src/`, `packages/access/host/src/AllowanceStore.adapter.ts`, `packages/catalog/model/src/Assistant/Assistant.handler.ts` and the two callers of `review`
 (`packages/catalog/web/src/ReviewStep.screen.tsx`, `packages/catalog/model/src/Import/Imports.handler.ts`).
 
 ```mermaid

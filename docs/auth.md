@@ -118,7 +118,7 @@ An agent (a model's tool loop, or rules) runs on the server inside `asAgent(Agen
 - It is named: every activity line written inside a run carries `agent` beside the person (`activity.agent` in
   `migrations/0001_init.sql`); the Activity page shows the agent beside the person's name.
 
-The table assistant is the example (`packages/catalog/host/src/TableAssistant.adapter.ts`): it runs as "Table assistant", at most a viewer,
+The table assistant is the example (`packages/catalog/model/src/Assistant/Assistant.handler.ts`): it runs as "Table assistant", at most a viewer,
 because it changes only the person's view; a model's answer writes one audit line, "Asked for a view", naming the
 agent beside the person, and an answer from the rules writes nothing. Tests: `test/server/Agent.test.ts` (both caps)
 and `test/server/Assistant.slow.test.ts`. An agent outside this Worker (a separate process calling the API with its own

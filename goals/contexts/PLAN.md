@@ -502,6 +502,51 @@ None.
   (packages/catalog/web/src) and no `@source` line in apps/inventory/src/web/index.css: add @source ...", and with
   the `screenPackages` entry taken out with "... is not in `screenPackages` ... the production stylesheet would lack
   its classes"; both put back, "check-screens OK  4 packages with screens, each in both lists".
+- **5. What had not been seen on screen.** Fresh database, dev server on 5200, the model on.
+  - Phone width (390 by 844), no sideways scroll on any of these screens. The messy sample read "Import 155, skip
+    45". "Leave out 2" on the first decision (two costs written "35,82" and "30,46") left the button as it was,
+    since those rows were not ready before either, and the confirm asked "Import 155 items? 45 items won't be
+    imported (Needs a decision 22, Cannot import 21, Left out 2)"; confirmed: "Not imported 45 · Imported 155".
+    **The editor:** on Brass Washer M6 the Unit cost box read "26.99"; typed "12.50", Save (in view, at the foot of
+    the sheet): toast "Saved AAT-7076", the card reads "Unit cost $12.50". **The assistant with the model:** typed
+    "only kilograms, cheapest first", Send: "Answered by anthropic/claude-haiku-5.5", "Filtered: UoM is KG",
+    "Sorted by Unit cost, low to high", "20 of 155 items", first card Nylon Tube 1in $10.71. **A decision undone
+    and redone:** "Fix 45 not imported" opened the review at "Needs a decision 22 · Cannot import 21 · Ready 0 ·
+    Left out 2 · Already there 155 · All 200", "No items ready yet", "Decision 1 of 19, Number, 2 rows, 1,200
+    becomes 1200"; pressed "Use 1200 for 2": "Needs a decision 20 · Ready 2", "Import 2, skip 198", "Decision 2 of
+    19"; Undo: 22 and 0 again, "No items ready yet", back on decision 1; Redo: 20 and 2, "Import 2, skip 198".
+    Confirmed: "Not imported 43 · Imported 157". **A take-back:** "Take back this import? This removes the 156
+    items that items_messy.csv created. It keeps the item someone changed since: AAT-7076 Brass Washer M6, changed
+    by Dana Whitfield on Nov 18, 11:06 PM ...", its button in view; pressed: "Taken back 156 · Not imported 43 ·
+    Imported 1", Items "1 item", Brass Washer M6 at $12.50.
+  - **A suggested column** (desk width). The messy sample with its heading "Reorder Pt" renamed "Min level", chosen
+    as a file: "“Min level” is not imported (89 rows have a value)". "Suggest fixes": "Suggested 2 names. Suggested
+    2 categories. Suggested 1 column. Answered by the model anthropic/claude-haiku-5.5."; the suggestion as
+    answered: `column`, `reorderPoint`, column 1, heading "Min level", confidence low, "No heading matched Reorder
+    point; "Min level" has a value on 89 of 200 rows, such as 425, 51, 423." The button "Use column “Min level” for
+    Reorder point" appeared; pressed: the match answered 200 with `{"how":"person","field":"reorderPoint",
+    "column":{"index":1,"header":"Min level",...}}`, the "is not imported" line for it went, and so did the button.
+    The clean sample with the same rename offers no "Suggest fixes" at all: the button shows only when a row cannot
+    be imported.
+  - **Cancel during an upload.** A CSV of 40,000 rows made for the pass, chosen as a file: "Reading 2,039 of about
+    40,795 rows", then "Reading 40,001 of 40,001 rows" (a count, so no "about"), then "Saving 1,000 of 40,000
+    rows"; pressed Cancel: the progress and the Cancel button went, the upload page came back, and the list of
+    open imports had 3 before and 3 after. Sent: `POST /imports/uploads`, `PUT .../chunks/N`, then
+    `DELETE /imports/uploads/<id>`.
+  - **The editor showing a 400: it cannot be reached from the screen, and what happens instead is worse than a
+    400.** The form checks the name, the cost, the counts and the days itself. The one value it lets through that
+    the schema refuses is a description over 32,767 characters: typed 33,000 characters in Description, Save. **No
+    request was sent**: the browser's client encodes the edit through the same schema and fails there. The sheet
+    closed, the row stayed as it was, and a toast read "Something went wrong. Brass Washer M6 was not saved. Try
+    again, and reload the page if it keeps happening." with "Edit again". Two things for Benjamin, not changed
+    here: the sentence tells the person to try again, which cannot help; and "Edit again" on that toast opened
+    nothing when pressed (no sheet, read 1.5 s after). Neither is new with these moves as far as the code says
+    (the editor moved as it was), but I did not run the old commit to prove it.
+- **Two proofs the brief asks for, added with this pass.** `StoredBytes.test.ts` in the contract: a decision, the
+  column choices, a file's head and a staged row, each as the local database held it after the pass above, decode
+  and encode back to the same text; stocking is what the two stored columns say and says them back.
+  `Rows.test.ts` in the host: the `item` row the database held reads into its item (the cost's digits, the tags,
+  the stocking), and the same row as a discontinued or an inactive item is stored reads into that.
 
 ## Closing note
 
@@ -509,26 +554,22 @@ None.
 `contract`, `model`, `host` and `web`; `@inventory/client` between the screens and the API; `check-boundaries.mjs`
 in the root check holding which may import which (21 workspaces). The app's `src/domain` is gone; its `src/server`
 holds composition, settings and telemetry; its `src/web` holds the shell, the Activity page and the gallery.
-`check:full` runs 64 tasks. Tests: the app 155 (fast and slow), `catalog-contract` 40, `catalog-model` 25, the
-access packages 30 as before. Stage C findings: app 38, `catalog-web` 254, review 283, ui 52, client 22,
-`access-web` 17: 666 of the cap's 678.
+`check:full` runs 66 tasks. Tests are counted in the final report of each turn. Stage C findings: app 38,
+`catalog-web` 254, review 283, ui 52, client 22, `access-web` 17: 666 of the cap's 678.
 
-**What is owed** (each is in the brief or a recorded decision, and is not built):
+**What was owed when this note was first written is paid**, item by item, under "What was owed, as it was paid"
+above. **What is still not as the brief has it:**
 
-1. The in-memory twins of the catalog's four ports and `CatalogTest.memory` (decision (C6)), and with them tests of
-   the endpoints over twins. The catalog's server tests still run in the app, on D1.
-2. `ConfirmPlan` in place of the `CommitRow` type; `handlersOf` for the catalog; the storage-only ports
-   `SuggestionStore` and `AssistantLog`; the `Answerer` and `ModelAllowance` ports with `ModelAllowanceViaAccess`
-   (decision (C4)): suggestions and the table assistant sit whole in the host and take from the access gateway.
-3. The model's `Review.rules.ts` as four files; the cell readers and `ItemSearch` out of the contract;
-   `ViewChange` split into `show` and `hide`; `UploadState` in `catalog-web` with `RowEstimate`; the assistant's
-   conversation with `Option`s; identity-composer identifiers for the catalog's schemas.
-4. `ImportDecisions.screen.tsx` out of the app's Activity page; the web tests in `catalog-web`.
-5. One `internal/auditLine.ts` per host for the guarded audit insert.
+1. The import store's methods other than the two writes keep today's arguments (the brief names `UploadBegin`,
+   `Owner`, `DecideWrite`, `ChoicesWrite`, `RemoveWrite`, `SkuKey`), and `ItemStore.edit` answers by `_tag`.
+2. The assistant's conversation still stores `null`s; the catalog's schemas keep their plain identifiers, not an
+   identity composer's.
+3. `ItemImport` and `ReviewRules` are tested in `catalog-web`, not the model: they stage through the screens' reader.
+4. `ModelAllowanceViaAccess` hands on the access contract's short words for a used-up allowance, to keep the
+   sentence the person reads as it was.
 
-**Not seen on screen**, in either turn: a suggested column; Cancel during an upload; the editor showing a 400; a
-typed value in Activity's Decisions; a member's own People list after signing up; at phone width, the review's
-decisions, the editor and a take-back.
+**Not seen on screen**: a typed value in Activity's Decisions; a member's own People list after signing up; an
+editor's 400, which the screen cannot produce (item 5 above says what it does instead).
 
 **What `@beep/xlsx` should know.**
 
@@ -545,8 +586,8 @@ decisions, the editor and a take-back.
   belongs to the family `@beep/csv` is in.
 - Nothing with a class crosses the worker: an `Option` or a `DateTime` arrives as a plain object. The reader hands
   the head over as plain fields (`PlainHead`, `internal/protocol.ts`) and the page rebuilds it.
-- Its tests are `readSpreadsheet.test.ts`, `readInPieces.test.ts` and `csvDifferential.test.ts` in the app's
-  `test/web`, with the app's sample files.
+- Its tests are `readSpreadsheet.test.ts`, `readInPieces.test.ts` and `csvDifferential.test.ts` in
+  `packages/catalog/web/test`, with their fixtures and copies of the sample files beside them.
 
 **What `@beep/infra` should know.**
 

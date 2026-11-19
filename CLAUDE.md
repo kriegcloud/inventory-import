@@ -60,8 +60,8 @@ sign-in secret into `.dev.vars` the first time).
   there", counted from the stored SKU keys.
 - **The Items page** (`packages/catalog/web/src/ItemsPage.screen.tsx`): the data table paged, sorted and filtered by the server
   (`packages/catalog/host/src/ItemStore.adapter.ts`), one search box that finds every word in any order and forgives one wrong letter (a
-  full-text index in the migration, `packages/catalog/contract/src/Item/ItemSearch.read.ts`), the table assistant (a request in words becomes a
-  checked change to the view: `packages/catalog/web/src/TableAssistant.screen.tsx`, `packages/catalog/host/src/TableAssistant.adapter.ts`), and an
+  full-text index in the migration, `packages/catalog/model/src/Item/ItemSearch.rules.ts`), the table assistant (a request in words becomes a
+  checked change to the view: `packages/catalog/web/src/TableAssistant.screen.tsx`, `packages/catalog/model/src/Assistant/Assistant.handler.ts`), and an
   editor for one item (`ItemEditor.screen.tsx`, editors and admins). With no key the assistant's fixed rules answer and
   it says so.
 - **Activity** (`src/web/pages/ActivityPage.tsx`): every value an import wrote that differs from its file, who decided
@@ -297,9 +297,10 @@ packages/access/         The access context (who may do what), as four packages:
 packages/catalog/        The catalog context (items and the imports that write them), as four packages: contract/ (the
                         schemas of items, staged files, decisions, changes, suggestions and results, and the imports,
                         items and assistant groups), model/ (the pure rules the screen and the server both run: the
-                        review, suggestions, the table view's checks, sheet layout, upload pieces; the four ports and
-                        what each endpoint does: no SQL, no HTTP), host/ (the D1 adapters, the two features that ask a
-                        model) and web/ (the import's steps, the Items page, the editor, the assistant, the upload).
+                        review, suggestions, the table view's checks, sheet layout, upload pieces; the six ports, their
+                        in-memory twins and what each endpoint does: no SQL, no HTTP), host/ (the D1 adapters, the model
+                        and the allowance as the catalog asks them) and web/ (the import's steps, the Items page, the
+                        editor, the assistant, the upload).
 packages/kernel/, packages/drivers/   @inventory/kernel and the @beep drivers (d1, better-auth, openrouter).
 packages/foundation/     Product-neutral packages. Today only beep-effect's kit, vendored: @beep/types (primitive/),
                         @beep/identity, @beep/schema and @beep/utils (modeling/). Never edit them: each vendor.json
@@ -515,7 +516,7 @@ to `AI_MODEL` in `wrangler.jsonc`, and `AI_MODEL` in `.dev.vars` can override it
 feature with `answeredByRules(...)` and show `answeredBy` on screen. **Every model call takes one call from the day's
 allowance first** (`ModelAllowanceGateway.take(purpose)` from `@inventory/access-contract/ModelAllowance`, before the
 call): a new model feature adds its purpose there (`ModelCallPurpose`) and in the `modelCall` table's check, and when the allowance is used up it says so and its rules
-answer, as the table assistant does (`packages/catalog/host/src/TableAssistant.adapter.ts`).
+answer, as the table assistant does (`packages/catalog/model/src/Assistant/Assistant.handler.ts`).
 
 ## UI
 

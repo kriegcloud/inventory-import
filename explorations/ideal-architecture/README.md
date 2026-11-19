@@ -84,6 +84,8 @@ Each step ends with the full check and an import of the messy sample in a browse
 
 ## Trail
 
+- 2026-11-19: BRIEF-atoms.md written after Benjamin's rule "useEffect banned with no exceptions"; the decision
+  "client state" is reversed; nothing built.
 - 2026-11-19: BRIEF-infra.md written for the goal `infra` (step 9); nothing built or deployed; awaiting "the brief
   matches" and nine decisions.
 - 2026-11-19: goal `beep-xlsx` done: the app reads workbooks through `@beep/xlsx`; the SheetJS reader removed, and

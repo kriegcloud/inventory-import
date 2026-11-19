@@ -74,7 +74,7 @@ Question: what is cleared before the workspace move? Answer: the timed-build too
 and documents are removed, and every placeholder name becomes `inventory`, the sign-in cookie included. Rationale:
 nothing is deployed, so nobody is signed out. Reverse: git history.
 
-### 2026-11-18 — client state
+### 2026-11-18 — client state (superseded 2026-11-19 by "client state, reversed")
 
 Question: atoms or TanStack Query? Answer: TanStack Query for the rebuild; atoms later as their own goal. Rationale:
 undo per change, invalidate-after-last-write and keep-previous-data paging have no atom equivalent yet. Reverse: a
@@ -357,3 +357,12 @@ unreadable cell moved to Needs a decision), and "Leave behind Activity". Reverse
 Question: what follows `beep-xlsx`? Answer: "Write the infra brief (Recommended)":
 [BRIEF-infra.md](BRIEF-infra.md) for step 9, written only; nothing built or deployed, no goal opened. Rejected:
 clearing the open schema decisions first; stopping. Reverse: none needed, the brief changes nothing.
+
+### 2026-11-19 — client state, reversed
+
+Mine, in my words: "Also no react hooks where effect/reactivity + @effect/react-atom should can be used." and
+"useEffect banned with no exceptions." (The package is published as `@effect/atom-react`.) This supersedes "client
+state" of 2026-11-18, which kept TanStack Query for the rebuild and left atoms for later. What it means file by
+file, the exact line of what stays a hook, and the five questions it leaves are in
+[BRIEF-atoms.md](BRIEF-atoms.md); nothing is built, and the goal starts after the Effect-imports migration is merged.
+Reverse: none planned.

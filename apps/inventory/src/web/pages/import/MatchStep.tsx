@@ -16,7 +16,8 @@ import {
   type Field,
   fieldLabels,
   requiredFields,
-  type StagedTable
+  type StagedTable,
+  matchedColumn
 } from "../../../domain/ItemImport.ts"
 import { toastError } from "@inventory/client/SayError"
 import { notImportedColumn } from "./format.tsx"
@@ -70,7 +71,7 @@ export function MatchStep(props: { view: ImportView; table: StagedTable; canImpo
         <NativeSelect
           size="sm"
           aria-label={`File column for ${fieldLabels[entry.field]}`}
-          value={entry.column === null ? "" : `${entry.column}`}
+          value={Option.match(matchedColumn(entry), { onNone: () => "", onSome: (column) => `${column.index}` })}
           disabled={!props.canImport || match.isPending}
           onChange={(event) =>
             match.mutate({ field: entry.field, column: event.target.value === "" ? null : Number(event.target.value) })
@@ -89,13 +90,16 @@ export function MatchStep(props: { view: ImportView; table: StagedTable; canImpo
     {
       id: "examples",
       label: "Examples",
-      cell: ({ match: entry }) => (entry.examples.length === 0 ? <NotSet /> : entry.examples.join(" · "))
+      cell: ({ match: entry }) => {
+        const examples = Option.match(matchedColumn(entry), { onNone: () => [], onSome: (column) => column.examples })
+        return examples.length === 0 ? <NotSet /> : examples.join(" · ")
+      }
     }
   ]
 
-  const matched = view.mapping.filter((entry) => entry.column !== null).length
+  const matched = view.mapping.filter((entry) => Option.isSome(matchedColumn(entry))).length
   const missing = view.mapping
-    .filter((entry) => entry.column === null && requiredFields.includes(entry.field))
+    .filter((entry) => Option.isNone(matchedColumn(entry)) && requiredFields.includes(entry.field))
     .map((entry) => fieldLabels[entry.field])
   const names =
     missing.length < 2 ? (missing[0] ?? "") : `${missing.slice(0, -1).join(", ")} and ${missing[missing.length - 1]}`

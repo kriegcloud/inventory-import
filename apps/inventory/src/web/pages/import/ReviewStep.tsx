@@ -27,7 +27,8 @@ import {
   rowId,
   ruleFixes,
   type SavedDecisions,
-  type StagedTable
+  type StagedTable,
+  matchedColumn
 } from "../../../domain/ItemImport.ts"
 import { WhyFlagged } from "./WhyFlagged.tsx"
 import { DimensionsForm, VendorsForm } from "./CellForms.tsx"
@@ -286,7 +287,7 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
     (suggestion) =>
       suggestion.kind === "column" &&
       suggestion.column !== null &&
-      current.mapping.some((matched) => matched.field === suggestion.field && matched.header === null)
+      current.mapping.some((matched) => matched.field === suggestion.field && Option.isNone(matchedColumn(matched)))
   )
   const answered =
     suggested === undefined

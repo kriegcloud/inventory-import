@@ -6,7 +6,13 @@ import { Array as Arr, Effect, Option } from "effect"
 import clean from "../../public/samples/items_clean.csv?raw"
 import messy from "../../public/samples/items_messy.csv?raw"
 import type { ItemFields } from "../../src/domain/Item.ts"
-import { type Review, review, type SavedDecisions, type StagedTable } from "../../src/domain/ItemImport.ts"
+import {
+  matchedColumn,
+  type Review,
+  review,
+  type SavedDecisions,
+  type StagedTable
+} from "../../src/domain/ItemImport.ts"
 import { stage } from "../server/support/files.ts"
 
 const reviewOf = (table: StagedTable, decisions: SavedDecisions = {}, storedItems: ReadonlyArray<ItemFields> = []) =>
@@ -95,7 +101,7 @@ describe("items_messy.csv", () => {
       expect(head(56)?.proposal?.labels).toEqual(["Ridgeline Metals preferred", "Acme Industrial preferred"])
       // "Internal Notes" is no field: it is reported with how many rows hold a value, and read by nothing.
       expect(result.unusedColumns).toEqual([{ index: 15, letter: "P", label: "Internal Notes", filled: 20 }])
-      expect(Arr.every(result.mapping, (match) => match.column !== null)).toBe(true)
+      expect(Arr.every(result.mapping, (match) => Option.isSome(matchedColumn(match)))).toBe(true)
     })
   )
 

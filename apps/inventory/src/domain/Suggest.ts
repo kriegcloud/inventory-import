@@ -18,7 +18,8 @@ import {
   type ReviewedRow,
   type StagedTable,
   type Suggestion,
-  suggestionFits
+  suggestionFits,
+  matchedColumn
 } from "./ItemImport.ts"
 
 /** The most rows of one kind a single request asks about; the rest wait for the next press. */
@@ -81,7 +82,8 @@ export const digest = (source: SuggestSource) => {
   const unmatched = Arr.filter(
     source.review.mapping,
     (match) =>
-      match.column === null && !Arr.some(source.suggestions, (s) => s.kind === "column" && s.field === match.field)
+      Option.isNone(matchedColumn(match)) &&
+      !Arr.some(source.suggestions, (s) => s.kind === "column" && s.field === match.field)
   )
   return {
     rowsWithoutName: Arr.map(Arr.take(nameless, suggestCap), (row) => ({

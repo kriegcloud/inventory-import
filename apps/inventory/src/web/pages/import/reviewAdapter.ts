@@ -2,6 +2,7 @@
 // holds no rules. The one thing a reader must not break: a row's `problem` is always the first thing still open
 // *given the decisions so far*, because the region re-checks a row only after the person types, not after they
 // accept a fix.
+import { Option } from "effect"
 import type {
   Choice,
   Fix,
@@ -25,7 +26,8 @@ import {
   rowPlace,
   type SavedDecisions,
   type StagedColumn,
-  type StagedTable
+  type StagedTable,
+  matchedColumn
 } from "../../../domain/ItemImport.ts"
 import { costText, countText, dimensionsCellText, tagsCellText, vendorsCellText } from "./itemText.ts"
 
@@ -289,12 +291,13 @@ const itemColumns = (
 ): ReadonlyArray<ReviewColumn> =>
   order.map((field) => {
     const match = mapping.find((candidate) => candidate.field === field)
-    const missing = match !== undefined && match.header === null && requiredFields.includes(field) && unused.length > 0
+    const column = match === undefined ? Option.none() : matchedColumn(match)
+    const missing = match !== undefined && Option.isNone(column) && requiredFields.includes(field) && unused.length > 0
     return {
       id: field,
       label: fieldLabels[field],
       ...layout[field],
-      ...(match === undefined || match.header === null
+      ...(Option.isNone(column)
         ? missing
           ? {
               match: {
@@ -306,9 +309,9 @@ const itemColumns = (
         : {
             match: {
               state: "matched" as const,
-              source: match.header,
+              source: column.value.header,
               by: "name" as const,
-              samples: match.examples
+              samples: column.value.examples
             }
           })
     }

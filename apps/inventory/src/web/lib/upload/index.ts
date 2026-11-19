@@ -25,7 +25,13 @@ import { toast } from "sonner"
 import type { ImportView } from "../../../api/v1/Api.ts"
 import { apiPrefix } from "../../../api/v1/Version.ts"
 import { FileProblem } from "../../../domain/FileProblem.ts"
-import { requiredFields, type StagedHead, type StagedRow, type StagedTable } from "../../../domain/ItemImport.ts"
+import {
+  matchedColumn,
+  requiredFields,
+  type StagedHead,
+  type StagedRow,
+  type StagedTable
+} from "../../../domain/ItemImport.ts"
 import type { SheetChoice, SheetSummary } from "../../../domain/Spreadsheet.ts"
 import { savedRows, type UploadState } from "../../../domain/Upload.ts"
 import { type Client, fork, runExit } from "../api.ts"
@@ -225,7 +231,9 @@ const arrive = (queryClient: QueryClient, file: File, done: Finished) => {
   void queryClient.invalidateQueries({ queryKey: queryKeys.activity })
   if (workbook !== null) rememberWorkbook(view.id, { file, sheets: workbook.sheets, chosen: workbook.chosen })
   // Straight to the review when every required field found its column by heading; to Match when one did not.
-  const unmatched = view.mapping.some((entry) => entry.column === null && requiredFields.includes(entry.field))
+  const unmatched = view.mapping.some(
+    (entry) => Option.isNone(matchedColumn(entry)) && requiredFields.includes(entry.field)
+  )
   const next = importAddress(view.id, unmatched ? "match" : "review")
   if (window.location.pathname === "/") navigate(next)
   else toast(`${view.fileName} is ready to review`, { action: { label: "Open", onClick: () => navigate(next) } })

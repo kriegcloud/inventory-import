@@ -172,4 +172,18 @@ None.
     (Dana Whitfield)" and "Oak Cutting Oil ... SKU YDR-8742 is also on row 10 with different values. Keep one row,
     or leave one out." with no name; an imported row has no reason. "Download 43 not imported" made 44 records
     (heading and 43), last columns "Row" and "Why it was not imported", no empty reason.
+- **catalog (e), `ColumnMatch`.** A field's match is one of `heading { field, column }`, `person { field, column }`
+  or `none { field }` by `how`, and a column is a `ColumnPick { index, header, examples }`; `matchedColumn(match)`
+  answers the column whatever settled it, and every reader uses it. Not stored, so nothing to map.
+  - **A person's "None" still reads as not matched**, as before: `matchColumns` has always given `how: "none"` to a
+    field a person pointed at no column. The union allows `person` with no column; the picker does not make one.
+  - `S.annotate` in a pipe after `S.toTaggedUnion` loses the union's `match` in its type (the kernel's
+    `$I.annoteSchema` keeps it); `matchedColumn` is written on `how` for that reason. Solved for good when these
+    schemas get their `$I` in `catalog-contract`.
+  - Read on screen (items_clean.csv, step Match): "items_clean.csv · 15 of 15 fields matched"; "SKU Required | A:
+    sku | By its heading | SHH-9574 · GZN-1338 · NMN-3238". Chose None for Description: "Description | None | Not
+    matched | Not set", the line "14 of 15 fields matched", the answer `{"how":"none","field":"description"}`. Chose
+    "A: sku": "By a person" with that column's examples, the answer `{"how":"person","field":"description",
+    "column":{"index":0,"header":"sku","examples":[...]}}`. Then, fresh database, the messy sample through Confirm:
+    the three numbers.
 

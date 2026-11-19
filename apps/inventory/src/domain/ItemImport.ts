@@ -9,7 +9,8 @@
  *
  * Each rule is one kind of problem (`problemKinds`), one check (`fault`) and at most one proposal (`proposeFor`).
  */
-import { Array as Arr, HashMap, HashSet, Option, Record as Rec, String as Str } from "effect"
+import { LiteralKit } from "@beep/schema/LiteralKit"
+import { Array as Arr, HashMap, HashSet, Option, Record as Rec, String as Str, Tuple } from "effect"
 import { type FileProblem, fileProblem } from "./FileProblem.ts"
 import {
   categories,
@@ -249,25 +250,71 @@ export const MappingChoice = S.Struct({
 /** The decoded value of `MappingChoice`: the column chosen for a field, or none. */
 export type MappingChoice = typeof MappingChoice.Type
 
-/** How one field is filled: from which file column, and how that was settled. */
-export const ColumnMatch = S.Struct({
-  field: Field,
-  column: S.NullOr(S.Int).annotateKey({
-    description: "The file column's position, from 0; null when no column fills the field"
-  }),
-  header: S.NullOr(S.String).annotateKey({ description: "That column's heading; null with no column" }),
-  how: S.Literals(["heading", "person", "none"]).annotateKey({
-    description: "Matched by its heading, chosen by a person, or not matched"
-  }),
-  examples: S.Array(S.String).annotateKey({
-    description: "A few values from that column, to check the match by eye"
-  })
-}).annotate({
-  identifier: "ColumnMatch",
-  description: "How one field is filled: from which file column, and how that was settled"
+/** A file column that fills a field: where it is, what it is headed, and a few of its values. */
+export const ColumnPick = S.Struct({
+  index: S.Int.check(S.isGreaterThanOrEqualTo(0)).pipe(
+    S.annotateKey({ description: "The file column's position, from 0" })
+  ),
+  header: S.String.pipe(S.annotateKey({ description: "That column's heading" })),
+  examples: S.Array(S.String)
+    .check(S.isMaxLength(5))
+    .pipe(S.annotateKey({ description: "A few values from that column, to check the match by eye" }))
+}).annotate({ identifier: "ColumnPick", description: "A file column that fills a field" })
+/** The decoded value of `ColumnPick`. */
+export type ColumnPick = typeof ColumnPick.Type
+
+/** The three ways a field's column was settled. */
+export const MatchHow = LiteralKit(["heading", "person", "none"]).annotate({
+  identifier: "MatchHow",
+  description: "Matched by its heading, chosen by a person, or not matched"
 })
+
+class MatchedByHeading extends S.Opaque<MatchedByHeading, { readonly brand: unique symbol }>()(
+  S.Struct({ how: S.tag("heading"), field: Field, column: ColumnPick }).annotate({
+    identifier: "MatchedByHeading",
+    description: "The field is filled by the column whose heading names it"
+  })
+) {}
+
+class MatchedByPerson extends S.Opaque<MatchedByPerson, { readonly brand: unique symbol }>()(
+  S.Struct({
+    how: S.tag("person"),
+    field: Field,
+    column: ColumnPick.pipe(nullAsNone({ description: "The column the person chose; null for none, on purpose" }))
+  }).annotate({
+    identifier: "MatchedByPerson",
+    description: "A person chose the field's column, or chose that no column fills it"
+  })
+) {}
+
+class NotMatched extends S.Opaque<NotMatched, { readonly brand: unique symbol }>()(
+  S.Struct({ how: S.tag("none"), field: Field }).annotate({
+    identifier: "NotMatched",
+    description: "No heading names the field, and nobody has chosen a column for it"
+  })
+) {}
+
+/**
+ * How one field is filled, by how that was settled: by a heading (with its column), by a person (with the column
+ * they chose, or none on purpose), or not at all. `matchedColumn` answers the column whatever settled it.
+ */
+export const ColumnMatch = MatchHow.mapMembers(() => Tuple.make(MatchedByHeading, MatchedByPerson, NotMatched)).pipe(
+  S.toTaggedUnion("how"),
+  S.annotate({
+    identifier: "ColumnMatch",
+    description: "How one field is filled: from which file column, and how that was settled"
+  })
+)
 /** The decoded value of `ColumnMatch`: how one field is filled. */
 export type ColumnMatch = typeof ColumnMatch.Type
+
+/**
+ * The file column that fills the field, when one does, however it was settled.
+ *
+ * @example matchedColumn(match) // Option.some({ index: 3, header: "Unit", examples: ["EA", "BX"] })
+ */
+export const matchedColumn = (match: ColumnMatch): Option.Option<ColumnPick> =>
+  match.how === "heading" ? Option.some(match.column) : match.how === "person" ? match.column : Option.none()
 
 /** How sure a proposal's source is, in a word. Code sets it from the file's own rows. */
 export const Confidence = S.Literals(["high", "medium", "low"]).annotate({
@@ -776,19 +823,28 @@ export const matchColumns = (input: {
   )
   const totals = totalRowNumbers(table, skuColumn)
   const itemRows = Arr.filter(table.rows, (row) => !Arr.contains(totals, row.rowNumber))
-  return Arr.map(picked, ({ field, column, how }): ColumnMatch => {
-    if (Option.isNone(column)) return { field, column: null, header: null, how, examples: [] }
-    const index = column.value.index
-    const examples = Arr.take(
+  const pick = (column: StagedColumn): ColumnPick => ({
+    index: column.index,
+    header: column.label,
+    examples: Arr.take(
       Arr.dedupe(
         Arr.filter(
-          Arr.map(itemRows, (row) => Str.trim(shownText(row.cells[index]))),
+          Arr.map(itemRows, (row) => Str.trim(shownText(row.cells[column.index]))),
           (text) => text !== ""
         )
       ),
       3
     )
-    return { field, column: index, header: column.value.label, how, examples }
+  })
+  return Arr.map(picked, ({ field, column, how }): ColumnMatch => {
+    const found = Option.map(column, pick)
+    // A heading that named a column always has one; without it the field is simply not matched.
+    return how === "person"
+      ? MatchedByPerson.make({ field, column: found })
+      : Option.match(found, {
+          onNone: (): ColumnMatch => NotMatched.make({ field }),
+          onSome: (chosen): ColumnMatch => MatchedByHeading.make({ field, column: chosen })
+        })
   })
 }
 
@@ -1157,8 +1213,11 @@ const makeContext = (input: {
   const columnOf = (field: Field): number | null =>
     Option.getOrNull(
       Option.map(
-        Arr.findFirst(mapping, (match) => match.field === field),
-        (match) => match.column
+        Option.flatMap(
+          Arr.findFirst(mapping, (match) => match.field === field),
+          matchedColumn
+        ),
+        (column) => column.index
       )
     )
   const totalNumbers = totalRowNumbers(input.table, columnOf("sku"))
@@ -1211,7 +1270,7 @@ const makeContext = (input: {
       monthFirst: Arr.filter(readings, (r) => Option.isNone(r.dayFirst) && Option.isSome(r.monthFirst)).length
     }
   }
-  const used = keepSome(mapping, (match) => Option.fromNullishOr(match.column))
+  const used = keepSome(mapping, (match) => Option.map(matchedColumn(match), (column) => column.index))
   const stored = HashMap.fromIterable(Arr.map(input.storedItems, (item) => [skuKey(item), item] as const))
   return {
     mapping,
@@ -1567,7 +1626,7 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
   const lower = Str.toLowerCase(label)
   // What the edit button names: "SKU" keeps its capitals.
   const asked = field === "sku" ? label : lower
-  const hasColumn = Arr.some(ctx.mapping, (match) => match.field === field && match.column !== null)
+  const hasColumn = Arr.some(ctx.mapping, (match) => match.field === field && Option.isSome(matchedColumn(match)))
   const empty = Str.trim(text) === ""
   const required = Arr.contains(requiredFields, field)
   if (!hasColumn && required && empty) {

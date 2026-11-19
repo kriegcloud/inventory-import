@@ -1,4 +1,4 @@
-import { parse, stringify } from "../../lib/json.ts"
+import { parse, stringify } from "@/ui-kit/Json.codec"
 import { type Column, createColumnHelper, Subscribe } from "@tanstack/react-table"
 import {
   CheckIcon,
@@ -84,7 +84,7 @@ import {
   visible,
   waitingGroups
 } from "./logic.ts"
-import { useContentWidth } from "@/lib/content-width"
+import { useContentWidth } from "@/ui-kit/ContentWidth.hook"
 import { LayoutContext, useLayout } from "./parts.tsx"
 import {
   actionsFit,

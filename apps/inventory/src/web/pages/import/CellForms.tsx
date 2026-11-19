@@ -1,4 +1,4 @@
-import { stringify } from "../../lib/json.ts"
+import { stringify } from "@/ui-kit/Json.codec"
 // The two cells of an item that hold JSON, fixed in a small form instead of as raw text. The form writes the cell back
 // as the brief's own JSON; the one thing not to break: nothing is saved that the domain's readers (`readDimensions`,
 // `readVendors`) would refuse, and their sentence is what the person reads under the fields.

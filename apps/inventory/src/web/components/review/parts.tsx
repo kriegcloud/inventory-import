@@ -27,7 +27,7 @@ import { Button } from "@/components/ui/button"
 import { Field, FieldLabel } from "@/components/ui/field"
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
 import { Input } from "@/components/ui/input"
-import { narrowBelow, useContentBelow } from "@/lib/content-width"
+import { narrowBelow, useContentBelow } from "@/ui-kit/ContentWidth.hook"
 import {
   Popover,
   PopoverArrow,

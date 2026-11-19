@@ -2,11 +2,11 @@
 // The parsers keep nuqs's names and shapes, so data-table-config.ts and data-table-parsers.ts only change their
 // import line, and `config.parse(search)` still reads a query string for a server that wants one. The table state
 // lives in React state by default. Given `urlKeys` it lives in the address instead, as it does upstream, through
-// the app's own router (`@/lib/route`): a refresh, a copied link or the back button then land on the same page,
+// the app's own router (`@/ui-kit/Route.hook`): a refresh, a copied link or the back button then land on the same page,
 // order and filters, and a server-side table can read its query from the same address.
 import * as React from "react";
 
-import { navigate, useLocation } from "@/lib/route";
+import { navigate, useLocation } from "@/ui-kit/Route.hook";
 
 interface ParserBase<T> {
   readonly serialize: (value: T) => string | string[];

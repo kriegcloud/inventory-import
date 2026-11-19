@@ -11,7 +11,7 @@ import type { DataTableFeatures } from "@/components/ui/data-table/data-table-fe
 import { DataTablePagination } from "@/components/ui/data-table/data-table-pagination";
 import type { DataTableColumnConfig } from "@/components/ui/data-table/data-table-types";
 import { useDataTable } from "@/hooks/use-data-table";
-import { useContentWidth, useIsNarrow } from "@/lib/content-width";
+import { useContentWidth, useIsNarrow } from "@/ui-kit/ContentWidth.hook";
 
 /*
  * Local addition: a list of records the page already holds, as tablecn's data table. Every column can be sorted

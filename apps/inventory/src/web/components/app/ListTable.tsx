@@ -11,7 +11,7 @@ import { DataTablePagination } from "@/components/ui/data-table/data-table-pagin
 import { DataTableToolbar } from "@/components/ui/data-table/data-table-toolbar"
 import type { ColumnSelectOption, DataTableColumnConfig } from "@/components/ui/data-table/data-table-types"
 import { useDataTable } from "@/hooks/use-data-table"
-import { useContentWidth, useIsNarrow } from "@/lib/content-width"
+import { useContentWidth, useIsNarrow } from "@/ui-kit/ContentWidth.hook"
 
 // A list the page already holds whole (the activity, the people), on the same data table as the Items page: sortable
 // headings, the column toggle, the one search box and the quick filters. The Items page asks the server for each

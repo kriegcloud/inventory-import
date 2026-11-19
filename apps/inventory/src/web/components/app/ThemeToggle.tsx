@@ -1,5 +1,5 @@
 import { MoonIcon, SunIcon } from "lucide-react"
-import { useTheme } from "@/lib/theme"
+import { useTheme } from "@/ui-kit/Theme.provider"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 

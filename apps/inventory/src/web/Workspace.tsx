@@ -19,8 +19,8 @@ import {
 import { useActor } from "@/lib/actor"
 import { importTableQuery, importViewQuery, useImportView } from "@/lib/imports"
 import { queryClient } from "@/lib/queries"
-import { useContentBelow } from "@/lib/content-width"
-import { linkTo, useLocation } from "@/lib/route"
+import { useContentBelow } from "@/ui-kit/ContentWidth.hook"
+import { linkTo, useLocation } from "@/ui-kit/Route.hook"
 
 // Each page is its own chunk, fetched when it is first opened: the shell loads without the review table, the
 // spreadsheet reader or the other pages.

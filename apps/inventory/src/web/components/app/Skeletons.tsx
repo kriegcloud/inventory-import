@@ -11,7 +11,7 @@ import {
   StickyTableRow,
   StickyTableRowHeader
 } from "@/components/ui/sticky-table"
-import { useIsNarrow } from "@/lib/content-width"
+import { useIsNarrow } from "@/ui-kit/ContentWidth.hook"
 
 // Skeletons of what is on its way, each drawn in the same boxes as the real thing (the same frame, header row and
 // 36px rows; the same page header; the review's own bands), so nothing on the screen moves when the data arrives.

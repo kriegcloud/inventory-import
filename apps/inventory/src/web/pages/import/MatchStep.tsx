@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { call } from "@/lib/api"
 import { useImportCache } from "@/lib/imports"
-import { importAddress, navigate } from "@/lib/route"
+import { navigate } from "@/ui-kit/Route.hook"
+import { importAddress } from "@/lib/route"
 import type { ImportView } from "../../../api/v1/Api.ts"
 import {
   type ColumnMatch,

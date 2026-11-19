@@ -1,4 +1,4 @@
-import { stringify } from "../../lib/json.ts"
+import { stringify } from "@/ui-kit/Json.codec"
 import { useMutation } from "@tanstack/react-query"
 import { ArrowUp, ChevronRight, MessageSquarePlus, Sparkles, Undo2, X } from "lucide-react"
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react"

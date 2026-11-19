@@ -40,8 +40,8 @@ import {
   useSidebar
 } from "@/components/ui/sidebar"
 import { useActor } from "@/lib/actor"
-import { linkTo, navigate } from "@/lib/route"
-import { type Theme, useTheme } from "@/lib/theme"
+import { linkTo, navigate } from "@/ui-kit/Route.hook"
+import { type Theme, useTheme } from "@/ui-kit/Theme.provider"
 import { BrandMark } from "./BrandMark.tsx"
 
 /** A page the sidebar links to. `path` is its address; `icon` is all that shows when the sidebar is collapsed. */

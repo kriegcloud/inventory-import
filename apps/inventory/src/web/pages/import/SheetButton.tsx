@@ -3,7 +3,8 @@ import { SheetChooser } from "@/components/app/SheetChooser"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { workbookOf } from "@/lib/imports"
-import { importAddress, navigate } from "@/lib/route"
+import { navigate } from "@/ui-kit/Route.hook"
+import { importAddress } from "@/lib/route"
 import { useUpload } from "@/lib/upload"
 
 /**

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { type RecordColumn, RecordsTable } from "@/components/ui/data-table/data-table-records"
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@/components/ui/item"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import { useIsNarrow } from "@/lib/content-width"
+import { useIsNarrow } from "@/ui-kit/ContentWidth.hook"
 import { type JobReview, lineColumns, lineKinds, makeJobs, questionRows, recheckLine, reviewJobs } from "./jobs.ts"
 
 type View = "jobs" | "questions"

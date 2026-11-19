@@ -1,7 +1,7 @@
 import { type ReactNode, useLayoutEffect, useState } from "react"
 import { Separator } from "@/components/ui/separator"
 import { SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar"
-import { setContentInset, sidebarFolded, sidebarOpen, sidebarWasOpen } from "@/lib/content-width"
+import { setContentInset, sidebarFolded, sidebarOpen, sidebarWasOpen } from "@/ui-kit/ContentWidth.hook"
 import { BrandMark } from "./BrandMark.tsx"
 import { BarSlotContext } from "./slots.ts"
 import { ThemeToggle } from "./ThemeToggle.tsx"

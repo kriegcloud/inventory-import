@@ -39,7 +39,7 @@ import {
   StickyTableRow,
   StickyTableRowHeader
 } from "@/components/ui/sticky-table"
-import { textWidth } from "@/lib/text-width"
+import { textWidth } from "@/ui-kit/TextWidth.measure"
 import {
   askFor,
   choicesOf,

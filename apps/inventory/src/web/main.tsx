@@ -6,7 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { appRuntime } from "@/lib/api"
 import { queryClient } from "@/lib/queries"
 import { startTelemetry } from "@/lib/telemetry"
-import { ThemeProvider } from "@/lib/theme"
+import { ThemeProvider } from "@/ui-kit/Theme.provider"
 import App from "./App.tsx"
 import "./index.css"
 

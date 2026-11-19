@@ -1,4 +1,4 @@
-import { stringify } from "../json.ts"
+import { stringify } from "@/ui-kit/Json.codec"
 // The spreadsheet reader, off the page's thread. A module worker that the build emits as its own file on our origin,
 // so the content security policy's `script-src 'self'` covers it; never a blob: worker, which the policy blocks (a
 // library that made one hung here). It runs the same `readSpreadsheet` the tests run, then trims the table to what

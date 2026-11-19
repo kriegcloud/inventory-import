@@ -1,4 +1,4 @@
-import { stringify } from "../lib/json.ts"
+import { stringify } from "@/ui-kit/Json.codec"
 import {
   type ColumnFiltersState,
   functionalUpdate,

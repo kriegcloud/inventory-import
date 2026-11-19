@@ -5,10 +5,7 @@
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
     "lib": ["ESNext", "DOM"],
     "module": "esnext",
-    // "node" only because the vendored @beep/schema/LiteralKit (used by @beep/csv) imports the @beep/utils root, whose
-    // index re-exports modules that name Node types (FileSystem, Path, NodeUrl). Nothing in src/web imports a Node
-    // module, and the build would refuse one. Remove it when LiteralKit imports @beep/utils/Array upstream.
-    "types": ["vite/client", "node"],
+    "types": ["vite/client"],
     "allowArbitraryExtensions": true,
     "moduleResolution": "bundler",
     "paths": {

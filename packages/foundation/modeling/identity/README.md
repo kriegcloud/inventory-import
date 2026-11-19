@@ -10,4 +10,6 @@ here under the same name and the same export subpaths, and is replaced by the pu
   copy starts with one provenance line, which the hash leaves out). `bun run vendor:check` fails when they differ.
 - Copied tests have their imports of beep-effect's test runner and run-count helper rewritten (each rewrite is listed
   in `vendor.json`); `test/support/fcRuns.ts`, when present, stands in for the run-count helper.
+- A source file differs from upstream only by a patch in `SOURCE_PATCHES` (scripts/vendor-beep.mjs), recorded with
+  its reason under `patches` in `vendor.json` and named in the file's first line.
 - Licensed under MIT, as the package's own LICENSE file in beep-effect says (`LICENSE`, copied unchanged).

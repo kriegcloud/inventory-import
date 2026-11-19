@@ -1,5 +1,5 @@
 {
-  "$comment": "Written by scripts/vendor-beep.mjs; checked by scripts/vendor-check.mjs. sha256 is of each file without its first (provenance) line; it equals sourceSha256 unless the file lists rewrites. local files are written here, not copied.",
+  "$comment": "Written by scripts/vendor-beep.mjs; checked by scripts/vendor-check.mjs. sha256 is of each file without its first (provenance) line; it equals sourceSha256 unless the file lists rewrites (tests) or patches (deliberate source patches, each with its reason, against source.commit). local files are written here, not copied.",
   "source": {
     "repository": "beep-effect",
     "commit": "c5cebd5c9de7077493cb9ccaaa18e1d4f73da0b0",
@@ -30,8 +30,14 @@
     {
       "path": "src/LiteralKit/LiteralKit.schema.ts",
       "sourceSha256": "a9f53fb522832a3ba78e4db1f0250ce7648ad481238a5402753c9c6f490dbe59",
-      "sha256": "a9f53fb522832a3ba78e4db1f0250ce7648ad481238a5402753c9c6f490dbe59",
-      "rewrites": []
+      "sha256": "e362aaadb28b72424aa43a91bc3b2b0c1f6e7ea293e5d77ffc92993abb5e1386",
+      "rewrites": [],
+      "patches": [
+        {
+          "change": "import { A } from \"@beep/utils\"; -> import * as A from \"@beep/utils/Array\";",
+          "reason": "The @beep/utils root re-exports modules that name Node types (FileSystem, Path, NodeUrl), and Node's URL type clashes with the Workers one, so a Worker that imports LiteralKit failed to type-check. The subpath holds the same module. Unnecessary once beep-effect's LiteralKit imports @beep/utils/Array itself."
+        }
+      ]
     },
     {
       "path": "src/LiteralKit/index.ts",
@@ -42,8 +48,14 @@
     {
       "path": "src/LiteralKit/internal/builders.ts",
       "sourceSha256": "3018080d9c5ba84cc5c43085ff7b9ee7c241c489cf93cae531bbee7b1aefc216",
-      "sha256": "3018080d9c5ba84cc5c43085ff7b9ee7c241c489cf93cae531bbee7b1aefc216",
-      "rewrites": []
+      "sha256": "561c273498f772ccb6e8e89c018548bdd039c5306ca29275e2c631e4cbb4fc95",
+      "rewrites": [],
+      "patches": [
+        {
+          "change": "import { A, R } from \"@beep/utils\"; -> import * as A from \"@beep/utils/Array\";\nimport * as R from \"@beep/utils/Record\";",
+          "reason": "As LiteralKit.schema.ts: the @beep/utils root brings Node types into a Worker's type-check. Unnecessary once beep-effect's builders.ts imports @beep/utils/Array and @beep/utils/Record itself."
+        }
+      ]
     },
     {
       "path": "src/SchemaUtils/collectAnnotationsAt.ts",

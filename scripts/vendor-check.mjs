@@ -2,8 +2,9 @@
 // (written by scripts/vendor-beep.mjs) is checked:
 //
 // - each listed file exists and starts with its provenance line, naming the recorded commit and upstream path;
-// - the SHA-256 of the rest of the file equals the recorded one, and, for a file copied without rewrites, the recorded
-//   upstream (source) hash too: a vendored source file is the upstream file, byte for byte;
+// - the SHA-256 of the rest of the file equals the recorded one, and, for a file copied without rewrites or patches, the
+//   recorded upstream (source) hash too: a vendored source file is the upstream file, byte for byte, unless vendor.json
+//   lists a patch for it, with its reason (scripts/vendor-beep.mjs, SOURCE_PATCHES), which this check then reports;
 // - src/ and test/ hold nothing that is neither listed nor one of the package's local files;
 // - package.json's exports are the recorded ones.
 //
@@ -38,6 +39,7 @@ const filesUnder = (dir, base = dir) => {
 }
 
 const problems = []
+const patched = []
 let checked = 0
 const manifests = manifestsUnder(path.join(repoRoot, "packages"))
 for (const manifestPath of manifests) {
@@ -63,8 +65,22 @@ for (const manifestPath of manifests) {
     const actual = sha256(content.subarray(newline + 1))
     if (actual !== entry.sha256)
       problems.push(`${where}/${entry.path}: changed since it was vendored (sha256 ${actual})`)
-    if (entry.rewrites.length === 0 && entry.sha256 !== entry.sourceSha256) {
+    const patches = entry.patches ?? []
+    if (entry.rewrites.length === 0 && patches.length === 0 && entry.sha256 !== entry.sourceSha256) {
       problems.push(`${where}/${entry.path}: copied without rewrites, yet its hash differs from its source hash`)
+    }
+    if (patches.length > 0) {
+      if (entry.sha256 === entry.sourceSha256)
+        problems.push(`${where}/${entry.path}: lists a patch, yet equals upstream`)
+      if (!patches.every((patch) => typeof patch.reason === "string" && patch.reason.length > 0)) {
+        problems.push(`${where}/${entry.path}: a patch has no reason`)
+      }
+      if (!first.includes("Patched on purpose")) {
+        problems.push(`${where}/${entry.path}: patched, but its first line does not say so`)
+      }
+      patched.push(
+        `${where}/${entry.path} (${patches.length} patch${patches.length === 1 ? "" : "es"}, against beep-effect ${commit.slice(0, 12)})`
+      )
     }
     if (source !== undefined) {
       const upstream = execFileSync("git", ["-C", source, "show", `${commit}:${upstreamDir}/${entry.path}`], {
@@ -98,3 +114,4 @@ console.log(
   `vendor:check: ${checked} vendored files in ${manifests.length} packages match their recorded hashes` +
     (source === undefined ? "" : " and beep-effect")
 )
+for (const file of patched) console.log(`vendor:check: patched on purpose: ${file}`)

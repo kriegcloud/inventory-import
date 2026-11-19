@@ -5,7 +5,8 @@
 // The subset is computed, not hand-listed: the import closure of ENTRIES below (what the format packages use), plus
 // the tests named in TESTS. Source files are copied byte for byte under a one-line provenance header. Test files get
 // the import rewrites in TEST_REWRITES (beep-effect's test runner and run-count packages are not vendored), recorded
-// per file. Run it again, pointed at a newer commit, to refresh:
+// per file. A source file is patched only by SOURCE_PATCHES, each with its reason, recorded in vendor.json and named
+// in the file's provenance line. Run it again, pointed at a newer commit, to refresh:
 //
 //   node scripts/vendor-beep.mjs --from <beep-effect checkout> [--commit <sha>]
 import { execFileSync } from "node:child_process"
@@ -115,9 +116,49 @@ const TEST_REWRITES = [
   ]
 ]
 
+/**
+ * Deliberate, minimal patches to vendored source files, each with the reason it exists and what would make it
+ * unnecessary upstream. A patch replaces exact text; a refresh fails when the text is gone, so a patch that upstream
+ * has made unnecessary is noticed and removed. The import closure (which files are vendored) is computed from the
+ * unpatched upstream files, so a patch never changes the vendored subset.
+ */
+const SOURCE_PATCHES = [
+  {
+    pkg: "@beep/schema",
+    file: "src/LiteralKit/LiteralKit.schema.ts",
+    from: 'import { A } from "@beep/utils";',
+    to: 'import * as A from "@beep/utils/Array";',
+    reason:
+      "The @beep/utils root re-exports modules that name Node types (FileSystem, Path, NodeUrl), and Node's URL type clashes with the Workers one, so a Worker that imports LiteralKit failed to type-check. The subpath holds the same module. Unnecessary once beep-effect's LiteralKit imports @beep/utils/Array itself."
+  },
+  {
+    pkg: "@beep/schema",
+    file: "src/LiteralKit/internal/builders.ts",
+    from: 'import { A, R } from "@beep/utils";',
+    to: 'import * as A from "@beep/utils/Array";\nimport * as R from "@beep/utils/Record";',
+    reason:
+      "As LiteralKit.schema.ts: the @beep/utils root brings Node types into a Worker's type-check. Unnecessary once beep-effect's builders.ts imports @beep/utils/Array and @beep/utils/Record itself."
+  }
+]
+
+/** The source file's text with its patches applied, and the record of each. */
+const patchSource = (pkgName, file, body) => {
+  let text = body.toString()
+  const applied = []
+  for (const patch of SOURCE_PATCHES) {
+    if (patch.pkg !== pkgName || patch.file !== file) continue
+    if (!text.includes(patch.from)) {
+      throw new Error(`${pkgName} ${file}: the text a patch replaces is gone upstream; remove or update the patch`)
+    }
+    text = text.replace(patch.from, patch.to)
+    applied.push({ change: `${patch.from} -> ${patch.to}`, reason: patch.reason })
+  }
+  return { body: Buffer.from(text), patches: applied }
+}
+
 const LICENSE_FILE = "LICENSE"
-const header = (pkgDir, file) =>
-  `// Vendored from beep-effect ${commit.slice(0, 12)}:${pkgDir}/${file} (MIT, see LICENSE). Do not edit: scripts/vendor-check.mjs compares the rest of this file with its recorded hash.\n`
+const header = (pkgDir, file, patched = false) =>
+  `// Vendored from beep-effect ${commit.slice(0, 12)}:${pkgDir}/${file} (MIT, see LICENSE). ${patched ? "Patched on purpose: the patch and its reason are in vendor.json (patches) and scripts/vendor-beep.mjs (SOURCE_PATCHES). " : ""}Do not edit: scripts/vendor-check.mjs compares the rest of this file with its recorded hash.\n`
 
 const sha256 = (data) => createHash("sha256").update(data).digest("hex")
 
@@ -283,6 +324,8 @@ here under the same name and the same export subpaths, and is replaced by the pu
   copy starts with one provenance line, which the hash leaves out). \`bun run vendor:check\` fails when they differ.
 - Copied tests have their imports of beep-effect's test runner and run-count helper rewritten (each rewrite is listed
   in \`vendor.json\`); \`test/support/fcRuns.ts\`, when present, stands in for the run-count helper.
+- A source file differs from upstream only by a patch in \`SOURCE_PATCHES\` (scripts/vendor-beep.mjs), recorded with
+  its reason under \`patches\` in \`vendor.json\` and named in the file's first line.
 - Licensed under MIT, as the package's own LICENSE file in beep-effect says (\`LICENSE\`, copied unchanged).
 `
   )
@@ -297,10 +340,20 @@ for (const pkg of PACKAGES) {
   const entries = []
   const sources = [...chosen.get(pkg.name)].sort()
   for (const file of sources) {
-    const body = show(`${pkg.dir}/${file}`)
+    const source = show(`${pkg.dir}/${file}`)
+    const { body, patches } = patchSource(pkg.name, file, source)
     fs.mkdirSync(path.dirname(path.join(target, file)), { recursive: true })
-    fs.writeFileSync(path.join(target, file), Buffer.concat([Buffer.from(header(pkg.dir, file)), body]))
-    entries.push({ path: file, sourceSha256: sha256(body), sha256: sha256(body), rewrites: [] })
+    fs.writeFileSync(
+      path.join(target, file),
+      Buffer.concat([Buffer.from(header(pkg.dir, file, patches.length > 0)), body])
+    )
+    entries.push({
+      path: file,
+      sourceSha256: sha256(source),
+      sha256: sha256(body),
+      rewrites: [],
+      ...(patches.length === 0 ? {} : { patches })
+    })
   }
   for (const name of TESTS[pkg.name]) {
     const file = `test/${name}`
@@ -343,7 +396,7 @@ for (const pkg of PACKAGES) {
 
   const manifest = {
     $comment:
-      "Written by scripts/vendor-beep.mjs; checked by scripts/vendor-check.mjs. sha256 is of each file without its first (provenance) line; it equals sourceSha256 unless the file lists rewrites. local files are written here, not copied.",
+      "Written by scripts/vendor-beep.mjs; checked by scripts/vendor-check.mjs. sha256 is of each file without its first (provenance) line; it equals sourceSha256 unless the file lists rewrites (tests) or patches (deliberate source patches, each with its reason, against source.commit). local files are written here, not copied.",
     source: { repository: "beep-effect", commit, path: pkg.dir, license: "MIT" },
     exports: exportsMap,
     files: entries,

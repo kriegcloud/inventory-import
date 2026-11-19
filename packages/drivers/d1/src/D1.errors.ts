@@ -4,6 +4,7 @@
  *
  * @packageDocumentation
  */
+import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as S from "effect/Schema"
 import { $D1Id } from "./internal/identity.ts"
 
@@ -14,7 +15,7 @@ const $I = $D1Id.create("D1Error")
  *
  * @category schemas
  */
-export const D1Stage = S.Literals(["encode", "execute", "decode"]).pipe(
+export const D1Stage = LiteralKit(["encode", "execute", "decode"]).pipe(
   $I.annoteSchema("D1Stage", { description: "Encoding a request, running SQL, or decoding its rows" })
 )
 
@@ -45,6 +46,10 @@ export class D1Error extends S.TaggedError<D1Error, { readonly brand: unique sym
 ) {
   /** A short sentence for the log: the stage and the statement's position. */
   override get message(): string {
-    return `D1 statement ${this.statement} failed to ${this.stage}`
+    return `D1 statement ${this.statement} ${D1Stage.match(this.stage, {
+      encode: () => "could not be encoded from its request",
+      execute: () => "failed in SQL",
+      decode: () => "answered rows its result Schema refuses"
+    })}`
   }
 }

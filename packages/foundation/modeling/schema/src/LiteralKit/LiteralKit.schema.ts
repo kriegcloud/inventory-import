@@ -1,4 +1,4 @@
-// Vendored from beep-effect c5cebd5c9de7:packages/foundation/modeling/schema/src/LiteralKit/LiteralKit.schema.ts (MIT, see LICENSE). Do not edit: scripts/vendor-check.mjs compares the rest of this file with its recorded hash.
+// Vendored from beep-effect c5cebd5c9de7:packages/foundation/modeling/schema/src/LiteralKit/LiteralKit.schema.ts (MIT, see LICENSE). Patched on purpose: the patch and its reason are in vendor.json (patches) and scripts/vendor-beep.mjs (SOURCE_PATCHES). Do not edit: scripts/vendor-check.mjs compares the rest of this file with its recorded hash.
 /**
  * Schema-backed literal toolkit helpers for mixed literal types.
  *
@@ -6,7 +6,7 @@
  * @packageDocumentation
  */
 
-import { A } from "@beep/utils";
+import * as A from "@beep/utils/Array";
 import * as HashSet from "effect/HashSet";
 import * as P from "effect/Predicate";
 import * as S from "effect/Schema";

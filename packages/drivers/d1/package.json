@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@beep/identity": "workspace:*",
+    "@beep/schema": "workspace:*",
     "@effect/sql-d1": "4.1.4",
     "effect": "4.1.4"
   },

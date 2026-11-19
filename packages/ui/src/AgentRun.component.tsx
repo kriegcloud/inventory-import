@@ -40,10 +40,18 @@ export function AgentRun(props: { title: string; producer: string; steps: Readon
         {props.steps.map((step) => {
           const hasDetail = step.input !== undefined || step.output !== undefined
           const line = (
-            <span className="flex min-w-0 items-center gap-2 [&_svg]:size-3.5 [&_svg]:shrink-0">
+            // A step that opens shows the rest of itself below, so its line is cut to one. A step with nothing to
+            // open has only this line to say what happened (a cell that could not be read, by name), so it wraps.
+            <span
+              className={
+                hasDetail
+                  ? "flex min-w-0 items-center gap-2 [&_svg]:size-3.5 [&_svg]:shrink-0"
+                  : "flex min-w-0 items-start gap-2 [&_svg]:mt-1 [&_svg]:size-3.5 [&_svg]:shrink-0"
+              }
+            >
               {icons[step.status]}
               <span className="sr-only">{statusWords[step.status]}: </span>
-              <span className="truncate">{step.label}</span>
+              <span className={hasDetail ? "truncate" : "min-w-0 break-words"}>{step.label}</span>
               {step.tag === undefined ? null : (
                 <span className="ml-auto shrink-0 rounded-chip bg-secondary px-1.5 text-xs text-secondary-foreground">
                   {step.tag}

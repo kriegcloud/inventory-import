@@ -1,6 +1,10 @@
 // @effect-diagnostics globalFetch:off
 import { expect, it } from "@effect/vitest"
-import { Array as Arr, Effect, Layer, Predicate, String as Str } from "effect"
+import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as P from "effect/Predicate"
+import * as Str from "effect/String"
 import { afterAll, beforeAll, vi } from "vitest"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
@@ -52,7 +56,7 @@ beforeAll(() => {
     collectorSeen.sent.push(Str.slice(endpoint.length)(url))
     const body = init?.body
     collectorSeen.bodies.push(
-      Predicate.isString(body) ? body : body instanceof Uint8Array ? new TextDecoder().decode(body) : ""
+      P.isString(body) ? body : body instanceof Uint8Array ? new TextDecoder().decode(body) : ""
     )
     return collectorSeen.answer()
   })
@@ -90,7 +94,7 @@ it.effect("on: each request sends its traces, logs and metrics after it has answ
         expect(answer.status).toBe(200)
       }
       yield* Effect.promise(() => Promise.all(served.pending))
-      const count = (signal: string) => Arr.filter(collectorSeen.sent, (path) => path === `/v1/${signal}`).length
+      const count = (signal: string) => A.filter(collectorSeen.sent, (path) => path === `/v1/${signal}`).length
       expect([count("traces"), count("metrics")]).toEqual([3, 3])
       expect(count("logs")).toBeLessThanOrEqual(3)
     })
@@ -105,10 +109,10 @@ it.effect("on: every batch names this isolate as one instance, so its counters a
       for (const path of ["/api/v1/identity/me", "/api/v1/activity"])
         yield* Effect.promise(() => served.fetch(page(path)))
       yield* Effect.promise(() => Promise.all(served.pending))
-      const instances = Arr.dedupe(
-        Arr.flatMap(collectorSeen.bodies, (body) =>
-          Arr.flatMap(
-            Arr.fromIterable(Str.matchAll(/"key":"service\.instance\.id","value":\{"stringValue":"([^"]+)"/g)(body)),
+      const instances = A.dedupe(
+        A.flatMap(collectorSeen.bodies, (body) =>
+          A.flatMap(
+            A.fromIterable(Str.matchAll(/"key":"service\.instance\.id","value":\{"stringValue":"([^"]+)"/g)(body)),
             (m) => (m[1] === undefined ? [] : [m[1]])
           )
         )

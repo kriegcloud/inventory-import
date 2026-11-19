@@ -1,6 +1,8 @@
 // @effect-diagnostics globalFetch:off
 import { expect, it } from "@effect/vitest"
-import { Effect, Layer, String as Str } from "effect"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Str from "effect/String"
 import { afterAll, vi } from "vitest"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"

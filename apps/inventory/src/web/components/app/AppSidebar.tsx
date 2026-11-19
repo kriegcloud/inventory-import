@@ -1,4 +1,4 @@
-import { Option } from "effect"
+import * as O from "effect/Option"
 import {
   CheckIcon,
   ChevronsUpDownIcon,
@@ -153,7 +153,7 @@ function UserMenu() {
   const { theme, setTheme } = useTheme()
   const { isMobile } = useSidebar()
   if (actor === undefined) return null
-  const testAccounts = features === undefined ? undefined : Option.getOrUndefined(features.testAccounts)
+  const testAccounts = features === undefined ? undefined : O.getOrUndefined(features.testAccounts)
   const otherAccounts = (testAccounts?.accounts ?? []).filter((account) => account.email !== email)
   const who = (
     <>

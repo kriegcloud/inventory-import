@@ -1,5 +1,14 @@
-import { Clock, Context, Deferred, Duration, Effect, Exit, Layer, Option, Scope, Tracer } from "effect"
-import { DevTools } from "effect/devtools"
+import * as Clock from "effect/Clock"
+import * as Context from "effect/Context"
+import * as Deferred from "effect/Deferred"
+import * as Duration from "effect/Duration"
+import * as Effect from "effect/Effect"
+import * as Exit from "effect/Exit"
+import * as Layer from "effect/Layer"
+import * as O from "effect/Option"
+import * as Scope from "effect/Scope"
+import * as Tracer from "effect/Tracer"
+import * as DevTools from "effect/devtools/DevTools"
 import { devToolsSettings } from "./Settings.ts"
 
 // SPANS OUT OF THE WORKER, ONE REQUEST AT A TIME. The Workers runtime refuses to let one request's I/O be awaited from
@@ -35,9 +44,9 @@ export type RequestExports = {
  * Exporters to a collector, built into one request's scope (closing that scope sends what they hold). None by
  * default; a telemetry module provides them. Effect DevTools, when on, sees every span they see.
  */
-export const Collector = Context.Reference<Option.Option<(scope: Scope.Scope) => Effect.Effect<RequestExports>>>(
+export const Collector = Context.Reference<O.Option<(scope: Scope.Scope) => Effect.Effect<RequestExports>>>(
   "@inventory/app/server/RequestTelemetry/Collector",
-  { defaultValue: () => Option.none() }
+  { defaultValue: () => O.none() }
 )
 
 const off: RequestScope = { context: Context.empty(), done: Effect.void }
@@ -92,20 +101,19 @@ export class RequestTelemetry extends Context.Service<
     Effect.gen(function* () {
       // `import.meta.env.DEV` first, here and where the client is built below: a production build folds both to
       // false and leaves the DevTools client out of the Worker (checked 2026-11-17: no `DevToolsClient` in `dist/`).
-      const devTools = import.meta.env.DEV ? yield* devToolsSettings : Option.none<URL>()
+      const devTools = import.meta.env.DEV ? yield* devToolsSettings : O.none<URL>()
       const collector = yield* Collector
-      if (Option.isNone(devTools) && Option.isNone(collector))
-        return RequestTelemetry.of({ begin: Effect.succeed(off) })
+      if (O.isNone(devTools) && O.isNone(collector)) return RequestTelemetry.of({ begin: Effect.succeed(off) })
       return RequestTelemetry.of({
         begin: Effect.gen(function* () {
           const scope = yield* Scope.make()
-          const exports = Option.isSome(collector)
+          const exports = O.isSome(collector)
             ? yield* collector.value(scope)
             : { tracer: Tracer.nativeTracer, context: Context.empty() }
           const now = yield* Clock.currentTimeMillis
           // DevTools wraps the collector's tracer, so it sees every span the collector does.
           const traced =
-            import.meta.env.DEV && Option.isSome(devTools) && Number(now) - devToolsMissedAt > 30_000
+            import.meta.env.DEV && O.isSome(devTools) && Number(now) - devToolsMissedAt > 30_000
               ? yield* Effect.map(
                   Effect.timed(
                     Layer.buildWithScope(

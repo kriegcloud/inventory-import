@@ -1,5 +1,7 @@
 import { expect, layer } from "@effect/vitest"
-import { Array as Arr, Effect, String as Str } from "effect"
+import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as Str from "effect/String"
 import { pwnedPasswordMessage } from "@inventory/access-host/AuthOptions"
 import { browser, signInApp } from "./support/app.ts"
 
@@ -20,8 +22,8 @@ layer(signInApp({ settings: { PWNED_PASSWORD_CHECK: "true" } }), { timeout: "60 
         expect([refused.status, refused.json.message]).toEqual([400, pwnedPasswordMessage])
 
         // Twenty random bytes as hex: a password no breach can have held.
-        const strong = Arr.join(
-          Arr.map(Arr.fromIterable(crypto.getRandomValues(new Uint8Array(20))), (byte) =>
+        const strong = A.join(
+          A.map(A.fromIterable(crypto.getRandomValues(new Uint8Array(20))), (byte) =>
             Str.padStart(2, "0")(byte.toString(16))
           ),
           ""

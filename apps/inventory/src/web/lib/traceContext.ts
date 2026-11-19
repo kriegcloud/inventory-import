@@ -1,5 +1,5 @@
-import { Layer } from "effect"
-import { HttpClient } from "effect/http"
+import * as Layer from "effect/Layer"
+import * as HttpClient from "effect/http/HttpClient"
 import { publicSettings } from "./settings.ts"
 
 // THE PAGE'S TRACE CONTEXT. A request gets a span, and sends its trace context (`traceparent`), only once the

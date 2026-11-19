@@ -1,6 +1,14 @@
 import { expect, layer } from "@effect/vitest"
-import { Array as Arr, Cause, Effect, ErrorReporter, Exit, Formatter, Layer, Predicate, Redacted } from "effect"
-import { TestConsole } from "effect/testing"
+import * as A from "effect/Array"
+import * as Cause from "effect/Cause"
+import * as Effect from "effect/Effect"
+import * as ErrorReporter from "effect/ErrorReporter"
+import * as Exit from "effect/Exit"
+import * as Formatter from "effect/Formatter"
+import * as Layer from "effect/Layer"
+import * as P from "effect/Predicate"
+import * as Redacted from "effect/Redacted"
+import * as TestConsole from "effect/testing/TestConsole"
 import { Forbidden } from "@inventory/kernel/AccessError"
 import * as Observability from "../../src/server/Observability.ts"
 import { settingsLayer } from "./support/app.ts"
@@ -14,7 +22,7 @@ const production = Observability.layer({ production: true }).pipe(
 
 /** What reached the console, one string per line. */
 const written = Effect.map(TestConsole.logLines, (lines) =>
-  Arr.map(lines, (line) => (Predicate.isString(line) ? line : Formatter.format(line)))
+  A.map(lines, (line) => (P.isString(line) ? line : Formatter.format(line)))
 )
 
 layer(production, { buildPerTest: true })("logging in production", (it) => {
@@ -37,7 +45,7 @@ layer(production, { buildPerTest: true })("logging in production", (it) => {
     Effect.gen(function* () {
       yield* ErrorReporter.report(Cause.die(new Error("The row just written could not be read back")))
       yield* ErrorReporter.report(
-        Cause.fail(Forbidden.make({ reason: "You are a viewer in Example Works (test).", required: "editor" }))
+        Forbidden.make({ reason: "You are a viewer in Example Works (test).", required: "editor" }).pipe(Cause.fail)
       )
       // A defect that carries a secret: the secret is a Redacted, so the line shows its placeholder.
       yield* ErrorReporter.report(Cause.die({ provider: "gateway", key: Redacted.make("sk-gw-secret-42") }))
@@ -58,10 +66,10 @@ layer(production, { buildPerTest: true })("logging in production", (it) => {
 layer(Layer.empty)("settings that are not valid", (it) => {
   it.effect("stop the app with an error that names the variable and its valid values", () =>
     Effect.gen(function* () {
-      const exit = yield* Effect.exit(
-        Layer.build(
-          Observability.layer({ production: false }).pipe(Layer.provide(settingsLayer({ LOG_LEVEL: "info" })))
-        )
+      const exit = yield* Observability.layer({ production: false }).pipe(
+        Layer.provide(settingsLayer({ LOG_LEVEL: "info" })),
+        Layer.build,
+        Effect.exit
       )
       expect(Exit.isFailure(exit)).toBe(true)
       const pretty = Exit.isFailure(exit) ? Cause.pretty(exit.cause) : ""

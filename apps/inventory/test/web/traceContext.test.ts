@@ -1,7 +1,12 @@
 // @effect-diagnostics globalFetch:off
 import { expect, it } from "@effect/vitest"
-import { Array as Arr, Context, Effect, Layer, ManagedRuntime } from "effect"
-import { FetchHttpClient, HttpClient } from "effect/http"
+import * as A from "effect/Array"
+import * as Context from "effect/Context"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as ManagedRuntime from "effect/ManagedRuntime"
+import * as FetchHttpClient from "effect/http/FetchHttpClient"
+import * as HttpClient from "effect/http/HttpClient"
 import { afterAll, vi } from "vitest"
 import { sendTraceContext, traceContextGate } from "../../src/web/lib/traceContext.ts"
 
@@ -39,6 +44,6 @@ it.effect("sends no trace context until the exporters are plugged in, and sends 
     yield* Effect.promise(press)
     sendTraceContext()
     yield* Effect.promise(press)
-    expect(Arr.map(seen, (headers) => headers.has("traceparent"))).toEqual([false, true])
+    expect(A.map(seen, (headers) => headers.has("traceparent"))).toEqual([false, true])
   })
 )

@@ -1,4 +1,6 @@
-import { Array as Arr, Option, String as Str } from "effect"
+import * as A from "effect/Array"
+import * as O from "effect/Option"
+import * as Str from "effect/String"
 import { dual } from "effect/Function"
 import { docsPath } from "../api/v1/Api.ts"
 
@@ -41,11 +43,11 @@ const headers: ReadonlyArray<readonly [string, string]> = [
  * `default-src 'none'`, loads nothing and stays blank.
  */
 const docsPolicy = (scriptHashes: ReadonlyArray<string>) =>
-  Arr.join(
+  A.join(
     [
       "default-src 'none'",
-      `script-src ${Arr.join(
-        Arr.map(scriptHashes, (hash) => `'sha256-${hash}'`),
+      `script-src ${A.join(
+        A.map(scriptHashes, (hash) => `'sha256-${hash}'`),
         " "
       )}`,
       "style-src 'unsafe-inline'",
@@ -62,8 +64,8 @@ const docsPolicy = (scriptHashes: ReadonlyArray<string>) =>
 const sha256Base64 = (text: string) =>
   crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)).then((digest) =>
     btoa(
-      Arr.join(
-        Arr.map(Arr.fromIterable(new Uint8Array(digest)), (byte) => String.fromCharCode(byte)),
+      A.join(
+        A.map(A.fromIterable(new Uint8Array(digest)), (byte) => String.fromCharCode(byte)),
         ""
       )
     )
@@ -86,13 +88,13 @@ export const withSecurityHeaders: {
     return Promise.resolve(secured)
   }
   return secured.text().then((html) =>
-    Promise.all(
-      Arr.map(Arr.fromIterable(Str.matchAll(inlineScripts)(html)), (match) => sha256Base64(match[1] ?? ""))
-    ).then((hashes) => {
-      const page = new Response(html, secured)
-      page.headers.set("Content-Security-Policy", docsPolicy(hashes))
-      return page
-    })
+    Promise.all(A.map(A.fromIterable(Str.matchAll(inlineScripts)(html)), (match) => sha256Base64(match[1] ?? ""))).then(
+      (hashes) => {
+        const page = new Response(html, secured)
+        page.headers.set("Content-Security-Policy", docsPolicy(hashes))
+        return page
+      }
+    )
   )
 })
 
@@ -101,17 +103,17 @@ export const withSecurityHeaders: {
  * `next` value before redirecting, so a link cannot send people to another site (an open redirect).
  *
  * @example
- * safeRedirectPath("/imports/42?tab=review") // Option.some("/imports/42?tab=review")
- * safeRedirectPath("https://elsewhere.example/") // Option.none()
- * safeRedirectPath("//elsewhere.example/") // Option.none(): a scheme-relative address is another site
+ * safeRedirectPath("/imports/42?tab=review") // O.some("/imports/42?tab=review")
+ * safeRedirectPath("https://elsewhere.example/") // O.none()
+ * safeRedirectPath("//elsewhere.example/") // O.none(): a scheme-relative address is another site
  */
-export const safeRedirectPath = (target: string): Option.Option<string> => {
+export const safeRedirectPath = (target: string): O.Option<string> => {
   if (!Str.startsWith("/")(target) || Str.startsWith("//")(target) || Str.startsWith("/\\")(target)) {
-    return Option.none()
+    return O.none()
   }
   const base = "https://this.invalid"
-  return Option.liftThrowable(() => new URL(target, base))().pipe(
-    Option.filter((url) => url.origin === base),
-    Option.map((url) => `${url.pathname}${url.search}${url.hash}`)
+  return O.liftThrowable(() => new URL(target, base))().pipe(
+    O.filter((url) => url.origin === base),
+    O.map((url) => `${url.pathname}${url.search}${url.hash}`)
   )
 }

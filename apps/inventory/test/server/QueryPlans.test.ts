@@ -1,7 +1,11 @@
 // @effect-diagnostics nodeBuiltinImport:off
 import { DatabaseSync } from "node:sqlite"
 import { expect, it } from "@effect/vitest"
-import { Array as Arr, Effect, Option, Order, Record as Rec } from "effect"
+import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as O from "effect/Option"
+import * as Order from "effect/Order"
+import * as R from "effect/Record"
 import * as S from "effect/Schema"
 
 // The statements whose speed depends on an index, asked of SQLite's own planner on the real migrations (the same
@@ -18,8 +22,8 @@ const columns = "id, sku, name, category, uom, unitCost, quantityOnHand, created
 const planOf = (db: DatabaseSync, query: string) =>
   S.decodeUnknownEffect(S.Array(PlanRow))(db.prepare(`EXPLAIN QUERY PLAN ${query}`).all()).pipe(
     Effect.map((rows) =>
-      Arr.join(
-        Arr.map(rows, (row) => row.detail),
+      A.join(
+        A.map(rows, (row) => row.detail),
         "; "
       )
     )
@@ -28,8 +32,8 @@ const planOf = (db: DatabaseSync, query: string) =>
 it.effect("a page by SKU, either way, and an import's changes are read off an index", () =>
   Effect.gen(function* () {
     const db = new DatabaseSync(":memory:")
-    for (const file of Arr.sort(Rec.keys(migrations), Order.String)) {
-      db.exec(Option.getOrElse(Rec.get(migrations, file), () => ""))
+    for (const file of A.sort(R.keys(migrations), Order.String)) {
+      db.exec(O.getOrElse(R.get(migrations, file), () => ""))
     }
     for (const direction of ["ASC", "DESC"]) {
       const page = yield* planOf(

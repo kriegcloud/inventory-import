@@ -4,9 +4,14 @@
 // (retries, timeouts, a bad answer asked once) are tested in packages/drivers/openrouter.
 import { describe, expect, layer } from "@effect/vitest"
 import { OpenRouter } from "@beep/openrouter/OpenRouter"
-import { Array as Arr, Effect, Formatter, Layer, MutableRef } from "effect"
+import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as Formatter from "effect/Formatter"
+import * as Layer from "effect/Layer"
+import * as MutableRef from "effect/MutableRef"
 import * as S from "effect/Schema"
-import { HttpClient, HttpClientResponse } from "effect/http"
+import * as HttpClient from "effect/http/HttpClient"
+import * as HttpClientResponse from "effect/http/HttpClientResponse"
 import { modelSentences } from "@inventory/catalog-contract/AiUnavailable"
 import { askModel } from "@inventory/catalog-host/Model"
 import { answeredByRules } from "@inventory/catalog-model/Answerer"
@@ -95,7 +100,7 @@ describe("the model, as the app sees it", () => {
     it.effect("is sent the models list, and the answer names the fallback that answered", () =>
       Effect.gen(function* () {
         const status = aiStatusOf((yield* OpenRouter).status)
-        expect(Arr.map(status.routes, (route) => [route.provider, route.model, route.fallbackModels])).toEqual([
+        expect(A.map(status.routes, (route) => [route.provider, route.model, route.fallbackModels])).toEqual([
           ["openrouter", "anthropic/claude-haiku-5.5", ["google/gemini-3.8-flash"]]
         ])
         expect(status.reason).toBe(

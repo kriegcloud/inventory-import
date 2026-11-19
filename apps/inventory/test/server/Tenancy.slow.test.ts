@@ -3,11 +3,14 @@
 // another organization's member, import, confirm or item is refused by the database, whatever a handler forgot.
 // Checked against the real migration with statements written by hand, the way a bug in a service would write them.
 // A new table joins the first test by itself: it reads the schema, not a list.
-import { D1Client } from "@effect/sql-d1"
+import * as D1Client from "@effect/sql-d1/D1Client"
 import { expect, layer } from "@effect/vitest"
-import { Array as Arr, Effect, String as Str } from "effect"
+import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as Str from "effect/String"
 import * as S from "effect/Schema"
-import { type SqlError, SqlSchema } from "effect/sql"
+import type * as SqlError from "effect/sql/SqlError"
+import * as SqlSchema from "effect/sql/SqlSchema"
 import { TestDatabase } from "./support/app.ts"
 
 const at = "2026-11-17T00:00:00.000Z"
@@ -33,8 +36,8 @@ layer(TestDatabase)("tenancy in the database", (it) => {
         execute: () => sql`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
           AND name NOT LIKE '_cf_%' AND name NOT LIKE 'd1_%' AND name NOT LIKE 'itemSearch%' ORDER BY name`
       })(undefined)
-      const tenant = Arr.filter(tables, (table) => !Arr.contains(notTenantData, table.name))
-      expect(Arr.map(tenant, (table) => table.name)).toEqual([
+      const tenant = A.filter(tables, (table) => !A.contains(notTenantData, table.name))
+      expect(A.map(tenant, (table) => table.name)).toEqual([
         "activity",
         "importBatch",
         "importChange",
@@ -56,24 +59,21 @@ layer(TestDatabase)("tenancy in the database", (it) => {
           Result: S.Struct({ name: S.String }),
           execute: (name) => sql`SELECT name FROM pragma_table_info(${name})`
         })(table.name)
-        expect([table.name, Arr.some(columns, (column) => column.name === "organizationId")]).toEqual([
-          table.name,
-          true
-        ])
+        expect([table.name, A.some(columns, (column) => column.name === "organizationId")]).toEqual([table.name, true])
         const indexes = yield* SqlSchema.findAll({
           Request: S.String,
           Result: S.Struct({ name: S.String }),
           execute: (name) => sql`SELECT name FROM pragma_index_list(${name})`
         })(table.name)
         for (const index of indexes) {
-          if (Arr.contains(crossTenantIndexes, index.name)) continue
+          if (A.contains(crossTenantIndexes, index.name)) continue
           const first = yield* SqlSchema.findAll({
             Request: S.String,
             Result: S.Struct({ name: S.NullOr(S.String) }),
             execute: (name) => sql`SELECT name FROM pragma_index_info(${name}) WHERE seqno = 0`
           })(index.name)
           // A table's own primary key on `id` alone (member) is the plugin's; every other key starts with the tenant.
-          const leads = Arr.map(first, (column) => column.name)
+          const leads = A.map(first, (column) => column.name)
           if (table.name === "member" && Str.startsWith("sqlite_autoindex_member_1")(index.name)) continue
           expect([table.name, index.name, leads]).toEqual([table.name, index.name, ["organizationId"]])
         }

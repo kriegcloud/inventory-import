@@ -4,7 +4,8 @@ import { cloudflare } from "@cloudflare/vite-plugin"
 import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react"
 import compression from "compression"
-import { Array as Arr, String as Str } from "effect"
+import * as A from "effect/Array"
+import * as Str from "effect/String"
 import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { visualizer } from "rollup-plugin-visualizer"
@@ -82,8 +83,8 @@ const usedSourcesOnly = (): Plugin => ({
   transform(code, id) {
     if (!Str.endsWith("/src/web/index.css")(id)) return undefined
     const files = reachableSources({ entry: `${web}/main.tsx`, root: web, alias: web, packages: screenPackages })
-    const sources = Arr.join(
-      Arr.map(files, (file) => `@source "${file}";`),
+    const sources = A.join(
+      A.map(files, (file) => `@source "${file}";`),
       "\n"
     )
     if (!Str.includes('@source "./";')(code)) throw new Error('index.css must name its sources with @source "./";')

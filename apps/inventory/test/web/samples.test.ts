@@ -3,7 +3,8 @@
 // same files, byte for byte, or those tests prove something about a file nobody is offered.
 // @effect-diagnostics nodeBuiltinImport:off
 import { readdirSync, readFileSync } from "node:fs"
-import { Array as Arr, Order } from "effect"
+import * as A from "effect/Array"
+import * as Order from "effect/Order"
 import { describe, expect, it } from "vitest"
 
 const served = new URL("../../public/samples/", import.meta.url)
@@ -11,8 +12,8 @@ const copies = new URL("../../../../packages/catalog/web/test/fixtures/samples/"
 
 describe("the sample files", () => {
   it("are the same in the app and in the catalog screens' fixtures", () => {
-    const names = Arr.sort(readdirSync(served), Order.String)
-    expect(Arr.sort(readdirSync(copies), Order.String)).toEqual(names)
+    const names = A.sort(readdirSync(served), Order.String)
+    expect(A.sort(readdirSync(copies), Order.String)).toEqual(names)
     for (const name of names) {
       expect(readFileSync(new URL(name, copies)).equals(readFileSync(new URL(name, served)))).toBe(true)
     }

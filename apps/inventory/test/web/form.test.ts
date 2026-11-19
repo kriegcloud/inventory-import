@@ -1,7 +1,7 @@
 // A form says every problem at once. The rule that would hurt if wrong: a press on a form with several mistakes lists
 // every one of them, in the form's order, and nothing for a field that is fine.
 import { it } from "@effect/vitest"
-import { Array as Arr } from "effect"
+import * as A from "effect/Array"
 import * as S from "effect/Schema"
 import { expect } from "vitest"
 import { formProblems, problemOf } from "../../src/web/lib/form.ts"
@@ -19,7 +19,7 @@ it.prop(
       unit: checks.unit ?? undefined,
       cost: checks.cost ?? undefined
     })
-    expect(Arr.map(problems, (problem) => problem.field)).toEqual(Arr.filter(fields, (field) => checks[field] !== null))
+    expect(A.map(problems, (problem) => problem.field)).toEqual(A.filter(fields, (field) => checks[field] !== null))
     for (const field of fields) expect(problemOf(problems, field)).toBe(checks[field] ?? undefined)
   }
 )

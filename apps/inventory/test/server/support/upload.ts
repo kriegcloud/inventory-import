@@ -1,8 +1,9 @@
 // Stages a table the way the browser does, through the real upload endpoints: begin with the head, send every
 // chunk, finish. Tests that need an import to work on start here, so they exercise the one staging path there is.
 // Each step answers a StagingOutcome; these helpers turn a FileProblem into the test's failure, as the browser does.
-import { Effect, MutableRef } from "effect"
-import type { HttpApiClient } from "effect/http-api"
+import * as Effect from "effect/Effect"
+import * as MutableRef from "effect/MutableRef"
+import type * as HttpApiClient from "effect/http-api/HttpApiClient"
 import type { Api } from "../../../src/api/v1/Api.ts"
 import type { StagedTable } from "@inventory/catalog-contract/Staged"
 import { uploadChunks } from "@inventory/catalog-model/Upload"

@@ -1,5 +1,11 @@
 import { expect, it } from "@effect/vitest"
-import { Array as Arr, Context, Effect, Layer, Option, Scope, Tracer } from "effect"
+import * as A from "effect/Array"
+import * as Context from "effect/Context"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as O from "effect/Option"
+import * as Scope from "effect/Scope"
+import * as Tracer from "effect/Tracer"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
 import { ModelId } from "@beep/openrouter/OpenRouterModel"
@@ -27,7 +33,7 @@ const app = inMemoryApp({ member: dana, ai: OpenRouterTest.off("noKey", ModelId.
 type Exported = { spans: Array<string>; ended: number; closed: boolean }
 
 /** A `fetch` built as the Worker's, with `collector` per request, and what it handed to `waitUntil`. */
-const serving = (collector: Option.Option<(scope: Scope.Scope) => Effect.Effect<Tracer.Tracer>>) =>
+const serving = (collector: O.Option<(scope: Scope.Scope) => Effect.Effect<Tracer.Tracer>>) =>
   Effect.acquireRelease(
     Effect.sync(() => {
       const pending: Array<Promise<unknown>> = []
@@ -37,7 +43,7 @@ const serving = (collector: Option.Option<(scope: Scope.Scope) => Effect.Effect<
           Layer.provide(
             Layer.succeed(
               Collector,
-              Option.map(
+              O.map(
                 collector,
                 (make) => (scope: Scope.Scope) =>
                   Effect.map(make(scope), (tracer) => ({ tracer, context: Context.empty() }))
@@ -58,7 +64,7 @@ it.effect("gives each request its own exporters, and closes them after the answe
     Effect.gen(function* () {
       const exports: Array<Exported> = []
       const served = yield* serving(
-        Option.some((scope) =>
+        O.some((scope) =>
           Effect.gen(function* () {
             const mine: Exported = { spans: [], ended: 0, closed: false }
             exports.push(mine)
@@ -90,7 +96,7 @@ it.effect("gives each request its own exporters, and closes them after the answe
       // Three requests, three exporters, each with its own request's spans and nobody else's.
       expect(exports.length).toBe(3)
       // The first span of each is its request's own server span ("GET"), then the middleware and the handler.
-      expect(Arr.map(exports, (one) => Arr.take(one.spans, 3))).toEqual([
+      expect(A.map(exports, (one) => A.take(one.spans, 3))).toEqual([
         ["GET", "SameOrigin", "Identity"],
         ["GET", "SameOrigin", "Identity"],
         ["GET", "SameOrigin", "Identity"]
@@ -112,7 +118,7 @@ it.effect("gives each request its own exporters, and closes them after the answe
 it.effect("off, the default: nothing is built, and the request answers as before", () =>
   Effect.scoped(
     Effect.gen(function* () {
-      const served = yield* serving(Option.none())
+      const served = yield* serving(O.none())
       const answer = yield* Effect.promise(() => served.fetch(new Request(`${testOrigin}/api/v1/identity/me`)))
       expect(answer.status).toBe(200)
       expect(answer.headers.get("cache-control")).toBe("no-store")

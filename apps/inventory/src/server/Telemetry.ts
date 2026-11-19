@@ -1,26 +1,27 @@
-import {
-  Array as Arr,
-  Clock,
-  Context,
-  Duration,
-  Effect,
-  Layer,
-  Logger,
-  Metric,
-  Option,
-  String as Str,
-  Tracer
-} from "effect"
-import { SecureRandom } from "effect/crypto"
-import {
-  FetchHttpClient,
-  HttpClient,
-  HttpMiddleware,
-  HttpRouter,
-  HttpServerRequest,
-  HttpServerResponse
-} from "effect/http"
-import { OtlpExporter, OtlpLogger, OtlpMetrics, OtlpProxy, OtlpSerialization, OtlpTracer } from "effect/observability"
+import * as A from "effect/Array"
+import * as Clock from "effect/Clock"
+import * as Context from "effect/Context"
+import * as Duration from "effect/Duration"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Logger from "effect/Logger"
+import * as Metric from "effect/Metric"
+import * as O from "effect/Option"
+import * as Str from "effect/String"
+import * as Tracer from "effect/Tracer"
+import * as SecureRandom from "effect/crypto/SecureRandom"
+import * as FetchHttpClient from "effect/http/FetchHttpClient"
+import * as HttpClient from "effect/http/HttpClient"
+import * as HttpMiddleware from "effect/http/HttpMiddleware"
+import * as HttpRouter from "effect/http/HttpRouter"
+import * as HttpServerRequest from "effect/http/HttpServerRequest"
+import * as HttpServerResponse from "effect/http/HttpServerResponse"
+import * as OtlpExporter from "effect/observability/OtlpExporter"
+import * as OtlpLogger from "effect/observability/OtlpLogger"
+import * as OtlpMetrics from "effect/observability/OtlpMetrics"
+import * as OtlpProxy from "effect/observability/OtlpProxy"
+import * as OtlpSerialization from "effect/observability/OtlpSerialization"
+import * as OtlpTracer from "effect/observability/OtlpTracer"
 import { loggers } from "./Observability.ts"
 import { Collector } from "./RequestTelemetry.ts"
 import { RequestSource } from "@inventory/kernel/SameOrigin"
@@ -63,10 +64,10 @@ export const httpDuration = Metric.histogram("http_duration_ms", {
  */
 export const routeOf = (path: string): string => {
   const parts = Str.split(
-    Option.getOrElse(Arr.head(Str.split(path, "?")), () => ""),
+    O.getOrElse(A.head(Str.split(path, "?")), () => ""),
     "/"
   )
-  return Arr.join(Arr.take(parts, parts[2] === "v1" ? 4 : 3), "/")
+  return A.join(A.take(parts, parts[2] === "v1" ? 4 : 3), "/")
 }
 
 /**
@@ -108,7 +109,7 @@ export const collector = (build: { readonly production: boolean }) =>
       // isolate's counters carry the same labels, and a collector sees one series that keeps starting over.
       const random = yield* SecureRandom.SecureRandom
       const instance = yield* random.uuidV4()
-      return Option.map(settings.endpoint, (endpoint) => {
+      return O.map(settings.endpoint, (endpoint) => {
         const base = Str.endsWith("/")(endpoint.href) ? endpoint.href : `${endpoint.href}/`
         const url = (signal: string) => new URL(`v1/${signal}`, base).href
         const resource = {
@@ -186,9 +187,9 @@ export const OtlpProxyRoute = withRouter(
     yield* router.add(
       "GET",
       `${otlpPrefix}/status`,
-      HttpServerResponse.json({ on: Option.isSome(settings.endpoint) }).pipe(Effect.orDie)
+      HttpServerResponse.json({ on: O.isSome(settings.endpoint) }).pipe(Effect.orDie)
     )
-    if (Option.isNone(settings.endpoint)) return
+    if (O.isNone(settings.endpoint)) return
     const handlers = yield* OtlpProxy.make({ baseUrl: settings.endpoint.value.href, maxBodySize: "1 MiB" })
     for (const signal of ["traces", "logs", "metrics"] as const) {
       yield* router.add(
@@ -196,14 +197,14 @@ export const OtlpProxyRoute = withRouter(
         `${otlpPrefix}/v1/${signal}`,
         Effect.gen(function* () {
           const request = yield* HttpServerRequest.HttpServerRequest
-          const own = Option.toArray(Option.map(HttpServerRequest.toURL(request), (url) => url.origin))
+          const own = O.toArray(O.map(HttpServerRequest.toURL(request), (url) => url.origin))
           const fromOurPage =
             request.headers["sec-fetch-site"] !== undefined || request.headers["origin"] !== undefined
               ? RequestSource.allows(
                   RequestSource.make({
                     method: request.method,
-                    fetchSite: Option.fromUndefinedOr(request.headers["sec-fetch-site"]),
-                    origin: Option.fromUndefinedOr(request.headers["origin"]),
+                    fetchSite: O.fromUndefinedOr(request.headers["sec-fetch-site"]),
+                    origin: O.fromUndefinedOr(request.headers["origin"]),
                     own
                   })
                 )

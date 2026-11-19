@@ -1,6 +1,7 @@
 import { D1 } from "@beep/d1/D1"
 import { env, waitUntil } from "cloudflare:workers"
-import { ConfigProvider, Layer } from "effect"
+import * as ConfigProvider from "effect/ConfigProvider"
+import * as Layer from "effect/Layer"
 import { makeApp, toTracedFetch } from "./App.ts"
 import { RequestTelemetry } from "./RequestTelemetry.ts"
 import { SessionIdentityLive } from "@inventory/access-host/SessionIdentity"

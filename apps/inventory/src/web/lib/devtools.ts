@@ -7,8 +7,8 @@
 // - Silent unless asked for. The browser prints an error to the console for every refused WebSocket, and the client
 //   tries again every second, so connecting by default would print one a second whenever the listener is closed.
 //   Measured in headless Chrome: one refused connection is one console error.
-import { Layer } from "effect"
-import { DevTools } from "effect/devtools"
+import * as Layer from "effect/Layer"
+import * as DevTools from "effect/devtools/DevTools"
 import { publicSettings } from "./settings.ts"
 
 /**

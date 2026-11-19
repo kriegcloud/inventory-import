@@ -1,5 +1,9 @@
 import { expect, it, layer } from "@effect/vitest"
-import { Array as Arr, Effect, Option, Record as Rec, String as Str } from "effect"
+import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as O from "effect/Option"
+import * as R from "effect/Record"
+import * as Str from "effect/String"
 import * as S from "effect/Schema"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
@@ -63,7 +67,7 @@ layer(App)("the API over HTTP", (it) => {
       }
       const missing = yield* send({ path: "/api/v1/no-such-thing" })
       for (const answer of [yield* send({ path: "/api/v1/system/status" }), missing]) {
-        expect(Rec.fromEntries(answer.headers)).toMatchObject({
+        expect(R.fromEntries(answer.headers)).toMatchObject({
           "cache-control": "no-store",
           "content-security-policy": "default-src 'none'; frame-ancestors 'none'",
           "cross-origin-embedder-policy": "require-corp",
@@ -106,13 +110,13 @@ layer(App)("the API over HTTP", (it) => {
       })
       expect(twoWrong.status).toBe(400)
       const problem = yield* S.decodeUnknownEffect(ProblemDocument)(twoWrong.json)
-      expect(Arr.map(problem.errors, (issue) => issue.path)).toEqual([
+      expect(A.map(problem.errors, (issue) => issue.path)).toEqual([
         ["payload", "prompt"],
         ["payload", "table"]
       ])
       const missing = yield* send({ path: "/api/v1/assistant/view", body: { ...view("x"), prompt: undefined } })
       const absent = yield* S.decodeUnknownEffect(ProblemDocument)(missing.json)
-      expect(Arr.map(absent.errors, (issue) => issue.message)).toEqual(["Type what you want to see in the table."])
+      expect(A.map(absent.errors, (issue) => issue.message)).toEqual(["Type what you want to see in the table."])
     })
   )
 
@@ -128,31 +132,31 @@ layer(App)("the API over HTTP", (it) => {
       expect(document.text).toContain("True when trying again later may work")
       // The session cookie is the one scheme, required wherever a 401 can come back, and the session answer is open.
       const spec = yield* S.decodeUnknownEffect(OpenApiDocument)(document.json)
-      expect(Rec.keys(spec.components.securitySchemes)).toEqual(["sessionCookie"])
-      const operations = Arr.flatMap(Rec.values(spec.paths), (item) => Rec.toEntries(item))
+      expect(R.keys(spec.components.securitySchemes)).toEqual(["sessionCookie"])
+      const operations = A.flatMap(R.values(spec.paths), (item) => R.toEntries(item))
       for (const [, operation] of operations) {
-        expect(operation.security).toEqual(Rec.has(operation.responses, "401") ? [{ sessionCookie: [] }] : [])
+        expect(operation.security).toEqual(R.has(operation.responses, "401") ? [{ sessionCookie: [] }] : [])
       }
-      expect(Rec.get(spec.paths, "/api/v1/identity/session")).toEqual(
-        Option.some({ get: expect.objectContaining({ security: [] }) })
+      expect(R.get(spec.paths, "/api/v1/identity/session")).toEqual(
+        O.some({ get: expect.objectContaining({ security: [] }) })
       )
       // A read is never refused as cross-site, so no GET lists that 403; and no component keeps Effect's suffix.
       for (const [method, operation] of operations) {
-        if (method === "get") expect(Rec.has(operation.responses, "403")).toBe(false)
+        if (method === "get") expect(R.has(operation.responses, "403")).toBe(false)
       }
-      expect(Arr.filter(Rec.keys(spec.components.schemas), Str.endsWith("Encoded"))).toEqual([])
+      expect(A.filter(R.keys(spec.components.schemas), Str.endsWith("Encoded"))).toEqual([])
       // Nor a numbered second copy of a schema, nor one named by its whole path: each shape is in the document once.
-      expect(Arr.filter(Rec.keys(spec.components.schemas), (name) => /_\d+$|^_beep_/.test(name))).toEqual([])
+      expect(A.filter(R.keys(spec.components.schemas), (name) => /_\d+$|^_beep_/.test(name))).toEqual([])
       expect((yield* send({ path: "/api/v1/docs" })).status).toBe(404)
     })
   )
 })
 
 it("sends a person back only to a path on this site", () => {
-  expect(safeRedirectPath("/imports/42?tab=review#row-3")).toEqual(Option.some("/imports/42?tab=review#row-3"))
-  expect(safeRedirectPath("https://elsewhere.example/")).toEqual(Option.none())
-  expect(safeRedirectPath("//elsewhere.example/")).toEqual(Option.none())
-  expect(safeRedirectPath("/\\elsewhere.example/")).toEqual(Option.none())
-  expect(safeRedirectPath("javascript:alert(1)")).toEqual(Option.none())
-  expect(safeRedirectPath("imports")).toEqual(Option.none())
+  expect(safeRedirectPath("/imports/42?tab=review#row-3")).toEqual(O.some("/imports/42?tab=review#row-3"))
+  expect(safeRedirectPath("https://elsewhere.example/")).toEqual(O.none())
+  expect(safeRedirectPath("//elsewhere.example/")).toEqual(O.none())
+  expect(safeRedirectPath("/\\elsewhere.example/")).toEqual(O.none())
+  expect(safeRedirectPath("javascript:alert(1)")).toEqual(O.none())
+  expect(safeRedirectPath("imports")).toEqual(O.none())
 })

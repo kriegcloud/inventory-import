@@ -2,10 +2,12 @@
 // straight into the `user` table the way sign-up would, because this file is about membership, not passwords
 // (those are in Auth.http.test.ts).
 import { expect, layer } from "@effect/vitest"
-import { Array as Arr, Effect, Option } from "effect"
+import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as O from "effect/Option"
 import * as S from "effect/Schema"
-import { HttpApiTest } from "effect/http-api"
-import { SqlClient } from "effect/sql"
+import * as HttpApiTest from "effect/http-api/HttpApiTest"
+import * as SqlClient from "effect/sql/SqlClient"
 import { Api } from "../../src/api/v1/Api.ts"
 import { AddPerson, ChangeRole } from "@inventory/access-contract/PeopleCommand"
 import { AccountEmail } from "@inventory/access-contract/SessionState"
@@ -30,7 +32,7 @@ layer(TypedApp)("people", (it) => {
 
       // Everyone in the organization can see who is in it; only an admin can change it.
       const seen = yield* client.people.list().pipe(as("mem_priya"))
-      expect(Arr.map(seen, (person) => [person.name, person.role, Option.getOrNull(person.email)])).toEqual([
+      expect(A.map(seen, (person) => [person.name, person.role, O.getOrNull(person.email)])).toEqual([
         ["Dana Whitfield", "admin", "dana@example-works.test"],
         ["Marcus Oyelaran", "editor", "marcus@example-works.test"],
         ["Priya Raman", "viewer", null]
@@ -41,7 +43,7 @@ layer(TypedApp)("people", (it) => {
 
       // The email is matched whatever its case. An email nobody signed up with is refused in a sentence.
       const sam = yield* client.people.add(add).pipe(dana, Effect.flatMap(Effect.fromResult))
-      expect([sam.name, sam.role, Option.getOrNull(sam.email)]).toEqual(["Sam Okafor", "editor", "Sam@Example.test"])
+      expect([sam.name, sam.role, O.getOrNull(sam.email)]).toEqual(["Sam Okafor", "editor", "Sam@Example.test"])
       // Adding them again with the same role is the same add (a second press); with another role it is the email's
       // problem, answered as data the form shows.
       const again = yield* client.people.add(add).pipe(dana, Effect.flatMap(Effect.fromResult))
@@ -95,7 +97,7 @@ layer(TypedApp)("people", (it) => {
       yield* client.people.remove({ params: { memberId: MemberId.make("mem_marcus") } }).pipe(samIs)
       yield* client.people.remove({ params: { memberId: MemberId.make("mem_dana") } }).pipe(samIs)
       const left = yield* client.people.list().pipe(samIs)
-      expect(Arr.map(left, (person) => person.name)).toEqual(["Priya Raman", "Sam Okafor"])
+      expect(A.map(left, (person) => person.name)).toEqual(["Priya Raman", "Sam Okafor"])
       const sql = yield* SqlClient.SqlClient
       const gone = yield* sql<{ userId: string | null; removedAt: string | null }>`
         SELECT userId, removedAt FROM member WHERE id = 'mem_dana'`.pipe(Effect.orDie)
@@ -111,14 +113,14 @@ layer(TypedApp)("people", (it) => {
       // Another organization's admin cannot see or touch these members.
       const elena = as("mem_elena")
       const theirs = yield* client.people.list().pipe(elena)
-      expect(Arr.some(theirs, (person) => person.name === "Sam Okafor")).toBe(false)
+      expect(A.some(theirs, (person) => person.name === "Sam Okafor")).toBe(false)
       expect((yield* client.people.remove({ params: { memberId: sam.memberId } }).pipe(elena, Effect.flip))._tag).toBe(
         "PersonNotFound"
       )
 
       // Each change is in the audit trail, under the name of who made it.
       const trail = yield* client.activity.recent().pipe(samIs)
-      expect(Arr.map(trail, (row) => [row.action, row.detail, row.actorName])).toEqual(
+      expect(A.map(trail, (row) => [row.action, row.detail, row.actorName])).toEqual(
         expect.arrayContaining([
           ["Added a person", "Sam Okafor as editor", "Dana Whitfield"],
           ["Changed a role", "Sam Okafor: editor to admin", "Dana Whitfield"],

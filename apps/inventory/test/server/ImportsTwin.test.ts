@@ -1,8 +1,11 @@
 // The messy sample through the catalog's in-memory twins, held to the numbers the D1 adapter gives for the same
 // steps (Imports.slow.test.ts and TakeBack.slow.test.ts): a twin that drifted from the adapter fails here, fast.
 import { expect, layer } from "@effect/vitest"
-import { Array as Arr, Effect, Option, String as Str } from "effect"
-import { HttpApiTest } from "effect/http-api"
+import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as O from "effect/Option"
+import * as Str from "effect/String"
+import * as HttpApiTest from "effect/http-api/HttpApiTest"
 import messy from "../../public/samples/items_messy.csv?raw"
 import { Api } from "../../src/api/v1/Api.ts"
 import { decisionFromFlags } from "@inventory/catalog-contract/Decision"
@@ -53,27 +56,25 @@ layer(inMemoryHandlers({ member: marcus, ai: OpenRouterTest.off("noKey", ModelId
           }
         })
         const confirmed = yield* client.imports.commit({ params, payload: { set: {}, clear: [] } })
-        const result = Option.getOrThrow(confirmed.result)
+        const result = O.getOrThrow(confirmed.result)
         expect([result.created, result.updated, result.already, result.notImported]).toEqual([155, 0, 0, 45])
         expect(result.fixed).toEqual({ rows: 16, cells: 19 })
-        const row18 = Arr.findFirst(result.rows, (row) => row.rowNumber === 18)
-        expect(Option.map(row18, (row) => (row.outcome === "notImported" ? [row.decidedBy, row.reason] : row))).toEqual(
-          Option.some([{ kind: "nobody" }, 'Unit of measure "bx" is not one of EA, BX, KG, M, L.'])
+        const row18 = A.findFirst(result.rows, (row) => row.rowNumber === 18)
+        expect(O.map(row18, (row) => (row.outcome === "notImported" ? [row.decidedBy, row.reason] : row))).toEqual(
+          O.some([{ kind: "nobody" }, 'Unit of measure "bx" is not one of EA, BX, KG, M, L.'])
         )
         const stored = yield* client.items.list()
         expect(stored.length).toBe(155)
-        const crate = Option.getOrThrow(Arr.findFirst(stored, (item) => item.sku === "XRR-0266"))
+        const crate = O.getOrThrow(A.findFirst(stored, (item) => item.sku === "XRR-0266"))
         expect([crate.name, crate.stocking, digits(crate.vendors[1]?.unitCost)]).toEqual([
           "Fiberglass Crate",
           { kind: "discontinued", on: "2025-02-26" },
           "3.87"
         ])
         const past = yield* client.imports.past()
-        expect(Arr.map(past.imports, (row) => [row.status, row.items, row.notImported])).toEqual([
-          ["imported", 155, 45]
-        ])
+        expect(A.map(past.imports, (row) => [row.status, row.items, row.notImported])).toEqual([["imported", 155, 45]])
         const facets = yield* client.items.facets()
-        expect([facets.total, Arr.reduce(facets.uom, 0, (n, row) => n + row.count)]).toEqual([155, 155])
+        expect([facets.total, A.reduce(facets.uom, 0, (n, row) => n + row.count)]).toEqual([155, 155])
         const page = yield* client.items.page({
           query: {
             page: 1,
@@ -86,7 +87,7 @@ layer(inMemoryHandlers({ member: marcus, ai: OpenRouterTest.off("noKey", ModelId
         })
         expect(page.total).toBeGreaterThan(0)
         expect(
-          Arr.every(
+          A.every(
             page.data,
             (item) => item.category === "finished-goods" && Str.includes("oak")(Str.toLowerCase(item.name))
           )
@@ -96,13 +97,13 @@ layer(inMemoryHandlers({ member: marcus, ai: OpenRouterTest.off("noKey", ModelId
         const again = yield* upload({ client, table })
         expect(again.progress).toMatchObject({ ready: 1, needs: 45 })
         const second = yield* client.imports.commit({ params: { id: again.id }, payload: { set: {}, clear: [] } })
-        const secondResult = Option.getOrThrow(second.result)
+        const secondResult = O.getOrThrow(second.result)
         expect([secondResult.created, secondResult.already, secondResult.notImported]).toEqual([1, 154, 45])
 
         // Taking the first import back removes its 155 and keeps the second's one.
         const back = yield* client.imports.takeBack({ params, payload: { confirms: confirmed.takeBack.confirms } })
-        const taken = Arr.filter(back.history, (event) => event._tag === "TakenBack")
-        expect(Arr.map(taken, (event) => (event._tag === "TakenBack" ? [event.removed, event.kept] : []))).toEqual([
+        const taken = A.filter(back.history, (event) => event._tag === "TakenBack")
+        expect(A.map(taken, (event) => (event._tag === "TakenBack" ? [event.removed, event.kept] : []))).toEqual([
           [155, 0]
         ])
         const left = yield* client.items.list()

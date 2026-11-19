@@ -1,0 +1,24 @@
+// Who is signed in, for the screens of every web package, as an atom: the app reads the session once (the access
+// screens' session atom) and points `memberSource` at it at the root, so a screen mirrors the server's role rule with
+// `useAtomValue(member)` without knowing how the session is read. The server enforces the rule; this only keeps a
+// refused button off the screen.
+import * as O from "effect/Option"
+import * as Atom from "effect/reactivity/Atom"
+import type { Member } from "@inventory/kernel/Member"
+
+const nobody: Atom.Atom<O.Option<Member>> = Atom.make(O.none<Member>())
+
+/**
+ * Where the member is read from. The app gives it the atom of its session at the root (`provideMember`); until then,
+ * and in a test that gives none, nobody is known.
+ */
+export const memberSource: Atom.Atom<Atom.Atom<O.Option<Member>>> = Atom.make<Atom.Atom<O.Option<Member>>>(nobody).pipe(
+  Atom.keepAlive
+)
+
+/** The atom's initial value, for `RegistryProvider`'s `initialValues`: the member is read from `from`. */
+export const provideMember = (from: Atom.Atom<O.Option<Member>>): readonly [Atom.Atom<unknown>, unknown] =>
+  Atom.initialValue(memberSource, from)
+
+/** The signed-in member of the active organization; none while that is not known yet. */
+export const member: Atom.Atom<O.Option<Member>> = Atom.readable((get) => get(get(memberSource)))

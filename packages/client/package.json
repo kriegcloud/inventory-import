@@ -15,7 +15,10 @@
     "./Rollback": "./src/Rollback.rules.ts",
     "./SayError": "./src/SayError.controller.ts",
     "./QueryClient": "./src/QueryClient.runtime.ts",
-    "./CurrentMember": "./src/CurrentMember.controller.ts"
+    "./CurrentMember": "./src/CurrentMember.controller.ts",
+    "./Api": "./src/Api.atoms.ts",
+    "./OptimisticAtoms": "./src/Optimistic.atoms.ts",
+    "./MemberAtoms": "./src/Member.atoms.ts"
   },
   "scripts": {
     "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json && beep-cli quality strict strict-ceiling.json",
@@ -23,6 +26,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@effect/atom-react": "4.1.4",
     "@inventory/kernel": "workspace:*",
     "@tanstack/react-query": "^5.107.1",
     "effect": "4.1.4",

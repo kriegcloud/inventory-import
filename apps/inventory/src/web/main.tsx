@@ -1,12 +1,14 @@
+import { RegistryProvider } from "@effect/atom-react"
 import { QueryClientProvider } from "@tanstack/react-query"
 import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 import { Toaster } from "@inventory/ui/components/sonner"
 import { TooltipProvider } from "@inventory/ui/components/tooltip"
-import { appRuntime } from "@/lib/api"
+import { appLayer, appRuntime } from "@/lib/api"
 import { modelSentences } from "@inventory/catalog-web/AnsweredByWords"
 import { queryClient } from "@/lib/queries"
 import { startTelemetry } from "@/lib/telemetry"
+import { provideApi } from "@inventory/client/Api"
 import { ApiRuntime } from "@inventory/client/ApiRuntime"
 import { installTroubleSentences } from "@inventory/client/SayError"
 import { ThemeProvider } from "@inventory/ui/Theme"
@@ -25,20 +27,27 @@ installTroubleSentences(modelSentences)
 // Traces and logs to a collector when the server says telemetry is on (@/lib/telemetry); off, one small request.
 void appRuntime.runPromise(startTelemetry)
 
+// What the atoms of every web package read the API through: the app's one runtime, given to the registry once.
+const initialAtoms = [provideApi(appLayer)]
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ThemeProvider>
-      <QueryClientProvider client={queryClient}>
-        {/* The one runtime every web package's screens call the API on. */}
-        <ApiRuntime.Provider value={appRuntime as never}>
-          <TooltipProvider delayDuration={300}>
-            <App />
-            {/* Top centre, under the bar: between a page's title and its buttons, so a message never covers the table's
+      {/* The atoms' registry, beside the query cache while the screens move to atoms (goals/atoms). An atom nobody reads
+        is dropped 400 ms later; a read of the API is kept for `freshFor` (@inventory/client/Api). */}
+      <RegistryProvider initialValues={initialAtoms} defaultIdleTTL={400}>
+        <QueryClientProvider client={queryClient}>
+          {/* The one runtime every web package's screens call the API on. */}
+          <ApiRuntime.Provider value={appRuntime as never}>
+            <TooltipProvider delayDuration={300}>
+              <App />
+              {/* Top centre, under the bar: between a page's title and its buttons, so a message never covers the table's
               page controls or a confirm button. */}
-            <Toaster position="top-center" offset={64} richColors closeButton />
-          </TooltipProvider>
-        </ApiRuntime.Provider>
-      </QueryClientProvider>
+              <Toaster position="top-center" offset={64} richColors closeButton />
+            </TooltipProvider>
+          </ApiRuntime.Provider>
+        </QueryClientProvider>
+      </RegistryProvider>
     </ThemeProvider>
   </StrictMode>
 )

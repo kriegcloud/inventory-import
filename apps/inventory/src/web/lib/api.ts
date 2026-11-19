@@ -66,6 +66,13 @@ export const appRuntime = ManagedRuntime.make(
 
 const api = makeApi(appRuntime, ApiClient)
 
+/**
+ * The same runtime's services as a layer, for the atom registry (`provideApi` from `@inventory/client/Api`): the atoms
+ * call the API through this one client, so there is one connection to DevTools and one set of traces, whichever way a
+ * screen reaches the API while the screens move from TanStack Query to atoms.
+ */
+export const appLayer = Layer.effectContext(appRuntime.contextEffect)
+
 // The catalog screens start uploads and prefetch outside any component, so they are bound to this runtime here, once,
 // before anything of theirs runs.
 configureCatalog({ ...makeApi(appRuntime, CatalogClient), runtime: appRuntime, apiPrefix })

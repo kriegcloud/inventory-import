@@ -1,6 +1,19 @@
 {
-  // The client seam's lint: the shared rules for code that runs in the browser.
+  // The client seam's lint: the shared rules for code that runs in the browser, and the atoms rule (goals/atoms).
   "$schema": "../../node_modules/@effect/tsgo/oxlint-schema.json",
-  "extends": ["../../.oxlintrc.web.json"],
-  "ignorePatterns": ["dist/**"]
+  "extends": ["../../.oxlintrc.web.json", "../../.oxlintrc.atoms.json"],
+  "ignorePatterns": ["dist/**"],
+  "overrides": [
+    {
+      // The React and TanStack Query forms the screens still call until their package moves (goals/atoms/PLAN.md,
+      // "Legacy in the client"). Each file goes when its last caller has moved; none may gain a caller.
+      "files": [
+        "src/ApiRuntime.runtime.ts",
+        "src/CurrentMember.controller.ts",
+        "src/Optimistic.controller.ts",
+        "src/QueryClient.runtime.ts"
+      ],
+      "rules": { "no-restricted-imports": "off" }
+    }
+  ]
 }

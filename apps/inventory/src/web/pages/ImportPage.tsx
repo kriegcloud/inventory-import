@@ -19,7 +19,7 @@ import { useActor } from "@/lib/actor"
 import { useImportTable, useImportView } from "@/lib/imports"
 import { useIsNarrow } from "@inventory/ui/ContentWidth"
 import { navigate, useLocation } from "@inventory/ui/Route"
-import { importAddress } from "@/lib/route"
+import { importAddress, importInAddress } from "@/lib/route"
 import { hasRole } from "@inventory/kernel/Role"
 import { SheetButton } from "./import/SheetButton.tsx"
 import { UploadStep } from "./import/UploadStep.tsx"
@@ -45,7 +45,7 @@ type Step = (typeof steps)[number]["value"]
  */
 export function ImportPage() {
   const { params } = useLocation()
-  const importId = params.get("import") ?? undefined
+  const { id: importId, malformed } = importInAddress(params)
   const { actor } = useActor()
   // The server enforces this. The screen mirrors it so nobody is offered a button that will be refused.
   const canImport = actor !== undefined && hasRole(actor.role, "editor")
@@ -55,7 +55,9 @@ export function ImportPage() {
   // Confirmed, or confirmed and taken back: either way the result screen is where it stands.
   const imported = view.data !== undefined && view.data.status !== "open"
   const step: Step =
-    importId === undefined || wanted === "upload"
+    // An address that names something that is no import is said so on the step it asked for, not answered
+    // with the upload screen as if it named none.
+    (importId === undefined && !malformed) || wanted === "upload"
       ? "upload"
       : view.data === undefined
         ? // While the import is on its way the address decides, so a link to a result shows the result's skeleton,
@@ -91,12 +93,14 @@ export function ImportPage() {
     )
   const failed = view.error ?? table.error
   const body = (render: () => React.ReactNode) =>
-    failed !== null ? (
+    failed !== null || malformed ? (
       <div className="mx-auto max-w-2xl px-4 pt-6 sm:px-9">
         <Alert variant="destructive">
           <AlertTitle>This import could not be opened</AlertTitle>
           <AlertDescription>
-            {sayError(failed).sentence}
+            {failed === null
+              ? "The address does not name an import. Check the link, or choose a file."
+              : sayError(failed).sentence}
             <Button variant="outline" size="sm" onClick={() => navigate("/")}>
               Choose a file
             </Button>

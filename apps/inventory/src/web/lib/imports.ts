@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { MutableHashMap, Option } from "effect"
+import type { ImportId } from "../../domain/Ids.ts"
+import { Effect, MutableHashMap, Option } from "effect"
 import type { ImportView, OpenImports } from "../../api/v1/Api.ts"
 import type { StagedTable } from "../../domain/ItemImport.ts"
 import type { SheetChoice, SheetSummary } from "../../domain/Spreadsheet.ts"
@@ -8,29 +9,32 @@ import { cacheChange } from "@inventory/client/Optimistic"
 import { queryKeys } from "./queries.ts"
 
 /** How the import's view is fetched: by its hook, and ahead of it by the workspace when the address names one. */
-export const importViewQuery = (id: string | undefined) => ({
+export const importViewQuery = (id: ImportId | undefined) => ({
   queryKey: queryKeys.import(id),
-  queryFn: () => call((api) => api.imports.get({ params: { id: id ?? "" } })),
+  // Never run with no id (`enabled`); the guard is for the type.
+  queryFn: () =>
+    call((api) => (id === undefined ? Effect.die("no import is open") : api.imports.get({ params: { id } }))),
   enabled: id !== undefined
 })
 
 /** How the staged file's rows are fetched. They never change once staged, so they are fetched once and kept. */
-export const importTableQuery = (id: string | undefined) => ({
+export const importTableQuery = (id: ImportId | undefined) => ({
   queryKey: queryKeys.importTable(id),
-  queryFn: () => call((api) => api.imports.table({ params: { id: id ?? "" } })),
+  queryFn: () =>
+    call((api) => (id === undefined ? Effect.die("no import is open") : api.imports.table({ params: { id } }))),
   enabled: id !== undefined,
   staleTime: Infinity,
   gcTime: Infinity
 })
 
 /** The import as the server has it now: status, what is already stored, the result once confirmed. */
-export function useImportView(id: string | undefined) {
+export function useImportView(id: ImportId | undefined) {
   // Coming back to the tab asks again, however fresh, so decisions made on another screen show up.
   return useQuery({ ...importViewQuery(id), refetchOnWindowFocus: "always" })
 }
 
 /** The staged file's rows, fetched once and kept. */
-export function useImportTable(id: string | undefined) {
+export function useImportTable(id: ImportId | undefined) {
   return useQuery(importTableQuery(id))
 }
 

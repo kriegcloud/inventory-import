@@ -25,6 +25,7 @@ import {
   suggestionToStored
 } from "../domain/ItemImport.ts"
 import { LiteralKit } from "@beep/schema/LiteralKit"
+import { RowId, SuggestionId } from "../domain/Ids.ts"
 import {
   answerByRules,
   digest,
@@ -130,9 +131,9 @@ export const propose = Effect.fn("Suggestions.propose")(function* (input: {
 
 // A suggestion as its table's columns hold it; `suggestionFromStored` reads it and `suggestionToStored` writes it.
 const Stored = S.Struct({
-  id: S.String,
+  id: SuggestionId,
   kind: SuggestionKind,
-  rowId: S.String,
+  rowId: S.Union([RowId, S.Literal("")]),
   rowNumber: S.NullOr(S.Int),
   field: Field,
   from: S.String,
@@ -243,7 +244,7 @@ export class Suggestions extends Context.Service<
         const at = DateTime.formatIso(now)
         const rows = yield* Effect.forEach(
           proposed.suggestions,
-          (made) => Effect.map(random.uuidV4(), (id) => storedSuggestion({ id, made })),
+          (made) => Effect.map(random.uuidV4(), (id) => storedSuggestion({ id: SuggestionId.make(id), made })),
           { concurrency: 1 }
         )
         const activity = yield* random.uuidV4()

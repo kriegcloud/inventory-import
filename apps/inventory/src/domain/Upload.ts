@@ -6,6 +6,7 @@
  */
 import { Array as Arr } from "effect"
 import { FileProblem, fileProblem } from "./FileProblem.ts"
+import { ImportId } from "./Ids.ts"
 import { maxStagedRows, type StagedRow } from "./ItemImport.ts"
 import * as S from "effect/Schema"
 
@@ -54,14 +55,14 @@ export const UploadState = S.TaggedUnion({
   },
   Saving: {
     fileName: S.String,
-    uploadId: S.String,
+    uploadId: ImportId,
     rowsSaved: S.Int.annotateKey({ description: "Rows in the pieces the server has acknowledged, each piece once" }),
     rows: S.Int.annotateKey({ description: "Data rows in the file: what will be staged" })
   },
   /** Every piece arrived; the server is turning the upload into an import and preparing its review. */
-  Preparing: { fileName: S.String, uploadId: S.String, rows: S.Int },
+  Preparing: { fileName: S.String, uploadId: ImportId, rows: S.Int },
   /** The person pressed Cancel: the reader is stopped and the server is deleting what arrived. */
-  Cancelling: { fileName: S.String, uploadId: S.NullOr(S.String) },
+  Cancelling: { fileName: S.String, uploadId: S.NullOr(ImportId) },
   /** The file itself cannot be staged, found by the reader or by the server: what is wrong and what to do. */
   Refused: { problem: FileProblem },
   /** Something that is not the file stopped it (the network, the server, the browser): the sentence says what to do. */

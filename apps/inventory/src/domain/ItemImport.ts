@@ -10,6 +10,7 @@
  * Each rule is one kind of problem (`problemKinds`), one check (`fault`) and at most one proposal (`proposeFor`).
  */
 import { LiteralKit } from "@beep/schema/LiteralKit"
+import { RowId, SuggestionId } from "./Ids.ts"
 import { Array as Arr, HashMap, HashSet, Option, Record as Rec, String as Str, Tuple } from "effect"
 import { type FileProblem, fileProblem } from "./FileProblem.ts"
 import {
@@ -371,7 +372,7 @@ export const SuggestionKind = LiteralKit(["name", "category", "column"]).annotat
 /** The decoded value of `SuggestionKind`. */
 export type SuggestionKind = typeof SuggestionKind.Type
 
-const suggestionId = S.String.pipe(S.annotateKey({ description: "The suggestion's id" }))
+const suggestionId = SuggestionId.pipe(S.annotateKey({ description: "The suggestion's id" }))
 const suggestionConfidence = LiteralKit(["medium", "low"]).pipe(
   S.annotateKey({
     description: "How sure it is, set by the guard from the file's rows, never by the model: medium at most"
@@ -383,9 +384,7 @@ const suggestionBasis = S.String.pipe(
 // What a suggestion for one row's cell says: the row, the cell as the file has it, and the value suggested.
 const rowSuggestion = {
   id: suggestionId,
-  rowId: bounded(40).pipe(
-    S.annotateKey({ description: "The row it is for, as the review keys rows (`row-7`)", examples: ["row-7"] })
-  ),
+  rowId: RowId.pipe(S.annotateKey({ description: "The row it is for, as the review keys rows (`row-7`)" })),
   rowNumber: S.Int.pipe(S.annotateKey({ description: "That row's number in the file" })),
   from: S.String.pipe(S.annotateKey({ description: "The cell exactly as the file has it" })),
   to: S.String.pipe(S.annotateKey({ description: "The suggested value", examples: ["Nylon Coil"] })),
@@ -449,7 +448,7 @@ export type Suggestion = typeof Suggestion.Type
 export type NewSuggestion =
   | {
       readonly kind: "name" | "category"
-      readonly rowId: string
+      readonly rowId: RowId
       readonly rowNumber: number
       readonly from: string
       readonly to: string
@@ -472,7 +471,7 @@ export const suggestionField = (suggestion: NewSuggestion): Field =>
   suggestion.kind === "column" ? suggestion.field : suggestion.kind
 
 /** A new suggestion as it is stored, with its id. */
-export const storedSuggestion = (input: { readonly id: string; readonly made: NewSuggestion }): Suggestion => {
+export const storedSuggestion = (input: { readonly id: SuggestionId; readonly made: NewSuggestion }): Suggestion => {
   const { id, made } = input
   if (made.kind === "column") {
     const { kind: _kind, ...column } = made
@@ -484,9 +483,9 @@ export const storedSuggestion = (input: { readonly id: string; readonly made: Ne
 
 /** A suggestion as the columns of `importSuggestion` hold it: the row id is empty, not null, for a column. */
 export type StoredSuggestionRow = {
-  readonly id: string
+  readonly id: SuggestionId
   readonly kind: SuggestionKind
-  readonly rowId: string
+  readonly rowId: RowId | ""
   readonly rowNumber: number | null
   readonly field: Field
   readonly from: string
@@ -819,8 +818,10 @@ export type SavedDecisions = typeof SavedDecisions.Type
  * rowId({ rowNumber: 56 }) // "row-56"
  * rowId({ rowNumber: 8, part: 2 }) // "row-8.2"
  */
-export const rowId = (input: { readonly rowNumber: number; readonly part?: number | undefined }): string =>
-  input.part === undefined || input.part === 0 ? `row-${input.rowNumber}` : `row-${input.rowNumber}.${input.part}`
+export const rowId = (input: { readonly rowNumber: number; readonly part?: number | undefined }): RowId =>
+  RowId.make(
+    input.part === undefined || input.part === 0 ? `row-${input.rowNumber}` : `row-${input.rowNumber}.${input.part}`
+  )
 
 /**
  * Where an item is, as a sentence names it after "row": the row's number, and the file's word for the item when
@@ -1114,7 +1115,7 @@ export type ReviewedRow = {
   /** The file's word for it among its row's items, when the row holds several. */
   readonly partLabel?: string
   /** `rowId` of its row and part: what decisions, rivals and outcomes are keyed on. */
-  readonly id: string
+  readonly id: RowId
   /** The file's text by field. */
   readonly file: Readonly<Record<Field, string>>
   /** The values after the rules' fixes and the person's decisions: what would be imported. */
@@ -1660,7 +1661,7 @@ type FileRow = {
   readonly rowNumber: number
   readonly part: number
   readonly label: string | null
-  readonly id: string
+  readonly id: RowId
   /** Its position among the file's items, so "the first one kept" follows the file's order. */
   readonly order: number
   readonly file: Readonly<Record<Field, string>>
@@ -2689,7 +2690,10 @@ export const recheckRow = (input: {
   readonly suggestions?: ReadonlyArray<Suggestion>
 }): ((row: { readonly id: string; readonly values: Readonly<Record<string, string>> }) => Problem | undefined) => {
   const ctx = makeContext(input)
-  const byId = Rec.fromEntries(Arr.map(ctx.rows, (row) => [row.id, row] as const))
+  // Keyed by plain text: the screen asks by the key its region holds for the row.
+  const byId: Readonly<Record<string, (typeof ctx.rows)[number]>> = Rec.fromEntries(
+    Arr.map(ctx.rows, (row) => [row.id, row] as const)
+  )
   const byKey = Arr.groupBy(
     Arr.filter(ctx.rows, (row) => skuKey({ sku: row.file.sku }) !== ""),
     (row) => `sku:${skuKey({ sku: row.file.sku })}`

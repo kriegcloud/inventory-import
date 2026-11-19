@@ -25,6 +25,7 @@ import { toast } from "sonner"
 import type { ImportView } from "../../../api/v1/Api.ts"
 import { apiPrefix } from "../../../api/v1/Version.ts"
 import { FileProblem } from "../../../domain/FileProblem.ts"
+import { type ImportId, UploadKey } from "../../../domain/Ids.ts"
 import {
   matchedColumn,
   requiredFields,
@@ -100,7 +101,7 @@ type Failure = { readonly _tag: "Failed"; readonly step: "read" | "save" }
 let running: {
   fiber: Fiber.Fiber<Finished, UploadError>
   fileName: string
-  uploadId: string | null
+  uploadId: ImportId | null
   onEnd: (end: UploadEnd) => void
 } | null = null
 
@@ -143,7 +144,7 @@ const reader = (request: ReadRequest) =>
 /** Reads `file` in the worker, sends it in chunks as they arrive, and finishes it. Reports each step to the store. */
 const program = Effect.fn("upload.program")(function* (client: Client, request: ReadRequest) {
   const fileName = request.file.name
-  const begun = yield* Deferred.make<{ readonly id: string; readonly sizes: ReadonlyArray<number> }>()
+  const begun = yield* Deferred.make<{ readonly id: ImportId; readonly sizes: ReadonlyArray<number> }>()
   const chunks: Array<ReadonlyArray<StagedRow>> = []
   const acknowledged: Array<number> = []
   let head: StagedHead | undefined
@@ -172,7 +173,7 @@ const program = Effect.fn("upload.program")(function* (client: Client, request: 
           const rows = message.chunkSizes.reduce((sum, size) => sum + size, 0)
           // One key for this file: a begin sent again after a lost answer is the same upload on the server, so the
           // begin can be retried like every other step.
-          const key = SecureRandom.uuidV4Unsafe()
+          const key = UploadKey.make(SecureRandom.uuidV4Unsafe())
           const { id } = yield* staged(
             client.imports.beginUpload({
               payload: { key, head: read, rowCount: rows, chunkCount: message.chunkSizes.length }
@@ -219,7 +220,7 @@ const program = Effect.fn("upload.program")(function* (client: Client, request: 
 })
 
 /** Asks the server to delete an upload. Resolves to whether it answered. */
-const discard = (uploadId: string): Promise<boolean> =>
+const discard = (uploadId: ImportId): Promise<boolean> =>
   runExit(Fiber.join(fork((client) => client.imports.discardUpload({ params: { id: uploadId } })))).then(Exit.isSuccess)
 
 /** Puts a finished upload where the next screen looks for it, and moves on to it if the person is still here. */
@@ -244,7 +245,7 @@ const start = (queryClient: QueryClient, file: File, sheet: string | null, onEnd
   if (running !== null) return
   set({ _tag: "Reading", fileName: file.name, rowsRead: 0, rowsAbout: null, exact: false })
   const fiber = fork((client) => program(client, { file, sheet }))
-  const current = { fiber, fileName: file.name, uploadId: null as string | null, onEnd }
+  const current = { fiber, fileName: file.name, uploadId: null as ImportId | null, onEnd }
   running = current
   fiber.addObserver((exit) => {
     // Cancel handles its own ending.

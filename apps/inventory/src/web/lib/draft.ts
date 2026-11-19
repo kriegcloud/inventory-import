@@ -2,6 +2,7 @@ import { stringify } from "@inventory/ui/Json"
 import { useCallback, useRef } from "react"
 import type { DecisionDelta } from "../../api/v1/Api.ts"
 import type { SavedDecisions } from "../../domain/ItemImport.ts"
+import type { ImportId } from "../../domain/Ids.ts"
 import { callWrite } from "./api.ts"
 import { isTransient, toastError } from "@inventory/client/SayError"
 
@@ -29,7 +30,7 @@ const isEmpty = (delta: DecisionDelta): boolean => Object.keys(delta.set).length
  * away) is told to `onRefused`, which puts the screen back to what the server holds.
  */
 export function useDecisionSaver(input: {
-  importId: string
+  importId: ImportId
   start: SavedDecisions
   /** Told the draft's revision after every save, and the decisions that are now on the server. */
   onSaved: (revision: number, decisions: SavedDecisions) => void

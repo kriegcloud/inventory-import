@@ -8,6 +8,7 @@ import { ModelCallsUsedUp } from "@inventory/access-contract/ModelAllowance"
 import { AiProvider, AnsweredBy } from "../../domain/Answer.ts"
 import { personName, reasonForPerson } from "../../domain/Described.ts"
 import { StagingOutcome } from "../../domain/FileProblem.ts"
+import { ConfirmId, ImportId, ItemId, RowId, UploadKey } from "../../domain/Ids.ts"
 import { ItemEdit, ItemFields, StoredItem } from "../../domain/Item.ts"
 import {
   Change,
@@ -386,7 +387,7 @@ export type ImportResult = typeof ImportResult.Type
  */
 export const ImportEvent = S.TaggedUnion({
   Confirmed: {
-    batchId: S.String.annotateKey({ description: "The confirm's id: what a take-back names in `confirms`" }),
+    batchId: ConfirmId.annotateKey({ description: "The confirm's id: what a take-back names in `confirms`" }),
     by: personName("Who confirmed"),
     at: Instant.pipe(S.annotateKey({ description: "When" })),
     created: S.Int.annotateKey({ description: "Items this confirm created" }),
@@ -395,7 +396,7 @@ export const ImportEvent = S.TaggedUnion({
     notImported: S.Int.annotateKey({ description: "Rows it left out" })
   },
   TakenBack: {
-    batchId: S.String.annotateKey({
+    batchId: ConfirmId.annotateKey({
       description: "The first confirm the take-back reversed; one take-back of several confirms is one event"
     }),
     by: personName("Who took it back"),
@@ -441,7 +442,7 @@ export const changedItemsShown = 20
  * such item has changed, nothing can be taken back, and the screen says so.
  */
 export const TakeBackState = S.Struct({
-  confirms: S.Array(S.String).annotateKey({
+  confirms: S.Array(ConfirmId).annotateKey({
     description: "The confirms still in force: what a take-back of the import would reverse"
   }),
   removable: S.Int.annotateKey({ description: "Items of those confirms still as the import created them" }),
@@ -467,7 +468,7 @@ export type TakeBackState = typeof TakeBackState.Type
  */
 export class ImportView extends S.Class<ImportView, { readonly brand: unique symbol }>("ImportView")(
   {
-    id: S.String.annotateKey({ description: "The import's id: the id its upload was given" }),
+    id: ImportId.annotateKey({ description: "The import's id: the id its upload was given" }),
     fileName: S.String.annotateKey({
       description: "The file's name as it was chosen",
       examples: ["items_messy.csv"]
@@ -490,10 +491,10 @@ export class ImportView extends S.Class<ImportView, { readonly brand: unique sym
     createdRows: S.Array(S.Int).annotateKey({
       description: "Rows an earlier confirm of this import turned into items: already there when it is opened again"
     }),
-    createdIds: S.String.pipe(S.Array, S.optionalKey).annotateKey({
+    createdIds: RowId.pipe(S.Array, S.optionalKey).annotateKey({
       description:
         "The items an earlier confirm of this import created, by row id (`row-7`, or `row-8.2` for the second item of row 8): what the review counts as already there",
-      examples: [["row-7", "row-8.2"]]
+      examples: [[RowId.make("row-7"), RowId.make("row-8.2")]]
     }),
     decisions: SavedDecisions.annotateKey({ description: "The saved draft: what has been decided about each row" }),
     suggestions: S.Array(Suggestion).annotateKey({
@@ -612,7 +613,7 @@ export const OpenImports = S.Struct({
 export type OpenImports = typeof OpenImports.Type
 
 const importId = {
-  id: S.String.check(S.isMaxLength(64)).annotateKey({
+  id: ImportId.annotateKey({
     description: "The id `beginUpload` answered: the upload's, and the import's once the upload has finished"
   })
 }
@@ -633,7 +634,7 @@ export class UploadNotFound extends S.TaggedError<UploadNotFound, { readonly bra
 
 /** The start of an upload: the file without its rows, and how many rows will follow in how many pieces. */
 export const UploadStart = S.Struct({
-  key: S.String.check(S.isMinLength(1), S.isMaxLength(64)).annotateKey({
+  key: UploadKey.annotateKey({
     description:
       "Chosen by the browser for this one file: a begin sent again with the same key (a retry after a lost answer) " +
       "is the same upload, not a second one"
@@ -707,7 +708,7 @@ export const pastImportsShown = 50
  * who confirmed it last and when, and how many of its items are stored now, counted from the items themselves.
  */
 export const PastImport = S.Struct({
-  id: S.String.annotateKey({ description: "The import's id: its result is at `/?import=<id>&step=result`" }),
+  id: ImportId.annotateKey({ description: "The import's id: its result is at `/?import=<id>&step=result`" }),
   fileName: S.String.annotateKey({ description: "The file it came from", examples: ["items_messy.csv"] }),
   rowCount: S.Int.annotateKey({ description: "The rows of the file", examples: [200] }),
   status: S.Literals(["open", "imported", "takenBack"]).annotateKey({
@@ -740,7 +741,7 @@ export type PastImports = typeof PastImports.Type
 
 /** One changed value of an imported row as the activity view shows it: the file it came from, when, and who. */
 export const ChangeRecord = S.Struct({
-  importId: S.String.annotateKey({ description: "The import that wrote the value" }),
+  importId: ImportId.annotateKey({ description: "The import that wrote the value" }),
   fileName: S.String.annotateKey({ description: "That import's file" }),
   rowNumber: S.Int.annotateKey({ description: "The row of the file, as Excel numbers it" }),
   part: S.Int.pipe(
@@ -795,7 +796,7 @@ export class ImportsApi extends HttpApiGroup.make("imports")
       ),
     HttpApiEndpoint.post("beginUpload", "/uploads", {
       payload: UploadStart,
-      success: StagingOutcome(S.Struct({ id: S.String.annotateKey({ description: "The upload's id" }) })),
+      success: StagingOutcome(S.Struct({ id: ImportId.annotateKey({ description: "The upload's id" }) })),
       error: Forbidden
     })
       .annotate(OpenApi.Summary, "Start an upload with the file's head")
@@ -915,7 +916,7 @@ export class ImportsApi extends HttpApiGroup.make("imports")
     HttpApiEndpoint.post("takeBack", "/:id/take-back", {
       params: importId,
       payload: S.Struct({
-        confirms: S.Array(S.String.check(S.isMaxLength(64)))
+        confirms: S.Array(ConfirmId)
           .check(S.isMinLength(1), S.isMaxLength(1000))
           .annotateKey({ description: "The confirms the screen offered to take back (TakeBackState.confirms)" })
       }),
@@ -1050,7 +1051,7 @@ export class ItemsApi extends HttpApiGroup.make("items")
       ),
     HttpApiEndpoint.put("edit", "/:id", {
       params: {
-        id: S.String.check(S.isMaxLength(64)).annotateKey({
+        id: ItemId.annotateKey({
           description: "The item's id, as `items.page` gives it (`id`)"
         })
       },

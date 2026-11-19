@@ -3,6 +3,7 @@
 // guard, never by the model.
 import { describe, expect, it, layer } from "@effect/vitest"
 import { Array as Arr, Effect, Option, Record as Rec, Ref } from "effect"
+import { SuggestionId } from "../../src/domain/Ids.ts"
 import messy from "../../public/samples/items_messy.csv?raw"
 import {
   decisionFromFlags,
@@ -97,7 +98,7 @@ describe("a stored suggestion", () => {
         answer: { names: [{ rowNumber: 7, name: "Nylon Coil" }], categories: [], columns: [] }
       }).suggestions
       const stored = Arr.map(made, (suggestion, index): Suggestion =>
-        storedSuggestion({ id: `sug_${index}`, made: suggestion })
+        storedSuggestion({ id: SuggestionId.make(`00000000-0000-4000-8000-00000000000${index}`), made: suggestion })
       )
       const waiting = yield* sourceOf(stored)
       const row = rowOf(waiting, 7)

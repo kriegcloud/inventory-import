@@ -6,12 +6,13 @@ import type { HttpApiClient } from "effect/http-api"
 import type { Api } from "../../../src/api/v1/Api.ts"
 import type { StagedTable } from "../../../src/domain/ItemImport.ts"
 import { uploadChunks } from "../../../src/domain/Upload.ts"
+import { type ImportId, UploadKey } from "../../../src/domain/Ids.ts"
 
 type Client = HttpApiClient.ForApi<typeof Api>
 
 // Each upload a test starts gets its own key, as each file the browser starts to send does.
 const started = MutableRef.make(0)
-const nextKey = Effect.sync(() => `test-upload-${MutableRef.incrementAndGet(started)}`)
+const nextKey = Effect.sync(() => UploadKey.make(`test-upload-${MutableRef.incrementAndGet(started)}`))
 
 /**
  * Begins an upload of `table` and sends no rows. Returns the upload id, the chunks to send and the key it began with;
@@ -20,7 +21,7 @@ const nextKey = Effect.sync(() => `test-upload-${MutableRef.incrementAndGet(star
 export const beginUpload = Effect.fn("beginUpload")(function* (input: {
   readonly client: Client
   readonly table: StagedTable
-  readonly key?: string
+  readonly key?: UploadKey
 }) {
   const { client, table } = input
   const { rows, ...head } = table
@@ -36,7 +37,7 @@ export const beginUpload = Effect.fn("beginUpload")(function* (input: {
 /** Sends chunk `seq` of an upload. Answers the step's StagingOutcome as it is. */
 export const putChunk = (input: {
   readonly client: Client
-  readonly id: string
+  readonly id: ImportId
   readonly chunks: ReadonlyArray<StagedTable["rows"]>
   readonly seq: number
 }) =>
@@ -58,7 +59,7 @@ export const upload = Effect.fn("upload")(function* (input: { readonly client: C
 })
 
 /** Finishes an upload: the import it became, or its FileProblem as the failure. */
-export const finishUpload = (input: { readonly client: Client; readonly id: string }) =>
+export const finishUpload = (input: { readonly client: Client; readonly id: ImportId }) =>
   Effect.flatMap(input.client.imports.finishUpload({ params: { id: input.id } }), Effect.fromResult)
 
 /** Sends chunk `seq` of an upload: what was stored, or its FileProblem as the failure. */

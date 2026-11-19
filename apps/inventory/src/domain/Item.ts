@@ -16,6 +16,7 @@ import {
 import { Instant } from "@inventory/kernel/Text"
 import { personName } from "./Described.ts"
 import * as S from "effect/Schema"
+import { ItemId } from "./Ids.ts"
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import { nullAsNone } from "@inventory/kernel/Wire"
 
@@ -307,7 +308,7 @@ export type ItemFields = typeof ItemFields.Type
 
 /** An item as stored for one organization. */
 export const StoredItem = S.Struct({
-  id: S.String.annotateKey({ description: "The item's id, given when the import created it" }),
+  id: ItemId.annotateKey({ description: "The item's id, given when the import created it" }),
   ...ItemFields.fields,
   createdAt: Instant.pipe(S.annotateKey({ description: "When the import created the item" })),
   createdBy: personName("Who confirmed the import that created the item"),

@@ -1,3 +1,4 @@
+import type { ImportId } from "../../../domain/Ids.ts"
 import { SheetIcon } from "lucide-react"
 import { SheetChooser } from "@/components/app/SheetChooser"
 import { Button } from "@inventory/ui/components/button"
@@ -13,7 +14,7 @@ import { useUpload } from "@/lib/upload"
  * file, and the sheet's name is in the review's activity instead. Another sheet is a new upload, so the person goes
  * to the upload screen and watches it there.
  */
-export function SheetButton(props: { importId: string }) {
+export function SheetButton(props: { importId: ImportId }) {
   const upload = useUpload()
   const workbook = workbookOf(props.importId)
   if (workbook === undefined || workbook.sheets.filter((sheet) => sheet.rowCount > 0).length < 2) return null

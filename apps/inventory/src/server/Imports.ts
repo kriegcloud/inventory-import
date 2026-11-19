@@ -54,10 +54,11 @@ import {
 } from "../domain/ItemImport.ts"
 import { abandonedAfterMinutes, chunkRows, maxChunkChars } from "../domain/Upload.ts"
 import { D1, NoRows } from "@beep/d1/D1"
+import { ConfirmId, ImportId } from "../domain/Ids.ts"
 
 /** An import as stored, without its rows. */
 export const Draft = S.Struct({
-  id: S.String,
+  id: ImportId,
   fileName: S.String,
   headJson: S.String,
   rowCount: S.Int,
@@ -111,7 +112,7 @@ const textOf = (item: ItemFields | null): number =>
 
 /** An upload that has not finished: who started it, what file, and how many rows in how many pieces will follow. */
 export const Upload = S.Struct({
-  id: S.String,
+  id: ImportId,
   fileName: S.String,
   headJson: S.String,
   rowCount: S.Int,
@@ -238,7 +239,7 @@ const ChangeInsert = S.Struct({
 const ChangeInserts = ChangeInsert.pipe(S.Array, S.fromJsonString)
 
 const ChangeRow = S.Struct({
-  importId: S.String,
+  importId: ImportId,
   fileName: S.String,
   rowNumber: S.Int,
   part: S.Int,
@@ -272,7 +273,7 @@ const whoDecided = (row: typeof OutcomeRow.Type): DecidedBy =>
 
 // A confirm as `importBatch` stores it: what it did, and the take-back that reversed it, if one did.
 const BatchRow = S.Struct({
-  id: S.String,
+  id: ConfirmId,
   confirmedByName: S.String,
   confirmedAt: Instant,
   created: S.Int,
@@ -309,7 +310,7 @@ export class Imports extends Context.Service<
       key: string,
       head: StagedHead,
       counts: { readonly rowCount: number; readonly chunkCount: number }
-    ): Effect.Effect<Result.Result<string, FileProblem>>
+    ): Effect.Effect<Result.Result<ImportId, FileProblem>>
     /** The caller's own unfinished upload with this id. Another member's, or one that finished, is none. */
     findUpload(actor: Member, id: string): Effect.Effect<Option.Option<Upload>>
     /**
@@ -541,7 +542,7 @@ export class Imports extends Context.Service<
       })
       const findUploadByKey = SqlSchema.findOne({
         Request: S.Struct({ org: OrganizationId, actor: MemberId, key: S.String }),
-        Result: S.Struct({ id: S.String }),
+        Result: S.Struct({ id: ImportId }),
         execute: ({ org, actor, key }) =>
           sql`SELECT id FROM importUpload WHERE organizationId = ${org} AND actorId = ${actor} AND requestKey = ${key}`
       })
@@ -599,7 +600,8 @@ export class Imports extends Context.Service<
         head: StagedHead,
         counts: { readonly rowCount: number; readonly chunkCount: number }
       ) {
-        const id = yield* random.uuidV4()
+        const made = yield* random.uuidV4()
+        const id = ImportId.make(made)
         const now = yield* DateTime.now
         const at = DateTime.formatIso(now)
         const before = DateTime.formatIso(DateTime.subtract(now, { minutes: abandonedAfterMinutes }))
@@ -1504,7 +1506,7 @@ export class Imports extends Context.Service<
         WHERE organizationId = ${org} AND importId = ${id} AND takeBackId IS NULL)`
       const confirmsInForce = D1.statement({
         Request: Scope,
-        Result: Ids,
+        Result: S.Array(S.Struct({ id: ConfirmId })),
         execute: (r) => sql`SELECT id FROM importBatch WHERE organizationId = ${r.org} AND importId = ${r.id}
           AND takeBackId IS NULL ORDER BY confirmedAt, rowid`
       })

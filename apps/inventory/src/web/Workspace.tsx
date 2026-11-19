@@ -11,6 +11,8 @@ import {
 } from "@inventory/ui/components/breadcrumb"
 import { ReviewSkeleton, someColumns, StepsSkeleton, TablePageSkeleton, UploadSkeleton } from "@inventory/ui/Skeletons"
 import { useActor } from "@/lib/actor"
+import type { ImportId } from "../domain/Ids.ts"
+import { importInAddress } from "@/lib/route"
 import { importTableQuery, importViewQuery, useImportView } from "@/lib/imports"
 import { queryClient } from "@/lib/queries"
 import { useContentBelow } from "@inventory/ui/ContentWidth"
@@ -24,7 +26,7 @@ const ImportPage = lazy(() => importPage().then((module) => ({ default: module.I
 // the address names an import, its view and rows are asked for now too, beside the page's code instead of after it.
 if (window.location.pathname === "/") {
   void importPage()
-  const opened = new URLSearchParams(window.location.search).get("import") ?? undefined
+  const opened = importInAddress(new URLSearchParams(window.location.search)).id
   if (opened !== undefined) {
     void queryClient.prefetchQuery(importViewQuery(opened))
     void queryClient.prefetchQuery(importTableQuery(opened))
@@ -72,7 +74,7 @@ function PageSkeleton(props: { path: string; params: URLSearchParams }) {
  * Where the person is, in the bar beside the sidebar's button: the organization, the page, and the file when an
  * import is open. The organization gives way first on a narrow screen; the sidebar already names it.
  */
-function Crumbs(props: { page: AppPage; importId: string | undefined }) {
+function Crumbs(props: { page: AppPage; importId: ImportId | undefined }) {
   const { actor } = useActor()
   // The same cached answer the import page reads: no second request.
   const fileName = useImportView(props.importId).data?.fileName
@@ -128,7 +130,7 @@ export default function Workspace() {
       fill
       title="Inventory import"
       sidebar={<AppSidebar current={current.path} />}
-      crumbs={<Crumbs page={current} importId={params.get("import") ?? undefined} />}
+      crumbs={<Crumbs page={current} importId={importInAddress(params).id} />}
     >
       <Suspense fallback={<PageSkeleton path={path} params={params} />}>
         {current.path === peoplePath ? (

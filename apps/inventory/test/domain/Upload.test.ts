@@ -1,6 +1,7 @@
 // What the upload screen says about how far it is. The rule that would hurt most if wrong: the screen never says more
 // rows are done than there are ("Saving 51,000 of 50,000 rows"), whatever the estimate did and however often a piece
 // was sent again.
+import { ImportId } from "../../src/domain/Ids.ts"
 import { describe, expect, it } from "@effect/vitest"
 import { Array as Arr } from "effect"
 import * as S from "effect/Schema"
@@ -45,7 +46,13 @@ describe("progress", () => {
     },
     ({ saved, rows }) => {
       const { done, total } = progressOf({
-        state: { _tag: "Saving", fileName: "items.csv", uploadId: "u", rowsSaved: saved, rows }
+        state: {
+          _tag: "Saving",
+          fileName: "items.csv",
+          uploadId: ImportId.make("00000000-0000-4000-8000-000000000001"),
+          rowsSaved: saved,
+          rows
+        }
       })
       expect(total).toBe(rows)
       expect(done).toBeGreaterThanOrEqual(0)

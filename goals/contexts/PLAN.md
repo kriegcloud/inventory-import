@@ -287,3 +287,22 @@ None.
     request sent `"12.5"`, the answer 200 with `"12.5"`, the row reads "$12.50" and the editor "12.5". Typed
     "1.23456", Save: "Unit cost is not an amount in dollars with up to 4 decimals. Write it as digits, for example
     12.50."
+- **catalog (i), last part: the ids are branded.** `src/domain/Ids.ts`: `ImportId`, `ItemId`, `ConfirmId`,
+  `SuggestionId` (UUIDs), `UploadKey` (1 to 64 characters) and `RowId` (`row-7`, `row-8.2`). They are on the paths
+  (`/imports/:id`, `/items/:id`), `ImportView.id` and `createdIds`, `PastImport.id`, `ChangeRecord.importId`,
+  `ImportEvent.batchId`, `TakeBackState.confirms`, the take-back's `confirms`, `UploadStart.key`, `StoredItem.id`, a
+  suggestion's `id` and `rowId`, a reviewed row's `id` and the upload's state. The server's row schemas for a draft,
+  an upload, a confirm and a change decode the id columns with them; its other private statements still bind plain
+  text and move to the brands with `catalog-host`.
+  - A decision's key and the review region's row key stay plain text (the brief: `RowKey` stays bounded text), so
+    `recheckRow` is asked by text.
+  - Wire change, as the brief lists it: a malformed id in a path answers 400 where it answered 404.
+  - On the screen the address is read once (`importInAddress`, `src/web/lib/route.ts`): an `import=` that is no id is
+    not sent to the server, and the page says so under the same title. **One new sentence**, mine and not in the
+    brief: "The address does not name an import. Check the link, or choose a file."
+  - Read on screen, fresh database: the messy sample "Import 155, skip 45"; "Leave out 2": "Import 157, skip 43",
+    the same after a refresh; confirmed "Not imported 43 · Imported 157 · Already there 0 · All 200" at
+    `/?import=<uuid>&step=result`; "Take back this import? This removes the 157 items ...": "Taken back 157 · Not
+    imported 43 · Imported 0", Items "0 items". `/?import=nope&step=review`: "This import could not be opened. The
+    address does not name an import. Check the link, or choose a file."; an id no import has: "No import with that
+    id in your organization." Asked directly: `GET /imports/nope` 400, an unknown UUID 404, `PUT /items/nope` 400.

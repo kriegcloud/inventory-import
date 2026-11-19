@@ -1,8 +1,6 @@
 import { Array as Arr } from "effect"
 import { FileProblem, fileProblem } from "@inventory/catalog-contract/FileProblem"
-import { ImportId } from "@inventory/catalog-contract/Ids"
 import { maxStagedRows, type StagedRow } from "@inventory/catalog-contract/Staged"
-import * as S from "effect/Schema"
 import { chunkRows } from "@inventory/catalog-contract/Upload"
 
 /**
@@ -34,69 +32,6 @@ export const fitsChunks = (input: { readonly rowCount: number; readonly chunkCou
   input.chunkCount <= input.rowCount &&
   input.chunkCount >= Math.ceil(input.rowCount / chunkRows) &&
   input.rowCount <= maxStagedRows
-
-/**
- * Where one upload stands, as the screen shows it. Each state carries only what is needed to say so in words and
- * numbers; `progressOf` turns it into a bar.
- */
-export const UploadState = S.TaggedUnion({
-  /** Nothing chosen, or the last upload finished, failed or was cancelled. */
-  Idle: {},
-  Reading: {
-    fileName: S.String,
-    rowsRead: S.Int.annotateKey({ description: "Rows of the file read so far, heading and blank rows included" }),
-    rowsAbout: S.NullOr(S.Int).annotateKey({
-      description:
-        "How many rows the file has: worked out from how much of a CSV has been read (an estimate), counted for a " +
-        "workbook once it is open (exact), and null while a workbook is still being opened"
-    }),
-    exact: S.Boolean.annotateKey({ description: "True when rowsAbout is a count, not an estimate" })
-  },
-  Saving: {
-    fileName: S.String,
-    uploadId: ImportId,
-    rowsSaved: S.Int.annotateKey({ description: "Rows in the pieces the server has acknowledged, each piece once" }),
-    rows: S.Int.annotateKey({ description: "Data rows in the file: what will be staged" })
-  },
-  /** Every piece arrived; the server is turning the upload into an import and preparing its review. */
-  Preparing: { fileName: S.String, uploadId: ImportId, rows: S.Int },
-  /** The person pressed Cancel: the reader is stopped and the server is deleting what arrived. */
-  Cancelling: { fileName: S.String, uploadId: S.NullOr(ImportId) },
-  /** The file itself cannot be staged, found by the reader or by the server: what is wrong and what to do. */
-  Refused: { problem: FileProblem },
-  /** Something that is not the file stopped it (the network, the server, the browser): the sentence says what to do. */
-  Failed: {
-    fileName: S.String,
-    step: S.Literals(["read", "save"]).annotateKey({ description: "Reading the file, or saving it" }),
-    message: S.String.annotateKey({ description: "What happened and what to do, for the person" })
-  }
-}).annotate({ description: "Where one upload stands, as the screen shows it" })
-/** The decoded value of `UploadState`: where one upload stands, as the screen shows it. */
-export type UploadState = typeof UploadState.Type
-
-/**
- * How far an upload is, for a bar: `done` of `total`, where `total` is null while nobody can know it. `done` never
- * passes `total`: a CSV's estimate is raised to the rows already read, and saved rows are capped at the file's rows.
- *
- * @example progressOf({ state: { _tag: "Reading", fileName: "items.csv", rowsRead: 52000, rowsAbout: 50000, exact: false } })
- * // { done: 52000, total: 52000 }
- */
-export const progressOf = (input: { readonly state: UploadState }): { done: number; total: number | null } => {
-  const { state } = input
-  switch (state._tag) {
-    case "Reading":
-      return {
-        done: Math.max(0, state.rowsRead),
-        total: state.rowsAbout === null ? null : Math.max(state.rowsAbout, state.rowsRead, 0)
-      }
-    case "Saving":
-      return { done: Math.min(Math.max(0, state.rowsSaved), state.rows), total: state.rows }
-    case "Preparing":
-      return { done: state.rows, total: state.rows }
-    default:
-      return { done: 0, total: null }
-  }
-}
 
 /**
  * How many rows a CSV probably has, from how far its text has been read: never fewer than the rows already read, and

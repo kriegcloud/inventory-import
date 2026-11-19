@@ -31,14 +31,17 @@
     "./Conversation": "./src/Conversation.machine.ts",
     "./TableViewState": "./src/internal/view.ts",
     "./Route": "./src/internal/route.ts",
-    "./AnsweredByWords": "./src/internal/answeredBy.ts"
+    "./AnsweredByWords": "./src/internal/answeredBy.ts",
+    "./UploadMachine": "./src/Upload.machine.ts"
   },
   "scripts": {
-    "check": "tsrs -p tsconfig.json && node ../../../scripts/check-strict.mjs strict-ceiling.json",
-    "lint": "oxlint --quiet src; lint=$?; oxlint --disable-nested-config --deny-warnings -c ../../../.oxlintrc.shadcn.json src && exit $lint"
+    "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json && node ../../../scripts/check-strict.mjs strict-ceiling.json",
+    "lint": "oxlint --quiet src; lint=$?; oxlint --disable-nested-config --deny-warnings -c ../../../.oxlintrc.shadcn.json src && exit $lint",
+    "test": "vitest run"
   },
   "dependencies": {
     "@beep/csv": "workspace:*",
+    "@beep/schema": "workspace:*",
     "@inventory/catalog-contract": "workspace:*",
     "@inventory/catalog-model": "workspace:*",
     "@inventory/client": "workspace:*",
@@ -53,11 +56,14 @@
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
+    "@effect/vitest": "4.1.4",
+    "@types/node": "^24.19.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "oxlint": "1.93.0",
     "tsrs": "0.25.0-ts7.1.0-beta",
-    "typescript": "~7.0.2"
+    "typescript": "~7.0.2",
+    "vitest": "^5.1.0"
   },
   "peerDependencies": {
     "react": "^19.3.1",

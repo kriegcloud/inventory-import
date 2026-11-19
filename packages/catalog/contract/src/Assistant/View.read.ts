@@ -1,6 +1,8 @@
 import * as S from "effect/Schema"
 import { AnsweredBy } from "../Answer/AnsweredBy.read.ts"
 import { nullAsNone } from "@inventory/kernel/Wire"
+import { LiteralKit } from "@beep/schema/LiteralKit"
+import { Tuple } from "effect"
 
 // WHAT THE TABLE ASSISTANT MAY ASK OF A TABLE, AND NOTHING MORE. A person types what they want to see; a model (or the
 // fixed rules) answers with a `ViewCommand`: sort, filter, search, show or hide a column, clear. The command changes
@@ -85,14 +87,14 @@ export type ColumnCatalog = typeof ColumnCatalog.Type
 
 /** Order the table by one column. It replaces the order the table had. */
 export const SortChange = S.Struct({
-  kind: S.Literal("sort"),
+  kind: S.tag("sort"),
   column: ColumnId,
   direction: S.Literals(["asc", "desc"]).annotateKey({ description: "asc: A to Z, low to high. desc: the reverse" })
 }).annotate({ description: "Order the table by one column, replacing the order it had" })
 
 /** Keep only the rows whose column passes a comparison. It replaces any filter the column had. */
 export const FilterChange = S.Struct({
-  kind: S.Literal("filter"),
+  kind: S.tag("filter"),
   column: ColumnId,
   operator: ViewOperator,
   values: S.Array(Text(200)).check(S.isMaxLength(50)).annotateKey({
@@ -109,29 +111,47 @@ export const maxSearchText = 200
  * says it has a search box allows it.
  */
 export const SearchChange = S.Struct({
-  kind: S.Literal("search"),
+  kind: S.tag("search"),
   text: Text(maxSearchText).annotateKey({
     description:
       'The words to put in the search box, as the person would type them ("m8 washer"); empty to stop searching'
   })
 }).annotate({ description: "Search the table: the words are found in any order, ignoring case and accents" })
 
-/** Show or hide one column. */
-export const ColumnChange = S.Struct({
-  kind: S.Literals(["show", "hide"]),
+/** Show one column the view had hidden. */
+export const ShowChange = S.Struct({
+  kind: S.tag("show"),
   column: ColumnId
-}).annotate({ description: "Show or hide one column" })
+}).annotate({ description: "Show one column" })
+
+/** Hide one column. A column the table always shows cannot be hidden: `checkCommand` refuses it. */
+export const HideChange = S.Struct({
+  kind: S.tag("hide"),
+  column: ColumnId
+}).annotate({ description: "Hide one column" })
 
 /** Put part of the view back as the table opens: its filters, its order, its search, its columns, or all of them. */
 export const ClearChange = S.Struct({
-  kind: S.Literal("clear"),
+  kind: S.tag("clear"),
   what: S.Literals(["everything", "filters", "sorting", "search", "columns"])
 }).annotate({ description: "Put part of the view back as the table opens" })
 
-/** One change to a table's view. */
-export const ViewChange = S.Union([SortChange, FilterChange, SearchChange, ColumnChange, ClearChange]).annotate({
-  description: "One change to a table's view: sort, filter, search, show or hide a column, or clear"
+/** The six changes a view can take. */
+export const ViewChangeKind = LiteralKit(["sort", "filter", "search", "show", "hide", "clear"]).annotate({
+  description: "What a change to a view does: sort, filter, search, show a column, hide a column, or clear"
 })
+/** The decoded value of `ViewChangeKind`. */
+export type ViewChangeKind = typeof ViewChangeKind.Type
+
+/** One change to a table's view, by `kind`. */
+export const ViewChange = ViewChangeKind.mapMembers(() =>
+  Tuple.make(SortChange, FilterChange, SearchChange, ShowChange, HideChange, ClearChange)
+).pipe(
+  S.toTaggedUnion("kind"),
+  S.annotate({
+    description: "One change to a table's view: sort, filter, search, show or hide a column, or clear"
+  })
+)
 /** The decoded value of `ViewChange`. */
 export type ViewChange = typeof ViewChange.Type
 

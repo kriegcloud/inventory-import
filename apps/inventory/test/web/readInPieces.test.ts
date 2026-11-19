@@ -5,7 +5,7 @@
 import { Array as Arr, Effect } from "effect"
 import { describe, expect, it } from "vitest"
 import { readSpreadsheet, type ReadProgress } from "@inventory/catalog-web/Spreadsheet"
-import { progressOf } from "@inventory/catalog-model/Upload"
+import { progressOf, rowsOf } from "@inventory/catalog-web/UploadMachine"
 
 describe("reading CSV text in pieces", () => {
   it("reports progress that rises, ends exact, and never passes its total", () =>
@@ -26,7 +26,9 @@ describe("reading CSV text in pieces", () => {
           expect(after.rowsRead).toBeGreaterThanOrEqual(before.rowsRead)
         }
         for (const report of reports) {
-          const { done, total } = progressOf({ state: { _tag: "Reading", fileName: "big.csv", ...report } })
+          const { done, total } = progressOf({
+            state: { _tag: "Reading", fileName: "big.csv", rowsRead: report.rowsRead, rows: rowsOf(report) }
+          })
           expect(done).toBeLessThanOrEqual(total ?? Infinity)
         }
         // Rows of the file: the heading and 40,000 rows, not the empty record after the last line break.

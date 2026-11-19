@@ -32,7 +32,7 @@ import { catalogRuntime } from "./Catalog.runtime.ts"
 import { type UploadEnd, useUpload, type UploadState } from "./Upload.controller.ts"
 import type { ImportView } from "@inventory/catalog-contract/Import"
 import { fileProblemTitle } from "@inventory/catalog-contract/FileProblem"
-import { progressOf } from "@inventory/catalog-model/Upload"
+import { progressOf } from "./Upload.machine.ts"
 import { sayError } from "@inventory/client/SayError"
 
 /**
@@ -57,7 +57,7 @@ const line = (state: UploadState): string => {
     case "Reading":
       return total === null
         ? "Reading"
-        : `Reading ${whole.format(done)} of ${state.exact ? "" : "about "}${whole.format(total)} rows`
+        : `Reading ${whole.format(done)} of ${state.rows.kind === "counted" ? "" : "about "}${whole.format(total)} rows`
     case "Saving":
       return `Saving ${whole.format(done)} of ${whole.format(total ?? done)} rows`
     case "Preparing":

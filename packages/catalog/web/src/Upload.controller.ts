@@ -28,7 +28,8 @@ import { type ImportId, UploadKey } from "@inventory/catalog-contract/Ids"
 import { matchedColumn } from "@inventory/catalog-contract/Mapping"
 import { requiredFields, type StagedHead, type StagedRow, type StagedTable } from "@inventory/catalog-contract/Staged"
 import type { SheetChoice, SheetSummary } from "@inventory/catalog-model/Spreadsheet"
-import { savedRows, type UploadState } from "@inventory/catalog-model/Upload"
+import { savedRows } from "@inventory/catalog-model/Upload"
+import { rowsOf, type UploadState } from "./Upload.machine.ts"
 import { type Client, fork, runExit, apiPrefixOf } from "./Catalog.runtime.ts"
 import { rememberWorkbook } from "./Imports.controller.ts"
 import { navigate } from "@inventory/ui/Route"
@@ -37,7 +38,7 @@ import type { ReadMessage, ReadRequest } from "./internal/protocol.ts"
 import { sayError } from "@inventory/client/SayError"
 import { queryKeys } from "./Catalog.keys.ts"
 
-export type { UploadState } from "@inventory/catalog-model/Upload"
+export type { UploadState } from "./Upload.machine.ts"
 
 /** The reader itself failed (not the file): `message` says so, for the person. */
 class ReadFailed extends S.TaggedError<ReadFailed, { readonly brand: unique symbol }>()("ReadFailed", {
@@ -154,8 +155,7 @@ const program = Effect.fn("upload.program")(function* (client: Client, request: 
             _tag: "Reading",
             fileName,
             rowsRead: message.rowsRead,
-            rowsAbout: message.rowsAbout,
-            exact: message.exact
+            rows: rowsOf(message)
           })
         )
       case "Head":
@@ -237,7 +237,7 @@ const arrive = (queryClient: QueryClient, file: File, done: Finished) => {
 /** Starts reading and sending `file`; `onEnd` is told how it ended. Ignored while another upload is under way. */
 const start = (queryClient: QueryClient, file: File, sheet: string | null, onEnd: (end: UploadEnd) => void) => {
   if (running !== null) return
-  set({ _tag: "Reading", fileName: file.name, rowsRead: 0, rowsAbout: null, exact: false })
+  set({ _tag: "Reading", fileName: file.name, rowsRead: 0, rows: rowsOf({ rowsAbout: null, exact: false }) })
   const fiber = fork((client) => program(client, { file, sheet }))
   const current = { fiber, fileName: file.name, uploadId: null as ImportId | null, onEnd }
   running = current

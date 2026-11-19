@@ -132,6 +132,45 @@ Notes; no fixture or sample has either, and none was built for the browser), a d
 on the Review step (the sample workbooks hold text only), a workbook that unpacks past 64 MB, Cancel during a
 workbook read, a hidden sheet chosen, and the dark theme.
 
+## Seen in the browser, second pass
+
+After Benjamin's answers (DECISIONS, 2026-11-19), on a fresh database, port 5200, 1440 wide unless said. Each file
+was built from the clean sample's 25 items by hand-written parts, with only the named change, and chosen on the
+Upload step.
+
+- **A cell that points at shared text the file does not have** (`unreadable_cells.xlsx`: C4 and C8, two
+  descriptions): Review read "25 rows read" and "Import 25 items". Pressed the Activity button; under Steps, tagged
+  Read: "2 cells could not be read and were left empty: C4, C8. The file itself holds no usable value there; open it
+  in Excel and retype them if they matter."
+- **A number format outside what is displayed** (`format_not_shown.xlsx`: 20 quantities under `# ?/?`): "25 rows
+  read", "Import 25 items"; in Activity: "20 cells have the number format # ?/?, which is not shown here as Excel
+  shows it; the stored values were read."
+- **Wrong on screen, and fixed**: the Activity panel cut each of those sentences to one line with an ellipsis ("2
+  cells could not be read and were left e…"), so the cells' names could not be read. It did that to every Note of
+  every file, before this goal too. A step with nothing to open now wraps
+  (`packages/ui/src/AgentRun.component.tsx`); a step that opens is still one line. Seen again: the sentence in four
+  lines at 1440, and in four lines inside the screen at 390 wide, nothing cut.
+- **A workbook of 77 kB that unpacks to 70 MiB** (`unpacks_large.xlsx`): 0.3 s after choosing it the Upload step read
+  "This file could not be read", ""unpacks_large.xlsx" could not be read: it unpacks to more than 64 MB.", "Split it
+  into smaller files, or delete sheets and columns that are not needed, and choose it again."
+- **Displayed text of a number and a date cell** (`shown_text.xlsx`: unit costs as numbers under `$#,##0.00`, first
+  received as dates under `m/d/yyyy`): on Match, the examples read "$12.33 · $8.03 · $20.59" for Unit cost and
+  "3/18/2019 · 1/21/2023 · 2/14/2020" for First received (the sample's 2019-03-18). Review read "Ready 25", "Import
+  25 items", the first row's cost "$12.33". Review draws a cost in the app's own money format, so a cell's displayed
+  text is not what it shows; Match's examples are where it is seen.
+- **Cancel during a workbook read** (`many_rows.xlsx`, 36,000 rows, 2.4 MB): the Upload step showed the file's name,
+  a bar and "Reading" with a Cancel button. Pressed Cancel: the box went back to "Choose file", the address stayed
+  on Upload, and no import named many_rows.xlsx was in the list of open imports.
+- **Dark theme**: switched with the bar's button ("Switch to dark theme"). Looked at the Upload step with the
+  "unpacks to more than 64 MB" problem (red text on the dark panel, readable), the Review step and the Activity
+  panel with the unreadable-cells sentence (light text on the dark panel).
+- No error in the browser console in the whole pass.
+
+Still not shown: Cancel while a workbook's rows are being sent (the read was cancelled, not the sending); a hidden
+sheet chosen in the chooser; an import of these files carried through Confirm (they were left on Review); the two
+Notes anywhere but the Activity panel. That last one is worth Benjamin's eye: `unreadableCells` is a warning, and a
+warning from the reader is shown only behind the Activity button, as every reader Note is.
+
 ## Closing note
 
 `@beep/xlsx` is at `packages/foundation/modeling/xlsx`: ten schema and facade files, eleven internal ones, five test

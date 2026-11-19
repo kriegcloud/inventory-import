@@ -46,7 +46,7 @@ Scope, not time. In:
 
 - Four packages, in this order, each with the app switched over and green before the next starts:
   `@inventory/kernel` (`packages/kernel`), `@beep/d1` (`packages/drivers/d1`), `@beep/better-auth`
-  (`packages/drivers/better-auth`) and the AI driver (`packages/drivers/openrouter`, name decision (b)).
+  (`packages/drivers/better-auth`) and `@beep/openrouter` (`packages/drivers/openrouter`).
 - Each new package meets the full strict profile with no overrides; code that moves is fixed to it as it moves.
 - The test database harness moves into `@beep/d1` as its test layer.
 - The Vercel AI SDK is replaced by `@effect/ai-openrouter` over `effect/ai`, with the house rules kept: the app is
@@ -340,7 +340,7 @@ Dependencies: `effect`, `better-auth` 1.7.22 (exact, as today), `@beep/identity`
 with the guard built on the kernel's `RequestSource.allows`. `SessionIdentity.ts` decodes `AuthSession` ids into
 kernel ids before `Members.findByUser`.
 
-### 4. The AI driver (`packages/drivers/openrouter`, name decision (b))
+### 4. `@beep/openrouter` (`packages/drivers/openrouter`)
 
 One structured answer from OpenRouter through `effect/ai`, with one retry policy and a failure a product can word.
 Product-neutral: no allowance, no sentences, no `AnsweredBy` wire format. The allowance (`ModelCalls.take` before
@@ -517,7 +517,11 @@ The definition of done, per package, written before the code.
 
 ## Decisions for Benjamin
 
-Each is open until answered; the brief is built on the recommendation, marked so.
+Answered 2026-11-18, each as recommended (recorded in [DECISIONS.md](DECISIONS.md)): (a) "Raw SQL, Model.Class
+rows", with `drizzle-orm`, `drizzle-kit` and the Drizzle MCP entries removed and the Drizzle skill kept; (b)
+"@beep/openrouter"; (c) "Kernel now, contract with contexts"; (d) "Keep it, names unchanged"; (e1)
+"@beep/inventory/kernel/..."; (e2) "Drop it", which also confirms (e4); (e3) "In the app's contract". The options
+below are kept as they were put.
 
 **(a) What does `@beep/d1` build statements from?**
 

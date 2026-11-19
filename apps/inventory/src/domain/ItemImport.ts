@@ -774,30 +774,141 @@ export type Problem = {
   readonly rivals: ReadonlyArray<string>
 }
 
-/** One value that differs from the file, and who is behind it: what the activity view shows per row. */
-export const Change = S.Struct({
-  field: Field,
-  from: S.String.annotateKey({ description: "The value as the file gives it", examples: ["bx"] }),
-  to: S.String.annotateKey({ description: "The value the import wrote in its place", examples: ["BX"] }),
-  source: S.Literals(["rule", "model", "person"]).annotateKey({
-    description: "Where the new value came from: a rule, a model's suggestion the person accepted, or the person"
-  }),
-  decidedBy: S.Literals(["person", "rule"]).annotateKey({ description: "Who put it in force" }),
-  how: S.Literals(["accepted a proposal", "typed or chose a value", "applied by a rule"]).annotateKey({
-    description: "How the new value came to stand, in the words the activity view shows"
-  }),
-  basis: S.NullOr(S.String).annotateKey({
-    description: "What a proposal rested on, in a sentence; null for a value a person typed"
-  }),
-  confidence: S.NullOr(Confidence).annotateKey({
-    description: "How sure a proposal's source was; null where there was no proposal"
-  })
-}).annotate({
-  identifier: "Change",
-  description: "One value that differs from the file, and who is behind it: what the activity view shows per row"
+/** Where a written value came from: a rule, a model's suggestion, or the person. */
+export const ChangeSource = LiteralKit(["rule", "model", "person"]).annotate({
+  identifier: "ChangeSource",
+  description: "Where the new value came from: a rule, a model's suggestion the person accepted, or the person"
 })
-/** The decoded value of `Change`: one value that differs from the file, and who is behind it. */
+/** The decoded value of `ChangeSource`. */
+export type ChangeSource = typeof ChangeSource.Type
+
+/** The three ways a value that differs from the file came to stand. */
+export const ChangeHow = LiteralKit(["appliedByRule", "acceptedProposal", "typed"]).annotate({
+  identifier: "ChangeHow",
+  description:
+    "appliedByRule: a form-only rule wrote it and nobody undid it. acceptedProposal: the person accepted a rule's or a model's proposal. typed: the person typed or chose it"
+})
+/** The decoded value of `ChangeHow`. */
+export type ChangeHow = typeof ChangeHow.Type
+
+// What every change says: the field, the file's value and the value written in its place.
+const changed = {
+  field: Field,
+  from: S.String.pipe(S.annotateKey({ description: "The value as the file gives it", examples: ["bx"] })),
+  to: S.String.pipe(S.annotateKey({ description: "The value the import wrote in its place", examples: ["BX"] }))
+}
+const proposalBasis = S.String.pipe(S.annotateKey({ description: "What the proposal rested on, in a sentence" }))
+const proposalConfidence = Confidence.pipe(S.annotateKey({ description: "How sure the proposal's source was" }))
+
+class AppliedByRule extends S.Opaque<AppliedByRule, { readonly brand: unique symbol }>()(
+  S.Struct({ how: S.tag("appliedByRule"), ...changed, basis: proposalBasis, confidence: proposalConfidence }).annotate({
+    identifier: "AppliedByRule",
+    description: "A form-only rule wrote the value, and nobody undid it"
+  })
+) {}
+
+class AcceptedProposal extends S.Opaque<AcceptedProposal, { readonly brand: unique symbol }>()(
+  S.Struct({
+    how: S.tag("acceptedProposal"),
+    ...changed,
+    source: LiteralKit(["rule", "model"]).pipe(
+      S.annotateKey({ description: "Who proposed it: a rule, or a model's suggestion" })
+    ),
+    basis: proposalBasis,
+    confidence: proposalConfidence
+  }).annotate({ identifier: "AcceptedProposal", description: "The person accepted a rule's or a model's proposal" })
+) {}
+
+class TypedValue extends S.Opaque<TypedValue, { readonly brand: unique symbol }>()(
+  S.Struct({ how: S.tag("typed"), ...changed }).annotate({
+    identifier: "TypedValue",
+    description: "The person typed or chose the value"
+  })
+) {}
+
+/**
+ * One value that differs from the file, by how it came to stand: a rule applied it, the person accepted a proposal,
+ * or the person typed it. Only a value that came from a proposal has a basis and a confidence; `changeSource` and
+ * `changeDecidedBy` answer who was behind it in each case.
+ */
+export const Change = ChangeHow.mapMembers(() => Tuple.make(AppliedByRule, AcceptedProposal, TypedValue)).pipe(
+  S.toTaggedUnion("how"),
+  S.annotate({
+    identifier: "Change",
+    description: "One value that differs from the file, and how it came to stand"
+  })
+)
+/** The decoded value of `Change`: one value that differs from the file, and how it came to stand. */
 export type Change = typeof Change.Type
+
+/** Where the new value came from: a rule, a model's suggestion, or the person. */
+export const changeSource = (change: Change): ChangeSource =>
+  change.how === "appliedByRule" ? "rule" : change.how === "acceptedProposal" ? change.source : "person"
+
+/** Who put the value in force: the rule that applied it, or the person who accepted or typed it. */
+export const changeDecidedBy = (change: Change): "rule" | "person" =>
+  change.how === "appliedByRule" ? "rule" : "person"
+
+/** What a proposal rested on; none for a value the person typed. */
+export const changeBasis = (change: Change): Option.Option<string> =>
+  change.how === "typed" ? Option.none() : Option.some(change.basis)
+
+/** How sure a proposal's source was; none for a value the person typed. */
+export const changeConfidence = (change: Change): Option.Option<Confidence> =>
+  change.how === "typed" ? Option.none() : Option.some(change.confidence)
+
+/** The words `importChange.how` has always held for each case, and the activity view shows where there is no basis. */
+export const changeHowWords = {
+  appliedByRule: "applied by a rule",
+  acceptedProposal: "accepted a proposal",
+  typed: "typed or chose a value"
+} as const satisfies Record<ChangeHow, string>
+
+/** A change as the columns of `importChange` store it. */
+export type StoredChange = {
+  readonly field: Field
+  readonly from: string
+  readonly to: string
+  readonly source: ChangeSource
+  readonly how: (typeof changeHowWords)[ChangeHow]
+  readonly basis: string | null
+  readonly confidence: Confidence | null
+}
+
+/**
+ * The change the stored columns say. A row of an older build with no basis or confidence on a proposal reads with an
+ * empty basis and low confidence, the least it can claim.
+ */
+export const changeFromStored = (stored: StoredChange): Change => {
+  const core = { field: stored.field, from: stored.from, to: stored.to }
+  const basis = stored.basis ?? ""
+  const confidence = stored.confidence ?? "low"
+  return stored.how === "typed or chose a value"
+    ? TypedValue.make(core)
+    : stored.how === "applied by a rule"
+      ? AppliedByRule.make({ ...core, basis, confidence })
+      : AcceptedProposal.make({ ...core, source: stored.source === "model" ? "model" : "rule", basis, confidence })
+}
+
+/** A change as `importChange`'s columns: the inverse of `changeFromStored`, with who put it in force. */
+export const changeToStored = (change: Change): StoredChange & { readonly decidedBy: "rule" | "person" } => ({
+  field: change.field,
+  from: change.from,
+  to: change.to,
+  source: changeSource(change),
+  decidedBy: changeDecidedBy(change),
+  how: changeHowWords[change.how],
+  basis: Option.getOrNull(changeBasis(change)),
+  confidence: Option.getOrNull(changeConfidence(change))
+})
+
+/** A value a form-only rule wrote. */
+export const appliedByRule = (change: Omit<AppliedByRule, "how" | "brand">): Change => AppliedByRule.make(change)
+/** A proposal the person accepted. */
+export const acceptedProposal = (change: Omit<AcceptedProposal, "how" | "brand">): Change =>
+  AcceptedProposal.make(change)
+/** A value the person typed or chose. */
+export const typedChange = (change: Omit<TypedValue, "how" | "brand">): Change => TypedValue.make(change)
 
 /** Where a row stands. The four counts add up to the rows of the file. `needs` splits into decision and cannot (`RowOutcome`). */
 export type RowStatus = "ready" | "needs" | "out" | "already"
@@ -2193,32 +2304,16 @@ export const review = (input: {
         if (Option.isSome(typed)) {
           const to = canonical(field, typed.value)
           if (to !== text) {
-            changes.push({
-              field,
-              from: text,
-              to,
-              source: "person",
-              decidedBy: "person",
-              how: "typed or chose a value",
-              basis: null,
-              confidence: null
-            })
+            changes.push(typedChange({ field, from: text, to }))
           }
           return [field, to] as const
         }
         if (Option.isSome(proposed) && inForce(proposed.value, decision)) {
           const p = proposed.value
           const accepted = Arr.contains(decision.accepted, field)
-          changes.push({
-            field,
-            from: text,
-            to: p.to,
-            source: p.by,
-            decidedBy: accepted ? "person" : "rule",
-            how: accepted ? "accepted a proposal" : "applied by a rule",
-            basis: p.basis,
-            confidence: p.confidence
-          })
+          const proposal = { field, from: text, to: p.to, basis: p.basis, confidence: p.confidence }
+          // In force without an accept only when it is a form-only rule's fix: `inForce` says so.
+          changes.push(accepted ? acceptedProposal({ ...proposal, source: p.by }) : appliedByRule(proposal))
           return [field, p.to] as const
         }
         return [field, text] as const
@@ -2367,7 +2462,7 @@ export const review = (input: {
   })
   const byRule = Arr.map(
     Arr.filter(rows, (row) => row.status === "ready" || row.status === "needs"),
-    (row) => Arr.filter(row.changes, (change) => change.how === "applied by a rule").length
+    (row) => Arr.filter(row.changes, (change) => change.how === "appliedByRule").length
   )
 
   return {

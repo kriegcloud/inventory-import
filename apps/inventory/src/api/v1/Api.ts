@@ -743,13 +743,17 @@ export const ChangeRecord = S.Struct({
   importId: S.String.annotateKey({ description: "The import that wrote the value" }),
   fileName: S.String.annotateKey({ description: "That import's file" }),
   rowNumber: S.Int.annotateKey({ description: "The row of the file, as Excel numbers it" }),
-  part: S.optionalKey(S.Int).annotateKey({
-    description:
-      "Which of its row's items the value went into (1, 2, ...), when the row holds several; left out for a row that is one item"
-  }),
+  part: S.Int.pipe(
+    absentAsNone({
+      description:
+        "Which of its row's items the value went into (1, 2, ...), when the row holds several; left out for a row that is one item"
+    })
+  ),
   sku: S.String.annotateKey({ description: "The SKU of the item the value went into" }),
-  ...Change.fields,
-  decidedByName: S.NullOr(S.String).annotateKey({ description: "The member who accepted or typed it" }),
+  change: Change.pipe(S.annotateKey({ description: "The value that differs from the file, and how it came to stand" })),
+  decidedByName: S.String.pipe(
+    nullAsNone({ description: "The member who accepted or typed it; null for a value a rule applied" })
+  ),
   createdAt: Instant.pipe(S.annotateKey({ description: "When the import wrote it" })),
   takenBack: S.Boolean.annotateKey({
     description:

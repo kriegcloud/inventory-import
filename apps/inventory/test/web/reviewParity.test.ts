@@ -7,6 +7,7 @@ import { readFileSync } from "node:fs"
 import { describe, expect, it } from "@effect/vitest"
 import { Array as Arr, Effect, Option, Order, String as Str } from "effect"
 import {
+  changeToStored,
   decisionToFlags,
   firstDecisions,
   recheckRow,
@@ -184,7 +185,8 @@ describe("the screen and the server apply decisions the same way", () => {
         ).toEqual(
           Arr.map(ready, (row) =>
             byColumn(
-              Arr.map(row.changes, (change) => ({
+              // In the stored words, which are the region's own: who proposed, who decided, and how.
+              Arr.map(Arr.map(row.changes, changeToStored), (change) => ({
                 column: change.field,
                 from: change.from,
                 to: change.to,

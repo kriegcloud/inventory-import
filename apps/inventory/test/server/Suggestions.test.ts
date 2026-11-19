@@ -99,7 +99,9 @@ describe("a stored suggestion", () => {
       const accepted = yield* sourceOf(stored, { "row-7": { accepted: ["name"] } })
       const taken = rowOf(accepted, 7)
       expect([taken.status, taken.item?.name]).toEqual(["ready", "Nylon Coil"])
-      expect(taken.changes).toMatchObject([{ field: "name", to: "Nylon Coil", source: "model", decidedBy: "person" }])
+      expect(taken.changes).toMatchObject([
+        { how: "acceptedProposal", field: "name", to: "Nylon Coil", source: "model" }
+      ])
     })
   )
 })

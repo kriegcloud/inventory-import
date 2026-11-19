@@ -115,7 +115,7 @@ describe("items_messy.csv", () => {
       const table = yield* messyTable
       const result = reviewOf(table)
       expect(result.fixed).toEqual({ rows: 17, cells: 20 })
-      const fixed = Arr.filter(result.rows, (row) => Arr.some(row.changes, (c) => c.how === "applied by a rule"))
+      const fixed = Arr.filter(result.rows, (row) => Arr.some(row.changes, (c) => c.how === "appliedByRule"))
       expect(Arr.map(fixed, (row) => row.rowNumber)).toEqual([
         8, 9, 18, 48, 60, 63, 69, 75, 111, 136, 173, 179, 182, 183, 190, 197, 198
       ])
@@ -123,17 +123,15 @@ describe("items_messy.csv", () => {
       expect(
         Arr.every(
           Arr.flatMap(fixed, (row) => row.changes),
-          (c) => c.confidence === "high"
+          (c) => c.how === "appliedByRule" && c.confidence === "high"
         )
       ).toBe(true)
       expect(rowOf(result, 18).changes).toEqual([
         {
+          how: "appliedByRule",
           field: "uom",
           from: "bx",
           to: "BX",
-          source: "rule",
-          decidedBy: "rule",
-          how: "applied by a rule",
           basis: '"bx" on 2 rows; 58 rows say BX.',
           confidence: "high"
         }
@@ -210,9 +208,7 @@ describe("a row discontinued yet active", () => {
       ])
       const noDate = rowOf(reviewOf(table, { "row-45": { edits: { discontinuedOn: "" } } }), 45)
       expect([noDate.status, noDate.item?.stocking]).toEqual(["ready", { kind: "active" }])
-      expect(noDate.changes).toContainEqual(
-        expect.objectContaining({ field: "discontinuedOn", to: "", decidedBy: "person" })
-      )
+      expect(noDate.changes).toContainEqual(expect.objectContaining({ how: "typed", field: "discontinuedOn", to: "" }))
     })
   )
 })

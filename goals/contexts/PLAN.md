@@ -238,4 +238,22 @@ None.
     `{"set":{},"clear":["row-148","row-195"]}`; Redo: "Import 157, skip 43"; a refresh: still "Import 157, skip 43"
     with "Undo: 2 rows left out"; confirmed ("Import 157 items? 43 items won't be imported (Needs a decision 20,
     Cannot import 21, Left out 2)"): "Not imported 43 · Imported 157 · Already there 0 · All 200", Items "157 items".
+- **catalog (f), first half: `Change`.** A value that differs from the file is one of `appliedByRule { field, from,
+  to, basis, confidence }`, `acceptedProposal { ..., source: rule | model, basis, confidence }` or `typed { field,
+  from, to }` by `how`, and `ChangeRecord` carries it as `change`, with `part` and `decidedByName` as `Option`.
+  `changeSource`, `changeDecidedBy`, `changeBasis` and `changeConfidence` answer what the flat fields did.
+  - **`importChange` keeps its columns and its words.** `changeToStored` writes `source`, `decidedBy`, `how`
+    ("applied by a rule", "accepted a proposal", "typed or chose a value"), `basis` and `confidence` as before, and
+    `changeFromStored` reads them; the count of rule fixes still asks SQL for `how = 'applied by a rule'`. A stored
+    proposal with no basis or confidence (none is written that way) would read with an empty basis and "low".
+  - The Activity page's "Basis" still shows the basis, or for a typed value the words "typed or chose a value".
+  - Read on screen, fresh database: the messy sample confirmed ("Not imported 45 · Imported 155 · Already there 0 ·
+    All 200", "20 values fixed for you in 17 rows"); Activity "Decisions 20", a row "YYE-9806 8 First received was
+    Jun 19, 2024 now 2024-06-19 · Rule · high · Rule · "Jun 19, 2024" on 1 row is 2024-06-19 written another way; it
+    has no other reading." The same file loaded again: "Needs a decision 24 · Cannot import 21 · Ready 0 · Already
+    there 155 · All 200", "No items ready yet". On "Cost, 2 items", "Accept for the 2 ticked": "Import 2, skip 198";
+    confirmed: "Not imported 43 · Imported 2 · Already there 155 · All 200", Items "157 items", Activity "Decisions
+    22" with "CWB-5404 55 Unit cost was 35,82 now 35.82 · Rule · medium · Dana Whitfield · "35,82" reads as 35.82 with
+    a decimal comma ..." and the answer `"change":{"how":"acceptedProposal",...,"source":"rule",...,
+    "confidence":"medium"},"decidedByName":"Dana Whitfield"`. Not seen on screen: a typed value in Decisions.
 

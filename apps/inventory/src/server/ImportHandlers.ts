@@ -23,6 +23,7 @@ import { fileProblem } from "../domain/FileProblem.ts"
 import type { Member } from "@inventory/kernel/Member"
 import { fieldsOf, skuKey } from "../domain/Item.ts"
 import {
+  changeDecidedBy,
   carryDecisions,
   dropAccepted,
   fieldLabels,
@@ -386,8 +387,8 @@ export const ImportHandlers = HttpApiBuilder.group(
             row.item === null
               ? []
               : Arr.map(row.changes, (change) => ({
-                  ...change,
-                  decidedByName: change.decidedBy === "person" ? who(row) : null
+                  change,
+                  decidedByName: changeDecidedBy(change) === "person" ? who(row) : null
                 }))
         }))
         const won = yield* imports.commit(actor, draft, rows)

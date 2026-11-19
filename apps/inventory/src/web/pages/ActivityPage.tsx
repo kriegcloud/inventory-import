@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import { DateTime } from "effect"
+import { DateTime, Option } from "effect"
 import { useState } from "react"
 import { Code } from "@inventory/ui/Code"
 import { importAddress } from "@/lib/route"
@@ -12,7 +12,14 @@ import { Button } from "@inventory/ui/components/button"
 import { call } from "@/lib/api"
 import type { ChangeRecord } from "../../api/v1/Api.ts"
 import { AuditEvents, auditEventColumns, auditEventsCaption, useAuditEvents } from "@inventory/access-web/AuditEvents"
-import { fieldLabels } from "../../domain/ItemImport.ts"
+import {
+  changeBasis,
+  changeConfidence,
+  changeDecidedBy,
+  changeHowWords,
+  changeSource,
+  fieldLabels
+} from "../../domain/ItemImport.ts"
 import { whenShort } from "@inventory/ui/Dates"
 import { when } from "./import/format.tsx"
 import { sayError } from "@inventory/client/SayError"
@@ -22,9 +29,11 @@ import { pastImportColumns } from "./import/pastImports.tsx"
 
 const sourceWords = { rule: "Rule", model: "Model", person: "Person" } as const
 
-const proposedBy = (change: ChangeRecord): string => sourceWords[change.source]
-const decidedBy = (change: ChangeRecord): string =>
-  change.decidedBy === "rule" ? "Rule" : (change.decidedByName ?? "Person")
+const proposedBy = (record: ChangeRecord): string => sourceWords[changeSource(record.change)]
+const decidedBy = (record: ChangeRecord): string =>
+  changeDecidedBy(record.change) === "rule" ? "Rule" : Option.getOrElse(record.decidedByName, () => "Person")
+/** How sure the proposal's source was, when the value came from a proposal. */
+const confidenceOf = (record: ChangeRecord): string | null => Option.getOrNull(changeConfidence(record.change))
 
 const changeColumns: ReadonlyArray<ListColumn<ChangeRecord>> = [
   {
@@ -48,7 +57,11 @@ const changeColumns: ReadonlyArray<ListColumn<ChangeRecord>> = [
     label: "Row",
     width: 64,
     align: "right",
-    cell: (change) => (change.part === undefined ? change.rowNumber : `${change.rowNumber} · ${change.part}`),
+    cell: (change) =>
+      Option.match(change.part, {
+        onNone: () => `${change.rowNumber}`,
+        onSome: (part) => `${change.rowNumber} · ${part}`
+      }),
     value: (change) => change.rowNumber,
     searchable: false
   },
@@ -56,16 +69,16 @@ const changeColumns: ReadonlyArray<ListColumn<ChangeRecord>> = [
     id: "field",
     label: "Field",
     width: 124,
-    value: (change) => fieldLabels[change.field],
+    value: (record) => fieldLabels[record.change.field],
     facet: true
   },
   {
     id: "change",
     label: "Was, now",
     width: 150,
-    cell: (change) => <ProposedValue from={change.from === "" ? "empty" : change.from} to={change.to} />,
+    cell: ({ change }) => <ProposedValue from={change.from === "" ? "empty" : change.from} to={change.to} />,
     // Searched by both values; a pair has no one order to sort by.
-    value: (change) => `${change.from} ${change.to}`,
+    value: ({ change }) => `${change.from} ${change.to}`,
     sortable: false
   },
   {
@@ -77,10 +90,13 @@ const changeColumns: ReadonlyArray<ListColumn<ChangeRecord>> = [
     cell: (change) => (
       <>
         {proposedBy(change)}
-        {change.confidence === null ? null : <span className="text-muted-foreground"> · {change.confidence}</span>}
+        {confidenceOf(change) === null ? null : (
+          <span className="text-muted-foreground"> · {confidenceOf(change)}</span>
+        )}
       </>
     ),
-    title: (change) => `${proposedBy(change)}${change.confidence === null ? "" : `, confidence ${change.confidence}`}`,
+    title: (change) =>
+      `${proposedBy(change)}${confidenceOf(change) === null ? "" : `, confidence ${confidenceOf(change)}`}`,
     value: proposedBy,
     facet: true
   },
@@ -94,7 +110,8 @@ const changeColumns: ReadonlyArray<ListColumn<ChangeRecord>> = [
   {
     id: "basis",
     label: "Basis",
-    value: (change) => change.basis ?? change.how,
+    // What the proposal rested on; for a value the person typed, the words that say so.
+    value: ({ change }) => Option.getOrElse(changeBasis(change), () => changeHowWords[change.how]),
     sortable: false,
     wrap: true
   },
@@ -200,7 +217,7 @@ export function ActivityPage() {
           columns={changeColumns}
           rows={changes.data ?? []}
           rowKey={(change) =>
-            `${change.importId}:${change.rowNumber}.${change.part ?? 0}:${change.field}:${DateTime.formatIso(change.createdAt)}`
+            `${change.importId}:${change.rowNumber}.${Option.getOrElse(change.part, () => 0)}:${change.change.field}:${DateTime.formatIso(change.createdAt)}`
           }
           empty="No decisions yet. They appear here once an import with accepted or typed values is confirmed."
         />

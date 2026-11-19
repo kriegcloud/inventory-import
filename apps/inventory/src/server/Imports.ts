@@ -39,7 +39,12 @@ import {
   Vendor
 } from "../domain/Item.ts"
 import {
-  Change,
+  type Change,
+  changeFromStored,
+  ChangeSource,
+  changeToStored,
+  Confidence,
+  Field,
   MappingChoice,
   RowDecision,
   type SavedDecisions,
@@ -83,7 +88,7 @@ export type CommitRow = {
   readonly decidedByName: string | null
   readonly item: ItemFields | null
   /** The values that differ from the file, for a row that is ready. */
-  readonly changes: ReadonlyArray<Change & { readonly decidedByName: string | null }>
+  readonly changes: ReadonlyArray<{ readonly change: Change; readonly decidedByName: string | null }>
 }
 
 /** The saved draft of a review, and who last decided each row. */
@@ -210,8 +215,20 @@ const OutcomeInsert = S.Struct({
 const OutcomeInserts = OutcomeInsert.pipe(S.Array, S.fromJsonString)
 
 // One changed value a confirm items.
+// A change as `importChange`'s columns hold it: the words of `how` are the ones the table has always stored.
+const storedChange = {
+  field: Field,
+  from: S.String,
+  to: S.String,
+  source: ChangeSource,
+  decidedBy: S.Literals(["person", "rule"]),
+  how: S.Literals(["accepted a proposal", "typed or chose a value", "applied by a rule"]),
+  basis: S.NullOr(S.String),
+  confidence: S.NullOr(Confidence)
+}
+
 const ChangeInsert = S.Struct({
-  ...Change.fields,
+  ...storedChange,
   rowNumber: S.Int,
   part: S.Int,
   sku: S.String,
@@ -221,8 +238,14 @@ const ChangeInsert = S.Struct({
 const ChangeInserts = ChangeInsert.pipe(S.Array, S.fromJsonString)
 
 const ChangeRow = S.Struct({
-  ...ChangeRecord.fields,
+  importId: S.String,
+  fileName: S.String,
+  rowNumber: S.Int,
   part: S.Int,
+  sku: S.String,
+  ...storedChange,
+  decidedByName: S.NullOr(S.String),
+  createdAt: Instant,
   takenBack: S.BooleanFromBit
 }).annotate({
   description:
@@ -246,9 +269,6 @@ const whoDecided = (row: typeof OutcomeRow.Type): DecidedBy =>
   row.decidedBy === "person" && row.decidedByName !== null && S.is(DisplayName)(row.decidedByName)
     ? decidedByPerson(row.decidedByName)
     : decidedByNobody
-
-/** A part as the API says it: left out for a row that is one item (stored as 0), so those answers are as before. */
-const partOf = (part: number): { readonly part?: number } => (part === 0 ? {} : { part })
 
 // A confirm as `importBatch` stores it: what it did, and the take-back that reversed it, if one did.
 const BatchRow = S.Struct({
@@ -1264,8 +1284,9 @@ export class Imports extends Context.Service<
         )
         const changes = bySize(
           Arr.flatMap(rows, (row) =>
-            Arr.map(row.changes, (change) => ({
-              ...change,
+            Arr.map(row.changes, (entry) => ({
+              ...changeToStored(entry.change),
+              decidedByName: entry.decidedByName,
               rowNumber: row.rowNumber,
               part: row.part,
               sku: row.sku,
@@ -1585,7 +1606,18 @@ export class Imports extends Context.Service<
         rewriteDecisions,
         changes: Effect.fn("Imports.changes")(function* (organizationId: OrganizationId) {
           const rows = yield* findChanges(organizationId).pipe(Effect.orDie)
-          return Arr.map(rows, ({ part, ...row }) => ({ ...row, ...partOf(part) }))
+          return Arr.map(rows, (row): ChangeRecord => ({
+            importId: row.importId,
+            fileName: row.fileName,
+            rowNumber: row.rowNumber,
+            // Stored as 0 for a row that is one item, which the answer leaves out.
+            part: row.part === 0 ? Option.none() : Option.some(row.part),
+            sku: row.sku,
+            change: changeFromStored(row),
+            decidedByName: Option.fromNullOr(row.decidedByName),
+            createdAt: row.createdAt,
+            takenBack: row.takenBack
+          }))
         }),
         find: Effect.fn("Imports.find")(function* (organizationId: OrganizationId, id: string) {
           return yield* findDraft({ org: organizationId, id }).pipe(Effect.orDie)

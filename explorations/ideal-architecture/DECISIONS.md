@@ -434,3 +434,32 @@ Question: does [BRIEF-tooling-cli.md](BRIEF-tooling-cli.md) match, and when is i
 beside infra (Recommended)". Rejected: build after infra; not yet. The goal is
 [goals/tooling-cli](../../goals/tooling-cli/SPEC.md).
 
+### 2026-11-19 — merging the tooling CLI
+
+Question: how does `claude/tooling-cli` reach main? Answer: "Merge locally, I push (Recommended)". Merged into local
+main at its last commit of that day.
+
+### 2026-11-19 — tooling CLI: what a rule returns
+
+Question: each rule returns the lines it prints, where the brief asked for typed findings; keep that, or make them
+tagged unions? Answer: "Make them tagged unions (Recommended)". Rejected: keep printed lines. Each rule returns typed
+findings, a schema tagged union per rule (`docs/standards/schema-first.md`, SF-6), and one renderer prints them; the
+printed sentences and exit codes stay byte for byte what they were. Reverse: none wanted.
+
+### 2026-11-19 — tooling CLI: the three deliberate differences from the scripts
+
+Question, as "which do you accept; unticked ones go back": `quality strict` exits 1 on a refusal where the script
+printed FAIL and exited 0; `vendor sync` without `--from` exits 1 with the CLI's usage where the script exited 2; and
+the new row in `laws boundaries` that lets nothing depend on a `tooling` package. Answer: he ticked all three:
+"quality strict fails on a refusal", "vendor sync without --from exits 1", "New rule: nothing depends on tooling".
+Nothing goes back.
+
+### 2026-11-19 — the words in the vendored kit
+
+Question: the kit's provenance lines, READMEs and `vendor.json` comments name `scripts/vendor-beep.mjs` and
+`scripts/vendor-check.mjs`, which are gone; reword them now, or at the next refresh of the kit? Answer: "Reword now
+(Recommended)". Rejected: leave until the next kit refresh. `vendor sync` writes the command names (`bun run beep
+vendor sync`, `bun run beep vendor check`) and the kit is synced again at its recorded commit: the first line of the
+90 vendored files, the four READMEs and the four `vendor.json` comments change, and nothing else in the kit.
+Reverse: the three strings in `packages/tooling/tool/cli/src/commands/Vendor/VendorSync.rules.ts`, and one sync.
+

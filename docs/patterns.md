@@ -197,16 +197,16 @@ upload.start(file)                       // returns at once; upload.state: Readi
   cents from the digits); `shown` is what Excel displays (`"$12.50"`, `"00123"`): use it for codes. Dates are ISO from
   the stored date (`"2026-03-04"`), never from a display format. CSV cells are always text: deciding what
   `"03/04/2026"` means is the app's question for the person.
-- **Lazy, and off the page's thread.** The CSV reader (`@beep/csv`, about 75 kB with the Effect Schema it uses) and
-  SheetJS (261 kB) are in the reader worker's own files, fetched only when a file is chosen. SheetJS CE 0.20.3 comes
-  from `cdn.sheetjs.com` (the registry's `xlsx` is stale). Not `read-excel-file`: in the production build it starts
-  `blob:` Workers for sheets over 512 KiB, which the policy blocks, and the read never finishes; it also empties error
-  cells.
+- **Lazy, and off the page's thread.** The CSV reader (`@beep/csv`) and the workbook reader (`@beep/xlsx`) are in the
+  reader worker's own files, fetched only when a file is chosen. Both are this repository's own packages: no
+  third-party parser runs in the browser. `@beep/xlsx` reads the archive and its XML with Effect's `Zip` and `Xml`,
+  expands no entity, and stops a file that unpacks past 64 MB.
 - **Progress.** A CSV is parsed in pieces of 256 KiB (`Csv.parseBytesInPiecesResult`), giving the same rows, Notes and
   delimiter as parsing it at once (`packages/catalog/web/test/csvDifferential.test.ts`, every piece size from 5 characters), with a row
-  estimate from how much text is read; a workbook says "Opening the file" while SheetJS opens it, then counts its rows
-  exactly.
-- **Limits.** CSV 10 MB, .xlsx 3 MB (about 70,000 rows; 50,000 rows read in 0.7 s). `.xls`, `.xlsb`, `.ods`,
+  estimate from how much text is read; a workbook says "Opening the file" while every sheet is counted, then reads the
+  chosen sheet against that exact count.
+- **Limits.** CSV 10 MB, .xlsx 3 MB and 64 MB unpacked (a 7-column export of 36,000 rows is 3.0 MB and reads in
+  0.5 s). `.xls`, `.xlsb`, `.ods`,
   password-protected files and PDFs are refused with what to do instead. Hidden rows, columns and sheets, merged
   cells, formulas and error cells are read and named in `notes`.
 - **Samples.** `public/samples/items_messy.csv` (200 items, with the mess the review exists for) and

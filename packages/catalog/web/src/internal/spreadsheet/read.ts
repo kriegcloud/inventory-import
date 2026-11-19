@@ -1,7 +1,8 @@
 // Decides what a chosen file really is from its bytes, not its name, then hands it to the CSV or workbook reader.
-// Each reader is its own lazily loaded chunk, so choosing a CSV never downloads the workbook library.
+// Each reader is its own lazily loaded chunk, so choosing a CSV never downloads the workbook reader.
 import { Array as Arr, Effect, Option } from "effect"
 import { type FileProblem, fileProblem } from "@inventory/catalog-contract/FileProblem"
+import type { XlsxContainer } from "@beep/xlsx/XlsxDiagnostic"
 import { maxFileBytes, type Note, type SpreadsheetTable } from "@inventory/catalog-model/Spreadsheet"
 
 /**
@@ -27,14 +28,15 @@ export interface ReadSpreadsheetInput {
 type Sniffed =
   | { readonly kind: "csv" }
   | { readonly kind: "xlsx" }
+  | { readonly kind: "archive" }
   | { readonly kind: "refuse"; readonly error: FileProblem }
 
 const startsWith = (bytes: Uint8Array, prefix: ReadonlyArray<number>): boolean =>
   prefix.every((byte, i) => bytes[i] === byte)
 
-/** True when `bytes` contain `text` as ASCII (zip entry names) or, with `utf16`, as UTF-16LE (OLE stream names). */
-const contains = (bytes: Uint8Array, text: string, utf16 = false): boolean => {
-  const needle = utf16 ? [...text].flatMap((ch) => [ch.charCodeAt(0), 0]) : [...text].map((ch) => ch.charCodeAt(0))
+/** True when `bytes` contain `text` as ASCII (a zip entry's name). */
+const contains = (bytes: Uint8Array, text: string): boolean => {
+  const needle = [...text].map((ch) => ch.charCodeAt(0))
   const first = needle[0]
   outer: for (
     let i = bytes.indexOf(first ?? 0);
@@ -57,40 +59,58 @@ const others: ReadonlyArray<readonly [ReadonlyArray<number>, string]> = [
   [[0x50, 0x4b, 0x05, 0x06], "an empty zip archive"]
 ]
 
-/** The file's real format, from its first bytes and, for zip and OLE containers, the names inside. */
+const refuse = (fileName: string, what: string, how?: string): Sniffed => ({
+  kind: "refuse",
+  error: fileProblem.notASpreadsheet({ fileName, is: what, ...(how === undefined ? {} : { todo: how }) })
+})
+
+/**
+ * The file's real format from its first bytes: text to read as CSV, a file that is plainly something else, or an
+ * archive (a zip file or an older Office file), which the workbook reader looks inside.
+ */
 export const sniff = (fileName: string, bytes: Uint8Array): Sniffed => {
-  const refuse = (what: string, how?: string): Sniffed => ({
-    kind: "refuse",
-    error: fileProblem.notASpreadsheet({ fileName, is: what, ...(how === undefined ? {} : { todo: how }) })
-  })
-  if (startsWith(bytes, zip)) {
-    if (contains(bytes, "xl/workbook.xml")) return { kind: "xlsx" }
-    if (contains(bytes, "xl/workbook.bin"))
-      return refuse("an Excel binary workbook (.xlsb)", "Open it in Excel and save it as .xlsx or CSV UTF-8.")
-    if (contains(bytes, "opendocument.spreadsheet"))
-      return refuse("an OpenDocument spreadsheet (.ods)", "Save it as .xlsx or CSV UTF-8 and choose it again.")
-    if (contains(bytes, "word/document.xml")) return refuse("a Word document")
-    // An Office file cut short (a failed download, a full disk) loses the list of its parts at the end.
-    if (contains(bytes, "[Content_Types].xml") || /\.xls[xm]$/i.test(fileName)) {
-      return { kind: "refuse", error: fileProblem.unreadable({ fileName, why: ": it looks damaged or incomplete" }) }
-    }
-    return refuse("a zip archive")
-  }
-  if (startsWith(bytes, ole)) {
-    if (contains(bytes, "EncryptedPackage", true)) {
-      return { kind: "refuse", error: fileProblem.protectedWorkbook({ fileName }) }
-    }
-    if (contains(bytes, "Workbook", true) || contains(bytes, "Book", true)) {
-      return { kind: "refuse", error: fileProblem.oldExcel({ fileName }) }
-    }
-    return refuse("an older Office document")
-  }
-  for (const [magic, what] of others) if (startsWith(bytes, magic)) return refuse(what)
+  if (startsWith(bytes, zip) || startsWith(bytes, ole)) return { kind: "archive" }
+  for (const [magic, what] of others) if (startsWith(bytes, magic)) return refuse(fileName, what)
   const head = new TextDecoder("utf-8").decode(bytes.subarray(0, 512)).trimStart().toLowerCase()
   if (head.startsWith("<!doctype html") || head.startsWith("<html") || head.startsWith("<table"))
-    return refuse("a web page saved with a spreadsheet name", "Open it in Excel and save it as .xlsx or CSV UTF-8.")
-  if (bytes.subarray(0, 4096).includes(0)) return refuse("a binary file")
+    return refuse(
+      fileName,
+      "a web page saved with a spreadsheet name",
+      "Open it in Excel and save it as .xlsx or CSV UTF-8."
+    )
+  if (bytes.subarray(0, 4096).includes(0)) return refuse(fileName, "a binary file")
   return { kind: "csv" }
+}
+
+/** What an archive is to the person: a workbook to read, or the sentence that says what it is instead. */
+const archiveKind = (fileName: string, bytes: Uint8Array, container: XlsxContainer): Sniffed => {
+  switch (container) {
+    case "workbook":
+    case "macroWorkbook":
+      return { kind: "xlsx" }
+    case "binaryWorkbook":
+      return refuse(fileName, "an Excel binary workbook (.xlsb)", "Open it in Excel and save it as .xlsx or CSV UTF-8.")
+    case "openDocument":
+      return refuse(
+        fileName,
+        "an OpenDocument spreadsheet (.ods)",
+        "Save it as .xlsx or CSV UTF-8 and choose it again."
+      )
+    case "word":
+      return refuse(fileName, "a Word document")
+    case "otherZip":
+      // An Office file cut short (a failed download, a full disk) loses the list of its parts at the end.
+      return contains(bytes, "[Content_Types].xml") || /\.xls[xm]$/i.test(fileName)
+        ? { kind: "refuse", error: fileProblem.unreadable({ fileName, why: ": it looks damaged or incomplete" }) }
+        : refuse(fileName, "a zip archive")
+    case "encrypted":
+      return { kind: "refuse", error: fileProblem.protectedWorkbook({ fileName }) }
+    case "legacyXls":
+      return { kind: "refuse", error: fileProblem.oldExcel({ fileName }) }
+    case "otherOle":
+    case "notAnArchive":
+      return refuse(fileName, "an older Office document")
+  }
 }
 
 const extensionOf = (fileName: string): string => /\.([^.]+)$/.exec(fileName)?.[1]?.toLowerCase() ?? ""
@@ -129,8 +149,19 @@ export const readSpreadsheet = Effect.fn("readSpreadsheet")(function* (
   if (file.size === 0) return yield* Effect.fail(fileProblem.noValues({ fileName }))
   const buffer = yield* Effect.promise(() => file.arrayBuffer())
   const bytes = new Uint8Array(buffer)
-  const sniffed = sniff(fileName, bytes)
-  if (sniffed.kind === "refuse") return yield* Effect.fail(sniffed.error)
+  const first = sniff(fileName, bytes)
+  // An archive is looked inside by the workbook reader, which is fetched only now: a CSV never downloads it.
+  const sniffed =
+    first.kind === "archive"
+      ? archiveKind(fileName, bytes, (yield* Effect.promise(() => import("./xlsx.ts"))).containerOf(bytes))
+      : first
+  if (sniffed.kind === "refuse" || sniffed.kind === "archive") {
+    return yield* Effect.fail(
+      sniffed.kind === "refuse"
+        ? sniffed.error
+        : fileProblem.unreadable({ fileName, why: ": it looks damaged or incomplete" })
+    )
+  }
   const limit = maxFileBytes[sniffed.kind]
   if (file.size > limit) {
     const what = sniffed.kind === "csv" ? "CSV files" : "workbooks"

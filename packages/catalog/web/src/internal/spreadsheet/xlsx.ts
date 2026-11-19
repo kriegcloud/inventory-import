@@ -1,141 +1,105 @@
-// .xlsx bytes -> one grid per sheet, with SheetJS CE (the 0.20.3 "mini" build: XLSX and CSV only, 279 KB).
-// Chosen over read-excel-file 9.3.15, whose every entry point starts a blob: Worker for sheets over 512 KiB (blocked
-// by our content security policy, and the read then never finishes) and which turns error cells into empty ones.
-// SheetJS keeps each cell's type, number format, formula and error code, and reports hidden sheets, rows, columns
-// and merged cells. It starts no worker and uses no eval; the upload screen runs it inside its own module worker
-// (packages/catalog/web/src/Upload.controller.ts), a file from our own origin.
-import { Effect, Option } from "effect"
-import { read, SSF, type CellObject, type WorkSheet } from "xlsx/dist/xlsx.mini.min.js"
+// .xlsx bytes -> the grid of one sheet, with @beep/xlsx. The upload screen runs this inside its own module worker.
+// Every sheet is counted (the chooser lists each one's rows, and the sheet with the most data is read), and only
+// the chosen sheet's rows are built. The package keeps each cell as the file holds it; here a cell becomes the
+// app's `Cell`: its type, its text without coercion and the text Excel would display.
+import { Xlsx } from "@beep/xlsx/Xlsx"
+import { columnLetters } from "@beep/xlsx/XlsxAddress"
+import { XlsxCell, XlsxNumberFormat, type XlsxValue } from "@beep/xlsx/XlsxCell"
+import type { XlsxContainer } from "@beep/xlsx/XlsxDiagnostic"
+import type { XlsxParseError } from "@beep/xlsx/XlsxError"
+import { XlsxLimits, XlsxReadOptions } from "@beep/xlsx/XlsxOptions"
+import { XlsxCalendar, type XlsxDateSystem } from "@beep/xlsx/XlsxSerial"
+import type { XlsxRow } from "@beep/xlsx/XlsxWorkbook"
+import { Array as Arr, ByteSize, Effect, MutableHashMap, Option, Stream } from "effect"
+import { type FileProblem, fileProblem } from "@inventory/catalog-contract/FileProblem"
 import {
   dateText,
-  describeWorkbook,
+  describeSheets,
   emptyCell,
   numberText,
   type GridRow,
-  type MergedRange,
-  type WorkbookSheet
+  type MergedRange
 } from "@inventory/catalog-model/SheetLayout"
-import { fileProblem } from "@inventory/catalog-contract/FileProblem"
-import type { Cell, Note } from "@inventory/catalog-model/Spreadsheet"
+import { maxFileBytes, maxWorkbookInflatedBytes, type Cell, type Note } from "@inventory/catalog-model/Spreadsheet"
 import type { ReadProgress } from "./read.ts"
 
-interface DateCode {
-  D: number
-  y: number
-  m: number
-  d: number
-  H: number
-  M: number
-  S: number
-}
-const ssf = SSF as {
-  is_date: (format: string) => boolean
-  parse_date_code: (value: number, options: { date1904: boolean }) => DateCode | null
-}
+const options = XlsxReadOptions.make({
+  limits: XlsxLimits.make({
+    maxInputBytes: ByteSize.bytes(maxFileBytes.xlsx),
+    maxInflatedBytes: ByteSize.bytes(maxWorkbookInflatedBytes)
+  })
+})
 
-const withShown = (cell: Cell, shown: string | undefined): Cell =>
-  shown === undefined || shown === cell.text ? cell : { ...cell, shown }
-
-/** One SheetJS cell as the file holds it: its type, its text without coercion, and its displayed text. */
-const toCell = (raw: CellObject | undefined, date1904: boolean): Cell => {
-  if (raw === undefined) return emptyCell
-  const formula = raw.f === undefined ? {} : { formula: `=${raw.f}` }
-  switch (raw.t) {
-    case "s": {
-      const text = String(raw.v ?? "")
-      return text === "" ? { type: "empty", text: "", ...formula } : { type: "text", text, ...formula }
-    }
-    case "b":
-      return { type: "boolean", text: raw.v === true ? "TRUE" : "FALSE", ...formula }
-    case "e":
-      return { type: "error", text: raw.w ?? "#ERROR", ...formula }
-    case "n": {
-      const value = typeof raw.v === "number" ? raw.v : Number(raw.v)
-      if (typeof raw.z === "string" && ssf.is_date(raw.z)) {
-        const code = ssf.parse_date_code(value, { date1904 })
-        if (code !== null) {
-          const text = dateText({
-            day: Math.floor(value),
-            y: code.y,
-            m: code.m,
-            d: code.d,
-            H: code.H,
-            M: code.M,
-            S: code.S
-          })
-          return withShown({ type: "date", text, ...formula }, raw.w)
-        }
-      }
-      return withShown({ type: "number", text: numberText(value), ...formula }, raw.w)
-    }
-    case "d":
-      // Only when a file stores an ISO date string (t="d"); SheetJS hands it over as a Date at UTC midnight.
-      if (!(raw.v instanceof Date)) return { type: "text", text: String(raw.w ?? raw.v ?? ""), ...formula }
-      return withShown(
-        {
-          type: "date",
-          text: dateText({
-            day: 1,
-            y: raw.v.getUTCFullYear(),
-            m: raw.v.getUTCMonth() + 1,
-            d: raw.v.getUTCDate(),
-            H: raw.v.getUTCHours(),
-            M: raw.v.getUTCMinutes(),
-            S: raw.v.getUTCSeconds()
-          }),
-          ...formula
-        },
-        raw.w
-      )
-    default:
-      return { type: "empty", text: "", ...formula }
+const withShown = (cell: Cell, shown: Option.Option<string>, formula: Option.Option<string>): Cell => {
+  const display = Option.filter(shown, (text) => text !== cell.text)
+  return {
+    ...cell,
+    ...(Option.isSome(display) ? { shown: display.value } : {}),
+    ...(Option.isSome(formula) ? { formula: `=${formula.value}` } : {})
   }
 }
 
-/** The rows a sheet's grid will have: up to its last used row, as its `!ref` says. */
-const lastRowOf = (sheet: WorkSheet | undefined): number => {
-  const end = /([A-Z]+)(\d+)$/.exec(sheet?.["!ref"] ?? "")
-  return end === null ? 0 : Number(end[2])
+/** One cell of the package as the app's cell: its type, its text without coercion, and its displayed text. */
+const toCell = (cell: XlsxRow["cells"][number], system: XlsxDateSystem): Cell => {
+  const value: XlsxValue = cell.value
+  switch (value.kind) {
+    case "Text":
+      return withShown(value.text === "" ? emptyCell : { type: "text", text: value.text }, Option.none(), cell.formula)
+    case "Boolean":
+      return withShown({ type: "boolean", text: value.value ? "TRUE" : "FALSE" }, Option.none(), cell.formula)
+    case "Error":
+      return withShown({ type: "error", text: value.code }, Option.none(), cell.formula)
+    case "Number":
+      return withShown({ type: "number", text: numberText(value.value) }, XlsxCell.shown(cell, system), cell.formula)
+    case "Date": {
+      const at = XlsxCalendar.fromSerial(value.serial, system)
+      const text = dateText({
+        day: Math.floor(value.serial),
+        y: at.year,
+        m: at.month,
+        d: at.day,
+        H: at.hour,
+        M: at.minute,
+        S: at.second
+      })
+      return withShown({ type: "date", text }, XlsxCell.shown(cell, system), cell.formula)
+    }
+    case "Blank":
+    case "Unreadable":
+      return withShown(emptyCell, Option.none(), cell.formula)
+  }
 }
+
+/** Why the package stopped, as the problem the person is told. */
+const problemOf = (fileName: string, bytes: number, error: XlsxParseError): FileProblem => {
+  const finding = error.fatal.finding
+  if (finding.kind === "LimitExceeded" && finding.limit === "inputBytes") {
+    return fileProblem.tooManyBytes({ fileName, bytes, limitBytes: maxFileBytes.xlsx, what: "workbooks" })
+  }
+  if (finding.kind === "LimitExceeded" && (finding.limit === "inflatedBytes" || finding.limit === "partBytes")) {
+    return fileProblem.unreadable({
+      fileName,
+      why: `: it unpacks to more than ${Math.round(maxWorkbookInflatedBytes / (1024 * 1024))} MB`,
+      todo: "Split it into smaller files, or delete sheets and columns that are not needed, and choose it again."
+    })
+  }
+  return fileProblem.unreadable({ fileName, why: ": it looks damaged or incomplete" })
+}
+
+/**
+ * What an archive is, from its first bytes and the names inside: a workbook this reader takes, or which other kind of
+ * file. Asked only of a file that starts as a zip archive or an older Office file does.
+ */
+export const containerOf = (bytes: Uint8Array): XlsxContainer => Xlsx.container(bytes)
 
 /** Rows between two progress reports while a sheet's grid is built. */
 const reportEvery = 2000
 
-/**
- * A worksheet as a grid: every row from 1 to the last used row, every column from A to the last used column.
- * `onRow` hears how many rows are done, every few thousand, out of how many.
- */
-const toGrid = (
-  sheet: WorkSheet | undefined,
-  date1904: boolean,
-  onRow: (done: number, of: number) => void = () => {}
-): WorkbookSheet["grid"] => {
-  const ref = sheet?.["!ref"]
-  if (sheet === undefined || ref === undefined) return { rows: [], merges: [], hiddenColumns: [] }
-  const [, endRef = ref] = ref.split(":")
-  const end = /^([A-Z]+)(\d+)$/.exec(endRef)
-  const lastColumn = end === null ? 0 : [...(end[1] ?? "A")].reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0) - 1
-  const lastRow = end === null ? 0 : Number(end[2]) - 1
-  const data = sheet["!data"] ?? []
-  const rowInfo = sheet["!rows"] ?? []
-  const rows: Array<GridRow> = []
-  for (let r = 0; r <= lastRow; r++) {
-    const source = data[r] ?? []
-    const cells: Array<Cell> = []
-    for (let c = 0; c <= lastColumn; c++) cells.push(toCell(source[c], date1904))
-    rows.push({ rowNumber: r + 1, cells, hidden: rowInfo[r]?.hidden === true })
-    if ((r + 1) % reportEvery === 0) onRow(r + 1, lastRow + 1)
-  }
-  onRow(lastRow + 1, lastRow + 1)
-  const merges: Array<MergedRange> = (sheet["!merges"] ?? []).map((m) => ({
-    firstRow: m.s.r + 1,
-    lastRow: m.e.r + 1,
-    firstColumn: m.s.c,
-    lastColumn: m.e.c
-  }))
-  const hiddenColumns = (sheet["!cols"] ?? []).flatMap((col, c) => (col?.hidden === true ? [c] : []))
-  return { rows, merges, hiddenColumns }
-}
+const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`
+const listed = (items: ReadonlyArray<string>, limit = 5): string =>
+  items.length <= limit
+    ? Arr.join(items, ", ")
+    : `${Arr.join(Arr.take(items, limit), ", ")} and ${items.length - limit} more`
 
 /** Reads a workbook the person chose into a table from one sheet (`sheet`, or the one with the most data). */
 export const readXlsx = Effect.fn("readXlsx")(function* (input: {
@@ -145,30 +109,96 @@ export const readXlsx = Effect.fn("readXlsx")(function* (input: {
   notes: ReadonlyArray<Note>
   onProgress?: (progress: ReadProgress) => void
 }) {
-  const workbook = yield* Effect.try({
-    // cellStyles is needed for hidden rows and columns; cellNF keeps number formats (dates, leading zeros).
-    try: () =>
-      read(input.bytes, {
-        type: "array",
-        dense: true,
-        cellFormula: true,
-        cellNF: true,
-        cellStyles: true,
-        cellDates: false
-      }),
-    catch: () => fileProblem.unreadable({ fileName: input.fileName, why: ": it looks damaged or incomplete" })
+  const { fileName, bytes } = input
+  const failed = (error: XlsxParseError): FileProblem => problemOf(fileName, bytes.length, error)
+  const outline = yield* Effect.mapError(Xlsx.outline(bytes, options), failed)
+  const system = outline.dateSystem
+  return yield* describeSheets({
+    fileName,
+    sheets: Arr.map(outline.sheets, (sheet) => ({
+      name: sheet.count.info.name,
+      visibility: sheet.count.info.state,
+      rowCount: sheet.count.rowsWithValues,
+      filledCells: sheet.count.cellsWithValues
+    })),
+    sheet: input.sheet,
+    notes: input.notes,
+    grid: Effect.fnUntraced(function* (index: number) {
+      const sheet = outline.sheets[index]
+      if (sheet === undefined) return yield* Effect.die("sheet index out of range")
+      const total = sheet.count.rows
+      const kept: Array<XlsxRow> = []
+      let lastColumn = -1
+      let lastRow = 0
+      yield* Xlsx.rows(bytes, sheet.count.info.name, options).pipe(
+        Stream.mapError(failed),
+        Stream.runForEach((row) =>
+          Effect.sync(() => {
+            kept.push(row)
+            const last = row.cells[row.cells.length - 1]
+            if (last !== undefined) {
+              lastRow = Math.max(lastRow, row.number)
+              lastColumn = Math.max(lastColumn, last.column)
+            }
+            if (kept.length % reportEvery === 0) {
+              input.onProgress?.({ rowsRead: kept.length, rowsAbout: total, exact: true })
+            }
+          })
+        )
+      )
+      input.onProgress?.({ rowsRead: total, rowsAbout: total, exact: true })
+      // The grid runs from A1 to the last cell the sheet writes, whatever extent the file declares for itself.
+      const width = lastColumn + 1
+      const blank = (): Array<Cell> => Arr.makeBy(width, () => emptyCell)
+      const rows: Array<GridRow> = Arr.makeBy(lastRow, (i) => ({ rowNumber: i + 1, cells: blank(), hidden: false }))
+      const filled = MutableHashMap.empty<number, true>()
+      const unreadable: Array<string> = []
+      const unreadableRows: Array<number> = []
+      const notShown = MutableHashMap.empty<string, number>()
+      for (const row of kept) {
+        if (row.number > lastRow || MutableHashMap.has(filled, row.number)) continue
+        MutableHashMap.set(filled, row.number, true)
+        const cells = blank()
+        for (const cell of row.cells) {
+          cells[cell.column] = toCell(cell, system)
+          if (cell.value.kind === "Unreadable") {
+            unreadable.push(`${columnLetters(cell.column)}${row.number}`)
+            if (!Arr.contains(unreadableRows, row.number)) unreadableRows.push(row.number)
+          } else if (
+            (cell.value.kind === "Number" || cell.value.kind === "Date") &&
+            Option.isNone(XlsxCell.shown(cell, system)) &&
+            XlsxNumberFormat.kind(cell.format).kind !== "General"
+          ) {
+            const code = cell.format.code
+            MutableHashMap.set(notShown, code, Option.getOrElse(MutableHashMap.get(notShown, code), () => 0) + 1)
+          }
+        }
+        rows[row.number - 1] = { rowNumber: row.number, cells, hidden: row.hidden }
+      }
+      const notes: Array<Note> = []
+      if (unreadable.length > 0) {
+        notes.push({
+          kind: "unreadableCells",
+          level: "warning",
+          message: `${plural(unreadable.length, "cell", "cells")} could not be read and ${unreadable.length === 1 ? "was" : "were"} left empty: ${listed(unreadable)}. The file itself holds no usable value there; open it in Excel and retype ${unreadable.length === 1 ? "it" : "them"} if ${unreadable.length === 1 ? "it matters" : "they matter"}.`,
+          rows: unreadableRows
+        })
+      }
+      for (const [code, cells] of notShown) {
+        notes.push({
+          kind: "formatNotShown",
+          level: "info",
+          message: `${plural(cells, "cell has", "cells have")} the number format ${code}, which is not shown here as Excel shows it; the stored ${cells === 1 ? "value was" : "values were"} read.`,
+          rows: []
+        })
+      }
+      const merges: Array<MergedRange> = Arr.map(sheet.merges, (range) => ({
+        firstRow: range.first.row,
+        lastRow: range.last.row,
+        firstColumn: range.first.column,
+        lastColumn: range.last.column
+      }))
+      return { grid: { rows, merges, hiddenColumns: sheet.hiddenColumns }, notes }
+    })
   })
-  const date1904 = workbook.Workbook?.WBProps?.date1904 === true
-  // Every sheet is laid out (the chooser shows each one's rows), so progress counts the rows of all of them.
-  const totalRows = workbook.SheetNames.reduce((sum, name) => sum + lastRowOf(workbook.Sheets[name]), 0)
-  let before = 0
-  const sheets: Array<WorkbookSheet> = workbook.SheetNames.map((name, i) => {
-    const hidden = workbook.Workbook?.Sheets?.[i]?.Hidden
-    const grid = toGrid(workbook.Sheets[name], date1904, (done) =>
-      input.onProgress?.({ rowsRead: before + done, rowsAbout: totalRows, exact: true })
-    )
-    before += grid.rows.length
-    return { name, visibility: hidden === 1 ? "hidden" : hidden === 2 ? "veryHidden" : "visible", grid }
-  })
-  return yield* describeWorkbook({ fileName: input.fileName, sheets, sheet: input.sheet, notes: input.notes })
 })

@@ -302,8 +302,10 @@ packages/catalog/        The catalog context (items and the imports that write t
                         and the allowance as the catalog asks them) and web/ (the import's steps, the Items page, the
                         editor, the assistant, the upload).
 packages/kernel/, packages/drivers/   @inventory/kernel and the @beep drivers (d1, better-auth, openrouter).
-packages/foundation/     Product-neutral packages. Today only beep-effect's kit, vendored: @beep/types (primitive/),
-                        @beep/identity, @beep/schema and @beep/utils (modeling/). Never edit them: each vendor.json
+packages/foundation/     Product-neutral packages: this repository's own @beep/csv and @beep/xlsx (modeling/), which read
+                        and write a CSV and an Excel workbook as Effect Schema codecs, and beep-effect's kit, vendored:
+                        @beep/types (primitive/), @beep/identity, @beep/schema and @beep/utils (modeling/). Never edit
+                        the kit: each vendor.json
                         records its beep-effect commit and file hashes, and `bun run vendor:check` fails on a change.
 docs/                   Standards, the kit, patterns, the glossary and sign-in (`docs/index.md` lists them); qa/ is evidence.
 explorations/           Questions being shaped: research, decisions, briefs.

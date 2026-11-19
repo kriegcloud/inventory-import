@@ -191,12 +191,12 @@ export const SpreadsheetTable = S.Struct({
 export type SpreadsheetTable = typeof SpreadsheetTable.Type
 
 /**
- * The largest file the browser reads, per format. Measured in Node 26 (vitest) on a 7-column stock export: 50,000
- * rows are 3.3 MB as CSV (read in 0.06 s, about 52 MB of heap at the peak) and 2.1 MB as .xlsx (0.73 s, about
- * 180 MB). A workbook costs about ten times more per row, so its limit is lower. At the limits, by the same
- * measure: 10 MB of CSV is about 150,000 such rows (about 0.2 s, 160 MB) and 3 MB of .xlsx about 70,000 (about 1.1 s,
- * 260 MB), estimated linearly from the 50,000-row runs, not measured. Over the limit the person
- * is told to split the file (a `FileProblem` of kind `tooLarge`), before anything is parsed.
+ * The largest file the browser reads, per format. Measured in Node 26 on a 7-column stock export: 50,000 rows are
+ * 3.3 MB as CSV (read in 0.06 s, about 52 MB of heap at the peak); 36,000 rows are 3.0 MB as .xlsx with its text
+ * inline (read in 0.5 s, about 60 MB), and Excel's own files, which share their text, hold more rows in as many
+ * bytes. The workbook limit stays where it was when a workbook cost ten times a CSV to read (decision X5: "Keep
+ * 3 MiB, cap 64 MiB inflated"); raising it is its own decision. Over the limit the person is told to split the file
+ * (a `FileProblem` of kind `tooLarge`), before anything is parsed.
  */
 export const maxFileBytes = { csv: 10 * 1024 * 1024, xlsx: 3 * 1024 * 1024 } as const
 

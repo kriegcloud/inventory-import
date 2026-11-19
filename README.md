@@ -159,8 +159,8 @@ apps/inventory/src/api/      The HTTP contract, shared by server and browser (Ef
 apps/inventory/src/server/   Worker: composition, group Layers, settings, the model service's setup
 apps/inventory/src/web/      React 19, Tailwind 4, shadcn/ui, TanStack Query
 apps/inventory/migrations/   D1 (SQLite) schema
-packages/foundation/         @beep/csv (the CSV reader and writer) and @beep/types, @beep/identity, @beep/schema,
-                             @beep/utils, vendored from beep-effect and hash-checked
+packages/foundation/         @beep/csv and @beep/xlsx (the CSV and Excel readers and writers) and @beep/types,
+                             @beep/identity, @beep/schema, @beep/utils, vendored from beep-effect and hash-checked
 turbo.json                   check, lint, test, test:slow, build and dev per package; format, docs and key checks at the root
 ```
 

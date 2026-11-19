@@ -92,8 +92,8 @@ const usedSourcesOnly = (): Plugin => ({
   }
 })
 
-// The effect modules the CSV reader's worker imports (see optimizeDeps below).
-const csvReaderModules = [
+// The effect modules the file reader's worker imports, for @beep/csv and @beep/xlsx (see optimizeDeps below).
+const readerModules = [
   "effect/Array",
   "effect/Boolean",
   "effect/ByteSize",
@@ -129,7 +129,13 @@ const csvReaderModules = [
   "effect/Tuple",
   "effect/TxQueue",
   "effect/TxRef",
-  "effect/Utils"
+  "effect/Utils",
+  "effect/MutableHashMap",
+  "effect/MutableHashSet",
+  "effect/Order",
+  "effect/Schema",
+  "effect/encoding/Xml",
+  "effect/encoding/Zip"
 ]
 
 export default defineConfig({
@@ -143,14 +149,14 @@ export default defineConfig({
   server: { port: 5173, strictPort: false, cors: false, ...(https === undefined ? {} : { https }) },
   preview: { cors: false },
   // The file reader loads on the first file, so Vite found its dependencies only then, optimised them and reloaded the
-  // page: the first file on a cold dev server was lost. Listed here, they are ready at start: SheetJS, and the
-  // effect modules @beep/csv and the vendored kit reach (workspace source, which Vite serves as it is, so their own
+  // page: the first file on a cold dev server was lost. Listed here, they are ready at start: the effect modules
+  // @beep/csv, @beep/xlsx and the vendored kit reach (workspace source, which Vite serves as it is, so their own
   // imports are what it would otherwise discover late).
-  optimizeDeps: { include: ["xlsx/dist/xlsx.mini.min.js", ...csvReaderModules] },
+  optimizeDeps: { include: readerModules },
   // Keep every asset a file. Vite would otherwise inline small font subsets as data: URIs,
   // which the content security policy (font-src 'self') rightly blocks.
   build: { assetsInlineLimit: 0 },
-  // The file reader's worker is an ES module, so it loads the CSV reader or SheetJS as a chunk of its own, only the one a
-  // file needs.
+  // The file reader's worker is an ES module, so it loads the CSV reader or the workbook reader as a chunk of its own, only
+  // the one a file needs.
   worker: { format: "es" }
 })

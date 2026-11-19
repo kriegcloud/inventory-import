@@ -2,16 +2,16 @@
 // The definition of done for moving workbook reading onto @beep/xlsx: the reader gives exactly the table (cells with
 // their type, text, displayed text and formula, row numbers, Notes, the sheet list and the sheet chosen) or exactly
 // the problem the SheetJS reader gave, for every workbook fixture and every sheet of it, and for files built by
-// hand. The SheetJS reader's results were recorded in test/fixtures/xlsx-expected/ while it was still installed
-// (XLSX_RECORD=true writes them from the reader named below); the comparison reads those.
+// hand. The SheetJS reader's results were recorded in test/fixtures/xlsx-expected/ while it was still installed;
+// the comparison reads those. XLSX_RECORD=true writes them again from the reader as it is now, which is only for a
+// change of the table's shape that is meant.
 import { readFileSync, writeFileSync } from "node:fs"
 import { describe, expect, it } from "@effect/vitest"
 import { Array as Arr, Effect, Option } from "effect"
 import * as Config from "effect/Config"
 import * as Result from "effect/Result"
 import * as S from "effect/Schema"
-import { readWorkbook } from "../src/internal/spreadsheet/workbook.ts"
-import { readXlsx as recorded } from "../src/internal/spreadsheet/xlsx.ts"
+import { readXlsx } from "../src/internal/spreadsheet/xlsx.ts"
 import { builtCases, fixtureNames, lyingExtent, type XlsxCase } from "./xlsxCorpus.ts"
 
 const bytesOf = (name: string): Uint8Array =>
@@ -57,12 +57,12 @@ describe("@beep/xlsx reads every workbook as the SheetJS reader did", () => {
         const fileName = item.name
         const record = yield* Config.Boolean("XLSX_RECORD").pipe(Config.withDefault(false))
         if (record) {
-          const old = yield* recorded({ fileName, bytes, sheet: item.sheet, notes: [] }).pipe(Effect.result)
+          const old = yield* readXlsx({ fileName, bytes, sheet: item.sheet, notes: [] }).pipe(Effect.result)
           const text = yield* old.pipe(plain, S.encodeEffect(Json))
           writeFileSync(expectedUrl(item.name), `${text}\n`)
         }
         const expected = yield* S.decodeEffect(Json)(readFileSync(expectedUrl(item.name), "utf8"))
-        const next = yield* readWorkbook({ fileName, bytes, sheet: item.sheet, notes: [] }).pipe(Effect.result)
+        const next = yield* readXlsx({ fileName, bytes, sheet: item.sheet, notes: [] }).pipe(Effect.result)
         const nextText = yield* next.pipe(plain, S.encodeEffect(Json))
         const nextJson = yield* S.decodeEffect(Json)(nextText)
         expect(nextJson).toEqual(expected)
@@ -75,7 +75,7 @@ describe("@beep/xlsx reads every workbook as the SheetJS reader did", () => {
   it.effect("and reads the rows a sheet's declared extent leaves out", () =>
     Effect.gen(function* () {
       const bytes = yield* lyingExtent
-      const table = yield* readWorkbook({ fileName: "lying.xlsx", bytes, sheet: Option.none(), notes: [] })
+      const table = yield* readXlsx({ fileName: "lying.xlsx", bytes, sheet: Option.none(), notes: [] })
       expect(Arr.map(table.rows, (row) => row.rowNumber)).toEqual([2, 3, 4, 5])
     })
   )

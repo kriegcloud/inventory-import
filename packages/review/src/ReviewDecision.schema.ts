@@ -5,7 +5,9 @@
  *
  * @packageDocumentation
  */
+import * as A from "effect/Array"
 import { LiteralKit } from "@beep/schema/LiteralKit"
+import { identity } from "effect/Function"
 import * as Effect from "effect/Effect"
 import * as Tuple from "effect/Tuple"
 import * as R from "effect/Record"
@@ -124,8 +126,8 @@ export const leftOut = (wasKept: boolean): RowPlace => LeftOut.make({ kind: "lef
  * @example putBack(leftOut(true)).kind // "kept"
  */
 export const putBack: (place: RowPlace) => RowPlace = RowPlace.match({
-  open: (place) => place,
-  kept: (place) => place,
+  open: identity<RowPlace>,
+  kept: identity<RowPlace>,
   leftOut: (place) => (place.wasKept ? kept : open)
 })
 
@@ -163,9 +165,9 @@ export class ReviewDecision extends S.Opaque<ReviewDecision, { readonly brand: u
 ) {
   /** True when the decision says nothing: open, nothing accepted, undone or typed. */
   static readonly isEmpty = (decision: ReviewDecision): boolean =>
-    decision.place.kind === "open" &&
-    decision.accepted.length === 0 &&
-    decision.reverted.length === 0 &&
+    RowPlace.guards.open(decision.place) &&
+    A.isReadonlyArrayEmpty(decision.accepted) &&
+    A.isReadonlyArrayEmpty(decision.reverted) &&
     R.isEmptyRecord(decision.edits)
 
   /** Whether the person has said anything about the row: proposals and group actions leave such rows alone. */
@@ -205,12 +207,12 @@ type DecisionParts = {
 
 /** The flags of a decision: the stored form, every empty part left out. */
 export const toFlags = (decision: DecisionParts): DecisionFlags => ({
-  ...(decision.place.kind === "leftOut" ? { out: true } : {}),
-  ...(decision.place.kind === "kept" || (decision.place.kind === "leftOut" && decision.place.wasKept)
+  ...(RowPlace.guards.leftOut(decision.place) ? { out: true } : {}),
+  ...(RowPlace.guards.kept(decision.place) || (RowPlace.guards.leftOut(decision.place) && decision.place.wasKept)
     ? { kept: true }
     : {}),
-  ...(decision.accepted.length === 0 ? {} : { accepted: decision.accepted }),
-  ...(decision.reverted.length === 0 ? {} : { reverted: decision.reverted }),
+  ...(A.isReadonlyArrayEmpty(decision.accepted) ? {} : { accepted: decision.accepted }),
+  ...(A.isReadonlyArrayEmpty(decision.reverted) ? {} : { reverted: decision.reverted }),
   ...(R.isEmptyRecord(decision.edits) ? {} : { edits: decision.edits })
 })
 

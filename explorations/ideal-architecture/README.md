@@ -82,6 +82,8 @@ Each step ends with the full check and an import of the messy sample in a browse
 
 ## Trail
 
+- 2026-11-19: Benjamin answered X1, X2, X4, X5 and X6 of BRIEF-xlsx.md; X3 is open and the brief is not yet said
+  to match.
 - 2026-11-19: BRIEF-xlsx.md written for the goal `beep-xlsx` (step 8); awaiting "the brief matches" and its six
   decisions.
 - 2026-11-18: goal `contexts` built: `access` and `catalog` each as `contract`, `model`, `host` and `web`, with

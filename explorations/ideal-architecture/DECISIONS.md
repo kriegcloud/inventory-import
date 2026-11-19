@@ -253,5 +253,52 @@ Question: which goal follows `contexts`? Answer: "@beep/xlsx (Recommended)": a f
 in the same fashion, his words for these packages being "representing the entire decoding <-> encoding two way
 transformation as an effect/Schema codec". It replaces the SheetJS reader in `catalog-web`'s `internal/spreadsheet`,
 which becomes the parity test and is then removed. The brief is [BRIEF-xlsx.md](BRIEF-xlsx.md); no goal is open
-until he says it matches, and its six decisions (X1 to X6) are his. Rejected: the answer came
-without the options he passed over, so none is recorded. Reverse: take step 9 first; nothing of step 8 is built.
+until he says it matches, and its six decisions (X1 to X6) are his. Rejected: "@beep/infra" and
+"Stop here for now". Reverse: take step 9 first; nothing of step 8 is built.
+
+### 2026-11-19 — Suggest fixes for a heading, the narrowing
+
+Question: the button is shown for an unmatched column only while some field still has no column, a narrowing the
+agent made; keep it? Answer: "Keep the narrowing (Recommended)". It is now Benjamin's choice. Rejected: "Show it for
+any unmatched column". Reverse: drop the second condition in `offersSuggestions`
+(`packages/catalog/model/src/Suggestion/Suggest.rules.ts`).
+
+### 2026-11-19 — xlsx engine (X1)
+
+Question: what inflates the archive and reads the XML in `@beep/xlsx`? Answer: "Effect's Zip and Xml
+(Recommended)", each behind one internal file, `effect` pinned exactly. Rejected: our own inflater and XML scanner;
+keeping SheetJS wrapped in the schemas. Reverse: replace `internal/container.ts` or `internal/ooxml.ts`; nothing
+else imports the two modules.
+
+### 2026-11-19 — xlsx writing (X2)
+
+Question: what does the first version write? Answer: "The workbook's values (Recommended)": cells with their kinds,
+formulas and saved results, number formats, the date system, sheets, merged ranges, hidden rows and columns;
+everything else read is named in `dropped` and not written. Rejected: read only; values plus unknown parts carried
+through. Reverse: add the carried-through parts when a use edits a workbook in place.
+
+### 2026-11-19 — xlsx displayed text (X3), open
+
+Question: for which number formats is a cell's displayed text worked out? Not decided: Benjamin chose "Something
+else" and typed nothing; he is being asked. The brief's default, not his answer, is dates and times, zero-padding and
+one plain number pattern. Nothing that depends on it is built: `XlsxNumberFormat.kind`, `XlsxCell.shown`,
+`internal/numberFormat.ts`, the `FormatNotShown` finding and the adapter's `shown`.
+
+### 2026-11-19 — xlsx unreadable cell (X4)
+
+Question: what happens to a cell the file itself gets wrong (a shared string that is not there, text where a number
+belongs)? Answer: "Read the rest, tell the person (Recommended)": the cell is `Unreadable`, the row is read, and a
+Note names the cells. Rejected: refuse the whole file. Reading the cell as empty without a Note was not offered: the
+brief listed it only to reject it. Reverse: make `UnreadableCell` a fatal finding.
+
+### 2026-11-19 — xlsx size (X5)
+
+Question: how large may a workbook be? Answer: "Keep 3 MiB, cap 64 MiB inflated (Recommended)". Rejected: 10 MiB
+with a 200 MiB cap; 3 MiB with no cap. Reverse: change `maxFileBytes.xlsx` and `XlsxLimits`' starting values, with
+measurements from the new reader.
+
+### 2026-11-19 — SheetJS afterwards (X6)
+
+Question: what becomes of SheetJS once the reader is swapped? Answer: "Keep as test oracle only (Recommended)": a
+devDependency of `@beep/xlsx`, out of the browser bundle and both runtime manifests. Rejected: remove it entirely;
+remove it and check with LibreOffice. Reverse: delete the oracle test and the devDependency.

@@ -17,8 +17,9 @@ Benjamin's words for these packages: "representing the entire decoding <-> encod
 effect/Schema codec". That sentence is the shape of the package: bytes on one side, a workbook value on the other, one
 codec between them.
 
-Nothing here is built. Six decisions at the end are Benjamin's; nothing they would change may be started before they
-are answered.
+Nothing here is built. Of the six decisions at the end, Benjamin has answered X1, X2, X4, X5 and X6 with the
+recommended option of each ([DECISIONS.md](DECISIONS.md), 2026-11-19); X3 is open, and nothing it would change may
+be started. He has not yet said the brief matches, so no goal is open.
 
 ## Problem
 

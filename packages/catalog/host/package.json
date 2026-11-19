@@ -17,7 +17,8 @@
     "./SuggestionStoreD1": "./src/SuggestionStore.adapter.ts",
     "./AssistantLogD1": "./src/AssistantLog.adapter.ts",
     "./ModelAllowance": "./src/ModelAllowance.adapter.ts",
-    "./AuditLine": "./src/internal/auditLine.ts"
+    "./AuditLine": "./src/internal/auditLine.ts",
+    "./CatalogTest": "./src/CatalogTest.test-layer.ts"
   },
   "scripts": {
     "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",

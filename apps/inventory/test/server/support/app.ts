@@ -37,11 +37,14 @@ import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
 import { makeApp, makeRoutes, servicesWith, toFetch } from "../../../src/server/App.ts"
 import { BetterAuthTest } from "@beep/better-auth/BetterAuthTest"
 import { Handlers } from "../../../src/server/handlers.ts"
-import { ImportStore } from "@inventory/catalog-model/ImportStore"
-import { ItemStore } from "@inventory/catalog-model/ItemStore"
-import { SuggestionStore } from "@inventory/catalog-model/SuggestionStore"
-import { AssistantLog } from "@inventory/catalog-model/AssistantLog"
 import { AnswererOpenRouter } from "@inventory/catalog-host/Model"
+import {
+  AssistantLogMemory,
+  CatalogMemoryRef,
+  ImportStoreMemory,
+  ItemStoreMemory,
+  SuggestionStoreMemory
+} from "@inventory/catalog-model/Memory"
 import { ModelAllowanceViaAccess } from "@inventory/catalog-host/ModelAllowance"
 import * as Observability from "../../../src/server/Observability.ts"
 import { SameOriginLive } from "../../../src/server/SameOrigin.ts"
@@ -135,27 +138,13 @@ const InMemoryAccess = (member: Member) =>
   )
 
 /**
- * A service the in-memory app does not have: its storage is SQL, tested on D1 (`*.slow.test.ts`). Any call dies with
- * a sentence naming the method, so a fast test that reaches one says what it reached.
- */
-const notInMemory = <I, S extends object>(tag: Context.Key<I, S>, name: string) =>
-  Layer.succeed(
-    tag,
-    new Proxy({} as S, {
-      get: (_, method) => () => Effect.die(`${name}.${String(method)} is not in memory: test it on D1`)
-    })
-  )
-
-/**
- * The services that keep their rows in SQL, for the in-memory app: absent. The table assistant with no key reads by
- * its rules and touches no table, so it works here as it does on D1.
+ * The catalog's stores for the in-memory app: its twins, on one state of their own. The model and the allowance are
+ * the real adapters, on the test's model service and the in-memory access context.
  */
 const InMemoryStorage = Layer.mergeAll(
-  notInMemory(ImportStore, "ImportStore"),
-  notInMemory(ItemStore, "ItemStore"),
-  notInMemory(SuggestionStore, "SuggestionStore"),
-  notInMemory(AssistantLog, "AssistantLog"),
-  // The model and the allowance are the real adapters, on the test's model service and the in-memory access context.
+  Layer.mergeAll(ImportStoreMemory, ItemStoreMemory, SuggestionStoreMemory, AssistantLogMemory).pipe(
+    Layer.provide(CatalogMemoryRef.layer)
+  ),
   AnswererOpenRouter,
   ModelAllowanceViaAccess
 )

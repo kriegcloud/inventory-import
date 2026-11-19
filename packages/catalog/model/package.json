@@ -27,7 +27,8 @@
     "./ModelAllowance": "./src/Answer/ModelAllowance.external.ts",
     "./SuggestionStore": "./src/Suggestion/SuggestionStore.store.ts",
     "./SuggestionsHandler": "./src/Suggestion/Suggestions.handler.ts",
-    "./AssistantLog": "./src/Assistant/AssistantLog.store.ts"
+    "./AssistantLog": "./src/Assistant/AssistantLog.store.ts",
+    "./Memory": "./src/Catalog.memory.ts"
   },
   "scripts": {
     "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",

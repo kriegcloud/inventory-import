@@ -440,6 +440,28 @@ None.
     Undo: 155 / 45, Redo: 157 / 43, the same after a refresh; "Import 157 items? ..."; "Not imported 43 · Imported
     157 · Already there 0 · All 200"; Items "157 items"; the assistant, "only kilograms, cheapest first":
     "Answered by anthropic/claude-haiku-5.5", "Filtered: UoM is KG", "20 of 157 items".
+- **2. In-memory twins for every catalog port (decision (C6)).** `Catalog.memory.ts` in the model: one state
+  (`CatalogMemoryRef`) and a twin of each store over it (`ImportStoreMemory`, `ItemStoreMemory`,
+  `SuggestionStoreMemory`, `AssistantLogMemory`), with `Answerer.off`, `Answerer.scripted` and
+  `ModelAllowance.memory(left)`; `catalogMemory(options)` is all six, and the host names it `CatalogTest.memory`
+  (`CatalogTest.test-layer.ts`). Each write is one pure step from a state to the next, with the adapter's guards in
+  the adapter's order: a confirm only while the import is open, a take-back only of confirms in force, an item
+  removed only at revision 1, a replaced item put back only at the revision the replace gave it.
+  - Tests over the twins, in the model (34 in all, 9 new): the endpoints (a viewer refused, an upload staged, a
+    confirm's counts, a second confirm `AlreadyImported`, an edit, the same edit again, a stale edit
+    `ItemChanged`, a take-back that keeps and names the edited item, a second press writing nothing, a decision
+    and its revision, a removal, suggestions by the rules stored once, the assistant asking no model once the
+    allowance is used), the `confirmPlan` property (its statuses add up to the review's rows, 60 generated files),
+    and `Ports.test.ts` with its `@ts-expect-error`.
+  - Held to D1's numbers: `ImportsTwin.test.ts` in the app runs the messy sample through the twins (fast) and
+    reads what `Imports.slow` and `TakeBack.slow` read on D1: 45 / 24 / 21 / 155 staged, 155 created and 45 not
+    imported with 16 rows and 19 values fixed, row 18's reason, the crate's values, the same file again 1 created
+    and 154 already there, the first import taken back with 155 removed. It passed on its first run. The app's
+    in-memory test app (`inMemoryHandlers`, `inMemoryApp`) runs on the twins now, where its stores died when
+    called.
+  - What a twin does not imitate, said in its header: the size limit of a stored value, and the search's
+    forgiveness of one wrong letter.
+  - No code the Worker runs changed in this item.
 
 ## Closing note
 

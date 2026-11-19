@@ -357,3 +357,33 @@ unreadable cell moved to Needs a decision), and "Leave behind Activity". Reverse
 Question: what follows `beep-xlsx`? Answer: "Write the infra brief (Recommended)":
 [BRIEF-infra.md](BRIEF-infra.md) for step 9, written only; nothing built or deployed, no goal opened. Rejected:
 clearing the open schema decisions first; stopping. Reverse: none needed, the brief changes nothing.
+
+### 2026-11-19 — the name of effect/Number
+
+Question: beep-effect imports `effect/Number` as `Num` (143 import lines) and as `N` (110) and no rule of its picks
+one; which name does it take here? Answer: "Num (Recommended)". Rejected: `N`. `docs/standards/effect-imports.md`
+fixes `import * as Num from "effect/Number"` and the check accepts only that. Reverse: the one row for
+`effect/Number` in `scripts/check-effect-imports.mjs` and in the standard's table.
+
+### 2026-11-19 — Effect imports in the two vendored UI files
+
+Question: `packages/ui/src/components/data-table/data-table-parsers.ts` and `packages/ui/src/hooks/use-data-table.ts`
+are vendored UI that already carried Effect imports written here; migrate them with the rest, or revert them and
+leave them out of the check? Answer: "Keep them migrated (Recommended)". Rejected: revert and exclude. Reverse:
+restore the two files' import lines and skip `packages/ui/src/components` and `packages/ui/src/hooks` in the check.
+
+### 2026-11-19 — the nested calls the import migration turned into pipes
+
+Question: once each module is imported from its own path, the `missedPipeableOpportunity` diagnostic sees 16 nested
+calls it missed through the barrel, and the check fails on them; rewrite them to the equivalent `.pipe(...)` form
+(`sam.pipe(actorOf, Effect.flip)` for `Effect.flip(actorOf(sam))`), or revert them and silence the rule at those
+sites? Answer: "Accept (Recommended)". Rejected: revert and silence the rule there. Reverse: none needed; the two
+forms are the same call sequence.
+
+### 2026-11-19 — merging the import migration
+
+Question: when does the Effect import migration merge into main? Answer: "Merge once the browser pass is clean
+(Recommended)". The pass on its last commit, on a fresh database: 200 rows read from `items_messy.csv`, the result
+said 155 imported and 45 not, 155 stored; one search, one edit, People, Activity and a take-back that kept the
+edited item; no console error. Not seen: the model's suggestions (no key in that copy), the `.xlsx` path, and the
+same walk on main before the migration.

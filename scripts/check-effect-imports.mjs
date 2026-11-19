@@ -10,7 +10,7 @@
 //   root-barrel     anything imported or re-exported from "effect"
 //   nested-barrel   anything from a folder of modules ("effect/http", "effect/sql", ...) or from an "@effect/<package>"
 //                   root other than the test runner's
-//   alias           a namespace import whose name is not the module's (A, O, P, R, S, Str, Eq, Bool, F, BI, Regex, and
+//   alias           a namespace import whose name is not the module's (A, O, P, R, S, Str, Eq, Bool, F, BI, Regex, Num, and
 //                   the module's own name for every other), unless that name is already taken in the file
 //   named-import    a value picked by name from a module's own path; only "effect/Function" is imported that way
 //   unknown-path    a path the installed package does not have
@@ -40,8 +40,8 @@ const aliases = {
   "effect/Function": ["F"],
   "effect/BigInt": ["BI"],
   "effect/RegExp": ["Regex"],
-  // beep-effect writes both and no rule of its picks one: either passes until Benjamin decides.
-  "effect/Number": ["Num", "N"]
+  // beep-effect writes both Num and N; Benjamin chose Num (explorations/ideal-architecture/DECISIONS.md).
+  "effect/Number": ["Num"]
 }
 /** Packages whose root is imported by name, as beep-effect does: the test runner's `describe`, `it`, `layer`. */
 const namedRoots = ["@effect/vitest", "@effect/atom-react"]

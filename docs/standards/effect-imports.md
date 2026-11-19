@@ -56,11 +56,12 @@ import { D1Client } from "@effect/sql-d1"
 | `effect/Function`, whole | `import * as F from "effect/Function"` | `F` |
 | `effect/BigInt` | `import * as BI from "effect/BigInt"` | `BI` |
 | `effect/RegExp` | `import * as Regex from "effect/RegExp"` | `Regex` |
-| `effect/Number` | `import * as Num from "effect/Number"` | `Num` (not decided: `N` also passes) |
+| `effect/Number` | `import * as Num from "effect/Number"` | `Num` |
 | every other module | `import * as Effect from "effect/Effect"`, `import * as DateTime from "effect/DateTime"`, `import * as HashMap from "effect/HashMap"`, `import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder"`, `import * as TestClock from "effect/testing/TestClock"` | the last part of its path |
 
 The first five are law; `Str`, `Eq` and `Bool` are EF-4's; `F` is the name beep-effect's standard writes in its own
-examples; `BI` and `Regex` are the only names its code uses for modules that would otherwise hide a global.
+examples; `BI` and `Regex` are the only names its code uses for modules that would otherwise hide a global; `Num` is
+Benjamin's choice between the two names its code uses.
 
 The only time a module takes another name is when its own is already taken in that file by something else, as in the
 CSV reader's test, where `Csv` is the package under test:
@@ -155,6 +156,6 @@ Measured over its tracked `apps`, `packages` and `infra` source; counts are impo
 | `effect/Equal` | `Eq` (EF-4) | `Equal` 156, `Eq` 103 | `Eq`: the rule wins |
 | `effect/Array`, `Option`, `Predicate`, `Record`, `Schema` | `A`, `O`, `P`, `R`, `S` only | a few of `Arr`, `Option`, `Predicate`, `Rec`, `Schema` (about 1% or less of each) | the rule |
 | A value picked by name from a module other than `effect/Function` | laws 1 and 2 read as "whole, by its name"; its command lets it pass | a few dozen (`TaggedError`, `fromUndefinedOr`) against tens of thousands of namespace imports | refused |
-| `effect/Number` | none | `Num` 143, `N` 110 | not decided; either passes |
+| `effect/Number` | none | `Num` 143, `N` 110 | `Num`: Benjamin's choice |
 | `@effect/platform-node`, `@effect/platform-bun` | none | by name from the root and whole from the module's path, both common | whole from the module's path; neither package is used by this repository's own code yet |
 | Order of imports | Biome sorts: value imports, then type imports, each by path | as sorted | not sorted by a tool here; a new line goes where its path sorts among its neighbours |

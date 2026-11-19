@@ -46,12 +46,14 @@ export const useAuditEvents = () => {
   return {
     data: result.pipe(AsyncResult.value, O.getOrUndefined),
     error: result._tag === "Failure" ? Cause.squash(result.cause) : null,
+    /** Shown from before, while it is asked again. */
+    updating: result.waiting,
     refetch
   }
 }
 
 /** The audit trail as a list a person searches and filters: every upload, import, take-back and change of role. */
-export function AuditEvents(props: { rows: ReadonlyArray<AuditEvent> }) {
+export function AuditEvents(props: { rows: ReadonlyArray<AuditEvent>; updating?: boolean }) {
   return (
     <ListTable
       key="events"
@@ -61,6 +63,7 @@ export function AuditEvents(props: { rows: ReadonlyArray<AuditEvent> }) {
       rows={props.rows}
       rowKey={(event) => event.id}
       empty="Nothing has happened yet."
+      updating={props.updating === true}
     />
   )
 }

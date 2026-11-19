@@ -71,7 +71,7 @@ export function ActivityPage() {
       ) : view === "decisions" ? (
         <ImportDecisions rows={changes.data ?? []} />
       ) : (
-        <AuditEvents rows={events.data ?? []} />
+        <AuditEvents rows={events.data ?? []} updating={events.updating} />
       )}
     </div>
   )

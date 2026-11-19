@@ -1,6 +1,7 @@
 // Two edits of one item in flight, the second answered first: the screen shows both at once, ends with both after the
 // server has answered, and reads the item again once, not twice (goals/atoms/PLAN.md, "two writes in flight"). A
-// refused edit beside a saved one ends at the server's word; two refused edits end where the screen started, unread.
+// refused edit is taken back the moment it is refused while the other keeps showing (Benjamin: "Take it back at
+// once"), and the screen ends at the server's word; two refused edits end where the screen started, unread.
 import { describe, expect, it } from "@effect/vitest"
 import * as Context from "effect/Context"
 import * as Deferred from "effect/Deferred"
@@ -87,7 +88,7 @@ describe("two optimistic edits in flight", () => {
     })
   )
 
-  it.live("ends at the server's word when the first is refused and the second saved", () =>
+  it.live("takes a refused edit back at once, keeps the other, and ends at the server's word", () =>
     Effect.gen(function* () {
       const t = world()
       yield* settle
@@ -96,6 +97,9 @@ describe("two optimistic edits in flight", () => {
       yield* settle
       yield* t.refuse(0)
       yield* settle
+      // Before the other edit has answered: the refused name is back, the other edit still shows, and waits.
+      expect(t.seen()).toEqual({ item: { name: "Bolt", unit: "box" }, waiting: true })
+      expect(t.reads()).toBe(1)
       yield* t.answer(1)
       yield* settle
       expect(t.seen()).toEqual({ item: { name: "Bolt", unit: "box" }, waiting: false })
@@ -112,6 +116,7 @@ describe("two optimistic edits in flight", () => {
       yield* settle
       yield* t.refuse(1)
       yield* settle
+      expect(t.seen()).toEqual({ item: { name: "Hex bolt", unit: "each" }, waiting: true })
       yield* t.refuse(0)
       yield* settle
       expect(t.seen()).toEqual({ item: { name: "Bolt", unit: "each" }, waiting: false })

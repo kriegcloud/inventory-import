@@ -636,3 +636,26 @@ is his to fill. Reverse: let a preview mint its own again (`testPasswordOf`) and
 
 Question: how does `claude/infra` reach main? Answer: "Merge locally, I push (Recommended)". Merged into local main
 at 8007ab5; the push, and with it `deploy.yml` on `main`, is his.
+
+### 2026-11-19 — atoms, merging the goal
+
+Question: how does the atoms goal reach main? Answer: "Merge each package as it lands (Recommended)". Local main took
+the client step at 27d03c1. Rejected: merge once at the end. Reverse: hold later packages on the branch.
+
+### 2026-11-19 — atoms, a refused edit beside another in flight
+
+Measured on `Atom.optimistic` before the client's optimistic write was built: a refused edit stayed on screen until
+the last write in flight had answered, where TanStack Query took it back at once. Question: what does the screen do
+the moment a save is refused while another is on its way? Answer: "Take it back at once (Recommended)": that field
+shows its previous value again beside the error, the other edit's value stays, and the screen ends at the server's
+word. Rejected: keep it until the last write answers. Built in `@inventory/client/OptimisticAtoms` (a change list over
+the read, not `Atom.optimistic`), with a test of two edits in flight, one refused. Reverse: that one file.
+
+### 2026-11-19 — atoms, a page opened again
+
+TanStack Query kept an unread answer five minutes and showed it while asking again; the first atom reads kept it 30
+seconds and then started from the skeleton. Question: what does a return to a page show? Answer: "Old rows at once,
+refreshed behind (Recommended)": what was there shows immediately, marked as updating, and the fresh rows are swapped
+in; no skeleton on a return. Rejected: 30 seconds then fresh; always fresh. Built in `@inventory/client/Api`
+(`keepUnwatched`, five minutes, and `Atom.swr` on every read); the mark is the search box's spinner, "Updating".
+Reverse: `keepUnwatched` and the one `Atom.swr` line.

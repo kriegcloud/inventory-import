@@ -117,6 +117,8 @@ export function ListTable<Row extends RowData>(props: {
   readonly searchLabel: string
   /** The widest the table's column of the page can be, in pixels, when it sits in a narrow column of its own. */
   readonly maxWidth?: number
+  /** The rows shown are being asked for again (a return to the page, a change being saved): the search box says so. */
+  readonly updating?: boolean
 }) {
   const narrow = useIsNarrow()
   const room = Math.min(useContentWidth(), props.maxWidth ?? Number.POSITIVE_INFINITY)
@@ -242,7 +244,7 @@ export function ListTable<Row extends RowData>(props: {
             value={searched}
             onSearch={(text) => table.setGlobalFilter(text)}
             placeholder={props.searchLabel}
-            working={false}
+            working={props.updating === true}
             maxLength={maxSearch}
             shortcutHint={!narrow}
             className={narrow ? "w-auto min-w-0 flex-1" : "w-80"}

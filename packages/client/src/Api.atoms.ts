@@ -10,6 +10,7 @@ import * as Effect from "effect/Effect"
 import * as Eq from "effect/Equal"
 import { dual } from "effect/Function"
 import * as Layer from "effect/Layer"
+import * as MutableHashMap from "effect/MutableHashMap"
 import * as O from "effect/Option"
 import * as Schedule from "effect/Schedule"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
@@ -18,8 +19,12 @@ import * as Reactivity from "effect/reactivity/Reactivity"
 import { memberKey } from "@inventory/client/MemberAtoms"
 import { isTransient } from "@inventory/client/SayError"
 
-/** How long an answer nobody is looking at is kept: a screen opened again within it shows it without asking again. */
-export const freshFor = 30_000
+/**
+ * How long an answer nobody is looking at is kept. A screen opened again within it shows that answer at once, marked
+ * waiting, and asks again behind it (Benjamin: "Old rows at once, refreshed behind"); after it, the screen starts from
+ * its skeleton. Five minutes, TanStack Query's own keep.
+ */
+export const keepUnwatched = 5 * 60_000
 
 /**
  * The app's one runtime, for the screens of every web package. Its layer is the app's to give (`provideApi`); until it
@@ -122,18 +127,32 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
   ): Atom.Atom<AsyncResult.AsyncResult<A, E>> {
     // One read per member: when the person or the organization changes, the screen shows its skeleton, never the
     // previous organization's rows marked as waiting.
-    const forMember = Atom.family((_member: string) => {
-      const read = Atom.setIdleTTL(
+    // Held with ordinary references, not `Atom.family`'s weak ones: once the screen is let go nothing else refers to
+    // these atoms, and a collected one would be made anew on a return, empty, so the person would see the skeleton
+    // instead of the rows kept for them (measured: after 35 s away). A tab meets a few members, so this stays small.
+    const reads = MutableHashMap.empty<string, Atom.Atom<AsyncResult.AsyncResult<A, E>>>()
+    const make = (): Atom.Atom<AsyncResult.AsyncResult<A, E>> => {
+      const held = Atom.setIdleTTL(
         apiRuntime.atom((get) =>
           Effect.flatMap(client, (c) => use(c, get)).pipe(
             Effect.retry(readRetry),
             Effect.map((answer) => keepWhenEqual(heldSuccess(get.self<AsyncResult.AsyncResult<A, E>>()), answer))
           )
         ),
-        freshFor
+        keepUnwatched
       )
+      // Every return to a screen asks again behind the answer it shows: the read outlives the screen by
+      // `keepUnwatched`, this wrapper does not, so a screen that mounts it again starts a new look. An answer under a
+      // second old counts as fresh, or a read answered before its first look would be asked for twice.
+      const read = Atom.swr(held, { staleTime: "1 second" })
       return options?.reactivityKeys === undefined ? read : read.pipe(followKeys(options.reactivityKeys))
-    })
+    }
+    const forMember = (member: string): Atom.Atom<AsyncResult.AsyncResult<A, E>> =>
+      O.getOrElse(MutableHashMap.get(reads, member), () => {
+        const read = make()
+        MutableHashMap.set(reads, member, read)
+        return read
+      })
     // The member it last read for, so a refresh of this atom (an optimistic write's, when the last one has answered)
     // reaches the read it shows. One registry holds it in the app; a test that makes several shares the key "".
     let shown = ""

@@ -372,6 +372,7 @@ export function PeoplePage() {
           rows={rows}
           rowKey={(person) => person.memberId}
           empty="Nobody is here yet."
+          updating={list.waiting}
         />
       )}
     </div>

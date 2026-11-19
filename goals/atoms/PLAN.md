@@ -129,6 +129,16 @@ Browser, on a fresh database, the dev server on port 5220, the headless browser:
 Not seen in this step: the development sign-in on a fresh tab (it moves with the app's shell, step 4), creating an
 account or an organization, a role change shown as saving (the answer came too fast to see it).
 
+**Benjamin's two answers, in the client** (after step 3). Client tests: a refused edit beside another in flight is
+taken back at once and the other keeps showing; a return to a screen shows its rows at once, marked waiting, then the
+fresh ones. Browser, fresh database: People, then Items, then People again through the sidebar, sampled every 10 ms.
+After 3 s away: the 3 rows at 62 ms with the search box's spinner "Updating", the fresh rows at 92 ms, no skeleton.
+After 45 s away: the rows and "Updating" at 131 ms, fresh at 665 ms, no skeleton. The first try at 35 s showed the
+skeleton: `Atom.family` held the per-member reads weakly, so after a garbage collection a return made a new, empty
+read; they are now held in a `MutableHashMap`, and the 45 s look above is after that change. Dana (the only admin) to
+Viewer: Admin again with the toast (the refusal came back within 50 ms, too fast to see Viewer); Priya to Editor held.
+The garbage collection is not reproduced by a test (a test cannot force one); the browser look is the proof.
+
 ## Legacy in the client
 
 The client's lint is on (`packages/client/.oxlintrc.json` extends `.oxlintrc.atoms.json`), with three files excepted by
@@ -181,10 +191,18 @@ Not discriminators, and not changed: string-literal domains with no data of thei
 - **Two stand-in hooks until the app's shell moves (step 4):** `useSession` and `useAuditEvents` in `access-web` keep
   the fields the shell and the Activity page read, built only from the atom hooks; the shell then reads `session`,
   `actor` and `auditEvents` itself and they go.
-- **Two of the measured differences are Benjamin's to decide** (asked through the lead): a refused optimistic change
-  stays on screen until the last write in flight has answered (`@inventory/client/OptimisticAtoms`), and an unread
-  answer is kept 30 s and not shown while asked again (`freshFor` in `@inventory/client/Api`). Each is one place to
-  change; nothing is built on either.
+- **A refused change is taken back at once** (Benjamin: "Take it back at once (Recommended)"). `Atom.optimistic`
+  could not do it, so `@inventory/client/OptimisticAtoms` holds its own list of changes on their way over the read:
+  the screen shows the read with each applied in order, a refused one leaves the list the moment it is refused, saved
+  ones stay until the one refresh after the last answer has come. Tested: the refused name reads "Bolt" again while
+  the other edit's "box" still shows, waiting; then the server's word after one refresh.
+- **A page opened again shows what it had, then the fresh rows** (Benjamin: "Old rows at once, refreshed behind
+  (Recommended)"). An unread answer is kept five minutes (`keepUnwatched`); every read is wrapped in `Atom.swr`, so a
+  return shows the held rows at once and asks again on the next tick, the rows marked waiting until the answer. On
+  screen the mark is the search box's spinner, labelled "Updating" (`ListTable`'s `updating`, on People and on
+  Activity's events); the rows stay. After five minutes unread, a return starts from the skeleton. An answer under a
+  second old counts as fresh: without that, a read answered before its first look was asked for twice (measured).
+  Tested: a return shows the old rows at once, marked waiting a moment later, then the new ones.
 
 - **The client's atoms** (`@inventory/client/Api`, `OptimisticAtoms`, `MemberAtoms`, files `*.atoms.ts`, the suffix
   beep-effect gives its atom files). One runtime, `apiRuntime`, whose layer the app gives the registry at the root

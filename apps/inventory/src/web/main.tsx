@@ -36,7 +36,7 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ThemeProvider>
       {/* The atoms' registry, beside the query cache while the screens move to atoms (goals/atoms). An atom nobody reads
-        is dropped 400 ms later; a read of the API is kept for `freshFor` (@inventory/client/Api). */}
+        is dropped 400 ms later; a read of the API is kept for `keepUnwatched` (@inventory/client/Api). */}
       <RegistryProvider initialValues={initialAtoms} defaultIdleTTL={400}>
         <QueryClientProvider client={queryClient}>
           <TooltipProvider delayDuration={300}>

@@ -22,7 +22,10 @@ export function TableSearch(props: {
   readonly value: string
   readonly onSearch: (text: string) => void
   readonly placeholder: string
-  /** The table is fetching rows for this search: the box shows it is working, the rows on screen stay. */
+  /**
+   * The table is fetching rows (for this search, or again for a return to the page): the box shows it is working, the
+   * rows on screen stay.
+   */
   readonly working: boolean
   readonly maxLength: number
   /** Shows "/" in the empty box. Off where there is no keyboard to press it on. */
@@ -117,7 +120,7 @@ export function TableSearch(props: {
         }}
       />
       <InputGroupAddon align="inline-end">
-        {busy ? <Spinner aria-label="Searching" /> : null}
+        {busy ? <Spinner aria-label={waiting ? "Searching" : "Updating"} /> : null}
         {draft === "" ? (
           props.shortcutHint ? (
             <Kbd aria-hidden>/</Kbd>

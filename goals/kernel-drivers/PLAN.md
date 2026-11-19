@@ -106,7 +106,7 @@ Where the brief left a choice open, or the code showed the brief could not be fo
 - **`CLOUDFLARE_INCLUDE_PROCESS_ENV=true AI_ENABLED=false` did not reach the Worker** while a `.dev.vars` existed
   (`/api/v1/system/status` still said AI was on). For the proof, the copied `.dev.vars` was set aside (renamed, never
   opened), the dev script generated a throwaway one, `AI_ENABLED=false` was appended to that, and the copy was moved
-  back afterwards. The `CLAUDE.md` recipe that says otherwise is not changed here (unverified on `main`).
+  back afterwards. Verified after the goal and corrected in `CLAUDE.md` (see "After the goal").
 - **OpenRouter proof**: check:full 32/32 tasks (openrouter 26 tests; app 215 fast + 45 slow); `bun.lock` names neither
   `ai` nor `@openrouter/ai-sdk-provider`. Browser on a fresh database: "200 rows read", "Import 155, skip 45", result
   "Imported 155 · Not imported 45 · All 200", Items "155 items", D1 `item` 155. With the key: status "Answers come from
@@ -148,4 +148,25 @@ What the contexts goal (step 7) should know:
 - `Activity.agent` is an `Option` now; a screen that shows the agent reads `Option`.
 - `TableAssistant` says "No AI key is set, so the rules answered." even when `AI_ENABLED=false` is the reason (it was
   so before this goal); its sentence could come from `aiStatusOf(...).reason`.
+
+## After the goal
+
+Two follow-ups Benjamin answered after the merge, and one check:
+
+- **LiteralKit** ("Fix the import, then use LiteralKit"): the vendored `LiteralKit.schema.ts` and
+  `internal/builders.ts` import `@beep/utils/Array` and `@beep/utils/Record` instead of the `@beep/utils` root, a
+  deliberate patch against beep-effect `c5cebd5c9de7` (`SOURCE_PATCHES` in `scripts/vendor-beep.mjs`, `patches` in
+  `packages/foundation/modeling/schema/vendor.json`, named in each file's first line, reported by `vendor:check`;
+  re-vendoring from that commit reproduces the kit exactly). `Role`, `D1Stage`, the Better Auth error fields
+  (`BetterAuthOperation`, `BetterAuthConfigProblem`), `AuthSecret`, `OffReason`, `ModelTrouble`, `ModelAccess` and
+  `ModelStatus` are `LiteralKit`s again, with `.match` holding the behaviour (the role rank, the error sentences, the
+  status words in `src/server/Model.ts`). The Worker and the web profile both type-check without Node types; the web
+  profile's recorded `"node"` exception is removed. `@beep/csv` never avoided `LiteralKit`, so it is unchanged.
+- **Drizzle skill** ("Remove it"): `.agents/skills/drizzle`, its `.claude`/`.codex` links and `skills-lock.json` are
+  gone. The Better Auth skills still name Drizzle as one of Better Auth's adapters; that is their own content.
+- **The AI-off recipe**: on the current code, with `.dev.vars` present,
+  `CLOUDFLARE_INCLUDE_PROCESS_ENV=true AI_ENABLED=false` left AI on ("Answers come from OpenRouter …"), because wrangler
+  includes the process environment only when it falls back to `.env` files (`getVarsForDev`). Appending
+  `AI_ENABLED=false` to a backed-up `.dev.vars` works ("AI suggestions are off: AI_ENABLED is set to false.", with the
+  key present); `CLAUDE.md` and `docs/patterns.md` now say so.
 

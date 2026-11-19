@@ -52,3 +52,14 @@ export const stagingProblem = (input: {
   if (columnCount > 200) return fileProblem.tooManyColumns({ fileName, columns: columnCount })
   return null
 }
+
+/**
+ * The reader's Notes the person is shown on the Review step before they import: the warnings. A warning says the
+ * reader could not take the file at its word (a cell it could not read, a quote in an odd place, a hidden sheet
+ * with data); an information Note says how the file was read and stays behind the Activity button. Benjamin's
+ * decision "where a reader's warning shows": the rows' outcomes and counts are not changed by a warning.
+ *
+ * @example readerWarnings({ notes: [{ kind: "delimiter", level: "info", message: "Columns are separated by tabs.", rows: [] }] }) // []
+ */
+export const readerWarnings = (table: Pick<StagedTable, "notes">): ReadonlyArray<StagedTable["notes"][number]> =>
+  Arr.filter(table.notes, (note) => note.level === "warning")

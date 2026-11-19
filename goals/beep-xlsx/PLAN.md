@@ -171,6 +171,30 @@ sheet chosen in the chooser; an import of these files carried through Confirm (t
 Notes anywhere but the Activity panel. That last one is worth Benjamin's eye: `unreadableCells` is a warning, and a
 warning from the reader is shown only behind the Activity button, as every reader Note is.
 
+## A reader's warning on the Review step
+
+Benjamin's decision "where a reader's warning shows" (DECISIONS, 2026-11-19): "Also on the Review step
+(Recommended)". `readerWarnings` (`packages/catalog/model/src/Staging/Staging.rules.ts`) picks the Notes of level
+warning; `ReaderWarnings` in `ReviewStep.screen.tsx` shows them above the review, each in the sentence the reader
+wrote, under "Check this before you import" (or "Check these N things before you import"). Those two headings are
+new words and his to change. Information Notes stay behind Activity; no row's outcome or count changes.
+
+Seen on a fresh database, port 5200:
+
+- `unreadable_cells.xlsx`, 1440 wide, light and dark: above "Review unreadable_cells.xlsx" a box read "Check this
+  before you import" and "2 cells could not be read and were left empty: C4, C8. The file itself holds no usable
+  value there; open it in Excel and retype them if they matter." Its left edge was the heading's (280). The views
+  still read "Needs a decision 0 · Ready 25 · All 25" and the button "Import 25 items".
+- The same file at 390 wide, light and dark: the box from 16 to 374 across, above the heading, the page 390 wide.
+- `items_cp1252.csv` (the clean sample saved as Windows-1252 with "Café" and "Señor" in two names), 1440 light and
+  390 dark: "Check this before you import" and "The file is not UTF-8, so it was read as Windows-1252, the encoding
+  Excel uses for "CSV (Comma delimited)". Check accented letters and symbols in rows 2 and 3. Saving as "CSV UTF-8"
+  avoids this." The names read "Café Foam Insert" and "Señor Label Roll"; "Import 25 items".
+- `items_clean.xlsx`, which has no warning: no box; the heading at the top as before.
+
+Not seen: a file with two or more warnings (the list form and its heading), and the box on the Match step, where it
+is not shown.
+
 ## Closing note
 
 `@beep/xlsx` is at `packages/foundation/modeling/xlsx`: ten schema and facade files, eleven internal ones, five test

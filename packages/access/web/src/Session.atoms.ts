@@ -4,11 +4,15 @@
 // protects: the session is asked for once per page load and shared; it is asked again only after signing in, creating
 // an organization or switching organization, and every read of the API then belongs to the new member
 // (`@inventory/client/Api` keys its reads by `member`). Signing out reloads the page.
-import { useAtomRefresh, useAtomValue } from "@effect/atom-react"
 import { forgetEarly } from "@inventory/client/Early"
 import { request } from "@inventory/client/Http"
 import { queryClient } from "@inventory/client/QueryClient"
-import { actorOfSession, type SessionState } from "@inventory/access-contract/SessionState"
+import {
+  actorOfSession,
+  type OrganizationChoice,
+  type SessionState,
+  type SignInFeatures
+} from "@inventory/access-contract/SessionState"
 import type { Member } from "@inventory/kernel/Member"
 import * as Cause from "effect/Cause"
 import * as Effect from "effect/Effect"
@@ -138,71 +142,106 @@ export const actor: Atom.Atom<O.Option<Member>> = Atom.map(session, (result) =>
   result.waiting ? O.none() : O.flatMap(AsyncResult.value(result), actorOfSession)
 )
 
+/** Who is signed in, as the shell draws it: the answer's fields, with "loading" while it is asked (again). */
+export interface SessionView {
+  /** loading, then signed-out, no-organization or ready (`actor` is set only when ready). */
+  readonly status: "loading" | SessionState["status"]
+  readonly actor: Member | undefined
+  readonly email: string | undefined
+  readonly organizations: ReadonlyArray<OrganizationChoice>
+  readonly features: SignInFeatures | undefined
+  /** No answer yet, and this browser was not signed in last time: draw the sign-in page without waiting. */
+  readonly probablySignedOut: boolean
+  /** Why the session could not be read, while it is not being asked again. */
+  readonly error: unknown
+}
+
 /**
- * Who is signed in, as the app's shell reads it until it moves to the atoms above (goals/atoms, step 4): only the
- * atom hooks, with the same fields `useSession` gave. While the session is asked again (after a switch) it reads as
- * loading, as it did when the cache was emptied for the new member.
+ * The session as the shell reads it. While it is asked again (after a switch) it reads as loading, as it did when the
+ * cache was emptied for the new member.
  */
-export function useSession() {
-  const result = useAtomValue(session)
-  const askAgain = useAtomRefresh(session)
+export const sessionView: Atom.Atom<SessionView> = Atom.map(session, (result): SessionView => {
   const state = result.waiting ? undefined : result.pipe(AsyncResult.value, O.getOrUndefined)
-  /** Everything read before belonged to the previous person or organization: ask again, for the new one. */
-  const refresh = () => {
-    // The catalog screens' cache, until they move to atoms: emptied as before. The atoms' reads follow the member.
-    void queryClient.resetQueries()
-    askAgain()
-    return Promise.resolve()
-  }
   return {
-    /** loading, then signed-out, no-organization or ready (`actor` is set only when ready). */
     status: state?.status ?? "loading",
     actor: state?.status === "ready" ? state.actor : undefined,
     email: state === undefined || state.status === "signed-out" ? undefined : state.email,
     organizations: state === undefined || state.status === "signed-out" ? [] : state.organizations,
     features: state?.features,
-    /** No answer yet, and this browser was not signed in last time: draw the sign-in page without waiting. */
     probablySignedOut: state === undefined && !wasSignedIn(),
-    isPending: AsyncResult.isInitial(result),
-    error: result._tag === "Failure" && !result.waiting ? Cause.squash(result.cause) : null,
-    retry: askAgain,
-    refresh,
-    switchTo: (organizationId: string) =>
-      loadAuthClient().then(({ authClient, orThrow }) =>
-        authClient.organization
-          .setActive({ organizationId })
-          .then(orThrow)
-          .then(() => refresh())
-      ),
-    /**
-     * Signs in as another account (a test account, from the person's menu): out of this one, into that one, then a
-     * full reload, so nothing the previous person saw stays in memory.
-     */
-    signInAs: (email: string, password: string) =>
-      loadAuthClient().then(({ authClient, orThrow }) =>
-        authClient
-          .signOut()
-          .then(() => authClient.signIn.email({ email, password }))
-          .then(orThrow)
-          .then(() => {
-            rememberSignedOut(false)
-            window.location.assign("/")
-          })
-      ),
-    // A full reload after signing out: nothing the previous person saw stays in memory for the next one.
-    signOut: () =>
-      loadAuthClient().then(({ authClient, orThrow }) =>
-        authClient
-          .signOut()
-          .then(orThrow)
-          .then(() => {
-            rememberSignedIn(false)
-            rememberSignedOut(true)
-            window.location.assign("/")
-          })
-      )
+    error: result._tag === "Failure" && !result.waiting ? Cause.squash(result.cause) : null
   }
-}
+})
+
+/**
+ * Asks who is signed in again, for a new member (after signing in or creating an organization): every read of the
+ * API follows the member, and the catalog screens' cache, until they move to atoms, is emptied as before.
+ */
+export const refreshSession = Atom.fnSync((_: void, get) => {
+  void queryClient.resetQueries()
+  get.refresh(session)
+})
+
+/**
+ * Better Auth refused a switch of organization. Its sentence is kept as `message`, for whoever is debugging; the toast
+ * says the general sentence, as it did before.
+ */
+export class SwitchRefused extends S.TaggedError<SwitchRefused, { readonly brand: unique symbol }>()(
+  "SwitchRefused",
+  { message: S.String },
+  $I.annote("SwitchRefused", { description: "Better Auth refused a switch of organization." })
+) {}
+
+/**
+ * Switches the session to another organization the person belongs to: the server checks the membership, then the
+ * session is asked again and every read follows the new member.
+ */
+export const switchOrganization = Atom.fn((organizationId: string, get) =>
+  Effect.tryPromise({
+    try: () =>
+      loadAuthClient().then(({ authClient, orThrow }) =>
+        authClient.organization.setActive({ organizationId }).then(orThrow)
+      ),
+    catch: (cause) =>
+      SwitchRefused.make({ message: cause instanceof Error ? cause.message : "The organization was not opened." })
+  }).pipe(
+    Effect.andThen(
+      Effect.sync(() => {
+        void queryClient.resetQueries()
+        get.refresh(session)
+      })
+    )
+  )
+)
+
+/**
+ * Signs in as another account (a test account, from the person's menu): out of this one, into that one, then a full
+ * reload, so nothing the previous person saw stays in memory.
+ */
+export const signInAs = (account: { readonly email: string; readonly password: string }): Promise<void> =>
+  loadAuthClient().then(({ authClient, orThrow }) =>
+    authClient
+      .signOut()
+      .then(() => authClient.signIn.email(account))
+      .then(orThrow)
+      .then(() => {
+        rememberSignedOut(false)
+        window.location.assign("/")
+      })
+  )
+
+/** Signs out, then a full reload: nothing the previous person saw stays in memory for the next one. */
+export const signOut = (): Promise<void> =>
+  loadAuthClient().then(({ authClient, orThrow }) =>
+    authClient
+      .signOut()
+      .then(orThrow)
+      .then(() => {
+        rememberSignedIn(false)
+        rememberSignedOut(true)
+        window.location.assign("/")
+      })
+  )
 
 /**
  * Signs in with an email and a password through Better Auth's own sign-in: a real session, the one the sign-in page

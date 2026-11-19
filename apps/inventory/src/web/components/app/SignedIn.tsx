@@ -1,10 +1,15 @@
+import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
-import { type ReactNode, useEffect, useState } from "react"
+import * as S from "effect/Schema"
+import * as AsyncResult from "effect/reactivity/AsyncResult"
+import * as Atom from "effect/reactivity/Atom"
+import type { ReactNode } from "react"
 import { Alert, AlertDescription, AlertTitle } from "@inventory/ui/components/alert"
 import { Button } from "@inventory/ui/components/button"
 import { Skeleton } from "@inventory/ui/components/skeleton"
-import { signedOutHere, signInWithPassword, useActor } from "@/lib/actor"
+import { signedOutHere, signInWithPassword } from "@/lib/actor"
+import { refreshSession, session, sessionView, signOut } from "@inventory/access-web/Session"
 import { sayError } from "@inventory/client/SayError"
 import { CreateOrganization, SignIn } from "@inventory/access-web/SignIn"
 import { AppShell } from "./AppShell.tsx"
@@ -23,36 +28,48 @@ import { AppShell } from "./AppShell.tsx"
 /** The sign-in card's place, in grey, while the session answer is on its way to a browser that was signed in. */
 const Waiting = () => <Skeleton className="mx-auto h-80 w-full max-w-sm" aria-label="Loading who you are" />
 
-/** Signs in as the first test account once, in development, when nobody is signed in and nobody signed out here. */
-function useDevelopmentSignIn(): "idle" | "signing-in" | "failed" {
-  const { status, features, refresh } = useActor()
-  const [state, setState] = useState<"idle" | "signing-in" | "failed">("idle")
-  const offer = features === undefined ? undefined : O.getOrUndefined(features.testAccounts)
+/**
+ * Signs in as the first test account once, in development, when nobody is signed in and nobody signed out here: an
+ * atom that does it when read, then asks who is signed in again. "failed" draws the sign-in page instead, with the
+ * test accounts on it; the reason is for whoever is debugging.
+ */
+/** Signing in as the first test account did not work; the sign-in page is drawn instead. */
+class DevelopmentSignInFailed extends S.TaggedError<DevelopmentSignInFailed, { readonly brand: unique symbol }>()(
+  "DevelopmentSignInFailed",
+  { cause: S.Defect() }
+) {}
+
+const developmentSignIn = Atom.make((get) => {
+  const view = get(sessionView)
+  const offer = view.features === undefined ? undefined : O.getOrUndefined(view.features.testAccounts)
   const first = offer?.accounts[0]
-  const password = offer?.password
-  const wanted =
-    import.meta.env.DEV && status === "signed-out" && first !== undefined && password !== undefined && !signedOutHere()
-  useEffect(() => {
-    if (!wanted || state !== "idle" || first === undefined || password === undefined) return
-    setState("signing-in")
-    void signInWithPassword({ email: first.email, password })
-      .then(() => refresh())
-      .catch((error: unknown) => {
-        // The sign-in page is drawn instead, with the test accounts on it; the reason is for whoever is debugging.
-        Effect.runSync(Effect.logError("Signing in as the first test account failed", error))
-        setState("failed")
-      })
-  }, [wanted, state, first, password, refresh])
-  return wanted ? state : "idle"
-}
+  if (!import.meta.env.DEV || view.status !== "signed-out" || offer === undefined || first === undefined) {
+    return Effect.succeed("idle" as const)
+  }
+  if (signedOutHere()) return Effect.succeed("idle" as const)
+  return Effect.tryPromise({
+    try: () => signInWithPassword({ email: first.email, password: offer.password }),
+    catch: (cause) => DevelopmentSignInFailed.make({ cause })
+  }).pipe(
+    Effect.andThen(Effect.sync(() => get.set(refreshSession, undefined))),
+    Effect.as("idle" as const),
+    Effect.catch((cause) =>
+      Effect.logError("Signing in as the first test account failed", cause).pipe(Effect.as("failed" as const))
+    )
+  )
+})
 
 /**
  * Shows its children only to a signed-in member of an organization. Anyone else gets the sign-in screen, or the
  * screen that creates their first organization. The server enforces the same rule on every request.
  */
 export function SignedIn(props: { title: string; children: ReactNode }) {
-  const { status, error, features, probablySignedOut, retry, refresh, signOut } = useActor()
-  const development = useDevelopmentSignIn()
+  const { status, error, features, probablySignedOut } = useAtomValue(sessionView)
+  const retry = useAtomRefresh(session)
+  const refresh = useAtomSet(refreshSession)
+  const signingIn = useAtomValue(developmentSignIn)
+  // On its way while the sign-in runs; "idle" or "failed" once it has ended or was not wanted.
+  const development = AsyncResult.isSuccess(signingIn) && !signingIn.waiting ? signingIn.value : "signing-in"
   if (status === "ready") return props.children
   return (
     <AppShell title={props.title}>
@@ -74,9 +91,9 @@ export function SignedIn(props: { title: string; children: ReactNode }) {
         // In development the first test account is about to sign in: the placeholder, not a form that vanishes.
         (status === "loading" && probablySignedOut && !(import.meta.env.DEV && !signedOutHere())) ? (
         // Until the answer comes, `features` is undefined: the test accounts appear with it.
-        <SignIn features={features} onSignedIn={() => void refresh()} />
+        <SignIn features={features} onSignedIn={() => refresh()} />
       ) : status === "no-organization" ? (
-        <CreateOrganization onCreated={() => void refresh()} onSignOut={() => void signOut()} />
+        <CreateOrganization onCreated={() => refresh()} onSignOut={() => void signOut()} />
       ) : (
         <Waiting />
       )}

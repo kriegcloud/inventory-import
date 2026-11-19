@@ -1,6 +1,14 @@
 {
-  // The app's lint: the shared rules for code with screens (../../.oxlintrc.web.json).
+  // The app's lint: the shared rules for code with screens (../../.oxlintrc.web.json), and the atoms rule (goals/atoms).
   "$schema": "../../node_modules/@effect/tsgo/oxlint-schema.json",
-  "extends": ["../../.oxlintrc.web.json"],
-  "ignorePatterns": ["dist/**", ".agents/**", ".claude/**", ".codex/**"]
+  "extends": ["../../.oxlintrc.web.json", "../../.oxlintrc.atoms.json"],
+  "ignorePatterns": ["dist/**", ".agents/**", ".claude/**", ".codex/**"],
+  "overrides": [
+    {
+      // The query cache's provider, while the catalog screens still read through TanStack Query; it goes with the
+      // dependency (goals/atoms, step 8). Nothing else in this file may use it.
+      "files": ["src/web/main.tsx"],
+      "rules": { "no-restricted-imports": "off" }
+    }
+  ]
 }

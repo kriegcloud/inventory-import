@@ -1,7 +1,8 @@
-import { type ReactNode, useLayoutEffect, useState } from "react"
+import { useAtom, useAtomMount } from "@effect/atom-react"
+import type { ReactNode } from "react"
 import { Separator } from "@inventory/ui/components/separator"
-import { SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from "@inventory/ui/components/sidebar"
-import { setContentInset, sidebarFolded, sidebarOpen, sidebarWasOpen } from "@inventory/ui/ContentWidth"
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@inventory/ui/components/sidebar"
+import { barSlot, contentInsetFollower, sidebarExpanded } from "@/lib/shell"
 import { BrandMark } from "./BrandMark.tsx"
 import { BarSlotContext } from "@inventory/ui/ShellSlots"
 import { ThemeToggle } from "./ThemeToggle.tsx"
@@ -16,16 +17,12 @@ const skipLink = (
 )
 
 /**
- * Tells the page how much room the sidebar leaves it, so a table knows whether it fits (`lib/content-width.ts`).
- * In a layout effect: the page is drawn once, already at the right layout.
+ * Tells the page how much room the sidebar leaves it, so a table knows whether it fits (`@inventory/ui/ContentWidth`),
+ * while the shell with a sidebar is on screen: the room is derived from the sidebar's state and the window
+ * (`@/lib/shell`), and known before the first draw from the cookie the sidebar keeps.
  */
 function SidebarRoom() {
-  const { isMobile, state } = useSidebar()
-  const taken = isMobile ? 0 : state === "expanded" ? sidebarOpen : sidebarFolded
-  useLayoutEffect(() => {
-    setContentInset(taken)
-    return () => setContentInset(0)
-  }, [taken])
+  useAtomMount(contentInsetFollower)
   return null
 }
 
@@ -52,11 +49,13 @@ export function AppShell(props: {
 }) {
   const frame =
     props.wide === true || props.fill === true ? "w-full px-4 sm:px-9" : "mx-auto w-full max-w-5xl px-4 sm:px-6"
-  const [barSlot, setBarSlot] = useState<HTMLElement | null>(null)
+  const [expanded, setExpanded] = useAtom(sidebarExpanded)
+  const [slot, setSlot] = useAtom(barSlot)
   if (props.sidebar !== undefined) {
     return (
       <SidebarProvider
-        defaultOpen={sidebarWasOpen()}
+        open={expanded}
+        onOpenChange={setExpanded}
         className={props.fill === true ? "h-svh overflow-hidden" : undefined}
       >
         {skipLink}
@@ -70,14 +69,14 @@ export function AppShell(props: {
             <span className="sr-only">{props.title}</span>
             <div className="min-w-0">{props.crumbs}</div>
             {/* A page's own navigation (the import's steps), put here by the page: one bar instead of two. */}
-            <div ref={setBarSlot} className="flex min-w-0 flex-1 items-center gap-4 pl-4 empty:hidden" />
+            <div ref={setSlot} className="flex min-w-0 flex-1 items-center gap-4 pl-4 empty:hidden" />
             <div className="ml-auto flex items-center gap-1.5">
               {props.actions}
               <ThemeToggle />
             </div>
           </header>
           <div id="main" className={props.fill === true ? "min-h-0 flex-1" : `flex-1 py-8 ${frame}`}>
-            <BarSlotContext value={barSlot}>{props.children}</BarSlotContext>
+            <BarSlotContext value={slot}>{props.children}</BarSlotContext>
           </div>
         </SidebarInset>
       </SidebarProvider>

@@ -10,7 +10,8 @@ import {
   BreadcrumbSeparator
 } from "@inventory/ui/components/breadcrumb"
 import { ReviewSkeleton, someColumns, StepsSkeleton, TablePageSkeleton, UploadSkeleton } from "@inventory/ui/Skeletons"
-import { useActor } from "@/lib/actor"
+import { useAtomValue } from "@effect/atom-react"
+import { sessionView } from "@inventory/access-web/Session"
 import { CurrentMember } from "@inventory/client/CurrentMember"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import { importInAddress } from "@inventory/catalog-web/Route"
@@ -78,7 +79,7 @@ function PageSkeleton(props: { path: string; params: URLSearchParams }) {
  * import is open. The organization gives way first on a narrow screen; the sidebar already names it.
  */
 function Crumbs(props: { page: AppPage; importId: ImportId | undefined }) {
-  const { actor } = useActor()
+  const { actor } = useAtomValue(sessionView)
   // The same cached answer the import page reads: no second request.
   const fileName = useImportView(props.importId).data?.fileName
   const inImport = props.page.path === "/" && props.importId !== undefined
@@ -126,7 +127,7 @@ function Crumbs(props: { page: AppPage; importId: ImportId | undefined }) {
 export default function Workspace() {
   const { path, params } = useLocation()
   // The catalog screens mirror the role rule from the member the app provides here, never from a request.
-  const { actor } = useActor()
+  const { actor } = useAtomValue(sessionView)
   // An address that names no page shows the first one, as before.
   const current = appPages.find((page) => page.path === path) ?? appPages[0]
   if (current === undefined) return null

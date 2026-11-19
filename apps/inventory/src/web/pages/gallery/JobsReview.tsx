@@ -1,4 +1,6 @@
-import { useCallback, useMemo, useState } from "react"
+import { useAtom, useAtomValue } from "@effect/atom-react"
+import * as A from "effect/Array"
+import * as Atom from "effect/reactivity/Atom"
 import { toast } from "sonner"
 import { StatusPill } from "@inventory/ui/StatusPill"
 import { ReviewRegion } from "@inventory/review/ReviewRegion"
@@ -28,6 +30,35 @@ const pageWords = { needs: "Waiting on you", ready: "Ready", out: "Left out", al
 const statusWords = { ready: pageWords.ready, waiting: pageWords.needs, out: pageWords.out } as const
 const statusTone = { ready: "info", waiting: "warning", out: "neutral" } as const
 
+/** Which view is open, which jobs it lists, the region's decisions and the jobs left out. */
+const jobsView = Atom.make<View>("jobs")
+const jobsFilter = Atom.make<JobFilter>("waiting")
+const jobDecisions = Atom.make<SavedDecisions>({})
+const jobsLeftOut = Atom.make<ReadonlyArray<string>>([])
+
+/** Every job as it stands after the decisions and the jobs left out. */
+const jobReviews = Atom.readable((get) => reviewJobs({ jobs, decisions: get(jobDecisions), leftOut: get(jobsLeftOut) }))
+
+/** The questions on the lines of the jobs still in. */
+const jobQuestionRows = Atom.map(jobsLeftOut, (leftOut) => questionRows(jobs, leftOut))
+
+/** "Leave job … out" on every question's row: one function for the region, kept the same between draws. */
+const leaveJobAction = Atom.readable((get) => (row: ReviewRow) => {
+  const code = row.cells.job
+  return code === undefined
+    ? undefined
+    : {
+        label: `Leave job ${code} out`,
+        onSelect: () =>
+          get.registry.update(jobsLeftOut, (before) =>
+            A.append(
+              A.filter(before, (at) => at !== code),
+              code
+            )
+          )
+      }
+})
+
 /**
  * Records with a parent, the way `docs/review-table.md` says to build them: the page's own table of jobs (each with
  * what it becomes and why, on one line, in the app's data table) holds the counts and the import button; the
@@ -37,20 +68,13 @@ const statusTone = { ready: "info", waiting: "warning", out: "neutral" } as cons
  */
 export function JobsReview() {
   const narrow = useIsNarrow()
-  const [view, setView] = useState<View>("jobs")
-  const [filter, setFilter] = useState<JobFilter>("waiting")
-  const [decisions, setDecisions] = useState<SavedDecisions>({})
-  const [leftOut, setLeftOut] = useState<ReadonlyArray<string>>([])
-  const reviews = useMemo(() => reviewJobs({ jobs, decisions, leftOut }), [decisions, leftOut])
-  const rows = useMemo(() => questionRows(jobs, leftOut), [leftOut])
-  const leave = useCallback((code: string) => setLeftOut((before) => [...before.filter((at) => at !== code), code]), [])
-  const rowAction = useCallback(
-    (row: ReviewRow) => {
-      const code = row.cells.job
-      return code === undefined ? undefined : { label: `Leave job ${code} out`, onSelect: () => leave(code) }
-    },
-    [leave]
-  )
+  const [view, setView] = useAtom(jobsView)
+  const [filter, setFilter] = useAtom(jobsFilter)
+  const [decisions, setDecisions] = useAtom(jobDecisions)
+  const [, setLeftOut] = useAtom(jobsLeftOut)
+  const reviews = useAtomValue(jobReviews)
+  const rows = useAtomValue(jobQuestionRows)
+  const rowAction = useAtomValue(leaveJobAction)
 
   const tally = { ready: 0, waiting: 0, out: 0 }
   for (const review of reviews) tally[review.status] += 1
@@ -155,7 +179,13 @@ export function JobsReview() {
           caption={`Jobs in jobs.csv: ${filters.find((entry) => entry.id === filter)?.label ?? "All"}`}
           columns={jobColumns({
             onAnswer: () => setView("questions"),
-            onLeaveOut: leave,
+            onLeaveOut: (code) =>
+              setLeftOut((before) =>
+                A.append(
+                  A.filter(before, (at) => at !== code),
+                  code
+                )
+              ),
             onBringBack: (code) => setLeftOut((before) => before.filter((at) => at !== code))
           })}
           rows={shown}

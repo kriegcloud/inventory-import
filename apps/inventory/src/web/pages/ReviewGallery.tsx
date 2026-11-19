@@ -1,5 +1,6 @@
 import { LayoutGridIcon } from "lucide-react"
-import { useMemo, useState } from "react"
+import { useAtom, useAtomValue } from "@effect/atom-react"
+import * as Atom from "effect/reactivity/Atom"
 import { toast } from "sonner"
 import { AppShell } from "@/components/app/AppShell"
 import { ReviewRegion } from "@inventory/review/ReviewRegion"
@@ -141,34 +142,38 @@ const leaveItemOut = (row: ReviewRow) => ({
   onSelect: () => toast(`Would leave every month of line ${row.line} out`)
 })
 
+/** Which state the gallery shows, first from the address (`?state=`). */
+const galleryState = Atom.make<GalleryState>(readState())
+
+/** The made-up rows of the state shown, made once per state. */
+const galleryRows = Atom.map(galleryState, (state): ReadonlyArray<ReviewRow> =>
+  state === "empty" || state === "loading" || state === "error" || state === "parent" || state === "months"
+    ? []
+    : state === "settled"
+      ? storedRows
+      : [
+          ...makeRows({
+            size: state === "big" ? 5000 : 178,
+            clean: state === "clear",
+            withoutUnit: state === "unmatched"
+          }),
+          ...(state === "stored" ? storedRows : []),
+          ...(state === "elsewhere" ? elsewhereRows : [])
+        ]
+)
+
 /**
  * Development only. The review region driven by made-up fabrication-shop stock, one state at a time
  * (`/gallery/review?state=unmatched`), and the shop's jobs with their lines as records with a parent
  * (`?state=parent`). `App.tsx` loads this page only when `import.meta.env.DEV`.
  */
 export default function ReviewGallery() {
-  const [state, setState] = useState<GalleryState>(readState)
+  const [state, setState] = useAtom(galleryState)
+  const rows = useAtomValue(galleryRows)
   const choose = (next: GalleryState) => {
     window.history.replaceState(null, "", `?state=${next}`)
     setState(next)
   }
-  const rows = useMemo(
-    () =>
-      state === "empty" || state === "loading" || state === "error" || state === "parent" || state === "months"
-        ? []
-        : state === "settled"
-          ? storedRows
-          : [
-              ...makeRows({
-                size: state === "big" ? 5000 : 178,
-                clean: state === "clear",
-                withoutUnit: state === "unmatched"
-              }),
-              ...(state === "stored" ? storedRows : []),
-              ...(state === "elsewhere" ? elsewhereRows : [])
-            ],
-    [state]
-  )
   return (
     <AppShell
       fill

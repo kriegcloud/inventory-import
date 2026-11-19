@@ -15,7 +15,7 @@ from: explorations/ideal-architecture
 | 1 | `@effect/atom-react` 4.1.4; a `RegistryProvider` at the root beside the query client; the lint written; the test of two writes in flight | done |
 | 2 | `@inventory/client`: the runtime, the API atoms with typed failures, the optimistic write as an atom, `member` | done |
 | 3 | `@inventory/access-web`: the session (`actor`), sign-in, People, the audit events | done |
-| 4 | The app's shell: the content width, the development sign-in, the Activity page | todo |
+| 4 | The app's shell: the content width, the development sign-in, the Activity page | done |
 | 5 | `@inventory/ui`'s own pieces: the theme, the table search, content width, the run log | todo |
 | 6 | `@inventory/catalog-web`: the upload, the Items page and its editor, the assistant, the import's steps | todo |
 | 7 | `@inventory/review`: the region's state with undo, saved progress, the grid, the queue; the A6 remodel | todo |
@@ -58,6 +58,11 @@ After each package, the same count:
   (`useAtomValue` 8, `useAtom` 10, `useAtomSet` 7, `useAtomRefresh` 3). `client`: `useMemo` 1 → 0 and `useContext`
   2 → 1 (`useApi` and its context went). `@tanstack/react-query` is imported in 12 files (16 before). The access-web
   strict ceiling fell from 17 to 14 (sum 654).
+- **After step 4 (the app's shell)**: the app's `src/web` holds no banned hook: `useEffect` 1 → 0, `useLayoutEffect`
+  1 → 0, `useState` 7 → 0, `useMemo` 3 → 0, `useCallback` 2 → 0, `useActor` 6 → 0 (the galleries' state included).
+  It calls `useAtomValue` 11, `useAtom` 8, `useAtomSet` 2, `useAtomMount` 1, `useAtomRefresh` 2, and still `ui`'s own
+  `useContentBelow`, `useIsNarrow`, `useTheme` and `useLocation` (step 5) and the catalog's query hooks (step 6). The
+  app's strict ceiling fell from 38 to 37 (sum 653); access-web's two stand-in hooks went.
 
 ## Proof
 
@@ -139,6 +144,31 @@ read; they are now held in a `MutableHashMap`, and the 45 s look above is after 
 Viewer: Admin again with the toast (the refusal came back within 50 ms, too fast to see Viewer); Priya to Editor held.
 The garbage collection is not reproduced by a test (a test cannot force one); the browser look is the proof.
 
+**Step 4, the app's shell.** `bun run check` (74 tasks) and `bun run check:full` (76 tasks) pass. The app's lint
+refuses a planted `useState`; `main.tsx` alone is excepted (below).
+
+Browser, on a fresh database, a new browser context (never signed out), the dev server on port 5220:
+
+- Opened `/`: signed in by itself as Dana Whitfield, Example Works (test), Admin; the requests were one session read,
+  one sign-in, one session read; no console error or warning.
+- At 1000 px wide on People: the sidebar open, the page 744 px wide and drawn as cards; folded, 952 px and a table of
+  3 rows, the cookie `sidebar_state=false`; reloaded: still folded, still the table; opened again: cards.
+- At 1440 px: the messy sample; the import's steps drawn in the bar's slot ("3 Review 4"); "200 rows read"; Import
+  155 items; the result "Not imported 45 · Imported 155 · Already there 0 · All 200"; D1 155. The three numbers:
+  200, 155, 155.
+- Activity: opened on Decisions 20; Events 2 (the import and the upload); Imports 1 (items_messy.csv, 155, 45, 200).
+- Switched to Sample Supply Co. (test): Viewer, the breadcrumb "Sample Supply Co. (test) / Activity", Decisions 0,
+  Events 0, Imports 0, the "Switching to" toast gone; switched back: Decisions 20.
+- Dark at 375 px: Activity as cards, no sideways scroll, the sidebar a closed drawer; opened it: the drawer over the
+  page (375 px), with the organization, the four pages and the person. Signed out from it: the sign-in page, and no
+  sign-in sent after the reload (this tab signed out). Console: 12 messages, no error or warning.
+- The development galleries: `/gallery/review?state=stored`: Needs a decision 59, Ready 119, Already there 3, All
+  181; chose "Records with a parent" from its menu: the address `?state=parent`, Jobs 24, Questions 9; "Leave job
+  J-2042 out" from a question's other answers: Questions 8. The gallery logs a warning that the preloaded session
+  answer was not used (the gallery never asks for it; not checked whether main logs the same).
+
+Not seen: the development sign-in failing; creating an organization.
+
 ## Legacy in the client
 
 The client's lint is on (`packages/client/.oxlintrc.json` extends `.oxlintrc.atoms.json`), with three files excepted by
@@ -174,6 +204,23 @@ Not discriminators, and not changed: string-literal domains with no data of thei
 `ColumnSize`, `AgentRun`'s `status`), which are `LiteralKit`s where a schema needs them.
 
 ## Choices made
+
+- **The shell's state is in `apps/inventory/src/web/lib/shell.ts`.** The sidebar is controlled from an atom
+  (`sidebarExpanded`; it still writes its own cookie), whether it is a drawer is a media-query atom (the vendored
+  sidebar's 768 px breakpoint), and the room it takes is derived from the two. Until the content-width store in
+  `@inventory/ui` is an atom (step 5), one atom mounted by the shell passes that room on to it by subscription, never
+  from a render. The bar's slot for a page's navigation is an atom set by a ref callback.
+- **The development sign-in is an atom that signs in when read** (`SignedIn.tsx`), as the brief says: it reads the
+  session, and only when nobody is signed in, the server offers test accounts and nobody signed out in this tab does it
+  sign in and ask the session again; a failure is logged and the sign-in page drawn.
+- **`main.tsx` keeps the query cache's provider** until TanStack Query leaves (step 8): the one file of the app the
+  atoms lint excepts, by name.
+- **What a previous member's reads are after a switch or sign-out** (for the reset question). Signing out and signing
+  in as another account reload the page, so nothing read stays in memory. A switch of organization keeps the previous
+  organization's reads, unread, for up to `keepUnwatched` (five minutes) in the registry, then lets them go; switching
+  back within that time shows them at once, marked updating, and asks again. The per-member read atoms themselves (no
+  data) are kept for the tab's life. The catalog screens' TanStack cache is emptied at once on a switch, as before.
+  This is by construction; it was not measured in the browser.
 
 - **A read belongs to the member who asked; no new registry on a switch** (asked of Benjamin, not decided). The brief's
   rabbit holes say a sign-in or a switch of organization is "a new registry, through `RegistryProvider`'s React

@@ -1,8 +1,4 @@
-import { useAtomRefresh, useAtomValue } from "@effect/atom-react"
-import * as Cause from "effect/Cause"
 import * as DateTime from "effect/DateTime"
-import * as O from "effect/Option"
-import * as AsyncResult from "effect/reactivity/AsyncResult"
 import type { Activity } from "@inventory/kernel/Activity"
 import { when, whenShort } from "@inventory/ui/Dates"
 import { type ListColumn, ListTable } from "@inventory/ui/ListTable"
@@ -35,22 +31,6 @@ export const auditEventsCaption = "Uploads and imports"
  * an audit line says `accessKeys.activity` changed, and it is asked again.
  */
 export const auditEvents = accessApi.query((api) => api.activity.recent(), { reactivityKeys: accessKeys.activity })
-
-/**
- * The audit trail as the Activity page reads it until that page moves to atoms (goals/atoms, step 4): only the atom
- * hooks, with the fields of the query it replaced.
- */
-export const useAuditEvents = () => {
-  const result = useAtomValue(auditEvents)
-  const refetch = useAtomRefresh(auditEvents)
-  return {
-    data: result.pipe(AsyncResult.value, O.getOrUndefined),
-    error: result._tag === "Failure" ? Cause.squash(result.cause) : null,
-    /** Shown from before, while it is asked again. */
-    updating: result.waiting,
-    refetch
-  }
-}
 
 /** The audit trail as a list a person searches and filters: every upload, import, take-back and change of role. */
 export function AuditEvents(props: { rows: ReadonlyArray<AuditEvent>; updating?: boolean }) {

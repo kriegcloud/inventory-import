@@ -1,3 +1,6 @@
+import { useAtomSet, useAtomValue } from "@effect/atom-react"
+import * as Cause from "effect/Cause"
+import * as Exit from "effect/Exit"
 import * as O from "effect/Option"
 import {
   CheckIcon,
@@ -40,7 +43,7 @@ import {
   SidebarRail,
   useSidebar
 } from "@inventory/ui/components/sidebar"
-import { useActor } from "@/lib/actor"
+import { sessionView, signInAs, signOut, switchOrganization } from "@inventory/access-web/Session"
 import { linkTo, navigate } from "@inventory/ui/Route"
 import { type Theme, useTheme } from "@inventory/ui/Theme"
 import { BrandMark } from "./BrandMark.tsx"
@@ -77,7 +80,8 @@ const themes: ReadonlyArray<{ value: Theme; label: string; icon: LucideIcon }> =
  * server changes the session's organization after checking membership, and everything on screen is asked for again.
  */
 function OrganizationPicker() {
-  const { actor, organizations, switchTo } = useActor()
+  const { actor, organizations } = useAtomValue(sessionView)
+  const switchTo = useAtomSet(switchOrganization, { mode: "promiseExit" })
   const { isMobile } = useSidebar()
   if (actor === undefined) return null
   return (
@@ -119,13 +123,12 @@ function OrganizationPicker() {
                       // The server checks the membership, so the switch is not shown before it answers: it says
                       // what it is doing, and the pages show their skeletons while everything is asked for again.
                       const switching = toast.loading(`Switching to ${organization.name}`)
-                      switchTo(organization.id).then(
-                        () => toast.dismiss(switching),
-                        (error: unknown) => {
-                          toast.dismiss(switching)
-                          toastError(error, { lead: `Still in ${actor.organizationName}.` })
+                      void switchTo(organization.id).then((exit) => {
+                        toast.dismiss(switching)
+                        if (Exit.isFailure(exit)) {
+                          toastError(Cause.squash(exit.cause), { lead: `Still in ${actor.organizationName}.` })
                         }
-                      )
+                      })
                     }
                   }}
                 >
@@ -149,7 +152,7 @@ function OrganizationPicker() {
  * test accounts (TEST_ACCOUNTS, on in development only), signing in as another of them in one click.
  */
 function UserMenu() {
-  const { actor, email, features, signOut, signInAs } = useActor()
+  const { actor, email, features } = useAtomValue(sessionView)
   const { theme, setTheme } = useTheme()
   const { isMobile } = useSidebar()
   if (actor === undefined) return null
@@ -218,7 +221,7 @@ function UserMenu() {
                       key={account.email}
                       onSelect={() => {
                         const switching = toast.loading(`Signing in as ${account.name}`)
-                        signInAs(account.email, testAccounts.password).catch((error: unknown) => {
+                        signInAs({ email: account.email, password: testAccounts.password }).catch((error: unknown) => {
                           toast.dismiss(switching)
                           toastError(error, { lead: `Still signed in as ${actor.name}.` })
                         })

@@ -16,8 +16,8 @@ brief's "Order of moves".
 | 2 | Schemas in the order of the Sketch, their behaviour, `XlsxSchemas.property.test.ts` | done |
 | 3 | Reading: container, parts, sheet; `parse`, `sheets`, `rows`; hostile tests | done |
 | 4 | Writing: `stringify`, the codecs; round-trip laws; the SheetJS oracle | done |
-| 5 | The adapter beside the SheetJS reader; parity over fixtures and generated workbooks | doing |
-| 6 | Expected tables frozen; the swap; SheetJS reader and its entries removed; browser pass; documents | todo |
+| 5 | The adapter beside the SheetJS reader; parity over fixtures and generated workbooks | done |
+| 6 | Expected tables frozen; the swap; SheetJS reader and its entries removed; browser pass; documents | doing |
 
 ## Current blocker
 
@@ -70,3 +70,20 @@ Where the brief left a choice open, or the code showed the brief could not be fo
 - **`sheetFromBytes` takes a row schema over `XlsxRecord`** (each heading to the `XlsxValue` its cell holds), and
   `recordsFromBytes` is the codec under it. A heading that is not text, or is used twice, is a schema issue.
 - **`XlsxContainer` is defined beside the findings** (`NotAWorkbook` carries it) and exported from `XlsxRead` too.
+- **`Xlsx.outline` beside `Xlsx.sheets`.** The adapter needs the date system, every sheet's count and the chosen
+  sheet's merged ranges and hidden columns before it reads rows; `outline` gives them in one pass over the sheets
+  (`XlsxOutline`, `XlsxSheetOutline` in `XlsxRead.schema.ts`), and `sheets` is its counts.
+- **The grid runs to the last cell the sheet writes.** The old reader built its grid to the extent the file
+  declared. On all six fixtures, the hand-built files and 150 generated workbooks the two give the same table; on a
+  file whose declared extent leaves rows out, the old reader lost those rows without a word and the new one reads
+  them (`xlsxParity.test.ts`, the last case). That difference is kept, and is for Benjamin to know.
+- **Only the chosen sheet is built.** `describeWorkbook` in `catalog-model` is now over `describeSheets`, which takes
+  what is known of every sheet and asks for one grid; the rules and sentences are the same lines.
+- **Two new Notes**, which decisions X3 and X4 ask for: `unreadableCells` (warning) names the cells a file gets
+  wrong and says they were left empty; `formatNotShown` (info) names a number format whose displayed text is not
+  worked out and counts its cells. No fixture produces either.
+- **A file that unpacks past 64 MiB** is refused as unreadable, with "it unpacks to more than 64 MB" and the advice
+  the size limit gives. `tooManyBytes` wants the file's size, which is not what is wrong.
+- **The comparison that stays is against recorded tables** (`test/fixtures/xlsx-expected/`, 23 files written from
+  the SheetJS reader), as the CSV swap did. `xlsxOldAgainstNew.test.ts` runs both readers, on generated workbooks
+  too, and goes when the SheetJS reader does.

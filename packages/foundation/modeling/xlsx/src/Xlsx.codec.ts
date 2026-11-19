@@ -23,7 +23,7 @@ import { XlsxBlank, XlsxCell, XlsxNumberFormat, XlsxText, XlsxValue } from "./Xl
 import { MissingPart, type XlsxContainer, type XlsxFatal, type XlsxWarning } from "./XlsxDiagnostic.schema.ts"
 import { XlsxParseError, XlsxStringifyError } from "./XlsxError.errors.ts"
 import { XlsxCodecOptions, XlsxReadOptions, XlsxWriteOptions } from "./XlsxOptions.schema.ts"
-import { XlsxRead } from "./XlsxRead.schema.ts"
+import { XlsxOutline, XlsxRead, XlsxSheetOutline } from "./XlsxRead.schema.ts"
 import {
   XlsxRow,
   XlsxSheetCount,
@@ -318,24 +318,40 @@ export class Xlsx {
     )
   }
 
-  /** Every sheet counted, none kept: what a sheet chooser shows and what "the sheet with the most data" is. */
-  static readonly sheets = Effect.fn("Xlsx.sheets")(function* (
+  /**
+   * The workbook without its rows: its date system, and every sheet counted with its merged ranges and hidden
+   * columns. One pass over the sheets, none kept.
+   */
+  static readonly outline = Effect.fn("Xlsx.outline")(function* (
     bytes: Uint8Array,
     options: XlsxReadOptions | ReadOptions = XlsxReadOptions.default
   ) {
     const opened = yield* open({ bytes, caps: capsOf(options.limits) })
     const reads = yield* readSheets({ opened, wanted: opened.sheets, keep: false })
-    return A.map(opened.sheets, (entry) => {
-      const layout = O.flatMap(MutableHashMap.get(reads, entry.path), (found) => found.layout)
-      return XlsxSheetCount.make({
-        info: infoOf(entry, layout),
-        rows: O.match(layout, { onNone: () => 0, onSome: (found) => found.rows }),
-        rowsWithValues: O.match(layout, { onNone: () => 0, onSome: (found) => found.rowsWithValues }),
-        cellsWithValues: O.match(layout, { onNone: () => 0, onSome: (found) => found.cellsWithValues }),
-        lastRow: O.flatMap(layout, (found) => found.lastRow)
+    return XlsxOutline.make({
+      dateSystem: opened.dateSystem,
+      sheets: A.map(opened.sheets, (entry) => {
+        const layout = O.flatMap(MutableHashMap.get(reads, entry.path), (found) => found.layout)
+        return XlsxSheetOutline.make({
+          count: XlsxSheetCount.make({
+            info: infoOf(entry, layout),
+            rows: O.match(layout, { onNone: () => 0, onSome: (found) => found.rows }),
+            rowsWithValues: O.match(layout, { onNone: () => 0, onSome: (found) => found.rowsWithValues }),
+            cellsWithValues: O.match(layout, { onNone: () => 0, onSome: (found) => found.cellsWithValues }),
+            lastRow: O.flatMap(layout, (found) => found.lastRow)
+          }),
+          merges: O.match(layout, { onNone: () => [], onSome: (found) => found.merges }),
+          hiddenColumns: O.match(layout, { onNone: () => [], onSome: (found) => A.dedupe(found.hiddenColumns) })
+        })
       })
     })
   }, Effect.mapError(parseError))
+
+  /** Every sheet counted, none kept: what a sheet chooser shows and what "the sheet with the most data" is. */
+  static readonly sheets = Effect.fn("Xlsx.sheets")(
+    (bytes: Uint8Array, options: XlsxReadOptions | ReadOptions = XlsxReadOptions.default) =>
+      Effect.map(Xlsx.outline(bytes, options), (outline) => A.map(outline.sheets, (sheet) => sheet.count))
+  )
 
   /**
    * One sheet's rows as they are read, in the order the file wrote them. A sheet the workbook lacks fails with

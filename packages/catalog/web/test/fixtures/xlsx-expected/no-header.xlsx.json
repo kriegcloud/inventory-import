@@ -1,0 +1,1 @@
+{"problem":{"_tag":"FileProblem","kind":"noHeaderRow","fileName":"no-header.xlsx","problem":"No row of column names was found in the first 20 rows of the sheet \"Sheet1\" of \"no-header.xlsx\".","todo":"Put the column names in one row above the data and choose the file again."}}

@@ -43,6 +43,7 @@
   "dependencies": {
     "@beep/csv": "workspace:*",
     "@beep/schema": "workspace:*",
+    "@beep/xlsx": "workspace:*",
     "@inventory/catalog-contract": "workspace:*",
     "@inventory/catalog-model": "workspace:*",
     "@inventory/client": "workspace:*",

@@ -32,7 +32,7 @@ import {
   XlsxSheetChoice,
   XlsxWriteOptions
 } from "@beep/xlsx/XlsxOptions"
-import { XlsxContainer, XlsxRead } from "@beep/xlsx/XlsxRead"
+import { XlsxContainer, XlsxOutline, XlsxRead, XlsxSheetOutline } from "@beep/xlsx/XlsxRead"
 import { XlsxCalendar, XlsxDateSystem, XlsxSerial } from "@beep/xlsx/XlsxSerial"
 import {
   XlsxDroppedPart,
@@ -74,7 +74,9 @@ const schemas = {
   XlsxCodecOptions,
   XlsxDiagnostic,
   XlsxContainer,
-  XlsxRead
+  XlsxRead,
+  XlsxSheetOutline,
+  XlsxOutline
 }
 
 describe("every schema generates only valid values", () => {

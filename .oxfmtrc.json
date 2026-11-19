@@ -8,6 +8,7 @@
     "apps/inventory/src/web/components/ui/**",
     "apps/inventory/src/web/shadcn-utilities.css",
     "apps/inventory/test/fixtures/csv-expected/**",
+    "packages/catalog/web/test/fixtures/xlsx-expected/**",
     "packages/foundation/primitive/types/**",
     "packages/foundation/modeling/identity/**",
     "packages/foundation/modeling/schema/**",

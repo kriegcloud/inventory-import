@@ -145,6 +145,8 @@ export const NoteKind = S.Literals([
   "formulas",
   "formulaWithoutResult",
   "errorCells",
+  "unreadableCells",
+  "formatNotShown",
   "dates",
   "leadingZeros",
   "longNumbers",
@@ -197,3 +199,10 @@ export type SpreadsheetTable = typeof SpreadsheetTable.Type
  * is told to split the file (a `FileProblem` of kind `tooLarge`), before anything is parsed.
  */
 export const maxFileBytes = { csv: 10 * 1024 * 1024, xlsx: 3 * 1024 * 1024 } as const
+
+/**
+ * The most a workbook may unpack to. A workbook is a compressed archive, and a small one can be built to unpack
+ * without end; an honest file under the size limit is far below this (50,000 rows by 15 columns unpack to 28 MB).
+ * Benjamin's decision X5: "Keep 3 MiB, cap 64 MiB inflated".
+ */
+export const maxWorkbookInflatedBytes = 64 * 1024 * 1024

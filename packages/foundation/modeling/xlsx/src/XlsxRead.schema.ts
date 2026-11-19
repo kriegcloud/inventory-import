@@ -7,7 +7,9 @@ import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as S from "effect/Schema"
 import { XlsxWarning } from "./XlsxDiagnostic.schema.ts"
-import { XlsxWorkbook, type XlsxDroppedKind } from "./XlsxWorkbook.schema.ts"
+import { XlsxRange, XlsxColumn } from "./XlsxAddress.schema.ts"
+import { XlsxDateSystem } from "./XlsxSerial.schema.ts"
+import { XlsxSheetCount, XlsxWorkbook, type XlsxDroppedKind } from "./XlsxWorkbook.schema.ts"
 import { $XlsxId } from "./internal/identity.ts"
 
 export { XlsxContainer } from "./XlsxDiagnostic.schema.ts"
@@ -34,3 +36,35 @@ export class XlsxRead extends S.Opaque<XlsxRead, { readonly brand: unique symbol
     readonly workbook: Pick<XlsxWorkbook, "dropped">
   }): ReadonlyArray<XlsxDroppedKind> => A.dedupe(A.map(read.workbook.dropped, (part) => part.kind))
 }
+
+/**
+ * One sheet in a workbook's outline: how much it holds, and what its XML says beside its rows.
+ *
+ * @category models
+ */
+export class XlsxSheetOutline extends S.Opaque<XlsxSheetOutline, { readonly brand: unique symbol }>()(
+  S.Struct({
+    count: XlsxSheetCount.pipe(S.annotateKey({ description: "How much the sheet holds" })),
+    merges: S.Array(XlsxRange.annotateKey({ description: "One merged range" })).pipe(
+      S.annotateKey({ description: "The merged ranges" })
+    ),
+    hiddenColumns: S.Array(XlsxColumn.annotateKey({ description: "One hidden column" })).pipe(
+      S.annotateKey({ description: "The hidden columns" })
+    )
+  }).pipe($I.annoteSchema("XlsxSheetOutline", { description: "One sheet, counted and not kept" }))
+) {}
+
+/**
+ * A workbook without its rows: its date system and every sheet counted. What a sheet chooser needs, and what says
+ * which sheet to read.
+ *
+ * @category models
+ */
+export class XlsxOutline extends S.Opaque<XlsxOutline, { readonly brand: unique symbol }>()(
+  S.Struct({
+    dateSystem: XlsxDateSystem.pipe(S.annotateKey({ description: "The day the workbook's date serials count from" })),
+    sheets: S.Array(XlsxSheetOutline.annotateKey({ description: "One sheet" })).pipe(
+      S.annotateKey({ description: "The sheets, in the workbook's order" })
+    )
+  }).pipe($I.annoteSchema("XlsxOutline", { description: "A workbook's date system and its sheets, counted" }))
+) {}

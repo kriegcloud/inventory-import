@@ -570,23 +570,35 @@ export const describeCsv = Effect.fn("SheetLayout.describeCsv")(function* (input
 
 const filledCells = (grid: SheetGrid): number => Arr.reduce(grid.rows, 0, (n, row) => n + filledCount(row))
 
+/** What is known of one sheet before its cells are laid out: enough to list it and to choose among the sheets. */
+export interface SheetCount {
+  readonly name: string
+  readonly visibility: SheetSummary["visibility"]
+  /** Rows with at least one non-empty cell. */
+  readonly rowCount: number
+  /** Non-empty cells: what "the sheet with the most data" is measured by. */
+  readonly filledCells: number
+}
+
 /**
- * A workbook read into a table from one sheet: the one the person chose, otherwise the visible sheet holding the
- * most data. Notes name hidden sheets that hold data, because they were not read.
+ * A workbook as the table of one of its sheets, from what is known of every sheet and the grid of the one that is
+ * read. `sheet` is the person's choice; without it the visible sheet with the most data is read. Only the chosen
+ * sheet's grid is asked for, so a reader need not hold the others.
  */
-export const describeWorkbook = Effect.fn("SheetLayout.describeWorkbook")(function* (input: {
+export const describeSheets = Effect.fn("SheetLayout.describeSheets")(function* <E>(input: {
   readonly fileName: string
-  readonly sheets: ReadonlyArray<WorkbookSheet>
+  readonly sheets: ReadonlyArray<SheetCount>
   readonly sheet: Option.Option<string>
   readonly notes: ReadonlyArray<Note>
+  readonly grid: (index: number) => Effect.Effect<{ readonly grid: SheetGrid; readonly notes: ReadonlyArray<Note> }, E>
 }) {
   const summaries: Array<SheetSummary> = Arr.map(input.sheets, (sheet, i) => ({
     name: sheet.name,
     position: i + 1,
     visibility: sheet.visibility,
-    rowCount: Arr.reduce(sheet.grid.rows, 0, (n, row) => (isBlank(row) ? n : n + 1))
+    rowCount: sheet.rowCount
   }))
-  const sizes = Arr.map(input.sheets, (sheet) => filledCells(sheet.grid))
+  const sizes = Arr.map(input.sheets, (sheet) => sheet.filledCells)
   const withData = Arr.filter(Arr.range(0, input.sheets.length - 1), (i) => (sizes[i] ?? 0) > 0)
   const visibleWithData = Arr.filter(withData, (i) => input.sheets[i]?.visibility === "visible")
   const largest = (indexes: ReadonlyArray<number>): number =>
@@ -610,7 +622,8 @@ export const describeWorkbook = Effect.fn("SheetLayout.describeWorkbook")(functi
       : visibleWithData.length === 1
         ? "onlySheetWithData"
         : "mostData"
-  const layout = yield* layoutSheet({ fileName: input.fileName, sheetName: Option.some(sheet.name), grid: sheet.grid })
+  const read = yield* input.grid(index)
+  const layout = yield* layoutSheet({ fileName: input.fileName, sheetName: Option.some(sheet.name), grid: read.grid })
   const explanation =
     reason === "chosenByPerson"
       ? "You chose this sheet."
@@ -621,7 +634,7 @@ export const describeWorkbook = Effect.fn("SheetLayout.describeWorkbook")(functi
           : `It has the most data (${plural(summary.rowCount, "row", "rows")}, ${plural(layout.columns.length, "column", "columns")}). ${others.length === 1 ? "Another sheet also has" : "Other sheets also have"} data: ${othersText}.`
 
   const hidden = Arr.filter(withData, (i) => i !== index && input.sheets[i]?.visibility !== "visible")
-  const notes: Array<Note> = [...input.notes]
+  const notes: Array<Note> = [...input.notes, ...read.notes]
   if (hidden.length > 0) {
     const names = Arr.map(hidden, (i) => {
       const s = summaries[i]
@@ -655,4 +668,33 @@ export const describeWorkbook = Effect.fn("SheetLayout.describeWorkbook")(functi
     rows: layout.rows,
     notes: [...notes, ...layout.notes]
   } satisfies SpreadsheetTable
+})
+
+/**
+ * A workbook read into a table from one sheet: the one the person chose, otherwise the visible sheet holding the
+ * most data. Notes name hidden sheets that hold data, because they were not read.
+ */
+export const describeWorkbook = Effect.fn("SheetLayout.describeWorkbook")(function* (input: {
+  readonly fileName: string
+  readonly sheets: ReadonlyArray<WorkbookSheet>
+  readonly sheet: Option.Option<string>
+  readonly notes: ReadonlyArray<Note>
+}) {
+  return yield* describeSheets({
+    fileName: input.fileName,
+    sheets: Arr.map(input.sheets, (sheet) => ({
+      name: sheet.name,
+      visibility: sheet.visibility,
+      rowCount: Arr.reduce(sheet.grid.rows, 0, (n, row) => (isBlank(row) ? n : n + 1)),
+      filledCells: filledCells(sheet.grid)
+    })),
+    sheet: input.sheet,
+    notes: input.notes,
+    grid: (index) => {
+      const sheet = input.sheets[index]
+      return sheet === undefined
+        ? Effect.die("sheet index out of range")
+        : Effect.succeed({ grid: sheet.grid, notes: [] })
+    }
+  })
 })

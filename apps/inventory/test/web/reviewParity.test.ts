@@ -4,6 +4,7 @@
 // the same adapter, and compares the two after every step.
 // @effect-diagnostics nodeBuiltinImport:off
 import { readFileSync } from "node:fs"
+import { cost } from "../support/cost.ts"
 import { describe, expect, it } from "@effect/vitest"
 import { Array as Arr, Effect, Option, Order, String as Str } from "effect"
 import {
@@ -313,7 +314,7 @@ describe("what the review screen is handed for a pick, for spaces and for a stor
         description: Option.none(),
         category: "packaging",
         uom: "EA",
-        unitCost: "1",
+        unitCost: cost("1"),
         quantityOnHand: 0,
         reorderPoint: Option.none(),
         stocking: active,

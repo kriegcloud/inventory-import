@@ -3,6 +3,7 @@
 // names both in its reason. And a take-back of an import that replaced a stored item puts it back as it was, unless
 // someone changed it after the replace: then it is kept and named.
 import { expect, layer } from "@effect/vitest"
+import { digits } from "../support/cost.ts"
 import { Array as Arr, Effect, Option, String as Str } from "effect"
 import { HttpApiTest } from "effect/http-api"
 import clean from "../../public/samples/items_clean.csv?raw"
@@ -91,7 +92,7 @@ const replaceRow2 = Effect.fn("test.replaceRow2")(function* () {
   ])
   const stored = yield* client.items.list().pipe(marcus)
   const insert = Option.getOrThrow(Arr.findFirst(stored, (item) => item.sku === "SHH-9574"))
-  expect([insert.name, insert.unitCost, insert.revision]).toEqual(["Oak Foam Insert XL", "14.1", 2])
+  expect([insert.name, digits(insert.unitCost), insert.revision]).toEqual(["Oak Foam Insert XL", "14.1", 2])
   return { client, marcus, first, second, replaced, insert }
 })
 
@@ -114,7 +115,12 @@ layer(TypedApp)("a take-back of an import that replaced a stored item", (it) => 
       ]).toEqual(["takenBack", 0, 1])
       const after = yield* client.items.list().pipe(marcus)
       const insert = Option.getOrThrow(Arr.findFirst(after, (item) => item.sku === "SHH-9574"))
-      expect([insert.name, insert.unitCost, insert.revision, after.length]).toEqual(["Oak Foam Insert", "12.33", 1, 25])
+      expect([insert.name, digits(insert.unitCost), insert.revision, after.length]).toEqual([
+        "Oak Foam Insert",
+        "12.33",
+        1,
+        25
+      ])
       const trail = yield* client.activity.recent().pipe(marcus)
       const line = Option.getOrThrow(Arr.findFirst(trail, (entry) => entry.action === "Took back an import"))
       expect(line.detail).toBe("items_changed.csv: removed 0 items, restored 1 item it had replaced")
@@ -167,7 +173,7 @@ layer(TypedApp)("a take-back of an import whose replaced item was edited since",
       expect([back.takeBack.keptCount, Arr.map(back.takeBack.kept, (item) => item.sku)]).toEqual([1, ["SHH-9574"]])
       const stored = yield* client.items.list().pipe(marcus)
       const after = Option.getOrThrow(Arr.findFirst(stored, (item) => item.sku === "SHH-9574"))
-      expect([after.name, after.unitCost, after.revision]).toEqual(["Oak Foam Insert, edited", "14.1", 3])
+      expect([after.name, digits(after.unitCost), after.revision]).toEqual(["Oak Foam Insert, edited", "14.1", 3])
       const trail = yield* client.activity.recent().pipe(marcus)
       const line = Option.getOrThrow(Arr.findFirst(trail, (entry) => entry.action === "Took back an import"))
       expect(line.detail).toBe("items_changed.csv: removed 0 items, kept 1 that had changed since")

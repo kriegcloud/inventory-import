@@ -273,3 +273,17 @@ None.
     "confidence":"medium",...}`. After a refresh, "Cannot import 21", row 7 reads "was empty proposed Nylon Coil
     (suggested by the model)"; "Use Nylon Coil for row 7" pressed: "Import 156, skip 44", "Cannot import 20". Not
     seen on screen: a suggested column (the samples leave no required field without a column).
+- **catalog (i), third part: `UnitCost` (decision (C2)).** An item's and a vendor's `unitCost` is a `BigDecimal` in
+  code and its shortest digits on the wire and in D1 (`UnitCost` in `src/domain/Item.ts`: the stored pattern on the
+  wire side, so an empty string or `1e3` is refused and never read as a number). `readUnitCost` reads a cell,
+  `costDigits` writes one, `decimalUnits` takes the decimal; the Items table and the editor show it through `costOf`.
+  - `Items.same` compared two costs with `===`, which type-checks for two objects and is false: now
+    `BigDecimal.equals`. Tests compare a cost by its digits (`test/support/cost.ts`): a decimal caches its shortest
+    form once written, so two equal ones are not deeply equal.
+  - The cost's wire side is named too (as `Instant`'s is), or the document held `ItemFields_1` and `Vendor_1`.
+  - Read on screen, fresh database: the messy sample, "Import 155, skip 45", "Stock value $40,259,038.27" (as
+    before), confirmed "Not imported 45 · Imported 155 · Already there 0 · All 200", Items "155 items". The first
+    row "Brass Washer M6 AAT-7076 ... $26.99": its editor's Unit cost read "26.99"; typed "12.50", Save: the
+    request sent `"12.5"`, the answer 200 with `"12.5"`, the row reads "$12.50" and the editor "12.5". Typed
+    "1.23456", Save: "Unit cost is not an amount in dollars with up to 4 decimals. Write it as digits, for example
+    12.50."

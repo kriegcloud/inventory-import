@@ -2,9 +2,10 @@
 // read yet, an item named "Total", a year written with two digits, a tags cell of separators only, a vendor cost in
 // quotes, and what an edit of one item may not say.
 import { describe, expect, it } from "@effect/vitest"
+import { digits } from "../support/cost.ts"
 import { Array as Arr, Effect, Option, String as Str } from "effect"
 import * as S from "effect/Schema"
-import { discontinued, inactive, ItemEdit, type ItemFields, stockingOf } from "../../src/domain/Item.ts"
+import { discontinued, inactive, ItemEdit, type ItemFields, stockingOf, UnitCost } from "../../src/domain/Item.ts"
 import { type Review, review } from "../../src/domain/ItemImport.ts"
 import { stage, textFile } from "../server/support/files.ts"
 
@@ -92,7 +93,26 @@ describe("reasons", () => {
       const vendors = '"[{""vendor_name"":""Acme Industrial"",""unit_cost"":""7.50"",""is_preferred"":false}]"'
       const result = yield* reviewed([line({ tags: "|" }), line({ sku: "ABC-0002", vendors })])
       expect([rowOf(result, 2).status, rowOf(result, 2).item?.tags]).toEqual(["ready", []])
-      expect([rowOf(result, 3).status, rowOf(result, 3).item?.vendors[0]?.unitCost]).toEqual(["ready", "7.5"])
+      expect([rowOf(result, 3).status, digits(rowOf(result, 3).item?.vendors[0]?.unitCost)]).toEqual(["ready", "7.5"])
+    })
+  )
+})
+
+describe("a unit cost", () => {
+  it.effect("is a decimal in code and its shortest digits on the wire, and refuses what is not a cost", () =>
+    Effect.gen(function* () {
+      const written = yield* Effect.forEach(
+        ["12.50", "012.5", "0.0100", "7"],
+        (text) => Effect.flatMap(S.decodeEffect(UnitCost)(text), S.encodeEffect(UnitCost)),
+        { concurrency: 1 }
+      )
+      expect(written).toEqual(["12.5", "12.5", "0.01", "7"])
+      const refused = yield* Effect.forEach(
+        ["-1", "1.23456", "", "1e3", "35,82", "1234567890123"],
+        (text) => Effect.isFailure(S.decodeEffect(UnitCost)(text)),
+        { concurrency: 1 }
+      )
+      expect(refused).toEqual([true, true, true, true, true, true])
     })
   )
 })

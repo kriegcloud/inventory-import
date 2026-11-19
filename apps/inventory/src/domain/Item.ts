@@ -3,7 +3,16 @@
 // switches, tags, two dates, and two nested values (dimensions and up to three vendors). The one thing not to break:
 // every value is read from the text as written (a cost from its digits as a decimal string, never through a float; a
 // date only when it has one reading), never through a guess.
-import { Array as Arr, Option, Record as Rec, Result, String as Str, Tuple } from "effect"
+import {
+  Array as Arr,
+  BigDecimal,
+  Option,
+  Record as Rec,
+  Result,
+  SchemaTransformation,
+  String as Str,
+  Tuple
+} from "effect"
 import { Instant } from "@inventory/kernel/Text"
 import { personName } from "./Described.ts"
 import * as S from "effect/Schema"
@@ -42,7 +51,55 @@ export const maxCount = 999_999_999_999
 /** The longest name an item may have, after trimming. */
 export const maxNameLength = 120
 
-const Decimal = S.String.check(S.isPattern(decimalPattern))
+/**
+ * A cost in US dollars: a decimal in code, exact, and its shortest digits on the wire and in the database ("12.5",
+ * never "12.50"), so two costs that are equal are stored as the same text. Never negative, at most four decimals and
+ * twelve whole digits. Decision (C2) of the contexts brief.
+ *
+ * @example S.decodeSync(UnitCost)("12.50") // BigDecimal 12.5, encoded again as "12.5"
+ */
+export const UnitCost = S.String.check(S.isPattern(decimalPattern))
+  .annotate({ examples: ["12.33"] })
+  .pipe(
+    S.decodeTo(
+      S.BigDecimal.check(
+        S.makeFilter((cost: BigDecimal.BigDecimal) => Option.isSome(readDecimal(BigDecimal.format(cost))), {
+          expected: "a cost of 0 or more with up to 4 decimals and 12 whole digits"
+        })
+      ),
+      SchemaTransformation.transform({
+        decode: (digits: string) => BigDecimal.fromStringUnsafe(digits),
+        encode: (cost: BigDecimal.BigDecimal) => BigDecimal.format(cost)
+      })
+    ),
+    S.annotate({
+      identifier: "UnitCost",
+      description: "A cost in US dollars, as a decimal string read from the digits"
+    }),
+    // The wire side named too: where the document is written from the wire side alone, an unnamed one would be a
+    // second, different copy of every schema that holds a cost.
+    S.annotateEncoded({
+      identifier: "UnitCost",
+      description: "A cost in US dollars, as a decimal string read from the digits"
+    })
+  )
+/** The decoded value of `UnitCost`. */
+export type UnitCost = typeof UnitCost.Type
+
+/**
+ * The cost a cell of digits says, or none: `readDecimal`, as the decimal the item holds.
+ *
+ * @example readUnitCost("12.50") // Option.some(BigDecimal 12.5)
+ */
+export const readUnitCost = (text: string): Option.Option<UnitCost> =>
+  Option.map(readDecimal(text), BigDecimal.fromStringUnsafe)
+
+/**
+ * A cost as its shortest digits: what the wire and the database hold.
+ *
+ * @example costDigits(BigDecimal.fromStringUnsafe("12.50")) // "12.5"
+ */
+export const costDigits = (cost: UnitCost): string => BigDecimal.format(cost)
 const Count = S.Int.check(S.isGreaterThanOrEqualTo(0), S.isLessThanOrEqualTo(maxCount))
 // A day written year-month-day that is on the calendar: 2024-02-30 and 2024-13-45 have the form and are no day. The
 // import reads a file's dates through the same `readDate`, so an edit cannot store a day a file could not.
@@ -90,10 +147,7 @@ export const Vendor = S.Struct({
   }).pipe(
     nullAsNone({ description: "The code the vendor sells the item under (the file's `vendor_sku`); null for none" })
   ),
-  unitCost: Decimal.annotate({
-    description: "The vendor's cost in US dollars, as a decimal string",
-    examples: ["7.59"]
-  }).annotateKey({
+  unitCost: UnitCost.annotateKey({
     description: "What one unit costs from this vendor, in US dollars, read from the digits (the file's `unit_cost`)",
     messageMissingKey: "Give the vendor's unit cost."
   }),
@@ -217,9 +271,8 @@ export const ItemFields = S.Struct({
     description: "The unit the item is counted and costed in: EA (each), BX (box), KG, M or L",
     messageMissingKey: "Choose the unit of measure."
   }),
-  unitCost: Decimal.annotateKey({
-    description: "The cost of one unit in US dollars, a decimal string read from the digits, up to 4 decimals",
-    examples: ["12.33"]
+  unitCost: UnitCost.annotateKey({
+    description: "The cost of one unit in US dollars, a decimal string read from the digits, up to 4 decimals"
   }),
   quantityOnHand: Count.annotateKey({
     description: "How many are in stock; 0 when the file gives none",
@@ -338,12 +391,9 @@ export const readDecimal = (text: string): Option.Option<string> => {
 /**
  * A cost as ten-thousandths of a dollar, exact, for adding costs up without a float.
  *
- * @example decimalUnits("12.5") // 125000n
+ * @example decimalUnits(BigDecimal.fromStringUnsafe("12.5")) // 125000n
  */
-export const decimalUnits = (decimal: string): bigint => {
-  const [whole = "0", fraction = ""] = Str.split(".")(decimal)
-  return BigInt(`${whole}${Str.slice(0, 4)(`${fraction}0000`)}`)
-}
+export const decimalUnits = (cost: UnitCost): bigint => BigDecimal.scale(cost, 4).value
 
 /**
  * Ten-thousandths of a dollar as dollars with at least two decimals ("48.6", exact) for a total on screen.
@@ -444,7 +494,7 @@ export const readItemForm = (input: {
   const { form } = input
   const name = Str.trim(form.name)
   const description = Str.trim(form.description)
-  const cost = readDecimal(form.unitCost)
+  const cost = readUnitCost(form.unitCost)
   // None: the box holds something that cannot be read. Some(none): the box is empty, which an optional value may be.
   const optional = <A>(text: string, read: (text: string) => Option.Option<A>): Option.Option<Option.Option<A>> =>
     Str.trim(text) === "" ? Option.some(Option.none()) : Option.map(read(text), Option.some)
@@ -506,7 +556,7 @@ export const readItemForm = (input: {
       description: description === "" ? Option.none() : Option.some(description),
       category: form.category,
       uom: form.uom,
-      unitCost: Option.getOrElse(cost, () => "0"),
+      unitCost: Option.getOrElse(cost, () => BigDecimal.fromBigInt(0n)),
       quantityOnHand: Option.getOrElse(quantity, () => 0),
       reorderPoint: Option.flatten(reorder),
       stocking: stockingOf({ isActive: form.isActive, discontinuedOn: Option.flatten(discontinued) }),

@@ -14,6 +14,7 @@ import { Array as Arr, HashMap, HashSet, Option, Record as Rec, String as Str, T
 import { type FileProblem, fileProblem } from "./FileProblem.ts"
 import {
   categories,
+  costDigits,
   decimalUnits,
   type Dimensions,
   discontinuedOn,
@@ -24,6 +25,7 @@ import {
   readCount,
   readDate,
   readDecimal,
+  readUnitCost,
   skuKey,
   skuPattern,
   stockingOf,
@@ -1441,7 +1443,7 @@ export const readVendors = (text: string): Read<ReadonlyArray<Vendor>> => {
     const name = Str.trim(vendor.vendor_name ?? "")
     if (name === "") return bad(`${place} has no name.`)
     if (vendor.unit_cost === undefined) return bad(`${place} (${name}) has no unit cost.`)
-    const cost = readDecimal(`${vendor.unit_cost}`)
+    const cost = readUnitCost(`${vendor.unit_cost}`)
     if (Option.isNone(cost)) {
       return bad(`${place} (${name}) has the unit cost ${vendor.unit_cost}, not 0 or more with up to 4 decimals.`)
     }
@@ -1483,7 +1485,7 @@ export const itemText = (item: ItemFields): Readonly<Record<Field, string>> => (
   description: Option.getOrElse(item.description, () => ""),
   category: item.category,
   uom: item.uom,
-  unitCost: item.unitCost,
+  unitCost: costDigits(item.unitCost),
   quantityOnHand: `${item.quantityOnHand}`,
   reorderPoint: Option.match(item.reorderPoint, { onNone: () => "", onSome: (point) => `${point}` }),
   isActive: `${isActive(item.stocking)}`,
@@ -1500,7 +1502,7 @@ export const itemText = (item: ItemFields): Readonly<Record<Field, string>> => (
             Arr.map(item.vendors, (vendor) => ({
               vendor_name: vendor.vendorName,
               ...Option.match(vendor.vendorSku, { onNone: () => ({}), onSome: (vendor_sku) => ({ vendor_sku }) }),
-              unit_cost: Number(vendor.unitCost),
+              unit_cost: Number(costDigits(vendor.unitCost)),
               ...Option.match(vendor.leadTimeDays, {
                 onNone: () => ({}),
                 onSome: (lead_time_days) => ({ lead_time_days })
@@ -2361,7 +2363,7 @@ const toItem = (values: Readonly<Record<Field, string>>): ItemFields | null => {
   const blank = (field: Field): boolean => Str.trim(values[field]) === ""
   const category = Arr.findFirst(categories, (candidate) => candidate === values.category)
   const uom = Arr.findFirst(uoms, (candidate) => candidate === values.uom)
-  const cost = readDecimal(values.unitCost)
+  const cost = readUnitCost(values.unitCost)
   const quantity = blank("quantityOnHand") ? Option.some(0) : readCount(values.quantityOnHand)
   const reorder = blank("reorderPoint") ? Option.some(null) : readCount(values.reorderPoint)
   const flag = (field: "isActive" | "lotTracked", byDefault: boolean): Option.Option<boolean> =>
@@ -2433,7 +2435,7 @@ const differences = (stored: ItemFields, item: ItemFields): ReadonlyArray<Stored
 const stockValue = (rows: ReadonlyArray<ReviewedRow>): string =>
   unitsToDecimal(
     Arr.reduce(rows, 0n, (total, row) => {
-      const cost = readDecimal(row.values.unitCost)
+      const cost = readUnitCost(row.values.unitCost)
       const quantity =
         Str.trim(row.values.quantityOnHand) === "" ? Option.some(0) : readCount(row.values.quantityOnHand)
       return Option.isSome(cost) && Option.isSome(quantity)

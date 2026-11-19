@@ -4,7 +4,7 @@
 // organization's condition and the search are AND-ed outside the filters' group, so an "or" between filters can never
 // reach another organization or bring back an item the search left out. What a search word matches is decided in
 // `src/domain/ItemSearch.ts`; this file only turns that decision into SQL over the `itemSearch` index.
-import { Array as Arr, Context, DateTime, Effect, Equal, Layer, Option, String as Str } from "effect"
+import { Array as Arr, BigDecimal, Context, DateTime, Effect, Equal, Layer, Option, String as Str } from "effect"
 import * as S from "effect/Schema"
 import { SecureRandom } from "effect/crypto"
 import { SqlClient, SqlSchema, type Statement } from "effect/sql"
@@ -544,7 +544,7 @@ export class Items extends Context.Service<
         Equal.equals(item.description, edit.description) &&
         item.category === edit.category &&
         item.uom === edit.uom &&
-        item.unitCost === edit.unitCost &&
+        BigDecimal.equals(item.unitCost, edit.unitCost) &&
         item.quantityOnHand === edit.quantityOnHand &&
         Equal.equals(item.reorderPoint, edit.reorderPoint) &&
         item.stocking.kind === edit.stocking.kind &&

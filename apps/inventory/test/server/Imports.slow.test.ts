@@ -3,6 +3,7 @@
 // taken back. The claims are the screens': the result's numbers add up to the rows of the file and are read from the
 // stored rows, a second load creates nothing twice, and the server reviews with the same rules as the screen.
 import { expect, layer } from "@effect/vitest"
+import { cost, digits } from "../support/cost.ts"
 import { Array as Arr, Effect, Option, String as Str } from "effect"
 import { HttpApiTest } from "effect/http-api"
 import clean from "../../public/samples/items_clean.csv?raw"
@@ -67,7 +68,7 @@ layer(TypedApp)("an import of items", (it) => {
         expect(stored.length).toBe(155)
         const bySku = (sku: string) => Option.getOrThrow(Arr.findFirst(stored, (item) => item.sku === sku))
         const comma = Option.getOrThrow(outcomeOf(55))
-        expect([comma.outcome, bySku(comma.sku).unitCost]).toEqual(["created", "35.82"])
+        expect([comma.outcome, digits(bySku(comma.sku).unitCost)]).toEqual(["created", "35.82"])
         const crate = bySku("XRR-0266")
         expect(crate).toMatchObject({
           name: "Fiberglass Crate",
@@ -76,7 +77,9 @@ layer(TypedApp)("an import of items", (it) => {
           tags: ["fragile"],
           dimensions: Option.some({ length: 97.4, width: 6.9, height: 4.4, unit: "cm" })
         })
-        expect(crate.vendors[1]).toEqual({
+        // A cost is compared by its digits: a decimal caches its shortest form once it has been written.
+        const vendor = Option.getOrThrow(Arr.get(crate.vendors, 1))
+        expect({ ...vendor, unitCost: digits(vendor.unitCost) }).toEqual({
           vendorName: "Tidewater Fasteners",
           vendorSku: Option.none(),
           unitCost: "3.87",
@@ -105,9 +108,9 @@ layer(TypedApp)("an import of items", (it) => {
           })
           .pipe(marcus)
         expect(page.total).toBeGreaterThan(0)
-        expect(Arr.every(page.data, (item) => Number(item.unitCost) > 500 && item.category === "finished-goods")).toBe(
-          true
-        )
+        expect(
+          Arr.every(page.data, (item) => Number(digits(item.unitCost)) > 500 && item.category === "finished-goods")
+        ).toBe(true)
         const facets = yield* client.items.facets().pipe(marcus)
         expect([facets.total, Arr.reduce(facets.uom, 0, (n, row) => n + row.count)]).toEqual([155, 155])
 
@@ -160,7 +163,7 @@ layer(TypedApp)("an import of items", (it) => {
               description: crate.description,
               category: crate.category,
               uom: crate.uom,
-              unitCost: "4.6",
+              unitCost: cost("4.6"),
               quantityOnHand: crate.quantityOnHand,
               reorderPoint: crate.reorderPoint,
               stocking: crate.stocking,
@@ -169,7 +172,7 @@ layer(TypedApp)("an import of items", (it) => {
             }
           })
           .pipe(marcus)
-        expect([edited.name, edited.unitCost, edited.revision, edited.tags]).toEqual([
+        expect([edited.name, digits(edited.unitCost), edited.revision, edited.tags]).toEqual([
           "Fiberglass Crate, large",
           "4.6",
           2,

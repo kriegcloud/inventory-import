@@ -1,4 +1,5 @@
 import { parse } from "@inventory/ui/Json"
+import { costDigits, type UnitCost } from "../../../domain/Item.ts"
 // How an item's values read on screen, in one place: the Items table, the editor and the review show a cost, the
 // dimensions and the vendors the same way. The one thing not to break: nothing here decides anything. Text that is
 // not what the field expects comes back as the file has it, so the person sees what is wrong with it.
@@ -17,6 +18,16 @@ export const costText = (text: string): string => {
   const dollars = (parts[1] ?? "0").replace(/^0+(?=\d)/, "").replace(/\B(?=(\d{3})+$)/g, ",")
   const decimals = (parts[2] ?? "").replace(/0+$/, "").padEnd(2, "0")
   return `$${dollars}.${decimals}`
+}
+
+/**
+ * An item's unit cost as money: `costText` of its digits.
+ *
+ * @example costOf(BigDecimal.fromStringUnsafe("4.5")) // "$4.50"
+ */
+export const costOf = (cost: UnitCost): string => {
+  const digits = costDigits(cost)
+  return costText(digits)
 }
 
 /**

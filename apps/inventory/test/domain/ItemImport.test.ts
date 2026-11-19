@@ -2,6 +2,7 @@
 // lands in the outcome DECISIONS.md gives it, the counts add up to the rows, the form-only fixes are in force, listed
 // and undoable while everything else waits for the person, and a stored item is never changed without a choice.
 import { describe, expect, it } from "@effect/vitest"
+import { cost, digits } from "../support/cost.ts"
 import { Array as Arr, Effect, Option, Record as Rec } from "effect"
 import clean from "../../public/samples/items_clean.csv?raw"
 import messy from "../../public/samples/items_messy.csv?raw"
@@ -47,7 +48,7 @@ describe("items_clean.csv", () => {
       const first = rowOf(result, 2).item
       expect(first).toMatchObject({
         sku: "SHH-9574",
-        unitCost: "12.33",
+        unitCost: cost("12.33"),
         quantityOnHand: 3845,
         stocking: { kind: "active" },
         tags: ["fragile"],
@@ -56,7 +57,7 @@ describe("items_clean.csv", () => {
       expect(first?.vendors[0]).toEqual({
         vendorName: "Tidewater Fasteners",
         vendorSku: Option.some("TI-12311"),
-        unitCost: "7.59",
+        unitCost: cost("7.59"),
         leadTimeDays: Option.some(54),
         isPreferred: false
       })
@@ -136,7 +137,7 @@ describe("items_messy.csv", () => {
           confidence: "high"
         }
       ])
-      expect(rowOf(result, 173).item?.unitCost).toBe("26.41")
+      expect(digits(rowOf(result, 173).item?.unitCost)).toBe("26.41")
       expect(rowOf(result, 198).item?.tags).toEqual(["metal"])
       // Rejected: the file's value comes back and the row waits, with the same fix offered.
       const undone = reviewOf(table, { "row-18": { reverted: ["uom"] } })
@@ -161,12 +162,12 @@ describe("items_messy.csv", () => {
         "row-45": { accepted: ["isActive"] },
         "row-184": { edits: { unitCost: "12.5000" } }
       })
-      expect(rowOf(result, 55).item?.unitCost).toBe("35.82")
+      expect(digits(rowOf(result, 55).item?.unitCost)).toBe("35.82")
       expect(rowOf(result, 85).item?.quantityOnHand).toBe(1200)
       expect(rowOf(result, 44).item?.firstReceivedOn).toEqual(Option.some("2024-06-04"))
       expect([rowOf(result, 4).status, rowOf(result, 10).status]).toEqual(["ready", "out"])
       expect(rowOf(result, 45).item).toMatchObject({ stocking: { kind: "discontinued", on: "2025-06-30" } })
-      expect(rowOf(result, 184).item?.unitCost).toBe("12.5")
+      expect(digits(rowOf(result, 184).item?.unitCost)).toBe("12.5")
       expect(result.counts.ready + result.counts.needs + result.counts.out).toBe(200)
     })
   )
@@ -222,7 +223,7 @@ describe("a second import", () => {
       expect([again.counts.already, again.counts.ready, again.counts.needs]).toEqual([25, 0, 0])
       // The stored SHH-9574 has another name and cost than the file's row 2: the row waits, and says where.
       const other = Arr.map(stored, (item) =>
-        item.sku === "SHH-9574" ? { ...item, name: "Oak Insert", unitCost: "11" } : item
+        item.sku === "SHH-9574" ? { ...item, name: "Oak Insert", unitCost: cost("11") } : item
       )
       const asked = reviewOf(table, {}, other)
       expect([asked.counts.already, asked.counts.decision]).toEqual([24, 1])

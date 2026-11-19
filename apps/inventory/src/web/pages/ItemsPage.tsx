@@ -26,7 +26,7 @@ import { discontinuedOn, isActive, type StoredItem } from "../../domain/Item.ts"
 import { itemPageSizes } from "../../domain/ItemQuery.ts"
 import { day, when } from "./import/format.tsx"
 import { ItemEditor } from "./ItemEditor.tsx"
-import { costText, dimensionsText, vendorsText } from "./import/itemText.ts"
+import { costOf, dimensionsText, vendorsText } from "./import/itemText.ts"
 import { sayError } from "@inventory/client/SayError"
 import { keptVisibility, TableAssistant } from "@/components/app/TableAssistant"
 import { TableSearch } from "@inventory/ui/TableSearch"
@@ -345,7 +345,7 @@ export function ItemsPage() {
       col.accessor("unitCost", {
         id: "unitCost",
         header: ({ column }) => <DataTableColumnHeader column={column} className="justify-end" />,
-        cell: ({ row }) => <div className="text-right tabular-nums">{costText(row.original.unitCost)}</div>,
+        cell: ({ row }) => <div className="text-right tabular-nums">{costOf(row.original.unitCost)}</div>,
         // A range in whole dollars, wide enough to hold the lowest and the highest cost there is.
         meta: { label: labels.unitCost, ...range(found?.unitCost) },
         size: widths.unitCost[0]

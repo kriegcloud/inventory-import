@@ -32,19 +32,20 @@ import {
   type ItemFormProblems,
   readItemForm,
   type StoredItem,
-  uoms
+  uoms,
+  costDigits
 } from "../../domain/Item.ts"
 import type { ItemPage } from "../../domain/ItemQuery.ts"
 import { sayError } from "@inventory/client/SayError"
 import { queryKeys } from "@/lib/queries"
-import { costText, dimensionsText } from "./import/itemText.ts"
+import { costOf, dimensionsText } from "./import/itemText.ts"
 
 const formOf = (item: StoredItem): ItemForm => ({
   name: item.name,
   description: Option.getOrElse(item.description, () => ""),
   category: item.category,
   uom: item.uom,
-  unitCost: item.unitCost,
+  unitCost: costDigits(item.unitCost),
   quantityOnHand: `${item.quantityOnHand}`,
   reorderPoint: Option.match(item.reorderPoint, { onNone: () => "", onSome: (point) => `${point}` }),
   isActive: isActive(item.stocking),
@@ -98,7 +99,7 @@ function FromTheFile(props: { item: StoredItem }) {
                   <span className="font-medium">{vendor.vendorName}</span>
                   {vendor.isPreferred ? " · preferred" : ""}
                   <span className="block text-muted-foreground tabular-nums">
-                    {costText(vendor.unitCost)}
+                    {costOf(vendor.unitCost)}
                     {Option.match(vendor.leadTimeDays, { onNone: () => "", onSome: (days) => ` · ${days} days` })}
                     {Option.match(vendor.vendorSku, {
                       onNone: () => null,

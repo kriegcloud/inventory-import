@@ -236,6 +236,7 @@ package's task and replays it when nothing it reads has changed. The app's own s
 | --- | --- |
 | `bun run dev` | Applies local migrations and the test accounts, then serves the app and API on http://localhost:5173, signed in by itself as the first test account |
 | `bun run check` | The loop check through turbo: type-check with Effect diagnostics, lint (with the two design lints), the fast tests, the format check, `docs:check`, the key scan (`keys:check`), the vendored-kit hash check (`vendor:check`), which package may import which (`boundaries:check`), the two stylesheet lists (`screens:check`) and the Effect imports (`imports:check`; `imports:fix` repairs code). Before every commit |
+| `bun run beep <group> <command>` | One of the repository's own rules by hand: `bun run beep laws boundaries`, `bun run beep quality ceilings`, `bun run beep vendor check`; `--help` on any of them lists its flags. `bun run check` runs them all under their root script names (`boundaries:check`, `vendor:check` and the rest) |
 | `bun run check:full` | `check` plus the slow tests (`*.slow.test.ts`) and the production build. CI runs it |
 | `bun run build` | The production build through turbo |
 | `bun run test` | Every test, fast and slow (Vitest, Node) |
@@ -301,7 +302,7 @@ packages/access/         The access context (who may do what), as four packages:
                         audit-trail schemas, their API groups, the model allowance's gateway), model/ (rules, ports,
                         in-memory twins, handlers: no SQL, no HTTP), host/ (the D1 adapters, sign-in, the session
                         identity, the endpoints) and web/ (the session controller, sign-in, People, the audit events).
-                        `scripts/check-boundaries.mjs` holds which of them may import which.
+                        `bun run beep laws boundaries` holds which of them may import which.
 packages/catalog/        The catalog context (items and the imports that write them), as four packages: contract/ (the
                         schemas of items, staged files, decisions, changes, suggestions and results, and the imports,
                         items and assistant groups), model/ (the pure rules the screen and the server both run: the
@@ -324,22 +325,24 @@ packages/foundation/     Product-neutral packages: this repository's own @beep/c
 docs/                   Standards, the kit, patterns, the glossary and sign-in (`docs/index.md` lists them); qa/ is evidence.
 explorations/           Questions being shaped: research, decisions, briefs.
 goals/                  Work with a definition of done: SPEC.md and PLAN.md.
-scripts/                Repository checks (`docs-check.sh`, `keys-check.sh`, `vendor-check.mjs`, `check-strict.mjs`,
-                        `check-ceilings.mjs`, `check-exports.mjs`, `check-boundaries.mjs`: which package may import which, `check-screens.mjs`: every package with screens in both stylesheet lists, `check-effect-imports.mjs`: every Effect import from its own path under its one name) and `vendor-beep.mjs`, which copies the kit from a
-                        beep-effect checkout.
+packages/tooling/tool/cli/  @beep/repo-cli: the repository's own rules as commands (`bun run beep <group> <command>`):
+                        `laws` (boundaries: which package may import which; screens: every package with screens in
+                        both stylesheet lists; exports; keys; effect-imports: every Effect import from its own path
+                        under its one name), `quality` (strict, ceilings), `docs check` and `vendor` (check; sync,
+                        which copies the kit from a beep-effect checkout). Nothing imports it.
 turbo.json              The task graph: seven package tasks and three root tasks.
 .agents/                Skills (see above). Not application code; the check ignores it.
 ```
 
-Paths in this file and in `docs/` that start `src/`, `test/`, `migrations/` or `public/`, and every `scripts/` file but
-`docs-check.sh` and `keys-check.sh`, are inside `apps/inventory/`.
+Paths in this file and in `docs/` that start `src/`, `test/`, `migrations/`, `public/` or `scripts/` are inside
+`apps/inventory/`.
 
 A package with screens is named in two lists, or its classes are missing from the stylesheet and only the look is
 wrong: an `@source` line in `src/web/index.css` (development) and `screenPackages` in `vite.config.ts` (the build).
-`bun run check` holds both (`scripts/check-screens.mjs`).
+`bun run check` holds both (`bun run beep laws screens`).
 
 Dependencies point one way: a context's `web -> model -> contract` and `host -> model -> contract`, and the app composes
-them (`src/web -> src/api`, `src/server -> src/api`). `bun run check` holds it (`scripts/check-boundaries.mjs`).
+them (`src/web -> src/api`, `src/server -> src/api`). `bun run check` holds it (`bun run beep laws boundaries`).
 
 ## Adding a feature: follow the Items example
 
@@ -395,8 +398,8 @@ exceptions exist, and nothing else may:
 - **Stage C, own code with screens** (the app's `src/web`; `@inventory/ui`'s own pieces; `@inventory/review`, its
   gallery fixtures included): `preferEffectArray`, `preferEffectString`, `preferEffectRecord` and
   `missingPipeableSignature` are off, in each package's `tsconfig.base.json`. Each package counts them against the
-  ceiling in its `strict-ceiling.json` (`scripts/check-strict.mjs`, part of its `check`), which fails when the count
-  is above it, and when it is below it until the ceiling is lowered; `scripts/check-ceilings.mjs` keeps the sum at
+  ceiling in its `strict-ceiling.json` (`bun run beep quality strict`, part of its `check`), which fails when the count
+  is above it, and when it is below it until the ceiling is lowered; `bun run beep quality ceilings` keeps the sum at
   most 678. The numbers only fall. Write new web code the Effect way anyway.
 - **Stage D, the vendored components and hooks** (`packages/ui/src/components`, `packages/ui/src/hooks`): every rule
   off, permanently.

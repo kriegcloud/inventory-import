@@ -27,7 +27,7 @@ status: draft
 
 - **Secrets stay on the server**, are read as redacted settings ([settings](config-and-logs.md)), are never logged,
   and no commit holds one. Check: `bun run check` runs the key scan over every file git would commit
-  (`scripts/keys-check.sh`).
+  (`bun run beep laws keys`).
 - **Cookies are `HttpOnly`, `Secure` in production and `SameSite=Lax` at least**, so no script reads a session.
   Check: the `Set-Cookie` header under `bun run preview`.
 - **Every write checks the role on the server and that the request came from our own pages** (`requireRole`, and the

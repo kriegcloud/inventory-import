@@ -1,4 +1,4 @@
-// Vendored from beep-effect c5cebd5c9de7:packages/foundation/modeling/schema/src/SchemaUtils/defectDiagnostics.ts (MIT, see LICENSE). Do not edit: scripts/vendor-check.mjs compares the rest of this file with its recorded hash.
+// Vendored from beep-effect c5cebd5c9de7:packages/foundation/modeling/schema/src/SchemaUtils/defectDiagnostics.ts (MIT, see LICENSE). Do not edit: bun run beep vendor check compares the rest of this file with its recorded hash.
 /**
  * Diagnostics extracted from an unknown failure for errors that carry an
  * optional `cause` and an optional `message`.

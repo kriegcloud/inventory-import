@@ -28,7 +28,7 @@ const written = Effect.map(TestConsole.logLines, (lines) =>
 layer(production, { buildPerTest: true })("logging in production", (it) => {
   it.effect("writes JSON lines at the configured level, and a redacted secret prints as <redacted>", () =>
     Effect.gen(function* () {
-      // Built here, so the file holds no key-shaped string for the key scan (scripts/keys-check.sh at the repository root) to refuse.
+      // Built here, so the file holds no key-shaped string for the key scan (bun run beep laws keys at the repository root) to refuse.
       const secret = `${"sk-or-v1-"}0123456789abcdef`
       const key = Redacted.make(secret)
       yield* Effect.logInfo("Model settings", { provider: "openrouter", key })

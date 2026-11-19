@@ -2,7 +2,7 @@
 okf_version: "0.2"
 ---
 
-Paths here that start `src/`, `test/`, `migrations/`, `public/` or `scripts/` (but `scripts/docs-check.sh` and `scripts/keys-check.sh`) are inside
+Paths here that start `src/`, `test/`, `migrations/`, `public/` or `scripts/` are inside
 `apps/inventory/`, the app's workspace.
 
 # Read before building

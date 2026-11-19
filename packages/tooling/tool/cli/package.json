@@ -1,0 +1,38 @@
+{
+  "name": "@beep/repo-cli",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The repository's own rules as commands: which package may import which, the strictness ceilings, exact exports, the vendored kit, the documents and the Effect imports",
+  "license": "MIT",
+  "bin": {
+    "beep-cli": "./src/bin.ts"
+  },
+  "type": "module",
+  "sideEffects": [],
+  "exports": {
+    "./package.json": "./package.json",
+    "./Root": "./src/Root.command.ts"
+  },
+  "scripts": {
+    "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",
+    "lint": "oxlint --quiet src test",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@beep/identity": "workspace:*",
+    "@beep/schema": "workspace:*",
+    "@effect/platform-bun": "4.1.4",
+    "effect": "4.1.4",
+    "oxc-parser": "0.148.0"
+  },
+  "devDependencies": {
+    "@effect/platform-node": "4.1.4",
+    "@effect/vitest": "4.1.4",
+    "@types/node": "^24.19.2",
+    "vitest": "^5.1.0"
+  },
+  "beep": {
+    "family": "tooling",
+    "kind": "tool"
+  }
+}

@@ -1,5 +1,5 @@
 {
-  "$comment": "Written by scripts/vendor-beep.mjs; checked by scripts/vendor-check.mjs. sha256 is of each file without its first (provenance) line; it equals sourceSha256 unless the file lists rewrites (tests) or patches (deliberate source patches, each with its reason, against source.commit). local files are written here, not copied.",
+  "$comment": "Written by bun run beep vendor sync; checked by bun run beep vendor check. sha256 is of each file without its first (provenance) line; it equals sourceSha256 unless the file lists rewrites (tests) or patches (deliberate source patches, each with its reason, against source.commit). local files are written here, not copied.",
   "source": {
     "repository": "beep-effect",
     "commit": "c5cebd5c9de7077493cb9ccaaa18e1d4f73da0b0",

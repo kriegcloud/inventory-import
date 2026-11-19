@@ -14,7 +14,12 @@
     // source and never build, so `check` has no `^build` edge to do this.
     "transit": { "dependsOn": ["^transit"], "inputs": ["$TURBO_DEFAULT$", "!**/*.md", "!test/**"] },
     // Type-check with the Effect diagnostics.
-    "check": { "dependsOn": ["transit"], "outputs": [] },
+    // A package's check may run the repository's own commands (quality strict, laws exports): their source is an input.
+    "check": {
+      "dependsOn": ["transit"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/tooling/tool/cli/src/**"],
+      "outputs": []
+    },
     // oxlint, and the design-system lint in packages with screens.
     "lint": { "outputs": [] },
     // The fast tests.
@@ -26,23 +31,23 @@
     "dev": { "cache": false, "persistent": true },
     // Repository checks: root scripts that do not call turbo.
     "//#format:check": { "outputs": [] },
-    // Vendored kit packages still match the beep-effect files they were copied from (scripts/vendor-check.mjs).
+    // Vendored kit packages still match the beep-effect files they were copied from (`beep vendor check`).
     "//#vendor:check": {
       "inputs": [
         "packages/**/vendor.json",
         "packages/**/package.json",
         "packages/**/src/**",
         "packages/**/test/**",
-        "scripts/vendor-check.mjs"
+        "packages/tooling/tool/cli/src/**"
       ],
       "outputs": []
     },
-    // The stage C ceilings of the packages with screens add up to at most 678 (scripts/check-ceilings.mjs).
+    // The stage C ceilings of the packages with screens add up to at most 678 (`beep quality ceilings`).
     "//#ceilings:check": {
-      "inputs": ["apps/*/strict-ceiling.json", "packages/**/strict-ceiling.json", "scripts/check-ceilings.mjs"],
+      "inputs": ["apps/*/strict-ceiling.json", "packages/**/strict-ceiling.json", "packages/tooling/tool/cli/src/**"],
       "outputs": []
     },
-    // Which package may import which (scripts/check-boundaries.mjs): every package.json and every import under src and test.
+    // Which package may import which (`beep laws boundaries`): every package.json and every import under src and test.
     "//#boundaries:check": {
       "inputs": [
         "apps/**/package.json",
@@ -51,11 +56,11 @@
         "packages/**/package.json",
         "packages/**/src/**",
         "packages/**/test/**",
-        "scripts/check-boundaries.mjs"
+        "packages/tooling/tool/cli/src/**"
       ],
       "outputs": []
     },
-    // Every package with screens is in both lists Tailwind reads class names from (scripts/check-screens.mjs).
+    // Every package with screens is in both lists Tailwind reads class names from (`beep laws screens`).
     "//#screens:check": {
       "inputs": [
         "apps/inventory/package.json",
@@ -63,18 +68,17 @@
         "apps/inventory/vite.config.ts",
         "packages/**/package.json",
         "packages/**/src/**/*.tsx",
-        "scripts/check-screens.mjs"
+        "packages/tooling/tool/cli/src/**"
       ],
       "outputs": []
     },
-    // Every Effect import from its own path under its own name (scripts/check-effect-imports.mjs,
+    // Every Effect import from its own path under its own name (`beep laws effect-imports`,
     // docs/standards/effect-imports.md): code, the examples in its comments, and the standing documents.
     "//#imports:check": {
       "inputs": [
         "apps/**/*.{ts,tsx,mts,mjs}",
         "packages/**/*.{ts,tsx,mts,mjs}",
         "packages/**/vendor.json",
-        "scripts/**",
         "*.md",
         "docs/**/*.md",
         ".claude/agents/*.md",
@@ -89,7 +93,7 @@
         "docs/**",
         "explorations/**",
         "goals/**",
-        "scripts/docs-check.sh",
+        "packages/tooling/tool/cli/src/**",
         ".agents/skills/okf-open-knowledge-format/**"
       ],
       "outputs": []

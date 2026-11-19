@@ -1,7 +1,7 @@
 {
   // The review region's profile: the repository profile (../../tsconfig.base.json, beep-effect's) with one recorded
   // exception (decision "ui-packages brief", (d)). `plugins` replaces the inherited plugin list as a whole, so the
-  // block below repeats the root's options; the check (../../scripts/check-strict.mjs) fails when it differs from the
+  // block below repeats the root's options; the check (../../bun run beep quality strict) fails when it differs from the
   // root's anywhere but `overrides`.
   //
   // Stage C, own code (src, and the gallery fixtures in test/fixtures): four style rules are off here: preferEffectArray, preferEffectString, preferEffectRecord

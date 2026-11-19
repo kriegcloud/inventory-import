@@ -5,8 +5,8 @@
     "": {
       "name": "inventory-import",
       "devDependencies": {
+        "@beep/repo-cli": "workspace:*",
         "@effect/tsgo": "0.70.0",
-        "oxc-parser": "0.148.0",
         "oxfmt": "^0.78.0",
         "oxlint": "1.93.0",
         "syncpack": "^15.3.3",
@@ -475,6 +475,26 @@
         "react-dom": "^19.3.1",
       },
     },
+    "packages/tooling/tool/cli": {
+      "name": "@beep/repo-cli",
+      "version": "0.0.0",
+      "bin": {
+        "beep-cli": "./src/bin.ts",
+      },
+      "dependencies": {
+        "@beep/identity": "workspace:*",
+        "@beep/schema": "workspace:*",
+        "@effect/platform-bun": "4.1.4",
+        "effect": "4.1.4",
+        "oxc-parser": "0.148.0",
+      },
+      "devDependencies": {
+        "@effect/platform-node": "4.1.4",
+        "@effect/vitest": "4.1.4",
+        "@types/node": "^24.19.2",
+        "vitest": "^5.1.0",
+      },
+    },
     "packages/ui": {
       "name": "@inventory/ui",
       "version": "0.0.0",
@@ -559,6 +579,8 @@
 
     "@beep/openrouter": ["@beep/openrouter@workspace:packages/drivers/openrouter"],
 
+    "@beep/repo-cli": ["@beep/repo-cli@workspace:packages/tooling/tool/cli"],
+
     "@beep/schema": ["@beep/schema@workspace:packages/foundation/modeling/schema"],
 
     "@beep/types": ["@beep/types@workspace:packages/foundation/primitive/types"],
@@ -634,6 +656,8 @@
     "@dnd-kit/utilities": ["@dnd-kit/utilities@3.2.2", "", { "dependencies": { "tslib": "^2.0.0" }, "peerDependencies": { "react": ">=16.8.0" } }, "sha512-+MKAJEOfaBe5SmV6t34p80MMKhjvUz0vRrvVJbPT0WElzaOJ/1xs+D+KDv+tD/NE5ujfrChEcshd4fLn0wpiqg=="],
 
     "@effect/ai-openrouter": ["@effect/ai-openrouter@4.1.4", "", { "peerDependencies": { "effect": "^4.1.4" } }, "sha512-xnubaIw9iGhHUcjSDVgwzcelm2bftBmTpn9lxywpJEO7KBbErqXYmLhXyARo6KH8Tz7Egut52360JEsTfWhkfg=="],
+
+    "@effect/platform-bun": ["@effect/platform-bun@4.1.4", "", { "dependencies": { "@effect/platform-node-shared": "4.1.4" }, "peerDependencies": { "effect": "^4.1.4" } }, "sha512-Vdq82GOrD5HVF43aXVwHeX+4uIOrgAnjju9MEyizzFZ3yt3A6x9prtmHej1q/zAOaeNddtkpPr2ExHEvZ13S6Q=="],
 
     "@effect/platform-node": ["@effect/platform-node@4.1.4", "", { "dependencies": { "@effect/platform-node-shared": "4.1.4", "undici": "^8.12.4" }, "peerDependencies": { "effect": "^4.1.4", "redis": ">=5.1.0 <7.0.0" } }, "sha512-h7QExTPq/RfYtHP/8tMlgfBvqYsuJKhxfkU6w0+NaF/ihqQ8Y3GH9t28ltupQjoqMM7P6W5gy8rOji7F0qVrmg=="],
 

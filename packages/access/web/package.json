@@ -15,7 +15,7 @@
     "./AuditEvents": "./src/AuditEvents.screen.tsx"
   },
   "scripts": {
-    "check": "tsrs -p tsconfig.json && node ../../../scripts/check-strict.mjs strict-ceiling.json",
+    "check": "tsrs -p tsconfig.json && beep-cli quality strict strict-ceiling.json",
     "lint": "oxlint --quiet src; lint=$?; oxlint --disable-nested-config --deny-warnings -c ../../../.oxlintrc.shadcn.json src && exit $lint"
   },
   "dependencies": {

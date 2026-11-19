@@ -1,7 +1,7 @@
 {
   // The access screens' profile: the repository profile (../../../tsconfig.base.json, beep-effect's) with one recorded
   // exception (decision "ui-packages brief", (d)). `plugins` replaces the inherited plugin list as a whole, so the
-  // block below repeats the root's options; the check (../../../scripts/check-strict.mjs) fails when it differs from
+  // block below repeats the root's options; the check (../../../bun run beep quality strict) fails when it differs from
   // the root's anywhere but `overrides`.
   //
   // Stage C, own code (src): these screens came from the app's src/web with their findings. Four style rules are off

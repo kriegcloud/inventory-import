@@ -520,3 +520,79 @@ its own goal. Reverse: split it out as a goal of its own before the atoms goal r
 A standing preference too: a hand-written `type` or `kind` discriminator in our code is a tagged enum when it lives
 only in memory, and a schema tagged union when anything decodes it. The atoms goal's PLAN names every other one
 found in the web packages.
+
+### 2026-11-19 — tooling CLI: the package (T1)
+
+Question: what is the repository CLI package called and where does it live? Answer: "@beep/repo-cli, as beep-effect
+(Recommended)": `packages/tooling/tool/cli`, bin `beep-cli`, `bun run beep <group> <command>`. Rejected:
+`@inventory/repo-cli` in the same folder; `packages/tooling/cli`. Reverse: rename the package and its bin.
+
+### 2026-11-19 — tooling CLI: what runs it (T2)
+
+Question: what runs the CLI? Answer: "bun with @effect/platform-bun (Recommended)", on the condition that it
+installs and runs here at 4.1.4 exactly; it does (`BunServices.layer` read a file and spawned git in a probe).
+Rejected: bun with `@effect/platform-node`; node. Reverse: the two platform imports in `src/bin.ts`.
+
+### 2026-11-19 — tooling CLI: command groups (T3)
+
+Question: how are the commands grouped? Answer: "beep-effect's groups (Recommended)": `laws`, `quality`, `docs`,
+`vendor`. Rejected: one group, `check`. Reverse: move the subcommands in `src/Root.command.ts`.
+
+### 2026-11-19 — tooling CLI: vendoring commands (T4)
+
+Question: where do the vendoring commands live? Answer: "In the CLI (Recommended)": `vendor check` and `vendor
+sync`. Rejected: the check in the CLI with the sync left a script; a second package.
+
+### 2026-11-19 — tooling CLI: when the scripts go (T5 and T6)
+
+Question, asked together: when is each old script deleted, and is the Effect imports check ported? Answer: "Each in
+its proving commit; imports ported last (Recommended)". Rejected: the same with the imports check left a script; all
+deleted at the end in one commit.
+
+### 2026-11-19 — tooling CLI: the calls every package makes (T7)
+
+Question: `quality strict` runs in six packages and `laws exports` in one; how do they reach the CLI without slowing
+the loop? Answer: "One entry and a budget (Recommended)": the bin loads the whole CLI and a test fails when a command
+that does nothing takes longer than a number set from the first real measurement. Rejected: beep-effect's fast path
+from the start; move them to the root. Reverse: add the fast path to `src/bin.ts`.
+
+### 2026-11-19 — tooling CLI: what the tests stand on (T8)
+
+Question: what do the rules' tests stand on? Answer: "@effect/vitest and a real temp folder (Recommended)".
+Rejected: vendor `@beep/memfs`.
+
+### 2026-11-19 — the tooling CLI brief
+
+Question: does [BRIEF-tooling-cli.md](BRIEF-tooling-cli.md) match, and when is it built? Answer: "Matches; build now
+beside infra (Recommended)". Rejected: build after infra; not yet. The goal is
+[goals/tooling-cli](../../goals/tooling-cli/SPEC.md).
+
+### 2026-11-19 — merging the tooling CLI
+
+Question: how does `claude/tooling-cli` reach main? Answer: "Merge locally, I push (Recommended)". Merged into local
+main at its last commit of that day.
+
+### 2026-11-19 — tooling CLI: what a rule returns
+
+Question: each rule returns the lines it prints, where the brief asked for typed findings; keep that, or make them
+tagged unions? Answer: "Make them tagged unions (Recommended)". Rejected: keep printed lines. Each rule returns typed
+findings, a schema tagged union per rule (`docs/standards/schema-first.md`, SF-6), and one renderer prints them; the
+printed sentences and exit codes stay byte for byte what they were. Reverse: none wanted.
+
+### 2026-11-19 — tooling CLI: the three deliberate differences from the scripts
+
+Question, as "which do you accept; unticked ones go back": `quality strict` exits 1 on a refusal where the script
+printed FAIL and exited 0; `vendor sync` without `--from` exits 1 with the CLI's usage where the script exited 2; and
+the new row in `laws boundaries` that lets nothing depend on a `tooling` package. Answer: he ticked all three:
+"quality strict fails on a refusal", "vendor sync without --from exits 1", "New rule: nothing depends on tooling".
+Nothing goes back.
+
+### 2026-11-19 — the words in the vendored kit
+
+Question: the kit's provenance lines, READMEs and `vendor.json` comments name `scripts/vendor-beep.mjs` and
+`scripts/vendor-check.mjs`, which are gone; reword them now, or at the next refresh of the kit? Answer: "Reword now
+(Recommended)". Rejected: leave until the next kit refresh. `vendor sync` writes the command names (`bun run beep
+vendor sync`, `bun run beep vendor check`) and the kit is synced again at its recorded commit: the first line of the
+90 vendored files, the four READMEs and the four `vendor.json` comments change, and nothing else in the kit.
+Reverse: the three strings in `packages/tooling/tool/cli/src/commands/Vendor/VendorSync.rules.ts`, and one sync.
+

@@ -1,4 +1,4 @@
-// Vendored from beep-effect c5cebd5c9de7:packages/foundation/modeling/identity/test/IriBinding.test.ts (MIT, see LICENSE). Do not edit: scripts/vendor-check.mjs compares the rest of this file with its recorded hash.
+// Vendored from beep-effect c5cebd5c9de7:packages/foundation/modeling/identity/test/IriBinding.test.ts (MIT, see LICENSE). Do not edit: bun run beep vendor check compares the rest of this file with its recorded hash.
 import { IdentityAuthority, make, SemanticFoundationVocab } from "@beep/identity";
 import { $EpistemicId, $I, $OntologyId, $QaId, $SemanticFoundationId } from "@beep/identity/packages";
 import { it } from "@effect/vitest";

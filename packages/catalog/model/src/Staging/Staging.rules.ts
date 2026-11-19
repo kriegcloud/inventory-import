@@ -6,25 +6,26 @@
  */
 import { SpreadsheetTable } from "../Reading/Spreadsheet.rules.ts"
 import { StagedTable, maxStagedRows } from "@inventory/catalog-contract/Staged"
-import { Array as Arr, Option } from "effect"
+import * as A from "effect/Array"
+import * as O from "effect/Option"
 import { FileProblem, fileProblem } from "@inventory/catalog-contract/FileProblem"
 export const stageTable = (input: { readonly table: SpreadsheetTable }): StagedTable => {
   const { table } = input
   return {
     fileName: table.fileName,
     kind: table.kind,
-    sheet: table.format._tag === "xlsx" ? Option.some(table.format.chosen.name) : Option.none(),
+    sheet: table.format._tag === "xlsx" ? O.some(table.format.chosen.name) : O.none(),
     headerRowNumber: table.headerRowNumber,
-    columns: Arr.map(table.columns, (column) => ({ index: column.index, letter: column.letter, label: column.label })),
-    rows: Arr.map(table.rows, (row) => ({
+    columns: A.map(table.columns, (column) => ({ index: column.index, letter: column.letter, label: column.label })),
+    rows: A.map(table.rows, (row) => ({
       rowNumber: row.rowNumber,
-      cells: Arr.map(row.cells, (cell) =>
+      cells: A.map(row.cells, (cell) =>
         cell.shown === undefined || cell.shown === cell.text
           ? { text: cell.text }
           : { text: cell.text, shown: cell.shown }
       )
     })),
-    notes: Arr.map(table.notes, (note) => ({
+    notes: A.map(table.notes, (note) => ({
       kind: note.kind,
       level: note.level,
       message: note.message,
@@ -62,4 +63,4 @@ export const stagingProblem = (input: {
  * @example readerWarnings({ notes: [{ kind: "delimiter", level: "info", message: "Columns are separated by tabs.", rows: [] }] }) // []
  */
 export const readerWarnings = (table: Pick<StagedTable, "notes">): ReadonlyArray<StagedTable["notes"][number]> =>
-  Arr.filter(table.notes, (note) => note.level === "warning")
+  A.filter(table.notes, (note) => note.level === "warning")

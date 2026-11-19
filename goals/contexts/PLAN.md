@@ -204,4 +204,13 @@ None.
     Applied changes · Sorted by Name, Z to A", first row "Zinc-Plated Workbench"; asked "which items are slow
     movers": "Answered by Rules · The rules could not read “which items are slow movers”." The settings file was put
     back afterwards.
+- **catalog (i), first part: the two answers that were a lone boolean.** Cancelling an upload answers
+  `UploadDiscard` (`{"kind":"discarded"}` or `{"kind":"nothingToDiscard"}`) and removing an import answers 204 with
+  no body (decision (A2)). The rest of (i) is not done: branded ids, `ItemInvalid` as a 400 (C3), `UnitCost` as a
+  decimal (C2).
+  - Read on screen: items_clean.csv uploaded, its card on the first screen ("Nothing left to decide · Dana
+    Whitfield · Nov 18, 9:43 PM"), Remove, "Remove items_clean.csv? This deletes the 25 rows it loaded ...": the
+    request answered 204 with an empty body and the card went. The cancel was asked of the server from the page (an
+    upload begun and not finished): first `{"kind":"discarded"}`, asked again `{"kind":"nothingToDiscard"}`. Not seen
+    on screen: Cancel pressed during an upload (the sample files finish before it can be pressed).
 

@@ -2,7 +2,7 @@ import { LiteralKit } from "@beep/schema/LiteralKit"
 import { Effect, Option, Tuple } from "effect"
 import * as S from "effect/Schema"
 import { absentAsNone, nullAsNone } from "@inventory/kernel/Wire"
-import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiMiddleware, OpenApi } from "effect/http-api"
+import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiMiddleware, HttpApiSchema, OpenApi } from "effect/http-api"
 import { ActivityApi, IdentityApi, PeopleApi } from "@inventory/access-contract/Access"
 import { ModelCallsUsedUp } from "@inventory/access-contract/ModelAllowance"
 import { AiProvider, AnsweredBy } from "../../domain/Answer.ts"
@@ -165,6 +165,38 @@ export class SystemApi extends HttpApiGroup.make("system")
   .prefix("/system")
   .annotate(OpenApi.Title, "System")
   .annotate(OpenApi.Description, "Whether the stack works, as the current member sees it.") {}
+
+/** The two things cancelling an upload can come to. */
+export const UploadDiscardKind = LiteralKit(["discarded", "nothingToDiscard"]).annotate({
+  identifier: "UploadDiscardKind",
+  description: "An unfinished upload was deleted, or there was none (it had finished, or was already gone)"
+})
+
+class UploadDiscarded extends S.Opaque<UploadDiscarded, { readonly brand: unique symbol }>()(
+  S.Struct({ kind: S.tag("discarded") }).annotate({
+    identifier: "UploadDiscarded",
+    description: "The unfinished upload and every piece that arrived were deleted"
+  })
+) {}
+
+class NothingToDiscard extends S.Opaque<NothingToDiscard, { readonly brand: unique symbol }>()(
+  S.Struct({ kind: S.tag("nothingToDiscard") }).annotate({
+    identifier: "NothingToDiscard",
+    description: "There was no unfinished upload: it had finished, or was already gone"
+  })
+) {}
+
+/** What cancelling an upload came to. */
+export const UploadDiscard = UploadDiscardKind.mapMembers(() => Tuple.make(UploadDiscarded, NothingToDiscard)).pipe(
+  S.toTaggedUnion("kind"),
+  S.annotate({ identifier: "UploadDiscard", description: "Whether an unfinished upload was deleted" })
+)
+/** The decoded value of `UploadDiscard`. */
+export type UploadDiscard = typeof UploadDiscard.Type
+
+/** What cancelling an upload came to, from whether one was deleted. */
+export const uploadDiscard = (deleted: boolean): UploadDiscard =>
+  deleted ? UploadDiscarded.make({}) : NothingToDiscard.make({})
 
 /** Who settled a row that was not imported: a person left it out, or nobody had settled it yet. */
 export const DecidedByKind = LiteralKit(["person", "nobody"]).annotate({
@@ -789,11 +821,7 @@ export class ImportsApi extends HttpApiGroup.make("imports")
       ),
     HttpApiEndpoint.delete("discardUpload", "/uploads/:id", {
       params: importId,
-      success: S.Struct({
-        discarded: S.Boolean.annotateKey({
-          description: "True when an unfinished upload was deleted; false when there was none (finished, or gone)"
-        })
-      }).annotate({ description: "Whether an unfinished upload was deleted" }),
+      success: UploadDiscard,
       error: Forbidden
     })
       .annotate(OpenApi.Summary, "Cancel an upload and delete what arrived")
@@ -901,15 +929,13 @@ export class ImportsApi extends HttpApiGroup.make("imports")
       ),
     HttpApiEndpoint.delete("remove", "/:id", {
       params: importId,
-      success: S.Struct({
-        removed: S.Boolean.annotateKey({ description: "True: the import and its saved decisions are gone" })
-      }).annotate({ description: "The import was removed" }),
+      success: HttpApiSchema.NoContent,
       error: [Forbidden, ImportNotFound, ImportKept]
     })
       .annotate(OpenApi.Summary, "Remove an import nobody has confirmed")
       .annotate(
         OpenApi.Description,
-        "Removes an import nobody has confirmed: the staged file and its saved decisions, in one batch with the audit line. One that has created items is kept (409 `ImportKept`); removing again answers 404 `ImportNotFound`, since it is gone. Needs the editor role."
+        "Removes an import nobody has confirmed and answers 204 with no body: the staged file and its saved decisions, in one batch with the audit line. One that has created items is kept (409 `ImportKept`); removing again answers 404 `ImportNotFound`, since it is gone. Needs the editor role."
       )
   )
   .middleware(Identity)

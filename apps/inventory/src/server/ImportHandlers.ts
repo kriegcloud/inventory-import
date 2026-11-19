@@ -16,6 +16,7 @@ import {
   ItemChanged,
   ItemInvalid,
   ItemNotFound,
+  uploadDiscard,
   UploadNotFound
 } from "../api/v1/Api.ts"
 import { CurrentActor } from "@inventory/kernel/Actor"
@@ -264,7 +265,8 @@ export const ImportHandlers = HttpApiBuilder.group(
       }),
       discardUpload: Effect.fn("imports.discardUpload")(function* ({ params }) {
         const actor = yield* requireRole("editor")
-        return { discarded: yield* imports.discardUpload(actor, params.id) }
+        const deleted = yield* imports.discardUpload(actor, params.id)
+        return uploadDiscard(deleted)
       }),
       match: Effect.fn("imports.match")(function* ({ params, payload }) {
         const actor = yield* requireRole("editor")
@@ -420,7 +422,7 @@ export const ImportHandlers = HttpApiBuilder.group(
         if (draft.status !== "open") return yield* kept(draft)
         // An open import that still has items (reopened, or taken back with one kept) is refused by the batch,
         // as is one a confirm closed after the read above.
-        if (yield* imports.remove(actor, draft)) return { removed: true }
+        if (yield* imports.remove(actor, draft)) return
         // Nothing was removed. Either another request removed it first (a double click), which answers as a second
         // remove does, or it has created items and stays.
         yield* find(actor, draft.id)

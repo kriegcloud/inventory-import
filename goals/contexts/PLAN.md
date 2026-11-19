@@ -213,4 +213,14 @@ None.
     request answered 204 with an empty body and the card went. The cancel was asked of the server from the page (an
     upload begun and not finished): first `{"kind":"discarded"}`, asked again `{"kind":"nothingToDiscard"}`. Not seen
     on screen: Cancel pressed during an upload (the sample files finish before it can be pressed).
+- **catalog (i), second part: `ItemInvalid` is gone (decision (C3)).** What `editProblem` checked is in the schema:
+  a name needs a character that is not a space, and a day (`firstReceivedOn`, a discontinued day) must be on the
+  calendar, read by the same `readDate` the import uses. A bad edit is a 400 problem document naming the field;
+  the 422 and `editProblem` are removed. The checks are on the item's own fields, so they hold for a stored item too
+  (every stored name and day went through the import's readers or the old edit check).
+  - Read over HTTP from the signed-in page (`PUT /api/v1/items/:id` for AAT-7076): a name of three spaces: 400,
+    `payload.name`, "Expected a name with at least one character that is not a space"; `firstReceivedOn`
+    "2024-02-30": 400, `payload.firstReceivedOn`, "Expected a day on the calendar, written year-month-day";
+    discontinued on "2024-13-45": 400, `payload.stocking.on`, the same words; the item's own values: 200. Not seen on
+    screen: the editor showing such a refusal, because its form refuses the same things before anything is sent.
 

@@ -1013,16 +1013,6 @@ export class ItemChanged extends S.TaggedError<ItemChanged, { readonly brand: un
 ) {}
 
 /**
- * The edit says something an item cannot be: a name of only spaces, a date that is not a day on the calendar, or
- * discontinued and active at once. Nothing was written; `reason` says which, for the person.
- */
-export class ItemInvalid extends S.TaggedError<ItemInvalid, { readonly brand: unique symbol }>()(
-  "ItemInvalid",
-  { reason: reasonForPerson },
-  { description: "The edit says something an item cannot be; nothing was written", httpApiStatus: 422 }
-) {}
-
-/**
  * The items an organization has. Items are created by confirming an import; an editor can change one afterwards,
  * which also means the import that created it can no longer take it back.
  */
@@ -1056,7 +1046,7 @@ export class ItemsApi extends HttpApiGroup.make("items")
       },
       payload: ItemEdit,
       success: StoredItem,
-      error: [Forbidden, ItemNotFound, ItemChanged, ItemInvalid]
+      error: [Forbidden, ItemNotFound, ItemChanged]
     })
       .annotate(OpenApi.Summary, "Change one item")
       .annotate(

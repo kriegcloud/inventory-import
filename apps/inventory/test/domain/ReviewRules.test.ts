@@ -2,16 +2,9 @@
 // read yet, an item named "Total", a year written with two digits, a tags cell of separators only, a vendor cost in
 // quotes, and what an edit of one item may not say.
 import { describe, expect, it } from "@effect/vitest"
-import { Array as Arr, Effect, Option } from "effect"
-import {
-  active,
-  discontinued,
-  editProblem,
-  inactive,
-  type ItemEdit,
-  type ItemFields,
-  stockingOf
-} from "../../src/domain/Item.ts"
+import { Array as Arr, Effect, Option, String as Str } from "effect"
+import * as S from "effect/Schema"
+import { discontinued, inactive, ItemEdit, type ItemFields, stockingOf } from "../../src/domain/Item.ts"
 import { type Review, review } from "../../src/domain/ItemImport.ts"
 import { stage, textFile } from "../server/support/files.ts"
 
@@ -105,24 +98,48 @@ describe("reasons", () => {
 })
 
 describe("an edit of one item", () => {
-  const edit: ItemEdit = {
+  // An edit as a request sends it.
+  const edit = {
     revision: 1,
     name: "Steel Tube",
-    description: Option.none(),
+    description: null,
     category: "components",
     uom: "EA",
     unitCost: "9.5",
     quantityOnHand: 4,
-    reorderPoint: Option.none(),
-    stocking: active,
+    reorderPoint: null,
+    stocking: { kind: "active" },
     lotTracked: false,
-    firstReceivedOn: Option.none()
+    firstReceivedOn: null
   }
-  it("is refused on a date off the calendar and with a name of only spaces; discontinued and active cannot be said", () => {
-    expect(editProblem(edit)).toBeNull()
-    expect(editProblem({ ...edit, stocking: discontinued("2024-06-19") })).toBeNull()
-    expect(editProblem({ ...edit, stocking: discontinued("2024-13-45") })).toContain("not a day on the calendar")
-    // The two values the item is stored with read as one: a date wins over the flag, so no item is both.
+  // The request field a refused edit names, or "accepted".
+  const refusedOn = (sent: unknown) =>
+    Effect.match(S.decodeUnknownEffect(ItemEdit)(sent), {
+      onSuccess: () => "accepted",
+      onFailure: (error) => Str.replace(/^[^]*at \["([^"]+)"\][^]*$/, "$1")(String(error))
+    })
+  it.effect("is refused by its schema, naming the field: a name of only spaces and a day off the calendar", () =>
+    Effect.gen(function* () {
+      const plain = yield* refusedOn(edit)
+      const discontinuedOk = yield* refusedOn({ ...edit, stocking: { kind: "discontinued", on: "2024-06-19" } })
+      const blankName = yield* refusedOn({ ...edit, name: "   " })
+      const noSuchDay = yield* refusedOn({ ...edit, firstReceivedOn: "2024-13-45" })
+      const noSuchLeapDay = yield* refusedOn({ ...edit, firstReceivedOn: "2023-02-29" })
+      const badDiscontinued = yield* refusedOn({ ...edit, stocking: { kind: "discontinued", on: "2024-13-45" } })
+      // Discontinued and active at once has no way to be written: the old pair of fields is not read.
+      const oldPair = yield* refusedOn({ ...edit, stocking: undefined, isActive: true, discontinuedOn: "2024-06-19" })
+      expect([plain, discontinuedOk, blankName, noSuchDay, noSuchLeapDay, badDiscontinued, oldPair]).toEqual([
+        "accepted",
+        "accepted",
+        "name",
+        "firstReceivedOn",
+        "firstReceivedOn",
+        "stocking",
+        "stocking"
+      ])
+    })
+  )
+  it("the two values an item is stored with read as one: a date wins over the flag, so no item is both", () => {
     expect(stockingOf({ isActive: true, discontinuedOn: Option.some("2024-06-19") })).toEqual(
       discontinued("2024-06-19")
     )
@@ -130,7 +147,5 @@ describe("an edit of one item", () => {
       "active",
       "inactive"
     ])
-    expect(editProblem({ ...edit, firstReceivedOn: Option.some("2024-13-45") })).toContain("not a day on the calendar")
-    expect(editProblem({ ...edit, name: "   " })).toBe("Name is empty. Every item needs a name.")
   })
 })

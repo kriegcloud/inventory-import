@@ -44,7 +44,14 @@ export const maxNameLength = 120
 
 const Decimal = S.String.check(S.isPattern(decimalPattern))
 const Count = S.Int.check(S.isGreaterThanOrEqualTo(0), S.isLessThanOrEqualTo(maxCount))
-const IsoDate = S.String.check(S.isPattern(/^\d{4}-\d{2}-\d{2}$/))
+// A day written year-month-day that is on the calendar: 2024-02-30 and 2024-13-45 have the form and are no day. The
+// import reads a file's dates through the same `readDate`, so an edit cannot store a day a file could not.
+const IsoDate = S.String.check(
+  S.isPattern(/^\d{4}-\d{2}-\d{2}$/),
+  S.makeFilter((text: string) => Option.isSome(readDate(text)), {
+    expected: "a day on the calendar, written year-month-day"
+  })
+)
 const Measure = S.Finite.check(S.isGreaterThan(0))
 
 /** An item's size: all three measurements together, each above zero, in centimetres or inches. */
@@ -189,7 +196,11 @@ export const ItemFields = S.Struct({
       description: "The code the item is known by. No two items of one organization share it, and it never changes",
       messageMissingKey: "Give the item's SKU: three capital letters, a hyphen and four digits, like SHH-9574."
     }),
-  name: S.NonEmptyString.check(S.isMaxLength(maxNameLength)).annotateKey({
+  name: S.NonEmptyString.check(
+    S.isMaxLength(maxNameLength),
+    // A name of only spaces is no name.
+    S.isPattern(/\S/, { expected: "a name with at least one character that is not a space" })
+  ).annotateKey({
     description: "The item's name, 1 to 120 characters, trimmed",
     examples: ["Oak Foam Insert"]
   }),
@@ -267,6 +278,8 @@ export const fieldsOf = (item: StoredItem): ItemFields => {
  * What a person sends to change one item by hand: the plain values it should have afterwards, and the revision they
  * saw. The SKU is not among them (it is the item's identity), nor are tags, dimensions and vendors, which only an
  * import writes. An edit made on an older revision is refused instead of overwriting a change the person did not see.
+ * What an item cannot be is refused by this schema, as a 400 that names the field: a name of only spaces, a day that
+ * is not on the calendar, and (through `Stocking`) discontinued and active at once.
  */
 export const ItemEdit = S.Struct({
   revision: S.Int.check(S.isGreaterThanOrEqualTo(1)).annotateKey({
@@ -305,24 +318,6 @@ export const ItemEdit = S.Struct({
 })
 /** The decoded value of `ItemEdit`: what a person sends to change one item. */
 export type ItemEdit = typeof ItemEdit.Type
-
-/**
- * What is wrong with an edit that its Schema cannot say, as a sentence for the person, or null when it may be
- * written: a name of only spaces, or a date that is not a day on the calendar (2024-13-45). The import refuses the
- * same, so an edit cannot store what a file could not. An item discontinued and active at once can no longer be
- * sent: `Stocking` has no such case.
- *
- * @example editProblem({ ...edit, stocking: discontinued("2024-13-45") })
- * // 'Discontinued on "2024-13-45" is not a day on the calendar, written year-month-day.'
- */
-export const editProblem = (edit: ItemEdit): string | null => {
-  const badDate = (label: string, date: Option.Option<string>): string | null =>
-    Option.isNone(date) || Option.isSome(readDate(date.value))
-      ? null
-      : `${label} "${date.value}" is not a day on the calendar, written year-month-day.`
-  if (Str.trim(edit.name) === "") return "Name is empty. Every item needs a name."
-  return badDate("First received", edit.firstReceivedOn) ?? badDate("Discontinued on", discontinuedOn(edit.stocking))
-}
 
 /**
  * A cost written as plain digits ("12.33", "9.3", "4") as the decimal string an item stores, read from the digits and

@@ -14,7 +14,6 @@ import {
   openImportsShown,
   pastImportsShown,
   ItemChanged,
-  ItemInvalid,
   ItemNotFound,
   uploadDiscard,
   UploadNotFound
@@ -22,7 +21,7 @@ import {
 import { CurrentActor } from "@inventory/kernel/Actor"
 import { fileProblem } from "../domain/FileProblem.ts"
 import type { Member } from "@inventory/kernel/Member"
-import { editProblem, fieldsOf, skuKey } from "../domain/Item.ts"
+import { fieldsOf, skuKey } from "../domain/Item.ts"
 import {
   carryDecisions,
   dropAccepted,
@@ -465,9 +464,6 @@ export const ItemHandlers = HttpApiBuilder.group(
       // A person's change to one item. The same edit sent twice answers the item and writes nothing the second time.
       edit: Effect.fn("items.edit")(function* ({ params, payload }) {
         const actor = yield* requireRole("editor")
-        // What the Schema cannot say: discontinued yet active, a date off the calendar, a name of only spaces.
-        const problem = editProblem(payload)
-        if (problem !== null) return yield* ItemInvalid.make({ reason: problem })
         const done = yield* items.edit(actor, params.id, payload)
         switch (done._tag) {
           case "Edited":

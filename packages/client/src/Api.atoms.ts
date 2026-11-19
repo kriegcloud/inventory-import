@@ -3,7 +3,8 @@
 // declares (`makeApiAtoms`), so a screen reads `useAtomValue(people)` and never runs an Effect itself. The rules this
 // file protects: a failure stays typed (a refusal is the endpoint's own error, never a defect); a read is asked again
 // once, and a write twice, only for a failure that may pass, never for a refusal; an answer equal to the one held keeps
-// the object held, so nothing derived from it is rebuilt.
+// the object held, so nothing derived from it is rebuilt; a read belongs to the member who asked, so another member or
+// another organization starts from nothing instead of seeing the last one's answer.
 import type * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Eq from "effect/Equal"
@@ -13,7 +14,8 @@ import * as O from "effect/Option"
 import * as Schedule from "effect/Schedule"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as Atom from "effect/reactivity/Atom"
-import type * as Reactivity from "effect/reactivity/Reactivity"
+import * as Reactivity from "effect/reactivity/Reactivity"
+import { memberKey } from "@inventory/client/MemberAtoms"
 import { isTransient } from "@inventory/client/SayError"
 
 /** How long an answer nobody is looking at is kept: a screen opened again within it shows it without asking again. */
@@ -35,6 +37,30 @@ export const apiRuntime: Atom.AtomRuntime<unknown> = Effect.die(
 export const provideApi = <R>(layer: Layer.Layer<R>): readonly [Atom.Atom<unknown>, unknown] =>
   // The runtime holds the layer as one that provides anything: what it provides is the app's promise (above).
   Atom.initialValue(apiRuntime.layer, layer as Layer.Layer<never> as Layer.Layer<unknown>)
+
+/**
+ * The tab's one record of what changed: a write names its keys here and every read that shows one of them asks again.
+ * One instance for the tab, not one per registry, so code that is not an atom yet (the catalog screens on TanStack
+ * Query, through `@inventory/client/QueryClient`) can say what it changed with `invalidate`.
+ */
+const reactivity: Reactivity.Reactivity = Effect.runSync(Reactivity.make)
+
+/** Says that what `keys` name has changed: every read registered under one of them asks again. */
+export const invalidate = (keys: Reactivity.KeysInput): void => reactivity.invalidateUnsafe(keys)
+
+/** A read that asks again whenever one of `keys` is invalidated (Effect's `withReactivity`, on the tab's instance). */
+const followKeys =
+  (keys: Reactivity.KeysInput) =>
+  <A>(atom: Atom.Atom<A>): Atom.Atom<A> =>
+    Atom.transform(
+      atom,
+      (get) => {
+        get.addFinalizer(reactivity.registerUnsafe(keys, () => get.refresh(atom)))
+        get.subscribe(atom, (value) => get.setSelf(value))
+        return get.once(atom)
+      },
+      { initialValueTarget: atom }
+    )
 
 /** A read is asked again once for a failure that may pass (the network, a server error), never for a refusal. */
 const readRetry = { times: 1, while: isTransient } as const
@@ -94,18 +120,30 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
     use: (client: Client, get: Atom.AtomContext) => Effect.Effect<A, E>,
     options?: { readonly reactivityKeys?: Reactivity.KeysInput }
   ): Atom.Atom<AsyncResult.AsyncResult<A, E>> {
-    const read = Atom.setIdleTTL(
-      apiRuntime.atom((get) =>
-        Effect.flatMap(client, (c) => use(c, get)).pipe(
-          Effect.retry(readRetry),
-          Effect.map((answer) => keepWhenEqual(heldSuccess(get.self<AsyncResult.AsyncResult<A, E>>()), answer))
-        )
-      ),
-      freshFor
+    // One read per member: when the person or the organization changes, the screen shows its skeleton, never the
+    // previous organization's rows marked as waiting.
+    const forMember = Atom.family((_member: string) => {
+      const read = Atom.setIdleTTL(
+        apiRuntime.atom((get) =>
+          Effect.flatMap(client, (c) => use(c, get)).pipe(
+            Effect.retry(readRetry),
+            Effect.map((answer) => keepWhenEqual(heldSuccess(get.self<AsyncResult.AsyncResult<A, E>>()), answer))
+          )
+        ),
+        freshFor
+      )
+      return options?.reactivityKeys === undefined ? read : read.pipe(followKeys(options.reactivityKeys))
+    })
+    // The member it last read for, so a refresh of this atom (an optimistic write's, when the last one has answered)
+    // reaches the read it shows. One registry holds it in the app; a test that makes several shares the key "".
+    let shown = ""
+    return Atom.readable(
+      (get) => {
+        shown = get(memberKey)
+        return get(forMember(shown))
+      },
+      (refresh) => refresh(forMember(shown))
     )
-    return options?.reactivityKeys === undefined
-      ? read
-      : read.pipe(apiRuntime.factory.withReactivity(options.reactivityKeys))
   }
   function send<A, E>(use: (client: Client) => Effect.Effect<A, E>): Effect.Effect<A, E, Id> {
     return Effect.flatMap(client, use).pipe(Effect.retry(writeRetry))
@@ -116,9 +154,13 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
       use: (client: Client, input: Input) => Effect.Effect<A, E>,
       options?: { readonly reactivityKeys?: Reactivity.KeysInput }
     ): Atom.AtomResultFn<Input, A, E> =>
-      apiRuntime.fn<Input>()((input) => send((c) => use(c, input)), {
-        concurrent: true,
-        ...(options?.reactivityKeys === undefined ? {} : { reactivityKeys: options.reactivityKeys })
-      })
+      apiRuntime.fn<Input>()(
+        (input) => {
+          const keys = options?.reactivityKeys
+          const sent = send((c) => use(c, input))
+          return keys === undefined ? sent : Effect.tap(sent, () => Effect.sync(() => invalidate(keys)))
+        },
+        { concurrent: true }
+      )
   return { query, write, send }
 }

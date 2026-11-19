@@ -15,8 +15,8 @@ import { dual } from "effect/Function"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as Atom from "effect/reactivity/Atom"
 import * as AtomRegistry from "effect/reactivity/AtomRegistry"
-import * as Reactivity from "effect/reactivity/Reactivity"
-import { apiRuntime } from "@inventory/client/Api"
+import type * as Reactivity from "effect/reactivity/Reactivity"
+import { apiRuntime, invalidate } from "@inventory/client/Api"
 import { toastError } from "@inventory/client/SayError"
 
 /**
@@ -95,11 +95,9 @@ export const optimisticWrite = <Input, A, E, R>(
           })
         ),
         Effect.ensuring(
-          Effect.gen(function* () {
+          Effect.sync(() => {
             registry.update(inFlight, (n) => n - 1)
-            if (registry.get(inFlight) === 0 && spec.settled !== undefined) {
-              yield* Reactivity.invalidate(spec.settled)
-            }
+            if (registry.get(inFlight) === 0 && spec.settled !== undefined) invalidate(spec.settled)
           })
         )
       )

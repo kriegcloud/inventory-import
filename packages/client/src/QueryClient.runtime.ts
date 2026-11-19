@@ -5,6 +5,7 @@
 import { QueryClient, replaceEqualDeep } from "@tanstack/react-query"
 import * as Eq from "effect/Equal"
 import { dual } from "effect/Function"
+import { invalidate } from "@inventory/client/Api"
 import { isTransient } from "@inventory/client/SayError"
 
 /** How long fetched data is shown as it is before a screen that mounts asks again. */
@@ -28,7 +29,20 @@ export const sameWhenEqual: {
  * only for a failure that may pass (the network, a server error). Mutations are never retried by the client: a
  * button is disabled while its request is pending, and the server treats a repeated write as the same write.
  */
-export const queryClient = new QueryClient({
+/**
+ * The query client, with one addition while the screens move to atoms (goals/atoms): what a screen on TanStack Query
+ * invalidates is said to the atoms too, so an import confirmed on the catalog screens still makes the audit trail (an
+ * atom since the access screens moved) ask again. Goes with TanStack Query, at the end of the move.
+ */
+class BridgedQueryClient extends QueryClient {
+  override invalidateQueries(...args: Parameters<QueryClient["invalidateQueries"]>) {
+    const key = args[0]?.queryKey
+    if (key !== undefined) invalidate(key)
+    return super.invalidateQueries(...args)
+  }
+}
+
+export const queryClient = new BridgedQueryClient({
   defaultOptions: {
     queries: {
       staleTime: freshFor,

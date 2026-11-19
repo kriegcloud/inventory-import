@@ -22,3 +22,12 @@ export const provideMember = (from: Atom.Atom<O.Option<Member>>): readonly [Atom
 
 /** The signed-in member of the active organization; none while that is not known yet. */
 export const member: Atom.Atom<O.Option<Member>> = Atom.readable((get) => get(get(memberSource)))
+
+/**
+ * Who the API is being asked for, as one string ("member/organization", empty when nobody is known): a read is kept per
+ * key (`@inventory/client/Api`), so signing in as someone else or switching organization starts every read afresh.
+ */
+export const memberKey: Atom.Atom<string> = Atom.map(
+  member,
+  O.match({ onNone: () => "", onSome: (who) => `${who.id}/${who.organizationId}` })
+)

@@ -2,7 +2,7 @@
 type: Goal
 title: "tooling-cli"
 description: A repository CLI package, @beep/repo-cli at packages/tooling/tool/cli, as beep-effect has, and the ten scripts under scripts/ ported to typed Effect commands on it with their behaviour and failure sentences unchanged.
-status: active
+status: done
 from: explorations/ideal-architecture
 ---
 
@@ -40,14 +40,14 @@ publishing, none of beep-effect's other command groups or support packages. The 
 
 ## Acceptance
 
-- [ ] `@effect/platform-bun` 4.1.4 installs and a command runs on it: `bun run beep quality ceilings`.
-- [ ] `quality ceilings`, `laws exports`, `laws boundaries`, `laws screens`, `laws keys`, `vendor check`,
+- [x] `@effect/platform-bun` 4.1.4 installs and a command runs on it: `bun run beep quality ceilings`.
+- [x] `quality ceilings`, `laws exports`, `laws boundaries`, `laws screens`, `laws keys`, `vendor check`,
       `docs check`, `quality strict`, `vendor sync` and `laws effect-imports` each proved equal to its script and
       that script deleted: [PLAN](PLAN.md) records each proof.
-- [ ] Every rule has tests from its planted violations: `bun run --cwd packages/tooling/tool/cli test`.
-- [ ] A test fails when a command that does nothing takes longer than the budget set from the first real
+- [x] Every rule has tests from its planted violations: `bun run --cwd packages/tooling/tool/cli test`.
+- [x] A test fails when a command that does nothing takes longer than the budget set from the first real
       measurement.
-- [ ] `scripts/` holds no rule; `bun run check:full` passes; the check's time before and after is in the plan.
+- [x] `scripts/` holds no rule; `bun run check:full` passes; the check's time before and after is in the plan.
 
 ## Decisions
 

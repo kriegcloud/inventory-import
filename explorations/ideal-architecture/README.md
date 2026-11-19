@@ -113,3 +113,4 @@ Each step ends with the full check and an import of the messy sample in a browse
   as beep-effect has, and the ten scripts under `scripts/` ported to commands on it. Outside the nine steps; nothing
   built; awaiting "the brief matches" and answers T1 to T8.
 - 2026-11-19: Benjamin signed the tooling CLI brief (T1 to T8); goal `tooling-cli` opened.
+- 2026-11-19: goal `tooling-cli` done: the ten scripts are commands of `@beep/repo-cli` and `scripts/` is gone.

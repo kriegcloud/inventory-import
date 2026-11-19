@@ -128,7 +128,7 @@ apps/inventory/seeds/                the two organizations and the test accounts
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Personal | `dev_<user>` | `bun run dev`, unchanged | localhost | local, as today | organizations and test accounts | optional, as today | written to `.dev.vars`, as today |
 | Test | `test_<user>` | the deploy test | a `workers.dev` address | its own D1 | organizations and test accounts | none: the rules answer | minted |
-| Preview | `pr-<n>` | CI on a pull request; destroyed when it closes | by decision I4 | its own D1, destroyed with the stage | organizations only | by decision I5 | minted |
+| Preview | `pr-<n>` | CI on a pull request; destroyed when it closes | by decision I4 | its own D1, destroyed with the stage | organizations and test accounts, with a password minted for the stage; no sign-up (answered after the brief: "Nobody; test accounts only", "Password minted per stage") | by decision I5 | minted |
 | Production | `prod` | CI on a push to `main`, after approval | `https://inventory.beep-effect.com` | its own D1, never seeded, never destroyed by a workflow | none | by decision I5 | by decision I3 |
 
 `bun run dev` stays what it is. Whether `alchemy dev` replaces it is not part of this goal: the dev server, the

@@ -27,6 +27,13 @@ and everything after it.
 The next step is Benjamin's Cloudflare login and `alchemy state bootstrap`. Nothing more can be built or learned on
 this machine alone; "What Benjamin does by hand" below is the list, in order.
 
+**One question open, his:** how does a preview's minted password reach the person reviewing the pull request? The
+workflow's log is public, so it is not printed there. Built so far: whoever deploys from a workstation sees it. The
+ways it could reach a reviewer of a workflow's preview: (a) he reads it from the preview account's state with his
+own login (`alchemy state`; unverified until a state store exists); (b) one password for every preview, which he
+keeps in 1Password and the repository's stack writes to the `preview` environment as a secret, so it is never
+minted or printed and he already has it; (c) the workflow posts it where only he can read. None is built.
+
 ## Choices made
 
 Where the brief left a choice open, or the code showed the brief could not be followed as written.
@@ -51,21 +58,31 @@ Where the brief left a choice open, or the code showed the brief could not be fo
 - **An unknown stage stops both stacks.** The stage service refuses any name but `prod`, `pr-<number>` and
   `test_<user>`, so a deploy typed without `--stage` (Alchemy names it `live_<user>`) makes nothing. It stops as a
   defect with a sentence saying what to type, because a stack's only typed failure is a missing setting.
-- **A preview and production both take `SIGN_UP`; a test stage takes none.** The brief's table did not say who may
-  open an account on a preview. A preview has the two test organizations and no accounts, so with sign-up closed
-  nobody could open it; it reads the same `SIGN_UP` list as production from its GitHub environment. A test stage
-  has the five test accounts and closed sign-up.
-- **A test stage has the test accounts on a public `workers.dev` address**, as the brief's table says. Their
-  password is in the repository, so anyone who finds the address can sign in to that stage's two test organizations.
-  It holds no real data and is destroyed after the proof; whether that is acceptable is Benjamin's.
-- **Production deploys without a model key when none is given**, and the stack's output says "the rules answer".
-  The app is complete without a key, and a first deploy should not wait on one. A mistyped secret name therefore
-  shows as rules answering, not as a failed deploy.
+- **Nobody signs up on a preview or a test stage** (Benjamin: "Nobody; test accounts only"). Both are seeded with
+  the two test organizations and the five test accounts, name no sign-up source, and so run closed; no real email is
+  stored outside production. Only production's GitHub environment holds `SIGN_UP`.
+- **A deployed stage's test accounts take a password minted for that stage** (Benjamin: "Password minted per
+  stage"). The seeded rows keep the hash of the repository's password, so nothing is generated at deploy but one
+  random value: the stack mints `TEST_ACCOUNT_PASSWORD` and the Worker decides which password is held against a
+  stored hash (`packages/access/model/src/Session/StagePassword.rules.ts`). With the setting, the stage's password
+  opens a seeded account, the repository's is refused for every account, and the page offers no account in one
+  click. Rejected while building: writing a second seed file with new hashes at deploy time, because a stack's
+  resources are declared before the minted value exists.
+- **The minted password is shown only to a person deploying from their own machine**, as the stack's output
+  `testAccountPassword`. In a workflow (`CI=true`) the output says it was minted and does not show it: this
+  repository's workflow logs are public, so "the pull request's deploy output" would publish it. How a preview's
+  password reaches its reviewer is the one open question, below.
+- **A production deploy with no model key stops** (Benjamin: "Fail the production deploy"), with a sentence naming
+  the variable, where its reference is written, and the flag `DEPLOY_WITHOUT_MODEL_KEY=true` that deploys without a
+  model on purpose. The repository's stack stops the same way, and writes the flag to the production environment as
+  `true` or `false` so the workflow's deploy agrees with it. A blank value counts as none: a workflow gives a
+  missing secret an empty text.
 - **The model's name is in two places**: `apps/inventory/wrangler.jsonc` (local) and `Inventory.stack.ts`
   (deployed). Alchemy's Vite build was not shown to read `wrangler.jsonc`'s `vars`, so the stack states them.
 - **The GitHub stack takes three names from the environment**, since none is in the repository and none is a
   secret: `PRODUCTION_CLOUDFLARE_ACCOUNT_ID`, `PREVIEW_CLOUDFLARE_ACCOUNT_ID` and `PRODUCTION_APPROVER` (the GitHub
-  login that approves a production deploy). `SIGN_UP` defaults to `closed`; `OPENROUTER_API_KEY` is optional.
+  login that approves a production deploy). `SIGN_UP` defaults to `closed`; `OPENROUTER_API_KEY` is required unless
+  the flag is set.
 - **The rule on `main`** (I7): a pull request, the check named "Check, test and build" (the job in `ci.yml`), no
   deletion and no force push, and the repository's admin role may bypass it always. No approving review is
   required, since one person works here.
@@ -115,21 +132,45 @@ the last code commit. `SIGN_UP` was set by the same override recipe and put back
 Not seen: phone width and the dark theme for the two new sentences, and a second named person joining an existing
 organization.
 
+## Seen in the browser: a production build with a preview stage's settings
+
+`bun run preview` on port 5200, fresh database with both seeds (what a preview's database holds), and
+`TEST_ACCOUNT_PASSWORD` set to a value generated on the spot by the override recipe, which was put back.
+
+- Opened `/`: "Sign in", "Use your email and password. New accounts are added by the person who runs this app.",
+  Email, Password, "Sign in". No "Create an account" and no test account offered.
+- A sign-up posted from that page answered 403 with "New accounts are not open here. Ask the person who runs this
+  app to add your email, then try again."
+- Typed dana@example-works.test and local-test-password, pressed "Sign in": "Invalid email or password".
+- Typed dana@example-works.test and the generated password, pressed "Sign in": the Upload step opened as "Dana
+  Whitfield dana@example-works.test", "Example Works (test)", "Admin".
+
+Not seen: the stack minting the value and handing it to the Worker; that needs an apply.
+
 ## Proved without a cloud
 
-- `bun run check:full` passes: the two stacks type-check against Alchemy 2.0.0-beta.87 under the full strictness
-  profile, with `effect` still 4.1.4 for the whole repository.
+- `bun run check:full` passes on each commit: the two stacks type-check against Alchemy 2.0.0-beta.87 under the
+  full strictness profile, with `effect` still 4.1.4 for the whole repository.
 - `packages/infra/test/StagePlan.test.ts`: each of the four stage kinds maps to its plan; production has no seed,
-  the real host name and no `workers.dev`; `live_<user>` and other names are refused.
+  the real host name and no `workers.dev`; a preview and a test stage have the test accounts and no sign-up;
+  `live_<user>` and other names are refused; every deployed stage with test accounts mints a password; a
+  production deploy with no model key stops with its sentence, and the flag lets it through.
 - `packages/infra/test/InfraStage.test.ts`: the service hands a stack the plan of `pr-42`; a deploy named
   `live_ben` or `dev_ben` stops before any resource; both stack modules load on Node from the repository alone.
+- `packages/access/model/test/StagePassword.test.ts` and `apps/inventory/test/server/StagePassword.slow.test.ts`:
+  on a production build with a stage password, a test account signs in with it and not with the repository's,
+  nobody can sign up, and the page is told to offer no account; with no stage password the repository's works.
 - `apps/inventory/test/server/SignUp.slow.test.ts`: a production build refuses a sign-up with 403 and the sentence;
   a named email becomes the admin of the organization it creates. Seen in the browser on the production build, above.
+- `packages/tooling/tool/cli/test/Boundaries.test.ts`: nothing may depend on an `infra` package, not even an app,
+  and it may use only the foundation.
 - The migration creates no organization and no member; development and the tests get theirs from `seeds/`.
 - The cleanup job's guard was read, not run: its `case` accepts `pr-` followed by one to six digits, the first not
   zero, and nothing else.
 
 Not proved here: that any Alchemy command runs. None was run, by design: `plan` and `deploy` need an account.
+The slow tests failed once with hook timeouts in suites this work does not touch (the table assistant, the
+take-back), straight after a preview server was stopped, and passed on three runs after.
 
 ## What cannot be known until the first apply
 
@@ -152,6 +193,11 @@ Not proved here: that any Alchemy command runs. None was run, by design: `plan` 
    both end there.
 10. Whether a pull request's `closed` event still reaches the `preview` environment's secrets, which the cleanup
     job needs.
+11. Whether the minted `TEST_ACCOUNT_PASSWORD` reaches the Worker as a secret, shows in a workstation deploy's
+    output as text and not as a redacted mark, and can be read back from the state afterwards.
+12. Whether a stack that stops on a missing model key prints its sentence whole, or wraps it in a stack trace.
+13. Whether the sign-in's second look at a password on a stage (two comparisons, one hash) changes the CPU of a
+    sign-in in any way that matters.
 
 ## What Benjamin does by hand, in order
 
@@ -163,23 +209,28 @@ Nothing below was started. Every command names its stage.
 3. **`bunx alchemy state bootstrap`** in the preview account. This is the first thing that exists outside this
    machine: the state store's Worker.
 4. **A test stage in the preview account**: `bunx alchemy plan --stage test_<user>`, read it, then `bunx alchemy
-   deploy --stage test_<user>`. Open the address it prints; sign in as a test account; load `items_messy.csv`
-   through Confirm and read 155 stored; search the Items page. Points 1 to 5 above are settled here. Then
+   deploy --stage test_<user>`. Its output gives the address and `testAccountPassword`. Open the address; sign in
+   as dana@example-works.test with that password, and see local-test-password refused; load `items_messy.csv`
+   through Confirm and read 155 stored; search the Items page. Points 1 to 5 and 11 above are settled here. Then
    `bunx alchemy destroy --stage test_<user>`.
 5. **`bunx alchemy state bootstrap`** in the production account.
 6. **Write production's model key reference** into `packages/infra/env/op.env` as
-   `OPENROUTER_API_KEY=op://<vault>/<item>/<field>`, or leave it out and production's rules answer.
-7. **Decide who may open an account**: the emails for `SIGN_UP`, his own first.
+   `OPENROUTER_API_KEY=op://<vault>/<item>/<field>`. Without it steps 8 and 9 stop and say so; to go on without a
+   model on purpose, add `DEPLOY_WITHOUT_MODEL_KEY=true` to both commands.
+7. **Decide who may open an account in production**: the emails for `SIGN_UP`, his own first. Previews and test
+   stages take none.
 8. **`gh auth login`** with rights over the repository's settings, then the repository's stack, from the
    production account's profile:
    `PRODUCTION_CLOUDFLARE_ACCOUNT_ID=... PREVIEW_CLOUDFLARE_ACCOUNT_ID=... PRODUCTION_APPROVER=<his GitHub login>
    SIGN_UP=<emails> op run --env-file packages/infra/env/op.env -- bunx alchemy deploy
    packages/infra/src/GitHub.stack.ts --stage prod`, after the same line with `plan`. Points 6 and 8 are settled here.
-9. **Production**: `SIGN_UP=<emails> bunx alchemy plan --stage prod`, read it, then `deploy`. Open
-   `https://inventory.beep-effect.com`: the sign-in page offers no sign-up to a stranger; his email signs up, creates
-   the organization and is its admin.
+9. **Production**: `SIGN_UP=<emails> op run --env-file packages/infra/env/op.env -- bunx alchemy plan --stage
+   prod`, read it, then the same with `deploy`. Open `https://inventory.beep-effect.com`: the sign-in page offers no
+   sign-up to a stranger; his email signs up, creates the organization and is its admin.
 10. **On the zone**: "Always Use HTTPS" confirmed on.
-11. **Push the branch and merge it**, so `deploy.yml` reaches `main`. From then a pull request gets a preview and a
+11. **Answer how a preview's password reaches its reviewer** ("Current blocker", above), before the first pull
+    request needs one.
+12. **Push the branch and merge it**, so `deploy.yml` reaches `main`. From then a pull request gets a preview and a
     push to `main` waits for his approval in the `production` environment.
-12. **Adding a person later**: add their email to `SIGN_UP` (step 8 again, so both environments have it), deploy,
-    and they sign up; or they sign up and an admin adds them on the People page.
+13. **Adding a person to production later**: add their email to `SIGN_UP` (step 8 again), deploy, and they sign
+    up; or they sign up and an admin adds them on the People page.

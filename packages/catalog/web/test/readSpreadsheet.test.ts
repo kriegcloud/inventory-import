@@ -8,8 +8,9 @@ import type { Note, NoteKind, Row, SpreadsheetTable } from "@inventory/catalog-m
 import { sayError } from "@inventory/client/SayError"
 import { readSpreadsheet } from "@inventory/catalog-web/Spreadsheet"
 
-const bytesOf = (path: string): Uint8Array => readFileSync(new URL(`../../${path}`, import.meta.url))
-const fixture = (name: string, as: string = name): File => new File([bytesOf(`test/fixtures/spreadsheet/${name}`)], as)
+const bytesOf = (path: string): Uint8Array<ArrayBuffer> =>
+  new Uint8Array(readFileSync(new URL(`./${path}`, import.meta.url)))
+const fixture = (name: string, as: string = name): File => new File([bytesOf(`fixtures/spreadsheet/${name}`)], as)
 const textFile = (text: string, name = "items.csv"): File => new File([text], name)
 
 const noteOf = (table: SpreadsheetTable, kind: NoteKind): Option.Option<Note> =>
@@ -368,7 +369,7 @@ describe("Failures a person can act on", () => {
 
   it.effect("unreadable: a damaged workbook", () =>
     Effect.gen(function* () {
-      const whole = bytesOf("test/fixtures/spreadsheet/sheets.xlsx")
+      const whole = bytesOf("fixtures/spreadsheet/sheets.xlsx")
       const head = yield* failure(new File([whole.subarray(0, 3000)], "cut.xlsx"))
       expect(head).toMatchObject({ kind: "unreadable", problem: expect.stringContaining("damaged or incomplete") })
       const half = yield* failure(new File([whole.subarray(0, Math.floor(whole.length / 2))], "half.xlsx"))
@@ -399,7 +400,7 @@ describe("Failures a person can act on", () => {
       const big = yield* failure(new File([new Uint8Array(10 * 1024 * 1024 + 1)], "big.csv"))
       expect(big).toMatchObject({ kind: "tooLarge", problem: expect.stringContaining("over 10.0 MB") })
       const zipHead = new Uint8Array(3 * 1024 * 1024 + 1)
-      zipHead.set(bytesOf("test/fixtures/spreadsheet/sheets.xlsx"))
+      zipHead.set(bytesOf("fixtures/spreadsheet/sheets.xlsx"))
       const workbook = yield* failure(new File([zipHead], "big.xlsx"))
       expect(workbook).toMatchObject({ kind: "tooLarge", problem: expect.stringContaining("workbooks over 3.0 MB") })
     })
@@ -437,10 +438,10 @@ describe("The sample files", () => {
   it.effect("the clean file is 25 items under the schema's own headings, the messy one 16 columns", () =>
     Effect.gen(function* () {
       const clean = yield* readSpreadsheet({
-        file: new File([bytesOf("public/samples/items_clean.csv")], "items_clean.csv")
+        file: new File([bytesOf("fixtures/samples/items_clean.csv")], "items_clean.csv")
       })
       const messy = yield* readSpreadsheet({
-        file: new File([bytesOf("public/samples/items_messy.csv")], "items_messy.csv")
+        file: new File([bytesOf("fixtures/samples/items_messy.csv")], "items_messy.csv")
       })
       expect(clean.rows.length).toBe(25)
       expect(Arr.map(clean.columns, (c) => c.header)[0]).toBe("sku")

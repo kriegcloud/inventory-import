@@ -27,9 +27,9 @@ export const csvCorpus = (
 ): ReadonlyArray<{ readonly name: string; readonly bytes: Uint8Array }> => [
   ...A.map(fixtures, (name) => ({
     name,
-    bytes: read(new URL(`../fixtures/spreadsheet/${name}`, import.meta.url))
+    bytes: read(new URL(`./fixtures/spreadsheet/${name}`, import.meta.url))
   })),
-  ...A.map(samples, (name) => ({ name, bytes: read(new URL(`../../public/samples/${name}`, import.meta.url)) })),
+  ...A.map(samples, (name) => ({ name, bytes: read(new URL(`./fixtures/samples/${name}`, import.meta.url)) })),
   { name: "generated.csv", bytes: encoder.encode(generated) },
   { name: "unclosed.csv", bytes: encoder.encode(unclosed) },
   { name: "semicolons.csv", bytes: encoder.encode(semicolons) },

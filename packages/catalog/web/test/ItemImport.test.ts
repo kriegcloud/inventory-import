@@ -2,16 +2,16 @@
 // lands in the outcome DECISIONS.md gives it, the counts add up to the rows, the form-only fixes are in force, listed
 // and undoable while everything else waits for the person, and a stored item is never changed without a choice.
 import { describe, expect, it } from "@effect/vitest"
-import { cost, digits } from "../support/cost.ts"
+import { cost, digits } from "./support/cost.ts"
 import { Array as Arr, Effect, Option, Record as Rec } from "effect"
-import clean from "../../public/samples/items_clean.csv?raw"
-import messy from "../../public/samples/items_messy.csv?raw"
+import clean from "./fixtures/samples/items_clean.csv?raw"
+import messy from "./fixtures/samples/items_messy.csv?raw"
 import type { ItemFields } from "@inventory/catalog-contract/Item"
 import { type Review, review } from "@inventory/catalog-model/Review"
 import { decisionFromFlags, type RowDecisionFlags } from "@inventory/catalog-contract/Decision"
 import { matchedColumn } from "@inventory/catalog-contract/Mapping"
 import { type StagedTable } from "@inventory/catalog-contract/Staged"
-import { stage } from "../server/support/files.ts"
+import { stage } from "./support/files.ts"
 
 // Decisions are written here as the flags a draft stores, and read through `decisionFromFlags`.
 const reviewOf = (

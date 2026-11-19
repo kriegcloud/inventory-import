@@ -1,0 +1,62 @@
+{
+  "table": {
+    "fileName": "strays.csv",
+    "kind": "csv",
+    "format": { "_tag": "csv", "delimiter": ",", "encoding": "utf-8" },
+    "headerRowNumber": 1,
+    "columns": [
+      { "index": 0, "letter": "A", "header": "SKU", "label": "SKU" },
+      { "index": 1, "letter": "B", "header": "Name", "label": "Name" },
+      { "index": 2, "letter": "C", "header": "Note", "label": "Note" }
+    ],
+    "rows": [
+      {
+        "rowNumber": 2,
+        "cells": [
+          { "type": "text", "text": "A-1" },
+          { "type": "text", "text": "ab\"c" },
+          { "type": "text", "text": "x" }
+        ]
+      },
+      {
+        "rowNumber": 3,
+        "cells": [
+          { "type": "text", "text": "A-2" },
+          { "type": "text", "text": "q" },
+          { "type": "text", "text": "y" }
+        ]
+      },
+      {
+        "rowNumber": 4,
+        "cells": [
+          { "type": "text", "text": "A-3" },
+          { "type": "text", "text": "r\" s,\"t" },
+          { "type": "empty", "text": "" }
+        ]
+      },
+      {
+        "rowNumber": 7,
+        "cells": [
+          { "type": "empty", "text": "" },
+          { "type": "text", "text": "x" },
+          { "type": "empty", "text": "" }
+        ]
+      }
+    ],
+    "notes": [
+      {
+        "kind": "strayQuote",
+        "level": "warning",
+        "message": "Rows 4 and 4 have a quote (\") in an odd place; check how they were split into columns.",
+        "rows": [4, 4]
+      },
+      { "kind": "blankRows", "level": "info", "message": "Skipped 2 blank rows: rows 5 and 6.", "rows": [5, 6] },
+      {
+        "kind": "shortRows",
+        "level": "warning",
+        "message": "Row 4 has fewer cells than there are column names (3); the missing cells are read as empty.",
+        "rows": [4]
+      }
+    ]
+  }
+}

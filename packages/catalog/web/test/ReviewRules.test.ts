@@ -2,7 +2,7 @@
 // read yet, an item named "Total", a year written with two digits, a tags cell of separators only, a vendor cost in
 // quotes, and what an edit of one item may not say.
 import { describe, expect, it } from "@effect/vitest"
-import { digits } from "../support/cost.ts"
+import { digits } from "./support/cost.ts"
 import { Array as Arr, Effect, Option, String as Str } from "effect"
 import * as S from "effect/Schema"
 import {
@@ -14,7 +14,7 @@ import {
   UnitCost
 } from "@inventory/catalog-contract/Item"
 import { type Review, review } from "@inventory/catalog-model/Review"
-import { stage, textFile } from "../server/support/files.ts"
+import { stage, textFile } from "./support/files.ts"
 
 const head =
   "sku,name,description,category,uom,unit_cost,quantity_on_hand,reorder_point,is_active,lot_tracked,tags,first_received_on,discontinued_on,dimensions,vendors"

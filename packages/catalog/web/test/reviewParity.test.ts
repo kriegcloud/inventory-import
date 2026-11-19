@@ -4,7 +4,7 @@
 // the same adapter, and compares the two after every step.
 // @effect-diagnostics nodeBuiltinImport:off
 import { readFileSync } from "node:fs"
-import { cost } from "../support/cost.ts"
+import { cost } from "./support/cost.ts"
 import { describe, expect, it } from "@effect/vitest"
 import { Array as Arr, Effect, Option, Order, String as Str } from "effect"
 import { firstDecisions, recheckRow, review } from "@inventory/catalog-model/Review"
@@ -37,7 +37,7 @@ import { stageTable } from "@inventory/catalog-model/Staging"
 
 /** A file from `public/samples/`, as the browser would hold it after the person chose it. */
 const sample = (name: string): File =>
-  new File([readFileSync(new URL(`../../public/samples/${name}`, import.meta.url))], name)
+  new File([new Uint8Array(readFileSync(new URL(`./fixtures/samples/${name}`, import.meta.url)))], name)
 
 /** Reads and stages a file exactly as the upload screen does. */
 const stage = (file: File): Effect.Effect<StagedTable> =>

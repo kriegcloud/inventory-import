@@ -462,6 +462,39 @@ None.
   - What a twin does not imitate, said in its header: the size limit of a stored value, and the search's
     forgiveness of one wrong letter.
   - No code the Worker runs changed in this item.
+- **3. The splits.**
+  - `Review.rules.ts` is four files in the model: `Review/Mapping.rules.ts` (`matchColumns`, `headingWords`,
+    `totalRowNumbers`), `Review/CellReading.rules.ts` (`readDecimal`, `readUnitCost`, `readCount`, `readDate`,
+    `dateReadings`, `readDimensions`, `readVendors`, `canonicalTags`, `itemText`), `Review/Review.rules.ts` and
+    `Review/NotImported.rules.ts`; `stageTable` and `stagingProblem` are `Staging/Staging.rules.ts`.
+  - The cell readers and the search rules left the contract: `readItemForm` is the model's
+    `Item/ItemEdit.rules.ts`, the search's words and plan its `Item/ItemSearch.rules.ts`. The contract keeps
+    `ItemSearchText` (the query needs it), `isoDate`, `skuKey`, `costDigits`, `decimalUnits`; `UnitCost` and the
+    calendar-day check test themselves, with no reader behind them.
+  - `ViewChange` is closed by `kind` with `show` and `hide` as their own cases; the wire's bytes are unchanged.
+  - `UploadState` and `progressOf` are the screens' (`catalog-web`'s `Upload.machine.ts`); while a file is read,
+    how many rows it has is a `RowEstimate`: `unknown`, `about { n }` or `counted { n }`. The worker still reports
+    plain fields, and `rowsOf` makes the estimate from them.
+  - The Activity page's two catalog lists are `catalog-web`'s (`ImportDecisions.screen.tsx`, and
+    `PastImportsList` in `PastImports.screen.tsx`), each with its query; the app's Activity page is the shell over
+    them and the access screens' events (decision (A1)).
+  - The web tests are in `catalog-web` (94 tests, 9 files: `reviewParity`, `reviewHonesty`, `readSpreadsheet`,
+    `readInPieces`, `csvDifferential`, `tableView`, `UploadMachine`, and `ItemImport` and `ReviewRules`). The last
+    two are not in the model, where the brief lists them: they stage the sample files through the screens' reader,
+    which the model may not import. The samples they read are copies in the package's `test/fixtures/samples`, since
+    a package may not reach into the app; `test/web/samples.test.ts` in the app holds the copies to
+    `public/samples` byte for byte. `ItemSearch.test.ts` is the model's; `form.test.ts` and `traceContext.test.ts`
+    stay with the app files they test.
+  - `catalog-web`'s test profile lists the review region's sources under its stage C override, as the app's did,
+    because `reviewHonesty` reads the region's sizing: no new exception, and the sum is still 666.
+  - Not changed, and not in the list I was given: the assistant's conversation still stores `null`s; the catalog's
+    schemas keep their plain identifiers.
+  - Read on screen, fresh database, after the dev server was restarted (Vite had cached the package's old
+    exports and answered 500 for the Activity page until then): the messy sample "Import 155, skip 45", "Import
+    155 items?", "Not imported 45 · Imported 155 · Already there 0 · All 200", Items "155 items"; Activity
+    "Decisions 20 · Events 2 · Imports 1", the first decision "YYE-9806 8 First received was Jun 19, 2024 now
+    2024-06-19 · Rule · high · Rule ...", the import "items_messy.csv Imported 155 45 200 Dana Whitfield", the
+    event "Imported items · Dana Whitfield · Created 155 items from items_messy.csv".
 
 ## Closing note
 

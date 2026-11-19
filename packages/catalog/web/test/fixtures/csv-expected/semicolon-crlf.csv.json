@@ -1,0 +1,38 @@
+{
+  "table": {
+    "fileName": "semicolon-crlf.csv",
+    "kind": "csv",
+    "format": { "_tag": "csv", "delimiter": ";", "encoding": "utf-8" },
+    "headerRowNumber": 1,
+    "columns": [
+      { "index": 0, "letter": "A", "header": "SKU", "label": "SKU" },
+      { "index": 1, "letter": "B", "header": "Item", "label": "Item" },
+      { "index": 2, "letter": "C", "header": "Unit", "label": "Unit" },
+      { "index": 3, "letter": "D", "header": "Quantity", "label": "Quantity" },
+      { "index": 4, "letter": "E", "header": "Unit cost", "label": "Unit cost" }
+    ],
+    "rows": [
+      {
+        "rowNumber": 2,
+        "cells": [
+          { "type": "text", "text": "BRK-040" },
+          { "type": "text", "text": "Steel bracket 40 mm" },
+          { "type": "text", "text": "Each" },
+          { "type": "text", "text": "120" },
+          { "type": "text", "text": "2,35" }
+        ]
+      },
+      {
+        "rowNumber": 3,
+        "cells": [
+          { "type": "text", "text": "HB-M8-30" },
+          { "type": "text", "text": "Hex bolt M8 x 30" },
+          { "type": "text", "text": "Each" },
+          { "type": "text", "text": "1500" },
+          { "type": "text", "text": "0,12" }
+        ]
+      }
+    ],
+    "notes": [{ "kind": "delimiter", "level": "info", "message": "Columns are separated by semicolons.", "rows": [] }]
+  }
+}

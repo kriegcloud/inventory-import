@@ -4,7 +4,8 @@
   // block below repeats the root's options; the check (../../../scripts/check-strict.mjs) fails when it differs from
   // the root's anywhere but `overrides`.
   //
-  // Stage C, own code (src): these screens came from the app's src/web with their findings. Four style rules are off
+  // Stage C, own code (src), and the review region's files a test here reads (its sizing), which are stage C in
+  // their own package: these screens came from the app's src/web with their findings. Four style rules are off
   // here: preferEffectArray, preferEffectString, preferEffectRecord and missingPipeableSignature. Every other rule is
   // at its root severity. Their findings are still counted by the check, against the ceiling in strict-ceiling.json,
   // which may only fall; remove the override when it reaches zero.
@@ -60,7 +61,7 @@
         "allowedDuplicatedPackages": [],
         "overrides": [
           {
-            "include": ["src/**/*.ts", "src/**/*.tsx"],
+            "include": ["src/**/*.ts", "src/**/*.tsx", "../../review/src/**/*.ts", "../../review/src/**/*.tsx"],
             "options": {
               "diagnosticSeverity": {
                 "preferEffectArray": "off",

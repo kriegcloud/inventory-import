@@ -15,7 +15,7 @@ import { csvCorpus } from "./csvCorpus.ts"
 
 const pieces = [5, 37, 64, 255, 1000, 4096, 256 * 1024]
 const Json = S.fromJsonString(S.Unknown)
-const expectedUrl = (name: string) => new URL(`../fixtures/csv-expected/${name}.json`, import.meta.url)
+const expectedUrl = (name: string) => new URL(`./fixtures/csv-expected/${name}.json`, import.meta.url)
 
 const plain = (result: Result.Result<unknown, unknown>): unknown =>
   result.pipe(

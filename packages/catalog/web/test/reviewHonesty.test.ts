@@ -24,7 +24,7 @@ import {
   viewRows,
   visible
 } from "@inventory/review/ReviewDraft"
-import { planColumns, type SizedColumn } from "../../../../packages/review/src/internal/sizing.ts"
+import { planColumns, type SizedColumn } from "../../../review/src/internal/sizing.ts"
 import type { ProblemKind, ReviewColumn, ReviewRow } from "@inventory/review/ReviewTypes"
 import { defaultReviewWords, reviewWords } from "@inventory/review/ReviewWords"
 import { readSpreadsheet } from "@inventory/catalog-web/Spreadsheet"
@@ -41,7 +41,7 @@ import {
 import { stageTable } from "@inventory/catalog-model/Staging"
 
 const sample = (name: string): File =>
-  new File([readFileSync(new URL(`../../public/samples/${name}`, import.meta.url))], name)
+  new File([new Uint8Array(readFileSync(new URL(`./fixtures/samples/${name}`, import.meta.url)))], name)
 
 const stage = (file: File): Effect.Effect<StagedTable> =>
   Effect.orDie(Effect.map(readSpreadsheet({ file }), (table) => stageTable({ table })))

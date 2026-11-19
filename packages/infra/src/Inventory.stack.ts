@@ -4,19 +4,23 @@
  * stage's name read here.
  *
  * Must not break: production is never seeded and never answers on `workers.dev`; the sign-in secret is minted by
- * the stack and never written anywhere a person can read; a model key reaches only a stage whose plan names one.
+ * the stack and never written anywhere a person can read; a model key reaches only a stage whose plan names one; a
+ * stage with test accounts gets a password of its own for them, which no workflow log ever shows.
  *
  * @packageDocumentation
  */
 import * as Cloudflare from "@alchemy.run/cloudflare"
 import * as Alchemy from "alchemy"
+import * as Output from "alchemy/Output"
 import * as A from "effect/Array"
 import * as Config from "effect/Config"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as Path from "effect/Path"
+import * as Redacted from "effect/Redacted"
 import { InfraStage } from "./InfraStage.context.ts"
 import type { SettingSource } from "./Stage.schema.ts"
+import { hasOwnTestPassword } from "./StagePlan.rules.ts"
 
 /**
  * The model the app asks, and the one it falls back to. The same two values as `apps/inventory/wrangler.jsonc`,
@@ -58,6 +62,15 @@ export default Alchemy.Stack(
     const modelKey = yield* secretFrom(plan.modelKey)
     const signUp = yield* textFrom(plan.signUp)
 
+    // The test accounts of a deployed stage take a password of the stage's own, minted once and kept in state.
+    const mintTestPassword = Effect.fnUntraced(function* () {
+      const minted = yield* Alchemy.Random("TestAccountPassword", { bytes: 12 })
+      return O.some(minted)
+    })
+    const testPassword = hasOwnTestPassword(plan) ? yield* mintTestPassword() : O.none()
+    // A workflow's log is public, so the password is shown only to a person deploying from their own machine.
+    const inWorkflow = yield* Config.Boolean("CI").pipe(Config.withDefault(false))
+
     const website = yield* Cloudflare.Website.Vite("Website", {
       rootDir: app,
       main: "src/server/worker.ts",
@@ -76,6 +89,10 @@ export default Alchemy.Stack(
         BETTER_AUTH_SECRET: signInSecret.text,
         ...model,
         ...O.match(modelKey, { onNone: () => ({}), onSome: (key) => ({ OPENROUTER_API_KEY: key }) }),
+        ...O.match(testPassword, {
+          onNone: () => ({}),
+          onSome: (password) => ({ TEST_ACCOUNT_PASSWORD: password.text })
+        }),
         ...O.match(signUp, { onNone: () => ({}), onSome: (emails) => ({ SIGN_UP: emails }) })
       }
     })
@@ -84,7 +101,14 @@ export default Alchemy.Stack(
       stage: plan.stage,
       url: website.url,
       model: O.isSome(modelKey) ? "a model answers" : "the rules answer",
-      signUp: O.isSome(signUp) ? "the named emails" : "closed"
+      signUp: O.isSome(signUp) ? "the named emails" : "closed",
+      testAccountPassword: O.match(testPassword, {
+        onNone: () => "none: this stage has no test account",
+        onSome: (password) =>
+          inWorkflow
+            ? "minted for this stage; not shown in a workflow's log"
+            : Output.map(password.text, Redacted.value)
+      })
     }
     // The stack is the entry point the CLI runs: this is where its one layer is provided.
     // @effect-diagnostics-next-line strictEffectProvide:off

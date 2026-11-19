@@ -6,7 +6,7 @@ import * as Arbitrary from "effect/Arbitrary"
 import * as Result from "effect/Result"
 import * as S from "effect/Schema"
 import { StagePlan } from "@beep/infra/Stage"
-import { kindOf, planFor } from "@beep/infra/StagePlan"
+import { hasOwnTestPassword, kindOf, planFor } from "@beep/infra/StagePlan"
 
 const plan = (stage: string) => Result.getOrThrow(planFor(stage))
 
@@ -88,5 +88,16 @@ describe("the plan of a stage", () => {
 
   it.prop("the plan schema generates only valid values", [Arbitrary.schema(StagePlan)], ([value]) => {
     expect(S.is(StagePlan)(value)).toBe(true)
+  })
+
+  it("every deployed stage with test accounts has its own password for them; the repository's is for a developer's machine", () => {
+    expect(
+      A.map(["prod", "pr-42", "test_ben", "dev_ben"], (stage) => [stage, hasOwnTestPassword(plan(stage))])
+    ).toEqual([
+      ["prod", false],
+      ["pr-42", true],
+      ["test_ben", true],
+      ["dev_ben", false]
+    ])
   })
 })

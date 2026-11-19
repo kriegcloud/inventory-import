@@ -18,6 +18,7 @@ interface Env {
   readonly BETTER_AUTH_URL?: string
   readonly PWNED_PASSWORD_CHECK?: string
   readonly TEST_ACCOUNTS?: string
+  readonly TEST_ACCOUNT_PASSWORD?: string
   readonly SIGN_UP?: string
 }
 

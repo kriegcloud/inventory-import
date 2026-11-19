@@ -11,12 +11,15 @@ import { RequestSource } from "@inventory/kernel/SameOrigin"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as O from "effect/Option"
+import * as Redacted from "effect/Redacted"
 import * as HttpServerRequest from "effect/http/HttpServerRequest"
 import * as HttpServerResponse from "effect/http/HttpServerResponse"
 import type { CrossSiteRequest } from "@inventory/kernel/AccessError"
 import { mayCreateAccount } from "@inventory/access-model/SignUp"
+import { passwordToVerify } from "@inventory/access-model/StagePassword"
 import { authSettings } from "./Config.ts"
 import { authOptions } from "./internal/authOptions.ts"
+import { testAccountPassword } from "./internal/TestAccounts.ts"
 
 /**
  * Better Auth for this Worker, on the D1 binding, from the sign-in settings. In production a missing or short
@@ -52,6 +55,14 @@ export const signIn = (options: {
             secureCookies: resolved.secureCookies,
             pwnedPasswordCheck: settings.pwnedPasswordCheck,
             mayCreateAccount: (email) => mayCreateAccount(settings.signUp, email),
+            passwordToVerify: (typed) =>
+              O.getOrUndefined(
+                passwordToVerify({
+                  stage: O.map(settings.testAccountPassword, Redacted.value),
+                  repository: testAccountPassword,
+                  typed
+                })
+              ),
             backgroundTasks: options.backgroundTasks,
             rateLimit: options.rateLimit
           })

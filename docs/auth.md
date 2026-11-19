@@ -72,6 +72,7 @@ are in `.dev.vars.example`.
 | `BETTER_AUTH_URL` | unset: each request's origin | The deployed address. When set: the one trusted origin, the cross-site check's own origin behind a proxy, and Secure cookies exactly when it is `https:` |
 | `PWNED_PASSWORD_CHECK` | on in production, off in development | Refuses a new password found in known breaches (Have I Been Pwned). Fails closed: a sign-up is refused while the service cannot be reached |
 | `TEST_ACCOUNTS` | on in development, off in production | Offers the seeded test accounts in one click; only accounts the database holds are offered |
+| `TEST_ACCOUNT_PASSWORD` | unset | Secret. A deployed test or preview stage's own password for its test accounts, minted by its stack. Set, it opens them, the password written in the repository is refused for every account, and no test account is offered in one click (`packages/access/model/src/Session/StagePassword.rules.ts`) |
 | `SIGN_UP` | closed in production, open in development | Who may make an account: `open`, `closed`, or the emails that may, separated by commas. Closed, the sign-in page offers no sign-up and `POST /api/auth/sign-up/email` answers 403 for anyone not named. The person named signs up and is the admin of the organization they create (decision "infra I8"; `packages/access/model/src/Session/SignUp.rules.ts`) |
 
 ## Security settings
@@ -145,8 +146,12 @@ Better Auth's tables come first in `0001_init.sql`, because `member.userId` refe
 The accounts are listed once, in `packages/access/host/src/internal/TestAccounts.ts`. `seeds/accounts.sql` (written by
 `bun scripts/dev-accounts.mjs > seeds/accounts.sql`) adds a user and a password for each seeded person, and makes
 Dana a viewer in Sample Supply so switching can be seen. `bun run dev` applies it after the migrations. It is not a
-migration, so a deployed database has no accounts: the first person signs up and creates their organization, and an
+migration, so production's database has no accounts: the first person signs up and creates their organization, and an
 admin adds others.
+
+A deployed test or preview stage is seeded with the same accounts and gets a password of its own for them
+(`TEST_ACCOUNT_PASSWORD`, minted by the stack). There the password above opens nothing, sign-up is closed, and the
+sign-in page offers no account in one click: whoever deployed the stage has the password and types it.
 
 ## Checking it by hand
 

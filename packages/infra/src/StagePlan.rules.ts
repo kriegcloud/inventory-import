@@ -7,6 +7,7 @@
  *
  * @packageDocumentation
  */
+import * as A from "effect/Array"
 import * as Result from "effect/Result"
 import * as S from "effect/Schema"
 import { FromEnvironment, NotGiven, OnHostname, OnWorkersDev, StagePlan, type StageKind } from "./Stage.schema.ts"
@@ -108,3 +109,13 @@ export const planFor = (stage: string): Result.Result<StagePlan, UnknownStage> =
         })
     }
   })
+
+/**
+ * Whether a stage's test accounts take a password of the stage's own. Every deployed stage that is seeded with them
+ * does (decision "infra, the test accounts' password"): the password written in the repository opens them only on a
+ * developer's own machine.
+ *
+ * @example hasOwnTestPassword(planOfPreview) // true
+ * @example hasOwnTestPassword(planOfProduction) // false: it has no test account
+ */
+export const hasOwnTestPassword = (plan: StagePlan): boolean => plan.deployed && A.contains(plan.seeds, "accounts")

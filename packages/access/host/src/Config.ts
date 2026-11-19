@@ -37,6 +37,9 @@ const present = (key: O.Option<Redacted.Redacted<string>>) =>
  * - `TEST_ACCOUNTS`: `true` or `false`. Offer the seeded test accounts in one click on the sign-in page. Default: on in
  *   development, off in a production build. Only accounts the database holds are offered, and only `bun run dev`
  *   writes them, so a deployed database has none whatever this says.
+ * - `TEST_ACCOUNT_PASSWORD`: secret. A deployed test or preview stage's own password for its test accounts, minted by
+ *   its stack. Set, it opens the seeded test accounts, the password written in the repository is refused for every
+ *   account, and the sign-in page offers no test account in one click. Unset on a developer's machine and in production.
  * - `SIGN_UP`: who may make an account. `open`, `closed`, or the emails that may, separated by commas. Default:
  *   closed in a production build, open in development. A value that is not `open` never opens it.
  *
@@ -48,6 +51,7 @@ export const authSettings = (build: { readonly production: boolean }) =>
     publicUrl: optionalUrl("BETTER_AUTH_URL"),
     pwnedPasswordCheck: Config.Boolean("PWNED_PASSWORD_CHECK").pipe(Config.withDefault(build.production)),
     testAccounts: Config.Boolean("TEST_ACCOUNTS").pipe(Config.withDefault(!build.production)),
+    testAccountPassword: Config.Redacted("TEST_ACCOUNT_PASSWORD").pipe(Config.option, Config.map(present)),
     signUp: Config.String("SIGN_UP").pipe(
       Config.withDefault(build.production ? "closed" : "open"),
       Config.map(signUpRuleOf)

@@ -602,3 +602,16 @@ Question: a preview reads the same `SIGN_UP` list as production; who may sign up
 accounts only (Recommended)": a preview is seeded with the test accounts and sign-up is closed on it; no real email
 is stored in the preview account. Rejected: the same list as production; its own list. Reverse: give the preview's
 plan a sign-up source again and write the variable to the `preview` environment.
+
+### 2026-11-19 — infra, the test accounts' password
+
+Question: test stages and previews carry the test accounts, whose password is in the public repository, on a public
+`workers.dev` address; accept that? Answer: "Password minted per stage (Recommended)": each test or preview stage
+gets a generated password for its test accounts, given to whoever deployed it (and the pull request's deploy
+output); the repository's known password works only on a developer's own machine. Rejected: accept it; behind
+Cloudflare Access. Reverse: stop minting it in the stack; the seeded hash then opens the accounts with the
+repository's password again.
+
+As built: the stack mints it and shows it in the deploy's output only to a person deploying from their own machine.
+A workflow's log in a public repository is public, so a pull request's deploy output does not show it; how a
+preview's password reaches its reviewer is asked of Benjamin and not yet answered.

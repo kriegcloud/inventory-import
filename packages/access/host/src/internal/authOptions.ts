@@ -1,5 +1,6 @@
 import type { BetterAuthOptions } from "better-auth"
 import { APIError } from "better-auth/api"
+import { verifyPassword } from "better-auth/crypto"
 import { haveIBeenPwned } from "better-auth/plugins/haveibeenpwned"
 import { organization } from "better-auth/plugins/organization"
 import { memberAc, ownerAc } from "better-auth/plugins/organization/access"
@@ -42,6 +43,11 @@ export const authOptions = (input: {
   readonly pwnedPasswordCheck?: boolean | undefined
   /** Who may make an account (SIGN_UP): asked of each new account's email. Unset: anyone, as the schema script needs. */
   readonly mayCreateAccount?: ((email: string) => boolean) | undefined
+  /**
+   * What to hold against a stored hash for a typed password, or undefined to refuse it (TEST_ACCOUNT_PASSWORD: a
+   * deployed stage's own password for its test accounts). Unset: the typed password, as Better Auth does.
+   */
+  readonly passwordToVerify?: ((typed: string) => string | undefined) | undefined
   /** Runs work Better Auth does after answering (rate-limit updates, cleanup). The Worker passes `waitUntil`. */
   readonly backgroundTasks?: ((promise: Promise<unknown>) => void) | undefined
   /** Off only in tests that sign in many times from one address. On in `bun run dev` and in production. */
@@ -74,7 +80,18 @@ export const authOptions = (input: {
       maxPasswordLength: 128,
       // No email is sent from this app, so there is no verification or reset link to click. See docs/auth.md.
       requireEmailVerification: false,
-      revokeSessionsOnPasswordReset: true
+      revokeSessionsOnPasswordReset: true,
+      ...(input.passwordToVerify === undefined
+        ? {}
+        : {
+            password: {
+              // The stored hashes are Better Auth's own; only which password is held against one is decided here.
+              verify: ({ hash, password }: { hash: string; password: string }) => {
+                const held = input.passwordToVerify?.(password)
+                return held === undefined ? Promise.resolve(false) : verifyPassword({ hash, password: held })
+              }
+            }
+          })
     },
     session: {
       expiresIn: sessionSeconds,

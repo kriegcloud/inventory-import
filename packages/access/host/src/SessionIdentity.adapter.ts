@@ -97,8 +97,11 @@ export class Sessions extends Context.Service<
         const userIds = A.map(seededAccounts, (account) => UserId.make(account.userId))
         return Sessions.of({
           state: Effect.fn("Sessions.state")(function* (headers: Headers) {
-            const found = settings.testAccounts ? yield* directory.testAccounts(userIds) : []
-            const accounts = settings.testAccounts ? O.some(found) : O.none()
+            // A stage with its own password for the test accounts never offers them in one click: the page would
+            // have to hand that password to whoever opens it.
+            const offered = settings.testAccounts && O.isNone(settings.testAccountPassword)
+            const found = offered ? yield* directory.testAccounts(userIds) : []
+            const accounts = offered ? O.some(found) : O.none()
             const features = SignInFeatures.make({
               testAccounts: O.map(accounts, (offered) =>
                 TestAccountsOffer.make({ password: testAccountPassword, accounts: offered })

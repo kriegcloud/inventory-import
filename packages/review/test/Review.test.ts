@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest"
 import {
   act,
   Action,
+  OtherAnswer,
   appliedGroups,
   choicesOf,
   choiceText,
@@ -120,7 +121,7 @@ describe("a proposal never overwrites the person's decision", () => {
       Action.AcceptGroup({ groupId: "unit:each", except: [] })
     )
     expect(viewOf(state, typed).cells.unit).toBe("kg")
-    expect(viewOf(state, typed).marks.unit).toMatchObject({ state: "applied", by: "you", to: "kg" })
+    expect(viewOf(state, typed).marks.unit).toMatchObject({ _tag: "Applied", by: "you", to: "kg" })
     expect(viewOf(state, left).status).toBe("out")
     expect(O.getOrUndefined(HashMap.get(state.decisions, left))?.accepted ?? []).toEqual([])
     expect(state.undo[state.undo.length - 1]?.label).toBe("7 fixes accepted")
@@ -283,7 +284,7 @@ describe("what the table and the phone show", () => {
     const lines = entries({ list, groups: waitingGroups({ views: all, kind: "unit" }) })
     expect(
       A.join(
-        A.map(lines, (line) => (line.type === "group" ? line.group.id : "row")),
+        A.map(lines, (line) => (line._tag === "Group" ? line.group.id : "row")),
         " "
       )
     ).toBe(A.join(["unit:each", ...A.makeBy(9, () => "row"), "unit:length", "row", "row", "row"], " "))
@@ -314,7 +315,7 @@ describe("what the table and the phone show", () => {
     const all = views(emptyState)
     const decisions = queue({ views: all, split: HashSet.empty() })
     expect(decisions).toHaveLength(2 + 30)
-    expect(A.map(A.take(decisions, 2), (entry) => entry.type)).toEqual(["group", "group"])
+    expect(A.map(A.take(decisions, 2), (entry) => entry._tag)).toEqual(["Group", "Group"])
     const split = queue({ views: all, split: HashSet.make("unit:length") })
     expect(split).toHaveLength(1 + 33)
   })
@@ -331,12 +332,12 @@ describe("the first screen and the confirm step", () => {
     })
     expect(
       A.map(
-        A.filter(lines, (line) => line.type === "kind"),
-        (line) => (line.type === "kind" ? `${line.kind.id} ${line.rowIds.length} ${line.collapsed}` : "")
+        A.filter(lines, (line) => line._tag === "Kind"),
+        (line) => (line._tag === "Kind" ? `${line.kind.id} ${line.rowIds.length} ${line.collapsed}` : "")
       )
     ).toEqual(["unit 12 false", "cost 9 true", "copy 8 true", "below 7 true", "name 6 true"])
-    expect(A.filter(lines, (line) => line.type === "row")).toHaveLength(12)
-    expect(A.filter(lines, (line) => line.type === "group")).toHaveLength(2)
+    expect(A.filter(lines, (line) => line._tag === "Row")).toHaveLength(12)
+    expect(A.filter(lines, (line) => line._tag === "Group")).toHaveLength(2)
   })
 
   it("a group accept leaves out the rows the person unticked", () => {
@@ -374,7 +375,7 @@ describe("the approved standards", () => {
       problemKinds,
       collapsed: () => false
     })
-    const safe = A.flatMap(lines, (line) => (line.type === "kind" ? line.safe : []))
+    const safe = A.flatMap(lines, (line) => (line._tag === "Kind" ? line.safe : []))
     expect(safe).toHaveLength(17)
     const taken = act({ rows, state: start, action: Action.Accept({ rowIds: safe }), recheck })
     expect(taken.label).toBe("17 fixes accepted")
@@ -565,18 +566,18 @@ describe("records with a parent: label, choices, rowAction, and undo across view
   it("rowAction: a row keeps its own answer, then typing (beside a fix), leaving the row out and the page's answer", () => {
     const at = (kind: string) => lineView(emptyState, lineOf(kind).id)
     expect(otherAnswers({ view: at("comma"), extra })).toEqual([
-      { type: "type" },
-      { type: "leaveOut", label: `Leave row ${lineOf("comma").line} out` },
-      { type: "action", label: "Leave job J-2045 out" }
+      OtherAnswer.Type(),
+      OtherAnswer.LeaveOut({ label: `Leave row ${lineOf("comma").line} out` }),
+      OtherAnswer.Extra({ label: "Leave job J-2045 out" })
     ])
     // A pick and a row with nothing proposed have no typing among the others: the first is chosen, the second typed.
-    expect(A.map(otherAnswers({ view: at("unit"), extra }) ?? [], (answer) => answer.type)).toEqual([
-      "leaveOut",
-      "action"
+    expect(A.map(otherAnswers({ view: at("unit"), extra }) ?? [], (answer) => answer._tag)).toEqual([
+      "LeaveOut",
+      "Extra"
     ])
-    expect(A.map(otherAnswers({ view: at("stock"), extra }) ?? [], (answer) => answer.type)).toEqual([
-      "leaveOut",
-      "action"
+    expect(A.map(otherAnswers({ view: at("stock"), extra }) ?? [], (answer) => answer._tag)).toEqual([
+      "LeaveOut",
+      "Extra"
     ])
     // Without the page's answer, and on a row that is ready, there is nothing more: "Leave out" as before.
     expect(otherAnswers({ view: at("comma"), extra: undefined })).toBeUndefined()

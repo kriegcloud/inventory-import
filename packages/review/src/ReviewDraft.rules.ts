@@ -16,12 +16,11 @@ import * as HashSet from "effect/HashSet"
 import * as MutableHashMap from "effect/MutableHashMap"
 import * as MutableHashSet from "effect/MutableHashSet"
 import * as O from "effect/Option"
+import { CellMark, Entry } from "@inventory/review/ReviewTypes"
 import type {
-  CellMark,
   DraftStep,
   Choice,
   Counts,
-  Entry,
   QueueEntry,
   FilterId,
   Fix,
@@ -211,14 +210,13 @@ function build(
     else {
       if (accepted.includes(fix.column)) took = true
       else auto = true
-      marks[fix.column] = {
-        state: "applied",
+      marks[fix.column] = CellMark.Applied({
         from: row.cells[fix.column] ?? "",
         to: fix.to,
         by: sourceOf(fix),
         fix,
         ...(accepted.includes(fix.column) ? { accepted: true } : {})
-      }
+      })
       cells[fix.column] = fix.to
     }
   }
@@ -229,14 +227,13 @@ function build(
     if (column !== undefined && Object.hasOwn(edits, column)) continue
     if (candidate.fix !== undefined && accepted.includes(candidate.fix.column)) {
       const fix = candidate.fix
-      marks[fix.column] = {
-        state: "applied",
+      marks[fix.column] = CellMark.Applied({
         from: row.cells[fix.column] ?? "",
         to: fix.to,
         by: sourceOf(fix),
         fix,
         accepted: true
-      }
+      })
       cells[fix.column] = fix.to
       took = true
       continue
@@ -251,7 +248,7 @@ function build(
   let typed = false
   for (const column of Object.keys(edits)) {
     const value = edits[column] ?? ""
-    marks[column] = { state: "applied", from: row.cells[column] ?? "", to: value, by: "you" }
+    marks[column] = CellMark.Applied({ from: row.cells[column] ?? "", to: value, by: "you" })
     cells[column] = value
     typed = true
   }
@@ -265,7 +262,7 @@ function build(
 
   if (problem?.fix !== undefined && !leftOutRow(decision)) {
     const fix = problem.fix
-    marks[fix.column] = { state: "proposed", from: cells[fix.column] ?? "", to: fix.to, by: sourceOf(fix), fix }
+    marks[fix.column] = CellMark.Proposed({ from: cells[fix.column] ?? "", to: fix.to, by: sourceOf(fix), fix })
   }
 
   // A problem nothing here can settle is counted apart from the ones the person can decide.
@@ -361,7 +358,7 @@ export function count(views: ReadonlyArray<RowView>): Counts {
     }
     for (const fix of view.row.applied ?? []) {
       const mark = view.marks[fix.column]
-      if (mark !== undefined && mark.state === "applied" && mark.by !== "you" && mark.accepted !== true) applied += 1
+      if (mark !== undefined && mark._tag === "Applied" && mark.by !== "you" && mark.accepted !== true) applied += 1
     }
   }
   return {
@@ -463,7 +460,7 @@ export function appliedGroups(views: ReadonlyArray<RowView>): ReadonlyArray<FixG
   for (const view of views) {
     for (const fix of view.row.applied ?? []) {
       const mark = view.marks[fix.column]
-      if (mark === undefined || mark.state !== "applied" || mark.by === "you") continue
+      if (mark === undefined || mark._tag !== "Applied" || mark.by === "you") continue
       const id = fix.group ?? `${fix.column}:${fix.to}`
       const group = O.getOrElse(MutableHashMap.get(found, id), (): Gathered => ({ fix, rowIds: [], froms: [] }))
       MutableHashMap.set(found, id, gather(group, view.row.id, mark.from, fix))
@@ -823,7 +820,7 @@ export function primary(input: {
   words?: ReviewWords | undefined
 }): Primary {
   const words = input.words ?? defaultReviewWords
-  const unmatched = input.columns.find((column) => column.match?.state === "unmatched")
+  const unmatched = input.columns.find((column) => column.match?._tag === "Unmatched")
   if (unmatched !== undefined) {
     return { label: `Match ${unmatched.label} to import`, blocked: true, columnId: unmatched.id }
   }
@@ -941,14 +938,14 @@ export function entries(input: {
   groups: ReadonlyArray<FixGroup>
   applied?: boolean
 }): ReadonlyArray<Entry> {
-  const rows = (views: ReadonlyArray<RowView>): ReadonlyArray<Entry> => views.map((view) => ({ type: "row", view }))
+  const rows = (views: ReadonlyArray<RowView>): ReadonlyArray<Entry> => views.map((view) => Entry.Row({ view }))
   if (input.groups.length === 0) return rows(input.list)
   const owner = MutableHashMap.empty<string, string>()
   for (const group of input.groups) for (const rowId of group.rowIds) MutableHashMap.set(owner, rowId, group.id)
   const ownerOf = (view: RowView): string | undefined => O.getOrUndefined(MutableHashMap.get(owner, view.row.id))
   const out: Array<Entry> = []
   for (const group of input.groups) {
-    out.push({ type: "group", group, applied: input.applied === true })
+    out.push(Entry.Group({ group, applied: input.applied === true }))
     out.push(...rows(input.list.filter((view) => ownerOf(view) === group.id)))
   }
   out.push(...rows(input.list.filter((view) => !MutableHashMap.has(owner, view.row.id))))
@@ -975,7 +972,7 @@ export function sections(input: {
     const safe = rows
       .filter((view) => view.problem?.fix !== undefined && (view.row.applied ?? []).includes(view.problem.fix))
       .map((view) => view.row.id)
-    out.push({ type: "kind", kind, rowIds: rows.map((view) => view.row.id), safe, collapsed })
+    out.push(Entry.Kind({ kind, rowIds: rows.map((view) => view.row.id), safe, collapsed }))
     if (collapsed) continue
     const lines = entries({ list: rows, groups })
     // The rows of no group come last. Straight after a group's rows they read as part of it ("1 row" over six),
@@ -983,7 +980,7 @@ export function sections(input: {
     const grouped = MutableHashSet.fromIterable(groups.flatMap((group) => group.rowIds))
     const loose = rows.filter((view) => !MutableHashSet.has(grouped, view.row.id)).length
     if (groups.length === 0 || loose === 0) out.push(...lines)
-    else out.push(...lines.slice(0, -loose), { type: "rest", count: loose }, ...lines.slice(-loose))
+    else out.push(...lines.slice(0, -loose), Entry.Rest({ count: loose }), ...lines.slice(-loose))
   }
   return out
 }
@@ -1001,16 +998,16 @@ export function queue(input: {
   if (input.blocked === true) {
     return input.views
       .filter((view) => view.status === "needs" && view.blocked === true)
-      .map((view): QueueEntry => ({ type: "row", view }))
+      .map((view): QueueEntry => Entry.Row({ view }))
   }
   const split = HashSet.fromIterable(input.split)
   const groups = waitingGroups({ views: input.views }).filter((group) => !HashSet.has(split, group.id))
   const covered = MutableHashSet.fromIterable(groups.flatMap((group) => group.rowIds))
   return [
-    ...groups.map((group): QueueEntry => ({ type: "group", group, applied: false })),
+    ...groups.map((group): QueueEntry => Entry.Group({ group, applied: false })),
     ...input.views
       .filter((view) => view.status === "needs" && view.blocked !== true && !MutableHashSet.has(covered, view.row.id))
-      .map((view): QueueEntry => ({ type: "row", view }))
+      .map((view): QueueEntry => Entry.Row({ view }))
   ]
 }
 
@@ -1043,7 +1040,7 @@ export function result(input: {
     if (view.status === "ready") {
       const changes: Array<ImportChange> = []
       for (const [column, mark] of Object.entries(view.marks)) {
-        if (mark.state !== "applied" || mark.from === mark.to) continue
+        if (mark._tag !== "Applied" || mark.from === mark.to) continue
         const person = mark.by === "you"
         changes.push({
           column,
@@ -1156,7 +1153,15 @@ export const groupUse = (input: { group: FixGroup; n: number; ticks: boolean }):
   `${input.group.mixed === true ? "Accept" : `Use ${input.group.label ?? valueWords(input.group, input.group.to)}`} ${input.ticks ? `for the ${input.n} ticked` : `for all ${input.n}`}`
 
 /** One entry of "Other answers": typing a value, leaving the row out, or the caller's own answer. */
-export type OtherAnswer = { type: "type" } | { type: "leaveOut"; label: string } | { type: "action"; label: string }
+export type OtherAnswer = Data.TaggedEnum<{
+  /** Type a value instead of taking the proposal. */
+  Type: {}
+  LeaveOut: { readonly label: string }
+  /** The caller's own answer for the row (`rowAction`). */
+  Extra: { readonly label: string }
+}>
+/** Builds and tells apart the entries of "Other answers". */
+export const OtherAnswer = Data.taggedEnum<OtherAnswer>()
 
 /**
  * What "Other answers" holds on a row that needs the person when the caller has an answer of its own for it
@@ -1173,11 +1178,11 @@ export function otherAnswers(input: {
   if (problem === undefined || extra === undefined) return undefined
   const subject = problem.column
   const proposed = subject === undefined ? undefined : view.marks[subject]
-  const typing = problem.choices === undefined && proposed?.state === "proposed"
+  const typing = problem.choices === undefined && proposed?._tag === "Proposed"
   return [
-    ...(typing ? [{ type: "type" } as const] : []),
-    { type: "leaveOut", label: `Leave row ${rowName(view.row)} out` },
-    { type: "action", label: extra.label }
+    ...(typing ? [OtherAnswer.Type()] : []),
+    OtherAnswer.LeaveOut({ label: `Leave row ${rowName(view.row)} out` }),
+    OtherAnswer.Extra({ label: extra.label })
   ]
 }
 

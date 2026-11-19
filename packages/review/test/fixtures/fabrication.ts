@@ -6,7 +6,15 @@
 import * as A from "effect/Array"
 import * as MutableHashMap from "effect/MutableHashMap"
 import * as O from "effect/Option"
-import type { Activity, Fix, Problem, ProblemKind, ReviewColumn, ReviewRow } from "@inventory/review/ReviewTypes"
+import {
+  type Activity,
+  ColumnMatch,
+  type Fix,
+  type Problem,
+  type ProblemKind,
+  type ReviewColumn,
+  type ReviewRow
+} from "@inventory/review/ReviewTypes"
 
 export const problemKinds: ReadonlyArray<ProblemKind> = [
   { id: "unit", label: "Unknown unit", tone: "decision", help: "The unit is not on your unit list." },
@@ -24,7 +32,7 @@ export const problemKinds: ReadonlyArray<ProblemKind> = [
 const units = ["pcs", "kg", "m", "L"] as const
 
 const matched = (source: string, samples: ReadonlyArray<string>, by: "name" | "model" = "name") =>
-  ({ state: "matched", source, by, samples }) as const
+  ColumnMatch.Matched({ source, by, samples })
 
 export const columns: ReadonlyArray<ReviewColumn> = [
   {
@@ -96,13 +104,12 @@ export const columnsUnmatched: ReadonlyArray<ReviewColumn> = columns.map((column
   column.id === "unit"
     ? {
         ...column,
-        match: {
-          state: "unmatched",
+        match: ColumnMatch.Unmatched({
           candidates: [
             { source: "UOM", samples: ["m", "PCS", "kg"] },
             { source: "Pack", samples: ["bundle", "box 100", "spool"] }
           ]
-        }
+        })
       }
     : column
 )

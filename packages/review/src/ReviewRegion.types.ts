@@ -3,6 +3,7 @@ import type { ReviewDecision } from "@inventory/review/ReviewDecision"
  * The data a review region shows. Everything here comes from the caller: the primitive holds no field names, status
  * words or rules of its own. Do not add one product's vocabulary to this file.
  */
+import * as Data from "effect/Data"
 import type * as HashMap from "effect/HashMap"
 import type * as O from "effect/Option"
 import type { ReactNode } from "react"
@@ -26,9 +27,14 @@ export type ProblemKind = {
 }
 
 /** How a column of ours was found in the file. `unmatched` blocks the import until the person picks a source. */
-export type ColumnMatch =
-  | { state: "matched"; source: string; by: "name" | "model"; samples: ReadonlyArray<string> }
-  | { state: "unmatched"; candidates: ReadonlyArray<{ source: string; samples: ReadonlyArray<string> }> }
+export type ColumnMatch = Data.TaggedEnum<{
+  Matched: { readonly source: string; readonly by: "name" | "model"; readonly samples: ReadonlyArray<string> }
+  Unmatched: {
+    readonly candidates: ReadonlyArray<{ readonly source: string; readonly samples: ReadonlyArray<string> }>
+  }
+}>
+/** Builds and tells apart how a column was found. */
+export const ColumnMatch = Data.taggedEnum<ColumnMatch>()
 
 /**
  * How a column takes its width. `fit`: as wide as its longest value and its header, measured from the loaded rows,
@@ -251,19 +257,21 @@ export type ReviewState = {
 /** `cannot`: the row's problem is of a kind nothing on this screen can settle (`ProblemKind.fixable: false`). */
 export type RowStatus = "needs" | "cannot" | "ready" | "out" | "stored"
 
-/** How one cell differs from the file. `proposed` waits for the person; `applied` is in force. */
-export type CellMark =
-  | { state: "proposed"; from: string; to: string; by: MarkSource; fix: Fix }
-  | {
-      state: "applied"
-      from: string
-      to: string
-      by: MarkSource | "you"
-      /** The fix this value came from, when it came from one. */
-      fix?: Fix
-      /** True when the person took the fix; absent when a rule applied it by itself. */
-      accepted?: boolean
-    }
+/** How one cell differs from the file. `Proposed` waits for the person; `Applied` is in force. */
+export type CellMark = Data.TaggedEnum<{
+  Proposed: { readonly from: string; readonly to: string; readonly by: MarkSource; readonly fix: Fix }
+  Applied: {
+    readonly from: string
+    readonly to: string
+    readonly by: MarkSource | "you"
+    /** The fix this value came from, when it came from one. */
+    readonly fix?: Fix
+    /** True when the person took the fix; absent when a rule applied it by itself. */
+    readonly accepted?: boolean
+  }
+}>
+/** Builds and tells apart a cell's mark. */
+export const CellMark = Data.taggedEnum<CellMark>()
 
 /** A row as it stands after the person's decisions: the values that would be imported and what is still open. */
 export type RowView = {
@@ -282,22 +290,24 @@ export type RowView = {
 }
 
 /** One line of the table or the phone queue: a heading for a problem kind, a group of identical fixes, or a row. */
-export type Entry =
-  | {
-      type: "kind"
-      kind: ProblemKind
-      rowIds: ReadonlyArray<string>
-      /** Rows whose open proposal is a rule's lossless fix: safe to take together. */
-      safe: ReadonlyArray<string>
-      collapsed: boolean
-    }
-  | { type: "group"; group: FixGroup; applied: boolean }
+export type Entry = Data.TaggedEnum<{
+  Kind: {
+    readonly kind: ProblemKind
+    readonly rowIds: ReadonlyArray<string>
+    /** Rows whose open proposal is a rule's lossless fix: safe to take together. */
+    readonly safe: ReadonlyArray<string>
+    readonly collapsed: boolean
+  }
+  Group: { readonly group: FixGroup; readonly applied: boolean }
   /** Where a kind's groups end: the rows after it belong to no group and are settled one at a time. */
-  | { type: "rest"; count: number }
-  | { type: "row"; view: RowView }
+  Rest: { readonly count: number }
+  Row: { readonly view: RowView }
+}>
+/** Builds and tells apart the lines of the table and the queue. */
+export const Entry = Data.taggedEnum<Entry>()
 
 /** A decision on a phone: a group or a row, never a heading. */
-export type QueueEntry = Exclude<Entry, { type: "kind" | "rest" }>
+export type QueueEntry = Exclude<Entry, { readonly _tag: "Kind" | "Rest" }>
 
 export type FilterId = "needs" | "cannot" | "ready" | "out" | "stored" | "auto" | "all"
 

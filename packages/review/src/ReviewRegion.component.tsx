@@ -488,9 +488,7 @@ export function ReviewRegion(props: ReviewRegionProps) {
           ? list.flatMap((view) => (view.problem?.column === undefined ? [] : [view.problem.column]))
           : filter === "auto"
             ? // The fixes made for the person are what this view is about: their cells stay in the row.
-              list.flatMap((view) =>
-                Object.keys(view.marks).filter((column) => view.marks[column]?.state === "applied")
-              )
+              list.flatMap((view) => Object.keys(view.marks).filter((column) => view.marks[column]?._tag === "Applied"))
             : []
       ),
     [filter, activeKind, list]
@@ -556,9 +554,9 @@ export function ReviewRegion(props: ReviewRegionProps) {
   // not the order the kind lists them in. So the stop carries the kind to unfold and its rows to choose among.
   const sequence: Array<Stop> = []
   for (const entry of lines) {
-    if (entry.type === "row") {
+    if (entry._tag === "Row") {
       if (entry.view.status === "needs") sequence.push({ rowId: entry.view.row.id })
-    } else if (entry.type === "kind" && entry.collapsed) {
+    } else if (entry._tag === "Kind" && entry.collapsed) {
       const first = entry.rowIds[0]
       if (first !== undefined) sequence.push({ rowId: first, kindId: entry.kind.id, among: entry.rowIds })
     }
@@ -952,7 +950,7 @@ export function ReviewRegion(props: ReviewRegionProps) {
 
   // Which columns show: the data table's own column toggle, on the review's one table instance. Which file column
   // fed each field is the Match step's to say: the button beside it goes there, amber while a field has no column.
-  const unmatched = columns.filter((column) => column.match?.state === "unmatched").length
+  const unmatched = columns.filter((column) => column.match?._tag === "Unmatched").length
   const matchButton =
     props.onShowMatching === undefined ? null : (
       <ToolButton

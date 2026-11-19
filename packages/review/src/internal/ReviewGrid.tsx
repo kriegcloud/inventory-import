@@ -14,6 +14,7 @@ import {
   useState
 } from "react"
 import { cn } from "cn"
+import * as Data from "effect/Data"
 import * as HashMap from "effect/HashMap"
 import * as HashSet from "effect/HashSet"
 import * as O from "effect/Option"
@@ -147,7 +148,7 @@ const nameOf = (view: RowView, first: ReviewColumn | undefined): string => {
 /** A column that could not be found in the file: the choice sits in its own header, where the values will appear. */
 function MatchSelect(props: { column: ReviewColumn; onMatch: (columnId: string, source: string) => void }) {
   const match = props.column.match
-  if (match === undefined || match.state !== "unmatched") return null
+  if (match === undefined || match._tag !== "Unmatched") return null
   return (
     <NativeSelect
       size="sm"
@@ -313,22 +314,22 @@ const measureNeeds = (input: {
       const mark = view.marks[column.id]
       if (mark === undefined || mark.from === mark.to || view.status === "out") continue
       const from = textWidth(spellingOf(shownWith(column, mark.from, view.cells)), { mono })
-      const guess = mark.state === "proposed" && choicesOf(mark.fix) !== undefined
+      const guess = mark._tag === "Proposed" && choicesOf(mark.fix) !== undefined
       // A mark that draws an icon: a model's sparkle, or the question mark of a suggestion nobody was named for.
       const icon = mark.by === "model" || mark.by === "unknown" ? sparkle : 0
       const to = shownWith(column, mark.to, view.cells)
       const chip = textWidth(to, { mono, medium: true }) + chipChrome + icon
       const value = guess
         ? from + 6 + icon + textWidth(`${to}?`, { mono })
-        : mark.state === "proposed" && mark.from.trim() === mark.to && to.length > longValue
+        : mark._tag === "Proposed" && mark.from.trim() === mark.to && to.length > longValue
           ? chip
           : from + arrowGap + chip
       // A proposal carries its "Why?" in the cell, except under a group heading, which says why for all its rows.
       // A question's rows (a `low` fix) keep their own "Why?" under its heading, as the row draws them.
       const banded =
-        input.banding && mark.state === "proposed" && mark.fix.group !== undefined && !guess && view.status === "needs"
+        input.banding && mark._tag === "Proposed" && mark.fix.group !== undefined && !guess && view.status === "needs"
       // A fix in force carries its "Why?" too, with the way to undo it.
-      const asks = mark.state === "proposed" ? !banded : mark.by !== "you" && mark.fix !== undefined
+      const asks = mark._tag === "Proposed" ? !banded : mark.by !== "you" && mark.fix !== undefined
       widest = Math.max(widest, value + (asks ? whyButton : 0))
     }
     const cell = index === 0 ? widest + firstChrome + (input.expandable ? expander : 0) : widest + cellChrome
@@ -354,15 +355,15 @@ export const actionsFit = (input: {
   rowAction: ReviewRegionProps["rowAction"]
 }): number => {
   if (input.readOnly) return actionsQuiet
-  if (!input.entries.some((entry) => entry.type !== "row" || entry.view.status === "needs")) return actionsQuiet
+  if (!input.entries.some((entry) => entry._tag !== "Row" || entry.view.status === "needs")) return actionsQuiet
   let widest = 0
   for (const entry of input.entries) {
-    if (entry.type !== "row" || entry.view.status !== "needs") continue
+    if (entry._tag !== "Row" || entry.view.status !== "needs") continue
     const problem = entry.view.problem
     const subject = problem?.column
     if (problem === undefined) continue
     const proposed = subject === undefined ? undefined : entry.view.marks[subject]
-    const fix = proposed !== undefined && proposed.state === "proposed" ? proposed.fix : undefined
+    const fix = proposed !== undefined && proposed._tag === "Proposed" ? proposed.fix : undefined
     const choices = fix === undefined ? undefined : choicesOf(fix)
     const label = input.columns.find((column) => column.id === subject)?.label ?? subject ?? ""
     const only = problem.choices?.length === 1 ? problem.choices[0] : undefined
@@ -430,7 +431,7 @@ const Row = memo(function Row(props: {
   const out = view.status === "out"
   const subject = shownProblem?.column
   const proposed = subject === undefined ? undefined : view.marks[subject]
-  const fix = proposed !== undefined && proposed.state === "proposed" ? proposed.fix : undefined
+  const fix = proposed !== undefined && proposed._tag === "Proposed" ? proposed.fix : undefined
   const choices = fix === undefined ? undefined : choicesOf(fix)
   // One status mark per row: the tag. Only a required cell with nothing in it is also tinted, because an empty cell
   // has no ink to point at; a bad value is red text, a proposal is its own mark.
@@ -513,7 +514,7 @@ const Row = memo(function Row(props: {
   // A fix already in force on a cell says why too, and can be taken out again from there.
   const whyApplied = (column: ReviewColumn): ReactNode => {
     const mark = view.marks[column.id]
-    if (props.readOnly || out || mark === undefined || mark.state !== "applied" || mark.by === "you") return null
+    if (props.readOnly || out || mark === undefined || mark._tag !== "Applied" || mark.by === "you") return null
     const made = mark.fix
     if (made === undefined || mark.from === mark.to) return null
     return (
@@ -930,7 +931,7 @@ const Row = memo(function Row(props: {
                   {(close) => (
                     <span className="flex flex-col gap-3">
                       {others.map((answer) =>
-                        answer.type === "type" ? (
+                        answer._tag === "Type" ? (
                           subject === undefined ? null : (
                             <EditForm
                               key="type"
@@ -945,12 +946,12 @@ const Row = memo(function Row(props: {
                           )
                         ) : (
                           <Button
-                            key={answer.type}
+                            key={answer._tag}
                             variant="outline"
                             size="sm"
                             onClick={() => {
                               close()
-                              if (answer.type === "leaveOut") actions.leaveOut(view.row.id)
+                              if (answer._tag === "LeaveOut") actions.leaveOut(view.row.id)
                               else extra.onSelect()
                             }}
                           >
@@ -995,7 +996,11 @@ const Row = memo(function Row(props: {
 })
 
 /** A line of the table: one of the region's entries, or the detail opened under a row. */
-type Line = Entry | { type: "detail"; view: RowView }
+/** A row's detail, drawn under it when the row is opened. */
+type Opened = Data.TaggedEnum<{ Detail: { readonly view: RowView } }>
+const Opened = Data.taggedEnum<Opened>()
+
+type Line = Entry | Opened
 
 /** 36 px rows, or 44 px with more air between them. */
 export type Density = "compact" | "comfortable"
@@ -1048,7 +1053,7 @@ function Detail(props: { view: RowView; columns: ReadonlyArray<ReviewColumn> }) 
  * The work list beside the table picks the kind, so the heading no longer folds.
  */
 function KindRow(props: {
-  entry: Extract<Entry, { type: "kind" }>
+  entry: Extract<Entry, { readonly _tag: "Kind" }>
   span: number
   index: number
   actions: GroupActions
@@ -1342,7 +1347,7 @@ export function ReviewGrid(props: {
   // -- Widths: each `fit` column as wide as its widest value, the `fill` columns share the rest; short of room the
   // lowest priority moves into the row's detail (an `under` column under the name), never cut. -----------------
   // Group headings are drawn in this view: a row under one has no "Why?" of its own.
-  const bands = banding && props.entries.some((entry) => entry.type === "group")
+  const bands = banding && props.entries.some((entry) => entry._tag === "Group")
   // Every row that needs the person or cannot be fixed here says why, in its own column after the name and status.
   const reasons = props.views.some((view) => view.status === "needs" || view.status === "cannot")
   const shownColumns = useMemo(
@@ -1399,8 +1404,8 @@ export function ReviewGrid(props: {
       folded.length === 0 || HashSet.size(expanded) === 0
         ? props.entries
         : props.entries.flatMap((entry): ReadonlyArray<Line> =>
-            entry.type === "row" && HashSet.has(expanded, entry.view.row.id)
-              ? [entry, { type: "detail", view: entry.view }]
+            entry._tag === "Row" && HashSet.has(expanded, entry.view.row.id)
+              ? [entry, Opened.Detail({ view: entry.view })]
               : [entry]
           ),
     [props.entries, folded.length, expanded]
@@ -1413,7 +1418,7 @@ export function ReviewGrid(props: {
     count: entries.length,
     getScrollElement: () => scroller.current,
     estimateSize: (index) =>
-      entries[index]?.type === "row" ? height : entries[index]?.type === "group" ? groupHeight : bandHeight,
+      entries[index]?._tag === "Row" ? height : entries[index]?._tag === "Group" ? groupHeight : bandHeight,
     overscan: 12
   })
   const latest = useRef(entries)
@@ -1422,7 +1427,7 @@ export function ReviewGrid(props: {
     props.handle,
     () => ({
       reveal: (rowId) => {
-        const index = latest.current.findIndex((entry) => entry.type === "row" && entry.view.row.id === rowId)
+        const index = latest.current.findIndex((entry) => entry._tag === "Row" && entry.view.row.id === rowId)
         if (index !== -1) virtual.scrollToIndex(index, { align: "auto" })
       },
       focus: () => scroller.current?.focus()
@@ -1431,8 +1436,8 @@ export function ReviewGrid(props: {
   )
 
   // Group headings change the sizes, and a new filter starts at its first line.
-  const shape = entries.map((entry) => (entry.type === "row" ? "" : entry.type === "detail" ? "d" : "g")).join("")
-  const firstKey = entries[0] === undefined ? "" : entries[0].type === "row" ? entries[0].view.row.id : entries[0].type
+  const shape = entries.map((entry) => (entry._tag === "Row" ? "" : entry._tag === "Detail" ? "d" : "g")).join("")
+  const firstKey = entries[0] === undefined ? "" : entries[0]._tag === "Row" ? entries[0].view.row.id : entries[0]._tag
   const seen = useRef({ firstKey, length: entries.length })
   useEffect(() => {
     virtual.measure()
@@ -1459,8 +1464,8 @@ export function ReviewGrid(props: {
       : entries
           .slice(range.startIndex, range.endIndex + 1)
           .find(
-            (entry): entry is Extract<Line, { type: "group" }> =>
-              entry.type === "group" && !entry.applied && choicesOf(entry.group) === undefined
+            (entry): entry is Extract<Line, { readonly _tag: "Group" }> =>
+              entry._tag === "Group" && !entry.applied && choicesOf(entry.group) === undefined
           )?.group.id
   const leading = lead !== undefined
   const { onLead } = props
@@ -1501,10 +1506,10 @@ export function ReviewGrid(props: {
                     align={column.align}
                     // A sortable heading is one control as large as its cell, so the cell keeps no padding of its own.
                     flush={
-                      sortable !== undefined && !(column.match?.state === "unmatched" && props.onMatch !== undefined)
+                      sortable !== undefined && !(column.match?._tag === "Unmatched" && props.onMatch !== undefined)
                     }
                   >
-                    {column.match?.state === "unmatched" && props.onMatch !== undefined ? (
+                    {column.match?._tag === "Unmatched" && props.onMatch !== undefined ? (
                       <MatchSelect column={column} onMatch={props.onMatch} />
                     ) : (
                       <span className={cn("flex min-w-0 items-center", column.align === "right" && "justify-end")}>
@@ -1563,7 +1568,7 @@ export function ReviewGrid(props: {
               {items.map((item) => {
                 const entry = entries[item.index]
                 if (entry === undefined) return null
-                if (entry.type === "detail") {
+                if (entry._tag === "Detail") {
                   return (
                     <StickyTableBand
                       key={`detail:${entry.view.row.id}`}
@@ -1577,7 +1582,7 @@ export function ReviewGrid(props: {
                     </StickyTableBand>
                   )
                 }
-                if (entry.type === "kind") {
+                if (entry._tag === "Kind") {
                   return (
                     <KindRow
                       key={`kind:${entry.kind.id}`}
@@ -1589,7 +1594,7 @@ export function ReviewGrid(props: {
                     />
                   )
                 }
-                if (entry.type === "rest") {
+                if (entry._tag === "Rest") {
                   return (
                     <StickyTableBand key={`rest:${item.index}`} span={span} aria-rowindex={item.index + 2}>
                       <span className="pl-6 text-sm text-muted-foreground">
@@ -1598,7 +1603,7 @@ export function ReviewGrid(props: {
                     </StickyTableBand>
                   )
                 }
-                if (entry.type === "group") {
+                if (entry._tag === "Group") {
                   return (
                     <GroupRow
                       key={`group:${entry.group.id}`}
@@ -1625,11 +1630,11 @@ export function ReviewGrid(props: {
                 let sought = true
                 for (let at = item.index - 1; at >= 0; at -= 1) {
                   const above = entries[at]
-                  if (above?.type === "group" && sought) {
+                  if (above?._tag === "Group" && sought) {
                     if (above.group.rowIds.includes(entry.view.row.id)) group = above.group
                     sought = false
                   }
-                  if (above?.type === "kind") {
+                  if (above?._tag === "Kind") {
                     sectioned = true
                     break
                   }

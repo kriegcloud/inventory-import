@@ -3,14 +3,15 @@
 // *given the decisions so far*, because the region re-checks a row only after the person types, not after they
 // accept a fix.
 import * as O from "effect/Option"
-import type {
-  Choice,
-  Fix,
-  Problem as RegionProblem,
-  ProblemKind,
-  ReviewColumn,
-  ReviewRow,
-  SavedDecisions as RegionDecisions
+import {
+  type Choice,
+  ColumnMatch as RegionMatch,
+  type Fix,
+  type Problem as RegionProblem,
+  type ProblemKind,
+  type ReviewColumn,
+  type ReviewRow,
+  type SavedDecisions as RegionDecisions
 } from "@inventory/review/ReviewTypes"
 import { fromFlags, toFlags } from "@inventory/review/ReviewDecision"
 import {
@@ -312,19 +313,17 @@ const itemColumns = (
       ...(O.isNone(column)
         ? missing
           ? {
-              match: {
-                state: "unmatched" as const,
+              match: RegionMatch.Unmatched({
                 candidates: unused.map((column) => ({ source: column.label, samples: samplesOf(table, column.index) }))
-              }
+              })
             }
           : {}
         : {
-            match: {
-              state: "matched" as const,
+            match: RegionMatch.Matched({
               source: column.value.header,
-              by: "name" as const,
+              by: "name",
               samples: column.value.examples
-            }
+            })
           })
     }
   })

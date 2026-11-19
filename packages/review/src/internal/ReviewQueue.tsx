@@ -114,7 +114,7 @@ function Decision(props: {
   )
   const columnOf = (id: string | undefined) => props.columns.find((column) => column.id === id)
 
-  if (entry.type === "group") {
+  if (entry._tag === "Group") {
     const { group } = entry
     const n = group.rowIds.filter((rowId) => !HashSet.has(props.excluded, rowId)).length
     const choices = choicesOf(group)
@@ -212,7 +212,7 @@ function Decision(props: {
   const problem = view.problem
   const subject = problem?.column
   const mark = subject === undefined ? undefined : view.marks[subject]
-  const fix = mark !== undefined && mark.state === "proposed" ? mark.fix : undefined
+  const fix = mark !== undefined && mark._tag === "Proposed" ? mark.fix : undefined
   const choices = fix === undefined ? undefined : choicesOf(fix)
   const rival = problem?.rivals?.[0] === undefined ? undefined : actions.peek(problem.rivals[0])
   const label = subject === undefined ? "" : O.getOrElse(HashMap.get(labels, subject), () => subject)
@@ -376,7 +376,7 @@ function Decision(props: {
           ) : (
             // The caller's own answer for the row: each answer in full words, as on a desk.
             others.map((answer) =>
-              answer.type === "type" ? (
+              answer._tag === "Type" ? (
                 subject === undefined ? null : (
                   <Overlay
                     key="type"
@@ -403,11 +403,11 @@ function Decision(props: {
                 )
               ) : (
                 <Button
-                  key={answer.type}
+                  key={answer._tag}
                   variant="outline"
                   size="touch"
-                  {...(main === null && answer.type === "leaveOut" ? first : {})}
-                  onClick={() => (answer.type === "leaveOut" ? actions.leaveOut(view.row.id) : extra.onSelect())}
+                  {...(main === null && answer._tag === "LeaveOut" ? first : {})}
+                  onClick={() => (answer._tag === "LeaveOut" ? actions.leaveOut(view.row.id) : extra.onSelect())}
                 >
                   {answer.label}
                 </Button>
@@ -463,7 +463,7 @@ export function ReviewQueue(props: {
   )
   const index = Math.min(at, Math.max(0, decisions.length - 1))
   const entry = decisions[index]
-  const key = entry === undefined ? "" : entry.type === "group" ? `g:${entry.group.id}` : entry.view.row.id
+  const key = entry === undefined ? "" : entry._tag === "Group" ? `g:${entry.group.id}` : entry.view.row.id
   const nameColumn = props.columns[0]
 
   // After a decision the next card takes its place, and focus goes to its first button.

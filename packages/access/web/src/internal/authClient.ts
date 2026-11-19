@@ -2,8 +2,8 @@ import { createAuthClient } from "better-auth/client"
 import { organizationClient } from "better-auth/client/plugins"
 
 // Loaded only when a person acts (signs in, signs up, switches organization, signs out): every import of this file
-// is `import("./auth-client.ts")`, so the first page does not carry Better Auth's client. Who is signed in comes from
-// the API's own session answer (`useActor` in ./actor.ts), fetched once, not from this client.
+// is a dynamic import, so the first page does not carry Better Auth's client. Who is signed in comes from
+// the API's own session answer (`useSession` in ../Session.controller.ts), fetched once, not from this client.
 
 /**
  * Better Auth's browser client: sign-up, sign-in, sign-out and organizations, at /api/auth on this origin. The session

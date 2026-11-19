@@ -16,7 +16,7 @@ const pageCode = (path: string, step: string | null): ReadonlyArray<() => Promis
     : path === "/activity"
       ? [() => import("@/pages/ActivityPage")]
       : path === "/people"
-        ? [() => import("@/pages/PeoplePage")]
+        ? [() => import("@inventory/access-web/People")]
         : step === "review"
           ? [() => import("@/pages/ImportPage"), () => import("@/pages/import/ReviewStep")]
           : step === "result"

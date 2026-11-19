@@ -13,8 +13,8 @@ from: explorations/ideal-architecture
 | --- | --- | --- |
 | 1 | Decisions recorded; SPEC and PLAN | done |
 | 2 | Boundaries check; `@inventory/client` | done |
-| 3 | access: shapes in place, then contract, model, host, web | doing |
-| 4 | catalog: shapes in place, then contract, model, host, web | todo |
+| 3 | access: shapes in place, then contract, model, host, web | done |
+| 4 | catalog: shapes in place, then contract, model, host, web | doing |
 | 5 | Closing note | todo |
 
 ## Current blocker
@@ -83,4 +83,26 @@ None.
     "155 items"; People: an unknown email said as "Nobody has signed up with nobody@example.test yet.", Sam added
     as editor, changed to viewer, Dana's demotion refused ("...is the only admin of Example Works (test)...") and put
     back, Sam removed (204); Events lists the three lines above the import's two.
+- **`access-web` (`packages/access/web`).** The session controller, sign-in, the People page and the audit trail's
+  events list move out of `src/web`.
+  - **The client seam took the brief's shape after all.** `@inventory/client` gains `ApiRuntime` (a React context
+    holding the app's runtime) and `useApi(tag)`; `access-web` declares `AccessClient` over
+    `HttpApiClient.Client<IdentityApi | PeopleApi | ActivityApi, ...>` and its screens call `useAccess()` and
+    `useAccessWrite(spec)`. The app provides `AccessClient` from its one client with no cast: the client type names
+    the errors of the two middlewares the assembled `Api` adds (`ProblemDetails`, `SameOrigin`).
+  - **`configureSession({ sessionPath, onSignedIn })`** is the one thing the app tells the controller: where it asks
+    for the session and what it starts for a signed-in member (its `preload`). The app's `lib/actor.ts` is that call
+    and `useActor = useSession`. `useMember` in `@inventory/client` waits for `catalog-web`, its first reader.
+  - **`@inventory/client/QueryClient`** holds the query client; each web package owns its keys (`accessKeys`), and
+    the app's `queryKeys` spreads them.
+  - **Dates** (`when`, `whenShort`, `day`) moved to `@inventory/ui/Dates`: both contexts' screens format them.
+  - **The Activity page** stays in the app and composes `useAuditEvents`, `AuditEvents` and its columns (A1).
+  - Ceilings: app 294, review 283, ui 52, client 22, access-web 17: sum 668, cap 678.
+  - Built: the stylesheet is the same 124.37 kB, the entry chunk 261.22 kB (261.25 before); the first download has
+    `Session.controller` (2.01 kB) and not `SessionState.read` (31.86 kB) or `authClient` (40.79 kB), which load when
+    needed, as before.
+  - Browser, fresh database: the same three numbers; signed out, made an account ("Sam Okafor", "Sam Works") on the
+    moved sign-in screen, signed in as Dana from the test accounts, and the People pass and Events read as after
+    `access-host`. Not read this time: Sam's own People list right after sign-up (the script read the placeholder
+    rows before the list arrived).
 

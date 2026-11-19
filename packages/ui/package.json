@@ -128,6 +128,7 @@
     "./AgentRun": "./src/AgentRun.component.tsx",
     "./Code": "./src/Code.component.tsx",
     "./ContentWidth": "./src/ContentWidth.hook.ts",
+    "./Dates": "./src/Dates.format.ts",
     "./Json": "./src/Json.codec.ts",
     "./ListTable": "./src/ListTable.component.tsx",
     "./NotSet": "./src/NotSet.component.tsx",

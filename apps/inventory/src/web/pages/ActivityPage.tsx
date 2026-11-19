@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query"
-import { DateTime } from "effect"
 import { useState } from "react"
 import { Code } from "@inventory/ui/Code"
 import { importAddress } from "@/lib/route"
@@ -11,16 +10,14 @@ import { TableSkeleton } from "@inventory/ui/Skeletons"
 import { Button } from "@inventory/ui/components/button"
 import { call } from "@/lib/api"
 import type { ChangeRecord } from "../../api/v1/Api.ts"
-import type { Activity } from "@inventory/kernel/Activity"
+import { AuditEvents, auditEventColumns, auditEventsCaption, useAuditEvents } from "@inventory/access-web/AuditEvents"
 import { fieldLabels } from "../../domain/ItemImport.ts"
-import { whenShort } from "@/lib/dates"
+import { whenShort } from "@inventory/ui/Dates"
 import { when } from "./import/format.tsx"
 import { sayError } from "@inventory/client/SayError"
 import { queryKeys } from "@/lib/queries"
 import { usePastImports } from "@/lib/imports"
 import { pastImportColumns } from "./import/pastImports.tsx"
-
-type Event = (typeof Activity.json)["Type"]
 
 const sourceWords = { rule: "Rule", model: "Model", person: "Person" } as const
 
@@ -125,31 +122,15 @@ const changeColumns: ReadonlyArray<ListColumn<ChangeRecord>> = [
   }
 ]
 
-const eventColumns: ReadonlyArray<ListColumn<Event>> = [
-  { id: "action", label: "What", width: 220, value: (event) => event.action, facet: true },
-  { id: "who", label: "Who", width: 200, value: (event) => event.actorName, facet: true },
-  { id: "detail", label: "Detail", value: (event) => event.detail, sortable: false, wrap: true },
-  // The same short form as the decisions' column, so the two lists on this page read alike.
-  {
-    id: "when",
-    label: "When",
-    width: 150,
-    cell: (event) => whenShort(DateTime.formatIso(event.createdAt)),
-    title: (event) => when(DateTime.formatIso(event.createdAt)),
-    value: (event) => DateTime.formatIso(event.createdAt),
-    searchable: false
-  }
-]
-
 /**
  * Who decided what. "Decisions" lists every value an import wrote that differs from the file: what it was, what
- * it became, who proposed it and who accepted or typed it. "Events" is the audit trail of uploads and imports.
+ * it became, who proposed it and who accepted or typed it. "Events" is the audit trail (the access screens' list, `@inventory/access-web/AuditEvents`).
  * "Imports" lists every confirmed import, a clean file's too, each a link back to its result.
  */
 export function ActivityPage() {
   const [chosen, setView] = useState<"decisions" | "events" | "imports">()
   const changes = useQuery({ queryKey: queryKeys.changes, queryFn: () => call((api) => api.imports.changes()) })
-  const events = useQuery({ queryKey: queryKeys.activity, queryFn: () => call((api) => api.activity.recent()) })
+  const events = useAuditEvents()
   const past = usePastImports()
   // Until the person chooses, the page opens on the list that has something in it: an empty "Decisions" beside
   // nine events read as "nothing has happened here".
@@ -189,8 +170,8 @@ export function ActivityPage() {
           <TableSkeleton caption="Imports that were confirmed" columns={pastImportColumns} />
         ) : (
           <TableSkeleton
-            caption={view === "decisions" ? "Values that imports changed, and who decided each" : "Uploads and imports"}
-            columns={view === "decisions" ? changeColumns : eventColumns}
+            caption={view === "decisions" ? "Values that imports changed, and who decided each" : auditEventsCaption}
+            columns={view === "decisions" ? changeColumns : auditEventColumns}
           />
         )
       ) : view === "imports" ? (
@@ -223,15 +204,7 @@ export function ActivityPage() {
           empty="No decisions yet. They appear here once an import with accepted or typed values is confirmed."
         />
       ) : (
-        <ListTable
-          key="events"
-          caption="Uploads and imports"
-          searchLabel="Search events"
-          columns={eventColumns}
-          rows={events.data ?? []}
-          rowKey={(event) => event.id}
-          empty="Nothing has happened yet."
-        />
+        <AuditEvents rows={events.data ?? []} />
       )}
     </div>
   )

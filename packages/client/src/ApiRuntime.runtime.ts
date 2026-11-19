@@ -4,6 +4,7 @@
 // file protects: a write is retried only for a failure that may pass, never for a refusal.
 import { Cause, Context, Effect, Exit, type Fiber, type ManagedRuntime, Schedule } from "effect"
 import { SecureRandom } from "effect/crypto"
+import { createContext, useContext, useMemo } from "react"
 import { RequestId } from "@inventory/kernel/Ids"
 import { isTransient } from "@inventory/client/SayError"
 
@@ -57,3 +58,22 @@ export const makeApi = <Id, Client, R>(
  * key if that request is retried. The server writes once per key, so a retry or a double submit adds nothing.
  */
 export const newRequestId = (): RequestId => RequestId.make(SecureRandom.uuidV4Unsafe())
+
+/**
+ * The app's one runtime, for the screens of a web package: the app provides it once, above everything that calls the
+ * API, and it must provide the client tag of every web package it mounts.
+ */
+export const ApiRuntime = createContext<ManagedRuntime.ManagedRuntime<never, never> | undefined>(undefined)
+
+/**
+ * The helpers for one client over the app's runtime, for a web package's screens: `const { call } = useApi(tag)`.
+ * That the runtime provides `tag` is the app's promise (it builds the runtime); it is not checked here.
+ */
+export const useApi = <Id, Client>(tag: Context.Key<Id, Client>): Api<Client> => {
+  const runtime = useContext(ApiRuntime)
+  if (runtime === undefined) throw new Error("ApiRuntime is not provided above this screen.")
+  return useMemo(
+    () => makeApi(runtime as unknown as ManagedRuntime.ManagedRuntime<Id, never>, tag as never),
+    [runtime, tag]
+  )
+}

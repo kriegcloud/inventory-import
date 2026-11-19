@@ -32,15 +32,14 @@ import {
 import { Field, FieldGroup, FieldLabel } from "@inventory/ui/components/field"
 import { Input } from "@inventory/ui/components/input"
 import { NativeSelect, NativeSelectOption } from "@inventory/ui/components/native-select"
-import { useActor } from "@/lib/actor"
-import { call, callWrite, useOptimisticWrite } from "@/lib/api"
 import { cacheChange } from "@inventory/client/Optimistic"
 import { AddPerson as AddPersonCommand, ChangeRole } from "@inventory/access-contract/PeopleCommand"
 import { Person } from "@inventory/access-contract/Person"
 import { hasRole, type Role } from "@inventory/kernel/Role"
-import { when } from "./import/format.tsx"
+import { when } from "@inventory/ui/Dates"
 import { sayError } from "@inventory/client/SayError"
-import { queryKeys } from "@/lib/queries"
+import { accessKeys, useAccess, useAccessWrite } from "./Access.runtime.ts"
+import { useSession } from "./Session.controller.ts"
 
 /** A person as the table shows them: with whether their role is being saved. */
 type PersonRow = Person & { readonly saving: boolean }
@@ -68,6 +67,7 @@ function AddPerson(props: { onAdded: () => void }) {
   const [open, setOpen] = useState(false)
   const [email, setEmail] = useState("")
   const [role, setRole] = useState<Role>("editor")
+  const { callWrite } = useAccess()
   const add = useMutation({
     mutationFn: () =>
       callWrite((api) =>
@@ -157,17 +157,18 @@ function AddPerson(props: { onAdded: () => void }) {
 /** Who is in the organization and with what role. An admin adds people, changes roles and removes members here. */
 export function PeoplePage() {
   const queryClient = useQueryClient()
-  const { actor } = useActor()
+  const { actor } = useSession()
+  const { call } = useAccess()
   const admin = actor !== undefined && hasRole(actor.role, "admin")
-  const people = useQuery({ queryKey: queryKeys.people, queryFn: () => call((api) => api.people.list()) })
+  const people = useQuery({ queryKey: accessKeys.people, queryFn: () => call((api) => api.people.list()) })
   // Every change to a membership writes an audit line beside it.
   const refresh = () => {
-    void queryClient.invalidateQueries({ queryKey: queryKeys.people })
-    void queryClient.invalidateQueries({ queryKey: queryKeys.activity })
+    void queryClient.invalidateQueries({ queryKey: accessKeys.people })
+    void queryClient.invalidateQueries({ queryKey: accessKeys.activity })
   }
   // A role change and a removal show at once and are put back, with the reason, if the server refuses (the last
   // admin of an organization cannot become a viewer or go). Each writes an audit line, so the activity is fetched too.
-  const setRole = useOptimisticWrite({
+  const setRole = useAccessWrite({
     name: "people",
     write: (client, input: { person: Person; role: Role }) =>
       client.people.setRole({
@@ -176,7 +177,7 @@ export function PeoplePage() {
       }),
     changes: (input) => [
       cacheChange<ReadonlyArray<Person>, { person: Person; role: Role }>({
-        key: queryKeys.people,
+        key: accessKeys.people,
         apply: (list) =>
           list.map((entry) =>
             entry.memberId === input.person.memberId ? Person.make({ ...entry, role: input.role }) : entry
@@ -188,14 +189,14 @@ export function PeoplePage() {
       })
     ],
     failed: (input) => `${input.person.name}'s role was not changed.`,
-    settled: () => [queryKeys.activity]
+    settled: () => [accessKeys.activity]
   })
-  const remove = useOptimisticWrite({
+  const remove = useAccessWrite({
     name: "people",
     write: (client, person: Person) => client.people.remove({ params: { memberId: person.memberId } }),
     changes: (person) => [
       cacheChange<ReadonlyArray<Person>, Person>({
-        key: queryKeys.people,
+        key: accessKeys.people,
         apply: (list) => list.filter((entry) => entry.memberId !== person.memberId),
         // Back in the place they had, unless the list fetched meanwhile already has them.
         undo: (now, before) => {
@@ -206,7 +207,7 @@ export function PeoplePage() {
       })
     ],
     failed: (person) => `${person.name} was not removed.`,
-    settled: () => [queryKeys.activity]
+    settled: () => [accessKeys.activity]
   })
   // Each row says whether its role is on its way to the server. Carried in the row itself: the table redraws a row
   // when its data changes, and the list the server sends back after a change can be the very object shown before.

@@ -40,60 +40,72 @@ type Written = {
 }
 
 /**
- * One optimistic write. `changes` says what the screen shows at once; `failed` is the sentence put before the
+ * What one optimistic write is. `changes` says what the screen shows at once; `failed` is the sentence put before the
  * reason when the server refuses ("Your line was not recorded."); `retry` offers the person's own input again
  * instead of making them repeat it; `settled` names what else to fetch once the server has answered. `onRefused`
- * handles a refusal the screen says in its own place (it returns true, and no toast is shown). Bound once to a
- * client's `callWrite`; what it returns is the hook a screen calls.
+ * handles a refusal the screen says in its own place (it returns true, and no toast is shown). */
+export interface OptimisticWrite<Client, Input, A, E> {
+  /** The writes of one kind, so the cache is fetched again only when the last of them has answered. */
+  readonly name: string
+  readonly write: (client: Client, input: Input) => Effect.Effect<A, E>
+  readonly changes: (input: Input) => ReadonlyArray<CacheChange<Input>>
+  readonly failed: (input: Input) => string
+  readonly retry?: (input: Input) => { readonly label: string; readonly onClick: () => void } | undefined
+  readonly settled?: (input: Input) => ReadonlyArray<QueryKey>
+  readonly onAnswer?: (answer: A, input: Input) => void
+  readonly onRefused?: (error: unknown, input: Input) => boolean
+}
+
+/**
+ * One optimistic write through a client's `callWrite`: the hook itself, for a screen that gets its client from
+ * `useApi`. `makeOptimisticWrite` binds it to one `callWrite` once.
  */
-export const makeOptimisticWrite = <Client>(callWrite: Call<Client>) =>
-  function useOptimisticWrite<Input, A, E>(spec: {
-    /** The writes of one kind, so the cache is fetched again only when the last of them has answered. */
-    readonly name: string
-    readonly write: (client: Client, input: Input) => Effect.Effect<A, E>
-    readonly changes: (input: Input) => ReadonlyArray<CacheChange<Input>>
-    readonly failed: (input: Input) => string
-    readonly retry?: (input: Input) => { readonly label: string; readonly onClick: () => void } | undefined
-    readonly settled?: (input: Input) => ReadonlyArray<QueryKey>
-    readonly onAnswer?: (answer: A, input: Input) => void
-    readonly onRefused?: (error: unknown, input: Input) => boolean
-  }) {
-    const queryClient = useQueryClient()
-    return useMutation({
-      mutationKey: [spec.name],
-      mutationFn: (input: Input) => callWrite((client) => spec.write(client, input)),
-      onMutate: (input): Promise<{ readonly written: ReadonlyArray<Written> }> => {
-        const changes = spec.changes(input)
-        // A list request already on its way would land on top of the change and undo it on screen: stop it first.
-        return Promise.all(changes.map((change) => queryClient.cancelQueries({ queryKey: change.key }))).then(() => {
-          const written: Array<Written> = []
-          for (const change of changes) {
-            for (const [key, before] of queryClient.getQueriesData({ queryKey: change.key })) {
-              if (before === undefined) continue
-              const after = change.apply(before, input)
-              queryClient.setQueryData(key, after)
-              written.push({ key, before, written: after, undo: (now, was) => change.undo(now, was, input) })
-            }
+export function useOptimisticWriteVia<Client, Input, A, E>(
+  write: OptimisticWrite<Client, Input, A, E> & { readonly callWrite: Call<Client> }
+) {
+  const { callWrite, ...spec } = write
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationKey: [spec.name],
+    mutationFn: (input: Input) => callWrite((client) => spec.write(client, input)),
+    onMutate: (input): Promise<{ readonly written: ReadonlyArray<Written> }> => {
+      const changes = spec.changes(input)
+      // A list request already on its way would land on top of the change and undo it on screen: stop it first.
+      return Promise.all(changes.map((change) => queryClient.cancelQueries({ queryKey: change.key }))).then(() => {
+        const written: Array<Written> = []
+        for (const change of changes) {
+          for (const [key, before] of queryClient.getQueriesData({ queryKey: change.key })) {
+            if (before === undefined) continue
+            const after = change.apply(before, input)
+            queryClient.setQueryData(key, after)
+            written.push({ key, before, written: after, undo: (now, was) => change.undo(now, was, input) })
           }
-          return { written }
-        })
-      },
-      onError: (error, input, context) => {
-        for (const entry of context?.written ?? []) {
-          const now = queryClient.getQueryData(entry.key)
-          queryClient.setQueryData(entry.key, rollback({ ...entry, now }))
         }
-        if (spec.onRefused?.(error, input) === true) return
-        const retry = spec.retry?.(input)
-        toastError(error, { lead: spec.failed(input), ...(retry === undefined ? {} : { action: retry }) })
-      },
-      onSuccess: (answer, input) => spec.onAnswer?.(answer, input),
-      // Fetched again only once the last write of this kind has answered: a list fetched while another is still on its
-      // way would show the server's state before that one, and the screen would jump back and forth.
-      onSettled: (_answer, _error, input) => {
-        if (queryClient.isMutating({ mutationKey: [spec.name] }) > 1) return
-        const keys = [...spec.changes(input).map((change) => change.key), ...(spec.settled?.(input) ?? [])]
-        for (const key of keys) void queryClient.invalidateQueries({ queryKey: key })
+        return { written }
+      })
+    },
+    onError: (error, input, context) => {
+      for (const entry of context?.written ?? []) {
+        const now = queryClient.getQueryData(entry.key)
+        queryClient.setQueryData(entry.key, rollback({ ...entry, now }))
       }
-    })
+      if (spec.onRefused?.(error, input) === true) return
+      const retry = spec.retry?.(input)
+      toastError(error, { lead: spec.failed(input), ...(retry === undefined ? {} : { action: retry }) })
+    },
+    onSuccess: (answer, input) => spec.onAnswer?.(answer, input),
+    // Fetched again only once the last write of this kind has answered: a list fetched while another is still on its
+    // way would show the server's state before that one, and the screen would jump back and forth.
+    onSettled: (_answer, _error, input) => {
+      if (queryClient.isMutating({ mutationKey: [spec.name] }) > 1) return
+      const keys = [...spec.changes(input).map((change) => change.key), ...(spec.settled?.(input) ?? [])]
+      for (const key of keys) void queryClient.invalidateQueries({ queryKey: key })
+    }
+  })
+}
+
+/** The hook bound to one client's `callWrite`: what an app with a single client exports as `useOptimisticWrite`. */
+export const makeOptimisticWrite = <Client>(callWrite: Call<Client>) =>
+  function useOptimisticWrite<Input, A, E>(spec: OptimisticWrite<Client, Input, A, E>) {
+    return useOptimisticWriteVia({ ...spec, callWrite })
   }

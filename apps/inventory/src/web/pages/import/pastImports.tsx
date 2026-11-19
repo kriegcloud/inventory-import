@@ -3,7 +3,7 @@
 // The one thing not to break: the count of items is the server's, read from the stored items, never the confirm's.
 import { StatusPill, type Tone } from "@inventory/ui/StatusPill"
 import type { ListColumn } from "@inventory/ui/ListTable"
-import { whenShort } from "@/lib/dates"
+import { whenShort } from "@inventory/ui/Dates"
 import { importAddress } from "@/lib/route"
 import type { PastImport } from "../../../api/v1/Api.ts"
 import { when } from "./format.tsx"

@@ -1,0 +1,48 @@
+{
+  "name": "@inventory/access-web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The screens of who may do what: the session as the browser knows it, sign-in, the People page and the audit trail's events",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": [],
+  "exports": {
+    "./package.json": "./package.json",
+    "./Access": "./src/Access.runtime.ts",
+    "./Session": "./src/Session.controller.ts",
+    "./SignIn": "./src/SignIn.screen.tsx",
+    "./People": "./src/People.screen.tsx",
+    "./AuditEvents": "./src/AuditEvents.screen.tsx"
+  },
+  "scripts": {
+    "check": "tsrs -p tsconfig.json && node ../../../scripts/check-strict.mjs strict-ceiling.json",
+    "lint": "oxlint --quiet src; lint=$?; oxlint --disable-nested-config --deny-warnings -c ../../../.oxlintrc.shadcn.json src && exit $lint"
+  },
+  "dependencies": {
+    "@beep/identity": "workspace:*",
+    "@inventory/access-contract": "workspace:*",
+    "@inventory/client": "workspace:*",
+    "@inventory/kernel": "workspace:*",
+    "@inventory/ui": "workspace:*",
+    "@tanstack/react-query": "^5.107.1",
+    "better-auth": "1.7.22",
+    "effect": "4.1.4",
+    "sonner": "^2.0.8"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "oxlint": "1.93.0",
+    "tsrs": "0.25.0-ts7.1.0-beta",
+    "typescript": "~7.0.2"
+  },
+  "peerDependencies": {
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "beep": {
+    "family": "context",
+    "context": "access",
+    "layer": "web"
+  }
+}

@@ -41,7 +41,7 @@ export function OutcomePill(props: { outcome: keyof typeof outcomeTone }) {
 
 // The date helpers live in their own module so the upload screen can show a date without loading the table code
 // this file brings in.
-export { day, when } from "@/lib/dates"
+export { day, when } from "@inventory/ui/Dates"
 
 /**
  * A column of the file no field of an item reads, said the same on every step: it is not imported, and how many rows

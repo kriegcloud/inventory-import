@@ -7,6 +7,7 @@ import { appRuntime } from "@/lib/api"
 import { modelSentences } from "@/lib/answeredBy"
 import { queryClient } from "@/lib/queries"
 import { startTelemetry } from "@/lib/telemetry"
+import { ApiRuntime } from "@inventory/client/ApiRuntime"
 import { installTroubleSentences } from "@inventory/client/SayError"
 import { ThemeProvider } from "@inventory/ui/Theme"
 import App from "./App.tsx"
@@ -28,12 +29,15 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
-        <TooltipProvider delayDuration={300}>
-          <App />
-          {/* Top centre, under the bar: between a page's title and its buttons, so a message never covers the table's
+        {/* The one runtime every web package's screens call the API on. */}
+        <ApiRuntime.Provider value={appRuntime as never}>
+          <TooltipProvider delayDuration={300}>
+            <App />
+            {/* Top centre, under the bar: between a page's title and its buttons, so a message never covers the table's
               page controls or a confirm button. */}
-          <Toaster position="top-center" offset={64} richColors closeButton />
-        </TooltipProvider>
+            <Toaster position="top-center" offset={64} richColors closeButton />
+          </TooltipProvider>
+        </ApiRuntime.Provider>
       </QueryClientProvider>
     </ThemeProvider>
   </StrictMode>

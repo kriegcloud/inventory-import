@@ -1,0 +1,6 @@
+{
+  // The access screens' lint: the shared rules for code with screens.
+  "$schema": "../../../node_modules/@effect/tsgo/oxlint-schema.json",
+  "extends": ["../../../.oxlintrc.web.json"],
+  "ignorePatterns": ["dist/**"]
+}

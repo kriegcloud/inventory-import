@@ -3,15 +3,15 @@ import { type ReactNode, useEffect, useState } from "react"
 import { Alert, AlertDescription, AlertTitle } from "@inventory/ui/components/alert"
 import { Button } from "@inventory/ui/components/button"
 import { Skeleton } from "@inventory/ui/components/skeleton"
-import { signedOutHere, useActor } from "@/lib/actor"
+import { signedOutHere, signInWithPassword, useActor } from "@/lib/actor"
 import { sayError } from "@inventory/client/SayError"
-import { CreateOrganization, SignIn } from "@/pages/SignIn"
+import { CreateOrganization, SignIn } from "@inventory/access-web/SignIn"
 import { AppShell } from "./AppShell.tsx"
 
 // The sign-in page is drawn with the first paint for a browser that was not signed in last time, without waiting for
 // the session answer: Lighthouse on a phone measured mobile Performance at 76 for a sign-in page drawn only once that
 // answer (or its own chunk) had arrived, and at 97 drawn at once. Better Auth's browser client is what stays out of
-// the first page (`import()` in @/lib/actor and the page).
+// the first page (`import()` in the session controller and the page, @inventory/access-web).
 //
 // IN DEVELOPMENT the app opens signed in: when the dev server's session answer offers test accounts (TEST_ACCOUNTS,
 // on in development, off in production) and nobody is signed in, the first test account signs in on its own, with
@@ -34,8 +34,7 @@ function useDevelopmentSignIn(): "idle" | "signing-in" | "failed" {
   useEffect(() => {
     if (!wanted || state !== "idle" || first === undefined || password === undefined) return
     setState("signing-in")
-    void import("@/lib/auth-client")
-      .then(({ authClient, orThrow }) => authClient.signIn.email({ email: first.email, password }).then(orThrow))
+    void signInWithPassword({ email: first.email, password })
       .then(() => refresh())
       .catch((error: unknown) => {
         // The sign-in page is drawn instead, with the test accounts on it; the reason is for whoever is debugging.

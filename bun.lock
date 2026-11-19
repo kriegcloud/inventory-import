@@ -34,6 +34,7 @@
         "@hookform/resolvers": "^7.0.6",
         "@inventory/access-contract": "workspace:*",
         "@inventory/access-host": "workspace:*",
+        "@inventory/access-web": "workspace:*",
         "@inventory/client": "workspace:*",
         "@inventory/kernel": "workspace:*",
         "@inventory/review": "workspace:*",
@@ -137,6 +138,32 @@
         "@effect/vitest": "4.1.4",
         "@types/node": "^24.19.2",
         "vitest": "^5.1.0",
+      },
+    },
+    "packages/access/web": {
+      "name": "@inventory/access-web",
+      "version": "0.0.0",
+      "dependencies": {
+        "@beep/identity": "workspace:*",
+        "@inventory/access-contract": "workspace:*",
+        "@inventory/client": "workspace:*",
+        "@inventory/kernel": "workspace:*",
+        "@inventory/ui": "workspace:*",
+        "@tanstack/react-query": "^5.107.1",
+        "better-auth": "1.7.22",
+        "effect": "4.1.4",
+        "sonner": "^2.0.8",
+      },
+      "devDependencies": {
+        "@types/react": "^19.3.0",
+        "@types/react-dom": "^19.3.0",
+        "oxlint": "1.93.0",
+        "tsrs": "0.25.0-ts7.1.0-beta",
+        "typescript": "~7.0.2",
+      },
+      "peerDependencies": {
+        "react": "^19.3.1",
+        "react-dom": "^19.3.1",
       },
     },
     "packages/client": {
@@ -612,6 +639,8 @@
     "@inventory/access-host": ["@inventory/access-host@workspace:packages/access/host"],
 
     "@inventory/access-model": ["@inventory/access-model@workspace:packages/access/model"],
+
+    "@inventory/access-web": ["@inventory/access-web@workspace:packages/access/web"],
 
     "@inventory/app": ["@inventory/app@workspace:apps/inventory"],
 

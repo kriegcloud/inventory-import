@@ -4,6 +4,7 @@ import { HttpApiClient } from "effect/http-api"
 import { Api } from "../../api/v1/Api.ts"
 import { devToolsLayer } from "./devtools.ts"
 import { takeEarly } from "@inventory/client/Early"
+import { AccessClient } from "@inventory/access-web/Access"
 import { makeApi } from "@inventory/client/ApiRuntime"
 import { makeOptimisticWrite } from "@inventory/client/Optimistic"
 import { browserTelemetry } from "./telemetry.ts"
@@ -44,7 +45,11 @@ class ApiClient extends Context.Service<ApiClient, Client>()("@inventory/app/web
  * so DevTools has one connection and a Cancel anywhere interrupts the fiber it started.
  */
 export const appRuntime = ManagedRuntime.make(
-  Layer.mergeAll(ApiClient.layer, devToolsLayer).pipe(Layer.provideMerge(browserTelemetry))
+  Layer.mergeAll(
+    // The access screens' client is this one client, seen through the three groups they may call.
+    Layer.effect(AccessClient, Effect.service(ApiClient)).pipe(Layer.provideMerge(ApiClient.layer)),
+    devToolsLayer
+  ).pipe(Layer.provideMerge(browserTelemetry))
 )
 
 const api = makeApi(appRuntime, ApiClient)

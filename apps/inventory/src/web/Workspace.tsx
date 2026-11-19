@@ -32,7 +32,7 @@ if (window.location.pathname === "/") {
 }
 const ItemsPage = lazy(() => import("@/pages/ItemsPage").then((module) => ({ default: module.ItemsPage })))
 const ActivityPage = lazy(() => import("@/pages/ActivityPage").then((module) => ({ default: module.ActivityPage })))
-const PeoplePage = lazy(() => import("@/pages/PeoplePage").then((module) => ({ default: module.PeoplePage })))
+const PeoplePage = lazy(() => import("@inventory/access-web/People").then((module) => ({ default: module.PeoplePage })))
 
 const peoplePath = "/people"
 

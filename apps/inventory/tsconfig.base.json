@@ -68,7 +68,9 @@
               "../../packages/review/test/fixtures/**/*.ts",
               "../../packages/review/src/**/*.ts",
               "../../packages/review/src/**/*.tsx",
-              "../../packages/client/src/**/*.ts"
+              "../../packages/client/src/**/*.ts",
+              "../../packages/access/web/src/**/*.ts",
+              "../../packages/access/web/src/**/*.tsx"
             ],
             "options": {
               "diagnosticSeverity": {

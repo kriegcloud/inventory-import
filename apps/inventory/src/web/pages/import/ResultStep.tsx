@@ -18,7 +18,7 @@ import {
 import { Button } from "@inventory/ui/components/button"
 import { type RecordColumn, RecordsTable } from "@inventory/ui/components/data-table/data-table-records"
 import { call } from "@/lib/api"
-import { whenShort } from "@/lib/dates"
+import { whenShort } from "@inventory/ui/Dates"
 import { useImportCache } from "@/lib/imports"
 import { navigate } from "@inventory/ui/Route"
 import { importAddress } from "@/lib/route"

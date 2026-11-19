@@ -19,10 +19,10 @@ const dayTime = new Intl.DateTimeFormat(undefined, {
 })
 
 /** A date and time for a table column: the year is left out while it is this year ("Nov 14, 5:28 AM"). */
-export const whenShort = (iso: string): string => {
-  const parsed = DateTime.make(iso)
+export const whenShort = (at: string | DateTime.Utc): string => {
+  const parsed = DateTime.make(at)
   const date = Option.isSome(parsed) ? DateTime.toDateUtc(parsed.value) : undefined
-  if (date === undefined) return iso
+  if (date === undefined) return String(at)
   return (date.getFullYear() === DateTime.toDateUtc(DateTime.nowUnsafe()).getFullYear() ? dayTime : dateTime).format(
     date
   )

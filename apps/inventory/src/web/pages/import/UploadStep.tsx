@@ -20,7 +20,7 @@ import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@inv
 import { FileUpload, FileUploadDropzone } from "@inventory/ui/components/file-upload"
 import { Progress } from "@inventory/ui/components/progress"
 import { useActor } from "@/lib/actor"
-import { when, whenShort } from "@/lib/dates"
+import { when, whenShort } from "@inventory/ui/Dates"
 import { useImportCache, useOpenImports, usePastImports, useRemoveImport } from "@/lib/imports"
 import { ListTable } from "@inventory/ui/ListTable"
 import { pastImportColumnsShort } from "./pastImports.tsx"

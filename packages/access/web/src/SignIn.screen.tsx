@@ -10,11 +10,11 @@ import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@inv
 import { Spinner } from "@inventory/ui/components/spinner"
 import type { SignInFeatures, TestAccount } from "@inventory/access-contract/SessionState"
 
-// The sign-in page, drawn with the first paint (components/app/SignedIn.tsx says why). Better Auth's client is loaded
+// The sign-in page, drawn with the first paint (the app's sign-in gate says why). Better Auth's client is loaded
 // only when a person reaches for the page or presses, so the first page of the app does not carry it.
 
 /** Better Auth's browser client, fetched when it is first needed. Asking again returns the same module. */
-const authClient = () => import("@/lib/auth-client")
+const authClient = () => import("./internal/authClient.ts")
 
 /** A slug the organization plugin requires: the name in lowercase words, plus a short suffix so two names can match. */
 const slugFor = (name: string) =>

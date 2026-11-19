@@ -114,4 +114,30 @@ None.
   "Nov 18, 9:10 PM" (title "Nov 18, 2026, 9:10 PM"); Imports "Nov 18, 9:10 PM"; the result "Dana Whitfield · Nov
   18, 2026, 9:10 PM"; "Imported before" on the first screen. Not seen on screen: the Items table's created cell
   (the column is not shown by default).
+- **catalog (b), `Option` for absence.** An item's `description`, `reorderPoint`, `firstReceivedOn`, `dimensions` and
+  a vendor's `vendorSku` and `leadTimeDays`; the staged head's `sheet`; `ImportView.result`; `ChangedItem.changedBy`;
+  the facets' `min` and `max`; the match command's `column`. The wire and the stored rows keep `null`. Every
+  `?? ""` that reached the wire is gone: a result is said once the confirm's name and moment are stored, a take-back
+  event once its name and moment are. `discontinuedOn` waits for (c), and the fields of `RowOutcome`, `ColumnMatch`,
+  `Suggestion`, `Change` and the assistant's answers for their own steps.
+  - **`nullAsNone` in `@inventory/kernel/Wire`.** A key annotation on `S.OptionFromNullOr` reaches the decoder but
+    not the OpenAPI document, and `Security.test.ts` reads a field's sentence from the document. `nullAsNone({
+    description, messageMissingKey? })`, last in a field's pipe, puts the words on both sides. The access contract's
+    three optional fields use it too, so their sentences are in the document again (PLAN said they were not).
+  - **The instant's wire side is named** (`Instant` in the kernel): inside a `S.Result` the document is written from
+    the wire side alone, and five schemas that hold an instant came out as second copies that differed.
+  - **`Document.ts` folds identical copies to a fixpoint**, compared by shape whatever the key order: a copy that
+    points at another copy is identical only once that one is folded. 87 components, none numbered, none with a
+    path; `Security.test.ts` now asserts it.
+  - **An `Option` does not survive the copy between threads.** The reader worker posted the staged head with
+    `sheet` as an `Option`; the page then could not encode it, and every upload ended "The file was not saved". No
+    test saw it (the tests stage in one thread); the browser import did. The head now crosses as plain fields
+    (`PlainHead` in `lib/upload/protocol.ts`) and the page makes the `Option` again.
+  - **`=== null` on an `Option` type-checks and is always false.** Thirteen such comparisons in the Items page and
+    the editor were found by reading, not by the compiler; `Items.same` compared optional values by identity and
+    now uses `Equal.equals`.
+  - Read on screen, fresh database: the three numbers; Items "Reorder point" cells "Not set" and "312 EA", "First
+    received" "Not set" and "2024-09-11"; the editor's Dimensions "69 × 27.3 × 45.4 cm"; typed 40 in Reorder point
+    and cleared Description, Save: "Saved AAT-7076", the request sent `"description":null,"reorderPoint":40`, and
+    the row reads "40 BX" after a reload; saving the same values again answered 200.
 

@@ -55,7 +55,13 @@ export type Sentence = typeof Sentence.Type
  * @category schemas
  */
 export const Instant = S.DateTimeUtcFromString.pipe(
-  $I.annoteSchema("Instant", { description: "A moment the server recorded, as an ISO 8601 instant in UTC" })
+  $I.annoteSchema("Instant", { description: "A moment the server recorded, as an ISO 8601 instant in UTC" }),
+  // The wire side named too: inside a `S.Result` the document is written from the wire side alone, and an unnamed
+  // one would be a second, different copy of every schema that holds an instant.
+  S.annotateEncoded({
+    identifier: $I.make("Instant"),
+    description: "A moment the server recorded, as an ISO 8601 instant in UTC"
+  })
 )
 
 /**

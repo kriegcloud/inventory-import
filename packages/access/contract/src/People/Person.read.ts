@@ -6,6 +6,7 @@
 import { MemberId } from "@inventory/kernel/Ids"
 import { Role } from "@inventory/kernel/Role"
 import { DisplayName, Instant } from "@inventory/kernel/Text"
+import { nullAsNone } from "@inventory/kernel/Wire"
 import * as S from "effect/Schema"
 import { $AccessContractId } from "../internal/identity.ts"
 import { AccountEmail } from "../Session/SessionState.read.ts"
@@ -29,13 +30,9 @@ export class Person extends S.Opaque<Person, { readonly brand: unique symbol }>(
       S.annotateKey({ description: "The name people read. Not unique, so it never tells two people apart" })
     ),
     email: AccountEmail.pipe(
-      S.annotateKey({ description: "The email of the person's account; null for a member with no account" }),
-      S.OptionFromNullOr
+      nullAsNone({ description: "The email of the person's account; null for a member with no account" })
     ),
     role: Role,
-    joinedAt: Instant.pipe(
-      S.annotateKey({ description: "When they became a member; null when that is not known" }),
-      S.OptionFromNullOr
-    )
+    joinedAt: Instant.pipe(nullAsNone({ description: "When they became a member; null when that is not known" }))
   }).pipe($I.annoteSchema("Person", { description: "One member of the organization as the People page shows them" }))
 ) {}

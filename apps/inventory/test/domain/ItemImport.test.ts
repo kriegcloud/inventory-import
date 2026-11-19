@@ -40,17 +40,17 @@ describe("items_clean.csv", () => {
         quantityOnHand: 3845,
         isActive: true,
         tags: ["fragile"],
-        dimensions: { length: 78.8, width: 56.9, height: 2.6, unit: "cm" }
+        dimensions: Option.some({ length: 78.8, width: 56.9, height: 2.6, unit: "cm" })
       })
       expect(first?.vendors[0]).toEqual({
         vendorName: "Tidewater Fasteners",
-        vendorSku: "TI-12311",
+        vendorSku: Option.some("TI-12311"),
         unitCost: "7.59",
-        leadTimeDays: 54,
+        leadTimeDays: Option.some(54),
         isPreferred: false
       })
       // An empty quantity is the brief's default, 0, not a problem.
-      expect(rowOf(result, 6).item).toMatchObject({ sku: "UZS-4663", quantityOnHand: 0, reorderPoint: null })
+      expect(rowOf(result, 6).item).toMatchObject({ sku: "UZS-4663", quantityOnHand: 0, reorderPoint: Option.none() })
     })
   )
 })
@@ -154,7 +154,7 @@ describe("items_messy.csv", () => {
       })
       expect(rowOf(result, 55).item?.unitCost).toBe("35.82")
       expect(rowOf(result, 85).item?.quantityOnHand).toBe(1200)
-      expect(rowOf(result, 44).item?.firstReceivedOn).toBe("2024-06-04")
+      expect(rowOf(result, 44).item?.firstReceivedOn).toEqual(Option.some("2024-06-04"))
       expect([rowOf(result, 4).status, rowOf(result, 10).status]).toEqual(["ready", "out"])
       expect(rowOf(result, 45).item).toMatchObject({ isActive: false, discontinuedOn: "2025-06-30" })
       expect(rowOf(result, 184).item?.unitCost).toBe("12.5")

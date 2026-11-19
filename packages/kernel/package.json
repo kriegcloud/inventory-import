@@ -12,6 +12,7 @@
     "./Ids": "./src/Ids.id.ts",
     "./Role": "./src/Role.schema.ts",
     "./Text": "./src/Text.schema.ts",
+    "./Wire": "./src/Wire.schema.ts",
     "./Member": "./src/Member.schema.ts",
     "./AgentRun": "./src/AgentRun.schema.ts",
     "./Activity": "./src/Activity.schema.ts",

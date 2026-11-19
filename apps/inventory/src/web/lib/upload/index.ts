@@ -5,7 +5,20 @@ import { SecureRandom } from "effect/crypto"
 // The one thing not to break: Cancel stops everything (the worker, every request in flight) and then deletes what
 // reached the server, and the screen says it was cancelled only once the server has answered.
 import { useQueryClient, type QueryClient } from "@tanstack/react-query"
-import { Cause, Deferred, Effect, Exit, Fiber, HashSet, MutableHashSet, Queue, Result, Schedule, Stream } from "effect"
+import {
+  Cause,
+  Deferred,
+  Effect,
+  Exit,
+  Fiber,
+  HashSet,
+  MutableHashSet,
+  Option,
+  Queue,
+  Result,
+  Schedule,
+  Stream
+} from "effect"
 import * as S from "effect/Schema"
 import { useCallback, useSyncExternalStore } from "react"
 import { toast } from "sonner"
@@ -146,7 +159,9 @@ const program = Effect.fn("upload.program")(function* (client: Client, request: 
         )
       case "Head":
         return Effect.gen(function* () {
-          head = message.head
+          // The sheet crossed the threads as its name or null: the Option is made again here.
+          const read: StagedHead = { ...message.head, sheet: Option.fromNullOr(message.head.sheet) }
+          head = read
           workbook = message.workbook
           const rows = message.chunkSizes.reduce((sum, size) => sum + size, 0)
           // One key for this file: a begin sent again after a lost answer is the same upload on the server, so the
@@ -154,7 +169,7 @@ const program = Effect.fn("upload.program")(function* (client: Client, request: 
           const key = SecureRandom.uuidV4Unsafe()
           const { id } = yield* staged(
             client.imports.beginUpload({
-              payload: { key, head: message.head, rowCount: rows, chunkCount: message.chunkSizes.length }
+              payload: { key, head: read, rowCount: rows, chunkCount: message.chunkSizes.length }
             })
           )
           if (running !== null) running.uploadId = id

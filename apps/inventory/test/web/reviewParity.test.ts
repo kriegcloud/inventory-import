@@ -307,18 +307,18 @@ describe("what the review screen is handed for a pick, for spaces and for a stor
       const stored: ItemFields = {
         sku: "ABC-0001",
         name: "One",
-        description: null,
+        description: Option.none(),
         category: "packaging",
         uom: "EA",
         unitCost: "1",
         quantityOnHand: 0,
-        reorderPoint: null,
+        reorderPoint: Option.none(),
         isActive: true,
         lotTracked: false,
         tags: [],
-        firstReceivedOn: null,
+        firstReceivedOn: Option.none(),
         discontinuedOn: null,
-        dimensions: null,
+        dimensions: Option.none(),
         vendors: []
       }
       for (const answer of ["keep", "replace"] as const) {

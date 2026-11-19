@@ -4,7 +4,7 @@
 // organization's condition and the search are AND-ed outside the filters' group, so an "or" between filters can never
 // reach another organization or bring back an item the search left out. What a search word matches is decided in
 // `src/domain/ItemSearch.ts`; this file only turns that decision into SQL over the `itemSearch` index.
-import { Array as Arr, Context, DateTime, Effect, Layer, Option, String as Str } from "effect"
+import { Array as Arr, Context, DateTime, Effect, Equal, Layer, Option, String as Str } from "effect"
 import * as S from "effect/Schema"
 import { SecureRandom } from "effect/crypto"
 import { SqlClient, SqlSchema, type Statement } from "effect/sql"
@@ -495,8 +495,8 @@ export class Items extends Context.Service<
           uom: Arr.map(uom, (row) => ({ value: row.value, count: row.n })),
           isActive: Arr.map(isActive, (row) => ({ value: row.value, count: row.n })),
           lotTracked: Arr.map(lotTracked, (row) => ({ value: row.value, count: row.n })),
-          quantityOnHand: { min: summary.quantityMin, max: summary.quantityMax },
-          unitCost: { min: summary.costMin, max: summary.costMax }
+          quantityOnHand: { min: Option.fromNullOr(summary.quantityMin), max: Option.fromNullOr(summary.quantityMax) },
+          unitCost: { min: Option.fromNullOr(summary.costMin), max: Option.fromNullOr(summary.costMax) }
         }
       }, Effect.orDie)
 
@@ -536,15 +536,16 @@ export class Items extends Context.Service<
       })
       const same = (item: StoredItem, edit: ItemEdit): boolean =>
         item.name === edit.name &&
-        item.description === edit.description &&
+        // An optional value is an Option: compared by what it holds, never by identity.
+        Equal.equals(item.description, edit.description) &&
         item.category === edit.category &&
         item.uom === edit.uom &&
         item.unitCost === edit.unitCost &&
         item.quantityOnHand === edit.quantityOnHand &&
-        item.reorderPoint === edit.reorderPoint &&
+        Equal.equals(item.reorderPoint, edit.reorderPoint) &&
         item.isActive === edit.isActive &&
         item.lotTracked === edit.lotTracked &&
-        item.firstReceivedOn === edit.firstReceivedOn &&
+        Equal.equals(item.firstReceivedOn, edit.firstReceivedOn) &&
         item.discontinuedOn === edit.discontinuedOn
 
       const edit = Effect.fn("Items.edit")(function* (actor: Member, id: string, change: ItemEdit) {

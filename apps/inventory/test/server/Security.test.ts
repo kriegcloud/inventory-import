@@ -141,6 +141,8 @@ layer(App)("the API over HTTP", (it) => {
         if (method === "get") expect(Rec.has(operation.responses, "403")).toBe(false)
       }
       expect(Arr.filter(Rec.keys(spec.components.schemas), Str.endsWith("Encoded"))).toEqual([])
+      // Nor a numbered second copy of a schema, nor one named by its whole path: each shape is in the document once.
+      expect(Arr.filter(Rec.keys(spec.components.schemas), (name) => /_\d+$|^_beep_/.test(name))).toEqual([])
       expect((yield* send({ path: "/api/v1/docs" })).status).toBe(404)
     })
   )

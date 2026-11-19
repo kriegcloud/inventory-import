@@ -22,7 +22,7 @@ layer(TypedApp)("a take-back after two confirms", (it) => {
       const staged = yield* upload({ client, table }).pipe(marcus)
       const params = { id: staged.id }
       const first = yield* client.imports.commit({ params, payload: { set: {}, clear: [] } }).pipe(marcus)
-      expect(first.result?.created).toBe(155)
+      expect(Option.getOrUndefined(first.result)?.created).toBe(155)
       // Listed among the past imports at once, its items counted from what is stored.
       const listed = yield* client.imports.past().pipe(marcus)
       expect(Arr.map(listed.imports, (past) => [past.id, past.status, past.items, past.notImported])).toEqual([
@@ -83,7 +83,9 @@ const replaceRow2 = Effect.fn("test.replaceRow2")(function* () {
   const replaced = yield* client.imports
     .commit({ params: { id: second.id }, payload: { set: { "row-2": { stored: "replace" } }, clear: [] } })
     .pipe(marcus)
-  expect([replaced.result?.updated, replaced.result?.created]).toEqual([1, 0])
+  expect([Option.getOrUndefined(replaced.result)?.updated, Option.getOrUndefined(replaced.result)?.created]).toEqual([
+    1, 0
+  ])
   const stored = yield* client.items.list().pipe(marcus)
   const insert = Option.getOrThrow(Arr.findFirst(stored, (item) => item.sku === "SHH-9574"))
   expect([insert.name, insert.unitCost, insert.revision]).toEqual(["Oak Foam Insert XL", "14.1", 2])
@@ -102,7 +104,11 @@ layer(TypedApp)("a take-back of an import that replaced a stored item", (it) => 
         .pipe(marcus)
       const event = Option.getOrThrow(Arr.findFirst(back.history, (event) => event._tag === "TakenBack"))
       expect(event._tag === "TakenBack" ? [event.removed, event.restored, event.kept] : []).toEqual([0, 1, 0])
-      expect([back.status, back.result?.updated, back.result?.takenBack]).toEqual(["takenBack", 0, 1])
+      expect([
+        back.status,
+        Option.getOrUndefined(back.result)?.updated,
+        Option.getOrUndefined(back.result)?.takenBack
+      ]).toEqual(["takenBack", 0, 1])
       const after = yield* client.items.list().pipe(marcus)
       const insert = Option.getOrThrow(Arr.findFirst(after, (item) => item.sku === "SHH-9574"))
       expect([insert.name, insert.unitCost, insert.revision, after.length]).toEqual(["Oak Foam Insert", "12.33", 1, 25])
@@ -153,7 +159,9 @@ layer(TypedApp)("a take-back of an import whose replaced item was edited since",
         .pipe(marcus)
       const event = Option.getOrThrow(Arr.findFirst(back.history, (event) => event._tag === "TakenBack"))
       expect(event._tag === "TakenBack" ? [event.removed, event.restored, event.kept] : []).toEqual([0, 0, 1])
-      expect([back.result?.updated, back.result?.takenBack]).toEqual([1, 0])
+      expect([Option.getOrUndefined(back.result)?.updated, Option.getOrUndefined(back.result)?.takenBack]).toEqual([
+        1, 0
+      ])
       expect([back.takeBack.keptCount, Arr.map(back.takeBack.kept, (item) => item.sku)]).toEqual([1, ["SHH-9574"]])
       const stored = yield* client.items.list().pipe(marcus)
       const after = Option.getOrThrow(Arr.findFirst(stored, (item) => item.sku === "SHH-9574"))

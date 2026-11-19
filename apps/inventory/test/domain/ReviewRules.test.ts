@@ -100,22 +100,22 @@ describe("an edit of one item", () => {
   const edit: ItemEdit = {
     revision: 1,
     name: "Steel Tube",
-    description: null,
+    description: Option.none(),
     category: "components",
     uom: "EA",
     unitCost: "9.5",
     quantityOnHand: 4,
-    reorderPoint: null,
+    reorderPoint: Option.none(),
     isActive: true,
     lotTracked: false,
-    firstReceivedOn: null,
+    firstReceivedOn: Option.none(),
     discontinuedOn: null
   }
   it("is refused when discontinued yet active, on a date off the calendar, and with a name of only spaces", () => {
     expect(editProblem(edit)).toBeNull()
     expect(editProblem({ ...edit, discontinuedOn: "2024-06-19" })).toContain("A discontinued item is not active")
     expect(editProblem({ ...edit, discontinuedOn: "2024-06-19", isActive: false })).toBeNull()
-    expect(editProblem({ ...edit, firstReceivedOn: "2024-13-45" })).toContain("not a day on the calendar")
+    expect(editProblem({ ...edit, firstReceivedOn: Option.some("2024-13-45") })).toContain("not a day on the calendar")
     expect(editProblem({ ...edit, name: "   " })).toBe("Name is empty. Every item needs a name.")
   })
 })

@@ -1,3 +1,4 @@
+import { Option } from "effect"
 import { useMutation } from "@tanstack/react-query"
 import { PageHeader } from "@inventory/ui/PageHeader"
 import { NotSet } from "@inventory/ui/NotSet"
@@ -38,7 +39,12 @@ export function MatchStep(props: { view: ImportView; table: StagedTable; canImpo
   const cache = useImportCache()
   const match = useMutation({
     mutationFn: (input: { field: Field; column: number | null }) =>
-      call((api) => api.imports.match({ params: { id: view.id }, payload: input })),
+      call((api) =>
+        api.imports.match({
+          params: { id: view.id },
+          payload: { field: input.field, column: Option.fromNullOr(input.column) }
+        })
+      ),
     onSuccess: cache.setView,
     onError: (error) => toastError(error)
   })

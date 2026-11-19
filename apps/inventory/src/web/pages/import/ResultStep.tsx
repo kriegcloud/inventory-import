@@ -75,7 +75,8 @@ const items = (n: number) => `${n} ${n === 1 ? "item" : "items"}`
 function Changed(props: { item: ChangedItem }) {
   return (
     <>
-      <Code>{props.item.sku}</Code> {props.item.name}, changed by {props.item.changedBy}
+      <Code>{props.item.sku}</Code> {props.item.name}
+      {Option.match(props.item.changedBy, { onNone: () => ", changed since", onSome: (who) => `, changed by ${who}` })}
       {/* The moment is said when it was stored. */}
       {Option.match(props.item.changedAt, { onNone: () => "", onSome: (at) => ` on ${whenShort(at)}` })}
     </>

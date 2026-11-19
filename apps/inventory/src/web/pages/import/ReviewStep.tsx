@@ -210,7 +210,12 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
   // The person picked a file column for a field the headings left without one, from inside the review.
   const match = useMutation({
     mutationFn: (pick: { field: Field; column: number }) =>
-      call((api) => api.imports.match({ params: { id: view.id }, payload: pick })),
+      call((api) =>
+        api.imports.match({
+          params: { id: view.id },
+          payload: { field: pick.field, column: Option.some(pick.column) }
+        })
+      ),
     // The draft's revision moves with the match; the effect below then starts the region from the new columns.
     onSuccess: (next) => cache.setView(next),
     onError: (error) => toastError(error)
@@ -339,7 +344,7 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
     ],
     facts: [
       { label: "File", value: view.fileName },
-      ...(table.sheet === null ? [] : [{ label: "Sheet", value: table.sheet }]),
+      ...Option.match(table.sheet, { onNone: () => [], onSome: (sheet) => [{ label: "Sheet", value: sheet }] }),
       { label: "Uploaded by", value: view.startedBy },
       { label: "Prepared by", value: "The fixed rules" },
       { label: "Stock value in the file", value: totalText(sums.fileStockValue) }

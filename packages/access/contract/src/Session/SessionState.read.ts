@@ -11,6 +11,7 @@ import { Role } from "@inventory/kernel/Role"
 import { DisplayName } from "@inventory/kernel/Text"
 import { Option, Tuple } from "effect"
 import * as S from "effect/Schema"
+import { nullAsNone } from "@inventory/kernel/Wire"
 import { $AccessContractId } from "../internal/identity.ts"
 
 const $I = $AccessContractId.create("Session/SessionState")
@@ -91,8 +92,11 @@ export class TestAccountsOffer extends S.Opaque<TestAccountsOffer, { readonly br
  */
 export class SignInFeatures extends S.Opaque<SignInFeatures, { readonly brand: unique symbol }>()(
   S.Struct({
-    // TEST_ACCOUNTS: the accounts to offer and their password, or null when it is off.
-    testAccounts: S.OptionFromNullOr(TestAccountsOffer),
+    testAccounts: TestAccountsOffer.pipe(
+      nullAsNone({
+        description: "TEST_ACCOUNTS: the accounts to offer and their password, or null when it is off."
+      })
+    ),
     pwnedPasswordCheck: S.Boolean.pipe(
       S.annotateKey({ description: "PWNED_PASSWORD_CHECK: a new password is checked against known data breaches." })
     )

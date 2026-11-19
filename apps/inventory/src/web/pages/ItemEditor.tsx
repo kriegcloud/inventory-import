@@ -1,3 +1,4 @@
+import { Option } from "effect"
 import { useQueryClient } from "@tanstack/react-query"
 import { PencilIcon } from "lucide-react"
 import { useId, useState } from "react"
@@ -38,15 +39,15 @@ import { costText, dimensionsText } from "./import/itemText.ts"
 
 const formOf = (item: StoredItem): ItemForm => ({
   name: item.name,
-  description: item.description ?? "",
+  description: Option.getOrElse(item.description, () => ""),
   category: item.category,
   uom: item.uom,
   unitCost: item.unitCost,
   quantityOnHand: `${item.quantityOnHand}`,
-  reorderPoint: item.reorderPoint === null ? "" : `${item.reorderPoint}`,
+  reorderPoint: Option.match(item.reorderPoint, { onNone: () => "", onSome: (point) => `${point}` }),
   isActive: item.isActive,
   lotTracked: item.lotTracked,
-  firstReceivedOn: item.firstReceivedOn ?? "",
+  firstReceivedOn: Option.getOrElse(item.firstReceivedOn, () => ""),
   discontinuedOn: item.discontinuedOn ?? ""
 })
 
@@ -79,7 +80,9 @@ function FromTheFile(props: { item: StoredItem }) {
       </div>
       <div className="flex gap-2">
         <dt className="w-24 shrink-0 text-muted-foreground">Dimensions</dt>
-        <dd className="tabular-nums">{item.dimensions === null ? <NotSet /> : dimensionsText(item.dimensions)}</dd>
+        <dd className="tabular-nums">
+          {Option.match(item.dimensions, { onNone: () => <NotSet />, onSome: (size) => <>{dimensionsText(size)}</> })}
+        </dd>
       </div>
       <div className="flex gap-2">
         <dt className="w-24 shrink-0 text-muted-foreground">Vendors</dt>
@@ -94,13 +97,16 @@ function FromTheFile(props: { item: StoredItem }) {
                   {vendor.isPreferred ? " · preferred" : ""}
                   <span className="block text-muted-foreground tabular-nums">
                     {costText(vendor.unitCost)}
-                    {vendor.leadTimeDays === null ? "" : ` · ${vendor.leadTimeDays} days`}
-                    {vendor.vendorSku === null ? null : (
-                      <>
-                        {" · "}
-                        <Code>{vendor.vendorSku}</Code>
-                      </>
-                    )}
+                    {Option.match(vendor.leadTimeDays, { onNone: () => "", onSome: (days) => ` · ${days} days` })}
+                    {Option.match(vendor.vendorSku, {
+                      onNone: () => null,
+                      onSome: (code) => (
+                        <>
+                          {" · "}
+                          <Code>{code}</Code>
+                        </>
+                      )
+                    })}
                   </span>
                 </li>
               ))}

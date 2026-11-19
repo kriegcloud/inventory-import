@@ -1,5 +1,6 @@
 import { Effect } from "effect"
 import * as S from "effect/Schema"
+import { nullAsNone } from "@inventory/kernel/Wire"
 import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiMiddleware, OpenApi } from "effect/http-api"
 import { ActivityApi, IdentityApi, PeopleApi } from "@inventory/access-contract/Access"
 import { ModelCallsUsedUp } from "@inventory/access-contract/ModelAllowance"
@@ -296,11 +297,13 @@ export type ImportEvent = typeof ImportEvent.Type
 export const ChangedItem = S.Struct({
   sku: S.String.annotateKey({ description: "The item's SKU" }),
   name: S.String.annotateKey({ description: "The item's name, for the list" }),
-  changedBy: personName("Who changed it last"),
-  changedAt: Instant.pipe(
-    S.annotateKey({ description: "When it was last changed; null when that was not stored" }),
-    S.OptionFromNullOr
-  )
+  changedBy: S.String.pipe(
+    nullAsNone({
+      description:
+        "Who changed it last: the member's name as it was then, for the screen. Not an id; null when that was not stored"
+    })
+  ),
+  changedAt: Instant.pipe(nullAsNone({ description: "When it was last changed; null when that was not stored" }))
 }).annotate({ identifier: "ChangedItem", description: "An item changed after the import that created it" })
 /** The decoded value of `ChangedItem`: an item an import created that someone changed afterwards. */
 export type ChangedItem = typeof ChangedItem.Type
@@ -386,7 +389,9 @@ export class ImportView extends S.Class<ImportView, { readonly brand: unique sym
       fixedCells: S.Int.annotateKey({ description: "Values a form-only rule changed, still in force" }),
       rows: S.Int.annotateKey({ description: "Record rows in the file: every row but blank and total rows" })
     }).annotateKey({ description: "How far the review is: rows that needed the person at first, and now" }),
-    result: S.NullOr(ImportResult).annotateKey({ description: "What the confirms did, once there has been one" }),
+    result: ImportResult.pipe(
+      nullAsNone({ description: "What the confirms did, once there has been one; null before the first" })
+    ),
     history: S.Array(ImportEvent).annotateKey({
       description: "Every confirm and take-back of this import, oldest first"
     }),
@@ -730,11 +735,12 @@ export class ImportsApi extends HttpApiGroup.make("imports")
           examples: ["uom"],
           messageMissingKey: "Say which field of the item to match."
         }),
-        column: S.NullOr(S.Int.check(S.isGreaterThanOrEqualTo(0))).annotateKey({
-          description: "The file column's position, from 0, that fills the field; null for none",
-          examples: [3],
-          messageMissingKey: "Say which column of the file fills the field, or null for none."
-        })
+        column: S.Int.check(S.isGreaterThanOrEqualTo(0)).pipe(
+          nullAsNone({
+            description: "The file column's position, from 0, that fills the field; null for none",
+            messageMissingKey: "Say which column of the file fills the field, or null for none."
+          })
+        )
       }),
       success: ImportView,
       error: [Forbidden, ImportNotFound, AlreadyImported, ColumnNotFound]

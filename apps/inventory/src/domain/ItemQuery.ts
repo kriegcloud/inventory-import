@@ -1,4 +1,5 @@
 import * as S from "effect/Schema"
+import { nullAsNone } from "@inventory/kernel/Wire"
 import { StoredItem } from "./Item.ts"
 import { ItemSearchText } from "./ItemSearch.ts"
 
@@ -161,8 +162,8 @@ const Count = S.Struct({
   count: S.Int.annotateKey({ description: "How many items have it" })
 }).annotate({ description: "One value in use, and how many items have it" })
 const Range = S.Struct({
-  min: S.NullOr(S.Finite).annotateKey({ description: "The lowest value; null when no item has one" }),
-  max: S.NullOr(S.Finite).annotateKey({ description: "The highest value; null when no item has one" })
+  min: S.Finite.pipe(nullAsNone({ description: "The lowest value; null when no item has one" })),
+  max: S.Finite.pipe(nullAsNone({ description: "The highest value; null when no item has one" }))
 }).annotate({ description: "The lowest and highest value; null when no item has one" })
 
 /**

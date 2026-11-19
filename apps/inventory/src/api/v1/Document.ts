@@ -1,7 +1,7 @@
 // What the OpenAPI document says that the contract's own types cannot: corrections made to the generated document
 // only (`OpenApi.Transform` on the `Api`, applied last). Nothing here changes a route, a payload or an answer; the
 // one thing not to break is that every line below states what the server already does, never what it should do.
-import { Array as Arr, Equal, Record as Rec, String as Str } from "effect"
+import { Array as Arr, Record as Rec, String as Str } from "effect"
 
 /** The name of the security scheme every signed-in endpoint lists: the session cookie Better Auth sets. */
 export const sessionCookieScheme = "sessionCookie"
@@ -63,19 +63,38 @@ const renameRefs = (node: unknown, renamed: Readonly<Record<string, string>>): v
  * the path) when that name is free, and a numbered copy that is identical to the original is folded into it. A copy
  * that differs keeps its number.
  */
-const nameComponents = (spec: Json): void => {
+/** True when two parts of the document say the same thing: the same keys and values, whatever order the keys are in. */
+const sameShape = (a: unknown, b: unknown): boolean => {
+  if (Arr.isArray(a) || Arr.isArray(b)) {
+    return Arr.isArray(a) && Arr.isArray(b) && a.length === b.length && Arr.every(a, (item, i) => sameShape(item, b[i]))
+  }
+  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return a === b
+  const left = a as Json
+  const right = b as Json
+  const keys = Rec.keys(left)
+  return (
+    keys.length === Rec.keys(right).length &&
+    Arr.every(keys, (key) => Rec.has(right, key) && sameShape(left[key], right[key]))
+  )
+}
+
+/** One pass of naming: true when a component was renamed or folded, so another pass may find more. */
+const nameOnce = (spec: Json): boolean => {
   const schemas: Json = spec["components"]["schemas"]
   const renamed: Record<string, string> = {}
   for (const name of Rec.keys(schemas)) {
     const copy = /^(.+)_\d+$/.exec(name)
     const original = copy?.[1]
-    if (original !== undefined && Rec.has(schemas, original) && Equal.equals(schemas[name], schemas[original])) {
+    if (original !== undefined && Rec.has(schemas, original) && sameShape(schemas[name], schemas[original])) {
       renamed[name] = original
       continue
     }
     const unsuffixed = /^(.+)Encoded$/.exec(name)?.[1] ?? name
     const plain = /^_beep_(?:[A-Za-z0-9]+_)+([A-Za-z0-9]+)$/.exec(unsuffixed)?.[1] ?? unsuffixed
-    if (plain !== name && !Rec.has(schemas, plain)) renamed[name] = plain
+    // Its own name when that is free, or when what holds it is the very same shape.
+    if (plain !== name && (!Rec.has(schemas, plain) || sameShape(schemas[name], schemas[plain]))) {
+      renamed[name] = plain
+    }
   }
   const next: Json = {}
   for (const [name, schema] of Rec.toEntries(schemas)) {
@@ -84,6 +103,14 @@ const nameComponents = (spec: Json): void => {
   }
   spec["components"]["schemas"] = next
   renameRefs(spec, renamed)
+  return !Rec.isEmptyRecord(renamed)
+}
+
+// A copy that points at another copy is identical to its original only once that one has been folded, so the
+// naming is repeated until a pass changes nothing (a few passes: one per level of nesting).
+const nameComponents = (spec: Json): void => {
+  let passes = 0
+  while (passes < 12 && nameOnce(spec)) passes += 1
 }
 
 /**

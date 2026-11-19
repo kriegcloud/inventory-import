@@ -3,7 +3,7 @@ import { stringify } from "@inventory/ui/Json"
 // so the content security policy's `script-src 'self'` covers it; never a blob: worker, which the policy blocks (a
 // library that made one hung here). It runs the same `readSpreadsheet` the tests run, then trims the table to what
 // the server stages and hands it to the page in the chunks the server stores. Every file takes this path.
-import { Effect, Result } from "effect"
+import { Effect, Option, Result } from "effect"
 import { type FileProblem, fileProblem } from "../../../domain/FileProblem.ts"
 import { stageTable, stagingProblem } from "../../../domain/ItemImport.ts"
 import { maxChunkChars, uploadChunks } from "../../../domain/Upload.ts"
@@ -42,7 +42,9 @@ const read = ({ file, sheet }: ReadRequest) =>
   ).then((result) => {
     if (Result.isFailure(result)) return refuse(result.failure)
     const table = result.success
-    const { rows, ...head } = stageTable({ table })
+    const { rows, sheet: sheetName, ...rest } = stageTable({ table })
+    // Plain fields for the copy between threads (protocol.ts): the page makes the Option again.
+    const head = { ...rest, sheet: Option.getOrNull(sheetName) }
     const problem = stagingProblem({ fileName: head.fileName, rowCount: rows.length, columnCount: head.columns.length })
     if (problem !== null) return refuse(problem)
     const chunks = uploadChunks({ rows })

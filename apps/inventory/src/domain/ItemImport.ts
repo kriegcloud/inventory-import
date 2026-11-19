@@ -29,6 +29,7 @@ import {
 } from "./Item.ts"
 import type { SpreadsheetTable } from "./Spreadsheet.ts"
 import * as S from "effect/Schema"
+import { nullAsNone } from "@inventory/kernel/Wire"
 
 /**
  * Whether the rules' form-only fixes (spaces round a SKU or a name, "bx" for BX, a "$" before a cost, yes for true,
@@ -146,7 +147,7 @@ export type StagedNote = typeof StagedNote.Type
 export const StagedTable = S.Struct({
   fileName: bounded(255).annotateKey({ description: "The file's name as it was chosen", examples: ["items.csv"] }),
   kind: S.Literals(["csv", "xlsx"]).annotateKey({ description: "What kind of file it was read as" }),
-  sheet: S.NullOr(bounded(200)).annotateKey({ description: "The sheet the table came from; null for a CSV" }),
+  sheet: bounded(200).pipe(nullAsNone({ description: "The sheet the table came from; null for a CSV" })),
   headerRowNumber: S.Int.annotateKey({
     description: "The row the headings are on, as Excel numbers it",
     examples: [1]
@@ -184,7 +185,7 @@ export const stageTable = (input: { readonly table: SpreadsheetTable }): StagedT
   return {
     fileName: table.fileName,
     kind: table.kind,
-    sheet: table.format._tag === "xlsx" ? table.format.chosen.name : null,
+    sheet: table.format._tag === "xlsx" ? Option.some(table.format.chosen.name) : Option.none(),
     headerRowNumber: table.headerRowNumber,
     columns: Arr.map(table.columns, (column) => ({ index: column.index, letter: column.letter, label: column.label })),
     rows: Arr.map(table.rows, (row) => ({
@@ -909,9 +910,9 @@ export const readVendors = (text: string): Read<ReadonlyArray<Vendor>> => {
     }
     return ok({
       vendorName: name,
-      vendorSku: vendor.vendor_sku ?? null,
+      vendorSku: Option.fromNullishOr(vendor.vendor_sku),
       unitCost: cost.value,
-      leadTimeDays: lead,
+      leadTimeDays: Option.fromNullOr(lead),
       isPreferred: vendor.is_preferred === true
     })
   })
@@ -938,18 +939,18 @@ const withPreferred = (text: string, keep: number): Option.Option<string> =>
 export const itemText = (item: ItemFields): Readonly<Record<Field, string>> => ({
   sku: item.sku,
   name: item.name,
-  description: item.description ?? "",
+  description: Option.getOrElse(item.description, () => ""),
   category: item.category,
   uom: item.uom,
   unitCost: item.unitCost,
   quantityOnHand: `${item.quantityOnHand}`,
-  reorderPoint: item.reorderPoint === null ? "" : `${item.reorderPoint}`,
+  reorderPoint: Option.match(item.reorderPoint, { onNone: () => "", onSome: (point) => `${point}` }),
   isActive: `${item.isActive}`,
   lotTracked: `${item.lotTracked}`,
   tags: Arr.join(item.tags, "|"),
-  firstReceivedOn: item.firstReceivedOn ?? "",
+  firstReceivedOn: Option.getOrElse(item.firstReceivedOn, () => ""),
   discontinuedOn: item.discontinuedOn ?? "",
-  dimensions: item.dimensions === null ? "" : Option.getOrElse(encodeDimensions(item.dimensions), () => ""),
+  dimensions: Option.getOrElse(Option.flatMap(item.dimensions, encodeDimensions), () => ""),
   vendors:
     item.vendors.length === 0
       ? ""
@@ -957,9 +958,12 @@ export const itemText = (item: ItemFields): Readonly<Record<Field, string>> => (
           encodeVendors(
             Arr.map(item.vendors, (vendor) => ({
               vendor_name: vendor.vendorName,
-              ...(vendor.vendorSku === null ? {} : { vendor_sku: vendor.vendorSku }),
+              ...Option.match(vendor.vendorSku, { onNone: () => ({}), onSome: (vendor_sku) => ({ vendor_sku }) }),
               unit_cost: Number(vendor.unitCost),
-              ...(vendor.leadTimeDays === null ? {} : { lead_time_days: vendor.leadTimeDays }),
+              ...Option.match(vendor.leadTimeDays, {
+                onNone: () => ({}),
+                onSome: (lead_time_days) => ({ lead_time_days })
+              }),
               is_preferred: vendor.isPreferred
             }))
           ),
@@ -1857,18 +1861,18 @@ const toItem = (values: Readonly<Record<Field, string>>): ItemFields | null => {
   return {
     sku: values.sku,
     name: values.name,
-    description: blank("description") ? null : values.description,
+    description: blank("description") ? Option.none() : Option.some(values.description),
     category: category.value,
     uom: uom.value,
     unitCost: cost.value,
     quantityOnHand: quantity.value,
-    reorderPoint: reorder.value,
+    reorderPoint: Option.fromNullOr(reorder.value),
     isActive: active.value,
     lotTracked: lot.value,
     tags: tagsOf(values.tags),
-    firstReceivedOn: received.value,
+    firstReceivedOn: Option.fromNullOr(received.value),
     discontinuedOn: discontinued.value,
-    dimensions: dimensions.value,
+    dimensions: Option.fromNullOr(dimensions.value),
     vendors: vendors.value
   }
 }

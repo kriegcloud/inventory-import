@@ -7,6 +7,7 @@ import { Array as Arr, Option, Record as Rec, Result, String as Str } from "effe
 import { Instant } from "@inventory/kernel/Text"
 import { personName } from "./Described.ts"
 import * as S from "effect/Schema"
+import { nullAsNone } from "@inventory/kernel/Wire"
 
 /** The categories an item may be filed under: the list the category column is checked against. */
 export const categories = ["raw-materials", "components", "finished-goods", "packaging", "supplies"] as const
@@ -75,12 +76,12 @@ export const Vendor = S.Struct({
     description: "Who the item is bought from (the file's `vendor_name`)",
     messageMissingKey: "Give the vendor's name."
   }),
-  vendorSku: S.NullOr(S.String)
-    .annotate({
-      description: "The vendor's own code for the item; null for none",
-      examples: ["TI-12311"]
-    })
-    .annotateKey({ description: "The code the vendor sells the item under (the file's `vendor_sku`); null for none" }),
+  vendorSku: S.String.annotate({
+    description: "The vendor's own code for the item; null for none",
+    examples: ["TI-12311"]
+  }).pipe(
+    nullAsNone({ description: "The code the vendor sells the item under (the file's `vendor_sku`); null for none" })
+  ),
   unitCost: Decimal.annotate({
     description: "The vendor's cost in US dollars, as a decimal string",
     examples: ["7.59"]
@@ -88,11 +89,14 @@ export const Vendor = S.Struct({
     description: "What one unit costs from this vendor, in US dollars, read from the digits (the file's `unit_cost`)",
     messageMissingKey: "Give the vendor's unit cost."
   }),
-  leadTimeDays: S.NullOr(Count)
-    .annotate({ description: "Days from order to delivery; null when not given", examples: [54] })
-    .annotateKey({
+  leadTimeDays: Count.annotate({
+    description: "Days from order to delivery; null when not given",
+    examples: [54]
+  }).pipe(
+    nullAsNone({
       description: "How many days the vendor takes to deliver (the file's `lead_time_days`); null when not given"
-    }),
+    })
+  ),
   isPreferred: S.Boolean.annotate({
     description: "True for the one vendor the item is usually bought from",
     examples: [false]
@@ -122,9 +126,10 @@ export const ItemFields = S.Struct({
     description: "The item's name, 1 to 120 characters, trimmed",
     examples: ["Oak Foam Insert"]
   }),
-  description: S.NullOr(S.String)
-    .annotate({ description: "Free text; null for none", examples: ["Oak foam insert for general use."] })
-    .annotateKey({ description: "What the item is, in a sentence or two; null when the file gives none" }),
+  description: S.String.annotate({
+    description: "Free text; null for none",
+    examples: ["Oak foam insert for general use."]
+  }).pipe(nullAsNone({ description: "What the item is, in a sentence or two; null when the file gives none" })),
   category: Category.annotateKey({
     description:
       "What kind of stock the item is: one of raw-materials, components, finished-goods, packaging, supplies",
@@ -142,9 +147,9 @@ export const ItemFields = S.Struct({
     description: "How many are in stock; 0 when the file gives none",
     examples: [3845]
   }),
-  reorderPoint: S.NullOr(Count)
-    .annotate({ description: "The stock level to reorder at; null for none", examples: [402] })
-    .annotateKey({ description: "Reorder when the quantity on hand falls to this number; null when nobody set one" }),
+  reorderPoint: Count.annotate({ description: "The stock level to reorder at; null for none", examples: [402] }).pipe(
+    nullAsNone({ description: "Reorder when the quantity on hand falls to this number; null when nobody set one" })
+  ),
   isActive: S.Boolean.annotateKey({ description: "Whether the item is in use; true when the file does not say" }),
   lotTracked: S.Boolean.annotateKey({
     description: "Whether stock is tracked by lot; false when the file does not say"
@@ -152,9 +157,12 @@ export const ItemFields = S.Struct({
   tags: S.Array(S.String)
     .annotate({ description: "Lower-case tags, each once", examples: [["fragile"]] })
     .annotateKey({ description: "Words the item is filed under; the file writes them in one cell with | between" }),
-  firstReceivedOn: S.NullOr(IsoDate)
-    .annotate({ description: "ISO date first received; null for none", examples: ["2019-03-18"] })
-    .annotateKey({ description: "The day the item first came into stock, as year-month-day; null when not known" }),
+  firstReceivedOn: IsoDate.annotate({
+    description: "ISO date first received; null for none",
+    examples: ["2019-03-18"]
+  }).pipe(
+    nullAsNone({ description: "The day the item first came into stock, as year-month-day; null when not known" })
+  ),
   discontinuedOn: S.NullOr(IsoDate)
     .annotate({
       description: "ISO date discontinued; null for none. An item with one is not active",
@@ -164,9 +172,9 @@ export const ItemFields = S.Struct({
       description:
         "The day the item stopped being stocked, as year-month-day; null while it is stocked. With a date, `isActive` must be false"
     }),
-  dimensions: S.NullOr(Dimensions)
-    .annotate({ description: "The item's size; null for none" })
-    .annotateKey({ description: "The item's length, width and height with their unit, all together; null for none" }),
+  dimensions: Dimensions.pipe(
+    nullAsNone({ description: "The item's length, width and height with their unit, all together; null for none" })
+  ),
   vendors: S.Array(Vendor).check(S.isMaxLength(3)).annotate({ description: "Up to three vendors" }).annotateKey({
     description: "Who the item can be bought from: up to three, at most one of them preferred; empty for none"
   })
@@ -208,10 +216,12 @@ export const ItemEdit = S.Struct({
     messageMissingKey: "Send the revision of the item the change was made on."
   }),
   name: ItemFields.fields.name.annotateKey({ messageMissingKey: "Give the item a name." }),
-  description: S.NullOr(S.String.check(S.isMaxLength(32767))).annotateKey({
-    description: "Free text about the item; null for none",
-    messageMissingKey: "Give a description, or null for none."
-  }),
+  description: S.String.check(S.isMaxLength(32767)).pipe(
+    nullAsNone({
+      description: "Free text about the item; null for none",
+      messageMissingKey: "Give a description, or null for none."
+    })
+  ),
   category: Category.annotateKey({ messageMissingKey: "Choose the category." }),
   uom: Uom.annotateKey({ messageMissingKey: "Choose the unit of measure." }),
   unitCost: ItemFields.fields.unitCost.annotateKey({ messageMissingKey: "Give the unit cost." }),
@@ -255,7 +265,7 @@ export const editProblem = (edit: ItemEdit): string | null => {
       : `${label} "${date}" is not a day on the calendar, written year-month-day.`
   if (Str.trim(edit.name) === "") return "Name is empty. Every item needs a name."
   return (
-    badDate("First received", edit.firstReceivedOn) ??
+    badDate("First received", Option.getOrNull(edit.firstReceivedOn)) ??
     badDate("Discontinued on", edit.discontinuedOn) ??
     (edit.discontinuedOn !== null && edit.isActive
       ? "A discontinued item is not active. Clear the discontinued date, or mark the item not active."
@@ -389,8 +399,9 @@ export const readItemForm = (input: {
   const name = Str.trim(form.name)
   const description = Str.trim(form.description)
   const cost = readDecimal(form.unitCost)
-  const optional = <A>(text: string, read: (text: string) => Option.Option<A>): Option.Option<A | null> =>
-    Str.trim(text) === "" ? Option.some(null) : read(text)
+  // None: the box holds something that cannot be read. Some(none): the box is empty, which an optional value may be.
+  const optional = <A>(text: string, read: (text: string) => Option.Option<A>): Option.Option<Option.Option<A>> =>
+    Str.trim(text) === "" ? Option.some(Option.none()) : Option.map(read(text), Option.some)
   const quantity = Str.trim(form.quantityOnHand) === "" ? Option.some(0) : readCount(form.quantityOnHand)
   const reorder = optional(form.reorderPoint, readCount)
   const received = optional(form.firstReceivedOn, readDate)
@@ -446,16 +457,16 @@ export const readItemForm = (input: {
     edit: {
       revision: input.revision,
       name,
-      description: description === "" ? null : description,
+      description: description === "" ? Option.none() : Option.some(description),
       category: form.category,
       uom: form.uom,
       unitCost: Option.getOrElse(cost, () => "0"),
       quantityOnHand: Option.getOrElse(quantity, () => 0),
-      reorderPoint: Option.getOrNull(reorder),
+      reorderPoint: Option.flatten(reorder),
       isActive: form.isActive,
       lotTracked: form.lotTracked,
-      firstReceivedOn: Option.getOrNull(received),
-      discontinuedOn: Option.getOrNull(discontinued)
+      firstReceivedOn: Option.flatten(received),
+      discontinuedOn: Option.getOrNull(Option.flatten(discontinued))
     }
   }
 }

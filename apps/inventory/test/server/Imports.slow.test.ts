@@ -47,7 +47,7 @@ layer(TypedApp)("an import of items", (it) => {
         const confirmed = yield* client.imports
           .commit({ params: { id: staged.id }, payload: { set: {}, clear: [] } })
           .pipe(marcus)
-        const result = Option.getOrThrow(Option.fromNullishOr(confirmed.result))
+        const result = Option.getOrThrow(confirmed.result)
         expect([result.created, result.updated, result.already, result.notImported]).toEqual([155, 0, 0, 45])
         expect(result.fixed).toEqual({ rows: 16, cells: 19 })
         const outcomeOf = (n: number) => Arr.findFirst(result.rows, (row) => row.rowNumber === n)
@@ -68,17 +68,19 @@ layer(TypedApp)("an import of items", (it) => {
           lotTracked: false,
           discontinuedOn: "2025-02-26",
           tags: ["fragile"],
-          dimensions: { length: 97.4, width: 6.9, height: 4.4, unit: "cm" }
+          dimensions: Option.some({ length: 97.4, width: 6.9, height: 4.4, unit: "cm" })
         })
         expect(crate.vendors[1]).toEqual({
           vendorName: "Tidewater Fasteners",
-          vendorSku: null,
+          vendorSku: Option.none(),
           unitCost: "3.87",
-          leadTimeDays: 43,
+          leadTimeDays: Option.some(43),
           isPreferred: false
         })
         // "Internal Notes" was never stored: no item carries the text.
-        expect(Arr.some(stored, (item) => Str.includes("purchasing")(item.description ?? ""))).toBe(false)
+        expect(
+          Arr.some(stored, (item) => Str.includes("purchasing")(Option.getOrElse(item.description, () => "")))
+        ).toBe(false)
 
         // The Items table's questions run in SQL: a cost filter, a select, a search and the facets.
         const page = yield* client.items
@@ -112,7 +114,11 @@ layer(TypedApp)("an import of items", (it) => {
         const second = yield* client.imports
           .commit({ params: { id: again.id }, payload: { set: {}, clear: [] } })
           .pipe(marcus)
-        expect([second.result?.created, second.result?.already, second.result?.notImported]).toEqual([1, 154, 45])
+        expect([
+          Option.getOrUndefined(second.result)?.created,
+          Option.getOrUndefined(second.result)?.already,
+          Option.getOrUndefined(second.result)?.notImported
+        ]).toEqual([1, 154, 45])
         expect((yield* client.items.list().pipe(marcus)).length).toBe(156)
 
         // A file whose row says something else than a stored item: it waits, and only "replace" changes the item.
@@ -126,7 +132,11 @@ layer(TypedApp)("an import of items", (it) => {
         const replaced = yield* client.imports
           .commit({ params: { id: third.id }, payload: { set: { "row-2": { stored: "replace" } }, clear: [] } })
           .pipe(marcus)
-        expect([replaced.result?.updated, replaced.result?.already, replaced.result?.created]).toEqual([1, 24, 0])
+        expect([
+          Option.getOrUndefined(replaced.result)?.updated,
+          Option.getOrUndefined(replaced.result)?.already,
+          Option.getOrUndefined(replaced.result)?.created
+        ]).toEqual([1, 24, 0])
         const after = yield* client.items.list().pipe(marcus)
         const insert = Option.getOrThrow(Arr.findFirst(after, (item) => item.sku === "SHH-9574"))
         expect([insert.name, insert.revision, after.length]).toEqual(["Oak Foam Insert XL", 2, 181])
@@ -162,7 +172,11 @@ layer(TypedApp)("an import of items", (it) => {
         const taken = yield* client.imports
           .takeBack({ params: { id: first.id }, payload: { confirms: before.takeBack.confirms } })
           .pipe(marcus)
-        expect([taken.status, taken.result?.takenBack, taken.result?.created]).toEqual(["takenBack", 24, 1])
+        expect([
+          taken.status,
+          Option.getOrUndefined(taken.result)?.takenBack,
+          Option.getOrUndefined(taken.result)?.created
+        ]).toEqual(["takenBack", 24, 1])
         expect((yield* client.items.list().pipe(marcus)).length).toBe(157)
       })
   )

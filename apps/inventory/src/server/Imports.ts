@@ -52,7 +52,7 @@ export const Draft = S.Struct({
   status: S.Literals(["open", "imported", "takenBack"]),
   actorName: S.String,
   createdAt: Instant,
-  importedBy: S.NullOr(S.String),
+  importedBy: S.OptionFromNullOr(S.String),
   importedAt: S.OptionFromNullOr(Instant),
   revision: S.Int,
   needsAtStart: S.Int,
@@ -93,7 +93,7 @@ const textOf = (item: ItemFields | null): number =>
     ? 0
     : 600 +
       item.name.length +
-      (item.description ?? "").length +
+      Option.getOrElse(item.description, () => "").length +
       Arr.reduce(item.tags, 0, (total, tag) => total + tag.length + 3) +
       Arr.reduce(item.vendors, 0, (total, vendor) => total + vendor.vendorName.length + 120)
 
@@ -139,7 +139,7 @@ export const ItemRow = S.Struct({
   isActive: S.BooleanFromBit,
   lotTracked: S.BooleanFromBit,
   tags: S.String.pipe(S.Array, S.fromJsonString),
-  dimensions: Dimensions.pipe(S.fromJsonString, S.NullOr),
+  dimensions: Dimensions.pipe(S.fromJsonString, S.OptionFromNullOr),
   vendors: Vendor.pipe(S.Array, S.fromJsonString)
 }).annotate({ description: "An item row as SQLite stores it" })
 
@@ -228,7 +228,7 @@ const BatchRow = S.Struct({
   updated: S.Int,
   already: S.Int,
   notImported: S.Int,
-  takenBackByName: S.NullOr(S.String),
+  takenBackByName: S.OptionFromNullOr(S.String),
   takenBackAt: S.OptionFromNullOr(Instant),
   takeBackId: S.NullOr(S.String),
   removed: S.Int,
@@ -239,7 +239,7 @@ const BatchRow = S.Struct({
 const ChangedItemRow = S.Struct({
   sku: S.String,
   name: S.String,
-  changedBy: S.NullOr(S.String),
+  changedBy: S.OptionFromNullOr(S.String),
   changedAt: S.OptionFromNullOr(Instant)
 }).annotate({ description: "An item someone changed after the import, with who and when as stored" })
 
@@ -1426,12 +1426,13 @@ export class Imports extends Context.Service<
             already: row.already,
             notImported: row.notImported
           }),
-          ...(Option.isNone(row.takenBackAt) || !firstOf(row)
+          // A take-back stamps who and when in one statement: an event is said only when both are stored.
+          ...(Option.isNone(row.takenBackAt) || Option.isNone(row.takenBackByName) || !firstOf(row)
             ? []
             : [
                 ImportEvent.cases.TakenBack.make({
                   batchId: row.id,
-                  by: row.takenBackByName ?? "",
+                  by: row.takenBackByName.value,
                   at: row.takenBackAt.value,
                   removed: Arr.reduce(sameTakeBack(row), 0, (total, other) => total + other.removed),
                   restored: Arr.reduce(sameTakeBack(row), 0, (total, other) => total + other.restored),
@@ -1507,7 +1508,7 @@ export class Imports extends Context.Service<
             ChangedItem.make({
               sku: row.sku,
               name: row.name,
-              changedBy: row.changedBy ?? "",
+              changedBy: row.changedBy,
               changedAt: row.changedAt
             })
           )

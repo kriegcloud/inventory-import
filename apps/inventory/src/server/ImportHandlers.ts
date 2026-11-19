@@ -146,20 +146,21 @@ export const ImportHandlers = HttpApiBuilder.group(
           fixedCells: current.fixed.cells,
           rows: current.counts.rows
         },
-        // A confirmed import always has the moment of its confirm: the same statement writes both.
-        result: Option.isSome(draft.importedAt)
-          ? {
-              importedBy: draft.importedBy ?? "",
-              importedAt: draft.importedAt.value,
-              created: tally("created"),
-              updated: tally("updated"),
-              already: tally("already"),
-              notImported: tally("notImported"),
-              takenBack: tally("takenBack"),
-              fixed,
-              rows: outcomes
-            }
-          : null,
+        // A confirm stamps who and when in one statement: there is a result once both are stored.
+        result:
+          Option.isSome(draft.importedAt) && Option.isSome(draft.importedBy)
+            ? Option.some({
+                importedBy: draft.importedBy.value,
+                importedAt: draft.importedAt.value,
+                created: tally("created"),
+                updated: tally("updated"),
+                already: tally("already"),
+                notImported: tally("notImported"),
+                takenBack: tally("takenBack"),
+                fixed,
+                rows: outcomes
+              })
+            : Option.none(),
         history,
         takeBack
       })
@@ -270,19 +271,20 @@ export const ImportHandlers = HttpApiBuilder.group(
         const draft = yield* find(actor, params.id)
         if (draft.status !== "open") return yield* closed(draft)
         const table = yield* imports.table(actor.organizationId, draft)
-        const column = Arr.findFirst(table.columns, (candidate) => candidate.index === payload.column)
-        if (payload.column !== null && Option.isNone(column)) {
+        const asked = Option.getOrNull(payload.column)
+        const column = Arr.findFirst(table.columns, (candidate) => candidate.index === asked)
+        if (Option.isSome(payload.column) && Option.isNone(column)) {
           return yield* ColumnNotFound.make({ reason: `${draft.fileName} has no column at that position.` })
         }
         const before = yield* imports.choices(draft)
         // The same match again (a second press, a retry) is the same match: nothing is taken back, dropped or
         // written to the audit trail a second time.
-        if (Arr.some(before, (choice) => choice.field === payload.field && choice.column === payload.column)) {
+        if (Arr.some(before, (choice) => choice.field === payload.field && choice.column === asked)) {
           return yield* viewOf(actor, draft)
         }
         const next: ReadonlyArray<MappingChoice> = [
           ...Arr.filter(before, (choice) => choice.field !== payload.field),
-          { field: payload.field, column: payload.column, by: "person" }
+          { field: payload.field, column: asked, by: "person" }
         ]
         // This field will read another column: an accept of a proposal about it goes.
         yield* dropAccepts(actor, draft, (proposal) => proposal.field === payload.field)

@@ -7,8 +7,8 @@
 #
 # A plain file is the simplest thing that works on one machine. On a team project these values would not live on
 # disk: they would come from a secrets manager at start-up (for example `op run -- bun run dev` with references into a
-# password manager), and the deployed Worker reads them from the platform's encrypted store
-# (`wrangler secret put OPENROUTER_API_KEY`), never from a file or from wrangler.jsonc.
+# password manager), and the deployed Worker reads them from the platform's encrypted store, put there by the stack
+# (packages/infra/src/Inventory.stack.ts), never from a file or from wrangler.jsonc.
 #
 # Non-secret settings have their defaults in wrangler.jsonc `vars`, where they are reviewed like code. A line here
 # overrides that default locally. An empty value counts as not set.
@@ -41,7 +41,7 @@ OPENROUTER_API_KEY=
 # Secret. Signs the session cookies: at least 32 random characters. Make one with
 #   openssl rand -base64 32
 # `bun run dev` writes one into .dev.vars the first time, when the file has none, so nothing has to be done locally.
-# Without it a production build refuses to start. Deployed: `wrangler secret put BETTER_AUTH_SECRET`.
+# Without it a production build refuses to start. Deployed: the stack mints one for each stage.
 # BETTER_AUTH_SECRET=
 # The address people open the app at, deployed (https://app.example.com). Unset locally: each request's own origin is
 # used, so any dev or preview port works. When set, it is the one trusted origin, and cookies are Secure exactly when

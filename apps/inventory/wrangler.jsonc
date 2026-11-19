@@ -13,7 +13,7 @@
     {
       "binding": "DB",
       "database_name": "inventory",
-      // Local dev ignores this id. `bun run deploy:setup` writes the real one.
+      // Local dev and the tests ignore this id. A deployed database is the stack's (packages/infra), not this file's.
       "database_id": "00000000-0000-0000-0000-000000000000",
       "migrations_dir": "migrations"
     }

@@ -15,16 +15,17 @@ as a step of its own.
 | --- | --- | --- |
 | 1 | The seed rows out of the migration into `seeds/`; the local script and the tests apply them | done |
 | 2 | Sign-up closed, with a first-admin path (I8) | done |
-| 3 | `packages/infra`: the stage schema, `planFor` and its test | doing |
-| 4 | Alchemy at one exact version; the two stacks; `deploy.yml`, not merged to `main` | todo |
-| 5 | Browser pass, the documents the moves made false, and the hand-over list | todo |
+| 3 | `packages/infra`: the stage schema, `planFor` and its test | done |
+| 4 | Alchemy at one exact version; the two stacks; `deploy.yml`, not merged to `main` | done |
+| 5 | Browser pass, the documents the moves made false, and the hand-over list | done |
 
 **Not done by this goal, and Benjamin's:** step 5 of the brief (his Cloudflare login and `alchemy state bootstrap`)
 and everything after it.
 
 ## Current blocker
 
-None.
+The next step is Benjamin's Cloudflare login and `alchemy state bootstrap`. Nothing more can be built or learned on
+this machine alone; "What Benjamin does by hand" below is the list, in order.
 
 ## Choices made
 
@@ -42,6 +43,36 @@ Where the brief left a choice open, or the code showed the brief could not be fo
   account ever made is allowed), because whoever reaches a new deployment first would own it; and a secret invite
   code, because it is one more secret to keep. That choice, and the two new sentences on the sign-in page, are his
   to change.
+
+- **A stage's differences are data, decided in one function.** `planFor(stage)` gives the plan (address, seeds,
+  where the model key and the sign-up list come from, whether it is deployed at all) and the stacks only read it.
+  The brief's `SecretReference` type was not built: no code holds a reference, `env/op.env` does, and 1Password
+  fills a variable for one process, so the plan names a variable, never a reference.
+- **An unknown stage stops both stacks.** The stage service refuses any name but `prod`, `pr-<number>` and
+  `test_<user>`, so a deploy typed without `--stage` (Alchemy names it `live_<user>`) makes nothing. It stops as a
+  defect with a sentence saying what to type, because a stack's only typed failure is a missing setting.
+- **A preview and production both take `SIGN_UP`; a test stage takes none.** The brief's table did not say who may
+  open an account on a preview. A preview has the two test organizations and no accounts, so with sign-up closed
+  nobody could open it; it reads the same `SIGN_UP` list as production from its GitHub environment. A test stage
+  has the five test accounts and closed sign-up.
+- **A test stage has the test accounts on a public `workers.dev` address**, as the brief's table says. Their
+  password is in the repository, so anyone who finds the address can sign in to that stage's two test organizations.
+  It holds no real data and is destroyed after the proof; whether that is acceptable is Benjamin's.
+- **Production deploys without a model key when none is given**, and the stack's output says "the rules answer".
+  The app is complete without a key, and a first deploy should not wait on one. A mistyped secret name therefore
+  shows as rules answering, not as a failed deploy.
+- **The model's name is in two places**: `apps/inventory/wrangler.jsonc` (local) and `Inventory.stack.ts`
+  (deployed). Alchemy's Vite build was not shown to read `wrangler.jsonc`'s `vars`, so the stack states them.
+- **The GitHub stack takes three names from the environment**, since none is in the repository and none is a
+  secret: `PRODUCTION_CLOUDFLARE_ACCOUNT_ID`, `PREVIEW_CLOUDFLARE_ACCOUNT_ID` and `PRODUCTION_APPROVER` (the GitHub
+  login that approves a production deploy). `SIGN_UP` defaults to `closed`; `OPENROUTER_API_KEY` is optional.
+- **The rule on `main`** (I7): a pull request, the check named "Check, test and build" (the job in `ci.yml`), no
+  deletion and no force push, and the repository's admin role may bypass it always. No approving review is
+  required, since one person works here.
+- **`deploy`, `deploy:setup` and `scripts/deploy-setup.mjs` are removed**, as the brief's Map says. No script was
+  added anywhere: a deploy is `bunx alchemy deploy --stage <name>`, and the workflow calls the same.
+- **Each stack provides its one layer where it is declared**, with the `strictEffectProvide` diagnostic turned off
+  on that one line in each: a stack file is the entry point the CLI runs.
 
 ## Seen in the browser: sign-up
 
@@ -64,3 +95,72 @@ Port 5200, fresh database. The dev server was restarted with `SIGN_UP` (and `TES
 
 Not seen: a production build in the browser (the tests run one: `SignUp.slow.test.ts`), phone width and the dark
 theme for these two sentences, and a second named person joining an existing organization.
+
+## Proved without a cloud
+
+- `bun run check:full` passes: the two stacks type-check against Alchemy 2.0.0-beta.87 under the full strictness
+  profile, with `effect` still 4.1.4 for the whole repository.
+- `packages/infra/test/StagePlan.test.ts`: each of the four stage kinds maps to its plan; production has no seed,
+  the real host name and no `workers.dev`; `live_<user>` and other names are refused.
+- `packages/infra/test/InfraStage.test.ts`: the service hands a stack the plan of `pr-42`; a deploy named
+  `live_ben` or `dev_ben` stops before any resource; both stack modules load on Node from the repository alone.
+- `apps/inventory/test/server/SignUp.slow.test.ts`: a production build refuses a sign-up with 403 and the sentence;
+  a named email becomes the admin of the organization it creates. Seen in the browser, above.
+- The migration creates no organization and no member; development and the tests get theirs from `seeds/`.
+- The cleanup job's guard was read, not run: its `case` accepts `pr-` followed by one to six digits, the first not
+  zero, and nothing else.
+
+Not proved here: that any Alchemy command runs. None was run, by design: `plan` and `deploy` need an account.
+
+## What cannot be known until the first apply
+
+1. Whether `Cloudflare.Website.Vite` builds this app with its own `vite.config.ts`, which already loads
+   `@cloudflare/vite-plugin` and reads `wrangler.jsonc`; and whether the Worker then gets the stack's `env` and not
+   the file's zero database id.
+2. Whether D1's migration applier takes `0001_init.sql` whole: the triggers' bodies hold semicolons, and the search
+   index uses the FTS5 trigram tokenizer. Both have only ever run locally.
+3. Whether the seeds import through D1's import API (`importFiles`), including the password hashes in
+   `accounts.sql`.
+4. Whether `Alchemy.Random(...).text` arrives as a secret binding the Worker reads as `BETTER_AUTH_SECRET`, and
+   `Cloudflare.Worker.URL` as an `https:` `BETTER_AUTH_URL` that sign-in accepts as its one origin.
+5. The CPU a sign-in (password hashing) and a 155-item confirm take against the plan's limit (I9).
+6. Whether the deploy tokens' permission groups are enough, for the state store and for attaching the host name;
+   a missing one shows as a refused call that names it.
+7. Whether the zone `beep-effect.com` is in the production account, and "Always Use HTTPS" is on.
+8. How the ruleset treats the required check before it has ever run on a pull request, and whether GitHub's id of
+   the admin role is 5 for this repository.
+9. Whether the state store encrypts what it keeps, as its documentation says; a minted secret and the model key
+   both end there.
+10. Whether a pull request's `closed` event still reaches the `preview` environment's secrets, which the cleanup
+    job needs.
+
+## What Benjamin does by hand, in order
+
+Nothing below was started. Every command names its stage.
+
+1. **Cloudflare accounts.** One that holds the zone `beep-effect.com`, on Workers Paid (I9); a second for previews
+   and test stages (I4).
+2. **Log in on the workstation** to each account (`bunx alchemy profile create`, one profile for each).
+3. **`bunx alchemy state bootstrap`** in the preview account. This is the first thing that exists outside this
+   machine: the state store's Worker.
+4. **A test stage in the preview account**: `bunx alchemy plan --stage test_<user>`, read it, then `bunx alchemy
+   deploy --stage test_<user>`. Open the address it prints; sign in as a test account; load `items_messy.csv`
+   through Confirm and read 155 stored; search the Items page. Points 1 to 5 above are settled here. Then
+   `bunx alchemy destroy --stage test_<user>`.
+5. **`bunx alchemy state bootstrap`** in the production account.
+6. **Write production's model key reference** into `packages/infra/env/op.env` as
+   `OPENROUTER_API_KEY=op://<vault>/<item>/<field>`, or leave it out and production's rules answer.
+7. **Decide who may open an account**: the emails for `SIGN_UP`, his own first.
+8. **`gh auth login`** with rights over the repository's settings, then the repository's stack, from the
+   production account's profile:
+   `PRODUCTION_CLOUDFLARE_ACCOUNT_ID=... PREVIEW_CLOUDFLARE_ACCOUNT_ID=... PRODUCTION_APPROVER=<his GitHub login>
+   SIGN_UP=<emails> op run --env-file packages/infra/env/op.env -- bunx alchemy deploy
+   packages/infra/src/GitHub.stack.ts --stage prod`, after the same line with `plan`. Points 6 and 8 are settled here.
+9. **Production**: `SIGN_UP=<emails> bunx alchemy plan --stage prod`, read it, then `deploy`. Open
+   `https://inventory.beep-effect.com`: the sign-in page offers no sign-up to a stranger; his email signs up, creates
+   the organization and is its admin.
+10. **On the zone**: "Always Use HTTPS" confirmed on.
+11. **Push the branch and merge it**, so `deploy.yml` reaches `main`. From then a pull request gets a preview and a
+    push to `main` waits for his approval in the `production` environment.
+12. **Adding a person later**: add their email to `SIGN_UP` (step 8 again, so both environments have it), deploy,
+    and they sign up; or they sign up and an admin adds them on the People page.

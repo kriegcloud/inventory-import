@@ -73,7 +73,7 @@ values in `.dev.vars.example`). After pulling a change to `apps/inventory/migrat
 | `bun run preview` | The production build on http://localhost:4173, with every security header, compressed as Cloudflare compresses it (`PREVIEW_COMPRESSION=off` sends it as it is) |
 | `bun run --cwd apps/inventory build:report` | The production build, and what each of its chunks is made of (`.scratch/bundle/client.html`, a treemap) |
 | `bun run auth:schema` | After a change to Better Auth's options, prints the migration it still needs (Node 22.18 or newer) |
-| `bun run --cwd apps/inventory deploy:setup`, then `deploy` | Host it on Cloudflare (both need a Cloudflare login) |
+| `bunx alchemy deploy --stage <name>` | Host it on Cloudflare: the stack in `packages/infra` makes the database and the Worker (needs a Cloudflare login; [goals/infra/PLAN.md](goals/infra/PLAN.md) has the steps, in order) |
 
 ### Signing in
 
@@ -95,7 +95,7 @@ organizations switches in the menu under their name.
 
 Sessions are signed with `BETTER_AUTH_SECRET`. The first `bun run dev` writes a random one into `apps/inventory/.dev.vars`
 (git-ignored) when that file has none, so there is nothing to set up; to make your own, run `openssl rand -base64 32`
-(`.dev.vars.example` has the line). A deployed copy needs `wrangler secret put BETTER_AUTH_SECRET`: a production build
+(`.dev.vars.example` has the line). A deployed copy gets its own from the stack in `packages/infra`, which mints one for each stage; a production build
 refuses to start without it.
 
 New passwords can be checked against known data breaches (Have I Been Pwned: only the first five characters of the
@@ -161,6 +161,7 @@ apps/inventory/src/web/      React 19, Tailwind 4, shadcn/ui, TanStack Query
 apps/inventory/migrations/   D1 (SQLite) schema
 packages/foundation/         @beep/csv and @beep/xlsx (the CSV and Excel readers and writers) and @beep/types,
                              @beep/identity, @beep/schema, @beep/utils, vendored from beep-effect and hash-checked
+packages/infra/              What is deployed, per stage: the stage plan and the two Alchemy stacks
 turbo.json                   check, lint, test, test:slow, build and dev per package; format, docs and key checks at the root
 ```
 

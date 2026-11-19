@@ -59,8 +59,8 @@ console.log('Local database: test accounts ready (README.md, "Signing in").')
 // A development secret for the session cookies, so sign-in works from the first `bun run dev` and a restart keeps
 // everyone signed in. Written once into .dev.vars (git-ignored, beside the app), and only when it has no
 // BETTER_AUTH_SECRET with a value: the script looks for that one line and changes nothing else in the file. The same
-// 32 random bytes as `openssl rand -base64 32`. A deployed copy never reads this file: it uses
-// `wrangler secret put BETTER_AUTH_SECRET` (.dev.vars.example).
+// 32 random bytes as `openssl rand -base64 32`. A deployed copy never reads this file: the stack mints its
+// secret (packages/infra/src/Inventory.stack.ts).
 const devVars = new URL("../.dev.vars", import.meta.url)
 const current = existsSync(devVars) ? readFileSync(devVars, "utf8") : ""
 if (!/^\s*BETTER_AUTH_SECRET\s*=\s*\S/m.test(current)) {

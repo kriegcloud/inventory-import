@@ -1,0 +1,103 @@
+name: Deploy
+
+# A preview for each pull request, destroyed when it closes; production on a push to main, after the approval the
+# `production` environment asks for. The environments, their secrets and variables are made by the repository's
+# stack (packages/infra/src/GitHub.stack.ts), deployed from a workstation. No job here can destroy any stage but
+# `pr-<number>`, and no job deploys the repository's stack.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.event.pull_request.number || 'prod' }}
+  cancel-in-progress: false
+
+jobs:
+  preview:
+    name: Preview
+    # A pull request from a fork gets no secret, so it gets no preview.
+    if: >-
+      github.event_name == 'pull_request' && github.event.action != 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: preview
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      SIGN_UP: ${{ vars.SIGN_UP }}
+      STAGE: pr-${{ github.event.pull_request.number }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - name: Deploy the preview
+        run: bunx alchemy deploy --stage "$STAGE" --yes
+
+  cleanup:
+    name: Remove the preview
+    if: >-
+      github.event_name == 'pull_request' && github.event.action == 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: preview
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      SIGN_UP: ${{ vars.SIGN_UP }}
+      STAGE: pr-${{ github.event.pull_request.number }}
+    steps:
+      # The one destroy in any workflow. It refuses every name but pr-<number>, so production's database and a
+      # person's test stage are out of its reach whatever the event says.
+      - name: Refuse any stage but a preview
+        run: |
+          case "$STAGE" in
+            pr-[1-9]|pr-[1-9][0-9]|pr-[1-9][0-9][0-9]|pr-[1-9][0-9][0-9][0-9]|pr-[1-9][0-9][0-9][0-9][0-9]|pr-[1-9][0-9][0-9][0-9][0-9][0-9]) ;;
+            *) echo "Refusing to destroy \"$STAGE\": only pr-<number> may be destroyed by a workflow." >&2; exit 1 ;;
+          esac
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - name: Destroy the preview
+        run: bunx alchemy destroy --stage "$STAGE" --yes
+
+  production:
+    name: Production
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Waits for the approval the environment asks for.
+    environment: production
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      SIGN_UP: ${{ vars.SIGN_UP }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - name: Deploy production
+        run: bunx alchemy deploy --stage prod --yes

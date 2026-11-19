@@ -85,6 +85,9 @@ Each step ends with the full check and an import of the messy sample in a browse
 
 ## Trail
 
+- 2026-11-19: [goals/infra](../../goals/infra/SPEC.md) built as far as this machine allows: the seeds out of the
+  migration, closed sign-up, `@beep/infra` with the stage plan and the two stacks, `deploy.yml`. Nothing deployed;
+  the next step is Benjamin's login and `alchemy state bootstrap` ([PLAN](../../goals/infra/PLAN.md)).
 - 2026-11-19: Benjamin answered BRIEF-atoms.md (A1 to A5) and said it matches; its goal opens after infra.
 - 2026-11-19: Benjamin answered BRIEF-infra.md (I1 to I9) and said it matches; order of work: the Effect-imports
   migration, then infra, then atoms.

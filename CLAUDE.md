@@ -255,7 +255,9 @@ package's task and replays it when nothing it reads has changed. The app's own s
 | `build:report` | The browser's build, then each chunk's makeup by package, largest first (`-- index` for one chunk); the treemap is `.scratch/bundle/client.html` |
 | `lighthouse` | Lighthouse on the production build, mobile and desktop. `-- /path` for another page. Prints the scores and every audit that scored below 100 |
 | `auth:schema` | After a change to Better Auth's options, prints the migration it still needs |
-| `deploy:setup`, `deploy` | Host it on Cloudflare (both need a Cloudflare login) |
+
+Hosting is not a script: `bunx alchemy deploy --stage <name>` from the root runs the stack in `packages/infra`, and
+only Benjamin runs it (`goals/infra/PLAN.md`, "What Benjamin does by hand").
 
 If you add or remove a dependency, do it with `bun add` or `bun remove` in the workspace that uses it
 (`bun add --cwd apps/inventory <name>`); `bun.lock` at the root is the only lockfile, and `bunfig.toml` keeps one
@@ -308,6 +310,12 @@ packages/catalog/        The catalog context (items and the imports that write t
                         and the allowance as the catalog asks them) and web/ (the import's steps, the Items page, the
                         editor, the assistant, the upload).
 packages/kernel/, packages/drivers/   @inventory/kernel and the @beep drivers (d1, better-auth, openrouter).
+packages/infra/          @beep/infra: what is deployed, per stage. The stage plan as a schema and a pure function
+                        (`StagePlan.rules.ts`: what each stage gets, decided from its name), the app's Alchemy stack
+                        (`Inventory.stack.ts`: one D1 database, one Worker) and the repository's (`GitHub.stack.ts`:
+                        the deploy environments, their secrets, the rule on main). Nothing in the app imports it.
+alchemy.run.ts          The app's stack, re-exported for `bunx alchemy deploy --stage <name>`. A deploy is Benjamin's:
+                        no agent runs `alchemy deploy`, `plan`, `destroy`, `login` or `state` (goals/infra/PLAN.md).
 packages/foundation/     Product-neutral packages: this repository's own @beep/csv and @beep/xlsx (modeling/), which read
                         and write a CSV and an Excel workbook as Effect Schema codecs, and beep-effect's kit, vendored:
                         @beep/types (primitive/), @beep/identity, @beep/schema and @beep/utils (modeling/). Never edit
@@ -473,8 +481,8 @@ The API runs in workerd, locally and deployed. Measured in this repo:
   A file that cannot be read or staged is a `FileProblem` (`packages/catalog/contract/src/Staging/FileProblem.read.ts`), data the screen shows; a
   server step that stages a file answers 200 with `StagingOutcome`, what it made or that problem.
 - **PDFs**: `unpdf` reads text from a PDF in the browser and in the Worker. Nothing for PDFs is installed.
-- **Secrets** and settings come from `wrangler.jsonc` `vars` and `.dev.vars` locally, `wrangler secret put` deployed,
-  and are read only through `src/server/Settings.ts` (secrets as `Config.Redacted`; pattern 9). No agent reads or
+- **Secrets** and settings come from `wrangler.jsonc` `vars` and `.dev.vars` locally, and from the stack deployed
+  (`packages/infra/src/Inventory.stack.ts`, the Worker's `env`), and are read only through `src/server/Settings.ts` (secrets as `Config.Redacted`; pattern 9). No agent reads or
   prints `.dev.vars`: the app and the project's scripts read it themselves. New bindings are
   declared in `wrangler.jsonc` and typed in `src/server/env.d.ts`; each new variable goes in `.dev.vars.example`.
 - **Security headers** are in `public/_headers` (static files) and `src/server/security.ts` (API): nothing from

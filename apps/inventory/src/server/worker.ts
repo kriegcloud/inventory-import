@@ -9,8 +9,8 @@ import { signIn } from "@inventory/access-host/SignIn"
 import { collector } from "./Telemetry.ts"
 
 // Cloudflare Worker entry: the app (App.ts) on the D1 binding, with every setting and secret read through one
-// ConfigProvider built from this Worker's `env` (wrangler.jsonc `vars`, and `.dev.vars` or `wrangler secret put`
-// for secrets). Nothing else reads `env`; bindings such as `DB` are passed here and nowhere else. Tracing that leaves
+// ConfigProvider built from this Worker's `env` (wrangler.jsonc `vars` and `.dev.vars` locally, the stack's `env`
+// deployed). Nothing else reads `env`; bindings such as `DB` are passed here and nowhere else. Tracing that leaves
 // the Worker (RequestTelemetry.ts) is built per request and finished under `waitUntil` after the answer.
 
 const settings = ConfigProvider.layer(ConfigProvider.fromUnknown(env))

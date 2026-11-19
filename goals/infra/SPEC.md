@@ -40,17 +40,22 @@ setting or secret is touched, nothing is deployed or planned against a real acco
 
 ## Acceptance
 
-- [ ] `apps/inventory/migrations/0001_init.sql` inserts no organization and no member; the seeds are in
+- [x] `apps/inventory/migrations/0001_init.sql` inserts no organization and no member; the seeds are in
       `apps/inventory/seeds/`; development and the tests still have their two organizations and five accounts.
-- [ ] Sign-up is closed (I8): the public sign-up endpoint refuses, the sign-in page offers no sign-up, and the first
+- [x] Sign-up is closed (I8): the public sign-up endpoint refuses, the sign-in page offers no sign-up, and the first
       admin of an organization is made the way PLAN describes; a test holds each, and each was seen in the browser.
-- [ ] `packages/infra` exists with the stage schema, `planFor` and its test: every stage kind maps to its plan,
+- [x] `packages/infra` exists with the stage schema, `planFor` and its test: every stage kind maps to its plan,
       production has no seed and no `workers.dev` address, a name outside the four kinds is refused.
-- [ ] The app's stack and the GitHub stack are written against Alchemy at one exact version and type-check.
-- [ ] `.github/workflows/deploy.yml` exists and cannot destroy any stage but `pr-<number>`.
-- [ ] `bun run check:full` passes on the last commit.
-- [ ] PLAN lists what was proved without a cloud, what cannot be known until the first apply, and what Benjamin
+- [x] The app's stack and the GitHub stack are written against Alchemy at one exact version and type-check.
+- [x] `.github/workflows/deploy.yml` exists and cannot destroy any stage but `pr-<number>`.
+- [x] `bun run check:full` passes on the last commit.
+- [x] PLAN lists what was proved without a cloud, what cannot be known until the first apply, and what Benjamin
       does by hand, in order.
+
+## Where it stands
+
+Every acceptance line holds on this machine. The goal stays active: the deploy and what it settles are in
+[PLAN](PLAN.md), "What cannot be known until the first apply" and "What Benjamin does by hand".
 
 ## Decisions
 

@@ -1,4 +1,4 @@
-// Bindings and variables from wrangler.jsonc, plus secrets from .dev.vars (local) or `wrangler secret put` (deployed).
+// Bindings and variables from wrangler.jsonc, plus secrets from .dev.vars (local) or the stack's `env` (deployed).
 // Only worker.ts reads `env`, and only to pass the D1 binding and to build the ConfigProvider that src/server/Settings.ts
 // reads every setting through. Valid values for each are in .dev.vars.example.
 interface Env {

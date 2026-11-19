@@ -57,8 +57,7 @@ What to try first, on the brief's messy file (`public/samples/items_messy.csv`, 
 
 `items_clean.csv` (25 items) imports as it is: all 25 Ready, nothing to decide.
 
-AI features are optional. To turn them on, copy `apps/inventory/.dev.vars.example` to `apps/inventory/.dev.vars` and add an OpenRouter key (or a
-Vercel AI Gateway key). Without a key the app says so and uses its non-AI path.
+AI features are optional. To turn them on, copy `apps/inventory/.dev.vars.example` to `apps/inventory/.dev.vars` and add an OpenRouter key. Without a key the app says so and uses its non-AI path.
 
 The API reference (Scalar) is at http://localhost:5173/api/v1/docs while `bun run dev` runs; the OpenAPI document is
 at `/api/v1/openapi.json` in development and production. Logs: `LOG_LEVEL` and `LOG_FORMAT` in `.dev.vars` (valid
@@ -131,7 +130,8 @@ What the starter held, now turned to the brief's inventory item:
 - An import in four steps (`src/web/pages/import/`): upload in pieces, match columns, review every row with the
   review region (`docs/review-table.md`), and a result counted from what is stored, with a take-back.
 - The Items page (paged by the server, one forgiving search box, a table assistant), Activity and People.
-- One AI service on the Vercel AI SDK with one daily allowance of model calls; without a key its rules answer.
+- One AI service on `effect/ai` and OpenRouter (`@beep/openrouter`) with one daily allowance of model calls; without a
+  key its rules answer.
 - The toolchain: Vite, React, Tailwind, every shadcn/ui component and more from Dice UI's and tablecn's registries
   (MIT; `docs/kit.md` says what was changed), Effect, Wrangler, Vitest, a .csv and .xlsx reader, and syncpack.
 - Two design lints in `bun run check` that hold every screen to the theme and its components.

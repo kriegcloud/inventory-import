@@ -4,7 +4,8 @@ import { HttpApiTest } from "effect/http-api"
 import { Api } from "../../src/api/v1/Api.ts"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
-import { Ai } from "../../src/server/Ai.ts"
+import { ModelId } from "@beep/openrouter/OpenRouterModel"
+import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
 import { inMemoryHandlers } from "./support/app.ts"
 
 // Every service call is a span named Service.method, and inside a request each carries the organization's and the
@@ -31,7 +32,7 @@ const Recording = Layer.succeed(
 )
 
 layer(
-  inMemoryHandlers({ member: tom, ai: Ai.layerFor({ routes: [], model: "test/model" }) }).pipe(
+  inMemoryHandlers({ member: tom, ai: OpenRouterTest.off("noKey", ModelId.make("test/model")) }).pipe(
     Layer.provideMerge(Recording)
   )
 )("service spans", (it) => {

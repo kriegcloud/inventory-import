@@ -23,7 +23,8 @@ import {
   type SuggestSource
 } from "../domain/Suggest.ts"
 import { asAgent } from "@inventory/kernel/Agent"
-import { Ai, answeredByRules } from "./Ai.ts"
+import { OpenRouter } from "@beep/openrouter/OpenRouter"
+import { answeredByRules, askModel, modelIsOn } from "./Model.ts"
 import { ModelCalls, usedUpWords } from "./ModelCalls.ts"
 import { D1, NoRows } from "@beep/d1/D1"
 
@@ -68,7 +69,7 @@ export const propose = Effect.fn("Suggestions.propose")(function* (input: {
   readonly fileName: string
   readonly take: Effect.Effect<boolean>
 }) {
-  const ai = yield* Ai
+  const openRouter = yield* OpenRouter
   const asked = digest(input.source)
   if (questions(asked) === 0) {
     const none: Proposed = {
@@ -79,7 +80,7 @@ export const propose = Effect.fn("Suggestions.propose")(function* (input: {
     return none
   }
   // One call from the day's allowance, taken before the call is made, and only when there is a model to ask.
-  const allowed = ai.status.available ? yield* input.take : true
+  const allowed = modelIsOn(openRouter.status) ? yield* input.take : true
   const byRules = (reason: string): Proposed => {
     const checked = guard({ source: input.source, answer: answerByRules(asked), by: "rule", model: null })
     return {
@@ -90,18 +91,16 @@ export const propose = Effect.fn("Suggestions.propose")(function* (input: {
   }
   if (!allowed) return byRules(usedUp)
   const sent = yield* toJson(asked).pipe(Effect.orDie)
-  const answer = yield* ai
-    .generateObject({
-      name: "suggest",
-      schema: SuggestAnswer,
-      maxOutputTokens: 2000,
-      system,
-      prompt: `What is open in the file "${input.fileName}":\n${sent}`
-    })
-    .pipe(
-      asAgent(suggester),
-      answeredByRules(() => null)
-    )
+  const answer = yield* askModel(openRouter, {
+    name: "suggest",
+    schema: SuggestAnswer,
+    maxOutputTokens: 2000,
+    system,
+    prompt: `What is open in the file "${input.fileName}":\n${sent}`
+  }).pipe(
+    asAgent(suggester),
+    answeredByRules(() => null)
+  )
   // No model could answer (no key, busy, down, an answer that did not fit): the rules do, and the reason is said.
   if (answer.value === null || answer.answeredBy._tag === "Rules") {
     const why = answer.answeredBy._tag === "Rules" ? answer.answeredBy.reason : "No model answered."
@@ -151,7 +150,7 @@ export class Suggestions extends Context.Service<
       const d1 = yield* D1
       const { batch } = d1
       const random = yield* SecureRandom.SecureRandom
-      const ai = yield* Ai
+      const openRouter = yield* OpenRouter
       const calls = yield* ModelCalls
 
       const findAll = SqlSchema.findAll({
@@ -211,7 +210,7 @@ export class Suggestions extends Context.Service<
           source: input.source,
           fileName: input.fileName,
           take: calls.take(actor, "suggest")
-        }).pipe(Effect.provideService(Ai, ai))
+        }).pipe(Effect.provideService(OpenRouter, openRouter))
         if (proposed.suggestions.length === 0) {
           return { made: [], answeredBy: proposed.answeredBy, lines: proposed.lines }
         }

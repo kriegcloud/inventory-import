@@ -1,4 +1,5 @@
-// Fails the build when the production Worker bundle could still let a header choose who the actor is.
+// Fails the build when the production Worker bundle could still let a header choose who the actor is, or carries a
+// driver's test layer.
 // The test identity (src/server/Identity.ts, `IdentityLive`) reads `x-acting-as`; the Worker uses the session
 // identity (src/server/SessionIdentity.ts). Run by `bun run build` after `vite build`.
 import { existsSync, readdirSync, readFileSync } from "node:fs"
@@ -18,8 +19,16 @@ const files = [
     .filter((f) => f.endsWith(".js"))
     .map((f) => `assets/${f}`)
 ]
-// The test identity's own refusal sentence, and the header it reads. Neither belongs in what is deployed.
-const markers = ["The test identity names no member", "x-acting-as"]
+// The test identity's own refusal sentence, and the header it reads; and the drivers' test layers (@beep/d1/D1Test
+// starts wrangler's platform proxy, @beep/openrouter/OpenRouterTest plays scripted replies). None belongs in what is
+// deployed.
+const markers = [
+  "The test identity names no member",
+  "x-acting-as",
+  "getPlatformProxy",
+  "wrangler.d1-test.jsonc",
+  "The script has no replies"
+]
 const found = files.flatMap((file) => {
   const text = readFileSync(new URL(file, dir), "utf8")
   return markers.filter((marker) => text.includes(marker)).map((marker) => `${file}: "${marker}"`)

@@ -68,7 +68,7 @@ sign-in secret into `.dev.vars` the first time).
   it, and the audit trail of uploads, imports, take-backs and changes of role.
 - **People** (`src/web/pages/PeoplePage.tsx`): who is in the organization; an admin adds a person by the email they
   signed up with, changes a role or removes someone, and the organization always keeps an admin.
-- **One model service** (`src/server/Ai.ts`) with **one daily allowance** (`src/server/ModelCalls.ts`, 40 calls a
+- **One model service** (`@beep/openrouter`, met by the app in `src/server/Model.ts`) with **one daily allowance** (`src/server/ModelCalls.ts`, 40 calls a
   day per organization, taken before each call): every model feature draws on it, and when it is used up the feature
   says so in plain words and its rules answer. `GET /api/v1/system/status` says whether a model is on.
 
@@ -471,10 +471,10 @@ Two rules shape any plan that uses a model:
 - A model proposes; it never writes. Anything it suggests lands as a draft, goes through the same validation and
   permission checks as a person's input, and the person confirms it.
 
-**Before writing any code that calls a model**, read patterns 3 to 6 in `docs/patterns.md`: the `Ai` service, the
-AI SDK 7 names models get wrong, what to send a small model, tool loops and model-written HTML. The model id defaults
+**Before writing any code that calls a model**, read patterns 3 to 6 in `docs/patterns.md`: `askModel` and the `OpenRouter` service,
+what to send a small model, cost and tool loops, and model-written HTML. The model id defaults
 to `AI_MODEL` in `wrangler.jsonc`, and `AI_MODEL` in `.dev.vars` can override it, so read it from
-`/api/v1/system/status`; do not hardcode a model name. One retry policy, in `Ai.ts`: never add another; end every AI
+`/api/v1/system/status`; do not hardcode a model name. One retry policy, `ModelPolicy` in `@beep/openrouter`: never add another; end every AI
 feature with `answeredByRules(...)` and show `answeredBy` on screen. **Every model call takes one call from the day's
 allowance first** (`ModelCalls.take(actor, kind)` in `src/server/ModelCalls.ts`, before the call): a new model feature
 adds its kind there and in the `modelCall` table's check, and when the allowance is used up it says so and its rules

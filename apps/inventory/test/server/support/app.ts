@@ -30,7 +30,9 @@ import { ActivityId } from "@inventory/kernel/Ids"
 import { MemberId, type OrganizationId } from "@inventory/kernel/Ids"
 import { type Member } from "@inventory/kernel/Member"
 import { Activities } from "../../../src/server/Activities.ts"
-import { Ai } from "../../../src/server/Ai.ts"
+import { OpenRouter } from "@beep/openrouter/OpenRouter"
+import { ModelId } from "@beep/openrouter/OpenRouterModel"
+import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
 import { makeApp, makeRoutes, servicesWith, toFetch } from "../../../src/server/App.ts"
 import { BetterAuthTest } from "@beep/better-auth/BetterAuthTest"
 import { signIn } from "../../../src/server/SignIn.ts"
@@ -214,7 +216,7 @@ export const inMemoryApp = <E, R>({
   settings = testSettings
 }: {
   readonly member: Member
-  readonly ai: Layer.Layer<Ai, E, R>
+  readonly ai: Layer.Layer<OpenRouter, E, R>
   /** Mount the API reference page, as a development build does. */
   readonly docs?: boolean
   /** The settings the app reads, as the Worker's `env` would give them. Default: `testSettings`. */
@@ -239,7 +241,7 @@ export const inMemoryHandlers = <E, R>({
   member
 }: {
   readonly member: Member
-  readonly ai: Layer.Layer<Ai, E, R>
+  readonly ai: Layer.Layer<OpenRouter, E, R>
 }) =>
   Handlers.pipe(
     Layer.provideMerge(IdentityLive),
@@ -274,7 +276,7 @@ export const as =
  * one), for the typed client (`HttpApiTest.groups`). Use `as(memberId)` on each call. Slow: name the file
  * `*.slow.test.ts`.
  */
-export const testAppWith = <E, R>(ai: Layer.Layer<Ai, E, R>) =>
+export const testAppWith = <E, R>(ai: Layer.Layer<OpenRouter, E, R>) =>
   Handlers.pipe(
     Layer.provideMerge(IdentityLive),
     Layer.provideMerge(SameOriginLive),
@@ -302,7 +304,7 @@ export const testAppWith = <E, R>(ai: Layer.Layer<Ai, E, R>) =>
   )
 
 /** The typed-client app with no AI key: the state the app must be complete in. */
-export const TypedApp = testAppWith(Ai.layerFor({ routes: [], model: testSettings.AI_MODEL }))
+export const TypedApp = testAppWith(OpenRouterTest.off("noKey", ModelId.make(testSettings.AI_MODEL)))
 
 /** The app's `fetch`, as the Worker exports it: security headers included. `dispose` runs when the test block ends. */
 export class TestFetch extends Context.Service<

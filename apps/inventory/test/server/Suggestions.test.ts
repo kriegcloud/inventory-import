@@ -2,12 +2,12 @@
 // suggestion never applies itself, with no model the rules answer and say so, and a model's answer is rated by the
 // guard, never by the model.
 import { describe, expect, it, layer } from "@effect/vitest"
-import { MockLanguageModelV4 } from "ai/test"
 import { Array as Arr, Effect, Option, Ref } from "effect"
 import messy from "../../public/samples/items_messy.csv?raw"
 import { review, type SavedDecisions, type Suggestion } from "../../src/domain/ItemImport.ts"
 import { digest, guard, type SuggestSource } from "../../src/domain/Suggest.ts"
-import { Ai, type ModelRoute } from "../../src/server/Ai.ts"
+import { ModelId } from "@beep/openrouter/OpenRouterModel"
+import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
 import { propose } from "../../src/server/Suggestions.ts"
 import { stage } from "./support/files.ts"
 
@@ -95,7 +95,7 @@ describe("a stored suggestion", () => {
   )
 })
 
-layer(Ai.layerFor({ routes: [], model: "none" }))("with no model", (it) => {
+layer(OpenRouterTest.off("noKey", ModelId.make("test/model")))("with no model", (it) => {
   it.effect("the rules answer and say so: a name from each description, no category, and no call is taken", () =>
     Effect.gen(function* () {
       const source = yield* sourceOf()
@@ -125,27 +125,9 @@ layer(Ai.layerFor({ routes: [], model: "none" }))("with no model", (it) => {
 
 const answer =
   '{"names":[{"rowNumber":7,"name":"Nylon Coil"}],"categories":[{"rowNumber":40,"category":"finished-goods"},{"rowNumber":116,"category":"Misc"}],"columns":[]}'
-const scripted = new MockLanguageModelV4({
-  modelId: "scripted/model",
-  doGenerate: () =>
-    Promise.resolve({
-      content: [{ type: "text" as const, text: answer }],
-      finishReason: { unified: "stop" as const, raw: undefined },
-      usage: {
-        inputTokens: { total: 12, noCache: 12, cacheRead: undefined, cacheWrite: undefined },
-        outputTokens: { total: 6, text: 6, reasoning: undefined }
-      },
-      warnings: []
-    })
-})
-const route: ModelRoute = {
-  provider: "openrouter",
-  model: "scripted/model",
-  fallbackModels: [],
-  languageModel: scripted
-}
+const scripted = OpenRouterTest.scripted([{ text: answer }], { model: ModelId.make("scripted/model") })
 
-layer(Ai.layerFor({ routes: [route], model: "scripted/model" }))("with a model", (it) => {
+layer(scripted.layer)("with a model", (it) => {
   it.effect("one call is taken, the answer goes through the guard, and with the allowance used the rules answer", () =>
     Effect.gen(function* () {
       const source = yield* sourceOf()

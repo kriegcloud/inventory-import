@@ -1,5 +1,6 @@
 // THE TABLE ASSISTANT: a request typed in words becomes a checked change to the person's own view of a table. The
-// model is asked through `Ai` (one retry policy, the fallback chain, the five model-trouble sentences); with no key or
+// model is asked through @beep/openrouter (`askModel` in Model.ts: one retry policy, OpenRouter's fallback list, the five
+// model-trouble sentences); with no key or
 // a model in trouble, the fixed rules read the plain cases. Whoever answers, the answer is checked against the
 // request's own catalog (`checkCommand`) before the screen sees it. A model call is taken from the organization's
 // daily allowance first (ModelCalls.ts), the one every model feature draws on; when it is used up the rules answer
@@ -14,7 +15,8 @@ import { AgentRun } from "@inventory/kernel/AgentRun"
 import { Member } from "@inventory/kernel/Member"
 import { checkCommand, readByRules, type ViewChange, ViewCommand, type ViewOutcome } from "../domain/TableView.ts"
 import { asAgent } from "@inventory/kernel/Agent"
-import { Ai } from "./Ai.ts"
+import { OpenRouter } from "@beep/openrouter/OpenRouter"
+import { askModel, modelIsOn } from "./Model.ts"
 import { ModelCalls, usedUpWords } from "./ModelCalls.ts"
 import { D1, NoRows } from "@beep/d1/D1"
 
@@ -73,7 +75,7 @@ export class TableAssistant extends Context.Service<
   static readonly layer = Layer.effect(
     TableAssistant,
     Effect.gen(function* () {
-      const ai = yield* Ai
+      const openRouter = yield* OpenRouter
       const sql = yield* SqlClient.SqlClient
       const { run } = yield* D1
       const random = yield* SecureRandom.SecureRandom
@@ -120,7 +122,7 @@ export class TableAssistant extends Context.Service<
       }, Effect.orDie)
 
       const view = Effect.fn("TableAssistant.view")(function* (actor: Member, request: ViewRequest) {
-        if (!ai.status.available) {
+        if (!modelIsOn(openRouter.status)) {
           return answerByRules({ request, why: noKey })
         }
         // One call from the day's allowance, taken before the call is made, so a call that fails still counts.
@@ -132,15 +134,13 @@ export class TableAssistant extends Context.Service<
           searchable: request.searchable,
           columns: request.columns
         }).pipe(Effect.orDie)
-        const asked = yield* ai
-          .generateObject({
-            name: "view",
-            schema: ViewCommand,
-            maxOutputTokens: 1200,
-            system,
-            prompt: `The table and its columns:\n${catalog}\n\nThe person asks: ${request.prompt}`
-          })
-          .pipe(asAgent(viewReader), Effect.result)
+        const asked = yield* askModel(openRouter, {
+          name: "view",
+          schema: ViewCommand,
+          maxOutputTokens: 1200,
+          system,
+          prompt: `The table and its columns:\n${catalog}\n\nThe person asks: ${request.prompt}`
+        }).pipe(asAgent(viewReader), Effect.result)
         if (Result.isFailure(asked)) {
           return answerByRules({ request, why: `${asked.failure.reason} The rules answered instead.` })
         }

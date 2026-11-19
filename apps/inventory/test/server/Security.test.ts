@@ -3,7 +3,8 @@ import { Array as Arr, Effect, Option, Record as Rec, String as Str } from "effe
 import * as S from "effect/Schema"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
-import { Ai } from "../../src/server/Ai.ts"
+import { ModelId } from "@beep/openrouter/OpenRouterModel"
+import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
 import { safeRedirectPath } from "../../src/server/security.ts"
 import { inMemoryApp, send, TestFetch } from "./support/app.ts"
 
@@ -18,7 +19,7 @@ const dana = Member.make({
   organizationName: "Example Works (test)"
 })
 
-const App = TestFetch.layer(inMemoryApp({ member: dana, ai: Ai.layerFor({ routes: [], model: "test/model" }) }))
+const App = TestFetch.layer(inMemoryApp({ member: dana, ai: OpenRouterTest.off("noKey", ModelId.make("test/model")) }))
 
 // The parts of the OpenAPI document the document's own corrections (src/api/v1/Document.ts) change.
 const Operation = S.Struct({

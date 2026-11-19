@@ -58,10 +58,8 @@ const present = (key: Option.Option<Redacted.Redacted<string>>) =>
  * - `AI_ENABLED`: `true` or `false` (also yes/no, on/off, 1/0). Default `true`. `false` turns AI off with a key set.
  * - `AI_MODEL`: the vendor/model id asked first (wrangler.jsonc `vars`). Required.
  * - `AI_FALLBACK_MODELS`: comma-separated vendor/model ids OpenRouter tries, in order, when the first fails
- *   (OpenRouter's `models` list). Default: none. Ignored by the gateway.
- * - `OPENROUTER_API_KEY`: secret. An OpenRouter key. Asked first, and the one that reports what a call cost.
- * - `AI_GATEWAY_API_KEY`: secret. A Vercel AI Gateway key: the second provider when both are set, the only one when
- *   it is the only key.
+ *   (OpenRouter's `models` list). Default: none.
+ * - `OPENROUTER_API_KEY`: secret. An OpenRouter key; it also reports what a call cost.
  */
 export const aiSettings = Config.all({
   enabled: Config.Boolean("AI_ENABLED").pipe(Config.withDefault(true)),
@@ -70,8 +68,7 @@ export const aiSettings = Config.all({
     Config.map(Arr.filter((model) => model !== "")),
     Config.withDefault<ReadonlyArray<string>>([])
   ),
-  openRouterKey: Config.Redacted("OPENROUTER_API_KEY").pipe(Config.option, Config.map(present)),
-  gatewayKey: Config.Redacted("AI_GATEWAY_API_KEY").pipe(Config.option, Config.map(present))
+  openRouterKey: Config.Redacted("OPENROUTER_API_KEY").pipe(Config.option, Config.map(present))
 })
 /** The decoded model settings. */
 export type AiSettings = Config.Success<typeof aiSettings>

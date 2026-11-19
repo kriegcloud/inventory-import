@@ -5,7 +5,8 @@ import { HttpApiBuilder } from "effect/http-api"
 import { AiCheck, Api, ModelCallsUsedUp, SystemStatus } from "../api/v1/Api.ts"
 import { CurrentActor } from "@inventory/kernel/Actor"
 import { Activities } from "./Activities.ts"
-import { Ai } from "./Ai.ts"
+import { OpenRouter } from "@beep/openrouter/OpenRouter"
+import { aiStatusOf, askModel, modelIsOn } from "./Model.ts"
 import { requireRole } from "@inventory/kernel/Actor"
 import { ImportHandlers, ItemHandlers } from "./ImportHandlers.ts"
 import { Members } from "./Members.ts"
@@ -22,22 +23,22 @@ const SystemHandlers = HttpApiBuilder.group(
   "system",
   Effect.fn(function* (handlers) {
     const activities = yield* Activities
-    const ai = yield* Ai
+    const openRouter = yield* OpenRouter
     const calls = yield* ModelCalls
     return handlers.handleAll({
       status: Effect.fn("system.status")(function* () {
         const actor = yield* CurrentActor
         const activityCount = yield* activities.count(actor.organizationId)
-        return SystemStatus.make({ database: { ok: true, activityCount }, ai: ai.status })
+        return SystemStatus.make({ database: { ok: true, activityCount }, ai: aiStatusOf(openRouter.status) })
       }),
       checkAi: Effect.fn("system.checkAi")(function* () {
         // It spends the key: an editor or above, like any write, and one of the day's model calls.
         const actor = yield* requireRole("editor")
-        if (ai.status.available && !(yield* calls.take(actor, "check"))) {
+        if (modelIsOn(openRouter.status) && !(yield* calls.take(actor, "check"))) {
           return yield* ModelCallsUsedUp.make({ reason: `${usedUpWords}. They come back over the next day.` })
         }
         const started = yield* Clock.currentTimeMillis
-        const answer = yield* ai.generateObject({
+        const answer = yield* askModel(openRouter, {
           name: "greeting",
           prompt: "Reply with a five-word greeting.",
           schema: S.Struct({ greeting: S.String })

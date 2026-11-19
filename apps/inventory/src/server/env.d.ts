@@ -7,7 +7,6 @@ interface Env {
   readonly AI_FALLBACK_MODELS?: string
   readonly AI_ENABLED?: string
   readonly OPENROUTER_API_KEY?: string
-  readonly AI_GATEWAY_API_KEY?: string
   readonly LOG_LEVEL?: string
   readonly LOG_FORMAT?: string
   readonly EFFECT_DEVTOOLS_URL?: string

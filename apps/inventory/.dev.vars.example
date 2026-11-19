@@ -15,18 +15,15 @@
 
 # --- Model (AI) ---------------------------------------------------------------------------------------------------
 
-# Secret. An OpenRouter key (https://openrouter.ai/keys). Asked first, and the provider that reports what a call cost.
+# Secret. An OpenRouter key (https://openrouter.ai/keys): the one model provider, and it reports what a call cost.
 OPENROUTER_API_KEY=
-# Secret. A Vercel AI Gateway key. With both keys set, the gateway is the second provider, tried when OpenRouter cannot
-# answer; with only this one, it is the only provider.
-AI_GATEWAY_API_KEY=
 # true or false (also yes/no, on/off, 1/0). Default true. false turns AI off even with a key set, to see the non-AI
 # path without removing the key.
 # AI_ENABLED=false
 # The vendor/model id asked first. Default in wrangler.jsonc (anthropic/claude-haiku-5.5).
 # AI_MODEL=anthropic/claude-haiku-5.5
 # Comma-separated vendor/model ids OpenRouter tries, in order, when AI_MODEL fails. Default in wrangler.jsonc.
-# Empty means no fallback model. The gateway ignores it.
+# Empty means no fallback model.
 # AI_FALLBACK_MODELS=google/gemini-3.8-flash
 
 # --- Logs ---------------------------------------------------------------------------------------------------------

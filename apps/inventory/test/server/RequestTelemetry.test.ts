@@ -2,7 +2,8 @@ import { expect, it } from "@effect/vitest"
 import { Array as Arr, Context, Effect, Layer, Option, Scope, Tracer } from "effect"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
-import { Ai } from "../../src/server/Ai.ts"
+import { ModelId } from "@beep/openrouter/OpenRouterModel"
+import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
 import { toTracedFetch } from "../../src/server/App.ts"
 import { Collector, RequestTelemetry } from "../../src/server/RequestTelemetry.ts"
 import { inMemoryApp, settingsLayer, testOrigin, testSettings } from "./support/app.ts"
@@ -20,7 +21,7 @@ const dana = Member.make({
   organizationName: "Example Works (test)"
 })
 
-const app = inMemoryApp({ member: dana, ai: Ai.layerFor({ routes: [], model: "test/model" }) })
+const app = inMemoryApp({ member: dana, ai: OpenRouterTest.off("noKey", ModelId.make("test/model")) })
 
 /** One recording exporter per request: the spans it was handed, and whether its scope has been closed. */
 type Exported = { spans: Array<string>; ended: number; closed: boolean }

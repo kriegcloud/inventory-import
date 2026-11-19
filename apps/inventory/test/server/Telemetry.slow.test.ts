@@ -4,7 +4,8 @@ import { Effect, Layer, String as Str } from "effect"
 import { afterAll, vi } from "vitest"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
-import { Ai } from "../../src/server/Ai.ts"
+import { ModelId } from "@beep/openrouter/OpenRouterModel"
+import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
 import { toTracedFetch } from "../../src/server/App.ts"
 import { RequestTelemetry } from "../../src/server/RequestTelemetry.ts"
 import { collector } from "../../src/server/Telemetry.ts"
@@ -42,7 +43,7 @@ it.effect("after a refused connection, the next requests build nothing for the c
       const served = yield* Effect.acquireRelease(
         Effect.sync(() =>
           toTracedFetch({
-            app: inMemoryApp({ member: tom, ai: Ai.layerFor({ routes: [], model: "test/model" }), settings }),
+            app: inMemoryApp({ member: tom, ai: OpenRouterTest.off("noKey", ModelId.make("test/model")), settings }),
             telemetry: RequestTelemetry.layer.pipe(
               Layer.provide(collector({ production: false })),
               Layer.provide(settingsLayer(settings))

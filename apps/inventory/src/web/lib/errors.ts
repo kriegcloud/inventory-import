@@ -23,8 +23,7 @@ export type Said = {
  */
 export { type ModelTrouble, modelSentences }
 
-const providerName = (provider: string): string =>
-  provider === "openrouter" ? "OpenRouter" : provider === "gateway" ? "the Vercel AI Gateway" : provider
+const providerName = (provider: string): string => (provider === "openrouter" ? "OpenRouter" : provider)
 
 /**
  * The line under a result that says who produced it: "Answered by anthropic/claude-haiku-5.5 through OpenRouter",

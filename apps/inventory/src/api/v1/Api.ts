@@ -41,9 +41,9 @@ export const openApiPath = `${apiPrefix}/openapi.json` as const
 /** The API reference page (Scalar). Served in development only: a production build has no such route. */
 export const docsPath = `${apiPrefix}/docs` as const
 
-/** The two model providers the server can reach, each with its own key. */
-export const AiProvider = S.Literals(["openrouter", "gateway"]).annotate({
-  description: "A model provider: OpenRouter (OPENROUTER_API_KEY) or the Vercel AI Gateway (AI_GATEWAY_API_KEY)."
+/** The model provider the server can reach. A union of one, so the wire keeps naming it. */
+export const AiProvider = S.Literals(["openrouter"]).annotate({
+  description: "The model provider: OpenRouter (OPENROUTER_API_KEY)."
 })
 /** One of the `AiProvider` names. */
 export type AiProvider = typeof AiProvider.Type
@@ -64,7 +64,7 @@ export class AiRoute extends S.Class<AiRoute, { readonly brand: unique symbol }>
 export class AiStatus extends S.Class<AiStatus, { readonly brand: unique symbol }>("AiStatus")(
   {
     available: S.Boolean.annotateKey({ description: "False with no key, or with AI_ENABLED=false." }),
-    provider: S.Literals(["openrouter", "gateway", "none"]).annotateKey({
+    provider: S.Literals(["openrouter", "none"]).annotateKey({
       description: "The provider asked first, or none when AI is off."
     }),
     model: S.String.annotateKey({ description: "The model asked first (AI_MODEL), even when AI is off." }),

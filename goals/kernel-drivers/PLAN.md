@@ -15,7 +15,7 @@ from: explorations/ideal-architecture
 | 2 | `@inventory/kernel`; the app switched; proof | done |
 | 3 | `@beep/d1` with `D1Test`; the app switched; proof | done |
 | 4 | `@beep/better-auth`; the app switched; proof with sign-out and sign-in | done |
-| 5 | `@beep/openrouter`; the AI SDK removed; proof with and without a model | doing |
+| 5 | `@beep/openrouter`; the AI SDK removed; proof with and without a model | done |
 | 6 | Closing note | todo |
 
 ## Current blocker
@@ -81,4 +81,39 @@ Where the brief left a choice open, or the code showed the brief could not be fo
   "Imported 155 · Not imported 45 · All 200", Items "155 items", D1 `item` 155 rows. Then the user menu's "Sign out":
   the sign-in page with "Test accounts"; "Sign in as Dana Whitfield": the Import page, and
   `/api/v1/identity/session` answers `ready`, Dana Whitfield, admin, Example Works (test).
+- **`strictJsonSchema: true` on the model** (found in the browser). `@effect/ai-openrouter` sends Anthropic models the
+  schema with `strict: null`; OpenRouter then does not enforce it, and `anthropic/claude-haiku-5.5` answered every
+  request in a ```` ```json ```` fence, which `generateObject` refuses ("Expected a valid JSON string"), so every
+  answer was `badAnswer` and the rules answered. With `strict: true` the answer is plain JSON. The driver's HTTP test
+  now asserts `response_format.json_schema.strict: true`.
+- **`src/server/Model.ts` meets the driver**, as `SignIn.ts` does Better Auth: `modelLayer` (settings to
+  `OpenRouterSettings`, over a given `HttpClient`), `ModelLive` (over `fetch`), `aiStatusOf`, `answeredByModel`,
+  `aiUnavailableOf`, `askModel(openRouter, …)` and `answeredByRules`. The brief named `src/server/Answered.ts` for
+  `answeredByRules` alone; one module holds the whole meeting point. `askModel` takes the service as an argument, so
+  no handler yields a service per request.
+- **`ModelUnavailable` carries `retryable`** beside `trouble`, rather than deriving it from the trouble: an invalid
+  request is `down` but not worth retrying, a deadline is `down` and is, as today's `AiUnavailable` says.
+- **No `LanguageModel` escape hatch** (today's `languageModel`): nothing used it. The SDK's `retryModelCall` and
+  `toAiSchema` are gone with it; `docs/patterns.md` patterns 3 to 5, `CLAUDE.md` (the model service, the retry rule)
+  and `README.md` now describe `@beep/openrouter`.
+- **The gateway is gone** (decision "model route and retries"): `AiProvider` is `"openrouter"` only (`AiStatus.provider`
+  is `"openrouter" | "none"`), `AI_GATEWAY_API_KEY` left `Settings.ts`, `env.d.ts` and `.dev.vars.example`, and
+  `src/web/lib/errors.ts` no longer names it.
+- **`OpenRouterTest.scripted` repeats its last reply** past the end of the script, so an app test that asks many times
+  (`Assistant.slow.test.ts`) scripts one answer.
+- **The bundle check also refuses the drivers' test layers** in the Worker (`getPlatformProxy`,
+  `wrangler.d1-test.jsonc`, the scripted model's sentence).
+- **`CLOUDFLARE_INCLUDE_PROCESS_ENV=true AI_ENABLED=false` did not reach the Worker** while a `.dev.vars` existed
+  (`/api/v1/system/status` still said AI was on). For the proof, the copied `.dev.vars` was set aside (renamed, never
+  opened), the dev script generated a throwaway one, `AI_ENABLED=false` was appended to that, and the copy was moved
+  back afterwards. The `CLAUDE.md` recipe that says otherwise is not changed here (unverified on `main`).
+- **OpenRouter proof**: check:full 32/32 tasks (openrouter 26 tests; app 215 fast + 45 slow); `bun.lock` names neither
+  `ai` nor `@openrouter/ai-sdk-provider`. Browser on a fresh database: "200 rows read", "Import 155, skip 45", result
+  "Imported 155 · Not imported 45 · All 200", Items "155 items", D1 `item` 155. With the key: status "Answers come from
+  OpenRouter (anthropic/claude-haiku-5.5, then google/gemini-3.8-flash); then the non-AI path."; the table assistant,
+  asked "only kilograms, cheapest first", set `?sort=unitCost.asc&uom=KG` and said "Answered by
+  anthropic/claude-haiku-5.5"; the audit line reads "Items: 2 changes to the view, answered by
+  anthropic/claude-haiku-5.5", agent "Table assistant"; the allowance counted every attempt (6 `view` calls, three of
+  them before the strict fix). With `AI_ENABLED=false`: status "AI suggestions are off: AI_ENABLED is set to false.";
+  "sort by name descending" set `?sort=name.desc` and said "Answered by Rules".
 

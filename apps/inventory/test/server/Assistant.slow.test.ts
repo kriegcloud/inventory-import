@@ -2,13 +2,13 @@
 // real one would be. The claims under test are the screen's: who answered is said, an answer naming anything the table
 // does not have is refused whole, and a model's answer leaves one audit line that only its own organization sees.
 import { expect, layer } from "@effect/vitest"
-import { MockLanguageModelV4 } from "ai/test"
 import { Array as Arr, Effect, Layer, Option, Result } from "effect"
 import * as S from "effect/Schema"
 import { HttpApiTest } from "effect/http-api"
 import { TestClock } from "effect/testing"
 import { Api } from "../../src/api/v1/Api.ts"
-import { Ai } from "../../src/server/Ai.ts"
+import { ModelId } from "@beep/openrouter/OpenRouterModel"
+import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
 import { dailyModelCalls } from "../../src/server/ModelCalls.ts"
 import { usedUp } from "../../src/server/TableAssistant.ts"
 import { items } from "../domain/TableView.test.ts"
@@ -56,30 +56,9 @@ const answering = (reply: unknown) =>
   Layer.unwrap(
     Effect.gen(function* () {
       const text = yield* toJson(reply)
-      return Ai.layerFor({
-        model: "scripted/model",
-        routes: [
-          {
-            provider: "openrouter",
-            model: "scripted/model",
-            fallbackModels: [],
-            languageModel: new MockLanguageModelV4({
-              modelId: "scripted/model",
-              doGenerate: {
-                content: [{ type: "text", text }],
-                finishReason: { unified: "stop", raw: undefined },
-                usage: {
-                  inputTokens: { total: 400, noCache: 400, cacheRead: undefined, cacheWrite: undefined },
-                  outputTokens: { total: 40, text: 40, reasoning: undefined }
-                },
-                warnings: []
-              }
-            })
-          }
-        ]
-      })
+      return OpenRouterTest.scripted([{ text }], { model: ModelId.make("scripted/model") }).layer
     })
-  ).pipe(Layer.orDie)
+  )
 
 layer(
   testAppWith(

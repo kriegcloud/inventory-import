@@ -1,0 +1,36 @@
+{
+  "name": "@beep/openrouter",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Structured answers from OpenRouter through effect/ai: one retry policy, a bad answer never retried, and a failure a product can word",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": [],
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts",
+    "./OpenRouter": "./src/OpenRouter.service.ts",
+    "./OpenRouterModel": "./src/OpenRouter.schema.ts",
+    "./OpenRouterConfig": "./src/OpenRouter.config.ts",
+    "./OpenRouterError": "./src/OpenRouter.errors.ts",
+    "./OpenRouterTest": "./src/OpenRouter.test-layer.ts"
+  },
+  "scripts": {
+    "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",
+    "lint": "oxlint --quiet src test",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@beep/identity": "workspace:*",
+    "@effect/ai-openrouter": "4.1.4",
+    "effect": "4.1.4"
+  },
+  "devDependencies": {
+    "@effect/vitest": "4.1.4",
+    "@types/node": "^24.19.2",
+    "vitest": "^5.1.0"
+  },
+  "beep": {
+    "family": "drivers"
+  }
+}

@@ -78,76 +78,75 @@ useQuery({ queryKey: ["record", code], queryFn: () => call((api) => api.items.re
 
 ## 3. Calling a model
 
-Model I/O is the Vercel AI SDK (`ai` version 7), wrapped by the `Ai` service in `src/server/Ai.ts`. Version 7 differs
-from what models remember: structured output is `generateText({ output: Output.object({ schema }) })`, not
-`generateObject`. Check `node_modules/ai/docs/` before writing SDK code.
+Model I/O is `effect/ai` with `@effect/ai-openrouter`, behind the `OpenRouter` service of `@beep/openrouter`
+(`packages/drivers/openrouter`); the app meets it in `src/server/Model.ts`. The AI modules ship inside `effect`
+(`effect/ai`): there is no `@effect/ai` package. Check `node_modules/effect/src/ai/` and
+`node_modules/@effect/ai-openrouter/src/` before writing model code.
 
-- For one structured answer use `ai.generateObject({ name, prompt, system, schema })` with an Effect `Schema.Struct`.
-  The same Schema tells the model the shape and validates the reply. It returns an answer (`value`, `answeredBy`,
-  tokens and `costMicroUsd`) or fails with `AiUnavailable`, never throws.
+- For one structured answer use `askModel(openRouter, { name, prompt, system, schema, maxOutputTokens })` from
+  `src/server/Model.ts`, with an Effect `Schema.Struct` whose root is an object (OpenRouter's codec refuses any other
+  root). The same Schema tells the model the shape and decodes the reply. It returns an answer (`value`,
+  `answeredBy`) or fails with `AiUnavailable`, never throws. Resolve `const openRouter = yield* OpenRouter` in the
+  Layer or the handler group's constructor, not in the request.
 - **Which one answered.** `answer.answeredBy` names the provider and the model that answered, and `fallback: true`
-  when it was not the first. End every AI feature with `answeredByRules((error) => rulesResult)`: when no model can
+  when a fallback model did. End every AI feature with `answeredByRules((error) => rulesResult)`: when no model can
   answer, the feature's own rules do, and `answeredBy` is `{ _tag: "Rules", reason }`. Show it on screen.
-- **One retry policy, in the service.** Each attempt has the SDK's own retries off (`maxRetries: 0`), a timeout, and
-  `aiPolicy`: `Effect.retry` with `Schedule.exponential` and `Schedule.jittered`, twice at most, only while the error
-  says `retryable` (busy, down). Then OpenRouter's `models` list falls back inside one call (`AI_FALLBACK_MODELS`),
-  then an `ExecutionPlan` moves to the Vercel AI Gateway when its key is set too, then the rules. A deadline bounds
-  the whole call. Do not add a retry around `generateObject`: that would be a second policy.
+- **One retry policy, in the driver.** `ModelPolicy` (`@beep/openrouter/OpenRouterConfig`): each attempt has a 15 s
+  timeout; a transient failure (rate limit, provider error, broken connection) is tried again twice at most, with
+  `Schedule.exponential` and `Schedule.jittered`; a refused key or an answer that does not fit is never tried again;
+  a 40 s deadline bounds the whole call. OpenRouter's `models` list (`AI_FALLBACK_MODELS`) falls back inside one call,
+  then the rules answer. Do not add a retry around `askModel`: that would be a second policy. The plan has one step on
+  purpose: a step whose `while` refuses hands over to the next one, which would re-ask after a bad answer.
 - **Errors**: `AiUnavailable.reason` is the contract's sentence for its `kind` (`modelSentences` in
-  `src/api/v1/ModelTrouble.ts`, made by `aiUnavailable`: "The model is busy right now. Try again in a minute."), the
-  same five sentences every screen shows. The provider's own words are logged once per failed attempt
-  (`ai.detail`), never sent to the screen.
-- For streaming text or a tool-calling loop, use the SDK directly with `ai.languageModel` (`streamText`, tools), with
-  `maxRetries: 0` and the Effect piped through `retryModelCall`, so it keeps the one policy. It is `undefined` when AI
-  is off, so handle that first. A tool loop is pattern 5.
+  `src/api/v1/ModelTrouble.ts`), the same five sentences every screen shows; the driver's `ModelUnavailable.trouble`
+  is mapped to it by `aiUnavailableOf`. An empty OpenRouter credit (HTTP 402) is `refused`. The provider's own words
+  are logged once per failed attempt (`ai.detail`), never sent to the screen.
+- The driver has no streaming or tool-calling call: nothing uses one. Adding one is a driver change (a method beside
+  `generateObject`, under the same `ModelPolicy`), not a direct `LanguageModel` call in a feature.
 - Send the model the minimum: headers and digested values (next point), never a whole file or raw rows. Batch
   questions into one call.
 - **Give a small model digested input.** Send distinct values, counts and three examples per column, already
   grouped, not raw rows. A small model can misread raw dates, and reads them right once they are grouped by how
   they could be read. Ask it to explain or pick, never to count. A different size or colour is not a match
   (null). Drop any key it returns that is not in your list.
-- `OPENROUTER_API_KEY` in `.dev.vars` is the OpenRouter key; `AI_GATEWAY_API_KEY` is the Vercel AI Gateway key, the
-  second provider when both are set. `AI_ENABLED=false` turns AI off with a key set. Pattern 9 for settings.
-- Tests script the model: `Ai.layerFor({ routes: [...], model })` with `MockLanguageModelV4` from `ai/test`, as
-  `test/server/Ai.test.ts` does for retry then succeed, fall back, and give up.
+- `OPENROUTER_API_KEY` in `.dev.vars` is the OpenRouter key, the one provider. `AI_ENABLED=false` turns AI off with a
+  key set. Pattern 9 for settings.
+- Tests script the model with `@beep/openrouter/OpenRouterTest`: `off("noKey", model)`, `scripted(replies, { model })`
+  (replies or `AiError`s played in order through the real call path, with an attempt count), and `overHttp(settings,
+  respond)` (OpenRouter's real client over a scripted transport), as the driver's own `test/OpenRouter.test.ts` does
+  for retry then succeed, give up, a bad answer asked once, the timeouts and HTTP 402.
 
 ## 4. A model suggestion that cannot invent a key, and works without a key
 
 The model picks from a list you give it. Anything it returns that is not in the list is dropped, and with no AI key
 the rules answer ("no suggestion") and the caller carries on. Goes in the handler group constructor, after
-`const ai = yield* Ai`; `answeredByRules` comes from `src/server/Ai.ts`.
+`const openRouter = yield* OpenRouter`; `askModel` and `answeredByRules` come from `src/server/Model.ts`.
 
 ```ts
 const Match = Schema.Struct({ code: Schema.NullOr(Schema.String), reason: Schema.String })
 
 const suggest = Effect.fn("records.suggest")(function* (line: string, codes: ReadonlyArray<string>) {
-  const answer = yield* ai
-    .generateObject({
-      name: "match",
-      schema: Match,
-      prompt: `Line: ${line}\nKnown codes:\n${Arr.join(codes, "\n")}`,
-      system:
-        "Suggest a code only when it is the same thing: same type, size and pack. " +
-        "A near miss is NOT a match: answer null and say which code is close and how it differs."
-    })
-    .pipe(answeredByRules((error) => ({ code: null, reason: `No suggestion: ${error.reason}` })))
+  const answer = yield* askModel(openRouter, {
+    name: "match",
+    schema: Match,
+    prompt: `Line: ${line}\nKnown codes:\n${Arr.join(codes, "\n")}`,
+    system:
+      "Suggest a code only when it is the same thing: same type, size and pack. " +
+      "A near miss is NOT a match: answer null and say which code is close and how it differs."
+  }).pipe(answeredByRules((error) => ({ code: null, reason: `No suggestion: ${error.reason}` })))
   const known = answer.value.code !== null && Arr.contains(codes, answer.value.code)
   return { ...(known ? answer.value : { code: null, reason: answer.value.reason }), answeredBy: answer.answeredBy }
 })
 ```
 
-## 5. A tool loop with a small model (AI SDK 7)
+## 5. What a call cost, and tool loops
 
-Use `isStepCount(n)`, not `stepCountIs`, and `onStepEnd`, not `onStepFinish`. Pass `maxRetries: 0` and pipe the call
-through `retryModelCall` (pattern 3): one retry policy. Set `toolChoice: "required"`, and use a
-stop condition that checks the final tool's result. Give the model counts and the few rows it must act on, and a
-skeleton to copy. A cut-off tool call throws "did not contain a tool call": report it as cut off. Run the loop inside
-the request, write one row per step, and let the page poll.
-
-- **What a call cost.** With an OpenRouter key every result carries dollars, not only tokens:
-  `result.providerMetadata?.openrouter?.usage?.cost` (the `Ai` service already asks for it). Sum it per run and show
-  it. Measured on `anthropic/claude-haiku-5.5`: a three-step tool loop cost $0.0003 and took under six seconds; one
-  structured answer takes about 1.6 seconds. The gateway path reports tokens only.
+- **What a call cost.** OpenRouter reports dollars per call on the finish part (`metadata.openrouter.usage.cost`);
+  the driver turns it into `ModelAnswered.usage.costMicroUsd` (an `Option`: `None` when OpenRouter did not say).
+  Measured on `anthropic/claude-haiku-5.5` with the earlier SDK: one structured answer took about 1.6 seconds.
+- **Tool loops.** The driver offers none (above). `effect/ai`'s `Toolkit` with `LanguageModel.generateText` is the
+  shape one would take, added to the driver under `ModelPolicy`; run such a loop inside the request, write one row
+  per step, and let the page poll.
 
 ## 6. Model-written HTML, and an Effect route beside the HttpApi
 
@@ -283,7 +282,7 @@ the row, never a 400 or a 500. The import shows the whole shape.
   (`src/server/Observability.ts` lists the valid values).
 - **No personal data or secrets in a log line or a span**: ids, never names, file contents or a person's input; a
   secret is a `Redacted`. A typed error's `reason` is for the person and may name their organization, so it is not
-  printed by the reporter; put what a developer needs in a log line where the failure happens (the `Ai` service logs
+  printed by the reporter; put what a developer needs in a log line where the failure happens (the `OpenRouter` service logs
   the provider's words as `ai.detail`).
 - **Failures are reported once, by the HTTP layer**, to `logReporter`: a defect at Error with its stack
   (`Cause.pretty`), a typed failure at Info. A defect is a bug: never catch it to hide it.

@@ -4,7 +4,8 @@ import { Array as Arr, Effect, Layer, Predicate, String as Str } from "effect"
 import { afterAll, beforeAll, vi } from "vitest"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
-import { Ai } from "../../src/server/Ai.ts"
+import { ModelId } from "@beep/openrouter/OpenRouterModel"
+import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
 import { toTracedFetch } from "../../src/server/App.ts"
 import { RequestTelemetry } from "../../src/server/RequestTelemetry.ts"
 import { collector } from "../../src/server/Telemetry.ts"
@@ -63,7 +64,7 @@ const serving = (settings: Record<string, string>) =>
   Effect.acquireRelease(
     Effect.sync(() => {
       const pending: Array<Promise<unknown>> = []
-      const app = inMemoryApp({ member: tom, ai: Ai.layerFor({ routes: [], model: "test/model" }), settings })
+      const app = inMemoryApp({ member: tom, ai: OpenRouterTest.off("noKey", ModelId.make("test/model")), settings })
       const served = toTracedFetch({
         app,
         telemetry: RequestTelemetry.layer.pipe(

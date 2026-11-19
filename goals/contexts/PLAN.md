@@ -52,4 +52,12 @@ None.
   suffix or a number. Naming `AddPersonOutcome` removed the second copy of `Person`. `ModelCallsUsedUp` and the
   gateway's declaration are here; the app's `ModelCalls` service still does the taking until `access-host` lands.
   16 tests (every schema generates values it accepts; the three wire shapes).
+- **`access-model` (`packages/access/model`).** Rules, the four ports, their twins and ten handlers, on the full
+  profile with no override. Choices: a function of two or more values takes one object (`changeRole({ member,
+  command })`, `keepsAnAdmin({ members, member, next })`), because the profile asks every such export to be dual;
+  the twins share one in-memory state (`accessMemory(seed)`), so a person added through the people store signs in
+  through the directory and their audit line reads back; the port answers `AddWrite`, `RoleWrite` and `RemoveWrite`
+  are `S.TaggedUnion`s; `MemberDirectory.byId` is added for the test identity, which a header names a member to;
+  the purity type is proved by a conditional type in `Rules.test.ts` (the profile reports a missing service on the
+  same line a `@ts-expect-error` would sit on). 11 tests. The app is not wired to it yet: no screen changed.
 

@@ -1,0 +1,49 @@
+{
+  "name": "@inventory/access-model",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The rules of who may do what, the ports a handler may use, in-memory twins of them, and the handlers: no SQL, no driver, no HTTP",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": [],
+  "exports": {
+    "./package.json": "./package.json",
+    "./Ports": "./src/Access.ports.ts",
+    "./Handlers": "./src/Access.handlers.ts",
+    "./Memory": "./src/Access.memory.ts",
+    "./LastAdmin": "./src/People/LastAdmin.rules.ts",
+    "./AddPersonRules": "./src/People/AddPerson.rules.ts",
+    "./PeopleStore": "./src/People/PeopleStore.store.ts",
+    "./PeopleHandler": "./src/People/People.handler.ts",
+    "./SessionRules": "./src/Session/Session.rules.ts",
+    "./MemberDirectory": "./src/Session/MemberDirectory.store.ts",
+    "./SessionHandler": "./src/Session/Session.handler.ts",
+    "./AuditTrailStore": "./src/Activity/AuditTrailStore.store.ts",
+    "./ActivityHandler": "./src/Activity/Activity.handler.ts",
+    "./AllowanceRules": "./src/Allowance/Allowance.rules.ts",
+    "./AllowanceStore": "./src/Allowance/AllowanceStore.store.ts",
+    "./AllowanceHandler": "./src/Allowance/Allowance.handler.ts"
+  },
+  "scripts": {
+    "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",
+    "lint": "oxlint --quiet src test",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@beep/identity": "workspace:*",
+    "@beep/schema": "workspace:*",
+    "@inventory/access-contract": "workspace:*",
+    "@inventory/kernel": "workspace:*",
+    "effect": "4.1.4"
+  },
+  "devDependencies": {
+    "@effect/vitest": "4.1.4",
+    "@types/node": "^24.19.2",
+    "vitest": "^5.1.0"
+  },
+  "beep": {
+    "family": "context",
+    "context": "access",
+    "layer": "model"
+  }
+}

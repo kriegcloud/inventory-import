@@ -102,6 +102,22 @@
         "vitest": "^5.1.0",
       },
     },
+    "packages/access/model": {
+      "name": "@inventory/access-model",
+      "version": "0.0.0",
+      "dependencies": {
+        "@beep/identity": "workspace:*",
+        "@beep/schema": "workspace:*",
+        "@inventory/access-contract": "workspace:*",
+        "@inventory/kernel": "workspace:*",
+        "effect": "4.1.4",
+      },
+      "devDependencies": {
+        "@effect/vitest": "4.1.4",
+        "@types/node": "^24.19.2",
+        "vitest": "^5.1.0",
+      },
+    },
     "packages/client": {
       "name": "@inventory/client",
       "version": "0.0.0",
@@ -571,6 +587,8 @@
     "@img/sharp-win32-x64": ["@img/sharp-win32-x64@0.35.5", "", { "os": "win32", "cpu": "x64" }, "sha512-x76eH0vEiHlcMQu8Y8IenntaACtddpT6W0wmXtWrnKcnKI7ME5DdgqhAD6SEWOEl1v2zDvkZDhFA9KnURwpfqg=="],
 
     "@inventory/access-contract": ["@inventory/access-contract@workspace:packages/access/contract"],
+
+    "@inventory/access-model": ["@inventory/access-model@workspace:packages/access/model"],
 
     "@inventory/app": ["@inventory/app@workspace:apps/inventory"],
 

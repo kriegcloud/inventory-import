@@ -14,6 +14,7 @@ import * as O from "effect/Option"
 import * as HttpServerRequest from "effect/http/HttpServerRequest"
 import * as HttpServerResponse from "effect/http/HttpServerResponse"
 import type { CrossSiteRequest } from "@inventory/kernel/AccessError"
+import { mayCreateAccount } from "@inventory/access-model/SignUp"
 import { authSettings } from "./Config.ts"
 import { authOptions } from "./internal/authOptions.ts"
 
@@ -50,6 +51,7 @@ export const signIn = (options: {
             // `bun run dev:https` once BETTER_AUTH_URL names its https address.
             secureCookies: resolved.secureCookies,
             pwnedPasswordCheck: settings.pwnedPasswordCheck,
+            mayCreateAccount: (email) => mayCreateAccount(settings.signUp, email),
             backgroundTasks: options.backgroundTasks,
             rateLimit: options.rateLimit
           })

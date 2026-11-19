@@ -9,6 +9,7 @@ import * as O from "effect/Option"
 import * as Redacted from "effect/Redacted"
 import * as Str from "effect/String"
 import * as S from "effect/Schema"
+import { signUpRuleOf } from "@inventory/access-model/SignUp"
 
 /** An address setting: unset or blank is none, anything else must be a URL. */
 const optionalUrl = (name: string) =>
@@ -36,6 +37,8 @@ const present = (key: O.Option<Redacted.Redacted<string>>) =>
  * - `TEST_ACCOUNTS`: `true` or `false`. Offer the seeded test accounts in one click on the sign-in page. Default: on in
  *   development, off in a production build. Only accounts the database holds are offered, and only `bun run dev`
  *   writes them, so a deployed database has none whatever this says.
+ * - `SIGN_UP`: who may make an account. `open`, `closed`, or the emails that may, separated by commas. Default:
+ *   closed in a production build, open in development. A value that is not `open` never opens it.
  *
  * @category settings
  */
@@ -44,7 +47,11 @@ export const authSettings = (build: { readonly production: boolean }) =>
     secret: Config.Redacted("BETTER_AUTH_SECRET").pipe(Config.option, Config.map(present)),
     publicUrl: optionalUrl("BETTER_AUTH_URL"),
     pwnedPasswordCheck: Config.Boolean("PWNED_PASSWORD_CHECK").pipe(Config.withDefault(build.production)),
-    testAccounts: Config.Boolean("TEST_ACCOUNTS").pipe(Config.withDefault(!build.production))
+    testAccounts: Config.Boolean("TEST_ACCOUNTS").pipe(Config.withDefault(!build.production)),
+    signUp: Config.String("SIGN_UP").pipe(
+      Config.withDefault(build.production ? "closed" : "open"),
+      Config.map(signUpRuleOf)
+    )
   })
 
 /**

@@ -72,6 +72,7 @@ are in `.dev.vars.example`.
 | `BETTER_AUTH_URL` | unset: each request's origin | The deployed address. When set: the one trusted origin, the cross-site check's own origin behind a proxy, and Secure cookies exactly when it is `https:` |
 | `PWNED_PASSWORD_CHECK` | on in production, off in development | Refuses a new password found in known breaches (Have I Been Pwned). Fails closed: a sign-up is refused while the service cannot be reached |
 | `TEST_ACCOUNTS` | on in development, off in production | Offers the seeded test accounts in one click; only accounts the database holds are offered |
+| `SIGN_UP` | closed in production, open in development | Who may make an account: `open`, `closed`, or the emails that may, separated by commas. Closed, the sign-in page offers no sign-up and `POST /api/auth/sign-up/email` answers 403 for anyone not named. The person named signs up and is the admin of the organization they create (decision "infra I8"; `packages/access/model/src/Session/SignUp.rules.ts`) |
 
 ## Security settings
 

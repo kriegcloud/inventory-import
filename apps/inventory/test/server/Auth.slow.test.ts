@@ -368,7 +368,7 @@ layer(signInApp({ production: true }), { timeout: "60 seconds" })("a production 
       expect(signIn.setCookie).toContain("HttpOnly")
       expect(signIn.setCookie).toContain("SameSite=Lax")
       const state = yield* browser("10.1.0.2").send("GET", "/api/v1/identity/session")
-      expect(state.json.features).toEqual({ testAccounts: null, pwnedPasswordCheck: false })
+      expect(state.json.features).toEqual({ testAccounts: null, pwnedPasswordCheck: false, signUp: "closed" })
     })
   )
 })

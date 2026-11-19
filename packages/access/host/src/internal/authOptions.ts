@@ -1,7 +1,9 @@
 import type { BetterAuthOptions } from "better-auth"
+import { APIError } from "better-auth/api"
 import { haveIBeenPwned } from "better-auth/plugins/haveibeenpwned"
 import { organization } from "better-auth/plugins/organization"
 import { memberAc, ownerAc } from "better-auth/plugins/organization/access"
+import { signUpClosedMessage } from "@inventory/access-model/SignUp"
 
 // Better Auth's configuration, in one place for the Worker (SignIn.route.ts), the schema script
 // (scripts/auth-schema.mjs) and the tests, so the tables the migration creates are the tables this config needs.
@@ -38,6 +40,8 @@ export const authOptions = (input: {
   readonly secureCookies?: boolean | undefined
   /** Refuse a new password found in known breaches (PWNED_PASSWORD_CHECK). */
   readonly pwnedPasswordCheck?: boolean | undefined
+  /** Who may make an account (SIGN_UP): asked of each new account's email. Unset: anyone, as the schema script needs. */
+  readonly mayCreateAccount?: ((email: string) => boolean) | undefined
   /** Runs work Better Auth does after answering (rate-limit updates, cleanup). The Worker passes `waitUntil`. */
   readonly backgroundTasks?: ((promise: Promise<unknown>) => void) | undefined
   /** Off only in tests that sign in many times from one address. On in `bun run dev` and in production. */
@@ -106,6 +110,16 @@ export const authOptions = (input: {
       ...(input.backgroundTasks === undefined ? {} : { backgroundTasks: { handler: input.backgroundTasks } })
     },
     databaseHooks: {
+      user: {
+        create: {
+          // Sign-up is closed to everyone the owner has not named (decision "infra I8"). Refused here, where every
+          // way of making an account passes, so no route can make one the setting does not allow.
+          before: (user) =>
+            input.mayCreateAccount === undefined || input.mayCreateAccount(user.email)
+              ? Promise.resolve()
+              : Promise.reject(new APIError("FORBIDDEN", { message: signUpClosedMessage }))
+        }
+      },
       session: {
         create: {
           // A new session opens in the person's earliest organisation, so the app has a tenant from the first

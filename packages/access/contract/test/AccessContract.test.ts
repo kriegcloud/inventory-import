@@ -59,7 +59,7 @@ describe("the wire", () => {
       const wire = yield* S.encodeEffect(SessionState)(state)
       expect(wire).toEqual({
         status: "signed-out",
-        features: { testAccounts: null, pwnedPasswordCheck: false }
+        features: { testAccounts: null, pwnedPasswordCheck: false, signUp: "closed" }
       })
       expect(actorOfSession(state)).toEqual(O.none())
     })

@@ -25,6 +25,7 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as O from "effect/Option"
 import * as HttpServerRequest from "effect/http/HttpServerRequest"
+import { signUpOfferOf } from "@inventory/access-model/SignUp"
 import { authSettings } from "./Config.ts"
 import { $AccessHostId } from "./internal/identity.ts"
 import { seededAccounts, testAccountPassword } from "./internal/TestAccounts.ts"
@@ -102,7 +103,8 @@ export class Sessions extends Context.Service<
               testAccounts: O.map(accounts, (offered) =>
                 TestAccountsOffer.make({ password: testAccountPassword, accounts: offered })
               ),
-              pwnedPasswordCheck: settings.pwnedPasswordCheck
+              pwnedPasswordCheck: settings.pwnedPasswordCheck,
+              signUp: signUpOfferOf(settings.signUp)
             })
             const session = yield* auth.session(headers).pipe(Effect.orDie)
             return yield* accessHandlers

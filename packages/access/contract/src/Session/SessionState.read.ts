@@ -9,6 +9,7 @@ import { OrganizationId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
 import { Role } from "@inventory/kernel/Role"
 import { DisplayName } from "@inventory/kernel/Text"
+import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as Tuple from "effect/Tuple"
 import * as S from "effect/Schema"
@@ -86,6 +87,23 @@ export class TestAccountsOffer extends S.Opaque<TestAccountsOffer, { readonly br
 ) {}
 
 /**
+ * Whether the sign-in page offers making an account: to anyone, to the emails the owner named, or to nobody. Which
+ * emails are named is never sent to the browser.
+ *
+ * @category schemas
+ */
+export const SignUpOffer = LiteralKit(["open", "invited", "closed"]).pipe(
+  $I.annoteSchema("SignUpOffer", { description: "Whether making an account is offered, and to whom" })
+)
+
+/**
+ * Runtime type of {@link SignUpOffer}.
+ *
+ * @category models
+ */
+export type SignUpOffer = typeof SignUpOffer.Type
+
+/**
  * What the settings turned on that the sign-in page must know before anyone signs in. Everything here is public: the
  * test accounts' one password is in the README, and they exist only in a local database.
  *
@@ -100,6 +118,14 @@ export class SignInFeatures extends S.Opaque<SignInFeatures, { readonly brand: u
     ),
     pwnedPasswordCheck: S.Boolean.pipe(
       S.annotateKey({ description: "PWNED_PASSWORD_CHECK: a new password is checked against known data breaches." })
+    ),
+    signUp: SignUpOffer.pipe(
+      S.annotateKey({
+        description:
+          "SIGN_UP: whether the page offers making an account: open to anyone, to invited emails only, or closed."
+      }),
+      S.withConstructorDefault(Effect.succeed("closed" as const)),
+      S.withDecodingDefaultTypeKey(Effect.succeed("closed" as const))
     )
   }).pipe(
     $I.annoteSchema("SignInFeatures", {

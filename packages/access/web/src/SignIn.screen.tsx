@@ -51,6 +51,8 @@ export function SignIn(props: { features: SignInFeatures | undefined; onSignedIn
   const [name, setName] = useState("")
   const [organization, setOrganization] = useState("")
   const testAccounts = props.features === undefined ? null : O.getOrNull(props.features.testAccounts)
+  // Until the features are known nothing is offered that may then be refused.
+  const offer = props.features === undefined ? "closed" : props.features.signUp
 
   const submit = useMutation({
     mutationFn: (attempt: Attempt) =>
@@ -93,7 +95,13 @@ export function SignIn(props: { features: SignInFeatures | undefined; onSignedIn
             <h1 className="text-xl font-semibold tracking-tight">{signUp ? "Create an account" : "Sign in"}</h1>
           </CardTitle>
           <CardDescription>
-            {signUp ? "You will be the admin of a new organization." : "Use your email and password."}
+            {signUp
+              ? offer === "invited"
+                ? "For an email that has been invited. You will be the admin of a new organization."
+                : "You will be the admin of a new organization."
+              : offer === "closed"
+                ? "Use your email and password. New accounts are added by the person who runs this app."
+                : "Use your email and password."}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -163,16 +171,19 @@ export function SignIn(props: { features: SignInFeatures | undefined; onSignedIn
                   {submit.isPending && pendingEmail === email ? <Spinner /> : null}
                   {signUp ? "Create account" : "Sign in"}
                 </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => {
-                    submit.reset()
-                    setMode(signUp ? "sign-in" : "sign-up")
-                  }}
-                >
-                  {signUp ? "I already have an account" : "Create an account"}
-                </Button>
+                {/* Offered only where an account can be made: closed, the page is sign-in alone. */}
+                {offer === "closed" ? null : (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      submit.reset()
+                      setMode(signUp ? "sign-in" : "sign-up")
+                    }}
+                  >
+                    {signUp ? "I already have an account" : "Create an account"}
+                  </Button>
+                )}
               </Field>
             </FieldGroup>
           </form>

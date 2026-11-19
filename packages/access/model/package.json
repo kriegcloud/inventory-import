@@ -16,6 +16,7 @@
     "./PeopleStore": "./src/People/PeopleStore.store.ts",
     "./PeopleHandler": "./src/People/People.handler.ts",
     "./SessionRules": "./src/Session/Session.rules.ts",
+    "./SignUp": "./src/Session/SignUp.rules.ts",
     "./MemberDirectory": "./src/Session/MemberDirectory.store.ts",
     "./SessionHandler": "./src/Session/Session.handler.ts",
     "./AuditTrailStore": "./src/Activity/AuditTrailStore.store.ts",

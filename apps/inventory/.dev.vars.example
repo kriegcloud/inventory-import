@@ -55,6 +55,10 @@ OPENROUTER_API_KEY=
 # production build. Only `bun run dev` writes those accounts (seeds/accounts.sql, password local-test-password),
 # so a deployed database has none whatever this says.
 # TEST_ACCOUNTS=false
+# Who may make an account: open, closed, or the emails that may, separated by commas. Default: closed in a production
+# build, open in development. A value that is not exactly `open` never opens it. The person whose email is named signs
+# up and is the admin of the organization they create; nobody else can make an account.
+# SIGN_UP=you@example.com
 # --- Developer tools ----------------------------------------------------------------------------------------------
 
 # The Effect DevTools server's WebSocket address, for the Worker's spans in development (one client per request).

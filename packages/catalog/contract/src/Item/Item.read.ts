@@ -3,7 +3,7 @@
 // switches, tags, two dates, and two nested values (dimensions and up to three vendors). The one thing not to break:
 // every value is read from the text as written (a cost from its digits as a decimal string, never through a float; a
 // date only when it has one reading), never through a guess.
-import { Array as Arr, BigDecimal, Option, Record as Rec, Result, String as Str, Tuple } from "effect"
+import { Array as Arr, BigDecimal, Option, String as Str, Tuple } from "effect"
 import * as S from "effect/Schema"
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as SchemaTransformation from "effect/SchemaTransformation"
@@ -56,7 +56,7 @@ export const UnitCost = S.String.check(S.isPattern(decimalPattern))
   .pipe(
     S.decodeTo(
       S.BigDecimal.check(
-        S.makeFilter((cost: BigDecimal.BigDecimal) => Option.isSome(readDecimal(BigDecimal.format(cost))), {
+        S.makeFilter((cost: BigDecimal.BigDecimal) => decimalPattern.test(BigDecimal.format(cost)), {
           expected: "a cost of 0 or more with up to 4 decimals and 12 whole digits"
         })
       ),
@@ -80,14 +80,6 @@ export const UnitCost = S.String.check(S.isPattern(decimalPattern))
 export type UnitCost = typeof UnitCost.Type
 
 /**
- * The cost a cell of digits says, or none: `readDecimal`, as the decimal the item holds.
- *
- * @example readUnitCost("12.50") // Option.some(BigDecimal 12.5)
- */
-export const readUnitCost = (text: string): Option.Option<UnitCost> =>
-  Option.map(readDecimal(text), BigDecimal.fromStringUnsafe)
-
-/**
  * A cost as its shortest digits: what the wire and the database hold.
  *
  * @example costDigits(BigDecimal.fromStringUnsafe("12.50")) // "12.5"
@@ -95,10 +87,17 @@ export const readUnitCost = (text: string): Option.Option<UnitCost> =>
 export const costDigits = (cost: UnitCost): string => BigDecimal.format(cost)
 const Count = S.Int.check(S.isGreaterThanOrEqualTo(0), S.isLessThanOrEqualTo(maxCount))
 // A day written year-month-day that is on the calendar: 2024-02-30 and 2024-13-45 have the form and are no day. The
-// import reads a file's dates through the same `readDate`, so an edit cannot store a day a file could not.
+// import reads a file's dates through the same `isoDate`, so an edit cannot store a day a file could not.
+// Hoisted: the schema below is evaluated before `isoDate` is defined.
+function isCalendarDay(text: string): boolean {
+  const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text)
+  return (
+    parts !== null && Option.isSome(isoDate({ year: Number(parts[1]), month: Number(parts[2]), day: Number(parts[3]) }))
+  )
+}
 const IsoDate = S.String.check(
   S.isPattern(/^\d{4}-\d{2}-\d{2}$/),
-  S.makeFilter((text: string) => Option.isSome(readDate(text)), {
+  S.makeFilter((text: string) => isCalendarDay(text), {
     expected: "a day on the calendar, written year-month-day"
   })
 )
@@ -366,22 +365,6 @@ export const ItemEdit = S.Struct({
 export type ItemEdit = typeof ItemEdit.Type
 
 /**
- * A cost written as plain digits ("12.33", "9.3", "4") as the decimal string an item stores, read from the digits and
- * never through a float: leading zeros and trailing decimal zeros dropped, so "012.50" and "12.5" are one cost. None
- * for anything else: a "$", a comma, a sign, a word or a fifth decimal is the review's to ask about.
- *
- * @example readDecimal("12.50") // Option.some("12.5")
- * @example readDecimal("35,82") // Option.none()
- */
-export const readDecimal = (text: string): Option.Option<string> => {
-  const parts = /^(\d{1,12})(?:\.(\d{1,4}))?$/.exec(Str.trim(text))
-  if (parts === null) return Option.none()
-  const whole = Str.replace(/^0+(?=\d)/, "")(parts[1] ?? "0")
-  const fraction = Str.replace(/0+$/, "")(parts[2] ?? "")
-  return Option.some(fraction === "" ? whole : `${whole}.${fraction}`)
-}
-
-/**
  * A cost as ten-thousandths of a dollar, exact, for adding costs up without a float.
  *
  * @example decimalUnits(BigDecimal.fromStringUnsafe("12.5")) // 125000n
@@ -398,18 +381,6 @@ export const unitsToDecimal = (units: bigint): string => {
   const fraction = Str.padStart(4, "0")(`${units % 10000n}`)
   const trimmed = Str.replace(/0{1,2}$/, "")(fraction)
   return `${whole}.${trimmed}`
-}
-
-/**
- * A whole number written as plain digits ("120"), or none. A comma or a point is never read here: "1,200" and
- * "12.5" are the review's to ask about.
- *
- * @example readCount("120") // Option.some(120)
- * @example readCount("12.5") // Option.none()
- */
-export const readCount = (text: string): Option.Option<number> => {
-  const trimmed = Str.trim(text)
-  return /^\d{1,12}$/.test(trimmed) ? Option.some(Number(trimmed)) : Option.none()
 }
 
 const daysIn = (year: number, month: number): number =>
@@ -433,130 +404,6 @@ export const isoDate = (input: { readonly year: number; readonly month: number; 
     return Option.none<string>()
   }
   return Option.some(`${year}-${Str.padStart(2, "0")(`${month}`)}-${Str.padStart(2, "0")(`${day}`)}`)
-}
-
-/**
- * A date written as an ISO date ("2026-03-04"), or none. Any other way of writing a date is read by the review, which
- * proposes the ISO date and, when the text has two readings (03/04/2026), asks which one.
- *
- * @example readDate("2026-03-04") // Option.some("2026-03-04")
- * @example readDate("03/04/2026") // Option.none()
- */
-export const readDate = (text: string): Option.Option<string> => {
-  const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(Str.trim(text))
-  if (parts === null) return Option.none()
-  return isoDate({ year: Number(parts[1]), month: Number(parts[2]), day: Number(parts[3]) })
-}
-
-/** The edit form as the person filled it in: the text of each box, and the choices as they are. */
-export type ItemForm = {
-  readonly name: string
-  readonly description: string
-  readonly category: Category
-  readonly uom: Uom
-  readonly unitCost: string
-  readonly quantityOnHand: string
-  readonly reorderPoint: string
-  readonly isActive: boolean
-  readonly lotTracked: boolean
-  readonly firstReceivedOn: string
-  readonly discontinuedOn: string
-}
-
-/** A field of the edit form that can hold a problem, and the sentence that says what to do about it. */
-export type ItemFormProblems = Partial<
-  Record<
-    "name" | "unitCost" | "quantityOnHand" | "reorderPoint" | "firstReceivedOn" | "discontinuedOn" | "isActive",
-    string
-  >
->
-
-/**
- * Reads the edit form into the values an item is stored with, or every problem in it at once, each a sentence that
- * says what to change. A cost is read from the digits, as an import reads it; empty optional boxes are none.
- *
- * @example readItemForm({ form: { ...form, unitCost: "3.65555" }, revision: 1 })
- * // { _tag: "Problems", problems: { unitCost: "Unit cost is not an amount ..." } }
- */
-export const readItemForm = (input: {
-  readonly form: ItemForm
-  readonly revision: number
-}):
-  | { readonly _tag: "Edit"; readonly edit: ItemEdit }
-  | { readonly _tag: "Problems"; readonly problems: ItemFormProblems } => {
-  const { form } = input
-  const name = Str.trim(form.name)
-  const description = Str.trim(form.description)
-  const cost = readUnitCost(form.unitCost)
-  // None: the box holds something that cannot be read. Some(none): the box is empty, which an optional value may be.
-  const optional = <A>(text: string, read: (text: string) => Option.Option<A>): Option.Option<Option.Option<A>> =>
-    Str.trim(text) === "" ? Option.some(Option.none()) : Option.map(read(text), Option.some)
-  const quantity = Str.trim(form.quantityOnHand) === "" ? Option.some(0) : readCount(form.quantityOnHand)
-  const reorder = optional(form.reorderPoint, readCount)
-  const received = optional(form.firstReceivedOn, readDate)
-  const discontinued = optional(form.discontinuedOn, readDate)
-  const found: ReadonlyArray<readonly [keyof ItemFormProblems, string | undefined]> = [
-    [
-      "name",
-      name === ""
-        ? "Name is empty. Every item needs a name."
-        : name.length > maxNameLength
-          ? `Name is longer than ${maxNameLength} characters. Shorten it.`
-          : undefined
-    ],
-    [
-      "unitCost",
-      Option.isNone(cost)
-        ? "Unit cost is not an amount in dollars with up to 4 decimals. Write it as digits, for example 12.50."
-        : undefined
-    ],
-    [
-      "quantityOnHand",
-      Option.isNone(quantity)
-        ? "Quantity on hand is not a whole number. Write it as digits, for example 120."
-        : undefined
-    ],
-    [
-      "reorderPoint",
-      Option.isNone(reorder) ? "Reorder point is not a whole number. Write it as digits, or leave it empty." : undefined
-    ],
-    [
-      "firstReceivedOn",
-      Option.isNone(received) ? "First received is not a date. Write it as year, month and day: 2026-03-04." : undefined
-    ],
-    [
-      "discontinuedOn",
-      Option.isNone(discontinued)
-        ? "Discontinued on is not a date. Write it as year, month and day: 2026-03-04."
-        : undefined
-    ],
-    [
-      "isActive",
-      form.isActive && Str.trim(form.discontinuedOn) !== ""
-        ? "A discontinued item cannot be active. Switch Active off, or clear the discontinued date."
-        : undefined
-    ]
-  ]
-  const problems = Arr.filterMap(found, ([field, message]) =>
-    message === undefined ? Result.failVoid : Result.succeed([field, message] as const)
-  )
-  if (Arr.isReadonlyArrayNonEmpty(problems)) return { _tag: "Problems", problems: Rec.fromEntries(problems) }
-  return {
-    _tag: "Edit",
-    edit: {
-      revision: input.revision,
-      name,
-      description: description === "" ? Option.none() : Option.some(description),
-      category: form.category,
-      uom: form.uom,
-      unitCost: Option.getOrElse(cost, () => BigDecimal.fromBigInt(0n)),
-      quantityOnHand: Option.getOrElse(quantity, () => 0),
-      reorderPoint: Option.flatten(reorder),
-      stocking: stockingOf({ isActive: form.isActive, discontinuedOn: Option.flatten(discontinued) }),
-      lotTracked: form.lotTracked,
-      firstReceivedOn: Option.flatten(received)
-    }
-  }
 }
 
 /**

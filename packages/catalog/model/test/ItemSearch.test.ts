@@ -6,16 +6,16 @@ import { Array as Arr, Effect, String as Str } from "effect"
 import * as S from "effect/Schema"
 import { ItemQueryParams } from "@inventory/catalog-contract/Catalog"
 import { ItemQuery } from "@inventory/catalog-contract/ItemQuery"
+import { maxSearch } from "@inventory/catalog-contract/ItemSearch"
 import {
   closeMatches,
   contains,
-  maxSearch,
   phrase,
   plan,
   searchWords,
   wordsLeftOut,
   wordsToCheck
-} from "@inventory/catalog-contract/ItemSearch"
+} from "@inventory/catalog-model/ItemSearch"
 const decodeQuery = S.decodeUnknownEffect(ItemQuery)
 const decodeParams = S.decodeUnknownEffect(ItemQueryParams)
 const asked = { page: 1, perPage: 20, sorting: [], filters: [], joinOperator: "and" }

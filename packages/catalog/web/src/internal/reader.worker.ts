@@ -5,10 +5,10 @@ import { stringify } from "@inventory/ui/Json"
 // the server stages and hands it to the page in the chunks the server stores. Every file takes this path.
 import { Effect, Option, Result } from "effect"
 import { type FileProblem, fileProblem } from "@inventory/catalog-contract/FileProblem"
-import { stageTable, stagingProblem } from "@inventory/catalog-model/Review"
 import { maxChunkChars, uploadChunks } from "@inventory/catalog-model/Upload"
 import { readSpreadsheet } from "./spreadsheet/read.ts"
 import type { ReadMessage, ReadRequest } from "./protocol.ts"
+import { stageTable, stagingProblem } from "@inventory/catalog-model/Staging"
 
 const post = (message: ReadMessage) => self.postMessage(message)
 

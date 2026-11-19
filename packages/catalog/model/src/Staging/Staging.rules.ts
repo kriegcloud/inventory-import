@@ -1,0 +1,54 @@
+// Staging a file that was read: the reader's table trimmed to what the review needs, and the two reasons a table is
+// not staged at all (no rows, too many).
+/**
+ * Trims the reader's table to what the server stages. Nothing is coerced: each cell keeps its stored text, and
+ * what Excel displays when that differs.
+ */
+import { SpreadsheetTable } from "../Reading/Spreadsheet.rules.ts"
+import { StagedTable, maxStagedRows } from "@inventory/catalog-contract/Staged"
+import { Array as Arr, Option } from "effect"
+import { FileProblem, fileProblem } from "@inventory/catalog-contract/FileProblem"
+export const stageTable = (input: { readonly table: SpreadsheetTable }): StagedTable => {
+  const { table } = input
+  return {
+    fileName: table.fileName,
+    kind: table.kind,
+    sheet: table.format._tag === "xlsx" ? Option.some(table.format.chosen.name) : Option.none(),
+    headerRowNumber: table.headerRowNumber,
+    columns: Arr.map(table.columns, (column) => ({ index: column.index, letter: column.letter, label: column.label })),
+    rows: Arr.map(table.rows, (row) => ({
+      rowNumber: row.rowNumber,
+      cells: Arr.map(row.cells, (cell) =>
+        cell.shown === undefined || cell.shown === cell.text
+          ? { text: cell.text }
+          : { text: cell.text, shown: cell.shown }
+      )
+    })),
+    notes: Arr.map(table.notes, (note) => ({
+      kind: note.kind,
+      level: note.level,
+      message: note.message,
+      rows: note.rows
+    }))
+  }
+}
+
+/**
+ * Why a file cannot be staged, as a `FileProblem` for the person, or null when it can. It takes counts, not rows, so
+ * the reader asks before anything is sent, the server asks again when an upload begins (before any row arrives) and
+ * once more when it finishes, and the words are the same wherever it is refused.
+ *
+ * @example stagingProblem({ fileName: "items.csv", rowCount: 50001, columnCount: 10 })?.problem
+ * // '"items.csv" has 50001 rows. Up to 50000 can be imported at a time.'
+ */
+export const stagingProblem = (input: {
+  readonly fileName: string
+  readonly rowCount: number
+  readonly columnCount: number
+}): FileProblem | null => {
+  const { fileName, rowCount, columnCount } = input
+  if (rowCount <= 0) return fileProblem.noRows({ fileName })
+  if (rowCount > maxStagedRows) return fileProblem.tooManyRows({ fileName, rows: rowCount, limit: maxStagedRows })
+  if (columnCount > 200) return fileProblem.tooManyColumns({ fileName, columns: columnCount })
+  return null
+}

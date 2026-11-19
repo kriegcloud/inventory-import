@@ -32,7 +32,6 @@ import {
   type StoredItem
 } from "@inventory/catalog-contract/Item"
 import type { ItemFacets, ItemFilter, ItemPage, ItemQuery, ItemSort } from "@inventory/catalog-contract/ItemQuery"
-import { searchWords } from "@inventory/catalog-contract/ItemSearch"
 import { MappingChoice } from "@inventory/catalog-contract/Mapping"
 import { StagedHead, type StagedRow, type StagedTable } from "@inventory/catalog-contract/Staged"
 import type { Suggestion } from "@inventory/catalog-contract/Suggestion"
@@ -78,6 +77,7 @@ import {
 import { type EditOutcome, ItemStore } from "./Item/ItemStore.store.ts"
 import { abandonedAfterMinutes } from "./Staging/Upload.rules.ts"
 import { type StoreSuggestions, SuggestionStore } from "./Suggestion/SuggestionStore.store.ts"
+import { searchWords } from "./Item/ItemSearch.rules.ts"
 
 // -- What the tables hold -------------------------------------------------------------------------------------
 

@@ -28,9 +28,6 @@ import {
   discontinuedOn,
   isActive,
   type ItemEdit,
-  type ItemForm,
-  type ItemFormProblems,
-  readItemForm,
   type StoredItem,
   uoms,
   costDigits
@@ -39,6 +36,7 @@ import type { ItemPage } from "@inventory/catalog-contract/ItemQuery"
 import { sayError } from "@inventory/client/SayError"
 import { queryKeys } from "./Catalog.keys.ts"
 import { costOf, dimensionsText } from "./internal/itemText.ts"
+import { type ItemForm, type ItemFormProblems, readItemForm } from "@inventory/catalog-model/ItemEdit"
 
 const formOf = (item: StoredItem): ItemForm => ({
   name: item.name,

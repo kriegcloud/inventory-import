@@ -22,8 +22,8 @@ import { ItemEdit, StoredItem, discontinuedOn } from "@inventory/catalog-contrac
 import { ItemStore } from "@inventory/catalog-model/ItemStore"
 import { D1, NoRows } from "@beep/d1/D1"
 import { SecureRandom } from "effect/crypto"
-import { type WordMatch, searchWords, wordsToCheck, plan, phrase } from "@inventory/catalog-contract/ItemSearch"
 import { Member } from "@inventory/kernel/Member"
+import { type WordMatch, wordsToCheck, plan, phrase, searchWords } from "@inventory/catalog-model/ItemSearch"
 
 // The stored column behind each id the table may send. Typed as a field of a stored item, so a column that does not
 // exist is a type error here rather than a query that fails, or matches nothing, at run time.

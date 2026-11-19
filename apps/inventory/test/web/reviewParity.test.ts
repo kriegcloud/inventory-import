@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs"
 import { cost } from "../support/cost.ts"
 import { describe, expect, it } from "@effect/vitest"
 import { Array as Arr, Effect, Option, Order, String as Str } from "effect"
-import { firstDecisions, recheckRow, review, stageTable } from "@inventory/catalog-model/Review"
+import { firstDecisions, recheckRow, review } from "@inventory/catalog-model/Review"
 import { changeToStored } from "@inventory/catalog-contract/Change"
 import { decisionToFlags, type SavedDecisions } from "@inventory/catalog-contract/Decision"
 import { type StagedTable } from "@inventory/catalog-contract/Staged"
@@ -33,6 +33,7 @@ import {
   toRegionRows,
   toServerDecisions
 } from "@inventory/catalog-web/ImportReview"
+import { stageTable } from "@inventory/catalog-model/Staging"
 
 /** A file from `public/samples/`, as the browser would hold it after the person chose it. */
 const sample = (name: string): File =>

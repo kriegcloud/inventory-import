@@ -31,8 +31,9 @@ import { sayError } from "@inventory/client/SayError"
 import { keptVisibility, TableAssistant } from "./TableAssistant.screen.tsx"
 import { TableSearch } from "@inventory/ui/TableSearch"
 import { queryKeys } from "./Catalog.keys.ts"
-import { maxSearch, maxSearchWords, wordsLeftOut } from "@inventory/catalog-contract/ItemSearch"
+import { maxSearch, maxSearchWords } from "@inventory/catalog-contract/ItemSearch"
 import { type CatalogColumn, type ColumnCatalog, operatorsFor } from "@inventory/catalog-contract/TableView"
+import { wordsLeftOut } from "@inventory/catalog-model/ItemSearch"
 // The sort and filter menus carry a calendar, a date library and drag-and-drop for reordering: more code than the
 // rest of the page. They are fetched after the table is drawn; until then each is its own button, the same size and
 // words, switched off, so nothing moves when it arrives.

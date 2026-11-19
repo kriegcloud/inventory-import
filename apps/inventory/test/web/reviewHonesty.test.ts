@@ -6,7 +6,7 @@
 import { readFileSync } from "node:fs"
 import { describe, expect, it } from "@effect/vitest"
 import { Array as Arr, Effect, Option, Record as Rec, String as Str } from "effect"
-import { firstDecisions, review, stageTable } from "@inventory/catalog-model/Review"
+import { firstDecisions, review } from "@inventory/catalog-model/Review"
 import { type StagedTable } from "@inventory/catalog-contract/Staged"
 import { sourceLead, sourceWordsFor } from "@inventory/ui/ProposalSource"
 import {
@@ -38,6 +38,7 @@ import {
   toRegionDecisions,
   toRegionRows
 } from "@inventory/catalog-web/ImportReview"
+import { stageTable } from "@inventory/catalog-model/Staging"
 
 const sample = (name: string): File =>
   new File([readFileSync(new URL(`../../public/samples/${name}`, import.meta.url))], name)

@@ -28,7 +28,13 @@
     "./SuggestionStore": "./src/Suggestion/SuggestionStore.store.ts",
     "./SuggestionsHandler": "./src/Suggestion/Suggestions.handler.ts",
     "./AssistantLog": "./src/Assistant/AssistantLog.store.ts",
-    "./Memory": "./src/Catalog.memory.ts"
+    "./Memory": "./src/Catalog.memory.ts",
+    "./Staging": "./src/Staging/Staging.rules.ts",
+    "./Mapping": "./src/Review/Mapping.rules.ts",
+    "./CellReading": "./src/Review/CellReading.rules.ts",
+    "./NotImported": "./src/Review/NotImported.rules.ts",
+    "./ItemSearch": "./src/Item/ItemSearch.rules.ts",
+    "./ItemEdit": "./src/Item/ItemEdit.rules.ts"
   },
   "scripts": {
     "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",

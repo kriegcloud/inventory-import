@@ -2,9 +2,9 @@
 // The sample files, read through the reader the browser uses and trimmed the way the browser stages them.
 import { readFileSync } from "node:fs"
 import { Effect } from "effect"
-import { stageTable } from "@inventory/catalog-model/Review"
 import { type StagedTable } from "@inventory/catalog-contract/Staged"
 import { readSpreadsheet } from "@inventory/catalog-web/Spreadsheet"
+import { stageTable } from "@inventory/catalog-model/Staging"
 
 /** A file from `public/samples/`, as the browser would hold it after the person chose it. */
 export const sample = (name: string): File =>

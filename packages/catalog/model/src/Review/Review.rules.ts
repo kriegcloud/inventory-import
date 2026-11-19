@@ -1,62 +1,3 @@
-import { RowId } from "@inventory/catalog-contract/Ids"
-import { Array as Arr, HashMap, HashSet, Option, Record as Rec, String as Str } from "effect"
-import { type FileProblem, fileProblem } from "@inventory/catalog-contract/FileProblem"
-import {
-  categories,
-  costDigits,
-  decimalUnits,
-  type Dimensions,
-  discontinuedOn,
-  isActive,
-  isoDate,
-  type ItemFields,
-  maxNameLength,
-  readCount,
-  readDate,
-  readDecimal,
-  readUnitCost,
-  skuKey,
-  skuPattern,
-  stockingOf,
-  unitsToDecimal,
-  uoms,
-  type Vendor
-} from "@inventory/catalog-contract/Item"
-import type { SpreadsheetTable } from "../Reading/Spreadsheet.rules.ts"
-import * as S from "effect/Schema"
-import {
-  StagedTable,
-  maxStagedRows,
-  Field,
-  StagedRow,
-  StagedCell,
-  StagedNote,
-  fields,
-  StagedColumn,
-  fieldLabels,
-  requiredFields
-} from "@inventory/catalog-contract/Staged"
-import { Confidence, Change, typedChange, acceptedProposal, appliedByRule } from "@inventory/catalog-contract/Change"
-import {
-  ColumnMatch,
-  UnusedColumn,
-  MappingChoice,
-  ColumnPick,
-  matchedColumn,
-  matchedByPerson,
-  notMatched,
-  matchedByHeading
-} from "@inventory/catalog-contract/Mapping"
-import { Suggestion, suggestionFits } from "@inventory/catalog-contract/Suggestion"
-import {
-  rowId,
-  RowDecision,
-  decisionOf,
-  SavedDecisions,
-  isLeftOut,
-  hasKeep
-} from "@inventory/catalog-contract/Decision"
-
 /**
  * The review of a file of inventory items: one pure function that turns the staged table, the column choices and the
  * person's decisions into rows that are ready, need a decision, cannot be imported as written, are left out or are
@@ -68,6 +9,86 @@ import {
  *
  * Each rule is one kind of problem (`problemKinds`), one check (`fault`) and at most one proposal (`proposeFor`).
  */
+import {
+  Field,
+  StagedRow,
+  StagedTable,
+  fields,
+  fieldLabels,
+  requiredFields,
+  StagedCell
+} from "@inventory/catalog-contract/Staged"
+import { Confidence, Change, typedChange, acceptedProposal, appliedByRule } from "@inventory/catalog-contract/Change"
+import { RowId } from "@inventory/catalog-contract/Ids"
+import {
+  ItemFields,
+  skuPattern,
+  maxNameLength,
+  skuKey,
+  categories,
+  uoms,
+  stockingOf,
+  unitsToDecimal,
+  decimalUnits,
+  Vendor
+} from "@inventory/catalog-contract/Item"
+import { ColumnMatch, UnusedColumn, MappingChoice, matchedColumn } from "@inventory/catalog-contract/Mapping"
+import { Array as Arr, HashMap, HashSet, Option, Record as Rec, String as Str } from "effect"
+import {
+  canonicalTags,
+  readDate,
+  readDecimal,
+  dateReadings,
+  readVendors,
+  readCount,
+  readDimensions,
+  readUnitCost,
+  itemText,
+  isUom,
+  isCategory,
+  categoryKey,
+  booleanWord,
+  twoDigitYear,
+  thousandsComma,
+  decimalComma,
+  tagsOf,
+  categoryStem,
+  withPreferred
+} from "./CellReading.rules.ts"
+import { Suggestion, suggestionFits } from "@inventory/catalog-contract/Suggestion"
+import { matchColumns, shownText, totalRowNumbers } from "./Mapping.rules.ts"
+import {
+  rowId,
+  RowDecision,
+  decisionOf,
+  SavedDecisions,
+  isLeftOut,
+  hasKeep
+} from "@inventory/catalog-contract/Decision"
+
+/** Fields read from a cell's stored text, not from what Excel shows: a cost from the digits, a date cell as ISO. */
+const storedTextFields: ReadonlyArray<Field> = ["unitCost", "firstReceivedOn", "discontinuedOn"]
+
+/**
+ * The text of a cell as the review reads it. A cost is read from the stored digits, so a cost Excel shows as
+ * "$3.65" but stores as 3.6549 is held, not rounded, and a date cell from its stored date (ISO), whatever format
+ * Excel shows it in. Everything else is what the person sees: a SKU stored as 123 with a five-digit format is
+ * "00123". Spaces round a value are kept: trimming them is a proposal.
+ */
+const cellText = (field: Field, cell: StagedCell | undefined): string => {
+  const text = cell === undefined ? "" : Arr.contains(storedTextFields, field) ? cell.text : (cell.shown ?? cell.text)
+  // A cell holding only spaces is an empty cell: the screen then says "Empty" instead of showing nothing.
+  return Str.trim(text) === "" ? "" : text
+}
+
+const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`
+
+/** Maps and keeps the values that exist. Effect 4's `Arr.filterMap` takes a Result, not an Option. */
+const keepSome = <A, B>(list: ReadonlyArray<A>, f: (a: A, index: number) => Option.Option<B>): Array<B> =>
+  Arr.getSomes(Arr.map(list, f))
+
+const preferredOf = (vendors: ReadonlyArray<Vendor>): ReadonlyArray<Vendor> =>
+  Arr.filter(vendors, (vendor) => vendor.isPreferred)
 
 /**
  * Whether the rules' form-only fixes (spaces round a SKU or a name, "bx" for BX, a "$" before a cost, yes for true,
@@ -75,55 +96,6 @@ import {
  * listed and undoable ("apply"). One line to switch: the review screen and the server both read it.
  */
 export const ruleFixes: "propose" | "apply" = "apply"
-
-/**
- * Trims the reader's table to what the server stages. Nothing is coerced: each cell keeps its stored text, and
- * what Excel displays when that differs.
- */
-export const stageTable = (input: { readonly table: SpreadsheetTable }): StagedTable => {
-  const { table } = input
-  return {
-    fileName: table.fileName,
-    kind: table.kind,
-    sheet: table.format._tag === "xlsx" ? Option.some(table.format.chosen.name) : Option.none(),
-    headerRowNumber: table.headerRowNumber,
-    columns: Arr.map(table.columns, (column) => ({ index: column.index, letter: column.letter, label: column.label })),
-    rows: Arr.map(table.rows, (row) => ({
-      rowNumber: row.rowNumber,
-      cells: Arr.map(row.cells, (cell) =>
-        cell.shown === undefined || cell.shown === cell.text
-          ? { text: cell.text }
-          : { text: cell.text, shown: cell.shown }
-      )
-    })),
-    notes: Arr.map(table.notes, (note) => ({
-      kind: note.kind,
-      level: note.level,
-      message: note.message,
-      rows: note.rows
-    }))
-  }
-}
-
-/**
- * Why a file cannot be staged, as a `FileProblem` for the person, or null when it can. It takes counts, not rows, so
- * the reader asks before anything is sent, the server asks again when an upload begins (before any row arrives) and
- * once more when it finishes, and the words are the same wherever it is refused.
- *
- * @example stagingProblem({ fileName: "items.csv", rowCount: 50001, columnCount: 10 })?.problem
- * // '"items.csv" has 50001 rows. Up to 50000 can be imported at a time.'
- */
-export const stagingProblem = (input: {
-  readonly fileName: string
-  readonly rowCount: number
-  readonly columnCount: number
-}): FileProblem | null => {
-  const { fileName, rowCount, columnCount } = input
-  if (rowCount <= 0) return fileProblem.noRows({ fileName })
-  if (rowCount > maxStagedRows) return fileProblem.tooManyRows({ fileName, rows: rowCount, limit: maxStagedRows })
-  if (columnCount > 200) return fileProblem.tooManyColumns({ fileName, columns: columnCount })
-  return null
-}
 
 /**
  * Where an item is, as a sentence names it after "row": the row's number, and the file's word for the item when
@@ -355,373 +327,6 @@ export type Review = {
   }
 }
 
-/** Fields read from a cell's stored text, not from what Excel shows: a cost from the digits, a date cell as ISO. */
-const storedTextFields: ReadonlyArray<Field> = ["unitCost", "firstReceivedOn", "discontinuedOn"]
-
-const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`
-
-/** Maps and keeps the values that exist. Effect 4's `Arr.filterMap` takes a Result, not an Option. */
-const keepSome = <A, B>(list: ReadonlyArray<A>, f: (a: A, index: number) => Option.Option<B>): Array<B> =>
-  Arr.getSomes(Arr.map(list, f))
-
-const headingKey = (heading: string): string => Str.toLowerCase(Str.replace(/[^a-z0-9]/gi, "")(heading))
-
-/** The headings each field answers to, compared without case, spaces or punctuation ("Unit Cost ($)" is "unitcost"). */
-export const headingWords: Record<Field, ReadonlyArray<string>> = {
-  sku: ["sku", "code", "itemcode", "itemsku", "partnumber", "partno"],
-  name: ["name", "itemname", "item", "title"],
-  description: ["description", "desc", "details"],
-  category: ["category", "cat", "itemcategory"],
-  uom: ["uom", "unit", "unitofmeasure", "units"],
-  unitCost: ["unitcost", "cost", "unitprice", "price"],
-  quantityOnHand: ["quantityonhand", "qtyonhand", "quantity", "qty", "onhand", "stock"],
-  reorderPoint: ["reorderpoint", "reorderpt", "reorder", "reorderlevel"],
-  isActive: ["isactive", "active"],
-  lotTracked: ["lottracked", "lottracking", "islottracked"],
-  tags: ["tags", "tag", "labels"],
-  firstReceivedOn: ["firstreceivedon", "firstreceived", "receivedon", "received"],
-  discontinuedOn: ["discontinuedon", "discontinued"],
-  dimensions: ["dimensions", "dimensionsjson", "dims", "size"],
-  vendors: ["vendors", "vendorsjson", "vendor", "suppliers"]
-}
-
-/**
- * The text of a cell as the review reads it. A cost is read from the stored digits, so a cost Excel shows as
- * "$3.65" but stores as 3.6549 is held, not rounded, and a date cell from its stored date (ISO), whatever format
- * Excel shows it in. Everything else is what the person sees: a SKU stored as 123 with a five-digit format is
- * "00123". Spaces round a value are kept: trimming them is a proposal.
- */
-const cellText = (field: Field, cell: StagedCell | undefined): string => {
-  const text = cell === undefined ? "" : Arr.contains(storedTextFields, field) ? cell.text : (cell.shown ?? cell.text)
-  // A cell holding only spaces is an empty cell: the screen then says "Empty" instead of showing nothing.
-  return Str.trim(text) === "" ? "" : text
-}
-
-const shownText = (cell: StagedCell | undefined): string => (cell === undefined ? "" : (cell.shown ?? cell.text))
-
-const isTotalText = (text: string): boolean => /^(grand\s+)?totals?:?$/i.test(Str.trim(text))
-
-/**
- * The rows that add the file up: the ones the reader named, and any row with a cell that says only "Total", and of
- * those only the rows with no SKU. A row with a SKU is an item, whatever its name: an item called "Total" is counted.
- * `skuColumn` is the column the SKU is read from; with none, no row has a SKU.
- */
-const totalRowNumbers = (table: StagedTable, skuColumn: number | null): ReadonlyArray<number> => {
-  const noted = Arr.flatMap(table.notes, (note: StagedNote): ReadonlyArray<number> =>
-    note.kind === "totalRow" ? note.rows : []
-  )
-  const noSku = (row: StagedRow): boolean => skuColumn === null || Str.trim(shownText(row.cells[skuColumn])) === ""
-  return Arr.map(
-    Arr.filter(
-      table.rows,
-      (row) =>
-        noSku(row) &&
-        (Arr.contains(noted, row.rowNumber) || Arr.some(row.cells, (cell) => isTotalText(shownText(cell))))
-    ),
-    (row) => row.rowNumber
-  )
-}
-
-/**
- * Which file column fills which field. Headings are matched by name, ignoring case, spaces and punctuation; a
- * choice the person made overrides that. A field with no column stays empty and its rows say so, instead of the app
- * guessing from the data.
- */
-export const matchColumns = (input: {
-  readonly table: StagedTable
-  readonly choices: ReadonlyArray<MappingChoice>
-}): ReadonlyArray<ColumnMatch> => {
-  const { table } = input
-  // A column a person gave to one field is not also matched to another by its heading.
-  const taken = keepSome(input.choices, (choice) => Option.fromNullishOr(choice.column))
-  const picked = Arr.map(fields, (field) => {
-    const choice = Arr.findLast(input.choices, (candidate) => candidate.field === field)
-    const byName = Arr.findFirst(
-      table.columns,
-      (column) => Arr.contains(headingWords[field], headingKey(column.label)) && !Arr.contains(taken, column.index)
-    )
-    const column = Option.isSome(choice)
-      ? Option.flatMap(Option.fromNullishOr(choice.value.column), (index) =>
-          Arr.findFirst(table.columns, (candidate) => candidate.index === index)
-        )
-      : byName
-    const how = Option.isSome(choice)
-      ? Option.isNone(column)
-        ? ("none" as const)
-        : choice.value.by
-      : Option.isSome(byName)
-        ? ("heading" as const)
-        : ("none" as const)
-    return { field, column, how }
-  })
-  // Which rows are totals depends on the SKU's column, so the columns are picked before the examples are read.
-  const skuColumn = Option.getOrNull(
-    Option.flatMap(
-      Arr.findFirst(picked, (match) => match.field === "sku"),
-      (match) => Option.map(match.column, (found) => found.index)
-    )
-  )
-  const totals = totalRowNumbers(table, skuColumn)
-  const itemRows = Arr.filter(table.rows, (row) => !Arr.contains(totals, row.rowNumber))
-  const pick = (column: StagedColumn): ColumnPick => ({
-    index: column.index,
-    header: column.label,
-    examples: Arr.take(
-      Arr.dedupe(
-        Arr.filter(
-          Arr.map(itemRows, (row) => Str.trim(shownText(row.cells[column.index]))),
-          (text) => text !== ""
-        )
-      ),
-      3
-    )
-  })
-  return Arr.map(picked, ({ field, column, how }): ColumnMatch => {
-    const found = Option.map(column, pick)
-    // A heading that named a column always has one; without it the field is simply not matched.
-    return how === "person"
-      ? matchedByPerson({ field, column: found })
-      : Option.match(found, {
-          onNone: (): ColumnMatch => notMatched({ field }),
-          onSome: (chosen): ColumnMatch => matchedByHeading({ field, column: chosen })
-        })
-  })
-}
-
-const isCategory = (text: string): boolean => Arr.contains(categories as ReadonlyArray<string>, text)
-const isUom = (text: string): boolean => Arr.contains(uoms as ReadonlyArray<string>, text)
-
-/** A category as people write it, reduced to the list's own form: lower case, hyphens for spaces and underscores. */
-const categoryKey = (text: string): string => Str.replace(/[\s_]+/g, "-")(Str.toLowerCase(Str.trim(text)))
-/** A category without its hyphens and its plural s, so "Finished Good" meets "finished-goods". */
-const categoryStem = (text: string): string => Str.replace(/s$/, "")(Str.replaceAll("-", "")(categoryKey(text)))
-
-const trueWords: ReadonlyArray<string> = ["true", "yes", "y", "1", "t"]
-const falseWords: ReadonlyArray<string> = ["false", "no", "n", "0", "f"]
-
-/** "true" or "false" for a word that can only mean one of them ("Yes", "Y", "1", "TRUE"), or none. */
-const booleanWord = (text: string): Option.Option<"true" | "false"> => {
-  const key = Str.toLowerCase(Str.trim(text))
-  return Arr.contains(trueWords, key)
-    ? Option.some("true" as const)
-    : Arr.contains(falseWords, key)
-      ? Option.some("false" as const)
-      : Option.none()
-}
-
-/**
- * Tags as an item stores them, in one cell: split at "|", trimmed, lower case, each once, empty ones dropped.
- *
- * @example canonicalTags("Metal|metal| METAL") // "metal"
- */
-export const canonicalTags = (text: string): string =>
-  Arr.join(
-    Arr.dedupe(
-      Arr.filter(
-        Arr.map(Str.split("|")(text), (tag) => Str.toLowerCase(Str.trim(tag))),
-        (tag) => tag !== ""
-      )
-    ),
-    "|"
-  )
-
-const tagsOf = (text: string): ReadonlyArray<string> => Arr.filter(Str.split("|")(text), (tag) => tag !== "")
-
-// The dimensions cell as the file writes it: JSON with the brief's own keys. Each measurement may be missing here, so
-// the review can say which one is, instead of only "not readable".
-const DimensionsCell = S.fromJsonString(
-  S.Struct({
-    length: S.optionalKey(S.Finite),
-    width: S.optionalKey(S.Finite),
-    height: S.optionalKey(S.Finite),
-    unit: S.optionalKey(S.String)
-  })
-)
-const decodeDimensions = S.decodeUnknownOption(DimensionsCell)
-const encodeDimensions = S.encodeOption(DimensionsCell)
-
-// One vendor as the file writes it, in the brief's own keys. A cost is a JSON number there, or the same digits in
-// quotes ("7.50"): both are read from the digits by `readDecimal`, so a quoted cost is not a cell "cut off".
-const VendorCell = S.Struct({
-  vendor_name: S.optionalKey(S.String),
-  vendor_sku: S.String.pipe(S.NullOr, S.optionalKey),
-  unit_cost: S.optionalKey(S.Union([S.Finite, S.String])),
-  lead_time_days: S.Finite.pipe(S.NullOr, S.optionalKey),
-  is_preferred: S.optionalKey(S.Boolean)
-})
-const VendorsCell = VendorCell.pipe(S.Array, S.fromJsonString)
-const decodeVendors = S.decodeUnknownOption(VendorsCell)
-const encodeVendors = S.encodeOption(VendorsCell)
-
-/** A value of a cell that holds JSON: read, or the sentence that says what is wrong with it. */
-type Read<A> = { readonly _tag: "ok"; readonly value: A } | { readonly _tag: "bad"; readonly message: string }
-const ok = <A>(value: A): Read<A> => ({ _tag: "ok", value })
-const bad = <A>(message: string): Read<A> => ({ _tag: "bad", message })
-
-/**
- * The dimensions a cell holds: none for an empty cell, the three measurements and their unit, or what is wrong, in a
- * sentence that names the missing measurement.
- *
- * @example readDimensions('{"length":31.2,"width":41.4,"unit":"cm"}') // bad: "Dimensions has no height. ..."
- */
-export const readDimensions = (text: string): Read<Dimensions | null> => {
-  if (Str.trim(text) === "") return ok(null)
-  const cell = decodeDimensions(text)
-  if (Option.isNone(cell)) {
-    return bad("Dimensions cannot be read: the cell is cut off or is not length, width, height and unit.")
-  }
-  const { length, width, height, unit } = cell.value
-  const missing = Arr.getSomes([
-    length === undefined ? Option.some("length") : Option.none(),
-    width === undefined ? Option.some("width") : Option.none(),
-    height === undefined ? Option.some("height") : Option.none()
-  ])
-  if (length === undefined || width === undefined || height === undefined) {
-    return bad(`Dimensions has no ${Arr.join(missing, " and no ")}. Give all three measurements together, or none.`)
-  }
-  if (length <= 0 || width <= 0 || height <= 0) return bad("Dimensions has a measurement that is not above zero.")
-  if (unit !== undefined && unit !== "cm" && unit !== "in")
-    return bad(`Dimensions has the unit "${unit}", not cm or in.`)
-  return ok({ length, width, height, unit: unit === "in" ? "in" : "cm" })
-}
-
-/**
- * The vendors a cell holds: none for an empty cell, up to three with a name and a cost each, or what is wrong, in a
- * sentence. More than one preferred vendor is read here and asked about by the review (`preferredCount`).
- */
-export const readVendors = (text: string): Read<ReadonlyArray<Vendor>> => {
-  if (Str.trim(text) === "") return ok([])
-  const cell = decodeVendors(text)
-  if (Option.isNone(cell)) return bad("Vendors cannot be read: the cell is cut off or is not a list of vendors.")
-  if (cell.value.length > 3) return bad(`Vendors lists ${cell.value.length} vendors. An item has at most 3.`)
-  const read = Arr.map(cell.value, (vendor, index): Read<Vendor> => {
-    const place = `Vendor ${index + 1}`
-    const name = Str.trim(vendor.vendor_name ?? "")
-    if (name === "") return bad(`${place} has no name.`)
-    if (vendor.unit_cost === undefined) return bad(`${place} (${name}) has no unit cost.`)
-    const cost = readUnitCost(`${vendor.unit_cost}`)
-    if (Option.isNone(cost)) {
-      return bad(`${place} (${name}) has the unit cost ${vendor.unit_cost}, not 0 or more with up to 4 decimals.`)
-    }
-    const lead = vendor.lead_time_days ?? null
-    if (lead !== null && (!Number.isInteger(lead) || lead < 0)) {
-      return bad(`${place} (${name}) has the lead time ${lead}, not a whole number of days.`)
-    }
-    return ok({
-      vendorName: name,
-      vendorSku: Option.fromNullishOr(vendor.vendor_sku),
-      unitCost: cost.value,
-      leadTimeDays: Option.fromNullOr(lead),
-      isPreferred: vendor.is_preferred === true
-    })
-  })
-  const wrong = Arr.findFirst(read, (entry) => entry._tag === "bad")
-  if (Option.isSome(wrong) && wrong.value._tag === "bad") return bad(wrong.value.message)
-  return ok(Arr.flatMap(read, (entry) => (entry._tag === "ok" ? [entry.value] : [])))
-}
-
-const preferredOf = (vendors: ReadonlyArray<Vendor>): ReadonlyArray<Vendor> =>
-  Arr.filter(vendors, (vendor) => vendor.isPreferred)
-
-/** The vendors cell again with only the vendor at `keep` preferred: one reading of a cell that marks several. */
-const withPreferred = (text: string, keep: number): Option.Option<string> =>
-  Option.flatMap(decodeVendors(text), (cell) =>
-    encodeVendors(Arr.map(cell, (vendor, index) => ({ ...vendor, is_preferred: index === keep })))
-  )
-
-/**
- * An item's values as the text a file's cells would hold, field by field: what a stored item is compared with a row
- * in, and shown beside it.
- *
- * @example itemText(item).tags // "fragile|imported"
- */
-export const itemText = (item: ItemFields): Readonly<Record<Field, string>> => ({
-  sku: item.sku,
-  name: item.name,
-  description: Option.getOrElse(item.description, () => ""),
-  category: item.category,
-  uom: item.uom,
-  unitCost: costDigits(item.unitCost),
-  quantityOnHand: `${item.quantityOnHand}`,
-  reorderPoint: Option.match(item.reorderPoint, { onNone: () => "", onSome: (point) => `${point}` }),
-  isActive: `${isActive(item.stocking)}`,
-  lotTracked: `${item.lotTracked}`,
-  tags: Arr.join(item.tags, "|"),
-  firstReceivedOn: Option.getOrElse(item.firstReceivedOn, () => ""),
-  discontinuedOn: Option.getOrElse(discontinuedOn(item.stocking), () => ""),
-  dimensions: Option.getOrElse(Option.flatMap(item.dimensions, encodeDimensions), () => ""),
-  vendors:
-    item.vendors.length === 0
-      ? ""
-      : Option.getOrElse(
-          encodeVendors(
-            Arr.map(item.vendors, (vendor) => ({
-              vendor_name: vendor.vendorName,
-              ...Option.match(vendor.vendorSku, { onNone: () => ({}), onSome: (vendor_sku) => ({ vendor_sku }) }),
-              unit_cost: Number(costDigits(vendor.unitCost)),
-              ...Option.match(vendor.leadTimeDays, {
-                onNone: () => ({}),
-                onSome: (lead_time_days) => ({ lead_time_days })
-              }),
-              is_preferred: vendor.isPreferred
-            }))
-          ),
-          () => ""
-        )
-})
-
-const monthNames = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
-
-const monthOf = (word: string): number => {
-  const at = Arr.findFirstIndex(monthNames, (name) => Str.startsWith(name)(Str.toLowerCase(word)))
-  return Option.isSome(at) && word.length >= 3 ? at.value + 1 : 0
-}
-
-const fullYear = (text: string): number => (text.length === 2 ? 2000 + Number(text) : Number(text))
-
-/**
- * The readings of a date written another way than year-month-day: one for "4 Mar 2026", "Jun 19, 2024" or
- * "13/04/2026", two for "03/04/2026" (day first, then month first), none for text that is not a date. A two-digit
- * year is read as 20xx.
- *
- * @example dateReadings("13/04/2026") // { dayFirst: Some("2026-04-13"), monthFirst: None }
- * @example dateReadings("03/04/2026") // { dayFirst: Some("2026-04-03"), monthFirst: Some("2026-03-04") }
- */
-export const dateReadings = (
-  text: string
-): { readonly dayFirst: Option.Option<string>; readonly monthFirst: Option.Option<string> } => {
-  const trimmed = Str.trim(text)
-  const numeric = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4}|\d{2})$/.exec(trimmed)
-  if (numeric !== null) {
-    const a = Number(numeric[1])
-    const b = Number(numeric[2])
-    const year = fullYear(numeric[3] ?? "")
-    return {
-      dayFirst: isoDate({ year, month: b, day: a }),
-      monthFirst: a === b ? Option.none() : isoDate({ year, month: a, day: b })
-    }
-  }
-  const dayMonth = /^(\d{1,2})[\s-]+([a-z]+)\.?,?[\s-]+(\d{4})$/i.exec(trimmed)
-  if (dayMonth !== null) {
-    const day = isoDate({ year: Number(dayMonth[3]), month: monthOf(dayMonth[2] ?? ""), day: Number(dayMonth[1]) })
-    return { dayFirst: day, monthFirst: Option.none() }
-  }
-  const monthDay = /^([a-z]+)\.?\s+(\d{1,2}),?\s+(\d{4})$/i.exec(trimmed)
-  if (monthDay !== null) {
-    const day = isoDate({ year: Number(monthDay[3]), month: monthOf(monthDay[1] ?? ""), day: Number(monthDay[2]) })
-    return { dayFirst: day, monthFirst: Option.none() }
-  }
-  return { dayFirst: Option.none(), monthFirst: Option.none() }
-}
-
-/** True for a date in numbers whose year has two digits ("13/04/98"): which century it means is a guess. */
-const twoDigitYear = (text: string): boolean => /^\d{1,2}[/.-]\d{1,2}[/.-]\d{2}$/.test(Str.trim(text))
-
-/** Digits grouped in thousands by commas, with a point for decimals: "1,250" or "12,000.5". */
-const thousandsComma = /^\d{1,3}(?:,\d{3})+(?:\.\d+)?$/
-/** One comma between digits: "35,82" or "2,5". */
-const decimalComma = /^\d+,\d+$/
-
 type DateField = "firstReceivedOn" | "discontinuedOn"
 const isDateField = (field: Field): field is DateField => field === "firstReceivedOn" || field === "discontinuedOn"
 const isCountField = (field: Field): field is "quantityOnHand" | "reorderPoint" =>
@@ -860,7 +465,7 @@ const makeContext = (input: {
         (column) => column.index
       )
     )
-  const totalNumbers = totalRowNumbers(input.table, columnOf("sku"))
+  const totalNumbers = totalRowNumbers({ table: input.table, skuColumn: columnOf("sku") })
   const columns = Rec.fromEntries(Arr.map(fields, (field) => [field, columnOf(field)] as const))
   const read = (row: StagedRow): Readonly<Record<Field, string>> =>
     Rec.fromEntries(
@@ -1225,7 +830,10 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): Option.Option<
       if (preferred.length > 1) {
         const picks = keepSome(read.value, (vendor, index) =>
           vendor.isPreferred
-            ? Option.map(withPreferred(text, index), (to) => ({ to, label: `${vendor.vendorName} preferred` }))
+            ? Option.map(withPreferred({ text, keep: index }), (to) => ({
+                to,
+                label: `${vendor.vendorName} preferred`
+              }))
             : Option.none()
         )
         const head = picks[0]
@@ -1953,34 +1561,3 @@ export const dropAccepted = (input: {
       return Option.some([row.id, { ...decision.value, accepted: kept }] as const)
     })
   )
-
-const csvCell = (cell: string): string => (/[",\r\n]/.test(cell) ? `"${Str.replaceAll('"', '""')(cell)}"` : cell)
-
-/**
- * The rows that are not in the system, with the reason for each, as a CSV the person can open: the file's own
- * columns as the file has them, then Excel's row number (with the item's word when its row holds several,
- * "8 · Feb") and why. Rows whose SKU is already stored are not in it:
- * they are items, counted on screen as "Already there".
- *
- * @example
- * notImportedCsv({ table, rows: [{ rowNumber: 9, reason: "No name" }] })
- * // "sku,name,Row,Why it was not imported\r\nZZZ-0003,,9,Name is empty."
- */
-export const notImportedCsv = (input: {
-  readonly table: StagedTable
-  readonly rows: ReadonlyArray<{ readonly rowNumber: number; readonly label?: string; readonly reason: string }>
-}): string => {
-  const head = [...Arr.map(input.table.columns, (column) => column.label), "Row", "Why it was not imported"]
-  const byNumber = Rec.fromEntries(Arr.map(input.table.rows, (row) => [`${row.rowNumber}`, row] as const))
-  const body = keepSome(input.rows, (held) =>
-    Option.map(Rec.get(byNumber, `${held.rowNumber}`), (row) => [
-      ...Arr.map(input.table.columns, (column) => shownText(row.cells[column.index])),
-      rowPlace(held),
-      held.reason
-    ])
-  )
-  return Arr.join(
-    Arr.map([head, ...body], (cells) => Arr.join(Arr.map(cells, csvCell), ",")),
-    "\r\n"
-  )
-}

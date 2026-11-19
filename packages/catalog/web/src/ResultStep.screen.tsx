@@ -31,12 +31,13 @@ import {
   outcomeReasonOf,
   type RowOutcome
 } from "@inventory/catalog-contract/Import"
-import { notImportedCsv, rowPlace } from "@inventory/catalog-model/Review"
+import { rowPlace } from "@inventory/catalog-model/Review"
 import { rowId } from "@inventory/catalog-contract/Decision"
 import { type StagedTable } from "@inventory/catalog-contract/Staged"
 import { download, importWords, notImportedColumn, OutcomePill, Text, when } from "./internal/format.tsx"
 import { toastError } from "@inventory/client/SayError"
 import { queryKeys } from "./Catalog.keys.ts"
+import { notImportedCsv } from "@inventory/catalog-model/NotImported"
 
 type Filter = "all" | RowOutcome["outcome"]
 

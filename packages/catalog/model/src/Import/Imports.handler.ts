@@ -24,7 +24,6 @@ import {
   ruleFixes,
   type Proposal,
   dropAccepted,
-  stagingProblem,
   firstDecisions
 } from "../Review/Review.rules.ts"
 import { skuKey, fieldsOf } from "@inventory/catalog-contract/Item"
@@ -42,6 +41,7 @@ import { fitsChunks, chunkProblem } from "../Staging/Upload.rules.ts"
 import { fileProblem } from "@inventory/catalog-contract/FileProblem"
 import { ImportId, ConfirmId } from "@inventory/catalog-contract/Ids"
 import * as S from "effect/Schema"
+import { stagingProblem } from "../Staging/Staging.rules.ts"
 
 /**
  * What each endpoint of the imports group does: staging, reading and confirming an import. The ports are resolved once,

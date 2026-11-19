@@ -22,7 +22,7 @@ import { NativeSelect, NativeSelectOption } from "@inventory/ui/components/nativ
 import { Switch } from "@inventory/ui/components/switch"
 import { Textarea } from "@inventory/ui/components/textarea"
 import { cacheChange } from "@inventory/client/Optimistic"
-import { useOptimisticWrite } from "@/lib/api"
+import { useOptimisticWrite } from "./Catalog.runtime.ts"
 import {
   categories,
   discontinuedOn,
@@ -37,8 +37,8 @@ import {
 } from "@inventory/catalog-contract/Item"
 import type { ItemPage } from "@inventory/catalog-contract/ItemQuery"
 import { sayError } from "@inventory/client/SayError"
-import { queryKeys } from "@/lib/queries"
-import { costOf, dimensionsText } from "./import/itemText.ts"
+import { queryKeys } from "./Catalog.keys.ts"
+import { costOf, dimensionsText } from "./internal/itemText.ts"
 
 const formOf = (item: StoredItem): ItemForm => ({
   name: item.name,

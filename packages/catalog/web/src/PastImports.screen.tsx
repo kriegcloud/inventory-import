@@ -5,9 +5,9 @@ import { DateTime } from "effect"
 import { StatusPill, type Tone } from "@inventory/ui/StatusPill"
 import type { ListColumn } from "@inventory/ui/ListTable"
 import { whenShort } from "@inventory/ui/Dates"
-import { importAddress } from "@/lib/route"
+import { importAddress } from "./internal/route.ts"
 import type { PastImport } from "@inventory/catalog-contract/Import"
-import { when } from "./format.tsx"
+import { when } from "./internal/format.tsx"
 
 const statusWords: Readonly<Record<PastImport["status"], { readonly words: string; readonly tone: Tone }>> = {
   imported: { words: "Imported", tone: "success" },

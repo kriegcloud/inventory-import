@@ -4,7 +4,7 @@
 import * as S from "effect/Schema"
 import { ViewChange } from "@inventory/catalog-contract/TableView"
 import { progressKey, type ProgressScope } from "@inventory/review/SavedProgress"
-import { Patch } from "./view.ts"
+import { Patch } from "./internal/view.ts"
 
 const Applied = S.Struct({
   change: ViewChange,

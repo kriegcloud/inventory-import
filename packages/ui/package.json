@@ -142,7 +142,8 @@
     "./TextWidth": "./src/TextWidth.measure.ts",
     "./Theme": "./src/Theme.provider.tsx",
     "./theme.css": "./src/theme.css",
-    "./utilities.css": "./src/utilities.css"
+    "./utilities.css": "./src/utilities.css",
+    "./ShellSlots": "./src/ShellSlots.context.ts"
   },
   "scripts": {
     "check": "tsrs -p tsconfig.json && node ../../scripts/check-exports.mjs && node ../../scripts/check-strict.mjs strict-ceiling.json",

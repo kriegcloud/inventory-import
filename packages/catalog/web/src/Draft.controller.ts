@@ -3,7 +3,7 @@ import { useCallback, useRef } from "react"
 import type { DecisionDelta } from "@inventory/catalog-contract/Decision"
 import type { SavedDecisions } from "@inventory/catalog-contract/Decision"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
-import { callWrite } from "./api.ts"
+import { callWrite } from "./Catalog.runtime.ts"
 import { isTransient, toastError } from "@inventory/client/SayError"
 
 /** What differs between two drafts, row by row: the rows to save and the rows whose decision was taken back. */

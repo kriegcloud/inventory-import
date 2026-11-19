@@ -6,7 +6,7 @@ import { describe, expect, it } from "@effect/vitest"
 import { Array as Arr, Effect, Option } from "effect"
 import type { Note, NoteKind, Row, SpreadsheetTable } from "@inventory/catalog-model/Spreadsheet"
 import { sayError } from "@inventory/client/SayError"
-import { readSpreadsheet } from "../../src/web/lib/spreadsheet/index.ts"
+import { readSpreadsheet } from "@inventory/catalog-web/Spreadsheet"
 
 const bytesOf = (path: string): Uint8Array => readFileSync(new URL(`../../${path}`, import.meta.url))
 const fixture = (name: string, as: string = name): File => new File([bytesOf(`test/fixtures/spreadsheet/${name}`)], as)

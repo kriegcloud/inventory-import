@@ -53,6 +53,7 @@
     "@inventory/catalog-contract": "workspace:*",
     "@inventory/catalog-host": "workspace:*",
     "@inventory/catalog-model": "workspace:*",
+    "@inventory/catalog-web": "workspace:*",
     "@inventory/client": "workspace:*",
     "@inventory/kernel": "workspace:*",
     "@inventory/review": "workspace:*",

@@ -366,3 +366,44 @@ None.
     Washer M6. Asked the assistant "only kilograms, cheapest first": "Answered by anthropic/claude-haiku-5.5",
     "Filtered: UoM is KG", "Sorted by Unit cost, low to high", "20 of 157 items", first row Nylon Tube 1in $10.71,
     address `?sort=unitCost.asc&uom=KG`.
+- **`catalog-web` (`packages/catalog/web`).** The import page and its four steps, the Items page with its editor,
+  the table assistant, the past imports, and the controllers and readers behind them (the upload and its worker,
+  the spreadsheet readers, the draft saver, the review adapter, the assistant's conversation), 30 files, stage C
+  with its own ceiling. The app keeps the shell, the Activity page (which still calls the catalog's `changes` and
+  `past` through the app's client), the gallery and the composition.
+  - **How the screens reach the API.** `Catalog.runtime.ts` declares `CatalogClient` (the client for the imports,
+    items and assistant groups only) and exports `call`, `callWrite`, `fork`, `runExit`, `useOptimisticWrite` and
+    `catalogRuntime`, bound once by the app (`configureCatalog` in `src/web/lib/api.ts`): an upload and a prefetch
+    run outside any component, so a hook could not carry them. This differs from `access-web`, whose screens take
+    the calls from `useApi`.
+  - **Who is signed in** reaches the screens through `@inventory/client/CurrentMember` (`useMember`), which the
+    app provides above the workspace from its session controller. The shell's two slots are
+    `@inventory/ui/ShellSlots`. The catalog's keys are `catalogKeys` (`./Keys`), spread into the app's `queryKeys`;
+    they name the audit trail's key too, because a confirm, a take-back and an edit each make it stale.
+  - **Ceilings.** 255 of the app's 293 findings moved with the files: app 38, catalog-web 255, review 283, ui 52,
+    client 22, access-web 17. Sum 667, cap 678, as before.
+  - **A defect I caused and found only by looking.** Tailwind reads class names from the folders `index.css`
+    names, and the production build from `screenPackages` in `vite.config.ts`; the new package was in neither, so
+    every class used only by the moved screens was missing. Every text read passed; at phone width the assistant's
+    Send button lay outside the viewport and could not be pressed. Both lists name `packages/catalog/web` now; the
+    built stylesheet holds all 105 class names the package's screens use.
+  - Not as the brief has it: the web tests (`reviewParity`, `reviewHonesty`, the spreadsheet readers', the
+    table view's) stay in the app, importing the package (they read the app's sample files);
+    `ImportDecisions.screen.tsx` is not split out of the Activity page; `UploadState` is still in the model's
+    `Upload.rules.ts`; the conversation's `null`s are not `Option`s; file names end `.screen.tsx` and
+    `.controller.ts` for the pages and controllers, and the rest sit under `internal/` with their old names.
+  - Read on screen after the stylesheet fix, fresh database. Desk, model on: the messy sample "Import 155, skip
+    45"; "Leave out 2": "Import 157, skip 43"; Undo: "Import 155, skip 45"; Redo: "Import 157, skip 43"; after a
+    refresh the same and "Undo: 2 rows left out"; confirmed "Not imported 43 · Imported 157 · Already there 0 · All
+    200"; Items "157 items"; searched "washr brass": "1 of 157 items, best matches first"; the assistant, "only
+    kilograms, cheapest first": "Answered by anthropic/claude-haiku-5.5", "Filtered: UoM is KG", "Sorted by Unit
+    cost, low to high", "20 of 157 items"; the editor on Brass Washer M6, typed "12.50", Save: toast "Saved
+    AAT-7076", the row reads "$12.50"; Activity "Decisions 20 · Events 4 · Imports 1"; the result's take-back:
+    "This removes the 156 items that items_messy.csv created. It keeps the item someone changed since: AAT-7076
+    Brass Washer M6, changed by Dana Whitfield ...", then "Taken back 156 · Not imported 43 · Imported 1", Items "1
+    item". Phone (390 wide), AI off (`"available": false`, "AI_ENABLED is set to false"): the sample confirmed,
+    Items "155 items" as 20 cards each with Edit and "Added Nov 18 · Dana Whitfield", no sideways scroll; the
+    assistant, "only KG": "Filtered: UoM is KG", "20 of 155 items", "Without the model the assistant reads ...";
+    "clear" sent with the Send button. Looked at as pictures: the result and the review at desk width, Items at
+    phone width. Not seen at phone width: the review's decisions, "Suggest fixes" (its button is not on the phone
+    review as I looked for it), the editor, a take-back.

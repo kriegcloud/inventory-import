@@ -6,15 +6,15 @@ import { type RecordColumn, RecordsTable } from "@inventory/ui/components/data-t
 import { StatusPill } from "@inventory/ui/StatusPill"
 import { Button } from "@inventory/ui/components/button"
 import { NativeSelect, NativeSelectOption } from "@inventory/ui/components/native-select"
-import { call } from "@/lib/api"
-import { useImportCache } from "@/lib/imports"
+import { call } from "./Catalog.runtime.ts"
+import { useImportCache } from "./Imports.controller.ts"
 import { navigate } from "@inventory/ui/Route"
-import { importAddress } from "@/lib/route"
+import { importAddress } from "./internal/route.ts"
 import type { ImportView } from "@inventory/catalog-contract/Import"
 import { type ColumnMatch, matchedColumn } from "@inventory/catalog-contract/Mapping"
 import { type Field, fieldLabels, requiredFields, type StagedTable } from "@inventory/catalog-contract/Staged"
 import { toastError } from "@inventory/client/SayError"
-import { notImportedColumn } from "./format.tsx"
+import { notImportedColumn } from "./internal/format.tsx"
 
 const howWords = {
   heading: "By its heading",

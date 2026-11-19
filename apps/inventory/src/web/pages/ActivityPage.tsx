@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import { DateTime, Option } from "effect"
 import { useState } from "react"
 import { Code } from "@inventory/ui/Code"
-import { importAddress } from "@/lib/route"
+import { importAddress } from "@inventory/catalog-web/Route"
 import { PageHeader, Views } from "@inventory/ui/PageHeader"
 import { ProposedValue } from "@inventory/ui/ProposedValue"
 import { type ListColumn, ListTable } from "@inventory/ui/ListTable"
@@ -21,11 +21,11 @@ import {
 } from "@inventory/catalog-contract/Change"
 import { fieldLabels } from "@inventory/catalog-contract/Staged"
 import { whenShort } from "@inventory/ui/Dates"
-import { when } from "./import/format.tsx"
+import { when } from "@inventory/catalog-web/ImportWords"
 import { sayError } from "@inventory/client/SayError"
 import { queryKeys } from "@/lib/queries"
-import { usePastImports } from "@/lib/imports"
-import { pastImportColumns } from "./import/pastImports.tsx"
+import { usePastImports } from "@inventory/catalog-web/Imports"
+import { pastImportColumns } from "@inventory/catalog-web/PastImports"
 
 const sourceWords = { rule: "Rule", model: "Model", person: "Person" } as const
 

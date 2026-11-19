@@ -4,7 +4,7 @@
 // the progress it reports never passes its total.
 import { Array as Arr, Effect } from "effect"
 import { describe, expect, it } from "vitest"
-import { readSpreadsheet, type ReadProgress } from "../../src/web/lib/spreadsheet/index.ts"
+import { readSpreadsheet, type ReadProgress } from "@inventory/catalog-web/Spreadsheet"
 import { progressOf } from "@inventory/catalog-model/Upload"
 
 describe("reading CSV text in pieces", () => {

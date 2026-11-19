@@ -11,7 +11,7 @@ import {
   revertAll,
   takeBack,
   type ViewState
-} from "../../src/web/lib/table-assistant/view.ts"
+} from "@inventory/catalog-web/TableViewState"
 
 const column = (input: Partial<CatalogColumn> & Pick<CatalogColumn, "id" | "label" | "type">): CatalogColumn => ({
   sortable: true,

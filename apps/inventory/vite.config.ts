@@ -72,7 +72,8 @@ const web = fileURLToPath(new URL("./src/web", import.meta.url))
 const screenPackages = {
   "@inventory/ui": fileURLToPath(new URL("../../packages/ui", import.meta.url)),
   "@inventory/review": fileURLToPath(new URL("../../packages/review", import.meta.url)),
-  "@inventory/access-web": fileURLToPath(new URL("../../packages/access/web", import.meta.url))
+  "@inventory/access-web": fileURLToPath(new URL("../../packages/access/web", import.meta.url)),
+  "@inventory/catalog-web": fileURLToPath(new URL("../../packages/catalog/web", import.meta.url))
 }
 const usedSourcesOnly = (): Plugin => ({
   name: "inventory:used-sources",

@@ -4,9 +4,9 @@ import { Effect, MutableHashMap, Option } from "effect"
 import type { ImportView, OpenImports } from "@inventory/catalog-contract/Import"
 import type { StagedTable } from "@inventory/catalog-contract/Staged"
 import type { SheetChoice, SheetSummary } from "@inventory/catalog-model/Spreadsheet"
-import { call, useOptimisticWrite } from "./api.ts"
+import { call, useOptimisticWrite } from "./Catalog.runtime.ts"
 import { cacheChange } from "@inventory/client/Optimistic"
-import { queryKeys } from "./queries.ts"
+import { queryKeys } from "./Catalog.keys.ts"
 
 /** How the import's view is fetched: by its hook, and ahead of it by the workspace when the address names one. */
 export const importViewQuery = (id: ImportId | undefined) => ({

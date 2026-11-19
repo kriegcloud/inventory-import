@@ -27,17 +27,17 @@ import {
 import { planColumns, type SizedColumn } from "../../../../packages/review/src/internal/sizing.ts"
 import type { ProblemKind, ReviewColumn, ReviewRow } from "@inventory/review/ReviewTypes"
 import { defaultReviewWords, reviewWords } from "@inventory/review/ReviewWords"
-import { readSpreadsheet } from "../../src/web/lib/spreadsheet/index.ts"
+import { readSpreadsheet } from "@inventory/catalog-web/Spreadsheet"
 import type { ItemFields } from "@inventory/catalog-contract/Item"
-import { costText, dimensionsCellText, vendorsCellText } from "../../src/web/pages/import/itemText.ts"
-import { vendorsDraft } from "../../src/web/pages/import/cellDrafts.ts"
+import { costText, dimensionsCellText, vendorsCellText } from "@inventory/catalog-web/ItemText"
+import { vendorsDraft } from "@inventory/catalog-web/CellDrafts"
 import {
   reasonShown,
   regionColumns,
   regionKinds,
   toRegionDecisions,
   toRegionRows
-} from "../../src/web/pages/import/reviewAdapter.ts"
+} from "@inventory/catalog-web/ImportReview"
 
 const sample = (name: string): File =>
   new File([readFileSync(new URL(`../../public/samples/${name}`, import.meta.url))], name)

@@ -3,7 +3,7 @@ import { Separator } from "@inventory/ui/components/separator"
 import { SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from "@inventory/ui/components/sidebar"
 import { setContentInset, sidebarFolded, sidebarOpen, sidebarWasOpen } from "@inventory/ui/ContentWidth"
 import { BrandMark } from "./BrandMark.tsx"
-import { BarSlotContext } from "./slots.ts"
+import { BarSlotContext } from "@inventory/ui/ShellSlots"
 import { ThemeToggle } from "./ThemeToggle.tsx"
 
 const skipLink = (

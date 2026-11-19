@@ -17,20 +17,20 @@ import type { DataTableFeatures } from "@inventory/ui/components/data-table/data
 import { DataTablePagination } from "@inventory/ui/components/data-table/data-table-pagination"
 import { DataTableToolbar } from "@inventory/ui/components/data-table/data-table-toolbar"
 import { useDataTable } from "@inventory/ui/hooks/use-data-table"
-import { useActor } from "@/lib/actor"
-import { call } from "@/lib/api"
+import { useMember } from "@inventory/client/CurrentMember"
+import { call } from "./Catalog.runtime.ts"
 import { contentWidth, useIsNarrow } from "@inventory/ui/ContentWidth"
 import { navigate, useLocation } from "@inventory/ui/Route"
 import { hasRole } from "@inventory/kernel/Role"
 import { discontinuedOn, isActive, type StoredItem } from "@inventory/catalog-contract/Item"
 import { itemPageSizes } from "@inventory/catalog-contract/ItemQuery"
-import { day, when } from "./import/format.tsx"
-import { ItemEditor } from "./ItemEditor.tsx"
-import { costOf, dimensionsText, vendorsText } from "./import/itemText.ts"
+import { day, when } from "./internal/format.tsx"
+import { ItemEditor } from "./ItemEditor.screen.tsx"
+import { costOf, dimensionsText, vendorsText } from "./internal/itemText.ts"
 import { sayError } from "@inventory/client/SayError"
-import { keptVisibility, TableAssistant } from "@/components/app/TableAssistant"
+import { keptVisibility, TableAssistant } from "./TableAssistant.screen.tsx"
 import { TableSearch } from "@inventory/ui/TableSearch"
-import { queryKeys } from "@/lib/queries"
+import { queryKeys } from "./Catalog.keys.ts"
 import { maxSearch, maxSearchWords, wordsLeftOut } from "@inventory/catalog-contract/ItemSearch"
 import { type CatalogColumn, type ColumnCatalog, operatorsFor } from "@inventory/catalog-contract/TableView"
 // The sort and filter menus carry a calendar, a date library and drag-and-drop for reordering: more code than the
@@ -239,7 +239,7 @@ const range = (
  */
 export function ItemsPage() {
   const narrow = useIsNarrow()
-  const { actor } = useActor()
+  const actor = useMember()
   const canImport = actor !== undefined && hasRole(actor.role, "editor")
   const { params } = useLocation()
   // The table writes its state into the address and the question for the server is read from the same address,

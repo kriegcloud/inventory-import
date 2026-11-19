@@ -10,7 +10,7 @@ import * as Config from "effect/Config"
 import * as Effect from "effect/Effect"
 import * as Result from "effect/Result"
 import * as S from "effect/Schema"
-import { readCsv } from "../../src/web/lib/spreadsheet/csv.ts"
+import { readCsv } from "@inventory/catalog-web/SpreadsheetCsv"
 import { csvCorpus } from "./csvCorpus.ts"
 
 const pieces = [5, 37, 64, 255, 1000, 4096, 256 * 1024]

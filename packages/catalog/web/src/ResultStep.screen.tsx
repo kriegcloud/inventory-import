@@ -18,11 +18,11 @@ import {
 } from "@inventory/ui/components/alert-dialog"
 import { Button } from "@inventory/ui/components/button"
 import { type RecordColumn, RecordsTable } from "@inventory/ui/components/data-table/data-table-records"
-import { call } from "@/lib/api"
+import { call } from "./Catalog.runtime.ts"
 import { whenShort } from "@inventory/ui/Dates"
-import { useImportCache } from "@/lib/imports"
+import { useImportCache } from "./Imports.controller.ts"
 import { navigate } from "@inventory/ui/Route"
-import { importAddress } from "@/lib/route"
+import { importAddress } from "./internal/route.ts"
 import {
   type ChangedItem,
   type ImportEvent,
@@ -34,9 +34,9 @@ import {
 import { notImportedCsv, rowPlace } from "@inventory/catalog-model/Review"
 import { rowId } from "@inventory/catalog-contract/Decision"
 import { type StagedTable } from "@inventory/catalog-contract/Staged"
-import { download, importWords, notImportedColumn, OutcomePill, Text, when } from "./format.tsx"
+import { download, importWords, notImportedColumn, OutcomePill, Text, when } from "./internal/format.tsx"
 import { toastError } from "@inventory/client/SayError"
-import { queryKeys } from "@/lib/queries"
+import { queryKeys } from "./Catalog.keys.ts"
 
 type Filter = "all" | RowOutcome["outcome"]
 

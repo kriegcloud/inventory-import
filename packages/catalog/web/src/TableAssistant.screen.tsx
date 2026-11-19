@@ -8,8 +8,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@inventory/
 import { Input } from "@inventory/ui/components/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@inventory/ui/components/popover"
 import { Spinner } from "@inventory/ui/components/spinner"
-import { useActor } from "@/lib/actor"
-import { call } from "@/lib/api"
+import { useMember } from "@inventory/client/CurrentMember"
+import { call } from "./Catalog.runtime.ts"
 import { sayError } from "@inventory/client/SayError"
 import {
   type Conversation,
@@ -18,8 +18,8 @@ import {
   type Entry,
   readConversation,
   writeConversation
-} from "@/lib/table-assistant/conversation"
-import { applyAll, describe, overtaken, takeBack, type ViewFilter, type ViewState } from "@/lib/table-assistant/view"
+} from "./Conversation.machine.ts"
+import { applyAll, describe, overtaken, takeBack, type ViewFilter, type ViewState } from "./internal/view.ts"
 import type { AnsweredBy } from "@inventory/catalog-contract/Answer"
 import { rulesRead } from "@inventory/catalog-model/TableViewRules"
 import { type ColumnCatalog, maxPrompt } from "@inventory/catalog-contract/TableView"
@@ -105,7 +105,7 @@ export function TableAssistant(props: {
   /** The view as the table opens, which "clear" returns to. */
   readonly opened: ViewState
 }) {
-  const { actor } = useActor()
+  const actor = useMember()
   const key =
     actor === undefined
       ? undefined

@@ -5,6 +5,8 @@ import { Api } from "../../api/v1/Api.ts"
 import { devToolsLayer } from "./devtools.ts"
 import { takeEarly } from "@inventory/client/Early"
 import { AccessClient } from "@inventory/access-web/Access"
+import { CatalogClient, configureCatalog } from "@inventory/catalog-web/Catalog"
+import { apiPrefix } from "../../api/v1/Version.ts"
 import { makeApi } from "@inventory/client/ApiRuntime"
 import { makeOptimisticWrite } from "@inventory/client/Optimistic"
 import { browserTelemetry } from "./telemetry.ts"
@@ -46,13 +48,20 @@ class ApiClient extends Context.Service<ApiClient, Client>()("@inventory/app/web
  */
 export const appRuntime = ManagedRuntime.make(
   Layer.mergeAll(
-    // The access screens' client is this one client, seen through the three groups they may call.
-    Layer.effect(AccessClient, Effect.service(ApiClient)).pipe(Layer.provideMerge(ApiClient.layer)),
+    // The access and the catalog screens' clients are this one client, each seen through the groups it may call.
+    Layer.mergeAll(
+      Layer.effect(AccessClient, Effect.service(ApiClient)),
+      Layer.effect(CatalogClient, Effect.service(ApiClient))
+    ).pipe(Layer.provideMerge(ApiClient.layer)),
     devToolsLayer
   ).pipe(Layer.provideMerge(browserTelemetry))
 )
 
 const api = makeApi(appRuntime, ApiClient)
+
+// The catalog screens start uploads and prefetch outside any component, so they are bound to this runtime here, once,
+// before anything of theirs runs.
+configureCatalog({ ...makeApi(appRuntime, CatalogClient), runtime: appRuntime, apiPrefix })
 
 /**
  * Run one API call as a Promise, for TanStack Query.

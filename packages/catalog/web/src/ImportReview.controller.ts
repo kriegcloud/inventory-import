@@ -36,7 +36,7 @@ import {
   type StagedColumn,
   type StagedTable
 } from "@inventory/catalog-contract/Staged"
-import { costText, countText, dimensionsCellText, tagsCellText, vendorsCellText } from "./itemText.ts"
+import { costText, countText, dimensionsCellText, tagsCellText, vendorsCellText } from "./internal/itemText.ts"
 
 /** The problem kinds in the region's shape, in the order their headings show. */
 export const regionKinds: ReadonlyArray<ProblemKind> = problemKinds.map((kind) => ({

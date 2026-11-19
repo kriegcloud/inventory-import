@@ -7,7 +7,7 @@ import { Effect, Option, Result } from "effect"
 import { type FileProblem, fileProblem } from "@inventory/catalog-contract/FileProblem"
 import { stageTable, stagingProblem } from "@inventory/catalog-model/Review"
 import { maxChunkChars, uploadChunks } from "@inventory/catalog-model/Upload"
-import { readSpreadsheet } from "../spreadsheet/read.ts"
+import { readSpreadsheet } from "./spreadsheet/read.ts"
 import type { ReadMessage, ReadRequest } from "./protocol.ts"
 
 const post = (message: ReadMessage) => self.postMessage(message)

@@ -23,20 +23,19 @@ import * as S from "effect/Schema"
 import { useCallback, useSyncExternalStore } from "react"
 import { toast } from "sonner"
 import type { ImportView } from "@inventory/catalog-contract/Import"
-import { apiPrefix } from "../../../api/v1/Version.ts"
 import { FileProblem } from "@inventory/catalog-contract/FileProblem"
 import { type ImportId, UploadKey } from "@inventory/catalog-contract/Ids"
 import { matchedColumn } from "@inventory/catalog-contract/Mapping"
 import { requiredFields, type StagedHead, type StagedRow, type StagedTable } from "@inventory/catalog-contract/Staged"
 import type { SheetChoice, SheetSummary } from "@inventory/catalog-model/Spreadsheet"
 import { savedRows, type UploadState } from "@inventory/catalog-model/Upload"
-import { type Client, fork, runExit } from "../api.ts"
-import { rememberWorkbook } from "../imports.ts"
+import { type Client, fork, runExit, apiPrefixOf } from "./Catalog.runtime.ts"
+import { rememberWorkbook } from "./Imports.controller.ts"
 import { navigate } from "@inventory/ui/Route"
-import { importAddress } from "../route.ts"
-import type { ReadMessage, ReadRequest } from "./protocol.ts"
+import { importAddress } from "./internal/route.ts"
+import type { ReadMessage, ReadRequest } from "./internal/protocol.ts"
 import { sayError } from "@inventory/client/SayError"
-import { queryKeys } from "../queries.ts"
+import { queryKeys } from "./Catalog.keys.ts"
 
 export type { UploadState } from "@inventory/catalog-model/Upload"
 
@@ -111,7 +110,7 @@ const reader = (request: ReadRequest) =>
   Stream.callback<ReadMessage>((queue) =>
     Effect.acquireRelease(
       Effect.sync(() => {
-        const worker = new Worker(new URL("./reader.worker.ts", import.meta.url), {
+        const worker = new Worker(new URL("./internal/reader.worker.ts", import.meta.url), {
           type: "module",
           name: "spreadsheet-reader"
         })
@@ -300,9 +299,10 @@ const cancel = (): Promise<void> => {
 window.addEventListener("pagehide", () => {
   const id = running?.uploadId
   if (id === null || id === undefined) return
-  void request(`${apiPrefix}/imports/uploads/${encodeURIComponent(id)}`, { method: "DELETE", keepalive: true }).catch(
-    () => {}
-  )
+  void request(`${apiPrefixOf()}/imports/uploads/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    keepalive: true
+  }).catch(() => {})
 })
 
 const ignore = () => {}

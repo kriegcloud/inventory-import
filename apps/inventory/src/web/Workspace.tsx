@@ -11,16 +11,17 @@ import {
 } from "@inventory/ui/components/breadcrumb"
 import { ReviewSkeleton, someColumns, StepsSkeleton, TablePageSkeleton, UploadSkeleton } from "@inventory/ui/Skeletons"
 import { useActor } from "@/lib/actor"
+import { CurrentMember } from "@inventory/client/CurrentMember"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
-import { importInAddress } from "@/lib/route"
-import { importTableQuery, importViewQuery, useImportView } from "@/lib/imports"
+import { importInAddress } from "@inventory/catalog-web/Route"
+import { importTableQuery, importViewQuery, useImportView } from "@inventory/catalog-web/Imports"
 import { queryClient } from "@/lib/queries"
 import { useContentBelow } from "@inventory/ui/ContentWidth"
 import { linkTo, useLocation } from "@inventory/ui/Route"
 
 // Each page is its own chunk, fetched when it is first opened: the shell loads without the review table, the
 // spreadsheet reader or the other pages.
-const importPage = () => import("@/pages/ImportPage")
+const importPage = () => import("@inventory/catalog-web/ImportPage")
 const ImportPage = lazy(() => importPage().then((module) => ({ default: module.ImportPage })))
 // A signed-in person most likely lands on the import page: its code is fetched with this chunk, not after it. When
 // the address names an import, its view and rows are asked for now too, beside the page's code instead of after it.
@@ -32,7 +33,9 @@ if (window.location.pathname === "/") {
     void queryClient.prefetchQuery(importTableQuery(opened))
   }
 }
-const ItemsPage = lazy(() => import("@/pages/ItemsPage").then((module) => ({ default: module.ItemsPage })))
+const ItemsPage = lazy(() =>
+  import("@inventory/catalog-web/ItemsPage").then((module) => ({ default: module.ItemsPage }))
+)
 const ActivityPage = lazy(() => import("@/pages/ActivityPage").then((module) => ({ default: module.ActivityPage })))
 const PeoplePage = lazy(() => import("@inventory/access-web/People").then((module) => ({ default: module.PeoplePage })))
 
@@ -122,9 +125,20 @@ function Crumbs(props: { page: AppPage; importId: ImportId | undefined }) {
  */
 export default function Workspace() {
   const { path, params } = useLocation()
+  // The catalog screens mirror the role rule from the member the app provides here, never from a request.
+  const { actor } = useActor()
   // An address that names no page shows the first one, as before.
   const current = appPages.find((page) => page.path === path) ?? appPages[0]
   if (current === undefined) return null
+  return (
+    <CurrentMember value={actor}>
+      <WorkspaceFrame current={current} path={path} params={params} />
+    </CurrentMember>
+  )
+}
+
+function WorkspaceFrame(props: { current: AppPage; path: string; params: URLSearchParams }) {
+  const { current, path, params } = props
   return (
     <AppShell
       fill

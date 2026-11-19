@@ -7,26 +7,26 @@ import { ReviewRegion } from "@inventory/review/ReviewRegion"
 import type { Activity, Problem, ReviewRow } from "@inventory/review/ReviewTypes"
 import { Button } from "@inventory/ui/components/button"
 import { Spinner } from "@inventory/ui/components/spinner"
-import { useActor } from "@/lib/actor"
-import { call } from "@/lib/api"
-import { useDecisionSaver } from "@/lib/draft"
-import { importViewQuery, useImportCache } from "@/lib/imports"
+import { useMember } from "@inventory/client/CurrentMember"
+import { call } from "./Catalog.runtime.ts"
+import { useDecisionSaver } from "./Draft.controller.ts"
+import { importViewQuery, useImportCache } from "./Imports.controller.ts"
 import { navigate } from "@inventory/ui/Route"
-import { importAddress } from "@/lib/route"
+import { importAddress } from "./internal/route.ts"
 import { restoredDecisions, storedReview } from "@inventory/review/SavedProgress"
 import { useSavedProgress } from "@inventory/review/SavedProgressHook"
 import type { SavedDecisions as RegionDecisions } from "@inventory/review/ReviewTypes"
-import { browserRuntime } from "@/lib/runtime"
+import { catalogRuntime } from "./Catalog.runtime.ts"
 import type { ImportView, SuggestOutcome } from "@inventory/catalog-contract/Import"
 import { recheckRow, review, ruleFixes } from "@inventory/catalog-model/Review"
 import { rowId, type SavedDecisions } from "@inventory/catalog-contract/Decision"
 import { matchedColumn } from "@inventory/catalog-contract/Mapping"
 import { type Field, fieldLabels, fields, type StagedTable } from "@inventory/catalog-contract/Staged"
 import { type Suggestion } from "@inventory/catalog-contract/Suggestion"
-import { WhyFlagged } from "./WhyFlagged.tsx"
-import { DimensionsForm, VendorsForm } from "./CellForms.tsx"
-import { notImportedColumn, reviewStepWords } from "./format.tsx"
-import { totalText } from "./itemText.ts"
+import { WhyFlagged } from "./internal/WhyFlagged.tsx"
+import { DimensionsForm, VendorsForm } from "./internal/CellForms.tsx"
+import { notImportedColumn, reviewStepWords } from "./internal/format.tsx"
+import { totalText } from "./internal/itemText.ts"
 import {
   regionColumns,
   regionKinds,
@@ -35,9 +35,9 @@ import {
   toRegionProblem,
   toRegionRows,
   toServerDecisions
-} from "./reviewAdapter.ts"
+} from "./ImportReview.controller.ts"
 import { toastError } from "@inventory/client/SayError"
-import { queryKeys } from "@/lib/queries"
+import { queryKeys } from "./Catalog.keys.ts"
 
 const whole = new Intl.NumberFormat("en-US")
 
@@ -104,12 +104,12 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
   // The decisions are the server's; the undo history behind them is kept in this browser, per person and import, so
   // a refresh brings "Undo last step" back too. It is used only while it ends at the decisions the server holds: a
   // change made on another screen since starts a new history from the server's.
-  const { actor } = useActor()
+  const actor = useMember()
   const progress = useSavedProgress(
     actor === undefined
       ? undefined
       : { organizationId: actor.organizationId, memberId: actor.id, screen: `import:${view.id}` },
-    browserRuntime
+    catalogRuntime()
   )
   const kept = progress.saved === undefined ? null : Option.getOrNull(progress.saved.review)
   // Where the person starts: the draft the server holds, with its undo history when this browser kept it.

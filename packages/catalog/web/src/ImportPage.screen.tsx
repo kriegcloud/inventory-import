@@ -4,7 +4,7 @@ import { createPortal } from "react-dom"
 import { Alert, AlertDescription, AlertTitle } from "@inventory/ui/components/alert"
 import { Button } from "@inventory/ui/components/button"
 import { ReviewSkeleton, someColumns, TablePageSkeleton } from "@inventory/ui/Skeletons"
-import { BarSlotContext, StepActionsContext } from "@/components/app/slots"
+import { BarSlotContext, StepActionsContext } from "@inventory/ui/ShellSlots"
 import {
   Stepper,
   StepperContent,
@@ -15,21 +15,21 @@ import {
   StepperTitle,
   StepperTrigger
 } from "@inventory/ui/components/stepper"
-import { useActor } from "@/lib/actor"
-import { useImportTable, useImportView } from "@/lib/imports"
+import { useMember } from "@inventory/client/CurrentMember"
+import { useImportTable, useImportView } from "./Imports.controller.ts"
 import { useIsNarrow } from "@inventory/ui/ContentWidth"
 import { navigate, useLocation } from "@inventory/ui/Route"
-import { importAddress, importInAddress } from "@/lib/route"
+import { importAddress, importInAddress } from "./internal/route.ts"
 import { hasRole } from "@inventory/kernel/Role"
-import { SheetButton } from "./import/SheetButton.tsx"
-import { UploadStep } from "./import/UploadStep.tsx"
+import { SheetButton } from "./internal/SheetButton.tsx"
+import { UploadStep } from "./UploadStep.screen.tsx"
 import { sayError } from "@inventory/client/SayError"
 
 // The steps after Upload are separate chunks: the first screen does not wait for the review table's code. While one
 // is on its way the person sees a skeleton of that step, in its own boxes.
-const MatchStep = lazy(() => import("./import/MatchStep.tsx").then((module) => ({ default: module.MatchStep })))
-const ReviewStep = lazy(() => import("./import/ReviewStep.tsx").then((module) => ({ default: module.ReviewStep })))
-const ResultStep = lazy(() => import("./import/ResultStep.tsx").then((module) => ({ default: module.ResultStep })))
+const MatchStep = lazy(() => import("./MatchStep.screen.tsx").then((module) => ({ default: module.MatchStep })))
+const ReviewStep = lazy(() => import("./ReviewStep.screen.tsx").then((module) => ({ default: module.ReviewStep })))
+const ResultStep = lazy(() => import("./ResultStep.screen.tsx").then((module) => ({ default: module.ResultStep })))
 
 const steps = [
   { value: "upload", title: "Upload" },
@@ -46,7 +46,7 @@ type Step = (typeof steps)[number]["value"]
 export function ImportPage() {
   const { params } = useLocation()
   const { id: importId, malformed } = importInAddress(params)
-  const { actor } = useActor()
+  const actor = useMember()
   // The server enforces this. The screen mirrors it so nobody is offered a button that will be refused.
   const canImport = actor !== undefined && hasRole(actor.role, "editor")
   const view = useImportView(importId)

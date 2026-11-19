@@ -19,17 +19,17 @@ import { Button } from "@inventory/ui/components/button"
 import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@inventory/ui/components/item"
 import { FileUpload, FileUploadDropzone } from "@inventory/ui/components/file-upload"
 import { Progress } from "@inventory/ui/components/progress"
-import { useActor } from "@/lib/actor"
+import { useMember } from "@inventory/client/CurrentMember"
 import { when, whenShort } from "@inventory/ui/Dates"
-import { useImportCache, useOpenImports, usePastImports, useRemoveImport } from "@/lib/imports"
+import { useImportCache, useOpenImports, usePastImports, useRemoveImport } from "./Imports.controller.ts"
 import { ListTable } from "@inventory/ui/ListTable"
-import { pastImportColumnsShort } from "./pastImports.tsx"
+import { pastImportColumnsShort } from "./PastImports.screen.tsx"
 import { navigate } from "@inventory/ui/Route"
-import { importAddress } from "@/lib/route"
+import { importAddress } from "./internal/route.ts"
 import { StoredFile } from "@inventory/review/SavedProgress"
 import { useSavedProgress } from "@inventory/review/SavedProgressHook"
-import { browserRuntime } from "@/lib/runtime"
-import { type UploadEnd, useUpload, type UploadState } from "@/lib/upload"
+import { catalogRuntime } from "./Catalog.runtime.ts"
+import { type UploadEnd, useUpload, type UploadState } from "./Upload.controller.ts"
 import type { ImportView } from "@inventory/catalog-contract/Import"
 import { fileProblemTitle } from "@inventory/catalog-contract/FileProblem"
 import { progressOf } from "@inventory/catalog-model/Upload"
@@ -272,10 +272,10 @@ function PastImports() {
  */
 export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
   const upload = useUpload()
-  const { actor } = useActor()
+  const actor = useMember()
   const progress = useSavedProgress(
     actor === undefined ? undefined : { organizationId: actor.organizationId, memberId: actor.id, screen: "upload" },
-    browserRuntime
+    catalogRuntime()
   )
   const [problem, setProblem] = useState<string | undefined>(undefined)
   const picker = useRef<HTMLDivElement>(null)
@@ -330,7 +330,7 @@ export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
   // While the rows are saving, fetch the review's code, so it is ready when the import is.
   const saving = state._tag === "Saving"
   useEffect(() => {
-    if (saving) void import("./ReviewStep.tsx")
+    if (saving) void import("./ReviewStep.screen.tsx")
   }, [saving])
 
   const takeSample = (sample: (typeof samples)[number]) => {

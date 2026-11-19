@@ -1,12 +1,12 @@
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import { SheetIcon } from "lucide-react"
-import { SheetChooser } from "@/components/app/SheetChooser"
+import { SheetChooser } from "./SheetChooser.tsx"
 import { Button } from "@inventory/ui/components/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@inventory/ui/components/popover"
-import { workbookOf } from "@/lib/imports"
+import { workbookOf } from "../Imports.controller.ts"
 import { navigate } from "@inventory/ui/Route"
-import { importAddress } from "@/lib/route"
-import { useUpload } from "@/lib/upload"
+import { importAddress } from "./route.ts"
+import { useUpload } from "../Upload.controller.ts"
 
 /**
  * Which sheet of the workbook was read, and a way to read another one. Shows only while the workbook chosen in

@@ -11,7 +11,7 @@ import { firstDecisions, recheckRow, review, stageTable } from "@inventory/catal
 import { changeToStored } from "@inventory/catalog-contract/Change"
 import { decisionToFlags, type SavedDecisions } from "@inventory/catalog-contract/Decision"
 import { type StagedTable } from "@inventory/catalog-contract/Staged"
-import { readSpreadsheet } from "../../src/web/lib/spreadsheet/index.ts"
+import { readSpreadsheet } from "@inventory/catalog-web/Spreadsheet"
 import {
   act,
   columnFor,
@@ -32,7 +32,7 @@ import {
   toRegionProblem,
   toRegionRows,
   toServerDecisions
-} from "../../src/web/pages/import/reviewAdapter.ts"
+} from "@inventory/catalog-web/ImportReview"
 
 /** A file from `public/samples/`, as the browser would hold it after the person chose it. */
 const sample = (name: string): File =>

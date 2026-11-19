@@ -14,7 +14,8 @@
     "./Optimistic": "./src/Optimistic.controller.ts",
     "./Rollback": "./src/Rollback.rules.ts",
     "./SayError": "./src/SayError.controller.ts",
-    "./QueryClient": "./src/QueryClient.runtime.ts"
+    "./QueryClient": "./src/QueryClient.runtime.ts",
+    "./CurrentMember": "./src/CurrentMember.controller.ts"
   },
   "scripts": {
     "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json && node ../../scripts/check-strict.mjs strict-ceiling.json",

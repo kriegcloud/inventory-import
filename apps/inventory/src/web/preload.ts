@@ -12,16 +12,16 @@ export const workspace = () => import("./Workspace.tsx")
 // chunk, so the two arrive together instead of one after the other.
 const pageCode = (path: string, step: string | null): ReadonlyArray<() => Promise<unknown>> =>
   path === "/items"
-    ? [() => import("@/pages/ItemsPage")]
+    ? [() => import("@inventory/catalog-web/ItemsPage")]
     : path === "/activity"
       ? [() => import("@/pages/ActivityPage")]
       : path === "/people"
         ? [() => import("@inventory/access-web/People")]
         : step === "review"
-          ? [() => import("@/pages/ImportPage"), () => import("@/pages/import/ReviewStep")]
+          ? [() => import("@inventory/catalog-web/ImportPage"), () => import("@inventory/catalog-web/ReviewStep")]
           : step === "result"
-            ? [() => import("@/pages/ImportPage"), () => import("@/pages/import/ResultStep")]
-            : [() => import("@/pages/ImportPage")]
+            ? [() => import("@inventory/catalog-web/ImportPage"), () => import("@inventory/catalog-web/ResultStep")]
+            : [() => import("@inventory/catalog-web/ImportPage")]
 
 let preloaded = false
 /** Starts the first screen's code and, for an open import, its data, once per page. */

@@ -1,0 +1,71 @@
+{
+  "name": "@inventory/catalog-web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The catalog's screens: the import of a file in four steps, the Items table with its editor and its assistant, and the controllers and readers behind them",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": [],
+  "exports": {
+    "./package.json": "./package.json",
+    "./Catalog": "./src/Catalog.runtime.ts",
+    "./Keys": "./src/Catalog.keys.ts",
+    "./ImportPage": "./src/ImportPage.screen.tsx",
+    "./UploadStep": "./src/UploadStep.screen.tsx",
+    "./MatchStep": "./src/MatchStep.screen.tsx",
+    "./ReviewStep": "./src/ReviewStep.screen.tsx",
+    "./ResultStep": "./src/ResultStep.screen.tsx",
+    "./ImportReview": "./src/ImportReview.controller.ts",
+    "./PastImports": "./src/PastImports.screen.tsx",
+    "./ImportWords": "./src/internal/format.tsx",
+    "./ItemText": "./src/internal/itemText.ts",
+    "./CellDrafts": "./src/internal/cellDrafts.ts",
+    "./ItemsPage": "./src/ItemsPage.screen.tsx",
+    "./ItemEditor": "./src/ItemEditor.screen.tsx",
+    "./TableAssistant": "./src/TableAssistant.screen.tsx",
+    "./Imports": "./src/Imports.controller.ts",
+    "./Draft": "./src/Draft.controller.ts",
+    "./Upload": "./src/Upload.controller.ts",
+    "./Spreadsheet": "./src/internal/spreadsheet/index.ts",
+    "./SpreadsheetCsv": "./src/internal/spreadsheet/csv.ts",
+    "./Conversation": "./src/Conversation.machine.ts",
+    "./TableViewState": "./src/internal/view.ts",
+    "./Route": "./src/internal/route.ts",
+    "./AnsweredByWords": "./src/internal/answeredBy.ts"
+  },
+  "scripts": {
+    "check": "tsrs -p tsconfig.json && node ../../../scripts/check-strict.mjs strict-ceiling.json",
+    "lint": "oxlint --quiet src; lint=$?; oxlint --disable-nested-config --deny-warnings -c ../../../.oxlintrc.shadcn.json src && exit $lint"
+  },
+  "dependencies": {
+    "@beep/csv": "workspace:*",
+    "@inventory/catalog-contract": "workspace:*",
+    "@inventory/catalog-model": "workspace:*",
+    "@inventory/client": "workspace:*",
+    "@inventory/kernel": "workspace:*",
+    "@inventory/review": "workspace:*",
+    "@inventory/ui": "workspace:*",
+    "@tanstack/react-query": "^5.107.1",
+    "@tanstack/react-table": "^9.3.1",
+    "effect": "4.1.4",
+    "lucide-react": "^1.72.0",
+    "sonner": "^2.0.8",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "oxlint": "1.93.0",
+    "tsrs": "0.25.0-ts7.1.0-beta",
+    "typescript": "~7.0.2"
+  },
+  "peerDependencies": {
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "beep": {
+    "family": "context",
+    "context": "catalog",
+    "layer": "web"
+  }
+}

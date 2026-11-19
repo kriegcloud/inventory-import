@@ -25,8 +25,8 @@ import {
   saved,
   viewRows,
   waitingGroups
-} from "../../src/web/components/review/logic.ts"
-import type { ReviewRow, ReviewState } from "../../src/web/components/review/types.ts"
+} from "@inventory/review/ReviewDraft"
+import type { ReviewRow, ReviewState } from "@inventory/review/ReviewTypes"
 import type { ItemFields } from "../../src/domain/Item.ts"
 import {
   regionKinds,

@@ -1,21 +1,16 @@
-import { DateTime } from "effect"
 // The browser half of saved progress: the chosen file in IndexedDB and the hook a screen uses. The rules and the
-// stored shape are in `store.ts` (tested without a browser).
-import { Effect, Option } from "effect"
+// stored shape are in `SavedProgress.schema.ts` (tested without a browser).
+import { DateTime, Effect, type ManagedRuntime, Option } from "effect"
 import * as S from "effect/Schema"
 import { useCallback, useMemo, useRef, useState } from "react"
-import { browserRuntime } from "../runtime.ts"
 import {
-  blank,
   progressKey,
   type ProgressScope,
   type ProgressStorage,
   readAt,
-  type SavedProgress,
+  SavedProgress,
   writeAt
-} from "./store.ts"
-
-export * from "./store.ts"
+} from "@inventory/review/SavedProgress"
 
 // The chosen file, kept as a Blob in IndexedDB: a whole spreadsheet does not fit localStorage, and a Blob is stored
 // without being copied through the page's thread.
@@ -77,8 +72,12 @@ const browserStorage = (): ProgressStorage | undefined => {
  * the last `clear`); `save` merges a change and writes it at once; `keepFile` stores the chosen file; `file` reads
  * it back; `clear` removes all of it (on Confirm, or "Start again"). `refused` turns true when the browser would not
  * keep it, so the screen can say so once. With no scope yet (the actor still loading) nothing is read or written.
+ * `browserRuntime` is the page's one runtime: the file is read and written on it, so a Cancel anywhere interrupts it.
  */
-export function useSavedProgress(scope: ProgressScope | undefined) {
+export function useSavedProgress(
+  scope: ProgressScope | undefined,
+  browserRuntime: ManagedRuntime.ManagedRuntime<never, never>
+) {
   const key = scope === undefined ? undefined : progressKey(scope)
   const storage = useMemo(browserStorage, [])
   const [refused, setRefused] = useState(false)
@@ -98,12 +97,8 @@ export function useSavedProgress(scope: ProgressScope | undefined) {
   const save = useCallback(
     (change: Partial<Omit<SavedProgress, "version" | "savedAt">>) => {
       if (key === undefined) return
-      const next: SavedProgress = {
-        ...(latest.current ?? blank),
-        ...change,
-        version: 1,
-        savedAt: DateTime.formatIso(DateTime.nowUnsafe())
-      }
+      const now = DateTime.nowUnsafe()
+      const next = SavedProgress.make({ ...(latest.current ?? SavedProgress.first(now)), ...change, savedAt: now })
       latest.current = next
       if (storage === undefined || !writeAt(storage, key, next)) setRefused(true)
       setState({ key, saved: next })
@@ -119,7 +114,7 @@ export function useSavedProgress(scope: ProgressScope | undefined) {
       if (scoped === undefined) return
       browserRuntime.runFork(saveFile(scoped, file).pipe(Effect.tapError(() => Effect.sync(() => setRefused(true)))))
     },
-    [scoped]
+    [scoped, browserRuntime]
   )
 
   const file = useCallback(
@@ -132,7 +127,7 @@ export function useSavedProgress(scope: ProgressScope | undefined) {
               Effect.orElseSucceed(() => undefined)
             )
           ),
-    [scoped]
+    [scoped, browserRuntime]
   )
 
   const clear = useCallback(() => {

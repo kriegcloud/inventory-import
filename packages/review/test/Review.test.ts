@@ -32,10 +32,10 @@ import {
   waitingGroups,
   weakGuess,
   whyWords
-} from "../../src/web/components/review/logic.ts"
-import type { ReviewRow, ReviewState, SavedDecisions } from "../../src/web/components/review/types.ts"
-import { columns, columnsUnmatched, makeRows, problemKinds, recheck } from "../../src/web/pages/gallery/fabrication.ts"
-import { lineKinds, makeJobs, questionRows, recheckLine, reviewJobs } from "../../src/web/pages/gallery/jobs.ts"
+} from "@inventory/review/ReviewDraft"
+import type { ReviewRow, ReviewState, SavedDecisions } from "@inventory/review/ReviewTypes"
+import { columns, columnsUnmatched, makeRows, problemKinds, recheck } from "./fixtures/fabrication.ts"
+import { lineKinds, makeJobs, questionRows, recheckLine, reviewJobs } from "./fixtures/jobs.ts"
 
 // The gallery's made-up stock file drives these tests: 178 rows, 136 ready, 42 that need the person.
 const rows = makeRows({ size: 178 })
@@ -120,7 +120,7 @@ describe("a proposal never overwrites the person's decision", () => {
     expect(viewOf(state, typed).cells.unit).toBe("kg")
     expect(viewOf(state, typed).marks.unit).toMatchObject({ state: "applied", by: "you", to: "kg" })
     expect(viewOf(state, left).status).toBe("out")
-    expect(Option.getOrUndefined(HashMap.get(state.decisions, left))?.accepted).toBeUndefined()
+    expect(Option.getOrUndefined(HashMap.get(state.decisions, left))?.accepted ?? []).toEqual([])
     expect(state.undo[state.undo.length - 1]?.label).toBe("7 fixes accepted")
   })
 

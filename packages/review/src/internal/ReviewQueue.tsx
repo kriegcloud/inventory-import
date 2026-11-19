@@ -29,10 +29,17 @@ import {
   shownWith,
   valueWords,
   weakGuess
-} from "./logic.ts"
+} from "@inventory/review/ReviewDraft"
 import { CellValue, ColumnText, DecisionTag, EditForm, GroupChange, Overlay, Reason, ReasonTag } from "./parts.tsx"
 import type { GroupActions, RowActions } from "./ReviewGrid.tsx"
-import type { ProblemKind, QueueEntry, ReviewColumn, ReviewRegionProps, ReviewWords, RowView } from "./types.ts"
+import type {
+  ProblemKind,
+  QueueEntry,
+  ReviewColumn,
+  ReviewRegionProps,
+  ReviewWords,
+  RowView
+} from "@inventory/review/ReviewTypes"
 
 const page = 30
 

@@ -3,5 +3,5 @@
   "own": ["src/web/"],
   "vendored": [],
   "rules": ["preferEffectArray", "preferEffectString", "preferEffectRecord", "missingPipeableSignature"],
-  "ceiling": 608
+  "ceiling": 332
 }

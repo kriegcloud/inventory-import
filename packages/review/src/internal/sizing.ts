@@ -5,7 +5,7 @@
  * other than the first (a second description, a note); only when the columns that must stay still do not fit does the
  * table scroll sideways, with its first column pinned. `fill` columns share what is left and end in an ellipsis.
  */
-import type { ColumnSize } from "./types.ts"
+import type { ColumnSize } from "@inventory/review/ReviewTypes"
 
 /** One column as the rule sees it, in the table's order, the record's own column first. */
 export type SizedColumn = {

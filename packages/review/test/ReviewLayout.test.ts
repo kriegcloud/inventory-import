@@ -17,11 +17,11 @@ import {
   viewRows,
   visible,
   workList
-} from "../../src/web/components/review/logic.ts"
-import { planColumns, priorityOf, type SizedColumn } from "../../src/web/components/review/sizing.ts"
-import type { ReviewRow, ReviewState } from "../../src/web/components/review/types.ts"
-import { defaultReviewWords } from "../../src/web/components/review/words.ts"
-import { columns, makeRows, problemKinds, recheck } from "../../src/web/pages/gallery/fabrication.ts"
+} from "@inventory/review/ReviewDraft"
+import { planColumns, priorityOf, type SizedColumn } from "../src/internal/sizing.ts"
+import type { ReviewRow, ReviewState } from "@inventory/review/ReviewTypes"
+import { defaultReviewWords } from "@inventory/review/ReviewWords"
+import { columns, makeRows, problemKinds, recheck } from "./fixtures/fabrication.ts"
 
 const rows = makeRows({ size: 178 })
 const views = (state: ReviewState) => viewRows({ rows, state, recheck })

@@ -4,7 +4,7 @@
  * spelling fix already applied) and 42 that need the person, across five kinds.
  */
 import { Array as Arr, MutableHashMap, Option } from "effect"
-import type { Activity, Fix, Problem, ProblemKind, ReviewColumn, ReviewRow } from "../../components/review/types.ts"
+import type { Activity, Fix, Problem, ProblemKind, ReviewColumn, ReviewRow } from "@inventory/review/ReviewTypes"
 
 export const problemKinds: ReadonlyArray<ProblemKind> = [
   { id: "unit", label: "Unknown unit", tone: "decision", help: "The unit is not on your unit list." },

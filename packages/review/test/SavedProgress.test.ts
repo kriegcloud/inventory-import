@@ -2,22 +2,24 @@
 // never read for anyone else; the decisions and the undo history come back exactly as they were left; and a draft
 // that no longer decodes is dropped, never shown half.
 import { it } from "@effect/vitest"
-import { Array as Arr, Effect, Record as Rec } from "effect"
+import { Array as Arr, ByteSize, DateTime, Effect, Option, Record as Rec } from "effect"
 import * as S from "effect/Schema"
 import { describe, expect, it as plain } from "vitest"
-import { act, emptyState, restored, saved } from "../../src/web/components/review/logic.ts"
-import type { ReviewRow, ReviewState } from "../../src/web/components/review/types.ts"
+import { ReviewDecision } from "@inventory/review/ReviewDecision"
+import { act, emptyState, restored, saved } from "@inventory/review/ReviewDraft"
+import type { ReviewRow, ReviewState } from "@inventory/review/ReviewTypes"
 import {
   clearProgress,
   progressKey,
   type ProgressStorage,
   readProgress,
   restoredDecisions,
-  type SavedProgress,
+  SavedProgress,
+  StoredFile,
   storedReview,
   StoredReview,
   writeProgress
-} from "../../src/web/lib/saved-progress/store.ts"
+} from "@inventory/review/SavedProgress"
 
 const memory = (): ProgressStorage & { readonly items: Record<string, string> } => {
   const items: Record<string, string> = {}
@@ -33,15 +35,25 @@ const memory = (): ProgressStorage & { readonly items: Record<string, string> } 
   }
 }
 
-const progress = (step: string): SavedProgress => ({
-  version: 1,
-  step,
-  file: { name: "items.csv", size: 1797, lastModified: 1_763_000_000_000, sheet: null },
-  review: { decisions: { "row-9": { edits: { qty: "2000" } } }, undo: [] },
-  decided: 1,
-  needed: 4,
-  savedAt: "2026-11-17T12:00:00.000Z"
-})
+const progress = (step: string): SavedProgress =>
+  SavedProgress.make({
+    version: 1,
+    step,
+    file: Option.some(
+      StoredFile.make({
+        name: "items.csv",
+        size: ByteSize.bytes(1797),
+        lastModified: DateTime.makeUnsafe(1_763_000_000_000),
+        sheet: Option.none()
+      })
+    ),
+    review: Option.some(
+      StoredReview.make({ decisions: { "row-9": ReviewDecision.make({ edits: { qty: "2000" } }) }, undo: [] })
+    ),
+    decided: 1,
+    needed: 4,
+    savedAt: DateTime.makeUnsafe("2026-11-17T12:00:00.000Z")
+  })
 
 const Scope = S.Struct({ organizationId: S.String, memberId: S.String, screen: S.String })
 

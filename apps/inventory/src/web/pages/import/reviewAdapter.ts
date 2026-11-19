@@ -8,8 +8,10 @@ import type {
   Problem as RegionProblem,
   ProblemKind,
   ReviewColumn,
-  ReviewRow
-} from "../../components/review/types.ts"
+  ReviewRow,
+  SavedDecisions as RegionDecisions
+} from "@inventory/review/ReviewTypes"
+import { fromFlags, toFlags } from "@inventory/review/ReviewDecision"
 import {
   type ColumnMatch,
   type Field,
@@ -185,27 +187,30 @@ const isStoredChoice = (value: string | undefined): value is "keep" | "replace" 
   value === "keep" || value === "replace"
 
 /**
- * The region's decisions as the server takes them: a keep-or-replace answer moves from the typed values
- * (`edits[storedChoice]`) to `stored`, where the review reads it.
+ * The region's decisions as the server takes them: the region's `ReviewDecision` as the flags the server stores, and a
+ * keep-or-replace answer moved from the typed values (`edits[storedChoice]`) to `stored`, where the review reads it.
  */
-export const toServerDecisions = (decisions: SavedDecisions): SavedDecisions =>
+export const toServerDecisions = (decisions: RegionDecisions): SavedDecisions =>
   Object.fromEntries(
     Object.entries(decisions).map(([id, decision]) => {
-      const answer = decision.edits?.[storedChoice]
-      if (!isStoredChoice(answer)) return [id, decision]
-      const { edits, ...rest } = decision
+      const flags = toFlags(decision)
+      const answer = flags.edits?.[storedChoice]
+      if (!isStoredChoice(answer)) return [id, flags]
+      const { edits, ...rest } = flags
       const { [storedChoice]: _answer, ...typed } = edits ?? {}
       return [id, { ...rest, ...(Object.keys(typed).length === 0 ? {} : { edits: typed }), stored: answer }]
     })
   )
 
 /** The server's decisions as the region holds them: the inverse of `toServerDecisions`. */
-export const toRegionDecisions = (decisions: SavedDecisions): SavedDecisions =>
+export const toRegionDecisions = (decisions: SavedDecisions): RegionDecisions =>
   Object.fromEntries(
     Object.entries(decisions).map(([id, decision]) => {
-      if (decision.stored === undefined) return [id, decision]
-      const { stored, ...rest } = decision
-      return [id, { ...rest, edits: { ...decision.edits, [storedChoice]: stored } }]
+      const { stored, ...flags } = decision
+      return [
+        id,
+        fromFlags(stored === undefined ? flags : { ...flags, edits: { ...flags.edits, [storedChoice]: stored } })
+      ]
     })
   )
 

@@ -1,6 +1,6 @@
 import { NotSet } from "@inventory/ui/NotSet"
 import { StatusPill, type Tone } from "@inventory/ui/StatusPill"
-import type { ReviewWords } from "@/components/review"
+import type { ReviewWords } from "@inventory/review/ReviewTypes"
 
 /** A cell's text, or "Not set" in grey when the file left it empty. */
 export function Text(props: { value: string }) {

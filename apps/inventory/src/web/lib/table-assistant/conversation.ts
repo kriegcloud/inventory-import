@@ -3,7 +3,7 @@
 // (`progressKey`: per person, organization and screen) and decoded on the way back, so an older shape is dropped.
 import * as S from "effect/Schema"
 import { ViewChange } from "../../../domain/TableView.ts"
-import { progressKey, type ProgressScope } from "../saved-progress/store.ts"
+import { progressKey, type ProgressScope } from "@inventory/review/SavedProgress"
 import { Patch } from "./view.ts"
 
 const Applied = S.Struct({

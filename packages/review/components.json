@@ -1,0 +1,25 @@
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "rsc": false,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "../ui/src/theme.css",
+    "baseColor": "neutral",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "iconLibrary": "lucide",
+  "aliases": {
+    "components": "@inventory/ui/components",
+    "utils": "cn",
+    "ui": "@inventory/ui/components",
+    "lib": "@inventory/ui/lib",
+    "hooks": "@inventory/ui/hooks"
+  },
+  "registries": {
+    "@diceui": "https://diceui.com/r/{style}/{name}.json",
+    "@tablecn": "https://www.tablecn.com/r/radix-vega/{name}.json"
+  }
+}

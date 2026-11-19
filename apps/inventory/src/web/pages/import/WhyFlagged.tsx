@@ -3,7 +3,7 @@
 // so it works with no model, and says so. The one thing not to break: every sentence here is the domain's own
 // (`Problem.message`, `Proposal.basis`); nothing is reworded or guessed.
 import { Code } from "@inventory/ui/Code"
-import type { ReviewRow } from "../../components/review/types.ts"
+import type { ReviewRow } from "@inventory/review/ReviewTypes"
 import { problemKinds, type Proposal, type Review, rowPlace } from "../../../domain/ItemImport.ts"
 
 /** How many rows the panel lists in full; past it, it says how many more and how to narrow the view. */

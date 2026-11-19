@@ -1,0 +1,7 @@
+{
+  "project": "tsconfig.json",
+  "own": ["src/", "test/fixtures/"],
+  "vendored": [],
+  "rules": ["preferEffectArray", "preferEffectString", "preferEffectRecord", "missingPipeableSignature"],
+  "ceiling": 283
+}

@@ -1,3 +1,4 @@
+import { ByteSize, DateTime, Option } from "effect"
 import { request } from "../../lib/http.ts"
 import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
@@ -25,7 +26,9 @@ import { ListTable } from "@inventory/ui/ListTable"
 import { pastImportColumnsShort } from "./pastImports.tsx"
 import { navigate } from "@inventory/ui/Route"
 import { importAddress } from "@/lib/route"
-import { useSavedProgress } from "@/lib/saved-progress"
+import { StoredFile } from "@inventory/review/SavedProgress"
+import { useSavedProgress } from "@inventory/review/SavedProgressHook"
+import { browserRuntime } from "@/lib/runtime"
 import { type UploadEnd, useUpload, type UploadState } from "@/lib/upload"
 import type { ImportView } from "../../../api/v1/Api.ts"
 import { fileProblemTitle } from "../../../domain/FileProblem.ts"
@@ -271,7 +274,8 @@ export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
   const upload = useUpload()
   const { actor } = useActor()
   const progress = useSavedProgress(
-    actor === undefined ? undefined : { organizationId: actor.organizationId, memberId: actor.id, screen: "upload" }
+    actor === undefined ? undefined : { organizationId: actor.organizationId, memberId: actor.id, screen: "upload" },
+    browserRuntime
   )
   const [problem, setProblem] = useState<string | undefined>(undefined)
   const picker = useRef<HTMLDivElement>(null)
@@ -289,8 +293,15 @@ export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
     keepFile(file)
     save({
       step: "upload",
-      file: { name: file.name, size: file.size, lastModified: file.lastModified, sheet: null },
-      review: null
+      file: Option.some(
+        StoredFile.make({
+          name: file.name,
+          size: ByteSize.bytes(file.size),
+          lastModified: DateTime.makeUnsafe(file.lastModified),
+          sheet: Option.none()
+        })
+      ),
+      review: Option.none()
     })
     upload.start(file, undefined, (end: UploadEnd) => {
       if (end._tag !== "Failed" || end.step === "read") clear()
@@ -298,10 +309,12 @@ export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
   }
   // A file whose upload stopped with the page. Not offered once an import of it exists: a reload while the server
   // was preparing it still finished it, and it is in the list above.
-  const stopped = progress.saved?.step === "upload" ? progress.saved.file : null
+  const saved = progress.saved
+  const stopped = saved?.step === "upload" ? Option.getOrNull(saved.file) : null
   const landed =
     stopped !== null &&
-    views.some((view) => view.fileName === stopped.name && view.createdAt >= (progress.saved?.savedAt ?? ""))
+    saved !== undefined &&
+    views.some((view) => view.fileName === stopped.name && view.createdAt >= DateTime.formatIso(saved.savedAt))
   // One filled button on the screen: Continue when a file stopped, else the first open import, else Choose file.
   const offered = stopped !== null && !landed && !busy && props.canImport
   const resume = () => {

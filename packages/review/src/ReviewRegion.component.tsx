@@ -83,9 +83,9 @@ import {
   viewRows,
   visible,
   waitingGroups
-} from "./logic.ts"
+} from "@inventory/review/ReviewDraft"
 import { useContentWidth } from "@inventory/ui/ContentWidth"
-import { LayoutContext, useLayout } from "./parts.tsx"
+import { LayoutContext, useLayout } from "./internal/parts.tsx"
 import {
   actionsFit,
   type Density,
@@ -93,14 +93,14 @@ import {
   type GroupActions,
   ReviewGrid,
   type RowActions
-} from "./ReviewGrid.tsx"
-import { ReviewQueue } from "./ReviewQueue.tsx"
-import { WorkList } from "./WorkList.tsx"
-import type { Activity, FilterId, ReviewRegionProps, ReviewState, RowView } from "./types.ts"
-import { reviewWords } from "./words.ts"
+} from "./internal/ReviewGrid.tsx"
+import { ReviewQueue } from "./internal/ReviewQueue.tsx"
+import { WorkList } from "./internal/WorkList.tsx"
+import type { Activity, FilterId, ReviewRegionProps, ReviewState, RowView } from "@inventory/review/ReviewTypes"
+import { reviewWords } from "@inventory/review/ReviewWords"
 
 // The phone's drawers (vaul) are their own chunk: fetched on a phone once the review is drawn, never on a desk.
-const PhoneDrawer = lazy(() => import("./PhoneDrawer.tsx").then((module) => ({ default: module.PhoneDrawer })))
+const PhoneDrawer = lazy(() => import("./internal/PhoneDrawer.tsx").then((module) => ({ default: module.PhoneDrawer })))
 
 /** The set with `id` taken out when it was in, put in when it was not: a tick or a fold pressed again. */
 const flip = (set: HashSet.HashSet<string>, id: string): HashSet.HashSet<string> =>
@@ -256,7 +256,7 @@ export function ReviewRegion(props: ReviewRegionProps) {
   // On a phone the confirm and the activity are drawers: their code is fetched once the review is drawn, so the
   // first press opens them at once.
   useEffect(() => {
-    if (narrow) void import("./PhoneDrawer.tsx")
+    if (narrow) void import("./internal/PhoneDrawer.tsx")
   }, [narrow])
   const titleId = useId()
   const loading = props.state === "loading"

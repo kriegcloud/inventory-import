@@ -22,15 +22,21 @@ import {
   restored,
   viewRows,
   visible
-} from "../../src/web/components/review/logic.ts"
-import { planColumns, type SizedColumn } from "../../src/web/components/review/sizing.ts"
-import type { ProblemKind, ReviewColumn, ReviewRow } from "../../src/web/components/review/types.ts"
-import { defaultReviewWords, reviewWords } from "../../src/web/components/review/words.ts"
+} from "@inventory/review/ReviewDraft"
+import { planColumns, type SizedColumn } from "../../../../packages/review/src/internal/sizing.ts"
+import type { ProblemKind, ReviewColumn, ReviewRow } from "@inventory/review/ReviewTypes"
+import { defaultReviewWords, reviewWords } from "@inventory/review/ReviewWords"
 import { readSpreadsheet } from "../../src/web/lib/spreadsheet/index.ts"
 import type { ItemFields } from "../../src/domain/Item.ts"
 import { costText, dimensionsCellText, vendorsCellText } from "../../src/web/pages/import/itemText.ts"
 import { vendorsDraft } from "../../src/web/pages/import/cellDrafts.ts"
-import { reasonShown, regionColumns, regionKinds, toRegionRows } from "../../src/web/pages/import/reviewAdapter.ts"
+import {
+  reasonShown,
+  regionColumns,
+  regionKinds,
+  toRegionDecisions,
+  toRegionRows
+} from "../../src/web/pages/import/reviewAdapter.ts"
 
 const sample = (name: string): File =>
   new File([readFileSync(new URL(`../../public/samples/${name}`, import.meta.url))], name)
@@ -74,7 +80,7 @@ describe("who is behind a suggestion", () => {
 describe("every row says why", () => {
   it.effect("gives each row of the sample that is not ready a sentence, the row with no fix included", () =>
     Effect.map(sampleRows(), ({ current, decisions, rows }) => {
-      const views = viewRows({ rows, state: restored(decisions) })
+      const views = viewRows({ rows, state: restored(toRegionDecisions(decisions)) })
       const kinds = kindsOf(regionKinds)
       const open = Arr.filter(views, (view) => view.status === "needs")
       expect(open.length).toBe(current.counts.needs)

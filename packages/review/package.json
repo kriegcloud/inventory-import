@@ -1,0 +1,53 @@
+{
+  "name": "@inventory/review",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The review region: any rows and columns, a reason per row, proposals to accept, values to type, rows to keep or leave out, undo and redo, and the saved progress that brings it all back after a refresh",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": [],
+  "exports": {
+    "./package.json": "./package.json",
+    "./ReviewRegion": "./src/ReviewRegion.component.tsx",
+    "./ReviewTypes": "./src/ReviewRegion.types.ts",
+    "./ReviewWords": "./src/ReviewWords.words.ts",
+    "./ReviewDecision": "./src/ReviewDecision.schema.ts",
+    "./ReviewDraft": "./src/ReviewDraft.rules.ts",
+    "./SavedProgress": "./src/SavedProgress.schema.ts",
+    "./SavedProgressHook": "./src/SavedProgress.hook.ts"
+  },
+  "scripts": {
+    "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json && node ../../scripts/check-strict.mjs strict-ceiling.json",
+    "lint": "oxlint --quiet src test; lint=$?; oxlint --disable-nested-config --deny-warnings -c ../../.oxlintrc.shadcn.json src && exit $lint",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@beep/identity": "workspace:*",
+    "@beep/schema": "workspace:*",
+    "@inventory/ui": "workspace:*",
+    "@tanstack/react-table": "^9.3.1",
+    "@tanstack/react-virtual": "^3.14.26",
+    "cn": "^0.5.2",
+    "effect": "4.1.4",
+    "lucide-react": "^1.72.0",
+    "radix-ui": "^1.8.1",
+    "sonner": "^2.0.8"
+  },
+  "devDependencies": {
+    "@effect/vitest": "4.1.4",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "oxlint": "1.93.0",
+    "tsrs": "0.25.0-ts7.1.0-beta",
+    "typescript": "~7.0.2",
+    "vitest": "^5.1.0"
+  },
+  "peerDependencies": {
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "beep": {
+    "family": "ui-system"
+  }
+}

@@ -37,9 +37,18 @@ import {
   PopoverTrigger
 } from "@inventory/ui/components/popover"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@inventory/ui/components/tooltip"
-import { choicesOf, pickedChoice, spellingOf, valueWords, variantsText } from "./logic.ts"
-import type { CellMark, Fix, FixGroup, MarkSource, ProblemKind, ReviewColumn, ReviewWords, RowView } from "./types.ts"
-import { defaultReviewWords } from "./words.ts"
+import { choicesOf, pickedChoice, spellingOf, valueWords, variantsText } from "@inventory/review/ReviewDraft"
+import type {
+  CellMark,
+  Fix,
+  FixGroup,
+  MarkSource,
+  ProblemKind,
+  ReviewColumn,
+  ReviewWords,
+  RowView
+} from "@inventory/review/ReviewTypes"
+import { defaultReviewWords } from "@inventory/review/ReviewWords"
 
 // ---------------------------------------------------------------------------------------------------------------
 // Layout: a table when the page has 1101px, a shorter table on a tablet, one decision at a time on a phone

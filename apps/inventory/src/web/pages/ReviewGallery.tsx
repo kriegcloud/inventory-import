@@ -2,7 +2,8 @@ import { LayoutGridIcon } from "lucide-react"
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
 import { AppShell } from "@/components/app/AppShell"
-import { type ProblemKind, type ReviewColumn, ReviewRegion, type ReviewRow } from "@/components/review"
+import { ReviewRegion } from "@inventory/review/ReviewRegion"
+import type { ProblemKind, ReviewColumn, ReviewRow } from "@inventory/review/ReviewTypes"
 import { Button } from "@inventory/ui/components/button"
 import {
   DropdownMenu,
@@ -11,7 +12,14 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger
 } from "@inventory/ui/components/dropdown-menu"
-import { activity, columns, columnsUnmatched, makeRows, problemKinds, recheck } from "./gallery/fabrication.ts"
+import {
+  activity,
+  columns,
+  columnsUnmatched,
+  makeRows,
+  problemKinds,
+  recheck
+} from "../../../../../packages/review/test/fixtures/fabrication.ts"
 import { JobsReview } from "./gallery/JobsReview.tsx"
 
 const states = [

@@ -1,3 +1,4 @@
+import type { ReviewDecision } from "@inventory/review/ReviewDecision"
 /**
  * The data a review region shows. Everything here comes from the caller: the primitive holds no field names, status
  * words or rules of its own. Do not add one product's vocabulary to this file.
@@ -219,18 +220,11 @@ export type ReviewRow = {
   blocked?: boolean
 }
 
-/** What the person has decided about one row. Only the person writes these; proposals never do. */
-export type RowDecision = {
-  out?: boolean
-  /** Kept over its rivals. */
-  kept?: boolean
-  /** Columns whose proposed fix the person accepted. */
-  accepted?: ReadonlyArray<string>
-  /** Columns whose applied fix the person undid. */
-  reverted?: ReadonlyArray<string>
-  /** Values the person typed, by column. */
-  edits?: Readonly<Record<string, string>>
-}
+/**
+ * What the person has decided about one row: `ReviewDecision` (`@inventory/review/ReviewDecision`). Only the person
+ * writes these; proposals never do.
+ */
+export type RowDecision = ReviewDecision
 
 export type UndoStep = {
   label: string

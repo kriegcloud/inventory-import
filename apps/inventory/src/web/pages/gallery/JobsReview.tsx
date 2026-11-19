@@ -1,13 +1,22 @@
 import { useCallback, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { StatusPill } from "@inventory/ui/StatusPill"
-import { ReviewRegion, type ReviewRow, type SavedDecisions } from "@/components/review"
+import { ReviewRegion } from "@inventory/review/ReviewRegion"
+import type { ReviewRow, SavedDecisions } from "@inventory/review/ReviewTypes"
 import { Button } from "@inventory/ui/components/button"
 import { type RecordColumn, RecordsTable } from "@inventory/ui/components/data-table/data-table-records"
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@inventory/ui/components/item"
 import { ToggleGroup, ToggleGroupItem } from "@inventory/ui/components/toggle-group"
 import { useIsNarrow } from "@inventory/ui/ContentWidth"
-import { type JobReview, lineColumns, lineKinds, makeJobs, questionRows, recheckLine, reviewJobs } from "./jobs.ts"
+import {
+  type JobReview,
+  lineColumns,
+  lineKinds,
+  makeJobs,
+  questionRows,
+  recheckLine,
+  reviewJobs
+} from "../../../../../../packages/review/test/fixtures/jobs.ts"
 
 type View = "jobs" | "questions"
 type JobFilter = "waiting" | "ready" | "out" | "all"

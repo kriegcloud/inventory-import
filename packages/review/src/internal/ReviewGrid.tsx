@@ -55,7 +55,7 @@ import {
   rowsWord,
   spellingOf,
   valueWords
-} from "./logic.ts"
+} from "@inventory/review/ReviewDraft"
 import { planColumns, priorityOf } from "./sizing.ts"
 import {
   CellValue,
@@ -79,7 +79,7 @@ import type {
   ReviewRegionProps,
   ReviewWords,
   RowView
-} from "./types.ts"
+} from "@inventory/review/ReviewTypes"
 
 /**
  * The region's own Reason column: the sentence behind each row that needs the person or cannot be fixed here, with or

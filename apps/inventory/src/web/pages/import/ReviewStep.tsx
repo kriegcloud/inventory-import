@@ -1,9 +1,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { Equal } from "effect"
+import { Equal, Option } from "effect"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 import { ReviewSkeleton } from "@inventory/ui/Skeletons"
-import { type Activity, type Problem, ReviewRegion, type ReviewRow } from "@/components/review"
+import { ReviewRegion } from "@inventory/review/ReviewRegion"
+import type { Activity, Problem, ReviewRow } from "@inventory/review/ReviewTypes"
 import { Button } from "@inventory/ui/components/button"
 import { Spinner } from "@inventory/ui/components/spinner"
 import { useActor } from "@/lib/actor"
@@ -12,7 +13,10 @@ import { useDecisionSaver } from "@/lib/draft"
 import { importViewQuery, useImportCache } from "@/lib/imports"
 import { navigate } from "@inventory/ui/Route"
 import { importAddress } from "@/lib/route"
-import { restoredDecisions, storedReview, useSavedProgress } from "@/lib/saved-progress"
+import { restoredDecisions, storedReview } from "@inventory/review/SavedProgress"
+import { useSavedProgress } from "@inventory/review/SavedProgressHook"
+import type { SavedDecisions as RegionDecisions } from "@inventory/review/ReviewTypes"
+import { browserRuntime } from "@/lib/runtime"
 import type { ImportView, SuggestOutcome } from "../../../api/v1/Api.ts"
 import {
   type Field,
@@ -110,13 +114,14 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
   const progress = useSavedProgress(
     actor === undefined
       ? undefined
-      : { organizationId: actor.organizationId, memberId: actor.id, screen: `import:${view.id}` }
+      : { organizationId: actor.organizationId, memberId: actor.id, screen: `import:${view.id}` },
+    browserRuntime
   )
-  const kept = progress.saved?.review ?? null
+  const kept = progress.saved === undefined ? null : Option.getOrNull(progress.saved.review)
   // Where the person starts: the draft the server holds, with its undo history when this browser kept it.
   // The region holds a keep-or-replace answer as a value of its own column; the server keeps it apart
   // (`toServerDecisions`, `toRegionDecisions`). `start` is the region's shape, `decisions` the server's.
-  const [start, setStart] = useState<SavedDecisions>(() =>
+  const [start, setStart] = useState<RegionDecisions>(() =>
     kept !== null && Equal.equals(toServerDecisions(kept.decisions), view.decisions)
       ? restoredDecisions(kept)
       : toRegionDecisions(view.decisions)
@@ -177,11 +182,11 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
   // Stable on purpose: the region calls this from an effect that lists it as a dependency, so a new function on
   // every render would make it call again, and again.
   const decided = useCallback(
-    (next: SavedDecisions) => {
+    (next: RegionDecisions) => {
       const server = toServerDecisions(next)
       setDecisions(server)
       change(server)
-      save({ step: "review", review: storedReview(next), decided: Object.keys(next).length })
+      save({ step: "review", review: Option.some(storedReview(next)), decided: Object.keys(next).length })
     },
     [change, save]
   )

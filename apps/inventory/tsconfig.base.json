@@ -7,7 +7,8 @@
   // style rules are off here: preferEffectArray, preferEffectString, preferEffectRecord and missingPipeableSignature.
   // Every other rule is at its root severity. Their findings are still counted by the check, against the ceiling in
   // strict-ceiling.json, which may only fall; remove the override when the count reaches zero. The vendored components
-  // and their stage D exception are in @inventory/ui (packages/ui).
+  // and their stage D exception are in @inventory/ui (packages/ui). The override also names @inventory/review's source and
+  // gallery fixtures, which the app's gallery page and two tests import by path; they are counted in that package's ceiling.
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "plugins": [
@@ -60,7 +61,13 @@
         "allowedDuplicatedPackages": [],
         "overrides": [
           {
-            "include": ["src/web/**/*.ts", "src/web/**/*.tsx"],
+            "include": [
+              "src/web/**/*.ts",
+              "src/web/**/*.tsx",
+              "../../packages/review/test/fixtures/**/*.ts",
+              "../../packages/review/src/**/*.ts",
+              "../../packages/review/src/**/*.tsx"
+            ],
             "options": {
               "diagnosticSeverity": {
                 "preferEffectArray": "off",

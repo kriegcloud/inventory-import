@@ -13,7 +13,7 @@ import type {
   ReviewRow,
   RowDecision,
   SavedDecisions
-} from "../../components/review/types.ts"
+} from "@inventory/review/ReviewTypes"
 
 export const lineKinds: ReadonlyArray<ProblemKind> = [
   {
@@ -258,7 +258,7 @@ export function recheckLine(input: { cells: Readonly<Record<string, string>> }):
 /** Whether the person's decision settles a line's question, and how: the page counts from this, not the region. */
 const answerOf = (entry: Line, decision: RowDecision | undefined): "open" | "answered" | "out" => {
   if (entry.problem === undefined) return "answered"
-  if (decision?.out === true) return "out"
+  if (decision !== undefined && decision.place.kind === "leftOut") return "out"
   const column = entry.problem.column ?? ""
   const typed = decision?.edits?.[column]
   if (decision?.accepted?.includes(column) === true) return "answered"

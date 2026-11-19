@@ -85,29 +85,3 @@ export const telemetrySettings = Config.all({
   endpoint: optionalUrl("OTEL_EXPORTER_OTLP_ENDPOINT"),
   serviceName: Config.String("OTEL_SERVICE_NAME").pipe(Config.withDefault("inventory"))
 })
-
-/**
- * The sign-in settings (src/server/SignIn.ts, docs/auth.md). The shortest secret accepted, 32 characters, is
- * `@beep/better-auth`'s rule. `production` is the build's: a production build turns the
- * breached-password check on and the test accounts off unless a variable says otherwise.
- *
- * - `BETTER_AUTH_SECRET`: secret. Signs the session cookies; at least 32 characters (`openssl rand -base64 32`).
- *   Required in production. In development `bun run dev` writes one into `.dev.vars` when there is none.
- * - `BETTER_AUTH_URL`: the address people open the app at (`https://app.example.com`). Unset locally: each request's
- *   own origin is used, so any dev or preview port works. When set it is the only trusted origin, and cookies are
- *   Secure exactly when it is `https:`.
- * - `PWNED_PASSWORD_CHECK`: `true` or `false`. Refuse a new password found in known breaches (Have I Been Pwned).
- *   Default: on in a production build, off in development. On, a sign-up is refused when the service cannot be reached.
- * - `TEST_ACCOUNTS`: `true` or `false`. Offer the seeded test accounts in one click on the sign-in page. Default: on in
- *   development, off in a production build. Only accounts the database holds are offered, and only `bun run dev`
- *   writes them, so a deployed database has none whatever this says.
- */
-export const authSettings = (build: { readonly production: boolean }) =>
-  Config.all({
-    secret: Config.Redacted("BETTER_AUTH_SECRET").pipe(Config.option, Config.map(present)),
-    publicUrl: optionalUrl("BETTER_AUTH_URL"),
-    pwnedPasswordCheck: Config.Boolean("PWNED_PASSWORD_CHECK").pipe(Config.withDefault(build.production)),
-    testAccounts: Config.Boolean("TEST_ACCOUNTS").pipe(Config.withDefault(!build.production))
-  })
-/** The decoded sign-in settings. */
-export type AuthSettings = Config.Success<ReturnType<typeof authSettings>>

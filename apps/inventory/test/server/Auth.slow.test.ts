@@ -1,7 +1,7 @@
 import { expect, layer } from "@effect/vitest"
 import { Array as Arr, Effect, Exit, Layer, Order, Record as Rec } from "effect"
-import { signIn } from "../../src/server/SignIn.ts"
-import { testAccountPassword } from "../../src/server/TestAccounts.ts"
+import { signIn } from "@inventory/access-host/SignIn"
+import { testAccountPassword } from "@inventory/access-host/TestAccounts"
 import { D1Binding } from "@beep/d1/D1"
 import { browser, settingsLayer, signInApp, TestDatabase, testSettings } from "./support/app.ts"
 

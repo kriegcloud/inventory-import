@@ -5,7 +5,7 @@ import { memoryAdapter } from "better-auth/adapters/memory"
 import { Array as Arr, Effect, String as Str } from "effect"
 import * as S from "effect/Schema"
 import { vi } from "vitest"
-import { authOptions } from "../../src/server/authOptions.ts"
+import { authOptions } from "@inventory/access-host/AuthOptions"
 
 // The breach check (Have I Been Pwned) is a setting, PWNED_PASSWORD_CHECK. Off, sign-up never calls the service. On
 // and unreachable, sign-up is refused: the check fails closed, as the README says. The real service is asked in

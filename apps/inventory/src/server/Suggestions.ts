@@ -25,7 +25,8 @@ import {
 import { asAgent } from "@inventory/kernel/Agent"
 import { OpenRouter } from "@beep/openrouter/OpenRouter"
 import { answeredByRules, askModel, modelIsOn } from "./Model.ts"
-import { ModelCalls, usedUpWords } from "./ModelCalls.ts"
+import { ModelAllowanceGateway, usedUpWords } from "@inventory/access-contract/ModelAllowance"
+import { CurrentActor } from "@inventory/kernel/Actor"
 import { D1, NoRows } from "@beep/d1/D1"
 
 /** The agent that suggests. It only proposes, and the most it may do is what an editor may do. */
@@ -151,7 +152,7 @@ export class Suggestions extends Context.Service<
       const { batch } = d1
       const random = yield* SecureRandom.SecureRandom
       const openRouter = yield* OpenRouter
-      const calls = yield* ModelCalls
+      const allowance = yield* ModelAllowanceGateway
 
       const findAll = SqlSchema.findAll({
         Request: S.Struct({ org: OrganizationId, id: S.String }),
@@ -209,7 +210,10 @@ export class Suggestions extends Context.Service<
         const proposed = yield* propose({
           source: input.source,
           fileName: input.fileName,
-          take: calls.take(actor, "suggest")
+          take: allowance.take("suggest").pipe(
+            Effect.provideService(CurrentActor, actor),
+            Effect.map((call) => call.kind === "taken")
+          )
         }).pipe(Effect.provideService(OpenRouter, openRouter))
         if (proposed.suggestions.length === 0) {
           return { made: [], answeredBy: proposed.answeredBy, lines: proposed.lines }

@@ -14,6 +14,7 @@ import * as S from "effect/Schema"
 import { $AccessModelId } from "../internal/identity.ts"
 import { AccessMemoryRef, type AccessMemoryState, type MemoryMembership } from "../internal/memory.ts"
 
+// Spans of this port are named `Members.<method>`, in memory as on D1: the names the traces have always carried.
 const $I = $AccessModelId.create("Session/MemberDirectory")
 
 /**
@@ -64,7 +65,7 @@ export class MemberDirectory extends Context.Service<
       const of = (state: AccessMemoryState, user: UserId): ReadonlyArray<MemoryMembership> =>
         A.filter(current(state), (row) => O.isSome(row.userId) && row.userId.value === user)
       return MemberDirectory.of({
-        actorFor: Effect.fn("MemberDirectory.actorFor")(function* (user: SignedInUser) {
+        actorFor: Effect.fn("Members.findByUser")(function* (user: SignedInUser) {
           const state = yield* Ref.get(ref)
           const mine = of(state, user.userId)
           return O.match(user.active, {
@@ -76,20 +77,20 @@ export class MemberDirectory extends Context.Service<
               )
           })
         }),
-        organizationsOf: Effect.fn("MemberDirectory.organizationsOf")(function* (user: UserId) {
+        organizationsOf: Effect.fn("Members.organizationsOf")(function* (user: UserId) {
           const state = yield* Ref.get(ref)
           return A.map(of(state, user), (row) =>
             OrganizationChoice.make({ id: row.member.organizationId, name: row.member.organizationName })
           )
         }),
-        inOrganization: Effect.fn("MemberDirectory.inOrganization")(function* (organization: OrganizationId) {
+        inOrganization: Effect.fn("Members.inOrganization")(function* (organization: OrganizationId) {
           const state = yield* Ref.get(ref)
           return A.map(
             A.filter(state.memberships, (row) => row.member.organizationId === organization),
             (row) => row.member
           )
         }),
-        testAccounts: Effect.fn("MemberDirectory.testAccounts")(function* (users: ReadonlyArray<UserId>) {
+        testAccounts: Effect.fn("Members.testAccounts")(function* (users: ReadonlyArray<UserId>) {
           const state = yield* Ref.get(ref)
           return A.getSomes(
             A.map(users, (user) =>
@@ -107,7 +108,7 @@ export class MemberDirectory extends Context.Service<
             )
           )
         }),
-        byId: Effect.fn("MemberDirectory.byId")(function* (member: MemberId) {
+        byId: Effect.fn("Members.findById")(function* (member: MemberId) {
           const state = yield* Ref.get(ref)
           return O.map(
             A.findFirst(state.memberships, (row) => row.member.id === member),

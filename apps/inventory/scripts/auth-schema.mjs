@@ -4,14 +4,14 @@
 //
 // Better Auth's own CLI cannot reach D1 (it runs in Node; D1 lives in workerd), so this script does what its
 // `generate` command does, against a stand-in: every migrations/*.sql applied in order to an in-memory node:sqlite
-// database, then Better Auth's `getMigrations` with this app's own options (src/server/authOptions.ts). Needs Node
+// database, then Better Auth's `getMigrations` with this app's own options (@inventory/access-host, internal/authOptions.ts). Needs Node
 // 22.18 or newer (node:sqlite and type stripping). Review the output before saving it: a required column on a table
 // that already has rows is listed as "unsafe" and has to be written by hand: nullable, then filled in for the rows
 // already there.
 import { readdirSync, readFileSync } from "node:fs"
 import { DatabaseSync } from "node:sqlite"
 import { getMigrations } from "better-auth/db/migration"
-import { authOptions } from "../src/server/authOptions.ts"
+import { authOptions } from "../../../packages/access/host/src/internal/authOptions.ts"
 
 const root = new URL("../", import.meta.url)
 const db = new DatabaseSync(":memory:")

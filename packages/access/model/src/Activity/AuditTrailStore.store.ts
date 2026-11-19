@@ -11,6 +11,7 @@ import * as A from "effect/Array"
 import { $AccessModelId } from "../internal/identity.ts"
 import { AccessMemoryRef } from "../internal/memory.ts"
 
+// Spans of this port are named `Activities.<method>`, in memory as on D1: the names the traces have always carried.
 const $I = $AccessModelId.create("Activity/AuditTrailStore")
 
 /**
@@ -37,11 +38,11 @@ export class AuditTrailStore extends Context.Service<
         return A.filter(state.lines, (line) => line.organizationId === organization)
       })
       return AuditTrailStore.of({
-        recent: Effect.fn("AuditTrailStore.recent")(function* (organization: OrganizationId) {
+        recent: Effect.fn("Activities.recent")(function* (organization: OrganizationId) {
           const lines = yield* of(organization)
           return A.take(A.reverse(lines), 500)
         }),
-        count: Effect.fn("AuditTrailStore.count")(function* (organization: OrganizationId) {
+        count: Effect.fn("Activities.count")(function* (organization: OrganizationId) {
           const lines = yield* of(organization)
           return lines.length
         })

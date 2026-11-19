@@ -3,9 +3,9 @@
 // `bun run dev` (scripts/migrate-local.mjs) applies that file to the local database after the migrations. It is not a
 // migration, so a deployed database never gets these accounts. Passwords are hashed with Better Auth's own
 // hashPassword (scrypt), so the rows are what its sign-up would have written. The accounts and their password are
-// defined once, in src/server/TestAccounts.ts, which the sign-in page's list is read through as well.
+// defined once, in @inventory/access-host (internal/TestAccounts.ts), which the sign-in page's list is read through as well.
 import { hashPassword } from "better-auth/crypto"
-import { seededAccounts, testAccountPassword } from "../src/server/TestAccounts.ts"
+import { seededAccounts, testAccountPassword } from "../../../packages/access/host/src/internal/TestAccounts.ts"
 
 const at = "2026-11-13T00:00:00.000Z"
 const q = (value) => `'${String(value).replaceAll("'", "''")}'`

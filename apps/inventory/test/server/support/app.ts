@@ -17,38 +17,33 @@ import {
   MutableRef,
   Option,
   Record as Rec,
-  Ref,
   String as Str
 } from "effect"
 import * as S from "effect/Schema"
 import { DevTools } from "effect/devtools"
 import { type HttpRouter, HttpServer } from "effect/http"
 import { HttpApiMiddleware } from "effect/http-api"
-import { OrganizationChoice } from "@inventory/access-contract/SessionState"
+import { actingAs, directoryFollowing, HeaderIdentity } from "@inventory/access-host/AccessTest"
+import { accessServices } from "@inventory/access-host/Host"
+import { SessionIdentityLive } from "@inventory/access-host/SessionIdentity"
+import { signIn } from "@inventory/access-host/SignIn"
 import { Activity } from "@inventory/kernel/Activity"
 import { ActivityId } from "@inventory/kernel/Ids"
 import { MemberId, type OrganizationId } from "@inventory/kernel/Ids"
 import { type Member } from "@inventory/kernel/Member"
-import { Activities } from "../../../src/server/Activities.ts"
 import { OpenRouter } from "@beep/openrouter/OpenRouter"
 import { ModelId } from "@beep/openrouter/OpenRouterModel"
 import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
 import { makeApp, makeRoutes, servicesWith, toFetch } from "../../../src/server/App.ts"
 import { BetterAuthTest } from "@beep/better-auth/BetterAuthTest"
-import { signIn } from "../../../src/server/SignIn.ts"
 import { Handlers } from "../../../src/server/handlers.ts"
-import { IdentityLive } from "../../../src/server/Identity.ts"
 import { Imports } from "../../../src/server/Imports.ts"
-import { Members } from "../../../src/server/Members.ts"
-import { ModelCalls } from "../../../src/server/ModelCalls.ts"
-import { People } from "../../../src/server/People.ts"
 import { Items } from "../../../src/server/Items.ts"
 import { Suggestions } from "../../../src/server/Suggestions.ts"
 import { answerByRules, TableAssistant } from "../../../src/server/TableAssistant.ts"
 import * as Observability from "../../../src/server/Observability.ts"
 import { SameOriginLive } from "../../../src/server/SameOrigin.ts"
-import { Sessions, SessionIdentityLive } from "../../../src/server/SessionIdentity.ts"
-import { testAccountPassword } from "../../../src/server/TestAccounts.ts"
+import { testAccountPassword } from "@inventory/access-host/TestAccounts"
 
 const migrations = new URL("../../../migrations/", import.meta.url)
 
@@ -104,50 +99,38 @@ export const SignedOutAuth = BetterAuthTest.signedOut
 /** The whole app on a fresh test database, as the Worker composes it, with the header identity naming the actor. */
 export const TestApp = makeApp({
   database: TestDatabase,
-  identity: IdentityLive,
+  identity: HeaderIdentity,
   auth: TestAuth(),
   production: false,
   docs: false
 }).pipe(Layer.provideMerge(DevToolsWhenAsked), Layer.provide(settingsLayer()))
 
 /**
- * The audit trail in memory, for tests of the rules that live in handlers and middleware: it starts with one line per
- * organization, so a count has something to count. SQL itself is tested on D1.
+ * The audit trail the in-memory app starts with: one line per organization, so a count has something to count. SQL
+ * itself is tested on D1.
  */
-export const InMemoryActivities = Layer.effect(
-  Activities,
-  Effect.gen(function* () {
-    const at = yield* DateTime.now
-    const rows = yield* Ref.make<ReadonlyArray<Activity>>(
-      Arr.map(["org_prairie", "org_northline"] as const, (org, index) =>
-        Activity.make({
-          id: ActivityId.make(`00000000-0000-4000-8000-00000000000${index}`),
-          organizationId: org as OrganizationId,
-          actorId: MemberId.make(org === "org_prairie" ? "mem_dana" : "mem_elena"),
-          actorName: "Seeded",
-          action: "Uploaded a file",
-          detail: "items.csv: 13 rows staged, nothing imported yet",
-          agent: Option.none(),
-          createdAt: at
-        })
-      )
-    )
-    const inOrganization = (organizationId: OrganizationId) =>
-      Effect.map(
-        Ref.get(rows),
-        Arr.filter((row) => row.organizationId === organizationId)
-      )
-    return Activities.of({
-      recent: Effect.fn("Activities.recent")(function* (organizationId: OrganizationId) {
-        return yield* inOrganization(organizationId)
-      }),
-      count: Effect.fn("Activities.count")(function* (organizationId: OrganizationId) {
-        const found = yield* inOrganization(organizationId)
-        return found.length
-      })
+const seededLines = (at: DateTime.Utc): ReadonlyArray<Activity> =>
+  Arr.map(["org_prairie", "org_northline"] as const, (org, index) =>
+    Activity.make({
+      id: ActivityId.make(`00000000-0000-4000-8000-00000000000${index}`),
+      organizationId: org as OrganizationId,
+      actorId: MemberId.make(org === "org_prairie" ? "mem_dana" : "mem_elena"),
+      actorName: "Seeded",
+      action: "Uploaded a file",
+      detail: "items.csv: 13 rows staged, nothing imported yet",
+      agent: Option.none(),
+      createdAt: at
     })
-  })
-)
+  )
+
+/**
+ * The access context in memory, acting as `member` whatever a header says: its ports on the in-memory twins, the
+ * session answer and the model allowance over them.
+ */
+const InMemoryAccess = (member: Member) =>
+  accessServices({ production: false }).pipe(
+    Layer.provideMerge(Layer.unwrap(Effect.map(DateTime.now, (at) => actingAs({ member, lines: seededLines(at) }))))
+  )
 
 /**
  * A service the in-memory app does not have: its storage is SQL, tested on D1 (`*.slow.test.ts`). Any call dies with
@@ -168,8 +151,6 @@ const notInMemory = <I, S extends object>(tag: Context.Key<I, S>, name: string) 
 const InMemoryStorage = Layer.mergeAll(
   notInMemory(Imports, "Imports"),
   notInMemory(Items, "Items"),
-  notInMemory(People, "People"),
-  notInMemory(ModelCalls, "ModelCalls"),
   notInMemory(Suggestions, "Suggestions"),
   Layer.succeed(
     TableAssistant,
@@ -180,30 +161,6 @@ const InMemoryStorage = Layer.mergeAll(
     })
   )
 )
-
-/** `Members` that resolves every request to `member`: who the request acts as, whatever its header says. */
-export const actingAs = (member: Member) =>
-  Layer.succeed(
-    Members,
-    Members.of({
-      all: Effect.succeed([member]),
-      findById: Effect.fn("Members.findById")(function* () {
-        return Option.some(member)
-      }),
-      findByUser: Effect.fn("Members.findByUser")(function* () {
-        return Option.some(member)
-      }),
-      inOrganization: Effect.fn("Members.inOrganization")(function* () {
-        return [member]
-      }),
-      organizationsOf: Effect.fn("Members.organizationsOf")(function* () {
-        return [OrganizationChoice.make({ id: member.organizationId, name: member.organizationName })]
-      }),
-      testAccounts: Effect.fn("Members.testAccounts")(function* () {
-        return []
-      })
-    })
-  )
 
 /**
  * The API's routes and middleware on in-memory storage, acting as `member`, with the given model layer: the fast
@@ -222,12 +179,10 @@ export const inMemoryApp = <E, R>({
   /** The settings the app reads, as the Worker's `env` would give them. Default: `testSettings`. */
   readonly settings?: Record<string, string>
 }) =>
-  makeRoutes({ docs, identity: IdentityLive }).pipe(
-    Layer.provide(Sessions.layer({ production: false })),
-    Layer.provide(SignedOutAuth),
-    Layer.provide(InMemoryActivities),
+  makeRoutes({ docs, identity: HeaderIdentity }).pipe(
     Layer.provide(InMemoryStorage),
-    Layer.provide(actingAs(member)),
+    Layer.provide(InMemoryAccess(member)),
+    Layer.provide(SignedOutAuth),
     Layer.provide(ai),
     Layer.provide(HttpServer.layerServices),
     Layer.provideMerge(Observability.layer({ production: false })),
@@ -244,14 +199,12 @@ export const inMemoryHandlers = <E, R>({
   readonly ai: Layer.Layer<OpenRouter, E, R>
 }) =>
   Handlers.pipe(
-    Layer.provideMerge(IdentityLive),
+    Layer.provideMerge(HeaderIdentity),
     Layer.provideMerge(SameOriginLive),
     Layer.provideMerge(HttpApiMiddleware.layerProblemDetails({ includeDetails: true })),
-    Layer.provide(Sessions.layer({ production: false })),
-    Layer.provide(SignedOutAuth),
-    Layer.provide(actingAs(member)),
-    Layer.provideMerge(InMemoryActivities),
     Layer.provide(InMemoryStorage),
+    Layer.provideMerge(InMemoryAccess(member)),
+    Layer.provide(SignedOutAuth),
     Layer.provide(ai),
     Layer.provideMerge(HttpServer.layerServices)
   )
@@ -261,7 +214,7 @@ const acting = MutableRef.make<MemberId>(MemberId.make("mem_dana"))
 /**
  * Runs a request of the typed client (`HttpApiTest.groups`) as a seeded member ("mem_tom"), on `testAppWith`. The
  * identity middleware resolves the member through `Members`, and there `Members` looks up whoever was named last in
- * the real `member` table, so one database can be used by several people in one test. Tests in a file run in turn.
+ * the real `member` table (`directoryFollowing`), so one database can be used by several people in one test. Tests in a file run in turn.
  */
 export const as =
   (memberId: string) =>
@@ -278,26 +231,13 @@ export const as =
  */
 export const testAppWith = <E, R>(ai: Layer.Layer<OpenRouter, E, R>) =>
   Handlers.pipe(
-    Layer.provideMerge(IdentityLive),
+    Layer.provideMerge(HeaderIdentity),
     Layer.provideMerge(SameOriginLive),
     Layer.provideMerge(HttpApiMiddleware.layerProblemDetails({ includeDetails: true })),
-    Layer.provide(Sessions.layer({ production: false })),
+    // The header identity looks up whoever `as` named last, in the real `member` table.
+    Layer.provide(directoryFollowing(() => MutableRef.get(acting))),
+    Layer.provideMerge(servicesWith({ ai, production: false })),
     Layer.provide(SignedOutAuth),
-    Layer.provide(
-      Layer.effect(
-        Members,
-        Effect.gen(function* () {
-          const real = yield* Members
-          return Members.of({
-            ...real,
-            findById: Effect.fn("Members.findById")(function* () {
-              return yield* real.findById(MutableRef.get(acting))
-            })
-          })
-        })
-      ).pipe(Layer.provide(Members.layer))
-    ),
-    Layer.provideMerge(servicesWith(ai)),
     Layer.provideMerge(TestDatabase),
     Layer.provideMerge(HttpServer.layerServices),
     Layer.provide(settingsLayer())

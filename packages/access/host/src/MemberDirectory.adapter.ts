@@ -1,0 +1,123 @@
+/**
+ * People and their organizations on D1, for the identity seam: the one adapter whose reads are not scoped to an
+ * organization, because it is what finds the organization.
+ *
+ * @packageDocumentation
+ */
+import { AccountEmail, Membership, OrganizationChoice, TestAccount } from "@inventory/access-contract/SessionState"
+import { MemberDirectory, type SignedInUser } from "@inventory/access-model/MemberDirectory"
+import { MemberId, OrganizationId, UserId } from "@inventory/kernel/Ids"
+import { Member } from "@inventory/kernel/Member"
+import { Role } from "@inventory/kernel/Role"
+import { DisplayName } from "@inventory/kernel/Text"
+import { Array as Arr, Effect, Layer, Option } from "effect"
+import * as S from "effect/Schema"
+import { SqlClient, SqlSchema } from "effect/sql"
+
+/** One membership row of a test account, as the database holds it. */
+const AccountRow = S.Struct({
+  userId: UserId,
+  email: AccountEmail,
+  name: DisplayName,
+  organizationName: DisplayName,
+  role: Role
+}).annotate({ description: "A test account's membership, read from user, member and organization." })
+
+/** A user and, when they chose one, the organization they act in. */
+const Chosen = S.Struct({ userId: UserId, organizationId: S.NullOr(OrganizationId) }).annotate({
+  description: "A user and the organization they chose, or null for their earliest"
+})
+
+/**
+ * `MemberDirectory` over `member`, `organization` and `user`.
+ *
+ * @category layers
+ */
+export const MemberDirectoryD1: Layer.Layer<MemberDirectory, never, SqlClient.SqlClient> = Layer.effect(
+  MemberDirectory,
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+
+    // The user's current name wins; `member.name` is the fallback for a member with no account.
+    const select = sql`
+      SELECT m.id, COALESCE(u.name, m.name) AS name, m.role, m.organizationId, o.name AS organizationName
+      FROM member m JOIN organization o ON o.id = m.organizationId LEFT JOIN "user" u ON u.id = m.userId
+    `
+
+    const findOne = SqlSchema.findOneOption({
+      Request: MemberId,
+      Result: Member,
+      execute: (id) => sql`${select} WHERE m.id = ${id}`
+    })
+
+    const findMembership = SqlSchema.findOneOption({
+      Request: Chosen,
+      Result: Member,
+      execute: ({ organizationId, userId }) =>
+        organizationId === null
+          ? sql`${select} WHERE m.userId = ${userId} ORDER BY m.createdAt, m.id LIMIT 1`
+          : sql`${select} WHERE m.userId = ${userId} AND m.organizationId = ${organizationId}`
+    })
+
+    const findInOrganization = SqlSchema.findAll({
+      Request: OrganizationId,
+      Result: Member,
+      execute: (organizationId) => sql`${select} WHERE m.organizationId = ${organizationId} ORDER BY name`
+    })
+
+    const findOrganizations = SqlSchema.findAll({
+      Request: UserId,
+      Result: OrganizationChoice,
+      execute: (userId) => sql`
+        SELECT o.id, o.name FROM member m JOIN organization o ON o.id = m.organizationId
+        WHERE m.userId = ${userId} ORDER BY m.createdAt, m.id`
+    })
+
+    const findAccounts = SqlSchema.findAll({
+      Request: S.Array(UserId),
+      Result: AccountRow,
+      execute: (userIds) => sql`
+        SELECT u.id AS userId, u.email, u.name, o.name AS organizationName, m.role
+        FROM "user" u JOIN member m ON m.userId = u.id JOIN organization o ON o.id = m.organizationId
+        WHERE u.id IN ${sql.in(userIds)}
+        ORDER BY m.createdAt, m.id`
+    })
+
+    return MemberDirectory.of({
+      byId: Effect.fn("Members.findById")(function* (id: MemberId) {
+        return yield* findOne(id).pipe(Effect.orDie)
+      }),
+      actorFor: Effect.fn("Members.findByUser")(function* (user: SignedInUser) {
+        return yield* findMembership({
+          userId: user.userId,
+          organizationId: Option.getOrNull(user.active)
+        }).pipe(Effect.orDie)
+      }),
+      inOrganization: Effect.fn("Members.inOrganization")(function* (organizationId: OrganizationId) {
+        return yield* findInOrganization(organizationId).pipe(Effect.orDie)
+      }),
+      organizationsOf: Effect.fn("Members.organizationsOf")(function* (userId: UserId) {
+        return yield* findOrganizations(userId).pipe(Effect.orDie)
+      }),
+      testAccounts: Effect.fn("Members.testAccounts")(function* (userIds: ReadonlyArray<UserId>) {
+        if (!Arr.isReadonlyArrayNonEmpty(userIds)) return []
+        const rows = yield* findAccounts(Arr.copy(userIds)).pipe(Effect.orDie)
+        // In the order asked for, each with its memberships, earliest first.
+        return Arr.getSomes(
+          Arr.map(userIds, (userId) => {
+            const mine = Arr.filter(rows, (row) => row.userId === userId)
+            return Option.map(Arr.head(mine), (first) =>
+              TestAccount.make({
+                email: first.email,
+                name: first.name,
+                memberships: Arr.map(mine, (row) =>
+                  Membership.make({ organizationName: row.organizationName, role: row.role })
+                )
+              })
+            )
+          })
+        )
+      })
+    })
+  })
+)

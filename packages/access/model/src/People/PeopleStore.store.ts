@@ -20,6 +20,7 @@ import { $AccessModelId } from "../internal/identity.ts"
 import { AccessMemoryRef, type AccessMemoryState, type MemoryMembership } from "../internal/memory.ts"
 import { keepsAnAdmin } from "./LastAdmin.rules.ts"
 
+// Spans of this port are named `People.<method>`, in memory as on D1: the names the traces have always carried.
 const $I = $AccessModelId.create("People/PeopleStore")
 
 /**
@@ -149,22 +150,22 @@ export class PeopleStore extends Context.Service<
         A.findFirst(inOrganization(state, organization), (row) => row.member.id === member)
 
       return PeopleStore.of({
-        list: Effect.fn("PeopleStore.list")(function* (organization: OrganizationId) {
+        list: Effect.fn("People.list")(function* (organization: OrganizationId) {
           const state = yield* Ref.get(ref)
           return A.map(inOrganization(state, organization), (row) => personOf(state, row))
         }),
-        find: Effect.fn("PeopleStore.find")(function* (scope) {
+        find: Effect.fn("People.one")(function* (scope) {
           const state = yield* Ref.get(ref)
           return O.map(found(state, scope.organization, scope.member), (row) => personOf(state, row))
         }),
-        accountByEmail: Effect.fn("PeopleStore.accountByEmail")(function* (email: AccountEmail) {
+        accountByEmail: Effect.fn("People.accountByEmail")(function* (email: AccountEmail) {
           const state = yield* Ref.get(ref)
           return O.map(
             A.findFirst(state.accounts, (account) => Str.toLowerCase(account.email) === email),
             (account) => Account.make({ userId: account.userId, name: account.name })
           )
         }),
-        add: Effect.fn("PeopleStore.add")(function* (write) {
+        add: Effect.fn("People.add")(function* (write) {
           const organization = write.audit.organizationId
           return yield* Ref.modify(ref, (state): readonly [AddWrite, AccessMemoryState] => {
             const mine = inOrganization(state, organization)
@@ -199,7 +200,7 @@ export class PeopleStore extends Context.Service<
             return [AddWrite.cases.added.make({ person: personOf(next, row) }), next]
           })
         }),
-        setRole: Effect.fn("PeopleStore.setRole")(function* (write) {
+        setRole: Effect.fn("People.setRole")(function* (write) {
           const organization = write.audit.organizationId
           return yield* Ref.modify(ref, (state): readonly [RoleWrite, AccessMemoryState] => {
             const row = found(state, organization, write.member)
@@ -223,7 +224,7 @@ export class PeopleStore extends Context.Service<
             return [RoleWrite.cases.changed.make({ person: personOf(next, changed) }), next]
           })
         }),
-        remove: Effect.fn("PeopleStore.remove")(function* (write) {
+        remove: Effect.fn("People.remove")(function* (write) {
           const organization = write.audit.organizationId
           return yield* Ref.modify(ref, (state): readonly [RemoveWrite, AccessMemoryState] => {
             const row = found(state, organization, write.member)

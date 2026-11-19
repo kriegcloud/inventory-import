@@ -21,7 +21,7 @@ import { AllowanceStore, Reservation } from "./AllowanceStore.store.ts"
  *
  * @category handlers
  */
-export const takeModelCall = Effect.fn("ModelCalls.take")(function* (purpose: ModelCallPurpose) {
+export const takeModelCall = Effect.fnUntraced(function* (purpose: ModelCallPurpose) {
   const actor = yield* CurrentActor
   const store = yield* AllowanceStore
   const random = yield* SecureRandom.SecureRandom
@@ -56,7 +56,7 @@ export const ModelAllowanceGatewayLive: Layer.Layer<
     const store = yield* AllowanceStore
     const random = yield* SecureRandom.SecureRandom
     return ModelAllowanceGateway.of({
-      take: Effect.fn("ModelAllowanceGateway.take")(function* (purpose: ModelCallPurpose) {
+      take: Effect.fnUntraced(function* (purpose: ModelCallPurpose) {
         return yield* takeModelCall(purpose).pipe(
           Effect.provideService(AllowanceStore, store),
           Effect.provideService(SecureRandom.SecureRandom, random)

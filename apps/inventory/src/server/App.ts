@@ -2,26 +2,22 @@ import type { D1 } from "@beep/d1/D1"
 import { Effect, Layer, ManagedRuntime } from "effect"
 import { HttpRouter, HttpServer } from "effect/http"
 import { HttpApiBuilder, HttpApiMiddleware, HttpApiScalar } from "effect/http-api"
+import { AccessLive } from "@inventory/access-host/Host"
+import { SignInRoute } from "@inventory/access-host/SignIn"
 import type { Identity } from "@inventory/kernel/Identity"
 import type { SqlClient } from "effect/sql"
 import { Api, docsPath, openApiPath } from "../api/v1/Api.ts"
 import { sessionCookieScheme } from "../api/v1/Document.ts"
-import { Activities } from "./Activities.ts"
 import type { OpenRouter } from "@beep/openrouter/OpenRouter"
 import { ModelLive } from "./Model.ts"
 import type { BetterAuth } from "@beep/better-auth/BetterAuth"
 import { Handlers } from "./handlers.ts"
 import { Imports } from "./Imports.ts"
-import { Members } from "./Members.ts"
-import { ModelCalls } from "./ModelCalls.ts"
 import * as Observability from "./Observability.ts"
 import { RequestTelemetry } from "./RequestTelemetry.ts"
 import { SameOriginLive } from "./SameOrigin.ts"
-import { SignInRoute } from "./SignIn.ts"
 import { withSecurityHeaders } from "./security.ts"
-import { People } from "./People.ts"
 import { Items } from "./Items.ts"
-import { Sessions } from "./SessionIdentity.ts"
 import { Suggestions } from "./Suggestions.ts"
 import { TableAssistant } from "./TableAssistant.ts"
 import { HttpTracing, OtlpProxyRoute, RequestMetrics } from "./Telemetry.ts"
@@ -66,7 +62,7 @@ export const DocsRoute = import.meta.env.DEV
   : Layer.empty
 
 /**
- * The HttpApi with its OpenAPI document, Better Auth's routes at /api/auth/* beside it (SignIn.ts), and the middleware
+ * The HttpApi with its OpenAPI document, Better Auth's routes at /api/auth/* beside it (@inventory/access-host/SignIn), and the middleware
  * every request passes through, needing the services and `BetterAuth`. `identity` is the `Identity` middleware's
  * implementation: the caller chooses it (worker.ts passes `SessionIdentityLive`, which reads the session; the tests
  * pass the header identity, `IdentityLive`), so this file never pulls one into a build.
@@ -89,16 +85,12 @@ export const makeRoutes = <E, R>(options: { readonly docs: boolean; readonly ide
  * Every service the handlers use, on a given model service: the Worker passes `ModelLive` (its key), the tests none
  * or a scripted model. Built once and shared by the Worker and the tests, so a service added here is added everywhere.
  */
-export const servicesWith = <E, R>(ai: Layer.Layer<OpenRouter, E, R>) => {
-  const storage = Layer.mergeAll(
-    Activities.layer,
-    Members.layer,
-    Imports.layer,
-    Items.layer,
-    People.layer,
-    ModelCalls.layer,
-    ai
-  )
+export const servicesWith = <E, R>(options: {
+  readonly ai: Layer.Layer<OpenRouter, E, R>
+  readonly production: boolean
+}) => {
+  // The access context: its ports on D1, the session answer, and the gateway to the day's model allowance.
+  const storage = Layer.mergeAll(AccessLive(options), Imports.layer, Items.layer, options.ai)
   // The table assistant and the import's suggestions use the model and the day's allowance; everything else uses
   // storage only.
   return Layer.mergeAll(
@@ -107,9 +99,6 @@ export const servicesWith = <E, R>(ai: Layer.Layer<OpenRouter, E, R>) => {
     Suggestions.layer.pipe(Layer.provide(storage))
   )
 }
-
-/** Every service the handlers use, with the model the settings allow. */
-export const Services = servicesWith(ModelLive)
 
 /**
  * The whole app on a given database, identity and sign-in. Settings come from the ConfigProvider the caller provides
@@ -125,8 +114,7 @@ export const makeApp = <E, R, IE, IR, AE, AR>(options: {
   readonly docs: boolean
 }) =>
   makeRoutes({ docs: options.docs, identity: options.identity }).pipe(
-    Layer.provide(Sessions.layer({ production: options.production })),
-    Layer.provide(Services),
+    Layer.provide(servicesWith({ ai: ModelLive, production: options.production })),
     Layer.provide(options.auth),
     Layer.provide(options.database),
     Layer.provide(HttpServer.layerServices),

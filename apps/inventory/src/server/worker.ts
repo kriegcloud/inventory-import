@@ -3,8 +3,8 @@ import { env, waitUntil } from "cloudflare:workers"
 import { ConfigProvider, Layer } from "effect"
 import { makeApp, toTracedFetch } from "./App.ts"
 import { RequestTelemetry } from "./RequestTelemetry.ts"
-import { SessionIdentityLive } from "./SessionIdentity.ts"
-import { signIn } from "./SignIn.ts"
+import { SessionIdentityLive } from "@inventory/access-host/SessionIdentity"
+import { signIn } from "@inventory/access-host/SignIn"
 import { collector } from "./Telemetry.ts"
 
 // Cloudflare Worker entry: the app (App.ts) on the D1 binding, with every setting and secret read through one
@@ -16,7 +16,7 @@ const settings = ConfigProvider.layer(ConfigProvider.fromUnknown(env))
 
 const app = makeApp({
   database: D1.layer({ db: env.DB }),
-  // Sign-in: the actor comes from the session cookie (SessionIdentity.ts), and Better Auth answers /api/auth/*.
+  // Sign-in: the actor comes from the session cookie (@inventory/access-host), and Better Auth answers /api/auth/*.
   identity: SessionIdentityLive,
   // Better Auth takes the D1 binding itself. Its work after an answer (rate-limit updates, cleanup) is handed to
   // `waitUntil`, so the answer does not wait for it and the Worker is not stopped before it is done.

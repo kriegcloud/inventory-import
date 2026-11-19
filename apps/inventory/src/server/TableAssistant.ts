@@ -3,7 +3,7 @@
 // model-trouble sentences); with no key or
 // a model in trouble, the fixed rules read the plain cases. Whoever answers, the answer is checked against the
 // request's own catalog (`checkCommand`) before the screen sees it. A model call is taken from the organization's
-// daily allowance first (ModelCalls.ts), the one every model feature draws on; when it is used up the rules answer
+// daily allowance first (the access context's `ModelAllowanceGateway`), the one every model feature draws on; when it is used up the rules answer
 // and say so. The one thing not to break: nothing here writes anything but that count and the audit line of a
 // model's answer, so it never needs more than the viewer role.
 import { Array as Arr, Context, DateTime, Effect, Layer, Result } from "effect"
@@ -17,7 +17,8 @@ import { checkCommand, readByRules, type ViewChange, ViewCommand, type ViewOutco
 import { asAgent } from "@inventory/kernel/Agent"
 import { OpenRouter } from "@beep/openrouter/OpenRouter"
 import { askModel, modelIsOn } from "./Model.ts"
-import { ModelCalls, usedUpWords } from "./ModelCalls.ts"
+import { ModelAllowanceGateway, usedUpWords } from "@inventory/access-contract/ModelAllowance"
+import { CurrentActor } from "@inventory/kernel/Actor"
 import { D1, NoRows } from "@beep/d1/D1"
 
 /** What an answer says when there is no key; the panel says once what the rules read (`rulesRead`). */
@@ -79,7 +80,7 @@ export class TableAssistant extends Context.Service<
       const sql = yield* SqlClient.SqlClient
       const { run } = yield* D1
       const random = yield* SecureRandom.SecureRandom
-      const calls = yield* ModelCalls
+      const allowance = yield* ModelAllowanceGateway
 
       const line = D1.statement({
         Request: S.Struct({
@@ -126,7 +127,8 @@ export class TableAssistant extends Context.Service<
           return answerByRules({ request, why: noKey })
         }
         // One call from the day's allowance, taken before the call is made, so a call that fails still counts.
-        if (!(yield* calls.take(actor, "view"))) {
+        const call = yield* allowance.take("view").pipe(Effect.provideService(CurrentActor, actor))
+        if (call.kind === "usedUp") {
           return answerByRules({ request, why: usedUp })
         }
         const catalog = yield* toJson({

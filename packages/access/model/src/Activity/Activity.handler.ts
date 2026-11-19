@@ -12,7 +12,7 @@ import { AuditTrailStore } from "./AuditTrailStore.store.ts"
  *
  * @category handlers
  */
-export const recentActivity = Effect.fn("activity.recent")(function* () {
+export const recentActivity = Effect.fnUntraced(function* () {
   const actor = yield* CurrentActor
   const store = yield* AuditTrailStore
   return yield* store.recent(actor.organizationId)
@@ -23,7 +23,7 @@ export const recentActivity = Effect.fn("activity.recent")(function* () {
  *
  * @category handlers
  */
-export const activityCount = Effect.fn("activity.count")(function* () {
+export const activityCount = Effect.fnUntraced(function* () {
   const actor = yield* CurrentActor
   const store = yield* AuditTrailStore
   return yield* store.count(actor.organizationId)

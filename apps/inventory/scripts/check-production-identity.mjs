@@ -1,7 +1,7 @@
 // Fails the build when the production Worker bundle could still let a header choose who the actor is, or carries a
 // driver's test layer.
-// The test identity (src/server/Identity.ts, `IdentityLive`) reads `x-acting-as`; the Worker uses the session
-// identity (src/server/SessionIdentity.ts). Run by `bun run build` after `vite build`.
+// The test identity (`HeaderIdentity` in @inventory/access-host/AccessTest) reads `x-acting-as`; the Worker uses the
+// session identity (@inventory/access-host/SessionIdentity). Run by `bun run build` after `vite build`.
 import { existsSync, readdirSync, readFileSync } from "node:fs"
 
 // The Worker's build folder: the Cloudflare plugin names it after the Worker, with "_" for "-" ("acme-app" builds

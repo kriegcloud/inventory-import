@@ -1,6 +1,6 @@
-// SIGN-IN. Better Auth through @beep/better-auth, with this app's options (authOptions.ts) and settings (Settings.ts),
+// SIGN-IN. Better Auth through @beep/better-auth, with this app's options (internal/authOptions.ts) and settings (Config.ts),
 // and its routes at /api/auth/* beside the HttpApi (never versioned: it is Better Auth's contract, and its browser
-// client's base path). Handlers never call it: they read `CurrentActor`, which SessionIdentity.ts resolves from the
+// client's base path). Handlers never call it: they read `CurrentActor`, which SessionIdentity.adapter.ts resolves from the
 // session it looks up. A write another site asked the browser to send is refused here first, by the same rule as the
 // app's own API (`RequestSource.allows`), before Better Auth's own origin and CSRF checks: two locks, and the first one
 // is ours and tested.
@@ -11,8 +11,8 @@ import { RequestSource } from "@inventory/kernel/SameOrigin"
 import { Effect, Layer, Option } from "effect"
 import { HttpServerRequest, HttpServerResponse } from "effect/http"
 import type { CrossSiteRequest } from "@inventory/kernel/AccessError"
-import { authOptions } from "./authOptions.ts"
-import { authSettings } from "./Settings.ts"
+import { authSettings } from "./Config.ts"
+import { authOptions } from "./internal/authOptions.ts"
 
 /**
  * Better Auth for this Worker, on the D1 binding, from the sign-in settings. In production a missing or short

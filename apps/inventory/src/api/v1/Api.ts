@@ -30,7 +30,7 @@ import { apiPrefix } from "./Version.ts"
 
 // The API contract, version 1. The server implements it (src/server) and the browser calls it through a client
 // derived from this same definition (src/web/lib/api.ts), so a renamed field is a compile error on both sides.
-// Sign-in routes are never versioned: Better Auth answers /api/auth/*, beside this (src/server/SignIn.ts).
+// Sign-in routes are never versioned: Better Auth answers /api/auth/*, beside this (@inventory/access-host/SignIn).
 
 export { apiPrefix } from "./Version.ts"
 

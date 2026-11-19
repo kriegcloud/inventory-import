@@ -12,6 +12,7 @@ import * as S from "effect/Schema"
 import { $AccessModelId } from "../internal/identity.ts"
 import { AccessMemoryRef } from "../internal/memory.ts"
 
+// Spans of this port are named `ModelCalls.<method>`, in memory as on D1: the names the traces have always carried.
 const $I = $AccessModelId.create("Allowance/AllowanceStore")
 
 /**
@@ -51,7 +52,7 @@ export class AllowanceStore extends Context.Service<
     Effect.gen(function* () {
       const ref = yield* AccessMemoryRef
       return AllowanceStore.of({
-        take: Effect.fn("AllowanceStore.take")(function* (reservation: Reservation) {
+        take: Effect.fn("ModelCalls.take")(function* (reservation: Reservation) {
           return yield* Ref.modify(ref, (state) => {
             const counted = A.filter(
               state.calls,

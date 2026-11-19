@@ -1,6 +1,6 @@
 import { expect, layer } from "@effect/vitest"
 import { Array as Arr, Effect, String as Str } from "effect"
-import { pwnedPasswordMessage } from "../../src/server/authOptions.ts"
+import { pwnedPasswordMessage } from "@inventory/access-host/AuthOptions"
 import { browser, signInApp } from "./support/app.ts"
 
 // The breach check against the real Have I Been Pwned service, through the Worker's own composition with

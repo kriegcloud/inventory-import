@@ -60,4 +60,27 @@ None.
   are `S.TaggedUnion`s; `MemberDirectory.byId` is added for the test identity, which a header names a member to;
   the purity type is proved by a conditional type in `Rules.test.ts` (the profile reports a missing service on the
   same line a `@ts-expect-error` would sit on). 11 tests. The app is not wired to it yet: no screen changed.
+- **`access-host` (`packages/access/host`).** The four D1 adapters, the session identity, sign-in, the settings and
+  the test identity move out of `src/server` (`Members.ts`, `People.ts`, `Activities.ts`, `ModelCalls.ts`,
+  `SessionIdentity.ts`, `SignIn.ts`, `authOptions.ts`, `TestAccounts.ts`, `Identity.ts` are gone from the app).
+  - **The rabbit hole was real.** A function typed against this package's group does not fit the app's: the `Api`'s
+    prefix and its `SameOrigin` and `ProblemDetails` middleware make each endpoint's type the app's own. So the host
+    exports what each endpoint does (`identityEndpoints`, `peopleEndpoints`, `activityEndpoints`: an Effect that
+    resolves the ports once and answers the object `handlers.handleAll` takes), and the app builds the three group
+    Layers in four lines each.
+  - **A handler's ports are provided where the group is built**, not per request: Effect turns a service a handler
+    still requires into a per-request requirement, and only `CurrentActor` is provided per request.
+  - **Span names are the ones the traces have always carried** (`People.setRole`, `Activities.recent`,
+    `Members.findByUser`, `ModelCalls.take`, `Sessions.state`, and `people.setRole` for the endpoint), in memory as on
+    D1; the model's handlers add no span of their own. One new span: `People.accountByEmail`. `Spans.test.ts` and
+    `RequestTelemetry.test.ts` pass unchanged.
+  - **The allowance is asked through `ModelAllowanceGateway`** by the table assistant, the suggestions and the
+    `checkAi` endpoint; the sentence for a used-up allowance is the gateway's.
+  - **The app's test support** uses the twins: `actingAs({ member, lines })` and `directoryFollowing` in
+    `@inventory/access-host/AccessTest` replace the hand-written `Members` and `Activities` doubles. The two scripts
+    that read the sign-in options and the test accounts import them by path.
+  - Browser, fresh database: "Import 155, skip 45", "Not imported 45 · Imported 155 · Already there 0 · All 200",
+    "155 items"; People: an unknown email said as "Nobody has signed up with nobody@example.test yet.", Sam added
+    as editor, changed to viewer, Dana's demotion refused ("...is the only admin of Example Works (test)...") and put
+    back, Sam removed (204); Events lists the three lines above the import's two.
 

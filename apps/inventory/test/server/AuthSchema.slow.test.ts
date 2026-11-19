@@ -3,10 +3,10 @@ import { getMigrations } from "better-auth/db/migration"
 import { DatabaseSync } from "node:sqlite"
 import { Array as Arr, Option, Order, Record as Rec, String as Str } from "effect"
 import { describe, expect, it } from "vitest"
-import { authOptions } from "../../src/server/authOptions.ts"
+import { authOptions } from "@inventory/access-host/AuthOptions"
 
 // The migrations give Better Auth every table and column its configuration needs. Adding a plugin (or a field) to
-// src/server/authOptions.ts without a migration fails here; `bun run auth:schema` prints the SQL to add.
+// the sign-in options (@inventory/access-host) without a migration fails here; `bun run auth:schema` prints the SQL to add.
 
 const migrations = import.meta.glob<string>("../../migrations/*.sql", { query: "?raw", import: "default", eager: true })
 

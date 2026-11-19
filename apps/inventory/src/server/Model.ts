@@ -2,7 +2,7 @@
 // and the five troubles are the driver's. This file is where the app meets it: the settings it is built from, the
 // contract's words for what will answer (`AiStatus`) and for who did (`AnsweredBy`), the sentences a failure is told in
 // (`AiUnavailable`, `modelSentences`), and the last step of every feature, `answeredByRules`, which always answers.
-// The day's allowance is not here: every feature takes a call from it (ModelCalls.ts) before it asks.
+// The day's allowance is not here: every feature takes a call from it (the access context's `ModelAllowanceGateway`) before it asks.
 import { OpenRouter } from "@beep/openrouter/OpenRouter"
 import { OpenRouterSettings } from "@beep/openrouter/OpenRouterConfig"
 import { ModelId, type ModelAnswered, ModelPrompt, ModelStatus, OffReason } from "@beep/openrouter/OpenRouterModel"

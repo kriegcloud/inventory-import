@@ -17,7 +17,7 @@ import { noActorSentence, sessionStateOf, signInSentence } from "./Session.rules
  *
  * @category handlers
  */
-export const actorOf = Effect.fn("Session.actorOf")(function* (user: O.Option<SignedInUser>) {
+export const actorOf = Effect.fnUntraced(function* (user: O.Option<SignedInUser>) {
   if (O.isNone(user)) return yield* NotSignedIn.make({ reason: signInSentence })
   const directory = yield* MemberDirectory
   const member = yield* directory.actorFor(user.value)
@@ -33,7 +33,7 @@ export const actorOf = Effect.fn("Session.actorOf")(function* (user: O.Option<Si
  *
  * @category handlers
  */
-export const sessionState = Effect.fn("Sessions.state")(function* (asked: {
+export const sessionState = Effect.fnUntraced(function* (asked: {
   readonly user: O.Option<SignedInUser>
   readonly features: SignInFeatures
 }) {
@@ -51,7 +51,7 @@ export const sessionState = Effect.fn("Sessions.state")(function* (asked: {
  *
  * @category handlers
  */
-export const membersOfActor = Effect.fn("identity.members")(function* () {
+export const membersOfActor = Effect.fnUntraced(function* () {
   const actor = yield* CurrentActor
   const directory = yield* MemberDirectory
   return yield* directory.inOrganization(actor.organizationId)

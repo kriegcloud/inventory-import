@@ -33,6 +33,7 @@
         "@fontsource-variable/jetbrains-mono": "^5.3.0",
         "@hookform/resolvers": "^7.0.6",
         "@inventory/access-contract": "workspace:*",
+        "@inventory/access-host": "workspace:*",
         "@inventory/client": "workspace:*",
         "@inventory/kernel": "workspace:*",
         "@inventory/review": "workspace:*",
@@ -97,6 +98,26 @@
         "effect": "4.1.4",
       },
       "devDependencies": {
+        "@effect/vitest": "4.1.4",
+        "@types/node": "^24.19.2",
+        "vitest": "^5.1.0",
+      },
+    },
+    "packages/access/host": {
+      "name": "@inventory/access-host",
+      "version": "0.0.0",
+      "dependencies": {
+        "@beep/better-auth": "workspace:*",
+        "@beep/d1": "workspace:*",
+        "@beep/identity": "workspace:*",
+        "@inventory/access-contract": "workspace:*",
+        "@inventory/access-model": "workspace:*",
+        "@inventory/kernel": "workspace:*",
+        "better-auth": "1.7.22",
+        "effect": "4.1.4",
+      },
+      "devDependencies": {
+        "@cloudflare/workers-types": "^5.20261113.1",
         "@effect/vitest": "4.1.4",
         "@types/node": "^24.19.2",
         "vitest": "^5.1.0",
@@ -587,6 +608,8 @@
     "@img/sharp-win32-x64": ["@img/sharp-win32-x64@0.35.5", "", { "os": "win32", "cpu": "x64" }, "sha512-x76eH0vEiHlcMQu8Y8IenntaACtddpT6W0wmXtWrnKcnKI7ME5DdgqhAD6SEWOEl1v2zDvkZDhFA9KnURwpfqg=="],
 
     "@inventory/access-contract": ["@inventory/access-contract@workspace:packages/access/contract"],
+
+    "@inventory/access-host": ["@inventory/access-host@workspace:packages/access/host"],
 
     "@inventory/access-model": ["@inventory/access-model@workspace:packages/access/model"],
 

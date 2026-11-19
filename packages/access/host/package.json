@@ -1,0 +1,51 @@
+{
+  "name": "@inventory/access-host",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The access context on D1 and Better Auth: the adapters of its ports, the session identity, sign-in at /api/auth, and the build functions of its three API groups",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": [],
+  "exports": {
+    "./package.json": "./package.json",
+    "./Host": "./src/Host.ts",
+    "./Adapters": "./src/Adapters.ts",
+    "./Http": "./src/Access.http.ts",
+    "./Config": "./src/Config.ts",
+    "./SignIn": "./src/SignIn.route.ts",
+    "./SessionIdentity": "./src/SessionIdentity.adapter.ts",
+    "./MemberDirectoryD1": "./src/MemberDirectory.adapter.ts",
+    "./PeopleStoreD1": "./src/PeopleStore.adapter.ts",
+    "./AuditTrailStoreD1": "./src/AuditTrailStore.adapter.ts",
+    "./AllowanceStoreD1": "./src/AllowanceStore.adapter.ts",
+    "./AccessTest": "./src/AccessTest.test-layer.ts",
+    "./AuthOptions": "./src/internal/authOptions.ts",
+    "./TestAccounts": "./src/internal/TestAccounts.ts"
+  },
+  "scripts": {
+    "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",
+    "lint": "oxlint --quiet src test",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@beep/better-auth": "workspace:*",
+    "@beep/d1": "workspace:*",
+    "@beep/identity": "workspace:*",
+    "@inventory/access-contract": "workspace:*",
+    "@inventory/access-model": "workspace:*",
+    "@inventory/kernel": "workspace:*",
+    "better-auth": "1.7.22",
+    "effect": "4.1.4"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261113.1",
+    "@effect/vitest": "4.1.4",
+    "@types/node": "^24.19.2",
+    "vitest": "^5.1.0"
+  },
+  "beep": {
+    "family": "context",
+    "context": "access",
+    "layer": "host"
+  }
+}

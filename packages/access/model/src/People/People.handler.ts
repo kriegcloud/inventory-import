@@ -44,7 +44,7 @@ const auditLine = Effect.fnUntraced(function* (
  *
  * @category handlers
  */
-export const listPeople = Effect.fn("People.list")(function* () {
+export const listPeople = Effect.fnUntraced(function* () {
   const actor = yield* CurrentActor
   const store = yield* PeopleStore
   return yield* store.list(actor.organizationId)
@@ -57,7 +57,7 @@ export const listPeople = Effect.fn("People.list")(function* () {
  *
  * @category handlers
  */
-export const addPerson = Effect.fn("People.add")(function* (command: AddPerson) {
+export const addPerson = Effect.fnUntraced(function* (command: AddPerson) {
   const actor = yield* requireRole("admin")
   const store = yield* PeopleStore
   const account = yield* store.accountByEmail(command.email)
@@ -92,7 +92,7 @@ const personNamed = Effect.fnUntraced(function* (actor: Member, member: MemberId
  *
  * @category handlers
  */
-export const changeRole = Effect.fn("People.setRole")(function* (change: {
+export const changeRole = Effect.fnUntraced(function* (change: {
   readonly member: MemberId
   readonly command: ChangeRole
 }) {
@@ -124,7 +124,7 @@ export const changeRole = Effect.fn("People.setRole")(function* (change: {
  *
  * @category handlers
  */
-export const removePerson = Effect.fn("People.remove")(function* (member: MemberId) {
+export const removePerson = Effect.fnUntraced(function* (member: MemberId) {
   const actor = yield* requireRole("admin")
   const store = yield* PeopleStore
   const before = yield* personNamed(actor, member)

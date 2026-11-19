@@ -2,19 +2,28 @@
 // suggestion never applies itself, with no model the rules answer and say so, and a model's answer is rated by the
 // guard, never by the model.
 import { describe, expect, it, layer } from "@effect/vitest"
-import { Array as Arr, Effect, Option, Ref } from "effect"
+import { Array as Arr, Effect, Option, Record as Rec, Ref } from "effect"
 import messy from "../../public/samples/items_messy.csv?raw"
-import { review, type SavedDecisions, type Suggestion } from "../../src/domain/ItemImport.ts"
+import { decisionFromFlags, review, type RowDecisionFlags, type Suggestion } from "../../src/domain/ItemImport.ts"
 import { digest, guard, type SuggestSource } from "../../src/domain/Suggest.ts"
 import { ModelId } from "@beep/openrouter/OpenRouterModel"
 import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
 import { propose } from "../../src/server/Suggestions.ts"
 import { stage } from "./support/files.ts"
 
-const sourceOf = (suggestions: ReadonlyArray<Suggestion> = [], decisions: SavedDecisions = {}) =>
+const sourceOf = (
+  suggestions: ReadonlyArray<Suggestion> = [],
+  flags: Readonly<Record<string, RowDecisionFlags>> = {}
+) =>
   Effect.map(stage(new File([messy], "items_messy.csv")), (table): SuggestSource => ({
     table,
-    review: review({ table, choices: [], decisions, storedItems: [], suggestions }),
+    review: review({
+      table,
+      choices: [],
+      decisions: Rec.map(flags, decisionFromFlags),
+      storedItems: [],
+      suggestions
+    }),
     suggestions
   }))
 

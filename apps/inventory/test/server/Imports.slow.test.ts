@@ -8,6 +8,7 @@ import { HttpApiTest } from "effect/http-api"
 import clean from "../../public/samples/items_clean.csv?raw"
 import messy from "../../public/samples/items_messy.csv?raw"
 import { Api } from "../../src/api/v1/Api.ts"
+import { decisionFromFlags } from "../../src/domain/ItemImport.ts"
 import { as, TypedApp } from "./support/app.ts"
 import { stage } from "./support/files.ts"
 import { upload } from "./support/upload.ts"
@@ -41,7 +42,13 @@ layer(TypedApp)("an import of items", (it) => {
         yield* client.imports
           .decide({
             params: { id: staged.id },
-            payload: { set: { "row-55": { accepted: ["unitCost"] }, "row-18": { reverted: ["uom"] } }, clear: [] }
+            payload: {
+              set: {
+                "row-55": decisionFromFlags({ accepted: ["unitCost"] }),
+                "row-18": decisionFromFlags({ reverted: ["uom"] })
+              },
+              clear: []
+            }
           })
           .pipe(marcus)
         const confirmed = yield* client.imports
@@ -129,7 +136,10 @@ layer(TypedApp)("an import of items", (it) => {
         const third = yield* upload({ client, table: changed }).pipe(marcus)
         expect([third.progress.decision, third.storedItems.length]).toEqual([1, 25])
         const replaced = yield* client.imports
-          .commit({ params: { id: third.id }, payload: { set: { "row-2": { stored: "replace" } }, clear: [] } })
+          .commit({
+            params: { id: third.id },
+            payload: { set: { "row-2": decisionFromFlags({ stored: "replace" }) }, clear: [] }
+          })
           .pipe(marcus)
         expect([
           Option.getOrUndefined(replaced.result)?.updated,

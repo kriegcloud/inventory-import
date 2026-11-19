@@ -6,6 +6,7 @@ import { Array as Arr, Effect } from "effect"
 import { HttpApiTest } from "effect/http-api"
 import messy from "../../public/samples/items_messy.csv?raw"
 import { Api } from "../../src/api/v1/Api.ts"
+import { decisionFromFlags } from "../../src/domain/ItemImport.ts"
 import { as, TypedApp } from "./support/app.ts"
 import { stage } from "./support/files.ts"
 import { upload } from "./support/upload.ts"
@@ -35,7 +36,10 @@ layer(TypedApp)("suggestions for an import", (it) => {
       expect(view.progress).toEqual(staged.progress)
 
       yield* client.imports
-        .decide({ params: { id: staged.id }, payload: { set: { "row-7": { accepted: ["name"] } }, clear: [] } })
+        .decide({
+          params: { id: staged.id },
+          payload: { set: { "row-7": decisionFromFlags({ accepted: ["name"] }) }, clear: [] }
+        })
         .pipe(marcus)
       const accepted = yield* client.imports.get({ params: { id: staged.id } }).pipe(marcus)
       expect([accepted.progress.ready, accepted.progress.cannot]).toEqual([

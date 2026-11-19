@@ -2,21 +2,26 @@
 // lands in the outcome DECISIONS.md gives it, the counts add up to the rows, the form-only fixes are in force, listed
 // and undoable while everything else waits for the person, and a stored item is never changed without a choice.
 import { describe, expect, it } from "@effect/vitest"
-import { Array as Arr, Effect, Option } from "effect"
+import { Array as Arr, Effect, Option, Record as Rec } from "effect"
 import clean from "../../public/samples/items_clean.csv?raw"
 import messy from "../../public/samples/items_messy.csv?raw"
 import type { ItemFields } from "../../src/domain/Item.ts"
 import {
+  decisionFromFlags,
   matchedColumn,
   type Review,
   review,
-  type SavedDecisions,
+  type RowDecisionFlags,
   type StagedTable
 } from "../../src/domain/ItemImport.ts"
 import { stage } from "../server/support/files.ts"
 
-const reviewOf = (table: StagedTable, decisions: SavedDecisions = {}, storedItems: ReadonlyArray<ItemFields> = []) =>
-  review({ table, choices: [], decisions, storedItems })
+// Decisions are written here as the flags a draft stores, and read through `decisionFromFlags`.
+const reviewOf = (
+  table: StagedTable,
+  decisions: Readonly<Record<string, RowDecisionFlags>> = {},
+  storedItems: ReadonlyArray<ItemFields> = []
+) => review({ table, choices: [], decisions: Rec.map(decisions, decisionFromFlags), storedItems })
 
 const rowOf = (result: Review, rowNumber: number) =>
   Option.getOrThrow(Arr.findFirst(result.rows, (row) => row.rowNumber === rowNumber))

@@ -15,8 +15,12 @@ import type {
 import { fromFlags, toFlags } from "@inventory/review/ReviewDecision"
 import {
   type ColumnMatch,
+  decisionFromFlags,
+  decisionOf,
+  decisionToFlags,
   type Field,
   fieldLabels,
+  hasKeep,
   type Problem,
   problemKinds,
   type Proposal,
@@ -160,7 +164,8 @@ const toRegionRow = (row: ReviewedRow, decisions: SavedDecisions): ReviewRow => 
   // problem is handed over without its rivals and stays open until the domain says it is settled.
   const stricter =
     open !== undefined &&
-    (decisions[row.id]?.kept === true || open.rivals.some((id) => decisions[id]?.edits?.sku !== undefined))
+    ((decisions[row.id] !== undefined && hasKeep(decisions[row.id] ?? decisionOf())) ||
+      open.rivals.some((id) => decisions[id]?.edits["sku"] !== undefined))
   return {
     ...where,
     cells: row.file,
@@ -195,12 +200,16 @@ const isStoredChoice = (value: string | undefined): value is "keep" | "replace" 
 export const toServerDecisions = (decisions: RegionDecisions): SavedDecisions =>
   Object.fromEntries(
     Object.entries(decisions).map(([id, decision]) => {
+      // Through the flags the two share: the region's decision and the server's are stored in the same form.
       const flags = toFlags(decision)
       const answer = flags.edits?.[storedChoice]
-      if (!isStoredChoice(answer)) return [id, flags]
+      if (!isStoredChoice(answer)) return [id, decisionFromFlags(flags)]
       const { edits, ...rest } = flags
       const { [storedChoice]: _answer, ...typed } = edits ?? {}
-      return [id, { ...rest, ...(Object.keys(typed).length === 0 ? {} : { edits: typed }), stored: answer }]
+      return [
+        id,
+        decisionFromFlags({ ...rest, ...(Object.keys(typed).length === 0 ? {} : { edits: typed }), stored: answer })
+      ]
     })
   )
 
@@ -208,7 +217,7 @@ export const toServerDecisions = (decisions: RegionDecisions): SavedDecisions =>
 export const toRegionDecisions = (decisions: SavedDecisions): RegionDecisions =>
   Object.fromEntries(
     Object.entries(decisions).map(([id, decision]) => {
-      const { stored, ...flags } = decision
+      const { stored, ...flags } = decisionToFlags(decision)
       return [
         id,
         fromFlags(stored === undefined ? flags : { ...flags, edits: { ...flags.edits, [storedChoice]: stored } })

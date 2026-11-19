@@ -33,6 +33,7 @@ import {
 } from "./Item.ts"
 import type { SpreadsheetTable } from "./Spreadsheet.ts"
 import * as S from "effect/Schema"
+import * as SchemaTransformation from "effect/SchemaTransformation"
 import { nullAsNone } from "@inventory/kernel/Wire"
 
 /**
@@ -390,11 +391,11 @@ export const suggestionFits = (input: {
 }
 
 /**
- * What the person has decided about one row, in the review screen's own serialisable shape: left out, kept over
+ * A row's decision as it is stored and sent, the flags a draft has always held: left out, kept over
  * another row with the same SKU, proposals accepted or undone by field, values typed by field, and, for a row whose
  * SKU is stored with other values, whether the stored item stays or the file's row replaces it.
  */
-export const RowDecision = S.Struct({
+export const RowDecisionFlags = S.Struct({
   out: S.optionalKey(S.Boolean).annotateKey({
     description: "True: the person left the row out. Leave the key out for a row that stays in",
     examples: [true]
@@ -427,8 +428,198 @@ export const RowDecision = S.Struct({
   description:
     "What the person has decided about one row: left out, kept over another row with the same SKU, proposals accepted or undone by field, values typed by field, and stored item kept or replaced"
 })
+/** The stored form of a row's decision: every key left out when it says nothing. */
+export type RowDecisionFlags = typeof RowDecisionFlags.Type
+
+/** Where a row stands by the person's own word. */
+export const RowPlaceKind = LiteralKit(["open", "kept", "leftOut"]).annotate({
+  identifier: "RowPlaceKind",
+  description: "open: nothing said. kept: kept over the rows that share its SKU. leftOut: left out"
+})
+
+class PlaceOpen extends S.Opaque<PlaceOpen, { readonly brand: unique symbol }>()(
+  S.Struct({ kind: S.tag("open") }).annotate({
+    identifier: "PlaceOpen",
+    description: "The person has not placed the row"
+  })
+) {}
+
+class PlaceKept extends S.Opaque<PlaceKept, { readonly brand: unique symbol }>()(
+  S.Struct({ kind: S.tag("kept") }).annotate({
+    identifier: "PlaceKept",
+    description: "Kept over the other rows that share its SKU"
+  })
+) {}
+
+class PlaceLeftOut extends S.Opaque<PlaceLeftOut, { readonly brand: unique symbol }>()(
+  S.Struct({
+    kind: S.tag("leftOut"),
+    wasKept: S.Boolean.pipe(
+      S.annotateKey({ description: "True when the row had been kept before it was left out: putting it back keeps it" })
+    )
+  }).annotate({ identifier: "PlaceLeftOut", description: "Left out by the person" })
+) {}
+
+/**
+ * Where a row stands by the person's own word: open, kept over its rivals, or left out (remembering a keep made
+ * before). The same rule as the review region's own (`@inventory/review/ReviewDecision`), which this module cannot
+ * import.
+ */
+export const RowPlace = RowPlaceKind.mapMembers(() => Tuple.make(PlaceOpen, PlaceKept, PlaceLeftOut)).pipe(
+  S.toTaggedUnion("kind"),
+  S.annotate({ identifier: "RowPlace", description: "Where a row stands by the person's own word" })
+)
+/** The decoded value of `RowPlace`. */
+export type RowPlace = typeof RowPlace.Type
+
+/** Nothing said about the row's place. */
+export const placeOpen: RowPlace = PlaceOpen.make({})
+/** Kept over its rivals. */
+export const placeKept: RowPlace = PlaceKept.make({})
+/** Left out; `wasKept` remembers a keep made before. */
+export const placeLeftOut = (wasKept: boolean): RowPlace => PlaceLeftOut.make({ wasKept })
+
+/** True when the row is left out. */
+export const isLeftOut = (decision: { readonly place: RowPlace }): boolean => decision.place.kind === "leftOut"
+
+/** True when the person kept the row over its rivals, whether or not they then left it out (the stored `kept` flag). */
+export const hasKeep = (decision: { readonly place: RowPlace }): boolean =>
+  decision.place.kind === "kept" || (decision.place.kind === "leftOut" && decision.place.wasKept)
+
+/** What to do with a row whose SKU is stored with other values. */
+export const StoredChoiceKind = LiteralKit(["undecided", "keep", "replace"]).annotate({
+  identifier: "StoredChoiceKind",
+  description:
+    "undecided: the person has not said. keep: the stored item stays and the row is skipped. replace: the file's row replaces it"
+})
+
+class StoredUndecided extends S.Opaque<StoredUndecided, { readonly brand: unique symbol }>()(
+  S.Struct({ kind: S.tag("undecided") }).annotate({
+    identifier: "StoredUndecided",
+    description: "The person has not said what happens to the stored item"
+  })
+) {}
+
+class StoredKeep extends S.Opaque<StoredKeep, { readonly brand: unique symbol }>()(
+  S.Struct({ kind: S.tag("keep") }).annotate({
+    identifier: "StoredKeep",
+    description: "The stored item stays; the row is skipped"
+  })
+) {}
+
+class StoredReplace extends S.Opaque<StoredReplace, { readonly brand: unique symbol }>()(
+  S.Struct({ kind: S.tag("replace") }).annotate({
+    identifier: "StoredReplace",
+    description: "The file's row replaces the stored item"
+  })
+) {}
+
+/** For a row whose SKU is stored with other values: keep the stored item, replace it, or not said yet. */
+export const StoredChoice = StoredChoiceKind.mapMembers(() =>
+  Tuple.make(StoredUndecided, StoredKeep, StoredReplace)
+).pipe(
+  S.toTaggedUnion("kind"),
+  S.annotate({ identifier: "StoredChoice", description: "What to do with a row whose SKU is stored with other values" })
+)
+/** The decoded value of `StoredChoice`. */
+export type StoredChoice = typeof StoredChoice.Type
+
+/** The person has not said. */
+export const storedUndecided: StoredChoice = StoredUndecided.make({})
+/** The stored item stays. */
+export const storedKeep: StoredChoice = StoredKeep.make({})
+/** The file's row replaces it. */
+export const storedReplace: StoredChoice = StoredReplace.make({})
+
+/** A decision's parts as its decoded and its encoded side both have them. */
+type DecisionShape = {
+  readonly place: { readonly kind: "open" | "kept" } | { readonly kind: "leftOut"; readonly wasKept: boolean }
+  readonly stored: { readonly kind: "undecided" | "keep" | "replace" }
+  readonly accepted: ReadonlyArray<string>
+  readonly reverted: ReadonlyArray<string>
+  readonly edits: { readonly [field: string]: string }
+}
+
+/** The flags of a decision: the stored form, every part that says nothing left out. */
+const flagsOf = (parts: DecisionShape): RowDecisionFlags => ({
+  ...(parts.place.kind === "leftOut" ? { out: true } : {}),
+  ...(parts.place.kind === "kept" || (parts.place.kind === "leftOut" && parts.place.wasKept) ? { kept: true } : {}),
+  ...(parts.accepted.length === 0 ? {} : { accepted: parts.accepted }),
+  ...(parts.reverted.length === 0 ? {} : { reverted: parts.reverted }),
+  ...(Rec.isEmptyRecord(parts.edits) ? {} : { edits: parts.edits }),
+  ...(parts.stored.kind === "undecided" ? {} : { stored: parts.stored.kind })
+})
+
+// A decision as code holds it. Every part is there, empty when the person said nothing about it.
+const RowDecisionParts = S.Struct({
+  place: RowPlace,
+  stored: StoredChoice,
+  accepted: S.Array(bounded(40)).check(S.isMaxLength(fields.length)),
+  reverted: S.Array(bounded(40)).check(S.isMaxLength(fields.length)),
+  edits: S.Record(bounded(40), bounded(32767)).check(S.isMaxProperties(fields.length))
+})
+
+/**
+ * What the person has decided about one row: where it stands, what happens to a stored item with its SKU, the
+ * proposals accepted or undone by field, and the values typed by field. Stored and sent as the flags a draft has
+ * always held (`RowDecisionFlags`), so a decision saved by an older build still reads.
+ */
+export const RowDecision = RowDecisionFlags.pipe(
+  S.decodeTo(
+    RowDecisionParts,
+    SchemaTransformation.transform({
+      decode: (flags): (typeof RowDecisionParts)["Encoded"] => ({
+        place:
+          flags.out === true
+            ? { kind: "leftOut", wasKept: flags.kept === true }
+            : flags.kept === true
+              ? { kind: "kept" }
+              : { kind: "open" },
+        stored: { kind: flags.stored ?? "undecided" },
+        accepted: flags.accepted ?? [],
+        reverted: flags.reverted ?? [],
+        edits: flags.edits ?? {}
+      }),
+      encode: (parts): RowDecisionFlags => flagsOf(parts)
+    })
+  )
+)
 /** The decoded value of `RowDecision`: what the person decided about one row. */
 export type RowDecision = typeof RowDecision.Type
+
+/**
+ * A decision from the parts that say something; the rest are empty.
+ *
+ * @example decisionOf({ accepted: ["uom"] }).place.kind // "open"
+ */
+export const decisionOf = (parts: Partial<RowDecision> = {}): RowDecision => ({
+  place: parts.place ?? placeOpen,
+  stored: parts.stored ?? storedUndecided,
+  accepted: parts.accepted ?? [],
+  reverted: parts.reverted ?? [],
+  edits: parts.edits ?? {}
+})
+
+/**
+ * A decision as its stored flags: the inverse of `decisionFromFlags`.
+ *
+ * @example decisionToFlags(decisionOf({ accepted: ["uom"] })) // { accepted: ["uom"] }
+ */
+export const decisionToFlags = (decision: RowDecision): RowDecisionFlags => flagsOf(decision)
+
+/**
+ * The decision the stored flags say: what a test or a caller holding the wire form uses.
+ *
+ * @example decisionFromFlags({ out: true, kept: true }).place // { kind: "leftOut", wasKept: true }
+ */
+export const decisionFromFlags = (flags: RowDecisionFlags): RowDecision =>
+  decisionOf({
+    place: flags.out === true ? placeLeftOut(flags.kept === true) : flags.kept === true ? placeKept : placeOpen,
+    stored: flags.stored === "keep" ? storedKeep : flags.stored === "replace" ? storedReplace : storedUndecided,
+    ...(flags.accepted === undefined ? {} : { accepted: flags.accepted }),
+    ...(flags.reverted === undefined ? {} : { reverted: flags.reverted }),
+    ...(flags.edits === undefined ? {} : { edits: flags.edits })
+  })
 
 /** Every row's decision by row id (`row-56`). This is the draft the server keeps while the person reviews. */
 export const SavedDecisions = S.Record(bounded(40), RowDecision)
@@ -1764,15 +1955,14 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
   return undefined
 }
 
-const emptyDecision: RowDecision = {}
+const emptyDecision: RowDecision = decisionOf()
 
 /** Whether a proposal is in force for a row: the person accepted it, or it is a form-only rule fix nobody undid. */
 const inForce = (proposed: Proposal, decision: RowDecision): boolean =>
-  Arr.contains(decision.accepted ?? [], proposed.field) ||
-  (proposed.lossless && !Arr.contains(decision.reverted ?? [], proposed.field))
+  Arr.contains(decision.accepted, proposed.field) ||
+  (proposed.lossless && !Arr.contains(decision.reverted, proposed.field))
 
-const typedValue = (decision: RowDecision, field: Field): Option.Option<string> =>
-  decision.edits === undefined ? Option.none() : Rec.get(decision.edits, field)
+const typedValue = (decision: RowDecision, field: Field): Option.Option<string> => Rec.get(decision.edits, field)
 
 type Rival = { readonly id: string; readonly place: string; readonly same: boolean }
 
@@ -2018,7 +2208,7 @@ export const review = (input: {
         }
         if (Option.isSome(proposed) && inForce(proposed.value, decision)) {
           const p = proposed.value
-          const accepted = Arr.contains(decision.accepted ?? [], field)
+          const accepted = Arr.contains(decision.accepted, field)
           changes.push({
             field,
             from: text,
@@ -2045,8 +2235,9 @@ export const review = (input: {
     // reads it is skipped (it says what is stored) or asks (it says something else).
     const stored = Option.isSome(storedItem) && item !== null ? differences(storedItem.value, item) : []
     const differs = stored.length > 0
-    const replace = differs && decision.stored === "replace"
-    const already = mine || (Option.isSome(storedItem) && item !== null && (!differs || decision.stored === "keep"))
+    const replace = differs && decision.stored.kind === "replace"
+    const already =
+      mine || (Option.isSome(storedItem) && item !== null && (!differs || decision.stored.kind === "keep"))
     return {
       row,
       decision,
@@ -2060,8 +2251,8 @@ export const review = (input: {
       replace,
       already,
       mine,
-      keptStored: differs && decision.stored === "keep",
-      out: decision.out === true
+      keptStored: differs && decision.stored.kind === "keep",
+      out: isLeftOut(decision)
     }
   })
 
@@ -2078,11 +2269,11 @@ export const review = (input: {
     const live = Arr.filter(twins, (other) => !other.out)
     // Kept wins over a twin still in the file only for the first row the person kept.
     const keptFirst =
-      entry.decision.kept === true &&
-      !Arr.some(live, (other) => other.decision.kept === true && other.row.order < entry.row.order)
+      hasKeep(entry.decision) &&
+      !Arr.some(live, (other) => hasKeep(other.decision) && other.row.order < entry.row.order)
     const sku = Str.trim(entry.values.sku)
     const changed: Problem | null =
-      entry.differs && entry.decision.stored === undefined
+      entry.differs && entry.decision.stored.kind === "undecided"
         ? {
             kind: "changed",
             tone: "decision",
@@ -2148,7 +2339,7 @@ export const review = (input: {
           : shown.length === 0 || Arr.some(shown, (problem) => problem.tone === "blocker")
             ? "cannot"
             : "decision",
-      kept: entry.decision.kept === true,
+      kept: hasKeep(entry.decision),
       changes: entry.changes,
       item,
       update: status === "ready" && entry.replace,
@@ -2251,7 +2442,7 @@ export const recheckRow = (input: {
  *
  * @example
  * // A file whose row 18 has a form-only rule fix for its unit ("bx"): the fix is held back for the person.
- * firstDecisions({ table, choices: [], mode: "propose" }) // { "row-18": { reverted: ["uom"] } }
+ * firstDecisions({ table, choices: [], mode: "propose" }) // { "row-18": decisionOf({ reverted: ["uom"] }) }
  * firstDecisions({ table, choices: [], mode: "apply" }) // {}
  */
 export const firstDecisions = (input: {
@@ -2268,7 +2459,7 @@ export const firstDecisions = (input: {
         Arr.filter(row.proposals, (proposal) => proposal.lossless),
         (proposal) => proposal.field
       )
-      return safe.length === 0 ? Option.none() : Option.some([row.id, { reverted: safe }] as const)
+      return safe.length === 0 ? Option.none() : Option.some([row.id, decisionOf({ reverted: safe })] as const)
     })
   )
 }
@@ -2288,13 +2479,12 @@ export const carryDecisions = (input: {
   const kept = input.decisions
   const merged = Arr.map(Arr.dedupe([...Rec.keys(fresh), ...Rec.keys(kept)]), (id) => {
     const before = Option.getOrElse(Rec.get(kept, id), () => emptyDecision)
-    const held = Option.getOrElse(Rec.get(fresh, id), () => emptyDecision).reverted ?? []
-    const accepted = before.accepted ?? []
+    const held = Option.getOrElse(Rec.get(fresh, id), () => emptyDecision).reverted
     const reverted = Arr.dedupe([
-      ...(before.reverted ?? []),
-      ...Arr.filter(held, (field) => !Arr.contains(accepted, field))
+      ...before.reverted,
+      ...Arr.filter(held, (field) => !Arr.contains(before.accepted, field))
     ])
-    return [id, { ...before, ...(reverted.length === 0 ? {} : { reverted }) }] as const
+    return [id, { ...before, reverted }] as const
   })
   return Rec.fromEntries(merged)
 }
@@ -2306,8 +2496,8 @@ export const carryDecisions = (input: {
  *
  * @example
  * // Row 24's unit proposal came from a column that was just matched again: the accept of it goes.
- * dropAccepted({ decisions: { "row-24": { accepted: ["uom"], out: false } }, rows, drop: (p) => p.field === "uom" })
- * // { "row-24": { out: false } }
+ * dropAccepted({ decisions: { "row-24": decisionOf({ accepted: ["uom"] }) }, rows, drop: (p) => p.field === "uom" })
+ * // { "row-24": decisionOf() }
  */
 export const dropAccepted = (input: {
   readonly decisions: SavedDecisions
@@ -2318,13 +2508,12 @@ export const dropAccepted = (input: {
     keepSome(input.rows, (row) => {
       const decision = Rec.get(input.decisions, row.id)
       if (Option.isNone(decision)) return Option.none()
-      const accepted = decision.value.accepted ?? []
+      const accepted = decision.value.accepted
       const kept = Arr.filter(accepted, (field) =>
         Arr.some(row.proposals, (proposal) => proposal.field === field && !input.drop(proposal))
       )
       if (kept.length === accepted.length) return Option.none()
-      const { accepted: _accepted, ...rest } = decision.value
-      return Option.some([row.id, kept.length === 0 ? rest : { ...rest, accepted: kept }] as const)
+      return Option.some([row.id, { ...decision.value, accepted: kept }] as const)
     })
   )
 

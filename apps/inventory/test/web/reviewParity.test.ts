@@ -7,6 +7,7 @@ import { readFileSync } from "node:fs"
 import { describe, expect, it } from "@effect/vitest"
 import { Array as Arr, Effect, Option, Order, String as Str } from "effect"
 import {
+  decisionToFlags,
   firstDecisions,
   recheckRow,
   review,
@@ -330,7 +331,9 @@ describe("what the review screen is handed for a pick, for spaces and for a stor
         expect(view?.problem?.ask).toBe("Keep or replace")
         expect(Arr.map(view?.problem?.choices ?? [], (choice) => choice.value)).toEqual(["keep", "replace"])
         s.press({ type: "edit", rowId: "row-2", column: storedChoice, value: answer })
-        expect(s.decisions["row-2"]).toEqual({ stored: answer })
+        // As the server stores it: the one flag, and nothing else said about the row.
+        const sent = s.decisions["row-2"]
+        expect(sent === undefined ? sent : decisionToFlags(sent)).toEqual({ stored: answer })
         const { current } = s.agree()
         expect(current.rows[0]?.status).toBe(answer === "keep" ? "already" : "ready")
         expect(current.rows[0]?.update).toBe(answer === "replace")

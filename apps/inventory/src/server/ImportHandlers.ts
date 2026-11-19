@@ -63,11 +63,7 @@ export const ImportHandlers = HttpApiBuilder.group(
       decisions: SavedDecisions
     ) {
       const blank = review({ table, choices, decisions: {}, storedItems: [], itemsOf })
-      const typed = Arr.getSomes(
-        Arr.map(Rec.values(decisions), (decision) =>
-          decision.edits === undefined ? Option.none() : Rec.get(decision.edits, "sku")
-        )
-      )
+      const typed = Arr.getSomes(Arr.map(Rec.values(decisions), (decision) => Rec.get(decision.edits, "sku")))
       const keys = Arr.dedupe(
         Arr.filter(
           [...Arr.map(blank.rows, (row) => skuKey({ sku: row.file.sku })), ...Arr.map(typed, (sku) => skuKey({ sku }))],

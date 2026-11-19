@@ -223,4 +223,19 @@ None.
     "2024-02-30": 400, `payload.firstReceivedOn`, "Expected a day on the calendar, written year-month-day";
     discontinued on "2024-13-45": 400, `payload.stocking.on`, the same words; the item's own values: 200. Not seen on
     screen: the editor showing such a refusal, because its form refuses the same things before anything is sent.
+- **catalog (g), `RowDecision`.** In code a row's decision is `{ place, stored, accepted, reverted, edits }`, every
+  part there: `place` is `open`, `kept` or `leftOut { wasKept }` (the review region's rule, written again here
+  because the rules cannot import a screen package), `stored` is `undecided`, `keep` or `replace`. On the wire and in
+  `importDecision.decisionJson` it is the flags it always was (`RowDecisionFlags`): the document still lists `out`,
+  `kept`, `accepted`, `reverted`, `edits`, `stored`.
+  - `decisionOf`, `decisionFromFlags` and `decisionToFlags` are the three ways in and out; the screen's adapter
+    converts the region's decision and the server's through the flags both store. A newly written decision leaves
+    out a part that says nothing (an empty `accepted` is not written), as the region's own saves already did.
+  - `hasKeep` is the old `kept === true` exactly (kept, or left out after a keep), so which of two kept rows wins is
+    unchanged.
+  - Read on screen, fresh database: "Import 155, skip 45"; "Leave out 2": "Import 157, skip 43", sent
+    `{"set":{"row-148":{"out":true},"row-195":{"out":true}},"clear":[]}`; Undo: "Import 155, skip 45", sent
+    `{"set":{},"clear":["row-148","row-195"]}`; Redo: "Import 157, skip 43"; a refresh: still "Import 157, skip 43"
+    with "Undo: 2 rows left out"; confirmed ("Import 157 items? 43 items won't be imported (Needs a decision 20,
+    Cannot import 21, Left out 2)"): "Not imported 43 · Imported 157 · Already there 0 · All 200", Items "157 items".
 

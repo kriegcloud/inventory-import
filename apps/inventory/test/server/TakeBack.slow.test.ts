@@ -8,7 +8,7 @@ import { HttpApiTest } from "effect/http-api"
 import clean from "../../public/samples/items_clean.csv?raw"
 import messy from "../../public/samples/items_messy.csv?raw"
 import { Api } from "../../src/api/v1/Api.ts"
-import { review } from "../../src/domain/ItemImport.ts"
+import { decisionFromFlags, review } from "../../src/domain/ItemImport.ts"
 import { as, TypedApp } from "./support/app.ts"
 import { stage } from "./support/files.ts"
 import { upload } from "./support/upload.ts"
@@ -31,7 +31,7 @@ layer(TypedApp)("a take-back after two confirms", (it) => {
       // Opened again, one answer given (the decimal comma on row 55), confirmed again: one more item.
       yield* client.imports.reopen({ params }).pipe(marcus)
       const second = yield* client.imports
-        .commit({ params, payload: { set: { "row-55": { accepted: ["unitCost"] } }, clear: [] } })
+        .commit({ params, payload: { set: { "row-55": decisionFromFlags({ accepted: ["unitCost"] }) }, clear: [] } })
         .pipe(marcus)
       expect([second.takeBack.confirms.length, second.takeBack.removable]).toEqual([2, 156])
       expect((yield* client.items.list().pipe(marcus)).length).toBe(156)
@@ -81,7 +81,10 @@ const replaceRow2 = Effect.fn("test.replaceRow2")(function* () {
   expect(copy).not.toBe(clean)
   const second = yield* upload({ client, table: yield* stage(new File([copy], "items_changed.csv")) }).pipe(marcus)
   const replaced = yield* client.imports
-    .commit({ params: { id: second.id }, payload: { set: { "row-2": { stored: "replace" } }, clear: [] } })
+    .commit({
+      params: { id: second.id },
+      payload: { set: { "row-2": decisionFromFlags({ stored: "replace" }) }, clear: [] }
+    })
     .pipe(marcus)
   expect([Option.getOrUndefined(replaced.result)?.updated, Option.getOrUndefined(replaced.result)?.created]).toEqual([
     1, 0

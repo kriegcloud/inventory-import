@@ -12,6 +12,7 @@ import { ItemEdit, ItemFields, StoredItem } from "../../domain/Item.ts"
 import {
   Change,
   ColumnMatch,
+  decisionOf,
   Field,
   MappingChoice,
   SavedDecisions,
@@ -670,7 +671,12 @@ export type UploadChunk = typeof UploadChunk.Type
 export const DecisionDelta = S.Struct({
   set: SavedDecisions.annotate({
     description: "Decisions that are new or different, by row id (`row-7`)",
-    examples: [{ "row-55": { accepted: ["unitCost"] }, "row-142": { edits: { name: "Steel Tube 1in" } } }]
+    examples: [
+      {
+        "row-55": decisionOf({ accepted: ["unitCost"] }),
+        "row-142": decisionOf({ edits: { name: "Steel Tube 1in" } })
+      }
+    ]
   }).annotateKey({
     description: "The rows decided since the last save, each with its whole decision",
     messageMissingKey: "Send `set`: the decisions that are new, by row id, or {} for none."

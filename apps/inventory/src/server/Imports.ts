@@ -48,7 +48,7 @@ import {
 import { RowDecision, type SavedDecisions } from "@inventory/catalog-contract/Decision"
 import { MappingChoice } from "@inventory/catalog-contract/Mapping"
 import { Field, StagedHead, StagedRow, type StagedTable } from "@inventory/catalog-contract/Staged"
-import { abandonedAfterMinutes, maxChunkChars } from "../domain/Upload.ts"
+import { abandonedAfterMinutes, maxChunkChars } from "@inventory/catalog-model/Upload"
 import { chunkRows } from "@inventory/catalog-contract/Upload"
 import { D1, NoRows } from "@beep/d1/D1"
 import { ConfirmId, ImportId } from "@inventory/catalog-contract/Ids"

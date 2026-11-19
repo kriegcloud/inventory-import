@@ -9,7 +9,7 @@
 import { Array as Arr, Option, String as Str } from "effect"
 import { categories, maxNameLength } from "@inventory/catalog-contract/Item"
 import * as S from "effect/Schema"
-import { type Review, type ReviewedRow } from "./ItemImport.ts"
+import { type Review, type ReviewedRow } from "../Review/Review.rules.ts"
 import { matchedColumn } from "@inventory/catalog-contract/Mapping"
 import { type Field, fieldLabels, fields, type StagedTable } from "@inventory/catalog-contract/Staged"
 import {

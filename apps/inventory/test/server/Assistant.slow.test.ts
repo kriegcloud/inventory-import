@@ -12,7 +12,7 @@ import { ModelId } from "@beep/openrouter/OpenRouterModel"
 import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
 import { dailyModelCalls } from "@inventory/access-contract/ModelAllowance"
 import { usedUp } from "../../src/server/TableAssistant.ts"
-import { items } from "../domain/TableView.test.ts"
+import { items } from "./support/columns.ts"
 import { as, TypedApp as TestApp, testAppWith } from "./support/app.ts"
 
 const request = (prompt: string) => ({ payload: { prompt, table: "Items", columns: items, searchable: false } })

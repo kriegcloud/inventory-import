@@ -28,8 +28,8 @@ import { FileProblem } from "@inventory/catalog-contract/FileProblem"
 import { type ImportId, UploadKey } from "@inventory/catalog-contract/Ids"
 import { matchedColumn } from "@inventory/catalog-contract/Mapping"
 import { requiredFields, type StagedHead, type StagedRow, type StagedTable } from "@inventory/catalog-contract/Staged"
-import type { SheetChoice, SheetSummary } from "../../../domain/Spreadsheet.ts"
-import { savedRows, type UploadState } from "../../../domain/Upload.ts"
+import type { SheetChoice, SheetSummary } from "@inventory/catalog-model/Spreadsheet"
+import { savedRows, type UploadState } from "@inventory/catalog-model/Upload"
 import { type Client, fork, runExit } from "../api.ts"
 import { rememberWorkbook } from "../imports.ts"
 import { navigate } from "@inventory/ui/Route"
@@ -38,7 +38,7 @@ import type { ReadMessage, ReadRequest } from "./protocol.ts"
 import { sayError } from "@inventory/client/SayError"
 import { queryKeys } from "../queries.ts"
 
-export type { UploadState } from "../../../domain/Upload.ts"
+export type { UploadState } from "@inventory/catalog-model/Upload"
 
 /** The reader itself failed (not the file): `message` says so, for the person. */
 class ReadFailed extends S.TaggedError<ReadFailed, { readonly brand: unique symbol }>()("ReadFailed", {

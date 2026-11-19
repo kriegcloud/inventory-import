@@ -7,10 +7,10 @@ import { CsvRead } from "@beep/csv/CsvRead"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Result from "effect/Result"
-import { describeCsv, describeRows, type GridRow } from "../../../domain/SheetLayout.ts"
+import { describeCsv, describeRows, type GridRow } from "@inventory/catalog-model/SheetLayout"
 import { fileProblem } from "@inventory/catalog-contract/FileProblem"
-import type { Cell, Note } from "../../../domain/Spreadsheet.ts"
-import { rowsAbout } from "../../../domain/Upload.ts"
+import type { Cell, Note } from "@inventory/catalog-model/Spreadsheet"
+import { rowsAbout } from "@inventory/catalog-model/Upload"
 import type { ReadProgress } from "./read.ts"
 
 const textCell = (text: string): Cell => (text === "" ? { type: "empty", text: "" } : { type: "text", text })

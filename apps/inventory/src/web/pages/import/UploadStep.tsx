@@ -32,7 +32,7 @@ import { browserRuntime } from "@/lib/runtime"
 import { type UploadEnd, useUpload, type UploadState } from "@/lib/upload"
 import type { ImportView } from "@inventory/catalog-contract/Import"
 import { fileProblemTitle } from "@inventory/catalog-contract/FileProblem"
-import { progressOf } from "../../../domain/Upload.ts"
+import { progressOf } from "@inventory/catalog-model/Upload"
 import { sayError } from "@inventory/client/SayError"
 
 /**

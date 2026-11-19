@@ -5,7 +5,7 @@
 import { Array as Arr, Effect } from "effect"
 import { describe, expect, it } from "vitest"
 import { readSpreadsheet, type ReadProgress } from "../../src/web/lib/spreadsheet/index.ts"
-import { progressOf } from "../../src/domain/Upload.ts"
+import { progressOf } from "@inventory/catalog-model/Upload"
 
 describe("reading CSV text in pieces", () => {
   it("reports progress that rises, ends exact, and never passes its total", () =>

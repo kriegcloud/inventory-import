@@ -10,7 +10,7 @@ import { Input } from "@inventory/ui/components/input"
 import { Label } from "@inventory/ui/components/label"
 import { NativeSelect, NativeSelectOption } from "@inventory/ui/components/native-select"
 import { RadioGroup, RadioGroupItem } from "@inventory/ui/components/radio-group"
-import { readDimensions, readVendors } from "../../../domain/ItemImport.ts"
+import { readDimensions, readVendors } from "@inventory/catalog-model/Review"
 import {
   type DimensionsDraft,
   dimensionsDraft,

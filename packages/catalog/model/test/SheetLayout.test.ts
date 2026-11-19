@@ -9,8 +9,8 @@ import {
   numberText,
   type GridRow,
   type SheetGrid
-} from "../../src/domain/SheetLayout.ts"
-import type { Cell } from "../../src/domain/Spreadsheet.ts"
+} from "../src/Reading/SheetLayout.rules.ts"
+import type { Cell } from "../src/Reading/Spreadsheet.rules.ts"
 
 const t = (text: string): Cell => (text === "" ? emptyCell : { type: "text", text })
 const n = (value: number): Cell => ({ type: "number", text: numberText(value) })

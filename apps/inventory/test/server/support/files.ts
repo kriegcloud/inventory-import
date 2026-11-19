@@ -2,7 +2,7 @@
 // The sample files, read through the reader the browser uses and trimmed the way the browser stages them.
 import { readFileSync } from "node:fs"
 import { Effect } from "effect"
-import { stageTable } from "../../../src/domain/ItemImport.ts"
+import { stageTable } from "@inventory/catalog-model/Review"
 import { type StagedTable } from "@inventory/catalog-contract/Staged"
 import { readSpreadsheet } from "../../../src/web/lib/spreadsheet/index.ts"
 

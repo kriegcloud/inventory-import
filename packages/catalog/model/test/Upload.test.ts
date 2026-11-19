@@ -13,7 +13,7 @@ import {
   savedRows,
   type UploadState,
   uploadChunks
-} from "../../src/domain/Upload.ts"
+} from "../src/Staging/Upload.rules.ts"
 import { chunkRows } from "@inventory/catalog-contract/Upload"
 const reading = (rowsRead: number, about: number | null): UploadState => ({
   _tag: "Reading",

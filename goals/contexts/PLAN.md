@@ -326,3 +326,19 @@ None.
   - Read on screen, fresh database: the messy sample "Import 155, skip 45", "Import 155 items?", "Not imported 45 ·
     Imported 155 · Already there 0 · All 200", Items "155 items", People "Dana Whitfield (you), Marcus Oyelaran,
     Priya Raman".
+- **`catalog-model` (`packages/catalog/model`), first part: the rules.** The pure code the screen and the server
+  both run, on the full profile with no override: `./Review` (`Review/Review.rules.ts`: `review`, `recheckRow`,
+  `matchColumns`, `stageTable`, the cell readers that propose, `notImportedCsv`), `./ItemsOfRow`, `./Suggest`,
+  `./TableViewRules`, `./Upload`, `./Spreadsheet`, `./SheetLayout`. The app's `src/domain` is gone. 25 tests moved
+  with them (`SheetLayout`, `TableView`, `Upload`); `FileProblem` and `ItemSearch` (9) went to the contract's tests.
+  - Not as the brief has it: `Review.rules.ts` is one file (the brief splits it into `Mapping`, `CellReading`,
+    `Review`, `NotImported`); `UploadState` and `progressOf` stay in `Staging/Upload.rules.ts` until `catalog-web`
+    takes them; `ConfirmPlan`, the ports, their twins and the handlers are not built yet.
+  - `ItemImport.test.ts` and `ReviewRules.test.ts` stay in the app: they read the sample files in the app's
+    `public/samples`, and a package may not reach into `apps/`.
+  - The app's fast and slow tests now count 155, the packages' 65 more. `Assistant.slow.test.ts` had imported its
+    column fixture from `TableView.test.ts` and so ran that file's 10 tests a second time; it has its own fixture
+    now (`test/server/support/columns.ts`). Compared file by file with the commit before: no other count moved.
+  - Read on screen, fresh database: the messy sample "Import 155, skip 45"; "Leave out 2": "Import 157, skip 43",
+    the same after a refresh; confirmed "Not imported 43 · Imported 157 · Already there 0 · All 200"; taken back
+    "Taken back 157 · Not imported 43 · Imported 0", Items "0 items".

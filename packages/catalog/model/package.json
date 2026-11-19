@@ -1,0 +1,40 @@
+{
+  "name": "@inventory/catalog-model",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The catalog's rules with no SQL and no HTTP in them: reading a sheet's layout, staging and its pieces, the review of a file of items, suggestions and the table assistant's checks",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": [],
+  "exports": {
+    "./package.json": "./package.json",
+    "./ItemsOfRow": "./src/Review/ItemsOfRow.context.ts",
+    "./Review": "./src/Review/Review.rules.ts",
+    "./SheetLayout": "./src/Reading/SheetLayout.rules.ts",
+    "./Spreadsheet": "./src/Reading/Spreadsheet.rules.ts",
+    "./Suggest": "./src/Suggestion/Suggest.rules.ts",
+    "./TableViewRules": "./src/Assistant/TableView.rules.ts",
+    "./Upload": "./src/Staging/Upload.rules.ts"
+  },
+  "scripts": {
+    "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",
+    "lint": "oxlint --quiet src test",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@beep/schema": "workspace:*",
+    "@inventory/catalog-contract": "workspace:*",
+    "@inventory/kernel": "workspace:*",
+    "effect": "4.1.4"
+  },
+  "devDependencies": {
+    "@effect/vitest": "4.1.4",
+    "@types/node": "^24.19.2",
+    "vitest": "^5.1.0"
+  },
+  "beep": {
+    "family": "context",
+    "context": "catalog",
+    "layer": "model"
+  }
+}

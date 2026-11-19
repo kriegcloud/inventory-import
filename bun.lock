@@ -36,6 +36,7 @@
         "@inventory/access-host": "workspace:*",
         "@inventory/access-web": "workspace:*",
         "@inventory/catalog-contract": "workspace:*",
+        "@inventory/catalog-model": "workspace:*",
         "@inventory/client": "workspace:*",
         "@inventory/kernel": "workspace:*",
         "@inventory/review": "workspace:*",
@@ -172,6 +173,21 @@
       "version": "0.0.0",
       "dependencies": {
         "@beep/schema": "workspace:*",
+        "@inventory/kernel": "workspace:*",
+        "effect": "4.1.4",
+      },
+      "devDependencies": {
+        "@effect/vitest": "4.1.4",
+        "@types/node": "^24.19.2",
+        "vitest": "^5.1.0",
+      },
+    },
+    "packages/catalog/model": {
+      "name": "@inventory/catalog-model",
+      "version": "0.0.0",
+      "dependencies": {
+        "@beep/schema": "workspace:*",
+        "@inventory/catalog-contract": "workspace:*",
         "@inventory/kernel": "workspace:*",
         "effect": "4.1.4",
       },
@@ -660,6 +676,8 @@
     "@inventory/app": ["@inventory/app@workspace:apps/inventory"],
 
     "@inventory/catalog-contract": ["@inventory/catalog-contract@workspace:packages/catalog/contract"],
+
+    "@inventory/catalog-model": ["@inventory/catalog-model@workspace:packages/catalog/model"],
 
     "@inventory/client": ["@inventory/client@workspace:packages/client"],
 

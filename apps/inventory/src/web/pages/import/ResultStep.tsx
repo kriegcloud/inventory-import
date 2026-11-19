@@ -31,7 +31,7 @@ import {
   outcomeReasonOf,
   type RowOutcome
 } from "@inventory/catalog-contract/Import"
-import { notImportedCsv, rowPlace } from "../../../domain/ItemImport.ts"
+import { notImportedCsv, rowPlace } from "@inventory/catalog-model/Review"
 import { rowId } from "@inventory/catalog-contract/Decision"
 import { type StagedTable } from "@inventory/catalog-contract/Staged"
 import { download, importWords, notImportedColumn, OutcomePill, Text, when } from "./format.tsx"

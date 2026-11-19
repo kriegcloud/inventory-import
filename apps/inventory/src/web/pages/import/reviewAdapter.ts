@@ -20,7 +20,7 @@ import {
   type Review,
   type ReviewedRow,
   rowPlace
-} from "../../../domain/ItemImport.ts"
+} from "@inventory/catalog-model/Review"
 import {
   decisionFromFlags,
   decisionOf,

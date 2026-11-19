@@ -2,7 +2,7 @@
 // so the messages are plain structured-clone values typed here, not decoded: nothing outside the page sends them.
 import type { FileProblem } from "@inventory/catalog-contract/FileProblem"
 import type { StagedHead, StagedRow } from "@inventory/catalog-contract/Staged"
-import type { SheetChoice, SheetSummary } from "../../../domain/Spreadsheet.ts"
+import type { SheetChoice, SheetSummary } from "@inventory/catalog-model/Spreadsheet"
 
 /** What the page asks the reader: one file, and the sheet the person chose (null the first time). */
 export type ReadRequest = { readonly file: File; readonly sheet: string | null }

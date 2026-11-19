@@ -13,7 +13,7 @@ import {
   stockingOf,
   UnitCost
 } from "@inventory/catalog-contract/Item"
-import { type Review, review } from "../../src/domain/ItemImport.ts"
+import { type Review, review } from "@inventory/catalog-model/Review"
 import { stage, textFile } from "../server/support/files.ts"
 
 const head =

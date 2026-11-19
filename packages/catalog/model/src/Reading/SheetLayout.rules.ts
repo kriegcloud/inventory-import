@@ -12,7 +12,7 @@ import {
   type SheetChoice,
   type SheetSummary,
   type SpreadsheetTable
-} from "./Spreadsheet.ts"
+} from "./Spreadsheet.rules.ts"
 import { fileProblem } from "@inventory/catalog-contract/FileProblem"
 /** One row of the grid as read, before the header is known. `cells[i]` is spreadsheet column `i` (0 = A). */
 export interface GridRow {

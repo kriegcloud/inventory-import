@@ -33,7 +33,7 @@ import {
   uoms,
   type Vendor
 } from "@inventory/catalog-contract/Item"
-import type { SpreadsheetTable } from "./Spreadsheet.ts"
+import type { SpreadsheetTable } from "../Reading/Spreadsheet.rules.ts"
 import * as S from "effect/Schema"
 import {
   StagedTable,

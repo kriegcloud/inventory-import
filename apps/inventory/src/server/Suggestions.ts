@@ -34,7 +34,7 @@ import {
   SuggestAnswer,
   suggestLines,
   type SuggestSource
-} from "../domain/Suggest.ts"
+} from "@inventory/catalog-model/Suggest"
 import { asAgent } from "@inventory/kernel/Agent"
 import { OpenRouter } from "@beep/openrouter/OpenRouter"
 import { answeredByRules, askModel, modelIsOn } from "./Model.ts"

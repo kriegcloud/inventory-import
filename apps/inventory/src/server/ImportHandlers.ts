@@ -27,14 +27,14 @@ import {
   review,
   ruleFixes,
   stagingProblem
-} from "../domain/ItemImport.ts"
+} from "@inventory/catalog-model/Review"
 import { changeDecidedBy } from "@inventory/catalog-contract/Change"
 import { rowId, type SavedDecisions } from "@inventory/catalog-contract/Decision"
 import { type MappingChoice } from "@inventory/catalog-contract/Mapping"
 import { fieldLabels, StagedHead, type StagedTable } from "@inventory/catalog-contract/Staged"
-import { chunkProblem, fitsChunks } from "../domain/Upload.ts"
+import { chunkProblem, fitsChunks } from "@inventory/catalog-model/Upload"
 import { requireRole } from "@inventory/kernel/Actor"
-import { ItemsOfRow } from "./ImportShape.ts"
+import { ItemsOfRow } from "@inventory/catalog-model/ItemsOfRow"
 import { type CommitRow, type Draft, Imports } from "./Imports.ts"
 import { Items } from "./Items.ts"
 import { Suggestions } from "./Suggestions.ts"

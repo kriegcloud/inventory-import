@@ -1,7 +1,7 @@
 import { useId } from "react"
 import { Field, FieldDescription, FieldLabel } from "@inventory/ui/components/field"
 import { NativeSelect, NativeSelectOption } from "@inventory/ui/components/native-select"
-import type { SheetChoice, SheetSummary } from "../../../domain/Spreadsheet.ts"
+import type { SheetChoice, SheetSummary } from "@inventory/catalog-model/Spreadsheet"
 
 /**
  * The person sees which sheet of the workbook was read and why, and can read another one. Renders nothing unless

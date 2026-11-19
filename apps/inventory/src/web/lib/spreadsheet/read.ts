@@ -2,7 +2,7 @@
 // Each reader is its own lazily loaded chunk, so choosing a CSV never downloads the workbook library.
 import { Array as Arr, Effect, Option } from "effect"
 import { type FileProblem, fileProblem } from "@inventory/catalog-contract/FileProblem"
-import { maxFileBytes, type Note, type SpreadsheetTable } from "../../../domain/Spreadsheet.ts"
+import { maxFileBytes, type Note, type SpreadsheetTable } from "@inventory/catalog-model/Spreadsheet"
 
 /**
  * How far a read has got: rows of the file read so far, and how many it has (`exact` once counted; an estimate from

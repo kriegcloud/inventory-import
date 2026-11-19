@@ -3,7 +3,7 @@
 // The upload screen calls it inside a worker (src/web/lib/upload), so the read never holds up the page.
 import { Effect } from "effect"
 import type { FileProblem } from "@inventory/catalog-contract/FileProblem"
-import type { SpreadsheetTable } from "../../../domain/Spreadsheet.ts"
+import type { SpreadsheetTable } from "@inventory/catalog-model/Spreadsheet"
 import type { ReadSpreadsheetInput } from "./read.ts"
 
 export type { ReadProgress, ReadSpreadsheetInput } from "./read.ts"

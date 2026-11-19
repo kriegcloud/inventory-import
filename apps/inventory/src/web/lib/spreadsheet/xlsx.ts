@@ -14,9 +14,9 @@ import {
   type GridRow,
   type MergedRange,
   type WorkbookSheet
-} from "../../../domain/SheetLayout.ts"
+} from "@inventory/catalog-model/SheetLayout"
 import { fileProblem } from "@inventory/catalog-contract/FileProblem"
-import type { Cell, Note } from "../../../domain/Spreadsheet.ts"
+import type { Cell, Note } from "@inventory/catalog-model/Spreadsheet"
 import type { ReadProgress } from "./read.ts"
 
 interface DateCode {

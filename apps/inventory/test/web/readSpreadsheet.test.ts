@@ -4,7 +4,7 @@
 import { readFileSync } from "node:fs"
 import { describe, expect, it } from "@effect/vitest"
 import { Array as Arr, Effect, Option } from "effect"
-import type { Note, NoteKind, Row, SpreadsheetTable } from "../../src/domain/Spreadsheet.ts"
+import type { Note, NoteKind, Row, SpreadsheetTable } from "@inventory/catalog-model/Spreadsheet"
 import { sayError } from "@inventory/client/SayError"
 import { readSpreadsheet } from "../../src/web/lib/spreadsheet/index.ts"
 

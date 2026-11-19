@@ -1,10 +1,13 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { Equal, Option } from "effect"
+import { Array as Arr, Equal, Option } from "effect"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { TriangleAlertIcon } from "lucide-react"
 import { toast } from "sonner"
 import { ReviewSkeleton } from "@inventory/ui/Skeletons"
 import { ReviewRegion } from "@inventory/review/ReviewRegion"
 import type { Activity, Problem, ReviewRow } from "@inventory/review/ReviewTypes"
+import { Alert, AlertDescription, AlertTitle } from "@inventory/ui/components/alert"
+import { useIsNarrow } from "@inventory/ui/ContentWidth"
 import { Button } from "@inventory/ui/components/button"
 import { Spinner } from "@inventory/ui/components/spinner"
 import { useMember } from "@inventory/client/CurrentMember"
@@ -19,6 +22,7 @@ import type { SavedDecisions as RegionDecisions } from "@inventory/review/Review
 import { catalogRuntime } from "./Catalog.runtime.ts"
 import type { ImportView, SuggestOutcome } from "@inventory/catalog-contract/Import"
 import { recheckRow, review, ruleFixes } from "@inventory/catalog-model/Review"
+import { readerWarnings } from "@inventory/catalog-model/Staging"
 import { type SavedDecisions } from "@inventory/catalog-contract/Decision"
 import { matchedColumn } from "@inventory/catalog-contract/Mapping"
 import { type Field, fieldLabels, fields, type StagedTable } from "@inventory/catalog-contract/Staged"
@@ -352,6 +356,7 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
 
   return (
     <>
+      <ReaderWarnings table={table} />
       <ReviewRegion
         key={`${view.id}:${epoch}`}
         title={`Review ${view.fileName}`}
@@ -401,5 +406,37 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
         onImport={() => commit.mutate()}
       />
     </>
+  )
+}
+
+/**
+ * What the reader could not take at the file's word, said above the table before the person imports: each warning
+ * in the sentence the reader wrote, with the cells or rows it names. Nothing here changes a row's outcome.
+ */
+function ReaderWarnings(props: { table: Pick<StagedTable, "notes"> }) {
+  const warnings = readerWarnings(props.table)
+  // The same side room the review below takes, from the room the page has (the sidebar is already taken off).
+  const narrow = useIsNarrow()
+  if (warnings.length === 0) return null
+  return (
+    <Alert className={narrow ? "mx-4 mt-3 w-auto" : "mx-6 mt-4 w-auto"}>
+      <TriangleAlertIcon aria-hidden />
+      <AlertTitle>
+        {warnings.length === 1
+          ? "Check this before you import"
+          : `Check these ${warnings.length} things before you import`}
+      </AlertTitle>
+      <AlertDescription>
+        {warnings.length === 1 ? (
+          <p>{warnings[0]?.message}</p>
+        ) : (
+          <ul className="list-disc pl-4">
+            {Arr.map(warnings, (warning) => (
+              <li key={warning.message}>{warning.message}</li>
+            ))}
+          </ul>
+        )}
+      </AlertDescription>
+    </Alert>
   )
 }

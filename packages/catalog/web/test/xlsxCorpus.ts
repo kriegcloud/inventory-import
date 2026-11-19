@@ -10,7 +10,7 @@ const pkg = "http://schemas.openxmlformats.org/package/2006/relationships"
 const office = "application/vnd.openxmlformats-officedocument.spreadsheetml"
 
 /** A one-sheet workbook from hand-written parts: the sheet's XML, and a styles part whose style n is the nth code. */
-const built = (input: {
+export const built = (input: {
   readonly sheet: string
   readonly codes?: ReadonlyArray<string>
   readonly strings?: string

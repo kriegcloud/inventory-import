@@ -341,3 +341,19 @@ the problem are written in `packages/catalog/web/src/internal/spreadsheet/xlsx.t
 Question: `@beep/xlsx`'s number formats follow what SheetJS (Apache-2.0) displayed; say so? Answer: "Add a short
 notice (Recommended)": one line in the package's README and in the number-format file's header, saying the format
 behaviour follows SheetJS, which is also the test oracle. Rejected: no notice. Reverse: remove the two lines.
+
+### 2026-11-19 — where a reader's warning shows
+
+Question: a reader warning (such as "2 cells could not be read and were left empty: C4, C8") is visible only behind
+the Activity button, and Review read "Import 25 items" with no word of it; where should a warning show before the
+person imports? Answer: "Also on the Review step (Recommended)": a warning line above the table names what the
+reader could not read, with the cells, before Confirm; plain information Notes stay behind Activity; it applies to
+CSV warnings too. Row outcomes and counts do not change. Rejected: "Review, and the rows are flagged" (rows with an
+unreadable cell moved to Needs a decision), and "Leave behind Activity". Reverse: remove `ReaderWarnings` from
+`packages/catalog/web/src/ReviewStep.screen.tsx`.
+
+### 2026-11-19 — after xlsx
+
+Question: what follows `beep-xlsx`? Answer: "Write the infra brief (Recommended)":
+[BRIEF-infra.md](BRIEF-infra.md) for step 9, written only; nothing built or deployed, no goal opened. Rejected:
+clearing the open schema decisions first; stopping. Reverse: none needed, the brief changes nothing.

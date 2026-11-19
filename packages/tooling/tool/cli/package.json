@@ -22,7 +22,8 @@
     "@beep/identity": "workspace:*",
     "@beep/schema": "workspace:*",
     "@effect/platform-bun": "4.1.4",
-    "effect": "4.1.4"
+    "effect": "4.1.4",
+    "oxc-parser": "0.148.0"
   },
   "devDependencies": {
     "@effect/platform-node": "4.1.4",

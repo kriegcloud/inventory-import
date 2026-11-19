@@ -38,13 +38,12 @@
     "ceilings:check": "bun packages/tooling/tool/cli/src/bin.ts quality ceilings",
     "boundaries:check": "bun packages/tooling/tool/cli/src/bin.ts laws boundaries",
     "screens:check": "bun packages/tooling/tool/cli/src/bin.ts laws screens",
-    "imports:check": "node scripts/check-effect-imports.mjs",
-    "imports:fix": "node scripts/check-effect-imports.mjs --write"
+    "imports:check": "bun packages/tooling/tool/cli/src/bin.ts laws effect-imports",
+    "imports:fix": "bun packages/tooling/tool/cli/src/bin.ts laws effect-imports --write"
   },
   "devDependencies": {
     "@beep/repo-cli": "workspace:*",
     "@effect/tsgo": "0.70.0",
-    "oxc-parser": "0.148.0",
     "oxfmt": "^0.78.0",
     "oxlint": "1.93.0",
     "syncpack": "^15.3.3",

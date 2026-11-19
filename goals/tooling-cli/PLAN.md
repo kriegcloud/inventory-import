@@ -16,7 +16,7 @@ from: explorations/ideal-architecture
 | 3 | `vendor check`, `docs check` | done |
 | 4 | `quality strict` | done |
 | 5 | `vendor sync` | done |
-| 6 | `laws effect-imports` | todo |
+| 6 | `laws effect-imports` | done |
 | 7 | The start-up budget test, the check's time before and after, the documents | todo |
 
 ## Proofs
@@ -35,6 +35,7 @@ compared on standard output, standard error and exit code.
 | `docs check` | the same, and with `--verbose` (exit 0) | a document with no frontmatter (exit 1). A bundle with no markdown, a validator that scanned nothing, and a missing validator are tested against a stand-in validator, not compared: planting them means moving a whole bundle or the vendored skill |
 | `quality strict` | the same in all six packages that run it, and with `--all` (exit 0), the elapsed seconds in its last line set aside | a ceiling above the count, a ceiling below it, plugin options that differ from the root's (exit 1) |
 | `vendor sync` | run at the recorded commit, it prints the same five lines and changes no file (the script did the same) | no failure sentences to plant. Run at beep-effect's current commit instead: the script and the command each changed the same 98 files to the same bytes, and the kit was restored. A commit that does not exist stops before anything is written |
+| `laws effect-imports` | the same (exit 0) | one file with every kind (root barrel, a function from the root, the barrel whole, a nested barrel, an `@effect` package root, a wrong name, `N` for `effect/Number`, a value picked by name, an unknown path, a name a barrel does not hold, a barrel re-export, a dynamic import of a barrel), an example in a comment, an import in a document; the same file named on the command line (exit 1). `--write`: the script and the command each repaired the 211 pre-migration source files to the same bytes and printed the same lines |
 
 ## Current blocker
 
@@ -61,6 +62,9 @@ Where the brief left a choice open, or the code showed the brief could not be fo
   READMEs and four records: a decision for Benjamin, not taken here.
 - **`vendor sync` has no test of its own.** Its proof is the two runs above; a test would need a small beep-effect
   repository with the four packages and their closure as a fixture.
+- **`laws effect-imports --write` keeps one limit of the script**: a renamed module used as a shorthand property
+  (`{ Option }`) is reported as "overlapping edits: repair this file by hand" and left. The script did the same;
+  none of the 211 migrated files had one.
 - **A missing argument exits 1, not 2.** `vendor-beep.mjs` exited 2 when `--from` was missing; a command's missing
   flag is reported by the CLI module, which prints its usage and exits 1.
 - **The root scripts call the bin directly** (`bun packages/tooling/tool/cli/src/bin.ts quality ceilings`), not

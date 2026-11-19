@@ -120,7 +120,7 @@ code. Not checked.
 
 ## The check
 
-`bun run imports:check` (`scripts/check-effect-imports.mjs`), part of `bun run check`. It parses every `.ts`, `.tsx`
+`bun run imports:check` (`bun run beep laws effect-imports`), part of `bun run check`. It parses every `.ts`, `.tsx`
 and `.mjs` file under `apps`, `packages` and `scripts`, reads the examples in their comments, and reads the import
 lines in `CLAUDE.md`, `AGENTS.md`, `README.md`, `DECISIONS.md`, `docs/` and `.claude/agents/` (this page excepted:
 it shows wrong imports on purpose). The vendored kit packages, each with a `vendor.json`, are skipped: they are not
@@ -141,10 +141,10 @@ name, and renames the identifiers that follow from a changed name, in code and i
 it cannot be sure of (a name declared again inside the file, a value picked by name) and says so. Documents are
 checked, never rewritten. Run `bun run format -- <files>` after it.
 
-beep-effect's own check is `beep laws effect-imports` (`packages/tooling/tool/cli/src/commands/Laws/EffectImports.ts`),
-a ts-morph command inside its CLI that cannot be brought over on its own. This script is the same law, and stricter
-in two places: beep-effect's command checks paths only, and this one also checks the name (EI-2) and the pick by name
-(EI-3).
+beep-effect's own check is the command of the same name in its CLI
+(`packages/tooling/tool/cli/src/commands/Laws/EffectImports.ts`). This one is the same law in this repository's CLI
+(`packages/tooling/tool/cli/src/commands/Laws/EffectImports.rules.ts`), and stricter in two places: beep-effect's
+command checks paths only, and this one also checks the name (EI-2) and the pick by name (EI-3).
 
 ## Where beep-effect's code and its rules disagree
 

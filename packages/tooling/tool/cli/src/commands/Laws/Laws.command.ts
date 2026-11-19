@@ -4,9 +4,12 @@
  * @packageDocumentation
  */
 import * as Effect from "effect/Effect"
+import * as Argument from "effect/cli/Argument"
 import * as Command from "effect/cli/Command"
+import * as Flag from "effect/cli/Flag"
 import { emit } from "../../Report.schema.ts"
 import { boundaries } from "./Boundaries.rules.ts"
+import { effectImports } from "./EffectImports.rules.ts"
 import { exactExports } from "./Exports.rules.ts"
 import { keys } from "./Keys.rules.ts"
 import { screens } from "./Screens.rules.ts"
@@ -31,8 +34,26 @@ export const keysCommand = Command.make("keys", {}, () => Effect.flatMap(keys(),
   Command.withDescription("No key-shaped string is in any file git would commit")
 )
 
+const write = Flag.Boolean("write").pipe(
+  Flag.withDescription("Repair the code that can be repaired mechanically, then check"),
+  Flag.withDefault(false)
+)
+const check = Flag.Boolean("check").pipe(
+  Flag.withDescription("Check only: what the command does without --write, said aloud as beep-effect's does"),
+  Flag.withDefault(false)
+)
+const files = Argument.String("file").pipe(
+  Argument.withDescription("Only these files; every file when none is named"),
+  Argument.variadic()
+)
+
+/** `laws effect-imports [--write] [files]`: every Effect import from its own path under its own name. */
+export const effectImportsCommand = Command.make("effect-imports", { write, check, files }, (flags) =>
+  Effect.flatMap(effectImports(flags.write, flags.files), emit)
+).pipe(Command.withDescription("Every Effect import comes from its module's own path under its one name"))
+
 /** The `laws` group. */
 export const lawsCommand = Command.make("laws").pipe(
   Command.withDescription("The repository's rules over its own source"),
-  Command.withSubcommands([boundariesCommand, exportsCommand, keysCommand, screensCommand])
+  Command.withSubcommands([boundariesCommand, effectImportsCommand, exportsCommand, keysCommand, screensCommand])
 )

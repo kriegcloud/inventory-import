@@ -7,7 +7,6 @@
       "devDependencies": {
         "@beep/repo-cli": "workspace:*",
         "@effect/tsgo": "0.70.0",
-        "oxc-parser": "0.148.0",
         "oxfmt": "^0.78.0",
         "oxlint": "1.93.0",
         "syncpack": "^15.3.3",
@@ -470,6 +469,7 @@
         "@beep/schema": "workspace:*",
         "@effect/platform-bun": "4.1.4",
         "effect": "4.1.4",
+        "oxc-parser": "0.148.0",
       },
       "devDependencies": {
         "@effect/platform-node": "4.1.4",

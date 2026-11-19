@@ -236,6 +236,7 @@ package's task and replays it when nothing it reads has changed. The app's own s
 | --- | --- |
 | `bun run dev` | Applies local migrations and the test accounts, then serves the app and API on http://localhost:5173, signed in by itself as the first test account |
 | `bun run check` | The loop check through turbo: type-check with Effect diagnostics, lint (with the two design lints), the fast tests, the format check, `docs:check`, the key scan (`keys:check`), the vendored-kit hash check (`vendor:check`), which package may import which (`boundaries:check`), the two stylesheet lists (`screens:check`) and the Effect imports (`imports:check`; `imports:fix` repairs code). Before every commit |
+| `bun run beep <group> <command>` | One of the repository's own rules by hand: `bun run beep laws boundaries`, `bun run beep quality ceilings`, `bun run beep vendor check`; `--help` on any of them lists its flags. `bun run check` runs them all under their root script names (`boundaries:check`, `vendor:check` and the rest) |
 | `bun run check:full` | `check` plus the slow tests (`*.slow.test.ts`) and the production build. CI runs it |
 | `bun run build` | The production build through turbo |
 | `bun run test` | Every test, fast and slow (Vitest, Node) |
@@ -316,15 +317,17 @@ packages/foundation/     Product-neutral packages: this repository's own @beep/c
 docs/                   Standards, the kit, patterns, the glossary and sign-in (`docs/index.md` lists them); qa/ is evidence.
 explorations/           Questions being shaped: research, decisions, briefs.
 goals/                  Work with a definition of done: SPEC.md and PLAN.md.
-scripts/                Repository checks (`beep docs check`, `beep laws keys`, `beep vendor check`, `beep quality strict`,
-                        `beep laws boundaries`: which package may import which, `beep laws screens`: every package with screens in both stylesheet lists, `check-effect-imports.mjs`: every Effect import from its own path under its one name) and `beep vendor sync`, which copies the kit from a
-                        beep-effect checkout.
+packages/tooling/tool/cli/  @beep/repo-cli: the repository's own rules as commands (`bun run beep <group> <command>`):
+                        `laws` (boundaries: which package may import which; screens: every package with screens in
+                        both stylesheet lists; exports; keys; effect-imports: every Effect import from its own path
+                        under its one name), `quality` (strict, ceilings), `docs check` and `vendor` (check; sync,
+                        which copies the kit from a beep-effect checkout). Nothing imports it.
 turbo.json              The task graph: seven package tasks and three root tasks.
 .agents/                Skills (see above). Not application code; the check ignores it.
 ```
 
-Paths in this file and in `docs/` that start `src/`, `test/`, `migrations/` or `public/`, and every `scripts/` file but
-`beep docs check` and `beep laws keys`, are inside `apps/inventory/`.
+Paths in this file and in `docs/` that start `src/`, `test/`, `migrations/`, `public/` or `scripts/` are inside
+`apps/inventory/`.
 
 A package with screens is named in two lists, or its classes are missing from the stylesheet and only the look is
 wrong: an `@source` line in `src/web/index.css` (development) and `screenPackages` in `vite.config.ts` (the build).

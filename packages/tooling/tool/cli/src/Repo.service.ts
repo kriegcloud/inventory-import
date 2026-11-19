@@ -104,6 +104,8 @@ export class Repo extends Context.Service<
     ) => (path: string) => Effect.Effect<Sch["Type"], RepoError, Sch["DecodingServices"]>
     /** A folder's entries, in the order the file system gives them. A folder that does not exist has none. */
     readonly entries: (dir: string) => Effect.Effect<ReadonlyArray<Entry>, RepoError>
+    /** Every path under a folder, files and folders, each from that folder. A folder that does not exist has none. */
+    readonly tree: (dir: string) => Effect.Effect<ReadonlyArray<string>, RepoError>
     /** Every file under a folder, depth first, in the order the file system gives them. */
     readonly files: (dir: string) => Effect.Effect<ReadonlyArray<string>, RepoError>
     /** Every workspace under `apps` and `packages`: a folder with a `package.json`, found at most five folders deep. */
@@ -196,6 +198,10 @@ export class Repo extends Context.Service<
             return A.flatten(nested)
           }
         )
+        const tree = Effect.fn("Repo.tree")(function* (dir: string) {
+          if (!(yield* exists(dir))) return A.empty<string>()
+          return yield* fs.readDirectory(dir, { recursive: true }).pipe(Effect.mapError(unreadable(dir)))
+        })
         const manifestOf = json(Manifest)
 
         const rootFrom: (dir: string) => Effect.Effect<string, RepoError> = Effect.fn("Repo.rootFrom")(function* (
@@ -278,6 +284,7 @@ export class Repo extends Context.Service<
           normalize: (file) => path.normalize(file),
           json,
           entries,
+          tree,
           files,
           workspaces,
           sha256: Effect.fn("Repo.sha256")((data: Uint8Array) => digest.digestHex(Digest.sha256, data)),

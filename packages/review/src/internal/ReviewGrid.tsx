@@ -14,7 +14,9 @@ import {
   useState
 } from "react"
 import { cn } from "cn"
-import { HashMap, HashSet, Option } from "effect"
+import * as HashMap from "effect/HashMap"
+import * as HashSet from "effect/HashSet"
+import * as O from "effect/Option"
 import { sourceWordsFor } from "@inventory/ui/ProposalSource"
 import { StatusPill } from "@inventory/ui/StatusPill"
 import { Badge } from "@inventory/ui/components/badge"
@@ -243,7 +245,7 @@ const statusFit = (input: {
   let widest = textWidth(words.ready)
   for (const view of input.views) {
     if (view.status === "needs" || view.status === "cannot") {
-      const kind = Option.getOrUndefined(HashMap.get(input.kinds, view.problem?.kind ?? ""))
+      const kind = O.getOrUndefined(HashMap.get(input.kinds, view.problem?.kind ?? ""))
       const rival = view.problem?.rivals === undefined ? 0 : 6 + xsHint(`row ${rowName(view.row)}`)
       widest = Math.max(widest, pill(kind?.label ?? view.problem?.kind ?? "", true) + rival)
     } else if (view.status === "out") widest = Math.max(widest, pill(words.out, false))
@@ -424,8 +426,7 @@ const Row = memo(function Row(props: {
   // (its tag, its reason, the cell it is in) and offers no answer.
   const problem = view.status === "needs" ? view.problem : undefined
   const shownProblem = view.status === "cannot" ? view.problem : problem
-  const kind =
-    shownProblem === undefined ? undefined : Option.getOrUndefined(HashMap.get(props.kinds, shownProblem.kind))
+  const kind = shownProblem === undefined ? undefined : O.getOrUndefined(HashMap.get(props.kinds, shownProblem.kind))
   const out = view.status === "out"
   const subject = shownProblem?.column
   const proposed = subject === undefined ? undefined : view.marks[subject]
@@ -631,7 +632,7 @@ const Row = memo(function Row(props: {
   // outline button with its evidence, never as the row's own answer.
   const typeIt = (subject: string, guess?: Fix): ReactNode => {
     if (problem === undefined) return null
-    const label = Option.getOrElse(HashMap.get(props.labels, subject), () => subject)
+    const label = O.getOrElse(HashMap.get(props.labels, subject), () => subject)
     const own = props.cellEditor?.({ row: view.row, column: subject, value: view.cells[subject] ?? "" })
     return (
       <Overlay
@@ -933,7 +934,7 @@ const Row = memo(function Row(props: {
                           subject === undefined ? null : (
                             <EditForm
                               key="type"
-                              label={Option.getOrElse(HashMap.get(props.labels, subject), () => subject)}
+                              label={O.getOrElse(HashMap.get(props.labels, subject), () => subject)}
                               size="sm"
                               value=""
                               onSave={(next) => {
@@ -1108,7 +1109,7 @@ function GroupRow(props: {
   const rowIds = group.rowIds.filter((rowId) => !HashSet.has(props.excluded, rowId))
   const n = rowIds.length
   const choices = choicesOf(group)
-  const column = Option.getOrElse(HashMap.get(props.labels, group.column), () => group.column)
+  const column = O.getOrElse(HashMap.get(props.labels, group.column), () => group.column)
   const other = `Other ${inSentence(column)}`
   const leaveOut = `Leave out ${n}`
   // The quiet answers side by side when the column has room for both, else behind one button.

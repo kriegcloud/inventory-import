@@ -13,7 +13,11 @@ import {
   Undo2Icon
 } from "lucide-react"
 import { toast } from "sonner"
-import { HashMap, HashSet, MutableHashMap, MutableHashSet, Option } from "effect"
+import * as HashMap from "effect/HashMap"
+import * as HashSet from "effect/HashSet"
+import * as MutableHashMap from "effect/MutableHashMap"
+import * as MutableHashSet from "effect/MutableHashSet"
+import * as O from "effect/Option"
 import {
   lazy,
   type ReactNode,
@@ -399,7 +403,7 @@ export function ReviewRegion(props: ReviewRegionProps) {
           const value = view.cells[column.id] ?? ""
           const key = keyOf(value)
           if (key === "") continue
-          const entry = Option.getOrElse(MutableHashMap.get(found, key), () => ({
+          const entry = O.getOrElse(MutableHashMap.get(found, key), () => ({
             values: MutableHashSet.empty<string>(),
             n: 0,
             spellings: {} as Record<string, number>
@@ -409,7 +413,7 @@ export function ReviewRegion(props: ReviewRegionProps) {
           MutableHashMap.set(found, key, entry)
         }
         for (const view of list) {
-          const entry = Option.getOrUndefined(MutableHashMap.get(found, keyOf(view.cells[column.id] ?? "")))
+          const entry = O.getOrUndefined(MutableHashMap.get(found, keyOf(view.cells[column.id] ?? "")))
           if (entry !== undefined) entry.n += 1
         }
         const options = [...found]

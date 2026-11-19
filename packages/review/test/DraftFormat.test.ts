@@ -2,7 +2,10 @@
 // restores. The fixture is the exact localStorage text that build wrote, kept as .txt so no formatter touches it. The
 // rule that would hurt if wrong: a person's unfinished review is never thrown away by a new build.
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, HashMap, Option, Order } from "effect"
+import * as Effect from "effect/Effect"
+import * as HashMap from "effect/HashMap"
+import * as O from "effect/Option"
+import * as Order from "effect/Order"
 import * as A from "effect/Array"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
@@ -27,17 +30,15 @@ describe("a draft saved by the build before the move", () => {
   it.effect("gives the region the same decisions and the same undo and redo history", () =>
     Effect.gen(function* () {
       const progress = yield* S.decodeEffect(asText)(before)
-      const review = Option.getOrThrow(progress.review)
+      const review = O.getOrThrow(progress.review)
       const state = restored(restoredDecisions(review))
       expect(A.sort([...HashMap.keys(state.decisions)], Order.String)).toEqual(["row-148", "row-195"])
-      expect(Option.map(HashMap.get(state.decisions, "row-148"), (d) => d.accepted)).toEqual(Option.some(["sku"]))
+      expect(O.map(HashMap.get(state.decisions, "row-148"), (d) => d.accepted)).toEqual(O.some(["sku"]))
       expect(A.map(state.undo, (step) => step.label)).toEqual(["2 fixes accepted"])
       expect(A.map(state.redo ?? [], (step) => step.label)).toEqual(["2 rows left out"])
       // The redo step holds the two rows as they were when it was undone: left out, not kept before.
       const redone = state.redo?.[0]?.before ?? HashMap.empty()
-      expect(Option.map(HashMap.get(redone, "row-55"), (d) => d?.place)).toEqual(
-        Option.some({ kind: "leftOut", wasKept: false })
-      )
+      expect(O.map(HashMap.get(redone, "row-55"), (d) => d?.place)).toEqual(O.some({ kind: "leftOut", wasKept: false }))
       // Redo after the restore puts the two rows back out.
       const rows: ReadonlyArray<ReviewRow> = A.map(["row-55", "row-191", "row-148", "row-195"], (id, i) => ({
         id,
@@ -45,9 +46,7 @@ describe("a draft saved by the build before the move", () => {
         cells: {}
       }))
       const after = act({ rows, state, action: { type: "redo" } }).state
-      expect(Option.map(R.get(R.fromEntries(after.decisions), "row-191"), (d) => d.place.kind)).toEqual(
-        Option.some("leftOut")
-      )
+      expect(O.map(R.get(R.fromEntries(after.decisions), "row-191"), (d) => d.place.kind)).toEqual(O.some("leftOut"))
     })
   )
 })

@@ -3,7 +3,7 @@ import type { ReviewDecision } from "@inventory/review/ReviewDecision"
  * The data a review region shows. Everything here comes from the caller: the primitive holds no field names, status
  * words or rules of its own. Do not add one product's vocabulary to this file.
  */
-import type { HashMap } from "effect"
+import type * as HashMap from "effect/HashMap"
 import type { ReactNode } from "react"
 
 /** Amber for a choice only the person can make, red for a value that cannot be imported as it is. */

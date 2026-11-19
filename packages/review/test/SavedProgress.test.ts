@@ -2,7 +2,12 @@
 // never read for anyone else; the decisions and the undo history come back exactly as they were left; and a draft
 // that no longer decodes is dropped, never shown half.
 import { it } from "@effect/vitest"
-import { Array as Arr, ByteSize, DateTime, Effect, Option, Record as Rec } from "effect"
+import * as A from "effect/Array"
+import * as ByteSize from "effect/ByteSize"
+import * as DateTime from "effect/DateTime"
+import * as Effect from "effect/Effect"
+import * as O from "effect/Option"
+import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import { describe, expect, it as plain } from "vitest"
 import { ReviewDecision } from "@inventory/review/ReviewDecision"
@@ -25,7 +30,7 @@ const memory = (): ProgressStorage & { readonly items: Record<string, string> } 
   const items: Record<string, string> = {}
   return {
     items,
-    getItem: (key) => Rec.get(items, key).pipe((found) => (found._tag === "Some" ? found.value : null)),
+    getItem: (key) => R.get(items, key).pipe((found) => (found._tag === "Some" ? found.value : null)),
     setItem: (key, value) => {
       items[key] = value
     },
@@ -39,15 +44,15 @@ const progress = (step: string): SavedProgress =>
   SavedProgress.make({
     version: 1,
     step,
-    file: Option.some(
+    file: O.some(
       StoredFile.make({
         name: "items.csv",
         size: ByteSize.bytes(1797),
         lastModified: DateTime.makeUnsafe(1_763_000_000_000),
-        sheet: Option.none()
+        sheet: O.none()
       })
     ),
-    review: Option.some(
+    review: O.some(
       StoredReview.make({ decisions: { "row-9": ReviewDecision.make({ edits: { qty: "2000" } }) }, undo: [] })
     ),
     decided: 1,
@@ -83,11 +88,11 @@ describe("saved progress", () => {
     const scope = { organizationId: "org_prairie", memberId: "mem_dana", screen: "import" }
     storage.setItem(progressKey(scope), '{"version":0,"step":"review"}')
     expect(readProgress(storage, scope)).toBeUndefined()
-    expect(Rec.keys(storage.items)).toEqual([])
+    expect(R.keys(storage.items)).toEqual([])
   })
 
   // Rows with a problem in one column; the person types values and leaves rows out in any order.
-  const rows: ReadonlyArray<ReviewRow> = Arr.makeBy(6, (i) => ({
+  const rows: ReadonlyArray<ReviewRow> = A.makeBy(6, (i) => ({
     id: `row-${i + 2}`,
     line: i + 2,
     cells: { name: `Item ${i}`, qty: "" },
@@ -125,13 +130,13 @@ describe("saved progress", () => {
         const text = yield* S.encodeEffect(asText)(storedReview(saved(state)))
         const stored = yield* S.decodeEffect(asText)(text)
         const back = restored(restoredDecisions(stored))
-        const plainOf = (decisions: ReviewState["decisions"]) => Rec.fromEntries(decisions)
+        const plainOf = (decisions: ReviewState["decisions"]) => R.fromEntries(decisions)
         const history = (of: ReviewState) =>
-          Arr.map(of.undo, (step) => [step.label, Rec.fromEntries(step.before), step.focus])
+          A.map(of.undo, (step) => [step.label, R.fromEntries(step.before), step.focus])
         expect(plainOf(back.decisions)).toEqual(plainOf(state.decisions))
         expect(history(back)).toEqual(history(state))
         const redoHistory = (of: ReviewState) =>
-          Arr.map(of.redo ?? [], (step) => [step.label, Rec.fromEntries(step.before), step.focus])
+          A.map(of.redo ?? [], (step) => [step.label, R.fromEntries(step.before), step.focus])
         expect(redoHistory(back)).toEqual(redoHistory(state))
         // Undo after the refresh takes back the same step it would have taken before it.
         if (state.undo.length > 0) {

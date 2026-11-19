@@ -1,5 +1,10 @@
 import { it as fx } from "@effect/vitest"
-import { Array as Arr, Effect, HashMap, HashSet, Option, String as Str } from "effect"
+import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
+import * as HashMap from "effect/HashMap"
+import * as HashSet from "effect/HashSet"
+import * as O from "effect/Option"
+import * as Str from "effect/String"
 import * as S from "effect/Schema"
 import { describe, expect, it } from "vitest"
 import {
@@ -44,14 +49,14 @@ const noun = ["item", "items"] as const
 const views = (state: ReviewState) => viewRows({ rows, state, recheck })
 const run = (state: ReviewState, action: Action) => act({ rows, state, action, recheck })
 const after = (...actions: ReadonlyArray<Action>): ReviewState =>
-  Arr.reduce(actions, emptyState, (state, action) => run(state, action).state)
+  A.reduce(actions, emptyState, (state, action) => run(state, action).state)
 const firstOf = (kind: string): ReviewRow => {
-  const row = Arr.findFirst(rows, (candidate) => candidate.problem?.kind === kind)
+  const row = A.findFirst(rows, (candidate) => candidate.problem?.kind === kind)
   if (row._tag === "None") throw new Error(`no ${kind} row in the gallery file`)
   return row.value
 }
 const viewOf = (state: ReviewState, rowId: string) => {
-  const view = Arr.findFirst(views(state), (candidate) => candidate.row.id === rowId)
+  const view = A.findFirst(views(state), (candidate) => candidate.row.id === rowId)
   if (view._tag === "None") throw new Error(`no row ${rowId}`)
   return view.value
 }
@@ -76,7 +81,7 @@ describe("counts", () => {
     for (const state of states) {
       const counts = count(views(state))
       expect(counts.needs + counts.ready + counts.out).toBe(counts.total)
-      expect(Arr.reduce([...HashMap.values(counts.kinds)], 0, (sum, n) => sum + n)).toBe(counts.needs)
+      expect(A.reduce([...HashMap.values(counts.kinds)], 0, (sum, n) => sum + n)).toBe(counts.needs)
     }
   })
 
@@ -105,10 +110,7 @@ describe("counts", () => {
 
 describe("a proposal never overwrites the person's decision", () => {
   it("a group accept skips a row the person typed a value into, and a row they left out", () => {
-    const group = Arr.findFirst(
-      waitingGroups({ views: views(emptyState) }),
-      (candidate) => candidate.id === "unit:each"
-    )
+    const group = A.findFirst(waitingGroups({ views: views(emptyState) }), (candidate) => candidate.id === "unit:each")
     if (group._tag === "None") throw new Error("no group")
     const [typed, left] = group.value.rowIds
     if (typed === undefined || left === undefined) throw new Error("group too small")
@@ -120,7 +122,7 @@ describe("a proposal never overwrites the person's decision", () => {
     expect(viewOf(state, typed).cells.unit).toBe("kg")
     expect(viewOf(state, typed).marks.unit).toMatchObject({ state: "applied", by: "you", to: "kg" })
     expect(viewOf(state, left).status).toBe("out")
-    expect(Option.getOrUndefined(HashMap.get(state.decisions, left))?.accepted ?? []).toEqual([])
+    expect(O.getOrUndefined(HashMap.get(state.decisions, left))?.accepted ?? []).toEqual([])
     expect(state.undo[state.undo.length - 1]?.label).toBe("7 fixes accepted")
   })
 
@@ -176,7 +178,7 @@ describe("one undo step per accept", () => {
   })
 
   it("an action that fits no row adds no step", () => {
-    const ready = Arr.findFirst(rows, (row) => row.problem === undefined)
+    const ready = A.findFirst(rows, (row) => row.problem === undefined)
     if (ready._tag === "None") throw new Error("no ready row")
     expect(run(emptyState, { type: "accept", rowIds: [ready.value.id] }).state).toBe(emptyState)
     expect(run(emptyState, { type: "undo" }).label).toBe("")
@@ -186,7 +188,7 @@ describe("one undo step per accept", () => {
 describe("groups", () => {
   it("a group holds one change only, with a count per spelling", () => {
     const groups = waitingGroups({ views: views(emptyState), kind: "unit" })
-    expect(Arr.map(groups, (group) => [group.id, group.rowIds.length, group.by])).toEqual([
+    expect(A.map(groups, (group) => [group.id, group.rowIds.length, group.by])).toEqual([
       ["unit:each", 9, "rule"],
       ["unit:length", 3, "model"]
     ])
@@ -200,12 +202,8 @@ describe("groups", () => {
     const before = views(emptyState)
     const outcome = run(emptyState, { type: "acceptGroup", groupId: "unit:length" })
     const now = views(outcome.state)
-    const moved = Arr.filter(now, (view, index) => view.status !== before[index]?.status)
-    expect(Arr.map(moved, (view) => view.row.problem?.fix?.group)).toEqual([
-      "unit:length",
-      "unit:length",
-      "unit:length"
-    ])
+    const moved = A.filter(now, (view, index) => view.status !== before[index]?.status)
+    expect(A.map(moved, (view) => view.row.problem?.fix?.group)).toEqual(["unit:length", "unit:length", "unit:length"])
     expect(waitingGroups({ views: now, kind: "unit" })).toHaveLength(1)
   })
 
@@ -217,7 +215,7 @@ describe("groups", () => {
     const again = run(reverted.state, { type: "acceptGroup", groupId: "unit:case:kg" })
     // Taken back by the person, they count as the person's decisions, not as the rule's.
     expect(count(views(again.state)).applied).toBe(9)
-    expect(Arr.filter(views(again.state), (view) => view.decided === "accepted")).toHaveLength(8)
+    expect(A.filter(views(again.state), (view) => view.decided === "accepted")).toHaveLength(8)
     expect(count(views(again.state)).ready).toBe(136)
     expect(appliedGroups(views(again.state))).toHaveLength(2)
   })
@@ -250,10 +248,10 @@ describe("the import button and the queue", () => {
   })
 
   it("every answer to Why? in the gallery is 25 words or fewer", () => {
-    const longest = Arr.reduce(rows, 0, (most, row) =>
+    const longest = A.reduce(rows, 0, (most, row) =>
       Math.max(
         most,
-        ...Arr.map([row.problem?.fix, ...(row.applied ?? [])], (fix) => (fix === undefined ? 0 : whyWords(fix.why)))
+        ...A.map([row.problem?.fix, ...(row.applied ?? [])], (fix) => (fix === undefined ? 0 : whyWords(fix.why)))
       )
     )
     expect(longest).toBeLessThanOrEqual(25)
@@ -280,7 +278,7 @@ describe("what the table and the phone show", () => {
     expect(viewOf(state, unit.id).decided).toBe("accepted")
     expect(viewOf(state, copy.id).decided).toBe("kept")
     expect(viewOf(state, cost.id).decided).toBe("edited")
-    expect(Arr.filter(views(state), (view) => view.decided === "auto")).toHaveLength(17)
+    expect(A.filter(views(state), (view) => view.decided === "auto")).toHaveLength(17)
     expect(visible({ views: views(state), filter: "auto" })).toHaveLength(17)
   })
 
@@ -289,23 +287,23 @@ describe("what the table and the phone show", () => {
     const list = visible({ views: all, filter: "needs", kind: "unit" })
     const lines = entries({ list, groups: waitingGroups({ views: all, kind: "unit" }) })
     expect(
-      Arr.join(
-        Arr.map(lines, (line) => (line.type === "group" ? line.group.id : "row")),
+      A.join(
+        A.map(lines, (line) => (line.type === "group" ? line.group.id : "row")),
         " "
       )
-    ).toBe(Arr.join(["unit:each", ...Arr.makeBy(9, () => "row"), "unit:length", "row", "row", "row"], " "))
+    ).toBe(A.join(["unit:each", ...A.makeBy(9, () => "row"), "unit:length", "row", "row", "row"], " "))
     expect(entries({ list, groups: [] })).toHaveLength(12)
   })
 
   it("a low-confidence guess is a question with choices, and choosing for a group is one undo step", () => {
-    const group = Arr.findFirst(
+    const group = A.findFirst(
       waitingGroups({ views: views(emptyState) }),
       (candidate) => candidate.id === "unit:length"
     )
     if (group._tag === "None") throw new Error("no group")
     expect(choicesOf(group.value)).toEqual(["m", "pcs"])
     expect(group.value.why.basis).toMatch(/^\d+ other Bar rows in this file use m; 0 use pcs\.$/)
-    const each = Arr.findFirst(waitingGroups({ views: views(emptyState) }), (candidate) => candidate.id === "unit:each")
+    const each = A.findFirst(waitingGroups({ views: views(emptyState) }), (candidate) => candidate.id === "unit:each")
     expect(each._tag === "Some" ? choicesOf(each.value) : "missing").toBeUndefined()
 
     const chosen = run(emptyState, { type: "chooseGroup", groupId: "unit:length", value: "pcs" })
@@ -321,7 +319,7 @@ describe("what the table and the phone show", () => {
     const all = views(emptyState)
     const decisions = queue({ views: all, split: HashSet.empty() })
     expect(decisions).toHaveLength(2 + 30)
-    expect(Arr.map(Arr.take(decisions, 2), (entry) => entry.type)).toEqual(["group", "group"])
+    expect(A.map(A.take(decisions, 2), (entry) => entry.type)).toEqual(["group", "group"])
     const split = queue({ views: all, split: HashSet.make("unit:length") })
     expect(split).toHaveLength(1 + 33)
   })
@@ -337,20 +335,17 @@ describe("the first screen and the confirm step", () => {
       collapsed: (_kind, hasGroups) => !hasGroups
     })
     expect(
-      Arr.map(
-        Arr.filter(lines, (line) => line.type === "kind"),
+      A.map(
+        A.filter(lines, (line) => line.type === "kind"),
         (line) => (line.type === "kind" ? `${line.kind.id} ${line.rowIds.length} ${line.collapsed}` : "")
       )
     ).toEqual(["unit 12 false", "cost 9 true", "copy 8 true", "below 7 true", "name 6 true"])
-    expect(Arr.filter(lines, (line) => line.type === "row")).toHaveLength(12)
-    expect(Arr.filter(lines, (line) => line.type === "group")).toHaveLength(2)
+    expect(A.filter(lines, (line) => line.type === "row")).toHaveLength(12)
+    expect(A.filter(lines, (line) => line.type === "group")).toHaveLength(2)
   })
 
   it("a group accept leaves out the rows the person unticked", () => {
-    const group = Arr.findFirst(
-      waitingGroups({ views: views(emptyState) }),
-      (candidate) => candidate.id === "unit:each"
-    )
+    const group = A.findFirst(waitingGroups({ views: views(emptyState) }), (candidate) => candidate.id === "unit:each")
     if (group._tag === "None") throw new Error("no group")
     const unticked = group.value.rowIds[0] ?? ""
     const outcome = run(emptyState, { type: "acceptGroup", groupId: "unit:each", except: [unticked] })
@@ -364,12 +359,12 @@ describe("the first screen and the confirm step", () => {
       { type: "leaveOut", rowIds: [firstOf("cost").id] }
     )
     const summary = importSummary(views(state))
-    expect(Arr.reduce(summary, 0, (sum, line) => sum + line.count)).toBe(145)
-    expect(Arr.findFirst(summary, (line) => line.label === "Fixed by a rule")._tag).toBe("Some")
+    expect(A.reduce(summary, 0, (sum, line) => sum + line.count)).toBe(145)
+    expect(A.findFirst(summary, (line) => line.label === "Fixed by a rule")._tag).toBe("Some")
     const csv = Str.split(heldCsv({ views: views(state), columns, problemKinds }), "\n")
     expect(csv).toHaveLength(1 + 33)
     expect(csv[0]).toBe("Row,Reason,Item,SKU,Category,Unit,On hand,Reorder at,Cost,Supplier,Bin,Lead time")
-    expect(Arr.every(Arr.drop(csv, 1), (line) => (Str.split(line, ",")[1] ?? "") !== "")).toBe(true)
+    expect(A.every(A.drop(csv, 1), (line) => (Str.split(line, ",")[1] ?? "") !== "")).toBe(true)
   })
 })
 
@@ -384,16 +379,16 @@ describe("the approved standards", () => {
       problemKinds,
       collapsed: () => false
     })
-    const safe = Arr.flatMap(lines, (line) => (line.type === "kind" ? line.safe : []))
+    const safe = A.flatMap(lines, (line) => (line.type === "kind" ? line.safe : []))
     expect(safe).toHaveLength(17)
     const taken = act({ rows, state: start, action: { type: "accept", rowIds: safe }, recheck })
     expect(taken.label).toBe("17 fixes accepted")
     expect(taken.state.undo).toHaveLength(1)
     const now = count(views(taken.state))
     expect([now.needs, now.ready, now.out, now.applied]).toEqual([42, 136, 0, 0])
-    expect(Arr.filter(views(taken.state), (view) => view.decided === "accepted")).toHaveLength(17)
+    expect(A.filter(views(taken.state), (view) => view.decided === "accepted")).toHaveLength(17)
     // "apply" mode is the empty state: the same 17 are in force on arrival and marked as the rule's.
-    expect(Arr.filter(views(emptyState), (view) => view.decided === "auto")).toHaveLength(17)
+    expect(A.filter(views(emptyState), (view) => view.decided === "auto")).toHaveLength(17)
   })
 
   it("the import result says who decided each change, with the basis and confidence of a fix", () => {
@@ -406,7 +401,7 @@ describe("the approved standards", () => {
       { type: "leaveOut", rowIds: [out.id] }
     )
     const outcome = result({ views: views(state), problemKinds })
-    const changesOf = (rowId: string) => Arr.flatMap(outcome.ready, (row) => (row.id === rowId ? row.changes : []))
+    const changesOf = (rowId: string) => A.flatMap(outcome.ready, (row) => (row.id === rowId ? row.changes : []))
     expect(changesOf(unit.id)).toEqual([
       {
         column: "unit",
@@ -422,20 +417,20 @@ describe("the approved standards", () => {
     expect(changesOf(cost.id)).toEqual([
       { column: "cost", from: "", to: "$4.10", source: "person", decidedBy: "person", how: "typed or chose a value" }
     ])
-    const byRule = Arr.filter(
-      Arr.flatMap(outcome.ready, (row) => row.changes),
+    const byRule = A.filter(
+      A.flatMap(outcome.ready, (row) => row.changes),
       (change) => change.decidedBy === "rule"
     )
     expect(byRule).toHaveLength(17)
-    expect(Arr.every(byRule, (change) => change.how === "applied by a rule" && change.basis !== undefined)).toBe(true)
-    expect(Arr.filter(outcome.held, (row) => row.decidedBy === "person")).toHaveLength(1)
-    expect(Arr.filter(outcome.held, (row) => row.decidedBy === "nobody")).toHaveLength(39)
+    expect(A.every(byRule, (change) => change.how === "applied by a rule" && change.basis !== undefined)).toBe(true)
+    expect(A.filter(outcome.held, (row) => row.decidedBy === "person")).toHaveLength(1)
+    expect(A.filter(outcome.held, (row) => row.decidedBy === "nobody")).toHaveLength(39)
   })
 
   fx.effect("decisions survive a refresh: saved as plain data, through JSON, restored to the same screen state", () =>
     Effect.gen(function* () {
       const copy = firstOf("copy")
-      const state = Arr.reduce(
+      const state = A.reduce(
         [
           { type: "acceptGroup", groupId: "unit:each" },
           { type: "keep", rowId: copy.id },
@@ -450,7 +445,7 @@ describe("the approved standards", () => {
       expect(typeof text).toBe("string")
       const back = restored((yield* S.decodeEffect(Json)(text)) as SavedDecisions)
       const shape = (given: ReviewState) =>
-        Arr.map(views(given), (view) => [
+        A.map(views(given), (view) => [
           view.row.id,
           view.status,
           view.decided ?? "",
@@ -471,12 +466,12 @@ describe("records with a parent: label, choices, rowAction, and undo across view
   const lineViews = (state: ReviewState) => viewRows({ rows: lines, state, recheck: recheckLine })
   const lineRun = (state: ReviewState, action: Action) => act({ rows: lines, state, action, recheck: recheckLine })
   const lineOf = (kind: string): ReviewRow => {
-    const row = Arr.findFirst(lines, (candidate) => candidate.problem?.kind === kind)
+    const row = A.findFirst(lines, (candidate) => candidate.problem?.kind === kind)
     if (row._tag === "None") throw new Error(`no ${kind} line in the gallery's jobs`)
     return row.value
   }
   const lineView = (state: ReviewState, rowId: string) => {
-    const view = Arr.findFirst(lineViews(state), (candidate) => candidate.row.id === rowId)
+    const view = A.findFirst(lineViews(state), (candidate) => candidate.row.id === rowId)
     if (view._tag === "None") throw new Error(`no line ${rowId}`)
     return view.value
   }
@@ -484,25 +479,25 @@ describe("records with a parent: label, choices, rowAction, and undo across view
 
   it("the sample has three kinds of question on its lines", () => {
     expect(lines).toHaveLength(9)
-    expect(Arr.map(lineKinds, (kind) => Arr.filter(lines, (row) => row.problem?.kind === kind.id).length)).toEqual([
+    expect(A.map(lineKinds, (kind) => A.filter(lines, (row) => row.problem?.kind === kind.id).length)).toEqual([
       3, 3, 3
     ])
   })
 
   it("label: a group whose rows end in different values is named by its label, and each row takes its own value", () => {
-    const group = Arr.findFirst(waitingGroups({ views: lineViews(emptyState) }), (found) => found.id === "qty:comma")
+    const group = A.findFirst(waitingGroups({ views: lineViews(emptyState) }), (found) => found.id === "qty:comma")
     if (group._tag === "None") throw new Error("no comma group")
     expect([group.value.label, group.value.rowIds.length]).toEqual(["a decimal point", 3])
     expect(groupUse({ group: group.value, n: 3, ticks: true })).toBe("Use a decimal point for the 3 ticked")
     // Where each row keeps its own answers (`rowAction`) there is no tick: the button acts on all of them.
     expect(groupUse({ group: group.value, n: 3, ticks: false })).toBe("Use a decimal point for all 3")
-    const unit = Arr.findFirst(waitingGroups({ views: views(emptyState) }), (found) => found.id === "unit:each")
+    const unit = A.findFirst(waitingGroups({ views: views(emptyState) }), (found) => found.id === "unit:each")
     if (unit._tag === "None") throw new Error("no unit group")
     expect(groupUse({ group: unit.value, n: 9, ticks: true })).toBe("Use pcs for the 9 ticked")
 
     const taken = lineRun(emptyState, { type: "acceptGroup", groupId: "qty:comma" })
     expect(taken.state.undo).toHaveLength(1)
-    expect(Arr.map(group.value.rowIds, (rowId) => lineView(taken.state, rowId).cells.qty)).toEqual([
+    expect(A.map(group.value.rowIds, (rowId) => lineView(taken.state, rowId).cells.qty)).toEqual([
       "1.5",
       "2.25",
       "0.75"
@@ -510,7 +505,7 @@ describe("records with a parent: label, choices, rowAction, and undo across view
     // One value typed for the whole group is that value on every row: accepted where it is the row's own proposal.
     const chosen = lineRun(emptyState, { type: "chooseGroup", groupId: "qty:comma", value: "1.5" })
     expect(
-      Arr.map(group.value.rowIds, (rowId) => {
+      A.map(group.value.rowIds, (rowId) => {
         const view = lineView(chosen.state, rowId)
         return `${view.cells.qty} ${view.decided ?? ""}`
       })
@@ -523,7 +518,7 @@ describe("records with a parent: label, choices, rowAction, and undo across view
     expect([before.status, before.cells.unit, before.marks.unit]).toEqual(["needs", "length", undefined])
     expect(HashMap.size(proposing(lines).decisions)).toBe(0)
     // A pick is never one of the group decisions, so it is never the screen's one filled button.
-    expect(Arr.some(waitingGroups({ views: lineViews(emptyState) }), (group) => group.rowIds.includes(unit.id))).toBe(
+    expect(A.some(waitingGroups({ views: lineViews(emptyState) }), (group) => group.rowIds.includes(unit.id))).toBe(
       false
     )
     const picked = lineRun(emptyState, { type: "edit", rowId: unit.id, column: "unit", value: "pcs" })
@@ -534,7 +529,7 @@ describe("records with a parent: label, choices, rowAction, and undo across view
       "edited",
       "pcs"
     ])
-    const change = Arr.findFirst(
+    const change = A.findFirst(
       result({ views: lineViews(picked.state), problemKinds: lineKinds }).ready,
       (row) => row.id === unit.id
     )
@@ -555,8 +550,8 @@ describe("records with a parent: label, choices, rowAction, and undo across view
 
   it("a suggested choice says so in words, with its reason, and is the only thing that marks it", () => {
     const choices = lineOf("unit").problem?.choices ?? []
-    expect(Arr.map(choices, choiceText)).toEqual(["m, as 13 of 13 lines with this SKU say (suggested)", "pcs"])
-    expect(Arr.filter(choices, (choice) => choice.suggested === true)).toHaveLength(1)
+    expect(A.map(choices, choiceText)).toEqual(["m, as 13 of 13 lines with this SKU say (suggested)", "pcs"])
+    expect(A.filter(choices, (choice) => choice.suggested === true)).toHaveLength(1)
     expect(choiceText({ value: "40", label: "40 L", note: "as 6 of 7 lines say", suggested: true })).toBe(
       "40 L, as 6 of 7 lines say (suggested)"
     )
@@ -571,11 +566,11 @@ describe("records with a parent: label, choices, rowAction, and undo across view
       { type: "action", label: "Leave job J-2045 out" }
     ])
     // A pick and a row with nothing proposed have no typing among the others: the first is chosen, the second typed.
-    expect(Arr.map(otherAnswers({ view: at("unit"), extra }) ?? [], (answer) => answer.type)).toEqual([
+    expect(A.map(otherAnswers({ view: at("unit"), extra }) ?? [], (answer) => answer.type)).toEqual([
       "leaveOut",
       "action"
     ])
-    expect(Arr.map(otherAnswers({ view: at("stock"), extra }) ?? [], (answer) => answer.type)).toEqual([
+    expect(A.map(otherAnswers({ view: at("stock"), extra }) ?? [], (answer) => answer.type)).toEqual([
       "leaveOut",
       "action"
     ])
@@ -586,7 +581,7 @@ describe("records with a parent: label, choices, rowAction, and undo across view
   })
 
   it("undo survives the region being drawn again from the object onDecisionsChange gave", () => {
-    const state = Arr.reduce(
+    const state = A.reduce(
       [
         { type: "acceptGroup", groupId: "qty:comma" },
         { type: "edit", rowId: lineOf("unit").id, column: "unit", value: "m" }
@@ -609,16 +604,16 @@ describe("records with a parent: label, choices, rowAction, and undo across view
 
   it("the page counts the jobs from the person's answers, not the region", () => {
     const tally = (state: ReviewState, leftOut: ReadonlyArray<string>) =>
-      Arr.map(reviewJobs({ jobs, decisions: saved(state), leftOut }), (review) => review.status)
+      A.map(reviewJobs({ jobs, decisions: saved(state), leftOut }), (review) => review.status)
     const statuses = (list: ReadonlyArray<string>) => [
-      Arr.filter(list, (status) => status === "ready").length,
-      Arr.filter(list, (status) => status === "waiting").length
+      A.filter(list, (status) => status === "ready").length,
+      A.filter(list, (status) => status === "waiting").length
     ]
     expect(statuses(tally(emptyState, []))).toEqual([16, 8])
     const comma = lineRun(emptyState, { type: "acceptGroup", groupId: "qty:comma" }).state
     expect(statuses(tally(comma, []))).toEqual([19, 5])
     const out = tally(emptyState, ["J-2045"])
-    expect([...statuses(out), Arr.filter(out, (status) => status === "out").length]).toEqual([16, 7, 1])
+    expect([...statuses(out), A.filter(out, (status) => status === "out").length]).toEqual([16, 7, 1])
     expect(questionRows(jobs, ["J-2045"])).toHaveLength(7)
   })
 })

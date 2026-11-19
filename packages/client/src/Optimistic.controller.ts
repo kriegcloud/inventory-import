@@ -6,7 +6,7 @@
 // one, a take-back, a model's answer) is not written here: it shows its progress instead (CLAUDE.md, "Adding a
 // feature").
 import { type QueryKey, useMutation, useQueryClient } from "@tanstack/react-query"
-import type { Effect } from "effect"
+import type * as Effect from "effect/Effect"
 import type { Call } from "@inventory/client/ApiRuntime"
 import { toastError } from "@inventory/client/SayError"
 import { rollback } from "@inventory/client/Rollback"

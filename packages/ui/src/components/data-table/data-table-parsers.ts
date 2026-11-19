@@ -1,5 +1,5 @@
 import { createParser, parseAsNativeArrayOf } from "@inventory/ui/components/data-table/data-table-state"
-import { Option } from "effect"
+import * as O from "effect/Option"
 import * as S from "effect/Schema"
 
 import type {
@@ -141,7 +141,7 @@ const decodeSortingJson = S.decodeUnknownOption(S.fromJsonString(S.Array(S.Struc
 
 function parseSorting(value: string): ColumnSortItem[] | null {
   if (value.startsWith("[")) {
-    return Option.match(decodeSortingJson(value), {
+    return O.match(decodeSortingJson(value), {
       onNone: () => null,
       onSome: (items) => items.map(({ id, desc }) => ({ id, desc }))
     })

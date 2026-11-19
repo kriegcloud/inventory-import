@@ -9,7 +9,11 @@
  * collection.
  */
 import { isKept, isLeftOut, kept, leftOut, putBack, ReviewDecision } from "@inventory/review/ReviewDecision"
-import { HashMap, HashSet, MutableHashMap, MutableHashSet, Option } from "effect"
+import * as HashMap from "effect/HashMap"
+import * as HashSet from "effect/HashSet"
+import * as MutableHashMap from "effect/MutableHashMap"
+import * as MutableHashSet from "effect/MutableHashSet"
+import * as O from "effect/Option"
 import type {
   CellMark,
   DraftStep,
@@ -345,7 +349,7 @@ export function count(views: ReadonlyArray<RowView>): Counts {
     } else {
       needs += 1
       const kind = view.problem?.kind ?? ""
-      MutableHashMap.set(kinds, kind, Option.getOrElse(MutableHashMap.get(kinds, kind), () => 0) + 1)
+      MutableHashMap.set(kinds, kind, O.getOrElse(MutableHashMap.get(kinds, kind), () => 0) + 1)
     }
     for (const fix of view.row.applied ?? []) {
       const mark = view.marks[fix.column]
@@ -366,8 +370,7 @@ export function count(views: ReadonlyArray<RowView>): Counts {
 }
 
 /** Undecided rows of one problem kind: none when the kind has no row waiting. */
-export const kindCount = (counts: Counts, kind: string): number =>
-  Option.getOrElse(HashMap.get(counts.kinds, kind), () => 0)
+export const kindCount = (counts: Counts, kind: string): number => O.getOrElse(HashMap.get(counts.kinds, kind), () => 0)
 
 /** The rows a filter shows, in file order. A problem kind narrows the needs view only. */
 export function visible(input: {
@@ -404,8 +407,7 @@ const mixedOf = (group: Gathered): { mixed?: boolean } =>
 
 const variantsOf = (froms: ReadonlyArray<string>): ReadonlyArray<{ from: string; count: number }> => {
   const tally = MutableHashMap.empty<string, number>()
-  for (const from of froms)
-    MutableHashMap.set(tally, from, Option.getOrElse(MutableHashMap.get(tally, from), () => 0) + 1)
+  for (const from of froms) MutableHashMap.set(tally, from, O.getOrElse(MutableHashMap.get(tally, from), () => 0) + 1)
   return [...tally].map(([from, n]) => ({ from, count: n })).sort((a, b) => b.count - a.count)
 }
 
@@ -423,7 +425,7 @@ export function waitingGroups(input: {
     // A row that cannot be imported as written is never part of a one-press group.
     if (view.status !== "needs" || view.blocked === true || fix === undefined || fix.group === undefined) continue
     if (input.kind !== undefined && view.problem?.kind !== input.kind) continue
-    const group = Option.getOrElse(MutableHashMap.get(found, fix.group), (): Gathered => ({
+    const group = O.getOrElse(MutableHashMap.get(found, fix.group), (): Gathered => ({
       fix,
       rowIds: [],
       froms: []
@@ -455,7 +457,7 @@ export function appliedGroups(views: ReadonlyArray<RowView>): ReadonlyArray<FixG
       const mark = view.marks[fix.column]
       if (mark === undefined || mark.state !== "applied" || mark.by === "you") continue
       const id = fix.group ?? `${fix.column}:${fix.to}`
-      const group = Option.getOrElse(MutableHashMap.get(found, id), (): Gathered => ({ fix, rowIds: [], froms: [] }))
+      const group = O.getOrElse(MutableHashMap.get(found, id), (): Gathered => ({ fix, rowIds: [], froms: [] }))
       MutableHashMap.set(found, id, gather(group, view.row.id, mark.from, fix))
     }
   }
@@ -529,7 +531,7 @@ const swap = (
 ): { decisions: HashMap.HashMap<string, RowDecision>; mirror: UndoStep } => {
   const mirror: UndoStep = {
     label: step.label,
-    before: HashMap.map(step.before, (_, rowId) => Option.getOrUndefined(HashMap.get(decisions, rowId))),
+    before: HashMap.map(step.before, (_, rowId) => O.getOrUndefined(HashMap.get(decisions, rowId))),
     focus: step.focus
   }
   const next = HashMap.mutate(decisions, (draft) => {
@@ -592,9 +594,8 @@ export function act(input: {
     ...(input.rejects === undefined ? {} : { rejects: input.rejects })
   })
   const byId = MutableHashMap.fromIterable(views.map((view) => [view.row.id, view] as const))
-  const viewOf = (rowId: string): RowView | undefined => Option.getOrUndefined(MutableHashMap.get(byId, rowId))
-  const decisionOf = (rowId: string): RowDecision | undefined =>
-    Option.getOrUndefined(HashMap.get(state.decisions, rowId))
+  const viewOf = (rowId: string): RowView | undefined => O.getOrUndefined(MutableHashMap.get(byId, rowId))
+  const decisionOf = (rowId: string): RowDecision | undefined => O.getOrUndefined(HashMap.get(state.decisions, rowId))
   const next = MutableHashMap.empty<string, RowDecision>()
   let label = ""
 
@@ -873,7 +874,7 @@ export const reasonOf = (input: {
   if (problem.reason !== undefined && problem.reason !== "") return problem.reason
   // A fix carries the evidence for itself: the next best sentence when the caller gave no reason.
   if (problem.fix !== undefined && problem.fix.why.basis !== "") return problem.fix.why.basis
-  const kind = Option.getOrUndefined(HashMap.get(input.kinds, problem.kind))
+  const kind = O.getOrUndefined(HashMap.get(input.kinds, problem.kind))
   return kind?.help ?? kind?.label ?? problem.kind
 }
 
@@ -909,7 +910,7 @@ export function entries(input: {
   if (input.groups.length === 0) return rows(input.list)
   const owner = MutableHashMap.empty<string, string>()
   for (const group of input.groups) for (const rowId of group.rowIds) MutableHashMap.set(owner, rowId, group.id)
-  const ownerOf = (view: RowView): string | undefined => Option.getOrUndefined(MutableHashMap.get(owner, view.row.id))
+  const ownerOf = (view: RowView): string | undefined => O.getOrUndefined(MutableHashMap.get(owner, view.row.id))
   const out: Array<Entry> = []
   for (const group of input.groups) {
     out.push({ type: "group", group, applied: input.applied === true })

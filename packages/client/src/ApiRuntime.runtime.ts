@@ -2,8 +2,14 @@
 // contract (one runtime, one DevTools connection) and each web package binds these helpers to the client tag it
 // declares, so a screen calls `call((api) => api.people.list())` against its own context's groups only. The rule this
 // file protects: a write is retried only for a failure that may pass, never for a refusal.
-import { Cause, Context, Effect, Exit, type Fiber, type ManagedRuntime, Schedule } from "effect"
-import { SecureRandom } from "effect/crypto"
+import * as Cause from "effect/Cause"
+import * as Context from "effect/Context"
+import * as Effect from "effect/Effect"
+import * as Exit from "effect/Exit"
+import type * as Fiber from "effect/Fiber"
+import type * as ManagedRuntime from "effect/ManagedRuntime"
+import * as Schedule from "effect/Schedule"
+import * as SecureRandom from "effect/crypto/SecureRandom"
 import { createContext, useContext, useMemo } from "react"
 import { RequestId } from "@inventory/kernel/Ids"
 import { isTransient } from "@inventory/client/SayError"

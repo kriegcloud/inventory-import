@@ -5,7 +5,9 @@
 // never shown half; and Confirm clears it. The decisions are small and go to localStorage, written before the next
 // frame; the file itself is a Blob in IndexedDB, written once when it is chosen and read again by the worker on return.
 import * as S from "effect/Schema"
-import { type DateTime, Effect, Option } from "effect"
+import type * as DateTime from "effect/DateTime"
+import * as Effect from "effect/Effect"
+import * as O from "effect/Option"
 import { ReviewDecisionFromFlags, RowKey } from "@inventory/review/ReviewDecision"
 import { fromDraft, toDraft } from "@inventory/review/ReviewDraft"
 import type { DraftStep, SavedDecisions } from "@inventory/review/ReviewTypes"
@@ -113,8 +115,8 @@ export class SavedProgress extends S.Opaque<SavedProgress, { readonly brand: uni
     SavedProgress.make({
       version: 1,
       step: "upload",
-      file: Option.none(),
-      review: Option.none(),
+      file: O.none(),
+      review: O.none(),
       decided: 0,
       needed: 0,
       savedAt
@@ -171,14 +173,14 @@ export const clearProgress = (storage: ProgressStorage, scope: ProgressScope): v
 const toStoredStep = (step: DraftStep): StoredStep =>
   StoredStep.make({
     label: step.label,
-    before: step.before.map(([rowId, decision]) => [rowId, Option.fromNullOr(decision)] as const),
-    focus: Option.fromNullOr(step.focus)
+    before: step.before.map(([rowId, decision]) => [rowId, O.fromNullOr(decision)] as const),
+    focus: O.fromNullOr(step.focus)
   })
 
 const fromStoredStep = (step: StoredStep): DraftStep => ({
   label: step.label,
-  before: step.before.map(([rowId, decision]) => [rowId, Option.getOrNull(decision)] as const),
-  focus: Option.getOrNull(step.focus)
+  before: step.before.map(([rowId, decision]) => [rowId, O.getOrNull(decision)] as const),
+  focus: O.getOrNull(step.focus)
 })
 
 /** The decisions handed out by the review region, as stored, undo history included. */

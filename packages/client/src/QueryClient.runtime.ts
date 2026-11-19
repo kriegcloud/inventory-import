@@ -3,7 +3,7 @@
 // retried by the client; a refetch that answers what is already held keeps the object already held. The query keys
 // are each web package's own.
 import { QueryClient, replaceEqualDeep } from "@tanstack/react-query"
-import { Equal } from "effect"
+import * as Eq from "effect/Equal"
 import { dual } from "effect/Function"
 import { isTransient } from "@inventory/client/SayError"
 
@@ -20,7 +20,7 @@ export const sameWhenEqual: {
   (answered: unknown): (held: unknown) => unknown
   (held: unknown, answered: unknown): unknown
 } = dual(2, (held: unknown, answered: unknown): unknown =>
-  Equal.equals(held, answered) ? held : replaceEqualDeep(held, answered)
+  Eq.equals(held, answered) ? held : replaceEqualDeep(held, answered)
 )
 
 /**

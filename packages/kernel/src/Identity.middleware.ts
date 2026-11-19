@@ -5,7 +5,7 @@
  *
  * @packageDocumentation
  */
-import { HttpApiMiddleware } from "effect/http-api"
+import * as HttpApiMiddleware from "effect/http-api/HttpApiMiddleware"
 import { NotSignedIn } from "./AccessError.errors.ts"
 import { CurrentActor } from "./Actor.context.ts"
 import { $KernelId } from "./internal/identity.ts"

@@ -12,7 +12,7 @@ import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
-import { HttpApiMiddleware } from "effect/http-api"
+import * as HttpApiMiddleware from "effect/http-api/HttpApiMiddleware"
 import { CrossSiteRequest } from "./AccessError.errors.ts"
 import { $KernelId } from "./internal/identity.ts"
 

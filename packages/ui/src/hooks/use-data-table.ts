@@ -10,7 +10,8 @@ import {
   type Updater,
   useTable
 } from "@tanstack/react-table"
-import { Array as Arr, Effect } from "effect"
+import * as A from "effect/Array"
+import * as Effect from "effect/Effect"
 import * as React from "react"
 
 import type { ColumnFilterItem, JoinOperator } from "@inventory/ui/components/data-table/data-table-types"
@@ -312,7 +313,7 @@ function useDataTable<TData extends RowData>({
 }
 
 function getFilterColumnOrder(filters: ColumnFilterItem[]) {
-  return stringify(Arr.dedupe(filters.map((filter) => filter.id)))
+  return stringify(A.dedupe(filters.map((filter) => filter.id)))
 }
 
 function getGlobalFilterValue(value: unknown) {

@@ -2,13 +2,15 @@
 // values. Without it, everything memoized on fetched data is rebuilt on every refetch.
 import { describe, expect, it } from "@effect/vitest"
 import { sameWhenEqual } from "@inventory/client/QueryClient"
-import { BigDecimal, DateTime, Option } from "effect"
+import * as BigDecimal from "effect/BigDecimal"
+import * as DateTime from "effect/DateTime"
+import * as O from "effect/Option"
 
 const answer = () => ({
   total: 3,
   cost: BigDecimal.fromStringUnsafe("12.50"),
-  range: { min: Option.some(1), max: Option.none<number>() },
-  rows: [{ id: "a", at: DateTime.makeUnsafe("2026-01-01T00:00:00.000Z"), note: Option.some("x") }]
+  range: { min: O.some(1), max: O.none<number>() },
+  rows: [{ id: "a", at: DateTime.makeUnsafe("2026-01-01T00:00:00.000Z"), note: O.some("x") }]
 })
 
 describe("what a refetch keeps", () => {

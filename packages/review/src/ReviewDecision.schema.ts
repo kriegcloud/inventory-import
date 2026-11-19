@@ -6,7 +6,8 @@
  * @packageDocumentation
  */
 import { LiteralKit } from "@beep/schema/LiteralKit"
-import { Effect, Tuple } from "effect"
+import * as Effect from "effect/Effect"
+import * as Tuple from "effect/Tuple"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import * as SchemaTransformation from "effect/SchemaTransformation"

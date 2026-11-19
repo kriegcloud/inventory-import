@@ -22,7 +22,7 @@ import { call } from "@/lib/api"
 import { contentWidth, useIsNarrow } from "@inventory/ui/ContentWidth"
 import { navigate, useLocation } from "@inventory/ui/Route"
 import { hasRole } from "@inventory/kernel/Role"
-import type { StoredItem } from "../../domain/Item.ts"
+import { discontinuedOn, isActive, type StoredItem } from "../../domain/Item.ts"
 import { itemPageSizes } from "../../domain/ItemQuery.ts"
 import { day, when } from "./import/format.tsx"
 import { ItemEditor } from "./ItemEditor.tsx"
@@ -376,10 +376,10 @@ export function ItemsPage() {
         meta: { label: labels.reorderPoint },
         size: widths.reorderPoint[0]
       }),
-      col.accessor("isActive", {
+      col.accessor((item) => isActive(item.stocking), {
         id: "isActive",
         header: labels.isActive,
-        cell: ({ row }) => yesNo(row.original.isActive),
+        cell: ({ row }) => yesNo(isActive(row.original.stocking)),
         meta: { label: labels.isActive, options: flagOptions(found?.isActive) },
         size: widths.isActive[0]
       }),
@@ -415,15 +415,14 @@ export function ItemsPage() {
         meta: { label: labels.firstReceivedOn },
         size: widths.firstReceivedOn[0]
       }),
-      col.accessor("discontinuedOn", {
+      col.accessor((item) => Option.getOrElse(discontinuedOn(item.stocking), () => ""), {
         id: "discontinuedOn",
         header: labels.discontinuedOn,
         cell: ({ row }) =>
-          row.original.discontinuedOn === null ? (
-            <NotSet />
-          ) : (
-            <span className="tabular-nums">{row.original.discontinuedOn}</span>
-          ),
+          Option.match(discontinuedOn(row.original.stocking), {
+            onNone: () => <NotSet />,
+            onSome: (day) => <span className="tabular-nums">{day}</span>
+          }),
         meta: { label: labels.discontinuedOn },
         size: widths.discontinuedOn[0]
       }),
@@ -552,7 +551,7 @@ export function ItemsPage() {
     (columnId === "reorderPoint" && Option.isNone(item.reorderPoint)) ||
     (columnId === "tags" && item.tags.length === 0) ||
     (columnId === "firstReceivedOn" && Option.isNone(item.firstReceivedOn)) ||
-    (columnId === "discontinuedOn" && item.discontinuedOn === null) ||
+    (columnId === "discontinuedOn" && Option.isNone(discontinuedOn(item.stocking))) ||
     (columnId === "dimensions" && Option.isNone(item.dimensions)) ||
     (columnId === "vendors" && item.vendors.length === 0)
 

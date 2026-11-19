@@ -64,9 +64,8 @@ layer(TypedApp)("an import of items", (it) => {
         const crate = bySku("XRR-0266")
         expect(crate).toMatchObject({
           name: "Fiberglass Crate",
-          isActive: false,
           lotTracked: false,
-          discontinuedOn: "2025-02-26",
+          stocking: { kind: "discontinued", on: "2025-02-26" },
           tags: ["fragile"],
           dimensions: Option.some({ length: 97.4, width: 6.9, height: 4.4, unit: "cm" })
         })
@@ -154,10 +153,9 @@ layer(TypedApp)("an import of items", (it) => {
               unitCost: "4.6",
               quantityOnHand: crate.quantityOnHand,
               reorderPoint: crate.reorderPoint,
-              isActive: crate.isActive,
+              stocking: crate.stocking,
               lotTracked: crate.lotTracked,
-              firstReceivedOn: crate.firstReceivedOn,
-              discontinuedOn: crate.discontinuedOn
+              firstReceivedOn: crate.firstReceivedOn
             }
           })
           .pipe(marcus)

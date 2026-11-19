@@ -10,7 +10,7 @@ import { SecureRandom } from "effect/crypto"
 import { SqlClient, SqlSchema, type Statement } from "effect/sql"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { type Member } from "@inventory/kernel/Member"
-import { ItemEdit, type StoredItem } from "../domain/Item.ts"
+import { discontinuedOn, ItemEdit, type StoredItem } from "../domain/Item.ts"
 import {
   type FilterOperator,
   type ItemFacets,
@@ -23,12 +23,12 @@ import {
   type ItemSortColumn
 } from "../domain/ItemQuery.ts"
 import { phrase, plan, searchWords, type WordMatch, wordsToCheck } from "../domain/ItemSearch.ts"
-import { itemColumns, ItemRow } from "./Imports.ts"
+import { itemColumns, ItemRow, storedItem } from "./Imports.ts"
 import { D1, NoRows } from "@beep/d1/D1"
 
 // The stored column behind each id the table may send. Typed as a field of a stored item, so a column that does not
 // exist is a type error here rather than a query that fails, or matches nothing, at run time.
-const filterColumns: { readonly [K in ItemFilterColumn]: keyof StoredItem } = {
+const filterColumns: { readonly [K in ItemFilterColumn]: keyof ItemRow } = {
   name: "name",
   sku: "sku",
   description: "description",
@@ -42,7 +42,7 @@ const filterColumns: { readonly [K in ItemFilterColumn]: keyof StoredItem } = {
 
 // `text` columns sort ignoring case, so "anchor" sits with "Anchor" and not after every capital letter.
 const sortColumns: {
-  readonly [K in ItemSortColumn]: { readonly column: keyof StoredItem; readonly text: boolean }
+  readonly [K in ItemSortColumn]: { readonly column: keyof ItemRow; readonly text: boolean }
 } = {
   name: { column: "name", text: true },
   sku: { column: "sku", text: true },
@@ -470,7 +470,7 @@ export class Items extends Context.Service<
           pageCount(narrowed)(organizationId)
         ])
         const total = Option.match(Arr.head(count), { onNone: () => 0, onSome: (row) => row.n })
-        return { data, total, pageCount: Math.ceil(total / query.perPage) }
+        return { data: Arr.map(data, storedItem), total, pageCount: Math.ceil(total / query.perPage) }
       }, Effect.orDie)
 
       const facets = Effect.fn("Items.facets")(function* (organizationId: OrganizationId) {
@@ -505,14 +505,18 @@ export class Items extends Context.Service<
         Result: ItemRow,
         execute: ({ org, id }) => sql`SELECT ${itemColumns(sql)} FROM item WHERE organizationId = ${org} AND id = ${id}`
       })
+      // The edit's stocking as the two columns that store it: the active bit, and the discontinued day or NULL.
+      const activeBit = (edit: (typeof ItemEdit)["Encoded"]): number => (edit.stocking.kind === "active" ? 1 : 0)
+      const discontinuedDay = (edit: (typeof ItemEdit)["Encoded"]): string | null =>
+        edit.stocking.kind === "discontinued" ? edit.stocking.on : null
       // True while the item is at the revision the edit was made on and holds something other than the edit says.
       const editable = (r: typeof EditRequest.Encoded) => sql`EXISTS (SELECT 1 FROM item
         WHERE organizationId = ${r.org} AND id = ${r.id} AND revision = ${r.edit.revision}
           AND (name IS NOT ${r.edit.name} OR description IS NOT ${r.edit.description}
             OR category IS NOT ${r.edit.category} OR uom IS NOT ${r.edit.uom} OR unitCost IS NOT ${r.edit.unitCost}
             OR quantityOnHand IS NOT ${r.edit.quantityOnHand} OR reorderPoint IS NOT ${r.edit.reorderPoint}
-            OR isActive IS NOT ${r.edit.isActive ? 1 : 0} OR lotTracked IS NOT ${r.edit.lotTracked ? 1 : 0}
-            OR firstReceivedOn IS NOT ${r.edit.firstReceivedOn} OR discontinuedOn IS NOT ${r.edit.discontinuedOn}))`
+            OR isActive IS NOT ${activeBit(r.edit)} OR lotTracked IS NOT ${r.edit.lotTracked ? 1 : 0}
+            OR firstReceivedOn IS NOT ${r.edit.firstReceivedOn} OR discontinuedOn IS NOT ${discontinuedDay(r.edit)}))`
       // The audit line first, while the condition can still be true, then the change under the same condition.
       const editedLine = D1.statement({
         Request: EditRequest,
@@ -528,8 +532,8 @@ export class Items extends Context.Service<
         execute: (r) => sql`UPDATE item SET name = ${r.edit.name}, description = ${r.edit.description},
             category = ${r.edit.category}, uom = ${r.edit.uom}, unitCost = ${r.edit.unitCost},
             quantityOnHand = ${r.edit.quantityOnHand}, reorderPoint = ${r.edit.reorderPoint},
-            isActive = ${r.edit.isActive ? 1 : 0}, lotTracked = ${r.edit.lotTracked ? 1 : 0},
-            firstReceivedOn = ${r.edit.firstReceivedOn}, discontinuedOn = ${r.edit.discontinuedOn},
+            isActive = ${activeBit(r.edit)}, lotTracked = ${r.edit.lotTracked ? 1 : 0},
+            firstReceivedOn = ${r.edit.firstReceivedOn}, discontinuedOn = ${discontinuedDay(r.edit)},
             revision = revision + 1, updatedById = ${r.actor}, updatedBy = ${r.name}, updatedAt = ${r.at}
           WHERE organizationId = ${r.org} AND id = ${r.id} AND ${editable(r)}
           RETURNING ${itemColumns(sql)}`
@@ -543,10 +547,10 @@ export class Items extends Context.Service<
         item.unitCost === edit.unitCost &&
         item.quantityOnHand === edit.quantityOnHand &&
         Equal.equals(item.reorderPoint, edit.reorderPoint) &&
-        item.isActive === edit.isActive &&
+        item.stocking.kind === edit.stocking.kind &&
+        Equal.equals(discontinuedOn(item.stocking), discontinuedOn(edit.stocking)) &&
         item.lotTracked === edit.lotTracked &&
-        Equal.equals(item.firstReceivedOn, edit.firstReceivedOn) &&
-        item.discontinuedOn === edit.discontinuedOn
+        Equal.equals(item.firstReceivedOn, edit.firstReceivedOn)
 
       const edit = Effect.fn("Items.edit")(function* (actor: Member, id: string, change: ItemEdit) {
         const at = yield* DateTime.now.pipe(Effect.map(DateTime.formatIso))
@@ -554,13 +558,14 @@ export class Items extends Context.Service<
         const request = { org: actor.organizationId, actor: actor.id, name: actor.name, id, activity, at, edit: change }
         const [, edited] = yield* batch([editedLine(request), editItem(request)])
         const written = Arr.head(edited)
-        if (Option.isSome(written)) return { _tag: "Edited" as const, item: written.value }
+        if (Option.isSome(written)) return { _tag: "Edited" as const, item: storedItem(written.value) }
         // Nothing was written: the item is gone, already says what the edit says, or was changed by someone else.
         const now = yield* findItem({ org: actor.organizationId, id })
         if (Option.isNone(now)) return { _tag: "Missing" as const }
-        return same(now.value, change)
-          ? { _tag: "Same" as const, item: now.value }
-          : { _tag: "Changed" as const, item: now.value }
+        const stored = storedItem(now.value)
+        return same(stored, change)
+          ? { _tag: "Same" as const, item: stored }
+          : { _tag: "Changed" as const, item: stored }
       }, Effect.orDie)
 
       return Items.of({ page, facets, edit })

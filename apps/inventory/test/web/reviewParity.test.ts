@@ -27,7 +27,7 @@ import {
   waitingGroups
 } from "@inventory/review/ReviewDraft"
 import type { ReviewRow, ReviewState } from "@inventory/review/ReviewTypes"
-import type { ItemFields } from "../../src/domain/Item.ts"
+import { active, type ItemFields } from "../../src/domain/Item.ts"
 import {
   regionKinds,
   storedChoice,
@@ -242,8 +242,8 @@ describe("a row discontinued yet active, on the screen", () => {
           Option.getOrUndefined(Arr.findFirst(views, (candidate) => candidate.row.id === "row-45"))?.status,
           answer
         ).toBe("ready")
-        expect([row?.item?.isActive, row?.item?.discontinuedOn], answer).toEqual(
-          answer === "Not active" ? [false, "2025-06-30"] : [true, null]
+        expect(row?.item?.stocking, answer).toEqual(
+          answer === "Not active" ? { kind: "discontinued", on: "2025-06-30" } : { kind: "active" }
         )
         // Undone, the row asks again on both sides.
         s.press({ type: "undo" })
@@ -313,11 +313,10 @@ describe("what the review screen is handed for a pick, for spaces and for a stor
         unitCost: "1",
         quantityOnHand: 0,
         reorderPoint: Option.none(),
-        isActive: true,
+        stocking: active,
         lotTracked: false,
         tags: [],
         firstReceivedOn: Option.none(),
-        discontinuedOn: null,
         dimensions: Option.none(),
         vendors: []
       }

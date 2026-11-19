@@ -5,7 +5,7 @@
 // only one that deletes from it or puts a replaced item back; each is one atomic batch whose
 // every statement checks the same condition (the import is still open; the confirm is still in force), so a second
 // press, a retry or another tab writes nothing.
-import { Array as Arr, Context, DateTime, Effect, Layer, Option, Order, Record as Rec, Result } from "effect"
+import { Array as Arr, Context, DateTime, Effect, Layer, Option, Order, Record as Rec, Result, Struct } from "effect"
 import * as S from "effect/Schema"
 import { SecureRandom } from "effect/crypto"
 import { SqlClient, SqlSchema, type Statement } from "effect/sql"
@@ -28,6 +28,7 @@ import {
   type ItemFields,
   ItemFields as ItemFieldsSchema,
   skuKey,
+  stockingOf,
   StoredItem,
   Vendor
 } from "../domain/Item.ts"
@@ -133,15 +134,26 @@ const bySize = <A>(rows: ReadonlyArray<A>, size: (row: A) => number): ReadonlyAr
 /**
  * An item as SQLite stores it, decoded by the services that read `item` (here and `Items`): the two switches are 0 or
  * 1, and tags, dimensions and vendors are JSON text, each checked against its Schema on the way out as on the way in.
+ * Whether it is in use is two columns here, `isActive` and `discontinuedOn`; `storedItem` reads them as one `stocking`.
  */
 export const ItemRow = S.Struct({
-  ...StoredItem.fields,
+  ...Struct.omit(StoredItem.fields, ["stocking"]),
   isActive: S.BooleanFromBit,
+  discontinuedOn: S.OptionFromNullOr(S.String),
   lotTracked: S.BooleanFromBit,
   tags: S.String.pipe(S.Array, S.fromJsonString),
   dimensions: Dimensions.pipe(S.fromJsonString, S.OptionFromNullOr),
   vendors: Vendor.pipe(S.Array, S.fromJsonString)
 }).annotate({ description: "An item row as SQLite stores it" })
+
+/** The decoded value of `ItemRow`: an item's columns as SQLite stores them. */
+export type ItemRow = typeof ItemRow.Type
+
+/** The item a row holds: its two stocking columns read as one value (the table's CHECK refuses the impossible pair). */
+export const storedItem = (row: ItemRow): StoredItem => {
+  const { discontinuedOn, isActive, ...rest } = row
+  return { ...rest, stocking: stockingOf({ isActive, discontinuedOn }) }
+}
 
 /** The columns of `item` that `ItemRow` reads, in one place for every query that answers items. */
 export const itemColumns = (sql: SqlClient.SqlClient) =>
@@ -1022,7 +1034,7 @@ export class Imports extends Context.Service<
           (some) => findStored({ org: organizationId, keys: some }),
           { concurrency: 1 }
         )
-        return Arr.flatten(found)
+        return Arr.map(Arr.flatten(found), storedItem)
       }, Effect.orDie)
 
       const findFixed = SqlSchema.findOne({
@@ -1070,9 +1082,9 @@ export class Imports extends Context.Service<
           SELECT json_extract(value, '$.id'), ${r.org}, json_extract(value, '$.sku'), json_extract(value, '$.skuKey'),
             json_extract(value, '$.name'), json_extract(value, '$.description'), json_extract(value, '$.category'),
             json_extract(value, '$.uom'), json_extract(value, '$.unitCost'), json_extract(value, '$.quantityOnHand'),
-            json_extract(value, '$.reorderPoint'), json_extract(value, '$.isActive'),
+            json_extract(value, '$.reorderPoint'), json_extract(value, '$.stocking.kind') = 'active',
             json_extract(value, '$.lotTracked'), json_extract(value, '$.tags'),
-            json_extract(value, '$.firstReceivedOn'), json_extract(value, '$.discontinuedOn'),
+            json_extract(value, '$.firstReceivedOn'), json_extract(value, '$.stocking.on'),
             json_extract(value, '$.dimensions'), json_extract(value, '$.vendors'), ${r.id},
             ${r.batch}, json_extract(value, '$.rowNumber'), json_extract(value, '$.part'), ${r.actor}, ${r.name}, ${r.at}
           FROM json_each(${r.items}) WHERE ${thisConfirm(r.org, r.batch)}
@@ -1105,10 +1117,11 @@ export class Imports extends Context.Service<
             description = json_extract(j.value, '$.description'), category = json_extract(j.value, '$.category'),
             uom = json_extract(j.value, '$.uom'), unitCost = json_extract(j.value, '$.unitCost'),
             quantityOnHand = json_extract(j.value, '$.quantityOnHand'),
-            reorderPoint = json_extract(j.value, '$.reorderPoint'), isActive = json_extract(j.value, '$.isActive'),
+            reorderPoint = json_extract(j.value, '$.reorderPoint'),
+            isActive = json_extract(j.value, '$.stocking.kind') = 'active',
             lotTracked = json_extract(j.value, '$.lotTracked'), tags = json_extract(j.value, '$.tags'),
             firstReceivedOn = json_extract(j.value, '$.firstReceivedOn'),
-            discontinuedOn = json_extract(j.value, '$.discontinuedOn'),
+            discontinuedOn = json_extract(j.value, '$.stocking.on'),
             dimensions = json_extract(j.value, '$.dimensions'), vendors = json_extract(j.value, '$.vendors'),
             revision = revision + 1, updatedById = ${r.actor}, updatedBy = ${r.name}, updatedAt = ${r.at}
           FROM json_each(${r.items}) AS j
@@ -1563,7 +1576,7 @@ export class Imports extends Context.Service<
           return Arr.map(rows, ({ part, ...row }) => ({ ...row, ...partOf(part) }))
         }),
         items: Effect.fn("Imports.items")(function* (organizationId: OrganizationId) {
-          return yield* findItems(organizationId).pipe(Effect.orDie)
+          return yield* findItems(organizationId).pipe(Effect.map(Arr.map(storedItem)), Effect.orDie)
         })
       })
     })

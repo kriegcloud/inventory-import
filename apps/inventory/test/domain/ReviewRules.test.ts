@@ -3,7 +3,15 @@
 // quotes, and what an edit of one item may not say.
 import { describe, expect, it } from "@effect/vitest"
 import { Array as Arr, Effect, Option } from "effect"
-import { editProblem, type ItemEdit, type ItemFields } from "../../src/domain/Item.ts"
+import {
+  active,
+  discontinued,
+  editProblem,
+  inactive,
+  type ItemEdit,
+  type ItemFields,
+  stockingOf
+} from "../../src/domain/Item.ts"
 import { type Review, review } from "../../src/domain/ItemImport.ts"
 import { stage, textFile } from "../server/support/files.ts"
 
@@ -106,15 +114,22 @@ describe("an edit of one item", () => {
     unitCost: "9.5",
     quantityOnHand: 4,
     reorderPoint: Option.none(),
-    isActive: true,
+    stocking: active,
     lotTracked: false,
-    firstReceivedOn: Option.none(),
-    discontinuedOn: null
+    firstReceivedOn: Option.none()
   }
-  it("is refused when discontinued yet active, on a date off the calendar, and with a name of only spaces", () => {
+  it("is refused on a date off the calendar and with a name of only spaces; discontinued and active cannot be said", () => {
     expect(editProblem(edit)).toBeNull()
-    expect(editProblem({ ...edit, discontinuedOn: "2024-06-19" })).toContain("A discontinued item is not active")
-    expect(editProblem({ ...edit, discontinuedOn: "2024-06-19", isActive: false })).toBeNull()
+    expect(editProblem({ ...edit, stocking: discontinued("2024-06-19") })).toBeNull()
+    expect(editProblem({ ...edit, stocking: discontinued("2024-13-45") })).toContain("not a day on the calendar")
+    // The two values the item is stored with read as one: a date wins over the flag, so no item is both.
+    expect(stockingOf({ isActive: true, discontinuedOn: Option.some("2024-06-19") })).toEqual(
+      discontinued("2024-06-19")
+    )
+    expect([stockingOf({ isActive: true, discontinuedOn: Option.none() }).kind, inactive.kind]).toEqual([
+      "active",
+      "inactive"
+    ])
     expect(editProblem({ ...edit, firstReceivedOn: Option.some("2024-13-45") })).toContain("not a day on the calendar")
     expect(editProblem({ ...edit, name: "   " })).toBe("Name is empty. Every item needs a name.")
   })

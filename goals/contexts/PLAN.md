@@ -140,4 +140,21 @@ None.
     received" "Not set" and "2024-09-11"; the editor's Dimensions "69 × 27.3 × 45.4 cm"; typed 40 in Reorder point
     and cleared Description, Save: "Saved AAT-7076", the request sent `"description":null,"reorderPoint":40`, and
     the row reads "40 BX" after a reload; saving the same values again answered 200.
+- **catalog (c), `Stocking`.** An item, its fields and an edit carry `stocking`: `active`, `inactive` or
+  `discontinued { on }`, in place of `isActive` beside `discontinuedOn`; "discontinued and active" has no case.
+  - **The two columns stay.** `ItemRow` reads `isActive` and `discontinuedOn` as stored and `storedItem(row)` makes
+    the one value (a date wins over the flag; the table's CHECK already refuses the pair). The confirm's and the
+    replace's statements write the columns from the item's JSON (`$.stocking.kind = 'active'`, `$.stocking.on`), the
+    edit's from the command. No row is rewritten.
+  - **The file's two fields stay two cells.** `isActive` and `discontinuedOn` are still what a row of the file says
+    and what the review asks about; `itemText` writes a stored item back into those two cells, so the comparison of
+    a stored item with a row is unchanged. The Items table keeps its Active and Discontinued columns and their
+    filter.
+  - `editProblem` no longer has the "discontinued yet active" sentence to say; the form still says it before
+    anything is sent.
+  - 197 app tests pass; the slow tests exercise the edit, the replace and the take-back on SQL.
+  - Read on screen, fresh database: the three numbers; Items "Active" cells "Yes" and "No"; Fiberglass Crate
+    (XRR-0266) "No", its editor Discontinued "2025-02-26" with Active off; switched Active on and Save: "A
+    discontinued item cannot be active. Switch Active off, or clear the discontinued date."; cleared the date and
+    Save: the request sent `"stocking":{"kind":"active"}`, 200, and the row reads "Yes" after a reload.
 

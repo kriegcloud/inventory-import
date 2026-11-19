@@ -15,6 +15,8 @@ import {
   categories,
   decimalUnits,
   type Dimensions,
+  discontinuedOn,
+  isActive,
   isoDate,
   type ItemFields,
   maxNameLength,
@@ -23,6 +25,7 @@ import {
   readDecimal,
   skuKey,
   skuPattern,
+  stockingOf,
   unitsToDecimal,
   uoms,
   type Vendor
@@ -945,11 +948,11 @@ export const itemText = (item: ItemFields): Readonly<Record<Field, string>> => (
   unitCost: item.unitCost,
   quantityOnHand: `${item.quantityOnHand}`,
   reorderPoint: Option.match(item.reorderPoint, { onNone: () => "", onSome: (point) => `${point}` }),
-  isActive: `${item.isActive}`,
+  isActive: `${isActive(item.stocking)}`,
   lotTracked: `${item.lotTracked}`,
   tags: Arr.join(item.tags, "|"),
   firstReceivedOn: Option.getOrElse(item.firstReceivedOn, () => ""),
-  discontinuedOn: item.discontinuedOn ?? "",
+  discontinuedOn: Option.getOrElse(discontinuedOn(item.stocking), () => ""),
   dimensions: Option.getOrElse(Option.flatMap(item.dimensions, encodeDimensions), () => ""),
   vendors:
     item.vendors.length === 0
@@ -1867,11 +1870,10 @@ const toItem = (values: Readonly<Record<Field, string>>): ItemFields | null => {
     unitCost: cost.value,
     quantityOnHand: quantity.value,
     reorderPoint: Option.fromNullOr(reorder.value),
-    isActive: active.value,
+    stocking: stockingOf({ isActive: active.value, discontinuedOn: Option.fromNullOr(discontinued.value) }),
     lotTracked: lot.value,
     tags: tagsOf(values.tags),
     firstReceivedOn: Option.fromNullOr(received.value),
-    discontinuedOn: discontinued.value,
     dimensions: Option.fromNullOr(dimensions.value),
     vendors: vendors.value
   }

@@ -3,10 +3,11 @@
 // switches, tags, two dates, and two nested values (dimensions and up to three vendors). The one thing not to break:
 // every value is read from the text as written (a cost from its digits as a decimal string, never through a float; a
 // date only when it has one reading), never through a guess.
-import { Array as Arr, Option, Record as Rec, Result, String as Str } from "effect"
+import { Array as Arr, Option, Record as Rec, Result, String as Str, Tuple } from "effect"
 import { Instant } from "@inventory/kernel/Text"
 import { personName } from "./Described.ts"
 import * as S from "effect/Schema"
+import { LiteralKit } from "@beep/schema/LiteralKit"
 import { nullAsNone } from "@inventory/kernel/Wire"
 
 /** The categories an item may be filed under: the list the category column is checked against. */
@@ -108,6 +109,72 @@ export const Vendor = S.Struct({
 /** The decoded value of `Vendor`. */
 export type Vendor = typeof Vendor.Type
 
+/** The three ways an item stands in the stock list. */
+export const StockingKind = LiteralKit(["active", "inactive", "discontinued"]).annotate({
+  identifier: "StockingKind",
+  description: "In use, not in use, or no longer stocked since a day"
+})
+
+class Active extends S.Opaque<Active, { readonly brand: unique symbol }>()(
+  S.Struct({ kind: S.tag("active") }).annotate({ identifier: "Active", description: "The item is in use" })
+) {}
+
+class Inactive extends S.Opaque<Inactive, { readonly brand: unique symbol }>()(
+  S.Struct({ kind: S.tag("inactive") }).annotate({
+    identifier: "Inactive",
+    description: "The item is not in use, and nobody said it was discontinued"
+  })
+) {}
+
+class Discontinued extends S.Opaque<Discontinued, { readonly brand: unique symbol }>()(
+  S.Struct({
+    kind: S.tag("discontinued"),
+    on: IsoDate.annotate({ description: "ISO date discontinued", examples: ["2024-06-19"] }).pipe(
+      S.annotateKey({ description: "The day the item stopped being stocked, as year-month-day" })
+    )
+  }).annotate({ identifier: "Discontinued", description: "The item stopped being stocked on a day; it is not in use" })
+) {}
+
+/**
+ * Whether an item is in use: active, not active, or discontinued on a day. One value where there were two (an
+ * active flag beside a discontinued date), so "discontinued and active" cannot be said: an item with a
+ * discontinued date is not active. Stored as the two columns it replaces; `stockingOf` reads them.
+ */
+export const Stocking = StockingKind.mapMembers(() => Tuple.make(Active, Inactive, Discontinued)).pipe(
+  S.toTaggedUnion("kind"),
+  S.annotate({ identifier: "Stocking", description: "Whether the item is in use, and since when it is not stocked" })
+)
+/** The decoded value of `Stocking`. */
+export type Stocking = typeof Stocking.Type
+
+/** In use. */
+export const active: Stocking = Active.make({})
+/** Not in use, with no discontinued date. */
+export const inactive: Stocking = Inactive.make({})
+/** No longer stocked since `on` (year-month-day). */
+export const discontinued = (on: string): Stocking => Discontinued.make({ on })
+
+/**
+ * The stocking the two stored values say: discontinued when there is a date, else active or not as the flag says.
+ *
+ * @example stockingOf({ isActive: false, discontinuedOn: Option.some("2024-06-19") }).kind // "discontinued"
+ */
+export const stockingOf = (stored: {
+  readonly isActive: boolean
+  readonly discontinuedOn: Option.Option<string>
+}): Stocking =>
+  Option.match(stored.discontinuedOn, {
+    onNone: () => (stored.isActive ? active : inactive),
+    onSome: discontinued
+  })
+
+/** True when the item is in use. */
+export const isActive = (stocking: Stocking): boolean => stocking.kind === "active"
+
+/** The day the item stopped being stocked, when it did. */
+export const discontinuedOn = (stocking: Stocking): Option.Option<string> =>
+  stocking.kind === "discontinued" ? Option.some(stocking.on) : Option.none()
+
 /**
  * What one item needs before it can be stored. A row of the file becomes this only when every value was read without
  * a doubt; the server decodes each row through it again before writing.
@@ -150,7 +217,8 @@ export const ItemFields = S.Struct({
   reorderPoint: Count.annotate({ description: "The stock level to reorder at; null for none", examples: [402] }).pipe(
     nullAsNone({ description: "Reorder when the quantity on hand falls to this number; null when nobody set one" })
   ),
-  isActive: S.Boolean.annotateKey({ description: "Whether the item is in use; true when the file does not say" }),
+  // Whether the item is in use; active when the file does not say.
+  stocking: Stocking,
   lotTracked: S.Boolean.annotateKey({
     description: "Whether stock is tracked by lot; false when the file does not say"
   }),
@@ -163,15 +231,6 @@ export const ItemFields = S.Struct({
   }).pipe(
     nullAsNone({ description: "The day the item first came into stock, as year-month-day; null when not known" })
   ),
-  discontinuedOn: S.NullOr(IsoDate)
-    .annotate({
-      description: "ISO date discontinued; null for none. An item with one is not active",
-      examples: ["2024-06-19"]
-    })
-    .annotateKey({
-      description:
-        "The day the item stopped being stocked, as year-month-day; null while it is stocked. With a date, `isActive` must be false"
-    }),
   dimensions: Dimensions.pipe(
     nullAsNone({ description: "The item's length, width and height with their unit, all together; null for none" })
   ),
@@ -229,9 +288,9 @@ export const ItemEdit = S.Struct({
   reorderPoint: ItemFields.fields.reorderPoint.annotateKey({
     messageMissingKey: "Give the reorder point, or null for none."
   }),
-  isActive: S.Boolean.annotateKey({
-    description: "Whether the item is in use",
-    messageMissingKey: "Say whether the item is active."
+  stocking: Stocking.annotateKey({
+    description: "Whether the item is in use: active, inactive, or discontinued on a day",
+    messageMissingKey: "Say whether the item is active, inactive or discontinued on a day."
   }),
   lotTracked: S.Boolean.annotateKey({
     description: "Whether stock is tracked by lot",
@@ -239,9 +298,6 @@ export const ItemEdit = S.Struct({
   }),
   firstReceivedOn: ItemFields.fields.firstReceivedOn.annotateKey({
     messageMissingKey: "Give the first received date, or null for none."
-  }),
-  discontinuedOn: ItemFields.fields.discontinuedOn.annotateKey({
-    messageMissingKey: "Give the discontinued date, or null for none."
   })
 }).annotate({
   identifier: "ItemEdit",
@@ -252,25 +308,20 @@ export type ItemEdit = typeof ItemEdit.Type
 
 /**
  * What is wrong with an edit that its Schema cannot say, as a sentence for the person, or null when it may be
- * written: a name of only spaces, a date that is not a day on the calendar (2024-13-45), or an item that would be
- * discontinued and active at once. The import refuses the same three, so an edit cannot store what a file could not.
+ * written: a name of only spaces, or a date that is not a day on the calendar (2024-13-45). The import refuses the
+ * same, so an edit cannot store what a file could not. An item discontinued and active at once can no longer be
+ * sent: `Stocking` has no such case.
  *
- * @example editProblem({ ...edit, discontinuedOn: "2024-06-19", isActive: true })
- * // "A discontinued item is not active. Clear the discontinued date, or mark the item not active."
+ * @example editProblem({ ...edit, stocking: discontinued("2024-13-45") })
+ * // 'Discontinued on "2024-13-45" is not a day on the calendar, written year-month-day.'
  */
 export const editProblem = (edit: ItemEdit): string | null => {
-  const badDate = (label: string, date: string | null): string | null =>
-    date === null || Option.isSome(readDate(date))
+  const badDate = (label: string, date: Option.Option<string>): string | null =>
+    Option.isNone(date) || Option.isSome(readDate(date.value))
       ? null
-      : `${label} "${date}" is not a day on the calendar, written year-month-day.`
+      : `${label} "${date.value}" is not a day on the calendar, written year-month-day.`
   if (Str.trim(edit.name) === "") return "Name is empty. Every item needs a name."
-  return (
-    badDate("First received", Option.getOrNull(edit.firstReceivedOn)) ??
-    badDate("Discontinued on", edit.discontinuedOn) ??
-    (edit.discontinuedOn !== null && edit.isActive
-      ? "A discontinued item is not active. Clear the discontinued date, or mark the item not active."
-      : null)
-  )
+  return badDate("First received", edit.firstReceivedOn) ?? badDate("Discontinued on", discontinuedOn(edit.stocking))
 }
 
 /**
@@ -463,10 +514,9 @@ export const readItemForm = (input: {
       unitCost: Option.getOrElse(cost, () => "0"),
       quantityOnHand: Option.getOrElse(quantity, () => 0),
       reorderPoint: Option.flatten(reorder),
-      isActive: form.isActive,
+      stocking: stockingOf({ isActive: form.isActive, discontinuedOn: Option.flatten(discontinued) }),
       lotTracked: form.lotTracked,
-      firstReceivedOn: Option.flatten(received),
-      discontinuedOn: Option.getOrNull(Option.flatten(discontinued))
+      firstReceivedOn: Option.flatten(received)
     }
   }
 }

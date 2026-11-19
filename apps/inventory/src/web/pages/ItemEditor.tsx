@@ -25,6 +25,8 @@ import { cacheChange } from "@inventory/client/Optimistic"
 import { useOptimisticWrite } from "@/lib/api"
 import {
   categories,
+  discontinuedOn,
+  isActive,
   type ItemEdit,
   type ItemForm,
   type ItemFormProblems,
@@ -45,10 +47,10 @@ const formOf = (item: StoredItem): ItemForm => ({
   unitCost: item.unitCost,
   quantityOnHand: `${item.quantityOnHand}`,
   reorderPoint: Option.match(item.reorderPoint, { onNone: () => "", onSome: (point) => `${point}` }),
-  isActive: item.isActive,
+  isActive: isActive(item.stocking),
   lotTracked: item.lotTracked,
   firstReceivedOn: Option.getOrElse(item.firstReceivedOn, () => ""),
-  discontinuedOn: item.discontinuedOn ?? ""
+  discontinuedOn: Option.getOrElse(discontinuedOn(item.stocking), () => "")
 })
 
 /** The item with an edit's values in it: what the table shows the moment the person saves. */

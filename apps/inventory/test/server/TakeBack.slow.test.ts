@@ -144,10 +144,9 @@ layer(TypedApp)("a take-back of an import whose replaced item was edited since",
             unitCost: insert.unitCost,
             quantityOnHand: insert.quantityOnHand,
             reorderPoint: insert.reorderPoint,
-            isActive: insert.isActive,
+            stocking: insert.stocking,
             lotTracked: insert.lotTracked,
-            firstReceivedOn: insert.firstReceivedOn,
-            discontinuedOn: insert.discontinuedOn
+            firstReceivedOn: insert.firstReceivedOn
           }
         })
         .pipe(marcus)

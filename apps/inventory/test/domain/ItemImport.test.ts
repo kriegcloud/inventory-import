@@ -38,7 +38,7 @@ describe("items_clean.csv", () => {
         sku: "SHH-9574",
         unitCost: "12.33",
         quantityOnHand: 3845,
-        isActive: true,
+        stocking: { kind: "active" },
         tags: ["fragile"],
         dimensions: Option.some({ length: 78.8, width: 56.9, height: 2.6, unit: "cm" })
       })
@@ -156,7 +156,7 @@ describe("items_messy.csv", () => {
       expect(rowOf(result, 85).item?.quantityOnHand).toBe(1200)
       expect(rowOf(result, 44).item?.firstReceivedOn).toEqual(Option.some("2024-06-04"))
       expect([rowOf(result, 4).status, rowOf(result, 10).status]).toEqual(["ready", "out"])
-      expect(rowOf(result, 45).item).toMatchObject({ isActive: false, discontinuedOn: "2025-06-30" })
+      expect(rowOf(result, 45).item).toMatchObject({ stocking: { kind: "discontinued", on: "2025-06-30" } })
       expect(rowOf(result, 184).item?.unitCost).toBe("12.5")
       expect(result.counts.ready + result.counts.needs + result.counts.out).toBe(200)
     })
@@ -193,13 +193,12 @@ describe("a row discontinued yet active", () => {
       const before = rowOf(reviewOf(table), 45)
       expect(before.outcome).toBe("decision")
       const notActive = rowOf(reviewOf(table, { "row-45": { accepted: ["isActive"] } }), 45)
-      expect([notActive.status, notActive.item?.isActive, notActive.item?.discontinuedOn]).toEqual([
+      expect([notActive.status, notActive.item?.stocking]).toEqual([
         "ready",
-        false,
-        "2025-06-30"
+        { kind: "discontinued", on: "2025-06-30" }
       ])
       const noDate = rowOf(reviewOf(table, { "row-45": { edits: { discontinuedOn: "" } } }), 45)
-      expect([noDate.status, noDate.item?.isActive, noDate.item?.discontinuedOn]).toEqual(["ready", true, null])
+      expect([noDate.status, noDate.item?.stocking]).toEqual(["ready", { kind: "active" }])
       expect(noDate.changes).toContainEqual(
         expect.objectContaining({ field: "discontinuedOn", to: "", decidedBy: "person" })
       )

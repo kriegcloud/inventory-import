@@ -414,6 +414,20 @@
         "vitest": "^5.1.0",
       },
     },
+    "packages/infra": {
+      "name": "@beep/infra",
+      "version": "0.0.0",
+      "dependencies": {
+        "@beep/identity": "workspace:*",
+        "@beep/schema": "workspace:*",
+        "effect": "4.1.4",
+      },
+      "devDependencies": {
+        "@effect/vitest": "4.1.4",
+        "@types/node": "^24.19.2",
+        "vitest": "^5.1.0",
+      },
+    },
     "packages/kernel": {
       "name": "@inventory/kernel",
       "version": "0.0.0",
@@ -521,6 +535,8 @@
     "@beep/d1": ["@beep/d1@workspace:packages/drivers/d1"],
 
     "@beep/identity": ["@beep/identity@workspace:packages/foundation/modeling/identity"],
+
+    "@beep/infra": ["@beep/infra@workspace:packages/infra"],
 
     "@beep/openrouter": ["@beep/openrouter@workspace:packages/drivers/openrouter"],
 

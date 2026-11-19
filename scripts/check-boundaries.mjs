@@ -39,11 +39,15 @@ const kindOf = (w) => {
 const allowed = (from, to) => {
   const a = kindOf(from)
   const b = kindOf(to)
+  // The infra package declares what is deployed; nothing that is deployed may import it.
+  if (b.family === "infra") return false
   if (a.family === "app") return true
   if (b.family === "app") return false
   if (b.family === "foundation") return true
   switch (a.family) {
     case "foundation":
+      return false
+    case "infra":
       return false
     case "drivers":
       return b.family === "drivers"

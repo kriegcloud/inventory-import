@@ -1,0 +1,32 @@
+{
+  "name": "@beep/infra",
+  "version": "0.0.0",
+  "private": true,
+  "description": "What is deployed, per stage: the stage plan as a schema, and the Alchemy stacks for the app and for the repository's GitHub settings",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": [],
+  "exports": {
+    "./package.json": "./package.json",
+    "./Stage": "./src/Stage.schema.ts",
+    "./StagePlan": "./src/StagePlan.rules.ts"
+  },
+  "scripts": {
+    "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",
+    "lint": "oxlint --quiet src test",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@beep/identity": "workspace:*",
+    "@beep/schema": "workspace:*",
+    "effect": "4.1.4"
+  },
+  "devDependencies": {
+    "@effect/vitest": "4.1.4",
+    "@types/node": "^24.19.2",
+    "vitest": "^5.1.0"
+  },
+  "beep": {
+    "family": "infra"
+  }
+}

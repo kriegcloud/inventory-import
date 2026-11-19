@@ -1,0 +1,13 @@
+{
+  "$schema": "../../node_modules/@effect/tsgo/oxlint-schema.json",
+  "plugins": ["typescript", "oxc"],
+  "rules": {
+    // Effect's collections, never the native ones: HashMap/HashSet for a value handed on, the Mutable forms for one a
+    // function fills.
+    "no-restricted-globals": [
+      "error",
+      { "name": "Map", "message": "Use HashMap or MutableHashMap from effect." },
+      { "name": "Set", "message": "Use HashSet or MutableHashSet from effect." }
+    ]
+  }
+}

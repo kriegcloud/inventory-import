@@ -9,8 +9,8 @@
  * reason, recorded in `vendor.json` and named in the file's provenance line. Run it again, pointed at a newer
  * commit, to refresh.
  *
- * The words written into the kit (the provenance line, each README, the comment in `vendor.json`) are kept exactly
- * as the script this replaces wrote them, so a run at the recorded commit changes no file.
+ * The words written into the kit (the provenance line, each README, the comment in `vendor.json`) name this command
+ * and `vendor check`. A run at the recorded commit changes no file.
  *
  * @packageDocumentation
  */
@@ -122,7 +122,7 @@ export const vendorSync = Effect.fn("VendorSync.vendorSync")(function* (from: st
     return Str.startsWith(".")(relative) ? relative : `./${relative}`
   }
   const header = (pkgDir: string, file: string, patched: boolean): string =>
-    `// Vendored from beep-effect ${short}:${pkgDir}/${file} (MIT, see LICENSE). ${patched ? "Patched on purpose: the patch and its reason are in vendor.json (patches) and scripts/vendor-beep.mjs (SOURCE_PATCHES). " : ""}Do not edit: scripts/vendor-check.mjs compares the rest of this file with its recorded hash.\n`
+    `// Vendored from beep-effect ${short}:${pkgDir}/${file} (MIT, see LICENSE). ${patched ? "Patched on purpose: the patch and its reason are in vendor.json (patches) and in the patches bun run beep vendor sync applies (sourcePatches). " : ""}Do not edit: bun run beep vendor check compares the rest of this file with its recorded hash.\n`
 
   // ── Resolution against the upstream export maps ───────────────────────────────────────────────────────────────
   const manifestEntries = yield* Effect.forEach(
@@ -313,13 +313,13 @@ The part of beep-effect's \`${pkg.name}\` that inventory-import's format package
 here under the same name and the same export subpaths, and is replaced by the published package when one exists.
 
 - **Do not edit** \`src/\` or the copied tests. Change the code in beep-effect and run
-  \`node scripts/vendor-beep.mjs --from <beep-effect checkout>\` again.
+  \`bun run beep vendor sync --from <beep-effect checkout>\` again.
 - \`vendor.json\` records the commit and, for every copied file, the SHA-256 of the upstream file and of the copy (each
   copy starts with one provenance line, which the hash leaves out). \`bun run vendor:check\` fails when they differ.
 - Copied tests have their imports of beep-effect's test runner and run-count helper rewritten (each rewrite is listed
   in \`vendor.json\`); \`test/support/fcRuns.ts\`, when present, stands in for the run-count helper.
-- A source file differs from upstream only by a patch in \`SOURCE_PATCHES\` (scripts/vendor-beep.mjs), recorded with
-  its reason under \`patches\` in \`vendor.json\` and named in the file's first line.
+- A source file differs from upstream only by a patch \`bun run beep vendor sync\` applies (\`sourcePatches\`),
+  recorded with its reason under \`patches\` in \`vendor.json\` and named in the file's first line.
 - Licensed under MIT, as the package's own LICENSE file in beep-effect says (\`LICENSE\`, copied unchanged).
 `
     )
@@ -435,7 +435,7 @@ here under the same name and the same export subpaths, and is replaced by the pu
     const local = yield* writePackageFiles(pkg, target, exportsMap, sources)
     const manifest = yield* pretty({
       $comment:
-        "Written by scripts/vendor-beep.mjs; checked by scripts/vendor-check.mjs. sha256 is of each file without its first (provenance) line; it equals sourceSha256 unless the file lists rewrites (tests) or patches (deliberate source patches, each with its reason, against source.commit). local files are written here, not copied.",
+        "Written by bun run beep vendor sync; checked by bun run beep vendor check. sha256 is of each file without its first (provenance) line; it equals sourceSha256 unless the file lists rewrites (tests) or patches (deliberate source patches, each with its reason, against source.commit). local files are written here, not copied.",
       source: { repository: "beep-effect", commit, path: pkg.dir, license: "MIT" },
       exports: exportsMap,
       files: A.appendAll<unknown, unknown>(sourceEntries, testEntries),

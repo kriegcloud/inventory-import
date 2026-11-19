@@ -85,11 +85,12 @@ Where the brief left a choice open, or the code showed the brief could not be fo
 - **`quality strict` exits 1 on two refusals where the script exited 0.** When no tsconfig had the plugin, or no
   ceiling file was named, the script printed its FAIL sentence and returned before it set the exit code, so the
   check passed. The command fails. The second sentence now names the command instead of the script's path.
-- **`vendor sync` writes the kit's words as the script wrote them.** The provenance line of every vendored file, each
-  kit README and the comment in each `vendor.json` name `scripts/vendor-beep.mjs` and `scripts/vendor-check.mjs`,
-  which no longer exist. The command still writes those exact words, so a run at the recorded commit changes no
-  file and the kit is untouched by this goal. Rewording them changes the first line of 90 vendored files, four
-  READMEs and four records: a decision for Benjamin, not taken here.
+- **The kit's words name the commands** (decision "the words in the vendored kit"). The first build wrote the
+  provenance lines, READMEs and `vendor.json` comments exactly as the script had, naming the two deleted scripts, so
+  the kit stayed byte for byte. `vendor sync` now writes `bun run beep vendor sync` and `bun run beep vendor check`,
+  and the kit was synced again at its recorded commit: the first line of the 90 vendored files and the comment line
+  of the four `vendor.json` files changed (one line each), and three lines in each of the four READMEs. No other line
+  of the kit changed, and `vendor check` passes, with and without `--source`.
 - **`vendor sync` has no test of its own.** Its proof is the two runs above; a test would need a small beep-effect
   repository with the four packages and their closure as a fixture.
 - **`laws effect-imports --write` keeps one limit of the script**: a renamed module used as a shorthand property

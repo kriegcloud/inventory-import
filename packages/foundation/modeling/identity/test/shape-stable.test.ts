@@ -1,4 +1,4 @@
-// Vendored from beep-effect c5cebd5c9de7:packages/foundation/modeling/identity/test/shape-stable.test.ts (MIT, see LICENSE). Do not edit: scripts/vendor-check.mjs compares the rest of this file with its recorded hash.
+// Vendored from beep-effect c5cebd5c9de7:packages/foundation/modeling/identity/test/shape-stable.test.ts (MIT, see LICENSE). Do not edit: bun run beep vendor check compares the rest of this file with its recorded hash.
 import * as Identity from "@beep/identity";
 import { make } from "@beep/identity";
 import * as IdentityPackages from "@beep/identity/packages";

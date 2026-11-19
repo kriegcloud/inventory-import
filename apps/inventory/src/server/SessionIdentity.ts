@@ -9,7 +9,7 @@ import {
   SignedOut,
   SignInFeatures,
   TestAccountsOffer
-} from "../api/v1/Identity.ts"
+} from "@inventory/access-contract/SessionState"
 import { NotSignedIn } from "@inventory/kernel/AccessError"
 import { CurrentActor } from "@inventory/kernel/Actor"
 import { Identity } from "@inventory/kernel/Identity"

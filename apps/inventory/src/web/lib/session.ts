@@ -1,5 +1,5 @@
 import * as S from "effect/Schema"
-import { SessionState } from "../../api/v1/Identity.ts"
+import { SessionState } from "@inventory/access-contract/SessionState"
 
 /**
  * Reads the session answer through its Schema. A module of its own, asked for with the first session request: the

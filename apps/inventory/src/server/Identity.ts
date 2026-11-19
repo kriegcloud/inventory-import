@@ -1,7 +1,7 @@
 import { Effect, Layer, Option } from "effect"
 import * as S from "effect/Schema"
 import { HttpServerRequest } from "effect/http"
-import { actingAsHeader } from "../api/v1/Identity.ts"
+import { actingAsHeader } from "@inventory/access-contract/Access"
 import { NotSignedIn } from "@inventory/kernel/AccessError"
 import { CurrentActor } from "@inventory/kernel/Actor"
 import { Identity } from "@inventory/kernel/Identity"

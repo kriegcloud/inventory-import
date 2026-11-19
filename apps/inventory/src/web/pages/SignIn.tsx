@@ -8,7 +8,7 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@in
 import { Input } from "@inventory/ui/components/input"
 import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@inventory/ui/components/item"
 import { Spinner } from "@inventory/ui/components/spinner"
-import type { SignInFeatures, TestAccount } from "../../api/v1/Identity.ts"
+import type { SignInFeatures, TestAccount } from "@inventory/access-contract/SessionState"
 
 // The sign-in page, drawn with the first paint (components/app/SignedIn.tsx says why). Better Auth's client is loaded
 // only when a person reaches for the page or presses, so the first page of the app does not carry it.

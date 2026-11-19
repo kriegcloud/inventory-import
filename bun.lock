@@ -32,6 +32,7 @@
         "@fontsource-variable/ibm-plex-sans": "^5.3.0",
         "@fontsource-variable/jetbrains-mono": "^5.3.0",
         "@hookform/resolvers": "^7.0.6",
+        "@inventory/access-contract": "workspace:*",
         "@inventory/client": "workspace:*",
         "@inventory/kernel": "workspace:*",
         "@inventory/review": "workspace:*",
@@ -84,6 +85,21 @@
         "vite": "^8.3.6",
         "vitest": "^5.1.0",
         "wrangler": "^4.161.0",
+      },
+    },
+    "packages/access/contract": {
+      "name": "@inventory/access-contract",
+      "version": "0.0.0",
+      "dependencies": {
+        "@beep/identity": "workspace:*",
+        "@beep/schema": "workspace:*",
+        "@inventory/kernel": "workspace:*",
+        "effect": "4.1.4",
+      },
+      "devDependencies": {
+        "@effect/vitest": "4.1.4",
+        "@types/node": "^24.19.2",
+        "vitest": "^5.1.0",
       },
     },
     "packages/client": {
@@ -553,6 +569,8 @@
     "@img/sharp-win32-ia32": ["@img/sharp-win32-ia32@0.35.5", "", { "os": "win32", "cpu": "ia32" }, "sha512-5Zm82LoBc43nhwNybZlG7Y1KO//Zhsn306fQl29ZOuStHLGTo3BWL83q3cznX0poxSAMuYL1On/BHBxkBeKr6A=="],
 
     "@img/sharp-win32-x64": ["@img/sharp-win32-x64@0.35.5", "", { "os": "win32", "cpu": "x64" }, "sha512-x76eH0vEiHlcMQu8Y8IenntaACtddpT6W0wmXtWrnKcnKI7ME5DdgqhAD6SEWOEl1v2zDvkZDhFA9KnURwpfqg=="],
+
+    "@inventory/access-contract": ["@inventory/access-contract@workspace:packages/access/contract"],
 
     "@inventory/app": ["@inventory/app@workspace:apps/inventory"],
 

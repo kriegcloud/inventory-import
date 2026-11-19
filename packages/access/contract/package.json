@@ -1,0 +1,40 @@
+{
+  "name": "@inventory/access-contract",
+  "version": "0.0.0",
+  "private": true,
+  "description": "What the browser and the rest of the app may ask about who may do what: the session, the people of an organization, the audit trail's read side and the daily model allowance",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": [],
+  "exports": {
+    "./package.json": "./package.json",
+    "./Access": "./src/Access.contract.ts",
+    "./SessionState": "./src/Session/SessionState.read.ts",
+    "./Person": "./src/People/Person.read.ts",
+    "./PeopleCommand": "./src/People/People.command.ts",
+    "./PeopleRejection": "./src/People/People.rejection.ts",
+    "./AuditTrail": "./src/Activity/AuditTrail.read.ts",
+    "./ModelAllowance": "./src/Allowance/ModelAllowance.gateway.ts"
+  },
+  "scripts": {
+    "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",
+    "lint": "oxlint --quiet src test",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@beep/identity": "workspace:*",
+    "@beep/schema": "workspace:*",
+    "@inventory/kernel": "workspace:*",
+    "effect": "4.1.4"
+  },
+  "devDependencies": {
+    "@effect/vitest": "4.1.4",
+    "@types/node": "^24.19.2",
+    "vitest": "^5.1.0"
+  },
+  "beep": {
+    "family": "context",
+    "context": "access",
+    "layer": "contract"
+  }
+}

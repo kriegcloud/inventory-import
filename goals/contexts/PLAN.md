@@ -46,4 +46,10 @@ None.
   an `Option` field (`Person.email`, `Person.joinedAt`, `SignInFeatures.testAccounts`): the property is the value's
   component or null, and the sentence stays on the schema. `people.add`'s answer names a second copy of the person
   (`Person_1`): inside `S.Result` the instant is written as plain text, so `Document.ts` keeps the copy that differs.
+- **`access-contract` (`packages/access/contract`).** Identifiers read `@beep/inventory/access/contract/...`
+  (`$InventoryId.compose("access").$AccessId.compose("contract")` works as the brief assumed), and `Document.ts`
+  shortens them in the OpenAPI document as it does the kernel's: 88 components, none with a path, an `Encoded`
+  suffix or a number. Naming `AddPersonOutcome` removed the second copy of `Person`. `ModelCallsUsedUp` and the
+  gateway's declaration are here; the app's `ModelCalls` service still does the taking until `access-host` lands.
+  16 tests (every schema generates values it accepts; the three wire shapes).
 

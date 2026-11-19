@@ -1,7 +1,8 @@
 import { Effect } from "effect"
 import * as S from "effect/Schema"
 import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiMiddleware, OpenApi } from "effect/http-api"
-import { Activity } from "@inventory/kernel/Activity"
+import { ActivityApi, IdentityApi, PeopleApi } from "@inventory/access-contract/Access"
+import { ModelCallsUsedUp } from "@inventory/access-contract/ModelAllowance"
 import { instant, personName, reasonForPerson } from "../../domain/Described.ts"
 import { StagingOutcome } from "../../domain/FileProblem.ts"
 import { ItemEdit, ItemFields, StoredItem } from "../../domain/Item.ts"
@@ -21,11 +22,9 @@ import { ItemFacets, ItemPage, ItemQuery } from "../../domain/ItemQuery.ts"
 import { chunkRows } from "../../domain/Upload.ts"
 import { AssistantApi } from "./Assistant.ts"
 import { describeDocument } from "./Document.ts"
-import { IdentityApi } from "./Identity.ts"
 import { Forbidden } from "@inventory/kernel/AccessError"
 import { Identity } from "@inventory/kernel/Identity"
 import { aiTroubles, modelSentences } from "./ModelTrouble.ts"
-import { PeopleApi } from "./People.ts"
 import { SameOrigin } from "@inventory/kernel/SameOrigin"
 import { apiPrefix } from "./Version.ts"
 
@@ -164,16 +163,6 @@ export class AiUnavailable extends S.TaggedError<AiUnavailable, { readonly brand
 export const aiUnavailable = (input: { readonly kind: AiTrouble; readonly retryable: boolean }): AiUnavailable =>
   AiUnavailable.make({ reason: modelSentences[input.kind], kind: input.kind, retryable: input.retryable })
 
-/**
- * The organization has used the day's model calls (src/server/ModelCalls.ts): nothing was asked. Every model feature
- * draws on the same allowance; a feature with a non-AI path answers by its rules instead of failing with this.
- */
-export class ModelCallsUsedUp extends S.TaggedError<ModelCallsUsedUp, { readonly brand: unique symbol }>()(
-  "ModelCallsUsedUp",
-  { reason: S.String.annotateKey({ description: "What happened, in words for the person." }) },
-  { httpApiStatus: 429, description: "The day's model calls are used: the model was not asked." }
-) {}
-
 /** Liveness and configuration. Both endpoints name the actor: the count is tenant data and the check spends the key. */
 export class SystemApi extends HttpApiGroup.make("system")
   .add(
@@ -197,30 +186,6 @@ export class SystemApi extends HttpApiGroup.make("system")
   .prefix("/system")
   .annotate(OpenApi.Title, "System")
   .annotate(OpenApi.Description, "Whether the stack works, as the current member sees it.") {}
-
-/**
- * The audit trail of the current member's organization: who did what, newest first. It is written only by the
- * things it records (an upload, an import, a take-back, a change of role), in the same batch, never by a request of
- * its own.
- */
-export class ActivityApi extends HttpApiGroup.make("activity")
-  .add(
-    HttpApiEndpoint.get("recent", "/", {
-      success: S.Array(Activity.json).annotate({ description: "The organization's audit trail, newest first" })
-    })
-      .annotate(OpenApi.Summary, "The organization's audit trail, newest first")
-      .annotate(
-        OpenApi.Description,
-        "Who did what in the caller's organization, newest first. A line is written only by the thing it records (an upload, an import, a take-back, an edit, a change of role), in the same batch; no request writes one of its own. Any member may read it."
-      )
-  )
-  .middleware(Identity)
-  .prefix("/activity")
-  .annotate(OpenApi.Title, "Activity")
-  .annotate(
-    OpenApi.Description,
-    "The audit trail of the caller's organization: who did what, newest first. It is written only by the things it records, in the same batch, never by a request of its own."
-  ) {}
 
 /**
  * What the confirms did with one row of the file. `reason` is empty for a created row and for one whose item a

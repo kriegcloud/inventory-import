@@ -1,7 +1,7 @@
 import { Array as Arr, Context, Effect, Layer, Option } from "effect"
 import * as S from "effect/Schema"
 import { SqlClient, SqlSchema } from "effect/sql"
-import { AccountEmail, Membership, OrganizationChoice, TestAccount } from "../api/v1/Identity.ts"
+import { AccountEmail, Membership, OrganizationChoice, TestAccount } from "@inventory/access-contract/SessionState"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
 import { Role } from "@inventory/kernel/Role"

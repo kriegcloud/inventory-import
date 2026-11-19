@@ -387,3 +387,50 @@ Question: when does the Effect import migration merge into main? Answer: "Merge 
 said 155 imported and 45 not, 155 stored; one search, one edit, People, Activity and a take-back that kept the
 edited item; no console error. Not seen: the model's suggestions (no key in that copy), the `.xlsx` path, and the
 same walk on main before the migration.
+
+### 2026-11-19 — tooling CLI: the package (T1)
+
+Question: what is the repository CLI package called and where does it live? Answer: "@beep/repo-cli, as beep-effect
+(Recommended)": `packages/tooling/tool/cli`, bin `beep-cli`, `bun run beep <group> <command>`. Rejected:
+`@inventory/repo-cli` in the same folder; `packages/tooling/cli`. Reverse: rename the package and its bin.
+
+### 2026-11-19 — tooling CLI: what runs it (T2)
+
+Question: what runs the CLI? Answer: "bun with @effect/platform-bun (Recommended)", on the condition that it
+installs and runs here at 4.1.4 exactly; it does (`BunServices.layer` read a file and spawned git in a probe).
+Rejected: bun with `@effect/platform-node`; node. Reverse: the two platform imports in `src/bin.ts`.
+
+### 2026-11-19 — tooling CLI: command groups (T3)
+
+Question: how are the commands grouped? Answer: "beep-effect's groups (Recommended)": `laws`, `quality`, `docs`,
+`vendor`. Rejected: one group, `check`. Reverse: move the subcommands in `src/Root.command.ts`.
+
+### 2026-11-19 — tooling CLI: vendoring commands (T4)
+
+Question: where do the vendoring commands live? Answer: "In the CLI (Recommended)": `vendor check` and `vendor
+sync`. Rejected: the check in the CLI with the sync left a script; a second package.
+
+### 2026-11-19 — tooling CLI: when the scripts go (T5 and T6)
+
+Question, asked together: when is each old script deleted, and is the Effect imports check ported? Answer: "Each in
+its proving commit; imports ported last (Recommended)". Rejected: the same with the imports check left a script; all
+deleted at the end in one commit.
+
+### 2026-11-19 — tooling CLI: the calls every package makes (T7)
+
+Question: `quality strict` runs in six packages and `laws exports` in one; how do they reach the CLI without slowing
+the loop? Answer: "One entry and a budget (Recommended)": the bin loads the whole CLI and a test fails when a command
+that does nothing takes longer than a number set from the first real measurement. Rejected: beep-effect's fast path
+from the start; move them to the root. Reverse: add the fast path to `src/bin.ts`.
+
+### 2026-11-19 — tooling CLI: what the tests stand on (T8)
+
+Question: what do the rules' tests stand on? Answer: "@effect/vitest and a real temp folder (Recommended)".
+Rejected: vendor `@beep/memfs`.
+
+### 2026-11-19 — the tooling CLI brief
+
+Question: does [BRIEF-tooling-cli.md](BRIEF-tooling-cli.md) match, and when is it built? Answer: "Matches; build now
+beside infra (Recommended)". Rejected: build after infra; not yet. The goal is
+[goals/tooling-cli](../../goals/tooling-cli/SPEC.md).
+

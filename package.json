@@ -35,10 +35,13 @@
     "vendor:check": "node scripts/vendor-check.mjs",
     "ceilings:check": "node scripts/check-ceilings.mjs",
     "boundaries:check": "node scripts/check-boundaries.mjs",
-    "screens:check": "node scripts/check-screens.mjs"
+    "screens:check": "node scripts/check-screens.mjs",
+    "imports:check": "node scripts/check-effect-imports.mjs",
+    "imports:fix": "node scripts/check-effect-imports.mjs --write"
   },
   "devDependencies": {
     "@effect/tsgo": "0.70.0",
+    "oxc-parser": "0.148.0",
     "oxfmt": "^0.78.0",
     "oxlint": "1.93.0",
     "syncpack": "^15.3.3",

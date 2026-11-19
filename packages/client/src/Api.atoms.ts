@@ -5,9 +5,11 @@
 // once, and a write twice, only for a failure that may pass, never for a refusal; an answer equal to the one held keeps
 // the object held, so nothing derived from it is rebuilt; a read belongs to the member who asked, so another member or
 // another organization starts from nothing instead of seeing the last one's answer.
+import * as A from "effect/Array"
 import type * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Eq from "effect/Equal"
+import * as Fiber from "effect/Fiber"
 import { dual } from "effect/Function"
 import * as Layer from "effect/Layer"
 import * as MutableHashMap from "effect/MutableHashMap"
@@ -15,6 +17,7 @@ import * as O from "effect/Option"
 import * as Schedule from "effect/Schedule"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as Atom from "effect/reactivity/Atom"
+import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import * as Reactivity from "effect/reactivity/Reactivity"
 import { memberKey } from "@inventory/client/MemberAtoms"
 import { isTransient } from "@inventory/client/SayError"
@@ -22,7 +25,7 @@ import { isTransient } from "@inventory/client/SayError"
 /**
  * How long an answer nobody is looking at is kept. A screen opened again within it shows that answer at once, marked
  * waiting, and asks again behind it (Benjamin: "Old rows at once, refreshed behind"); after it, the screen starts from
- * its skeleton. Five minutes, TanStack Query's own keep.
+ * its skeleton. Five minutes, TanStack Query's own keep. A sign-out lets every one go at once (`forgetReads`).
  */
 export const keepUnwatched = 5 * 60_000
 
@@ -88,6 +91,56 @@ export const keepWhenEqual: {
 const heldSuccess = <A, E>(previous: O.Option<AsyncResult.AsyncResult<A, E>>): O.Option<A> =>
   O.flatMap(previous, AsyncResult.value)
 
+/** One member's read: the answer itself (`held`, which is what is kept) and what a screen reads (`read`). */
+interface PerMember<A, E> {
+  readonly held: Atom.Atom<AsyncResult.AsyncResult<A, E>>
+  readonly read: Atom.Atom<AsyncResult.AsyncResult<A, E>>
+}
+
+/** A hold on a read nobody looks at, and how to let it go before its time. */
+interface Keep {
+  readonly letGo: () => void
+}
+
+/**
+ * Holds `held` in `registry` for `keepUnwatched`, then lets it go and calls `done`. Letting go early stops the timer.
+ * Once nothing holds a read, the registry lets it go after its own idle time (400 ms in the app).
+ */
+const keepFor = (registry: AtomRegistry.AtomRegistry, held: Atom.Atom<unknown>, done: () => void): Keep => {
+  const release = registry.mount(held)
+  const timer = Effect.runFork(
+    Effect.sleep(keepUnwatched).pipe(
+      Effect.andThen(
+        Effect.sync(() => {
+          release()
+          done()
+        })
+      )
+    )
+  )
+  return {
+    letGo: () => {
+      Effect.runFork(timer.pipe(Fiber.interrupt))
+      release()
+    }
+  }
+}
+
+/** Every query's held reads, so a sign-out can let them all go at once. */
+const heldByQueries: Array<{ readonly forget: () => void; readonly members: () => ReadonlyArray<string> }> = []
+
+/**
+ * Lets go of every read held for anyone, at once: on sign-out the previous person's rows leave memory (Benjamin:
+ * "Keyed reads, and drop them on sign-out"), and whoever signs in next starts from the skeleton. A switch of
+ * organization does not call this: the person's reads for the organization they left are kept for `keepUnwatched`.
+ */
+export const forgetReads = (): void => {
+  for (const query of heldByQueries) query.forget()
+}
+
+/** The members some read is held for, across every query: for the tests that hold `forgetReads` to its word. */
+export const heldReadMembers = (): ReadonlyArray<string> => A.flatMap(heldByQueries, (query) => query.members())
+
 /** The atoms one web package makes against its client. */
 export interface ApiAtoms<Id, Client> {
   /**
@@ -126,42 +179,72 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
     options?: { readonly reactivityKeys?: Reactivity.KeysInput }
   ): Atom.Atom<AsyncResult.AsyncResult<A, E>> {
     // One read per member: when the person or the organization changes, the screen shows its skeleton, never the
-    // previous organization's rows marked as waiting.
-    // Held with ordinary references, not `Atom.family`'s weak ones: once the screen is let go nothing else refers to
-    // these atoms, and a collected one would be made anew on a return, empty, so the person would see the skeleton
-    // instead of the rows kept for them (measured: after 35 s away). A tab meets a few members, so this stays small.
-    const reads = MutableHashMap.empty<string, Atom.Atom<AsyncResult.AsyncResult<A, E>>>()
-    const make = (): Atom.Atom<AsyncResult.AsyncResult<A, E>> => {
-      const held = Atom.setIdleTTL(
-        apiRuntime.atom((get) =>
-          Effect.flatMap(client, (c) => use(c, get)).pipe(
-            Effect.retry(readRetry),
-            Effect.map((answer) => keepWhenEqual(heldSuccess(get.self<AsyncResult.AsyncResult<A, E>>()), answer))
-          )
-        ),
-        keepUnwatched
+    // previous organization's rows marked as waiting. Held with ordinary references, not `Atom.family`'s weak ones: a
+    // collected one would be made anew on a return, empty (measured: after 35 s away).
+    const reads = MutableHashMap.empty<string, PerMember<A, E>>()
+    const make = (): PerMember<A, E> => {
+      const held = apiRuntime.atom((get) =>
+        Effect.flatMap(client, (c) => use(c, get)).pipe(
+          Effect.retry(readRetry),
+          Effect.map((answer) => keepWhenEqual(heldSuccess(get.self<AsyncResult.AsyncResult<A, E>>()), answer))
+        )
       )
-      // Every return to a screen asks again behind the answer it shows: the read outlives the screen by
-      // `keepUnwatched`, this wrapper does not, so a screen that mounts it again starts a new look. An answer under a
-      // second old counts as fresh, or a read answered before its first look would be asked for twice.
-      const read = Atom.swr(held, { staleTime: "1 second" })
-      return options?.reactivityKeys === undefined ? read : read.pipe(followKeys(options.reactivityKeys))
+      // Every return to a screen asks again behind the answer it shows: `held` outlives the screen by
+      // `keepUnwatched` (kept below), this wrapper does not, so a screen that mounts it again starts a new look. An
+      // answer under a second old counts as fresh, or a read answered before its first look would be asked twice.
+      const fresh = Atom.swr(held, { staleTime: "1 second" })
+      return {
+        held,
+        read: options?.reactivityKeys === undefined ? fresh : fresh.pipe(followKeys(options.reactivityKeys))
+      }
     }
-    const forMember = (member: string): Atom.Atom<AsyncResult.AsyncResult<A, E>> =>
+    const forMember = (member: string): PerMember<A, E> =>
       O.getOrElse(MutableHashMap.get(reads, member), () => {
-        const read = make()
-        MutableHashMap.set(reads, member, read)
-        return read
+        const made = make()
+        MutableHashMap.set(reads, member, made)
+        return made
       })
+    // The reads nobody looks at, each kept by a hold this module has on it for `keepUnwatched`.
+    const kept = MutableHashMap.empty<string, Keep>()
+    const stopKeeping = (member: string): void =>
+      O.match(MutableHashMap.get(kept, member), {
+        onNone: () => {},
+        onSome: (keep) => {
+          MutableHashMap.remove(kept, member)
+          keep.letGo()
+        }
+      })
+    const startKeeping = (registry: AtomRegistry.AtomRegistry, member: string, held: Atom.Atom<unknown>): void => {
+      stopKeeping(member)
+      MutableHashMap.set(
+        kept,
+        member,
+        keepFor(registry, held, () => MutableHashMap.remove(kept, member))
+      )
+    }
+    heldByQueries.push({
+      forget: () => {
+        MutableHashMap.forEach(kept, (keep) => keep.letGo())
+        MutableHashMap.clear(kept)
+        MutableHashMap.clear(reads)
+      },
+      members: () => reads.pipe(MutableHashMap.keys, A.fromIterable)
+    })
     // The member it last read for, so a refresh of this atom (an optimistic write's, when the last one has answered)
     // reaches the read it shows. One registry holds it in the app; a test that makes several shares the key "".
     let shown = ""
     return Atom.readable(
       (get) => {
-        shown = get(memberKey)
-        return get(forMember(shown))
+        const member = get(memberKey)
+        shown = member
+        const { held, read } = forMember(member)
+        // Shown again: the screen holds it now. When it is let go (the screen left, or another member), it is kept.
+        stopKeeping(member)
+        get.addFinalizer(() => startKeeping(get.registry, member, held))
+        get.subscribe(read, (value) => get.setSelf(value))
+        return get.once(read)
       },
-      (refresh) => refresh(forMember(shown))
+      (refresh) => refresh(forMember(shown).read)
     )
   }
   function send<A, E>(use: (client: Client) => Effect.Effect<A, E>): Effect.Effect<A, E, Id> {

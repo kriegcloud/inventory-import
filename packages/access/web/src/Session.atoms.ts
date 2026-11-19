@@ -4,6 +4,7 @@
 // protects: the session is asked for once per page load and shared; it is asked again only after signing in, creating
 // an organization or switching organization, and every read of the API then belongs to the new member
 // (`@inventory/client/Api` keys its reads by `member`). Signing out reloads the page.
+import { forgetReads } from "@inventory/client/Api"
 import { forgetEarly } from "@inventory/client/Early"
 import { request } from "@inventory/client/Http"
 import { queryClient } from "@inventory/client/QueryClient"
@@ -128,6 +129,9 @@ const askSession: Effect.Effect<SessionState, SessionFailure> = Effect.tryPromis
       // whatever the hint asked for was asked for the wrong person, and no screen may take it.
       if (answer.status === "ready") setup.onSignedIn()
       else forgetEarly()
+      // Nobody is signed in: whatever was read for the previous person leaves memory now (a sign-out reloads the page,
+      // which does the same; this holds when the session is found signed out without one).
+      if (answer.status === "signed-out") forgetReads()
     })
   )
 )
@@ -225,6 +229,7 @@ export const signInAs = (account: { readonly email: string; readonly password: s
       .then(() => authClient.signIn.email(account))
       .then(orThrow)
       .then(() => {
+        forgetReads()
         rememberSignedOut(false)
         window.location.assign("/")
       })
@@ -237,6 +242,7 @@ export const signOut = (): Promise<void> =>
       .signOut()
       .then(orThrow)
       .then(() => {
+        forgetReads()
         rememberSignedIn(false)
         rememberSignedOut(true)
         window.location.assign("/")

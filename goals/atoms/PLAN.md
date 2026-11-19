@@ -169,6 +169,14 @@ Browser, on a fresh database, a new browser context (never signed out), the dev 
 
 Not seen: the development sign-in failing; creating an organization.
 
+**The reset, in the client** (after step 4). Client tests: 17 pass, the two new ones above among them. Browser, fresh
+database, a new browser context: People, then Items for 45 s, then People again: the 3 rows and "Updating" at 101 ms,
+fresh at 365 ms, no skeleton (the keep now being the client's hold). Signed out, then "Sign in as Marcus Oyelaran" on
+the same tab, then People sampled every 10 ms: nothing, the page's skeleton (its 24 placeholder rows), then his own
+view (3 people, no role menus, no Add: he is an Editor); no admin control of Dana's at any sample. Console: no error
+or warning. The sign-out reloads the page, so in the browser `forgetReads` and the reload drop the same things; the
+test holds `forgetReads` without the reload.
+
 ## Legacy in the client
 
 The client's lint is on (`packages/client/.oxlintrc.json` extends `.oxlintrc.atoms.json`), with three files excepted by
@@ -215,12 +223,16 @@ Not discriminators, and not changed: string-literal domains with no data of thei
   sign in and ask the session again; a failure is logged and the sign-in page drawn.
 - **`main.tsx` keeps the query cache's provider** until TanStack Query leaves (step 8): the one file of the app the
   atoms lint excepts, by name.
-- **What a previous member's reads are after a switch or sign-out** (for the reset question). Signing out and signing
-  in as another account reload the page, so nothing read stays in memory. A switch of organization keeps the previous
-  organization's reads, unread, for up to `keepUnwatched` (five minutes) in the registry, then lets them go; switching
-  back within that time shows them at once, marked updating, and asks again. The per-member read atoms themselves (no
-  data) are kept for the tab's life. The catalog screens' TanStack cache is emptied at once on a switch, as before.
-  This is by construction; it was not measured in the browser.
+- **A sign-out lets every read go at once; a switch keeps the person's reads** (Benjamin: "Keyed reads, and drop them
+  on sign-out (Recommended)"). The five-minute keep is now a hold the client has on the read (`keepFor`: a mount and a
+  timer), not the registry's own idle time, because the registry has no public way to let one atom go before its idle
+  time: `forgetReads` releases every hold and forgets the per-member reads, and the registry lets them go after its
+  400 ms. It runs when the session answers that nobody is signed in, and when sign-out or sign-in-as is about to
+  reload the page (which drops everything anyway). A switch of organization does not call it: the person's reads for
+  the organization they left stay kept for five minutes, and switching back shows them at once, marked updating.
+  Tested: after a sign-out no read is held for anyone, in the held map or the registry, and the next person sees the
+  skeleton, then their own rows, never the first one's; a switch and back shows the first organization's rows at
+  once.
 
 - **A read belongs to the member who asked; no new registry on a switch** (asked of Benjamin, not decided). The brief's
   rabbit holes say a sign-in or a switch of organization is "a new registry, through `RegistryProvider`'s React

@@ -659,3 +659,15 @@ refreshed behind (Recommended)": what was there shows immediately, marked as upd
 in; no skeleton on a return. Rejected: 30 seconds then fresh; always fresh. Built in `@inventory/client/Api`
 (`keepUnwatched`, five minutes, and `Atom.swr` on every read); the mark is the search box's spinner, "Updating".
 Reverse: `keepUnwatched` and the one `Atom.swr` line.
+
+### 2026-11-19 — atoms, the reads after a sign-out or a switch
+
+The brief said a sign-in, a sign-out or a switch of organization is a new atom registry; the build kept every read per
+member and organization instead, which needs no second registry. Question: which? Answer: "Keyed reads, and drop them
+on sign-out (Recommended)": each read belongs to one member and organization; a switch shows the other organization's
+own reads, and switching back within five minutes shows its rows at once; on sign-out the previous person's held rows
+leave memory at once. Read as: a sign-out drops everything held; a switch keeps the same person's reads for the
+organization they left for the five minutes. Rejected: keyed reads as built (rows linger up to five minutes); a new
+registry, as the brief said. Built in `@inventory/client/Api` (`forgetReads`, called when the session answers that
+nobody is signed in, and by sign-out and sign-in-as before their reload), with a test. Reverse: `forgetReads` and its
+three callers.

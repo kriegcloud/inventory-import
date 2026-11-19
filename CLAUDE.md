@@ -317,7 +317,7 @@ docs/                   Standards, the kit, patterns, the glossary and sign-in (
 explorations/           Questions being shaped: research, decisions, briefs.
 goals/                  Work with a definition of done: SPEC.md and PLAN.md.
 scripts/                Repository checks (`beep docs check`, `beep laws keys`, `beep vendor check`, `beep quality strict`,
-                        `beep laws boundaries`: which package may import which, `beep laws screens`: every package with screens in both stylesheet lists, `check-effect-imports.mjs`: every Effect import from its own path under its one name) and `vendor-beep.mjs`, which copies the kit from a
+                        `beep laws boundaries`: which package may import which, `beep laws screens`: every package with screens in both stylesheet lists, `check-effect-imports.mjs`: every Effect import from its own path under its one name) and `beep vendor sync`, which copies the kit from a
                         beep-effect checkout.
 turbo.json              The task graph: seven package tasks and three root tasks.
 .agents/                Skills (see above). Not application code; the check ignores it.

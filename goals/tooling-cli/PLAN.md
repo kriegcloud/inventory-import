@@ -15,7 +15,7 @@ from: explorations/ideal-architecture
 | 2 | `laws boundaries`, `laws screens`, `laws keys` | done |
 | 3 | `vendor check`, `docs check` | done |
 | 4 | `quality strict` | done |
-| 5 | `vendor sync` | todo |
+| 5 | `vendor sync` | done |
 | 6 | `laws effect-imports` | todo |
 | 7 | The start-up budget test, the check's time before and after, the documents | todo |
 
@@ -34,6 +34,7 @@ compared on standard output, standard error and exit code.
 | `vendor check` | the same, and with `--source` against a beep-effect checkout (exit 0) | a changed file, a lost provenance line, a missing file, a stray file, changed exports; in the record, a patch with no reason on a file equal to upstream and a source hash that differs; with `--source`, a recorded source hash that is not upstream's (exit 1) |
 | `docs check` | the same, and with `--verbose` (exit 0) | a document with no frontmatter (exit 1). A bundle with no markdown, a validator that scanned nothing, and a missing validator are tested against a stand-in validator, not compared: planting them means moving a whole bundle or the vendored skill |
 | `quality strict` | the same in all six packages that run it, and with `--all` (exit 0), the elapsed seconds in its last line set aside | a ceiling above the count, a ceiling below it, plugin options that differ from the root's (exit 1) |
+| `vendor sync` | run at the recorded commit, it prints the same five lines and changes no file (the script did the same) | no failure sentences to plant. Run at beep-effect's current commit instead: the script and the command each changed the same 98 files to the same bytes, and the kit was restored. A commit that does not exist stops before anything is written |
 
 ## Current blocker
 
@@ -53,6 +54,13 @@ Where the brief left a choice open, or the code showed the brief could not be fo
 - **`quality strict` exits 1 on two refusals where the script exited 0.** When no tsconfig had the plugin, or no
   ceiling file was named, the script printed its FAIL sentence and returned before it set the exit code, so the
   check passed. The command fails. The second sentence now names the command instead of the script's path.
+- **`vendor sync` writes the kit's words as the script wrote them.** The provenance line of every vendored file, each
+  kit README and the comment in each `vendor.json` name `scripts/vendor-beep.mjs` and `scripts/vendor-check.mjs`,
+  which no longer exist. The command still writes those exact words, so a run at the recorded commit changes no
+  file and the kit is untouched by this goal. Rewording them changes the first line of 90 vendored files, four
+  READMEs and four records: a decision for Benjamin, not taken here.
+- **`vendor sync` has no test of its own.** Its proof is the two runs above; a test would need a small beep-effect
+  repository with the four packages and their closure as a fixture.
 - **A missing argument exits 1, not 2.** `vendor-beep.mjs` exited 2 when `--from` was missing; a command's missing
   flag is reported by the CLI module, which prints its usage and exits 1.
 - **The root scripts call the bin directly** (`bun packages/tooling/tool/cli/src/bin.ts quality ceilings`), not

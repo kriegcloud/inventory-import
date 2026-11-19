@@ -92,6 +92,12 @@ export class Repo extends Context.Service<
     readonly bytes: (path: string) => Effect.Effect<Uint8Array, RepoError>
     /** Writes a file's text, making its folder first. */
     readonly write: (path: string, text: string) => Effect.Effect<void, RepoError>
+    /** Writes a file's bytes, making its folder first. */
+    readonly writeBytes: (path: string, data: Uint8Array) => Effect.Effect<void, RepoError>
+    /** Removes a file or a whole folder; one that is not there is not an error. */
+    readonly remove: (path: string) => Effect.Effect<void, RepoError>
+    /** A path with its `.` and `..` segments resolved, still relative if it was. */
+    readonly normalize: (path: string) => string
     /** A JSON file decoded through a schema. */
     readonly json: <Sch extends S.Constraint>(
       schema: Sch
@@ -142,6 +148,14 @@ export class Repo extends Context.Service<
               RepoError.make({ path: file, message: `${file} could not be written: ${String(cause)}` })
             )
           )
+        const unwritable = (file: string) => (cause: unknown) =>
+          RepoError.make({ path: file, message: `${file} could not be written: ${String(cause)}` })
+        const writeBytes = (file: string, data: Uint8Array) =>
+          fs
+            .makeDirectory(path.dirname(file), { recursive: true })
+            .pipe(Effect.andThen(fs.writeFile(file, data)), Effect.mapError(unwritable(file)))
+        const remove = (file: string) =>
+          fs.remove(file, { recursive: true, force: true }).pipe(Effect.mapError(unwritable(file)))
         const json =
           <Sch extends S.Constraint>(schema: Sch) =>
           (file: string): Effect.Effect<Sch["Type"], RepoError, Sch["DecodingServices"]> =>
@@ -259,6 +273,9 @@ export class Repo extends Context.Service<
           text,
           bytes,
           write,
+          writeBytes,
+          remove,
+          normalize: (file) => path.normalize(file),
           json,
           entries,
           files,

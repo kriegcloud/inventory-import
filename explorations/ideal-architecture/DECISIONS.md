@@ -277,12 +277,14 @@ formulas and saved results, number formats, the date system, sheets, merged rang
 everything else read is named in `dropped` and not written. Rejected: read only; values plus unknown parts carried
 through. Reverse: add the carried-through parts when a use edits a workbook in place.
 
-### 2026-11-19 — xlsx displayed text (X3), open
+### 2026-11-19 — xlsx displayed text (X3)
 
-Question: for which number formats is a cell's displayed text worked out? Not decided: Benjamin chose "Something
-else" and typed nothing; he is being asked. The brief's default, not his answer, is dates and times, zero-padding and
-one plain number pattern. Nothing that depends on it is built: `XlsxNumberFormat.kind`, `XlsxCell.shown`,
-`internal/numberFormat.ts`, the `FormatNotShown` finding and the adapter's `shown`.
+Question: for which number formats is a cell's displayed text worked out? Benjamin first chose "Something else" and
+typed nothing; asked again ("For X3 you chose "Something else": which number formats should get displayed text?") he
+typed: "Use the recommendation". So: dates and times, zero-padding and one plain number pattern (digits with
+optional thousands separators, fixed decimals, a percent sign, a literal prefix or suffix); any other format gives no
+displayed text and one Note names it. Rejected: dates and zero-padding only; every format Excel has. Reverse: widen
+or narrow `internal/numberFormat.ts`; nothing else knows the grammar.
 
 ### 2026-11-19 — xlsx unreadable cell (X4)
 
@@ -302,3 +304,15 @@ measurements from the new reader.
 Question: what becomes of SheetJS once the reader is swapped? Answer: "Keep as test oracle only (Recommended)": a
 devDependency of `@beep/xlsx`, out of the browser bundle and both runtime manifests. Rejected: remove it entirely;
 remove it and check with LibreOffice. Reverse: delete the oracle test and the devDependency.
+
+### 2026-11-19 — xlsx brief
+
+Question: does `BRIEF-xlsx.md` for the goal `beep-xlsx` match? Answer: "The brief matches (Recommended)", with X1 to
+X6 as answered above. The goal is open at `goals/beep-xlsx`. Reverse: reopen the brief before the goal's SPEC is
+ticked.
+
+### 2026-11-19 — who builds xlsx
+
+Question: who builds `@beep/xlsx`? Answer: "The same session (Recommended)", the one that wrote the brief, on its own
+branch `claude/beep-xlsx`. Rejected: a fresh session. Reverse: hand the branch and `goals/beep-xlsx/PLAN.md` to
+another builder.

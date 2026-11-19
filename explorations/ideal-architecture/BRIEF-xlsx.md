@@ -1,7 +1,7 @@
 ---
 type: Brief
 title: "Brief: beep-xlsx"
-description: The goal beep-xlsx, step 8 of the order of work. An Excel workbook as an Effect Schema codec, @beep/xlsx, built beside today's SheetJS reader, proved identical to it on every fixture, then swapped in. Not opened; it waits for "the brief matches".
+description: The goal beep-xlsx, step 8 of the order of work. An Excel workbook as an Effect Schema codec, @beep/xlsx, built beside today's SheetJS reader, proved identical to it on every fixture, then swapped in. Benjamin said it matches; the goal is goals/beep-xlsx.
 ---
 
 # Brief: `beep-xlsx`
@@ -17,9 +17,8 @@ Benjamin's words for these packages: "representing the entire decoding <-> encod
 effect/Schema codec". That sentence is the shape of the package: bytes on one side, a workbook value on the other, one
 codec between them.
 
-Nothing here is built. Of the six decisions at the end, Benjamin has answered X1, X2, X4, X5 and X6 with the
-recommended option of each ([DECISIONS.md](DECISIONS.md), 2026-11-19); X3 is open, and nothing it would change may
-be started. He has not yet said the brief matches, so no goal is open.
+Benjamin answered X1 to X6 with the recommended option of each and said "The brief matches (Recommended)"
+([DECISIONS.md](DECISIONS.md), 2026-11-19). The goal is open at [goals/beep-xlsx](../../goals/beep-xlsx/SPEC.md).
 
 ## Problem
 

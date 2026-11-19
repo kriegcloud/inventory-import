@@ -12,12 +12,14 @@
  *
  * @packageDocumentation
  */
-import { OpenRouterClient, OpenRouterLanguageModel } from "@effect/ai-openrouter"
+import * as OpenRouterClient from "@effect/ai-openrouter/OpenRouterClient"
+import * as OpenRouterLanguageModel from "@effect/ai-openrouter/OpenRouterLanguageModel"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as O from "effect/Option"
-import { FetchHttpClient, type HttpClient } from "effect/http"
+import * as FetchHttpClient from "effect/http/FetchHttpClient"
+import type * as HttpClient from "effect/http/HttpClient"
 import { ModelPolicy, type OpenRouterSettings } from "./OpenRouter.config.ts"
 import { ModelUnavailable } from "./OpenRouter.errors.ts"
 import { ModelAccess, modelAccessOf, type ModelPrompt, type ModelStatus, modelStatusOf } from "./OpenRouter.schema.ts"

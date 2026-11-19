@@ -10,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@inventory/ui/component
 import { Spinner } from "@inventory/ui/components/spinner"
 import { useActor } from "@/lib/actor"
 import { call } from "@/lib/api"
-import { sayError } from "@/lib/errors"
+import { sayError } from "@inventory/client/SayError"
 import {
   type Conversation,
   conversationKey,

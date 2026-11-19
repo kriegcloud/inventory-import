@@ -46,6 +46,7 @@
     "@fontsource-variable/ibm-plex-sans": "^5.3.0",
     "@fontsource-variable/jetbrains-mono": "^5.3.0",
     "@hookform/resolvers": "^7.0.6",
+    "@inventory/client": "workspace:*",
     "@inventory/kernel": "workspace:*",
     "@inventory/review": "workspace:*",
     "@inventory/ui": "workspace:*",

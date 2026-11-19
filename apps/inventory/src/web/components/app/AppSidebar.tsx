@@ -13,7 +13,7 @@ import {
   UsersIcon
 } from "lucide-react"
 import { toast } from "sonner"
-import { toastError } from "@/lib/errors"
+import { toastError } from "@inventory/client/SayError"
 import { Avatar, AvatarFallback } from "@inventory/ui/components/avatar"
 import {
   DropdownMenu,

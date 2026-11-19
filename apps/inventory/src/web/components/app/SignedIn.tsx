@@ -4,7 +4,7 @@ import { Alert, AlertDescription, AlertTitle } from "@inventory/ui/components/al
 import { Button } from "@inventory/ui/components/button"
 import { Skeleton } from "@inventory/ui/components/skeleton"
 import { signedOutHere, useActor } from "@/lib/actor"
-import { sayError } from "@/lib/errors"
+import { sayError } from "@inventory/client/SayError"
 import { CreateOrganization, SignIn } from "@/pages/SignIn"
 import { AppShell } from "./AppShell.tsx"
 

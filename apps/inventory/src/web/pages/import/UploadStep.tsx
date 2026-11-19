@@ -1,5 +1,5 @@
 import { ByteSize, DateTime, Option } from "effect"
-import { request } from "../../lib/http.ts"
+import { request } from "@inventory/client/Http"
 import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { PageHeader } from "@inventory/ui/PageHeader"
@@ -33,7 +33,7 @@ import { type UploadEnd, useUpload, type UploadState } from "@/lib/upload"
 import type { ImportView } from "../../../api/v1/Api.ts"
 import { fileProblemTitle } from "../../../domain/FileProblem.ts"
 import { progressOf } from "../../../domain/Upload.ts"
-import { sayError } from "@/lib/errors"
+import { sayError } from "@inventory/client/SayError"
 
 /**
  * What the picker offers: the spreadsheets the reader takes, and the ones it recognises to say how to convert them

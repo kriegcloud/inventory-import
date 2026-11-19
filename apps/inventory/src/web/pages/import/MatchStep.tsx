@@ -17,7 +17,7 @@ import {
   requiredFields,
   type StagedTable
 } from "../../../domain/ItemImport.ts"
-import { toastError } from "@/lib/errors"
+import { toastError } from "@inventory/client/SayError"
 import { notImportedColumn } from "./format.tsx"
 
 const howWords = {

@@ -1,0 +1,41 @@
+{
+  "name": "@inventory/client",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The browser's seam to the API with no contract in it: calls bound to a client, optimistic writes with their rollback, a sentence for any failure, and the early requests a page starts before its code has loaded",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": [],
+  "exports": {
+    "./package.json": "./package.json",
+    "./ApiRuntime": "./src/ApiRuntime.runtime.ts",
+    "./Http": "./src/Http.runtime.ts",
+    "./Early": "./src/Early.runtime.ts",
+    "./Optimistic": "./src/Optimistic.controller.ts",
+    "./Rollback": "./src/Rollback.rules.ts",
+    "./SayError": "./src/SayError.controller.ts"
+  },
+  "scripts": {
+    "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json && node ../../scripts/check-strict.mjs strict-ceiling.json",
+    "lint": "oxlint --quiet src test",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@inventory/kernel": "workspace:*",
+    "@tanstack/react-query": "^5.107.1",
+    "effect": "4.1.4",
+    "sonner": "^2.0.8"
+  },
+  "devDependencies": {
+    "@effect/vitest": "4.1.4",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "vitest": "^5.1.0"
+  },
+  "peerDependencies": {
+    "react": "^19.3.1"
+  },
+  "beep": {
+    "family": "web-kit"
+  }
+}

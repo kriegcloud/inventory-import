@@ -22,7 +22,7 @@ import { importAddress } from "@/lib/route"
 import { hasRole } from "@inventory/kernel/Role"
 import { SheetButton } from "./import/SheetButton.tsx"
 import { UploadStep } from "./import/UploadStep.tsx"
-import { sayError } from "@/lib/errors"
+import { sayError } from "@inventory/client/SayError"
 
 // The steps after Upload are separate chunks: the first screen does not wait for the review table's code. While one
 // is on its way the person sees a skeleton of that step, in its own boxes.

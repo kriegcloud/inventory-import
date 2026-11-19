@@ -3,7 +3,7 @@
 // answer says so before it is decoded); what is drawn still waits for the decoded session. A wrong hint only fetches
 // code nobody runs.
 import { apiPrefix } from "../api/v1/Version.ts"
-import { early } from "./lib/early.ts"
+import { early } from "@inventory/client/Early"
 
 /** The workspace's chunk: the shell's sidebar, the API client and every page's way in. */
 export const workspace = () => import("./Workspace.tsx")

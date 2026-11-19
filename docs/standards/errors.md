@@ -11,7 +11,7 @@ can do about it.
 
 - **What went wrong, and what to do instead**: "The file has no SKU column. Add one, or pick the sheet that has it."
   Never a code, a stack trace, an HTTP status, a field path or a provider's own message. `sayError(error)` from
-  `@/lib/errors` is the one place a failure becomes words; `modelSentences` are the model's five (the contract's,
+  `@inventory/client/SayError` is the one place a failure becomes words; `modelSentences` are the model's five (the contract's,
   `src/api/v1/ModelTrouble.ts`, so the server's `AiUnavailable` says the same), `answeredByLine`
   says which path answered, and `formProblems` (`@/lib/form`) and the pure `review` (`src/domain/ItemImport.ts`) say
   every problem at once, a form's and a file's rows'. Check: cause each refusal

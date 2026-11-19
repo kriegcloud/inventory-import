@@ -4,7 +4,7 @@
 // exactly what it changed.
 import { QueryClient } from "@tanstack/react-query"
 import type { ItemQuery } from "../../domain/ItemQuery.ts"
-import { isTransient } from "./errors.ts"
+import { isTransient } from "@inventory/client/SayError"
 
 /**
  * Every query key, in one place. A write invalidates the keys of what it changed: a confirm changes the items,

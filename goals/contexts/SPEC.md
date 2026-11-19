@@ -33,8 +33,12 @@ change to the import's rules or counts; no third context; drivers and the vendor
 
 ## Acceptance
 
-- [ ] `check-boundaries.mjs` in the root check, failing on a planted forbidden import.
-- [ ] `@inventory/client` with the app switched to it.
+- [x] `check-boundaries.mjs` in the root check, failing on a planted forbidden import. Proof: a planted
+  `@inventory/review` import in `packages/ui` fails with "imports @inventory/review, which @inventory/ui does not
+  declare"; removed, 13 workspaces pass.
+- [x] `@inventory/client` with the app switched to it. Proof: `check:full` 42 of 42 tasks; on a fresh database
+  the messy sample reads "Import 155, skip 45", then "Not imported 45 · Imported 155 · Already there 0 · All 200",
+  and Items says "155 items".
 - [ ] `access-contract`, `access-model`, `access-host`, `access-web`, each with its proof from the brief.
 - [ ] `catalog-contract`, `catalog-model`, `catalog-host`, `catalog-web`, each with its proof from the brief.
 - [ ] Every wire change in the brief's two tables made, and no other.

@@ -42,6 +42,19 @@
       "inputs": ["apps/*/strict-ceiling.json", "packages/**/strict-ceiling.json", "scripts/check-ceilings.mjs"],
       "outputs": []
     },
+    // Which package may import which (scripts/check-boundaries.mjs): every package.json and every import under src and test.
+    "//#boundaries:check": {
+      "inputs": [
+        "apps/**/package.json",
+        "apps/**/src/**",
+        "apps/**/test/**",
+        "packages/**/package.json",
+        "packages/**/src/**",
+        "packages/**/test/**",
+        "scripts/check-boundaries.mjs"
+      ],
+      "outputs": []
+    },
     // Every file git would commit, so its hash is the whole repository's.
     "//#keys:check": { "outputs": [] },
     "//#docs:check": {

@@ -1,0 +1,6 @@
+{
+  // The client seam's lint: the shared rules for code that runs in the browser.
+  "$schema": "../../node_modules/@effect/tsgo/oxlint-schema.json",
+  "extends": ["../../.oxlintrc.web.json"],
+  "ignorePatterns": ["dist/**"]
+}

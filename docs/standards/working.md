@@ -14,7 +14,7 @@ can follow.
   skeleton where a view is loading. Nothing waits behind a blank screen or a frozen page. Check: in the headless
   browser with the network throttled to Slow 4G, every press changes the screen within the same second.
 - **A write of a value the person chose is optimistic; a write whose outcome the server decides shows its progress.**
-  Optimistic, through `useOptimisticWrite` (`@/lib/optimistic`): the cache changes at once (`changes`, with an `undo`
+  Optimistic, through `useOptimisticWrite` (`@/lib/api`, bound from `@inventory/client/Optimistic`): the cache changes at once (`changes`, with an `undo`
   that takes out only this write's change, so a later write's stays), the request is retried only for a failure that may
   pass (`callWrite`), a refusal puts back what it changed and says why in a toast (`failed`, then the reason), with the
   person's words offered again (`retry`: "Edit again"), and the keys it touched are fetched again once the last write of

@@ -3,7 +3,7 @@ import { useCallback, useRef } from "react"
 import type { DecisionDelta } from "../../api/v1/Api.ts"
 import type { SavedDecisions } from "../../domain/ItemImport.ts"
 import { callWrite } from "./api.ts"
-import { isTransient, toastError } from "./errors.ts"
+import { isTransient, toastError } from "@inventory/client/SayError"
 
 /** What differs between two drafts, row by row: the rows to save and the rows whose decision was taken back. */
 export const deltaOf = (before: SavedDecisions, after: SavedDecisions): DecisionDelta => {

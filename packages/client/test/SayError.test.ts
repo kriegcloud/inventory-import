@@ -4,7 +4,7 @@ import { HttpClientError, HttpClientRequest, HttpClientResponse } from "effect/h
 import { HttpApiError } from "effect/http-api"
 import { Array as Arr } from "effect"
 import { describe, expect, it, vi } from "vitest"
-import { modelSentences, sayError } from "../../src/web/lib/errors.ts"
+import { installTroubleSentences, sayError } from "@inventory/client/SayError"
 
 const request = HttpClientRequest.get("http://localhost:5173/api/v1/activity")
 const answered = (status: number) =>
@@ -66,6 +66,15 @@ describe("saying a failure", () => {
 
   it("says the model's trouble in one of five sentences, never the provider's", () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined)
+    // The app installs the contract's `modelSentences`; any five sentences show the rule.
+    const modelSentences = {
+      noKey: "No key is set.",
+      refused: "Refused.",
+      busy: "Busy.",
+      badAnswer: "Not usable.",
+      down: "Down."
+    } as const
+    installTroubleSentences(modelSentences)
     for (const kind of ["noKey", "refused", "busy", "badAnswer", "down"] as const) {
       expect(sayError({ _tag: "AiUnavailable", kind, reason: "provider said 503 {}" }).sentence).toBe(
         modelSentences[kind]

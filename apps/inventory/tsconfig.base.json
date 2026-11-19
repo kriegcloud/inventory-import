@@ -8,7 +8,8 @@
   // Every other rule is at its root severity. Their findings are still counted by the check, against the ceiling in
   // strict-ceiling.json, which may only fall; remove the override when the count reaches zero. The vendored components
   // and their stage D exception are in @inventory/ui (packages/ui). The override also names @inventory/review's source and
-  // gallery fixtures, which the app's gallery page and two tests import by path; they are counted in that package's ceiling.
+  // gallery fixtures, which the app's gallery page and two tests import by path, and @inventory/client's source; each is
+  // counted in its own package's ceiling.
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "plugins": [
@@ -66,7 +67,8 @@
               "src/web/**/*.tsx",
               "../../packages/review/test/fixtures/**/*.ts",
               "../../packages/review/src/**/*.ts",
-              "../../packages/review/src/**/*.tsx"
+              "../../packages/review/src/**/*.tsx",
+              "../../packages/client/src/**/*.ts"
             ],
             "options": {
               "diagnosticSeverity": {

@@ -4,8 +4,10 @@ import { createRoot } from "react-dom/client"
 import { Toaster } from "@inventory/ui/components/sonner"
 import { TooltipProvider } from "@inventory/ui/components/tooltip"
 import { appRuntime } from "@/lib/api"
+import { modelSentences } from "@/lib/answeredBy"
 import { queryClient } from "@/lib/queries"
 import { startTelemetry } from "@/lib/telemetry"
+import { installTroubleSentences } from "@inventory/client/SayError"
 import { ThemeProvider } from "@inventory/ui/Theme"
 import App from "./App.tsx"
 import "./index.css"
@@ -15,6 +17,9 @@ import "./index.css"
 if (import.meta.env.DEV) {
   void import("react-grab")
 }
+
+// A model failure is said in the contract's sentences, by kind.
+installTroubleSentences(modelSentences)
 
 // Traces and logs to a collector when the server says telemetry is on (@/lib/telemetry); off, one small request.
 void appRuntime.runPromise(startTelemetry)

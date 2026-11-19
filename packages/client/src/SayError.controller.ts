@@ -5,8 +5,6 @@
 import { Effect, Predicate } from "effect"
 import { HttpClientError } from "effect/http"
 import { toast } from "sonner"
-import type { AnsweredBy } from "../../api/v1/Api.ts"
-import { type ModelTrouble, modelSentences } from "../../api/v1/ModelTrouble.ts"
 
 /** A failure as the person reads it: a short title, one or two sentences, and every problem when there are several. */
 export type Said = {
@@ -16,25 +14,19 @@ export type Said = {
   readonly problems: ReadonlyArray<string>
 }
 
-/**
- * Why a model did not answer, in five words the screen knows (`ModelTrouble`), and the five sentences
- * (`modelSentences`). Both are the contract's (`src/api/v1/ModelTrouble.ts`), so the server words its `AiUnavailable`
- * with the same sentences; the provider's own words stay in the server's log.
- */
-export { type ModelTrouble, modelSentences }
-
-const providerName = (provider: string): string => (provider === "openrouter" ? "OpenRouter" : provider)
+let troubles: Readonly<Record<string, string>> = {}
 
 /**
- * The line under a result that says who produced it: "Answered by anthropic/claude-haiku-5.5 through OpenRouter",
- * "Answered by a fallback model, …", or "Answered by the rules: no AI key is set up."
- *
- * @example answeredByLine({ _tag: "Rules", reason: "No AI key is set up." }) // "Answered by the rules: No AI key is set up."
+ * The sentences a model failure is said in, by kind (the app passes the contract's `modelSentences` at start). An
+ * unknown kind reads as the `down` sentence.
  */
-export const answeredByLine = (answeredBy: AnsweredBy): string =>
-  answeredBy._tag === "Rules"
-    ? `Answered by the rules: ${answeredBy.reason}`
-    : `Answered by ${answeredBy.fallback ? "a fallback model, " : ""}${answeredBy.model} through ${providerName(answeredBy.provider)}`
+export const installTroubleSentences = (sentences: Readonly<Record<string, string>>): void => {
+  troubles = sentences
+}
+
+const troubleSentence = (kind: string): string =>
+  (Object.hasOwn(troubles, kind) ? troubles[kind] : troubles["down"]) ??
+  "The model is not answering right now. Try again later."
 
 const reasonOf = (error: unknown): string | undefined =>
   Predicate.hasProperty(error, "reason") && Predicate.isString(error.reason) && error.reason.trim() !== ""
@@ -46,10 +38,6 @@ const tagOf = (error: unknown): string | undefined =>
 
 const statusOf = (error: HttpClientError.HttpClientError): number | undefined =>
   "response" in error.reason ? error.reason.response.status : undefined
-
-// The kinds are the keys of `modelSentences`, so a kind added to the contract and given a sentence is known here too.
-const isTrouble = (value: unknown): value is ModelTrouble =>
-  Predicate.isString(value) && Object.hasOwn(modelSentences, value)
 
 /** A request field's last path segment, made readable: `payload.unitCost` is "unit cost". */
 const fieldWords = (path: ReadonlyArray<string | number>): string => {
@@ -114,11 +102,10 @@ export const sayError = (
         reasonOf(error) ?? "Ask an admin in your organization for the editor role."
       )
     case "AiUnavailable": {
-      const kind = Predicate.hasProperty(error, "kind") ? error.kind : undefined
-      return said(
-        "The model did not answer",
-        isTrouble(kind) ? modelSentences[kind] : (reasonOf(error) ?? modelSentences.down)
-      )
+      // Said by its kind, from the sentences the app installed (the contract's `modelSentences`), never by the error's
+      // own text: a provider's words never reach the screen.
+      const kind = Predicate.hasProperty(error, "kind") && Predicate.isString(error.kind) ? error.kind : "down"
+      return said("The model did not answer", troubleSentence(kind))
     }
     case "BadRequestProblem": {
       const problems = requestProblems(error, options.fields ?? {})

@@ -284,6 +284,8 @@ apps/inventory/         The app: the Worker and the SPA, one Vite build. Its own
 packages/ui/             @inventory/ui: the vendored shadcn, Dice UI and tablecn components and hooks (as published, one
                         exact export each), the theme (`theme.css`, the Tailwind entry) and the shared screen pieces.
 packages/review/         @inventory/review: the review region and its saved progress.
+packages/client/         @inventory/client: the browser's seam to the API with no contract in it (calls bound to a client,
+                        optimistic writes, `sayError`, the early requests).
 packages/kernel/, packages/drivers/   @inventory/kernel and the @beep drivers (d1, better-auth, openrouter).
 packages/foundation/     Product-neutral packages. Today only beep-effect's kit, vendored: @beep/types (primitive/),
                         @beep/identity, @beep/schema and @beep/utils (modeling/). Never edit them: each vendor.json
@@ -292,7 +294,7 @@ docs/                   Standards, the kit, patterns, the glossary and sign-in (
 explorations/           Questions being shaped: research, decisions, briefs.
 goals/                  Work with a definition of done: SPEC.md and PLAN.md.
 scripts/                Repository checks (`docs-check.sh`, `keys-check.sh`, `vendor-check.mjs`, `check-strict.mjs`,
-                        `check-ceilings.mjs`, `check-exports.mjs`) and `vendor-beep.mjs`, which copies the kit from a
+                        `check-ceilings.mjs`, `check-exports.mjs`, `check-boundaries.mjs`: which package may import which) and `vendor-beep.mjs`, which copies the kit from a
                         beep-effect checkout.
 turbo.json              The task graph: seven package tasks and three root tasks.
 .agents/                Skills (see above). Not application code; the check ignores it.
@@ -320,7 +322,7 @@ Design in this order. Do not start from the UI.
    `Services` in `src/server/App.ts`.
 5. **UI** in `src/web/` (`ItemsPage.tsx`): `call((api) => api.group.endpoint(...))` inside TanStack Query, with
    loading, empty and error states. A write of a value the person chose is optimistic through `useOptimisticWrite`
-   (`@/lib/optimistic`, copy `ItemEditor.tsx` or the People page's role change); a write whose outcome only the
+   (`@/lib/api`, bound from `@inventory/client/Optimistic`; copy `ItemEditor.tsx` or the People page's role change); a write whose outcome only the
    server knows (a confirm, a take-back) shows its progress instead. A new page is one line in `appPages` and one
    branch in `Workspace.tsx`.
 6. **Test** the rule that would hurt most if it were wrong ("Tests" below).

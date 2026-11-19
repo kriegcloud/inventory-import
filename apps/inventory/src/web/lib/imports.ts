@@ -3,8 +3,8 @@ import { MutableHashMap, Option } from "effect"
 import type { ImportView, OpenImports } from "../../api/v1/Api.ts"
 import type { StagedTable } from "../../domain/ItemImport.ts"
 import type { SheetChoice, SheetSummary } from "../../domain/Spreadsheet.ts"
-import { call } from "./api.ts"
-import { cacheChange, useOptimisticWrite } from "./optimistic.ts"
+import { call, useOptimisticWrite } from "./api.ts"
+import { cacheChange } from "@inventory/client/Optimistic"
 import { queryKeys } from "./queries.ts"
 
 /** How the import's view is fetched: by its hook, and ahead of it by the workspace when the address names one. */

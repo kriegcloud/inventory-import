@@ -1,11 +1,11 @@
-// The rule every optimistic write rolls back by (src/web/lib/rollback.ts, used by optimistic.ts), on a change of one
+// The rule every optimistic write rolls back by (Rollback.rules.ts, used by Optimistic.controller.ts), on a change of one
 // value in a cached list: a member's role set at once, put back when the server refuses. Inputs are drawn from the
 // app's Role schema.
 import { describe, expect, it } from "@effect/vitest"
 import { Array as Arr } from "effect"
 import * as S from "effect/Schema"
 import { Role } from "@inventory/kernel/Role"
-import { rollback } from "../../src/web/lib/rollback.ts"
+import { rollback } from "@inventory/client/Rollback"
 
 type Person = { readonly memberId: string; readonly role: Role }
 

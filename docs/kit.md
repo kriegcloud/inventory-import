@@ -24,7 +24,7 @@ and the decisions behind them in `DECISIONS.md`.
 | A list the page already holds (people, a result's rows) | `RecordsTable`: the same data table in client mode, cards on a phone | `packages/ui/src/components/data-table/data-table-records.tsx` |
 | A spreadsheet to edit in bulk | `DataGrid` + `useDataGrid` from the tablecn registry (TanStack Table 9, virtualised) | `packages/ui/src/components/data-grid/` |
 | Something on its way | `PageHeaderSkeleton`, `TableSkeleton`, `TablePageSkeleton`, `ReviewSkeleton`, `UploadSkeleton`, `StepsSkeleton` in the real boxes | `@inventory/ui/Skeletons` (`packages/ui/src/Skeletons.component.tsx`) |
-| A failure, in words | `sayError(error)`: title, sentence and every problem; `toastError`; `answeredByLine` for which path answered | `lib/errors.ts` |
+| A failure, in words | `sayError(error)`: title, sentence and every problem; `toastError`; `answeredByLine` for which path answered | `@inventory/client/SayError`; `answeredByLine` in `lib/answeredBy.ts` |
 | Every problem of a form at once | `formProblems` and `problemOf`, shown with `FieldError` under each field (the record editor reads its form with `readRecordForm` from the domain instead) | `lib/form.ts`, `pages/ItemEditor.tsx` |
 | Cache keys and fetch rules | `queryKeys`, `freshFor`, `sessionQuery`; the one `queryClient` | `lib/queries.ts` |
 | Act on selected rows or cells | `ActionBar`, passed to `DataGrid` as `actionBar` | `packages/ui/src/components/action-bar.tsx` |
@@ -311,7 +311,7 @@ const save = useOptimisticWrite({ write: (api, edit) => api.items.edit(edit), ch
 - **A write** invalidates exactly the keys of what it changed, named in `queryKeys`, never everything (a confirm,
   a take-back or an edit: `queryKeys.items`, the import's view, and `queryKeys.activity` for its audit line). Its
   button is disabled while the request is pending. A write whose outcome the screen can show before the server
-  answers is optimistic (`useOptimisticWrite`, `lib/optimistic.ts`); one only the server knows (a confirm, a
+  answers is optimistic (`useOptimisticWrite` from `lib/api.ts`, built by `@inventory/client/Optimistic`); one only the server knows (a confirm, a
   take-back, adding a person by email) shows its progress instead. Mutations are retried only through `callWrite`,
   and only for a failure that may pass.
 - **Every problem of a form at once**: run every field's check (`readRecordForm` in `src/domain/Item.ts`, or

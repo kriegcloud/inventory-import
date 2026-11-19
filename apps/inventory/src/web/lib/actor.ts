@@ -1,8 +1,8 @@
-import { request } from "./http.ts"
+import { request } from "@inventory/client/Http"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { sessionPath } from "../../api/v1/Version.ts"
 import { preload } from "../preload.ts"
-import { forgetEarly } from "./early.ts"
+import { forgetEarly } from "@inventory/client/Early"
 import { queryKeys, sessionQuery } from "./queries.ts"
 
 // Who is signed in, read through the browser HTTP boundary: this module is in the sign-in screen's first download,

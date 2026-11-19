@@ -1,5 +1,5 @@
 // The five ways a model call can fail that the screens have words for, and those words. Plain values, with no import:
-// the browser's one place for failure sentences (src/web/lib/errors.ts) is on the first page, which must stay light,
+// the browser's one place for failure sentences (@inventory/client/SayError, which the app hands these sentences at start) is on the first page, which must stay light,
 // and the server words every `AiUnavailable` with the same sentences (`AiTrouble` and `aiUnavailable` in Api.ts).
 
 /** The five troubles, in the order the contract lists them (`AiTrouble` in Api.ts is their Schema). */

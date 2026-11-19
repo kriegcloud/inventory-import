@@ -25,7 +25,7 @@ import { importAddress } from "@/lib/route"
 import type { ChangedItem, ImportEvent, ImportResult, ImportView, RowOutcome } from "../../../api/v1/Api.ts"
 import { notImportedCsv, rowId, rowPlace, type StagedTable } from "../../../domain/ItemImport.ts"
 import { download, importWords, notImportedColumn, OutcomePill, Text, when } from "./format.tsx"
-import { toastError } from "@/lib/errors"
+import { toastError } from "@inventory/client/SayError"
 import { queryKeys } from "@/lib/queries"
 
 type Filter = "all" | RowOutcome["outcome"]

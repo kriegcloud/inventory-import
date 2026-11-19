@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs"
 import { describe, expect, it } from "@effect/vitest"
 import { Array as Arr, Effect, Option } from "effect"
 import type { Note, NoteKind, Row, SpreadsheetTable } from "../../src/domain/Spreadsheet.ts"
-import { sayError } from "../../src/web/lib/errors.ts"
+import { sayError } from "@inventory/client/SayError"
 import { readSpreadsheet } from "../../src/web/lib/spreadsheet/index.ts"
 
 const bytesOf = (path: string): Uint8Array => readFileSync(new URL(`../../${path}`, import.meta.url))

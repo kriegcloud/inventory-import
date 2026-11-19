@@ -1,4 +1,4 @@
-import { request } from "../http.ts"
+import { request } from "@inventory/client/Http"
 import { SecureRandom } from "effect/crypto"
 // One file on its way in: read in a worker, sent to the server in chunks, turned into an import. The upload lives in
 // this module, not in a component, so it carries on while the person opens another page, and there is one per tab.
@@ -20,7 +20,7 @@ import { rememberWorkbook } from "../imports.ts"
 import { navigate } from "@inventory/ui/Route"
 import { importAddress } from "../route.ts"
 import type { ReadMessage, ReadRequest } from "./protocol.ts"
-import { sayError } from "../errors.ts"
+import { sayError } from "@inventory/client/SayError"
 import { queryKeys } from "../queries.ts"
 
 export type { UploadState } from "../../../domain/Upload.ts"

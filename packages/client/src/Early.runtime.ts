@@ -1,4 +1,4 @@
-import { request } from "./http.ts"
+import { request } from "@inventory/client/Http"
 // Requests started before the code that will read them needs them. The first screen's data can be asked for the
 // moment someone is known to be signed in, by its address, and the API client takes the answer when it asks for that
 // address itself (`takeEarly`, in api.ts). Nothing here reads an answer: the client decodes it through the contract,

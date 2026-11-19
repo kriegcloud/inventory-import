@@ -20,7 +20,8 @@ import { Input } from "@inventory/ui/components/input"
 import { NativeSelect, NativeSelectOption } from "@inventory/ui/components/native-select"
 import { Switch } from "@inventory/ui/components/switch"
 import { Textarea } from "@inventory/ui/components/textarea"
-import { cacheChange, useOptimisticWrite } from "@/lib/optimistic"
+import { cacheChange } from "@inventory/client/Optimistic"
+import { useOptimisticWrite } from "@/lib/api"
 import {
   categories,
   type ItemEdit,
@@ -31,7 +32,7 @@ import {
   uoms
 } from "../../domain/Item.ts"
 import type { ItemPage } from "../../domain/ItemQuery.ts"
-import { sayError } from "@/lib/errors"
+import { sayError } from "@inventory/client/SayError"
 import { queryKeys } from "@/lib/queries"
 import { costText, dimensionsText } from "./import/itemText.ts"
 

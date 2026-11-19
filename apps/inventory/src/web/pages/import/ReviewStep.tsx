@@ -42,7 +42,7 @@ import {
   toRegionRows,
   toServerDecisions
 } from "./reviewAdapter.ts"
-import { toastError } from "@/lib/errors"
+import { toastError } from "@inventory/client/SayError"
 import { queryKeys } from "@/lib/queries"
 
 const whole = new Intl.NumberFormat("en-US")

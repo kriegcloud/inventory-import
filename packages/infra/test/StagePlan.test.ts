@@ -7,7 +7,7 @@ import * as O from "effect/Option"
 import * as Result from "effect/Result"
 import * as S from "effect/Schema"
 import { StagePlan } from "@beep/infra/Stage"
-import { hasOwnTestPassword, kindOf, modelKeyFor, planFor } from "@beep/infra/StagePlan"
+import { givenTestPassword, kindOf, modelKeyFor, planFor, testPasswordOf } from "@beep/infra/StagePlan"
 
 const plan = (stage: string) => Result.getOrThrow(planFor(stage))
 
@@ -91,15 +91,31 @@ describe("the plan of a stage", () => {
     expect(S.is(StagePlan)(value)).toBe(true)
   })
 
-  it("every deployed stage with test accounts has its own password for them; the repository's is for a developer's machine", () => {
-    expect(
-      A.map(["prod", "pr-42", "test_ben", "dev_ben"], (stage) => [stage, hasOwnTestPassword(plan(stage))])
-    ).toEqual([
-      ["prod", false],
-      ["pr-42", true],
-      ["test_ben", true],
-      ["dev_ben", false]
-    ])
+  describe("the password a stage's test accounts take", () => {
+    it("is minted for a test stage, given to a preview, and the repository's only on a developer's machine", () => {
+      expect(A.map(["prod", "pr-42", "test_ben", "dev_ben"], (stage) => [stage, testPasswordOf(plan(stage))])).toEqual([
+        ["prod", "none"],
+        ["pr-42", "given"],
+        ["test_ben", "minted"],
+        ["dev_ben", "none"]
+      ])
+    })
+
+    it("a preview takes the password it is given", () => {
+      expect(givenTestPassword({ stage: "pr-42", given: O.some("the previews' password") })).toEqual(
+        Result.succeed("the previews' password")
+      )
+    })
+
+    it("a preview with none stops, with a sentence naming the reference", () => {
+      const stopped = givenTestPassword({ stage: "pr-42", given: O.none<string>() })
+      expect(Result.isFailure(stopped) ? stopped.failure.message : "").toBe(
+        'Stage "pr-42" has no password for its test accounts: PREVIEW_TEST_ACCOUNT_PASSWORD is not set, so nobody ' +
+          "could sign in to this preview. Write the reference " +
+          "PREVIEW_TEST_ACCOUNT_PASSWORD=op://<vault>/<item>/<field> in packages/infra/env/op.env and deploy the " +
+          "repository's stack under `op run`, which gives the password to the preview environment as a secret."
+      )
+    })
   })
 
   describe("the model key a stage is deployed with", () => {

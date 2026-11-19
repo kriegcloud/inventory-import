@@ -18,7 +18,8 @@ import {
   OnWorkersDev,
   StagePlan,
   type SettingSource,
-  type StageKind
+  type StageKind,
+  type TestPassword
 } from "./Stage.schema.ts"
 import { $InfraId } from "./internal/identity.ts"
 
@@ -120,14 +121,69 @@ export const planFor = (stage: string): Result.Result<StagePlan, UnknownStage> =
   })
 
 /**
- * Whether a stage's test accounts take a password of the stage's own. Every deployed stage that is seeded with them
- * does (decision "infra, the test accounts' password"): the password written in the repository opens them only on a
- * developer's own machine.
+ * The variable a preview's deploy reads the previews' one test-account password from.
  *
- * @example hasOwnTestPassword(planOfPreview) // true
- * @example hasOwnTestPassword(planOfProduction) // false: it has no test account
+ * @category constants
  */
-export const hasOwnTestPassword = (plan: StagePlan): boolean => plan.deployed && A.contains(plan.seeds, "accounts")
+export const previewPasswordVariable = "PREVIEW_TEST_ACCOUNT_PASSWORD"
+
+/**
+ * Where a stage's test accounts get their password. The password written in the repository opens them only on a
+ * developer's own machine (decision "infra, the test accounts' password"). A test stage, deployed by hand, mints
+ * its own. A preview, deployed by a workflow whose log is public, is given the one password every preview shares,
+ * which its reviewer already holds (decision "infra, a preview's password").
+ *
+ * @example testPasswordOf(planOfPreview) // "given"
+ * @example testPasswordOf(planOfTestStage) // "minted"
+ * @example testPasswordOf(planOfProduction) // "none": it has no test account
+ */
+export const testPasswordOf = (plan: StagePlan): TestPassword => {
+  if (!plan.deployed || !A.contains(plan.seeds, "accounts")) return "none"
+  return plan.kind === "preview" ? "given" : "minted"
+}
+
+/**
+ * A preview was deployed without the password its test accounts take.
+ *
+ * @category errors
+ */
+export class MissingPreviewPassword extends S.TaggedError<MissingPreviewPassword, { readonly brand: unique symbol }>(
+  $I`MissingPreviewPassword`
+)(
+  "MissingPreviewPassword",
+  {
+    stage: S.String.pipe(S.annotateKey({ description: "The stage being deployed" })),
+    variable: S.String.pipe(S.annotateKey({ description: "The variable that should hold the password" }))
+  },
+  $I.annoteError<MissingPreviewPassword>("MissingPreviewPassword", {
+    description: "A preview deployed without the one password its test accounts take"
+  })
+) {
+  /** What is missing and where its reference is written. */
+  override get message(): string {
+    return (
+      `Stage "${this.stage}" has no password for its test accounts: ${this.variable} is not set, so nobody could ` +
+      `sign in to this preview. Write the reference ${this.variable}=op://<vault>/<item>/<field> in ` +
+      `packages/infra/env/op.env and deploy the repository's stack under \`op run\`, which gives the password to ` +
+      `the preview environment as a secret.`
+    )
+  }
+}
+
+/**
+ * The password a preview's test accounts take: the one it was given, or the deploy stops. None is ever minted for a
+ * preview, because nothing could carry a minted one to its reviewer without printing it.
+ *
+ * @example givenTestPassword({ stage: "pr-42", given: O.none() }) // Result.fail(MissingPreviewPassword)
+ */
+export const givenTestPassword = <Password>(input: {
+  readonly stage: string
+  readonly given: O.Option<Password>
+}): Result.Result<Password, MissingPreviewPassword> =>
+  O.match(input.given, {
+    onNone: () => Result.fail(MissingPreviewPassword.make({ stage: input.stage, variable: previewPasswordVariable })),
+    onSome: Result.succeed
+  })
 
 /**
  * The variable that deploys a stage without its model key on purpose, when set to `true`.

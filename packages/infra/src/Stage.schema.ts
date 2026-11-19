@@ -93,6 +93,24 @@ export const Seed = LiteralKit(["organizations", "accounts"]).pipe(
  */
 export type Seed = typeof Seed.Type
 
+/**
+ * Where a stage's test accounts get their password. `none`: the stage has no test account, or runs on a developer's
+ * machine with the password written in the repository. `minted`: the stack makes one for the stage. `given`: the
+ * deploy is handed one, the same for every preview.
+ *
+ * @category schemas
+ */
+export const TestPassword = LiteralKit(["none", "minted", "given"]).pipe(
+  $I.annoteSchema("TestPassword", { description: "Where a stage's test accounts get their password" })
+)
+
+/**
+ * The decoded value of `TestPassword`.
+ *
+ * @category models
+ */
+export type TestPassword = typeof TestPassword.Type
+
 /** The stage answers at the address Cloudflare gives every Worker, on `workers.dev`. */
 export class OnWorkersDev extends S.Opaque<OnWorkersDev, { readonly brand: unique symbol }>()(
   S.Struct({ at: S.tag("workersDev") }).pipe(

@@ -27,13 +27,6 @@ and everything after it.
 The next step is Benjamin's Cloudflare login and `alchemy state bootstrap`. Nothing more can be built or learned on
 this machine alone; "What Benjamin does by hand" below is the list, in order.
 
-**One question open, his:** how does a preview's minted password reach the person reviewing the pull request? The
-workflow's log is public, so it is not printed there. Built so far: whoever deploys from a workstation sees it. The
-ways it could reach a reviewer of a workflow's preview: (a) he reads it from the preview account's state with his
-own login (`alchemy state`; unverified until a state store exists); (b) one password for every preview, which he
-keeps in 1Password and the repository's stack writes to the `preview` environment as a secret, so it is never
-minted or printed and he already has it; (c) the workflow posts it where only he can read. None is built.
-
 ## Choices made
 
 Where the brief left a choice open, or the code showed the brief could not be followed as written.
@@ -68,10 +61,14 @@ Where the brief left a choice open, or the code showed the brief could not be fo
   opens a seeded account, the repository's is refused for every account, and the page offers no account in one
   click. Rejected while building: writing a second seed file with new hashes at deploy time, because a stack's
   resources are declared before the minted value exists.
-- **The minted password is shown only to a person deploying from their own machine**, as the stack's output
-  `testAccountPassword`. In a workflow (`CI=true`) the output says it was minted and does not show it: this
-  repository's workflow logs are public, so "the pull request's deploy output" would publish it. How a preview's
-  password reaches its reviewer is the one open question, below.
+- **A test stage's minted password is shown only to a person deploying from their own machine**, as the stack's
+  output `testAccountPassword`; in a workflow (`CI=true`) the output would say it was minted and not show it.
+- **Every preview takes one given password** (Benjamin: "One preview password in 1Password"). A preview mints
+  none: the repository's stack reads `PREVIEW_TEST_ACCOUNT_PASSWORD` under `op run` and writes it to the `preview`
+  environment as a secret, the workflow's preview job hands it to the deploy, and the stack gives it to the Worker.
+  It is never printed: the stack's output says only "the one every preview shares; never shown". A preview deploy
+  with none stops with a sentence naming the reference, and so does the repository's stack, since without it no
+  preview could be signed in to. The cleanup job is not given it: a destroy plans from state.
 - **A production deploy with no model key stops** (Benjamin: "Fail the production deploy"), with a sentence naming
   the variable, where its reference is written, and the flag `DEPLOY_WITHOUT_MODEL_KEY=true` that deploys without a
   model on purpose. The repository's stack stops the same way, and writes the flag to the production environment as
@@ -153,8 +150,9 @@ Not seen: the stack minting the value and handing it to the Worker; that needs a
   full strictness profile, with `effect` still 4.1.4 for the whole repository.
 - `packages/infra/test/StagePlan.test.ts`: each of the four stage kinds maps to its plan; production has no seed,
   the real host name and no `workers.dev`; a preview and a test stage have the test accounts and no sign-up;
-  `live_<user>` and other names are refused; every deployed stage with test accounts mints a password; a
-  production deploy with no model key stops with its sentence, and the flag lets it through.
+  `live_<user>` and other names are refused; a test stage mints its test accounts' password and a preview takes
+  the one it is given, stopping with its sentence when there is none; a production deploy with no model key stops
+  with its sentence, and the flag lets it through.
 - `packages/infra/test/InfraStage.test.ts`: the service hands a stack the plan of `pr-42`; a deploy named
   `live_ben` or `dev_ben` stops before any resource; both stack modules load on Node from the repository alone.
 - `packages/access/model/test/StagePassword.test.ts` and `apps/inventory/test/server/StagePassword.slow.test.ts`:
@@ -193,11 +191,15 @@ take-back), straight after a preview server was stopped, and passed on three run
    both end there.
 10. Whether a pull request's `closed` event still reaches the `preview` environment's secrets, which the cleanup
     job needs.
-11. Whether the minted `TEST_ACCOUNT_PASSWORD` reaches the Worker as a secret, shows in a workstation deploy's
-    output as text and not as a redacted mark, and can be read back from the state afterwards.
-12. Whether a stack that stops on a missing model key prints its sentence whole, or wraps it in a stack trace.
+11. Whether a test stage's minted `TEST_ACCOUNT_PASSWORD` reaches the Worker as a secret and shows in a
+    workstation deploy's output as text and not as a redacted mark; and whether a preview's given one reaches the
+    Worker from the environment's secret with GitHub masking it in the log.
+12. Whether a stack that stops on a missing model key or a missing preview password prints its sentence whole, or
+    wraps it in a stack trace.
 13. Whether the sign-in's second look at a password on a stage (two comparisons, one hash) changes the CPU of a
     sign-in in any way that matters.
+14. Whether `alchemy destroy` for a closed pull request runs without the preview's password, as its planning from
+    state suggests; if it does not, the cleanup job needs the secret too.
 
 ## What Benjamin does by hand, in order
 
@@ -209,14 +211,18 @@ Nothing below was started. Every command names its stage.
 3. **`bunx alchemy state bootstrap`** in the preview account. This is the first thing that exists outside this
    machine: the state store's Worker.
 4. **A test stage in the preview account**: `bunx alchemy plan --stage test_<user>`, read it, then `bunx alchemy
-   deploy --stage test_<user>`. Its output gives the address and `testAccountPassword`. Open the address; sign in
+   deploy --stage test_<user>`. Its output gives the address and `testAccountPassword`, minted for that stage. Open the address; sign in
    as dana@example-works.test with that password, and see local-test-password refused; load `items_messy.csv`
    through Confirm and read 155 stored; search the Items page. Points 1 to 5 and 11 above are settled here. Then
    `bunx alchemy destroy --stage test_<user>`.
 5. **`bunx alchemy state bootstrap`** in the production account.
-6. **Write production's model key reference** into `packages/infra/env/op.env` as
-   `OPENROUTER_API_KEY=op://<vault>/<item>/<field>`. Without it steps 8 and 9 stop and say so; to go on without a
-   model on purpose, add `DEPLOY_WITHOUT_MODEL_KEY=true` to both commands.
+6. **Two 1Password items and their references** in `packages/infra/env/op.env`, each a commented line there whose
+   vault path he fills in and whose `# ` he removes:
+   - `OPENROUTER_API_KEY=op://<vault>/<item>/<field>`: production's model key. Without it steps 8 and 9 stop and
+     say so; to go on without a model on purpose, add `DEPLOY_WITHOUT_MODEL_KEY=true` to both commands.
+   - `PREVIEW_TEST_ACCOUNT_PASSWORD=op://<vault>/<item>/<field>`: a new item, a password he generates in
+     1Password, which every preview's test accounts take. Without it step 8 stops and says so. He signs in to a
+     preview as dana@example-works.test (or any test account) with it.
 7. **Decide who may open an account in production**: the emails for `SIGN_UP`, his own first. Previews and test
    stages take none.
 8. **`gh auth login`** with rights over the repository's settings, then the repository's stack, from the
@@ -228,9 +234,7 @@ Nothing below was started. Every command names its stage.
    prod`, read it, then the same with `deploy`. Open `https://inventory.beep-effect.com`: the sign-in page offers no
    sign-up to a stranger; his email signs up, creates the organization and is its admin.
 10. **On the zone**: "Always Use HTTPS" confirmed on.
-11. **Answer how a preview's password reaches its reviewer** ("Current blocker", above), before the first pull
-    request needs one.
-12. **Push the branch and merge it**, so `deploy.yml` reaches `main`. From then a pull request gets a preview and a
+11. **Push `main`** (the branch is merged into it locally), so `deploy.yml` reaches GitHub. From then a pull request gets a preview and a
     push to `main` waits for his approval in the `production` environment.
-13. **Adding a person to production later**: add their email to `SIGN_UP` (step 8 again), deploy, and they sign
+12. **Adding a person to production later**: add their email to `SIGN_UP` (step 8 again), deploy, and they sign
     up; or they sign up and an admin adds them on the People page.

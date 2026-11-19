@@ -31,6 +31,8 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      # The one password every preview's test accounts take. A secret: never echoed, and the stack never prints it.
+      PREVIEW_TEST_ACCOUNT_PASSWORD: ${{ secrets.PREVIEW_TEST_ACCOUNT_PASSWORD }}
       STAGE: pr-${{ github.event.pull_request.number }}
     steps:
       - uses: actions/checkout@v4

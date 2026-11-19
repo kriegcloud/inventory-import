@@ -8,7 +8,8 @@
  * one process: `op run --env-file packages/infra/env/op.env -- bunx alchemy deploy packages/infra/src/GitHub.stack.ts
  * --stage prod`. No workflow deploys it: a job that could rewrite its own approval rule would have none.
  *
- * Must not break: a preview job holds no model key, no sign-up list and no token for production's account.
+ * Must not break: a preview job holds no model key, no sign-up list and no token for production's account; the
+ * previews' password is written as a secret and never printed.
  *
  * @packageDocumentation
  */
@@ -23,7 +24,13 @@ import * as Redacted from "effect/Redacted"
 import * as Result from "effect/Result"
 import * as Str from "effect/String"
 import { InfraStage } from "./InfraStage.context.ts"
-import { modelKeyFor, planFor, withoutModelKeyFlag } from "./StagePlan.rules.ts"
+import {
+  givenTestPassword,
+  modelKeyFor,
+  planFor,
+  previewPasswordVariable,
+  withoutModelKeyFlag
+} from "./StagePlan.rules.ts"
 
 /** The repository the deploy workflow runs in. */
 const repository = { owner: "kriegcloud", repository: "inventory-import" } as const
@@ -88,6 +95,17 @@ export default Alchemy.Stack(
       { onFailure: Effect.die, onSuccess: Effect.succeed }
     )
 
+    // The one password every preview's test accounts take (decision "infra, a preview's password"). Without it no
+    // preview could be signed in to, so this stack stops as a preview's own deploy would.
+    const givenPreviewPassword = yield* Config.Redacted(previewPasswordVariable).pipe(
+      Config.option,
+      Config.map(O.filter((value) => value.pipe(Redacted.value, Str.trim) !== ""))
+    )
+    const previewPassword = yield* Result.match(
+      givenTestPassword({ stage: "pr-<number>", given: givenPreviewPassword }),
+      { onFailure: Effect.die, onSuccess: Effect.succeed }
+    )
+
     const production = yield* GitHub.Environment("Production", {
       ...repository,
       name: "production",
@@ -143,6 +161,12 @@ export default Alchemy.Stack(
       environment: preview,
       name: "CLOUDFLARE_API_TOKEN",
       value: previewToken.value
+    })
+    yield* GitHub.Secret("PreviewTestAccountPassword", {
+      ...repository,
+      environment: preview,
+      name: previewPasswordVariable,
+      value: previewPassword
     })
     yield* GitHub.Variable("PreviewCloudflareAccount", {
       ...repository,

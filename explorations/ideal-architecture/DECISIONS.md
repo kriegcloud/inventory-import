@@ -612,9 +612,9 @@ output); the repository's known password works only on a developer's own machine
 Cloudflare Access. Reverse: stop minting it in the stack; the seeded hash then opens the accounts with the
 repository's password again.
 
-As built: the stack mints it and shows it in the deploy's output only to a person deploying from their own machine.
-A workflow's log in a public repository is public, so a pull request's deploy output does not show it; how a
-preview's password reaches its reviewer is asked of Benjamin and not yet answered.
+As built: the stack mints it for a test stage and shows it in the deploy's output only to a person deploying from
+their own machine. A workflow's log in a public repository is public, so a pull request's deploy output never shows
+a password; previews are answered next.
 
 ### 2026-11-19 — infra, a missing model key
 
@@ -622,3 +622,17 @@ Question: production deploys without a key when none is given, so a mistyped nam
 change that? Answer: "Fail the production deploy (Recommended)": a production deploy with no key stops with a
 sentence naming the missing reference; a flag deploys without one on purpose. Rejected: deploy and warn; leave as
 built. The flag is the variable `DEPLOY_WITHOUT_MODEL_KEY=true`. Reverse: let `modelKeyFor` succeed with no key.
+
+### 2026-11-19 — infra, a preview's password
+
+Question: the repository is public, so workflow logs are too; how does a preview's test-account password reach
+whoever reviews it? Answer: "One preview password in 1Password (Recommended)": the GitHub stack writes one password
+to the `preview` environment as a secret, from an `op://` reference in `packages/infra/env/op.env`; it is never
+printed; previews share it; test stages he deploys by hand stay minted per stage. Rejected: read it from the
+stage's state; no previews from the workflow yet. The variable is `PREVIEW_TEST_ACCOUNT_PASSWORD`; its vault path
+is his to fill. Reverse: let a preview mint its own again (`testPasswordOf`) and choose how it is read.
+
+### 2026-11-19 — merging infra
+
+Question: how does `claude/infra` reach main? Answer: "Merge locally, I push (Recommended)". Merged into local main
+at 8007ab5; the push, and with it `deploy.yml` on `main`, is his.

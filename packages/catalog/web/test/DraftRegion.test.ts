@@ -19,18 +19,23 @@ import {
   regionEpoch,
   reviewLocal,
   reviewState,
-  reviewStateAt
+  reviewStateAt,
+  rowsNotSaved
 } from "../src/ReviewDraft.atoms.ts"
 import { importNo, registryFor, viewAt } from "./support/catalog.ts"
 
 // What is said to the person.
-const page = vi.hoisted(() => ({ said: [] as Array<string> }))
+const page = vi.hoisted(() => ({ said: [] as Array<string>, actions: [] as Array<() => void> }))
 vi.mock("sonner", () => ({
   toast: Object.assign((title: string) => page.said.push(title), {
     dismiss: () => undefined,
     success: () => 0,
     loading: () => 0,
-    error: (title: string) => page.said.push(title)
+    error: (title: string, options?: { action?: { onClick: () => void } }) => {
+      page.said.push(title)
+      if (options?.action !== undefined) page.actions.push(options.action.onClick)
+      return 0
+    }
   })
 }))
 
@@ -42,7 +47,7 @@ const rows = [
 ]
 
 /** One import with a server that takes every save and answers the next revision; the app's idle time is 120 ms here. */
-const world = (id: ImportId) => {
+const world = (id: ImportId, network: { down: boolean } = { down: false }) => {
   const saves: Array<DecisionDelta> = []
   const revision = { now: 10 }
   const registry = registryFor({
@@ -52,6 +57,8 @@ const world = (id: ImportId) => {
         decide: (request: { readonly payload: SaveRequest }) => {
           const { madeOn: _madeOn, ...delta } = request.payload
           saves.push(delta)
+          // The server's own failure, as the API says it: the request was fine, so it may pass when sent again.
+          if (network.down) return Effect.fail({ _tag: "InternalServerErrorProblem" } as const)
           revision.now += 1
           return Effect.succeed({ revision: revision.now, changed: true, notApplied: [] })
         }
@@ -144,6 +151,36 @@ describe("the region beside the draft", () => {
       t.open()
       yield* settle
       expect(t.region()[0]).toEqual(["row-2", "row-5"])
+    })
+  )
+
+  it.live("keeps a row whose save failed, says so once with Save again, and that button sends the same row", () =>
+    Effect.gen(function* () {
+      const id = importNo(43)
+      const network = { down: true }
+      const t = world(id, network)
+      t.open()
+      yield* settle
+      page.said.length = 0
+      page.actions.length = 0
+      t.leaveOut("row-2")
+      yield* settle
+      // Sent once, failed: the row is still what the region shows, and the person is told it is not saved yet.
+      expect([t.saves, t.region()[0], page.said]).toEqual([
+        [{ set: { "row-2": out }, clear: [] }],
+        ["row-2"],
+        ["Not saved yet"]
+      ])
+      expect(t.registry.get(rowsNotSaved(id))).toBe(1)
+      // The network is back, and the person presses Save again on what was said.
+      network.down = false
+      page.actions[0]?.()
+      yield* settle
+      expect(t.saves).toEqual([
+        { set: { "row-2": out }, clear: [] },
+        { set: { "row-2": out }, clear: [] }
+      ])
+      expect([t.registry.get(rowsNotSaved(id)), page.said]).toEqual([0, ["Not saved yet"]])
     })
   )
 })

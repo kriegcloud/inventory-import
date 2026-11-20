@@ -87,7 +87,9 @@ After each package, the same count:
   `useId` 1 (the search field's id), no `useRef`, `useAtomValue` 17, `useAtomSet` 1, `useAtomMount` 3.
   `catalog-web`: `useId` 14, `useRef` 2, `useDeferredValue` 1, `useAtomValue` 39, `useAtom` 9, `useAtomSet` 14,
   `useAtomMount` 2, `useAtomSubscribe` 1, `useAtomRefresh` 3. Strict ceilings now: `review` 259, `catalog-web` 228,
-  `ui` 50, `client` 20, `access-web` 14, the app 37 (sum 608).
+  `ui` 50, `client` 20, `access-web` 14, the app 37 (sum 608). They were 281, 230 and 633 for `review`, `catalog-web`
+  and the sum before that rework; after the batch of 2026-11-20 (below) they are `review` 251, `catalog-web` 226 and
+  the sum 598.
 - **After step 8**: `@tanstack/react-query` is imported in no file, declared by no package and absent from the
   lockfile. `git grep "@tanstack/react-query"` outside `goals/` and `explorations/` finds two lines, both the atoms
   lint's own refusal of it (`.oxlintrc.atoms.json`). The hook count is the one above: step 8 held no hook.
@@ -503,7 +505,9 @@ what to send or ask. The draft is the picture held (`held`), and over it the per
 picture read yet holds (`landed`), the save that is out (`flight`) and what changed since (`unsent`). Events: the step
 opened or left, decided, a save answered, failed, sent again or refused, a view arrived, a match started or ended, the
 import confirmed or removed. `ReviewDraft.atoms.ts` runs it: one atom takes every event, steps the machine and does
-what it asks. The saver (`Draft.controller.ts`) is gone.
+what it asks. The saver (`Draft.controller.ts`, its `follow` and `reset`, and `DecisionSaver.test.ts`) is gone: rows
+3, 4 and 20 of the table under "Fixes after the review of step 6" name it as it was then, and each of their rules is
+the machine's now.
 
 **The property test** (`Draft.machine.test.ts`, `it.prop`) plays random orderings of: the person decides a row,
 somebody else decides a row, the server takes the save, its answer arrives, the save fails, is refused, "Save again",
@@ -520,6 +524,13 @@ match, a card's Continue), leaving and coming back. After every step it holds:
    else decides that row.
 5. A view put in place never lowers the revision held, and a put while a read is out is followed by a new ask.
 6. Once everything on its way has landed, the screen shows what the server holds, and nothing of the person's waits.
+
+What was true of that property, said late: it played ten commands at most (the runner bounds a collection by its
+`size`, ten unless told, ramped from none over the runs; about a third of its runs played none), nine of its fourteen
+kinds did nothing from an opened review, rule 3 was waived exactly where it failed, rule 6 was checked only after a
+read the test itself forced, and nothing in it noticed a Restart. "Tested over every ordering" in dd3e3e9's message
+was not so. The property that replaced it is described under "The draft review and Benjamin's answers of
+2026-11-20", below.
 
 200,000 orderings were run once; the suite runs 5,000. It found one failure, in the test's own bookkeeping (a row
 somebody else decided after the server took the person's save but before its answer), not in the machine. It fails
@@ -546,7 +557,7 @@ that read arrives. Closing it needs the server to say whether the save changed a
 | 10 an answer given and never taken | Said as it is (the choice above): kept until the read is let go or the person signs out | |
 | 12 `refused-decision-shown-again-on-return` | The machine drops the refused rows, here and for the next visit | "a decision the server refused" (machine and wiring) |
 | 15, 22 | The comment names who calls `invalidate`; the doubled doc block is one | |
-| 16, 17, 18 the lint | `lib/queries.ts` is gone; the hooks under their hoisted package names, the query client's core and its file by a relative path, and react-dom's default import are refused. Planted: four refusals in a review file, one in the client | |
+| 16, 17, 18 the lint | `lib/queries.ts` is gone; the hooks under the hoisted package names the lint lists (`@radix-ui/react-use-*`, `@radix-ui/react-compose-refs`, `use-sync-external-store`), the query client's core and its file by a relative path, and react-dom's default import are refused; a hoisted name it does not list (`use-callback-ref`, `@tanstack/react-store`) was not, until `laws boundaries` refused every undeclared third-party import (2026-11-20). Planted: four refusals in a review file, one in the client | |
 | 19, 20, 21, 34 false statements | Corrected above: the test-first sentence, group 20's "seen", the files excepted; the `viewRows` choice says `Option` | |
 | 24 `unsent-decision-freezes-follower` | A save waiting for "Save again" does not stop a newer draft from being followed | "a save waiting for Save again" |
 | 25 `own-save-told-as-someone-elses` | The draft outlives the step while a save is out: its answer is the person's own | "a save answered after the person left" (machine and wiring) |
@@ -631,6 +642,77 @@ table its rows.
 
 **Older, seen in passing and left:** the catalog's own tagged unions still switched on by hand (`Upload.machine.ts`,
 `UploadStep.screen.tsx`, an import's events in `ResultStep.screen.tsx`, `changedMeanwhile` in the item editor).
+
+## The draft review and Benjamin's answers of 2026-11-20
+
+The review of the rebuilt draft came back with 19 groups, and Benjamin answered three more questions. Head of this
+section: `fa83274` and what follows it.
+
+**The property, as it is now** (`Draft.machine.test.ts`). Each run plays 30 to 60 commands (`size: 60` is given to
+the runner, with a minimum length), each drawn from the kinds enabled in the world as it stands, so a run is that
+many things that happened. What must hold is checked after every command, those of `quiet` included. Four
+properties, 1,000 runs each: saves and reads; with the person confirming; with the page loaded again at any moment;
+with somebody else confirming the import. A failure is thrown under its shortest ordering (each command left out that
+it still fails without) with the rule that broke, in words. The world gained: the region's own state (reset by a
+Restart, kept by a return inside the idle time); `told`, the latest revision the tab was told of; the rows the
+browser keeps; the rows a closed import leaves over. The rules, beside the six above (rule 3 with no exception):
+
+- whenever what the screen shows differs after an event that was not the person's decision, a Restart is among the
+  effects, and what the region shows is what the draft shows;
+- with nothing on its way and nothing waiting to be sent: no saved row waits for a picture nobody asked for, the
+  picture held is not behind a revision the tab was told of, and when that revision is the server's latest what is
+  shown is what the server holds (before any forced look);
+- a confirm the server makes writes what its screen showed, carries only the person's own rows, and goes beside no
+  save;
+- a decision the person made is on the server, or still waiting on the screen and in the browser, never neither;
+- once the step knows the import is closed, the draft has ended, nothing is sent from it, and the rows left over are
+  exactly the person's rows the server never took.
+
+What it found before any fix, each under its shortest ordering as it printed it (every ordering ends with everything
+on its way landing):
+
+- "what the screen shows changed without the person (SaveAnswered), and the region was not told to start again":
+  Decide a kept, ServerTakesSave, SomeoneElse a out, OtherAnswerSent, OtherAnswerArrives. Group 1's first ordering.
+- "the region shows another thing than the draft": Decide b kept, ServerTakesSave, SaveAnswers, SomeoneElse a out,
+  OtherAnswerSent, Leave, OtherAnswerArrives, ComeBackQuickly. Group 1's second ordering.
+- "the person's own save moved the view back": Decide c out, ServerTakesSave, Leave, SomeoneElse a kept,
+  OtherAnswerSent, OtherAnswerArrives, SaveAnswers. Away from the step the draft does not follow the tab's view, so
+  its own picture is behind it; the runner already keeps the later one. The rule is held to the step that is drawn. With every `Ask` taken out of the machine it prints
+"nothing is on its way, and a saved row still waits for a picture nobody asked for" on two commands. What it cannot
+reach: a read ended by a later save's answer (group 8; `put` re-issues the read, as the runner does today).
+
+| Group | What became of it | Test |
+| --- | --- | --- |
+| 1 a save answered after a newer view; a return inside the idle time | Every transition is held to one rule after it has run (`told`): a change of what is shown that the person did not make restarts the region, and so does a draft let go while nobody looked. A draft let go keeps its epoch going | The property; `DraftRegion.test.ts` (the region reads the other person's row after it arrives). The wiring test of a quick return does not fail without the let-go restart: in the test's registry the region's own state is already gone at the return; the property's `ComeBackQuickly` holds the rule |
+| 2 the no-change save | Closed by "Answer says 'no change'" (`7b09ee4`); the ten commands are a named test | Named test |
+| 3 Confirm | Closed by "Refuse, show, confirm again" (`42c8303`); the confirm's `clear` has its test | Named tests, `ConfirmDraft.test.ts`, `ConfirmRevision.slow.test.ts` |
+| 4 a SKU typed while a save is out | `typed` is worked out from what the server is known to hold, so the read goes out once the server has the SKU | Named test: the first answer sends the SKU and asks nothing, the second asks |
+| 5 a save that failed waits on nothing | Rows that wait are sent again when a picture arrives; a line above the review stays while they wait, with Save again; the failed-save words never say "reload the page". What a reload does and what a confirm elsewhere does are Benjamin's answers, below | Named tests; `DraftRegion.test.ts` (the wired failure and Save again); seen on screen |
+| 6 a waiting accept survives a match | Benjamin's answer "Server refuses, screen says so", below | below |
+| 7 toasts outside the machine | Saying it is an effect (`Say`), returned only when a save was out; `SaveRefused` has the flight guard | Named test: a stray answer says nothing and changes nothing |
+| 8 the read that is out is ended by a later save | Not built | None |
+| 9 Continue over a confirmed view | Closed by the confirm raising the revision (`42c8303`) | `ConfirmRevision.slow.test.ts` asserts the revision goes up |
+| 11 the Items columns | Not built | None |
+| 12 tags by hand | `laws tags` and the 65 places (`3c4515a`) | `Tags.test.ts` |
+| 13 state outside atoms | The upload under way and the chosen workbook are atoms (`632fef8`). The given answer in `Api.atoms.ts` is not changed | None of its own: the upload was seen on screen |
+| 14 hooks under other hoisted names | `laws boundaries` refuses a third-party package the importer does not declare, read from the syntax tree. No per-file exception to the atoms lint is left to restate: step 8 removed them | `Boundaries.test.ts`, with planted files |
+| 15, 16, 17 | The property above; `DraftRegion.test.ts` for Restart and `announce`; `Dropped` is gone (nothing sent it) | as said |
+| 18 | The no-change test sends such a save; the wired failure has its test. Not written: a test for `Api.atoms.ts` "not kept again when the screen leaves", for the remove that empties the draft and forgets the workbook, and for leaving the address of a removed import | as said |
+| 19 | The statements in this file: the deleted saver, the ceilings, what the lint refuses, what the property held. 5efcd1b's message says "each filter control reads its values when it is drawn" for a commit whose list filters were empty: a commit message is not rewritten, so it is said here |  |
+
+**Benjamin's answers of 2026-11-19 and 2026-11-20**, each in `DECISIONS.md` and the exploration's log:
+
+| Answer | Built | Seen on screen |
+| --- | --- | --- |
+| "Effect atoms only" | `bc789bf`: the facets filter the rows in a derived atom | at the time |
+| "Answer says 'no change'" | `7b09ee4`, repaired by `a15fce7` (the first went in with a test file that did not parse: committed before the check had passed) | at the time |
+| "Refuse, show, confirm again" | `42c8303` | Two tabs on items_clean.csv: row 3 left out in one; "Import 25 items" in the other: commit 409, "Nothing was imported yet. 1 row was decided on another screen while you were reviewing…", 24 ready, 1 left out; pressed again: 24 imported |
+| "Keep them and send them" | `fa83274`: waiting rows kept through `Atom.kvs`, back after a reload, sent again; the browser asks before leaving | Network down, row 130 left out: "1 decision is not saved yet"; the browser asked before the reload; after it the row was on screen with the line and "Undo: 1 row left out"; network back, Save again: `PUT` 200 with `madeOn: 4`, the line gone |
+| "Name the rows, then drop them" | `fa83274`: the status reaches the machine; the result names the rows | Rows 55 and 191 left out and waiting; the import confirmed in another browser; Save again: 409, the result with "2 decisions of yours were not part of this import … Row 55: you left out, Row 191: you left out"; nothing kept after leaving the result |
+| "Server refuses, screen says so" | `fa83274`: `madeOn` in, `notApplied` out, `AcceptsTakenBack` at the confirm | Unit cost matched again by a request from outside the tab (the Match step's own controls were not driven), then "Accept for the 2 ticked": answered `notApplied` for rows 55 and 191, "2 accepts were taken back", both rows still open |
+
+**The rework review's groups 20 to 22**: `laws tags` and the table of step 7's checks (`3c4515a`); the review guide's
+condition for the decisions atom (`edffca6`); the row height and the saved progress through `Atom.kvs` (`3285206`).
 
 ## Step 8: TanStack Query removed, the lint everywhere, the documents
 

@@ -10,7 +10,9 @@ import * as HttpApiTest from "effect/http-api/HttpApiTest"
 import * as SqlClient from "effect/sql/SqlClient"
 import { Api } from "../../src/api/v1/Api.ts"
 import { AddPerson, ChangeRole } from "@inventory/access-contract/PeopleCommand"
+import { LastAdmin, PersonNotFound } from "@inventory/access-contract/PeopleRejection"
 import { AccountEmail } from "@inventory/access-contract/SessionState"
+import { Forbidden } from "@inventory/kernel/AccessError"
 import { MemberId } from "@inventory/kernel/Ids"
 import { as, TypedApp } from "./support/app.ts"
 
@@ -20,6 +22,12 @@ const signedUp = Effect.fn("signedUp")(function* (id: string, name: string, emai
     VALUES (${id}, ${name}, ${email}, 0, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')`
   if (memberId !== null) yield* sql`UPDATE member SET userId = ${id} WHERE id = ${memberId}`
 }, Effect.orDie)
+
+/** Runs a request that must be refused, and checks that its refusal is one of `refusal`'s class. */
+const refusedWith =
+  (refusal: S.Top) =>
+  <A, E, R>(request: Effect.Effect<A, E, R>) =>
+    Effect.flip(request).pipe(Effect.map((error) => expect(S.is(refusal)(error)).toBe(true)))
 
 layer(TypedApp)("people", (it) => {
   it.effect("an admin adds a person who has signed up; nobody else can, and no organization loses its last admin", () =>
@@ -38,8 +46,8 @@ layer(TypedApp)("people", (it) => {
         ["Priya Raman", "viewer", null]
       ])
       const add = { payload: AddPerson.make({ email: AccountEmail.make("sam@example.test"), role: "editor" }) }
-      expect((yield* client.people.add(add).pipe(as("mem_priya"), Effect.flip))._tag).toBe("Forbidden")
-      expect((yield* client.people.add(add).pipe(as("mem_marcus"), Effect.flip))._tag).toBe("Forbidden")
+      yield* client.people.add(add).pipe(as("mem_priya"), refusedWith(Forbidden))
+      yield* client.people.add(add).pipe(as("mem_marcus"), refusedWith(Forbidden))
 
       // The email is matched whatever its case. An email nobody signed up with is refused in a sentence.
       const sam = yield* client.people.add(add).pipe(dana, Effect.flatMap(Effect.fromResult))
@@ -49,36 +57,30 @@ layer(TypedApp)("people", (it) => {
       const again = yield* client.people.add(add).pipe(dana, Effect.flatMap(Effect.fromResult))
       expect(again).toEqual(sam)
       const otherRole = { payload: AddPerson.make({ email: AccountEmail.make("sam@example.test"), role: "viewer" }) }
-      const refused = yield* client.people.add(otherRole).pipe(dana)
+      const refused = yield* client.people.add(otherRole).pipe(dana, Effect.flatMap(Effect.fromResult), Effect.flip)
       expect(refused).toMatchObject({
-        _tag: "Failure",
-        failure: {
-          kind: "alreadyMember",
-          problem: "Sam Okafor is already in Example Works (test) as an editor.",
-          todo: "Change their role in the list instead."
-        }
+        kind: "alreadyMember",
+        problem: "Sam Okafor is already in Example Works (test) as an editor.",
+        todo: "Change their role in the list instead."
       })
       // As typed, with spaces and capitals: the command's schema drops the spaces and lower-cases it, and the
       // sentence names it that way.
       const typed = yield* S.decodeEffect(AddPerson)({ email: "  Nobody@Example.test ", role: "viewer" })
-      const unknown = yield* client.people.add({ payload: typed }).pipe(dana)
+      const unknown = yield* client.people
+        .add({ payload: typed })
+        .pipe(dana, Effect.flatMap(Effect.fromResult), Effect.flip)
       expect(unknown).toMatchObject({
-        _tag: "Failure",
-        failure: {
-          kind: "noAccount",
-          problem: "Nobody has signed up with nobody@example.test yet.",
-          todo: "Ask them to create an account, then add them here."
-        }
+        kind: "noAccount",
+        problem: "Nobody has signed up with nobody@example.test yet.",
+        todo: "Ask them to create an account, then add them here."
       })
 
       // The only admin cannot be demoted or removed, by themselves or by anyone.
       const self = { params: { memberId: MemberId.make("mem_dana") } }
-      expect(
-        (yield* client.people
-          .setRole({ ...self, payload: ChangeRole.make({ role: "editor" }) })
-          .pipe(dana, Effect.flip))._tag
-      ).toBe("LastAdmin")
-      expect((yield* client.people.remove(self).pipe(dana, Effect.flip))._tag).toBe("LastAdmin")
+      yield* client.people
+        .setRole({ ...self, payload: ChangeRole.make({ role: "editor" }) })
+        .pipe(dana, refusedWith(LastAdmin))
+      yield* client.people.remove(self).pipe(dana, refusedWith(LastAdmin))
       // With a second admin, the first can step down.
       const promoted = yield* client.people
         .setRole({ params: { memberId: sam.memberId }, payload: ChangeRole.make({ role: "admin" }) })
@@ -87,9 +89,9 @@ layer(TypedApp)("people", (it) => {
       const stepped = yield* client.people.setRole({ ...self, payload: ChangeRole.make({ role: "editor" }) }).pipe(dana)
       expect(stepped.role).toBe("editor")
       // Now Dana is an editor and can no longer manage people.
-      expect(
-        (yield* client.people.remove({ params: { memberId: MemberId.make("mem_priya") } }).pipe(dana, Effect.flip))._tag
-      ).toBe("Forbidden")
+      yield* client.people
+        .remove({ params: { memberId: MemberId.make("mem_priya") } })
+        .pipe(dana, refusedWith(Forbidden))
 
       // Sam (now the admin) removes Marcus, who has not acted yet, and then Dana, whose name is on audit lines.
       // The lines stay; the people are gone from the list and their accounts no longer open this organization.
@@ -103,20 +105,16 @@ layer(TypedApp)("people", (it) => {
         SELECT userId, removedAt FROM member WHERE id = 'mem_dana'`.pipe(Effect.orDie)
       expect([gone[0]?.userId, gone[0]?.removedAt === null]).toEqual([null, false])
       // A removed member cannot be removed twice, and the last admin still cannot remove themselves.
-      expect(
-        (yield* client.people.remove({ params: { memberId: MemberId.make("mem_dana") } }).pipe(samIs, Effect.flip))._tag
-      ).toBe("PersonNotFound")
-      expect((yield* client.people.remove({ params: { memberId: sam.memberId } }).pipe(samIs, Effect.flip))._tag).toBe(
-        "LastAdmin"
-      )
+      yield* client.people
+        .remove({ params: { memberId: MemberId.make("mem_dana") } })
+        .pipe(samIs, refusedWith(PersonNotFound))
+      yield* client.people.remove({ params: { memberId: sam.memberId } }).pipe(samIs, refusedWith(LastAdmin))
 
       // Another organization's admin cannot see or touch these members.
       const elena = as("mem_elena")
       const theirs = yield* client.people.list().pipe(elena)
       expect(A.some(theirs, (person) => person.name === "Sam Okafor")).toBe(false)
-      expect((yield* client.people.remove({ params: { memberId: sam.memberId } }).pipe(elena, Effect.flip))._tag).toBe(
-        "PersonNotFound"
-      )
+      yield* client.people.remove({ params: { memberId: sam.memberId } }).pipe(elena, refusedWith(PersonNotFound))
 
       // Each change is in the audit trail, under the name of who made it.
       const trail = yield* client.activity.recent().pipe(samIs)

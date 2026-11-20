@@ -27,13 +27,13 @@ export type ReadMessage = Data.TaggedEnum<{
   }
   Chunk: { readonly seq: number; readonly rows: ReadonlyArray<StagedRow> }
   Done: {}
-  /** The file's problem as plain fields: a class does not survive the copy between threads. */
-  Refused: { readonly problem: typeof FileProblem.Encoded }
+  /** The file's problem as its plain fields: a class does not survive the copy between threads. */
+  Refused: { readonly problem: Pick<FileProblem, "kind" | "fileName" | "problem" | "todo"> }
   Crashed: { readonly message: string }
 }>
 
 /**
- * The messages' matcher (`ReadMessage.$match`) and guards. The reader still posts plain objects (`{ _tag: "Done" }`):
- * what crosses the threads is a structured clone, and a value built here would arrive as one anyway.
+ * The messages' constructors, matcher (`ReadMessage.$match`) and guards. The reader builds each message with its
+ * constructor; what crosses the threads is a structured clone of its fields, which `$match` reads as it reads the value.
  */
 export const ReadMessage = Data.taggedEnum<ReadMessage>()

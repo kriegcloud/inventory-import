@@ -4,17 +4,17 @@
 import { describe, expect, it } from "@effect/vitest"
 import { ImportId } from "@inventory/catalog-contract/Ids"
 import { rowsAbout, savedRows } from "@inventory/catalog-model/Upload"
-import { progressOf, rowsOf, type UploadState } from "@inventory/catalog-web/UploadMachine"
+import { progressOf, rowsOf, UploadState } from "@inventory/catalog-web/UploadMachine"
 import * as A from "effect/Array"
 import * as S from "effect/Schema"
 import { chunkRows } from "@inventory/catalog-contract/Upload"
 
-const reading = (rowsRead: number, about: number | null): UploadState => ({
-  _tag: "Reading",
-  fileName: "items.csv",
-  rowsRead,
-  rows: rowsOf({ rowsAbout: about, exact: false })
-})
+const reading = (rowsRead: number, about: number | null): UploadState =>
+  UploadState.cases.Reading.make({
+    fileName: "items.csv",
+    rowsRead,
+    rows: rowsOf({ rowsAbout: about, exact: false })
+  })
 
 describe("progress", () => {
   const Count = S.Int.check(S.isBetween({ minimum: 0, maximum: 120_000 }))
@@ -38,13 +38,12 @@ describe("progress", () => {
     },
     ({ saved, rows }) => {
       const { done, total } = progressOf({
-        state: {
-          _tag: "Saving",
+        state: UploadState.cases.Saving.make({
           fileName: "items.csv",
           uploadId: ImportId.make("00000000-0000-4000-8000-000000000001"),
           rowsSaved: saved,
           rows
-        }
+        })
       })
       expect(total).toBe(rows)
       expect(done).toBeGreaterThanOrEqual(0)

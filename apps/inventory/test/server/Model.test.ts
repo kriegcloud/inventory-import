@@ -10,9 +10,11 @@ import * as Formatter from "effect/Formatter"
 import * as Layer from "effect/Layer"
 import * as MutableRef from "effect/MutableRef"
 import * as S from "effect/Schema"
+import * as HttpBody from "effect/http/HttpBody"
 import * as HttpClient from "effect/http/HttpClient"
 import * as HttpClientResponse from "effect/http/HttpClientResponse"
-import { modelSentences } from "@inventory/catalog-contract/AiUnavailable"
+import { AiUnavailable, modelSentences } from "@inventory/catalog-contract/AiUnavailable"
+import { AnsweredBy } from "@inventory/catalog-contract/Answer"
 import { askModel } from "@inventory/catalog-host/Model"
 import { answeredByRules } from "@inventory/catalog-model/Answerer"
 import { aiStatusOf, modelLayer } from "../../src/server/Model.ts"
@@ -37,7 +39,7 @@ const openRouterAnswering = (status: number, body: string) =>
     HttpClient.HttpClient,
     HttpClient.make((request) =>
       Effect.sync(() => {
-        if (request.body._tag === "Uint8Array") {
+        if (request.body instanceof HttpBody.Uint8Array) {
           const text = new TextDecoder().decode(request.body.body)
           MutableRef.update(sent, (all) => [...all, text])
         }
@@ -69,16 +71,12 @@ describe("the model, as the app sees it", () => {
           "AI suggestions are off: no AI key is set."
         ])
         const error = yield* ask.pipe(Effect.flip)
-        expect([error._tag, error.kind, error.retryable, error.reason]).toEqual([
-          "AiUnavailable",
-          "noKey",
-          false,
-          modelSentences.noKey
-        ])
+        expect(S.is(AiUnavailable)(error)).toBe(true)
+        expect([error.kind, error.retryable, error.reason]).toEqual(["noKey", false, modelSentences.noKey])
         const ruled = yield* ask.pipe(answeredByRules(() => ({ greeting: "Hello (from the rules)" })))
         expect(ruled).toEqual({
           value: { greeting: "Hello (from the rules)" },
-          answeredBy: { _tag: "Rules", reason: modelSentences.noKey }
+          answeredBy: AnsweredBy.cases.Rules.make({ reason: modelSentences.noKey })
         })
       })
     )
@@ -109,12 +107,9 @@ describe("the model, as the app sees it", () => {
         const answer = yield* ask
         expect(answer.value.greeting).toBe("Hello from the fallback")
         expect(MutableRef.get(sent)[0]).toContain('"models":["anthropic/claude-haiku-5.5","google/gemini-3.8-flash"]')
-        expect(answer.answeredBy).toEqual({
-          _tag: "Model",
-          provider: "openrouter",
-          model: "google/gemini-3.8-flash",
-          fallback: true
-        })
+        expect(answer.answeredBy).toEqual(
+          AnsweredBy.cases.Model.make({ provider: "openrouter", model: "google/gemini-3.8-flash", fallback: true })
+        )
       })
     )
   })

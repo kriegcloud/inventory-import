@@ -12,8 +12,10 @@ import {
   type NoteKind,
   type Row,
   type SpreadsheetTable,
+  CsvFormat,
   WorkbookFormat
 } from "@inventory/catalog-model/Spreadsheet"
+import { FileProblem } from "@inventory/catalog-contract/FileProblem"
 import { sayError } from "@inventory/client/SayError"
 import { readSpreadsheet } from "@inventory/catalog-web/Spreadsheet"
 
@@ -36,7 +38,7 @@ describe("CSV", () => {
   it.effect("reads UTF-8 with a byte-order mark, dropping only the mark", () =>
     Effect.gen(function* () {
       const table = yield* readSpreadsheet({ file: fixture("utf8-bom.csv") })
-      expect(table.format).toEqual({ _tag: "csv", delimiter: ",", encoding: "utf-8" })
+      expect(table.format).toEqual(CsvFormat.make({ delimiter: ",", encoding: "utf-8" }))
       expect(table.columns[0]?.header).toBe("SKU")
       expect(texts(rowAt(table, 5))).toEqual(["RD-12", "Round bar Ø 12 mm", "m", "36", "4.80"])
     })
@@ -45,7 +47,7 @@ describe("CSV", () => {
   it.effect("reads UTF-8 without a mark the same way", () =>
     Effect.gen(function* () {
       const table = yield* readSpreadsheet({ file: textFile("SKU,Item\nBRK-040,Steel bracket\n") })
-      expect(table.format).toEqual({ _tag: "csv", delimiter: ",", encoding: "utf-8" })
+      expect(table.format).toEqual(CsvFormat.make({ delimiter: ",", encoding: "utf-8" }))
       expect(texts(rowAt(table, 2))).toEqual(["BRK-040", "Steel bracket"])
     })
   )
@@ -53,7 +55,7 @@ describe("CSV", () => {
   it.effect("reads a non-UTF-8 file as Windows-1252 and says so, naming the rows to check", () =>
     Effect.gen(function* () {
       const table = yield* readSpreadsheet({ file: fixture("windows-1252.csv") })
-      expect(table.format).toEqual({ _tag: "csv", delimiter: ",", encoding: "windows-1252" })
+      expect(table.format).toEqual(CsvFormat.make({ delimiter: ",", encoding: "windows-1252" }))
       expect(texts(rowAt(table, 5))[1]).toBe("Round bar Ø 12 mm")
       expect(texts(rowAt(table, 6))[1]).toBe("Washer ½ inch")
       const note = noteOf(table, "notUtf8")
@@ -64,7 +66,7 @@ describe("CSV", () => {
   it.effect("detects semicolons with CRLF line ends and keeps decimal commas as text", () =>
     Effect.gen(function* () {
       const table = yield* readSpreadsheet({ file: fixture("semicolon-crlf.csv") })
-      expect(table.format).toEqual({ _tag: "csv", delimiter: ";", encoding: "utf-8" })
+      expect(table.format).toEqual(CsvFormat.make({ delimiter: ";", encoding: "utf-8" }))
       expect(texts(rowAt(table, 2))).toEqual(["BRK-040", "Steel bracket 40 mm", "Each", "120", "2,35"])
       expect(O.isSome(noteOf(table, "delimiter"))).toBe(true)
     })
@@ -73,7 +75,7 @@ describe("CSV", () => {
   it.effect("detects tabs", () =>
     Effect.gen(function* () {
       const table = yield* readSpreadsheet({ file: fixture("tab.csv") })
-      expect(table.format).toEqual({ _tag: "csv", delimiter: "\t", encoding: "utf-8" })
+      expect(table.format).toEqual(CsvFormat.make({ delimiter: "\t", encoding: "utf-8" }))
       expect(table.columns.length).toBe(5)
     })
   )
@@ -333,7 +335,8 @@ describe("Failures a person can act on", () => {
   it.effect("wrong type: an old .xls says to save it as .xlsx or CSV", () =>
     Effect.gen(function* () {
       const error = yield* failure(fixture("old-format.xls"))
-      expect(error).toMatchObject({ _tag: "FileProblem", kind: "wrongType", fileName: "old-format.xls" })
+      expect(S.is(FileProblem)(error)).toBe(true)
+      expect(error).toMatchObject({ kind: "wrongType", fileName: "old-format.xls" })
       expect(error.todo).toContain("save it as")
     })
   )

@@ -21,11 +21,11 @@
   "dependencies": {
     "@beep/identity": "workspace:*",
     "@beep/schema": "workspace:*",
+    "@cloudflare/workers-types": "^5.20261113.1",
     "@effect/sql-d1": "4.1.4",
     "effect": "4.1.4"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20261113.1",
     "@effect/platform-node": "4.1.4",
     "@effect/vitest": "4.1.4",
     "@types/node": "^24.19.2",

@@ -2,7 +2,7 @@
 // provider answers, with which key and how often it is tried again is the host's (`AnswererOpenRouter`). The one
 // thing not to break: a feature that asks ends with `answeredByRules`, so it always answers and says who did.
 import { type AiUnavailable, aiUnavailable, type AiTrouble } from "@inventory/catalog-contract/AiUnavailable"
-import type { AnsweredBy } from "@inventory/catalog-contract/Answer"
+import { AnsweredBy } from "@inventory/catalog-contract/Answer"
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
@@ -98,7 +98,7 @@ export class Answerer extends Context.Service<
           )
           const answered: ModelAnswered<Sc["Type"]> = {
             value,
-            answeredBy: { _tag: "Model", provider: "openrouter", model: input.model, fallback: false }
+            answeredBy: AnsweredBy.cases.Model.make({ provider: "openrouter", model: input.model, fallback: false })
           }
           return answered
         })
@@ -122,6 +122,6 @@ export const answeredByRules =
     self.pipe(
       Effect.map((answer): { readonly value: A | B; readonly answeredBy: AnsweredBy } => answer),
       Effect.catchTag("AiUnavailable", (error) =>
-        Effect.succeed({ value: rules(error), answeredBy: { _tag: "Rules" as const, reason: error.reason } })
+        Effect.succeed({ value: rules(error), answeredBy: AnsweredBy.cases.Rules.make({ reason: error.reason }) })
       )
     )

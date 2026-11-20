@@ -9,6 +9,7 @@ import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
+import * as HttpApiError from "effect/http-api/HttpApiError"
 import { vi } from "vitest"
 import {
   type ConfirmRequest,
@@ -18,7 +19,7 @@ import {
 } from "@inventory/catalog-contract/Decision"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import type { ImportView } from "@inventory/catalog-contract/Import"
-import { AcceptsTakenBack, DraftMoved } from "@inventory/catalog-contract/ImportRejection"
+import { AcceptsTakenBack, AlreadyImported, DraftMoved } from "@inventory/catalog-contract/ImportRejection"
 import { DraftEvent } from "../src/Draft.machine.ts"
 import { importView, importViewShown } from "../src/Imports.atoms.ts"
 import {
@@ -69,7 +70,7 @@ const out = decisionFromFlags({ out: true })
 const kept = decisionFromFlags({ kept: true })
 
 /** What the server refuses a confirm with. */
-type Refusal = DraftMoved | AcceptsTakenBack | { readonly _tag: "AlreadyImported" }
+type Refusal = DraftMoved | AcceptsTakenBack | AlreadyImported
 
 /** A server for one import: every request answers only when the test says so, and is kept as it was sent. */
 const world = (id: ImportId) => {
@@ -77,7 +78,7 @@ const world = (id: ImportId) => {
   const saves: Array<{
     readonly delta: DecisionDelta
     readonly madeOn: Readonly<Record<string, number>>
-    readonly answer: Deferred.Deferred<Saved, { readonly _tag: "InternalServerErrorProblem" }>
+    readonly answer: Deferred.Deferred<Saved, HttpApiError.InternalServerErrorProblem>
   }> = []
   const confirms: Array<{ readonly payload: ConfirmRequest; readonly answer: Deferred.Deferred<ImportView, Refusal> }> =
     []
@@ -89,7 +90,7 @@ const world = (id: ImportId) => {
         return Deferred.await(answer)
       },
       decide: (request: { readonly payload: SaveRequest }) => {
-        const answer = Deferred.makeUnsafe<Saved, { readonly _tag: "InternalServerErrorProblem" }>()
+        const answer = Deferred.makeUnsafe<Saved, HttpApiError.InternalServerErrorProblem>()
         // What it was made on is kept beside the rows, so a test of the rows reads the rows.
         const { madeOn, ...delta } = request.payload
         saves.push({ delta, madeOn, answer })
@@ -216,7 +217,10 @@ describe("a confirm", () => {
       t.press()
       yield* settle
       const asked = t.gets.length
-      yield* Deferred.fail(t.confirms[0]!.answer, { _tag: "AlreadyImported" } as const)
+      yield* Deferred.fail(
+        t.confirms[0]!.answer,
+        AlreadyImported.make({ reason: "This import was confirmed already." })
+      )
       yield* settle
       expect([t.confirming(), t.heldBack(), page.said.length, page.went]).toEqual([false, O.none(), 1, []])
       expect(t.gets.length).toBe(asked + 1)
@@ -256,7 +260,7 @@ describe("a confirm", () => {
         t.registry.set(draftEvents(id), DraftEvent.Decided({ changes: { "row-55": O.some(accepted) } }))
         yield* settle
         // The save fails: the row waits, and rides with the confirm.
-        yield* Deferred.fail(t.saves[0]!.answer, { _tag: "InternalServerErrorProblem" } as const)
+        yield* Deferred.fail(t.saves[0]!.answer, HttpApiError.InternalServerErrorProblem.make({}))
         yield* settle
         t.press()
         yield* settle

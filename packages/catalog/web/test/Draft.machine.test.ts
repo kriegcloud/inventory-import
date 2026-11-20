@@ -654,21 +654,21 @@ const quiet = (world: World): void => {
     run(world, command)
     holds(world)
   }
-  then({ _tag: "ComeBack" })
+  then(Command.cases.ComeBack.make({}))
   for (let turn = 0; turn < 12; turn += 1) {
-    then({ _tag: "SaveAgain" })
-    then({ _tag: "ServerTakesSave" })
-    then({ _tag: "SaveAnswers" })
-    then({ _tag: "ServerTakesConfirm" })
-    then({ _tag: "ConfirmAnswers" })
+    then(Command.cases.SaveAgain.make({}))
+    then(Command.cases.ServerTakesSave.make({}))
+    then(Command.cases.SaveAnswers.make({}))
+    then(Command.cases.ServerTakesConfirm.make({}))
+    then(Command.cases.ConfirmAnswers.make({}))
     // A closed import refuses what is still out.
     if (O.isSome(world.elsewhere) || O.isSome(world.closed)) {
-      then({ _tag: "SaveRefused" })
-      then({ _tag: "ConfirmFails" })
+      then(Command.cases.SaveRefused.make({}))
+      then(Command.cases.ConfirmFails.make({}))
     }
-    for (let left = world.late.length; left > 0; left -= 1) then({ _tag: "OtherAnswerArrives" })
-    then({ _tag: "ServerTakesRead" })
-    then({ _tag: "ReadArrives" })
+    for (let left = world.late.length; left > 0; left -= 1) then(Command.cases.OtherAnswerArrives.make({}))
+    then(Command.cases.ServerTakesRead.make({}))
+    then(Command.cases.ReadArrives.make({}))
   }
 }
 
@@ -703,14 +703,16 @@ const enabled = (world: World, may: Play): ReadonlyArray<ReadonlyArray<Command>>
       (pair) => reading && !Eq.equals(over(shows, change(pair.row, pair.to)), shows)
     )
     const left: ReadonlyArray<ReadonlyArray<Command>> = [
-      A.map(decides, (pair): Command => ({ _tag: "Decide", ...pair })),
-      O.isSome(world.confirm) ? [{ _tag: "ConfirmAnswers" }, { _tag: "ConfirmFails" }] : [],
-      O.exists(world.read, O.isNone) ? [{ _tag: "ServerTakesRead" }] : [],
-      O.exists(world.read, O.isSome) ? [{ _tag: "ReadArrives" }] : [],
-      draft.onScreen ? [{ _tag: "Leave" }] : [{ _tag: "ComeBack" }, { _tag: "ComeBackQuickly" }],
-      draft.stalled ? [{ _tag: "SaveAgain" }] : [],
+      A.map(decides, (pair): Command => Command.cases.Decide.make(pair)),
+      O.isSome(world.confirm) ? [Command.cases.ConfirmAnswers.make({}), Command.cases.ConfirmFails.make({})] : [],
+      O.exists(world.read, O.isNone) ? [Command.cases.ServerTakesRead.make({})] : [],
+      O.exists(world.read, O.isSome) ? [Command.cases.ReadArrives.make({})] : [],
+      draft.onScreen
+        ? [Command.cases.Leave.make({})]
+        : [Command.cases.ComeBack.make({}), Command.cases.ComeBackQuickly.make({})],
+      draft.stalled ? [Command.cases.SaveAgain.make({})] : [],
       // A closed import refuses a save sent to it.
-      O.isSome(world.save) ? [{ _tag: "SaveRefused" }] : []
+      O.isSome(world.save) ? [Command.cases.SaveRefused.make({})] : []
     ]
     return A.filter(left, A.isReadonlyArrayNonEmpty)
   }
@@ -728,35 +730,36 @@ const enabled = (world: World, may: Play): ReadonlyArray<ReadonlyArray<Command>>
   const confirmOut = O.exists(world.confirm, (confirm) => O.isNone(confirm.answer))
   const when = (condition: boolean, command: Command): ReadonlyArray<Command> => (condition ? [command] : [])
   const kinds: ReadonlyArray<ReadonlyArray<Command>> = [
-    A.map(decides, (pair): Command => ({ _tag: "Decide", ...pair })),
-    A.map(others, (pair): Command => ({ _tag: "SomeoneElse", ...pair })),
-    when(saveOut && O.isNone(world.elsewhere), { _tag: "ServerTakesSave" }),
+    A.map(decides, (pair): Command => Command.cases.Decide.make(pair)),
+    A.map(others, (pair): Command => Command.cases.SomeoneElse.make(pair)),
+    when(saveOut && O.isNone(world.elsewhere), Command.cases.ServerTakesSave.make({})),
     when(
       O.exists(world.save, (save) => O.isSome(save.answer)),
-      { _tag: "SaveAnswers" }
+      Command.cases.SaveAnswers.make({})
     ),
-    when(O.isSome(world.save), { _tag: "SaveFails" }),
-    when(saveOut, { _tag: "SaveRefused" }),
-    when(draft.stalled, { _tag: "SaveAgain" }),
-    when(draft.onScreen, { _tag: "ReturnToTab" }),
-    when(O.exists(world.read, O.isNone), { _tag: "ServerTakesRead" }),
-    when(O.exists(world.read, O.isSome), { _tag: "ReadArrives" }),
-    when(world.late.length < 2, { _tag: "OtherAnswerSent" }),
-    when(world.late.length > 0, { _tag: "OtherAnswerArrives" }),
-    when(draft.onScreen, { _tag: "Leave" }),
-    when(!draft.onScreen, { _tag: "ComeBack" }),
-    when(!draft.onScreen, { _tag: "ComeBackQuickly" }),
-    when(confirms && reading && draft.confirm === "idle", { _tag: "PressConfirm" }),
-    when(confirmOut && O.isNone(world.elsewhere), { _tag: "ServerTakesConfirm" }),
-    when(elsewhere && O.isNone(world.elsewhere) && !O.exists(world.confirm, (confirm) => O.isSome(confirm.answer)), {
-      _tag: "SomeoneConfirms"
-    }),
-    when(reloads, { _tag: "Reload" }),
+    when(O.isSome(world.save), Command.cases.SaveFails.make({})),
+    when(saveOut, Command.cases.SaveRefused.make({})),
+    when(draft.stalled, Command.cases.SaveAgain.make({})),
+    when(draft.onScreen, Command.cases.ReturnToTab.make({})),
+    when(O.exists(world.read, O.isNone), Command.cases.ServerTakesRead.make({})),
+    when(O.exists(world.read, O.isSome), Command.cases.ReadArrives.make({})),
+    when(world.late.length < 2, Command.cases.OtherAnswerSent.make({})),
+    when(world.late.length > 0, Command.cases.OtherAnswerArrives.make({})),
+    when(draft.onScreen, Command.cases.Leave.make({})),
+    when(!draft.onScreen, Command.cases.ComeBack.make({})),
+    when(!draft.onScreen, Command.cases.ComeBackQuickly.make({})),
+    when(confirms && reading && draft.confirm === "idle", Command.cases.PressConfirm.make({})),
+    when(confirmOut && O.isNone(world.elsewhere), Command.cases.ServerTakesConfirm.make({})),
+    when(
+      elsewhere && O.isNone(world.elsewhere) && !O.exists(world.confirm, (confirm) => O.isSome(confirm.answer)),
+      Command.cases.SomeoneConfirms.make({})
+    ),
+    when(reloads, Command.cases.Reload.make({})),
     when(
       O.exists(world.confirm, (confirm) => O.isSome(confirm.answer)),
-      { _tag: "ConfirmAnswers" }
+      Command.cases.ConfirmAnswers.make({})
     ),
-    when(confirmOut, { _tag: "ConfirmFails" })
+    when(confirmOut, Command.cases.ConfirmFails.make({}))
   ]
   return A.filter(kinds, A.isReadonlyArrayNonEmpty)
 }
@@ -775,9 +778,9 @@ const opened = (decisions: SavedDecisions = {}): World => {
   const world = start()
   world.server = { revision: 1, decisions }
   world.history[1] = decisions
-  run(world, { _tag: "ComeBack" })
-  run(world, { _tag: "ServerTakesRead" })
-  run(world, { _tag: "ReadArrives" })
+  run(world, Command.cases.ComeBack.make({}))
+  run(world, Command.cases.ServerTakesRead.make({}))
+  run(world, Command.cases.ReadArrives.make({}))
   return world
 }
 
@@ -798,9 +801,9 @@ const broken = (commands: ReadonlyArray<Command>): O.Option<string> => {
     ).toEqual([true, true, "idle"])
     expect(settled(world.draft), "after everything landed, a row of the person's still waits").toBe(true)
     // A look at the server, as any return to the tab gives: an open import then shows what the server holds.
-    one({ _tag: "ReturnToTab" })
-    one({ _tag: "ServerTakesRead" })
-    one({ _tag: "ReadArrives" })
+    one(Command.cases.ReturnToTab.make({}))
+    one(Command.cases.ServerTakesRead.make({}))
+    one(Command.cases.ReadArrives.make({}))
     if (O.isNone(world.closed) && O.isNone(world.elsewhere)) {
       expect(shown(world.draft), "after a look at the server, the screen shows another thing than it holds").toEqual(
         world.server.decisions
@@ -883,16 +886,16 @@ describe("the review's draft, whatever order things happen in", () => {
 describe("the orderings that lost or hid a decision", () => {
   it("back on Review with a decision unsaved, another person's rows are still followed and never sent over", () => {
     const world = opened()
-    run(world, { _tag: "Decide", row: "a", to: "out" })
-    run(world, { _tag: "SaveFails" })
-    run(world, { _tag: "Leave" })
-    run(world, { _tag: "SomeoneElse", row: "b", to: "kept" })
-    run(world, { _tag: "ComeBack" })
-    run(world, { _tag: "ServerTakesRead" })
-    run(world, { _tag: "ReadArrives" })
+    run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
+    run(world, Command.cases.SaveFails.make({}))
+    run(world, Command.cases.Leave.make({}))
+    run(world, Command.cases.SomeoneElse.make({ row: "b", to: "kept" }))
+    run(world, Command.cases.ComeBack.make({}))
+    run(world, Command.cases.ServerTakesRead.make({}))
+    run(world, Command.cases.ReadArrives.make({}))
     // Both are on screen: theirs from the server, the person's own still waiting.
     expect(shown(world.draft)).toEqual({ a: out, b: kept })
-    run(world, { _tag: "SaveAgain" })
+    run(world, Command.cases.SaveAgain.make({}))
     expect(O.map(world.save, (save) => save.delta)).toEqual(O.some({ set: { a: out }, clear: [] }))
     quiet(world)
     expect(world.server.decisions).toEqual({ a: out, b: kept })
@@ -900,22 +903,22 @@ describe("the orderings that lost or hid a decision", () => {
 
   it("a quick return after the region was started again starts from what is shown, and the next decision clears nothing", () => {
     const world = opened({ a: out })
-    run(world, { _tag: "SomeoneElse", row: "b", to: "kept" })
-    run(world, { _tag: "ReturnToTab" })
-    run(world, { _tag: "ServerTakesRead" })
-    run(world, { _tag: "ReadArrives" })
+    run(world, Command.cases.SomeoneElse.make({ row: "b", to: "kept" }))
+    run(world, Command.cases.ReturnToTab.make({}))
+    run(world, Command.cases.ServerTakesRead.make({}))
+    run(world, Command.cases.ReadArrives.make({}))
     expect(world.restarts).toBe(1)
-    run(world, { _tag: "Decide", row: "c", to: "out" })
-    run(world, { _tag: "ServerTakesSave" })
-    run(world, { _tag: "SaveAnswers" })
-    run(world, { _tag: "Leave" })
-    run(world, { _tag: "ComeBackQuickly" })
+    run(world, Command.cases.Decide.make({ row: "c", to: "out" }))
+    run(world, Command.cases.ServerTakesSave.make({}))
+    run(world, Command.cases.SaveAnswers.make({}))
+    run(world, Command.cases.Leave.make({}))
+    run(world, Command.cases.ComeBackQuickly.make({}))
     // Back within the idle time: the region is not the one it was, it is what the draft shows.
     expect([shown(world.draft), regionShows(world)]).toEqual([
       { a: out, b: kept, c: out },
       { a: out, b: kept, c: out }
     ])
-    run(world, { _tag: "Decide", row: "a", to: "nothing" })
+    run(world, Command.cases.Decide.make({ row: "a", to: "nothing" }))
     expect(O.map(world.save, (save) => save.delta)).toEqual(O.some({ set: {}, clear: ["a"] }))
     quiet(world)
     expect(world.server.decisions).toEqual({ b: kept, c: out })
@@ -924,15 +927,15 @@ describe("the orderings that lost or hid a decision", () => {
   it("an answer from another request that lands after a later save keeps the decision just saved on screen", () => {
     const world = opened()
     // A match is taken by the server; its answer is slow.
-    run(world, { _tag: "SomeoneElse", row: "b", to: "kept" })
-    run(world, { _tag: "OtherAnswerSent" })
-    run(world, { _tag: "Decide", row: "a", to: "out" })
-    run(world, { _tag: "ServerTakesSave" })
+    run(world, Command.cases.SomeoneElse.make({ row: "b", to: "kept" }))
+    run(world, Command.cases.OtherAnswerSent.make({}))
+    run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
+    run(world, Command.cases.ServerTakesSave.make({}))
     // The save's answer is two revisions on: the import is asked again.
-    run(world, { _tag: "SaveAnswers" })
+    run(world, Command.cases.SaveAnswers.make({}))
     expect(O.isSome(world.read)).toBe(true)
     // The match's answer lands now, without the person's row in it.
-    run(world, { _tag: "OtherAnswerArrives" })
+    run(world, Command.cases.OtherAnswerArrives.make({}))
     expect(shown(world.draft)).toEqual({ a: out, b: kept })
     // The ask is still out, and its answer is the newer picture.
     expect(O.isSome(world.read)).toBe(true)
@@ -942,39 +945,39 @@ describe("the orderings that lost or hid a decision", () => {
 
   it("a decision the server refused is held with the reason on the next visit, not shown as standing, and not sent with the next one", () => {
     const world = opened()
-    run(world, { _tag: "Decide", row: "a", to: "out" })
-    run(world, { _tag: "SaveRefused" })
-    run(world, { _tag: "Leave" })
-    run(world, { _tag: "ComeBack" })
+    run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
+    run(world, Command.cases.SaveRefused.make({}))
+    run(world, Command.cases.Leave.make({}))
+    run(world, Command.cases.ComeBack.make({}))
     expect(shown(world.draft)).toEqual({})
     expect(world.draft.onHold).toEqual({
       a: { mine: O.some(out), madeOn: 1, why: Hold.Refused({ reason: "The import was already imported." }) }
     })
-    run(world, { _tag: "Decide", row: "b", to: "kept" })
+    run(world, Command.cases.Decide.make({ row: "b", to: "kept" }))
     expect(O.map(world.save, (save) => save.delta)).toEqual(O.some({ set: { b: kept }, clear: [] }))
     expect(R.keys(world.draft.onHold)).toEqual(["a"])
   })
 
   it("a save waiting for Save again does not stop a newer draft from being followed", () => {
     const world = opened()
-    run(world, { _tag: "Decide", row: "a", to: "out" })
-    run(world, { _tag: "SaveFails" })
-    run(world, { _tag: "SomeoneElse", row: "b", to: "kept" })
-    run(world, { _tag: "ReturnToTab" })
-    run(world, { _tag: "ServerTakesRead" })
-    run(world, { _tag: "ReadArrives" })
+    run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
+    run(world, Command.cases.SaveFails.make({}))
+    run(world, Command.cases.SomeoneElse.make({ row: "b", to: "kept" }))
+    run(world, Command.cases.ReturnToTab.make({}))
+    run(world, Command.cases.ServerTakesRead.make({}))
+    run(world, Command.cases.ReadArrives.make({}))
     expect(shown(world.draft)).toEqual({ a: out, b: kept })
     expect(world.restarts).toBe(1)
   })
 
   it("a save answered after the person left is the person's own: the view moves on, and the return starts nothing again", () => {
     const world = opened()
-    run(world, { _tag: "Decide", row: "a", to: "out" })
-    run(world, { _tag: "Leave" })
-    run(world, { _tag: "ServerTakesSave" })
-    run(world, { _tag: "SaveAnswers" })
+    run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
+    run(world, Command.cases.Leave.make({}))
+    run(world, Command.cases.ServerTakesSave.make({}))
+    run(world, Command.cases.SaveAnswers.make({}))
     expect(O.map(world.view, (view) => view.revision)).toEqual(O.some(2))
-    run(world, { _tag: "ComeBack" })
+    run(world, Command.cases.ComeBack.make({}))
     expect(shown(world.draft)).toEqual({ a: out })
     expect(world.restarts).toBe(0)
   })
@@ -982,26 +985,26 @@ describe("the orderings that lost or hid a decision", () => {
   it("a save the server counts as no change is not taken for the person's own next revision", () => {
     const world = opened()
     // The person leaves a row out and takes that back while the save is out; the save fails and waits.
-    run(world, { _tag: "Decide", row: "a", to: "out" })
-    run(world, { _tag: "Decide", row: "a", to: "nothing" })
-    run(world, { _tag: "SaveFails" })
+    run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
+    run(world, Command.cases.Decide.make({ row: "a", to: "nothing" }))
+    run(world, Command.cases.SaveFails.make({}))
     // A read is on its way, taken by the server before somebody else decides another row.
-    run(world, { _tag: "ReturnToTab" })
-    run(world, { _tag: "ServerTakesRead" })
-    run(world, { _tag: "SomeoneElse", row: "b", to: "kept" })
+    run(world, Command.cases.ReturnToTab.make({}))
+    run(world, Command.cases.ServerTakesRead.make({}))
+    run(world, Command.cases.SomeoneElse.make({ row: "b", to: "kept" }))
     // "Save again" sends a clear of a row the server never had decided: no change, at the other person's revision.
-    run(world, { _tag: "SaveAgain" })
-    run(world, { _tag: "ServerTakesSave" })
+    run(world, Command.cases.SaveAgain.make({}))
+    run(world, Command.cases.ServerTakesSave.make({}))
     expect(O.flatMap(world.save, (save) => save.answer)).toEqual(O.some({ revision: 2, changed: false }))
-    run(world, { _tag: "ReadArrives" })
-    run(world, { _tag: "SaveAnswers" })
+    run(world, Command.cases.ReadArrives.make({}))
+    run(world, Command.cases.SaveAnswers.make({}))
     // The screen does not claim revision 2 for a picture without the other person's row: it holds what it read,
     // and has asked for the import again, at once.
     holds(world)
     expect(O.map(world.draft.held, (held) => held.revision)).toEqual(O.some(1))
     expect(O.isSome(world.read)).toBe(true)
-    run(world, { _tag: "ServerTakesRead" })
-    run(world, { _tag: "ReadArrives" })
+    run(world, Command.cases.ServerTakesRead.make({}))
+    run(world, Command.cases.ReadArrives.make({}))
     expect(shown(world.draft)).toEqual({ b: kept })
   })
 })
@@ -1011,58 +1014,58 @@ describe("a confirm", () => {
 
   it("made on a picture somebody has changed since is refused, writes nothing, and the next one is on their row too", () => {
     const world = opened({ a: out })
-    run(world, { _tag: "SomeoneElse", row: "b", to: "kept" })
-    run(world, { _tag: "PressConfirm" })
+    run(world, Command.cases.SomeoneElse.make({ row: "b", to: "kept" }))
+    run(world, Command.cases.PressConfirm.make({}))
     expect(sent(world)).toEqual(O.some([1, { set: {}, clear: [] }]))
-    run(world, { _tag: "ServerTakesConfirm" })
+    run(world, Command.cases.ServerTakesConfirm.make({}))
     expect([O.isNone(world.closed), world.server.decisions]).toEqual([true, { a: out, b: kept }])
-    run(world, { _tag: "ConfirmAnswers" })
+    run(world, Command.cases.ConfirmAnswers.make({}))
     // Not made, and said so; the newer picture is asked for, and the button waits for it.
     expect([world.draft.confirm, world.draft.heldBack, O.isSome(world.read)]).toEqual([
       "idle",
       O.some({ read: false, apart: 0, accepts: [] }),
       true
     ])
-    run(world, { _tag: "PressConfirm" })
+    run(world, Command.cases.PressConfirm.make({}))
     expect(O.isNone(world.confirm)).toBe(true)
-    run(world, { _tag: "ServerTakesRead" })
-    run(world, { _tag: "ReadArrives" })
+    run(world, Command.cases.ServerTakesRead.make({}))
+    run(world, Command.cases.ReadArrives.make({}))
     // Their row is on screen now, counted, and the region was started again from it.
     expect([shown(world.draft), world.draft.heldBack, world.restarts]).toEqual([
       { a: out, b: kept },
       O.some({ read: true, apart: 1, accepts: [] }),
       1
     ])
-    run(world, { _tag: "PressConfirm" })
+    run(world, Command.cases.PressConfirm.make({}))
     expect([sent(world), world.draft.heldBack]).toEqual([O.some([2, { set: {}, clear: [] }]), O.none()])
-    run(world, { _tag: "ServerTakesConfirm" })
+    run(world, Command.cases.ServerTakesConfirm.make({}))
     expect(world.closed).toEqual(O.some({ a: out, b: kept }))
   })
 
   it("waits for the save that is out, then carries only the rows not sent yet, with no save beside it", () => {
     const world = opened()
-    run(world, { _tag: "Decide", row: "a", to: "out" })
-    run(world, { _tag: "Decide", row: "b", to: "kept" })
-    run(world, { _tag: "PressConfirm" })
+    run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
+    run(world, Command.cases.Decide.make({ row: "b", to: "kept" }))
+    run(world, Command.cases.PressConfirm.make({}))
     expect([world.draft.confirm, O.isNone(world.confirm)]).toEqual(["waiting", true])
-    run(world, { _tag: "ServerTakesSave" })
-    run(world, { _tag: "SaveAnswers" })
+    run(world, Command.cases.ServerTakesSave.make({}))
+    run(world, Command.cases.SaveAnswers.make({}))
     // Row a is saved at revision 2; the confirm names that revision and carries row b alone.
     expect([sent(world), O.isNone(world.save)]).toEqual([O.some([2, { set: { b: kept }, clear: [] }]), true])
-    run(world, { _tag: "ServerTakesConfirm" })
+    run(world, Command.cases.ServerTakesConfirm.make({}))
     expect(world.closed).toEqual(O.some({ a: out, b: kept }))
-    run(world, { _tag: "ConfirmAnswers" })
+    run(world, Command.cases.ConfirmAnswers.make({}))
     // Ended on the confirmed picture, with nothing left over: both rows are in it.
     expect(world.draft).toEqual({ ...emptyDraft, onScreen: true, epoch: 1, ended: true })
   })
 
   it("that waits is held back when its save's answer says somebody else saved in between", () => {
     const world = opened()
-    run(world, { _tag: "Decide", row: "a", to: "out" })
-    run(world, { _tag: "SomeoneElse", row: "b", to: "kept" })
-    run(world, { _tag: "PressConfirm" })
-    run(world, { _tag: "ServerTakesSave" })
-    run(world, { _tag: "SaveAnswers" })
+    run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
+    run(world, Command.cases.SomeoneElse.make({ row: "b", to: "kept" }))
+    run(world, Command.cases.PressConfirm.make({}))
+    run(world, Command.cases.ServerTakesSave.make({}))
+    run(world, Command.cases.SaveAnswers.make({}))
     // Two revisions on from the picture held: no confirm goes, the newer picture is asked for.
     expect([world.draft.confirm, world.draft.heldBack, O.isNone(world.confirm), O.isSome(world.read)]).toEqual([
       "idle",
@@ -1070,8 +1073,8 @@ describe("a confirm", () => {
       true,
       true
     ])
-    run(world, { _tag: "ServerTakesRead" })
-    run(world, { _tag: "ReadArrives" })
+    run(world, Command.cases.ServerTakesRead.make({}))
+    run(world, Command.cases.ReadArrives.make({}))
     expect([shown(world.draft), world.draft.heldBack]).toEqual([
       { a: out, b: kept },
       O.some({ read: true, apart: 1, accepts: [] })
@@ -1080,35 +1083,35 @@ describe("a confirm", () => {
 
   it("that waits is held back by a newer picture that arrives before its save is answered", () => {
     const world = opened()
-    run(world, { _tag: "SomeoneElse", row: "b", to: "kept" })
-    run(world, { _tag: "ReturnToTab" })
-    run(world, { _tag: "ServerTakesRead" })
-    run(world, { _tag: "Decide", row: "a", to: "out" })
-    run(world, { _tag: "PressConfirm" })
-    run(world, { _tag: "ReadArrives" })
+    run(world, Command.cases.SomeoneElse.make({ row: "b", to: "kept" }))
+    run(world, Command.cases.ReturnToTab.make({}))
+    run(world, Command.cases.ServerTakesRead.make({}))
+    run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
+    run(world, Command.cases.PressConfirm.make({}))
+    run(world, Command.cases.ReadArrives.make({}))
     expect([world.draft.confirm, world.draft.heldBack]).toEqual(["idle", O.some({ read: true, apart: 1, accepts: [] })])
-    run(world, { _tag: "ServerTakesSave" })
-    run(world, { _tag: "SaveAnswers" })
+    run(world, Command.cases.ServerTakesSave.make({}))
+    run(world, Command.cases.SaveAnswers.make({}))
     expect(O.isNone(world.confirm)).toBe(true)
   })
 
   it("carries the clear of a decision the person took back and the server never heard of", () => {
     const world = opened({ a: out })
-    run(world, { _tag: "Decide", row: "a", to: "nothing" })
-    run(world, { _tag: "SaveFails" })
-    run(world, { _tag: "PressConfirm" })
+    run(world, Command.cases.Decide.make({ row: "a", to: "nothing" }))
+    run(world, Command.cases.SaveFails.make({}))
+    run(world, Command.cases.PressConfirm.make({}))
     expect(sent(world)).toEqual(O.some([1, { set: {}, clear: ["a"] }]))
-    run(world, { _tag: "ServerTakesConfirm" })
+    run(world, Command.cases.ServerTakesConfirm.make({}))
     // Without the clear the import would be confirmed with row a left out, as nobody on this screen saw it.
     expect(world.closed).toEqual(O.some({}))
   })
 
   it("that did not get through sends nothing and offers no Save again before the import is read; a read that says it is open sends the rows", () => {
     const world = opened()
-    run(world, { _tag: "Decide", row: "a", to: "out" })
-    run(world, { _tag: "SaveFails" })
-    run(world, { _tag: "PressConfirm" })
-    run(world, { _tag: "ConfirmFails" })
+    run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
+    run(world, Command.cases.SaveFails.make({}))
+    run(world, Command.cases.PressConfirm.make({}))
+    run(world, Command.cases.ConfirmFails.make({}))
     // Nothing is sent and nothing offered as a save: the import may be closed. The import is asked for.
     expect([world.draft.confirm, O.isNone(world.save), O.isSome(world.read), world.draft.stalled]).toEqual([
       "idle",
@@ -1120,8 +1123,8 @@ describe("a confirm", () => {
     const again = step(world.draft, DraftEvent.SaveAgain())
     expect(again.effects).toEqual([DraftEffect.Ask()])
     // It wrote nothing: the read answers the revision held, open, and that is the answer: the rows go by themselves.
-    run(world, { _tag: "ServerTakesRead" })
-    run(world, { _tag: "ReadArrives" })
+    run(world, Command.cases.ServerTakesRead.make({}))
+    run(world, Command.cases.ReadArrives.make({}))
     expect(O.map(world.save, (save) => save.delta)).toEqual(O.some({ set: { a: out }, clear: [] }))
     // Decisions made after it are sent as any are: nothing waits for a picture any more.
     quiet(world)
@@ -1130,16 +1133,16 @@ describe("a confirm", () => {
 
   it("that did not get through, then the step drawn again: the view given again is not the answer, and the next read is", () => {
     const world = opened()
-    run(world, { _tag: "Decide", row: "a", to: "out" })
-    run(world, { _tag: "SaveFails" })
-    run(world, { _tag: "PressConfirm" })
-    run(world, { _tag: "ConfirmFails" })
-    run(world, { _tag: "Leave" })
+    run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
+    run(world, Command.cases.SaveFails.make({}))
+    run(world, Command.cases.PressConfirm.make({}))
+    run(world, Command.cases.ConfirmFails.make({}))
+    run(world, Command.cases.Leave.make({}))
     // Back: the view the tab held is given again, and the import is asked for behind it.
-    run(world, { _tag: "ComeBackQuickly" })
+    run(world, Command.cases.ComeBackQuickly.make({}))
     expect([world.draft.waitsForPicture, O.isNone(world.save)]).toEqual([true, true])
-    run(world, { _tag: "ServerTakesRead" })
-    run(world, { _tag: "ReadArrives" })
+    run(world, Command.cases.ServerTakesRead.make({}))
+    run(world, Command.cases.ReadArrives.make({}))
     expect([world.draft.waitsForPicture, O.map(world.save, (save) => save.delta)]).toEqual([
       false,
       O.some({ set: { a: out }, clear: [] })
@@ -1171,28 +1174,28 @@ describe("rows that wait, kept in the browser", () => {
 
   it("are sent again when a picture arrives after a save that failed, and the failure is said once", () => {
     const world = opened()
-    run(world, { _tag: "Decide", row: "a", to: "out" })
-    run(world, { _tag: "SaveFails" })
+    run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
+    run(world, Command.cases.SaveFails.make({}))
     expect([world.said, world.draft.stalled, O.isNone(world.save)]).toEqual([1, true, true])
     // A save answer nobody waits for says nothing and changes nothing.
     const stray = step(world.draft, DraftEvent.SaveFailed())
     expect([stray.effects, stray.draft]).toEqual([[], world.draft])
     expect(step(world.draft, DraftEvent.SaveRefused({ reason: "No." })).draft).toEqual(world.draft)
-    run(world, { _tag: "SomeoneElse", row: "b", to: "kept" })
-    run(world, { _tag: "ReturnToTab" })
-    run(world, { _tag: "ServerTakesRead" })
-    run(world, { _tag: "ReadArrives" })
+    run(world, Command.cases.SomeoneElse.make({ row: "b", to: "kept" }))
+    run(world, Command.cases.ReturnToTab.make({}))
+    run(world, Command.cases.ServerTakesRead.make({}))
+    run(world, Command.cases.ReadArrives.make({}))
     expect(O.map(world.save, (save) => save.delta)).toEqual(O.some({ set: { a: out }, clear: [] }))
   })
 
   it("are named and never sent when somebody else confirms the import, and kept until the result has named them", () => {
     const world = opened()
-    run(world, { _tag: "Decide", row: "a", to: "out" })
-    run(world, { _tag: "SaveFails" })
-    run(world, { _tag: "SomeoneConfirms" })
-    run(world, { _tag: "ReturnToTab" })
-    run(world, { _tag: "ServerTakesRead" })
-    run(world, { _tag: "ReadArrives" })
+    run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
+    run(world, Command.cases.SaveFails.make({}))
+    run(world, Command.cases.SomeoneConfirms.make({}))
+    run(world, Command.cases.ReturnToTab.make({}))
+    run(world, Command.cases.ServerTakesRead.make({}))
+    run(world, Command.cases.ReadArrives.make({}))
     expect([world.draft.ended, world.draft.leftOver, O.isNone(world.save)]).toEqual([
       true,
       O.some({ a: O.some(out) }),
@@ -1202,9 +1205,9 @@ describe("rows that wait, kept in the browser", () => {
       O.some({ rows: { a: O.some(out) }, madeOn: {}, confirms: O.none(), leftOver: true, seen: {}, held: {} })
     )
     // A reload before the result was left: the rows come back as left over, and are named again, not sent.
-    run(world, { _tag: "Reload" })
-    run(world, { _tag: "ServerTakesRead" })
-    run(world, { _tag: "ReadArrives" })
+    run(world, Command.cases.Reload.make({}))
+    run(world, Command.cases.ServerTakesRead.make({}))
+    run(world, Command.cases.ReadArrives.make({}))
     expect([world.draft.leftOver, O.isNone(world.save)]).toEqual([O.some({ a: O.some(out) }), true])
     dispatch(world, DraftEvent.LeftOverNamed())
     expect([world.draft.leftOver, world.kept]).toEqual([O.none(), O.none()])
@@ -1212,14 +1215,14 @@ describe("rows that wait, kept in the browser", () => {
 
   it("that the confirm already wrote are not named: only what the confirmed import does not say", () => {
     const world = opened({ a: out })
-    run(world, { _tag: "Decide", row: "b", to: "kept" })
-    run(world, { _tag: "ServerTakesSave" })
+    run(world, Command.cases.Decide.make({ row: "b", to: "kept" }))
+    run(world, Command.cases.ServerTakesSave.make({}))
     // The server took row b; its answer is lost on the way, and somebody else confirms.
-    run(world, { _tag: "SaveFails" })
-    run(world, { _tag: "SomeoneConfirms" })
-    run(world, { _tag: "ReturnToTab" })
-    run(world, { _tag: "ServerTakesRead" })
-    run(world, { _tag: "ReadArrives" })
+    run(world, Command.cases.SaveFails.make({}))
+    run(world, Command.cases.SomeoneConfirms.make({}))
+    run(world, Command.cases.ReturnToTab.make({}))
+    run(world, Command.cases.ServerTakesRead.make({}))
+    run(world, Command.cases.ReadArrives.make({}))
     expect([world.draft.ended, world.draft.leftOver]).toEqual([true, O.none()])
   })
 })
@@ -1271,11 +1274,11 @@ describe("a save that names what it was made on", () => {
 describe("a confirm and the rows around it (his answers 4 and 5)", () => {
   it("made while the person decided another row: the draft ends on the confirmed picture and that row is named", () => {
     const world = opened()
-    run(world, { _tag: "PressConfirm" })
-    run(world, { _tag: "ServerTakesConfirm" })
+    run(world, Command.cases.PressConfirm.make({}))
+    run(world, Command.cases.ServerTakesConfirm.make({}))
     // The commit takes seconds on a large file; the region stays live.
-    run(world, { _tag: "Decide", row: "a", to: "out" })
-    run(world, { _tag: "ConfirmAnswers" })
+    run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
+    run(world, Command.cases.ConfirmAnswers.make({}))
     expect([world.draft.ended, world.draft.leftOver, world.kept]).toEqual([
       true,
       O.some({ a: O.some(out) }),
@@ -1285,15 +1288,15 @@ describe("a confirm and the rows around it (his answers 4 and 5)", () => {
 
   it("refused because somebody else confirmed it sends nothing: the import is read, and its rows are named", () => {
     const world = opened()
-    run(world, { _tag: "Decide", row: "a", to: "out" })
-    run(world, { _tag: "SaveFails" })
-    run(world, { _tag: "SomeoneConfirms" })
-    run(world, { _tag: "PressConfirm" })
+    run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
+    run(world, Command.cases.SaveFails.make({}))
+    run(world, Command.cases.SomeoneConfirms.make({}))
+    run(world, Command.cases.PressConfirm.make({}))
     // The server answers AlreadyImported.
-    run(world, { _tag: "ConfirmFails" })
+    run(world, Command.cases.ConfirmFails.make({}))
     expect([O.isNone(world.save), O.isSome(world.read)]).toEqual([true, true])
-    run(world, { _tag: "ServerTakesRead" })
-    run(world, { _tag: "ReadArrives" })
+    run(world, Command.cases.ServerTakesRead.make({}))
+    run(world, Command.cases.ReadArrives.make({}))
     expect([O.isNone(world.save), world.draft.ended, world.draft.leftOver]).toEqual([
       true,
       true,
@@ -1303,15 +1306,15 @@ describe("a confirm and the rows around it (his answers 4 and 5)", () => {
 
   it("made, with its answer lost on the way back: nothing is sent, and the closed picture names nothing it wrote", () => {
     const world = opened()
-    run(world, { _tag: "Decide", row: "a", to: "out" })
-    run(world, { _tag: "SaveFails" })
-    run(world, { _tag: "PressConfirm" })
-    run(world, { _tag: "ServerTakesConfirm" })
+    run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
+    run(world, Command.cases.SaveFails.make({}))
+    run(world, Command.cases.PressConfirm.make({}))
+    run(world, Command.cases.ServerTakesConfirm.make({}))
     expect(world.closed).toEqual(O.some({ a: out }))
-    run(world, { _tag: "ConfirmFails" })
+    run(world, Command.cases.ConfirmFails.make({}))
     expect(O.isNone(world.save)).toBe(true)
-    run(world, { _tag: "ServerTakesRead" })
-    run(world, { _tag: "ReadArrives" })
+    run(world, Command.cases.ServerTakesRead.make({}))
+    run(world, Command.cases.ReadArrives.make({}))
     expect([O.isNone(world.save), world.draft.ended, world.draft.leftOver]).toEqual([true, true, O.none()])
   })
 
@@ -1351,12 +1354,12 @@ describe("what a save and a confirm name (the review of the rebuilt draft, group
 
   it("decided and undone before anything of it was sent: the entry goes, and no clear is sent", () => {
     const world = opened()
-    run(world, { _tag: "Decide", row: "b", to: "kept" })
-    run(world, { _tag: "Decide", row: "a", to: "out" })
-    run(world, { _tag: "Decide", row: "a", to: "nothing" })
+    run(world, Command.cases.Decide.make({ row: "b", to: "kept" }))
+    run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
+    run(world, Command.cases.Decide.make({ row: "a", to: "nothing" }))
     expect(world.draft.unsent).toEqual({})
-    run(world, { _tag: "ServerTakesSave" })
-    run(world, { _tag: "SaveAnswers" })
+    run(world, Command.cases.ServerTakesSave.make({}))
+    run(world, Command.cases.SaveAnswers.make({}))
     expect(O.isNone(world.save)).toBe(true)
   })
 
@@ -1383,15 +1386,15 @@ describe("a confirm held back (the line that says nothing was imported)", () => 
 
   it("that waits for its save goes on the save's own picture, read before the save's answer", () => {
     const world = opened()
-    run(world, { _tag: "Decide", row: "a", to: "out" })
-    run(world, { _tag: "PressConfirm" })
-    run(world, { _tag: "ServerTakesSave" })
+    run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
+    run(world, Command.cases.PressConfirm.make({}))
+    run(world, Command.cases.ServerTakesSave.make({}))
     // The read taken after the save brings the person's own row back before the save's answer does.
-    run(world, { _tag: "ReturnToTab" })
-    run(world, { _tag: "ServerTakesRead" })
-    run(world, { _tag: "ReadArrives" })
+    run(world, Command.cases.ReturnToTab.make({}))
+    run(world, Command.cases.ServerTakesRead.make({}))
+    run(world, Command.cases.ReadArrives.make({}))
     expect([world.draft.confirm, world.draft.heldBack]).toEqual(["waiting", O.none()])
-    run(world, { _tag: "SaveAnswers" })
+    run(world, Command.cases.SaveAnswers.make({}))
     expect(O.map(world.confirm, (confirm) => confirm.revision)).toEqual(O.some(2))
   })
 

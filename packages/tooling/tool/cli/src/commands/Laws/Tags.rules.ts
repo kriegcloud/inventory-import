@@ -1,16 +1,22 @@
 /**
- * In the packages with screens a tagged value's case is told by what its type gives, never by comparing `_tag` by
- * hand: `Option.isSome` and `Option.match`, `AsyncResult.isFailure`, a tagged enum's `$is` and `$match`, a schema
- * union's `guards` and `match`, `Schema.is` of one member (Benjamin's standing rule; goals/atoms). A hand-written
- * comparison names a case as a string the compiler checks only where it narrows, and a `switch` over tags that misses
- * a new case draws nothing for it, without a word.
+ * A tagged value's case is told by what its type gives, never by its `_tag` by hand: `Option.isSome` and
+ * `Option.match`, `AsyncResult.isFailure`, a tagged enum's `$is` and `$match`, a schema union's `guards`, `isAnyOf` and
+ * `match`, `Schema.is` of one member (Benjamin's standing rule; goals/atoms). And a case is built by its own
+ * constructor (`Union.cases.A.make`, a tagged enum's `A(…)`, an error's `.make`), never as an object with a `_tag` key.
+ * A hand-written tag names a case as a string the compiler checks only where it narrows; a `switch` over tags that
+ * misses a new case draws nothing for it, without a word; and an object built by hand skips what the constructor
+ * checks and brands.
  *
- * What is refused: `x._tag === "A"` with any of `===`, `!==`, `==`, `!=`, on either side, through `?.` and
- * brackets, and a `switch` on `x._tag`. What passes: `"_tag" in x`, and a `_tag` read and handed on (a guard's own body
- * is written once, in the module that owns the type, outside these packages or with `Predicate.isTagged`).
+ * What is refused: `x._tag === "A"` with any of `===`, `!==`, `==`, `!=`, on either side, through `?.` and brackets;
+ * a `switch` on `x._tag`; the same through a name the tag was read into (`const tag = x._tag`, `const { _tag } = x`,
+ * `const { _tag: kind } = x`); a tag handed to a call (`A.contains(["A", "B"], x._tag)`,
+ * `HashSet.has(final, String(x._tag))`); and an object literal with a `_tag` key, outside the module that declares
+ * that case (a type's `_tag: "A"`, a tagged schema, class or error named "A", a tagged union's or enum's key `A`). What
+ * passes: `"_tag" in x`, and a `_tag` read and handed on as a value (returned, or put in a record).
  *
- * Where: the app's screens and their tests, and every package that holds screens or their state. The vendored kit
- * keeps its own.
+ * Where: the app's screens and every test, and every package that holds screens or their state, with the tests of
+ * every package. The vendored kit (its components and hooks, and each package a `vendor.json` copies from
+ * beep-effect) keeps its own.
  *
  * "Every file git would commit" is git's answer to give, so this asks git, and fails when git does not answer.
  *
@@ -27,28 +33,36 @@ import { readTags } from "./internal/tagsCode.ts"
 
 const $I = $RepoCliId.create("commands/Laws/Tags.rules")
 
-/** The packages with screens, their state and their tests; the vendored kit and the agents' skills left out. */
-const webCode = [
-  "--",
-  "apps/*/src/web/**/*.ts",
-  "apps/*/src/web/**/*.tsx",
-  "apps/*/test/web/**/*.ts",
-  "apps/*/test/web/**/*.tsx",
-  "packages/*/web/**/*.ts",
-  "packages/*/web/**/*.tsx",
-  "packages/client/**/*.ts",
-  "packages/client/**/*.tsx",
-  "packages/review/**/*.ts",
-  "packages/review/**/*.tsx",
-  "packages/ui/**/*.ts",
-  "packages/ui/**/*.tsx",
-  ":!packages/ui/src/components",
-  ":!packages/ui/src/hooks",
-  ":!.agents"
-]
+/**
+ * The packages with screens, their state, and every test; the vendored components and the agents' skills left out.
+ * Each is a glob pathspec: without the magic git reads `**` as `*`, so a pattern missed every file straight under its
+ * folder (`apps/inventory/src/web/App.tsx`).
+ */
+const webCode = A.appendAll(
+  A.map(
+    [
+      "apps/*/src/web/**/*.ts",
+      "apps/*/src/web/**/*.tsx",
+      "apps/*/test/**/*.ts",
+      "apps/*/test/**/*.tsx",
+      "packages/*/web/**/*.ts",
+      "packages/*/web/**/*.tsx",
+      "packages/client/**/*.ts",
+      "packages/client/**/*.tsx",
+      "packages/review/**/*.ts",
+      "packages/review/**/*.tsx",
+      "packages/ui/**/*.ts",
+      "packages/ui/**/*.tsx",
+      "packages/**/test/**/*.ts",
+      "packages/**/test/**/*.tsx"
+    ],
+    (pattern) => `:(glob)${pattern}`
+  ),
+  [":!packages/ui/src/components", ":!packages/ui/src/hooks", ":!.agents"]
+)
 
 /**
- * What `laws tags` finds: nothing, or a refusal and each place a `_tag` is compared by hand.
+ * What `laws tags` finds: nothing, or a refusal and each place a `_tag` is told apart or built by hand.
  *
  * @category schemas
  */
@@ -60,11 +74,16 @@ export const TagsFinding = S.TaggedUnion({
   },
   At: {
     place: S.String.pipe(S.annotateKey({ description: "The file and line, as file:line" })),
-    how: S.String.pipe(S.annotateKey({ description: 'The comparison: "===" and its kin, or "switch"' }))
+    how: S.String.pipe(
+      S.annotateKey({
+        description:
+          'How: "===" and its kin, "switch", "argument" (a tag handed to a call) or "literal" (an object built with a _tag key)'
+      })
+    )
   }
 }).pipe(
   $I.annoteSchema("TagsFinding", {
-    description: "No `_tag` is compared by hand in the packages with screens, or a refusal and each place one is"
+    description: "No `_tag` is told apart or built by hand, or a refusal and each place one is"
   })
 )
 
@@ -75,38 +94,58 @@ export const TagsFinding = S.TaggedUnion({
  */
 export type TagsFinding = typeof TagsFinding.Type
 
+const sayHow = (how: string): string =>
+  how === "switch"
+    ? "switch over a _tag"
+    : how === "argument"
+      ? "a _tag handed to a call"
+      : how === "literal"
+        ? "an object built with a _tag key: use the case's own constructor or .make"
+        : `_tag ${how}`
+
 /**
  * The line each finding prints.
  *
  * @category rendering
  */
 export const tagsSentence: (finding: TagsFinding) => Line = TagsFinding.match({
-  Clean: () => out("tags:check OK  no _tag is compared by hand in the packages with screens"),
+  Clean: () => out("tags:check OK  no _tag is told apart or built by hand"),
   Refused: () =>
     err(
-      "tags:check FAIL  a _tag compared by hand. Use what the type gives: O.isSome or O.match, AsyncResult.isFailure, a tagged enum's $is or $match, a schema union's guards or match:"
+      "tags:check FAIL  a _tag told apart or built by hand. Use what the type gives: O.isSome or O.match, AsyncResult.isFailure, a tagged enum's $is or $match, a schema union's guards, isAnyOf or match, S.is of one class; build a case with its constructor or .make:"
     ),
   Unlisted: ({ why }) => err(`git could not list the files, so none was checked: ${why}`),
-  At: ({ how, place }) => err(`${place}  ${how === "switch" ? "switch over a _tag" : `_tag ${how}`}`)
+  At: ({ how, place }) => err(`${place}  ${sayHow(how)}`)
 })
 
 /**
- * Reads every file of the packages with screens from the repository's root.
+ * Reads every file of the packages with screens and every test from the repository's root.
  *
  * @category rules
  */
 export const tags = Effect.fn("Tags.tags")(function* () {
   const repo = yield* Repo
-  const listed = yield* repo.run("git", ["ls-files", "--cached", "--others", "--exclude-standard", ...webCode])
+  const git = (pathspec: ReadonlyArray<string>) =>
+    repo.run("git", ["ls-files", "--cached", "--others", "--exclude-standard", ...pathspec])
+  const listed = yield* git(["--", ...webCode])
+  const vendored = yield* git(["--", ":(glob)packages/**/vendor.json"])
   // A list git could not give is not an empty list: nothing was checked, and the law says so.
-  if (listed.code !== 0) {
+  if (listed.code !== 0 || vendored.code !== 0) {
     return A.make<[TagsFinding, TagsFinding]>(
       TagsFinding.cases.Refused.make({}),
-      TagsFinding.cases.Unlisted.make({ why: Str.trim(listed.stderr) })
+      TagsFinding.cases.Unlisted.make({ why: Str.trim(listed.code !== 0 ? listed.stderr : vendored.stderr) })
     )
   }
+  // A package the kit is copied into keeps beep-effect's code as it is: its folder, from the root, with a slash.
+  const kit = A.map(
+    A.filter(Str.split("\n")(vendored.stdout), (file) => file !== ""),
+    (file) => Str.slice(0, file.length - "vendor.json".length)(file)
+  )
   const files = yield* Effect.filter(
-    A.filter(Str.split("\n")(listed.stdout), (file) => file !== "" && !Str.endsWith(".d.ts")(file)),
+    A.filter(
+      Str.split("\n")(listed.stdout),
+      (file) => file !== "" && !Str.endsWith(".d.ts")(file) && !A.some(kit, (folder) => Str.startsWith(folder)(file))
+    ),
     (file) => repo.exists(repo.join(repo.root, file)),
     { concurrency: 1 }
   )

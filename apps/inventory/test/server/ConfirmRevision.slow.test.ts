@@ -10,12 +10,14 @@ import * as O from "effect/Option"
 import * as Order from "effect/Order"
 import * as R from "effect/Record"
 import * as Result from "effect/Result"
+import * as S from "effect/Schema"
 import * as HttpApiTest from "effect/http-api/HttpApiTest"
 import clean from "../../public/samples/items_clean.csv?raw"
 import messy from "../../public/samples/items_messy.csv?raw"
 import { Api } from "../../src/api/v1/Api.ts"
 import { decisionFromFlags } from "@inventory/catalog-contract/Decision"
 import { ConfirmId } from "@inventory/catalog-contract/Ids"
+import { DraftMoved } from "@inventory/catalog-contract/ImportRejection"
 import { ConfirmPlan } from "@inventory/catalog-model/Confirm"
 import { ConfirmWrite, ImportStore } from "@inventory/catalog-model/ImportStore"
 import { Activity } from "@inventory/kernel/Activity"
@@ -60,10 +62,7 @@ layer(TypedApp)("a confirm names the revision its screen showed", (it) => {
             })
             .pipe(marcus)
         )
-        expect([refused._tag, refused._tag === "DraftMoved" ? refused.revision : -1]).toEqual([
-          "DraftMoved",
-          theirs.revision
-        ])
+        expect(S.is(DraftMoved)(refused) ? refused.revision : refused).toBe(theirs.revision)
         // Nothing was written: no item, the import open where Dana left it, her decision there and his not.
         expect((yield* client.items.list().pipe(marcus)).length).toBe(0)
         const still = yield* client.imports.get({ params }).pipe(marcus)

@@ -5,6 +5,7 @@ import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as Str from "effect/String"
 import * as S from "effect/Schema"
+import { CrossSiteRequest } from "@inventory/kernel/AccessError"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
 import { ModelId } from "@beep/openrouter/OpenRouterModel"
@@ -89,7 +90,8 @@ layer(App)("the API over HTTP", (it) => {
         send({ path: "/api/v1/assistant/view", body: view("sort by name"), headers })
       const crossSite = yield* write({ "sec-fetch-site": "cross-site", origin: "https://elsewhere.example" })
       expect(crossSite.status).toBe(403)
-      expect(crossSite.json).toMatchObject({ _tag: "CrossSiteRequest" })
+      // The answer is the typed refusal: it decodes as one, or the test stops here.
+      yield* S.decodeUnknownEffect(CrossSiteRequest)(crossSite.json)
       const sibling = yield* write({ "sec-fetch-site": "same-site" })
       expect(sibling.status).toBe(403)
       const oldBrowser = yield* write({ origin: "https://elsewhere.example" })

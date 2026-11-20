@@ -2,6 +2,7 @@
 // that would hurt most if wrong is that an answer naming anything the table does not have is refused whole.
 import { describe, expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
+import * as O from "effect/Option"
 import * as Result from "effect/Result"
 import * as Str from "effect/String"
 import * as S from "effect/Schema"
@@ -87,8 +88,8 @@ describe("the command a model may answer", () => {
       for (const passed of outcome.success) {
         if (passed.kind === "clear" || passed.kind === "search") continue
         const found = A.findFirst(items, (c) => c.id === passed.column)
-        expect(found._tag).toBe("Some")
-        if (passed.kind === "filter" && found._tag === "Some") {
+        expect(O.isSome(found)).toBe(true)
+        if (passed.kind === "filter" && O.isSome(found)) {
           expect(found.value.operators).toContain(passed.operator)
           if (found.value.type === "select") {
             for (const value of passed.values) expect(found.value.values).toContain(value)

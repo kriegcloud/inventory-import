@@ -7,6 +7,7 @@ import * as Effect from "effect/Effect"
 import * as HttpApiTest from "effect/http-api/HttpApiTest"
 import messy from "../../public/samples/items_messy.csv?raw"
 import { Api } from "../../src/api/v1/Api.ts"
+import { AnsweredBy } from "@inventory/catalog-contract/Answer"
 import { decisionFromFlags } from "@inventory/catalog-contract/Decision"
 import { as, TypedApp } from "./support/app.ts"
 import { stage } from "./support/files.ts"
@@ -22,7 +23,7 @@ layer(TypedApp)("suggestions for an import", (it) => {
       expect(staged.suggestions).toEqual([])
 
       const first = yield* client.imports.suggest({ params: { id: staged.id } }).pipe(marcus)
-      expect(first.answeredBy._tag).toBe("Rules")
+      expect(AnsweredBy.guards.Rules(first.answeredBy)).toBe(true)
       expect(
         A.map(first.made, (s) => (s.kind === "column" ? [] : [s.rowId, s.kind, s.to, s.by.kind, s.confidence]))
       ).toEqual([

@@ -10,7 +10,8 @@ import { type ConfirmWrite, ImportStore } from "@inventory/catalog-model/ImportS
 import { usedUpSentence } from "@inventory/catalog-model/AssistantHandler"
 import { memoryUsedUpWords } from "@inventory/catalog-model/ModelAllowance"
 import { decisionFromFlags } from "@inventory/catalog-contract/Decision"
-import { AcceptsTakenBack, RevisionAhead } from "@inventory/catalog-contract/ImportRejection"
+import { AcceptsTakenBack, DraftMoved, RevisionAhead } from "@inventory/catalog-contract/ImportRejection"
+import { AnsweredBy } from "@inventory/catalog-contract/Answer"
 import type { ColumnCatalog } from "@inventory/catalog-contract/TableView"
 import * as A from "effect/Array"
 import * as BigDecimal from "effect/BigDecimal"
@@ -220,10 +221,7 @@ describe("an import, over the twins", () => {
               })
               .pipe(as(marcus))
           )
-          expect([refused._tag, refused._tag === "DraftMoved" ? refused.revision : -1]).toEqual([
-            "DraftMoved",
-            theirs.revision
-          ])
+          expect(S.is(DraftMoved)(refused) ? refused.revision : refused).toBe(theirs.revision)
           // Nothing was written: no item, her decision still there, his not, and no line in the audit trail.
           const got1 = yield* items.list().pipe(as(marcus))
           expect(got1.length).toBe(0)
@@ -268,7 +266,7 @@ describe("suggestions, over the twins", () => {
         const got9 = yield* tag(imports.suggest({ params }).pipe(as(priya)))
         expect(got9).toBe("Forbidden")
         const first = yield* imports.suggest({ params }).pipe(as(marcus))
-        expect(first.answeredBy._tag).toBe("Rules")
+        expect(AnsweredBy.guards.Rules(first.answeredBy)).toBe(true)
         expect(A.map(first.made, (s) => (s.kind === "column" ? [] : [s.rowId, s.kind, s.to, s.by.kind]))).toEqual([
           ["row-5", "name", "Copper Plate", "rule"]
         ])
@@ -309,7 +307,7 @@ const Counting = Layer.succeed(
       const value: Sc["Type"] = yield* S.decodeUnknownEffect(schema)(sortByName).pipe(Effect.orDie)
       const answered: ModelAnswered<Sc["Type"]> = {
         value,
-        answeredBy: { _tag: "Model", provider: "openrouter", model: "twin/model", fallback: false }
+        answeredBy: AnsweredBy.cases.Model.make({ provider: "openrouter", model: "twin/model", fallback: false })
       }
       return answered
     })
@@ -324,15 +322,15 @@ describe("the table assistant, over the twins", () => {
         Effect.gen(function* () {
           const assistant = yield* assistantEndpoints
           const first = yield* assistant.view(request("sort by name descending")).pipe(as(priya))
-          expect(Result.isSuccess(first) ? first.success.answeredBy : first).toMatchObject({
-            _tag: "Model",
-            model: "twin/model"
-          })
+          expect(
+            Result.isSuccess(first) && AnsweredBy.guards.Model(first.success.answeredBy)
+              ? first.success.answeredBy.model
+              : first
+          ).toBe("twin/model")
           const second = yield* assistant.view(request("sort by name descending")).pipe(as(priya))
-          expect(Result.isSuccess(second) ? second.success.answeredBy : second).toEqual({
-            _tag: "Rules",
-            reason: usedUpSentence(memoryUsedUpWords)
-          })
+          expect(Result.isSuccess(second) ? second.success.answeredBy : second).toEqual(
+            AnsweredBy.cases.Rules.make({ reason: usedUpSentence(memoryUsedUpWords) })
+          )
           // The rules still do the work: the same sort, read from the words.
           expect(Result.isSuccess(second) ? A.map(second.success.changes, (change) => change.kind) : second).toEqual([
             "sort"
@@ -382,10 +380,7 @@ describe("a confirm another save overtakes after the handler checked its revisio
         const refused = yield* Effect.flip(
           imports.commit({ params, payload: { ...none, revision: view.revision, madeOn: {} } }).pipe(as(marcus))
         )
-        expect([refused._tag, refused._tag === "DraftMoved" ? refused.revision : -1]).toEqual([
-          "DraftMoved",
-          view.revision + 1
-        ])
+        expect(S.is(DraftMoved)(refused) ? refused.revision : refused).toBe(view.revision + 1)
         // Nothing of the confirm: no item, the import still open with Dana's decision, no line for an import.
         const stored = yield* items.list().pipe(as(marcus))
         const still = yield* imports.get({ params }).pipe(as(marcus))

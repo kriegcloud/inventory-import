@@ -11,7 +11,8 @@ import * as S from "effect/Schema"
 import * as HttpApiTest from "effect/http-api/HttpApiTest"
 import * as TestClock from "effect/testing/TestClock"
 import { Api } from "../../src/api/v1/Api.ts"
-import { type AnsweredBy } from "@inventory/catalog-contract/Answer"
+import { AnsweredBy } from "@inventory/catalog-contract/Answer"
+import { ModelCallsUsedUp } from "@inventory/access-contract/ModelAllowance"
 import { ModelId } from "@beep/openrouter/OpenRouterModel"
 import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
 import { dailyModelCalls } from "@inventory/access-contract/ModelAllowance"
@@ -23,10 +24,10 @@ import { as, TypedApp as TestApp, testAppWith } from "./support/app.ts"
 const request = (prompt: string) => ({ payload: { prompt, table: "Items", columns: items, searchable: false } })
 /** Who read a request, in a word: the rules or a model. */
 const who = (answer: { readonly answeredBy: AnsweredBy }): "rules" | "model" =>
-  answer.answeredBy._tag === "Rules" ? "rules" : "model"
+  AnsweredBy.match(answer.answeredBy, { Rules: () => "rules" as const, Model: () => "model" as const })
 /** The model that read it, when one did. */
 const modelOf = (answer: { readonly answeredBy: AnsweredBy }): string | null =>
-  answer.answeredBy._tag === "Model" ? answer.answeredBy.model : null
+  AnsweredBy.match(answer.answeredBy, { Model: (model) => model.model, Rules: () => null })
 
 layer(TestApp)("the table assistant with no AI key", (it) => {
   it.effect("the rules answer the plain cases, say that they did, and write nothing", () =>
@@ -36,7 +37,9 @@ layer(TestApp)("the table assistant with no AI key", (it) => {
       expect(Result.isSuccess(read)).toBe(true)
       if (Result.isSuccess(read)) {
         // Who answered is the contract's one value: the rules, with the reason no model did.
-        expect(read.success.answeredBy).toEqual({ _tag: "Rules", reason: "No AI key is set, so the rules answered." })
+        expect(read.success.answeredBy).toEqual(
+          AnsweredBy.cases.Rules.make({ reason: "No AI key is set, so the rules answered." })
+        )
         expect(read.success.note).toEqual(O.none())
         expect(read.success.changes).toEqual([
           { kind: "sort", column: "name", direction: "desc" },
@@ -88,7 +91,7 @@ layer(
         const read = yield* client.assistant.view(request("show items we count with no vendor")).pipe(as("mem_priya"))
         expect(Result.isSuccess(read)).toBe(true)
         if (Result.isSuccess(read)) {
-          expect(read.success.answeredBy).toMatchObject({ _tag: "Model", model: "scripted/model" })
+          expect(modelOf(read.success)).toBe("scripted/model")
           expect(read.success.note).toEqual(
             O.some("This table has no vendor column, so items with no vendor could not be picked out.")
           )
@@ -123,9 +126,9 @@ layer(
       if (Result.isFailure(read)) {
         expect(read.failure).toMatchObject({
           reason: "The answer named a column this table does not have (“vendor”), so nothing was changed.",
-          answeredBy: { _tag: "Model", model: "scripted/model" },
           note: O.none()
         })
+        expect(modelOf(read.failure)).toBe("scripted/model")
       }
     })
   )
@@ -185,17 +188,16 @@ layer(testAppWith(answering({ changes: [{ kind: "sort", column: "name", directio
           const by = A.map(answers, (answer) => who(Result.isSuccess(answer) ? answer.success : answer.failure))
           expect(A.filter(by, (who) => who === "model").length).toBe(dailyModelCalls)
           const last = A.last(answers)
-          expect(last._tag === "Some" && Result.isSuccess(last.value) ? last.value.success.answeredBy : last).toEqual({
-            _tag: "Rules",
-            reason: usedUpSentence(usedUpWords)
-          })
+          expect(O.isSome(last) && Result.isSuccess(last.value) ? last.value.success.answeredBy : last).toEqual(
+            AnsweredBy.cases.Rules.make({ reason: usedUpSentence(usedUpWords) })
+          )
           // The rules still do the work: the same sort, read from the words.
-          expect(last._tag === "Some" && Result.isSuccess(last.value) ? last.value.success.changes : last).toEqual([
+          expect(O.isSome(last) && Result.isSuccess(last.value) ? last.value.success.changes : last).toEqual([
             { kind: "sort", column: "name", direction: "asc" }
           ])
           // The allowance is the organization's, shared: the check that the key works is refused too, in words.
           const check = yield* client.system.checkAi().pipe(as("mem_marcus"), Effect.flip)
-          expect(check._tag === "ModelCallsUsedUp" ? check.reason : check._tag).toBe(
+          expect(S.is(ModelCallsUsedUp)(check) ? check.reason : check).toBe(
             `The day's ${dailyModelCalls} AI calls are used. They come back over the next day.`
           )
           // Another organization has its own allowance.

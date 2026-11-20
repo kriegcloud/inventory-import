@@ -4,6 +4,7 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as S from "effect/Schema"
+import { Forbidden } from "@inventory/kernel/AccessError"
 import { Activity } from "@inventory/kernel/Activity"
 import { CurrentActor, requireRole } from "@inventory/kernel/Actor"
 import { asAgent } from "@inventory/kernel/Agent"
@@ -35,7 +36,8 @@ describe("requireRole", () => {
   it.effect("an agent capped at viewer cannot write for an admin", () =>
     Effect.gen(function* () {
       const refused = yield* attempt("admin", O.some(AgentRun.make({ agent: "Proposer", maxRole: "viewer" })), "editor")
-      expect(refused).toMatchObject({ _tag: "Forbidden", required: "editor" })
+      expect(S.is(Forbidden)(refused)).toBe(true)
+      expect(refused.required).toBe("editor")
       expect(refused.reason).toBe("Proposer acts for you with at most the viewer role. This needs the editor role.")
     })
   )

@@ -7,13 +7,18 @@
  * unsubscribes and subscribes after every draw.
  *
  * Each screen is read from its syntax tree, and a name is judged by where the file binds it. What passes: a name the
- * file binds at its top level or imports; what a hook holds (`useRef(null)`, a member of what `useAtomValue` gave);
- * a member of either; a member, two or more steps down, of a parameter. What is refused: a function written where it
- * is handed over; a call (a function returned from a call, `.bind`); a choice by a condition (a ref switched on and
- * off is an effect on that condition); and a name bound inside a function to a function (typed, generic, `var` and
- * declared ones too), an object, a call that is not a hook's, or taken out of one. A prop handed to a ref
- * (`ref={props.measure}`) is the caller's to keep steady: every attribute of that name, in every screen, is judged
- * the same way.
+ * file binds at its top level or imports and no function sets again; what a hook holds (`useRef(null)`, a member of
+ * what `useAtomValue` gave, through a namespace import too); a member of either; an element of a list that is
+ * itself steady. A hook is a `use…` name imported from react, @effect/atom-react, or a module of hooks (a `hooks` or
+ * `components` folder, a `…Hook` module): a function merely named `use…` is judged by what it returns.
+ *
+ * What is refused: a function written where it is handed over; a call (a function returned from a call, `.bind`, a
+ * `use…` helper that is not a hook); a choice by a condition (a ref switched on and off is an effect on that
+ * condition); a name bound inside a function to a function (typed, generic, `var` and declared ones too), an object,
+ * a call that is not a hook's, or taken out of one; a module `let` a function sets again (it holds what the last draw
+ * gave it); and an element of a list (`rows.map((row) => <li ref={row.measure} />)`) made in the draw. A prop handed
+ * to a ref, at any depth (`ref={props.measure}`, `ref={props.on.measure}`), is the caller's to keep steady: every
+ * attribute of that name, in every screen, is judged the same way, and so is a list a prop hands in.
  *
  * What it does not see: a ref among spread props (`{...first}`); a steady callback on an element whose `key` changes
  * (React makes the element anew, and calls the callback, whenever the key does: an effect on the key); a hook that

@@ -5,8 +5,16 @@ import * as HttpClientRequest from "effect/http/HttpClientRequest"
 import * as HttpClientResponse from "effect/http/HttpClientResponse"
 import * as HttpApiError from "effect/http-api/HttpApiError"
 import * as A from "effect/Array"
+import * as S from "effect/Schema"
 import { describe, expect, it, vi } from "vitest"
 import { installTroubleSentences, sayError } from "@inventory/client/SayError"
+
+// The catalog's model failure, as this package meets it: an error of another package, read by its tag alone. A stand-in
+// with its own constructor, since this package holds no contract.
+class AiUnavailable extends S.TaggedError<AiUnavailable, { readonly brand: unique symbol }>()("AiUnavailable", {
+  kind: S.String,
+  reason: S.String
+}) {}
 
 const request = HttpClientRequest.get("http://localhost:5173/api/v1/activity")
 const answered = (status: number) =>
@@ -30,7 +38,7 @@ const failures: ReadonlyArray<readonly [string, unknown]> = [
   ["an answer that did not decode", answered(418)],
   ["a refused request", HttpApiError.BadRequestProblem.make({ detail: "Request validation failed" })],
   ["a server problem document", HttpApiError.InternalServerErrorProblem.make({})],
-  ["a busy model", { _tag: "AiUnavailable", kind: "busy", reason: "OpenRouter 429: rate limit for anthropic/x" }],
+  ["a busy model", AiUnavailable.make({ kind: "busy", reason: "OpenRouter 429: rate limit for anthropic/x" })],
   ["a crash", new Error("TypeError: Cannot read properties of undefined (reading 'rows') at ReviewGrid.tsx:12")],
   ["nothing at all", undefined]
 ]
@@ -78,9 +86,7 @@ describe("saying a failure", () => {
     } as const
     installTroubleSentences(modelSentences)
     for (const kind of ["noKey", "refused", "busy", "badAnswer", "down"] as const) {
-      expect(sayError({ _tag: "AiUnavailable", kind, reason: "provider said 503 {}" }).sentence).toBe(
-        modelSentences[kind]
-      )
+      expect(sayError(AiUnavailable.make({ kind, reason: "provider said 503 {}" })).sentence).toBe(modelSentences[kind])
     }
   })
 })

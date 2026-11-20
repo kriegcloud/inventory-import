@@ -6,11 +6,13 @@ import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
+import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import * as HttpApiTest from "effect/http-api/HttpApiTest"
 import messy from "../../public/samples/items_messy.csv?raw"
 import { Api } from "../../src/api/v1/Api.ts"
 import { decisionFromFlags } from "@inventory/catalog-contract/Decision"
+import { AcceptsTakenBack } from "@inventory/catalog-contract/ImportRejection"
 import { as, TypedApp } from "./support/app.ts"
 import { stage } from "./support/files.ts"
 import { upload } from "./support/upload.ts"
@@ -67,9 +69,8 @@ layer(TypedApp)("an accept made before its field's column was matched again", (i
             })
             .pipe(marcus)
         )
-        expect([refused._tag, refused._tag === "AcceptsTakenBack" ? refused.accepts : []]).toEqual([
-          "AcceptsTakenBack",
-          [{ rowId: "row-55", field: "unitCost", kind: "accept" }]
+        expect(S.is(AcceptsTakenBack)(refused) ? refused.accepts : refused).toEqual([
+          { rowId: "row-55", field: "unitCost", kind: "accept" }
         ])
         const still = yield* client.imports.get({ params }).pipe(marcus)
         expect([still.status, still.revision]).toEqual(["open", after.revision])

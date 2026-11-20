@@ -73,19 +73,29 @@
       "outputs": []
     },
     // Every ref is a DOM ref or a callback that stays the same across draws (`beep laws ref-callbacks`).
+    // Its inputs are the law's own pathspec: every .tsx git would commit, the vendored kit and the skills left out.
     "//#refs:check": {
-      "inputs": ["apps/**/src/**/*.tsx", "packages/**/src/**/*.tsx", "packages/tooling/tool/cli/src/**"],
+      "inputs": [
+        "**/*.tsx",
+        "!**/node_modules/**",
+        "!packages/ui/src/components/**",
+        "!packages/ui/src/hooks/**",
+        "!.agents/**",
+        "packages/tooling/tool/cli/src/**"
+      ],
       "outputs": []
     },
-    // No `_tag` is compared by hand in the packages with screens (`beep laws tags`).
+    // No `_tag` is told apart or built by hand in the packages with screens and in every test (`beep laws tags`).
     "//#tags:check": {
       "inputs": [
         "apps/*/src/web/**/*.{ts,tsx}",
-        "apps/*/test/web/**/*.{ts,tsx}",
+        "apps/*/test/**/*.{ts,tsx}",
         "packages/*/web/**/*.{ts,tsx}",
         "packages/client/**/*.{ts,tsx}",
         "packages/review/**/*.{ts,tsx}",
         "packages/ui/**/*.{ts,tsx}",
+        "packages/**/test/**/*.{ts,tsx}",
+        "packages/**/vendor.json",
         "packages/tooling/tool/cli/src/**"
       ],
       "outputs": []

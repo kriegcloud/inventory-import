@@ -5,6 +5,10 @@ import * as Exit from "effect/Exit"
 import * as Layer from "effect/Layer"
 import * as Order from "effect/Order"
 import * as R from "effect/Record"
+import * as S from "effect/Schema"
+import { AnsweredBy } from "@inventory/catalog-contract/Answer"
+import { ViewOutcome } from "@inventory/catalog-contract/TableView"
+import { CrossSiteRequest, Forbidden, NotSignedIn } from "@inventory/kernel/AccessError"
 import { signIn } from "@inventory/access-host/SignIn"
 import { testAccountPassword } from "@inventory/access-host/TestAccounts"
 import { D1Binding } from "@beep/d1/D1"
@@ -158,11 +162,13 @@ layer(signInApp(), { timeout: "60 seconds" })("sign-in with Better Auth", (it) =
       yield* priya.signIn("priya@example-works.test")
       const write = yield* priya.send("POST", "/api/v1/imports/uploads", begin("priya.csv"))
       expect(write.status).toBe(403)
-      expect(write.json).toMatchObject({ _tag: "Forbidden", required: "editor" })
+      const writeRefused = yield* S.decodeUnknownEffect(Forbidden)(write.json)
+      expect(writeRefused.required).toBe("editor")
       // The model check spends the key: the same rule as a write.
       const spend = yield* priya.send("POST", "/api/v1/system/ai-check")
       expect(spend.status).toBe(403)
-      expect(spend.json).toMatchObject({ _tag: "Forbidden", required: "editor" })
+      const spendRefused = yield* S.decodeUnknownEffect(Forbidden)(spend.json)
+      expect(spendRefused.required).toBe("editor")
       const role = yield* priya.send("POST", "/api/v1/people/mem_priya/role", { role: "admin" })
       expect(role.status).toBe(403)
 
@@ -276,7 +282,10 @@ layer(signInApp(), { timeout: "60 seconds" })("sign-in with Better Auth", (it) =
       const stranger = browser("10.0.0.10")
       const me = yield* stranger.send("GET", "/api/v1/identity/me", undefined, { "x-acting-as": "mem_dana" })
       expect(me.status).toBe(401)
-      expect(me.json).toEqual({ _tag: "NotSignedIn", reason: "Sign in to continue." })
+      const notSignedIn = yield* S.encodeEffect(S.toCodecJson(NotSignedIn))(
+        NotSignedIn.make({ reason: "Sign in to continue." })
+      )
+      expect(me.json).toEqual(notSignedIn)
       expect((yield* stranger.send("GET", "/api/v1/identity/members")).status).toBe(401)
       expect((yield* stranger.send("POST", "/api/v1/imports/uploads", begin("stranger.csv"))).status).toBe(401)
     })
@@ -296,10 +305,11 @@ layer(signInApp(), { timeout: "60 seconds" })("sign-in with Better Auth", (it) =
         searchable: false
       })
       expect(view.status).toBe(200)
-      expect(view.json).toMatchObject({
-        _tag: "Success",
-        success: { answeredBy: { _tag: "Rules" }, changes: [{ kind: "sort", column: "name", direction: "asc" }] }
-      })
+      const answer = yield* S.decodeUnknownEffect(S.toCodecJson(ViewOutcome))(view.json).pipe(
+        Effect.flatMap(Effect.fromResult)
+      )
+      expect(AnsweredBy.guards.Rules(answer.answeredBy)).toBe(true)
+      expect(answer.changes).toMatchObject([{ kind: "sort", column: "name", direction: "asc" }])
       expect((yield* priya.send("GET", "/api/v1/activity")).json.length).toBe(before)
     })
   )
@@ -315,7 +325,8 @@ layer(signInApp(), { timeout: "60 seconds" })("sign-in with Better Auth", (it) =
         { origin: "https://elsewhere.example", "sec-fetch-site": "cross-site" }
       )
       expect(crossSite.status).toBe(403)
-      expect(crossSite.json._tag).toBe("CrossSiteRequest")
+      // The answer is the typed refusal: it decodes as one, or the test stops here.
+      yield* S.decodeUnknownEffect(CrossSiteRequest)(crossSite.json)
       expect(elsewhere.cookie()).toBe("")
       // Better Auth's own checks, on under test: a callback to another origin is refused...
       const callback = yield* browser("10.0.0.16").send("POST", "/api/auth/sign-in/email", {
@@ -334,7 +345,8 @@ layer(signInApp(), { timeout: "60 seconds" })("sign-in with Better Auth", (it) =
         origin: "https://elsewhere.example",
         "sec-fetch-site": "cross-site"
       })
-      expect([write.status, write.json._tag]).toEqual([403, "CrossSiteRequest"])
+      expect(write.status).toBe(403)
+      yield* S.decodeUnknownEffect(CrossSiteRequest)(write.json)
     })
   )
 

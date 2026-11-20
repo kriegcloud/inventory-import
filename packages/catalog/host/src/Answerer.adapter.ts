@@ -25,12 +25,8 @@ export const modelIsOn = (status: ModelStatus): boolean =>
   ModelStatus.match(status, { on: () => true, off: () => false })
 
 /** Who answered, in the contract's words. */
-export const answeredByModel = (answered: ModelAnswered): AiAnswer<unknown>["answeredBy"] => ({
-  _tag: "Model",
-  provider: "openrouter",
-  model: answered.model,
-  fallback: answered.fallback
-})
+export const answeredByModel = (answered: ModelAnswered): AiAnswer<unknown>["answeredBy"] =>
+  AnsweredBy.cases.Model.make({ provider: "openrouter", model: answered.model, fallback: answered.fallback })
 
 /** A failure as the contract words it: the trouble, its sentence (`modelSentences`), and whether trying again helps. */
 export const aiUnavailableOf = (error: ModelUnavailable): AiUnavailable =>

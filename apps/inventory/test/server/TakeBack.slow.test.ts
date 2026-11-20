@@ -14,6 +14,7 @@ import messy from "../../public/samples/items_messy.csv?raw"
 import { Api } from "../../src/api/v1/Api.ts"
 import { review } from "@inventory/catalog-model/Review"
 import { decisionFromFlags } from "@inventory/catalog-contract/Decision"
+import { ImportEvent } from "@inventory/catalog-contract/Import"
 import { as, TypedApp } from "./support/app.ts"
 import { stage } from "./support/files.ts"
 import { upload } from "./support/upload.ts"
@@ -54,10 +55,8 @@ layer(TypedApp)("a take-back after two confirms", (it) => {
       const back = yield* client.imports
         .takeBack({ params, payload: { confirms: second.takeBack.confirms } })
         .pipe(marcus)
-      const takeBacks = A.filter(back.history, (event) => event._tag === "TakenBack")
-      expect(A.map(takeBacks, (event) => (event._tag === "TakenBack" ? [event.removed, event.kept] : []))).toEqual([
-        [156, 0]
-      ])
+      const takeBacks = A.filter(back.history, ImportEvent.guards.TakenBack)
+      expect(A.map(takeBacks, (event) => [event.removed, event.kept])).toEqual([[156, 0]])
       expect((yield* client.items.list().pipe(marcus)).length).toBe(0)
       // Still listed, so its result stays one click away, with nothing of it left in the system.
       const after = yield* client.imports.past().pipe(marcus)
@@ -128,8 +127,8 @@ layer(TypedApp)("a take-back of an import that replaced a stored item", (it) => 
       const back = yield* client.imports
         .takeBack({ params: { id: second.id }, payload: { confirms: replaced.takeBack.confirms } })
         .pipe(marcus)
-      const event = O.getOrThrow(A.findFirst(back.history, (event) => event._tag === "TakenBack"))
-      expect(event._tag === "TakenBack" ? [event.removed, event.restored, event.kept] : []).toEqual([0, 1, 0])
+      const event = O.getOrThrow(A.findFirst(back.history, ImportEvent.guards.TakenBack))
+      expect([event.removed, event.restored, event.kept]).toEqual([0, 1, 0])
       expect([back.status, O.getOrUndefined(back.result)?.updated, O.getOrUndefined(back.result)?.takenBack]).toEqual([
         "takenBack",
         0,
@@ -187,8 +186,8 @@ layer(TypedApp)("a take-back of an import whose replaced item was edited since",
       const back = yield* client.imports
         .takeBack({ params: { id: second.id }, payload: { confirms: before.takeBack.confirms } })
         .pipe(marcus)
-      const event = O.getOrThrow(A.findFirst(back.history, (event) => event._tag === "TakenBack"))
-      expect(event._tag === "TakenBack" ? [event.removed, event.restored, event.kept] : []).toEqual([0, 0, 1])
+      const event = O.getOrThrow(A.findFirst(back.history, ImportEvent.guards.TakenBack))
+      expect([event.removed, event.restored, event.kept]).toEqual([0, 0, 1])
       expect([O.getOrUndefined(back.result)?.updated, O.getOrUndefined(back.result)?.takenBack]).toEqual([1, 0])
       expect([back.takeBack.keptCount, A.map(back.takeBack.kept, (item) => item.sku)]).toEqual([1, ["SHH-9574"]])
       const stored = yield* client.items.list().pipe(marcus)

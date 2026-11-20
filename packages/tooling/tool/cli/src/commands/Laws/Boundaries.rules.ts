@@ -4,12 +4,16 @@
  * every workspace's `package.json` (`beep.family`, and for a context package `beep.context` and `beep.layer`) and
  * every import specifier under its `src` and `test`, and fails on:
  *
- * - a workspace package imported but not declared in dependencies, devDependencies or peerDependencies;
+ * - a workspace package imported but not declared: from `src`, in dependencies or peerDependencies; from `test`,
+ *   in devDependencies too;
  * - a declared or imported workspace package the importer's row does not allow;
  * - a path into `apps/` from a package;
  * - a third-party package imported but not declared by the importer (or, for what every workspace is run with, by
  *   the root): hoisting would let a package reach any hook or store another one installed, under its hoisted name,
- *   past the lint that refuses them by the names it knows.
+ *   past the lint that refuses them by the names it knows;
+ * - a package imported from `src` that the importer declares only in devDependencies: what it declares for its tests
+ *   is not there for its code (`@tanstack/store`, kept for one test of the review package, once came back into its
+ *   `src` this way and passed).
  *
  * @packageDocumentation
  */
@@ -53,6 +57,11 @@ export const BoundariesFinding = S.TaggedUnion({
     imported: S.String.pipe(S.annotateKey({ description: "The third-party package it imports" })),
     name: S.String.pipe(S.annotateKey({ description: "The workspace that does not declare it" }))
   },
+  TestOnly: {
+    where: S.String.pipe(S.annotateKey({ description: "The file under src, from the root" })),
+    imported: S.String.pipe(S.annotateKey({ description: "The package it imports" })),
+    name: S.String.pipe(S.annotateKey({ description: "The workspace that declares it only in devDependencies" }))
+  },
   ImportedAgainstRow: {
     where: S.String.pipe(S.annotateKey({ description: "The file, from the root" })),
     imported: S.String.pipe(S.annotateKey({ description: "The workspace package its row refuses" }))
@@ -81,6 +90,10 @@ export const boundariesSentence: (finding: BoundariesFinding) => Line = Boundari
   Undeclared: ({ where, imported, name }) => err(`  ${where} imports ${imported}, which ${name} does not declare`),
   UndeclaredThirdParty: ({ where, imported, name }) =>
     err(`  ${where} imports ${imported}, which ${name} does not declare (add it where it is used)`),
+  TestOnly: ({ where, imported, name }) =>
+    err(
+      `  ${where} imports ${imported}, which ${name} declares only for its tests (devDependencies): declare it in dependencies, or keep it in test`
+    ),
   ImportedAgainstRow: ({ where, imported }) => err(`  ${where} imports ${imported}, which its layer may not use`)
 })
 
@@ -181,21 +194,12 @@ export const boundaries = Effect.fn("Boundaries.boundaries")(function* () {
       const name = String(workspace.manifest.name)
       const kind = kindOf(workspace)
       const may = (other: string): boolean => R.get(byName, other).pipe(O.map(kindOf), O.exists(allowed(kind)))
-      const declared = A.filter(
-        R.keys({
-          ...workspace.manifest.dependencies,
-          ...workspace.manifest.devDependencies,
-          ...workspace.manifest.peerDependencies
-        }),
-        (dependency) => R.has(byName, dependency)
-      )
-      // What the workspace declares of the world outside, with what the root declares for every workspace.
-      const thirdParty = R.keys({
-        ...rootDeclared,
-        ...workspace.manifest.dependencies,
-        ...workspace.manifest.devDependencies,
-        ...workspace.manifest.peerDependencies
-      })
+      // What its code may import (dependencies and peerDependencies), and what its tests may import besides
+      // (devDependencies); with what the root declares for every workspace, its code and its tests alike.
+      const forCode = R.keys({ ...workspace.manifest.dependencies, ...workspace.manifest.peerDependencies })
+      const forTests = A.appendAll(forCode, R.keys({ ...workspace.manifest.devDependencies }))
+      const declared = A.filter(forTests, (dependency) => R.has(byName, dependency))
+      const thirdParty = A.appendAll(R.keys(rootDeclared), forTests)
       const fromManifest = A.flatMap(declared, (dependency) =>
         may(dependency)
           ? A.empty<BoundariesFinding>()
@@ -204,11 +208,17 @@ export const boundaries = Effect.fn("Boundaries.boundaries")(function* () {
       const inSrc = yield* sources(repo.join(workspace.dir, "src"))
       const inTest = yield* sources(repo.join(workspace.dir, "test"))
       const fromFiles = yield* Effect.forEach(
-        A.appendAll(inSrc, inTest),
-        (file) =>
+        A.appendAll(
+          A.map(inSrc, (file) => ({ file, code: true })),
+          A.map(inTest, (file) => ({ file, code: false }))
+        ),
+        ({ code, file }) =>
           repo.text(file).pipe(
             Effect.map((text) => {
               const where = repo.relative(repo.root, file)
+              // Declared only for the tests: a test may import it, the code may not.
+              const testOnly = (imported: string): boolean =>
+                code && !A.contains(forCode, imported) && !R.has(rootDeclared, imported)
               return A.flatMap(readImports({ file, source: text }), (specifier) => {
                 if (kind.family !== "app" && Str.startsWith(".")(specifier) && Str.includes("apps/")(specifier)) {
                   return A.of<BoundariesFinding>({ _tag: "IntoApps", where, specifier })
@@ -216,13 +226,18 @@ export const boundaries = Effect.fn("Boundaries.boundaries")(function* () {
                 const imported = packageOf(specifier)
                 if (imported === name) return A.empty<BoundariesFinding>()
                 if (!R.has(byName, imported)) {
-                  return isThirdParty(specifier) && !A.contains(thirdParty, imported)
-                    ? A.of<BoundariesFinding>({ _tag: "UndeclaredThirdParty", where, imported, name })
+                  if (!isThirdParty(specifier)) return A.empty<BoundariesFinding>()
+                  if (!A.contains(thirdParty, imported)) {
+                    return A.of<BoundariesFinding>({ _tag: "UndeclaredThirdParty", where, imported, name })
+                  }
+                  return testOnly(imported)
+                    ? A.of<BoundariesFinding>({ _tag: "TestOnly", where, imported, name })
                     : A.empty<BoundariesFinding>()
                 }
                 if (!A.contains(declared, imported)) {
                   return A.of<BoundariesFinding>({ _tag: "Undeclared", where, imported, name })
                 }
+                if (testOnly(imported)) return A.of<BoundariesFinding>({ _tag: "TestOnly", where, imported, name })
                 return may(imported)
                   ? A.empty<BoundariesFinding>()
                   : A.of<BoundariesFinding>({ _tag: "ImportedAgainstRow", where, imported })

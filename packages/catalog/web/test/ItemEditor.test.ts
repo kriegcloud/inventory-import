@@ -9,9 +9,12 @@ import * as A from "effect/Array"
 import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
+import * as S from "effect/Schema"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
 import { vi } from "vitest"
-import type { ItemEdit, StoredItem } from "@inventory/catalog-contract/Item"
+import { type ItemEdit, StoredItem } from "@inventory/catalog-contract/Item"
+import { ItemChanged } from "@inventory/catalog-contract/Catalog"
+import { Forbidden } from "@inventory/kernel/AccessError"
 import type { ItemForm } from "@inventory/catalog-model/ItemEdit"
 import { editItem, itemEditor, saveOut } from "../src/ItemEditor.screen.tsx"
 import { itemsPage } from "../src/ItemsPage.screen.tsx"
@@ -52,15 +55,36 @@ vi.mock("sonner", () => ({
   })
 }))
 
-const itemId = "item_bolt" as StoredItem["id"]
-// Only what the save and the editor read of an item.
-const item = { id: itemId, sku: "HB-M6-16", name: "Hex bolt M6", revision: 3 } as unknown as StoredItem
+// Hex bolt M6 as the API sends it, read through its own schema: a refusal that carries the item (`ItemChanged`) is
+// built with its constructor, which checks the item it is given.
+// @effect-diagnostics-next-line schemaSync:off
+const item = S.decodeSync(StoredItem)({
+  id: "5b0f8a3e-2c41-4c7e-9a55-0f3c1d2e4b6a",
+  sku: "HXB-0616",
+  name: "Hex bolt M6",
+  description: null,
+  category: "components",
+  uom: "BX",
+  unitCost: "0.19",
+  quantityOnHand: 500,
+  reorderPoint: null,
+  stocking: { kind: "active" },
+  lotTracked: false,
+  tags: [],
+  firstReceivedOn: null,
+  dimensions: null,
+  vendors: [],
+  createdAt: "2026-11-19T05:06:15.445Z",
+  createdBy: "Dana Whitfield",
+  revision: 3
+})
+const itemId = item.id
 const typed = { name: "Hex bolt M6 × 16", unitCost: "0.21" } as unknown as ItemForm
 const edit = { name: "Hex bolt M6 × 16", revision: 3 } as unknown as ItemEdit
 const save = { base: item, edit, form: typed }
 
 /** What the server refuses a save with: a role taken away, or someone else's save in between. */
-type Refusal = { readonly _tag: "Forbidden" } | { readonly _tag: "ItemChanged"; readonly item: StoredItem }
+type Refusal = Forbidden | ItemChanged
 
 /** A server whose edit answers when the test says, with what the test says. */
 const world = () => {
@@ -118,7 +142,10 @@ describe("a save of an item whose row has left the screen", () => {
       row()
       yield* afterIdle
       // The save is refused after the row has gone: the toast still says so, and offers "Edit again".
-      yield* Deferred.fail(t.out(), { _tag: "Forbidden" })
+      yield* Deferred.fail(
+        t.out(),
+        Forbidden.make({ reason: "Your role is viewer, and saving an item needs editor.", required: "editor" })
+      )
       yield* Effect.sleep("40 millis")
       const said = page.toasts[page.toasts.length - 1]
       expect(said?.description).toContain("Hex bolt M6 was not saved.")
@@ -127,7 +154,7 @@ describe("a save of an item whose row has left the screen", () => {
       page.went.length = 0
       said?.again?.()
       // No row of the item is on screen: the person is taken to it, the Items table searched for its SKU.
-      expect(page.went).toEqual(["/items?search=HB-M6-16"])
+      expect(page.went).toEqual(["/items?search=HXB-0616"])
       // And the editor is open on what they typed, for as long as it takes the row to be drawn.
       yield* afterIdle
       const editor = t.registry.get(itemEditor(itemId))
@@ -144,7 +171,10 @@ describe("a save of an item whose row has left the screen", () => {
       t.registry.set(editItem(itemId), save)
       yield* Effect.sleep("10 millis")
       const theirs = { ...item, name: "Hex bolt", revision: 4 }
-      yield* Deferred.fail(t.out(), { _tag: "ItemChanged", item: theirs })
+      yield* Deferred.fail(
+        t.out(),
+        ItemChanged.make({ reason: "Someone changed this item since you opened it.", item: theirs })
+      )
       yield* Effect.sleep("40 millis")
       const said = page.toasts[page.toasts.length - 1]
       expect(said?.title).toBe("Changed by someone else")
@@ -186,7 +216,12 @@ describe("an item edited again after its save has answered, before the table is 
                         server.stored = { ...server.stored, ...values, revision: server.stored.revision + 1 }
                         return server.stored
                       })
-                    : Effect.fail({ _tag: "ItemChanged", item: server.stored })
+                    : Effect.fail(
+                        ItemChanged.make({
+                          reason: "Someone changed this item since you opened it.",
+                          item: server.stored
+                        })
+                      )
                 )
               ),
             page: () => {

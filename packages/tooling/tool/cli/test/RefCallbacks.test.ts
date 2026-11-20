@@ -138,7 +138,83 @@ export function Page() {
 }
 `
 
+// The forms that once passed for steady, one each: a parameter's member two steps down (judged as the caller's prop,
+// which its caller makes in the draw), an element of a list of functions made in the draw, a row object's function
+// made in the draw, a module \`let\` the component sets again, a helper named as a hook that is not one, and a
+// subscription through a namespace import.
+const hidden = `import * as AtomReact from "@effect/atom-react"
+import { steps } from "./atoms"
+let current = (node: HTMLElement | null) => node?.focus()
+function useNodeRef() {
+  return (node: HTMLElement | null) => node?.focus()
+}
+export function Nested(props: { on: { measure: (node: HTMLElement | null) => void } }) {
+  return <p ref={props.on.measure} />
+}
+export function List(props: { items: ReadonlyArray<string> }) {
+  const fns = props.items.map(() => (node: HTMLElement | null) => node?.focus())
+  const rows = props.items.map((item) => ({ item, measure: (node: HTMLElement | null) => node?.focus() }))
+  current = (node: HTMLElement | null) => node?.scrollIntoView()
+  AtomReact.useAtomSubscribe(steps, (step) => step)
+  return (
+    <section>
+      <Nested on={{ measure: (node) => node?.focus() }} />
+      <ul>{fns.map((fn) => <li ref={fn} />)}</ul>
+      <ul>{rows.map((row) => <li ref={row.measure} />)}</ul>
+      <p ref={current} />
+      <p ref={useNodeRef()} />
+    </section>
+  )
+}
+`
+
+// What still passes in those shapes: a list a hook holds, a module \`let\` nothing sets again, a hook through a
+// namespace import, and a steady prop handed down two steps.
+const heldLists = `import * as AtomReact from "@effect/atom-react"
+import { rowsAtom, steps } from "./atoms"
+let kept = (node: HTMLElement | null) => node?.focus()
+const handlers = { measure: kept }
+function Nested(props: { on: { measure: (node: HTMLElement | null) => void } }) {
+  return <p ref={props.on.measure} />
+}
+export function List() {
+  const rows = AtomReact.useAtomValue(rowsAtom)
+  AtomReact.useAtomSubscribe(steps, kept)
+  return (
+    <section>
+      <Nested on={handlers} />
+      <ul>{rows.map((row) => <li ref={row.measure} />)}</ul>
+      <p ref={kept} />
+    </section>
+  )
+}
+`
+
 describe("laws ref-callbacks", () => {
+  it.effect("refuses each form that once passed: deep props, mapped lists, a module let set again, a false hook", () =>
+    Effect.gen(function* () {
+      const report = yield* inTree({ "src/List.tsx": hidden }, inRepository)
+      expect(report.failed).toBe(true)
+      expect(refusals(report)).toEqual([
+        "err: src/List.tsx:14  useAtomSubscribe: a function",
+        "err: src/List.tsx:18  ref: fn is",
+        "err: src/List.tsx:19  ref: row is",
+        "err: src/List.tsx:20  ref: current is",
+        "err: src/List.tsx:21  ref: useNodeRef is",
+        "err: src/List.tsx:17  on is handed"
+      ])
+    })
+  )
+
+  it.effect("passes the same shapes when the list, the variable and the prop are steady", () =>
+    Effect.gen(function* () {
+      const report = yield* inTree({ "src/List.tsx": heldLists }, inRepository)
+      expect(printed(report)).toEqual([
+        "out: refs:check OK  every ref is a DOM ref or a callback that stays the same across draws"
+      ])
+    })
+  )
+
   it.effect("passes a DOM ref, a module-level callback, what a hook holds, and a member of each", () =>
     Effect.gen(function* () {
       const report = yield* inTree({ "src/List.tsx": steady }, inRepository)

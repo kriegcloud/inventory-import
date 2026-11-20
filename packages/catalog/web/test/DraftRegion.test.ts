@@ -6,6 +6,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as R from "effect/Record"
+import * as HttpApiError from "effect/http-api/HttpApiError"
 import { vi } from "vitest"
 import { act, saved } from "@inventory/review/ReviewDraft"
 import { ReviewRow } from "@inventory/review/ReviewTypes"
@@ -56,7 +57,7 @@ const world = (id: ImportId, network: { down: boolean } = { down: false }) => {
           const { madeOn: _madeOn, ...delta } = request.payload
           saves.push(delta)
           // The server's own failure, as the API says it: the request was fine, so it may pass when sent again.
-          if (network.down) return Effect.fail({ _tag: "InternalServerErrorProblem" } as const)
+          if (network.down) return Effect.fail(HttpApiError.InternalServerErrorProblem.make({}))
           revision.now += 1
           return Effect.succeed({ revision: revision.now, changed: true, notApplied: [] })
         }

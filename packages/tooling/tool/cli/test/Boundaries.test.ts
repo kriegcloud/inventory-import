@@ -87,6 +87,42 @@ describe("laws boundaries", () => {
     })
   )
 
+  it.effect("refuses in src what a workspace declares only for its tests, and lets its tests import it", () =>
+    Effect.gen(function* () {
+      const report = yield* inTree(
+        {
+          ...base,
+          "package.json": json({
+            name: "root",
+            workspaces: ["packages/*", "apps/*"],
+            devDependencies: { vitest: "5.1.0" }
+          }),
+          "packages/review/package.json": json({
+            name: "@x/review",
+            beep: { family: "web-kit" },
+            dependencies: { effect: "4.1.4", "@x/kernel": "workspace:*" },
+            peerDependencies: { react: "19.0.0" },
+            devDependencies: { "@tanstack/store": "0.11.2", "@x/ui": "workspace:*" }
+          }),
+          // The code: a dependency, a peer, the root's own tool, and two packages declared only for the tests.
+          "packages/review/src/Region.ts":
+            'import * as O from "effect/Option"\nimport { useRef } from "react"\nimport { it } from "vitest"\n' +
+            'import { createAtom } from "@tanstack/store"\nimport "@x/kernel"\nexport { O, useRef, it, createAtom }\n',
+          "packages/review/src/Grid.ts": 'export const late = () => import("@x/ui/button")\n',
+          // The test may import what is declared for it.
+          "packages/review/test/Region.test.ts": 'import { createAtom } from "@tanstack/store"\nexport { createAtom }\n'
+        },
+        Effect.map(boundaries(), render(boundariesSentence))
+      )
+      expect(printed(report)).toEqual([
+        "err: check-boundaries FAIL",
+        "err:   @x/review declares @x/ui, which its layer may not use",
+        "err:   packages/review/src/Grid.ts imports @x/ui, which @x/review declares only for its tests (devDependencies): declare it in dependencies, or keep it in test",
+        "err:   packages/review/src/Region.ts imports @tanstack/store, which @x/review declares only for its tests (devDependencies): declare it in dependencies, or keep it in test"
+      ])
+    })
+  )
+
   it.effect("lets nothing depend on the tooling package, not even an app", () =>
     Effect.gen(function* () {
       const report = yield* inTree(

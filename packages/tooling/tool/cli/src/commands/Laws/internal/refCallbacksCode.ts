@@ -27,10 +27,29 @@ const isFunction = (node: Node): boolean => typeIs(node, ...functions)
 
 /** How a file binds a name. */
 type Binding =
-  /** At the file's top level, or imported: made once. */
-  | { readonly kind: "module" }
+  /**
+   * At the file's top level, or imported: made once. `source` is the module an import names, `fn` the function a
+   * top-level declaration is, and `reassigned` says a function sets the name again: a `let` that holds what the last
+   * draw gave it is made on every draw all the same.
+   */
+  | {
+      readonly kind: "module"
+      readonly source: O.Option<string>
+      readonly fn: O.Option<Node>
+      readonly reassigned: boolean
+    }
   /** A parameter of a function (a component's props), or a name taken out of one in the parameter list. */
   | { readonly kind: "param"; readonly prop: O.Option<string> }
+  /**
+   * The first parameter of a function handed to a list's `map`, `forEach`, `filter` or their kin: one element of
+   * `list`, which is read in `listScopes`, the scopes the call is written in. `prop` is the key it is taken out by.
+   */
+  | {
+      readonly kind: "element"
+      readonly list: Node
+      readonly listScopes: ReadonlyArray<Scope>
+      readonly prop: O.Option<string>
+    }
   /** A function declared inside another function: made again each time that one runs. */
   | { readonly kind: "inner-function" }
   /** A `const`, `let` or `var` inside a function: `init` is what it is given, `prop` the key when it is taken out of it. */
@@ -62,11 +81,11 @@ const namesIn = (pattern: Node): ReadonlyArray<{ readonly name: string; readonly
   return O.match(child(pattern, "parameter"), { onNone: () => [], onSome: namesIn })
 }
 
-/** Every declaration a function's body holds, not looking inside the functions written in it. */
-const declarationsIn = (body: Node): ReadonlyArray<Node> => {
+/** Every node of a function's body, not looking inside the functions written in it, that `keep` holds. */
+const ownNodes = (body: Node, keep: (node: Node) => boolean): ReadonlyArray<Node> => {
   const found: Array<Node> = []
   const visit = (node: Node): void => {
-    if (typeIs(node, "VariableDeclaration", "FunctionDeclaration")) found.push(node)
+    if (keep(node)) found.push(node)
     if (isFunction(node)) return
     for (const next of children(node)) visit(next)
   }
@@ -74,13 +93,30 @@ const declarationsIn = (body: Node): ReadonlyArray<Node> => {
   return found
 }
 
+/** Every declaration a function's body holds, not looking inside the functions written in it. */
+const declarationsIn = (body: Node): ReadonlyArray<Node> =>
+  ownNodes(body, (node) => typeIs(node, "VariableDeclaration", "FunctionDeclaration"))
+
 const bind = (entries: ReadonlyArray<readonly [string, Binding]>): Scope => R.fromEntries(entries)
 
-/** What one function binds: its parameters, and what its body declares. */
-const scopeOf = (fn: Node): Scope =>
+/** A list a function is handed to as the callback of its `map` (or kin), and the scopes that call is written in. */
+interface ElementOf {
+  readonly list: Node
+  readonly listScopes: ReadonlyArray<Scope>
+}
+
+/** What one function binds: its parameters (the first an element of the list it maps over), and what its body declares. */
+const scopeOf = (fn: Node, element: O.Option<ElementOf> = O.none()): Scope =>
   bind([
-    ...A.flatMap(nodes(fn["params"]), (param) =>
-      A.map(namesIn(param), (found) => [found.name, { kind: "param", prop: found.prop }] as const)
+    ...A.flatMap(nodes(fn["params"]), (param, index) =>
+      A.map(namesIn(param), (found): readonly [string, Binding] =>
+        index === 0 && O.isSome(element)
+          ? [
+              found.name,
+              { kind: "element", list: element.value.list, listScopes: element.value.listScopes, prop: found.prop }
+            ]
+          : [found.name, { kind: "param", prop: found.prop }]
+      )
     ),
     ...O.match(child(fn, "body"), {
       onNone: () => [],
@@ -131,15 +167,55 @@ const memberOf = (node: Node): O.Option<{ readonly root: Node; readonly path: Re
   })
 }
 
-/** True for a call of a hook (`useRef(null)`, `useAtomValue(scope)`, `React.useRef()`): what it holds, it holds across draws. */
-const isHookCall = (node: Node): boolean =>
+/** What a scope chain says of a name, with the depth of the scope that binds it (0 is the file's top level). */
+const lookUpAt = (
+  scopes: ReadonlyArray<Scope>,
+  name: string
+): O.Option<{ readonly binding: Binding; readonly at: number }> =>
+  O.flatMap(
+    A.findLastIndex(scopes, (scope) => R.has(scope, name)),
+    (at) =>
+      O.flatMap(O.fromUndefinedOr(scopes[at]), (scope) => O.map(R.get(scope, name), (binding) => ({ binding, at })))
+  )
+
+const lookUp = (scopes: ReadonlyArray<Scope>, name: string): O.Option<Binding> =>
+  O.map(lookUpAt(scopes, name), (found) => found.binding)
+
+/** The name a call is made by: `useRef` in `useRef(null)` and in `React.useRef(null)`. */
+const calleeName = (callee: Node): string =>
+  callee.type === "MemberExpression" ? O.getOrElse(O.map(child(callee, "property"), nameOf), () => "") : nameOf(callee)
+
+const namedAsHook = (name: string): boolean => /^use[A-Z0-9]/.test(name)
+
+/**
+ * The modules whose `use…` exports are hooks: React's, the atoms' bindings, and a module in a `hooks` or `components`
+ * folder or named `…Hook` (the vendored kit's hooks, `SavedProgressHook`). A `use…` name from anywhere else is only a
+ * name: what it gives is judged as any other call's answer.
+ */
+const isHookModule = (source: string): boolean =>
+  A.contains(["react", "react-dom", "@effect/atom-react"], source) ||
+  /(^|\/)(hooks|components)\//.test(source) ||
+  Str.endsWith("Hook")(source)
+
+/**
+ * True for a call of a hook (`useRef(null)`, `useAtomValue(scope)`, `React.useRef()`, `AtomReact.useAtomValue(x)`): a
+ * `use…` name imported, by name or through a namespace, from a module of hooks. What it holds, it holds across draws.
+ */
+const isHookCall = (node: Node, scopes: ReadonlyArray<Scope>): boolean =>
   node.type === "CallExpression" &&
-  O.exists(child(node, "callee"), (callee) => {
-    const called =
-      callee.type === "MemberExpression"
-        ? O.getOrElse(O.map(child(callee, "property"), nameOf), () => "")
-        : nameOf(callee)
-    return /^use[A-Z0-9]/.test(called)
+  O.exists(child(node, "callee"), (called) => {
+    const callee = unwrapped(called)
+    if (!namedAsHook(calleeName(callee))) return false
+    const root = callee.type === "MemberExpression" ? O.map(memberOf(callee), (found) => found.root) : O.some(callee)
+    return O.exists(
+      root,
+      (name) =>
+        name.type === "Identifier" &&
+        O.exists(
+          lookUp(scopes, nameOf(name)),
+          (binding) => binding.kind === "module" && O.exists(binding.source, isHookModule)
+        )
+    )
   })
 
 /** What a value handed to a ref (or to a subscription) is: steady, a prop the caller decides, or refused with why. */
@@ -151,8 +227,37 @@ type Verdict =
 const steady: Verdict = { kind: "steady" }
 const refused = (why: string): Verdict => ({ kind: "refused", why })
 
-const lookUp = (scopes: ReadonlyArray<Scope>, name: string): O.Option<Binding> =>
-  A.findFirst(A.reverse(scopes), (scope) => R.has(scope, name)).pipe(O.flatMap((scope) => R.get(scope, name)))
+/** The list methods whose callback is given one element at a time: `rows.map(fn)` and `A.map(rows, fn)`. */
+const iterators = [
+  "map",
+  "flatMap",
+  "forEach",
+  "filter",
+  "filterMap",
+  "find",
+  "findFirst",
+  "findLast",
+  "findIndex",
+  "findLastIndex",
+  "some",
+  "every"
+]
+
+/** The callback a call hands each element of a list to, and that list: `rows.map(fn)` and `A.map(rows, fn)`. */
+const elementCallback = (call: Node): O.Option<{ readonly fn: Node; readonly list: Node }> => {
+  if (call.type !== "CallExpression") return O.none()
+  return O.flatMap(child(call, "callee"), (called) => {
+    const callee = unwrapped(called)
+    if (callee.type !== "MemberExpression" || !A.contains(iterators, calleeName(callee))) return O.none()
+    const [first, second] = nodes(call["arguments"])
+    if (first !== undefined && isFunction(first)) {
+      return O.map(child(callee, "object"), (list) => ({ fn: first, list }))
+    }
+    return first !== undefined && second !== undefined && isFunction(second)
+      ? O.some({ fn: second, list: first })
+      : O.none()
+  })
+}
 
 /** Judges a value in the scopes it is written in, innermost last. */
 const judge = (value: Node, scopes: ReadonlyArray<Scope>, depth = 0): Verdict => {
@@ -163,34 +268,41 @@ const judge = (value: Node, scopes: ReadonlyArray<Scope>, depth = 0): Verdict =>
   if (typeIs(node, "ConditionalExpression", "LogicalExpression")) {
     return refused("a ref switched on and off by a condition is an effect on that condition under another name")
   }
-  if (node.type === "CallExpression") {
-    return isHookCall(node)
-      ? steady
-      : refused("a call makes its answer again on every draw (a function returned from a call, `.bind`)")
-  }
+  if (node.type === "CallExpression") return judgeCall(node, scopes, depth)
   if (node.type === "Literal" || (node.type === "Identifier" && nameOf(node) === "undefined")) return steady
   if (node.type === "ThisExpression") return steady
   const named = (name: string, path: ReadonlyArray<string>): Verdict =>
-    O.match(lookUp(scopes, name), {
+    O.match(lookUpAt(scopes, name), {
       // Not bound in the file: a global.
       onNone: () => steady,
-      onSome: (binding): Verdict => {
-        if (binding.kind === "module") return steady
+      onSome: ({ at, binding }): Verdict => {
+        if (binding.kind === "module") {
+          return binding.reassigned
+            ? refused(`${name} is a module variable a function sets again: it holds what the last draw gave it`)
+            : steady
+        }
         if (binding.kind === "inner-function") {
           return refused(`${name} is a function declared inside the component: made again on every draw`)
         }
         if (binding.kind === "param") {
-          // What a caller hands down is the caller's to keep steady: every place that hands it is judged too.
+          // What a caller hands down is the caller's to keep steady, at any depth: every place that hands it is judged.
           const prop = O.getOrElse(binding.prop, () => path[0] ?? "")
-          return O.isSome(binding.prop) || path.length === 1 ? { kind: "prop", name: prop } : steady
+          return O.isSome(binding.prop) || A.isReadonlyArrayNonEmpty(path) ? { kind: "prop", name: prop } : steady
+        }
+        if (depth > 8) return steady
+        if (binding.kind === "element") {
+          // One element of a list is as steady as the list: a list made in the draw makes what it holds in the draw.
+          const from = judge(binding.list, binding.listScopes, depth + 1)
+          return from.kind === "refused" ? refused(`${name} is an element of a list: ${from.why}`) : from
         }
         if (O.isNone(binding.init)) return refused(`${name} is declared inside the component with no value`)
         const init = unwrapped(binding.init.value)
-        if (isHookCall(init)) return steady
-        if (depth > 8) return steady
+        // What it is given is read where it is declared.
+        const where = A.take(scopes, at + 1)
+        if (isHookCall(init, where)) return steady
         // Another name for something else (`const actions = props.actions`, `const { attach } = region`).
         if (typeIs(init, "Identifier", "MemberExpression")) {
-          const from = judge(init, scopes, depth + 1)
+          const from = judge(init, where, depth + 1)
           // Taken out of the props: the prop's own name is the one a caller writes.
           return from.kind === "prop" && O.isSome(binding.prop) && init.type === "Identifier"
             ? { kind: "prop", name: binding.prop.value }
@@ -201,6 +313,10 @@ const judge = (value: Node, scopes: ReadonlyArray<Scope>, depth = 0): Verdict =>
         }
         if (init.type === "ObjectExpression") {
           return refused(`${name} is an object made inside the component: what it holds is new on every draw`)
+        }
+        if (init.type === "CallExpression" && isLocalHelperCall(init, where)) {
+          const from = judgeCall(init, where, depth + 1)
+          return from.kind === "refused" ? refused(`${name} is given ${from.why}`) : from
         }
         return refused(`${name} is made inside the component from a call or an expression, again on every draw`)
       }
@@ -213,8 +329,126 @@ const judge = (value: Node, scopes: ReadonlyArray<Scope>, depth = 0): Verdict =>
         ? named(nameOf(root), path)
         : root.type === "ThisExpression"
           ? steady
-          : judge(root, scopes)
+          : judge(root, scopes, depth + 1)
   })
+}
+
+/** The function this file declares at its top level that a call calls by name, if it does. */
+const localFunction = (call: Node, scopes: ReadonlyArray<Scope>): O.Option<Node> =>
+  O.flatMap(child(call, "callee"), (called) => {
+    const callee = unwrapped(called)
+    if (callee.type !== "Identifier") return O.none()
+    return O.flatMap(lookUp(scopes, nameOf(callee)), (binding) => (binding.kind === "module" ? binding.fn : O.none()))
+  })
+
+/** True for a call, by a `use…` name, of a function this file declares: what it returns is judged where it is written. */
+const isLocalHelperCall = (call: Node, scopes: ReadonlyArray<Scope>): boolean =>
+  O.exists(child(call, "callee"), (callee) => namedAsHook(calleeName(unwrapped(callee)))) &&
+  O.isSome(localFunction(call, scopes))
+
+/**
+ * Judges a call's answer. A hook's holds across draws. Anything else answers anew on every draw, a function named
+ * `use…` that is not a hook among them: one this file declares is judged by what it returns.
+ */
+const judgeCall = (call: Node, scopes: ReadonlyArray<Scope>, depth: number): Verdict => {
+  if (isHookCall(call, scopes)) return steady
+  const name = O.getOrElse(
+    O.map(child(call, "callee"), (callee) => calleeName(unwrapped(callee))),
+    () => ""
+  )
+  if (!namedAsHook(name)) {
+    return refused("a call makes its answer again on every draw (a function returned from a call, `.bind`)")
+  }
+  return O.match(localFunction(call, scopes), {
+    onNone: () =>
+      refused(
+        `${name} is named as a hook but is not one from react or @effect/atom-react: its answer is new on every draw`
+      ),
+    onSome: (fn) => {
+      const from = depth > 8 ? steady : judgeReturns(fn, scopes, depth + 1)
+      return from.kind === "refused" ? refused(`${name} is not a hook, and what it returns: ${from.why}`) : from
+    }
+  })
+}
+
+/** Judges what a function this file declares returns, in its own scope over the file's top level. */
+const judgeReturns = (fn: Node, scopes: ReadonlyArray<Scope>, depth: number): Verdict => {
+  const own = A.append(A.take(scopes, 1), scopeOf(fn))
+  const answers = O.match(child(fn, "body"), {
+    onNone: () => [],
+    onSome: (body) =>
+      body.type === "BlockStatement"
+        ? A.flatMap(
+            ownNodes(body, (node) => node.type === "ReturnStatement"),
+            (returned) => O.toArray(child(returned, "argument"))
+          )
+        : [body]
+  })
+  const verdicts = A.map(answers, (answer) => judge(answer, own, depth))
+  const first = O.getOrElse(
+    A.findFirst(verdicts, (verdict) => verdict.kind !== "steady"),
+    () => steady
+  )
+  return first.kind === "prop" ? refused("it hands back what it is given") : first
+}
+
+/** The names the file's top level binds, each with the module it is imported from or the function it declares. */
+const topLevel = (program: Node, reassigned: ReadonlyArray<string>): Scope =>
+  bind(
+    A.flatMap(nodes(program["body"]), (statement): ReadonlyArray<readonly [string, Binding]> => {
+      const declared = O.getOrElse(child(statement, "declaration"), () => statement)
+      if (declared.type === "ImportDeclaration") {
+        const source = O.flatMap(child(declared, "source"), (literal) => O.liftPredicate(literal["value"], P.isString))
+        return A.map(nodes(declared["specifiers"]), (specifier) => [
+          O.getOrElse(O.map(child(specifier, "local"), nameOf), () => ""),
+          { kind: "module", source, fn: O.none(), reassigned: false } as const
+        ])
+      }
+      if (declared.type === "VariableDeclaration") {
+        const constant = declared["kind"] === "const"
+        return A.flatMap(nodes(declared["declarations"]), (declarator) =>
+          O.match(child(declarator, "id"), {
+            onNone: () => [],
+            onSome: (id) =>
+              A.map(namesIn(id), (found): readonly [string, Binding] => [
+                found.name,
+                {
+                  kind: "module",
+                  source: O.none(),
+                  fn: O.filter(O.map(child(declarator, "init"), unwrapped), isFunction),
+                  reassigned: !constant && A.contains(reassigned, found.name)
+                }
+              ])
+          })
+        )
+      }
+      return O.match(child(declared, "id"), {
+        onNone: () => [],
+        onSome: (id) => [
+          [
+            nameOf(id),
+            { kind: "module", source: O.none(), fn: O.liftPredicate(declared, isFunction), reassigned: false }
+          ] as const
+        ]
+      })
+    })
+  )
+
+/** The names of the file's top level that a function assigns to (`current = next`, `count++`). */
+const reassignedInFunctions = (program: Node, top: Scope): ReadonlyArray<string> => {
+  const found: Array<string> = []
+  const visit = (node: Node, scopes: ReadonlyArray<Scope>): void => {
+    const here = isFunction(node) ? A.append(scopes, scopeOf(node)) : scopes
+    if (here.length > 1 && typeIs(node, "AssignmentExpression", "UpdateExpression")) {
+      const target = child(node, node.type === "AssignmentExpression" ? "left" : "argument")
+      for (const { name } of O.match(target, { onNone: () => [], onSome: (left) => namesIn(unwrapped(left)) })) {
+        if (O.exists(lookUpAt(here, name), (bound) => bound.at === 0)) found.push(name)
+      }
+    }
+    for (const next of children(node)) visit(next, here)
+  }
+  visit(program, [top])
+  return found
 }
 
 /** One place a screen hands a value over: where, what it is handed as, and the verdict. */
@@ -247,33 +481,11 @@ export const readScreen = (input: { readonly file: string; readonly source: stri
     A.append(offsets, (offsets[offsets.length - 1] ?? 0) + line.length + 1)
   )
   const lineAt = (offset: number): number => A.filter(starts, (start) => start <= offset).length
-  const top = bind([
-    ...A.flatMap(nodes(program["body"]), (statement): ReadonlyArray<readonly [string, Binding]> => {
-      const declared = O.getOrElse(child(statement, "declaration"), () => statement)
-      if (declared.type === "ImportDeclaration") {
-        return A.map(nodes(declared["specifiers"]), (specifier) => [
-          O.getOrElse(O.map(child(specifier, "local"), nameOf), () => ""),
-          { kind: "module" } as const
-        ])
-      }
-      if (declared.type === "VariableDeclaration") {
-        return A.flatMap(nodes(declared["declarations"]), (declarator) =>
-          O.match(child(declarator, "id"), {
-            onNone: () => [],
-            onSome: (id) => A.map(namesIn(id), (found) => [found.name, { kind: "module" }] as const)
-          })
-        )
-      }
-      return O.match(child(declared, "id"), {
-        onNone: () => [],
-        onSome: (id) => [[nameOf(id), { kind: "module" }] as const]
-      })
-    })
-  ])
+  const top = topLevel(program, reassignedInFunctions(program, topLevel(program, [])))
   const refs: Array<Handed> = []
   const attributes: Array<Handed> = []
-  const walk = (node: Node, scopes: ReadonlyArray<Scope>): void => {
-    const here = isFunction(node) ? A.append(scopes, scopeOf(node)) : scopes
+  const walk = (node: Node, scopes: ReadonlyArray<Scope>, element: O.Option<ElementOf>): void => {
+    const here = isFunction(node) ? A.append(scopes, scopeOf(node, element)) : scopes
     if (node.type === "JSXAttribute") {
       const as = O.getOrElse(O.map(child(node, "name"), nameOf), () => "")
       const held = O.flatMap(child(node, "value"), (value) =>
@@ -285,17 +497,25 @@ export const readScreen = (input: { readonly file: string; readonly source: stri
         else attributes.push(handed)
       }
     }
+    // `useAtomSubscribe(atom, fn)` and `AtomReact.useAtomSubscribe(atom, fn)` alike.
     if (
       node.type === "CallExpression" &&
-      O.exists(child(node, "callee"), (callee) => nameOf(callee) === "useAtomSubscribe")
+      O.exists(child(node, "callee"), (callee) => calleeName(unwrapped(callee)) === "useAtomSubscribe")
     ) {
       const heard = nodes(node["arguments"])[1]
       if (heard !== undefined) {
         refs.push({ line: lineAt(heard.start), as: "useAtomSubscribe", verdict: judge(heard, here) })
       }
     }
-    for (const next of children(node)) walk(next, here)
+    const callback = elementCallback(node)
+    for (const next of children(node)) {
+      walk(
+        next,
+        here,
+        O.flatMap(callback, ({ fn, list }) => (fn === next ? O.some({ list, listScopes: here }) : O.none()))
+      )
+    }
   }
-  walk(program, [top])
+  walk(program, [top], O.none())
   return { refs, attributes }
 }

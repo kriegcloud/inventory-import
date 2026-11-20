@@ -40,6 +40,12 @@
               "@tanstack/react-query/*"
             ],
             "message": "Effects, state and a query cache by another package's name: use an atom, a ref callback, or the component's own controlled props (goals/atoms)."
+          },
+          {
+            // TanStack's own store, and its React binding: state outside atoms by another package's name. The review
+            // package's test drives the table's store as the table does, and says so on its one import.
+            "group": ["@tanstack/store", "@tanstack/store/*", "@tanstack/react-store", "@tanstack/react-store/*"],
+            "message": "TanStack's store is state outside atoms: hold the value in an atom (Atom.make), and read it with useAtomValue (goals/atoms)."
           }
         ],
         "paths": [

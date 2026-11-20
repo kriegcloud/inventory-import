@@ -10,7 +10,6 @@ import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Fiber from "effect/Fiber"
-import * as HashSet from "effect/HashSet"
 import * as O from "effect/Option"
 import * as Atom from "effect/reactivity/Atom"
 import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
@@ -25,6 +24,8 @@ import { toast } from "sonner"
 import type { ImportView } from "@inventory/catalog-contract/Import"
 import { FileProblem } from "@inventory/catalog-contract/FileProblem"
 import { type ImportId, UploadKey } from "@inventory/catalog-contract/Ids"
+import { UploadNotFound } from "@inventory/catalog-contract/ImportRejection"
+import { Forbidden, NotSignedIn } from "@inventory/kernel/AccessError"
 import { matchedColumn } from "@inventory/catalog-contract/Mapping"
 import { requiredFields, type StagedHead, type StagedRow, type StagedTable } from "@inventory/catalog-contract/Staged"
 import type { SheetChoice, SheetSummary } from "@inventory/catalog-model/Spreadsheet"
@@ -61,16 +62,26 @@ const staged = <A, E>(answer: Effect.Effect<Result.Result<A, FileProblem>, E>): 
 const inFlight = 3
 
 /** Errors that say something about the request itself; sending it again would get the same answer. */
-const final = HashSet.make("UploadNotFound", "Forbidden", "NotSignedIn", "ReadFailed")
-const transient = (error: unknown): boolean =>
-  !(typeof error === "object" && error !== null && "_tag" in error && HashSet.has(final, String(error._tag)))
+const final = S.Union([UploadNotFound, Forbidden, NotSignedIn, ReadFailed])
+const transient = (error: unknown): boolean => !S.is(final)(error)
+
+/** The reader's last word: the file is read (`Done`), cannot be staged (`Refused`), or the reader failed (`Crashed`). */
+const isLast = (message: ReadMessage): boolean =>
+  ReadMessage.$match(message, {
+    Progress: () => false,
+    Head: () => false,
+    Chunk: () => false,
+    Done: () => true,
+    Refused: () => true,
+    Crashed: () => true
+  })
 
 /** A request that failed on the network or with a server error is tried three more times, waiting longer each time. */
 const retrying = <A, E>(effect: Effect.Effect<A, E>) =>
   effect.pipe(Effect.retry({ schedule: Schedule.exponential("400 millis"), times: 3, while: transient }))
 
 /** Where the upload of this tab stands: kept for the page, as the upload carries on across pages. */
-export const uploadState = Atom.make<UploadState>({ _tag: "Idle" }).pipe(Atom.keepAlive)
+export const uploadState = Atom.make<UploadState>(UploadState.cases.Idle.make({})).pipe(Atom.keepAlive)
 
 /** Says where the upload stands, in the registry it was started from (the tab's one). */
 const set = (registry: AtomRegistry.AtomRegistry, next: UploadState) => {
@@ -124,16 +135,17 @@ const reader = (request: ReadRequest) =>
         })
         worker.onmessage = (event: MessageEvent<ReadMessage>) => {
           Queue.offerUnsafe(queue, event.data)
-          const tag = event.data._tag
-          if (tag === "Done" || tag === "Refused" || tag === "Crashed") Queue.endUnsafe(queue)
+          if (isLast(event.data)) Queue.endUnsafe(queue)
         }
         // The worker's file could not be loaded or crashed: a sentence, not a hang.
         worker.onerror = (event) => {
           event.preventDefault()
-          Queue.offerUnsafe(queue, {
-            _tag: "Crashed",
-            message: `"${request.file.name}" could not be read. Reload the page and choose it again.`
-          })
+          Queue.offerUnsafe(
+            queue,
+            ReadMessage.Crashed({
+              message: `"${request.file.name}" could not be read. Reload the page and choose it again.`
+            })
+          )
           Queue.endUnsafe(queue)
         }
         worker.postMessage(request)
@@ -162,12 +174,14 @@ const program = Effect.fn("upload.program")(function* (
     ReadMessage.$match(message, {
       Progress: (progress) =>
         Effect.sync(() =>
-          set(registry, {
-            _tag: "Reading",
-            fileName,
-            rowsRead: progress.rowsRead,
-            rows: rowsOf(progress)
-          })
+          set(
+            registry,
+            UploadState.cases.Reading.make({
+              fileName,
+              rowsRead: progress.rowsRead,
+              rows: rowsOf(progress)
+            })
+          )
         ),
       Head: Effect.fn("Upload.head")(function* (message) {
         // The sheet crossed the threads as its name or null: the Option is made again here.
@@ -187,7 +201,7 @@ const program = Effect.fn("upload.program")(function* (
           uploadRunning,
           O.map((now) => ({ ...now, uploadId: id }))
         )
-        set(registry, { _tag: "Saving", fileName, uploadId: id, rowsSaved: 0, rows })
+        set(registry, UploadState.cases.Saving.make({ fileName, uploadId: id, rowsSaved: 0, rows }))
         yield* Deferred.succeed(begun, { id, sizes: message.chunkSizes })
       }),
       Chunk: Effect.fn("Upload.chunk")(function* (message) {
@@ -196,13 +210,15 @@ const program = Effect.fn("upload.program")(function* (
         yield* staged(client.imports.putChunk({ params: { id }, payload: { seq: message.seq, rows: message.rows } }))
         acknowledged.push(message.seq)
         const rows = sizes.reduce((sum, size) => sum + size, 0)
-        set(registry, {
-          _tag: "Saving",
-          fileName,
-          uploadId: id,
-          rowsSaved: savedRows({ chunkSizes: sizes, acknowledged }),
-          rows
-        })
+        set(
+          registry,
+          UploadState.cases.Saving.make({
+            fileName,
+            uploadId: id,
+            rowsSaved: savedRows({ chunkSizes: sizes, acknowledged }),
+            rows
+          })
+        )
       }),
       Done: () => Effect.void,
       Refused: ({ problem: { kind, fileName: name, problem, todo } }) =>
@@ -213,7 +229,7 @@ const program = Effect.fn("upload.program")(function* (
   yield* reader(request).pipe(Stream.mapEffect(handle, { concurrency: inFlight }), Stream.runDrain)
   const { id, sizes } = yield* Deferred.await(begun)
   const rows = sizes.reduce((sum, size) => sum + size, 0)
-  set(registry, { _tag: "Preparing", fileName, uploadId: id, rows })
+  set(registry, UploadState.cases.Preparing.make({ fileName, uploadId: id, rows }))
   const view = yield* staged(client.imports.finishUpload({ params: { id } }))
   if (head === undefined) return yield* Effect.die("the reader sent chunks without a head")
   const table: StagedTable = { ...head, rows: chunks.flat() }
@@ -265,7 +281,14 @@ const start = (input: {
 }) => {
   const { file, registry } = input
   if (O.isSome(registry.get(uploadRunning))) return
-  set(registry, { _tag: "Reading", fileName: file.name, rowsRead: 0, rows: rowsOf({ rowsAbout: null, exact: false }) })
+  set(
+    registry,
+    UploadState.cases.Reading.make({
+      fileName: file.name,
+      rowsRead: 0,
+      rows: rowsOf({ rowsAbout: null, exact: false })
+    })
+  )
   const fiber = fork((client) => program(registry, client, { file, sheet: input.sheet }))
   /** This upload, while it is still the one under way. */
   const mine = () => O.filter(registry.get(uploadRunning), (now) => now.fiber === fiber)
@@ -298,7 +321,7 @@ const start = (input: {
     registry.set(uploadRunning, O.none())
     stop()
     if (Exit.isSuccess(exit)) {
-      set(registry, { _tag: "Idle" })
+      set(registry, UploadState.cases.Idle.make({}))
       onEnd(UploadEnd.Arrived())
       arrive({ registry, file, done: exit.value, startedAs })
       return
@@ -309,17 +332,19 @@ const start = (input: {
     // The file's own problem is said as data: what is wrong with it and what to do.
     if (S.is(FileProblem)(error)) {
       onEnd(UploadEnd.Refused())
-      set(registry, { _tag: "Refused", problem: error })
+      set(registry, UploadState.cases.Refused.make({ problem: error }))
       return
     }
     const read = S.is(ReadFailed)(error)
     onEnd(UploadEnd.Failed({ step: read ? "read" : "save" }))
-    set(registry, {
-      _tag: "Failed",
-      fileName: file.name,
-      step: read ? "read" : "save",
-      message: read ? error.message : sayError(error).sentence
-    })
+    set(
+      registry,
+      UploadState.cases.Failed.make({
+        fileName: file.name,
+        step: read ? "read" : "save",
+        message: read ? error.message : sayError(error).sentence
+      })
+    )
   })
 }
 
@@ -333,7 +358,7 @@ const cancel = (registry: AtomRegistry.AtomRegistry): Promise<void> => {
     return Promise.resolve()
   }
   const current = running.value
-  set(registry, { _tag: "Cancelling", fileName: current.fileName, uploadId: current.uploadId })
+  set(registry, UploadState.cases.Cancelling.make({ fileName: current.fileName, uploadId: current.uploadId }))
   return current.fiber
     .pipe(Fiber.interrupt, runExit)
     .then(() => {
@@ -348,7 +373,7 @@ const cancel = (registry: AtomRegistry.AtomRegistry): Promise<void> => {
       return uploadId === null ? true : discard(uploadId)
     })
     .then((answered) => {
-      set(registry, { _tag: "Idle" })
+      set(registry, UploadState.cases.Idle.make({}))
       if (answered) toast(`Cancelled. Nothing from ${current.fileName} was saved.`)
       else
         toast.error(
@@ -379,5 +404,5 @@ export const cancelUpload = Atom.fnSync((_: void, get) => {
 
 /** Puts away what the last upload said (a problem with the file, a failure), back to choosing a file. */
 export const dismissUpload = Atom.fnSync((_: void, get) => {
-  set(get.registry, { _tag: "Idle" })
+  set(get.registry, UploadState.cases.Idle.make({}))
 })

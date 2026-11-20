@@ -3,6 +3,7 @@
 // sends the rows the person changed and nothing else, that its answer goes into the view held, that the server is
 // asked again when it must be and the ask is not lost, and that leaving and coming back loses nothing.
 import { describe, expect, it } from "@effect/vitest"
+import * as HttpApiError from "effect/http-api/HttpApiError"
 import { vi } from "vitest"
 import * as A from "effect/Array"
 import * as Deferred from "effect/Deferred"
@@ -21,6 +22,7 @@ import {
 } from "@inventory/catalog-contract/Decision"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import type { ImportView } from "@inventory/catalog-contract/Import"
+import { AlreadyImported } from "@inventory/catalog-contract/ImportRejection"
 import type { StagedTable } from "@inventory/catalog-contract/Staged"
 import { DraftEvent, type RowChanges, settled } from "../src/Draft.machine.ts"
 import { giveView, importTable, importView, importViewShown } from "../src/Imports.atoms.ts"
@@ -61,7 +63,7 @@ const out = decisionFromFlags({ out: true })
 const kept = decisionFromFlags({ kept: true })
 
 /** The server's refusal of a save (the import is no longer open), or its own failure, which is sent again. */
-type Refusal = { readonly _tag: "AlreadyImported" } | { readonly _tag: "InternalServerErrorProblem" }
+type Refusal = AlreadyImported | HttpApiError.InternalServerErrorProblem
 
 /** A server for one import: `get` and `decide` answer only when the test says so, and keep what they were sent. */
 const world = (id: ImportId) => {
@@ -117,9 +119,10 @@ const world = (id: ImportId) => {
     /** The server answers a save: at this revision, and (unless the test says otherwise) as the save that moved it. */
     answerSave: (n: number, revision: number, changed = true) =>
       Deferred.succeed(saves[n]!.answer, { revision, changed, notApplied: [] }),
-    refuseSave: (n: number) => Deferred.fail(saves[n]!.answer, { _tag: "AlreadyImported" } as const),
+    refuseSave: (n: number) =>
+      Deferred.fail(saves[n]!.answer, AlreadyImported.make({ reason: "This import was confirmed already." })),
     /** The server fails the save itself: the client sends it again, later. */
-    failSave: (n: number) => Deferred.fail(saves[n]!.answer, { _tag: "InternalServerErrorProblem" } as const),
+    failSave: (n: number) => Deferred.fail(saves[n]!.answer, HttpApiError.InternalServerErrorProblem.make({})),
     gets: () => gets.length,
     held: () => registry.get(importView(id)).pipe(AsyncResult.value, O.getOrThrow),
     draft: () => registry.get(draftOf(id)),

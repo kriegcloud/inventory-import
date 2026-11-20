@@ -5,6 +5,8 @@
 // heading that is not on screen, and a region that has left the page still writing the decisions of the one that took
 // its place.
 import { constructTable, functionalUpdate, type SortingState, type Updater } from "@tanstack/react-table"
+// The table's own store, driven as the table drives it: a devDependency for this test, refused in src by the atoms lint.
+// oxlint-disable-next-line no-restricted-imports
 import { batch, createAtom, shallow } from "@tanstack/store"
 import { createRenderPhaseSource, renderPhaseReactivity } from "@tanstack/table-core/reactivity"
 import { table_publishExternalState, table_setOptions } from "@tanstack/table-core/static-functions"

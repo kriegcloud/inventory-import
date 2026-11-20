@@ -370,7 +370,7 @@ describe("the first screen and the confirm step", () => {
     )
     const summary = importSummary(views(state))
     expect(A.reduce(summary, 0, (sum, line) => sum + line.count)).toBe(145)
-    expect(A.findFirst(summary, (line) => line.label === "Fixed by a rule")._tag).toBe("Some")
+    expect(O.isSome(A.findFirst(summary, (line) => line.label === "Fixed by a rule"))).toBe(true)
     const csv = Str.split(heldCsv({ views: views(state), columns, problemKinds }), "\n")
     expect(csv).toHaveLength(1 + 33)
     expect(csv[0]).toBe("Row,Reason,Item,SKU,Category,Unit,On hand,Reorder at,Cost,Supplier,Bin,Lead time")

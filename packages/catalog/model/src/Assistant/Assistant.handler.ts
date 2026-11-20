@@ -32,7 +32,7 @@ export const usedUpSentence = (words: string): string => `${words}, so the rules
  * the rules answered. Pure: it needs no key and touches no table.
  */
 /** The rules answered, and why no model did. */
-const answeredByRules = (reason: string): AnsweredBy => ({ _tag: "Rules", reason })
+const answeredByRules = (reason: string): AnsweredBy => AnsweredBy.cases.Rules.make({ reason })
 
 export const answerByRules = (input: { readonly request: ViewRequest; readonly why: string }): ViewOutcome => {
   const { request, why } = input

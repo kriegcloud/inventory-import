@@ -11,6 +11,7 @@ import * as HttpApiTest from "effect/http-api/HttpApiTest"
 import messy from "../../public/samples/items_messy.csv?raw"
 import { Api } from "../../src/api/v1/Api.ts"
 import { decisionFromFlags } from "@inventory/catalog-contract/Decision"
+import { ImportEvent } from "@inventory/catalog-contract/Import"
 import { ModelId } from "@beep/openrouter/OpenRouterModel"
 import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
@@ -111,10 +112,8 @@ layer(inMemoryHandlers({ member: marcus, ai: OpenRouterTest.off("noKey", ModelId
 
         // Taking the first import back removes its 155 and keeps the second's one.
         const back = yield* client.imports.takeBack({ params, payload: { confirms: confirmed.takeBack.confirms } })
-        const taken = A.filter(back.history, (event) => event._tag === "TakenBack")
-        expect(A.map(taken, (event) => (event._tag === "TakenBack" ? [event.removed, event.kept] : []))).toEqual([
-          [155, 0]
-        ])
+        const taken = A.filter(back.history, ImportEvent.guards.TakenBack)
+        expect(A.map(taken, (event) => [event.removed, event.kept])).toEqual([[155, 0]])
         const left = yield* client.items.list()
         expect([back.status, left.length]).toEqual(["takenBack", 1])
       })

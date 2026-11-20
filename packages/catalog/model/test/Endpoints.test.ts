@@ -6,6 +6,7 @@ import { Answerer, type AnswerSchema, type ModelAnswered, type ModelQuestion } f
 import { importsEndpoints } from "@inventory/catalog-model/ImportsHandler"
 import { itemsEndpoints } from "@inventory/catalog-model/ItemsHandler"
 import { catalogMemory, CatalogMemoryRef } from "@inventory/catalog-model/Memory"
+import { type ConfirmWrite, ImportStore } from "@inventory/catalog-model/ImportStore"
 import { usedUpSentence } from "@inventory/catalog-model/AssistantHandler"
 import { memoryUsedUpWords } from "@inventory/catalog-model/ModelAllowance"
 import { decisionFromFlags } from "@inventory/catalog-contract/Decision"
@@ -328,6 +329,64 @@ describe("the table assistant, over the twins", () => {
           const got11 = yield* lines
           expect(got11).toEqual(["Priya Raman: Asked for a view: Items: 1 change to the view, answered by twin/model"])
         })
+    )
+  })
+})
+
+// The handler checks the confirm's revision before it plans the write; another person's save can still land between
+// that check and the store's write. The store checks the revision again, in the same step as the write: this store
+// makes Dana's save at that moment, once, and then hands Marcus's confirm to the twin.
+const danaSavesDuringTheConfirm = Layer.effect(
+  ImportStore,
+  Effect.gen(function* () {
+    const inner = yield* ImportStore
+    const raced = yield* Ref.make(false)
+    return ImportStore.of({
+      ...inner,
+      commit: Effect.fnUntraced(function* (write: ConfirmWrite) {
+        const first = !(yield* Ref.getAndSet(raced, true))
+        if (first) {
+          const found = yield* inner.find(write.audit.organizationId, write.draft)
+          yield* inner.decide(dana, O.getOrThrow(found), {
+            set: { "row-2": decisionFromFlags({ out: true }) },
+            clear: []
+          })
+        }
+        return yield* inner.commit(write)
+      })
+    })
+  })
+)
+
+describe("a confirm another save overtakes after the handler checked its revision", () => {
+  layer(withCrypto(Layer.provideMerge(danaSavesDuringTheConfirm, catalogMemory())))("the store's own check", (it) => {
+    it.effect("is DraftMoved at the revision the save left, and writes nothing", () =>
+      Effect.gen(function* () {
+        const imports = yield* importsEndpoints
+        const items = yield* itemsEndpoints
+        const view = yield* stage(tableOf({ fileName: "five.csv", lines: fiveLines })).pipe(as(marcus))
+        const params = { id: view.id }
+        const refused = yield* Effect.flip(
+          imports
+            .commit({ params, payload: { ...none, revision: view.revision, madeOn: view.revision } })
+            .pipe(as(marcus))
+        )
+        expect([refused._tag, refused._tag === "DraftMoved" ? refused.revision : -1]).toEqual([
+          "DraftMoved",
+          view.revision + 1
+        ])
+        // Nothing of the confirm: no item, the import still open with Dana's decision, no line for an import.
+        const stored = yield* items.list().pipe(as(marcus))
+        const still = yield* imports.get({ params }).pipe(as(marcus))
+        const imported = yield* said("Imported items")
+        expect([stored.length, still.status, still.revision, R.keys(still.decisions), imported]).toEqual([
+          0,
+          "open",
+          view.revision + 1,
+          ["row-2"],
+          []
+        ])
+      })
     )
   })
 })

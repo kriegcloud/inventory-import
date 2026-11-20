@@ -143,12 +143,15 @@ describe("the region beside the draft", () => {
       yield* settle
       expect(t.region()).toEqual([["row-2"], 1])
       leave()
+      // The step is gone (the draft was let go) before anything changes: what follows is not seen by a step on screen.
+      yield* settle
       // Away for less than the idle time: somebody else leaves row 5 out, and the tab's view is told.
       t.give(t.at({ revision: 12, decisions: { "row-2": out, "row-5": out } }))
       yield* settle
       t.open()
       yield* settle
-      expect(t.region()[0]).toEqual(["row-2", "row-5"])
+      // The region starts from what is shown, with a history of its own: not the region it was when the step left.
+      expect(t.region()).toEqual([["row-2", "row-5"], 0])
     })
   )
 

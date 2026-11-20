@@ -65,6 +65,20 @@ export class RevisionAhead extends S.TaggedError<RevisionAhead, { readonly brand
 ) {}
 
 /**
+ * The import kept changing while a save, a confirm or a match was worked out against it (others saving or matching at
+ * the same moment, every try overtaken): nothing was written. The same limit holds in every store; the person tries
+ * again.
+ */
+export class DraftBusy extends S.TaggedError<DraftBusy, { readonly brand: unique symbol }>()(
+  "DraftBusy",
+  { reason: reasonForPerson },
+  {
+    description: "The import kept changing while the request was worked out against it. Nothing was written",
+    httpApiStatus: 409
+  }
+) {}
+
+/**
  * The confirm carried an accept made before its field's column was matched again: the proposal the person accepted
  * is no longer the one the row has, so confirming would import a row the screen does not show as it would be
  * written. Nothing was written. `accepts` names each such accept; the screen takes them back, shows the rows with

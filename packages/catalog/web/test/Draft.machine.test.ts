@@ -884,6 +884,22 @@ describe("the review's draft, whatever order things happen in", () => {
 })
 
 describe("the orderings that lost or hid a decision", () => {
+  it("a row held while an earlier decision of it was on its way comes back after a reload held, and its earlier copy is not sent", () => {
+    const world = opened()
+    for (const command of [
+      Command.cases.SomeoneElse.make({ row: "b", to: "out" }),
+      Command.cases.Decide.make({ row: "b", to: "kept" }),
+      Command.cases.SaveFails.make({}),
+      Command.cases.Decide.make({ row: "a", to: "out" }),
+      Command.cases.OtherAnswerSent.make({}),
+      Command.cases.Decide.make({ row: "b", to: "nothing" }),
+      Command.cases.OtherAnswerArrives.make({}),
+      Command.cases.Reload.make({})
+    ])
+      run(world, command)
+    expect([R.keys(world.draft.onHold), R.keys(world.draft.unsent)]).toEqual([["b"], ["a"]])
+  })
+
   it("back on Review with a decision unsaved, another person's rows are still followed and never sent over", () => {
     const world = opened()
     run(world, Command.cases.Decide.make({ row: "a", to: "out" }))

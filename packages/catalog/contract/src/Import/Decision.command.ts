@@ -301,7 +301,9 @@ export type DecisionDelta = typeof DecisionDelta.Type
 /** A draft's revision: 0 for a draft nobody has changed, one more for every change. Never negative. */
 const Revision = S.Int.check(S.isGreaterThanOrEqualTo(0))
 
-const madeOn = S.Record(S.String, Revision)
+// As bounded as the rows it speaks of: one key per row of `set`, each a row id.
+const madeOn = S.Record(bounded(40), Revision)
+  .check(S.isMaxProperties(50000))
   .annotate({
     description:
       "For each row in `set`, the draft's revision the screen held when that row was last decided (`ImportView.revision` as it was read then)",

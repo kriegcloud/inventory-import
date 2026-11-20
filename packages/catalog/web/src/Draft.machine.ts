@@ -513,7 +513,8 @@ export const waiting = (draft: Draft): O.Option<Waiting> => {
       held: {}
     }))
   }
-  const rows = unconfirmed(draft)
+  // A row on hold is kept as that: its copy on its way is an earlier decision, and never comes back as waiting.
+  const rows = R.filter(unconfirmed(draft), (_change, rowId) => !R.has(draft.onHold, rowId))
   if (R.isEmptyReadonlyRecord(rows) && R.isEmptyReadonlyRecord(draft.onHold)) return O.none()
   // A row waiting again over the one on its way is the person's latest decision of it, made on its own revision.
   return O.some({

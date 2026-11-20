@@ -289,7 +289,9 @@ export const importsEndpoints = Effect.gen(function* () {
             })
           : O.none(),
       history,
-      takeBack
+      takeBack,
+      // What matches took back from the stored decisions: kept by the match (group 3 naming, built next).
+      takenBack: []
     })
   })
 

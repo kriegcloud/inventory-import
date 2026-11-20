@@ -12,6 +12,7 @@
 import { CellMark, Entry } from "@inventory/review/ReviewTypes"
 import * as ScopedAtom from "@effect/atom-react/ScopedAtom"
 import { type ColumnFiltersState, createColumnHelper, type Table } from "@tanstack/react-table"
+import { table_setOptions } from "@tanstack/react-table/static-functions"
 import { createAtom } from "@tanstack/store"
 import * as A from "effect/Array"
 import * as HashMap from "effect/HashMap"
@@ -589,8 +590,11 @@ const makeRegionTable = (
     get(sorted)
     // The table is given the same rows when the region is drawn. It is given them here first, so the order read now
     // is of these rows and not of the ones it was last drawn with.
-    if (table.optionsStore?.get().data !== data) {
-      table.setOptions((before) => (before.data === data ? before : { ...before, data }))
+    // Given as the table's own hook gives them while it is drawn: the options alone, with nothing published. The
+    // hook hands the screen a copy of the table; the table itself is the one its columns belong to.
+    const core = table.getAllLeafColumns()[0]?.table ?? table
+    if (core.options.data !== data) {
+      table_setOptions(core, (before) => ({ ...before, data }), { syncExternalState: false })
     }
     return table.getPrePaginatedRowModel().rows.map((row) => row.original)
   })

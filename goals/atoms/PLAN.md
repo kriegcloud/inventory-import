@@ -767,8 +767,8 @@ discriminators" below. Then the groups the draft review's table above left open:
   stand-in around the real D1 store: a save between the match's read and write (fails with the stamp one revision
   earlier), a match between a save's check and write (fails without the guard), and a save just before the match's
   write (its leave-out stands).
-- **Not built, Benjamin's to answer:** a kept waiting row sent again over a decision somebody else saved since
-  (`Draft.machine.ts` `Opened` and `ViewArrived`); the lead puts it to him.
+- **A kept waiting row sent again over a decision somebody else saved since:** Benjamin answered ("Hold it, show both,
+  ask"); built in the round below.
 - **Group 11** (`e7ca8df`). Category and UoM in the toolbar are the kit's `DataTableFacetedFilter`, fed from
   `quickFilterOptions`; the toolbar is given `quick={[]}`. Only the Filter menu's values travel on the columns'
   meta. Every cell and heading is a named component at module level, and the editor's and viewer's columns are made
@@ -777,6 +777,27 @@ discriminators" below. Then the groups the draft review's table above left open:
   what lives for the page. Leaving the address of a removed import moved from the button's click into
   `removeImport`, where a test reaches it.
 - **The twin's own check of the confirm's revision, and the quick return** (`f8ef35e`): above.
+
+## The second review's groups, and group 3 decided (2026-11-20)
+
+The review of `1171834..cf6ac58` confirmed 49 findings in groups; Benjamin then answered group 3's seven questions
+(the exploration's `DECISIONS.md`, entries of 2026-11-20).
+
+- **Groups 1 and 2** (`b784320`): a confirm never sends its rows to a closed import or drops rows decided while it was
+  out; each row names its own revision (`madeOn` per row); the kept rows, the leave question and their tests.
+- **Group 4** (`46b2c07`): the item editor saves on the revision its last save answered with.
+- **Group 5** (`f922f9f`, `00f3f2d`): the review's virtual list and table get their options outside draws; refs,
+  tags and boundaries laws refuse the forms that slipped past them, and every hand tag is a constructor.
+- **Groups 6 and 7** (`7ab5b31`, `58d6f80`): the tests whose names said more than they held, and the documents.
+- **Group 3** (`25e631a` the answers; `59d8c91` the contract's `kind`; `0bd8bc7` the server; `cb73739`, `59690da`,
+  `1456964`, `e263a88` the screen): a re-match takes back a keep-or-replace, a keep-one-of-two and an undone fix
+  that rested on the column, in the match's batch, the save and the confirm, each named by kind; a refused save holds
+  its rows with the reason; a waiting row decided elsewhere since is held with both decisions; each tab keeps its own
+  waiting rows and takes up only a gone tab's.
+- **From the review of `b784320`** (`cb73739`, `1456964`): a held-back confirm records the revision it waits for and
+  frees its button once the screen holds it; rows apart are counted from what was shown at the press; a closed
+  picture outdated by a reopen no longer ends the draft; a refused or lost confirm offers no Save again, and the first
+  picture after it that is not the step's own redraw answers it; the leave question is asked after a reload.
 
 ## Step 8: TanStack Query removed, the lint everywhere, the documents
 

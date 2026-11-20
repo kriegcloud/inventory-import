@@ -34,6 +34,17 @@ const decided = (decision: RowDecision): string => {
 }
 
 /**
+ * One row's decision in words, or what an empty one means: "left out", "kept the stored item", "no decision".
+ *
+ * @example decisionWords(O.some(leftOut)) // "left out"
+ */
+export const decisionWords = (change: O.Option<RowDecision>): string =>
+  O.match(change, { onNone: () => "no decision", onSome: decided })
+
+/** A row as the person knows it: "Row 12". */
+export const rowLabel = (id: string): string => `Row ${Str.replace(/^row-/, "")(id)}`
+
+/**
  * The rows left over, one line each, in the file's order: the row as the person knows it, and what they had decided.
  *
  * @example leftOverLines({ "row-12": O.some(leftOut) }) // [{ row: "Row 12", decided: "left out" }]
@@ -48,7 +59,7 @@ export const leftOverLines = (
     ),
     ([id, change]) => ({
       id,
-      row: `Row ${Str.replace(/^row-/, "")(id)}`,
+      row: rowLabel(id),
       decided: O.match(change, { onNone: () => "took your decision back", onSome: decided })
     })
   )

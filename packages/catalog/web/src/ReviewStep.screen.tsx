@@ -4,6 +4,9 @@ import * as A from "effect/Array"
 import * as Cause from "effect/Cause"
 import * as Exit from "effect/Exit"
 import * as O from "effect/Option"
+import * as Order from "effect/Order"
+import * as R from "effect/Record"
+import * as Str from "effect/String"
 import * as Atom from "effect/reactivity/Atom"
 import { useDeferredValue } from "react"
 import { TriangleAlertIcon } from "lucide-react"
@@ -23,6 +26,7 @@ import {
   confirmHeldBack,
   confirmingImport,
   rowsNotSaved,
+  rowsOnHold,
   draftEvents,
   followDraft,
   regionEpoch,
@@ -33,7 +37,8 @@ import {
   whileCurrent
 } from "./ReviewDraft.atoms.ts"
 import { acceptsWords } from "./ReviewDraft.atoms.ts"
-import { DraftEvent, type HeldBack } from "./Draft.machine.ts"
+import { DraftEvent, Hold, type HeldBack, type HeldRows } from "./Draft.machine.ts"
+import { decisionWords, rowLabel } from "./internal/leftOver.ts"
 import { matchColumn, suggestFixes } from "./Imports.atoms.ts"
 import { navigate } from "@inventory/ui/Route"
 import { importAddress } from "./internal/route.ts"
@@ -185,6 +190,7 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
   const committing = useAtomValue(confirmingImport(view.id))
   const heldBack = useAtomValue(confirmHeldBack(view.id))
   const notSaved = useAtomValue(rowsNotSaved(view.id))
+  const onHold = useAtomValue(rowsOnHold(view.id))
   const commit = () => happened(DraftEvent.ConfirmPressed())
 
   if (O.isNone(worked) || O.isNone(recheckRead)) return <ReviewSkeleton title={`Review ${view.fileName}`} />
@@ -280,6 +286,11 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
       <ReaderWarnings table={table} />
       <NotImportedYet why={heldBack} />
       <NotSavedYet rows={notSaved} onSaveAgain={() => happened(DraftEvent.SaveAgain())} />
+      <OnHold
+        rows={onHold}
+        onSettle={(rowId, keep) => happened(DraftEvent.HoldSettled({ rowId, keep }))}
+        canDecide={props.canImport}
+      />
       <ReviewRegion
         key={`${view.id}:${epoch}`}
         title={`Review ${view.fileName}`}
@@ -352,6 +363,75 @@ function NotSavedYet(props: { rows: number; onSaveAgain: () => void }) {
         <Button variant="outline" size="xs" onClick={props.onSaveAgain}>
           Save again
         </Button>
+      </AlertDescription>
+    </Alert>
+  )
+}
+
+/**
+ * The person's decisions held instead of sent, one line each, above the review: refused by the server (with its
+ * sentence; dismissed, or settled by deciding the row again), or decided otherwise elsewhere while they waited (both
+ * said; the person picks which stands). Nothing here is sent until the person says so.
+ */
+function OnHold(props: {
+  rows: HeldRows
+  onSettle: (rowId: string, keep: "mine" | "theirs") => void
+  canDecide: boolean
+}) {
+  const narrow = useAtomValue(isNarrow)
+  // In the file's order: row 9 before row 10.
+  const lines = A.sort(
+    R.toEntries(props.rows),
+    Order.mapInput(Order.Number, ([rowId]: readonly [string, unknown]) =>
+      Number(Str.replace(/^row-(\d+).*$/, "$1")(rowId))
+    )
+  )
+  if (!A.isReadonlyArrayNonEmpty(lines)) return null
+  return (
+    <Alert role="status" className={narrow ? "mx-4 mt-3 w-auto" : "mx-6 mt-4 w-auto"}>
+      <TriangleAlertIcon aria-hidden />
+      <AlertTitle>
+        {A.length(lines) === 1
+          ? "1 decision of yours is not saved"
+          : `${A.length(lines)} decisions of yours are not saved`}
+      </AlertTitle>
+      <AlertDescription>
+        <ul className="flex flex-col gap-2">
+          {A.map(lines, ([rowId, held]) => (
+            <li key={rowId} className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              {Hold.$match(held.why, {
+                Refused: ({ reason }) => (
+                  <>
+                    <span className="min-w-0">
+                      {rowLabel(rowId)}: you {decisionWords(held.mine)}. Not saved: {reason}
+                    </span>
+                    <Button variant="outline" size="xs" onClick={() => props.onSettle(rowId, "theirs")}>
+                      Dismiss
+                    </Button>
+                  </>
+                ),
+                Elsewhere: ({ theirs }) => (
+                  <>
+                    <span className="min-w-0">
+                      {rowLabel(rowId)}: decided elsewhere since: {decisionWords(theirs)}. Yours:{" "}
+                      {decisionWords(held.mine)}.
+                    </span>
+                    {props.canDecide ? (
+                      <span className="flex gap-2">
+                        <Button variant="outline" size="xs" onClick={() => props.onSettle(rowId, "mine")}>
+                          Use mine
+                        </Button>
+                        <Button variant="outline" size="xs" onClick={() => props.onSettle(rowId, "theirs")}>
+                          Keep theirs
+                        </Button>
+                      </span>
+                    ) : null}
+                  </>
+                )
+              })}
+            </li>
+          ))}
+        </ul>
       </AlertDescription>
     </Alert>
   )

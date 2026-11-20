@@ -122,6 +122,19 @@ const archiveKind = (fileName: string, bytes: Uint8Array, container: XlsxContain
   }
 }
 
+/**
+ * The reader a sniffed file goes to, or the problem that says why it goes to none. Every case is named: a new kind
+ * of file is a compile error here, never a file read by the wrong reader.
+ */
+const formatOf = (fileName: string, sniffed: Sniffed): Effect.Effect<"csv" | "xlsx", FileProblem> =>
+  Sniffed.$match(sniffed, {
+    Csv: (): Effect.Effect<"csv" | "xlsx", FileProblem> => Effect.succeed("csv"),
+    Xlsx: (): Effect.Effect<"csv" | "xlsx", FileProblem> => Effect.succeed("xlsx"),
+    // Still an archive after the workbook reader looked inside: it could not tell what it is.
+    Archive: () => Effect.fail(fileProblem.unreadable({ fileName, why: ": it looks damaged or incomplete" })),
+    Refuse: ({ error }) => Effect.fail(error)
+  })
+
 const extensionOf = (fileName: string): string => /\.([^.]+)$/.exec(fileName)?.[1]?.toLowerCase() ?? ""
 
 /**
@@ -160,15 +173,10 @@ export const readSpreadsheet = Effect.fn("readSpreadsheet")(function* (
   const bytes = new Uint8Array(buffer)
   const first = sniff(fileName, bytes)
   // An archive is looked inside by the workbook reader, which is fetched only now: a CSV never downloads it.
-  const sniffed =
-    first._tag === "Archive"
-      ? archiveKind(fileName, bytes, (yield* Effect.promise(() => import("./xlsx.ts"))).containerOf(bytes))
-      : first
-  if (sniffed._tag === "Refuse") return yield* Effect.fail(sniffed.error)
-  if (sniffed._tag === "Archive") {
-    return yield* Effect.fail(fileProblem.unreadable({ fileName, why: ": it looks damaged or incomplete" }))
-  }
-  const format = sniffed._tag === "Csv" ? "csv" : "xlsx"
+  const sniffed = Sniffed.$is("Archive")(first)
+    ? archiveKind(fileName, bytes, (yield* Effect.promise(() => import("./xlsx.ts"))).containerOf(bytes))
+    : first
+  const format = yield* formatOf(fileName, sniffed)
   const limit = maxFileBytes[format]
   if (file.size > limit) {
     const what = format === "csv" ? "CSV files" : "workbooks"

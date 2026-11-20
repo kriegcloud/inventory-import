@@ -4,6 +4,7 @@ import { stringify } from "@inventory/ui/Json"
 // `readVendors`) would refuse, and their sentence is what the person reads under the fields.
 import { PlusIcon, Trash2Icon } from "lucide-react"
 import { useAtom } from "@effect/atom-react"
+import * as ScopedAtom from "@effect/atom-react/ScopedAtom"
 import * as O from "effect/Option"
 import * as Atom from "effect/reactivity/Atom"
 import { useId } from "react"
@@ -34,19 +35,29 @@ const dimensionsCell = (draft: DimensionsDraft): string =>
 
 /**
  * What one open form holds: what was typed (none until something is, the cell's value showing meanwhile) and why
- * the last save was refused. One per form on screen, by its `useId`, let go with it.
+ * the last save was refused. One per form on screen, made in the form's own provider and let go with it.
  */
-const formOf = Atom.family((_form: string) =>
+const FormScope = ScopedAtom.make(() =>
   Atom.make<{ readonly typed: O.Option<unknown>; readonly error: string | undefined }>({
     typed: O.none(),
     error: undefined
   })
 )
 
+type CellFormProps = { value: string; onSave: (cell: string) => void }
+
 /** Length, width, height and their unit, saved as the cell's JSON once the three read; or no dimensions at all. */
-export function DimensionsForm(props: { value: string; onSave: (cell: string) => void }) {
+export function DimensionsForm(props: CellFormProps) {
+  return (
+    <FormScope.Provider>
+      <DimensionsFields {...props} />
+    </FormScope.Provider>
+  )
+}
+
+function DimensionsFields(props: CellFormProps) {
   const id = useId()
-  const [held, setHeld] = useAtom(formOf(id))
+  const [held, setHeld] = useAtom(FormScope.use())
   const draft = O.getOrElse(held.typed as O.Option<DimensionsDraft>, () => dimensionsDraft(props.value))
   const { error } = held
   const setError = (message: string) => setHeld((now) => ({ ...now, error: message }))
@@ -117,9 +128,17 @@ const vendorsCell = (vendors: ReadonlyArray<VendorDraft>): string =>
   )
 
 /** Up to three vendors, each with a name, its SKU, a unit cost and a lead time, one of them preferred; or none. */
-export function VendorsForm(props: { value: string; onSave: (cell: string) => void }) {
+export function VendorsForm(props: CellFormProps) {
+  return (
+    <FormScope.Provider>
+      <VendorsFields {...props} />
+    </FormScope.Provider>
+  )
+}
+
+function VendorsFields(props: CellFormProps) {
   const id = useId()
-  const [held, setHeld] = useAtom(formOf(id))
+  const [held, setHeld] = useAtom(FormScope.use())
   const vendors = O.getOrElse(held.typed as O.Option<ReadonlyArray<VendorDraft>>, () => {
     const found = vendorsDraft(props.value)
     return found.length === 0 ? [emptyVendor] : found

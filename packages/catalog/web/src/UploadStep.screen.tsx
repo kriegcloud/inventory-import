@@ -27,7 +27,7 @@ import { when, whenShort } from "@inventory/ui/Dates"
 import { giveView, openImports as openImportsRead, pastImports, removeImport } from "./Imports.atoms.ts"
 import { resultOf } from "./internal/result.ts"
 import { ListTable } from "@inventory/ui/ListTable"
-import { pastImportColumnsShort } from "./PastImports.screen.tsx"
+import { pastImportColumnsShortAtom, pastImportRows } from "./PastImports.screen.tsx"
 import { navigate } from "@inventory/ui/Route"
 import { importAddress } from "./internal/route.ts"
 import { StoredFile } from "@inventory/review/SavedProgress"
@@ -98,24 +98,20 @@ function UploadProgress(props: { state: UploadState; onCancel: () => void }) {
 
 const carriesFiles = (event: DragEvent): boolean => event.dataTransfer?.types.includes("Files") === true
 
-/** What the Upload step does with a file dropped on the page: read while it is on screen, nothing while it is not. */
-type PageDrop = { readonly enabled: boolean; readonly onFiles: (files: ReadonlyArray<File>) => void }
-
 /**
- * The Upload step as it was last drawn, for the page's drop: set on every draw. Not drawn itself, so not an atom:
- * the one drop listener reads it at the moment of the drop.
+ * The Upload step's frame while it is on the page (`data-upload-step`), found at the moment of a drop: the page hands
+ * it a file only then, and only while it says it takes one (`data-takes-files`). A file dropped anywhere on the page
+ * goes in through the upload's own input, so it meets the same checks as a chosen one: one way in.
  */
-let pageDrop: PageDrop | undefined
-/** True while the step's frame is on screen (`whilePageTakesDrops`): only then does the page hand it a file. */
-let stepOnScreen = false
+const stepOnPage = (): HTMLElement | null => document.querySelector<HTMLElement>("[data-upload-step]")
 
-/** On the step's frame, and the same function on every draw: the page takes drops exactly while the step is on screen. */
-const whilePageTakesDrops = (frame: HTMLElement | null) => {
-  if (frame === null) return
-  stepOnScreen = true
-  return () => {
-    stepOnScreen = false
-  }
+const giveStep = (step: HTMLElement, files: ReadonlyArray<File>): void => {
+  const input = step.querySelector<HTMLInputElement>('input[type="file"]')
+  if (input === null || files.length === 0) return
+  const transfer = new DataTransfer()
+  for (const file of files) transfer.items.add(file)
+  input.files = transfer.files
+  input.dispatchEvent(new Event("change", { bubbles: true }))
 }
 
 /**
@@ -148,10 +144,10 @@ const fileOverPage: Atom.Atom<boolean> = Atom.readable((get) => {
   }
   const drop = (event: DragEvent) => {
     if (!carriesFiles(event)) return
-    const step = stepOnScreen ? pageDrop : undefined
-    if (!event.defaultPrevented && step !== undefined) {
+    const step = stepOnPage()
+    if (!event.defaultPrevented && step !== null) {
       event.preventDefault()
-      if (step.enabled) step.onFiles(Array.from(event.dataTransfer?.files ?? []))
+      if (step.dataset.takesFiles !== undefined) giveStep(step, Array.from(event.dataTransfer?.files ?? []))
     }
     depth = 0
     get.setSelf(false)
@@ -277,8 +273,8 @@ function PastImports() {
       <ListTable
         caption="Files imported before"
         searchLabel="Search past imports"
-        columns={pastImportColumnsShort}
-        rows={listed}
+        columns={pastImportColumnsShortAtom}
+        rows={pastImportRows}
         rowKey={(entry) => entry.id}
         empty="No file has been imported yet."
         maxWidth={672}
@@ -384,25 +380,17 @@ export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
   }
 
   const fileInput = () => picker.current?.querySelector<HTMLInputElement>('input[type="file"]') ?? null
-  // A file dropped anywhere on the page goes in through the upload's own input, so it meets the same checks as a
-  // chosen one and reaches `onAccept` below: one way in.
   const dragging = useAtomValue(fileOverPage) && props.canImport && !busy
-  pageDrop = {
-    enabled: props.canImport && !busy,
-    onFiles: (files) => {
-      const input = fileInput()
-      if (input === null || files.length === 0) return
-      const transfer = new DataTransfer()
-      for (const file of files) transfer.items.add(file)
-      input.files = transfer.files
-      input.dispatchEvent(new Event("change", { bubbles: true }))
-    }
-  }
 
   const failed = state._tag === "Failed" ? state : undefined
   const refused = state._tag === "Refused" ? state.problem : undefined
   return (
-    <div ref={whilePageTakesDrops} className="relative h-full overflow-y-auto">
+    <div
+      data-upload-step=""
+      // The page hands a dropped file to the step only while it takes one (not a viewer, not an upload under way).
+      data-takes-files={props.canImport && !busy ? "" : undefined}
+      className="relative h-full overflow-y-auto"
+    >
       <div className="mx-auto flex w-full max-w-2xl flex-col pb-8">
         <PageHeader title="Import items" line=".csv or .xlsx" />
         <div className="flex flex-col gap-4 px-4 sm:px-9">

@@ -1,6 +1,5 @@
 import { createColumnHelper, type ColumnDef, type FilterFn, type RowData } from "@tanstack/react-table"
-import * as MutableHashMap from "effect/MutableHashMap"
-import * as O from "effect/Option"
+import * as Atom from "effect/reactivity/Atom"
 import type { ReactNode } from "react"
 import { TableSearch } from "@inventory/ui/TableSearch"
 import { Button } from "@inventory/ui/components/button"
@@ -14,6 +13,7 @@ import { DataTableToolbar } from "@inventory/ui/components/data-table/data-table
 import type { ColumnSelectOption, DataTableColumnConfig } from "@inventory/ui/components/data-table/data-table-types"
 import { useDataTable } from "@inventory/ui/hooks/use-data-table"
 import { useAtomValue } from "@effect/atom-react"
+import * as ScopedAtom from "@effect/atom-react/ScopedAtom"
 import { contentWidth, isNarrow } from "@inventory/ui/ContentWidth"
 
 // A list the page already holds whole (the activity, the people), on the same data table as the Items page: sortable
@@ -104,69 +104,39 @@ const optionsOf = <Row,>(rows: ReadonlyArray<Row>, value: (row: Row) => string |
     .map((text) => ({ label: text === "" ? "Not set" : text, value: text, count: counts[text] ?? 0 }))
 }
 
-// The table's config and its columns are kept for as long as what they are made from is the same, so the vendored
-// table keeps its state (its sort, its page, an open row) across draws. Without a hook: the config by the columns'
-// shape, which a page has a handful of; the columns by the very arrays they are made from, held weakly, so they go
-// with those arrays.
-const configs = MutableHashMap.empty<string, unknown>()
-const configFor = <A,>(shape: string, make: () => A): A =>
-  O.getOrElse(MutableHashMap.get(configs, shape) as O.Option<A>, () => {
-    const made = make()
-    MutableHashMap.set(configs, shape, made)
-    return made
-  })
-
-// Weak, so an entry goes with the columns and rows it was made for; Effect has no weak collection to use instead.
-const madeColumns = new WeakMap<object, WeakMap<object, { readonly flexible: number; readonly made: unknown }>>()
-const columnsFor = <A,>(columns: object, rows: object, flexible: number, make: () => A): A => {
-  const byRows =
-    madeColumns.get(columns) ?? new WeakMap<object, { readonly flexible: number; readonly made: unknown }>()
-  madeColumns.set(columns, byRows)
-  const held = byRows.get(rows)
-  if (held !== undefined && held.flexible === flexible) return held.made as A
-  const made = make()
-  byRows.set(rows, { flexible, made })
-  return made
+type ListInput<Row extends RowData> = {
+  readonly columns: Atom.Atom<ReadonlyArray<ListColumn<Row>>>
+  readonly rows: Atom.Atom<ReadonlyArray<Row>>
+  readonly maxWidth: number | undefined
 }
 
 /**
- * A list the page already holds, as a data table the person sorts from its headings, searches, filters by the
- * values a column has, and narrows to the columns they want; on a page as narrow as a phone, the same rows as cards.
+ * What one list works out from the columns and the rows it is given: the table's config and its column definitions,
+ * each made again only when what it is made from changes, so the vendored table keeps its state (its sort, its page,
+ * an open row) while the page around it is drawn again.
  */
-export function ListTable<Row extends RowData>(props: {
-  /** What the table holds, for the scroll region and the screen reader ("People in the organization"). */
-  readonly caption: string
-  readonly columns: ReadonlyArray<ListColumn<Row>>
-  readonly rows: ReadonlyArray<Row>
-  readonly rowKey: (row: Row) => string
-  /** Shown in place of rows when the list has none at all. */
-  readonly empty: ReactNode
-  /** The search box's label and placeholder ("Search people"). */
-  readonly searchLabel: string
-  /** The widest the table's column of the page can be, in pixels, when it sits in a narrow column of its own. */
-  readonly maxWidth?: number
-  /** The rows shown are being asked for again (a return to the page, a change being saved): the search box says so. */
-  readonly updating?: boolean
-}) {
-  const narrow = useAtomValue(isNarrow)
-  const room = Math.min(useAtomValue(contentWidth), props.maxWidth ?? Number.POSITIVE_INFINITY)
-  const { columns, rows } = props
+const makeList = <Row extends RowData>(input: ListInput<Row>) => {
   // The column without a width takes the room the others leave, never less than `leastFlexible`: only then does
   // the table scroll sideways inside its frame.
-  const fixed = columns.reduce((total, column) => total + (column.width ?? 0), 0)
-  const flexible = Math.max(leastFlexible, room - chrome - fixed)
-  // The config follows the columns' ids and what each does, not the array itself: a page that builds its columns on
-  // every render (their cells close over its state) keeps its order, its filters and its page.
-  const shape = columns
-    .map(
-      (column) =>
-        `${column.id}:${column.value !== undefined && column.sortable !== false ? "sort" : ""}:${column.value !== undefined && column.facet === true ? "facet" : ""}`
-    )
-    .join("|")
-  const config = configFor(shape, () =>
+  const flexible = Atom.readable((get) => {
+    const room = Math.min(get(contentWidth), input.maxWidth ?? Number.POSITIVE_INFINITY)
+    const fixed = get(input.columns).reduce((total, column) => total + (column.width ?? 0), 0)
+    return Math.max(leastFlexible, room - chrome - fixed)
+  })
+  // The config follows the columns' ids and what each does, not the array itself: columns made anew (their cells
+  // follow the page's state) keep the table's order, its filters and its page.
+  const shape = Atom.map(input.columns, (columns) =>
+    columns
+      .map(
+        (column) =>
+          `${column.id}:${column.value !== undefined && column.sortable !== false ? "sort" : ""}:${column.value !== undefined && column.facet === true ? "facet" : ""}`
+      )
+      .join("|")
+  )
+  const config = Atom.map(shape, (now) =>
     createDataTableConfig({
       columns: Object.fromEntries(
-        shape.split("|").map((entry): [string, DataTableColumnConfig] => {
+        now.split("|").map((entry): [string, DataTableColumnConfig] => {
           const [id = "", sorts, facet] = entry.split(":")
           return [
             id,
@@ -179,11 +149,14 @@ export function ListTable<Row extends RowData>(props: {
       enableGlobalFilter: true
     })
   )
-  const tableColumns = columnsFor(columns, rows, flexible, () => {
+  const tableColumns = Atom.readable((get) => {
+    const columns = get(input.columns)
+    const rows = get(input.rows)
+    const room = get(flexible)
     const col = createColumnHelper<DataTableFeatures, Row>()
     const first = columns[0]?.id
     return columns.map((column): ColumnDef<DataTableFeatures, Row, unknown> => {
-      const size = column.width ?? flexible
+      const size = column.width ?? room
       const show = column.cell ?? ((row: Row) => (column.value === undefined ? null : String(column.value(row))))
       const value = column.value
       if (value === undefined) {
@@ -229,6 +202,52 @@ export function ListTable<Row extends RowData>(props: {
       }) as ColumnDef<DataTableFeatures, Row, unknown>
     })
   })
+  return { config, tableColumns }
+}
+
+/** One list's atoms, made when it is first drawn from the columns and rows it is given. */
+const ListScope = ScopedAtom.make((input: ListInput<RowData>) => Atom.make(makeList(input)))
+
+type ListTableProps<Row extends RowData> = {
+  /** What the table holds, for the scroll region and the screen reader ("People in the organization"). */
+  readonly caption: string
+  /**
+   * The columns and the rows, as atoms: the table's own columns and its quick filters follow them, and a page whose
+   * rows change hands over no new props.
+   */
+  readonly columns: Atom.Atom<ReadonlyArray<ListColumn<Row>>>
+  readonly rows: Atom.Atom<ReadonlyArray<Row>>
+  readonly rowKey: (row: Row) => string
+  /** Shown in place of rows when the list has none at all. */
+  readonly empty: ReactNode
+  /** The search box's label and placeholder ("Search people"). */
+  readonly searchLabel: string
+  /** The widest the table's column of the page can be, in pixels, when it sits in a narrow column of its own. */
+  readonly maxWidth?: number
+  /** The rows shown are being asked for again (a return to the page, a change being saved): the search box says so. */
+  readonly updating?: boolean
+}
+
+/**
+ * A list the page already holds, as a data table the person sorts from its headings, searches, filters by the
+ * values a column has, and narrows to the columns they want; on a page as narrow as a phone, the same rows as cards.
+ */
+export function ListTable<Row extends RowData>(props: ListTableProps<Row>) {
+  return (
+    // One scope serves every kind of row: inside it a row is whatever the columns read.
+    <ListScope.Provider value={{ columns: props.columns, rows: props.rows, maxWidth: props.maxWidth } as never}>
+      <ListBody {...props} />
+    </ListScope.Provider>
+  )
+}
+
+function ListBody<Row extends RowData>(props: ListTableProps<Row>) {
+  const narrow = useAtomValue(isNarrow)
+  const list = useAtomValue(ListScope.use())
+  const columns = useAtomValue(props.columns)
+  const rows = useAtomValue(props.rows)
+  const config = useAtomValue(list.config)
+  const tableColumns = useAtomValue(list.tableColumns) as unknown as Array<ColumnDef<DataTableFeatures, Row, unknown>>
   const first = columns[0]?.id
   const ends = columns.filter((column) => column.end === true).map((column) => column.id)
   const { table } = useDataTable({

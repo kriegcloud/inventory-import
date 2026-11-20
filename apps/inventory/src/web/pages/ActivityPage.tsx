@@ -92,11 +92,11 @@ export function ActivityPage() {
           />
         )
       ) : view === "imports" ? (
-        <PastImportsList rows={past.data?.imports ?? []} older={older} />
+        <PastImportsList older={older} />
       ) : view === "decisions" ? (
-        <ImportDecisions rows={changes.data ?? []} />
+        <ImportDecisions />
       ) : (
-        <AuditEvents rows={events.data ?? []} updating={events.updating} />
+        <AuditEvents updating={events.updating} />
       )}
     </div>
   )

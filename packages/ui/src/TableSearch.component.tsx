@@ -1,5 +1,6 @@
 import { Search, X } from "lucide-react"
-import { useAtom } from "@effect/atom-react"
+import { useAtom, useAtomMount, useAtomValue } from "@effect/atom-react"
+import * as ScopedAtom from "@effect/atom-react/ScopedAtom"
 import * as O from "effect/Option"
 import * as Atom from "effect/reactivity/Atom"
 import { useId, useRef } from "react"
@@ -29,35 +30,37 @@ interface Box {
   readonly asked: O.Option<string>
 }
 
-/** Each box on screen has its own, by its `useId`; let go when the box is. */
-const boxes = Atom.family((_box: string) => Atom.make<Box>({ typed: O.none(), waiting: false, asked: O.none() }))
-
 /**
- * "/" or Ctrl+K (⌘K) anywhere puts the caret in this field, while it is on screen: a ref callback, so the keys are
- * heard exactly as long as the field is there.
+ * One box's own, made when the box is first drawn from the id of its field: its state, and the keys that put the
+ * caret in it. "/" or Ctrl+K (⌘K) anywhere focuses the field while the box is on screen: an atom that listens to the
+ * page for as long as the box mounts it, and is let go with the box at once.
  */
-const shortcutKeys = (field: HTMLInputElement | null) => {
-  if (field === null) return
-  const onKey = (event: KeyboardEvent) => {
-    const slash = event.key === "/" && !event.ctrlKey && !event.metaKey && !event.altKey && !typingIn(event.target)
-    const command = event.key.toLowerCase() === "k" && (event.ctrlKey || event.metaKey) && !event.altKey
-    // A dialog open over the table keeps its keys.
-    const inDialog = event.target instanceof Element && event.target.closest("[role=dialog]") !== null
-    if ((!slash && !command) || inDialog) return
-    event.preventDefault()
-    field.focus()
-    field.select()
-  }
-  document.addEventListener("keydown", onKey)
-  return () => document.removeEventListener("keydown", onKey)
-}
+const BoxScope = ScopedAtom.make((fieldId: string) =>
+  Atom.readable(() => ({
+    box: Atom.make<Box>({ typed: O.none(), waiting: false, asked: O.none() }),
+    keys: Atom.setIdleTTL(
+      Atom.readable((get) => {
+        const onKey = (event: KeyboardEvent) => {
+          const slash =
+            event.key === "/" && !event.ctrlKey && !event.metaKey && !event.altKey && !typingIn(event.target)
+          const command = event.key.toLowerCase() === "k" && (event.ctrlKey || event.metaKey) && !event.altKey
+          // A dialog open over the table keeps its keys.
+          const inDialog = event.target instanceof Element && event.target.closest("[role=dialog]") !== null
+          const field = document.getElementById(fieldId)
+          if ((!slash && !command) || inDialog || !(field instanceof HTMLInputElement)) return
+          event.preventDefault()
+          field.focus()
+          field.select()
+        }
+        document.addEventListener("keydown", onKey)
+        get.addFinalizer(() => document.removeEventListener("keydown", onKey))
+      }),
+      0
+    )
+  }))
+)
 
-/**
- * The person types words to find in a table; the table asks for them after a pause in the typing. "/" or Ctrl+K
- * (⌘K) puts the caret here, Escape or the cross empties it. `value` is the search the table holds now (the page
- * address), so the assistant, Reset or a link changes what the box shows.
- */
-export function TableSearch(props: {
+type TableSearchProps = {
   readonly value: string
   readonly onSearch: (text: string) => void
   readonly placeholder: string
@@ -70,8 +73,27 @@ export function TableSearch(props: {
   /** Shows "/" in the empty box. Off where there is no keyboard to press it on. */
   readonly shortcutHint: boolean
   readonly className?: string
-}) {
-  const [box, setBox] = useAtom(boxes(useId()))
+}
+
+/**
+ * The person types words to find in a table; the table asks for them after a pause in the typing. "/" or Ctrl+K
+ * (⌘K) puts the caret here, Escape or the cross empties it. `value` is the search the table holds now (the page
+ * address), so the assistant, Reset or a link changes what the box shows.
+ */
+export function TableSearch(props: TableSearchProps) {
+  const fieldId = useId()
+  return (
+    <BoxScope.Provider value={fieldId}>
+      <SearchBox {...props} fieldId={fieldId} />
+    </BoxScope.Provider>
+  )
+}
+
+function SearchBox(props: TableSearchProps & { readonly fieldId: string }) {
+  const scope = useAtomValue(BoxScope.use())
+  const [box, setBox] = useAtom(scope.box)
+  useAtomMount(scope.keys)
+  const { fieldId } = props
   // The field itself, to put the caret back after the cross.
   const field = useRef<HTMLInputElement | null>(null)
   // What was typed counts while the table's search is still the last one this box asked for (its own echo) or, before
@@ -106,10 +128,8 @@ export function TableSearch(props: {
         <Search />
       </InputGroupAddon>
       <InputGroupInput
-        ref={(node) => {
-          field.current = node
-          return shortcutKeys(node)
-        }}
+        ref={field}
+        id={fieldId}
         // A plain text field with the search role: the browser's own clear button would be a second cross.
         type="text"
         role="searchbox"

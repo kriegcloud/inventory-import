@@ -1,4 +1,6 @@
 // The Activity page's "Decisions" list: every value an import wrote that differs from its file, what it was, what it
+import * as Atom from "effect/reactivity/Atom"
+import { answerOf } from "@inventory/client/Api"
 // became, who proposed it and who accepted or typed it. The app's Activity page shows it beside the audit trail.
 import * as DateTime from "effect/DateTime"
 import * as O from "effect/Option"
@@ -142,15 +144,21 @@ export const importDecisions = catalogApi.query((api) => api.imports.changes(), 
   reactivityKeys: catalogKeys.changes
 })
 
+const noChanges: ReadonlyArray<ChangeRecord> = []
+const importDecisionAnswer = answerOf(importDecisions)
+/** The decisions' rows and columns as the list follows them: empty until the decisions have been read. */
+const importDecisionRows = Atom.map(importDecisionAnswer, (answer) => answer ?? noChanges)
+const importDecisionColumnsAtom = Atom.make(importDecisionColumns)
+
 /** The decisions list. The person searches it, sorts it and narrows it by field, by who proposed and by file. */
-export function ImportDecisions(props: { rows: ReadonlyArray<ChangeRecord> }) {
+export function ImportDecisions() {
   return (
     <ListTable
       key="decisions"
       caption={importDecisionsCaption}
       searchLabel="Search decisions"
-      columns={importDecisionColumns}
-      rows={props.rows}
+      columns={importDecisionColumnsAtom}
+      rows={importDecisionRows}
       rowKey={(change) =>
         `${change.importId}:${change.rowNumber}.${O.getOrElse(change.part, () => 0)}:${change.change.field}:${DateTime.formatIso(change.createdAt)}`
       }

@@ -3,6 +3,7 @@ import * as A from "effect/Array"
 import * as Cause from "effect/Cause"
 import * as Exit from "effect/Exit"
 import * as O from "effect/Option"
+import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as Atom from "effect/reactivity/Atom"
 import { toast } from "sonner"
 import { Code } from "@inventory/ui/Code"
@@ -22,8 +23,9 @@ import {
 import { Button } from "@inventory/ui/components/button"
 import { type RecordColumn, RecordsTable } from "@inventory/ui/components/data-table/data-table-records"
 import { whenShort } from "@inventory/ui/Dates"
-import { reopenImport, takeBackImport } from "./Imports.atoms.ts"
+import { importView, reopenImport, takeBackImport } from "./Imports.atoms.ts"
 import { invalidate, perKey } from "@inventory/client/Api"
+import type { ImportId } from "@inventory/catalog-contract/Ids"
 import { navigate } from "@inventory/ui/Route"
 import { importAddress } from "./internal/route.ts"
 import {
@@ -121,20 +123,30 @@ const eventLine = (event: ImportEvent): string =>
     : `Took back ${items(event.removed)}${event.restored === 0 ? "" : `, restored ${event.restored}`}${event.kept === 0 ? "" : `, kept ${event.kept}`}, ${event.by}, ${whenShort(event.at)}`
 
 /** The view the person chose on one import's result; none until they choose, and the step opens on its own. */
-const chosenFilter = perKey((_id: string) => Atom.make<O.Option<Filter>>(O.none()))
+const chosenFilter = perKey((_id: ImportId) => Atom.make<O.Option<Filter>>(O.none()))
 
-// The rows a view shows, kept for as long as the result is the same, so the table keeps its state between draws.
-// Weak, so an entry goes with the result it was made for; Effect has no weak collection to use instead.
-const shownRows = new WeakMap<ImportResult, Partial<Record<Filter, ImportResult["rows"]>>>()
-const rowsIn = (result: ImportResult, filter: Filter): ImportResult["rows"] => {
-  const byFilter = shownRows.get(result) ?? {}
-  shownRows.set(result, byFilter)
-  const held = byFilter[filter]
-  if (held !== undefined) return held
-  const rows = A.filter(result.rows, (row) => filter === "all" || row.outcome === filter)
-  byFilter[filter] = rows
-  return rows
-}
+/** The view the result opens on until the person picks one: what was taken back, else what was left out, else all. */
+const filterOf = (input: {
+  readonly view: ImportView
+  readonly result: ImportResult
+  readonly chosen: O.Option<Filter>
+}): Filter =>
+  O.getOrElse(input.chosen, () =>
+    input.view.status === "takenBack" ? "takenBack" : input.result.notImported > 0 ? "notImported" : "all"
+  )
+
+const noResultRows: ImportResult["rows"] = []
+
+/** The rows the view on screen shows: the same rows while the result and the view are the same, so the table keeps its state. */
+const shownRows = perKey((id: ImportId) =>
+  Atom.readable((get): ImportResult["rows"] => {
+    const view = get(importView(id)).pipe(AsyncResult.value)
+    if (O.isNone(view) || O.isNone(view.value.result)) return noResultRows
+    const result = view.value.result.value
+    const filter = filterOf({ view: view.value, result, chosen: get(chosenFilter(id)) })
+    return A.filter(result.rows, (row) => filter === "all" || row.outcome === filter)
+  })
+)
 
 /**
  * What the import did, row by row: imported, updated, already there, not imported with the reason, or taken back. The rows
@@ -145,9 +157,7 @@ const rowsIn = (result: ImportResult, filter: Filter): ImportResult["rows"] => {
 export function ResultStep(props: { view: ImportView; result: ImportResult; table: StagedTable; canImport: boolean }) {
   const { view, result, table } = props
   const [chosen, choose] = useAtom(chosenFilter(view.id))
-  const filter: Filter = O.getOrElse(chosen, () =>
-    view.status === "takenBack" ? "takenBack" : result.notImported > 0 ? "notImported" : "all"
-  )
+  const filter = filterOf({ view, result, chosen })
   const setFilter = (next: Filter) => choose(O.some(next))
   const reopening = useAtomValue(reopenImport).waiting
   const reopenNow = useAtomSet(reopenImport, { mode: "promiseExit" })
@@ -175,7 +185,7 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
       )
       setFilter("takenBack")
     })
-  const shown = rowsIn(result, filter)
+  const shown = useAtomValue(shownRows(view.id))
   const views: ReadonlyArray<readonly [Filter, string, number]> = [
     ...(result.takenBack > 0 || filter === "takenBack"
       ? [["takenBack", importWords.takenBack, result.takenBack] as const]

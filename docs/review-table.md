@@ -166,9 +166,12 @@ holds several records, is [patterns](patterns.md) section 16):
   person ("Leave job J-2044 out"), beside "Leave row 8 out"; the page leaves the parent out and drops its lines from
   `rows`. A question with no default is `problem.choices`, one of them `suggested` with its reason in `note`.
 - **Two views, one history.** A page that shows the parent table and the questions as two views unmounts the region
-  when it switches. The decisions are the page's atom, so they outlive the region: it comes back with its answers
-  and with "Undo last step". After a refresh, `fromDraft(draft)` brings the decisions and their history back; the
-  plain decisions alone (`restored(saved)`) bring them back and start a new history.
+  when it switches. The decisions are the page's atom, and they outlive the region only while something still
+  holds that atom: the app's registry lets an atom nobody reads go after 400 ms, and an `Atom.make` read again
+  starts from its first value, with no answers and no history. So the page reads or mounts the atom in both views
+  (`useAtomMount(decisions)`), or makes it `Atom.keepAlive`; the region then comes back with its answers and with
+  "Undo last step". After a refresh, `fromDraft(draft)` brings the decisions and their history back; the plain
+  decisions alone (`restored(saved)`) bring them back and start a new history.
 - **Twelve parent rows at 1440 by 900.** The parent table is the data table (`RecordsTable`), one line a row with
   the reason cut to one line and the whole sentence in its `title`, one status pill, the totals on one line beside
   the import button and the filters on the same row as the view tabs.
@@ -253,16 +256,19 @@ choice suggested), a decimal comma under one labelled group, a SKU not in stock,
   `result.ready[i].changes` is `{ column, from, to, source: "rule" | "model" | "person", decidedBy: "person" | "rule",
   how, basis?, confidence }` (`basis` and `confidence` are the fix's `why.basis` and `confidence`, the latter an `Option`), `kept` marks a row
   kept over another, and `result.held[i].decidedBy` is `"person"` for a row left out, `"nobody"` for one still open.
-- **A refresh does not lose work**: decisions are plain data. Keep them and hand them back (the caller's atom keeps
-  "Undo last step" too while the page is open: "Two views, one history"):
+- **A refresh does not lose work**: decisions are plain data. Keep them with their history (`toDraft(state)`) and
+  start again from them (`fromDraft(draft)`); kept as `saved(state)` alone they come back with a new history:
 
 ```tsx
-// One atom per file: read is what is held, or what was kept; a write holds it and keeps it (your server draft or localStorage).
+// One atom per file. Read: what is held, or what was kept, with its Undo and Redo. A write holds it and keeps it
+// (your server draft or localStorage; `readDraft` gives an Option of what `toDraft` made). `held` is kept alive: the
+// registry lets an atom nobody reads go after 400 ms, and without it a region that comes back after the other view
+// would read the kept draft again in place of what the person did since the last write landed.
 const decisionsOf = perKey((fileId: string) => {
-  const held = Atom.make<O.Option<ReviewState>>(O.none())
+  const held = Atom.keepAlive(Atom.make<O.Option<ReviewState>>(O.none()))
   return Atom.writable(
-    (get) => O.getOrElse(get(held), () => restored(readDraft(fileId) ?? {})),
-    (ctx, next: ReviewState) => { ctx.set(held, O.some(next)); writeDraft(fileId, saved(next)) }
+    (get) => O.getOrElse(get(held), () => O.match(readDraft(fileId), { onNone: () => emptyState, onSome: fromDraft })),
+    (ctx, next: ReviewState) => { ctx.set(held, O.some(next)); writeDraft(fileId, toDraft(next)) }
   )
 })
 <ReviewRegion key={fileId} decisions={decisionsOf(fileId)} … />
@@ -282,7 +288,9 @@ const decisionsOf = perKey((fileId: string) => {
 - No sums of its own: it cannot know which columns add up or in what units. Pass yours in `totals`, and a check
   against the file in `summary` ("Totals match file").
 - It keeps no decisions of its own: they live in the caller's `decisions` atom, for as long as the caller keeps that
-  atom, and across a reload only if the caller's atom writes them somewhere (see "A refresh does not lose work"). The
+  atom (read or mounted somewhere, or `Atom.keepAlive`: an atom nobody reads is let go after 400 ms and starts again
+  from its first value), and across a reload only if the caller's atom writes them somewhere (see "A refresh does
+  not lose work"). The
   undo and redo history lives in the state the atom holds; to keep it across a refresh, store `toDraft(state)`
   and start again from `fromDraft(draft)` (the Review step does this with the saved progress; a draft saved
   before redo existed opens with nothing to redo).

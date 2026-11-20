@@ -18,6 +18,13 @@ An exploration is a question being shaped before anyone builds. Each lives in `e
 - `BRIEF.md`: Problem, Appetite, Sketch, Rabbit holes, No-gos and a Map (goal slugs, the first slice, "later, when
   <gate>", each part citing existing code or marked NET-NEW).
 
+## Packets
+
+- [ideal-architecture](ideal-architecture/README.md): what inventory-import becomes as a model-first Turborepo of deep
+  packages, shipped with Alchemy. Its goals are being built.
+- [alchemy-domain](alchemy-domain/README.md): everything `@alchemy.run/domain` and what plugs into it offers, concept
+  by concept, with how this app would use each. Research; the brief follows.
+
 ## Graduation
 
 An exploration graduates when all four hold:

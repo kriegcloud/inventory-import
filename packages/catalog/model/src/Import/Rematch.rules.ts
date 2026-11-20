@@ -5,6 +5,7 @@
 // confirm that was on its way, and the two stores agree.
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
+import * as HashSet from "effect/HashSet"
 import * as O from "effect/Option"
 import * as Order from "effect/Order"
 import * as R from "effect/Record"
@@ -24,7 +25,7 @@ import {
   storedUndecided,
   type TakenBackKind
 } from "@inventory/catalog-contract/Decision"
-import type { ItemFields } from "@inventory/catalog-contract/Item"
+import { type ItemFields, skuKey } from "@inventory/catalog-contract/Item"
 import type { Suggestion } from "@inventory/catalog-contract/Suggestion"
 import { matchColumns } from "../Review/Mapping.rules.ts"
 import {
@@ -342,15 +343,48 @@ export const comparisonsChanged = (input: {
 }
 
 /**
- * The stored items a match's question to the file's review was answered from: every SKU key it looked up, and the
- * items it found under them, each at its revision. The D1 store writes the match only while the organization's items
- * under those keys are still exactly these, so an item edited, replaced, created or taken back in between makes the
- * match be worked out again, never written with take-backs judged against an item that is no longer there.
+ * The stored items a question to the file's review was answered from (a match's, a save's or a confirm's judgement of
+ * a Replace or Keep-stored across a re-match): every SKU key it looked up, and the items it found under them, each at
+ * its revision. Both stores write the match, the save and the confirm only while the organization's items under those
+ * keys are still exactly these, so an item edited, replaced, created or taken back in between makes the judgement be
+ * worked out again, never written with take-backs judged against an item that is no longer there. No keys: the review
+ * was not asked, and nothing is checked.
  */
-export type ItemsAsRead = {
-  readonly keys: ReadonlyArray<string>
-  readonly items: ReadonlyArray<{ readonly id: string; readonly revision: number }>
-}
+export const ItemsAsRead = S.Struct({
+  keys: S.Array(S.String).annotateKey({ description: "Every SKU key the review looked up, as `skuKey` makes them" }),
+  items: S.Array(
+    S.Struct({ id: S.String, revision: S.Int }).annotate({
+      description: "One stored item the review compared with, at the revision it read"
+    })
+  ).annotateKey({ description: "Every item the organization had under those keys when the review read them" })
+}).annotate({
+  identifier: "ItemsAsRead",
+  description: "The stored items a judgement of the decisions across a re-match was worked out from"
+})
+/** The decoded value of `ItemsAsRead`. */
+export type ItemsAsRead = typeof ItemsAsRead.Type
+
+/** A judgement that did not ask the file's review: it read no stored item, so no item change can overtake it. */
+export const noItemsRead: ItemsAsRead = { keys: [], items: [] }
+
+/**
+ * Whether the organization's items (`items`, every one it has) are still those a judgement read: under its keys
+ * exactly the items it found, each at the revision it found. The in-memory store's form of the check the D1 store makes
+ * in its write; true when nothing was read.
+ *
+ * @example stillAsRead({ keys: ["AAA-0002"], items: [{ id: "item-1", revision: 1 }] })(itemsNow) // false once edited
+ */
+export const stillAsRead =
+  (read: ItemsAsRead) =>
+  (items: ReadonlyArray<{ readonly id: string; readonly sku: string; readonly revision: number }>): boolean => {
+    if (read.keys.length === 0) return true
+    const keys = HashSet.fromIterable(read.keys)
+    const under = A.filter(items, (item) => HashSet.has(keys, skuKey(item)))
+    return (
+      under.length === read.items.length &&
+      A.every(read.items, (seen) => A.some(under, (item) => item.id === seen.id && item.revision === seen.revision))
+    )
+  }
 
 /** The review's answer to a match's question, and the stored items it was worked out from. */
 export type Compared = { readonly changed: ReadonlyArray<ComparisonChanged>; readonly read: ItemsAsRead }
@@ -386,7 +420,8 @@ const indexIn = <A>(list: ReadonlyArray<A>, value: A): number =>
 /**
  * What one match took back, as the view names it: one entry per re-matched field and kind (fields in the item's
  * order, kinds as the screen names them), each with the revision the match wrote, who matched, how many rows and the
- * first `takenBackRowsNamed` of them in the file's order.
+ * first `takenBackRowsNamed` of them in the file's order. A taken-back key that is not a row id is not counted, and a
+ * field and kind left with no row has no entry.
  *
  * @example
  * takenBackOfMatch({ revision: 13, by: "Dana Whitfield", notApplied: [{ rowId: "row-9", field: "sku", kind: "stored" }, { rowId: "row-4", field: "sku", kind: "stored" }] })
@@ -402,17 +437,27 @@ export const takenBackOfMatch = (input: {
   const entries = A.getSomes(
     A.map(R.values(groups), (group) => {
       const first = A.headNonEmpty(group)
-      const rows = A.dedupe(A.map(group, (taken) => taken.rowId))
-      return O.map(
+      // Only rows the entry can name are counted, so `count` and `rows` always agree; a stored key that names no row
+      // of a file is no row the screen can show.
+      const rows = A.dedupe(
+        A.filter(
+          A.map(group, (taken) => taken.rowId),
+          isRowId
+        )
+      )
+      return O.flatMap(
         A.findFirst(fields, (known) => known === first.field),
-        (field): MatchTakeBack => ({
-          revision: input.revision,
-          by: input.by,
-          field,
-          kind: first.kind,
-          count: rows.length,
-          rows: A.take(A.sort(A.filter(rows, isRowId), fileOrder), takenBackRowsNamed)
-        })
+        (field): O.Option<MatchTakeBack> =>
+          rows.length === 0
+            ? O.none()
+            : O.some({
+                revision: input.revision,
+                by: input.by,
+                field,
+                kind: first.kind,
+                count: rows.length,
+                rows: A.take(A.sort(rows, fileOrder), takenBackRowsNamed)
+              })
       )
     })
   )
@@ -454,21 +499,17 @@ export const takenBackWords = (takeBacks: ReadonlyArray<MatchTakeBack>): string 
 }
 
 /**
- * How many entries a draft keeps of what its matches took back: the newest. A screen names an entry once it holds a
- * picture of that match's revision, so only an entry long past is let go, and the draft's row stays small.
- */
-export const takeBacksKept = 100
-
-/**
- * What a draft keeps of its matches' take-backs once one more match is written: the entries it had, then this
- * match's, the newest `takeBacksKept` of them.
+ * What a draft keeps of its matches' take-backs once one more match is written: every entry it had, then this
+ * match's. None is let go while the import is open: a screen still holding the picture of an earlier revision is told
+ * by that entry, however many matches came after it (the confirm lets them all go). It stays small without a cap: one
+ * entry per match, field and kind, each naming at most `takenBackRowsNamed` rows.
  *
  * @example withTakeBacks({ kept: draftsEntries, added: takenBackOfMatch({ revision: 13, by, notApplied }) })
  */
 export const withTakeBacks = (input: {
   readonly kept: ReadonlyArray<MatchTakeBack>
   readonly added: ReadonlyArray<MatchTakeBack>
-}): ReadonlyArray<MatchTakeBack> => A.takeRight([...input.kept, ...input.added], takeBacksKept)
+}): ReadonlyArray<MatchTakeBack> => [...input.kept, ...input.added]
 
 /**
  * One match worked out from a draft as it is stored: the choices it leaves (the field's new choice stamped `at`, the

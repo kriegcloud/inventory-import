@@ -1,6 +1,7 @@
 // A shared formula is written once, on its first cell; the cells that share it say only which one. Each of them
 // gets the first cell's text with its relative references moved by the distance between the two cells, as Excel
 // shows it. A reference is moved wherever one stands in the text, as the reader this package replaced did.
+import * as O from "effect/Option"
 import * as Str from "effect/String"
 import { MAX_COLUMN, MAX_ROW, columnFromLetters, columnLetters } from "../XlsxAddress.schema.ts"
 
@@ -19,7 +20,7 @@ export const shifted = (input: {
     const index = found.index ?? 0
     const [whole, before = "", fixedColumn = "", letters = "", fixedRow = "", digits = ""] = found
     const column = columnFromLetters(letters)
-    if (column._tag === "None") continue
+    if (O.isNone(column)) continue
     const movedColumn = fixedColumn === "$" ? column.value : column.value + input.columns
     const movedRow = fixedRow === "$" ? Number(digits) : Number(digits) + input.rows
     if (movedColumn < 0 || movedColumn > MAX_COLUMN || movedRow < 1 || movedRow > MAX_ROW) continue

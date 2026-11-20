@@ -25,6 +25,7 @@ import {
   waiting
 } from "../src/Draft.machine.ts"
 import { holdLine, takeBackWords } from "../src/internal/leftOver.ts"
+import { keptForm } from "../src/internal/storedWaiting.ts"
 
 /** One match's take-backs as the view carries them, read through the contract's schema. */
 // @effect-diagnostics-next-line schemaSync:off
@@ -212,7 +213,11 @@ describe("a waiting row is checked before it goes, on every path (G2)", () => {
 
   it("a return to the tab gives the view again: that is no answer, and nothing waiting is sent (g2-bypassed-on-focus-decide-saveagain)", () => {
     const back = play(aWaits, [givenAgain(4)])
-    expect([sends(back), A.some(back.effects, DraftEffect.$is("Ask"))]).toEqual([[], true])
+    // Nor is the import asked again: the read that is out (the return's own) brings the fresh picture, and asking
+    // again while it is out would only give the view again.
+    expect([sends(back), A.some(back.effects, DraftEffect.$is("Ask"))]).toEqual([[], false])
+    // Its answer checks the row, and sends it.
+    expect(A.map(sends(play(back.draft, [view(4)])), (send) => send.delta)).toEqual([{ set: { a: out }, clear: [] }])
   })
 
   it("the next decision sends only itself; the waiting row waits for a fresh picture (in-tab-waiting-row-sent-blind)", () => {
@@ -274,15 +279,46 @@ describe("a waiting row is checked before it goes, on every path (G2)", () => {
     ])
   })
 
-  it("rows taken up before the first picture are checked by it", () => {
+  it("rows taken up before the first picture are checked by the first answer, never by the view the step finds (it may be older)", () => {
     const opened = play(emptyDraft, [DraftEvent.Opened({ kept: O.none() })]).draft
-    const taken = play(opened, [
-      DraftEvent.TakenUp({ kept: goneTab({ a: O.some(out), b: O.some(out) }) }),
-      view(5, { a: kept })
-    ])
+    // The tab held the view of revision 4 (the Match step read it); Marcus kept row a since.
+    const found = play(opened, [DraftEvent.TakenUp({ kept: goneTab({ a: O.some(out), b: O.some(out) }) }), view(4)])
+    expect([sends(found), A.some(found.effects, DraftEffect.$is("Ask"))]).toEqual([[], true])
+    const taken = play(found.draft, [view(5, { a: kept })])
     expect([A.flatMap(sends(taken), (send) => R.keys(send.delta.set)), R.keys(taken.draft.onHold)]).toEqual([
       ["b"],
       ["a"]
+    ])
+  })
+
+  it("the Review step drawn again gives the view it held: a row that waits is not checked by it, and goes over nobody's newer decision (redraw-skips-g2)", () => {
+    // Row a waits at revision 4; the person goes to the Match step; someone keeps row a (revision 5); back to Review.
+    const back = play(aWaits, [DraftEvent.Left(), DraftEvent.Opened({ kept: O.none() }), view(4)])
+    expect([sends(back), A.some(back.effects, DraftEffect.$is("Ask"))]).toEqual([[], true])
+    // The import asked for answers with revision 5: row a is held, both said.
+    const answered = play(back.draft, [view(5, { a: kept })])
+    expect([sends(answered), answered.draft.onHold]).toEqual([
+      [],
+      { a: { mine: O.some(out), madeOn: 4, why: Hold.Elsewhere({ theirs: O.some(kept) }) } }
+    ])
+  })
+
+  it("rows taken up are checked by the gone tab's values seen, not by what this tab once saw of the row (takenup-seen-override)", () => {
+    // This tab left row a out, and it was saved: the server holds out, which this tab saw.
+    const saved = play(atFour, [
+      DraftEvent.Decided({ changes: { a: O.some(out) } }),
+      DraftEvent.SaveAnswered({ revision: 5, changed: true, notApplied: [] })
+    ]).draft
+    // A gone tab had kept row a, beginning from nothing: this tab's out is a decision made since, elsewhere.
+    const taken = play(saved, [
+      DraftEvent.TakenUp({
+        kept: { ...goneTab({ a: O.some(kept) }, { a: 4 }), seen: { a: [O.none(), O.some(kept)] } }
+      }),
+      view(5, { a: out })
+    ])
+    expect([sends(taken), taken.draft.onHold]).toEqual([
+      [],
+      { a: { mine: O.some(kept), madeOn: 4, why: Hold.Elsewhere({ theirs: O.some(out) }) } }
     ])
   })
 
@@ -327,6 +363,65 @@ describe("rows a tab that is gone kept, never dropped without a word", () => {
     expect(A.map(sends(theirs), (send) => [send.delta.set, send.madeOn])).toEqual([[{ r: out }, { r: 3 }]])
   })
 
+  it("this tab's own decision stays beside the other tab's: a failed save of it, Keep this tab's and a reload never lose it (othertab-loses-own)", () => {
+    // Row 12 kept in this tab, its save out; the gone tab had left it out.
+    const out1 = play(atFour, [DraftEvent.Decided({ changes: { r: O.some(kept) } })]).draft
+    const taken = play(out1, [DraftEvent.TakenUp({ kept: goneTab({ r: O.some(out) }) }), DraftEvent.SaveFailed()])
+    expect([R.keys(taken.draft.onHold), taken.draft.unsent]).toEqual([["r"], { r: O.some(kept) }])
+    // Kept in this browser beside the hold, and back after a reload.
+    expect(O.map(waiting(taken.draft), (kept) => [kept.rows, R.keys(kept.held)])).toEqual(
+      O.some([{ r: O.some(kept) }, ["r"]])
+    )
+    const reloaded = play(emptyDraft, [DraftEvent.Opened({ kept: keptForm(waiting(taken.draft)) })]).draft
+    expect([reloaded.unsent, R.keys(reloaded.onHold)]).toEqual([{ r: O.some(kept) }, ["r"]])
+    // Keep this tab's: this tab's decision goes, once a fresh picture has checked it.
+    const keepHere = play(taken.draft, [DraftEvent.HoldSettled({ rowId: "r", keep: "theirs" }), view(5)])
+    expect(A.map(sends(keepHere), (send) => send.delta)).toEqual([{ set: { r: kept }, clear: [] }])
+  })
+
+  it("Keep this tab's decides this tab's again where it is no longer on its way, and nothing of it on the server", () => {
+    // This tab's decision of row 12 was refused after the hold was made: it is only in the line now.
+    const out1 = play(atFour, [DraftEvent.Decided({ changes: { r: O.some(kept) } })]).draft
+    const taken = play(out1, [
+      DraftEvent.TakenUp({ kept: goneTab({ r: O.some(out) }) }),
+      DraftEvent.SaveRefused({ reason: "No." })
+    ])
+    expect([taken.draft.unsent, R.keys(taken.draft.onHold)]).toEqual([{}, ["r"]])
+    const keepHere = play(taken.draft, [view(4), DraftEvent.HoldSettled({ rowId: "r", keep: "theirs" })])
+    expect(A.map(sends(keepHere), (send) => send.delta)).toEqual([{ set: { r: kept }, clear: [] }])
+  })
+
+  it("a ready row of this tab beside the other tab's goes nowhere while the line asks: not with the next save, not in a confirm", () => {
+    // Row b's save is out; row 12 kept in this tab waits behind it; the gone tab had left 12 out.
+    const behind = play(atFour, [
+      DraftEvent.Decided({ changes: { b: O.some(out) } }),
+      DraftEvent.Decided({ changes: { r: O.some(kept) } }),
+      DraftEvent.TakenUp({ kept: goneTab({ r: O.some(out) }) })
+    ]).draft
+    const answered = play(behind, [DraftEvent.SaveAnswered({ revision: 5, changed: true, notApplied: [] })])
+    expect(sends(answered)).toEqual([])
+    const pressed = play(answered.draft, [DraftEvent.ConfirmPressed()])
+    expect(A.some(pressed.effects, DraftEffect.$is("Confirm"))).toBe(false)
+  })
+
+  it("the server holding the other tab's decision does not let the line go: this tab's differs, and is never sent unasked", () => {
+    const here = play(atFour, [DraftEvent.Decided({ changes: { r: O.some(kept) } }), DraftEvent.SaveFailed()]).draft
+    const taken = play(here, [DraftEvent.TakenUp({ kept: goneTab({ r: O.some(out) }) })]).draft
+    // The gone tab's save had reached the server after all.
+    const arrived = play(taken, [view(5, { r: out })])
+    expect([sends(arrived), arrived.draft.onHold]).toEqual([
+      [],
+      { r: { mine: O.some(out), madeOn: 3, why: Hold.OtherTab({ thisTab: O.some(kept) }) } }
+    ])
+  })
+
+  it("a gone tab's refused row stays refused beside this tab's decision, never offered to be sent as the other tab's", () => {
+    const here = play(atFour, [DraftEvent.Decided({ changes: { r: O.some(kept) } }), DraftEvent.SaveFailed()]).draft
+    const refused = { mine: O.some(out), madeOn: 3, why: Hold.Refused({ reason: "Your role was changed." }) }
+    const taken = play(here, [DraftEvent.TakenUp({ kept: goneTab({}, { held: { r: refused } }) })])
+    expect([taken.draft.onHold, taken.draft.unsent]).toEqual([{ r: refused }, { r: O.some(kept) }])
+  })
+
   it("decided the same in both tabs: nothing is held, nothing lost", () => {
     const here = play(atFour, [DraftEvent.Decided({ changes: { r: O.some(out) } }), DraftEvent.SaveFailed()]).draft
     expect(play(here, [DraftEvent.TakenUp({ kept: goneTab({ r: O.some(out) }) })]).draft.onHold).toEqual({})
@@ -360,6 +455,13 @@ describe("rows a tab that is gone kept, never dropped without a word", () => {
       [],
       [DraftEffect.Say({ what: Said.Outlived({ rows: { a: O.some(out) } }) })]
     ])
+  })
+})
+
+describe("a draft with no picture held", () => {
+  it("sends nothing for a decision (it would go made on nothing): the import is asked for, and its picture sends it (decided-after-let-go)", () => {
+    const decided = play(emptyDraft, [DraftEvent.Decided({ changes: { a: O.some(out) } })])
+    expect([sends(decided), A.some(decided.effects, DraftEffect.$is("Ask"))]).toEqual([[], true])
   })
 })
 
@@ -416,12 +518,31 @@ describe("the line above the review", () => {
 describe("what a match took back", () => {
   it("is said as taken back, not as a change on another screen", () => {
     const arrived = play(atFour, [
-      DraftEvent.ViewArrived({ revision: 5, decisions: { a: out }, open: true, confirms: 0, takenBack: [5] })
+      DraftEvent.ViewArrived({
+        revision: 5,
+        decisions: { a: out },
+        open: true,
+        confirms: 0,
+        takenBack: [{ revision: 5, rows: ["a"] }]
+      })
     ])
     expect(A.filter(arrived.effects, DraftEffect.$is("Restart"))).toEqual([DraftEffect.Restart({ announce: false })])
     // Without a take-back at that revision, the same change is somebody else's.
     const other = play(atFour, [view(5, { a: out })])
     expect(A.filter(other.effects, DraftEffect.$is("Restart"))).toEqual([DraftEffect.Restart({ announce: true })])
+  })
+
+  it("explains only its own rows: another decision in the same jump is still said as a change on another screen (takeback-hides-unrelated)", () => {
+    const arrived = play(atFour, [
+      DraftEvent.ViewArrived({
+        revision: 6,
+        decisions: { a: out, b: kept },
+        open: true,
+        confirms: 0,
+        takenBack: [{ revision: 5, rows: ["a"] }]
+      })
+    ])
+    expect(A.filter(arrived.effects, DraftEffect.$is("Restart"))).toEqual([DraftEffect.Restart({ announce: true })])
   })
 
   it("is named by who matched, the field, the kind, how many and which rows", () => {

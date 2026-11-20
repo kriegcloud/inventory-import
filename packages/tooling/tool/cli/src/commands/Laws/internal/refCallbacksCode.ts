@@ -478,9 +478,80 @@ const rootOf = (target: Node): O.Option<string> => {
   return node.type === "MemberExpression" ? O.flatMap(child(node, "object"), rootOf) : O.none()
 }
 
+/** The calls that write into the object they are handed first: `Object.assign(refs, { [id]: fn })` and its kin. */
+const writesInto = [
+  "Object.assign",
+  "Object.defineProperty",
+  "Object.defineProperties",
+  "Reflect.set",
+  "Reflect.defineProperty"
+]
+
+/** The name a call is made by, with what it is called on: `Object.assign` in `Object.assign(refs, …)`. */
+const calledPath = (callee: Node): string =>
+  O.getOrElse(
+    O.map(memberOf(unwrapped(callee)), ({ path, root }) => A.join([nameOf(root), ...path], ".")),
+    () => nameOf(unwrapped(callee))
+  )
+
+/** How many other names a write is followed through to the top-level name it writes into. */
+const maxAliases = 8
+
+/**
+ * The top-level name a name inside a function stands for: itself when the file's top level binds it, or what another
+ * name of the function was given (`const r = refs`, `const { inner } = refs`), followed to the top.
+ */
+const topNameOf = (name: string, scopes: ReadonlyArray<Scope>, depth = 0): O.Option<string> =>
+  O.flatMap(lookUpAt(scopes, name), ({ at, binding }) => {
+    if (at === 0) return O.some(name)
+    if (binding.kind !== "inner" || depth > maxAliases) return O.none()
+    return O.flatMap(O.flatMap(binding.init, rootOf), (other) => topNameOf(other, A.take(scopes, at + 1), depth + 1))
+  })
+
+/**
+ * The top level's other names for one another: `const r = refs` makes `r` and `refs` one record, so a write into
+ * either fills both.
+ */
+const topAliases = (program: Node): ReadonlyArray<readonly [string, string]> =>
+  A.flatMap(nodes(program["body"]), (statement) => {
+    const declared = O.getOrElse(child(statement, "declaration"), () => statement)
+    if (declared.type !== "VariableDeclaration") return []
+    return A.flatMap(nodes(declared["declarations"]), (declarator) =>
+      O.match(child(declarator, "init"), {
+        onNone: () => [],
+        onSome: (init) =>
+          O.match(rootOf(init), {
+            onNone: () => [],
+            onSome: (other) =>
+              O.match(child(declarator, "id"), {
+                onNone: () => [],
+                onSome: (id) => A.map(namesIn(id), ({ name }) => [name, other] as const)
+              })
+          })
+      })
+    )
+  })
+
+/** Every name `filled` names, with each top-level name that is another name for one of them. */
+const withAliases = (filled: ReadonlyArray<string>, aliases: ReadonlyArray<readonly [string, string]>) => {
+  const grow = (names: ReadonlyArray<string>, rounds: number): ReadonlyArray<string> => {
+    const next = A.dedupe(
+      A.appendAll(
+        names,
+        A.flatMap(aliases, ([name, other]) =>
+          A.contains(names, name) ? [other] : A.contains(names, other) ? [name] : []
+        )
+      )
+    )
+    return next.length === names.length || rounds <= 0 ? next : grow(next, rounds - 1)
+  }
+  return grow(A.dedupe(filled), aliases.length)
+}
+
 /**
  * What the functions of a file do to its top level's names: assign one again (`current = next`, `count++`), or write
- * into what one holds (`refs[id] = …`, `refs[id] ??= …`, `refs.count++`, `delete refs[id]`).
+ * into what one holds (`refs[id] = …`, `refs[id] ??= …`, `refs.count++`, `delete refs[id]`,
+ * `Object.assign(refs, { [id]: fn })`), directly or through another name for it (`const r = refs; r[id] ??= fn`).
  */
 const writtenInFunctions = (program: Node, top: Scope): Written => {
   const reassigned: Array<string> = []
@@ -488,22 +559,32 @@ const writtenInFunctions = (program: Node, top: Scope): Written => {
   const visit = (node: Node, scopes: ReadonlyArray<Scope>): void => {
     const here = isFunction(node) ? A.append(scopes, scopeOf(node)) : scopes
     const atTop = (name: string): boolean => O.exists(lookUpAt(here, name), (bound) => bound.at === 0)
+    const fill = (target: Node): void => {
+      for (const name of O.toArray(O.flatMap(rootOf(target), (root) => topNameOf(root, here)))) filled.push(name)
+    }
     const deleted = node.type === "UnaryExpression" && node["operator"] === "delete"
     if (here.length > 1 && (deleted || typeIs(node, "AssignmentExpression", "UpdateExpression"))) {
       const target = child(node, node.type === "AssignmentExpression" ? "left" : "argument")
       const member = O.exists(target, (left) => unwrapped(left).type === "MemberExpression")
       if (member) {
-        for (const name of O.toArray(O.flatMap(target, rootOf))) if (atTop(name)) filled.push(name)
+        for (const left of O.toArray(target)) fill(left)
       } else {
         for (const { name } of O.match(target, { onNone: () => [], onSome: (left) => namesIn(unwrapped(left)) })) {
           if (atTop(name)) reassigned.push(name)
         }
       }
     }
+    if (
+      here.length > 1 &&
+      node.type === "CallExpression" &&
+      O.exists(child(node, "callee"), (callee) => A.contains(writesInto, calledPath(callee)))
+    ) {
+      for (const first of A.take(nodes(node["arguments"]), 1)) fill(first)
+    }
     for (const next of children(node)) visit(next, here)
   }
   visit(program, [top])
-  return { reassigned, filled }
+  return { reassigned, filled: withAliases(filled, topAliases(program)) }
 }
 
 /** One place a screen hands a value over: where, what it is handed as, and the verdict. */

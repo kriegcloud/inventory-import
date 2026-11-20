@@ -242,6 +242,40 @@ export function List() {
 }
 `
 
+// A module record filled in place by other means the third review found passing: through `Object.assign`, through
+// another name a component gives it, and read through another name the module gives it.
+const aliased = `const refs: Record<string, (node: HTMLElement | null) => void> = {}
+const kept: Record<string, (node: HTMLElement | null) => void> = {}
+const shared = kept
+export function List(props: { id: string }) {
+  Object.assign(refs, { [props.id]: (node: HTMLElement | null) => node?.focus() })
+  const r = kept
+  r[props.id] ??= (node) => node?.focus()
+  return (
+    <section>
+      <p ref={refs[props.id]} />
+      <p ref={kept[props.id]} />
+      <p ref={shared[props.id]} />
+    </section>
+  )
+}
+`
+
+// What still passes beside them: a record copied into a new object, and a record read through another name.
+const aliasedSteady = `const refs: Record<string, (node: HTMLElement | null) => void> = { lead: (node) => node?.focus() }
+export function List() {
+  const r = refs
+  const copy = Object.assign({}, refs)
+  return (
+    <section>
+      <p ref={r.lead} />
+      <p ref={refs.lead} />
+      <p title={String(copy.lead === undefined)} />
+    </section>
+  )
+}
+`
+
 /** The workspaces whose exports name modules of hooks: the vendored kit's `src/hooks`, and a `*.hook.ts` file. */
 const hookPackages = {
   "packages/ui/package.json": json({
@@ -262,6 +296,27 @@ describe("laws ref-callbacks", () => {
         "err: src/List.tsx:25  ref: current reads",
         "err: src/List.tsx:26  ref: useStable is",
         "err: src/List.tsx:27  ref: followed more"
+      ])
+    })
+  )
+
+  it.effect("refuses a module record filled by Object.assign or through another name, and read through one", () =>
+    Effect.gen(function* () {
+      const report = yield* inTree({ "src/List.tsx": aliased }, inRepository)
+      expect(report.failed).toBe(true)
+      expect(refusals(report)).toEqual([
+        "err: src/List.tsx:10  ref: refs is",
+        "err: src/List.tsx:11  ref: kept is",
+        "err: src/List.tsx:12  ref: shared is"
+      ])
+    })
+  )
+
+  it.effect("passes a record copied into a new object and a record read through another name", () =>
+    Effect.gen(function* () {
+      const report = yield* inTree({ "src/List.tsx": aliasedSteady }, inRepository)
+      expect(printed(report)).toEqual([
+        "out: refs:check OK  every ref is a DOM ref or a callback that stays the same across draws"
       ])
     })
   )

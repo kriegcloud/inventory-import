@@ -18,7 +18,9 @@
  * `use…` helper that is not a hook); a choice by a condition (a ref switched on and off is an effect on that
  * condition); a name bound inside a function to a function (typed, generic, `var` and declared ones too), an object,
  * a call that is not a hook's, or taken out of one; a module `let` a function sets again (it holds what the last draw
- * gave it); a module record a function writes into (`refs[id] ??= …`: a cache by hand, holding what a draw made); the
+ * gave it); a module record a function writes into (`refs[id] ??= …`, `Object.assign(refs, { [id]: fn })`, or through
+ * another name for it, `const r = refs; r[id] ??= …`: a cache by hand, holding what a draw made), under any of its
+ * names; the
  * `.current` of what a hook holds (`useRef(fn).current`: useRef is for a DOM node, and `.current` is what it held when
  * the draw read it); a value followed more than eight names deep (nothing there was shown steady); and an element of
  * a list (`rows.map((row) => <li ref={row.measure} />)`) made in the draw. A prop handed

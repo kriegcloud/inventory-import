@@ -21,10 +21,12 @@ import { useAtomValue } from "@effect/atom-react"
 import { catalogApi } from "./Catalog.runtime.ts"
 import { sayError } from "@inventory/client/SayError"
 import {
+  answererName,
   type Conversation,
   conversationKey,
   emptyConversation,
   type Entry,
+  lastAnsweredByRules,
   readConversation,
   writeConversation
 } from "./Conversation.machine.ts"
@@ -33,17 +35,19 @@ import { AnsweredBy } from "@inventory/catalog-contract/Answer"
 import { rulesRead } from "@inventory/catalog-model/TableViewRules"
 import { type ColumnCatalog, maxPrompt } from "@inventory/catalog-contract/TableView"
 /**
- * Who answered and the line under it, as the conversation keeps them: "Rules" with the reason no model answered, or
- * the model's name with what it said it could not do.
+ * Who answered and the line under it, as the conversation keeps them: who answered as its case, with the reason no
+ * model answered, or with what the model said it could not do.
  */
 const whoAnswered = (answer: {
   readonly answeredBy: AnsweredBy
   readonly note: O.Option<string>
-}): { readonly answeredBy: string; readonly note: string | null } =>
-  AnsweredBy.match(answer.answeredBy, {
-    Rules: (by) => ({ answeredBy: "Rules", note: by.reason }),
-    Model: (by) => ({ answeredBy: by.model, note: O.getOrNull(answer.note) })
+}): { readonly answeredBy: AnsweredBy; readonly note: string | null } => ({
+  answeredBy: answer.answeredBy,
+  note: AnsweredBy.match(answer.answeredBy, {
+    Rules: (by) => by.reason,
+    Model: () => O.getOrNull(answer.note)
   })
+})
 
 /** The parts of a TanStack table the assistant reads and writes: the table's own state, never a copy of it. */
 export type AssistedTable = {
@@ -490,7 +494,7 @@ export function TableAssistant(props: {
               <li key={entry.id} className="flex flex-col gap-1">
                 <p className="text-sm font-medium">{entry.prompt}</p>
                 {entry.answeredBy === null ? null : (
-                  <p className="text-xs text-muted-foreground">Answered by {entry.answeredBy}</p>
+                  <p className="text-xs text-muted-foreground">Answered by {answererName(entry.answeredBy)}</p>
                 )}
                 {entry.reason === null ? null : <p className="text-sm text-destructive">{entry.reason}</p>}
                 {entry.note === null || entry.note === conversation.entries[index - 1]?.note ? null : (
@@ -573,7 +577,7 @@ export function TableAssistant(props: {
               <ArrowUp />
             </Button>
           </form>
-          {conversation.entries[conversation.entries.length - 1]?.answeredBy === "Rules" ? (
+          {lastAnsweredByRules(conversation.entries) ? (
             <p className="text-xs text-muted-foreground">{rulesRead}</p>
           ) : null}
           <div className="flex flex-wrap gap-1.5">

@@ -6,6 +6,7 @@ import * as HashMap from "effect/HashMap"
 import * as MutableHashMap from "effect/MutableHashMap"
 import * as MutableHashSet from "effect/MutableHashSet"
 import * as O from "effect/Option"
+import * as P from "effect/Predicate"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import * as Stream from "effect/Stream"
@@ -136,7 +137,7 @@ const stringsOf = Effect.fnUntraced(function* (input: {
   let text = ""
   let failed: O.Option<"sharedStrings" | "cellChars"> = O.none()
   const step = (event: XmlEvent): void => {
-    if (event._tag === "StartElement") {
+    if (P.isTagged(event, "StartElement")) {
       depth += 1
       const name = localName(event.name)
       if (entryAt === -1) {
@@ -148,7 +149,7 @@ const stringsOf = Effect.fnUntraced(function* (input: {
         if (name === "rPh") phoneticAt = depth
         else if (name === "t") textAt = depth
       }
-    } else if (event._tag === "EndElement") {
+    } else if (P.isTagged(event, "EndElement")) {
       if (depth === textAt) textAt = -1
       else if (depth === phoneticAt) phoneticAt = -1
       else if (depth === entryAt) {
@@ -158,7 +159,7 @@ const stringsOf = Effect.fnUntraced(function* (input: {
         else strings.push(detached(unescaped(text)))
       }
       depth -= 1
-    } else if (event._tag === "Text" && textAt !== -1) text += event.text
+    } else if (P.isTagged(event, "Text") && textAt !== -1) text += event.text
   }
   yield* eventsOf({ path: input.path, body: Stream.make(input.bytes), cellChars: input.caps.cellChars }).pipe(
     Stream.takeWhile(() => O.isNone(failed)),

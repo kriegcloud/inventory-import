@@ -88,8 +88,8 @@
       ],
       "outputs": []
     },
-    // No `_tag` is told apart or built by hand in our own code and every test (`beep laws tags`), but in the files
-    // the root's tags-ledger.json records, each held to its count.
+    // No `_tag` is told apart or built by hand in our own code and every test (`beep laws tags`), with no file
+    // excepted: a count per file would let one hand-written tag be swapped for another.
     "//#tags:check": {
       "inputs": [
         "apps/*/src/**/*.{ts,tsx}",
@@ -100,7 +100,6 @@
         "packages/review/**/*.{ts,tsx}",
         "packages/ui/**/*.{ts,tsx}",
         "packages/**/vendor.json",
-        "tags-ledger.json",
         "packages/tooling/tool/cli/src/**"
       ],
       "outputs": []

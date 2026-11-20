@@ -3,13 +3,16 @@
 // audit line counts it. Also, over the twins: a Replace whose row stops reading under the new column is taken back,
 // a draft overtaken on every try is a typed refusal in both the match and the save, and a `madeOn` key naming no row
 // of the save is not read. The D1 side of the same rules is in the app's Rematch and MatchAtomic slow tests.
-import { describe, expect, layer } from "@effect/vitest"
+import { describe, expect, it, layer } from "@effect/vitest"
 import { decisionFromFlags, type RowDecisionFlags } from "@inventory/catalog-contract/Decision"
-import { DraftBusy, RevisionAhead } from "@inventory/catalog-contract/ImportRejection"
+import { RowId } from "@inventory/catalog-contract/Ids"
+import type { MatchTakeBack } from "@inventory/catalog-contract/Import"
+import { AcceptsTakenBack, DraftBusy, RevisionAhead } from "@inventory/catalog-contract/ImportRejection"
 import type { StagedTable } from "@inventory/catalog-contract/Staged"
-import { decisionsRematched, draftTries, ImportStore } from "@inventory/catalog-model/ImportStore"
+import { type ConfirmWrite, decisionsRematched, draftTries, ImportStore } from "@inventory/catalog-model/ImportStore"
 import { importsEndpoints } from "@inventory/catalog-model/ImportsHandler"
 import { catalogMemory, CatalogMemoryRef } from "@inventory/catalog-model/Memory"
+import { takenBackOfMatch, withTakeBacks } from "@inventory/catalog-model/Rematch"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
@@ -326,6 +329,117 @@ describe("a madeOn key that names no row of the save", () => {
         )
         expect(S.is(RevisionAhead)(ahead)).toBe(true)
       })
+    )
+  })
+})
+
+describe("what a draft keeps of its matches' take-backs", () => {
+  const entry = (revision: number): MatchTakeBack => ({
+    revision,
+    by: "Dana Whitfield",
+    field: "unitCost",
+    kind: "accept",
+    count: 1,
+    rows: [RowId.make("row-2")]
+  })
+  it("keeps every entry while the import is open: a 101st does not let go of the first", () => {
+    const kept = A.makeBy(100, (index) => entry(index + 1))
+    const after = withTakeBacks({ kept, added: [entry(101)] })
+    expect([after.length, A.head(after), A.last(after)]).toEqual([101, O.some(entry(1)), O.some(entry(101))])
+  })
+
+  it("counts only the rows it can name: a taken-back key that is not a row id is neither counted nor named", () => {
+    const entries = takenBackOfMatch({
+      revision: 13,
+      by: "Dana Whitfield",
+      notApplied: [
+        { rowId: "row-9", field: "sku", kind: "stored" },
+        { rowId: "not-a-row", field: "sku", kind: "stored" },
+        { rowId: "row-4", field: "sku", kind: "stored" },
+        // A field and kind with no row the screen can show has no entry at all.
+        { rowId: "row-0", field: "uom", kind: "accept" }
+      ]
+    })
+    expect(A.map(entries, (taken) => [taken.field, taken.kind, taken.count, taken.rows])).toEqual([
+      ["sku", "stored", 2, ["row-4", "row-9"]]
+    ])
+  })
+})
+
+describe("a stored item that changes between a judgement of the decisions and its write", () => {
+  // Row 2 costs 9.00 under "unit_cost" and 3 under "Net cost"; nothing is stocked under its SKU when it is judged.
+  // Stocked at 3, a Replace made while the cost read "unit_cost" compares otherwise under "Net cost".
+  const lone = tableOf("lone.csv", [
+    { ...item, sku: "AAA-0002", name: "Steel Bolt", unit_cost: "9.00", "Net cost": "3" }
+  ])
+  const replace = flags({ "row-2": { stored: "replace" } })
+  const named = [{ rowId: "row-2", field: "unitCost", kind: "stored" }]
+
+  /** The file staged and its cost matched to "Net cost"; the stocking import is confirmed once, as `step` writes. */
+  const windowed = Effect.fn("windowed")(function* (step: "decide" | "commit") {
+    const plain = yield* importsEndpoints
+    const inner = yield* ImportStore
+    const first = yield* stage(stocked).pipe(as(marcus))
+    const view = yield* stage(lone).pipe(as(marcus))
+    const params = { id: view.id }
+    const matched = yield* plain
+      .match({ params, payload: { field: "unitCost", column: O.some(column("Net cost")) } })
+      .pipe(as(dana))
+    const waiting = MutableRef.make(true)
+    const stockOnce = Effect.suspend(() => {
+      if (!MutableRef.get(waiting)) return Effect.void
+      MutableRef.set(waiting, false)
+      return plain
+        .commit({ params: { id: first.id }, payload: { revision: first.revision, madeOn: {}, set: {}, clear: [] } })
+        .pipe(as(marcus), Effect.asVoid, Effect.orDie)
+    })
+    const windowedStore = ImportStore.of({
+      ...inner,
+      decide: Effect.fn("windowed.decide")(function* (...args: Parameters<ImportStore["Service"]["decide"]>) {
+        if (step === "decide") yield* stockOnce
+        return yield* inner.decide(...args)
+      }),
+      commit: Effect.fn("windowed.commit")(function* (write: ConfirmWrite) {
+        if (step === "commit") yield* stockOnce
+        return yield* inner.commit(write)
+      })
+    })
+    const imports = yield* importsEndpoints.pipe(Effect.provideService(ImportStore, windowedStore))
+    return { imports, view, params, matched }
+  })
+
+  // Each on its own twins: the item one stocks must not be there already when the other is judged.
+  layer(App)("the save is judged again against the items as they are", (it) => {
+    it.effect("a save judged with no item stored: the item stocked before its write takes the Replace back", () =>
+      Effect.gen(function* () {
+        const { imports, view, params } = yield* windowed("decide")
+        const saved = yield* imports
+          .decide({ params, payload: { madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
+          .pipe(as(marcus))
+        expect(saved.notApplied).toEqual(named)
+        const after = yield* imports.get({ params }).pipe(as(marcus))
+        expect(R.get(after.decisions, "row-2")).toEqual(O.some(decisionFromFlags({})))
+      })
+    )
+  })
+
+  layer(App)("the confirm is judged again against the items as they are", (it) => {
+    it.effect(
+      "a confirm judged with no item stored: the item stocked before its batch refuses it, nothing imported",
+      () =>
+        Effect.gen(function* () {
+          const { imports, view, params, matched } = yield* windowed("commit")
+          const refused = yield* Effect.flip(
+            imports
+              .commit({
+                params,
+                payload: { revision: matched.revision, madeOn: { "row-2": view.revision }, set: replace, clear: [] }
+              })
+              .pipe(as(marcus))
+          )
+          expect(S.is(AcceptsTakenBack)(refused) ? refused.accepts : []).toEqual(named)
+          expect((yield* imports.get({ params }).pipe(as(marcus))).status).toBe("open")
+        })
     )
   })
 })

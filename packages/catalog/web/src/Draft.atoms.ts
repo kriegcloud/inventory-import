@@ -15,6 +15,7 @@ import { pipe } from "effect/Function"
 import * as HashSet from "effect/HashSet"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
+import * as Schedule from "effect/Schedule"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import * as Atom from "effect/reactivity/Atom"
@@ -199,21 +200,54 @@ export const takeUpGoneTabs = (input: {
   })
 }
 
+/** The text kept under a key in the browser's storage as it is now: null where there is none or it cannot be read. */
+const keptNow = (key: string): string | null => {
+  try {
+    return sharedStorage()?.getItem(key) ?? null
+  } catch {
+    return null
+  }
+}
+
 /**
- * Claims one entry of a tab that is gone and, once claimed, does `then` with it, keeping the claim for this page's
- * life: of two tabs that find the same tab gone at once, only one gets it; and another tab's copy of the browser's
- * storage can lag behind this tab's erase, so a claim let go at once could be granted to a tab that still reads it.
+ * How long a claim is kept after the entry it took reads as erased here: another tab's copy of the browser's storage
+ * can lag behind this tab's erase, so a claim let go at once could be granted to a tab that still reads the entry.
+ */
+const claimKept = "500 millis"
+
+/**
+ * Claims one entry of a tab that is gone and, once claimed, does `then` with it: of two tabs that find the same tab
+ * gone at once, only one gets it. The claim is let go once the take-up is done (the entry reads as erased here, and a
+ * moment more for other tabs' copies of the storage): a tab of that id that comes back and is gone again later (a
+ * reload, then a close) is taken up again, by this page or another.
  */
 const claiming = (locks: LockManager, entry: { readonly key: string }, then: () => void): void =>
   void locks.request(claimOf(entry), { ifAvailable: true }, (lock) =>
     lock === null
       ? Effect.runPromise(Effect.void)
-      : Effect.runPromise(Effect.sync(then).pipe(Effect.andThen(Effect.never)))
+      : Effect.runPromise(
+          Effect.sync(then).pipe(
+            Effect.andThen(
+              Effect.sync(() => keptNow(entry.key)).pipe(
+                Effect.repeat({ until: (text) => text === null, schedule: Schedule.spaced("10 millis"), times: 100 })
+              )
+            ),
+            Effect.andThen(Effect.sleep(claimKept))
+          )
+        )
   )
 
 /**
+ * The keys of the waiting rows this page has read into a draft: only those are ever written by `keepWaiting`. A draft
+ * whose entry was not read yet (the step opened before this tab's id was its own) holds none of what the entry keeps,
+ * and writing it there would erase the rows kept before a reload.
+ */
+const keysRead = Atom.make(HashSet.empty<string>()).pipe(Atom.keepAlive)
+
+/**
  * The waiting rows this browser kept for one import, for the person signed in now and this tab: what the step reads
- * when it opens. None while nobody is, or before this tab's id is its own.
+ * when it opens, or when this tab's id becomes its own after the step opened. None while nobody is, or before this
+ * tab's id is its own. Once read, the entry is the draft's to write.
  */
 export const keptWaiting = (input: {
   readonly registry: AtomRegistry.AtomRegistry
@@ -221,7 +255,11 @@ export const keptWaiting = (input: {
 }): O.Option<Waiting> =>
   pipe(
     O.all({ actor: input.registry.get(member), tab: input.registry.get(thisTab) }),
-    O.flatMap(({ actor, tab }) => toWaiting(input.registry.get(waitingAt(keyOf(actor, input.id, tab)))))
+    O.flatMap(({ actor, tab }) => {
+      const key = keyOf(actor, input.id, tab)
+      input.registry.update(keysRead, HashSet.add(key))
+      return toWaiting(input.registry.get(waitingAt(key)))
+    })
   )
 
 /**
@@ -244,6 +282,8 @@ export const keepWaiting = (input: {
   }
   O.map(O.all({ owner: registry.get(draftOwner(id)), tab: registry.get(thisTab) }), ({ owner, tab }) => {
     const key = keyOf(owner, id, tab)
+    // An entry not read into the draft yet is left as it is: the draft does not hold what it keeps.
+    if (!HashSet.has(registry.get(keysRead), key)) return
     const stored = toStored(input.waits)
     if (!Eq.equals(registry.get(waitingAt(key)), stored)) registry.set(waitingAt(key), stored)
   })
@@ -255,6 +295,22 @@ export const keepWaiting = (input: {
       : HashSet.remove(now, id)
   )
 }
+
+/**
+ * The take-backs of a match one member dismissed for one import, by key, kept in this browser: none is no entry. An
+ * older page kept the list bare; it is read the same.
+ */
+export const takeBackDismissals = Atom.family((key: string) =>
+  kept({
+    key,
+    schema: S.String.pipe(S.Array, S.OptionFromNullOr),
+    defaultValue: (): O.Option<ReadonlyArray<string>> => O.none()
+  })
+)
+
+/** Where one member's dismissals of one import's take-backs are kept. */
+export const dismissalsKey = (of: { readonly actor: Owner; readonly id: ImportId }): string =>
+  progressKey({ organizationId: of.actor.organizationId, memberId: of.actor.id, screen: `import:${of.id}:takenBack` })
 
 /**
  * Erases one import's draft and the rows kept for it in this browser that no open tab holds (the import was removed):
@@ -273,6 +329,8 @@ export const forgetDraft = (input: { readonly registry: AtomRegistry.AtomRegistr
   registry.set(draftOf(id), emptyDraft)
   registry.set(draftOwner(id), O.none())
   registry.update(waitingImports, HashSet.remove(id))
+  // What each of them dismissed of the take-backs a match made goes with the import.
+  for (const owner of owners) registry.set(takeBackDismissals(dismissalsKey({ actor: owner, id })), O.none())
   O.map(registry.get(thisTab), (tab) => {
     const locks = browserLocks()
     for (const owner of owners) {

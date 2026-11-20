@@ -13,7 +13,14 @@ import type { ImportView } from "@inventory/catalog-contract/Import"
 import { importsEndpoints } from "@inventory/catalog-model/ImportsHandler"
 import { itemsOfRow, review } from "@inventory/catalog-model/Review"
 import { catalogMemory } from "@inventory/catalog-model/Memory"
-import { columnAt, columnsOf, movesOfMatch, withoutStaleDecisions } from "@inventory/catalog-model/Rematch"
+import {
+  columnAt,
+  columnsOf,
+  comparisonQuestions,
+  comparisonsChanged,
+  movesOfMatch,
+  withoutStaleDecisions
+} from "@inventory/catalog-model/Rematch"
 import * as A from "effect/Array"
 import * as Arbitrary from "effect/Arbitrary"
 import * as Effect from "effect/Effect"
@@ -407,6 +414,53 @@ describe("a Replace or Keep-stored across a re-match of another column", () => {
           [{ rowId: "row-3", field: "unitCost", kind: "stored" }]
         ])
       })
+    )
+
+    it.effect(
+      "is judged on its own field only: an accept or undone fix of a second field matched again changes nothing of it",
+      () =>
+        Effect.gen(function* () {
+          const imports = yield* importsEndpoints
+          const first = yield* stage(stocked).pipe(as(marcus))
+          yield* imports
+            .commit({ params: { id: first.id }, payload: { revision: first.revision, madeOn: {}, set: {}, clear: [] } })
+            .pipe(as(marcus))
+          // Each row's cost reads the same under "Net cost" as under "unit_cost", and its unit "EA" under "uom" as "ea"
+          // under "Pack unit", which a rule writes in capitals: neither re-match changes how a row compares. Row 2
+          // accepted the unit's fix, row 3 undid it, both with a Replace. Each re-match takes that accept or undo back
+          // on both sides, so row 3 kept as "ea" against the stored "EA" on one side only is not a change of the cost.
+          const table = tableOf("two-moves.csv", [
+            { ...item, sku: "AAA-0001", name: "Oak Crate", unit_cost: "12.50", "Net cost": "12.50", "Pack unit": "ea" },
+            { ...item, sku: "AAA-0002", name: "Steel Bolt", unit_cost: "3", "Net cost": "3", "Pack unit": "ea" }
+          ])
+          const view = yield* stage(table).pipe(as(marcus))
+          const set = flags({
+            "row-2": { stored: "replace", accepted: ["uom"] },
+            "row-3": { stored: "replace", reverted: ["uom"] }
+          })
+          // Both fields matched again after the rows were decided on revision 1.
+          const choices: ReadonlyArray<MappingChoice> = [
+            { field: "unitCost", column: column("Net cost"), by: "person", at: 2 },
+            { field: "uom", column: column("Pack unit"), by: "person", at: 3 }
+          ]
+          const moves = [
+            { field: "unitCost" as const, at: 2, was: column("unit_cost"), column: column("Net cost") },
+            { field: "uom" as const, at: 3, was: column("uom"), column: column("Pack unit") }
+          ]
+          const madeOn = { "row-2": 1, "row-3": 1 }
+          const changed = comparisonsChanged({
+            table,
+            choices,
+            moves,
+            storedItems: view.storedItems,
+            createdIds: [],
+            suggestions: view.suggestions,
+            itemsOf: itemsOfRow,
+            questions: comparisonQuestions({ choices, moves, madeOn, set })
+          })
+          // Both Replaces stand: no re-match changed how either row compares with its stored item.
+          expect(changed).toEqual([])
+        })
     )
   })
 })

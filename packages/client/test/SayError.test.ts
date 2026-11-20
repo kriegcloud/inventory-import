@@ -90,3 +90,20 @@ describe("saying a failure", () => {
     }
   })
 })
+
+// The catalog's busy draft, read by its tag alone, as the model's failure is.
+class DraftBusy extends S.TaggedError<DraftBusy, { readonly brand: unique symbol }>()("DraftBusy", {
+  reason: S.String
+}) {}
+
+describe("a draft too busy to work a request out against", () => {
+  it("says so in its own words, with the server's reason: nothing was written, try again", () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined)
+    const reason = "The import kept changing while this was worked out. Nothing was written; try again."
+    expect(sayError(DraftBusy.make({ reason }))).toEqual({
+      title: "The import kept changing",
+      sentence: reason,
+      problems: []
+    })
+  })
+})

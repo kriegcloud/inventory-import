@@ -7,6 +7,7 @@ import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as A from "effect/Array"
 import * as MutableHashMap from "effect/MutableHashMap"
 import * as O from "effect/Option"
+import * as P from "effect/Predicate"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
@@ -207,18 +208,18 @@ export class SheetReader {
   /** Takes one event of the part and returns the rows that ended with it. */
   push(event: XmlEvent): ReadonlyArray<ReadRow> {
     if (O.isSome(this.failed)) return none
-    if (event._tag === "Text") {
+    if (P.isTagged(event, "Text")) {
       if (this.target === "v") this.valueText += event.text
       else if (this.target === "t") this.inlineText += event.text
       else if (this.target === "f") this.formulaText += event.text
       return none
     }
-    if (event._tag === "StartElement") {
+    if (P.isTagged(event, "StartElement")) {
       this.depth += 1
       this.start(localName(event.name), event.attributes)
       return none
     }
-    if (event._tag !== "EndElement") return none
+    if (!P.isTagged(event, "EndElement")) return none
     const depth = this.depth
     this.depth -= 1
     if (depth === this.targetDepth) {

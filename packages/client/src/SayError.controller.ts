@@ -117,6 +117,11 @@ export const sayError = (
         problems.length > 1 ? problems : []
       )
     }),
+    // The import kept changing while a save, a confirm or a match was worked out (others saving or matching at the
+    // same moment): nothing was written, and its reason says to try again.
+    Match.when(P.isTagged("DraftBusy"), () =>
+      said("The import kept changing", reasonOf(error) ?? "Nothing was written. Try again in a moment.")
+    ),
     Match.when(P.isTagged("InternalServerErrorProblem"), () =>
       said(
         "Something went wrong on our side",

@@ -58,6 +58,7 @@ import {
   decimalComma,
   tagsOf,
   categoryStem,
+  wasRead,
   withPreferred
 } from "./CellReading.rules.ts"
 import { Suggestion, suggestionFits } from "@inventory/catalog-contract/Suggestion"
@@ -830,7 +831,7 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): O.Option<Propo
   }
   if (field === "vendors") {
     const read = readVendors(text)
-    if (read._tag === "ok") {
+    if (wasRead(read)) {
       const preferred = preferredOf(read.value)
       if (preferred.length > 1) {
         const picks = keepSome(read.value, (vendor, index) =>
@@ -994,13 +995,13 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
   }
   if (field === "dimensions") {
     const read = readDimensions(text)
-    return read._tag === "ok"
+    return wasRead(read)
       ? undefined
       : { kind: "dimensions", message: read.message, ask: "Correct the dimensions, or clear them" }
   }
   if (field === "vendors") {
     const read = readVendors(text)
-    if (read._tag === "bad") {
+    if (!wasRead(read)) {
       return { kind: "vendors", message: read.message, ask: "Correct the vendors, or clear them" }
     }
     const preferred = preferredOf(read.value)
@@ -1171,8 +1172,8 @@ const toItem = (values: Readonly<Record<Field, string>>): ItemFields | null => {
     O.isNone(lot) ||
     O.isNone(received) ||
     O.isNone(discontinued) ||
-    dimensions._tag === "bad" ||
-    vendors._tag === "bad" ||
+    !wasRead(dimensions) ||
+    !wasRead(vendors) ||
     preferredOf(vendors.value).length > 1 ||
     (canonicalTags(values.tags) !== values.tags && canonicalTags(values.tags) !== "") ||
     (discontinued.value !== null && active.value)

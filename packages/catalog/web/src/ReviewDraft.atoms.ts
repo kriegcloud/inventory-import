@@ -24,11 +24,10 @@ import {
 } from "@inventory/catalog-contract/Import"
 import { restored, saved } from "@inventory/review/ReviewDraft"
 import type { ReviewState } from "@inventory/review/ReviewTypes"
-import { progressKey, restoredReview, storedReview } from "@inventory/review/SavedProgress"
-import { kept } from "@inventory/review/Kept"
+import { restoredReview, storedReview } from "@inventory/review/SavedProgress"
 import { dropFile, progressOf, progressWith } from "@inventory/review/SavedProgressHook"
 import { navigate } from "@inventory/ui/Route"
-import { AcceptsTakenBack, DraftMoved, ImportNotFound } from "@inventory/catalog-contract/ImportRejection"
+import { AcceptsTakenBack, DraftBusy, DraftMoved, ImportNotFound } from "@inventory/catalog-contract/ImportRejection"
 import { fieldLabels } from "@inventory/catalog-contract/Staged"
 import * as A from "effect/Array"
 import * as Str from "effect/String"
@@ -38,15 +37,17 @@ import type { review } from "@inventory/catalog-model/Review"
 import { call, callWrite, catalogRuntime } from "./Catalog.runtime.ts"
 import { importAddress } from "./internal/route.ts"
 import {
+  dismissalsKey,
   draftOf,
-  forgetDraft,
   keepWaiting,
   keptWaiting,
   letAnothersDraftGo,
   ownedByAnother,
   sentByOwner,
+  takeBackDismissals,
   takeUpGoneTabs
 } from "./Draft.atoms.ts"
+import { thisTab } from "@inventory/client/TabAtoms"
 import { leftOverLines } from "./internal/leftOver.ts"
 import {
   changesBetween,
@@ -210,11 +211,13 @@ const perform = (input: {
         },
         (error: unknown) => {
           answered(registry, id)
-          // Nobody signed in is not a refusal: the rows wait, kept in this browser, and are sent after sign-in.
+          // Nobody signed in is not a refusal: the rows wait, kept in this browser, and are sent after sign-in. Nor is
+          // a draft too busy to work the save out against (others matching at the same moment): nothing was written,
+          // and the rows wait to be sent again, as after a failure that may pass.
           happened(
             S.is(NotSignedIn)(error)
               ? DraftEvent.SaveSignedOut()
-              : isTransient(error)
+              : isTransient(error) || S.is(DraftBusy)(error)
                 ? DraftEvent.SaveFailed()
                 : DraftEvent.SaveRefused({ reason: sayError(error).sentence })
           )
@@ -233,12 +236,15 @@ const perform = (input: {
               "Your last decision is kept in this browser, and the server did not take it. It is sent again when you are back on this import's review, once it has read the server; nothing is lost.",
             action: { label: "Save again", onClick: () => happened(DraftEvent.SaveAgain()) }
           }),
-        // The page's idea of who is signed in is out of date: it is asked again, so the tab shows the sign-in page.
+        // The page's idea of who is signed in may be out of date: it is asked again, so the tab shows the sign-in page
+        // or whoever is signed in now. Said as it is: nobody is signed in, or somebody else is.
         SignedOut: () => {
           askWhoIsSignedIn(registry)
-          void toast.error("Not saved: you are signed out", {
-            description:
-              "Your last decision is kept in this browser. It is sent once you sign in again as yourself, in this tab or another; nothing is lost.",
+          const another = ownedByAnother({ registry, id })
+          void toast.error(another ? "Not saved: someone else is signed in" : "Not saved: you are signed out", {
+            description: another
+              ? "Your last decision is kept in this browser for you, and was not sent as them. It is sent once you sign in again as yourself, in this tab or another; nothing is lost."
+              : "Your last decision is kept in this browser. It is sent once you sign in again as yourself, in this tab or another; nothing is lost.",
             action: { label: "Save again", onClick: () => happened(DraftEvent.SaveAgain()) }
           })
         },
@@ -311,8 +317,18 @@ const perform = (input: {
     // made because the draft had moved on: the machine asks for the newer picture and the screen says so above the
     // review. Any other failure (somebody else confirmed it, the role was taken away, the network) is said, and the
     // import asked again, which moves the screen to the result where there is one.
-    Confirm: ({ delta, madeOn, revision }) =>
-      void call((api) => api.imports.commit({ params: { id }, payload: { revision, madeOn, ...delta } })).then(
+    // Like a save, only as the member the rows belong to: with that member not signed in, nothing is sent, nothing is
+    // imported, and the rows wait, kept for them.
+    Confirm: ({ delta, madeOn, revision }) => {
+      if (!sentByOwner({ registry, id })) {
+        const another = ownedByAnother({ registry, id })
+        void toast.error(another ? "Not imported: someone else is signed in" : "Not imported: you are signed out", {
+          description:
+            "Nothing was confirmed. Your decisions are kept in this browser; confirm again once you are signed in as yourself."
+        })
+        return happened(DraftEvent.ConfirmFailed())
+      }
+      return void call((api) => api.imports.commit({ params: { id }, payload: { revision, madeOn, ...delta } })).then(
         (view) => {
           answered(registry, id)
           const onScreen = registry.get(draftOf(id)).onScreen
@@ -332,8 +348,21 @@ const perform = (input: {
           happened(DraftEvent.ConfirmFailed())
         }
       )
+    }
   })
 }
+
+/** A view of the import as the machine reads it: a picture, whether it can be decided, its confirms, its take-backs. */
+const arrivedFrom = (view: ImportView, waiting: boolean): DraftEvent =>
+  DraftEvent.ViewArrived({
+    revision: view.revision,
+    decisions: view.decisions,
+    open: view.status === "open",
+    // How many times it was confirmed: one more than the person's waiting rows knew means they outlived one.
+    confirms: A.filter(view.history, ImportEvent.guards.Confirmed).length,
+    waiting,
+    takenBack: A.map(view.takenBack, (taken) => ({ revision: taken.revision, rows: taken.rows }))
+  })
 
 /**
  * Everything that happens to one import's draft goes in here: the machine says what the draft becomes and what to
@@ -348,11 +377,22 @@ export const draftEvents = perKey((id: ImportId) =>
       DraftEvent.$is("Opened")(event) ||
       DraftEvent.$is("Decided")(event) ||
       DraftEvent.$is("HoldSettled")(event) ||
-      DraftEvent.$is("TakenUp")(event)
+      DraftEvent.$is("TakenUp")(event) ||
+      DraftEvent.$is("ConfirmPressed")(event)
     // The draft in memory is another member's (someone else signed in on this page) and the member signed in now acts
-    // on the import: the draft is let go, and its rows stay kept in this browser for that member, never sent or kept as
-    // whoever is signed in now. An answer to the owner's own request is still the owner's.
-    if (pressed && ownedByAnother({ registry, id })) letAnothersDraftGo({ registry, id })
+    // on the import: the draft is let go, and its rows stay kept in this browser for that member, never sent, confirmed
+    // or kept as whoever is signed in now. An answer to the owner's own request is still the owner's. With the step
+    // drawn, the draft starts again for the member signed in now, over the view the screen shows (their own kept rows,
+    // and the picture their press is made on), so the press is never made on a draft with no picture.
+    if (pressed && ownedByAnother({ registry, id })) {
+      const onScreen = registry.get(draftOf(id)).onScreen
+      letAnothersDraftGo({ registry, id })
+      registry.update(reviewLocal(id), (now) => ({ ...now, state: O.none() }))
+      if (onScreen && !DraftEvent.$is("Opened")(event)) {
+        registry.set(draftEvents(id), DraftEvent.Opened({ kept: keptWaiting({ registry, id }) }))
+        O.map(importView(id).peek(registry), (view) => registry.set(draftEvents(id), arrivedFrom(view, true)))
+      }
+    }
     const stepped = step(registry.get(draftOf(id)), event)
     // One change for whoever follows the draft: the new draft and what it changes in this tab are in place before
     // anything is worked out from them (the epoch, before what a region of that epoch is given). What goes to the
@@ -385,15 +425,9 @@ export const shownDecisions = perKey((id: ImportId) =>
 /** One take-back of a match, as its dismissal is kept: the revision it was written at, the field and the kind. */
 const takeBackKey = (taken: MatchTakeBack): string => `${taken.revision}:${taken.field}:${taken.kind}`
 
-/** The take-backs one member dismissed for one import, kept in this browser under that member's key. */
-const dismissedAt = Atom.family((key: string) =>
-  kept({ key, schema: S.Array(S.String), defaultValue: (): ReadonlyArray<string> => [] })
-)
-
+/** Where the member signed in keeps what they dismissed of one import's take-backs; none while nobody is. */
 const dismissedKey = (signedIn: O.Option<{ readonly organizationId: string; readonly id: string }>, id: ImportId) =>
-  O.map(signedIn, (actor) =>
-    progressKey({ organizationId: actor.organizationId, memberId: actor.id, screen: `import:${id}:takenBack` })
-  )
+  O.map(signedIn, (actor) => dismissalsKey({ actor, id }))
 
 /**
  * The decisions matches took back that this screen names for one import (Benjamin, 2026-11-20, G1, G5, G6, G7: "the
@@ -405,7 +439,7 @@ export const takeBacksNamed = perKey((id: ImportId) =>
   Atom.readable((get): ReadonlyArray<MatchTakeBack> => {
     const dismissed = O.match(dismissedKey(get(member), id), {
       onNone: (): ReadonlyArray<string> => [],
-      onSome: (key) => get(dismissedAt(key))
+      onSome: (key) => O.getOrElse(get(takeBackDismissals(key)), (): ReadonlyArray<string> => [])
     })
     return O.match(viewOf(get, id), {
       onNone: (): ReadonlyArray<MatchTakeBack> => [],
@@ -418,7 +452,15 @@ export const takeBacksNamed = perKey((id: ImportId) =>
 export const dismissTakeBack = perKey((id: ImportId) =>
   Atom.writable(noValue, (ctx, taken: MatchTakeBack) => {
     O.map(dismissedKey(ctx.get(member), id), (key) =>
-      ctx.set(dismissedAt(key), A.dedupe([...ctx.get(dismissedAt(key)), takeBackKey(taken)]))
+      ctx.set(
+        takeBackDismissals(key),
+        O.some(
+          A.dedupe([
+            ...O.getOrElse(ctx.get(takeBackDismissals(key)), (): ReadonlyArray<string> => []),
+            takeBackKey(taken)
+          ])
+        )
+      )
     )
   })
 )
@@ -475,39 +517,44 @@ export const followDraft = perKey((id: ImportId) =>
   Atom.setIdleTTL(
     Atom.readable((get) => {
       const registry = get.registry
+      const takeUp = () =>
+        takeUpGoneTabs({ registry, id, take: (kept) => registry.set(draftEvents(id), DraftEvent.TakenUp({ kept })) })
       // What this browser kept of the person's waiting rows (from before a reload) comes back with the step.
       registry.set(draftEvents(id), DraftEvent.Opened({ kept: keptWaiting({ registry, id }) }))
       // And what the person's tabs that are gone kept for it: taken up by this one (never from a tab still open).
-      takeUpGoneTabs({ registry, id, take: (kept) => registry.set(draftEvents(id), DraftEvent.TakenUp({ kept })) })
+      takeUp()
+      // Drawn before this tab's id is its own (the page has just started): its own kept rows, and the gone tabs',
+      // are read once it is, and taken into the draft as it stands then; nothing is written over them before.
+      if (O.isNone(registry.get(thisTab))) {
+        let read = false
+        get.subscribe(thisTab, (tab) => {
+          if (read || O.isNone(tab)) return
+          read = true
+          O.map(keptWaiting({ registry, id }), (kept) => registry.set(draftEvents(id), DraftEvent.TakenUp({ kept })))
+          takeUp()
+        })
+      }
       get.addFinalizer(() => registry.set(draftEvents(id), DraftEvent.Left()))
       // (The browser asks before the page is left while rows wait wherever the person is: `askBeforeLeaving`.)
-      get.subscribe(
-        importViewShown(id),
-        (result) => {
-          // The import was removed (by anyone): nothing of it can be sent, and nothing of it is kept.
-          if (AsyncResult.isFailure(result)) {
-            if (!result.waiting && S.is(ImportNotFound)(result.cause.pipe(Cause.squash))) forgetDraft({ registry, id })
-            return
-          }
-          if (!AsyncResult.isSuccess(result)) return
-          const { revision, decisions, status, history, takenBack } = result.value
-          // How many times it was confirmed: one more than the person's waiting rows knew means they outlived one.
-          const confirms = A.filter(history, ImportEvent.guards.Confirmed).length
-          registry.set(
-            draftEvents(id),
-            DraftEvent.ViewArrived({
-              revision,
-              decisions,
-              open: status === "open",
-              confirms,
-              // The view held, given again while it is asked anew: not an answer, and it checks no waiting row.
-              waiting: result.waiting,
-              takenBack: A.map(takenBack, (taken) => taken.revision)
-            })
-          )
-        },
-        { immediate: true }
-      )
+      let handed: unknown = undefined
+      const hand = (result: AsyncResult.AsyncResult<ImportView, unknown>): void => {
+        handed = result
+        // Not found: removed, or the session's organization changed in another tab. Which is not known from here,
+        // so nothing kept is erased (only the removal does that); who is signed in is asked again.
+        if (AsyncResult.isFailure(result)) {
+          if (!result.waiting && S.is(ImportNotFound)(result.cause.pipe(Cause.squash))) askWhoIsSignedIn(registry)
+          return
+        }
+        if (!AsyncResult.isSuccess(result)) return
+        // The view held, given again while it is asked anew: not an answer, and it checks no waiting row. (The first
+        // one, the view the step finds when it is drawn, the machine knows as given again itself.)
+        registry.set(draftEvents(id), arrivedFrom(result.value, result.waiting))
+      }
+      get.subscribe(importViewShown(id), hand, { immediate: true })
+      // What the first view asked for may have answered while it was being handed over, before anything listened:
+      // the view as it is now is handed over too.
+      const now = registry.get(importViewShown(id))
+      if (now !== handed) hand(now)
     }),
     0
   )

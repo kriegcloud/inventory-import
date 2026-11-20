@@ -47,12 +47,14 @@ import {
   confirmWritten,
   confirmClosed,
   confirmMoved,
+  confirmItemsChanged,
   TakeBackWrite,
   tookBack,
   nothingInForce,
   decisionsSaved,
   decisionsClosed,
-  decisionsRematched
+  decisionsRematched,
+  decisionsItemsChanged
 } from "@inventory/catalog-model/ImportStore"
 import * as SqlClient from "effect/sql/SqlClient"
 import * as SqlSchema from "effect/sql/SqlSchema"
@@ -67,6 +69,8 @@ import { lineOf } from "./internal/auditLine.ts"
 import { plannedItems, PlannedRow } from "@inventory/catalog-model/Confirm"
 import {
   type CompareAtMatch,
+  type ItemsAsRead,
+  noItemsRead,
   noComparison,
   planMatch,
   takenBackOfMatch,
@@ -562,16 +566,46 @@ export const ImportStoreD1 = Layer.effect(
         AND d.rowId = json_extract(j.value, '$.rowId') AND d.decisionJson = json_extract(j.value, '$.json')))`
     const clears = (org: string, id: string, rowIds: string) => sql`EXISTS (SELECT 1 FROM importDecision
       WHERE organizationId = ${org} AND importId = ${id} AND rowId IN (SELECT value FROM json_each(${rowIds})))`
-    // The draft is open and its column choices are still those the save's accepts were checked against: a match
-    // since writes nothing of the save. Part of every statement that writes it, so no match falls in between.
-    const sameChoices = (org: string, id: string, choices: string) => sql`EXISTS (SELECT 1 FROM importDraft
-      WHERE organizationId = ${org} AND id = ${id} AND status = 'open' AND choicesJson = ${choices})`
+    // The stored items a judgement of the decisions read (a match's, a save's, a confirm's), in pieces of 5,000 so no
+    // JSON value nears D1's limit: the keys it looked up and the items it found, each with its revision. Empty when the
+    // file's review was not asked.
+    const ItemsGuard = S.Struct({ keys: S.Array(IdList), items: S.Array(ItemsRead), found: S.Int })
+    const guardOf = (read: ItemsAsRead): typeof ItemsGuard.Type => ({
+      keys: A.chunksOf(read.keys, 5000),
+      items: A.chunksOf(read.items, 5000),
+      found: read.items.length
+    })
+    // The organization's items under those keys are exactly the ones read, each still at the revision read: one edited,
+    // replaced, created or taken back since makes this false. A count and a check of each, so nothing is missed.
+    const itemsAsRead = (org: string, guard: typeof ItemsGuard.Encoded) =>
+      guard.keys.length === 0
+        ? sql`1=1`
+        : sql`(SELECT COUNT(*) FROM item WHERE organizationId = ${org} AND (${sql.or(
+            A.map(guard.keys, (keys) => sql`skuKey IN (SELECT value FROM json_each(${keys}))`)
+          )})) = ${guard.found}
+          AND ${sql.and(
+            A.map(
+              guard.items,
+              (items) => sql`NOT EXISTS (SELECT 1 FROM json_each(${items}) AS j WHERE NOT EXISTS (SELECT 1 FROM item i
+                WHERE i.organizationId = ${org} AND i.id = json_extract(j.value, '$.id')
+                  AND i.revision = json_extract(j.value, '$.revision')))`
+            )
+          )}`
+
+    // The draft is open, its column choices are still those the save's decisions were judged against, and the stored
+    // items that judgement read are as read: a match or an item change since writes nothing of the save. Part of every
+    // statement that writes it, so neither falls in between.
+    const sameChoices = (org: string, id: string, choices: string, guard: typeof ItemsGuard.Encoded) =>
+      sql`EXISTS (SELECT 1 FROM importDraft
+      WHERE organizationId = ${org} AND id = ${id} AND status = 'open' AND choicesJson = ${choices})
+      AND ${itemsAsRead(org, guard)}`
     const DeltaRequest = S.Struct({
       org: OrganizationId,
       id: S.String,
       choices: S.String,
       sets: S.Array(DecisionEntries),
-      clears: S.Array(IdList)
+      clears: S.Array(IdList),
+      ...ItemsGuard.fields
     })
     // Bumps the revision only when the delta changes something, before the writes below make it true.
     const bumpRevision = D1.statement({
@@ -584,27 +618,34 @@ export const ImportStoreD1 = Layer.effect(
         ]
         return sql`UPDATE importDraft SET revision = revision + 1
           WHERE organizationId = ${r.org} AND id = ${r.id} AND status = 'open' AND choicesJson = ${r.choices}
-            AND (${sql.or(changes)})`
+            AND ${itemsAsRead(r.org, r)} AND (${sql.or(changes)})`
       }
     })
     const upsertDecisions = D1.statement({
-      Request: S.Struct({ ...Acting, id: S.String, choices: S.String, entries: DecisionEntries, at: S.String }),
+      Request: S.Struct({
+        ...Acting,
+        id: S.String,
+        choices: S.String,
+        entries: DecisionEntries,
+        at: S.String,
+        ...ItemsGuard.fields
+      }),
       Result: NoRows,
       // The same decision sent again leaves the row (and who made it) as it is.
       execute: (r) => sql`INSERT INTO importDecision (importId, organizationId, rowId, decisionJson, decidedById,
           decidedByName, updatedAt)
         SELECT ${r.id}, ${r.org}, json_extract(value, '$.rowId'), json_extract(value, '$.json'), ${r.actor}, ${r.name},
           ${r.at}
-        FROM json_each(${r.entries}) WHERE ${sameChoices(r.org, r.id, r.choices)}
+        FROM json_each(${r.entries}) WHERE ${sameChoices(r.org, r.id, r.choices, r)}
         ON CONFLICT (organizationId, importId, rowId) DO UPDATE SET decisionJson = excluded.decisionJson,
           decidedById = excluded.decidedById, decidedByName = excluded.decidedByName, updatedAt = excluded.updatedAt
         WHERE importDecision.decisionJson IS NOT excluded.decisionJson`
     })
     const clearDecisions = D1.statement({
-      Request: S.Struct({ org: OrganizationId, id: S.String, choices: S.String, rowIds: IdList }),
+      Request: S.Struct({ org: OrganizationId, id: S.String, choices: S.String, rowIds: IdList, ...ItemsGuard.fields }),
       Result: NoRows,
       execute: (r) => sql`DELETE FROM importDecision WHERE organizationId = ${r.org} AND importId = ${r.id}
-        AND rowId IN (SELECT value FROM json_each(${r.rowIds})) AND ${sameChoices(r.org, r.id, r.choices)}`
+        AND rowId IN (SELECT value FROM json_each(${r.rowIds})) AND ${sameChoices(r.org, r.id, r.choices, r)}`
     })
     const openRevision = D1.statement({
       Request: Scope,
@@ -613,17 +654,26 @@ export const ImportStoreD1 = Layer.effect(
         WHERE organizationId = ${r.org} AND id = ${r.id} AND status = 'open'`
     })
 
+    // The open draft's revision and choices, and whether the stored items the save's judgement read are still so.
     const openChoices = D1.statement({
-      Request: Scope,
-      Result: S.Array(S.Struct({ revision: S.Int, choicesJson: S.String })),
-      execute: (r) => sql`SELECT revision, choicesJson FROM importDraft
-        WHERE organizationId = ${r.org} AND id = ${r.id} AND status = 'open'`
+      Request: S.Struct({ ...Scope.fields, ...ItemsGuard.fields }),
+      Result: S.Array(S.Struct({ revision: S.Int, choicesJson: S.String, itemsSame: S.Int })),
+      execute: (
+        r
+      ) => sql`SELECT revision, choicesJson, CASE WHEN ${itemsAsRead(r.org, r)} THEN 1 ELSE 0 END AS itemsSame
+        FROM importDraft WHERE organizationId = ${r.org} AND id = ${r.id} AND status = 'open'`
     })
 
-    const decide = Effect.fn("Imports.decide")(function* (actor: Member, draft: Draft, delta: DecisionDelta) {
+    const decide = Effect.fn("Imports.decide")(function* (
+      actor: Member,
+      draft: Draft,
+      delta: DecisionDelta,
+      read: ItemsAsRead = noItemsRead
+    ) {
       const at = yield* now
       const org = actor.organizationId
       const choices = draft.choicesJson
+      const guard = guardOf(read)
       const sets = A.chunksOf(
         A.map(R.toEntries(delta.set), ([rowId, json]) => ({ rowId, json })),
         2000
@@ -639,23 +689,27 @@ export const ImportStoreD1 = Layer.effect(
       // The revision is read, then moved, and only for a delta that changes something; read again right after, it is
       // the revision these decisions are saved under, and a higher one than before says this save is what moved it.
       // The writes after it change no revision. One batch: nobody else's save can fall between the two reads, and
-      // every write in it holds only while the choices are those the save was checked against.
+      // every write in it holds only while the choices and the stored items are those the save was judged against.
       const [before, , after] = yield* batch([
-        openChoices({ org, id: draft.id }),
-        bumpRevision({ org, id: draft.id, choices, sets, clears: cleared }),
+        openChoices({ org, id: draft.id, ...guard }),
+        bumpRevision({ org, id: draft.id, choices, sets, clears: cleared, ...guard }),
         openRevision({ org, id: draft.id }),
-        ...A.map(sets, (entries) => upsertDecisions({ ...acting(actor), id: draft.id, choices, entries, at })),
-        ...A.map(cleared, (rowIds) => clearDecisions({ org, id: draft.id, choices, rowIds }))
+        ...A.map(sets, (entries) =>
+          upsertDecisions({ ...acting(actor), id: draft.id, choices, entries, at, ...guard })
+        ),
+        ...A.map(cleared, (rowIds) => clearDecisions({ org, id: draft.id, choices, rowIds, ...guard }))
       ])
       return O.match(A.head(before), {
         onNone: () => decisionsClosed,
         onSome: (was) =>
           was.choicesJson !== choices
             ? decisionsRematched
-            : O.match(A.head(after), {
-                onNone: () => decisionsClosed,
-                onSome: (row) => decisionsSaved({ revision: row.revision, changed: row.revision > was.revision })
-              })
+            : was.itemsSame !== 1
+              ? decisionsItemsChanged
+              : O.match(A.head(after), {
+                  onNone: () => decisionsClosed,
+                  onSome: (row) => decisionsSaved({ revision: row.revision, changed: row.revision > was.revision })
+                })
       })
     }, Effect.orDie)
 
@@ -818,25 +872,6 @@ export const ImportStoreD1 = Layer.effect(
       detail: S.String,
       at: S.String
     })
-    // The stored items the file's review answered the match from, in pieces of 5,000 so no JSON value nears D1's
-    // limit: the keys it looked up and the items it found, each with its revision. Empty when the review was not asked.
-    const ItemsGuard = S.Struct({ keys: S.Array(IdList), items: S.Array(ItemsRead), found: S.Int })
-    // The organization's items under those keys are exactly the ones read, each still at the revision read: one edited,
-    // replaced, created or taken back since makes this false. A count and a check of each, so nothing is missed.
-    const itemsAsRead = (org: string, guard: typeof ItemsGuard.Encoded) =>
-      guard.keys.length === 0
-        ? sql`1=1`
-        : sql`(SELECT COUNT(*) FROM item WHERE organizationId = ${org} AND (${sql.or(
-            A.map(guard.keys, (keys) => sql`skuKey IN (SELECT value FROM json_each(${keys}))`)
-          )})) = ${guard.found}
-          AND ${sql.and(
-            A.map(
-              guard.items,
-              (items) => sql`NOT EXISTS (SELECT 1 FROM json_each(${items}) AS j WHERE NOT EXISTS (SELECT 1 FROM item i
-                WHERE i.organizationId = ${org} AND i.id = json_extract(j.value, '$.id')
-                  AND i.revision = json_extract(j.value, '$.revision')))`
-            )
-          )}`
     // The audit line, written only while the import is open at the revision and with the choices the match was worked
     // out from, and the stored items its review read are as read. It is the match's own row: every statement after it
     // checks it, as a confirm's do, so a match worked out from anything that changed since writes nothing at all.
@@ -919,14 +954,7 @@ export const ImportStoreD1 = Layer.effect(
             detail: `${detail}${takenBackWords(took)}`,
             at
           }
-          const guard = O.match(plan.read, {
-            onNone: () => ({ keys: [], items: [], found: 0 }),
-            onSome: (asRead) => ({
-              keys: A.chunksOf(asRead.keys, 5000),
-              items: A.chunksOf(asRead.items, 5000),
-              found: asRead.items.length
-            })
-          })
+          const guard = guardOf(O.getOrElse(plan.read, () => noItemsRead))
           const rewrites = A.chunksOf(
             A.map(R.toEntries(plan.rewrites), ([rowId, json]) => ({ rowId, json })),
             2000
@@ -982,15 +1010,17 @@ export const ImportStoreD1 = Layer.effect(
     // The confirm's own row is written first, and only while the import is open at the revision the confirm was
     // made on; the import is closed next. Every statement after them checks that this confirm's row exists, so a
     // second confirm (a double click, a retry, another tab) finds the import closed, and a confirm made on a draft
-    // somebody has changed since finds another revision: either writes no row of its own, and so nothing at all.
+    // somebody has changed since finds another revision, and a confirm whose judgement read stored items that changed
+    // since finds them otherwise: each writes no row of its own, and so nothing at all.
     const insertBatch = D1.statement({
-      Request: S.Struct({ ...CommitScope.fields, expected: S.Int }),
+      Request: S.Struct({ ...CommitScope.fields, expected: S.Int, ...ItemsGuard.fields }),
       Result: Ids,
       execute: (r) => sql`INSERT INTO importBatch (id, organizationId, importId, confirmedById, confirmedByName,
           confirmedAt)
         SELECT ${r.batch}, ${r.org}, ${r.id}, ${r.actor}, ${r.name}, ${r.at}
         WHERE EXISTS (SELECT 1 FROM importDraft WHERE organizationId = ${r.org} AND id = ${r.id}
           AND status = 'open' AND revision = ${r.expected})
+          AND ${itemsAsRead(r.org, r)}
         RETURNING id`
     })
     const thisConfirm = (org: string, batchId: string) =>
@@ -1227,7 +1257,7 @@ export const ImportStoreD1 = Layer.effect(
       )
       const cleared = A.chunksOf(write.unsaved.clear, 5000)
       const [confirmed] = yield* batch([
-        insertBatch({ ...scope, expected: write.expected }),
+        insertBatch({ ...scope, expected: write.expected, ...guardOf(write.read) }),
         ...A.map(sets, (entries) => saveAtConfirm({ ...scope, entries })),
         ...A.map(cleared, (rowIds) => clearAtConfirm({ ...scope, rowIds })),
         closeDraft(scope),
@@ -1241,9 +1271,13 @@ export const ImportStoreD1 = Layer.effect(
       ])
       // The first statement returns the confirm's id only when this batch was the one that confirmed the import.
       if (confirmed.length > 0) return confirmWritten
-      // Nothing was written. Still open means the draft is at another revision than the confirm was made on.
+      // Nothing was written. Still open at another revision: the draft moved on. Still open at the revision the confirm
+      // was made on: a stored item its judgement read changed (revisions only go up, so the draft never came back).
       const open = yield* run(openRevision({ org: audit.org, id: write.draft }))
-      return O.match(A.head(open), { onNone: () => confirmClosed, onSome: (row) => confirmMoved(row.revision) })
+      return O.match(A.head(open), {
+        onNone: () => confirmClosed,
+        onSome: (row) => (row.revision === write.expected ? confirmItemsChanged : confirmMoved(row.revision))
+      })
     }, Effect.orDie)
 
     // -- Taking a confirm back -----------------------------------------------------------------------------

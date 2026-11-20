@@ -446,6 +446,72 @@ describe("two tabs of one person", () => {
   )
 })
 
+describe("a tab taken up from that comes back", () => {
+  it.live(
+    "and is gone again is taken up again, by the page that took it up before: the claim is let go once the take-up is done (claim-held-for-page-life)",
+    () =>
+      Effect.gen(function* () {
+        freshServer()
+        const id = "00000000-0000-4000-8000-0000000000c1" as ImportId
+        const gone = yield* tab()
+        yield* settle
+        gone.open(id)
+        yield* settle
+        gone.decide(id, "row-2")
+        yield* settle
+        const goneSession = { ...gone.session }
+        gone.close()
+        const later = yield* tab()
+        yield* settle
+        const leave = later.open(id)
+        yield* settle
+        expect(A.map(later.saves, (save) => R.keys(save.set))).toEqual([["row-2"]])
+        // The gone tab is loaded again (the same tab), decides row 3, and is closed again.
+        const back = yield* tab(goneSession)
+        yield* settle
+        back.open(id)
+        yield* settle
+        back.decide(id, "row-3")
+        yield* settle
+        back.close()
+        yield* Effect.sleep("700 millis")
+        // The page that took it up before draws the step again: it takes row 3 up, kept under its own key.
+        leave()
+        yield* settle
+        later.open(id)
+        yield* settle
+        const own = A.filter(R.toEntries(entriesOf(id)), ([key]) => Str.endsWith(later.id)(key))
+        expect(A.map(own, ([, text]) => Str.includes('"row-3"')(text))).toEqual([true])
+      })
+  )
+})
+
+describe("a step drawn before this tab's id is its own", () => {
+  it.live(
+    "reads the rows the tab kept before a reload once its id is, and writes nothing over them before (opened-before-tab)",
+    () =>
+      Effect.gen(function* () {
+        freshServer()
+        const id = "00000000-0000-4000-8000-0000000000c2" as ImportId
+        const before = yield* tab()
+        yield* settle
+        before.open(id)
+        yield* settle
+        before.decide(id, "row-2")
+        yield* settle
+        before.close()
+        // The reload draws the step at once, before the tab's lock has answered.
+        const after = yield* tab(before.session)
+        after.open(id)
+        yield* settle
+        // The row kept came back, was checked by an answer of the import, and was sent.
+        expect(A.map(after.saves, (save) => R.keys(save.set))).toEqual([["row-2"]])
+        const own = A.filter(R.toEntries(entriesOf(id)), ([key]) => Str.endsWith(after.id)(key))
+        expect(A.map(own, ([, text]) => Str.includes('"row-2"')(text))).toEqual([true])
+      })
+  )
+})
+
 describe("an import removed", () => {
   it.live(
     "takes with it the rows a tab that is gone kept for it, and leaves a tab still open its own (two-of-49-partly-open)",

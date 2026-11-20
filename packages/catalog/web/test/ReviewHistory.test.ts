@@ -77,13 +77,20 @@ const memberOf = (member: string) =>
   )
 
 /** The Review step of one import opened in a page of its own: a refresh is another page on the same storage. */
-const visit = (id: ImportId, options: { readonly member?: string; readonly saves?: "taken" | "lost" } = {}) => {
-  const server = { revision: 0 }
+const visit = (
+  id: ImportId,
+  options: { readonly member?: string; readonly saves?: "taken" | "lost"; readonly reads?: "answered" } = {}
+) => {
+  const server: { revision: number; decisions: SavedDecisions } = { revision: 0, decisions: {} }
   const sent: Array<SaveRequest> = []
   const registry = registryFor({
     endpoints: {
       imports: {
-        get: () => Deferred.await(Deferred.makeUnsafe<ImportView>()),
+        // A read of the import never answers, unless the test says the server answers it with what it holds.
+        get: () =>
+          options.reads === "answered"
+            ? Effect.sync(() => viewAt({ id, revision: server.revision, decisions: server.decisions }))
+            : Deferred.await(Deferred.makeUnsafe<ImportView>()),
         // The server takes every save, unless the test says the network loses them: those never answer.
         decide: (request: { readonly payload: SaveRequest }) => {
           sent.push(request.payload)
@@ -101,6 +108,7 @@ const visit = (id: ImportId, options: { readonly member?: string; readonly saves
     /** The server's view is in the tab and the step is drawn. */
     open: (revision: number, decisions: SavedDecisions) => {
       server.revision = revision
+      server.decisions = decisions
       registry.set(importView(id), viewAt({ id, revision, decisions }))
       registry.mount(importViewShown(id))
       registry.mount(reviewLocal(id))
@@ -188,12 +196,13 @@ describe("the undo history kept in the browser", () => {
         expect(first.sent).toEqual([{ madeOn: { "row-2": 10 }, set: { "row-2": out }, clear: [] }])
 
         // A refresh. Somebody else has left row 3 out meanwhile: the server holds that, and not row 2.
-        const again = visit(id)
+        const again = visit(id, { reads: "answered" })
         again.open(13, { "row-3": out })
         yield* settle
         // Both are on the screen: what the server holds, with the person's waiting row over it.
         expect(R.keys(saved(again.state()))).toEqual(["row-2", "row-3"])
-        // And the row is sent again as the person's decision, made on the revision it was made on.
+        // And the row is sent again as the person's decision, made on the revision it was made on, once the import
+        // read anew (not the view the step found) has checked it.
         expect(again.sent).toEqual([{ madeOn: { "row-2": 10 }, set: { "row-2": out }, clear: [] }])
         yield* settle
         // The server took it: nothing of it waits in this browser any more.

@@ -5,7 +5,7 @@
 // after) its batch, through a D1 whose batches the test steps into. The save's window is the handler's: a stand-in
 // around the store runs the other write once, just before the store's save.
 import { D1 } from "@beep/d1/D1"
-import { expect, layer } from "@effect/vitest"
+import { beforeEach, expect, layer } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
@@ -16,7 +16,7 @@ import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import * as HttpApiTest from "effect/http-api/HttpApiTest"
 import { decisionFromFlags, type RowDecisionFlags } from "@inventory/catalog-contract/Decision"
-import { DraftBusy } from "@inventory/catalog-contract/ImportRejection"
+import { AcceptsTakenBack, DraftBusy } from "@inventory/catalog-contract/ImportRejection"
 import type { StagedTable } from "@inventory/catalog-contract/Staged"
 import { ImportStoreD1 } from "@inventory/catalog-host/ImportStoreD1"
 import { draftTries, ImportStore } from "@inventory/catalog-model/ImportStore"
@@ -79,6 +79,15 @@ type Between = { readonly before: Step; readonly run: (store: ImportStore["Servi
 const between = MutableRef.make(O.none<Between>())
 const putBetween = (before: Step, run: Between["run"]) =>
   Effect.sync(() => MutableRef.set(between, O.some({ before, run })))
+
+// Every test starts with nothing waiting: a test that failed before its batches ran leaves its entries, its count or
+// its stand-in behind, and the next test's batches would run them.
+beforeEach(() => {
+  MutableRef.set(coming, [])
+  MutableRef.set(sent, 0)
+  MutableRef.set(inside, false)
+  MutableRef.set(between, O.none())
+})
 
 // The real D1 store, built afresh (the app's own is shared, on the plain D1) on the stepped D1, with a stand-in around
 // its save.
@@ -161,6 +170,37 @@ const tableOf = (fileName: string, lines: ReadonlyArray<Line>): StagedTable => (
   }))
 })
 const item = { category: "packaging", uom: "EA", quantity_on_hand: "10" }
+
+/** A Replace on row 2, and what judging it after the cost's re-match takes back once the item is stocked. */
+const replace = flags({ "row-2": { stored: "replace" } })
+const taken = [{ rowId: "row-2", field: "unitCost", kind: "stored" }]
+
+/**
+ * A file whose row 2 (under `sku`) costs 9.00 under "unit_cost" and 3 under "List cost", staged with its cost matched to
+ * "List cost"; and `stock`, the confirm of a staged import that stocks the SKU at 3. With nothing stored a Replace made
+ * before the match compares the same under both columns and stands; with the item stored it compares otherwise.
+ */
+const judgedAgainst = Effect.fn("judgedAgainst")(function* (sku: string) {
+  const client = yield* HttpApiTest.groups(Api, ["imports", "items"])
+  const stocking = yield* upload({
+    client,
+    table: tableOf("stocking.csv", [{ ...item, sku, name: "Brass Hinge", unit_cost: "3" }])
+  }).pipe(as("mem_marcus"))
+  const view = yield* upload({
+    client,
+    table: tableOf("judged.csv", [{ ...item, sku, name: "Brass Hinge", unit_cost: "9.00", "List cost": "3" }])
+  }).pipe(as("mem_marcus"))
+  const params = { id: view.id }
+  const matched = yield* client.imports
+    .match({ params, payload: { field: "unitCost", column: O.some(column("List cost")) } })
+    .pipe(as("mem_dana"))
+  const stock = Effect.orDie(
+    client.imports
+      .commit({ params: { id: stocking.id }, payload: { revision: stocking.revision, madeOn: {}, set: {}, clear: [] } })
+      .pipe(as("mem_marcus"))
+  )
+  return { client, view, params, matched, stock }
+})
 
 layer(App)("a match and another person's write that fall into each other", (it) => {
   it.effect(
@@ -402,6 +442,66 @@ layer(App)("a match and another person's write that fall into each other", (it) 
         view.revision + draftTries,
         false
       ])
+    })
+  )
+
+  it.effect(
+    "a stored item created between a save's judgement and its write: the batch writes nothing, the save is judged again against it",
+    () =>
+      Effect.gen(function* () {
+        const { client, view, params, stock } = yield* judgedAgainst("EEE-0001")
+        // Once Marcus's save has been judged (nothing stored under EEE-0001: the Replace stands) and is about to be
+        // written, the stocking import is confirmed.
+        yield* around([{ before: stock }, {}])
+        const saved = yield* client.imports
+          .decide({ params, payload: { madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
+          .pipe(as("mem_marcus"))
+        // Two batches: the first found an item it was not judged against, the second is the save judged again.
+        expect([MutableRef.get(sent), saved.notApplied]).toEqual([2, taken])
+        const after = yield* client.imports.get({ params }).pipe(as("mem_marcus"))
+        expect(R.get(after.decisions, "row-2")).toEqual(O.some(decisionFromFlags({})))
+      })
+  )
+
+  it.effect(
+    "a stored item created between a confirm's judgement and its batch: nothing is imported, the confirm is judged again and refused",
+    () =>
+      Effect.gen(function* () {
+        const { client, view, params, matched, stock } = yield* judgedAgainst("EEE-0002")
+        yield* around([{ before: stock }])
+        const refused = yield* Effect.flip(
+          client.imports
+            .commit({
+              params,
+              payload: { revision: matched.revision, madeOn: { "row-2": view.revision }, set: replace, clear: [] }
+            })
+            .pipe(as("mem_marcus"))
+        )
+        expect([MutableRef.get(sent), S.is(AcceptsTakenBack)(refused) ? refused.accepts : []]).toEqual([1, taken])
+        const after = yield* client.imports.get({ params }).pipe(as("mem_marcus"))
+        expect([after.status, after.revision]).toEqual(["open", matched.revision])
+      })
+  )
+
+  // The two below run in this order. The first leaves everything waiting, as a test that failed before its batches ran
+  // would; the second finds nothing of it.
+  it.effect("a test that stops before its batches leaves entries, a count and a stand-in waiting", () =>
+    Effect.sync(() => {
+      MutableRef.set(coming, [{ before: Effect.die("a batch of the test before") }])
+      MutableRef.set(sent, 3)
+      MutableRef.set(inside, true)
+      MutableRef.set(between, O.some({ before: "decide", run: () => Effect.die("a save of the test before") }))
+    })
+  )
+
+  it.effect("the next test starts with nothing waiting", () =>
+    Effect.sync(() => {
+      expect([
+        MutableRef.get(coming).length,
+        MutableRef.get(sent),
+        MutableRef.get(inside),
+        MutableRef.get(between)
+      ]).toEqual([0, 0, false, O.none()])
     })
   )
 })

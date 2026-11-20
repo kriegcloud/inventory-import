@@ -64,11 +64,13 @@ import {
   type ChoicesSaved,
   confirmClosed,
   type Confirmed,
+  confirmItemsChanged,
   confirmMoved,
   confirmWritten,
   type ConfirmWrite,
   type Decided,
   decisionsClosed,
+  decisionsItemsChanged,
   decisionsRematched,
   decisionsSaved,
   type Draft,
@@ -80,10 +82,13 @@ import {
   type TookBack,
   type Upload
 } from "./Import/ImportStore.store.ts"
-import { type EditOutcome, ItemStore } from "./Item/ItemStore.store.ts"
+import { EditOutcome, ItemStore } from "./Item/ItemStore.store.ts"
 import { abandonedAfterMinutes } from "./Staging/Upload.rules.ts"
 import {
   type CompareAtMatch,
+  type ItemsAsRead,
+  noItemsRead,
+  stillAsRead,
   noComparison,
   planMatch,
   takenBackOfMatch,
@@ -311,6 +316,12 @@ const commitStep = (
   if (O.isNone(open)) return [confirmClosed, state]
   // Made on another revision than the draft is at: nothing is written.
   if (open.value.draft.revision !== write.expected) return [confirmMoved(open.value.draft.revision), state]
+  // A stored item the confirm's judgement read changed since: nothing is written, and the confirm is judged again.
+  const orgItems = A.map(
+    A.filter(state.items, (entry) => entry.organizationId === org),
+    (entry) => entry.item
+  )
+  if (!stillAsRead(write.read)(orgItems)) return [confirmItemsChanged, state]
   const at = audit.createdAt
   const written = plannedItems(write.plan)
   const ready = A.filter(written, (row) => row.status === "ready")
@@ -986,7 +997,12 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
       })
     })
 
-    const decide = Effect.fnUntraced(function* (actor: Member, draft: Draft, delta: DecisionDelta) {
+    const decide = Effect.fnUntraced(function* (
+      actor: Member,
+      draft: Draft,
+      delta: DecisionDelta,
+      read: ItemsAsRead = noItemsRead
+    ) {
       const sets = yield* Effect.forEach(
         R.toEntries(delta.set),
         ([rowId, decision]) =>
@@ -999,6 +1015,8 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
         if (O.isNone(found) || found.value.draft.status !== "open") return [decisionsClosed, state]
         // Checked against other choices than the draft has now: a match came between, and nothing is saved.
         if (found.value.draft.choicesJson !== draft.choicesJson) return [decisionsRematched, state]
+        // Judged against stored items that changed since (a Replace or Keep-stored across a re-match): nothing is saved.
+        if (!stillAsRead(read)(itemsOfOrg(state, org))) return [decisionsItemsChanged, state]
         const stored = found.value
         const differs = A.some(
           sets,
@@ -1548,12 +1566,15 @@ export const ItemStoreMemory: Layer.Layer<ItemStore, never, CatalogMemoryRef> = 
       return yield* Ref.modify(ref, (state): readonly [EditOutcome, CatalogState] => {
         const org = actor.organizationId
         const found = A.findFirst(state.items, (entry) => entry.organizationId === org && entry.item.id === id)
-        if (O.isNone(found)) return [{ _tag: "Missing" }, state]
+        if (O.isNone(found)) return [EditOutcome.cases.Missing.make({}), state]
         const stored = found.value.item
         const same = sameAsEdit(stored, change)
         // Written only while the item is at the revision the edit was made on and holds something else.
         if (stored.revision !== change.revision || same) {
-          return [same ? { _tag: "Same", item: stored } : { _tag: "Changed", item: stored }, state]
+          return [
+            same ? EditOutcome.cases.Same.make({ item: stored }) : EditOutcome.cases.Changed.make({ item: stored }),
+            state
+          ]
         }
         const item: StoredItem = {
           ...stored,
@@ -1570,7 +1591,7 @@ export const ItemStoreMemory: Layer.Layer<ItemStore, never, CatalogMemoryRef> = 
           revision: stored.revision + 1
         }
         return [
-          { _tag: "Edited", item },
+          EditOutcome.cases.Edited.make({ item }),
           {
             ...state,
             items: A.map(state.items, (entry) =>

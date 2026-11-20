@@ -136,9 +136,15 @@ interface World {
    * time, so a quick return finds it as it was.
    */
   region: O.Option<SavedDecisions>
+  /**
+   * The step was just drawn: the next picture it reads is the view the tab already held (the runner's `followDraft`
+   * reads it at once), however it is marked, and checks no waiting row.
+   */
+  drawn: boolean
 }
 
 const start = (): World => ({
+  drawn: false,
   draft: emptyDraft,
   server: { revision: 1, decisions: {} },
   view: O.none(),
@@ -348,13 +354,17 @@ const dispatch = (world: World, event: DraftEvent): void => {
       ).toBe(false)
     }
   }
-  // G2: a fresh picture (an answer at least as new as the one held, not the view given again) checks every waiting row;
-  // one it shows decided otherwise since, to a value the server could not have from this tab, must be held.
+  // G2: a fresh picture (an answer at least as new as the one held, not the view given again: neither one marked
+  // waiting nor the one the step finds when it is drawn, which is the view the tab already held) checks every waiting
+  // row; one it shows decided otherwise since, to a value the server could not have from this tab, must be held.
   const fresh =
     DraftEvent.$is("ViewArrived")(event) &&
     event.open &&
     event.waiting !== true &&
+    !world.drawn &&
     !O.exists(before.held, (held) => event.revision < held.revision)
+  if (DraftEvent.$is("ViewArrived")(event)) world.drawn = false
+  if (DraftEvent.$is("Opened")(event)) world.drawn = true
   const mustBeHeld = fresh ? A.filter(R.keys(world.waiting), (row) => mustHold(world, row, event.decisions)) : []
   // A waiting row held because it was decided otherwise elsewhere since: the person's choice is not what the server
   // holds now (in the picture that arrived, or the one a confirm names), and it moves from waiting to held, kept until
@@ -401,12 +411,14 @@ const dispatch = (world: World, event: DraftEvent): void => {
 
 const sentRows = (delta: DecisionDelta): ReadonlyArray<string> => [...R.keys(delta.set), ...delta.clear]
 
-/** The Review step is drawn again: it reads the view it finds, and asks again behind it. */
+/**
+ * The Review step is drawn again: it reads the view it finds, as the runner gives it (`followDraft` subscribes with
+ * the view the tab holds at once). Nothing asks again behind it: the import page keeps the view mounted, so it is the
+ * view the tab already held, marked waiting only while a read of it is out.
+ */
 const comeBack = (world: World): void => {
   dispatch(world, DraftEvent.Opened({ kept: O.none() }))
-  // The view held is given again while it is asked anew behind it: as waiting.
-  world.read = O.some(O.none())
-  O.map(world.view, (view) => arrive(world, view, true))
+  O.map(world.view, (view) => arrive(world, view, O.isSome(world.read)))
 }
 
 /** What can still happen once the person's own confirm was made: its answer (or its loss), a decision, a read. */
@@ -905,9 +917,10 @@ const opened = (decisions: SavedDecisions = {}): World => {
   const world = start()
   world.server = { revision: 1, decisions }
   world.history[1] = decisions
+  // The import page reads the import first, and draws the Review step once it holds the view (as the runner does).
+  world.view = O.some(world.server)
+  world.told = 1
   run(world, Command.cases.ComeBack.make({}))
-  run(world, Command.cases.ServerTakesRead.make({}))
-  run(world, Command.cases.ReadArrives.make({}))
   return world
 }
 
@@ -1023,7 +1036,10 @@ describe("the orderings that lost or hid a decision", () => {
       Command.cases.OtherAnswerArrives.make({}),
       Command.cases.Reload.make({}),
       // The first fresh picture after the reload checks the waiting rows (the late answer above came while a read was
-      // out, as the view given again, and checked nothing).
+      // out, as the view given again, and checked nothing). The picture the step finds when it is drawn is the view
+      // given again too: the import is asked again, and that answer checks them.
+      Command.cases.ServerTakesRead.make({}),
+      Command.cases.ReadArrives.make({}),
       Command.cases.ServerTakesRead.make({}),
       Command.cases.ReadArrives.make({})
     ])
@@ -1315,11 +1331,17 @@ describe("rows that wait, kept in the browser", () => {
     const back = step(emptyDraft, DraftEvent.Opened({ kept: waitingA }))
     // Nothing is sent before the import's picture has arrived: it says whether the import can still be decided.
     expect([back.effects, back.draft.stalled, back.draft.unsent]).toEqual([[], true, { a: O.some(out) }])
-    const arrived = step(
+    const found = step(
       back.draft,
       DraftEvent.ViewArrived({ revision: 9, decisions: { b: kept }, open: true, confirms: 0 })
     )
-    expect(shown(arrived.draft)).toEqual({ a: out, b: kept })
+    expect(shown(found.draft)).toEqual({ a: out, b: kept })
+    // The picture the step finds is the view the tab held, given again: it checks nothing, and the import is asked.
+    expect(found.effects).toEqual([DraftEffect.Ask()])
+    const arrived = step(
+      found.draft,
+      DraftEvent.ViewArrived({ revision: 9, decisions: { b: kept }, open: true, confirms: 0 })
+    )
     expect(arrived.effects).toEqual([DraftEffect.Send({ delta: { set: { a: out }, clear: [] }, madeOn: { a: 4 } })])
   })
 

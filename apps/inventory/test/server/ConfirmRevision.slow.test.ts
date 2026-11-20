@@ -20,6 +20,7 @@ import { ConfirmId } from "@inventory/catalog-contract/Ids"
 import { AlreadyImported, DraftMoved } from "@inventory/catalog-contract/ImportRejection"
 import { ConfirmPlan } from "@inventory/catalog-model/Confirm"
 import { ConfirmWrite, ImportStore } from "@inventory/catalog-model/ImportStore"
+import { noItemsRead } from "@inventory/catalog-model/Rematch"
 import { Activity } from "@inventory/kernel/Activity"
 import { ActivityId, MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { as, TypedApp } from "./support/app.ts"
@@ -120,6 +121,7 @@ layer(TypedApp)("a confirm names the revision its screen showed", (it) => {
           unsaved: { set: { "row-3": decisionFromFlags({ out: true }) }, clear: ["row-2"] },
           plan: ConfirmPlan.make({ draft: staged.id, rows: [] }),
           itemIds: [],
+          read: noItemsRead,
           audit: Activity.make({
             id: ActivityId.make(`00000000-0000-4000-8000-00000000010${expected}`),
             organizationId: OrganizationId.make("org_prairie"),

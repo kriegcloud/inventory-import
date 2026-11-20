@@ -6,6 +6,7 @@ import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Layer from "effect/Layer"
 import * as O from "effect/Option"
+import * as P from "effect/Predicate"
 import * as Scope from "effect/Scope"
 import * as Tracer from "effect/Tracer"
 import * as DevTools from "effect/devtools/DevTools"
@@ -66,7 +67,7 @@ const countingOpenSpans = (tracer: Tracer.Tracer) => {
       started = true
       const end = span.end
       span.end = function (endTime, exit) {
-        if (span.status._tag === "Ended") return
+        if (P.isTagged(span.status, "Ended")) return
         end.call(this, endTime, exit)
         open -= 1
         if (open === 0) Deferred.doneUnsafe(allEnded, Exit.void)

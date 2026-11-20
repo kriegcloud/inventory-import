@@ -42,10 +42,10 @@ export const refCallbacksCommand = Command.make("ref-callbacks", {}, () =>
   Effect.flatMap(refCallbacks(), emit(refCallbacksSentence))
 ).pipe(Command.withDescription("Every ref is a DOM ref or a callback that stays the same across draws"))
 
-/** `laws tags`: no `_tag` is told apart or built by hand in our own code and every test, but the ledger's files. */
+/** `laws tags`: no `_tag` is told apart or built by hand in our own code and every test, with no file excepted. */
 export const tagsCommand = Command.make("tags", {}, () => Effect.flatMap(tags(), emit(tagsSentence))).pipe(
   Command.withDescription(
-    "No _tag is told apart or built by hand in our own code and every test; the files tags-ledger.json records hold to their counts"
+    "No _tag is told apart or built by hand in our own code and every test, with no file excepted"
   )
 )
 

@@ -163,21 +163,6 @@ export const ModelTrouble = LiteralKit(["noKey", "refused", "busy", "badAnswer",
 export type ModelTrouble = typeof ModelTrouble.Type
 
 /**
- * A failure transient enough to try again: a rate limit, a provider error, or a broken connection. A bad answer is
- * not: `AiError.isRetryable` says it is, and it is deliberately not used.
- *
- * @category behaviour
- */
-export const isTransient = (error: AiError.AiError): boolean => {
-  const reason = error.reason
-  return (
-    reason._tag === "RateLimitError" ||
-    reason._tag === "InternalProviderError" ||
-    (reason._tag === "NetworkError" && reason.reason === "TransportError")
-  )
-}
-
-/**
  * What one failed call means: which trouble it is, and whether trying again later may help. OpenRouter answers an
  * empty credit with HTTP 402, which reaches here as an `UnknownError` carrying that status.
  *
@@ -206,6 +191,15 @@ export const troubleOf = (error: AiError.AiError): Trouble =>
     })),
     Match.orElse((): Trouble => ({ trouble: "down", retryable: false }))
   )
+
+/**
+ * A failure transient enough to try again: a rate limit, a provider error, or a broken connection. A bad answer is
+ * not: `AiError.isRetryable` says it is, and it is deliberately not used. Read from `troubleOf`, so the retry and the
+ * words say the same of every failure.
+ *
+ * @category behaviour
+ */
+export const isTransient = (error: AiError.AiError): boolean => troubleOf(error).retryable
 
 /** A model failure as its kind, and whether asking again could help. */
 type Trouble = { readonly trouble: ModelTrouble; readonly retryable: boolean }

@@ -48,22 +48,6 @@ export class Manifest extends S.Class<Manifest, { readonly brand: unique symbol 
 ) {}
 
 /**
- * The root's `tags-ledger.json`: the files that still tell a `_tag` apart or build one by hand, each with how many
- * places it has. The count of each only falls: a file not in it may have none, and a file whose count fell is lowered.
- *
- * @category schemas
- */
-export class TagsLedger extends S.Class<TagsLedger, { readonly brand: unique symbol }>($I`TagsLedger`)(
-  {
-    description: S.optionalKey(S.String).pipe(S.annotateKey({ description: "What the file is, for a person" })),
-    files: S.Record(S.String, S.Int).pipe(
-      S.annotateKey({ description: "Each file, from the root, with the places it still has: never more" })
-    )
-  },
-  $I.annote("TagsLedger", { description: "The files that still tell a _tag apart or build one by hand, and how often" })
-) {}
-
-/**
  * A package's `strict-ceiling.json`: the recorded count of the four style findings its own code still has.
  *
  * @category schemas

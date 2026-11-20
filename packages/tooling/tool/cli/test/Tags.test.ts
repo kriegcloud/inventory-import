@@ -134,6 +134,71 @@ export const yes: Answer = { _tag: "Yes" }
 export const no = (why: string): Answer => ({ _tag: "No", why })
 `
 
+// Tags joined into words are a sentence: handed on it passes, compared or expected it tells a case. The forms the
+// third review found passing once a call named join was let through whole.
+const joined = `import * as A from "effect/Array"
+import type { Upload } from "./machine"
+export const line = (x: Upload, xs: ReadonlyArray<Upload>) => {
+  if (A.join([x._tag], "") === "Idle") return "Idle"
+  expect(A.join([x._tag], "")).toBe("Idle")
+  expect(A.join(A.map(xs, (e) => e._tag), ",")).toBe("A,B")
+  if ([x._tag].join("") === "Idle") return "Idle"
+  expect(${tick}tag \${x._tag}${tick}).toBe("tag Idle")
+  return ""
+}
+`
+
+// A tag carried where the law once lost it: assigned into a name declared before, put in a list or a record and read
+// back by place, handed back by a function declared after its first use (directly, or through another declared after
+// it), by a method of a record (an arrow or a method written short), and a sentence that names it expected.
+const carried = `import type { Upload } from "./machine"
+export const kindOf = (x: Upload) => early(x)
+export const viaLater = (x: Upload) => first(x)
+export const line = (x: Upload) => {
+  let t = ""
+  t = x._tag
+  if (t === "Idle") return "Idle"
+  const [held] = [x._tag]
+  if (held === "Idle") return "Idle"
+  const o = { k: x._tag, n: 1 }
+  if (o.k === "Idle") return "Idle"
+  const k = { of: (e: Upload) => e._tag, short(e: Upload) { return e._tag } }
+  if (k.of(x) === "Idle") return "Idle"
+  if (k.short(x) === "Idle") return "Idle"
+  if (kindOf(x) === "Idle") return "Idle"
+  if (viaLater(x) === "Idle") return "Idle"
+  if ([x._tag][0] === "Idle") return "Idle"
+  expect(${tick}tag \${x._tag}${tick}).toBe("tag Idle")
+  expect("tag Idle").toEqual(${tick}tag \${x._tag}${tick})
+  const said = ${tick}while \${x._tag}${tick}
+  return said === "while Idle"
+}
+function early(e: Upload) { return e._tag }
+function first(e: Upload) { return second(e) }
+function second(e: Upload) { return e._tag }
+`
+
+// The same shapes with nothing of a tag in what is compared: a plain value assigned, listed, put in a record or handed
+// back; tags joined into a message handed on; a sentence handed to an expectation as its message.
+const steadyShapes = `import * as A from "effect/Array"
+import type { Upload } from "./machine"
+export const count = (x: Upload) => size(x)
+export const line = (x: Upload, xs: ReadonlyArray<Upload>, toast: (words: string) => void) => {
+  let n = 0
+  n = 1
+  if (n === 1) toast(A.join(A.map(xs, (e) => e._tag), ", "))
+  const [first] = [1, x._tag]
+  const o = { k: x._tag, n: 1 }
+  const k = { of: (e: Upload) => e, size }
+  toast([x._tag].join(""))
+  toast(${tick}while \${x._tag}${tick})
+  expect(o.n === 1, ${tick}while \${x._tag}${tick}).toBe(true)
+  return first === 1 && o.n === 1 && k.of(x) === x && k.size(x) === 1 && count(x) === 1
+}
+function size(e: Upload) { return xsOf(e).length }
+function xsOf(e: Upload) { return [e] }
+`
+
 describe("laws tags", () => {
   it.effect("passes guards, matches, a tag looked for with in, a tag handed on as a value, and constructors", () =>
     Effect.gen(function* () {
@@ -213,29 +278,68 @@ describe("laws tags", () => {
     })
   )
 
-  it.effect("holds a file the ledger records to its count: no more, and lowered when it has fewer", () =>
+  it.effect("excepts no file: a ledger of counts at the root changes nothing", () =>
     Effect.gen(function* () {
       const file = "packages/catalog/model/src/Rules.ts"
-      const ledger = (files: Record<string, number>) => json({ files })
-      const held = yield* inTree({ [file]: byHand, "tags-ledger.json": ledger({ [file]: 8 }) }, inRepository)
-      expect(printed(held)).toEqual([
-        clean,
-        "out:   8 places in 1 files are still recorded in tags-ledger.json: none more, and the count only falls"
-      ])
-      const more = yield* inTree({ [file]: byHand, "tags-ledger.json": ledger({ [file]: 7 }) }, inRepository)
-      expect(more.failed).toBe(true)
-      expect(printed(more).slice(1, 3)).toEqual([
-        `err: ${file}  8 places, and tags-ledger.json records 7: it may have no more`,
-        `err: ${file}:3  _tag ===`
-      ])
-      const fewer = yield* inTree(
-        { [file]: byHand, "tags-ledger.json": ledger({ [file]: 9, "packages/catalog/model/src/Gone.ts": 2 }) },
+      const report = yield* inTree({ [file]: byHand, "tags-ledger.json": json({ files: { [file]: 8 } }) }, inRepository)
+      expect(report.failed).toBe(true)
+      expect(printed(report).length).toBe(9)
+      expect(printed(report)[1]).toBe(`err: ${file}:3  _tag ===`)
+    })
+  )
+
+  it.effect("refuses tags joined into words and then compared or expected", () =>
+    Effect.gen(function* () {
+      const report = yield* inTree(
+        { "packages/catalog/web/src/Step.ts": joined, "packages/catalog/web/test/Step.test.ts": joined },
         inRepository
       )
-      expect(printed(fewer).slice(1)).toEqual([
-        `err: ${file}  8 places, and tags-ledger.json records 9: lower it to 8`,
-        "err: packages/catalog/model/src/Gone.ts  has no place left, and tags-ledger.json records 2: take it out of the ledger"
+      expect(report.failed).toBe(true)
+      const places = (file: string) => [
+        `err: ${file}:4  _tag ===`,
+        `err: ${file}:5  a _tag handed to a call`,
+        `err: ${file}:6  a _tag handed to a call`,
+        `err: ${file}:7  _tag ===`,
+        `err: ${file}:8  a _tag handed to a call`
+      ]
+      expect(printed(report).slice(1)).toEqual([
+        ...places("packages/catalog/web/src/Step.ts"),
+        ...places("packages/catalog/web/test/Step.test.ts")
       ])
+    })
+  )
+
+  it.effect("refuses a tag through an assignment, a list, a record, a hoisted function, a method, a sentence", () =>
+    Effect.gen(function* () {
+      const file = "packages/catalog/web/test/Step.test.ts"
+      const report = yield* inTree({ [file]: carried }, inRepository)
+      expect(report.failed).toBe(true)
+      expect(printed(report).slice(1)).toEqual([
+        `err: ${file}:7  _tag ===`,
+        `err: ${file}:9  _tag ===`,
+        `err: ${file}:11  _tag ===`,
+        `err: ${file}:13  _tag ===`,
+        `err: ${file}:14  _tag ===`,
+        `err: ${file}:15  _tag ===`,
+        `err: ${file}:16  _tag ===`,
+        `err: ${file}:17  _tag ===`,
+        `err: ${file}:18  a _tag handed to a call`,
+        `err: ${file}:19  a _tag handed to a call`,
+        `err: ${file}:21  _tag ===`
+      ])
+    })
+  )
+
+  it.effect("passes the same shapes when what flows is not a tag, and a sentence handed on as words", () =>
+    Effect.gen(function* () {
+      const report = yield* inTree(
+        {
+          "packages/catalog/web/src/Steady.ts": steadyShapes,
+          "packages/catalog/web/test/Steady.test.ts": steadyShapes
+        },
+        inRepository
+      )
+      expect(printed(report)).toEqual([clean])
     })
   )
 

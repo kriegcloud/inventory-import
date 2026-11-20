@@ -32,7 +32,7 @@ There is no "local-first" declaration. The pieces are a stable command id per in
 ```typescript
 // SKETCH: not compiled
 // A resend with the same commandId returns the first receipt instead of deciding again.
-const sent = client.DecideRows(importKey, { step, rows }, { commandId: `${session}:${n}` })
+const sent = client.DecideRow(importKey, { row, step, saw, flags }, { commandId: `${session}:${n}` })
 
 // Decide locally, as the server would. `context` is required when the command's middleware provides something.
 const outcome = Import.predict(state, new ConfirmImport({ reviewedAt: version }), {
@@ -126,7 +126,7 @@ With a domain model, each act of the review is the intent, and the Import aggreg
 person did ("decide these rows as …", "undo my step"), never the difference between two pictures of the draft: the
 [trial on saving review decisions](../07-review-decisions-trial.md) shows that a command of rows to set and rows to
 clear cannot hold the rule "no command clears a decision its sender did not make", and [the brief](../../BRIEF.md)
-models the acts as `DecideRows` and `UndoStep`.
+models the acts as `DecideRow` and `UndoRowStep`, each naming the decision its sender saw.
 
 ```typescript
 // SKETCH: not compiled
@@ -138,7 +138,9 @@ import * as S from "effect/Schema"
 export const DecisionIntent = S.Struct({
   commandId: S.String,
   step: S.String,
-  rows: S.Array(S.Struct({ row: S.String, decision: RowDecision, seen: S.Int }))
+  row: S.String,
+  saw: Saw, // the step of the decision its sender saw on the row, or none
+  flags: S.String // the row's decision as the text the database holds
 })
 
 // Before Confirm is sent: what the Import aggregate would say, from the state the screen holds.
@@ -165,7 +167,7 @@ counts already runs the same pure `review` locally; that stays as it is.
 - **Used today:** no. In its place: `useDecisionSaver` (`packages/catalog/web/src/Draft.controller.ts`),
   `ReviewState` with undo and redo (`packages/review/src/ReviewDraft.rules.ts`), `useSavedProgress`
   (`packages/review/src/SavedProgress.hook.ts`), and the optimistic write atoms (`packages/client/src/Optimistic.atoms.ts`).
-- **Where it goes:** each act of the review becomes a `DecideRows` or `UndoStep` command with a stable `commandId` kept in
+- **Where it goes:** each act of the review becomes a `DecideRow` or `UndoRowStep` command with a stable `commandId` kept in
   the saved progress (`packages/review/src/SavedProgress.schema.ts`); `predict` is called by the confirm button in
   `packages/catalog/web/src/ReviewStep.screen.tsx`.
 - **What the person gets:** a review that keeps every decision offline and sends them when back online, and a
@@ -176,7 +178,7 @@ counts already runs the same pure `review` locally; that stays as it is.
 - A browser-free test of the queue, like the example's `Bank.test.ts` stories: offline, three decisions queue in
   order; back online they are sent oldest first; the second fails with `AlreadyImported` and only it is marked
   refused; a reload restores the queue and a decision the server already applied is not applied twice (same id).
-- A [story](./story.md) that sends `DecideRows` twice with one `commandId` and checks one event and one receipt.
+- A [story](./story.md) that sends `DecideRow` twice with one `commandId` and checks one event and one receipt.
   The underlying rule was run in a trial on 2026-11-19 on beta.87 with the in-memory host: a `ConfirmImport` sent a
   second time with the same `commandId` answered the same receipt (version 2), and a `ConfirmImport` whose
   `reviewedAt` was not the decide context's `version` was rejected with `StaleReview { current: 1 }`, the refusal
@@ -195,7 +197,7 @@ Objects on Cloudflare) and the Api client over `protocolWebSocket` or `protocolH
 
 ## Verdict
 
-**Use:** model each act of the review as an intent (`DecideRows`, `UndoStep`) with a stable command id kept in the saved progress,
+**Use:** model each act of the review as an intent (`DecideRow`, `UndoRowStep`) with a stable command id kept in the saved progress,
 replay the queue in order on reconnect, treat a rejection as the conflict, and call `Import.predict` before Confirm
 to refuse early; keep the review's counts and the confirm's writes on the server.
 

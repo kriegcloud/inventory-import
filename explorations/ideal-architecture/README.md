@@ -34,20 +34,21 @@ follows infra; Benjamin said it matches too.
 ## Where the research disagrees with the request
 
 The request listed many technologies. The research recommended against using several of them. On 2026-11-19 Benjamin
-reversed that for the Alchemy domain and for the extras he named ("Not borrow use."; DECISIONS.md, "core, reversed");
-the rows it changes say so, and how each is used is in the [alchemy-domain](../alchemy-domain/README.md) packet. The
-recommendation column is kept as it was written, for the record.
+reversed that for the Alchemy domain ("Not borrow use."; DECISIONS.md, "core, reversed"), and marked as wanted, on
+his own list of 2026-11-18, the extras the rows below name. Whether and how each is used is not decided: the
+[alchemy-domain](../alchemy-domain/README.md) brief asks him. The recommendation column is kept as it was written,
+for the record.
 
 | Asked for | What the research found | Recommendation |
 | --- | --- | --- |
-| Alchemy domain as the core | It does not build on Effect's `schema/Model`. The documented API (npm `2.0.0-beta.87`) already differs from GitHub `main`. Confirm and take-back would stop being one atomic write. | Model-first package shape now, over D1 state tables behind ports. Move the import lifecycle onto an aggregate later, once a release with `Decision` is published. **Reversed 2026-11-19: used, all of it.** |
-| Effect Cluster, workflows, singletons | The SQL storage needs transactions, which the D1 driver cannot do. The only Workers path keeps state in Durable Objects and is experimental. No step of an import needs them today. | Not now. Revisit if a model pass outgrows one request. **Reversed 2026-11-19: Cluster as a host and workflows are used; singletons and crons cannot be yet, and the packet says what is in the way.** |
-| Drizzle v1 in Durable Objects | A second schema language beside Effect Schema, and no help for the hard SQL (full-text search, triggers, composite keys). | Keep D1 with raw SQL and `Model.Class` row schemas. **Reversed 2026-11-19 for tables inside one object (the model-call allowance); D1 keeps raw SQL.** |
+| Alchemy domain as the core | It does not build on Effect's `schema/Model`. The documented API (npm `2.0.0-beta.87`) already differs from GitHub `main`. Confirm and take-back would stop being one atomic write. | Model-first package shape now, over D1 state tables behind ports. Move the import lifecycle onto an aggregate later, once a release with `Decision` is published. **Reversed 2026-11-19: to be used, all of it. How is the alchemy-domain brief, whose decisions are open.** |
+| Effect Cluster, workflows, singletons | The SQL storage needs transactions, which the D1 driver cannot do. The only Workers path keeps state in Durable Objects and is experimental. No step of an import needs them today. | Not now. Revisit if a model pass outgrows one request. **Marked as wanted by him. How is decisions 11, 13 and 14 of the alchemy-domain brief, all open.** |
+| Drizzle v1 in Durable Objects | A second schema language beside Effect Schema, and no help for the hard SQL (full-text search, triggers, composite keys). | Keep D1 with raw SQL and `Model.Class` row schemas. **Marked as wanted by him. How is decision 11 of the alchemy-domain brief, open.** |
 | `@effect/atom-react` and reactivity | Works, but undo per change, invalidate-after-last-write and keep-previous-data paging must be rebuilt by hand. | Keep TanStack Query for the first version; atoms as a later, separate change. **Reversed 2026-11-19 by "client state, reversed": the atoms goal.** |
-| `effect/graphql` | A client only. There is no server to call. | Leave out. **Reversed 2026-11-19: used as a client; serving cannot be yet.** |
-| `@effect/ai-typesafe` for confidence scores | It does not score another model's answer; a score costs a second call to a second vendor. | No second vendor until a labelled calibration run shows a gain. **Reversed 2026-11-19: used, to decide closed questions with a calibrated probability.** |
-| Alchemy Git for CI/CD | `alchemy.run/git` is a self-hosted git server. The GitHub provider declares environments, secrets and rules, but not workflow files. | Declare repository settings in a workstation-only stack; keep the workflow file hand-written. **Added to on 2026-11-19: Alchemy Git is used as a history of confirmed imports and a mirror; CI on it cannot be yet. The stack and the workflow file stand.** |
-| distilled 1Password package | It wraps the Connect REST API and cannot resolve `op://` references. | Run deploys under `op run`. **Added to on 2026-11-19: the distilled clients are used where each has an honest job; `@alchemy.run/1password`, on the library's main, does resolve references at a deploy.** |
+| `effect/graphql` | A client only. There is no server to call. | Leave out. **Marked as wanted by him. How is decision 34 of the alchemy-domain brief, open.** |
+| `@effect/ai-typesafe` for confidence scores | It does not score another model's answer; a score costs a second call to a second vendor. | No second vendor until a labelled calibration run shows a gain. **Marked as wanted by him. How is decisions 26 to 28 of the alchemy-domain brief, open.** |
+| Alchemy Git for CI/CD | `alchemy.run/git` is a self-hosted git server. The GitHub provider declares environments, secrets and rules, but not workflow files. | Declare repository settings in a workstation-only stack; keep the workflow file hand-written. **Marked as wanted by him. What it holds is decision 35 of the alchemy-domain brief, open. The stack and the workflow file stand.** |
+| distilled 1Password package | It wraps the Connect REST API and cannot resolve `op://` references. | Run deploys under `op run`. **He marked "Discord sign-in, distilled clients" as wanted. The alchemy-domain brief proposes a job for each; none is decided.** |
 | R2 presigned uploads | Rows arrive as JSON; a bucket adds cross-origin setup for nothing. | Leave out. Stands: not among what he asked for on 2026-11-19. |
 | The four codec packages as a template | They have no filename postfixes, export `./internal/*`, and depend on three packages that are private in beep-effect. | Postfix in every filename, exact exports, and vendor the needed subset of `@beep/identity`, `@beep/schema`, `@beep/utils`. |
 | Lift the current reader into `@beep/csv` and `@beep/xlsx` | The reader wraps papaparse and SheetJS. Effect ships `effect/encoding` `Csv`, `Zip` and `Xml`. | Write both engines; use the old reader as the parity test. |
@@ -125,6 +126,7 @@ Each step ends with the full check and an import of the messy sample in a browse
   built; awaiting "the brief matches" and answers T1 to T8.
 - 2026-11-19: Benjamin signed the tooling CLI brief (T1 to T8); goal `tooling-cli` opened.
 - 2026-11-19: goal `tooling-cli` done: the ten scripts are commands of `@beep/repo-cli` and `scripts/` is gone.
-- 2026-11-19: Benjamin reversed "core": the app uses `@alchemy.run/domain`, all of it, with the extras he named. The
-  reading, two trials and the brief are the packet [alchemy-domain](../alchemy-domain/README.md); nothing of it is
-  built, and its build starts after he signs that brief and the atoms goal is merged.
+- 2026-11-19: Benjamin reversed "core": the app uses `@alchemy.run/domain`, all of it. The reading, the trials and
+  the brief are the packet [alchemy-domain](../alchemy-domain/README.md); how each part and each extra he marked as
+  wanted is used is open there. Nothing of it is built; its build starts after he signs that brief and the atoms
+  goal is merged.

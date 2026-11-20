@@ -15,7 +15,7 @@ Answered decisions move below with the date, the answer and how to reverse it.
 
 | # | Question | Recommendation | Source |
 | --- | --- | --- | --- |
-| 13 | A second vendor for confidence scores? | Not until a labelled calibration run shows a gain (reversed 2026-11-19 by "core, reversed": he asked for confidence scores; how is decision 15 of the alchemy-domain brief) | 03 §7.3 |
+| 13 | A second vendor for confidence scores? | Not until a labelled calibration run shows a gain (at odds with "ai-typesafe confidence" on his list of wanted items; see "core, reversed"; asked again as decisions 26 to 28 of the alchemy-domain brief) | 03 §7.3 |
 | 15 | Do model-preselected values count as Ready? | No | 03 §7.8 |
 | 16 | MCP for agents? | Own tools: reads plus proposal-only writes that need approval | 01 §3 |
 
@@ -399,11 +399,11 @@ The reference `op://BEEP_SECRETS/BEEP_SECRETS/TYPESAFE_AI_API_KEY`: "Not deploye
 reserved for a later confidence-score goal; no stage gets it, and it is not in `env/op.env`. Rejected: declare it,
 unused. It is never resolved by an agent.
 
-Reversed in part on 2026-11-19 by "core, reversed": he asked for confidence scores, so the key is no longer "for
-later". Whether it is needed at all, and which stage gets it, follow decision 15 of the alchemy-domain brief. It is
-still never resolved by an agent.
+At odds with "ai-typesafe confidence" on his list of wanted items (see "core, reversed"). Whether the key is used
+is decision 27 of the alchemy-domain brief; this entry stands until he answers it. The key is still never resolved
+by an agent.
 
-### 2026-11-19 — infra I6, email (23) (reversed 2026-11-19 by "core, reversed")
+### 2026-11-19 — infra I6, email (23) (at odds with "Resend email" on his list of wanted items; see "core, reversed")
 
 Question: does the app send email now? Answer: "Not now (Recommended)". Rejected: Resend for reset only; Resend for
 reset, verification and invitations. Reverse: a later goal adds the sending domain and its key.
@@ -685,28 +685,26 @@ primary reasons I wanted to embark on this build out in the first place"; "Not b
 way to make use of ever single thing". The app is where he explores the library in full and settles its designs
 before porting beep-effect to it.
 
-Question: does the app use `@alchemy.run/domain`, or take its ideas? Answer: it uses it, all of it. The default for
-every concept is "use it, and here is how"; "cannot yet" needs the exact thing in the way and what removes it. The
-reading, the two trials and the brief are their own packet, [alchemy-domain](../alchemy-domain/README.md); its
-[brief](../alchemy-domain/BRIEF.md) puts sixteen decisions to him, each about how. Nothing is built until he signs it
-and the atoms goal is merged.
+Question: does the app use `@alchemy.run/domain`, or take its ideas? Answer: it uses it, all of it. How is not
+decided: the reading, the trials and the brief are their own packet, [alchemy-domain](../alchemy-domain/README.md),
+and its [brief](../alchemy-domain/BRIEF.md) puts each "how" to him. None of that brief's recommendations is his
+until he answers it. Nothing is built until he signs it and the atoms goal is merged.
 
-He also asked, by name, for: Cluster, workflows and singletons; Drizzle v1 on Durable Objects; GraphQL
-(`effect/graphql`); confidence scores through the `typesafe` AI package; email through Resend (the distilled client);
-Discord sign-in and the distilled clients; Alchemy Git. He did not ask for R2 presigned uploads, which stay out.
+From his own list of 2026-11-18, the items he marked as wanted (CAPTURE.md of that packet records them under
+2026-11-19, in his labels): "Cluster, workflows, singletons"; "Drizzle v1 on Durable Objects"; "GraphQL
+(effect/graphql)"; "ai-typesafe confidence"; "Resend email"; "Discord sign-in, distilled clients"; "Alchemy Git". He
+did not mark R2 presigned uploads, which stay out.
 
-What this reverses, with the date above:
+What this touches in this file:
 
-- "core" (2026-11-18): reversed.
-- "infra I6, email (23)": "Not now" is reversed; which mails are sent is decision 16 of the alchemy-domain brief.
-- Open question 13 and the second paragraph of "infra I5" (confidence scores, and the key reserved for them):
-  reversed; what the scores decide is decision 15 of that brief.
-- "infra I7, repository rules (24)" was answered "Yes, with an admin bypass" and is built; it stands. Alchemy Git is
-  added beside it as a history of confirmed imports and a mirror, not as a replacement for the ruleset or for CI.
-- The rows of the README's table "Where the research disagrees with the request" for the Alchemy domain, Cluster,
-  Drizzle in Durable Objects, `effect/graphql`, confidence scores, Alchemy Git and the distilled 1Password package
-  are marked there.
+- "core" (2026-11-18): reversed, in his words above.
+- "infra I6, email (23)" (his "Not now" of 2026-11-19), open question 13, and the second paragraph of "infra I5"
+  (the key reserved for confidence scores): not reversed in any words of his. Each is at odds with an item he marked
+  as wanted. That they are reversed is inferred from his list and from "make use of ever single thing"; the
+  alchemy-domain brief asks him (its decisions 26 to 31), and these entries stand until he answers.
+- "infra I7, repository rules (24)" was answered "Yes, with an admin bypass" and is built; it stands. The
+  alchemy-domain brief proposes Alchemy Git beside it (its decision 35), not in place of the ruleset or of CI.
+- The rows of the README's table "Where the research disagrees with the request" that name those items say so.
 
 Rejected: keeping "core" and moving one aggregate later. Reverse: a new decision by him; the app as it stands on main
 is the D1 core, and nothing of the reversal is built yet.
-

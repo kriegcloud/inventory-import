@@ -4,7 +4,7 @@ title: Alchemy domain
 description: Everything @alchemy.run/domain and what plugs into it offers, concept by concept, with how inventory-import would use each. The reference the brief is built on, written so its pages can later become agent skills.
 status: active
 stage: shape
-next: Benjamin answers the brief's sixteen decisions and says whether it matches; the build starts after that and after the atoms goal is merged
+next: Benjamin answers the brief's decisions, 1 to 22 first, and says whether it matches; the build starts after that and after the atoms goal is merged
 goals: []
 ---
 
@@ -21,16 +21,17 @@ only he can make, is [the brief](BRIEF.md).
 
 ## How to read it
 
-Start with [the brief](BRIEF.md): the design, the saving of review decisions modelled first, and the sixteen
-decisions. The research under it:
+Start with [the brief](BRIEF.md): the design, the saving of review decisions modelled first, one table of every
+concept with its instance, its move and its check, and the decisions in the order they must be asked. The research
+under it:
 
 1. [The map](research/00-map.md): every concept on one page, with its verdict. Fifty-four pages give 59 verdicts:
    46 "use" on the published release, 8 "use, from main", and 5 "cannot yet", each with what is in the way.
 2. [The pull request he pointed at](research/01-pr-3260-verify.md): `Verify`, which proves a model's rules.
 3. [This app's rules under Verify](research/03-this-apps-rules-under-verify.md): the app's own rules, declared and
    proved, and [the trial](research/04-trial.md) that ran them. Then
-   [the trial on saving review decisions](research/07-review-decisions-trial.md): five models, their sources and
-   Verify's reports.
+   [the trial on saving review decisions](research/07-review-decisions-trial.md): two rounds, every source and every
+   report of Verify. Read its second round's table first.
 4. [What was merged since the published release](research/02-merged-since-beta-87.md): what `main` has that npm
    does not.
 5. The concept pages, in [research/concepts/](research/concepts/), one file per concept under a stable name.
@@ -63,12 +64,14 @@ A model of this app, outside the repository ([the trial](research/04-trial.md)):
   `Verify`. Nineteen of the app's rules were proved for every state and every input, and one was checked over 5,173
   sequences of commands. A rule broken on purpose came back with the state, the command and the shortest sequence
   that breaks it.
-- On `main`, the saving of review decisions, five ways ([07](research/07-review-decisions-trial.md)). Today's
-  set-and-clear difference breaks "no command clears a decision its sender did not make", and Verify gives the three
-  commands that do it. With commands that say what the person did, a row's eight rules are proved; one instance per
-  import that applies the same functions holds its six rules in every sequence of up to 3 commands, checked and not
-  proved. Four of the five ran from the library's own preview build of that commit, installed with bun beside the
-  app's Effect.
+- On `main`, the saving of review decisions, in two rounds ([07](research/07-review-decisions-trial.md)). The first
+  showed that a command of rows to set and rows to clear cannot hold "no command clears a decision its sender did not
+  make". The second, run after a review of the brief, found the shape under which the review's rules are proved: the
+  import's lifecycle as its own instance, one instance per decided row, and every act a decision across both. Verify
+  verified that model with 27 rules proved and 1 checked. One instance per import proves nothing, by the prover's
+  design.
+- The same round stored values in a local Durable Object through the domain host (about 8 MiB is the limit), and
+  ran a decision, a relation, a model invariant, an `eventually` rule and a broken rule kept as a story.
 
 ## What the reading found
 
@@ -94,9 +97,14 @@ Each line is argued on the page it links to. These are findings, not decisions.
 - The request that saves decisions does not say which picture of the draft it was worked out from, so no check on
   the server can tell a decision its maker took back from one a stale screen cleared
   ([07](research/07-review-decisions-trial.md)).
-- An aggregate's state is one stored value of at most 8 MB, written again at every accepted command. A draft with
-  every one of 50,000 rows decided measures 10 MB as JSON with ids written out and 3.3 to 4.2 MB in a compact form
-  ([07](research/07-review-decisions-trial.md), "How large one draft's state is").
+- An aggregate's state is one stored value, written again at every accepted command. In local workerd, through the
+  domain host, 8.3 MB was stored and 8.5 MB was refused. The 2 MiB in the library's source is a guard of its cluster
+  package. One instance per import passes 8 MiB at about 42,800 decided rows; one instance per row is a few hundred
+  bytes ([07](research/07-review-decisions-trial.md), trials 1 and 5).
+- The prover cannot prove a rule over the app's real decision shape, or over a list. A row's decision is held as
+  text, and no state in the recommended shape holds a list.
+- A handler named `Effect.fn("name")(…)` and a schema imported from another package are read by the prover; a
+  request context imported from another package is not.
 
 **What the prover asks of this repository's code**
 
@@ -192,3 +200,8 @@ pages whose "Where this was read" names a file that changed.
   Verify ([07](research/07-review-decisions-trial.md)); the open questions renumbered to the brief's sixteen.
   Benjamin's reversal of "core" recorded in ideal-architecture. Nothing built; awaiting his answers and "the brief
   matches".
+- 2026-11-20: a review of the brief found sixty points, four of them blocking: its recommended answers left almost
+  no rule proved, its check of what an act's sender saw could not work, and the limit on a stored value was in
+  doubt. A second round of trials was run and added to [07](research/07-review-decisions-trial.md); the brief was
+  rewritten on it, with thirty-five decisions in the order they must be asked. His five answers on today's review
+  saving are under "Answered". Nothing built.

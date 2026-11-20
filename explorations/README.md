@@ -23,7 +23,7 @@ An exploration is a question being shaped before anyone builds. Each lives in `e
 - [ideal-architecture](ideal-architecture/README.md): what inventory-import becomes as a model-first Turborepo of deep
   packages, shipped with Alchemy. Its goals are being built.
 - [alchemy-domain](alchemy-domain/README.md): everything `@alchemy.run/domain` and what plugs into it offers, concept
-  by concept, with how this app would use each. Research; the brief follows.
+  by concept, with how this app would use each. Research, two rounds of trials, and a brief awaiting his answers.
 
 ## Graduation
 

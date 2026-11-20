@@ -30,9 +30,9 @@ import * as DomainFoldkit from "@alchemy.run/domain/Foldkit"
 export const Inventory = DomainFoldkit.make(InventoryApi) // InventoryApi: a Domain.Api; no entry may be named Message
 
 // A command (beta.87): { target, input, commandId }; its result is a Message tagged
-// "SucceededDecideRows" or "FailedDecideRows" (the case name is `Succeeded` or `Failed` joined to the tag).
+// "SucceededDecideRow" or "FailedDecideRow" (the case name is `Succeeded` or `Failed` joined to the tag).
 const allocation = DomainFoldkit.next(model.commandIds) // { commandId: "<session>:<sent>", commandIds: next state }
-const save = Inventory.DecideRows({ target: model.importKey, input: { step, rows }, commandId: allocation.commandId })
+const save = Inventory.DecideRow({ target: model.importKey, input: { row, step, saw, flags }, commandId: allocation.commandId })
 
 // A live read as a Subscription entry: key change restarts it, cursor change does not.
 const allowance = Inventory.AllowanceToday.watch({

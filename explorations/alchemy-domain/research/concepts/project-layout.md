@@ -153,7 +153,7 @@ closest thing to upstream's pure domain package, and importable by `host` and `w
 | --- | --- | --- |
 | `.model` | `packages/catalog/model`, `packages/access/model` | `src/Catalog.model.ts`, `src/Access.model.ts` (with the handlers Layer) |
 | `.aggregate` | `model` | `src/Import/Import.aggregate.ts`, `src/Item/Item.aggregate.ts`, `src/People/Organization.aggregate.ts` |
-| `.id` | `contract` (already there) | `src/Catalog.id.ts`; `packages/kernel/src/Ids.id.ts`. Whether the prover reads an id schema imported by package name was not tried; upstream imports ids relatively. |
+| `.id` | `contract` (already there) | `src/Catalog.id.ts`; `packages/kernel/src/Ids.id.ts`. Tried on 2026-11-20 ([the trial](../07-review-decisions-trial.md), trial 3): an id and a value schema imported by package name are read; a request context imported that way is not. Upstream imports ids relatively. |
 | `.command` (`Domain.Command` + its events + its rejections) | `model` | `src/Import/ConfirmImport.command.ts`, `src/Item/EditItem.command.ts`. Either accept two meanings of `.command.ts` (payloads in `contract`, `Domain.Command`s in `model`), or rename one side: a choice for the owner. |
 | `.rejection` (shared) | `model`, or reuse `contract`'s tagged errors | `src/Import/ImportNotOpen.rejection.ts`. A rejection imported from `contract` by package name runs, but the prover on main does not read it (next section). |
 | `.decision` (main only) | `model` | `src/Import/Confirm.decision.ts` |

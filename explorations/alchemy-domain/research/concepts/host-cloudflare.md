@@ -334,7 +334,11 @@ deploy the old layout).
 - Never rename the model. Classes are named after it, so a renamed model starts empty under new classes. The same for
   adding `jurisdiction` after data exists.
 - Keep one command's events small. Cloudflare's documentation (read 2026-11-19) gives 8 MB for a key and value combined
-  on the SQLite backend (https://developers.cloudflare.com/durable-objects/platform/limits/). Each event is one value,
+  on the SQLite backend (https://developers.cloudflare.com/durable-objects/platform/limits/). Measured on
+  2026-11-20 through this host in local workerd: an aggregate's state of 8.3 MB was stored and the command that
+  would take it to 8.5 MB failed with `string or blob too big: SQLITE_TOOBIG`
+  ([the trial](../07-review-decisions-trial.md), trial 1). The 2 MiB in the library's cluster package is that
+  package's own guard, not this host's. A deployed object was not tried. Each event is one value,
   and the command's receipt is one value that holds every event of the command again. So the sum of one command's
   events must stay under 8 MB: a confirm of 50,000 rows at about 400 bytes a row (about 20 MB) cannot be one command,
   however it is split into events. Carry the rows in chunks of several commands, or keep them out of the events

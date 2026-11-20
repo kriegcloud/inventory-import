@@ -449,8 +449,29 @@ than when step 7 was measured, so the code before the rework (`ef53dbd`) was mea
 | Before the rework, measured again | 8.6 s, 8.4 s | 1.47 s, 1.67 s | 1.20 s, 1.50 s | 3.6 s, 4.6 s | 28, 38 | 183 ms, 217 ms |
 | After the rework (four runs) | 7.3 s, 9.7 s, 7.4 s, 12.2 s | 1.54 s, 1.91 s, 1.42 s, 1.72 s | 1.32 s, 1.54 s, 1.18 s, 1.35 s | 3.9 s, 4.0 s, 4.4 s, 3.5 s | 29, 32, 36, 29 | 217 ms, 300 ms, 333 ms, 217 ms |
 
-Not slower than before the rework beyond the spread between runs of the same code. The 12.2 s reload followed the
-dev server compiling the files again.
+That table set two runs before against four after, was measured before `1531c32`, and its worst frame after is above
+both old runs in two of four: "not slower" was more than it shows. Measured again on 2026-11-20 at `b8b6700`, four
+runs a side in one sitting, the code before the rework (`ef53dbd`) checked out in place:
+
+| 50,000 rows | Reload to the region drawn | One accept of 500 | Ctrl+Z | 40 scroll jumps | Frames over 50 ms | Worst frame |
+| --- | --- | --- | --- | --- | --- | --- |
+| Before the rework (`ef53dbd`) | 13.7 s, 7.5 s, 7.5 s, 7.9 s | 1.29 s, 1.50 s, 1.45 s, 1.62 s | 1.36 s, 1.32 s, 1.30 s, 1.50 s | 3.7 s, 3.8 s, 3.7 s, 3.6 s | 31, 31, 31, 30 | 183, 200, 183, 167 ms |
+| Head (`b8b6700`) | 10.5 s, 7.9 s, 7.2 s, 7.2 s | 1.33 s, 1.22 s, 1.37 s, 1.34 s | 1.10 s, 1.13 s, 1.25 s, 1.07 s | 3.4 s, 4.4 s, 3.6 s, 3.9 s | 25, 28, 26, 29 | 183, 333, 217, 400 ms |
+
+The first reload of each side followed the dev server compiling the files. Reload: the same from the second run on.
+An accept and Ctrl+Z: shorter at the head in every run but one accept. The scroll: fewer frames over 50 ms at the
+head in every run, the 40 jumps longer in two runs of four, and the worst frame longer in three runs of four (333 ms
+and 400 ms against 200 ms at most before).
+
+And on a page with a kind marked `fixable: false` (the gallery's `?state=elsewhere`, 181 rows), one accept and one
+key in Search, four runs a side:
+
+| 181 rows, one kind that cannot be fixed | One accept | One key in Search, to the rows shown |
+| --- | --- | --- |
+| Before the rework (`ef53dbd`) | 144, 144, 129, 158 ms | 63, 60, 57, 62 ms |
+| Head (`b8b6700`) | 162, 162, 159, 162 ms | 88, 79, 80, 92 ms |
+
+On that small page the head is slower in both: an accept by about 18 ms, a key in Search by about 25 ms.
 
 **On screen**, a fresh database, 1440 px unless said: items_messy.csv, Continue to the review (200 rows: Needs a
 decision 24, Cannot import 21, Ready 155). Accepted the SKU group of 2: the work list said "SKU: done", "SKU clash: 9

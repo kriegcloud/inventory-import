@@ -389,6 +389,63 @@ a 50,000-row import is open (group 12); it is said when the server answers.
 **Left as they were, older than step 6:** a retried item save that the server answers "changed meanwhile" for the
 person's own save still says "Changed by someone else" (group 8's older part).
 
+## The rework after Benjamin's answers (2026-11-19), and the review of step 7
+
+Benjamin answered the five choices step 7 had put to him: ref callbacks follow the brief, what the region works out
+is derived atoms, state of one component is a `ScopedAtom`, `viewRows` reads an `Option` (measured), and the theme
+stays in plain `localStorage`. "Choices made" below says what each became. The review of step 7 came back while the
+rework was under way; its groups are answered in the same commits.
+
+| Group | What was wrong | What changed | Test | Seen on screen |
+| --- | --- | --- | --- | --- |
+| 1 | A region that had gone still acted: a bulk toast's Undo, and its keys for up to 600 ms, told the caller the old region's decisions | The region's actions, its stepping and its keys return while its section is off the page (`present`, set by the section's ref callback); the keys atom has no idle time | `ReviewRegion.atoms.test.ts`: the toast's Undo pressed after the region left, and a region not yet on the page. Each fails with the guard taken out | Imported items_messy.csv, then Ctrl+Z on the Result: nothing was sent |
+| 2 | Until the first decision the region worked its state out again on every draw of its caller | The decisions are the caller's atom; the Review step's start is one derived atom, read once | catalog-web `ReviewDraft.test.ts`: the decisions stay the same object while the screen's other state changes, and nothing is told | Not measured apart: the 50,000-row reload below includes it |
+| 3 | No test of undo and redo on the region's atom | The region's atoms and actions are in a file a test can read (`ReviewRegion.atoms.ts`) | `ReviewRegion.atoms.test.ts`, six tests through a registry with a table made as the screen makes one | |
+| 4 | A change that changed nothing redrew the region | `change` keeps what it holds when every value is the same | The same file. Fails with the check taken out | |
+| 5 | The review package did not declare `@effect/atom-react` | Declared, with `@tanstack/store` (the facets) and `@tanstack/table-core` (the test's table) | `bun run check` (boundaries) | |
+| 6, 7, 8 | Observers rebuilt on every draw; the grid's handle left behind; records changed in place inside atoms | Every ref callback is the same function across draws; there is no handle (the region asks for a row through an atom); what was changed in place is atom state written through the registry | `laws ref-callbacks` and its test | On the gallery: "Why?" opened by a click and closed by Escape; by a resting mouse after the delay, without taking the focus, and closed when the mouse left; a click while it was open by hover kept it open. The work list as chips at 1250 px. Not seen: a strip too long for its line (its edge buttons), and a cut text's card (no text was cut) |
+| 9 | The phone drawers' code was fetched inside a draw, behind a module-level flag | Fetched where the layout is derived to be narrow; no flag | | On the gallery at 390 px: Import opened the confirm drawer at the first press |
+| 10 | Only `Action` was matched by its enum | Every comparison of a tag in the review package is the enum's own guard, made once per file; the stops of "Next problem" are an exhaustive `Entry.$match`; a row's place is read through `RowPlace.guards` | `bun run check` | |
+| 11 | The column plan was not kept across draws | The plan, the widths, the lines and each row's headings are derived atoms | The same file (the rows are worked out once per change) | 50,000 rows below |
+| 12 | Comments and documents named what was gone | `docs/review-table.md`, the props' comments and this plan say atoms | `bun run docs:check` | |
+| 13 | The inventory of a hook's job done with no hook and no atom | Each item is one of the house forms; what is not is listed under "Choices made" | | |
+| 14 | The lint read imports only | `laws ref-callbacks` (`refs:check`, part of `bun run check`) refuses a ref callback made on each draw | `RefCallbacks.test.ts`, with planted files; on the seven files as they stood before the rework it names all eight | |
+
+Found while looking, and fixed:
+
+- A second search in the review did not reach the rows (the first did): the atom that reads the table's order gave
+  the table its rows through `setOptions`, which also publishes the table's state outside a draw. The rows are given as
+  the table's own hook gives them. Seen: bolt 5 items, nut 0, cleared 200; before the fix 5, 5 and 5.
+- Scrolling 50,000 rows was four times slower after the first pass of the rework (15 s for the script's 40 jumps):
+  each drawn row walked back up the whole list for its headings, the enums' guards were made anew at every
+  comparison, and the table's order was worked out five times per decision. Fixed in `c48f932`.
+
+**50,000 rows** (`items_50000.csv`, dev server, headless Chromium, the same script as step 7). The machine was busier
+than when step 7 was measured, so the code before the rework (`ef53dbd`) was measured again in the same sitting:
+
+| | Reload to the region drawn | One accept of 500 | Ctrl+Z | 40 scroll jumps | Frames over 50 ms | Worst frame |
+| --- | --- | --- | --- | --- | --- | --- |
+| Step 7 as first measured | 8.2 s, 8.4 s | 1.31 s, 1.31 s | 1.19 s, 1.14 s | 3.6 s, 3.6 s | 21, 24 | 300 ms, 317 ms |
+| Before the rework, measured again | 8.6 s, 8.4 s | 1.47 s, 1.67 s | 1.20 s, 1.50 s | 3.6 s, 4.6 s | 28, 38 | 183 ms, 217 ms |
+| After the rework (four runs) | 7.3 s, 9.7 s, 7.4 s, 12.2 s | 1.54 s, 1.91 s, 1.42 s, 1.72 s | 1.32 s, 1.54 s, 1.18 s, 1.35 s | 3.9 s, 4.0 s, 4.4 s, 3.5 s | 29, 32, 36, 29 | 217 ms, 300 ms, 333 ms, 217 ms |
+
+Not slower than before the rework beyond the spread between runs of the same code. The 12.2 s reload followed the
+dev server compiling the files again.
+
+**On screen**, a fresh database, 1440 px unless said: items_messy.csv, Continue to the review (200 rows: Needs a
+decision 24, Cannot import 21, Ready 155). Accepted the SKU group of 2: the work list said "SKU: done", "SKU clash: 9
+left" (the two trimmed SKUs now clash), focus went to the Cost group's accept, a toast "2 fixes accepted" with Undo;
+Ctrl+Z and Ctrl+Shift+Z put it back and forth, one PUT each. Accepted the Cost group: Needs a decision 22, Ready 157.
+J, J, K moved the focus down the rows and back. "Leave out Oak Tape 2in": Needs a decision 20, Left out 1, focus on the
+next row. All, typed bolt: 5 items; nut: 0; cleared: 200. Sorted descending: the first row changed. Ticked Category
+"Component": 1 item; unticked: 200. Reloaded: the same counts and "Undo: 1 row left out". At 390 px: the first card
+took no focus; "Use 1200 for 2" moved to card 2 with focus on its first button; Skip and Undo moved between cards;
+Ready and back to Needs a decision left the focus on the tab. Import: the confirm said "Import 158 items? 42 items
+won't be imported"; the Result said Not imported 42, Imported 158, All 200. Activity: 22 decisions, "/" put the caret
+in the search, "unit" left 7, Escape 22; Imports 1. People: 3 rows, a role changed to Viewer and back to Editor.
+items_clean.csv dropped on the page beside the box: uploaded, Review 25 Ready. Not seen: two screens on one import
+(the toast pressed after another tab's change is held by the test), a refused save, a file over the limit.
+
 ## Legacy in the client
 
 The client's lint is on (`packages/client/.oxlintrc.json` extends `.oxlintrc.atoms.json`), with one file excepted by

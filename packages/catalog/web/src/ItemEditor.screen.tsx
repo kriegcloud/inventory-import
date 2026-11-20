@@ -23,7 +23,7 @@ import { Input } from "@inventory/ui/components/input"
 import { NativeSelect, NativeSelectOption } from "@inventory/ui/components/native-select"
 import { Switch } from "@inventory/ui/components/switch"
 import { Textarea } from "@inventory/ui/components/textarea"
-import { invalidate, perKey } from "@inventory/client/Api"
+import { invalidate } from "@inventory/client/Api"
 import { optimisticChange, optimisticWrite } from "@inventory/client/OptimisticAtoms"
 import { catalogApi } from "./Catalog.runtime.ts"
 import { itemsPage } from "./ItemsPage.screen.tsx"
@@ -132,8 +132,11 @@ interface EditorState {
   readonly notice: string | null
 }
 
-/** Each item's editor, let go with it. */
-const itemEditor = perKey((_id: string) =>
+/**
+ * Each item's editor, let go with its row: held weakly (`Atom.family`), since a person can page through thousands of
+ * items and each one drawn would otherwise leave its atoms behind for the page's life.
+ */
+const itemEditor = Atom.family((_id: string) =>
   Atom.make<EditorState>({ open: false, base: O.none(), form: O.none(), problems: {}, notice: null })
 )
 
@@ -149,7 +152,7 @@ interface ItemSave {
  * back), the filters' values and the audit trail are asked again. Someone else's save in between is shown, not
  * overwritten: the table shows their values and the form keeps the person's, on their revision.
  */
-const editItem = perKey((id: StoredItem["id"]) =>
+const editItem = Atom.family((id: StoredItem["id"]) =>
   optimisticWrite({
     send: (save: ItemSave) => catalogApi.send((api) => api.items.edit({ params: { id }, payload: save.edit })),
     changes: [

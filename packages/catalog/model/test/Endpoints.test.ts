@@ -10,7 +10,7 @@ import { type ConfirmWrite, ImportStore } from "@inventory/catalog-model/ImportS
 import { usedUpSentence } from "@inventory/catalog-model/AssistantHandler"
 import { memoryUsedUpWords } from "@inventory/catalog-model/ModelAllowance"
 import { decisionFromFlags } from "@inventory/catalog-contract/Decision"
-import { RevisionAhead } from "@inventory/catalog-contract/ImportRejection"
+import { AcceptsTakenBack, RevisionAhead } from "@inventory/catalog-contract/ImportRejection"
 import type { ColumnCatalog } from "@inventory/catalog-contract/TableView"
 import * as A from "effect/Array"
 import * as BigDecimal from "effect/BigDecimal"
@@ -425,6 +425,47 @@ describe("a revision the draft has not reached", () => {
           expect([S.is(RevisionAhead)(save), S.is(RevisionAhead)(confirm)]).toEqual([true, true])
           const still = yield* imports.get({ params }).pipe(as(marcus))
           expect([still.status, still.revision, R.keys(still.decisions)]).toEqual(["open", view.revision, []])
+        })
+    )
+  })
+})
+
+describe("an accept made before its column was matched again, over the twins", () => {
+  layer(withCrypto(catalogMemory()))("the twin holds the rule as D1 does", (it) => {
+    it.effect(
+      "is not applied by a save, which names it, and a confirm that carries it is refused and writes nothing",
+      () =>
+        Effect.gen(function* () {
+          const imports = yield* importsEndpoints
+          const items = yield* itemsEndpoints
+          const view = yield* stage(tableOf({ fileName: "five.csv", lines: fiveLines })).pipe(as(marcus))
+          const params = { id: view.id }
+          const table = yield* imports.table({ params }).pipe(as(dana))
+          const cost = O.getOrThrow(A.findFirst(table.columns, (column) => column.label === "unit_cost"))
+          const matched = yield* imports
+            .match({ params, payload: { field: "unitCost", column: O.some(cost.index) } })
+            .pipe(as(dana))
+          expect(matched.revision).toBe(view.revision + 1)
+          const accept = { "row-2": decisionFromFlags({ accepted: ["unitCost"] }) }
+          const saved = yield* imports
+            .decide({ params, payload: { madeOn: { "row-2": view.revision }, set: accept, clear: [] } })
+            .pipe(as(marcus))
+          expect(saved.notApplied).toEqual([{ rowId: "row-2", field: "unitCost" }])
+          const after = yield* imports.get({ params }).pipe(as(marcus))
+          expect(R.get(after.decisions, "row-2")).toEqual(O.some(decisionFromFlags({})))
+          const refused = yield* Effect.flip(
+            imports
+              .commit({
+                params,
+                payload: { revision: after.revision, madeOn: { "row-2": view.revision }, set: accept, clear: [] }
+              })
+              .pipe(as(marcus))
+          )
+          expect([S.is(AcceptsTakenBack)(refused), S.is(AcceptsTakenBack)(refused) ? refused.accepts : []]).toEqual([
+            true,
+            [{ rowId: "row-2", field: "unitCost" }]
+          ])
+          expect((yield* items.list().pipe(as(marcus))).length).toBe(0)
         })
     )
   })

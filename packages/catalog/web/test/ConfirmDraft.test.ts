@@ -18,7 +18,7 @@ import {
 } from "@inventory/catalog-contract/Decision"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import type { ImportView } from "@inventory/catalog-contract/Import"
-import { DraftMoved } from "@inventory/catalog-contract/ImportRejection"
+import { AcceptsTakenBack, DraftMoved } from "@inventory/catalog-contract/ImportRejection"
 import { DraftEvent } from "../src/Draft.machine.ts"
 import { importView, importViewShown } from "../src/Imports.atoms.ts"
 import {
@@ -69,7 +69,7 @@ const out = decisionFromFlags({ out: true })
 const kept = decisionFromFlags({ kept: true })
 
 /** What the server refuses a confirm with. */
-type Refusal = DraftMoved | { readonly _tag: "AlreadyImported" }
+type Refusal = DraftMoved | AcceptsTakenBack | { readonly _tag: "AlreadyImported" }
 
 /** A server for one import: every request answers only when the test says so, and is kept as it was sent. */
 const world = (id: ImportId) => {
@@ -77,7 +77,7 @@ const world = (id: ImportId) => {
   const saves: Array<{
     readonly delta: DecisionDelta
     readonly madeOn: Readonly<Record<string, number>>
-    readonly answer: Deferred.Deferred<Saved>
+    readonly answer: Deferred.Deferred<Saved, { readonly _tag: "InternalServerErrorProblem" }>
   }> = []
   const confirms: Array<{ readonly payload: ConfirmRequest; readonly answer: Deferred.Deferred<ImportView, Refusal> }> =
     []
@@ -89,7 +89,7 @@ const world = (id: ImportId) => {
         return Deferred.await(answer)
       },
       decide: (request: { readonly payload: SaveRequest }) => {
-        const answer = Deferred.makeUnsafe<Saved>()
+        const answer = Deferred.makeUnsafe<Saved, { readonly _tag: "InternalServerErrorProblem" }>()
         // What it was made on is kept beside the rows, so a test of the rows reads the rows.
         const { madeOn, ...delta } = request.payload
         saves.push({ delta, madeOn, answer })
@@ -221,5 +221,69 @@ describe("a confirm", () => {
       expect([t.confirming(), t.heldBack(), page.said.length, page.went]).toEqual([false, O.none(), 1, []])
       expect(t.gets.length).toBe(asked + 1)
     })
+  )
+
+  it.live("a save answered without an accept says so, and the row shows its proposal open again", () =>
+    Effect.gen(function* () {
+      const id = importNo(35)
+      const t = world(id)
+      yield* settle
+      page.said.length = 0
+      const accepted = decisionFromFlags({ accepted: ["unitCost"] })
+      t.registry.set(draftEvents(id), DraftEvent.Decided({ changes: { "row-55": O.some(accepted) } }))
+      yield* settle
+      expect(t.saves[0]?.madeOn).toEqual({ "row-55": 10 })
+      yield* Deferred.succeed(t.saves[0]!.answer, {
+        revision: 11,
+        changed: true,
+        notApplied: [{ rowId: "row-55", field: "unitCost" }]
+      })
+      yield* settle
+      expect(page.said).toEqual(["An accept was taken back"])
+      expect(t.shown()["row-55"]).toEqual(decisionFromFlags({}))
+    })
+  )
+
+  it.live(
+    "refused for an accept made before its column was matched again: nothing was imported, the accept is named once the newer picture is read, and the row is saved without it",
+    () =>
+      Effect.gen(function* () {
+        const id = importNo(36)
+        const t = world(id)
+        yield* settle
+        page.said.length = 0
+        const accepted = decisionFromFlags({ accepted: ["unitCost"] })
+        t.registry.set(draftEvents(id), DraftEvent.Decided({ changes: { "row-55": O.some(accepted) } }))
+        yield* settle
+        // The save fails: the row waits, and rides with the confirm.
+        yield* Deferred.fail(t.saves[0]!.answer, { _tag: "InternalServerErrorProblem" } as const)
+        yield* settle
+        t.press()
+        yield* settle
+        expect(t.sent()).toEqual([{ revision: 10, madeOn: { "row-55": 10 }, set: { "row-55": accepted }, clear: [] }])
+        const asked = t.gets.length
+        yield* Deferred.fail(
+          t.confirms[0]!.answer,
+          AcceptsTakenBack.make({
+            reason: "A column was matched again.",
+            accepts: [{ rowId: "row-55", field: "unitCost" }]
+          })
+        )
+        yield* settle
+        // Nothing was imported, said above the review, while the newer picture is read; the row goes without the accept.
+        expect([t.heldBack(), t.confirming(), t.gets.length]).toEqual([
+          O.some({ read: false, apart: 0, accepts: [{ rowId: "row-55", field: "unitCost" }] }),
+          true,
+          asked + 1
+        ])
+        expect(A.map(t.saves, (save) => save.delta)[1]).toEqual({ set: { "row-55": decisionFromFlags({}) }, clear: [] })
+        expect(page.said).toEqual(["Not saved yet", "An accept was taken back"])
+        yield* Deferred.succeed(O.getOrThrow(A.last(t.gets)), t.at({ revision: 11, decisions: { "row-7": kept } }))
+        yield* settle
+        expect([t.heldBack(), t.confirming()]).toEqual([
+          O.some({ read: true, apart: 0, accepts: [{ rowId: "row-55", field: "unitCost" }] }),
+          false
+        ])
+      })
   )
 })

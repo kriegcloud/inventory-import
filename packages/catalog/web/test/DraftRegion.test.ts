@@ -102,7 +102,9 @@ const world = (id: ImportId, network: { down: boolean } = { down: false }) => {
       return [R.keys(saved(state)), state.undo.length] as const
     },
     give: (view: ImportView) => registry.set(importView(id), view),
-    happened: (event: DraftEvent) => registry.set(draftEvents(id), event)
+    happened: (event: DraftEvent) => registry.set(draftEvents(id), event),
+    /** Which region the draft is at: one more each time the region must start again. */
+    epoch: () => registry.get(regionEpoch(id))
   }
 }
 
@@ -142,6 +144,8 @@ describe("the region beside the draft", () => {
       t.leaveOut("row-2")
       yield* settle
       expect(t.region()).toEqual([["row-2"], 1])
+      page.said.length = 0
+      const before = t.epoch()
       leave()
       // The step is gone (the draft was let go) before anything changes: what follows is not seen by a step on screen.
       yield* settle
@@ -150,8 +154,9 @@ describe("the region beside the draft", () => {
       yield* settle
       t.open()
       yield* settle
-      // The region starts from what is shown, with a history of its own: not the region it was when the step left.
-      expect(t.region()).toEqual([["row-2", "row-5"], 0])
+      // The region starts from what is shown, with a history of its own: not the region it was when the step left. It
+      // was started again once, by the let-go, and nothing was said of another screen.
+      expect([t.region(), t.epoch(), page.said]).toEqual([[["row-2", "row-5"], 0], before + 1, []])
     })
   )
 

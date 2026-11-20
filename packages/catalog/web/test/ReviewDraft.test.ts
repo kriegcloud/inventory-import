@@ -3,6 +3,7 @@
 // sends the rows the person changed and nothing else, that its answer goes into the view held, that the server is
 // asked again when it must be and the ask is not lost, and that leaving and coming back loses nothing.
 import { describe, expect, it } from "@effect/vitest"
+import { vi } from "vitest"
 import * as A from "effect/Array"
 import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
@@ -36,6 +37,17 @@ import {
   whileCurrent
 } from "../src/ReviewDraft.atoms.ts"
 import { importNo, registryFor, viewAt } from "./support/catalog.ts"
+
+// What is said to the person.
+const page = vi.hoisted(() => ({ said: [] as Array<string> }))
+vi.mock("sonner", () => ({
+  toast: Object.assign((title: string) => page.said.push(title), {
+    dismiss: () => undefined,
+    success: () => 0,
+    loading: () => 0,
+    error: (title: string) => page.said.push(title)
+  })
+}))
 
 /** What the server answers a save with. */
 type Saved = {
@@ -325,9 +337,12 @@ describe("a saved decision", () => {
       yield* settle
       decide(t.registry, id, { "row-1": O.some(out) })
       yield* settle
+      page.said.length = 0
       yield* t.refuseSave(0)
       yield* settle
       expect([t.shown(), t.gets(), t.epoch()]).toEqual([{ "row-7": kept }, 1, 1])
+      // The refusal is said as such, once; the region starting again is not said as another screen's change.
+      expect(page.said).toEqual(["Your last decision was not saved"])
       leave()
       yield* settle
       t.open()
@@ -354,14 +369,16 @@ describe("leaving the Review step and coming back", () => {
         yield* settle
         leave()
         yield* settle
+        const before = t.epoch()
         yield* t.answerSave(0, 11)
         yield* settle
         expect([t.held().revision, t.held().decisions]).toEqual([11, { "row-12": out }])
-        // Back on the step: the region is drawn once, from the view as the save left it, and not drawn again.
-        const away = t.epoch()
+        // The answer moved the view by the person's own row, and let the draft go (nobody looks): one new epoch, for
+        // the let-go alone. Back on the step the region is drawn once, from the view as the save left it.
+        expect(t.epoch()).toBe(before + 1)
         t.open()
         yield* settle
-        expect([t.shown(), t.epoch()]).toEqual([{ "row-12": out }, away])
+        expect([t.shown(), t.epoch()]).toEqual([{ "row-12": out }, before + 1])
       })
   )
 

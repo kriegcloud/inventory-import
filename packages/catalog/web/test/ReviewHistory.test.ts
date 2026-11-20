@@ -191,20 +191,22 @@ describe("the undo history kept in the browser", () => {
       })
   )
 
-  it.live("is one person's: another member opening the same import in this browser starts with none", () =>
-    Effect.gen(function* () {
-      const id = importNo(62)
-      const first = visit(id)
-      first.open(10, {})
-      yield* settle
-      first.run({ type: "leaveOut" as const, rowIds: ["row-2"] })
-      yield* settle
+  it.live(
+    "is one person's: another member opening the same import in this browser starts with none of the undo history (the waiting rows: KeptRows.test.ts)",
+    () =>
+      Effect.gen(function* () {
+        const id = importNo(62)
+        const first = visit(id)
+        first.open(10, {})
+        yield* settle
+        first.run({ type: "leaveOut" as const, rowIds: ["row-2"] })
+        yield* settle
 
-      const other = visit(id, { member: "mem_lee" })
-      other.open(11, { "row-2": out })
-      yield* settle
-      expect(labels(other.state())).toEqual([])
-      expect(R.keys(saved(other.state()))).toEqual(["row-2"])
-    })
+        const other = visit(id, { member: "mem_lee" })
+        other.open(11, { "row-2": out })
+        yield* settle
+        expect(labels(other.state())).toEqual([])
+        expect(R.keys(saved(other.state()))).toEqual(["row-2"])
+      })
   )
 })

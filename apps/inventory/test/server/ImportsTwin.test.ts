@@ -1,5 +1,7 @@
 // The messy sample through the catalog's in-memory twins, held to the numbers the D1 adapter gives for the same
-// steps (Imports.slow.test.ts and TakeBack.slow.test.ts): a twin that drifted from the adapter fails here, fast.
+// steps (Imports.slow.test.ts and TakeBack.slow.test.ts): one save, a confirm, a second load of the same file and a
+// take-back. A twin whose counts drifted from the adapter's fails here, fast. The twin's refusals (a stale accept, a
+// confirm overtaken by a save, a revision ahead of the draft) are held in the model package's Endpoints.test.ts.
 import { expect, layer } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"

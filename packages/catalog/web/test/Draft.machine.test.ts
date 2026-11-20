@@ -262,6 +262,19 @@ const dispatch = (world: World, event: DraftEvent): void => {
       `what the screen shows changed without the person (${event._tag}), and the region was not told to start again`
     ).toBe(true)
   }
+  // "Updated with what changed on another screen" is said only of another person's change: never of a refusal, a
+  // close, the person's own confirm, or a draft let go while nobody looked.
+  for (const effect of stepped.effects) {
+    if (DraftEffect.$is("Restart")(effect) && effect.announce) {
+      expect(
+        DraftEvent.$is("SaveRefused")(event) ||
+          DraftEvent.$is("Left")(event) ||
+          DraftEvent.$is("ConfirmDone")(event) ||
+          O.isNone(stepped.draft.held),
+        `a refusal, a close or a let-go (${event._tag}) was said as a change on another screen`
+      ).toBe(false)
+    }
+  }
   world.draft = stepped.draft
   for (const effect of stepped.effects) perform(world, effect)
   // What waits is kept in the browser as it changes, so a reload finds it.
@@ -641,8 +654,9 @@ interface Play {
 }
 
 /**
- * What can happen next, by kind: only what would do something in the world as it stands, so a run of forty commands
- * is forty things that happened.
+ * What can happen next, by kind: the commands enabled in the world as it stands. Most do something; a few can change
+ * nothing (a return to the tab while a read is already out), so a run of forty commands is up to forty things that
+ * happened.
  */
 const enabled = (world: World, may: Play): ReadonlyArray<ReadonlyArray<Command>> => {
   const { confirms, elsewhere, reloads } = may
@@ -800,8 +814,10 @@ const play = (picks: typeof Picks.Type, may: Play): void => {
   throw new Error(`${A.join(A.map(ordering, said), ", ")}\n${O.getOrElse(broken(ordering), () => "")}`)
 }
 
-// Thirty to sixty commands a run, each one enabled when it is drawn (`enabled`): the runner bounds a collection by
-// its `size`, ten unless told, so both are given.
+// Each run draws 30 to 60 picks, each one enabled when it is drawn (`enabled`). The runner grows `size` from 0 to 60
+// over the runs and a list is at least 30 long, so about the first half of the runs play 30 picks and the longest
+// come last. A run ends early when nothing is enabled any more. The seed is new on every run: a failure is printed
+// under its shortest ordering, which plays it again.
 describe("the review's draft, whatever order things happen in", () => {
   it.prop(
     "sends only the person's own rows, never runs ahead of the server, never shows the region another thing than the draft, and waits for nothing it was not told is coming",
@@ -818,14 +834,14 @@ describe("the review's draft, whatever order things happen in", () => {
   )
 
   it.prop(
-    "with the page loaded again at any moment: a decision the person made is on the server or still waiting, never neither",
+    "with the page loaded again at any moment: a decision the person made is on the server, still waiting, or named as refused (a refusal sets the rows aside, said)",
     { picks: Picks },
     ({ picks }) => play(picks, { confirms: false, elsewhere: false, reloads: true }),
     { timeout: 120_000, arbitrary: { runs: 1000, size: 60 } }
   )
 
   it.prop(
-    "with somebody else confirming the import: nothing more is sent to it, and the rows left over are the person's that it never took",
+    "with somebody else confirming the import: a step that knows it is closed sends nothing to it, and the rows left over are the person's that it never took",
     { picks: Picks },
     ({ picks }) => play(picks, { confirms: true, elsewhere: true, reloads: true }),
     { timeout: 120_000, arbitrary: { runs: 1000, size: 60 } }
@@ -861,8 +877,12 @@ describe("the orderings that lost or hid a decision", () => {
     run(world, { _tag: "ServerTakesSave" })
     run(world, { _tag: "SaveAnswers" })
     run(world, { _tag: "Leave" })
-    run(world, { _tag: "ComeBack" })
-    expect(shown(world.draft)).toEqual({ a: out, b: kept, c: out })
+    run(world, { _tag: "ComeBackQuickly" })
+    // Back within the idle time: the region is not the one it was, it is what the draft shows.
+    expect([shown(world.draft), regionShows(world)]).toEqual([
+      { a: out, b: kept, c: out },
+      { a: out, b: kept, c: out }
+    ])
     run(world, { _tag: "Decide", row: "a", to: "nothing" })
     expect(O.map(world.save, (save) => save.delta)).toEqual(O.some({ set: {}, clear: ["a"] }))
     quiet(world)

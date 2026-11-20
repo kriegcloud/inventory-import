@@ -43,7 +43,10 @@ layer(TypedApp)("an accept made before its field's column was matched again", (i
         const saved = yield* client.imports
           .decide({ params, payload: { madeOn: R.map(mine, () => staged.revision), set: mine, clear: [] } })
           .pipe(marcus)
-        expect([saved.changed, saved.notApplied]).toEqual([true, [{ rowId: "row-55", field: "unitCost" }]])
+        expect([saved.changed, saved.notApplied]).toEqual([
+          true,
+          [{ rowId: "row-55", field: "unitCost", kind: "accept" }]
+        ])
         const after = yield* client.imports.get({ params }).pipe(marcus)
         expect([R.get(after.decisions, "row-55"), R.get(after.decisions, "row-18")]).toEqual([
           O.some(decisionFromFlags({})),
@@ -66,7 +69,7 @@ layer(TypedApp)("an accept made before its field's column was matched again", (i
         )
         expect([refused._tag, refused._tag === "AcceptsTakenBack" ? refused.accepts : []]).toEqual([
           "AcceptsTakenBack",
-          [{ rowId: "row-55", field: "unitCost" }]
+          [{ rowId: "row-55", field: "unitCost", kind: "accept" }]
         ])
         const still = yield* client.imports.get({ params }).pipe(marcus)
         expect([still.status, still.revision]).toEqual(["open", after.revision])

@@ -61,7 +61,7 @@ vi.mock("sonner", () => ({
 type Saved = {
   readonly revision: number
   readonly changed: boolean
-  readonly notApplied: ReadonlyArray<{ readonly rowId: string; readonly field: string }>
+  readonly notApplied: ReadonlyArray<{ readonly rowId: string; readonly field: string; readonly kind: "accept" }>
 }
 
 const settle = Effect.sleep("15 millis")
@@ -236,7 +236,7 @@ describe("a confirm", () => {
       yield* Deferred.succeed(t.saves[0]!.answer, {
         revision: 11,
         changed: true,
-        notApplied: [{ rowId: "row-55", field: "unitCost" }]
+        notApplied: [{ rowId: "row-55", field: "unitCost", kind: "accept" }]
       })
       yield* settle
       expect(page.said).toEqual(["An accept was taken back"])
@@ -266,13 +266,13 @@ describe("a confirm", () => {
           t.confirms[0]!.answer,
           AcceptsTakenBack.make({
             reason: "A column was matched again.",
-            accepts: [{ rowId: "row-55", field: "unitCost" }]
+            accepts: [{ rowId: "row-55", field: "unitCost", kind: "accept" }]
           })
         )
         yield* settle
         // Nothing was imported, said above the review, while the newer picture is read; the row goes without the accept.
         expect([t.heldBack(), t.confirming(), t.gets.length]).toEqual([
-          O.some({ read: false, apart: 0, accepts: [{ rowId: "row-55", field: "unitCost" }] }),
+          O.some({ read: false, apart: 0, accepts: [{ rowId: "row-55", field: "unitCost", kind: "accept" }] }),
           true,
           asked + 1
         ])
@@ -281,7 +281,7 @@ describe("a confirm", () => {
         yield* Deferred.succeed(O.getOrThrow(A.last(t.gets)), t.at({ revision: 11, decisions: { "row-7": kept } }))
         yield* settle
         expect([t.heldBack(), t.confirming()]).toEqual([
-          O.some({ read: true, apart: 0, accepts: [{ rowId: "row-55", field: "unitCost" }] }),
+          O.some({ read: true, apart: 0, accepts: [{ rowId: "row-55", field: "unitCost", kind: "accept" }] }),
           false
         ])
       })

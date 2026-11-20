@@ -75,7 +75,7 @@ export const withoutStaleAccepts = (input: {
       accepted: A.filter(decision.accepted, (field) => !stale(rowId)(field))
     })),
     notApplied: A.flatMap(R.toEntries(input.set), ([rowId, decision]) =>
-      A.map(A.filter(decision.accepted, stale(rowId)), (field) => ({ rowId, field }))
+      A.map(A.filter(decision.accepted, stale(rowId)), (field) => ({ rowId, field, kind: "accept" as const }))
     )
   }
 }

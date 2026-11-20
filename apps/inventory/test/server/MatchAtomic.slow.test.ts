@@ -124,7 +124,7 @@ layer(App)("a match and a save that fall into each other", (it) => {
             }
           })
           .pipe(as("mem_marcus"))
-        expect(saved.notApplied).toEqual([{ rowId: "row-55", field: "unitCost" }])
+        expect(saved.notApplied).toEqual([{ rowId: "row-55", field: "unitCost", kind: "accept" }])
         const after = yield* client.imports.get({ params }).pipe(as("mem_marcus"))
         expect([R.get(after.decisions, "row-55"), R.get(after.decisions, "row-3")]).toEqual([
           O.some(decisionFromFlags({})),
@@ -154,7 +154,7 @@ layer(App)("a match and a save that fall into each other", (it) => {
             }
           })
           .pipe(as("mem_marcus"))
-        expect(saved.notApplied).toEqual([{ rowId: "row-55", field: "unitCost" }])
+        expect(saved.notApplied).toEqual([{ rowId: "row-55", field: "unitCost", kind: "accept" }])
         const after = yield* client.imports.get({ params }).pipe(as("mem_marcus"))
         expect(R.get(after.decisions, "row-55")).toEqual(O.some(decisionFromFlags({})))
         expect(after.revision).toBe(saved.revision)

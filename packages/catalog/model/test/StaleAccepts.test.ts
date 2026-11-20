@@ -17,7 +17,7 @@ const set = {
 describe("accepts made before a column was matched again", () => {
   it("are taken out and named; the rest of the decision, and every other row, is applied", () => {
     const made = withoutStaleAccepts({ choices, madeOn: { "row-55": 11, "row-18": 11 }, set })
-    expect(made.notApplied).toEqual([{ rowId: "row-55", field: "unitCost" }])
+    expect(made.notApplied).toEqual([{ rowId: "row-55", field: "unitCost", kind: "accept" }])
     expect(made.applied).toEqual({
       "row-55": decisionFromFlags({ accepted: ["uom"], edits: { name: "Steel Tube 1in" } }),
       "row-18": set["row-18"]
@@ -33,8 +33,8 @@ describe("accepts made before a column was matched again", () => {
 
   it("names every accept of every field matched since, on a decision made before any match", () => {
     expect(withoutStaleAccepts({ choices, madeOn: { "row-55": 2, "row-18": 2 }, set }).notApplied).toEqual([
-      { rowId: "row-55", field: "unitCost" },
-      { rowId: "row-55", field: "uom" }
+      { rowId: "row-55", field: "unitCost", kind: "accept" },
+      { rowId: "row-55", field: "uom", kind: "accept" }
     ])
   })
 
@@ -46,8 +46,8 @@ describe("accepts made before a column was matched again", () => {
     }
     // Row 9 waited from revision 10, before unit cost was matched again at 12; row 55 was accepted on 12.
     expect(withoutStaleAccepts({ choices, madeOn: { "row-55": 12, "row-9": 10 }, set: both }).notApplied).toEqual([
-      { rowId: "row-9", field: "unitCost" },
-      { rowId: "row-3", field: "unitCost" }
+      { rowId: "row-9", field: "unitCost", kind: "accept" },
+      { rowId: "row-3", field: "unitCost", kind: "accept" }
     ])
   })
 })

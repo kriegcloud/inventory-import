@@ -450,7 +450,7 @@ describe("an accept made before its column was matched again, over the twins", (
           const saved = yield* imports
             .decide({ params, payload: { madeOn: { "row-2": view.revision }, set: accept, clear: [] } })
             .pipe(as(marcus))
-          expect(saved.notApplied).toEqual([{ rowId: "row-2", field: "unitCost" }])
+          expect(saved.notApplied).toEqual([{ rowId: "row-2", field: "unitCost", kind: "accept" }])
           const after = yield* imports.get({ params }).pipe(as(marcus))
           expect(R.get(after.decisions, "row-2")).toEqual(O.some(decisionFromFlags({})))
           const refused = yield* Effect.flip(
@@ -463,7 +463,7 @@ describe("an accept made before its column was matched again, over the twins", (
           )
           expect([S.is(AcceptsTakenBack)(refused), S.is(AcceptsTakenBack)(refused) ? refused.accepts : []]).toEqual([
             true,
-            [{ rowId: "row-2", field: "unitCost" }]
+            [{ rowId: "row-2", field: "unitCost", kind: "accept" }]
           ])
           expect((yield* items.list().pipe(as(marcus))).length).toBe(0)
         })

@@ -1,5 +1,6 @@
 // What the person decided for one row of a file, as code holds it and as it is stored and sent (its flags), the
 // id of one item of a file, and the change to the saved decisions a screen sends.
+import * as Effect from "effect/Effect"
 import * as R from "effect/Record"
 import * as Tuple from "effect/Tuple"
 import * as S from "effect/Schema"
@@ -314,15 +315,35 @@ const madeOn = S.Record(S.String, Revision)
   })
 
 /**
- * An accept the server did not apply: the field's column was matched again after the decision was made, so the
- * proposal the person accepted is no longer the one the row has.
+ * What kind of decision a re-match took back. accept: an accept of a field's proposal. stored: a Replace or a
+ * Keep-stored. twin: a keep-one-of-two over the rows that share a SKU. undo: an undone fix of a field.
+ */
+export const TakenBackKind = LiteralKit(["accept", "stored", "twin", "undo"]).annotate({
+  identifier: "TakenBackKind",
+  description:
+    "accept: an accepted proposal. stored: a Replace or Keep-stored. twin: a keep-one-of-two. undo: an undone fix"
+})
+/** The decoded value of `TakenBackKind`. */
+export type TakenBackKind = typeof TakenBackKind.Type
+
+/**
+ * A decision the server did not apply because a column it rests on was matched again after it was made (Benjamin,
+ * 2026-11-20, group 3: "Server refuses, says so"). An accept or an undone fix rests on its field's column; a Replace,
+ * a Keep-stored and a keep-one-of-two rest on the SKU's column, and a Replace or Keep-stored also on another field's
+ * column when the re-match changed how the row compares with the stored item. `field` is the field whose column was
+ * matched again. Stored answers from before `kind` existed decode as accepts.
  */
 export const StaleAccept = S.Struct({
   rowId: S.String.annotateKey({ description: "The row (`row-7`)" }),
-  field: S.String.annotateKey({ description: "The field whose proposal was accepted (`unitCost`)" })
+  field: S.String.annotateKey({
+    description: "The field whose column was matched again (`unitCost`); for an accept, the field accepted"
+  }),
+  kind: TakenBackKind.pipe(S.withDecodingDefaultKey(Effect.succeed("accept" as const))).annotateKey({
+    description: "What was taken back: an accept, a Replace or Keep-stored, a keep-one-of-two, or an undone fix"
+  })
 }).annotate({
   identifier: "StaleAccept",
-  description: "An accept made before its field's column was matched again: not applied"
+  description: "A decision made before a column it rests on was matched again: not applied"
 })
 /** The decoded value of `StaleAccept`. */
 export type StaleAccept = typeof StaleAccept.Type

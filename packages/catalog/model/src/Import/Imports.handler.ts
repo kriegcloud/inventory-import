@@ -6,7 +6,14 @@ import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as Result from "effect/Result"
-import { ConfirmWrite, ImportStore, Draft, type StoredDecisions, TakeBackWrite } from "./ImportStore.store.ts"
+import {
+  ConfirmWrite,
+  ImportStore,
+  Draft,
+  draftTries,
+  type StoredDecisions,
+  TakeBackWrite
+} from "./ImportStore.store.ts"
 import { SuggestionStore } from "../Suggestion/SuggestionStore.store.ts"
 import { suggest } from "../Suggestion/Suggestions.handler.ts"
 import { confirmPlan, plannedItems } from "../Confirm/Confirm.rules.ts"
@@ -38,6 +45,7 @@ import {
   UploadNotFound,
   AcceptsTakenBack,
   AlreadyImported,
+  DraftBusy,
   DraftMoved,
   ImportKept,
   ColumnNotFound,
@@ -53,39 +61,17 @@ import { stagingProblem } from "../Staging/Staging.rules.ts"
 import { type CompareAtMatch, comparisonQuestions, comparisonsChanged, withoutStaleDecisions } from "./Rematch.rules.ts"
 
 /**
- * Decisions as they may be applied: an accept of a proposal for a field whose column was matched again after the
- * revision its row was decided on (the row's `madeOn`; 0 when the request names none) is taken out, and named. The
- * person accepted what the field read before the match; the row now has another proposal, or none. Each row on its
- * own revision: a row decided long ago never makes a newer row's accept stale. The accept rule alone, by the choices'
- * stamps: the endpoints judge every kind of decision, and fields moved off their column, with `withoutStaleDecisions`
- * (`Rematch.rules.ts`).
- *
- * @example withoutStaleAccepts({ choices: [{ field: "unitCost", column: 7, by: "person", at: 12 }], madeOn: { "row-55": 11 }, set })
- * // an accept of unitCost on row 55 is in `notApplied`; decided on revision 12 or later it is applied
+ * A request's `madeOn` for the rows it sets, and only those: a key that names no row of `set` says nothing about any
+ * decision, so it is not read (not judged, not counted against the draft's revision). Worked out once per request.
  */
-export const withoutStaleAccepts = (input: {
-  readonly choices: ReadonlyArray<MappingChoice>
+const madeOnOfSet = (request: {
   readonly madeOn: Readonly<Record<string, number>>
   readonly set: SavedDecisions
-}): { readonly applied: SavedDecisions; readonly notApplied: ReadonlyArray<StaleAccept> } => {
-  const stale = (rowId: string) => {
-    const made = O.getOrElse(R.get(input.madeOn, rowId), () => 0)
-    return (field: string): boolean => A.some(input.choices, (choice) => choice.field === field && choice.at > made)
-  }
-  return {
-    applied: R.map(input.set, (decision, rowId) => ({
-      ...decision,
-      accepted: A.filter(decision.accepted, (field) => !stale(rowId)(field))
-    })),
-    notApplied: A.flatMap(R.toEntries(input.set), ([rowId, decision]) =>
-      A.map(A.filter(decision.accepted, stale(rowId)), (field) => ({ rowId, field, kind: "accept" as const }))
-    )
-  }
-}
+}): Readonly<Record<string, number>> => R.filter(request.madeOn, (_revision, rowId) => R.has(request.set, rowId))
 
 /** The latest revision a request names, of a row's `madeOn` and a confirm's `revision`: none ahead of `draft`'s. */
-const latestNamed = (madeOn: Readonly<Record<string, number>>, also: ReadonlyArray<number> = []): number =>
-  A.reduce([...R.values(madeOn), ...also], 0, (latest, revision) => Math.max(latest, revision))
+const latestNamed = (madeOn: Readonly<Record<string, number>>, also: number = 0): number =>
+  R.reduce(madeOn, also, (latest, revision) => Math.max(latest, revision))
 
 /**
  * A draft's stored decisions with one person's unsaved ones laid over them, as the confirm will store them: a row
@@ -137,8 +123,8 @@ export const importsEndpoints = Effect.gen(function* () {
   })
 
   // Which codes of this import the organization already has: the file's own, and any the person typed. Asked
-  // with the keys, never by listing every item.
-  const storedFor = Effect.fn("imports.storedFor")(function* (
+  // with the keys, never by listing every item. `keys` are the keys asked, `found` the items as stored.
+  const storedAmongFile = Effect.fn("imports.storedAmongFile")(function* (
     actor: Member,
     table: StagedTable,
     choices: ReadonlyArray<MappingChoice>,
@@ -153,31 +139,43 @@ export const importsEndpoints = Effect.gen(function* () {
       )
     )
     const found = yield* imports.storedAmong(actor.organizationId, keys)
+    return { keys, found }
+  })
+
+  // The stored items the review compares the file's rows with.
+  const storedFor = Effect.fn("imports.storedFor")(function* (
+    actor: Member,
+    table: StagedTable,
+    choices: ReadonlyArray<MappingChoice>,
+    decisions: SavedDecisions
+  ) {
+    const { found } = yield* storedAmongFile(actor, table, choices, decisions)
     return A.map(found, fieldsOf)
   })
 
   // The file's review, asked whether re-matches changed how rows compare with their stored items: each side as the
-  // screen would draw it, with the import's stored items, suggestions and created rows. `known` saves a read of the
-  // staged table when the caller holds it.
+  // screen would draw it, with the import's stored items, suggestions and created rows; and the stored items it read,
+  // which a match's write checks are still as read. `known` saves a read of the staged table when the caller holds it.
   const compareFor =
     (actor: Member, draft: Draft, known?: StagedTable): CompareAtMatch =>
     (asked) =>
       Effect.gen(function* () {
         const table = known ?? (yield* imports.table(actor.organizationId, draft))
         const typed = R.fromEntries(A.map(asked.questions, (question) => [question.rowId, question.then] as const))
-        const storedItems = yield* storedFor(actor, table, asked.choices, typed)
+        const { keys, found } = yield* storedAmongFile(actor, table, asked.choices, typed)
         const created = yield* imports.createdRows(actor.organizationId, draft.id)
         const suggestions = yield* suggestionStore.list(actor.organizationId, draft.id)
-        return comparisonsChanged({
+        const changed = comparisonsChanged({
           table,
           choices: asked.choices,
           moves: asked.moves,
-          storedItems,
+          storedItems: A.map(found, fieldsOf),
           createdIds: A.map(created, rowId),
           suggestions,
           itemsOf,
           questions: asked.questions
         })
+        return { changed, read: { keys, items: A.map(found, (item) => ({ id: item.id, revision: item.revision })) } }
       }).pipe(Effect.withSpan("imports.compare"))
 
   // Decisions as they may be applied, judged against every column matched again since each row's revision; and what
@@ -192,7 +190,7 @@ export const importsEndpoints = Effect.gen(function* () {
     const moves = yield* imports.moves(draft)
     const questions = comparisonQuestions({ choices, moves, madeOn: request.madeOn, set: request.set })
     const changed = A.isReadonlyArrayNonEmpty(questions)
-      ? yield* compareFor(actor, draft)({ choices, moves, questions })
+      ? (yield* compareFor(actor, draft)({ choices, moves, questions })).changed
       : []
     return withoutStaleDecisions({ choices, moves, madeOn: request.madeOn, set: request.set, changed })
   })
@@ -246,6 +244,8 @@ export const importsEndpoints = Effect.gen(function* () {
     const tally = (outcome: string): number => A.filter(outcomes, (row) => row.outcome === outcome).length
     const history = yield* imports.history(actor.organizationId, draft.id)
     const takeBack = yield* imports.takeBackState(actor.organizationId, draft.id)
+    // What matches took back is named only while the import is open: once confirmed there is nothing left to decide.
+    const takenBack = confirmed ? [] : yield* imports.takenBack(draft)
     const fixed = confirmed ? yield* imports.fixed(actor.organizationId, draft.id) : { rows: 0, cells: 0 }
     return ImportView.make({
       id: draft.id,
@@ -290,8 +290,7 @@ export const importsEndpoints = Effect.gen(function* () {
           : O.none(),
       history,
       takeBack,
-      // What matches took back from the stored decisions: kept by the match (group 3 naming, built next).
-      takenBack: []
+      takenBack
     })
   })
 
@@ -305,25 +304,28 @@ export const importsEndpoints = Effect.gen(function* () {
 
   // A save checked against the draft's column choices as read, and written only while they are still its choices
   // (the store checks them in the save's own write). A match in between makes the store refuse it: the import is read
-  // again and the save checked against the choices it has now. A match is a person's press, so a few tries settle it.
+  // again and the save checked against the choices it has now. A match is a person's press, so a few tries settle it;
+  // a draft overtaken on every one of `draftTries` is answered as busy, with nothing written. `latest` is the latest
+  // revision the request names, worked out once.
   const saveChecked = Effect.fn("imports.saveChecked")(function* (
     actor: Member,
     id: ImportId,
     payload: SaveRequest,
+    latest: number,
     triesLeft: number
   ): Effect.fn.Return<
     { readonly revision: number; readonly changed: boolean; readonly notApplied: ReadonlyArray<StaleAccept> },
-    AlreadyImported | ImportNotFound | RevisionAhead
+    AlreadyImported | ImportNotFound | RevisionAhead | DraftBusy
   > {
     const draft = yield* find(actor, id)
-    if (latestNamed(payload.madeOn) > draft.revision) return yield* ahead(draft)
+    if (latest > draft.revision) return yield* ahead(draft)
     // A decision made before a column it rests on was matched again is not applied; the rest of the row's decision is.
     const { applied, notApplied } = yield* judged(actor, draft, payload)
     const done = yield* imports.decide(actor, draft, { set: applied, clear: payload.clear })
     if (done.kind === "saved") return { revision: done.revision, changed: done.changed, notApplied }
     if (done.kind === "closed") return yield* closed(draft)
-    if (triesLeft === 0) return yield* Effect.die("The import's columns kept being matched while a save was checked.")
-    return yield* saveChecked(actor, id, payload, triesLeft - 1)
+    if (triesLeft <= 1) return yield* busy()
+    return yield* saveChecked(actor, id, payload, latest, triesLeft - 1)
   })
 
   const gone = () =>
@@ -346,6 +348,12 @@ export const importsEndpoints = Effect.gen(function* () {
       reason:
         "Someone else changed this import while you were reviewing it. Nothing was imported: look at what changed, then confirm again.",
       revision
+    })
+
+  const busy = () =>
+    DraftBusy.make({
+      reason:
+        "Others kept changing this import while your request was worked out, so nothing was written. Try again in a moment."
     })
 
   const ahead = (draft: Draft) =>
@@ -459,8 +467,9 @@ export const importsEndpoints = Effect.gen(function* () {
       }
       // One write: the choice, stamped with the revision that write moves the draft to (a decision made on an earlier
       // one was made before the match), and a move for it and for every field it moved off its column; every stored
-      // decision that rests on a column the match moved taken out (the review is asked which Replaces it changed); and
-      // the audit line. Nothing can fall between them.
+      // decision that rests on a column the match moved taken out (the review is asked which Replaces it changed), and
+      // kept with the draft by field and kind for every screen to name; and the audit line, with what it took back
+      // counted. Nothing can fall between them. The answer is the view, which names what this match took back.
       const label = fieldLabels[payload.field]
       const saved = yield* imports.matchColumn(
         actor,
@@ -473,6 +482,7 @@ export const importsEndpoints = Effect.gen(function* () {
         compareFor(actor, draft, table)
       )
       if (saved === "closed") return yield* closed(draft)
+      if (saved === "busy") return yield* busy()
       const after = yield* find(actor, draft.id)
       return yield* viewOf(actor, after)
     }),
@@ -530,7 +540,8 @@ export const importsEndpoints = Effect.gen(function* () {
       readonly payload: SaveRequest
     }) {
       const actor = yield* requireRole("editor")
-      return yield* saveChecked(actor, params.id, payload, 5)
+      const madeOn = madeOnOfSet(payload)
+      return yield* saveChecked(actor, params.id, { ...payload, madeOn }, latestNamed(madeOn), draftTries)
     }),
     commit: Effect.fn("imports.commit")(function* ({
       params,
@@ -543,14 +554,15 @@ export const importsEndpoints = Effect.gen(function* () {
       const draft = yield* find(actor, params.id)
       if (draft.status !== "open") return yield* closed(draft)
       // A revision the draft has not reached is not taken on the client's word.
-      if (latestNamed(payload.madeOn, [payload.revision]) > draft.revision) return yield* ahead(draft)
+      const madeOn = madeOnOfSet(payload)
+      if (latestNamed(madeOn, payload.revision) > draft.revision) return yield* ahead(draft)
       // Somebody has changed the draft since the picture this confirm was made on: nothing is written, and the
       // person is shown the newer picture before they confirm. The store checks the same again inside its write.
       if (draft.revision !== payload.revision) return yield* moved(draft.revision)
       // A decision among the ones it carries, made before a column it rests on was matched again (an accept, an undone
       // fix, a Replace or Keep-stored, a keep-one-of-two), is about what the row no longer reads: confirming would
       // write another thing than the screen shows. Nothing is written.
-      const stale = (yield* judged(actor, draft, payload)).notApplied
+      const stale = (yield* judged(actor, draft, { madeOn, set: payload.set })).notApplied
       if (A.isReadonlyArrayNonEmpty(stale)) {
         return yield* AcceptsTakenBack.make({
           reason:

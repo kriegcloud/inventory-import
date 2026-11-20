@@ -16,6 +16,7 @@ import {
   type DecidedBy,
   decidedByNobody,
   ImportEvent,
+  MatchTakeBack,
   type OutcomeKind,
   outcomeOf,
   type PastImport,
@@ -71,6 +72,7 @@ import {
   decisionsRematched,
   decisionsSaved,
   type Draft,
+  draftTries,
   ImportStore,
   nothingInForce,
   type TakeBackWrite,
@@ -80,7 +82,14 @@ import {
 } from "./Import/ImportStore.store.ts"
 import { type EditOutcome, ItemStore } from "./Item/ItemStore.store.ts"
 import { abandonedAfterMinutes } from "./Staging/Upload.rules.ts"
-import { type CompareAtMatch, noComparison, planMatch } from "./Import/Rematch.rules.ts"
+import {
+  type CompareAtMatch,
+  noComparison,
+  planMatch,
+  takenBackOfMatch,
+  takenBackWords,
+  withTakeBacks
+} from "./Import/Rematch.rules.ts"
 import { type StoreSuggestions, SuggestionStore } from "./Suggestion/SuggestionStore.store.ts"
 import { searchWords } from "./Item/ItemSearch.rules.ts"
 
@@ -224,6 +233,7 @@ const HeadJson = S.fromJsonString(StagedHead)
 const DecisionJson = S.fromJsonString(RowDecision)
 const ChoicesJson = MappingChoice.pipe(S.Array, S.fromJsonString)
 const MovesJson = ColumnMove.pipe(S.Array, S.fromJsonString)
+const TakenBackJson = MatchTakeBack.pipe(S.Array, S.fromJsonString)
 
 const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`
 
@@ -473,6 +483,8 @@ const commitStep = (
         status: "imported",
         // One revision on: a confirmed import is never taken for the open one of the same revision.
         revision: entry.draft.revision + 1,
+        // What its matches took back is let go: there is nothing left to name.
+        takenBackJson: "[]",
         importedBy: O.some<string>(audit.actorName),
         importedAt: O.some(at)
       }
@@ -939,7 +951,8 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
             revision: 0,
             needsAtStart,
             choicesJson: "[]",
-            movesJson: "[]"
+            movesJson: "[]",
+            takenBackJson: "[]"
           },
           rows: A.flatMap(
             A.sort(
@@ -1041,6 +1054,9 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
         })
         const choicesJson = yield* S.encodeEffect(ChoicesJson)(plan.choices)
         const movesJson = yield* S.encodeEffect(MovesJson)(plan.moves)
+        const takenBack = takenBackOfMatch({ revision: plan.at, by: actor.name, notApplied: plan.notApplied })
+        const kept = yield* S.decodeEffect(TakenBackJson)(entry.draft.takenBackJson)
+        const takenBackJson = yield* S.encodeEffect(TakenBackJson)(withTakeBacks({ kept, added: takenBack }))
         // Every stored decision the match takes back, whoever made it; who made it stays.
         const decisions = yield* Effect.forEach(
           entry.decisions,
@@ -1057,7 +1073,7 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
           const next = mapDraft(now, org, draft.id, (held) => ({
             ...held,
             decisions,
-            draft: { ...held.draft, choicesJson, movesJson, revision: plan.at }
+            draft: { ...held.draft, choicesJson, movesJson, takenBackJson, revision: plan.at }
           }))
           return [
             O.some("saved"),
@@ -1071,7 +1087,7 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
                   actorId: actor.id,
                   actorName: actor.name,
                   action: "Matched a column",
-                  detail,
+                  detail: `${detail}${takenBackWords(takenBack)}`,
                   at
                 })
               )
@@ -1079,10 +1095,16 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
           ]
         })
       })
-      const settle: Effect.Effect<ChoicesSaved, S.SchemaError> = Effect.flatMap(attempt, (done) =>
-        O.match(done, { onNone: () => Effect.suspend(() => settle), onSome: Effect.succeed })
-      )
-      return yield* settle
+      // As the D1 store: a try overtaken by any change (a save, a match, an item) is worked out again, at most
+      // `draftTries` times, then answered as busy with nothing written.
+      const settle = (triesLeft: number): Effect.Effect<ChoicesSaved, S.SchemaError> =>
+        Effect.flatMap(attempt, (done) =>
+          O.match(done, {
+            onNone: () => (triesLeft <= 1 ? Effect.succeed<ChoicesSaved>("busy") : settle(triesLeft - 1)),
+            onSome: Effect.succeed
+          })
+        )
+      return yield* settle(draftTries)
     }, Effect.orDie)
 
     const reopen = Effect.fnUntraced(function* (actor: Member, draft: Draft) {
@@ -1372,6 +1394,9 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
       }, Effect.orDie),
       moves: Effect.fnUntraced(function* (draft: Draft) {
         return yield* S.decodeEffect(MovesJson)(draft.movesJson)
+      }, Effect.orDie),
+      takenBack: Effect.fnUntraced(function* (draft: Draft) {
+        return yield* S.decodeEffect(TakenBackJson)(draft.takenBackJson)
       }, Effect.orDie),
       matchColumn,
       createdRows: Effect.fnUntraced(function* (organizationId: OrganizationId, importId: string) {

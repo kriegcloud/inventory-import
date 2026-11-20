@@ -79,22 +79,25 @@ export class DraftBusy extends S.TaggedError<DraftBusy, { readonly brand: unique
 ) {}
 
 /**
- * The confirm carried an accept made before its field's column was matched again: the proposal the person accepted
- * is no longer the one the row has, so confirming would import a row the screen does not show as it would be
- * written. Nothing was written. `accepts` names each such accept; the screen takes them back, shows the rows with
- * their proposals open, and the person confirms again.
+ * The confirm carried a decision made before a column it rests on was matched again (judged row by row on its
+ * `madeOn`): an accept or an undone fix of that field, a Replace, Keep-stored or keep-one-of-two after the SKU's
+ * column, a Replace or Keep-stored whose row now compares otherwise after another column. Confirming would import a
+ * row the screen does not show as it would be written. Nothing was written. `accepts` names each by row, field and
+ * kind (the name is older than the kinds); the screen takes them back, shows the rows open again, and the person
+ * confirms again.
  */
 export class AcceptsTakenBack extends S.TaggedError<AcceptsTakenBack, { readonly brand: unique symbol }>()(
   "AcceptsTakenBack",
   {
     reason: reasonForPerson,
     accepts: S.Array(StaleAccept).annotateKey({
-      description: "The accepts that were not applied, each by row and field"
+      description:
+        "The decisions that would not be applied, each by row, field and kind (accept, stored, twin, undo), not only accepts"
     })
   },
   {
     description:
-      "The confirm carried accepts made before their field's column was matched again. Nothing was written; `accepts` names them",
+      "The confirm carried decisions made before a column they rest on was matched again: accepts, undone fixes, Replaces or Keep-storeds, keeps of one of two. Nothing was written; `accepts` names them",
     httpApiStatus: 409
   }
 ) {}

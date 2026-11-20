@@ -15,7 +15,14 @@ import { Member } from "@inventory/kernel/Member"
 import { type Field, StagedHead, StagedRow, StagedTable } from "@inventory/catalog-contract/Staged"
 import { FileProblem } from "@inventory/catalog-contract/FileProblem"
 import { OrganizationId } from "@inventory/kernel/Ids"
-import { PastImport, ChangeRecord, ImportEvent, TakeBackState, RowOutcome } from "@inventory/catalog-contract/Import"
+import {
+  PastImport,
+  ChangeRecord,
+  ImportEvent,
+  type MatchTakeBack,
+  TakeBackState,
+  RowOutcome
+} from "@inventory/catalog-contract/Import"
 import { ColumnMove, MappingChoice } from "@inventory/catalog-contract/Mapping"
 import { ConfirmPlan } from "../Confirm/Confirm.rules.ts"
 import type { CompareAtMatch } from "./Rematch.rules.ts"
@@ -38,6 +45,10 @@ export const Draft = S.Struct({
   choicesJson: S.String,
   movesJson: S.String.annotateKey({
     description: "Every field that began to read another column at a match, oldest first: `ColumnMove`s as JSON"
+  }),
+  takenBackJson: S.String.annotateKey({
+    description:
+      "What each match of the open import took back from the stored decisions, oldest first: `MatchTakeBack`s as JSON; '[]' once it is confirmed"
   })
 }).annotate({ description: "An import as stored, without its rows" })
 /** The decoded value of `Draft`: an import as stored, without its rows. */
@@ -202,8 +213,19 @@ export type StoredDecisions = {
   readonly authors: Readonly<Record<string, string>>
 }
 
-/** What saving the column choices did: saved them, found them already so (nothing written), or found the import closed. */
-export type ChoicesSaved = "saved" | "same" | "closed"
+/**
+ * What saving the column choices did: saved them, found them already so (nothing written), found the import closed,
+ * or found it changing under every one of its `draftTries` tries (`busy`: nothing written).
+ */
+export type ChoicesSaved = "saved" | "same" | "closed" | "busy"
+
+/**
+ * How many times a request worked out against a draft as read is tried before it gives up with nothing written: a
+ * match, in either store, and a save checked against the draft's column choices. Each try that is overtaken (somebody
+ * saved or matched in between) reads the draft again; a draft overtaken this many times running is answered as busy
+ * (`DraftBusy`), never retried without end and never a server error.
+ */
+export const draftTries = 6
 
 /** An upload that has not finished: who started it, what file, and how many rows in how many pieces will follow. */
 export const Upload = S.Struct({
@@ -297,15 +319,23 @@ export class ImportStore extends Context.Service<
     /** Every field that began to read another column at a match, oldest first, as stored with the draft. */
     moves(draft: Draft): Effect.Effect<ReadonlyArray<ColumnMove>>
     /**
-     * Points one field at a file column (or at none, `column` null), in one atomic write with four parts: the choice,
+     * What the matches of the open import took back from the stored decisions, oldest first, as stored with the draft:
+     * empty once it is confirmed.
+     */
+    takenBack(draft: Draft): Effect.Effect<ReadonlyArray<MatchTakeBack>>
+    /**
+     * Points one field at a file column (or at none, `column` null), in one atomic write with five parts: the choice,
      * stamped with the revision this write moves the draft to (a decision made on an earlier one was made before the
      * field read this column); a move for that field and for every field the match moved off its column
      * (`movesOfMatch`), stamped the same; every stored decision the match takes back (`withoutStaleDecisions`, as if
      * each was made on the revision before the match), whoever made it: accepts and undone fixes of a moved field,
      * and when the SKU moved every Replace, Keep-stored and keep-one-of-two, and the Replaces and Keep-storeds whose
-     * comparison `compare` says the match changed; and the audit line. It is worked out from the draft and its
-     * decisions as they are stored when it writes, not as `draft` read them: a save that lands first is in it. The
-     * same choice again writes nothing (`same`); an import no longer open writes nothing (`closed`).
+     * comparison `compare` says the match changed; what it took back, kept with the draft by field and kind
+     * (`takenBackOfMatch`); and the audit line, which counts what it took back by kind. It is worked out from the
+     * draft, its decisions and the stored items `compare` read as they are when it writes, not as `draft` read them: a
+     * save, a match or an item change that lands first makes it be worked out again, at most `draftTries` times
+     * (`busy`, nothing written). The same choice again writes nothing (`same`); an import no longer open writes
+     * nothing (`closed`).
      */
     matchColumn(
       actor: Member,
@@ -342,8 +372,8 @@ export class ImportStore extends Context.Service<
       importId: string
     ): Effect.Effect<{ readonly rows: number; readonly cells: number }>
     /**
-     * Writes a confirm: the confirming person's unsaved decisions, the close of the import (one revision on), its new
-     * items, the stored items it replaces (each with a kept copy), every row's outcome, the changed values and the
+     * Writes a confirm: the confirming person's unsaved decisions, the close of the import (one revision on, with what
+     * its matches took back let go: there is nothing left to name), its new items, the stored items it replaces (each with a kept copy), every row's outcome, the changed values and the
      * audit line, in one atomic batch, and only while the draft is open at `expected`. `closed` when the import was
      * no longer open, `moved` when its draft is at another revision: in both nothing was written.
      */

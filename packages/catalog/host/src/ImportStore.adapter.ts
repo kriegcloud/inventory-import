@@ -34,11 +34,14 @@ import {
   changedItemsShown,
   ChangedItem,
   ChangeRecord,
+  MatchTakeBack,
   outcomeOf
 } from "@inventory/catalog-contract/Import"
 import {
   ImportStore,
+  type ChoicesSaved,
   Draft,
+  draftTries,
   Upload,
   ConfirmWrite,
   confirmWritten,
@@ -62,7 +65,14 @@ import { abandonedAfterMinutes, maxChunkChars } from "@inventory/catalog-model/U
 import { fileProblem } from "@inventory/catalog-contract/FileProblem"
 import { lineOf } from "./internal/auditLine.ts"
 import { plannedItems, PlannedRow } from "@inventory/catalog-model/Confirm"
-import { type CompareAtMatch, noComparison, planMatch } from "@inventory/catalog-model/Rematch"
+import {
+  type CompareAtMatch,
+  noComparison,
+  planMatch,
+  takenBackOfMatch,
+  takenBackWords,
+  withTakeBacks
+} from "@inventory/catalog-model/Rematch"
 const textOf = (item: ItemFields | null): number =>
   item === null
     ? 0
@@ -99,6 +109,9 @@ const RowsJson = StagedRow.pipe(S.Array, S.fromJsonString)
 const DecisionJson = S.fromJsonString(RowDecision)
 const ChoicesJson = MappingChoice.pipe(S.Array, S.fromJsonString)
 const MovesJson = ColumnMove.pipe(S.Array, S.fromJsonString)
+const TakenBackJson = MatchTakeBack.pipe(S.Array, S.fromJsonString)
+// The stored items a match's question to the review read, each at its revision, as one JSON parameter.
+const ItemsRead = S.Struct({ id: S.String, revision: S.Int }).pipe(S.Array, S.fromJsonString)
 const IdList = S.String.pipe(S.Array, S.fromJsonString).annotate({
   description: "Ids or keys bound as one JSON parameter and read with json_each"
 })
@@ -232,7 +245,7 @@ export const ImportStoreD1 = Layer.effect(
     // -- Reads ---------------------------------------------------------------------------------------------------
 
     const draftColumns = sql`id, fileName, headJson, rowCount, status, actorName, createdAt, importedBy, importedAt,
-      revision, needsAtStart, choicesJson, movesJson`
+      revision, needsAtStart, choicesJson, movesJson, takenBackJson`
     const findDraft = SqlSchema.findOneOption({
       Request: Scope,
       Result: Draft,
@@ -792,6 +805,10 @@ export const ImportStoreD1 = Layer.effect(
       return yield* S.decodeEffect(MovesJson)(draft.movesJson)
     }, Effect.orDie)
 
+    const takenBack = Effect.fn("Imports.takenBack")(function* (draft: Draft) {
+      return yield* S.decodeEffect(TakenBackJson)(draft.takenBackJson)
+    }, Effect.orDie)
+
     const MatchRequest = S.Struct({
       ...Acting,
       id: S.String,
@@ -801,24 +818,48 @@ export const ImportStoreD1 = Layer.effect(
       detail: S.String,
       at: S.String
     })
+    // The stored items the file's review answered the match from, in pieces of 5,000 so no JSON value nears D1's
+    // limit: the keys it looked up and the items it found, each with its revision. Empty when the review was not asked.
+    const ItemsGuard = S.Struct({ keys: S.Array(IdList), items: S.Array(ItemsRead), found: S.Int })
+    // The organization's items under those keys are exactly the ones read, each still at the revision read: one edited,
+    // replaced, created or taken back since makes this false. A count and a check of each, so nothing is missed.
+    const itemsAsRead = (org: string, guard: typeof ItemsGuard.Encoded) =>
+      guard.keys.length === 0
+        ? sql`1=1`
+        : sql`(SELECT COUNT(*) FROM item WHERE organizationId = ${org} AND (${sql.or(
+            A.map(guard.keys, (keys) => sql`skuKey IN (SELECT value FROM json_each(${keys}))`)
+          )})) = ${guard.found}
+          AND ${sql.and(
+            A.map(
+              guard.items,
+              (items) => sql`NOT EXISTS (SELECT 1 FROM json_each(${items}) AS j WHERE NOT EXISTS (SELECT 1 FROM item i
+                WHERE i.organizationId = ${org} AND i.id = json_extract(j.value, '$.id')
+                  AND i.revision = json_extract(j.value, '$.revision')))`
+            )
+          )}`
     // The audit line, written only while the import is open at the revision and with the choices the match was worked
-    // out from. It is the match's own row: the statements after the choice is saved check it, as a confirm's do.
+    // out from, and the stored items its review read are as read. It is the match's own row: every statement after it
+    // checks it, as a confirm's do, so a match worked out from anything that changed since writes nothing at all.
     const matchedLine = D1.statement({
-      Request: MatchRequest,
+      Request: S.Struct({ ...MatchRequest.fields, ...ItemsGuard.fields }),
       Result: NoRows,
       execute: (r) => sql`INSERT INTO activity (id, organizationId, actorId, actorName, action, detail, createdAt)
         SELECT ${r.activity}, ${r.org}, ${r.actor}, ${r.name}, 'Matched a column', ${r.detail}, ${r.at}
         WHERE EXISTS (SELECT 1 FROM importDraft WHERE organizationId = ${r.org} AND id = ${r.id} AND status = 'open'
-          AND revision = ${r.revision} AND choicesJson = ${r.before})`
+          AND revision = ${r.revision} AND choicesJson = ${r.before})
+          AND ${itemsAsRead(r.org, r)}`
     })
-    // The choices and moves the match leaves, at the revision it moves the draft to, under the same condition.
+    const thisMatch = (org: string, activity: string) =>
+      sql`EXISTS (SELECT 1 FROM activity WHERE organizationId = ${org} AND id = ${activity})`
+    // The choices, the moves and what was taken back that the match leaves, at the revision it moves the draft to,
+    // under the same condition and only when this batch wrote the match's audit line.
     const saveChoice = D1.statement({
-      Request: S.Struct({ ...MatchRequest.fields, choices: ChoicesJson, moves: MovesJson }),
+      Request: S.Struct({ ...MatchRequest.fields, choices: ChoicesJson, moves: MovesJson, takenBack: TakenBackJson }),
       Result: Ids,
       execute: (r) => sql`UPDATE importDraft SET choicesJson = ${r.choices}, movesJson = ${r.moves},
-          revision = revision + 1
+          takenBackJson = ${r.takenBack}, revision = revision + 1
         WHERE organizationId = ${r.org} AND id = ${r.id} AND status = 'open' AND revision = ${r.revision}
-          AND choicesJson = ${r.before}
+          AND choicesJson = ${r.before} AND ${thisMatch(r.org, r.activity)}
         RETURNING id`
     })
     // The stored decisions the match takes back, as the match worked them out, whoever made them (who made them
@@ -830,7 +871,7 @@ export const ImportStoreD1 = Layer.effect(
           FROM json_each(${r.entries}) AS j WHERE json_extract(j.value, '$.rowId') = importDecision.rowId)
         WHERE organizationId = ${r.org} AND importId = ${r.id}
           AND rowId IN (SELECT json_extract(value, '$.rowId') FROM json_each(${r.entries}))
-          AND EXISTS (SELECT 1 FROM activity WHERE organizationId = ${r.org} AND id = ${r.activity})`
+          AND ${thisMatch(r.org, r.activity)}`
     })
 
     const matchColumn = Effect.fn("Imports.matchColumn")(function* (
@@ -841,10 +882,10 @@ export const ImportStoreD1 = Layer.effect(
       compare: CompareAtMatch = noComparison
     ) {
       const org = actor.organizationId
-      // Worked out from the draft and its decisions as stored, and written in one atomic batch only while the draft is
-      // still at that revision with those choices: a save or a match that lands in between moves it, and the match is
-      // worked out again. A match is a person's press, so a few tries settle it.
-      const attempt = (triesLeft: number): Effect.Effect<"saved" | "same" | "closed"> =>
+      // Worked out from the draft, its decisions and the stored items its review read, and written in one atomic batch
+      // only while all of them are still as read: a save, a match or an item change that lands in between makes the
+      // batch write nothing, and the match is worked out again, at most `draftTries` times (then `busy`).
+      const attempt = (triesLeft: number): Effect.Effect<ChoicesSaved> =>
         Effect.gen(function* () {
           const read = yield* findDraft({ org, id: draft.id })
           if (O.isNone(read) || read.value.status !== "open") return "closed" as const
@@ -856,6 +897,7 @@ export const ImportStoreD1 = Layer.effect(
           }
           const head = yield* S.decodeEffect(HeadJson)(current.headJson)
           const stored = yield* decisions(org, draft.id)
+          const kept = yield* takenBack(current)
           const plan = yield* planMatch({
             head,
             choices: before,
@@ -865,6 +907,7 @@ export const ImportStoreD1 = Layer.effect(
             revision: current.revision,
             compare
           })
+          const took = takenBackOfMatch({ revision: plan.at, by: actor.name, notApplied: plan.notApplied })
           const at = yield* now
           const activity = yield* random.uuidV4()
           const request = {
@@ -873,23 +916,36 @@ export const ImportStoreD1 = Layer.effect(
             revision: current.revision,
             before: current.choicesJson,
             activity,
-            detail,
+            detail: `${detail}${takenBackWords(took)}`,
             at
           }
+          const guard = O.match(plan.read, {
+            onNone: () => ({ keys: [], items: [], found: 0 }),
+            onSome: (asRead) => ({
+              keys: A.chunksOf(asRead.keys, 5000),
+              items: A.chunksOf(asRead.items, 5000),
+              found: asRead.items.length
+            })
+          })
           const rewrites = A.chunksOf(
             A.map(R.toEntries(plan.rewrites), ([rowId, json]) => ({ rowId, json })),
             2000
           )
           const [, saved] = yield* batch([
-            matchedLine(request),
-            saveChoice({ ...request, choices: plan.choices, moves: plan.moves }),
+            matchedLine({ ...request, ...guard }),
+            saveChoice({
+              ...request,
+              choices: plan.choices,
+              moves: plan.moves,
+              takenBack: withTakeBacks({ kept, added: took })
+            }),
             ...A.map(rewrites, (entries) => rewriteDecisions({ org, id: draft.id, activity, entries }))
           ])
           if (saved.length > 0) return "saved" as const
-          if (triesLeft === 0) return yield* Effect.die("The import kept changing while a match was worked out.")
+          if (triesLeft <= 1) return "busy" as const
           return yield* attempt(triesLeft - 1)
         }).pipe(Effect.orDie)
-      return yield* attempt(5)
+      return yield* attempt(draftTries)
     }, Effect.orDie)
 
     const createdRows = Effect.fn("Imports.createdRows")(function* (organizationId: OrganizationId, importId: string) {
@@ -942,9 +998,10 @@ export const ImportStoreD1 = Layer.effect(
     const closeDraft = D1.statement({
       Request: CommitScope,
       Result: Ids,
-      // One revision on: a confirmed import is never taken for the open one of the same revision.
+      // One revision on: a confirmed import is never taken for the open one of the same revision. What its matches
+      // took back is let go: there is nothing left to name.
       execute: (r) => sql`UPDATE importDraft SET status = 'imported', revision = revision + 1,
-          importedBy = ${r.name}, importedAt = ${r.at}
+          importedBy = ${r.name}, importedAt = ${r.at}, takenBackJson = '[]'
         WHERE organizationId = ${r.org} AND id = ${r.id} AND status = 'open' AND ${thisConfirm(r.org, r.batch)}
         RETURNING id`
     })
@@ -1484,6 +1541,7 @@ export const ImportStoreD1 = Layer.effect(
       remove,
       choices,
       moves,
+      takenBack,
       matchColumn,
       createdRows,
       changes: Effect.fn("Imports.changes")(function* (organizationId: OrganizationId) {

@@ -383,11 +383,21 @@ step (`packages/catalog/web/src/ResultStep.screen.tsx`) says what it will do and
   (`batchId`) and starts at `revision` 1. Records, outcomes, changes, the audit line and the import's status are one
   atomic batch, and every statement checks that the import is still open, so a second Confirm writes nothing.
 - **A save names what its decisions were made on.** `PUT /api/v1/imports/:id/decisions` takes `SaveRequest`: the
-  rows whose decision is new or taken back, and `madeOn`, the draft's revision the screen held when the earliest of
-  them was decided. Each column choice records the first revision that has it (`MappingChoice.at`); an accept of a
-  proposal for a field matched again after `madeOn` is not applied, the rest of the row's decision is, and the
-  answer names it in `notApplied` (`withoutStaleAccepts` in `Imports.handler.ts`). A confirm carries the same
-  `madeOn` for the rows it carries, and is refused whole (`AcceptsTakenBack`, 409) when one of them is such an accept.
+  rows whose decision is new or taken back, and `madeOn`, for each row of `set`, the draft's revision the screen held
+  when that row was last decided (a key that names no row of `set` is not read). Each column choice records the first
+  revision that has it (`MappingChoice.at`) and each match the fields it moved (`ColumnMove`); every row is judged on
+  its own revision by `withoutStaleDecisions` (`packages/catalog/model/src/Import/Rematch.rules.ts`), and a part of
+  its decision that rests on a column matched again since is not applied, of four kinds: an accept or an undone fix
+  of that field (`accept`, `undo`), a Replace, Keep-stored or keep-one-of-two after the SKU's column (`stored`,
+  `twin`), a Replace or Keep-stored after another column where the row now compares otherwise with its stored item
+  (`stored`). The rest of the row's decision is applied, and the answer names each part in `notApplied` by row, field
+  and kind. A confirm carries the same `madeOn` for the rows it carries, and is refused whole (`AcceptsTakenBack`,
+  409) when any part of one of them would not be applied.
+- **A match takes back what rests on the columns it moves, and keeps what it took.** The same rule, on the stored
+  decisions as if each was made on the revision before the match, in the match's own atomic write; what it took back
+  is kept with the draft by field and kind (`ImportView.takenBack`, the first 200 rows named and all counted) so every
+  screen names it, the audit line counts it by kind, and it is let go when the import is confirmed. A request
+  overtaken on every try (`draftTries`) is refused with `DraftBusy` (409), nothing written.
 - **A Confirm names the draft it was made on.** Its payload is the revision of the draft the screen shows and the
   person's own decisions not saved yet (`ConfirmRequest`), never the screen's whole picture. The batch's first
   statement writes the confirm's row only while the import is open at that revision, and everything after it,

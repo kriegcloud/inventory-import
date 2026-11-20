@@ -734,6 +734,9 @@ every event of the draft). When the step is drawn they come back as the person's
 when the import's picture arrives, made on the revision they were made on. The browser asks before the page is left
 while rows wait. This replaces the rule that the kept copy is used only while it ends at the server's decisions: the
 server's picture is followed, and the waiting rows go over it. Reverse: the `kept` of `Opened`, and `waitingKept`.
+Superseded in part (2026-11-20): the rows are kept per person, import and tab by `keepWaiting` and `keptWaiting` in
+`Draft.atoms.ts` (`waitingKept` is gone), per "Each tab keeps its own" below; and a waiting row decided otherwise
+elsewhere since is held for the person, not sent over it, per "Hold it, show both, ask" below.
 
 ### 2026-11-20 — atoms, rows that wait unsaved when somebody else confirms the import
 

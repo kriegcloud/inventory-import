@@ -11,8 +11,10 @@ import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import * as HttpApiTest from "effect/http-api/HttpApiTest"
 import { decisionFromFlags, type RowDecisionFlags } from "@inventory/catalog-contract/Decision"
+import type { ImportView } from "@inventory/catalog-contract/Import"
 import { AcceptsTakenBack } from "@inventory/catalog-contract/ImportRejection"
 import type { Field, StagedTable } from "@inventory/catalog-contract/Staged"
+import { itemsOfRow, review } from "@inventory/catalog-model/Review"
 import { Api } from "../../src/api/v1/Api.ts"
 import { as, TypedApp } from "./support/app.ts"
 import { upload } from "./support/upload.ts"
@@ -27,11 +29,12 @@ const headings = [
   "quantity_on_hand",
   "Alt code",
   "List cost",
-  "Net cost"
+  "Net cost",
+  "Pack unit"
 ] as const
 type Heading = (typeof headings)[number]
 type Line = Partial<Record<Heading, string>>
-const letters = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
+const letters = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K"]
 const column = (heading: Heading): number =>
   O.getOrThrow(A.findFirstIndex(headings, (candidate) => candidate === heading))
 
@@ -79,7 +82,15 @@ const reviewed = tableOf("reviewed.csv", [
   },
   { ...item, sku: "BBB-0001", name: "Twin A", unit_cost: "1", "Alt code": "YYY-0001" },
   { ...item, sku: "BBB-0001", name: "Twin B", unit_cost: "2", "Alt code": "YYY-0002" },
-  { ...item, sku: "CCC-0001", name: "Hemp Rope", uom: "each", unit_cost: "4", "Alt code": "XXX-0001" }
+  {
+    ...item,
+    sku: "CCC-0001",
+    name: "Hemp Rope",
+    uom: "each",
+    unit_cost: "4",
+    "Alt code": "XXX-0001",
+    "Pack unit": "kg"
+  }
 ])
 
 const marcus = as("mem_marcus")
@@ -87,7 +98,7 @@ const dana = as("mem_dana")
 
 /** The two items stocked, then the reviewed file staged twice: one import to save and confirm on, one to match on. */
 const seeded = Effect.gen(function* () {
-  const client = yield* HttpApiTest.groups(Api, ["imports", "items"])
+  const client = yield* HttpApiTest.groups(Api, ["imports", "items", "activity"])
   const first = yield* upload({ client, table: stocked }).pipe(marcus)
   yield* client.imports
     .commit({ params: { id: first.id }, payload: { revision: first.revision, madeOn: {}, set: {}, clear: [] } })
@@ -143,12 +154,36 @@ const scenario = Effect.fn("scenario")(function* (input: {
     saved: afterSave.decisions,
     refused: S.is(AcceptsTakenBack)(refused) ? refused.accepts : [],
     confirm: [stillOpen.status, stillOpen.revision === afterSave.revision, items.length],
-    matched: afterMatch.decisions
+    matched: afterMatch.decisions,
+    matchedView: afterMatch
   }
 })
 
 const decided = (decisions: Readonly<Record<string, unknown>>, rows: ReadonlyArray<string>) =>
   A.map(rows, (row) => R.get(decisions, row))
+
+/** What row 6's unit reads, and the fix it is offered, as the screen draws the import's review from this view. */
+const unitOfRow6 = (view: ImportView) => {
+  const drawn = review({
+    table: reviewed,
+    choices: view.choices,
+    decisions: view.decisions,
+    storedItems: view.storedItems,
+    createdIds: view.createdIds,
+    suggestions: view.suggestions,
+    itemsOf: itemsOfRow
+  })
+  return O.map(
+    A.findFirst(drawn.rows, (candidate) => candidate.id === "row-6"),
+    (found) => ({
+      reads: found.values.uom,
+      fix: O.map(
+        A.findFirst(found.proposals, (proposal) => proposal.field === "uom"),
+        (proposal) => proposal.to
+      )
+    })
+  )
+}
 /** The confirm wrote nothing: the import is open at the same revision, and only the two stocked items exist. */
 const nothingWritten = ["open", true, 2]
 
@@ -233,18 +268,26 @@ layer(TypedApp)("a Replace judged after several re-matches of its column", (it) 
 })
 
 layer(TypedApp)("an undone fix across a re-match of its field's column", (it) => {
-  it.effect("is named and not applied by a save, refuses a confirm, and is dropped by the match", () =>
-    Effect.gen(function* () {
-      const done = yield* scenario({
-        rematch: [{ field: "uom", column: column("uom") }],
-        set: { "row-6": { reverted: ["uom"], edits: { name: "Hemp Rope 10m" } } }
+  it.effect(
+    "is named and not applied by a save, refuses a confirm, and is dropped by the match; the row shows the new value's fix",
+    () =>
+      Effect.gen(function* () {
+        // The unit is matched to "Pack unit", where row 6 says "kg": a new value, with its own fix (KG).
+        const done = yield* scenario({
+          rematch: [{ field: "uom", column: column("Pack unit") }],
+          set: { "row-6": { reverted: ["uom"], edits: { name: "Hemp Rope 10m" } } }
+        })
+        const named = [{ rowId: "row-6", field: "uom", kind: "undo" }]
+        expect([done.notApplied, done.refused, done.confirm]).toEqual([named, named, nothingWritten])
+        const after = [O.some(decisionFromFlags({ edits: { name: "Hemp Rope 10m" } }))]
+        expect(decided(done.saved, ["row-6"])).toEqual(after)
+        expect(decided(done.matched, ["row-6"])).toEqual(after)
+        // The fix the person undid was for "each"; the row now reads "kg", and its own fix is in force.
+        expect(unitOfRow6(done.matchedView)).toEqual(O.some({ reads: "KG", fix: O.some("KG") }))
+        expect(
+          A.map(done.matchedView.takenBack, (entry) => [entry.field, entry.kind, entry.count, entry.rows])
+        ).toEqual([["uom", "undo", 1, ["row-6"]]])
       })
-      const named = [{ rowId: "row-6", field: "uom", kind: "undo" }]
-      expect([done.notApplied, done.refused, done.confirm]).toEqual([named, named, nothingWritten])
-      const after = [O.some(decisionFromFlags({ edits: { name: "Hemp Rope 10m" } }))]
-      expect(decided(done.saved, ["row-6"])).toEqual(after)
-      expect(decided(done.matched, ["row-6"])).toEqual(after)
-    })
   )
 })
 
@@ -264,6 +307,76 @@ layer(TypedApp)("a field moved off its column when a person gives that column to
       const after = [O.some(decisionFromFlags({})), O.some(decisionFromFlags({}))]
       expect(decided(done.saved, ["row-6", "row-2"])).toEqual(after)
       expect(decided(done.matched, ["row-6", "row-2"])).toEqual(after)
+    })
+  )
+})
+
+layer(TypedApp)("what a match took back from the stored decisions", (it) => {
+  it.effect(
+    "is kept by field and kind, named in every view, counted in the audit line, and let go at the confirm",
+    () =>
+      Effect.gen(function* () {
+        const { client, matching } = yield* seeded
+        const params = { id: matching.id }
+        const set = flags({
+          "row-3": { stored: "replace" },
+          "row-2": { stored: "keep" },
+          "row-4": { kept: true },
+          "row-5": { out: true, kept: true },
+          "row-6": { edits: { name: "Hemp Rope 10m" } }
+        })
+        yield* client.imports
+          .decide({ params, payload: { madeOn: R.map(set, () => matching.revision), set, clear: [] } })
+          .pipe(marcus)
+        const matched = yield* client.imports
+          .match({ params, payload: { field: "sku", column: O.some(column("Alt code")) } })
+          .pipe(dana)
+        const by = { revision: matched.revision, by: "Dana Whitfield", field: "sku" }
+        const named = [
+          { ...by, kind: "stored", count: 2, rows: ["row-2", "row-3"] },
+          { ...by, kind: "twin", count: 2, rows: ["row-4", "row-5"] }
+        ]
+        expect(matched.takenBack).toEqual(named)
+        const read = yield* client.imports.get({ params }).pipe(marcus)
+        expect(read.takenBack).toEqual(named)
+        const trail = yield* client.activity.recent().pipe(marcus)
+        const line = O.getOrThrow(A.findFirst(trail, (entry) => entry.action === "Matched a column"))
+        expect(line.detail).toBe(
+          `SKU reads column H "Alt code" in reviewed.csv; took back 2 Replaces or Keep-storeds, 2 keeps of one of two`
+        )
+        const confirmed = yield* client.imports
+          .commit({ params, payload: { revision: matched.revision, madeOn: {}, set: {}, clear: [] } })
+          .pipe(marcus)
+        expect(confirmed.takenBack).toEqual([])
+        const reopened = yield* client.imports.reopen({ params }).pipe(marcus)
+        expect([reopened.status, reopened.takenBack]).toEqual(["open", []])
+      })
+  )
+})
+
+layer(TypedApp)("a Replace whose row stops reading under the column its field is matched to", (it) => {
+  it.effect("is taken back by the match, though no difference of that field changed", () =>
+    Effect.gen(function* () {
+      const { client } = yield* seeded
+      // Row 2 differs from its stored item on the name only; its cost reads 3 as stored, "Net cost" says "call".
+      const reads = tableOf("reads.csv", [
+        { ...item, sku: "AAA-0002", name: "Steel Bolt XL", unit_cost: "3", "Net cost": "call" }
+      ])
+      const view = yield* upload({ client, table: reads }).pipe(marcus)
+      const params = { id: view.id }
+      yield* client.imports
+        .decide({
+          params,
+          payload: { madeOn: { "row-2": view.revision }, set: flags({ "row-2": { stored: "replace" } }), clear: [] }
+        })
+        .pipe(marcus)
+      const matched = yield* client.imports
+        .match({ params, payload: { field: "unitCost", column: O.some(column("Net cost")) } })
+        .pipe(dana)
+      expect(R.get(matched.decisions, "row-2")).toEqual(O.some(decisionFromFlags({})))
+      expect(A.map(matched.takenBack, (entry) => [entry.field, entry.kind, entry.rows])).toEqual([
+        ["unitCost", "stored", ["row-2"]]
+      ])
     })
   )
 })

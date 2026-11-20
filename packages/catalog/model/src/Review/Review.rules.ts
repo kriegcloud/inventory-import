@@ -1124,6 +1124,14 @@ const problemsOf = (
 }
 
 /**
+ * Whether a row's values make an item: only such a row is compared with a stored item with its SKU. A re-match that
+ * makes the row stop reading (or start) changes how it compares, whatever its differences said.
+ *
+ * @example readsAsItem(reviewedRow.values) // false when Unit cost reads "call for price"
+ */
+export const readsAsItem = (values: Readonly<Record<Field, string>>): boolean => toItem(values) !== null
+
+/**
  * The item a row's values make, or null when one of them does not read. Empty optional cells take the brief's
  * defaults: quantity on hand 0, active true, lot tracked false.
  */

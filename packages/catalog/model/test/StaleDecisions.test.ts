@@ -9,7 +9,9 @@ import { ColumnMove, type MappingChoice } from "@inventory/catalog-contract/Mapp
 import { decisionFromFlags, type RowDecisionFlags } from "@inventory/catalog-contract/Decision"
 import { AcceptsTakenBack } from "@inventory/catalog-contract/ImportRejection"
 import type { StagedTable } from "@inventory/catalog-contract/Staged"
+import type { ImportView } from "@inventory/catalog-contract/Import"
 import { importsEndpoints } from "@inventory/catalog-model/ImportsHandler"
+import { itemsOfRow, review } from "@inventory/catalog-model/Review"
 import { catalogMemory } from "@inventory/catalog-model/Memory"
 import { columnAt, columnsOf, movesOfMatch, withoutStaleDecisions } from "@inventory/catalog-model/Rematch"
 import * as A from "effect/Array"
@@ -34,10 +36,11 @@ const headings = [
   "quantity_on_hand",
   "Alt code",
   "List cost",
-  "Net cost"
+  "Net cost",
+  "Pack unit"
 ] as const
 type Line = Partial<Record<(typeof headings)[number], string>>
-const letters = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
+const letters = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K"]
 const column = (heading: (typeof headings)[number]): number =>
   O.getOrThrow(A.findFirstIndex(headings, (candidate) => candidate === heading))
 
@@ -85,7 +88,15 @@ const reviewed = tableOf("reviewed.csv", [
   },
   { ...item, sku: "BBB-0001", name: "Twin A", unit_cost: "1", "Alt code": "YYY-0001" },
   { ...item, sku: "BBB-0001", name: "Twin B", unit_cost: "2", "Alt code": "YYY-0002" },
-  { ...item, sku: "CCC-0001", name: "Hemp Rope", uom: "each", unit_cost: "4", "Alt code": "XXX-0001" }
+  {
+    ...item,
+    sku: "CCC-0001",
+    name: "Hemp Rope",
+    uom: "each",
+    unit_cost: "4",
+    "Alt code": "XXX-0001",
+    "Pack unit": "kg"
+  }
 ])
 
 /** The two items stocked, then the reviewed file staged twice: one import to save and confirm on, one to match on. */
@@ -145,12 +156,34 @@ const scenario = Effect.fn("scenario")(function* (input: {
     saved: afterSave.decisions,
     refused: S.is(AcceptsTakenBack)(refused) ? refused.accepts : [],
     status: stillOpen.status,
-    matched: afterMatch.decisions
+    matched: afterMatch.decisions,
+    matchedView: afterMatch
   }
 })
 
 const decided = (decisions: Readonly<Record<string, unknown>>, rows: ReadonlyArray<string>) =>
   A.map(rows, (row) => R.get(decisions, row))
+
+/** What row 6's unit reads, and the fix it is offered, as the screen draws the import's review from this view. */
+const unitOfRow6 = (view: ImportView) => {
+  const drawn = review({
+    table: reviewed,
+    choices: view.choices,
+    decisions: view.decisions,
+    storedItems: view.storedItems,
+    createdIds: view.createdIds,
+    suggestions: view.suggestions,
+    itemsOf: itemsOfRow
+  })
+  const row = A.findFirst(drawn.rows, (candidate) => candidate.id === "row-6")
+  return O.map(row, (found) => ({
+    reads: found.values.uom,
+    fix: O.map(
+      A.findFirst(found.proposals, (proposal) => proposal.field === "uom"),
+      (proposal) => proposal.to
+    )
+  }))
+}
 
 describe("the column a field read at a past revision, and when it moved", () => {
   const { rows: _rows, ...staged } = reviewed
@@ -185,6 +218,71 @@ describe("the column a field read at a past revision, and when it moved", () => 
 
   it.prop("ColumnMove generates only valid values", [Arbitrary.schema(ColumnMove)], ([move]) => {
     expect(S.is(ColumnMove)(move)).toBe(true)
+  })
+})
+
+describe("accepts made before their field's column was matched again, as the save and the confirm judge them", () => {
+  // Unit cost matched by hand at 12, the unit at 3; each match kept its move, as the stores write them.
+  const choices: ReadonlyArray<MappingChoice> = [
+    { field: "unitCost", column: 7, by: "person", at: 12 },
+    { field: "uom", column: 4, by: "person", at: 3 }
+  ]
+  const moves: ReadonlyArray<ColumnMove> = [
+    { field: "uom", at: 3, was: 4, column: 4 },
+    { field: "unitCost", at: 12, was: 5, column: 7 }
+  ]
+  const set = flags({
+    "row-55": { accepted: ["unitCost", "uom"], edits: { name: "Steel Tube 1in" } },
+    "row-18": { reverted: ["name"] }
+  })
+  const judge = (madeOn: Readonly<Record<string, number>>, decisions = set) =>
+    withoutStaleDecisions({ choices, moves, madeOn, set: decisions, changed: [] })
+
+  it("are taken out and named; the rest of the decision, and every other row, is applied", () => {
+    const made = judge({ "row-55": 11, "row-18": 11 })
+    expect(made.notApplied).toEqual([{ rowId: "row-55", field: "unitCost", kind: "accept" }])
+    expect(made.applied).toEqual({
+      "row-55": decisionFromFlags({ accepted: ["uom"], edits: { name: "Steel Tube 1in" } }),
+      "row-18": set["row-18"]
+    })
+  })
+
+  it("are applied when the row was decided on the revision that has the match, or a later one", () => {
+    expect(judge({ "row-55": 12, "row-18": 12 })).toEqual({ applied: set, notApplied: [] })
+  })
+
+  it("names every accept of every field matched since, on a row decided before any match", () => {
+    expect(judge({ "row-55": 2, "row-18": 2 }).notApplied).toEqual([
+      { rowId: "row-55", field: "unitCost", kind: "accept" },
+      { rowId: "row-55", field: "uom", kind: "accept" }
+    ])
+  })
+
+  it("are judged row by row: an old row never makes a newer row's accept stale, and a row named on no revision counts as made on 0", () => {
+    const three = flags({
+      "row-55": { accepted: ["unitCost"] },
+      "row-9": { accepted: ["unitCost"] },
+      "row-3": { accepted: ["unitCost"] }
+    })
+    // Row 9 waited from revision 10, before unit cost was matched again at 12; row 55 was accepted on 12.
+    expect(judge({ "row-55": 12, "row-9": 10 }, three).notApplied).toEqual([
+      { rowId: "row-9", field: "unitCost", kind: "accept" },
+      { rowId: "row-3", field: "unitCost", kind: "accept" }
+    ])
+  })
+
+  it("are stale too when their field only moved off its column (another field took it), with no choice of its own", () => {
+    const made = withoutStaleDecisions({
+      choices: [{ field: "name", column: 4, by: "person", at: 6 }],
+      moves: [
+        { field: "name", at: 6, was: 1, column: 4 },
+        { field: "uom", at: 6, was: 4, column: null }
+      ],
+      madeOn: { "row-55": 5 },
+      set: flags({ "row-55": { accepted: ["uom"] } }),
+      changed: []
+    })
+    expect(made.notApplied).toEqual([{ rowId: "row-55", field: "uom", kind: "accept" }])
   })
 })
 
@@ -315,18 +413,23 @@ describe("a Replace or Keep-stored across a re-match of another column", () => {
 
 describe("an undone fix across a re-match of its field's column", () => {
   layer(App)("Server refuses, says so", (it) => {
-    it.effect("is named and not applied by a save, refuses a confirm, and is dropped by the match", () =>
-      Effect.gen(function* () {
-        const done = yield* scenario({
-          rematch: [{ field: "uom", column: column("uom") }],
-          set: { "row-6": { reverted: ["uom"], edits: { name: "Hemp Rope 10m" } } }
+    it.effect(
+      "is named and not applied by a save, refuses a confirm, and is dropped by the match; the row shows the new value's fix",
+      () =>
+        Effect.gen(function* () {
+          // The unit is matched to "Pack unit", where row 6 says "kg": a new value, with its own fix (KG).
+          const done = yield* scenario({
+            rematch: [{ field: "uom", column: column("Pack unit") }],
+            set: { "row-6": { reverted: ["uom"], edits: { name: "Hemp Rope 10m" } } }
+          })
+          const named = [{ rowId: "row-6", field: "uom", kind: "undo" }]
+          expect([done.notApplied, done.refused, done.status]).toEqual([named, named, "open"])
+          const after = [O.some(decisionFromFlags({ edits: { name: "Hemp Rope 10m" } }))]
+          expect(decided(done.saved, ["row-6"])).toEqual(after)
+          expect(decided(done.matched, ["row-6"])).toEqual(after)
+          // The fix the person undid was for "each"; the row now reads "kg", and its own fix is open in force.
+          expect(unitOfRow6(done.matchedView)).toEqual(O.some({ reads: "KG", fix: O.some("KG") }))
         })
-        const named = [{ rowId: "row-6", field: "uom", kind: "undo" }]
-        expect([done.notApplied, done.refused, done.status]).toEqual([named, named, "open"])
-        const after = [O.some(decisionFromFlags({ edits: { name: "Hemp Rope 10m" } }))]
-        expect(decided(done.saved, ["row-6"])).toEqual(after)
-        expect(decided(done.matched, ["row-6"])).toEqual(after)
-      })
     )
   })
 })

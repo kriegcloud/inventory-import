@@ -100,9 +100,37 @@ function UploadProgress(props: { state: UploadState; onCancel: () => void }) {
 
 const carriesFiles = (event: DragEvent): boolean => event.dataTransfer?.types.includes("Files") === true
 
+/** What the Upload step does with a file dropped on the page: read while it is on screen, nothing while it is not. */
+type PageDrop = { readonly enabled: boolean; readonly onFiles: (files: ReadonlyArray<File>) => void }
+
 /**
- * Whether a file is being dragged over the page, following the window while something reads it. dragenter and
+ * The Upload step as it was last drawn, for the page's drop: set on every draw. Not drawn itself, so not an atom:
+ * the one drop listener reads it at the moment of the drop.
+ */
+let pageDrop: PageDrop | undefined
+/** True while the step's frame is on screen (`whilePageTakesDrops`): only then does the page hand it a file. */
+let stepOnScreen = false
+
+/** On the step's frame, and the same function on every draw: the page takes drops exactly while the step is on screen. */
+const whilePageTakesDrops = (frame: HTMLElement | null) => {
+  if (frame === null) return
+  stepOnScreen = true
+  return () => {
+    stepOnScreen = false
+  }
+}
+
+/**
+ * Whether a file is being dragged over the page, and the page's one way to take a dropped file. dragenter and
  * dragleave fire for every element the pointer crosses: the page is left when they balance.
+ *
+ * The whole page takes a dropped file, not only the dashed box: a file let go beside the box would otherwise make the
+ * browser open it and leave the app. One `drop` listener cancels the drop, hands the files to the step and only then
+ * lowers the flag, and it stays the same listener for as long as the step is on screen. Two listeners did this once:
+ * the first lowered the flag, the step drew again in the gap the browser leaves between listeners, and the second,
+ * the one that cancels, was taken off the window before it ran. While the step takes no file (a viewer, an upload
+ * under way) the drop is swallowed, so the page stays, and nothing is read. The dashed box takes a file dropped on it
+ * itself.
  */
 const fileOverPage: Atom.Atom<boolean> = Atom.readable((get) => {
   let depth = 0
@@ -116,47 +144,32 @@ const fileOverPage: Atom.Atom<boolean> = Atom.readable((get) => {
     depth = Math.max(0, depth - 1)
     if (depth === 0) get.setSelf(false)
   }
+  // Without this the browser refuses the drop and opens the file instead.
+  const hold = (event: DragEvent) => {
+    if (carriesFiles(event)) event.preventDefault()
+  }
   const drop = (event: DragEvent) => {
     if (!carriesFiles(event)) return
+    const step = stepOnScreen ? pageDrop : undefined
+    if (!event.defaultPrevented && step !== undefined) {
+      event.preventDefault()
+      if (step.enabled) step.onFiles(Array.from(event.dataTransfer?.files ?? []))
+    }
     depth = 0
     get.setSelf(false)
   }
   window.addEventListener("dragenter", enter)
   window.addEventListener("dragleave", leave)
+  window.addEventListener("dragover", hold)
   window.addEventListener("drop", drop)
   get.addFinalizer(() => {
     window.removeEventListener("dragenter", enter)
     window.removeEventListener("dragleave", leave)
+    window.removeEventListener("dragover", hold)
     window.removeEventListener("drop", drop)
   })
   return false
 })
-
-/**
- * Makes the whole page take a dropped file, not only the dashed box: a file let go beside the box would otherwise make
- * the browser open it and leave the app. A ref callback on the step's frame, so it is heard exactly while the step is
- * on screen and with the step's own `enabled` and `onFiles`. While `enabled` is false a drop is swallowed, so the page
- * stays, and nothing is read. The dashed box takes a file dropped on it itself.
- */
-const takePageDrop =
-  (input: { enabled: boolean; onFiles: (files: ReadonlyArray<File>) => void }) => (frame: HTMLElement | null) => {
-    if (frame === null) return
-    // Without this the browser refuses the drop and opens the file instead.
-    const hold = (event: DragEvent) => {
-      if (carriesFiles(event)) event.preventDefault()
-    }
-    const drop = (event: DragEvent) => {
-      if (!carriesFiles(event) || event.defaultPrevented) return
-      event.preventDefault()
-      if (input.enabled) input.onFiles(Array.from(event.dataTransfer?.files ?? []))
-    }
-    window.addEventListener("dragover", hold)
-    window.addEventListener("drop", drop)
-    return () => {
-      window.removeEventListener("dragover", hold)
-      window.removeEventListener("drop", drop)
-    }
-  }
 
 /**
  * A file somebody loaded and nobody has confirmed: continue its review, or remove it. Removing asks first, because
@@ -379,7 +392,7 @@ export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
   // A file dropped anywhere on the page goes in through the upload's own input, so it meets the same checks as a
   // chosen one and reaches `onAccept` below: one way in.
   const dragging = useAtomValue(fileOverPage) && props.canImport && !busy
-  const takeDrop = takePageDrop({
+  pageDrop = {
     enabled: props.canImport && !busy,
     onFiles: (files) => {
       const input = fileInput()
@@ -389,12 +402,12 @@ export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
       input.files = transfer.files
       input.dispatchEvent(new Event("change", { bubbles: true }))
     }
-  })
+  }
 
   const failed = state._tag === "Failed" ? state : undefined
   const refused = state._tag === "Refused" ? state.problem : undefined
   return (
-    <div ref={takeDrop} className="relative h-full overflow-y-auto">
+    <div ref={whilePageTakesDrops} className="relative h-full overflow-y-auto">
       <div className="mx-auto flex w-full max-w-2xl flex-col pb-8">
         <PageHeader title="Import items" line=".csv or .xlsx" />
         <div className="flex flex-col gap-4 px-4 sm:px-9">

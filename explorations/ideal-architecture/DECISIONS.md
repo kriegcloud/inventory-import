@@ -784,10 +784,16 @@ since. Question ("Kept vs newer"): such a row was decided differently since, by 
 happens? Options: "Hold it, show both, ask (Recommended)"; "Send it, last press wins"; "Drop hers, name it". Answer:
 "Hold it, show both, ask". I chose; the agent recommended the same. The row shows "Decided elsewhere since: <theirs>.
 Yours: <yours>" with a choice of which one stands; nothing is sent for that row until the person picks, and the other
-waiting rows go as usual. Built: each waiting row keeps the values it is known to have had (`Draft.seen`: the server's when the person began
-deciding it, then each of theirs, any of which a failed save may have written); a picture that holds none of them puts
-the row on hold (`Hold.Elsewhere`), listed above the review with Use mine and Keep theirs (`HoldSettled`). Seen on
-screen.
+waiting rows go as usual. Built: each waiting row keeps the values it is known to have had (`Draft.seen`: what the server was known to hold
+when the row was first sent, then each value sent, any of which a failed save may have written; a value that never
+left the browser is not in it). A waiting row is never sent before it is checked against a fresh picture at least as
+new as the one held (never the picture a redraw gives again): a picture that holds none of its values puts it on hold
+(`Hold.Elsewhere`), said "Row N: decided since by someone else or another tab: <theirs>. Yours: <yours>." with Use
+mine and Keep theirs (Keep theirs offered to a view-only member too); the hold's theirs follows later pictures and the
+hold lets go when the server holds the person's decision; the confirm waits, and says so, until the person picks. A
+decision of the person's own gone tab beside this tab's is held the same way ("Row N: from your other tab: … This
+tab: …", `Hold.OtherTab`), with Use the other tab's and Keep this tab's. Use mine keeps the revision the decision was
+made on. Seen on screen (the Elsewhere line, in an earlier round).
 
 ### 2026-11-20 — atoms, what a refused save does to waiting rows
 

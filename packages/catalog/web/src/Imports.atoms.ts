@@ -168,7 +168,9 @@ export interface ColumnPick {
 
 /**
  * Matches a file column to a field (or clears it), from the Match step or from inside the review. The server decides
- * what a new match drops (the accepts of that field); its answer is the import's new view, put in place at once.
+ * what a new match takes back from the stored decisions (accepts and undone fixes of every moved field, keep-or-replace
+ * answers and keeps of one of two after a SKU move, a keep-or-replace whose row now compares otherwise); its answer is
+ * the import's new view, put in place at once, and its `takenBack` is what the screen names.
  */
 export const matchColumn = apiRuntime.fn<ColumnPick>()(
   Effect.fnUntraced(function* (pick: ColumnPick) {

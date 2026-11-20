@@ -799,6 +799,37 @@ The review of `1171834..cf6ac58` confirmed 49 findings in groups; Benjamin then 
   picture outdated by a reopen no longer ends the draft; a refused or lost confirm offers no Save again, and the first
   picture after it that is not the step's own redraw answers it; the leave question is asked after a reload.
 
+## The third review (2026-11-20): group 3 checked, 45 findings
+
+The review of `cf6ac58..2fb8dbb` confirmed 45 findings (1 blocker, 14 major, 30 minor). Built in three lanes (server,
+laws, screen), each checked by an independent reader, then three more passes on what each check found, and a last
+read of the whole range by four readers:
+
+- **G2 on every path** (`0844c01`, `d390d8d`, `de8ce87`, `8c00d3c`): a waiting row (stalled, sent before, kept across
+  a reload, taken up from a gone tab) is never sent before a fresh picture at least as new as the one held has
+  checked it; the picture a redraw gives again is not fresh; the values a row is known to have had are those sent;
+  holds follow later pictures; a gone tab's decision beside this tab's is held ("From your other tab"); a held row
+  holds the confirm, and the screen says why; Use mine and a row decided again keep their revision; a row the strip
+  of a stale accept leaves empty is not sent, and a row the person put back is never dropped.
+- **What a match took back is named** (`674a93b` the contract, `6c12973`): kept with the import by field and kind
+  (`ImportView.takenBack`, migration 0003), in the match's guarded batch, counted in the audit line, named on every
+  screen of the import until dismissed. G6 counts a row that stops reading as changed; one limit of tries in both
+  stores, refused as `DraftBusy`; the save's and the confirm's writes are guarded on the stored items, created rows
+  and suggestions their judgement read; a match's earlier answers hold only while the columns are the same.
+- **Tabs and the session** (`0844c01`, `d390d8d`, `de8ce87`): one tab id for the tab's life (an atom, held from the
+  app's start, the sign-in page included); an orphan is taken up under a lock; rows of a confirmed import taken up
+  are named; sends and confirms go only for the rows' member, and wait while the session is asked again; another
+  member's press only redraws; thisTab, keptKeys and lastAnswered are atoms; the item editor's saved items go with
+  the sign-out.
+- **Laws** (`9ca70b5`, `d390d8d`, `de8ce87`, `0636e39`): AnsweredBy and every finding of the laws are constructors read
+  with match; the tags law reads every src and test folder, follows a tag through helpers, joins, lists, records and
+  reassignment, and refuses P.isTagged with a string; no count-only exemption; the refs and boundaries laws close the
+  listed holes, and the refs law's alias walk is bounded.
+- **Departure, the lead's to accept:** the vendored `useDataTable` still sets the table's options in a draw (the
+  comment says so); avoiding it means replacing the kit's hook.
+- **On HOLD (Benjamin):** a Replace on a draft matched before migration 0002, where "changed" cannot be known; whether
+  a tab the browser discarded or has not loaded yet counts as gone.
+
 ## Step 8: TanStack Query removed, the lint everywhere, the documents
 
 **What went** (`1aa2788`): `packages/client/src/QueryClient.runtime.ts` and its test, the client's `./QueryClient`

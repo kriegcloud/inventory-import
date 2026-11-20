@@ -43,18 +43,22 @@ layer(TypedApp)("an import of items", (it) => {
         expect(staged.unusedColumns).toEqual([{ index: 15, letter: "P", label: "Internal Notes", filled: 20 }])
 
         // The person accepts the decimal comma on row 55 and undoes the rule's "bx" on row 18.
-        yield* client.imports
-          .decide({
-            params: { id: staged.id },
-            payload: {
-              set: {
-                "row-55": decisionFromFlags({ accepted: ["unitCost"] }),
-                "row-18": decisionFromFlags({ reverted: ["uom"] })
-              },
-              clear: []
-            }
-          })
-          .pipe(marcus)
+        const decisions = {
+          params: { id: staged.id },
+          payload: {
+            set: {
+              "row-55": decisionFromFlags({ accepted: ["unitCost"] }),
+              "row-18": decisionFromFlags({ reverted: ["uom"] })
+            },
+            clear: []
+          }
+        }
+        const saved = yield* client.imports.decide(decisions).pipe(marcus)
+        // The answer says this save moved the draft by one; the same save sent again changes nothing and says so.
+        expect(saved).toEqual({ revision: staged.revision + 1, changed: true })
+        const again = yield* client.imports.decide(decisions).pipe(marcus)
+        expect(again).toEqual({ revision: saved.revision, changed: false })
+        })
         const confirmed = yield* client.imports
           .commit({ params: { id: staged.id }, payload: { set: {}, clear: [] } })
           .pipe(marcus)

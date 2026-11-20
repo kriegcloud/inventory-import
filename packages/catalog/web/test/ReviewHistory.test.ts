@@ -63,7 +63,7 @@ const visit = (id: ImportId, member = "mem_dana") => {
     endpoints: {
       imports: {
         get: () => Deferred.await(Deferred.makeUnsafe<ImportView>()),
-        decide: () => Deferred.await(Deferred.makeUnsafe<{ readonly revision: number }>())
+        decide: () => Deferred.await(Deferred.makeUnsafe<{ readonly revision: number; readonly changed: boolean }>())
       }
     },
     signedIn: Atom.make(memberOf(member))

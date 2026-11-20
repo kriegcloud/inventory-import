@@ -685,3 +685,17 @@ derived Effect atom (`shown`) before the table is given them, and the table keep
 hidden columns. `@tanstack/store` is no dependency of the package any more; it stays a development dependency, with
 `@tanstack/table-core`, for the one test that makes a table as the screen's hook does. Reverse: `shown` and the
 column definitions' `enableColumnFilter`.
+
+### 2026-11-19 — atoms, a save that changes nothing
+
+A save of decisions answered only the draft's revision. A save that changed nothing (the same one sent again after a
+lost answer, a decision taken back while its save was out, rows somebody else had just decided the same way) moved no
+revision, so its answer named wherever the draft had got to, and the screen took that for its own next revision: it
+then held a picture without the other person's rows under a revision that has them. Question: how does the screen
+tell? Options: "Answer says 'no change' (Recommended)"; "Leave it until the domain model"; "Always re-read after a
+save". Answer: "Answer says 'no change'". I chose; the agent recommended the same. Built: `PUT
+/api/v1/imports/:id/decisions` answers `{ revision, changed }` (`Catalog.contract.ts`; read in one batch on D1,
+`ImportStore.adapter.ts`, and in the in-memory twin); the draft's transition (`Draft.machine.ts`) moves its picture on
+by the person's own rows only when `changed` is true and the revision is the next one, and otherwise keeps the rows
+on screen and asks for the import at once. The property test no longer waives "what is held is what the server held
+at that revision" after such a save. Reverse: the field, and the one condition in `SaveAnswered`.

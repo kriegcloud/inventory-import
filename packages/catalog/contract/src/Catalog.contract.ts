@@ -163,14 +163,20 @@ export class ImportsApi extends HttpApiGroup.make("imports")
       params: importId,
       payload: DecisionDelta,
       success: S.Struct({
-        revision: S.Int.annotateKey({ description: "The draft's revision after this save" })
-      }).annotate({ description: "The decisions are saved; the draft's new revision" }),
+        revision: S.Int.annotateKey({ description: "The draft's revision after this save" }),
+        changed: S.Boolean.annotateKey({
+          description:
+            "True when this save changed a decision, so the revision is this save's own: one more than before it. False when every row it names already stood as sent (the same save again, or somebody else decided the same): nothing was written, and the revision is whatever the draft had reached, which may hold other people's decisions the sender has not read"
+        })
+      }).annotate({
+        description: "The decisions are saved: the draft's revision, and whether this save is what moved it"
+      }),
       error: [Forbidden, ImportNotFound, AlreadyImported]
     })
       .annotate(OpenApi.Summary, "Save the decisions made since the last save")
       .annotate(
         OpenApi.Description,
-        "Saves decisions as they are made. Only the difference travels (the rows whose decision is new, and the rows whose decision was taken back), so two screens deciding different rows do not collide. Returns the draft's new revision. Needs the editor role."
+        "Saves decisions as they are made. Only the difference travels (the rows whose decision is new, and the rows whose decision was taken back), so two screens deciding different rows do not collide. Answers the draft's revision and whether this save changed anything: a save that changed nothing (the same one sent again, or rows somebody else had already decided the same way) writes nothing and moves no revision, and its `revision` is then not the sender's own next one, so a screen that reads `changed: false` asks for the import again instead of counting on. Safe to send twice. Refused with 409 once the import is confirmed. Needs the editor role."
       ),
     HttpApiEndpoint.post("commit", "/:id/commit", {
       params: importId,

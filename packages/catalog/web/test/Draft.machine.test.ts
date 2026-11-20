@@ -58,8 +58,11 @@ interface World {
   server: Picture
   /** The import's view as the tab holds it: what every screen of the import reads. */
   view: O.Option<Picture>
-  /** The save that is out: on its way, or taken by the server with the revision it will answer. */
-  save: O.Option<{ readonly delta: DecisionDelta; readonly answer: O.Option<number> }>
+  /** The save that is out: on its way, or taken by the server with what it will answer. */
+  save: O.Option<{
+    readonly delta: DecisionDelta
+    readonly answer: O.Option<{ readonly revision: number; readonly changed: boolean }>
+  }>
   /** The read that is out: on its way, or taken by the server with the picture it will answer. */
   read: O.Option<O.Option<Picture>>
   /** Pictures on their way from other requests (a match, a card's Continue), oldest first. */
@@ -72,11 +75,6 @@ interface World {
   overtaken: Record<string, true>
   /** Every picture the server has held, by revision. */
   history: Record<number, SavedDecisions>
-  /**
-   * The server took a save of the person's that changed nothing (somebody else had just decided the same): its answer
-   * names their revision, which reads as the person's own. Until the next read, the picture held may lack their rows.
-   */
-  mayLack: boolean
   restarts: number
 }
 
@@ -91,7 +89,6 @@ const start = (): World => ({
   confirmed: {},
   overtaken: {},
   history: { 1: {} },
-  mayLack: false,
   restarts: 0
 })
 
@@ -168,8 +165,7 @@ const run = (world: World, command: Command): void => {
             ...R.map(save.delta.set, (decision) => O.some(decision)),
             ...R.fromEntries(A.map(save.delta.clear, (row) => [row, O.none()] as const))
           })
-          if (!changed) world.mayLack = true
-          world.save = O.some({ delta: save.delta, answer: O.some(world.server.revision) })
+          world.save = O.some({ delta: save.delta, answer: O.some({ revision: world.server.revision, changed }) })
         }
       })
     case "SaveAnswers":
@@ -187,7 +183,7 @@ const run = (world: World, command: Command): void => {
             }
           }
           world.overtaken = {}
-          dispatch(world, DraftEvent.SaveAnswered({ revision: save.answer.value }))
+          dispatch(world, DraftEvent.SaveAnswered(save.answer.value))
         }
       })
     case "SaveFails":
@@ -213,7 +209,6 @@ const run = (world: World, command: Command): void => {
         onNone: () => {},
         onSome: (picture) => {
           world.read = O.none()
-          world.mayLack = false
           put(world, picture)
         }
       })
@@ -247,9 +242,7 @@ const holds = (world: World): void => {
     expect(O.map(world.draft.held, (held) => held.revision)).toEqual(O.map(world.view, (view) => view.revision))
   }
   // What it holds is what the server held at that revision: a revision is never claimed for another picture.
-  O.map(world.draft.held, (held) => {
-    if (!world.mayLack) expect(held.decisions).toEqual(world.history[held.revision])
-  })
+  O.map(world.draft.held, (held) => expect(held.decisions).toEqual(world.history[held.revision]))
   // The person's own decision stays on screen: while it waits to be saved, and once the server has it, until
   // somebody else decides that row.
   if (O.isSome(world.draft.held)) {
@@ -397,16 +390,29 @@ describe("the orderings that lost or hid a decision", () => {
     expect(world.restarts).toBe(0)
   })
 
-  it("a save the server counts as no change does not hide what the other person saved beside it", () => {
+  it("a save the server counts as no change is not taken for the person's own next revision", () => {
     const world = opened()
-    run(world, { _tag: "SomeoneElse", row: "a", to: "out" })
-    run(world, { _tag: "SomeoneElse", row: "a", to: "nothing" })
-    // Revision 3 on the server, 1 on screen. The person's save is a new decision: revision 4.
-    run(world, { _tag: "Decide", row: "b", to: "kept" })
+    // The person leaves a row out and takes that back while the save is out; the save fails and waits.
+    run(world, { _tag: "Decide", row: "a", to: "out" })
+    run(world, { _tag: "Decide", row: "a", to: "nothing" })
+    run(world, { _tag: "SaveFails" })
+    // A read is on its way, taken by the server before somebody else decides another row.
+    run(world, { _tag: "ReturnToTab" })
+    run(world, { _tag: "ServerTakesRead" })
+    run(world, { _tag: "SomeoneElse", row: "b", to: "kept" })
+    // "Save again" sends a clear of a row the server never had decided: no change, at the other person's revision.
+    run(world, { _tag: "SaveAgain" })
     run(world, { _tag: "ServerTakesSave" })
+    expect(O.flatMap(world.save, (save) => save.answer)).toEqual(O.some({ revision: 2, changed: false }))
+    run(world, { _tag: "ReadArrives" })
     run(world, { _tag: "SaveAnswers" })
-    // Not the next revision after the one held: the import is asked again, the row stays on screen meanwhile.
-    expect(shown(world.draft)).toEqual({ b: kept })
+    // The screen does not claim revision 2 for a picture without the other person's row: it holds what it read,
+    // and has asked for the import again, at once.
+    holds(world)
+    expect(O.map(world.draft.held, (held) => held.revision)).toEqual(O.some(1))
     expect(O.isSome(world.read)).toBe(true)
+    run(world, { _tag: "ServerTakesRead" })
+    run(world, { _tag: "ReadArrives" })
+    expect(shown(world.draft)).toEqual({ b: kept })
   })
 })

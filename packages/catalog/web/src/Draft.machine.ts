@@ -75,8 +75,12 @@ export type DraftEvent = Data.TaggedEnum<{
   Left: {}
   /** The person changed these rows. */
   Decided: { readonly changes: RowChanges }
-  /** The server saved the rows that were out; the draft is now at `revision`. */
-  SaveAnswered: { readonly revision: number }
+  /**
+   * The server answered the save that was out: the draft is at `revision`, and `changed` says whether this save is
+   * what moved it there. When it changed nothing (the server already held every row as sent), `revision` is not the
+   * person's own next one: it is wherever the draft had got to, with whatever others decided on the way.
+   */
+  SaveAnswered: { readonly revision: number; readonly changed: boolean }
   /** The save did not get through (the network, a server error): the rows are not lost, and wait. */
   SaveFailed: {}
   /** The person pressed "Save again". */
@@ -257,7 +261,7 @@ export const step: {
         }),
         (after) => ({ draft: letGo(after), effects: [DraftEffect.Ask()] })
       ),
-    SaveAnswered: ({ revision }) =>
+    SaveAnswered: ({ changed, revision }) =>
       O.match(draft.flight, {
         onNone: () => ({ draft, effects: none }),
         onSome: (rows) => {
@@ -270,17 +274,19 @@ export const step: {
             onSome: (held): Stepped => {
               // A picture read after the save is already held: the rows are in it.
               if (revision <= held.revision) return { draft: { ...draft, flight: O.none() }, effects: none }
-              // The next revision after the one held: nobody else saved in between, so the picture moves on by
-              // the person's own rows, with no request.
-              if (revision === held.revision + 1 && O.isNone(draft.landed)) {
+              // This save moved the draft, to the next revision after the one held: nobody else saved in between, so
+              // the picture moves on by the person's own rows, with no request. A save that changed nothing moved
+              // nothing: its revision is somebody else's, and says nothing of what the picture held lacks.
+              if (changed && revision === held.revision + 1 && O.isNone(draft.landed)) {
                 const picture = { revision, decisions: over(held.decisions, rows) }
                 return {
                   draft: { ...draft, flight: O.none(), held: O.some(picture) },
                   effects: [DraftEffect.Put(picture)]
                 }
               }
-              // Somebody else saved in between: the picture held is behind. The person's rows stay on screen over
-              // it, and the import is asked again for everything the server holds.
+              // Somebody else saved in between, or the save changed nothing and the draft is further on than the
+              // picture held: that picture is behind. The person's rows stay on screen over it, and the import is
+              // asked again, at once, for everything the server holds.
               return {
                 draft: {
                   ...draft,

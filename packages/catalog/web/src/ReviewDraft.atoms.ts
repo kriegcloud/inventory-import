@@ -102,7 +102,7 @@ const perform = (input: {
     // holds, and the toast says why.
     Send: ({ delta }) =>
       void callWrite((api) => api.imports.decide({ params: { id }, payload: delta })).then(
-        ({ revision }) => happened(DraftEvent.SaveAnswered({ revision })),
+        ({ changed, revision }) => happened(DraftEvent.SaveAnswered({ revision, changed })),
         (error: unknown) => {
           if (isTransient(error)) {
             happened(DraftEvent.SaveFailed())

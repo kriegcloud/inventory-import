@@ -598,17 +598,22 @@ export const ImportStoreD1 = Layer.effect(
       const cleared = A.chunksOf(delta.clear, 5000)
       if (sets.length + cleared.length === 0) {
         const open = yield* run(openRevision({ org, id: draft.id }))
-        return O.map(A.head(open), (row) => row.revision)
+        return O.map(A.head(open), (row) => ({ revision: row.revision, changed: false }))
       }
-      // The revision moves first, and only for a delta that changes something; read right after it, it is the
-      // revision these decisions are saved under. The writes after it change no revision.
-      const [, revision] = yield* batch([
+      // The revision is read, then moved, and only for a delta that changes something; read again right after, it is
+      // the revision these decisions are saved under, and a higher one than before says this save is what moved it.
+      // The writes after it change no revision. One batch: nobody else's save can fall between the two reads.
+      const [before, , after] = yield* batch([
+        openRevision({ org, id: draft.id }),
         bumpRevision({ org, id: draft.id, sets, clears: cleared }),
         openRevision({ org, id: draft.id }),
         ...A.map(sets, (entries) => upsertDecisions({ ...acting(actor), id: draft.id, entries, at })),
         ...A.map(cleared, (rowIds) => clearDecisions({ org, id: draft.id, rowIds }))
       ])
-      return O.map(A.head(revision), (row) => row.revision)
+      return O.map(A.head(after), (row) => ({
+        revision: row.revision,
+        changed: O.exists(A.head(before), (was) => row.revision > was.revision)
+      }))
     }, Effect.orDie)
 
     const ReopenRequest = S.Struct({

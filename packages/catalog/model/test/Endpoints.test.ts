@@ -158,10 +158,13 @@ describe("an import, over the twins", () => {
           const first = yield* imports.decide({ params, payload: { set, clear: [] } }).pipe(as(marcus))
           const second = yield* imports.decide({ params, payload: { set, clear: [] } }).pipe(as(marcus))
           expect(second.revision).toBe(first.revision)
+          // The answer says which save moved the draft: the first did, the same one again did not.
+          expect([first.changed, second.changed]).toEqual([true, false])
           const after = yield* imports.get({ params }).pipe(as(marcus))
           expect(after.progress.ready).toBe(2)
           const cleared = yield* imports.decide({ params, payload: { set: {}, clear: ["row-2"] } }).pipe(as(marcus))
           expect(cleared.revision).toBe(first.revision + 1)
+          expect(cleared.changed).toBe(true)
           // Nothing of it is in the system, so it may be removed, once.
           yield* imports.remove({ params }).pipe(as(marcus))
           const got8 = yield* tag(imports.get({ params }).pipe(as(marcus)))

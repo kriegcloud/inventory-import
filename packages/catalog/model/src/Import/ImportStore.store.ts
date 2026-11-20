@@ -128,6 +128,12 @@ export const tookBack: TookBack = TakenBack.make({})
 /** None of the confirms was in force any more. */
 export const nothingInForce: TookBack = NothingInForce.make({})
 
+/** What a save of decisions did: the draft's revision after it, and whether the save is what moved it. */
+export interface DraftSaved {
+  readonly revision: number
+  readonly changed: boolean
+}
+
 /** The saved draft of a review, and who last decided each row. */
 export type StoredDecisions = {
   readonly decisions: SavedDecisions
@@ -216,11 +222,12 @@ export class ImportStore extends Context.Service<
     /** The saved draft: each row's decision, and who made it. */
     decisions(organizationId: OrganizationId, importId: string): Effect.Effect<StoredDecisions>
     /**
-     * Saves what changed in the draft, row by row, under the member's name, and answers the draft's revision. A
-     * delta that changes nothing (the same save sent again) writes nothing and leaves the revision as it is. None when
-     * the import is no longer open (nothing is saved then).
+     * Saves what changed in the draft, row by row, under the member's name, and answers the draft's revision and
+     * whether this save moved it. A delta that changes nothing (the same save sent again, or rows somebody else
+     * decided the same way) writes nothing, leaves the revision as it is and answers `changed: false`. None when the
+     * import is no longer open (nothing is saved then).
      */
-    decide(actor: Member, draft: Draft, delta: DecisionDelta): Effect.Effect<O.Option<number>>
+    decide(actor: Member, draft: Draft, delta: DecisionDelta): Effect.Effect<O.Option<DraftSaved>>
     /** The columns people chose for fields, as stored with the draft. */
     choices(draft: Draft): Effect.Effect<ReadonlyArray<MappingChoice>>
     /**

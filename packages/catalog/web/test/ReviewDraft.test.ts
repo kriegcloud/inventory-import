@@ -43,7 +43,7 @@ const world = (id: ImportId) => {
   const gets: Array<Deferred.Deferred<ImportView>> = []
   const saves: Array<{
     readonly delta: DecisionDelta
-    readonly answer: Deferred.Deferred<{ readonly revision: number }, Refusal>
+    readonly answer: Deferred.Deferred<{ readonly revision: number; readonly changed: boolean }, Refusal>
   }> = []
   const registry = registryWith({
     imports: {
@@ -53,7 +53,7 @@ const world = (id: ImportId) => {
         return Deferred.await(answer)
       },
       decide: (request: { readonly payload: DecisionDelta }) => {
-        const answer = Deferred.makeUnsafe<{ readonly revision: number }, Refusal>()
+        const answer = Deferred.makeUnsafe<{ readonly revision: number; readonly changed: boolean }, Refusal>()
         saves.push({ delta: request.payload, answer })
         return Deferred.await(answer)
       }
@@ -80,7 +80,9 @@ const world = (id: ImportId) => {
     },
     give: (view: ImportView) => registry.set(importView(id), view),
     answerGet: (n: number, view: ImportView) => Deferred.succeed(gets[n]!, view),
-    answerSave: (n: number, revision: number) => Deferred.succeed(saves[n]!.answer, { revision }),
+    /** The server answers a save: at this revision, and (unless the test says otherwise) as the save that moved it. */
+    answerSave: (n: number, revision: number, changed = true) =>
+      Deferred.succeed(saves[n]!.answer, { revision, changed }),
     refuseSave: (n: number) => Deferred.fail(saves[n]!.answer, { _tag: "AlreadyImported" } as const),
     gets: () => gets.length,
     held: () => registry.get(importView(id)).pipe(AsyncResult.value, O.getOrThrow),

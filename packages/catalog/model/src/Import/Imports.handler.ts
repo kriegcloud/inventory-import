@@ -396,9 +396,9 @@ export const importsEndpoints = Effect.gen(function* () {
     }) {
       const actor = yield* requireRole("editor")
       const draft = yield* find(actor, params.id)
-      const revision = yield* imports.decide(actor, draft, payload)
-      if (O.isNone(revision)) return yield* closed(draft)
-      return { revision: revision.value }
+      const saved = yield* imports.decide(actor, draft, payload)
+      if (O.isNone(saved)) return yield* closed(draft)
+      return saved.value
     }),
     commit: Effect.fn("imports.commit")(function* ({
       params,

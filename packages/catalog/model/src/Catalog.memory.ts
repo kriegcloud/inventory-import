@@ -65,6 +65,7 @@ import {
   confirmWritten,
   type ConfirmWrite,
   type Draft,
+  type DraftSaved,
   ImportStore,
   nothingInForce,
   type TakeBackWrite,
@@ -953,7 +954,7 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
           Effect.map(S.encodeEffect(DecisionJson)(decision), (json) => ({ rowId, json, decision })),
         { concurrency: 1 }
       )
-      return yield* Ref.modify(ref, (state): readonly [O.Option<number>, CatalogState] => {
+      return yield* Ref.modify(ref, (state): readonly [O.Option<DraftSaved>, CatalogState] => {
         const org = actor.organizationId
         const found = A.findFirst(state.drafts, sameDraft(org, draft.id))
         if (O.isNone(found) || found.value.draft.status !== "open") return [O.none(), state]
@@ -980,7 +981,7 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
         )
         const decisions = A.filter([...kept, ...added], (entry) => !A.contains(delta.clear, entry.rowId))
         return [
-          O.some(revision),
+          O.some({ revision, changed: differs || clears }),
           mapDraft(state, org, draft.id, (entry) => ({
             ...entry,
             decisions,

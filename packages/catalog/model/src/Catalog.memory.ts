@@ -62,6 +62,7 @@ import {
   type ChoicesSaved,
   confirmClosed,
   type Confirmed,
+  confirmMoved,
   confirmWritten,
   type ConfirmWrite,
   type Draft,
@@ -282,10 +283,18 @@ const withFields = (item: StoredItem, fields: ItemFields): StoredItem => ({
 
 const alreadyThere = "This SKU is already there. It is skipped, not changed."
 
-const commitStep = (state: CatalogState, write: ConfirmWrite): readonly [Confirmed, CatalogState] => {
+const commitStep = (
+  state: CatalogState,
+  write: ConfirmWrite,
+  /** The confirming person's unsaved decisions, encoded as they are stored. */
+  unsaved: ReadonlyArray<Omit<MemDecision, "author">>
+): readonly [Confirmed, CatalogState] => {
   const audit = write.audit
   const org = audit.organizationId
-  if (!isOpen(state, org, write.draft)) return [confirmClosed, state]
+  const open = A.findFirst(state.drafts, (entry) => sameDraft(org, write.draft)(entry) && entry.draft.status === "open")
+  if (O.isNone(open)) return [confirmClosed, state]
+  // Made on another revision than the draft is at: nothing is written.
+  if (open.value.draft.revision !== write.expected) return [confirmMoved(open.value.draft.revision), state]
   const at = audit.createdAt
   const written = plannedItems(write.plan)
   const ready = A.filter(written, (row) => row.status === "ready")
@@ -451,15 +460,47 @@ const commitStep = (state: CatalogState, write: ConfirmWrite): readonly [Confirm
     write.draft,
     (entry) => ({
       ...entry,
+      // The confirming person's own decisions not saved yet, in the confirm's own write.
+      decisions: withSaved(entry.decisions, { sets: unsaved, clear: write.unsaved.clear, author: audit.actorName }),
       draft: {
         ...entry.draft,
         status: "imported",
+        // One revision on: a confirmed import is never taken for the open one of the same revision.
+        revision: entry.draft.revision + 1,
         importedBy: O.some<string>(audit.actorName),
         importedAt: O.some(at)
       }
     })
   )
   return [confirmWritten, next]
+}
+
+/**
+ * A draft's stored decisions after one person's save: the same decision sent again leaves the row, and who made it,
+ * as it is; a new or changed one is theirs; a cleared row has none.
+ */
+const withSaved = (
+  stored: ReadonlyArray<MemDecision>,
+  save: {
+    readonly sets: ReadonlyArray<Omit<MemDecision, "author">>
+    readonly clear: ReadonlyArray<string>
+    readonly author: string
+  }
+): ReadonlyArray<MemDecision> => {
+  const kept = A.map(stored, (old) =>
+    O.match(
+      A.findFirst(save.sets, (set) => set.rowId === old.rowId),
+      {
+        onNone: () => old,
+        onSome: (set) => (set.json === old.json ? old : { ...set, author: save.author })
+      }
+    )
+  )
+  const added = A.map(
+    A.filter(save.sets, (set) => !A.some(stored, (old) => old.rowId === set.rowId)),
+    (set) => ({ ...set, author: save.author })
+  )
+  return A.filter([...kept, ...added], (entry) => !A.contains(save.clear, entry.rowId))
 }
 
 // -- The take-back, as one step -----------------------------------------------------------------------------------
@@ -965,21 +1006,7 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
         )
         const clears = A.some(stored.decisions, (old) => A.contains(delta.clear, old.rowId))
         const revision = stored.draft.revision + (differs || clears ? 1 : 0)
-        // The same decision sent again leaves the row, and who made it, as it is.
-        const kept = A.map(stored.decisions, (old) =>
-          O.match(
-            A.findFirst(sets, (set) => set.rowId === old.rowId),
-            {
-              onNone: () => old,
-              onSome: (set) => (set.json === old.json ? old : { ...set, author: actor.name as string })
-            }
-          )
-        )
-        const added = A.map(
-          A.filter(sets, (set) => !A.some(stored.decisions, (old) => old.rowId === set.rowId)),
-          (set) => ({ ...set, author: actor.name as string })
-        )
-        const decisions = A.filter([...kept, ...added], (entry) => !A.contains(delta.clear, entry.rowId))
+        const decisions = withSaved(stored.decisions, { sets, clear: delta.clear, author: actor.name })
         return [
           O.some({ revision, changed: differs || clears }),
           mapDraft(state, org, draft.id, (entry) => ({
@@ -1431,8 +1458,14 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
         }
       }),
       commit: Effect.fnUntraced(function* (write: ConfirmWrite) {
-        return yield* Ref.modify(ref, (state) => commitStep(state, write))
-      }),
+        const unsaved = yield* Effect.forEach(
+          R.toEntries(write.unsaved.set),
+          ([rowId, decision]) =>
+            Effect.map(S.encodeEffect(DecisionJson)(decision), (json) => ({ rowId, json, decision })),
+          { concurrency: 1 }
+        )
+        return yield* Ref.modify(ref, (state) => commitStep(state, write, unsaved))
+      }, Effect.orDie),
       takeBack: Effect.fnUntraced(function* (write: TakeBackWrite) {
         return yield* Ref.modify(ref, (state) => takeBackStep(state, write))
       }),

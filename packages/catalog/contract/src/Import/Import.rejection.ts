@@ -27,6 +27,25 @@ export class AlreadyImported extends S.TaggedError<AlreadyImported, { readonly b
 ) {}
 
 /**
+ * The confirm was made on an older draft than the one stored: somebody else decided a row, matched a column or
+ * stored a suggestion since the screen that confirmed last read the import. Nothing was written, not an item and not
+ * a decision: a confirm writes only what its screen showed. `revision` is where the draft is now, so the screen reads
+ * the import again, shows what changed with its new totals, and the person confirms again.
+ */
+export class DraftMoved extends S.TaggedError<DraftMoved, { readonly brand: unique symbol }>()(
+  "DraftMoved",
+  {
+    reason: reasonForPerson,
+    revision: S.Int.annotateKey({ description: "The draft's revision now: later than the one the confirm named" })
+  },
+  {
+    description:
+      "The confirm named an older revision of the draft than the one stored: somebody changed the import since this screen read it. Nothing was written",
+    httpApiStatus: 409
+  }
+) {}
+
+/**
  * The import cannot be removed because it has already created items: it is confirmed, or it was confirmed once and
  * opened again to finish the rows it left out. Its items, its row-by-row result and the item of who decided each
  * changed value all point at it, so it stays. Only a file nobody has confirmed yet can be removed.

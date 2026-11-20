@@ -26,7 +26,9 @@ layer(TypedApp)("a take-back after two confirms", (it) => {
       const table = yield* stage(new File([messy], "items_messy.csv"))
       const staged = yield* upload({ client, table }).pipe(marcus)
       const params = { id: staged.id }
-      const first = yield* client.imports.commit({ params, payload: { set: {}, clear: [] } }).pipe(marcus)
+      const first = yield* client.imports
+        .commit({ params, payload: { revision: staged.revision, set: {}, clear: [] } })
+        .pipe(marcus)
       expect(O.getOrUndefined(first.result)?.created).toBe(155)
       // Listed among the past imports at once, its items counted from what is stored.
       const listed = yield* client.imports.past().pipe(marcus)
@@ -34,9 +36,16 @@ layer(TypedApp)("a take-back after two confirms", (it) => {
         [staged.id, "imported", 155, 45]
       ])
       // Opened again, one answer given (the decimal comma on row 55), confirmed again: one more item.
-      yield* client.imports.reopen({ params }).pipe(marcus)
+      const reopened = yield* client.imports.reopen({ params }).pipe(marcus)
       const second = yield* client.imports
-        .commit({ params, payload: { set: { "row-55": decisionFromFlags({ accepted: ["unitCost"] }) }, clear: [] } })
+        .commit({
+          params,
+          payload: {
+            revision: reopened.revision,
+            set: { "row-55": decisionFromFlags({ accepted: ["unitCost"] }) },
+            clear: []
+          }
+        })
         .pipe(marcus)
       expect([second.takeBack.confirms.length, second.takeBack.removable]).toEqual([2, 156])
       expect((yield* client.items.list().pipe(marcus)).length).toBe(156)
@@ -78,7 +87,9 @@ const replaceRow2 = Effect.fn("test.replaceRow2")(function* () {
   const client = yield* HttpApiTest.groups(Api, ["imports", "items", "activity"])
   const marcus = as("mem_marcus")
   const first = yield* upload({ client, table: yield* stage(new File([clean], "items_clean.csv")) }).pipe(marcus)
-  yield* client.imports.commit({ params: { id: first.id }, payload: { set: {}, clear: [] } }).pipe(marcus)
+  yield* client.imports
+    .commit({ params: { id: first.id }, payload: { revision: first.revision, set: {}, clear: [] } })
+    .pipe(marcus)
   const copy = Str.replace(
     "SHH-9574,Oak Foam Insert,Oak foam insert for general use.,packaging,EA,12.33,",
     "SHH-9574,Oak Foam Insert XL,Oak foam insert for general use.,packaging,EA,14.10,"
@@ -88,7 +99,11 @@ const replaceRow2 = Effect.fn("test.replaceRow2")(function* () {
   const replaced = yield* client.imports
     .commit({
       params: { id: second.id },
-      payload: { set: { "row-2": decisionFromFlags({ stored: "replace" }) }, clear: [] }
+      payload: {
+        revision: second.revision,
+        set: { "row-2": decisionFromFlags({ stored: "replace" }) },
+        clear: []
+      }
     })
     .pipe(marcus)
   expect([O.getOrUndefined(replaced.result)?.updated, O.getOrUndefined(replaced.result)?.created]).toEqual([1, 0])

@@ -382,6 +382,12 @@ step (`packages/catalog/web/src/ResultStep.screen.tsx`) says what it will do and
 - **Each Confirm is a recorded batch.** One `importBatch` row per Confirm; each record it creates names it
   (`batchId`) and starts at `revision` 1. Records, outcomes, changes, the audit line and the import's status are one
   atomic batch, and every statement checks that the import is still open, so a second Confirm writes nothing.
+- **A Confirm names the draft it was made on.** Its payload is the revision of the draft the screen shows and the
+  person's own decisions not saved yet (`ConfirmRequest`), never the screen's whole picture. The batch's first
+  statement writes the confirm's row only while the import is open at that revision, and everything after it,
+  the unsaved decisions included, checks for that row: on a draft somebody has changed since, nothing is written and
+  the answer is `DraftMoved` (409) with the revision the draft is at. The screen then reads the import again, says
+  what changed above the review, and the person confirms again (`Draft.machine.ts`, `ConfirmPressed`).
 - **A change to a record moves its revision** (`Records.edit`, made on the revision the person saw; the same edit
   again writes nothing). Changed is "saved since", even if the person changed it back: the revision says a person
   touched it.

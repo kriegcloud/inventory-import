@@ -6,7 +6,7 @@ import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint"
 import * as HttpApiGroup from "effect/http-api/HttpApiGroup"
 import * as HttpApiSchema from "effect/http-api/HttpApiSchema"
 import * as OpenApi from "effect/http-api/OpenApi"
-import { DecisionDelta } from "./Import/Decision.command.ts"
+import { ConfirmRequest, DecisionDelta } from "./Import/Decision.command.ts"
 import { reasonForPerson } from "./internal/Described.ts"
 import { StagingOutcome } from "./Staging/FileProblem.read.ts"
 import { ConfirmId, ImportId, ItemId } from "./Catalog.id.ts"
@@ -14,6 +14,7 @@ import { ChangeRecord, ImportView, OpenImports, PastImports, SuggestOutcome } fr
 import {
   AlreadyImported,
   ColumnNotFound,
+  DraftMoved,
   ImportKept,
   ImportNotFound,
   UploadNotFound
@@ -180,14 +181,14 @@ export class ImportsApi extends HttpApiGroup.make("imports")
       ),
     HttpApiEndpoint.post("commit", "/:id/commit", {
       params: importId,
-      payload: DecisionDelta,
+      payload: ConfirmRequest,
       success: ImportView,
-      error: [Forbidden, ImportNotFound, AlreadyImported]
+      error: [Forbidden, ImportNotFound, AlreadyImported, DraftMoved]
     })
       .annotate(OpenApi.Summary, "Confirm: write the items the review says are ready")
       .annotate(
         OpenApi.Description,
-        "The confirm carries only the decisions not saved yet; the rows never travel. The server applies the saved draft to the staged file with the same review the screen ran and writes what that says is ready. A confirm of an import already confirmed is refused with 409 instead of running again. Needs the editor role."
+        "The confirm names the revision of the draft its screen shows and carries only that screen's own decisions not saved yet; the rows never travel. The server applies the saved draft and those decisions to the staged file with the same review the screen ran and writes what that says is ready, in one write with the decisions themselves and the close of the import, and only while the stored draft is still at the revision named. If the draft has moved on (somebody else decided a row, matched a column or stored a suggestion), nothing is written and the answer is 409 `DraftMoved` with the draft's revision now: read the import again, show what changed, and confirm again. Two confirms can never both pass, and a confirm never writes a decision its screen did not show. A confirm of an import already confirmed is refused with 409 `AlreadyImported` instead of running again. The answer is the import as it now is, one revision on. Needs the editor role."
       ),
     HttpApiEndpoint.post("takeBack", "/:id/take-back", {
       params: importId,

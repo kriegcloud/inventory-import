@@ -59,7 +59,7 @@ layer(TypedApp)("an import of items", (it) => {
         const savedAgain = yield* client.imports.decide(decisions).pipe(marcus)
         expect(savedAgain).toEqual({ revision: saved.revision, changed: false })
         const confirmed = yield* client.imports
-          .commit({ params: { id: staged.id }, payload: { set: {}, clear: [] } })
+          .commit({ params: { id: staged.id }, payload: { revision: saved.revision, set: {}, clear: [] } })
           .pipe(marcus)
         const result = O.getOrThrow(confirmed.result)
         expect([result.created, result.updated, result.already, result.notImported]).toEqual([155, 0, 0, 45])
@@ -127,7 +127,7 @@ layer(TypedApp)("an import of items", (it) => {
         const again = yield* upload({ client, table }).pipe(marcus)
         expect(again.progress).toMatchObject({ ready: 1, needs: 45 })
         const second = yield* client.imports
-          .commit({ params: { id: again.id }, payload: { set: {}, clear: [] } })
+          .commit({ params: { id: again.id }, payload: { revision: again.revision, set: {}, clear: [] } })
           .pipe(marcus)
         expect([
           O.getOrUndefined(second.result)?.created,
@@ -141,13 +141,19 @@ layer(TypedApp)("an import of items", (it) => {
           new File([Str.replace("Oak Foam Insert,", "Oak Foam Insert XL,")(clean)], "items_clean.csv")
         )
         const first = yield* upload({ client, table: yield* stage(new File([clean], "items_clean.csv")) }).pipe(marcus)
-        yield* client.imports.commit({ params: { id: first.id }, payload: { set: {}, clear: [] } }).pipe(marcus)
+        yield* client.imports
+          .commit({ params: { id: first.id }, payload: { revision: first.revision, set: {}, clear: [] } })
+          .pipe(marcus)
         const third = yield* upload({ client, table: changed }).pipe(marcus)
         expect([third.progress.decision, third.storedItems.length]).toEqual([1, 25])
         const replaced = yield* client.imports
           .commit({
             params: { id: third.id },
-            payload: { set: { "row-2": decisionFromFlags({ stored: "replace" }) }, clear: [] }
+            payload: {
+              revision: third.revision,
+              set: { "row-2": decisionFromFlags({ stored: "replace" }) },
+              clear: []
+            }
           })
           .pipe(marcus)
         expect([

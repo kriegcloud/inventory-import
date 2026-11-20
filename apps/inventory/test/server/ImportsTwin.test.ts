@@ -45,7 +45,7 @@ layer(inMemoryHandlers({ member: marcus, ai: OpenRouterTest.off("noKey", ModelId
           rows: 200
         })
         const params = { id: staged.id }
-        yield* client.imports.decide({
+        const saved = yield* client.imports.decide({
           params,
           payload: {
             set: {
@@ -55,7 +55,10 @@ layer(inMemoryHandlers({ member: marcus, ai: OpenRouterTest.off("noKey", ModelId
             clear: []
           }
         })
-        const confirmed = yield* client.imports.commit({ params, payload: { set: {}, clear: [] } })
+        const confirmed = yield* client.imports.commit({
+          params,
+          payload: { revision: saved.revision, set: {}, clear: [] }
+        })
         const result = O.getOrThrow(confirmed.result)
         expect([result.created, result.updated, result.already, result.notImported]).toEqual([155, 0, 0, 45])
         expect(result.fixed).toEqual({ rows: 16, cells: 19 })
@@ -96,7 +99,10 @@ layer(inMemoryHandlers({ member: marcus, ai: OpenRouterTest.off("noKey", ModelId
         // The same file again: 154 already there, row 55 waits with its proposal, row 18 is the one new item.
         const again = yield* upload({ client, table })
         expect(again.progress).toMatchObject({ ready: 1, needs: 45 })
-        const second = yield* client.imports.commit({ params: { id: again.id }, payload: { set: {}, clear: [] } })
+        const second = yield* client.imports.commit({
+          params: { id: again.id },
+          payload: { revision: again.revision, set: {}, clear: [] }
+        })
         const secondResult = O.getOrThrow(second.result)
         expect([secondResult.created, secondResult.already, secondResult.notImported]).toEqual([1, 154, 45])
 

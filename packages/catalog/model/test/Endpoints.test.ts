@@ -15,6 +15,7 @@ import * as BigDecimal from "effect/BigDecimal"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as O from "effect/Option"
+import * as R from "effect/Record"
 import * as Ref from "effect/Ref"
 import * as Result from "effect/Result"
 import * as Str from "effect/String"
@@ -54,8 +55,8 @@ describe("an import, over the twins", () => {
           const imports = yield* importsEndpoints
           const items = yield* itemsEndpoints
           const open = yield* imports.open().pipe(as(marcus))
-          const id = O.getOrThrow(A.head(open.views)).id
-          const confirmed = yield* imports.commit({ params: { id }, payload: none }).pipe(as(marcus))
+          const { id, revision } = O.getOrThrow(A.head(open.views))
+          const confirmed = yield* imports.commit({ params: { id }, payload: { ...none, revision } }).pipe(as(marcus))
           const result = O.getOrThrow(confirmed.result)
           expect([confirmed.status, result.created, result.updated, result.already, result.notImported]).toEqual([
             "imported",
@@ -75,7 +76,7 @@ describe("an import, over the twins", () => {
           // Another organization sees none of them.
           const got12 = yield* items.list().pipe(as(elena))
           expect(got12.length).toBe(0)
-          const again = yield* tag(imports.commit({ params: { id }, payload: none }).pipe(as(marcus)))
+          const again = yield* tag(imports.commit({ params: { id }, payload: { ...none, revision } }).pipe(as(marcus)))
           expect(again).toBe("AlreadyImported")
           const got13 = yield* items.list().pipe(as(marcus))
           expect(got13.length).toBe(3)
@@ -171,6 +172,57 @@ describe("an import, over the twins", () => {
           expect(got8).toBe("ImportNotFound")
           const got4 = yield* said("Removed an import")
           expect(got4).toEqual(["Marcus Oyelaran: Removed an import: five.csv: 5 rows, nothing had been imported"])
+        })
+    )
+
+    it.effect(
+      "a confirm made on an older picture is DraftMoved and writes nothing; on the newer one it writes, unsent rows too",
+      () =>
+        Effect.gen(function* () {
+          const imports = yield* importsEndpoints
+          const items = yield* itemsEndpoints
+          const view = yield* stage(tableOf({ fileName: "five.csv", lines: fiveLines })).pipe(as(marcus))
+          const params = { id: view.id }
+          // Dana leaves row 2 out; Marcus's screen has not shown it.
+          const theirs = yield* imports
+            .decide({ params, payload: { set: { "row-2": decisionFromFlags({ out: true }) }, clear: [] } })
+            .pipe(as(dana))
+          const mine = { "row-3": decisionFromFlags({ out: true }) }
+          const refused = yield* Effect.flip(
+            imports
+              .commit({ params, payload: { revision: view.revision, set: mine, clear: ["row-2"] } })
+              .pipe(as(marcus))
+          )
+          expect([refused._tag, refused._tag === "DraftMoved" ? refused.revision : -1]).toEqual([
+            "DraftMoved",
+            theirs.revision
+          ])
+          // Nothing was written: no item, her decision still there, his not, and no line in the audit trail.
+          const got1 = yield* items.list().pipe(as(marcus))
+          expect(got1.length).toBe(0)
+          const still = yield* imports.get({ params }).pipe(as(marcus))
+          expect([still.status, still.revision, R.keys(still.decisions)]).toEqual(["open", theirs.revision, ["row-2"]])
+          const got2 = yield* said("Imported items")
+          expect(got2).toEqual([])
+          // On the picture he has now, the confirm writes: one ready row is left, hers and his are left out, and each
+          // is said under the name of who left it out.
+          const confirmed = yield* imports
+            .commit({ params, payload: { revision: still.revision, set: mine, clear: [] } })
+            .pipe(as(marcus))
+          const result = O.getOrThrow(confirmed.result)
+          expect([confirmed.status, confirmed.revision, result.created, result.notImported]).toEqual([
+            "imported",
+            still.revision + 1,
+            1,
+            4
+          ])
+          const leftOutBy = (n: number) =>
+            O.flatMap(
+              A.findFirst(result.rows, (row) => row.rowNumber === n),
+              (row) =>
+                row.outcome === "notImported" && row.decidedBy.kind === "person" ? O.some(row.decidedBy.name) : O.none()
+            )
+          expect([leftOutBy(2), leftOutBy(3)]).toEqual([O.some("Dana Whitfield"), O.some("Marcus Oyelaran")])
         })
     )
   })

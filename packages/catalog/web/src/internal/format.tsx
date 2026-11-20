@@ -26,6 +26,21 @@ export const importWords = {
  */
 export const reviewStepWords: Partial<ReviewWords> = { stored: importWords.already, all: importWords.all }
 
+/**
+ * What the Review step says when a confirm was not made because the import had changed on another screen: `rows` is
+ * how many rows were decided there (none where a column was matched or a suggestion stored).
+ *
+ * @example heldBackSentence(1) // "1 row was decided on another screen while you were reviewing. …"
+ */
+export const heldBackSentence = (rows: number): string =>
+  `${
+    rows === 0
+      ? "This import was changed on another screen while you were reviewing."
+      : rows === 1
+        ? "1 row was decided on another screen while you were reviewing."
+        : `${rows} rows were decided on another screen while you were reviewing.`
+  } The review and its totals below show the import as it is now. Check them, then import again.`
+
 const outcomeTone = {
   created: "success",
   updated: "success",

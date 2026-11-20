@@ -45,6 +45,18 @@ export class ConfirmWrite extends S.Opaque<ConfirmWrite, { readonly brand: uniqu
     draft: ImportId,
     fileName: S.String.pipe(S.annotateKey({ description: "The import's file, for the audit line" })),
     confirm: ConfirmId,
+    expected: S.Int.pipe(
+      S.annotateKey({
+        description:
+          "The draft's revision the plan was worked out from: the confirm is written only while the draft is still at it"
+      })
+    ),
+    unsaved: DecisionDelta.pipe(
+      S.annotateKey({
+        description:
+          "The confirming person's own decisions not saved yet, already in the plan: saved under their name in the same write"
+      })
+    ),
     plan: ConfirmPlan,
     itemIds: S.Array(ItemId).pipe(
       S.annotateKey({ description: "One id per row the plan creates, in the plan's order, made by the handler" })
@@ -56,9 +68,10 @@ export class ConfirmWrite extends S.Opaque<ConfirmWrite, { readonly brand: uniqu
 ) {}
 
 /** What a confirm's write did. */
-export const ConfirmedKind = LiteralKit(["confirmed", "closed"]).annotate({
+export const ConfirmedKind = LiteralKit(["confirmed", "closed", "moved"]).annotate({
   identifier: "ConfirmedKind",
-  description: "The confirm was written, or the import was no longer open and nothing was"
+  description:
+    "The confirm was written; or nothing was, because the import was no longer open, or because its draft had moved on from the revision the confirm was made on"
 })
 class ConfirmWritten extends S.Opaque<ConfirmWritten, { readonly brand: unique symbol }>()(
   S.Struct({ kind: S.tag("confirmed") }).annotate({
@@ -72,8 +85,17 @@ class ConfirmClosed extends S.Opaque<ConfirmClosed, { readonly brand: unique sym
     description: "Another confirm won, or the import was not open: nothing was written"
   })
 ) {}
+class ConfirmMoved extends S.Opaque<ConfirmMoved, { readonly brand: unique symbol }>()(
+  S.Struct({
+    kind: S.tag("moved"),
+    revision: S.Int.pipe(S.annotateKey({ description: "The draft's revision now" }))
+  }).annotate({
+    identifier: "ConfirmMoved",
+    description: "The draft is open at another revision than the confirm was made on: nothing was written"
+  })
+) {}
 /** Whether a confirm's write was the one that confirmed the import. */
-export const Confirmed = ConfirmedKind.mapMembers(() => Tuple.make(ConfirmWritten, ConfirmClosed)).pipe(
+export const Confirmed = ConfirmedKind.mapMembers(() => Tuple.make(ConfirmWritten, ConfirmClosed, ConfirmMoved)).pipe(
   S.toTaggedUnion("kind"),
   S.annotate({ identifier: "Confirmed", description: "Whether a confirm's write confirmed the import" })
 )
@@ -83,6 +105,8 @@ export type Confirmed = typeof Confirmed.Type
 export const confirmWritten: Confirmed = ConfirmWritten.make({})
 /** The import was no longer open: nothing was written. */
 export const confirmClosed: Confirmed = ConfirmClosed.make({})
+/** The draft had moved on to `revision`: nothing was written. */
+export const confirmMoved = (revision: number): Confirmed => ConfirmMoved.make({ revision })
 
 /** One take-back, as it is written: the confirms it reverses and its audit line, in one atomic batch. */
 export class TakeBackWrite extends S.Opaque<TakeBackWrite, { readonly brand: unique symbol }>()(
@@ -273,9 +297,10 @@ export class ImportStore extends Context.Service<
       importId: string
     ): Effect.Effect<{ readonly rows: number; readonly cells: number }>
     /**
-     * Writes a confirm: its new items, the stored items it replaces (each with a kept copy), every row's outcome,
-     * the changed values and the audit line, in one atomic batch. `closed` when the import was no longer open, in
-     * which case nothing was written.
+     * Writes a confirm: the confirming person's unsaved decisions, the close of the import (one revision on), its new
+     * items, the stored items it replaces (each with a kept copy), every row's outcome, the changed values and the
+     * audit line, in one atomic batch, and only while the draft is open at `expected`. `closed` when the import was
+     * no longer open, `moved` when its draft is at another revision: in both nothing was written.
      */
     commit(write: ConfirmWrite): Effect.Effect<Confirmed>
     /**

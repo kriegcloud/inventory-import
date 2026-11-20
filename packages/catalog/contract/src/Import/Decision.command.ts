@@ -296,3 +296,26 @@ export const DecisionDelta = S.Struct({
 })
 /** The decoded value of `DecisionDelta`: what changed in the draft since the last save. */
 export type DecisionDelta = typeof DecisionDelta.Type
+
+/**
+ * What a confirm sends: the revision of the draft its screen shows, and the person's own decisions that screen
+ * holds and the server has not been sent yet. Never anybody else's decision, and never one the screen did not show.
+ */
+export const ConfirmRequest = S.Struct({
+  revision: S.Int.annotate({
+    description:
+      "The draft's revision as the confirming screen last read it (`ImportView.revision`, or the `revision` a save of this screen's answered with `changed: true`)",
+    examples: [12]
+  }).annotateKey({
+    description:
+      "The revision of the draft the screen shows. The confirm is written only while the stored draft is still at this revision",
+    messageMissingKey: "Send `revision`: the import's revision as this screen last read it."
+  }),
+  ...DecisionDelta.fields
+}).annotate({
+  identifier: "ConfirmRequest",
+  description:
+    "A confirm: the draft's revision as the screen shows it, and the decisions made on that screen that are not saved yet (new or different in `set`, taken back in `clear`)"
+})
+/** The decoded value of `ConfirmRequest`. */
+export type ConfirmRequest = typeof ConfirmRequest.Type

@@ -6,7 +6,7 @@ import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as Result from "effect/Result"
-import { ConfirmWrite, ImportStore, Draft, TakeBackWrite } from "./ImportStore.store.ts"
+import { ConfirmWrite, ImportStore, Draft, type StoredDecisions, TakeBackWrite } from "./ImportStore.store.ts"
 import { SuggestionStore } from "../Suggestion/SuggestionStore.store.ts"
 import { suggest } from "../Suggestion/Suggestions.handler.ts"
 import { confirmPlan, plannedItems } from "../Confirm/Confirm.rules.ts"
@@ -21,7 +21,7 @@ import { ItemsOfRow } from "../Review/ItemsOfRow.context.ts"
 import { Member } from "@inventory/kernel/Member"
 import { StagedTable, StagedHead, Field, fieldLabels } from "@inventory/catalog-contract/Staged"
 import { MappingChoice } from "@inventory/catalog-contract/Mapping"
-import { SavedDecisions, rowId, DecisionDelta } from "@inventory/catalog-contract/Decision"
+import { SavedDecisions, rowId, DecisionDelta, ConfirmRequest, RowDecision } from "@inventory/catalog-contract/Decision"
 import {
   review,
   carryDecisions,
@@ -36,6 +36,7 @@ import {
   ImportNotFound,
   UploadNotFound,
   AlreadyImported,
+  DraftMoved,
   ImportKept,
   ColumnNotFound
 } from "@inventory/catalog-contract/ImportRejection"
@@ -46,6 +47,25 @@ import { fileProblem } from "@inventory/catalog-contract/FileProblem"
 import { ImportId, ConfirmId } from "@inventory/catalog-contract/Ids"
 import * as S from "effect/Schema"
 import { stagingProblem } from "../Staging/Staging.rules.ts"
+
+/**
+ * A draft's stored decisions with one person's unsaved ones laid over them, as the confirm will store them: a row
+ * they set is theirs unless it says what is stored already, and a row they cleared has no decision.
+ */
+const withUnsaved = (
+  stored: StoredDecisions,
+  unsaved: { readonly delta: DecisionDelta; readonly author: string }
+): StoredDecisions => {
+  const same = S.toEquivalence(RowDecision)
+  const changed = R.filter(unsaved.delta.set, (decision, id) =>
+    O.match(R.get(stored.decisions, id), { onNone: () => true, onSome: (old) => !same(old, decision) })
+  )
+  const cleared = (_: unknown, id: string): boolean => !A.contains(unsaved.delta.clear, id)
+  return {
+    decisions: R.filter({ ...stored.decisions, ...unsaved.delta.set }, cleared),
+    authors: R.filter({ ...stored.authors, ...R.map(changed, () => unsaved.author) }, cleared)
+  }
+}
 
 /**
  * What each endpoint of the imports group does: staging, reading and confirming an import. The ports are resolved once,
@@ -100,10 +120,18 @@ export const importsEndpoints = Effect.gen(function* () {
   // The one place a review is worked out on the server, so the commit applies decisions exactly as the screen did.
   // The stored draft is normalised first: a lossless fix the person did not take is held back, whatever was saved.
   // `known` is the staged table when the caller already holds it (an upload that just finished), saving a read.
-  const reviewOf = Effect.fn("imports.reviewOf")(function* (actor: Member, draft: Draft, known?: StagedTable) {
+  // `unsaved` is the confirming person's own decisions not saved yet: the review is worked out with them laid over
+  // what is stored, under their name, as the confirm will store them.
+  const reviewOf = Effect.fn("imports.reviewOf")(function* (
+    actor: Member,
+    draft: Draft,
+    known?: StagedTable,
+    unsaved?: DecisionDelta
+  ) {
     const table = known ?? (yield* imports.table(actor.organizationId, draft))
     const choices = yield* imports.choices(draft)
-    const stored = yield* imports.decisions(actor.organizationId, draft.id)
+    const held = yield* imports.decisions(actor.organizationId, draft.id)
+    const stored = unsaved === undefined ? held : withUnsaved(held, { delta: unsaved, author: actor.name })
     const storedItems = yield* storedFor(actor, table, choices, stored.decisions)
     const created = yield* imports.createdRows(actor.organizationId, draft.id)
     const createdIds = A.map(created, rowId)
@@ -218,6 +246,13 @@ export const importsEndpoints = Effect.gen(function* () {
 
   const closed = (draft: Draft) =>
     AlreadyImported.make({ reason: `${draft.fileName} was already imported. Nothing was written a second time.` })
+
+  const moved = (revision: number) =>
+    DraftMoved.make({
+      reason:
+        "Someone else changed this import while you were reviewing it. Nothing was imported: look at what changed, then confirm again.",
+      revision
+    })
 
   const kept = (draft: Draft) =>
     ImportKept.make({
@@ -405,17 +440,18 @@ export const importsEndpoints = Effect.gen(function* () {
       payload
     }: {
       readonly params: { readonly id: ImportId }
-      readonly payload: DecisionDelta
+      readonly payload: ConfirmRequest
     }) {
       const actor = yield* requireRole("editor")
       const draft = yield* find(actor, params.id)
       if (draft.status !== "open") return yield* closed(draft)
-      // Decisions made a moment before the confirm, not saved yet, are saved first.
-      if (R.keys(payload.set).length > 0 || payload.clear.length > 0) {
-        const saved = yield* imports.decide(actor, draft, payload)
-        if (O.isNone(saved)) return yield* closed(draft)
-      }
-      const { current, authors } = yield* reviewOf(actor, draft)
+      // Somebody has changed the draft since the picture this confirm was made on: nothing is written, and the
+      // person is shown the newer picture before they confirm. The store checks the same again inside its write.
+      if (draft.revision !== payload.revision) return yield* moved(draft.revision)
+      // Decisions made a moment before the confirm, not saved yet, are the person's own: the review counts them, and
+      // the store saves them in the confirm's own write.
+      const unsaved: DecisionDelta = { set: payload.set, clear: payload.clear }
+      const { current, authors } = yield* reviewOf(actor, draft, undefined, unsaved)
       const plan = confirmPlan({ draft: draft.id, review: current, authors, actor })
       // The ids of the confirm and of each item it creates are made here, so the store only writes.
       const confirm = yield* random.uuidV4()
@@ -432,10 +468,13 @@ export const importsEndpoints = Effect.gen(function* () {
           confirm: ConfirmIdSchema.make(confirm),
           plan,
           itemIds,
-          audit
+          audit,
+          expected: payload.revision,
+          unsaved
         })
       )
       if (done.kind === "closed") return yield* closed(draft)
+      if (done.kind === "moved") return yield* moved(done.revision)
       const after = yield* find(actor, draft.id)
       return yield* viewOf(actor, after)
     }),

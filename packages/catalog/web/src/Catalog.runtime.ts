@@ -58,6 +58,12 @@ const binding = (): CatalogBinding => {
  */
 export const callWrite: Call<CatalogApiClient> = (use) => binding().callWrite(use)
 
+/**
+ * Runs one request as a Promise, sent once whatever its answer: the confirm of an import, whose outcome only the
+ * server knows, so a lost answer is asked about and never sent again.
+ */
+export const call: Call<CatalogApiClient> = (use) => binding().call(use)
+
 /** Runs a longer program against the API in the background; interrupting its fiber aborts its requests. */
 export const fork: Fork<CatalogApiClient> = (use) => binding().fork(use)
 

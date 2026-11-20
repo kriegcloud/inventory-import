@@ -43,6 +43,7 @@ import {
   ConfirmWrite,
   confirmWritten,
   confirmClosed,
+  confirmMoved,
   TakeBackWrite,
   tookBack,
   nothingInForce
@@ -872,15 +873,18 @@ export const ImportStoreD1 = Layer.effect(
     // -- The confirm ---------------------------------------------------------------------------------------
 
     const CommitScope = S.Struct({ ...Acting, id: S.String, batch: S.String, at: S.String })
-    // The confirm's own row is written first and only while the import is open; the import is closed next. Every
-    // statement after them checks that this confirm's row exists, so a second confirm (a double click, a retry,
-    // another tab) finds the import closed, writes no row of its own, and so writes nothing at all.
+    // The confirm's own row is written first, and only while the import is open at the revision the confirm was
+    // made on; the import is closed next. Every statement after them checks that this confirm's row exists, so a
+    // second confirm (a double click, a retry, another tab) finds the import closed, and a confirm made on a draft
+    // somebody has changed since finds another revision: either writes no row of its own, and so nothing at all.
     const insertBatch = D1.statement({
-      Request: CommitScope,
+      Request: S.Struct({ ...CommitScope.fields, expected: S.Int }),
       Result: Ids,
       execute: (r) => sql`INSERT INTO importBatch (id, organizationId, importId, confirmedById, confirmedByName,
           confirmedAt)
-        SELECT ${r.batch}, ${r.org}, ${r.id}, ${r.actor}, ${r.name}, ${r.at} WHERE ${stillOpen(r.org, r.id)}
+        SELECT ${r.batch}, ${r.org}, ${r.id}, ${r.actor}, ${r.name}, ${r.at}
+        WHERE EXISTS (SELECT 1 FROM importDraft WHERE organizationId = ${r.org} AND id = ${r.id}
+          AND status = 'open' AND revision = ${r.expected})
         RETURNING id`
     })
     const thisConfirm = (org: string, batchId: string) =>
@@ -888,9 +892,31 @@ export const ImportStoreD1 = Layer.effect(
     const closeDraft = D1.statement({
       Request: CommitScope,
       Result: Ids,
-      execute: (r) => sql`UPDATE importDraft SET status = 'imported', importedBy = ${r.name}, importedAt = ${r.at}
+      // One revision on: a confirmed import is never taken for the open one of the same revision.
+      execute: (r) => sql`UPDATE importDraft SET status = 'imported', revision = revision + 1,
+          importedBy = ${r.name}, importedAt = ${r.at}
         WHERE organizationId = ${r.org} AND id = ${r.id} AND status = 'open' AND ${thisConfirm(r.org, r.batch)}
         RETURNING id`
+    })
+    // The confirming person's own decisions not saved yet, under their name, in the confirm's own write: after the
+    // confirm's row, so only the confirm that won writes them, and before the close.
+    const saveAtConfirm = D1.statement({
+      Request: S.Struct({ ...CommitScope.fields, entries: DecisionEntries }),
+      Result: NoRows,
+      execute: (r) => sql`INSERT INTO importDecision (importId, organizationId, rowId, decisionJson, decidedById,
+          decidedByName, updatedAt)
+        SELECT ${r.id}, ${r.org}, json_extract(value, '$.rowId'), json_extract(value, '$.json'), ${r.actor}, ${r.name},
+          ${r.at}
+        FROM json_each(${r.entries}) WHERE ${thisConfirm(r.org, r.batch)}
+        ON CONFLICT (organizationId, importId, rowId) DO UPDATE SET decisionJson = excluded.decisionJson,
+          decidedById = excluded.decidedById, decidedByName = excluded.decidedByName, updatedAt = excluded.updatedAt
+        WHERE importDecision.decisionJson IS NOT excluded.decisionJson`
+    })
+    const clearAtConfirm = D1.statement({
+      Request: S.Struct({ ...CommitScope.fields, rowIds: IdList }),
+      Result: NoRows,
+      execute: (r) => sql`DELETE FROM importDecision WHERE organizationId = ${r.org} AND importId = ${r.id}
+        AND rowId IN (SELECT value FROM json_each(${r.rowIds})) AND ${thisConfirm(r.org, r.batch)}`
     })
     // One statement per 500 rows, the rows as one JSON value read with json_each: a handful of bound values a
     // statement however many rows it writes. A stored code is left as it is (ON CONFLICT DO NOTHING).
@@ -1088,8 +1114,15 @@ export const ImportStoreD1 = Layer.effect(
         ),
         (change) => change.from.length + change.to.length + (change.basis ?? "").length + change.sku.length
       )
+      const sets = A.chunksOf(
+        A.map(R.toEntries(write.unsaved.set), ([rowId, json]) => ({ rowId, json })),
+        2000
+      )
+      const cleared = A.chunksOf(write.unsaved.clear, 5000)
       const [confirmed] = yield* batch([
-        insertBatch(scope),
+        insertBatch({ ...scope, expected: write.expected }),
+        ...A.map(sets, (entries) => saveAtConfirm({ ...scope, entries })),
+        ...A.map(cleared, (rowIds) => clearAtConfirm({ ...scope, rowIds })),
         closeDraft(scope),
         ...A.map(items, (chunk) => insertItems({ ...scope, items: chunk })),
         ...A.map(replacements, (chunk) => keepReplaced({ ...scope, items: chunk })),
@@ -1100,7 +1133,10 @@ export const ImportStoreD1 = Layer.effect(
         importedLine({ ...scope, activity: audit.id, fileName: write.fileName })
       ])
       // The first statement returns the confirm's id only when this batch was the one that confirmed the import.
-      return confirmed.length > 0 ? confirmWritten : confirmClosed
+      if (confirmed.length > 0) return confirmWritten
+      // Nothing was written. Still open means the draft is at another revision than the confirm was made on.
+      const open = yield* run(openRevision({ org: audit.org, id: write.draft }))
+      return O.match(A.head(open), { onNone: () => confirmClosed, onSome: (row) => confirmMoved(row.revision) })
     }, Effect.orDie)
 
     // -- Taking a confirm back -----------------------------------------------------------------------------

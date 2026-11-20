@@ -1,7 +1,8 @@
 // The review's draft against a server and a network that answer in any order: the person decides, somebody else
 // saves, a save is taken by the server and answered late, fails or is refused, reads and other answers arrive out of
 // turn, the person leaves the Review step and comes back. Each rule here is one where a wrong result loses a decision
-// without a word: the person's own, or one somebody else made on the same import.
+// without a word: the person's own, or one somebody else made on the same import. And the person confirms: a confirm
+// the server makes writes exactly the decisions the screen showed when it was sent, never one it had not shown.
 import { describe, expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Eq from "effect/Equal"
@@ -11,7 +12,7 @@ import * as S from "effect/Schema"
 import { type DecisionDelta, decisionFromFlags, type SavedDecisions } from "@inventory/catalog-contract/Decision"
 import {
   type Draft,
-  type DraftEffect,
+  DraftEffect,
   DraftEvent,
   emptyDraft,
   over,
@@ -44,7 +45,11 @@ const Command = S.Union([
   tagged("OtherAnswerSent"),
   tagged("OtherAnswerArrives"),
   tagged("Leave"),
-  tagged("ComeBack")
+  tagged("ComeBack"),
+  tagged("PressConfirm"),
+  tagged("ServerTakesConfirm"),
+  tagged("ConfirmAnswers"),
+  tagged("ConfirmFails")
 ])
 type Command = typeof Command.Type
 
@@ -76,6 +81,18 @@ interface World {
   /** Every picture the server has held, by revision. */
   history: Record<number, SavedDecisions>
   restarts: number
+  /**
+   * The confirm that is out: the revision it names, the rows it carries, what the screen showed when it was sent,
+   * and what the server did with it once it has taken it.
+   */
+  confirm: O.Option<{
+    readonly revision: number
+    readonly delta: DecisionDelta
+    readonly shown: SavedDecisions
+    readonly answer: O.Option<"made" | "moved">
+  }>
+  /** The server made a confirm: the import is closed, and these are the decisions it was written with. */
+  closed: O.Option<SavedDecisions>
 }
 
 const start = (): World => ({
@@ -89,7 +106,9 @@ const start = (): World => ({
   confirmed: {},
   overtaken: {},
   history: { 1: {} },
-  restarts: 0
+  restarts: 0,
+  confirm: O.none(),
+  closed: O.none()
 })
 
 /** The server takes rows; true when they changed something. A save that changes nothing is no new revision. */
@@ -111,23 +130,40 @@ const put = (world: World, picture: Picture): void => {
   if (world.draft.onScreen) dispatch(world, DraftEvent.ViewArrived(picture))
 }
 
-const perform = (world: World, effect: DraftEffect): void => {
-  if (effect._tag === "Send") {
-    // One save at a time, and only of rows the person changed here and the server has not confirmed.
-    expect(O.isNone(world.save)).toBe(true)
-    for (const row of [...R.keys(effect.delta.set), ...effect.delta.clear]) {
-      expect(R.has(world.dirty, row)).toBe(true)
-      // And what is sent for the row is what the person last chose for it.
-      expect(R.get(effect.delta.set, row)).toEqual(valueOf(world.dirty[row] ?? "nothing"))
-    }
-    world.save = O.some({ delta: effect.delta, answer: O.none() })
-  } else if (effect._tag === "Ask") world.read = O.some(O.none())
-  else if (effect._tag === "Put") {
-    // The person's own save moves the view on, never back.
-    expect(O.exists(world.view, (view) => view.revision > effect.revision)).toBe(false)
-    put(world, { revision: effect.revision, decisions: effect.decisions })
-  } else world.restarts += 1
+/** Only rows the person changed here and the server has not confirmed, each as the person last chose it. */
+const ownRows = (world: World, delta: DecisionDelta): void => {
+  for (const row of [...R.keys(delta.set), ...delta.clear]) {
+    expect(R.has(world.dirty, row)).toBe(true)
+    expect(R.get(delta.set, row)).toEqual(valueOf(world.dirty[row] ?? "nothing"))
+  }
 }
+
+const perform = (world: World, effect: DraftEffect): void =>
+  DraftEffect.$match(effect, {
+    Send: ({ delta }) => {
+      // One save at a time, never beside a confirm, and only of the person's own rows.
+      expect([O.isNone(world.save), O.isNone(world.confirm)]).toEqual([true, true])
+      ownRows(world, delta)
+      world.save = O.some({ delta, answer: O.none() })
+    },
+    Ask: () => {
+      world.read = O.some(O.none())
+    },
+    Put: ({ decisions, revision }) => {
+      // The person's own save moves the view on, never back.
+      expect(O.exists(world.view, (view) => view.revision > revision)).toBe(false)
+      put(world, { revision, decisions })
+    },
+    Restart: () => {
+      world.restarts += 1
+    },
+    Confirm: ({ delta, revision }) => {
+      // One confirm at a time, never beside a save, carrying only the person's own rows: never the picture.
+      expect([O.isNone(world.save), O.isNone(world.confirm)]).toEqual([true, true])
+      ownRows(world, delta)
+      world.confirm = O.some({ revision, delta, shown: shown(world.draft), answer: O.none() })
+    }
+  })
 
 const dispatch = (world: World, event: DraftEvent): void => {
   const stepped = step(world.draft, event)
@@ -138,7 +174,51 @@ const dispatch = (world: World, event: DraftEvent): void => {
 const sentRows = (delta: DecisionDelta): ReadonlyArray<string> => [...R.keys(delta.set), ...delta.clear]
 
 const run = (world: World, command: Command): void => {
+  // A confirmed import is closed: all that is left to happen is the confirm's own answer.
+  if (O.isSome(world.closed) && command._tag !== "ConfirmAnswers") return
   switch (command._tag) {
+    case "PressConfirm":
+      if (world.draft.onScreen && O.isSome(world.draft.held)) dispatch(world, DraftEvent.ConfirmPressed())
+      return
+    case "ServerTakesConfirm":
+      return O.match(world.confirm, {
+        onNone: () => {},
+        onSome: (confirm) => {
+          if (O.isSome(confirm.answer)) return
+          // Made on another revision than the draft is at: the server writes nothing.
+          if (confirm.revision !== world.server.revision) {
+            world.confirm = O.some({ ...confirm, answer: O.some("moved") })
+            return
+          }
+          const written = over(world.server.decisions, {
+            ...R.map(confirm.delta.set, (decision) => O.some(decision)),
+            ...R.fromEntries(A.map(confirm.delta.clear, (row) => [row, O.none()] as const))
+          })
+          // The rule: what a confirm writes is what its screen showed. No decision it had not shown, none missing.
+          expect(written).toEqual(confirm.shown)
+          world.server = { revision: world.server.revision + 1, decisions: written }
+          world.history[world.server.revision] = written
+          world.closed = O.some(written)
+          world.confirm = O.some({ ...confirm, answer: O.some("made") })
+        }
+      })
+    case "ConfirmAnswers":
+      return O.match(world.confirm, {
+        onNone: () => {},
+        onSome: (confirm) => {
+          if (O.isNone(confirm.answer)) return
+          world.confirm = O.none()
+          if (confirm.answer.value === "moved") return dispatch(world, DraftEvent.ConfirmMoved())
+          world.dirty = {}
+          world.confirmed = {}
+          dispatch(world, DraftEvent.ConfirmDone())
+        }
+      })
+    case "ConfirmFails":
+      // Lost on its way to the server: nothing was written.
+      if (!O.exists(world.confirm, (confirm) => O.isNone(confirm.answer))) return
+      world.confirm = O.none()
+      return dispatch(world, DraftEvent.ConfirmFailed())
     case "Decide": {
       const changes = change(command.row, command.to)
       if (!world.draft.onScreen || O.isNone(world.draft.held)) return
@@ -238,7 +318,8 @@ const holds = (world: World): void => {
   // The screen never claims a revision the server has not reached.
   O.map(world.draft.held, (held) => expect(held.revision).toBeLessThanOrEqual(world.server.revision))
   // While the step is drawn, what it holds of the server is the view the tab holds: never ahead of it, never behind.
-  if (world.draft.onScreen) {
+  // (A confirmed import keeps no draft: its screen is the result.)
+  if (world.draft.onScreen && O.isNone(world.closed)) {
     expect(O.map(world.draft.held, (held) => held.revision)).toEqual(O.map(world.view, (view) => view.revision))
   }
   // What it holds is what the server held at that revision: a revision is never claimed for another picture.
@@ -260,7 +341,9 @@ const quiet = (world: World): void => {
     run(world, { _tag: "SaveAgain" })
     run(world, { _tag: "ServerTakesSave" })
     run(world, { _tag: "SaveAnswers" })
-    while (world.late.length > 0) run(world, { _tag: "OtherAnswerArrives" })
+    run(world, { _tag: "ServerTakesConfirm" })
+    run(world, { _tag: "ConfirmAnswers" })
+    for (let left = world.late.length; left > 0; left -= 1) run(world, { _tag: "OtherAnswerArrives" })
     run(world, { _tag: "ServerTakesRead" })
     run(world, { _tag: "ReadArrives" })
     holds(world)
@@ -282,7 +365,7 @@ const opened = (decisions: SavedDecisions = {}): World => {
 
 describe("the review's draft, whatever order things happen in", () => {
   it.prop(
-    "sends only the person's own rows, never runs ahead of the server, and ends showing what the server holds",
+    "sends only the person's own rows, never runs ahead of the server, confirms only what it showed, and ends showing what the server holds",
     { commands: S.Array(Command).check(S.isMaxLength(40)) },
     ({ commands }) => {
       const world = opened()
@@ -291,9 +374,10 @@ describe("the review's draft, whatever order things happen in", () => {
         holds(world)
       }
       quiet(world)
-      expect(O.isNone(world.save)).toBe(true)
+      expect([O.isNone(world.save), O.isNone(world.confirm), world.draft.confirm]).toEqual([true, true, "idle"])
       expect(settled(world.draft)).toBe(true)
-      expect(shown(world.draft)).toEqual(world.server.decisions)
+      // A confirmed import keeps no draft; an open one ends showing what the server holds.
+      if (O.isNone(world.closed)) expect(shown(world.draft)).toEqual(world.server.decisions)
     },
     { arbitrary: { runs: 5000 } }
   )
@@ -414,5 +498,103 @@ describe("the orderings that lost or hid a decision", () => {
     run(world, { _tag: "ServerTakesRead" })
     run(world, { _tag: "ReadArrives" })
     expect(shown(world.draft)).toEqual({ b: kept })
+  })
+})
+
+describe("a confirm", () => {
+  const sent = (world: World) => O.map(world.confirm, (confirm) => [confirm.revision, confirm.delta] as const)
+
+  it("made on a picture somebody has changed since is refused, writes nothing, and the next one is on their row too", () => {
+    const world = opened({ a: out })
+    run(world, { _tag: "SomeoneElse", row: "b", to: "kept" })
+    run(world, { _tag: "PressConfirm" })
+    expect(sent(world)).toEqual(O.some([1, { set: {}, clear: [] }]))
+    run(world, { _tag: "ServerTakesConfirm" })
+    expect([O.isNone(world.closed), world.server.decisions]).toEqual([true, { a: out, b: kept }])
+    run(world, { _tag: "ConfirmAnswers" })
+    // Not made, and said so; the newer picture is asked for.
+    expect([world.draft.confirm, world.draft.heldBack, O.isSome(world.read)]).toEqual(["idle", O.some(0), true])
+    run(world, { _tag: "ServerTakesRead" })
+    run(world, { _tag: "ReadArrives" })
+    // Their row is on screen now, counted, and the region was started again from it.
+    expect([shown(world.draft), world.draft.heldBack, world.restarts]).toEqual([{ a: out, b: kept }, O.some(1), 1])
+    run(world, { _tag: "PressConfirm" })
+    expect([sent(world), world.draft.heldBack]).toEqual([O.some([2, { set: {}, clear: [] }]), O.none()])
+    run(world, { _tag: "ServerTakesConfirm" })
+    expect(world.closed).toEqual(O.some({ a: out, b: kept }))
+  })
+
+  it("waits for the save that is out, then carries only the rows not sent yet, with no save beside it", () => {
+    const world = opened()
+    run(world, { _tag: "Decide", row: "a", to: "out" })
+    run(world, { _tag: "Decide", row: "b", to: "kept" })
+    run(world, { _tag: "PressConfirm" })
+    expect([world.draft.confirm, O.isNone(world.confirm)]).toEqual(["waiting", true])
+    run(world, { _tag: "ServerTakesSave" })
+    run(world, { _tag: "SaveAnswers" })
+    // Row a is saved at revision 2; the confirm names that revision and carries row b alone.
+    expect([sent(world), O.isNone(world.save)]).toEqual([O.some([2, { set: { b: kept }, clear: [] }]), true])
+    run(world, { _tag: "ServerTakesConfirm" })
+    expect(world.closed).toEqual(O.some({ a: out, b: kept }))
+    run(world, { _tag: "ConfirmAnswers" })
+    expect(world.draft).toEqual({ ...emptyDraft, onScreen: true })
+  })
+
+  it("that waits is held back when its save's answer says somebody else saved in between", () => {
+    const world = opened()
+    run(world, { _tag: "Decide", row: "a", to: "out" })
+    run(world, { _tag: "SomeoneElse", row: "b", to: "kept" })
+    run(world, { _tag: "PressConfirm" })
+    run(world, { _tag: "ServerTakesSave" })
+    run(world, { _tag: "SaveAnswers" })
+    // Two revisions on from the picture held: no confirm goes, the newer picture is asked for.
+    expect([world.draft.confirm, world.draft.heldBack, O.isNone(world.confirm), O.isSome(world.read)]).toEqual([
+      "idle",
+      O.some(0),
+      true,
+      true
+    ])
+    run(world, { _tag: "ServerTakesRead" })
+    run(world, { _tag: "ReadArrives" })
+    expect([shown(world.draft), world.draft.heldBack]).toEqual([{ a: out, b: kept }, O.some(1)])
+  })
+
+  it("that waits is held back by a newer picture that arrives before its save is answered", () => {
+    const world = opened()
+    run(world, { _tag: "SomeoneElse", row: "b", to: "kept" })
+    run(world, { _tag: "ReturnToTab" })
+    run(world, { _tag: "ServerTakesRead" })
+    run(world, { _tag: "Decide", row: "a", to: "out" })
+    run(world, { _tag: "PressConfirm" })
+    run(world, { _tag: "ReadArrives" })
+    expect([world.draft.confirm, world.draft.heldBack]).toEqual(["idle", O.some(1)])
+    run(world, { _tag: "ServerTakesSave" })
+    run(world, { _tag: "SaveAnswers" })
+    expect(O.isNone(world.confirm)).toBe(true)
+  })
+
+  it("carries the clear of a decision the person took back and the server never heard of", () => {
+    const world = opened({ a: out })
+    run(world, { _tag: "Decide", row: "a", to: "nothing" })
+    run(world, { _tag: "SaveFails" })
+    run(world, { _tag: "PressConfirm" })
+    expect(sent(world)).toEqual(O.some([1, { set: {}, clear: ["a"] }]))
+    run(world, { _tag: "ServerTakesConfirm" })
+    // Without the clear the import would be confirmed with row a left out, as nobody on this screen saw it.
+    expect(world.closed).toEqual(O.some({}))
+  })
+
+  it("that did not get through leaves the rows it carried to be saved as any decision", () => {
+    const world = opened()
+    run(world, { _tag: "Decide", row: "a", to: "out" })
+    run(world, { _tag: "SaveFails" })
+    run(world, { _tag: "PressConfirm" })
+    run(world, { _tag: "ConfirmFails" })
+    expect([world.draft.confirm, O.map(world.save, (save) => save.delta)]).toEqual([
+      "idle",
+      O.some({ set: { a: out }, clear: [] })
+    ])
+    quiet(world)
+    expect(world.server.decisions).toEqual({ a: out })
   })
 })

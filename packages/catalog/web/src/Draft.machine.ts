@@ -4,8 +4,10 @@
 // what to ask; it sends and asks nothing itself, so every ordering of those events can be tested without a server.
 //
 // The one rule a reader must not break: what is sent is what the person did. A save carries the rows the person
-// changed on this screen and nothing else. The server's picture is something the screen follows; it is never the
-// base a difference is worked out from, so a picture that is behind can never take back another person's decision.
+// changed on this screen and nothing else, and so does a confirm: it names the revision of the picture the screen
+// holds and carries the person's rows the server has not been sent, never the picture itself. The server's picture is
+// something the screen follows; it is never the base a difference is worked out from, so a picture that is behind
+// can never take back another person's decision, and a confirm never writes a decision the screen had not shown.
 import * as A from "effect/Array"
 import * as Data from "effect/Data"
 import { dual } from "effect/Function"
@@ -52,6 +54,17 @@ export interface Draft {
   readonly typed: string
   /** The Review step is drawn. A draft nobody looks at is kept only while it holds something the server has not. */
   readonly onScreen: boolean
+  /**
+   * Where the person's confirm is: not pressed; `waiting` for their save that is out to be answered; or `out`, sent
+   * with the rows in `flight`. While it waits, a picture that arrives from anywhere but that save holds it back.
+   */
+  readonly confirm: "idle" | "waiting" | "out"
+  /**
+   * The last confirm was not made because the import had changed since the picture it was pressed on: said on the
+   * screen until the person confirms again, with how many rows the newer picture decided otherwise (none counted
+   * until it is read; a match or a suggestion changes no row).
+   */
+  readonly heldBack: O.Option<number>
 }
 
 /** A draft of an import nobody has opened: nothing held, nothing of the person's. */
@@ -64,7 +77,9 @@ export const emptyDraft: Draft = {
   epoch: 0,
   matching: false,
   typed: "",
-  onScreen: false
+  onScreen: false,
+  confirm: "idle",
+  heldBack: O.none()
 }
 
 /** Everything that can happen to a draft. */
@@ -93,6 +108,14 @@ export type DraftEvent = Data.TaggedEnum<{
   MatchEnded: {}
   /** The import was confirmed or removed: nothing of its draft is kept. */
   Dropped: {}
+  /** The person pressed the confirm button. */
+  ConfirmPressed: {}
+  /** The server made the confirm: the import is closed and nothing of its draft is kept. */
+  ConfirmDone: {}
+  /** The server refused the confirm and wrote nothing: the draft is at another revision than the one it named. */
+  ConfirmMoved: {}
+  /** The confirm did not get through, or was refused for another reason: nothing is known to be written. */
+  ConfirmFailed: {}
 }>
 export const DraftEvent = Data.taggedEnum<DraftEvent>()
 
@@ -106,6 +129,11 @@ export type DraftEffect = Data.TaggedEnum<{
   Put: Picture
   /** The decisions under the region changed: draw it again from what is shown now. `announce`: say it was elsewhere. */
   Restart: { readonly announce: boolean }
+  /**
+   * Confirm the import as the screen shows it: the picture of `revision`, with the person's rows the server has not
+   * been sent. Sent once; say how it went with `ConfirmDone`, `ConfirmMoved` or `ConfirmFailed`.
+   */
+  Confirm: { readonly revision: number; readonly delta: DecisionDelta }
 }>
 export const DraftEffect = Data.taggedEnum<DraftEffect>()
 
@@ -206,7 +234,47 @@ const sending = (draft: Draft): Stepped =>
       }
 
 /** A draft nobody looks at keeps nothing once the server has everything. */
-const letGo = (draft: Draft): Draft => (!draft.onScreen && settled(draft) ? emptyDraft : draft)
+const letGo = (draft: Draft): Draft =>
+  !draft.onScreen && settled(draft) && draft.confirm === "idle" ? emptyDraft : draft
+
+/** The draft with its confirm at another stage. */
+const confirmAt = (draft: Draft, confirm: Draft["confirm"]): Draft => ({ ...draft, confirm })
+
+/** How many rows are decided otherwise in `after` than in `before`. */
+const rowsApart = (before: SavedDecisions, after: SavedDecisions): number =>
+  R.keys(changesBetween({ before, after })).length
+
+/**
+ * The confirm is not made: the import changed since the picture it was pressed on. Said on the screen, with the rows
+ * `counted` as decided otherwise so far; the person's rows are saved as any decision is.
+ */
+const holdingBack = (draft: Draft, counted: number): Draft => ({
+  ...draft,
+  confirm: "idle",
+  heldBack: O.some(O.getOrElse(draft.heldBack, () => 0) + counted)
+})
+
+/**
+ * Sends the confirm, when the screen holds a picture with nothing of the person's on its way over it: it names that
+ * picture's revision and carries the rows not sent yet, which are what the screen shows over it. The rows ride in
+ * `flight`, so no save goes out beside the confirm.
+ */
+const confirming = (draft: Draft): Stepped =>
+  O.match(draft.held, {
+    onNone: () => ({ draft: confirmAt(draft, "idle"), effects: none }),
+    onSome: (held) => ({
+      draft: confirmAt({ ...draft, flight: O.some(draft.unsent), unsent: {}, stalled: false }, "out"),
+      effects: [DraftEffect.Confirm({ revision: held.revision, delta: deltaOf(draft.unsent) })]
+    })
+  })
+
+/** The rows that rode with a confirm that was not made go back under whatever was changed since. */
+const unconfirming = (draft: Draft): Draft => ({
+  ...draft,
+  confirm: "idle",
+  flight: O.none(),
+  unsent: { ...O.getOrElse(draft.flight, (): RowChanges => ({})), ...draft.unsent }
+})
 
 /** After a change to what is held or the person's: the region starts again if what the screen shows is another. */
 const restarting = (input: { readonly before: Draft; readonly after: Draft; readonly announce: boolean }): Stepped =>
@@ -236,33 +304,61 @@ export const step: {
     Opened: () => ({ draft: { ...draft, onScreen: true }, effects: none }),
     Left: () => ({ draft: letGo({ ...draft, onScreen: false, matching: false }), effects: none }),
     Dropped: () => ({ draft: { ...emptyDraft, onScreen: draft.onScreen, epoch: draft.epoch }, effects: none }),
+    ConfirmDone: () => ({ draft: { ...emptyDraft, onScreen: draft.onScreen, epoch: draft.epoch }, effects: none }),
+    ConfirmPressed: () => {
+      if (draft.confirm !== "idle" || O.isNone(draft.held)) return { draft, effects: none }
+      const pressed: Draft = { ...draft, heldBack: O.none() }
+      // Their own save is out: the confirm waits for its answer, and goes on the picture that save leaves.
+      if (O.isSome(pressed.flight)) return { draft: confirmAt(pressed, "waiting"), effects: none }
+      // The picture held is known to be behind (somebody else saved before the person's last save): the newer one
+      // is asked for, and the confirm waits for the person to have seen it.
+      if (O.isSome(pressed.landed)) return { draft: holdingBack(pressed, 0), effects: [DraftEffect.Ask()] }
+      return confirming(pressed)
+    },
+    // Nothing was written. The newer picture is asked for, and the person's rows are saved as any decision is.
+    ConfirmMoved: () =>
+      draft.confirm !== "out"
+        ? { draft, effects: none }
+        : then(sending(holdingBack(unconfirming(draft), 0)), (after) => ({
+            draft: after,
+            effects: [DraftEffect.Ask()]
+          })),
+    ConfirmFailed: () => (draft.confirm !== "out" ? { draft, effects: none } : sending(unconfirming(draft))),
     MatchStarted: () => ({ draft: { ...draft, matching: true }, effects: none }),
     MatchEnded: () => ({ draft: { ...draft, matching: false }, effects: none }),
     // The person's rows, the latest over the earliest; sent at once unless a save is out.
     Decided: ({ changes }) => sending({ ...draft, unsent: { ...draft.unsent, ...changes } }),
     SaveAgain: () => sending({ ...draft, stalled: false }),
-    // Not lost: the rows go back under whatever was changed since, and wait.
+    // Not lost: the rows go back under whatever was changed since, and wait. A confirm that waited for this save is
+    // not made: the person is told the save failed, and presses again.
     SaveFailed: () =>
-      O.match(draft.flight, {
-        onNone: () => ({ draft, effects: none }),
-        onSome: (rows) => ({
-          draft: { ...draft, flight: O.none(), unsent: { ...rows, ...draft.unsent }, stalled: true },
-          effects: none
-        })
-      }),
+      draft.confirm === "out"
+        ? { draft, effects: none }
+        : O.match(draft.flight, {
+            onNone: () => ({ draft, effects: none }),
+            onSome: (rows) => ({
+              draft: confirmAt(
+                { ...draft, flight: O.none(), unsent: { ...rows, ...draft.unsent }, stalled: true },
+                "idle"
+              ),
+              effects: none
+            })
+          }),
     // The screen goes back to the decisions the server holds: the person's unconfirmed rows are dropped, here and
     // for any later visit, and the import is asked again.
     SaveRefused: () =>
-      then(
-        restarting({
-          before: draft,
-          after: { ...draft, flight: O.none(), unsent: {}, stalled: false },
-          announce: false
-        }),
-        (after) => ({ draft: letGo(after), effects: [DraftEffect.Ask()] })
-      ),
+      draft.confirm === "out"
+        ? { draft, effects: none }
+        : then(
+            restarting({
+              before: draft,
+              after: confirmAt({ ...draft, flight: O.none(), unsent: {}, stalled: false }, "idle"),
+              announce: false
+            }),
+            (after) => ({ draft: letGo(after), effects: [DraftEffect.Ask()] })
+          ),
     SaveAnswered: ({ changed, revision }) =>
-      O.match(draft.flight, {
+      O.match(draft.confirm === "out" ? O.none() : draft.flight, {
         onNone: () => ({ draft, effects: none }),
         onSome: (rows) => {
           const landed = O.match(draft.held, {
@@ -309,6 +405,14 @@ export const step: {
             typed === draft.typed || A.some(landed.effects, DraftEffect.$is("Ask"))
               ? { draft: { ...landed.draft, typed }, effects: landed.effects }
               : { draft: { ...landed.draft, typed }, effects: [...landed.effects, DraftEffect.Ask()] }
+          if (asked.draft.confirm === "waiting") {
+            // The confirm that waited for this save goes now, on the picture the save left, when that picture is the
+            // person's own doing: moved on by this save alone, or not moved at all. Otherwise somebody else changed
+            // the import in between: it is held back, and the newer picture is already asked for.
+            return O.isNone(asked.draft.landed)
+              ? then(asked, confirming)
+              : then({ draft: holdingBack(asked.draft, 0), effects: asked.effects }, sending)
+          }
           return then(then(asked, sending), (after) => ({ draft: letGo(after), effects: none }))
         }
       }),
@@ -328,14 +432,18 @@ export const step: {
           if (picture.revision === held.revision && Eq.equals(picture.decisions, held.decisions)) {
             return { draft, effects: none }
           }
+          const after: Draft = {
+            ...draft,
+            held: O.some(picture),
+            // The person's saved rows are in a picture of their revision or later.
+            landed: O.filter(draft.landed, (rows) => rows.at > picture.revision)
+          }
+          const apart = rowsApart(shown(draft), shown(after))
           return restarting({
             before: draft,
-            after: {
-              ...draft,
-              held: O.some(picture),
-              // The person's saved rows are in a picture of their revision or later.
-              landed: O.filter(draft.landed, (rows) => rows.at > picture.revision)
-            },
+            // A confirm that waits is held back by a newer picture from anywhere but the person's own save; one held
+            // back already counts the rows this picture decides otherwise.
+            after: draft.confirm === "waiting" || O.isSome(draft.heldBack) ? holdingBack(after, apart) : after,
             announce: !draft.matching
           })
         }

@@ -699,3 +699,24 @@ save". Answer: "Answer says 'no change'". I chose; the agent recommended the sam
 by the person's own rows only when `changed` is true and the revision is the next one, and otherwise keeps the rows
 on screen and asks for the import at once. The property test no longer waives "what is held is what the server held
 at that revision" after such a save. Reverse: the field, and the one condition in `SaveAnswered`.
+
+### 2026-11-19 — atoms, a confirm made on a draft somebody else has changed
+
+The confirm sent the decisions the screen showed, all of them, and the server saved them over what it held before it
+confirmed: a row another person had decided since this screen last read the import went back to what this screen
+showed, and the import was confirmed with totals nobody had looked at. Question: what does Confirm do when the other
+person has decided a row this screen has not shown yet? Options: "Refuse, show, confirm again (Recommended)"; "Their
+decision stands"; "As today: your screen wins". Answer: "Refuse, show, confirm again". I chose; the agent recommended
+the same. Built: `POST /api/v1/imports/:id/commit` takes `ConfirmRequest`, the revision of the draft the screen shows
+and the person's own decisions not saved yet (set and clear); on another revision the server writes nothing, not an
+item and not a decision, and answers `DraftMoved` (409) with the revision the draft is at. The check is the first
+statement of the confirm's own batch on D1 (`insertBatch` in `ImportStore.adapter.ts`: the confirm's row is written
+only while the import is open at that revision, and every later statement checks for that row), so two confirms
+cannot both pass; the handler checks the same before it works the review out. A confirm moves the draft on by one, so
+a confirmed import is never taken for the open one of the same revision. On the screen the confirm is an event of the
+draft (`Draft.machine.ts`): it waits for the person's save that is out, goes only on a picture with nothing of
+theirs on its way over it, and is held back by any newer picture that arrives meanwhile; refused, the newer picture
+is asked for, the review is drawn again from it with its totals, and a line above it says nothing was imported and
+how many rows were decided elsewhere, until the person confirms again. Reverse: the `revision` field and the
+`DraftMoved` error in the contract, the `revision = expected` condition in `insertBatch`, and `ConfirmPressed` in
+the machine.

@@ -8,7 +8,7 @@ import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as Atom from "effect/reactivity/Atom"
 import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import { toast } from "sonner"
-import { perKey } from "@inventory/client/Api"
+import { invalidate, perKey } from "@inventory/client/Api"
 import { member } from "@inventory/client/MemberAtoms"
 import { isTransient, toastError } from "@inventory/client/SayError"
 import type { SavedDecisions } from "@inventory/catalog-contract/Decision"
@@ -17,13 +17,19 @@ import type { ImportView, SuggestOutcome } from "@inventory/catalog-contract/Imp
 import { restored, saved } from "@inventory/review/ReviewDraft"
 import type { ReviewState } from "@inventory/review/ReviewTypes"
 import { restoredReview, storedReview } from "@inventory/review/SavedProgress"
-import { progressOf, progressWith } from "@inventory/review/SavedProgressHook"
+import { dropFile, progressOf, progressWith } from "@inventory/review/SavedProgressHook"
+import { navigate } from "@inventory/ui/Route"
+import { DraftMoved } from "@inventory/catalog-contract/ImportRejection"
+import * as Effect from "effect/Effect"
+import * as S from "effect/Schema"
 import type { review } from "@inventory/catalog-model/Review"
-import { callWrite } from "./Catalog.runtime.ts"
+import { call, callWrite, catalogRuntime } from "./Catalog.runtime.ts"
+import { catalogKeys } from "./Catalog.keys.ts"
+import { importAddress } from "./internal/route.ts"
 import { draftOf } from "./Draft.atoms.ts"
-import { changesBetween, DraftEffect, DraftEvent, type RowChanges, shown, step, unconfirmed } from "./Draft.machine.ts"
+import { changesBetween, DraftEffect, DraftEvent, type RowChanges, shown, step } from "./Draft.machine.ts"
 import { toRegionDecisions, toServerDecisions } from "./ImportReview.controller.ts"
-import { changeView, importTable, importView, importViewShown, viewWith } from "./Imports.atoms.ts"
+import { changeView, importTable, importView, importViewShown, putConfirmed, viewWith } from "./Imports.atoms.ts"
 
 /**
  * What the Review step holds for one import besides its draft: the region's decisions with their undo history (none
@@ -85,7 +91,27 @@ const registryOf = Atom.readable((get) => get.registry)
 const noValue = (): void => undefined
 
 /** True for what changes only what this tab holds; false for what goes to the server. */
-const isLocal = DraftEffect.$match({ Put: () => true, Restart: () => true, Send: () => false, Ask: () => false })
+const isLocal = DraftEffect.$match({
+  Put: () => true,
+  Restart: () => true,
+  Send: () => false,
+  Ask: () => false,
+  Confirm: () => false
+})
+
+/** The scope this browser keeps one import's review under, for the person signed in; none while nobody is. */
+const scopeFor = (signedIn: O.Option<{ readonly organizationId: string; readonly id: string }>, id: ImportId) =>
+  signedIn.pipe(
+    O.map((actor) => ({ organizationId: actor.organizationId, memberId: actor.id, screen: `import:${id}` })),
+    O.getOrUndefined
+  )
+
+/** A confirm ends the draft and its undo history: nothing of either comes back on the next visit. */
+const forget = (registry: AtomRegistry.AtomRegistry, id: ImportId): void => {
+  const scope = scopeFor(registry.get(member), id)
+  registry.set(progressOf(scope), O.none())
+  if (scope !== undefined) catalogRuntime().runFork(dropFile(scope).pipe(Effect.ignore))
+}
 
 /** Does what the machine asks: sends, asks, puts the person's own save into the view, starts the region again. */
 const perform = (input: {
@@ -127,7 +153,27 @@ const perform = (input: {
     Restart: ({ announce }) => {
       registry.update(reviewLocal(id), (now) => ({ ...now, state: O.none() }))
       if (announce) toast("Updated with what changed on another screen")
-    }
+    },
+    // Sent once. Made: the result is put in place and the person taken to it, if they are still on the review. Not
+    // made because the draft had moved on: the machine asks for the newer picture and the screen says so above the
+    // review. Any other failure (somebody else confirmed it, the role was taken away, the network) is said, and the
+    // import asked again, which moves the screen to the result where there is one.
+    Confirm: ({ delta, revision }) =>
+      void call((api) => api.imports.commit({ params: { id }, payload: { revision, ...delta } })).then(
+        (view) => {
+          const onScreen = registry.get(draftOf(id)).onScreen
+          putConfirmed({ registry, view })
+          happened(DraftEvent.ConfirmDone())
+          forget(registry, id)
+          if (onScreen) navigate(importAddress(view.id, "result"))
+        },
+        (error: unknown) => {
+          if (S.is(DraftMoved)(error)) return happened(DraftEvent.ConfirmMoved())
+          toastError(error)
+          happened(DraftEvent.ConfirmFailed())
+          invalidate(catalogKeys.import(id))
+        }
+      )
   })
 }
 
@@ -164,8 +210,14 @@ export const shownDecisions = perKey((id: ImportId) =>
   })
 )
 
-/** The rows of the person's that the server has not confirmed: what a confirm carries beside the decisions shown. */
-export const unconfirmedRows = perKey((id: ImportId) => Atom.map(draftOf(id), unconfirmed))
+/** True from the press of the confirm button until the server has answered it, or it is held back. */
+export const confirmingImport = perKey((id: ImportId) => Atom.map(draftOf(id), (draft) => draft.confirm !== "idle"))
+
+/**
+ * The last confirm was not made because the import had changed since the picture it was pressed on: how many rows
+ * the newer picture decides otherwise (none where it was a match or a suggestion), until the person confirms again.
+ */
+export const confirmHeldBack = perKey((id: ImportId) => Atom.map(draftOf(id), (draft) => draft.heldBack))
 
 /** Goes up when the region must be drawn again from what is shown: the decisions under it changed elsewhere. */
 export const regionEpoch = perKey((id: ImportId) => Atom.map(draftOf(id), (draft) => draft.epoch))
@@ -195,13 +247,7 @@ export const followDraft = perKey((id: ImportId) =>
 )
 
 /** Where this browser keeps one import's review for the person signed in: the undo history behind the decisions. */
-const progressFor = (get: <A>(atom: Atom.Atom<A>) => A, id: ImportId) =>
-  progressOf(
-    get(member).pipe(
-      O.map((actor) => ({ organizationId: actor.organizationId, memberId: actor.id, screen: `import:${id}` })),
-      O.getOrUndefined
-    )
-  )
+const progressFor = (get: <A>(atom: Atom.Atom<A>) => A, id: ImportId) => progressOf(scopeFor(get(member), id))
 
 const stateHeld = perKey((id: ImportId) => Atom.map(reviewLocal(id), (local) => local.state))
 

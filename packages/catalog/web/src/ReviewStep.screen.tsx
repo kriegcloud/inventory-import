@@ -16,8 +16,10 @@ import { Button } from "@inventory/ui/components/button"
 import { Spinner } from "@inventory/ui/components/spinner"
 import { member } from "@inventory/client/MemberAtoms"
 import { hasRole } from "@inventory/kernel/Role"
-import { invalidate, perKey } from "@inventory/client/Api"
+import { perKey } from "@inventory/client/Api"
 import {
+  confirmHeldBack,
+  confirmingImport,
   draftEvents,
   followDraft,
   regionEpoch,
@@ -25,15 +27,12 @@ import {
   reviewLocal,
   reviewStateAt,
   shownDecisions,
-  unconfirmedRows,
   whileCurrent
 } from "./ReviewDraft.atoms.ts"
-import { deltaOf, DraftEvent } from "./Draft.machine.ts"
-import { confirmImport, matchColumn, suggestFixes } from "./Imports.atoms.ts"
+import { DraftEvent } from "./Draft.machine.ts"
+import { matchColumn, suggestFixes } from "./Imports.atoms.ts"
 import { navigate } from "@inventory/ui/Route"
 import { importAddress } from "./internal/route.ts"
-import { useSavedProgress } from "@inventory/review/SavedProgressHook"
-import { catalogRuntime } from "./Catalog.runtime.ts"
 import type { ImportView } from "@inventory/catalog-contract/Import"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import { recheckRow, review, ruleFixes } from "@inventory/catalog-model/Review"
@@ -43,11 +42,10 @@ import { type Field, fieldLabels, fields, type StagedTable } from "@inventory/ca
 import { type Suggestion } from "@inventory/catalog-contract/Suggestion"
 import { WhyFlagged } from "./internal/WhyFlagged.tsx"
 import { DimensionsForm, VendorsForm } from "./internal/CellForms.tsx"
-import { notImportedColumn, reviewStepWords } from "./internal/format.tsx"
+import { heldBackSentence, notImportedColumn, reviewStepWords } from "./internal/format.tsx"
 import { totalText } from "./internal/itemText.ts"
 import { regionColumns, regionKinds, storedChoice, toRegionProblem, toRegionRows } from "./ImportReview.controller.ts"
 import { toastError } from "@inventory/client/SayError"
-import { catalogKeys } from "./Catalog.keys.ts"
 import { offersSuggestions } from "@inventory/catalog-model/Suggest"
 
 const whole = new Intl.NumberFormat("en-US")
@@ -147,20 +145,6 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
   const [local, setLocal] = useAtom(reviewLocal(view.id))
   const happened = useAtomSet(draftEvents(view.id))
   const epoch = useAtomValue(regionEpoch(view.id))
-  const unconfirmed = useAtomValue(unconfirmedRows(view.id))
-  // The decisions are the server's; the undo history behind them is kept in this browser, per person and import, so
-  // a refresh brings "Undo last step" back too. It is used only while it ends at the decisions the server holds: a
-  // change made on another screen since starts a new history from the server's.
-  const signedIn = useAtomValue(member)
-  const actor = O.getOrUndefined(signedIn)
-  const progress = useSavedProgress(
-    actor === undefined
-      ? undefined
-      : { organizationId: actor.organizationId, memberId: actor.id, screen: `import:${view.id}` },
-    catalogRuntime()
-  )
-  const shownRead = useAtomValue(shownDecisions(view.id))
-  const decisions = O.getOrElse(shownRead, () => view.decisions)
   const worked = useAtomValue(currentReview(view.id))
   const recheckRead = useAtomValue(recheckOf(view.id))
   const given = regionGiven(view.id)(epoch)
@@ -191,21 +175,12 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
     })
   const suggested = O.getOrUndefined(local.suggested)
 
-  const committing = useAtomValue(confirmImport).waiting
-  const commitNow = useAtomSet(confirmImport, { mode: "promiseExit" })
-  const commit = () =>
-    void commitNow({ id: view.id, decisions, clear: deltaOf(unconfirmed).clear }).then((exit) => {
-      if (Exit.isFailure(exit)) {
-        toastError(exit.cause.pipe(Cause.squash))
-        // Someone else confirmed it meanwhile: ask what happened, which moves this screen to the result.
-        invalidate(catalogKeys.import(view.id))
-        return
-      }
-      // Confirm ends the draft and its undo history: nothing of either comes back on the next visit.
-      happened(DraftEvent.Dropped())
-      progress.clear()
-      navigate(importAddress(exit.value.id, "result"))
-    })
+  // The confirm is the draft's to send (`ReviewDraft.atoms.ts`): it names the picture this screen holds and carries
+  // the person's rows not saved yet. Made on a picture somebody has changed since, it is refused and nothing is
+  // written; the screen then takes the newer picture and says so above the review, until the person confirms again.
+  const committing = useAtomValue(confirmingImport(view.id))
+  const heldBack = useAtomValue(confirmHeldBack(view.id))
+  const commit = () => happened(DraftEvent.ConfirmPressed())
 
   if (O.isNone(worked) || O.isNone(recheckRead)) return <ReviewSkeleton title={`Review ${view.fileName}`} />
   const { current } = worked.value
@@ -297,6 +272,7 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
   return (
     <>
       <ReaderWarnings table={table} />
+      <NotImportedYet rows={heldBack} />
       <ReviewRegion
         key={`${view.id}:${epoch}`}
         title={`Review ${view.fileName}`}
@@ -345,6 +321,24 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
         onImport={commit}
       />
     </>
+  )
+}
+
+/**
+ * Said above the review when a confirm was not made because the import had changed on another screen: nothing was
+ * imported, the review below already shows the import as it is now, and the person confirms again.
+ */
+function NotImportedYet(props: { rows: O.Option<number> }) {
+  const narrow = useAtomValue(isNarrow)
+  if (O.isNone(props.rows)) return null
+  return (
+    <Alert role="alert" className={narrow ? "mx-4 mt-3 w-auto" : "mx-6 mt-4 w-auto"}>
+      <TriangleAlertIcon aria-hidden />
+      <AlertTitle>Nothing was imported yet</AlertTitle>
+      <AlertDescription>
+        <p>{heldBackSentence(props.rows.value)}</p>
+      </AlertDescription>
+    </Alert>
   )
 }
 

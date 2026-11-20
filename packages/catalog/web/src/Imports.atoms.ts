@@ -16,7 +16,6 @@ import * as O from "effect/Option"
 import * as Atom from "effect/reactivity/Atom"
 import * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import type { ImportView, OpenImports } from "@inventory/catalog-contract/Import"
-import type { SavedDecisions } from "@inventory/catalog-contract/Decision"
 import type { Field } from "@inventory/catalog-contract/Staged"
 import type { SheetChoice, SheetSummary } from "@inventory/catalog-model/Spreadsheet"
 import { catalogApi } from "./Catalog.runtime.ts"
@@ -225,29 +224,13 @@ export const suggestFixes = apiRuntime.fn<ImportId>()(
 )
 
 /**
- * One confirm: the import, the decisions the screen shows, all of them, so the server reviews the same rows, and the
- * rows whose decision the person took back that the server has not been told yet (a save still out, or one that
- * failed and waits): without them an undo the server never heard of would be confirmed as decided.
+ * A confirm the server made (the review's draft sends it: `ReviewDraft.atoms.ts`): the import's new view, with the
+ * result, is put in place at once, and what the confirm wrote is asked for again.
  */
-export interface Confirm {
-  readonly id: ImportId
-  readonly decisions: SavedDecisions
-  readonly clear: ReadonlyArray<string>
+export const putConfirmed = (input: {
+  readonly registry: AtomRegistry.AtomRegistry
+  readonly view: ImportView
+}): void => {
+  input.registry.set(importView(input.view.id), input.view)
+  invalidate([...afterImportChange, ...catalogKeys.items, ...catalogKeys.itemFacets, ...catalogKeys.changes])
 }
-
-/**
- * Confirms an import: the server reviews the rows again with these decisions and writes what is ready, in one atomic
- * write. Its new view (with the result) is put in place at once, and what the confirm wrote is asked for again.
- */
-export const confirmImport = apiRuntime.fn<Confirm>()(
-  Effect.fnUntraced(function* (confirm: Confirm) {
-    const done = yield* catalogApi.ask((api) =>
-      api.imports.commit({ params: { id: confirm.id }, payload: { set: confirm.decisions, clear: [...confirm.clear] } })
-    )
-    const registry = yield* AtomRegistry.AtomRegistry
-    registry.set(importView(confirm.id), done)
-    invalidate([...afterImportChange, ...catalogKeys.items, ...catalogKeys.itemFacets, ...catalogKeys.changes])
-    return done
-  }),
-  { concurrent: true }
-)

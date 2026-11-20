@@ -169,8 +169,17 @@ const forget = (registry: AtomRegistry.AtomRegistry, id: ImportId): void => {
   if (scope !== undefined) catalogRuntime().runFork(dropFile(scope).pipe(Effect.ignore))
 }
 
-/** When this tab last sent a write of each import's draft (a save or a confirm): what an answer must not be older than. */
-const lastSent = MutableHashMap.empty<ImportId, DateTime.Utc>()
+/**
+ * When the server last answered a write of each import's draft from this tab (a save or a confirm, made or not): what
+ * a read must have left after to include it. Counted from the answer, not from when the write left: a read that left
+ * after the write may still be served before the write commits, and a write sent again after a failure leaves later
+ * than it was first sent.
+ */
+const lastAnswered = MutableHashMap.empty<ImportId, DateTime.Utc>()
+/** The server answered a write of this import: recorded before the machine hears of it. */
+const answered = (id: ImportId): void => {
+  MutableHashMap.set(lastAnswered, id, DateTime.nowUnsafe())
+}
 
 /** Does what the machine asks: sends, asks, puts the person's own save into the view, starts the region again. */
 const perform = (input: {
@@ -185,16 +194,19 @@ const perform = (input: {
     // still fails the rows stay on screen and wait for "Save again": they are the person's work. A refusal (the
     // import was confirmed or removed meanwhile, the role was taken away) puts the screen back to what the server
     // holds, and the toast says why.
-    Send: ({ delta, madeOn }) => {
-      MutableHashMap.set(lastSent, id, DateTime.nowUnsafe())
+    Send: ({ delta, madeOn }) =>
       void callWrite((api) => api.imports.decide({ params: { id }, payload: { madeOn, ...delta } })).then(
-        ({ changed, notApplied, revision }) => happened(DraftEvent.SaveAnswered({ revision, changed, notApplied })),
-        (error: unknown) =>
+        ({ changed, notApplied, revision }) => {
+          answered(id)
+          happened(DraftEvent.SaveAnswered({ revision, changed, notApplied }))
+        },
+        (error: unknown) => {
+          answered(id)
           happened(
             isTransient(error) ? DraftEvent.SaveFailed() : DraftEvent.SaveRefused({ reason: sayError(error).sentence })
           )
-      )
-    },
+        }
+      ),
     // Said only when the machine says so: an answer it no longer waits for is not told to anybody.
     Say: ({ what }) =>
       Said.$match(what, {
@@ -218,10 +230,11 @@ const perform = (input: {
             }
           )
       }),
-    // The import is wanted no older than the last write this screen sent. A read already out that left after it is
-    // that answer, and is let land; one that left before is let land too, and asked once more when it does. A read
-    // that is out is never ended: a save that answers every few milliseconds would otherwise keep it from landing.
-    Ask: () => importView(id).askAgain(registry, O.getOrUndefined(MutableHashMap.get(lastSent, id))),
+    // The import is wanted no older than the last write the server answered this screen. A read already out that
+    // left after that answer includes it, and is let land; one that left before is let land too, and asked once more
+    // when it does. A read that is out is never ended: a save that answers every few milliseconds would otherwise keep
+    // it from landing.
+    Ask: () => importView(id).askAgain(registry, O.getOrUndefined(MutableHashMap.get(lastAnswered, id))),
     // Only the decisions and the revision, and never over a later revision already held.
     Put: ({ decisions, revision }) =>
       changeView({
@@ -237,10 +250,10 @@ const perform = (input: {
     // made because the draft had moved on: the machine asks for the newer picture and the screen says so above the
     // review. Any other failure (somebody else confirmed it, the role was taken away, the network) is said, and the
     // import asked again, which moves the screen to the result where there is one.
-    Confirm: ({ delta, madeOn, revision }) => {
-      MutableHashMap.set(lastSent, id, DateTime.nowUnsafe())
+    Confirm: ({ delta, madeOn, revision }) =>
       void call((api) => api.imports.commit({ params: { id }, payload: { revision, madeOn, ...delta } })).then(
         (view) => {
+          answered(id)
           const onScreen = registry.get(draftOf(id)).onScreen
           putConfirmed({ registry, view })
           happened(DraftEvent.ConfirmDone())
@@ -248,6 +261,7 @@ const perform = (input: {
           if (onScreen) navigate(importAddress(view.id, "result"))
         },
         (error: unknown) => {
+          answered(id)
           if (S.is(DraftMoved)(error)) return happened(DraftEvent.ConfirmMoved())
           if (S.is(AcceptsTakenBack)(error)) return happened(DraftEvent.ConfirmStale({ accepts: error.accepts }))
           toastError(error)
@@ -255,7 +269,6 @@ const perform = (input: {
           invalidate(catalogKeys.import(id))
         }
       )
-    }
   })
 }
 

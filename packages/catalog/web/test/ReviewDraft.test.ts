@@ -35,7 +35,7 @@ import {
   shownDecisions,
   whileCurrent
 } from "../src/ReviewDraft.atoms.ts"
-import { importNo, registryWith, viewAt } from "./support/catalog.ts"
+import { importNo, registryFor, viewAt } from "./support/catalog.ts"
 
 /** What the server answers a save with. */
 type Saved = {
@@ -48,8 +48,8 @@ const settle = Effect.sleep("15 millis")
 const out = decisionFromFlags({ out: true })
 const kept = decisionFromFlags({ kept: true })
 
-/** The server's refusal of a save: the import is no longer open. */
-type Refusal = { readonly _tag: "AlreadyImported" }
+/** The server's refusal of a save (the import is no longer open), or its own failure, which is sent again. */
+type Refusal = { readonly _tag: "AlreadyImported" } | { readonly _tag: "InternalServerErrorProblem" }
 
 /** A server for one import: `get` and `decide` answer only when the test says so, and keep what they were sent. */
 const world = (id: ImportId) => {
@@ -59,22 +59,28 @@ const world = (id: ImportId) => {
     readonly madeOn: number
     readonly answer: Deferred.Deferred<Saved, Refusal>
   }> = []
-  const registry = registryWith({
-    imports: {
-      get: () => {
-        const answer = Deferred.makeUnsafe<ImportView>()
-        gets.push(answer)
-        return Deferred.await(answer)
-      },
-      decide: (request: { readonly payload: SaveRequest }) => {
-        const answer = Deferred.makeUnsafe<Saved, Refusal>()
-        // What it was made on is kept beside the rows, so a test of the rows reads the rows.
-        const { madeOn, ...delta } = request.payload
-        saves.push({ delta, madeOn, answer })
-        return Deferred.await(answer)
+  const registry = registryFor({
+    writesRetried: true,
+    endpoints: {
+      imports: {
+        get: () => {
+          const answer = Deferred.makeUnsafe<ImportView>()
+          gets.push(answer)
+          return Deferred.await(answer)
+        },
+        // Each time the request is sent (a retry too) is a save of its own, answered on its own.
+        decide: (request: { readonly payload: SaveRequest }) =>
+          Effect.suspend(() => {
+            const answer = Deferred.makeUnsafe<Saved, Refusal>()
+            // What it was made on is kept beside the rows, so a test of the rows reads the rows.
+            const { madeOn, ...delta } = request.payload
+            saves.push({ delta, madeOn, answer })
+            return Deferred.await(answer)
+          })
       }
     }
   })
+
   const at = (parts: Partial<ImportView> & { readonly revision: number }) => viewAt({ id, ...parts })
   return {
     registry,
@@ -100,6 +106,8 @@ const world = (id: ImportId) => {
     answerSave: (n: number, revision: number, changed = true) =>
       Deferred.succeed(saves[n]!.answer, { revision, changed, notApplied: [] }),
     refuseSave: (n: number) => Deferred.fail(saves[n]!.answer, { _tag: "AlreadyImported" } as const),
+    /** The server fails the save itself: the client sends it again, later. */
+    failSave: (n: number) => Deferred.fail(saves[n]!.answer, { _tag: "InternalServerErrorProblem" } as const),
     gets: () => gets.length,
     held: () => registry.get(importView(id)).pipe(AsyncResult.value, O.getOrThrow),
     draft: () => registry.get(draftOf(id)),
@@ -202,28 +210,67 @@ describe("a saved decision", () => {
     })
   )
 
-  it.live("that finds someone else saved, while a read that left after the save is out, lets that read answer", () =>
-    Effect.gen(function* () {
-      const id = importNo(11)
-      const t = world(id)
-      t.give(t.at({ revision: 10 }))
-      t.open()
-      yield* settle
-      decide(t.registry, id, { "row-1": O.some(out) })
-      yield* settle
-      // The import is read again after the save left (the person came back to the tab), and is still out.
-      t.registry.refresh(importView(id))
-      yield* settle
-      expect(t.gets()).toBe(1)
-      // Two revisions on: somebody else saved between. The read that is out left after the save: it is the answer.
-      yield* t.answerSave(0, 12)
-      yield* settle
-      expect(t.gets()).toBe(1)
-      const theirs: SavedDecisions = { "row-1": out, "row-5": kept }
-      yield* t.answerGet(0, t.at({ revision: 12, decisions: theirs }))
-      yield* settle
-      expect([t.gets(), t.shown(), O.map(t.draft().held, (held) => held.revision)]).toEqual([1, theirs, O.some(12)])
-    })
+  it.live(
+    "that finds someone else saved, while a read that left after the save is out, asks once more: that read may have been served before the save was written",
+    () =>
+      Effect.gen(function* () {
+        const id = importNo(11)
+        const t = world(id)
+        t.give(t.at({ revision: 10 }))
+        t.open()
+        yield* settle
+        decide(t.registry, id, { "row-1": O.some(out) })
+        yield* settle
+        // The import is read again after the save left (the person came back to the tab), and is still out.
+        t.registry.refresh(importView(id))
+        yield* settle
+        expect(t.gets()).toBe(1)
+        // Two revisions on: somebody else saved between. The read left before this answer, so it may not have it.
+        yield* t.answerSave(0, 12)
+        yield* settle
+        expect(t.gets()).toBe(1)
+        // It was: the server read the import before it wrote the save. It is asked once more, and that one has both.
+        yield* t.answerGet(0, t.at({ revision: 10 }))
+        yield* settle
+        expect(t.gets()).toBe(2)
+        const theirs: SavedDecisions = { "row-1": out, "row-5": kept }
+        yield* t.answerGet(1, t.at({ revision: 12, decisions: theirs }))
+        yield* settle
+        expect([t.gets(), t.shown(), O.map(t.draft().held, (held) => held.revision)]).toEqual([2, theirs, O.some(12)])
+      })
+  )
+
+  it.live(
+    "sent again after the server failed it, and answered while a read that left after the first try is out, asks once more",
+    () =>
+      Effect.gen(function* () {
+        const id = importNo(13)
+        const t = world(id)
+        t.give(t.at({ revision: 10 }))
+        t.open()
+        yield* settle
+        decide(t.registry, id, { "row-1": O.some(out) })
+        yield* settle
+        // The first try fails on the server; the client sends it again after a pause.
+        yield* t.failSave(0)
+        // Meanwhile the import is read again, and the server answers that read before it writes the second try.
+        t.registry.refresh(importView(id))
+        yield* settle
+        expect([t.gets(), t.saves.length]).toEqual([1, 1])
+        yield* Effect.sleep("1500 millis")
+        expect(t.saves.length).toBe(2)
+        // The second try answers: somebody else saved between. The read out left before this answer.
+        yield* t.answerSave(1, 12)
+        yield* settle
+        yield* t.answerGet(0, t.at({ revision: 10 }))
+        yield* settle
+        // Asked once more, and that one has the person's row and the other person's.
+        expect(t.gets()).toBe(2)
+        const theirs: SavedDecisions = { "row-1": out, "row-5": kept }
+        yield* t.answerGet(1, t.at({ revision: 12, decisions: theirs }))
+        yield* settle
+        expect([t.shown(), O.map(t.draft().held, (held) => held.revision)]).toEqual([theirs, O.some(12)])
+      })
   )
 
   it.live("that finds someone else saved, while a read that left before the save is out, asks once more after it", () =>

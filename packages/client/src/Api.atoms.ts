@@ -227,8 +227,8 @@ export interface Query<A, E> extends Atom.Writable<AsyncResult.AsyncResult<A, E>
    */
   readonly peek: (registry: AtomRegistry.AtomRegistry) => O.Option<A>
   /**
-   * Asks the server again without ending a request that is out, for an answer no older than `since` (when a write
-   * the answer must include was sent). With no request out it is asked now. A request that started after `since` is
+   * Asks the server again without ending a request that is out, for an answer no older than `since` (when the server
+   * answered a write the answer must include: a request that left after that answer was served after the write). With no request out it is asked now. A request that started after `since` is
    * the answer wanted: nothing is asked. An earlier one, or any one when no `since` is given, is left to land, and
    * the read is asked once more when it does.
    */

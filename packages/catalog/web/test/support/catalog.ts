@@ -4,10 +4,12 @@ import * as Layer from "effect/Layer"
 import * as Str from "effect/String"
 import * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import { provideApi } from "@inventory/client/Api"
+import { makeApi } from "@inventory/client/ApiRuntime"
 import { provideMember } from "@inventory/client/MemberAtoms"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import type { ImportView } from "@inventory/catalog-contract/Import"
 import * as Effect from "effect/Effect"
+import * as ManagedRuntime from "effect/ManagedRuntime"
 import {
   type CatalogApiClient,
   type CatalogBinding,
@@ -24,11 +26,17 @@ export const registryFor = (input: {
   readonly endpoints: object
   readonly idleTTL?: number
   readonly signedIn?: Parameters<typeof provideMember>[0]
+  /** Writes go through the app's own `callWrite`: a failure that may pass is sent again, as it is in the app. */
+  readonly writesRetried?: boolean
 }): AtomRegistry.AtomRegistry => {
   // The stand-in holds only the endpoints the test calls: the rest of the client is never reached.
   const client = input.endpoints as CatalogApiClient
   const run: CatalogBinding["call"] = (use) => Effect.runPromise(use(client))
-  configureCatalog({ call: run, callWrite: run } as CatalogBinding)
+  const callWrite =
+    input.writesRetried === true
+      ? makeApi(ManagedRuntime.make(Layer.succeed(CatalogClient, client)), CatalogClient).callWrite
+      : run
+  configureCatalog({ call: run, callWrite } as CatalogBinding)
   return AtomRegistry.make({
     initialValues: [
       provideApi(Layer.succeed(CatalogClient, client)),

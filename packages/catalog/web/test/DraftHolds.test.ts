@@ -9,6 +9,7 @@ import * as A from "effect/Array"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
+import { decisionWords } from "../src/internal/leftOver.ts"
 import { decisionFromFlags, type SavedDecisions } from "@inventory/catalog-contract/Decision"
 import { MatchTakeBack } from "@inventory/catalog-contract/Import"
 import {
@@ -98,6 +99,28 @@ describe("a refused save", () => {
   })
 })
 
+describe("a row put back (an empty decision of the person's own)", () => {
+  it("waits after a failed save and is not dropped by the next save's answer, nor by its own", () => {
+    const empty = decisionFromFlags({})
+    // Row 12 is stored as left out; the person puts it back and the save fails; then leaves row 5 out, answered.
+    const stored = play(emptyDraft, [
+      DraftEvent.Opened({ kept: O.none() }),
+      view(4, { "row-12": decisionFromFlags({ out: true }) })
+    ]).draft
+    const putBack = play(stored, [
+      DraftEvent.Decided({ changes: { "row-12": O.some(empty) } }),
+      DraftEvent.SaveFailed(),
+      DraftEvent.Decided({ changes: { "row-5": O.some(decisionFromFlags({ out: true })) } }),
+      DraftEvent.SaveAnswered({ revision: 5, changed: true, notApplied: [] })
+    ])
+    expect([R.get(putBack.draft.unsent, "row-12"), O.isSome(waiting(putBack.draft))]).toEqual([
+      O.some(O.some(empty)),
+      true
+    ])
+    expect(shown(putBack.draft)["row-12"]).toEqual(empty)
+  })
+})
+
 describe("a waiting row decided elsewhere since", () => {
   /** Row a decided out on revision 4, its save failed: it waits. */
   const aWaits = play(atFour, [DraftEvent.Decided({ changes: { a: O.some(out) } }), DraftEvent.SaveFailed()]).draft
@@ -112,6 +135,26 @@ describe("a waiting row decided elsewhere since", () => {
     expect(A.map(sends(arrived), (send) => send.delta)).toEqual([{ set: { b: out }, clear: [] }])
     // The screen shows theirs until the person picks.
     expect(shown(arrived.draft)).toEqual({ a: kept, b: out })
+  })
+
+  it("holds the confirm until the person picks, and says so: a second press imports nothing", () => {
+    const held = play(aWaits, [view(5, { a: kept })]).draft
+    const pressed = play(held, [DraftEvent.ConfirmPressed()])
+    const again = play(pressed.draft, [DraftEvent.ConfirmPressed()])
+    expect([
+      pressed.draft.heldForLines,
+      A.some([...pressed.effects, ...again.effects], DraftEffect.$is("Confirm"))
+    ]).toEqual([true, false])
+    // Picked: the confirm goes.
+    const picked = play(again.draft, [
+      DraftEvent.HoldSettled({ rowId: "a", keep: "theirs" }),
+      DraftEvent.ConfirmPressed()
+    ])
+    expect(A.some(picked.effects, DraftEffect.$is("Confirm"))).toBe(true)
+  })
+
+  it("names an empty decision of theirs as no decision, never as one taken back", () => {
+    expect(decisionWords(O.some(decisionFromFlags({})))).toBe("no decision")
   })
 
   it("is not held when the picture holds the person's own earlier decision: the save that failed was taken", () => {

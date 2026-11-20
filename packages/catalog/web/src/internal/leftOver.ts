@@ -1,10 +1,11 @@
 // What the person had decided about a row, in words: for the rows a confirm did not include, named on its result.
 import * as A from "effect/Array"
+import * as Eq from "effect/Equal"
 import * as O from "effect/Option"
 import * as Order from "effect/Order"
 import * as R from "effect/Record"
 import * as Str from "effect/String"
-import { hasKeep, isLeftOut, type TakenBackKind } from "@inventory/catalog-contract/Decision"
+import { decisionFromFlags, hasKeep, isLeftOut, type TakenBackKind } from "@inventory/catalog-contract/Decision"
 import type { MatchTakeBack } from "@inventory/catalog-contract/Import"
 import { fieldLabels } from "@inventory/catalog-contract/Staged"
 import { type HeldRow, Hold, type RowChanges, type RowDecision } from "../Draft.machine.ts"
@@ -40,7 +41,10 @@ const decided = (decision: RowDecision): string => {
  * @example decisionWords(O.some(leftOut)) // "left out"
  */
 export const decisionWords = (change: O.Option<RowDecision>): string =>
-  O.match(change, { onNone: () => "no decision", onSome: decided })
+  O.match(
+    O.filter(change, (decision) => !Eq.equals(decision, decisionFromFlags({}))),
+    { onNone: () => "no decision", onSome: decided }
+  )
 
 /**
  * The person's own decision of a row in words, where an empty one is a decision taken back: "left out", "took your

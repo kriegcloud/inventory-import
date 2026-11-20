@@ -269,8 +269,8 @@ const perform = (input: {
           const another = ownedByAnother({ registry, id })
           void toast.error(another ? "Not saved: someone else is signed in" : "Not saved: you are signed out", {
             description: another
-              ? "Your last decision is kept in this browser for you, and was not sent as them. It is sent once you sign in again as yourself, in this tab or another; nothing is lost."
-              : "Your last decision is kept in this browser. It is sent once you sign in again as yourself, in this tab or another; nothing is lost.",
+              ? "Your last decision is kept in this browser for you, and was not sent as them. It is sent once you sign in again as yourself in this tab; nothing is lost."
+              : "Your last decision is kept in this browser. It is sent once you sign in again as yourself in this tab; nothing is lost.",
             action: { label: "Save again", onClick: () => happened(DraftEvent.SaveAgain()) }
           })
         },

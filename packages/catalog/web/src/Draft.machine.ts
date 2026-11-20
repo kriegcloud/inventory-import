@@ -542,7 +542,8 @@ const strippingUnsent = (draft: Draft, stale: ReadonlyArray<StaleAccept>): Draft
     stripped,
     (change, rowId) =>
       O.exists(change, (decision) => Eq.equals(decision, nothingDecided)) &&
-      !Eq.equals(R.get(draft.unsent, rowId), change)
+      // Emptied by the strip, not decided empty by the person ("Put row back" is an empty decision of their own).
+      !Eq.equals(R.get(draft.unsent, rowId), O.some(change))
   )
   if (R.isEmptyReadonlyRecord(emptied)) return { ...draft, unsent: stripped }
   const stillDecided = (_value: unknown, rowId: string): boolean => !R.has(emptied, rowId)
@@ -850,7 +851,10 @@ const confirming = (draft: Draft): Stepped =>
       )
       if (!R.isEmptyReadonlyRecord(elsewhere)) {
         const holding = confirmAt(holdingElsewhere(draft, elsewhere, held.decisions), "idle")
-        return { draft: { ...holding, epoch: holding.epoch + 1 }, effects: [DraftEffect.Restart({ announce: false })] }
+        return {
+          draft: { ...holding, heldForLines: true, epoch: holding.epoch + 1 },
+          effects: [DraftEffect.Restart({ announce: false })]
+        }
       }
       // Each row it carries names the revision it was decided on.
       const madeOn = madeOnOf(draft.unsent, draft.unsentOn)
@@ -874,8 +878,13 @@ const confirming = (draft: Draft): Stepped =>
     }
   })
 
-/** True while a line above the review asks which of two decisions of a row of this tab's waiting rows stands. */
-const linesAsk = (draft: Draft): boolean => A.some(R.keys(draft.unsent), (rowId) => besideOwn(draft, rowId))
+/**
+ * True while a line above the review asks which of two decisions of a row stands: a gone tab's beside this tab's
+ * waiting row, or a waiting row decided elsewhere since. A confirm would carry one of them unasked.
+ */
+const linesAsk = (draft: Draft): boolean =>
+  A.some(R.keys(draft.unsent), (rowId) => besideOwn(draft, rowId)) ||
+  A.some(R.values(draft.onHold), (held) => Hold.$is("Elsewhere")(held.why))
 
 /** A confirm held for the lines above the review is free again once no line asks. */
 const linesSettled = (draft: Draft): Draft =>

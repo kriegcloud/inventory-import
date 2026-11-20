@@ -137,6 +137,12 @@ const askAssistant = apiRuntime.fn<Asked>()((asked: Asked) =>
 )
 
 /**
+ * Brings the newest line of the conversation into view. One function for the page's life: React calls a ref callback
+ * again only when it, or its element, is new, and the element's key is what says "a line was added".
+ */
+const intoView = (node: HTMLElement | null): void => node?.scrollIntoView({ block: "nearest" })
+
+/**
  * The person types what they want to see in a table; the assistant changes the table's sort, filters and columns, and
  * lists what it changed so each change can be taken back.
  */
@@ -173,9 +179,29 @@ export function TableAssistant(props: {
     if (typed === "" || pending !== null) return
     setUi((now) => ({ ...now, prompt: "", pending: O.some(typed) }))
     const id = `${Effect.runSync(Clock.currentTimeMillis)}`
+    // The page the table is on: an answer that arrives after the person has left it changes nothing.
+    const askedOn = window.location.pathname
     void ask({ prompt: typed, table: props.name, columns: props.columns, searchable: props.searchable }).then(
       (exit) => {
         setUi((now) => ({ ...now, pending: O.none() }))
+        if (window.location.pathname !== askedOn) {
+          // The request outlives the screen. Applied now, the view would be written into the address of the page the
+          // person is on, and the conversation would list changes the table never showed.
+          record(
+            {
+              id,
+              prompt: typed,
+              outcome: "failed",
+              answeredBy: null,
+              note: null,
+              reason: `The answer came after you left ${props.name}, so nothing was changed. Ask again.`,
+              applied: [],
+              undone: false
+            },
+            view.read().visibility
+          )
+          return
+        }
         if (Exit.isFailure(exit)) {
           const error = exit.cause.pipe(Cause.squash)
           record(
@@ -423,11 +449,9 @@ export function TableAssistant(props: {
               </li>
             )}
           </ol>
-          {/* The newest line is brought into view when it arrives: a ref callback on an element made anew each time. */}
-          <div
-            key={`${conversation.entries.length}:${pending ?? ""}:${open}`}
-            ref={(node) => node?.scrollIntoView({ block: "nearest" })}
-          />
+          {/* The newest line is brought into view when it arrives: the key makes the element anew when a line is
+              added, a request starts or ends, or the panel opens, and only then is `intoView` called. */}
+          <div key={`${conversation.entries.length}:${pending ?? ""}:${open}`} ref={intoView} />
         </div>
         <div className="flex flex-col gap-2 border-t pt-2">
           <form className="flex gap-2" onSubmit={submit}>

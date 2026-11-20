@@ -10,6 +10,7 @@ import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import * as HttpApiTest from "effect/http-api/HttpApiTest"
+import * as SqlClient from "effect/sql/SqlClient"
 import { decisionFromFlags, type RowDecisionFlags } from "@inventory/catalog-contract/Decision"
 import type { ImportView } from "@inventory/catalog-contract/Import"
 import { AcceptsTakenBack } from "@inventory/catalog-contract/ImportRejection"
@@ -118,8 +119,11 @@ const flags = (set: Readonly<Record<string, RowDecisionFlags>>) => R.map(set, de
 const scenario = Effect.fn("scenario")(function* (input: {
   readonly rematch: ReadonlyArray<{ readonly field: Field; readonly column: number }>
   readonly set: Readonly<Record<string, RowDecisionFlags>>
+  /** What else is stored for the import saved on, before anything is decided. */
+  readonly before?: (id: string) => Effect.Effect<void, never, SqlClient.SqlClient>
 }) {
   const { client, saving, matching } = yield* seeded
+  if (input.before !== undefined) yield* input.before(saving.id)
   const set = flags(input.set)
   const madeOn = R.map(set, () => saving.revision)
   const rematch = (id: typeof saving.id) =>
@@ -202,6 +206,31 @@ layer(TypedApp)("a Replace or Keep-stored across a re-match of the SKU column", 
       const undecided = [O.some(decisionFromFlags({})), O.some(decisionFromFlags({}))]
       expect(decided(done.saved, ["row-2", "row-3"])).toEqual(undecided)
       expect(decided(done.matched, ["row-2", "row-3"])).toEqual(undecided)
+    })
+  )
+})
+
+/** A name suggestion with no row, stored for the import `id`: the reader never shows such a row. */
+const brokenSuggestion = Effect.fn("brokenSuggestion")(function* (id: string) {
+  const sql = yield* SqlClient.SqlClient
+  yield* sql`INSERT INTO importSuggestion (id, organizationId, importId, kind, rowId, rowNumber, field,
+              fromValue, toValue, columnIndex, madeBy, model, confidence, basis, askedById, createdAt)
+              VALUES ('00000000-0000-4000-8000-0000000000b1', 'org_prairie', ${id}, 'name', '', NULL, 'name', '', 'Crate', NULL, 'rule', NULL,
+                'low', 'A row that was never whole.', 'mem_marcus', '2026-11-20T00:00:00.000Z')`
+}, Effect.orDie)
+
+layer(TypedApp)("a stored suggestion that never reads as one", (it) => {
+  it.effect("does not make the import read as busy: the rule is judged and said as without it", () =>
+    Effect.gen(function* () {
+      // A name suggestion with no row: the reader never shows such a row, so the judgement never reads it, and the
+      // guard on what the judgement read must not count it either.
+      const done = yield* scenario({
+        rematch: [{ field: "unitCost", column: column("List cost") }],
+        set: { "row-2": { stored: "replace" }, "row-3": { stored: "replace" } },
+        before: brokenSuggestion
+      })
+      const named = [{ rowId: "row-3", field: "unitCost", kind: "stored" }]
+      expect([done.notApplied, done.refused, done.confirm]).toEqual([named, named, nothingWritten])
     })
   )
 })

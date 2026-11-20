@@ -64,6 +64,8 @@ import { stagingProblem } from "../Staging/Staging.rules.ts"
 import {
   type Answered,
   answeredAcrossTries,
+  type HeldAtMatch,
+  heldAtMatch,
   type CompareAtMatch,
   comparisonQuestions,
   comparisonsChanged,
@@ -233,13 +235,20 @@ export const importsEndpoints = Effect.gen(function* () {
 
   // A match's question to the review, held across the store's tries of the one match: an answer a later try gives only
   // because an item, a created row or a suggestion changed in between never adds a take-back (`answeredAcrossTries`).
+  // Held only while the tries are asked with the same columns: another person's match in between starts it afresh
+  // (`heldAtMatch`), so a take-back a column causes is never held down.
   const heldAcrossTries = Effect.fnUntraced(function* (compare: CompareAtMatch) {
-    const answered = yield* Ref.make<ReadonlyArray<Answered>>([])
+    const earlier = yield* Ref.make<O.Option<HeldAtMatch>>(O.none())
     const held: CompareAtMatch = Effect.fnUntraced(function* (asked) {
       const answer = yield* compare(asked)
-      const earlier = yield* Ref.get(answered)
-      const kept = answeredAcrossTries({ earlier, questions: asked.questions, changed: answer.changed })
-      yield* Ref.set(answered, kept.answered)
+      const kept = heldAtMatch({
+        earlier: yield* Ref.get(earlier),
+        choices: asked.choices,
+        moves: asked.moves,
+        questions: asked.questions,
+        changed: answer.changed
+      })
+      yield* Ref.set(earlier, O.some(kept.held))
       return { changed: kept.changed, read: answer.read }
     })
     return held

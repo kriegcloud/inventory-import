@@ -13,7 +13,7 @@ import * as S from "effect/Schema"
 import { ItemId, RowId, SuggestionId } from "@inventory/catalog-contract/Ids"
 import { type MatchTakeBack, takenBackRowsNamed } from "@inventory/catalog-contract/Import"
 import { type Field, fields, type StagedHead, type StagedTable } from "@inventory/catalog-contract/Staged"
-import { type ColumnMove, type MappingChoice, matchedColumn } from "@inventory/catalog-contract/Mapping"
+import { ColumnMove, MappingChoice, matchedColumn } from "@inventory/catalog-contract/Mapping"
 import {
   hasKeep,
   isLeftOut,
@@ -470,6 +470,44 @@ export const answeredAcrossTries = (input: {
       ({ question }) => ({ rowId: question.rowId, field: question.field })
     ),
     answered: [...kept, ...now]
+  }
+}
+
+/** A match's earlier tries, held: what they answered, and the columns (choices and moves) they were asked with. */
+export type HeldAtMatch = {
+  readonly choices: ReadonlyArray<MappingChoice>
+  readonly moves: ReadonlyArray<ColumnMove>
+  readonly answered: ReadonlyArray<Answered>
+}
+
+const sameChoices = S.toEquivalence(S.Array(MappingChoice))
+const sameMoves = S.toEquivalence(S.Array(ColumnMove))
+
+/**
+ * One try of a match, held to its earlier tries only while it is asked with the same columns: when another person's
+ * match landed between two tries (the choices or the moves are not those the earlier tries were asked with), what
+ * changed may be a column, and a take-back a column causes is never held down by an answer given before it. Otherwise
+ * as `answeredAcrossTries`: an item, a created row or a suggestion changed between two tries never adds a take-back.
+ *
+ * @example
+ * // Try 1 found row 3's Replace standing; Marcus re-matched Unit cost before try 2, which finds it changed: taken back.
+ * heldAtMatch({ earlier: O.some({ choices: before, moves: [], answered }), choices: after, moves: [], questions, changed })
+ */
+export const heldAtMatch = (input: {
+  readonly earlier: O.Option<HeldAtMatch>
+  readonly choices: ReadonlyArray<MappingChoice>
+  readonly moves: ReadonlyArray<ColumnMove>
+  readonly questions: ReadonlyArray<ComparisonQuestion>
+  readonly changed: ReadonlyArray<ComparisonChanged>
+}): { readonly changed: ReadonlyArray<ComparisonChanged>; readonly held: HeldAtMatch } => {
+  const earlier = O.match(
+    O.filter(input.earlier, (held) => sameChoices(held.choices, input.choices) && sameMoves(held.moves, input.moves)),
+    { onNone: (): ReadonlyArray<Answered> => [], onSome: (held) => held.answered }
+  )
+  const kept = answeredAcrossTries({ earlier, questions: input.questions, changed: input.changed })
+  return {
+    changed: kept.changed,
+    held: { choices: input.choices, moves: input.moves, answered: kept.answered }
   }
 }
 

@@ -332,6 +332,24 @@ const hookPackages = {
   "packages/review/package.json": json({ name: "@x/review", exports: { "./KeptHook": "./src/Kept.hook.ts" } })
 }
 
+// A module variable filled lazily, read back in every function that fills it, by two names that follow each other:
+// following such names once per assignment at every step grew without bound (24 s, then out of memory, at six).
+const lazy = `let current: ((node: HTMLElement | null) => void) | undefined
+let previous: ((node: HTMLElement | null) => void) | undefined
+const make = () => (node: HTMLElement | null) => node?.focus()
+${A.join(
+  A.makeBy(
+    8,
+    (n) => `export function F${n}() {
+  previous = current
+  current = current ?? previous ?? make()
+  return <p ref={current} />
+}`
+  ),
+  "\n"
+)}
+`
+
 describe("laws ref-callbacks", () => {
   it.effect("refuses a module record filled in place, a useRef's .current, a use* only by folder, past the depth", () =>
     Effect.gen(function* () {
@@ -481,6 +499,16 @@ describe("laws ref-callbacks", () => {
       )
       expect(report.failed).toBe(true)
       expect(printed(report)[1]).toContain("git could not list the screens")
+    })
+  )
+
+  it.effect("follows a module variable read back in the functions that fill it in bounded time", () =>
+    Effect.gen(function* () {
+      const started = yield* Effect.clockWith((clock) => clock.currentTimeMillis)
+      const report = yield* inTree({ "src/Lazy.tsx": lazy }, inRepository)
+      const ended = yield* Effect.clockWith((clock) => clock.currentTimeMillis)
+      // Refused (a module variable set again), and in well under a second.
+      expect([report.failed, ended - started < 2000]).toEqual([true, true])
     })
   )
 

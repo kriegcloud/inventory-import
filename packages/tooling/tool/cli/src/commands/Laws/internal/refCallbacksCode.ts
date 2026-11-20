@@ -613,16 +613,20 @@ const resolved = (
   place: Place,
   scopes: ReadonlyArray<Scope>,
   topAssigned: ReadonlyArray<TopAssigned>,
-  depth = 0
+  depth = 0,
+  followed: ReadonlyArray<string> = []
 ): ReadonlyArray<Place> =>
   O.match(lookUpAt(scopes, place.root), {
     onNone: () => [place],
     onSome: ({ at, binding }): ReadonlyArray<Place> => {
-      if (depth > maxAliases) return binding.kind === "module" ? [place] : []
+      // A name already followed on this path (`cache = cache ?? make()`) adds nothing new: following it again would
+      // branch once per such assignment at every step, which grew without bound on a lazily filled module variable.
+      const key = `${at}:${place.root}`
+      if (depth > maxAliases || A.contains(followed, key)) return binding.kind === "module" ? [place] : []
       const where = A.take(scopes, at + 1)
       const through = (source: Node, sourceScopes: ReadonlyArray<Scope>, prop: O.Option<string>) =>
         A.flatMap(placesOf(source), (from) =>
-          resolved(extended(from, prop, place), sourceScopes, topAssigned, depth + 1)
+          resolved(extended(from, prop, place), sourceScopes, topAssigned, depth + 1, [...followed, key])
         )
       if (binding.kind === "module") {
         const given = A.flatMap(O.toArray(binding.init), (init) => through(init, where, binding.prop))

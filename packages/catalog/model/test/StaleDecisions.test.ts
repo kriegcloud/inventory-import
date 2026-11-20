@@ -18,6 +18,7 @@ import {
   columnsOf,
   comparisonQuestions,
   comparisonsChanged,
+  heldAtMatch,
   movesOfMatch,
   withoutStaleDecisions
 } from "@inventory/catalog-model/Rematch"
@@ -191,6 +192,41 @@ const unitOfRow6 = (view: ImportView) => {
     )
   }))
 }
+
+describe("a match's earlier tries, held", () => {
+  const replace = decisionFromFlags({ stored: "replace" })
+  const question = { rowId: "row-3", field: "unitCost" as const, made: 4, then: replace, now: replace }
+  const choice = (column: number): MappingChoice => ({ field: "unitCost", column, by: "person", at: 5 })
+  const firstTry = heldAtMatch({
+    earlier: O.none(),
+    choices: [choice(7)],
+    moves: [],
+    questions: [question],
+    changed: []
+  })
+
+  it("hold down a take-back a later try finds while the columns are the same (an item changed in between)", () => {
+    const later = heldAtMatch({
+      earlier: O.some(firstTry.held),
+      choices: [choice(7)],
+      moves: [],
+      questions: [question],
+      changed: [{ rowId: "row-3", field: "unitCost" }]
+    })
+    expect(later.changed).toEqual([])
+  })
+
+  it("never hold down a take-back once another person's match changed the columns between two tries", () => {
+    const later = heldAtMatch({
+      earlier: O.some(firstTry.held),
+      choices: [choice(8)],
+      moves: [],
+      questions: [question],
+      changed: [{ rowId: "row-3", field: "unitCost" }]
+    })
+    expect(later.changed).toEqual([{ rowId: "row-3", field: "unitCost" }])
+  })
+})
 
 describe("the column a field read at a past revision, and when it moved", () => {
   const { rows: _rows, ...staged } = reviewed

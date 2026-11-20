@@ -603,8 +603,12 @@ export const ImportStoreD1 = Layer.effect(
       if (guard.asked === 0) return sql`1=1`
       const created = sql`(SELECT COUNT(*) FROM importOutcome WHERE organizationId = ${org} AND importId = ${id}
         AND outcome = 'created') = ${guard.createdCount}`
+      // Only the rows that read as a whole suggestion (`suggestionFromStored`: a column one with its column, any other
+      // with its row), the rows the judgement can have read: a stored row that is never shown is never counted, or
+      // the import would read as busy for good.
       const suggestions = sql`(SELECT COUNT(*) FROM importSuggestion WHERE organizationId = ${org}
-        AND importId = ${id}) = ${guard.suggestionCount}`
+        AND importId = ${id} AND (CASE WHEN kind = 'column' THEN columnIndex IS NOT NULL
+          ELSE rowId <> '' AND rowNumber IS NOT NULL END)) = ${guard.suggestionCount}`
       const items =
         guard.keys.length === 0
           ? sql`${guard.found} = 0`

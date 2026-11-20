@@ -5,9 +5,9 @@
   "ignorePatterns": ["dist/**", ".agents/**", ".claude/**", ".codex/**"],
   "overrides": [
     {
-      // The query cache's provider, while the catalog screens still read through TanStack Query; it goes with the
-      // dependency (goals/atoms, step 8). Nothing else in this file may use it.
-      "files": ["src/web/main.tsx"],
+      // The query cache's provider and the client it is given, still at the root until TanStack Query leaves
+      // (goals/atoms, step 8). No screen reads through either; neither may gain a use.
+      "files": ["src/web/main.tsx", "src/web/lib/queries.ts"],
       "rules": { "no-restricted-imports": "off" }
     }
   ]

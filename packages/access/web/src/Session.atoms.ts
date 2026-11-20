@@ -7,7 +7,6 @@
 import { forgetReads } from "@inventory/client/Api"
 import { forgetEarly } from "@inventory/client/Early"
 import { request } from "@inventory/client/Http"
-import { queryClient } from "@inventory/client/QueryClient"
 import {
   actorOfSession,
   type OrganizationChoice,
@@ -179,10 +178,9 @@ export const sessionView: Atom.Atom<SessionView> = Atom.map(session, (result): S
 
 /**
  * Asks who is signed in again, for a new member (after signing in or creating an organization): every read of the
- * API follows the member, and the catalog screens' cache, until they move to atoms, is emptied as before.
+ * API follows the member, so nothing else has to be emptied.
  */
 export const refreshSession = Atom.fnSync((_: void, get) => {
-  void queryClient.resetQueries()
   get.refresh(session)
 })
 
@@ -211,7 +209,6 @@ export const switchOrganization = Atom.fn((organizationId: string, get) =>
   }).pipe(
     Effect.andThen(
       Effect.sync(() => {
-        void queryClient.resetQueries()
         get.refresh(session)
       })
     )

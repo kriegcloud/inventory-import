@@ -50,8 +50,8 @@ export const provideApi = <R>(layer: Layer.Layer<R>): readonly [Atom.Atom<unknow
 
 /**
  * The tab's one record of what changed: a write names its keys here and every read that shows one of them asks again.
- * One instance for the tab, not one per registry, so code that is not an atom yet (the catalog screens on TanStack
- * Query, through `@inventory/client/QueryClient`) can say what it changed with `invalidate`.
+ * One instance for the tab, not one per registry, so code that is not an atom (an upload, the review's saver) can say
+ * what it changed with `invalidate`.
  */
 const reactivity: Reactivity.Reactivity = Effect.runSync(Reactivity.make)
 

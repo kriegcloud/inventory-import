@@ -5,9 +5,9 @@
   "ignorePatterns": ["dist/**"],
   "overrides": [
     {
-      // The query client, still provided at the root until TanStack Query leaves (goals/atoms, step 8). No screen reads
-      // through it; it may gain no caller.
-      "files": ["src/QueryClient.runtime.ts"],
+      // The query client, still provided at the root (the app's main.tsx and lib/queries.ts) until TanStack Query
+      // leaves (goals/atoms, step 8), and its own test. No screen reads through it; it may gain no caller.
+      "files": ["src/QueryClient.runtime.ts", "test/QueryClient.test.ts"],
       "rules": { "no-restricted-imports": "off" }
     }
   ]

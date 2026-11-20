@@ -4,9 +4,8 @@
  * The one thing a reader must not break: a proposal never replaces a decision the person already made.
  *
  * Collections are Effect's: `HashMap` and `HashSet` for what a step hands on (the decisions, an undo step, the
- * counts), `MutableHashMap` and `MutableHashSet` for what one function fills and reads. A `WeakMap` stays where an
- * entry must go when its key does (the undo history beside a draft, the view of an untouched row): Effect has no weak
- * collection.
+ * counts), `MutableHashMap` and `MutableHashSet` for what one function fills and reads. One `WeakMap` stays, where an
+ * entry must go when its key does (the view of an untouched row): Effect has no weak collection.
  */
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import { isKept, isLeftOut, kept, leftOut, putBack, ReviewDecision, RowPlace } from "@inventory/review/ReviewDecision"
@@ -88,26 +87,15 @@ export function proposing(rows: ReadonlyArray<ReviewRow>): ReviewState {
   return { decisions: HashMap.fromIterable(decisions), undo: [], redo: [] }
 }
 
-/**
- * The state behind each object `saved` handed out, while the page is open. A page that shows another view unmounts
- * the region; handing the same object back brings the undo history with it. Held weakly: a dropped draft is freed.
- */
-const histories = new WeakMap<SavedDecisions, ReviewState>()
+/** The decisions as plain data, for whoever keeps them: the state's decisions and nothing of its undo history. */
+export const saved = (state: ReviewState): SavedDecisions => Object.fromEntries(state.decisions)
 
-/** The decisions as plain data, for a draft. The object itself is plain; the undo history is remembered beside it. */
-export const saved = (state: ReviewState): SavedDecisions => {
-  const data: SavedDecisions = Object.fromEntries(state.decisions)
-  histories.set(data, state)
-  return data
-}
-
-/**
- * A review restored from `saved` data. The very object `saved` returned comes back as it was, undo history and all
- * (the region drawn again after the page showed another view, or `fromDraft` after a refresh); a plain copy or
- * another device starts a new history from the same decisions.
- */
-export const restored = (decisions: SavedDecisions): ReviewState =>
-  histories.get(decisions) ?? { decisions: HashMap.fromIterable(Object.entries(decisions)), undo: [], redo: [] }
+/** A review started from decisions kept as plain data: the same decisions, and a new undo history. */
+export const restored = (decisions: SavedDecisions): ReviewState => ({
+  decisions: HashMap.fromIterable(Object.entries(decisions)),
+  undo: [],
+  redo: []
+})
 
 const toDraftStep = (step: UndoStep): DraftStep => ({
   label: step.label,
@@ -122,26 +110,24 @@ const fromDraftStep = (step: DraftStep): UndoStep => ({
 })
 
 /**
- * The decisions `saved` handed out, with their undo history, as plain data that survives JSON: what a page keeps in
- * the browser so a refresh or a closed tab loses neither a decision nor "Undo last step". An object `saved` did not
- * hand out (a copy) has no history to give, and its draft starts with none.
+ * The decisions with their undo and redo history, as plain data that survives JSON: what a page keeps in the browser
+ * so a refresh or a closed tab loses neither a decision nor "Undo last step".
  */
-export const toDraft = (decisions: SavedDecisions): ReviewDraft => ({
-  decisions: { ...decisions },
-  undo: (histories.get(decisions)?.undo ?? []).map(toDraftStep),
-  redo: (histories.get(decisions)?.redo ?? []).map(toDraftStep)
+export const toDraft = (state: ReviewState): ReviewDraft => ({
+  decisions: saved(state),
+  undo: state.undo.map(toDraftStep),
+  redo: state.redo.map(toDraftStep)
 })
 
 /**
- * Decisions to start the region from again after a refresh (`restored`): the very object it restores with its undo
- * history, rebuilt from a `toDraft` draft. Undoing after the refresh then takes back the last step taken before it.
+ * The review a `toDraft` draft was made from, its undo and redo history with it: undoing after a refresh takes back
+ * the last step taken before it.
  */
-export const fromDraft = (draft: ReviewDraft): SavedDecisions =>
-  saved({
-    decisions: HashMap.fromIterable(Object.entries(draft.decisions)),
-    undo: draft.undo.map(fromDraftStep),
-    redo: (draft.redo ?? []).map(fromDraftStep)
-  })
+export const fromDraft = (draft: ReviewDraft): ReviewState => ({
+  decisions: HashMap.fromIterable(Object.entries(draft.decisions)),
+  undo: draft.undo.map(fromDraftStep),
+  redo: (draft.redo ?? []).map(fromDraftStep)
+})
 
 type Recheck = ((input: { row: ReviewRow; cells: Readonly<Record<string, string>> }) => Problem | undefined) | undefined
 
@@ -813,14 +799,18 @@ export function act(input: ActInput): Outcome {
 // The footer
 // ---------------------------------------------------------------------------------------------------------------
 
-export type Primary =
-  | { label: string; blocked: false }
+/** What the footer's one button is, by what pressing it would do. */
+export type Primary = Data.TaggedEnum<{
+  /** Pressing it imports (or, reopened with nothing to add, closes the import). */
+  Import: { readonly label: string }
   /** The label names what stands in the way; pressing the button goes there instead of importing. */
-  | { label: string; blocked: true; columnId?: string }
+  Blocked: { readonly label: string; readonly columnId: string }
   /** Decisions are open and nothing is ready yet: the button says so and cannot be pressed. */
-  | { label: string; blocked: true; idle: true }
+  Idle: { readonly label: string }
   /** Nothing in the file can be imported, and nothing is left to decide: words stand where the button was. */
-  | { label: string; blocked: true; done: true }
+  Done: { readonly label: string }
+}>
+export const Primary = Data.taggedEnum<Primary>()
 
 /**
  * The primary button: a verb, the number that will be written, and the noun. A blocker replaces the label. A button
@@ -838,20 +828,18 @@ export function primary(input: {
   const words = input.words ?? defaultReviewWords
   const unmatched = input.columns.find((column) => isColumnMatchUnmatched(column.match))
   if (unmatched !== undefined) {
-    return { label: `Match ${unmatched.label} to import`, blocked: true, columnId: unmatched.id }
+    return Primary.Blocked({ label: `Match ${unmatched.label} to import`, columnId: unmatched.id })
   }
   const { counts } = input
   if (counts.ready === 0) {
     // Reopened to look, with every remaining row left out: there is nothing to add, and the way out is to close.
-    if (input.closing !== undefined && counts.needs === 0) return { label: input.closing, blocked: false }
-    if (counts.needs + counts.blocked > 0) return { label: `No ${input.noun[1]} ready yet`, blocked: true, idle: true }
-    return {
-      label: counts.total > 0 && counts.stored === counts.total ? words.nothingNew : words.nothingToImport,
-      blocked: true,
-      done: true
-    }
+    if (input.closing !== undefined && counts.needs === 0) return Primary.Import({ label: input.closing })
+    if (counts.needs + counts.blocked > 0) return Primary.Idle({ label: `No ${input.noun[1]} ready yet` })
+    return Primary.Done({
+      label: counts.total > 0 && counts.stored === counts.total ? words.nothingNew : words.nothingToImport
+    })
   }
-  return { label: `Import ${plural(counts.ready, input.noun[0], input.noun[1])}`, blocked: false }
+  return Primary.Import({ label: `Import ${plural(counts.ready, input.noun[0], input.noun[1])}` })
 }
 
 /** "Needs you 6, Left out 2": the counts that are not zero, each under the word its tab says. */

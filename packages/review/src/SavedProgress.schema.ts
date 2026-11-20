@@ -10,7 +10,7 @@ import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import { ReviewDecisionFromFlags, RowKey } from "@inventory/review/ReviewDecision"
 import { fromDraft, toDraft } from "@inventory/review/ReviewDraft"
-import type { DraftStep, SavedDecisions } from "@inventory/review/ReviewTypes"
+import type { DraftStep, ReviewState } from "@inventory/review/ReviewTypes"
 import { $ReviewId } from "./internal/identity.ts"
 
 /** Who the progress belongs to, and which screen. Every part comes from the session, never from the page's address. */
@@ -138,7 +138,7 @@ export const readAt = (storage: ProgressStorage, key: string): SavedProgress | u
   const text = storage.getItem(key)
   if (text === null) return undefined
   const found = decode(text)
-  if (found._tag === "Some") return found.value
+  if (O.isSome(found)) return found.value
   storage.removeItem(key)
   return undefined
 }
@@ -146,7 +146,7 @@ export const readAt = (storage: ProgressStorage, key: string): SavedProgress | u
 /** Writes the progress under `key`. False when the browser refused (a private window, a full disk). */
 export const writeAt = (storage: ProgressStorage, key: string, progress: SavedProgress): boolean => {
   const text = encode(progress)
-  if (text._tag === "None") return false
+  if (O.isNone(text)) return false
   try {
     storage.setItem(key, text.value)
     return true
@@ -183,9 +183,9 @@ const fromStoredStep = (step: StoredStep): DraftStep => ({
   focus: O.getOrNull(step.focus)
 })
 
-/** The decisions handed out by the review region, as stored, undo history included. */
-export const storedReview = (decisions: SavedDecisions): StoredReview => {
-  const draft = toDraft(decisions)
+/** The review region's decisions with their undo and redo history, as stored. */
+export const storedReview = (state: ReviewState): StoredReview => {
+  const draft = toDraft(state)
   return StoredReview.make({
     decisions: draft.decisions,
     undo: draft.undo.map(toStoredStep),
@@ -193,8 +193,8 @@ export const storedReview = (decisions: SavedDecisions): StoredReview => {
   })
 }
 
-/** Stored decisions, ready to start the review region's decisions from again (`restored`), undo history included. */
-export const restoredDecisions = (review: StoredReview): SavedDecisions =>
+/** A stored review as the region's decisions hold it: where the region starts again, its history with it. */
+export const restoredReview = (review: StoredReview): ReviewState =>
   fromDraft({
     decisions: review.decisions,
     undo: review.undo.map(fromStoredStep),

@@ -11,14 +11,14 @@ import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import { describe, expect, it as plain } from "vitest"
 import { ReviewDecision } from "@inventory/review/ReviewDecision"
-import { Action, act, emptyState, restored, saved } from "@inventory/review/ReviewDraft"
+import { Action, act, emptyState } from "@inventory/review/ReviewDraft"
 import type { ReviewRow, ReviewState } from "@inventory/review/ReviewTypes"
 import {
   clearProgress,
   progressKey,
   type ProgressStorage,
   readProgress,
-  restoredDecisions,
+  restoredReview,
   SavedProgress,
   StoredFile,
   storedReview,
@@ -127,9 +127,9 @@ describe("saved progress", () => {
         // And one redo, so the redo history makes the trip too.
         if (undos > 1) state = act({ rows, state, action: Action.Redo() }).state
         // What a refresh does: the decisions handed out, kept as JSON text, decoded and handed back.
-        const text = yield* S.encodeEffect(asText)(storedReview(saved(state)))
+        const text = yield* S.encodeEffect(asText)(storedReview(state))
         const stored = yield* S.decodeEffect(asText)(text)
-        const back = restored(restoredDecisions(stored))
+        const back = restoredReview(stored)
         const plainOf = (decisions: ReviewState["decisions"]) => R.fromEntries(decisions)
         const history = (of: ReviewState) =>
           A.map(of.undo, (step) => [step.label, R.fromEntries(step.before), step.focus])

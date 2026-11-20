@@ -49,16 +49,29 @@ import { Spinner } from "@inventory/ui/components/spinner"
 import { ToggleGroup, ToggleGroupItem } from "@inventory/ui/components/toggle-group"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@inventory/ui/components/tooltip"
 import { useDataTable } from "@inventory/ui/hooks/use-data-table"
-import { Action, confirmLine, heldCsv, heldLine, importSummary, primary, result } from "@inventory/review/ReviewDraft"
+import { saveCsv } from "@inventory/ui/SaveFile"
+import { Action, confirmLine, heldLine, importSummary, Primary, primary, result } from "@inventory/review/ReviewDraft"
 import { regionLayout } from "./internal/parts.tsx"
-import { ReviewGrid } from "./internal/ReviewGrid.tsx"
+import { GridScope, ReviewGrid } from "./internal/ReviewGrid.tsx"
 import { ReviewQueue } from "./internal/ReviewQueue.tsx"
 import { WorkList } from "./internal/WorkList.tsx"
-import { type Density, keepDensity, type Region, RegionScope, type RegionUi, TableScope } from "./ReviewRegion.atoms.ts"
+import {
+  type Density,
+  keepDensity,
+  type Region,
+  type RegionInput,
+  type RegionTable,
+  RegionScope,
+  type RegionUi,
+  TableScope
+} from "./ReviewRegion.atoms.ts"
 import type { Activity, FilterId, ReviewRegionProps, RowView } from "@inventory/review/ReviewTypes"
 
 // Each enum's own guard, made once: these run for every row and every cell.
 const isColumnMatchUnmatched = ColumnMatch.$is("Unmatched")
+const isPrimaryImport = Primary.$is("Import")
+const isPrimaryIdle = Primary.$is("Idle")
+const isPrimaryDone = Primary.$is("Done")
 
 // The phone's drawers (vaul) are their own chunk: fetched on a phone once the review is drawn, never on a desk.
 const PhoneDrawer = lazy(() => import("./internal/PhoneDrawer.tsx").then((module) => ({ default: module.PhoneDrawer })))
@@ -189,8 +202,20 @@ function ToolButton({
 /** No keys while the region is only looking. */
 const noKeys: Atom.Atom<void> = Atom.readable(() => undefined)
 
+// What a caller that says nothing is taken to say, each an atom as the caller's own would be.
 /** No rule to check a typed value with. */
-const noRecheck: NonNullable<ReviewRegionProps["recheck"]> = Atom.make(O.none())
+const noRecheck: RegionInput["recheck"] = Atom.make(O.none())
+/** No answer of the caller's own on a row. */
+const noRowAction: RegionInput["rowAction"] = Atom.make(O.none())
+/** The person may decide. */
+const deciding: RegionInput["readOnly"] = Atom.make(false)
+/** The rules' fixes are proposals. */
+const proposes: RegionInput["ruleFixes"] = Atom.make<"propose" | "apply">("propose")
+/** The region's own words. */
+const ownWords: RegionInput["words"] = Atom.make({})
+
+/** Where the rows that will not be imported are saved. */
+const heldFileName = "not-imported.csv"
 
 /**
  * The review step of an import as one region that fills its frame: counts that filter, the rows with each problem
@@ -209,8 +234,10 @@ export function ReviewRegion(props: ReviewRegionProps) {
         recheck: props.recheck ?? noRecheck,
         decisions: props.decisions,
         problemKinds: props.problemKinds,
-        rejects: props.ruleFixes === "apply",
-        words: props.words,
+        ruleFixes: props.ruleFixes ?? proposes,
+        words: props.words ?? ownWords,
+        rowAction: props.rowAction ?? noRowAction,
+        readOnly: props.readOnly ?? deciding,
         id
       }}
     >
@@ -234,22 +261,32 @@ function RegionWithTable(props: ReviewRegionProps) {
   useAtomMount(region.followFacets)
   return (
     <TableScope.Provider value={{ region, table }}>
-      <RegionBody {...props} region={region} table={table} />
+      <RegionWithGrid {...props} region={region} table={table} />
     </TableScope.Provider>
   )
 }
 
-function RegionBody(
-  props: ReviewRegionProps & { region: Region; table: ReturnType<typeof useDataTable<RowView>>["table"] }
-) {
-  const { region, table } = props
+type WithTable = ReviewRegionProps & { region: Region; table: ReturnType<typeof useDataTable<RowView>>["table"] }
+
+/** The grid's atoms are made here, above the region's body: its footer reads from them which group's accept leads. */
+function RegionWithGrid(props: WithTable) {
   const regionTable = useAtomValue(TableScope.use())
+  return (
+    <GridScope.Provider value={{ region: props.region, table: regionTable }}>
+      <RegionBody {...props} regionTable={regionTable} />
+    </GridScope.Provider>
+  )
+}
+
+function RegionBody(props: WithTable & { regionTable: RegionTable }) {
+  const { region, table, regionTable } = props
+  const grid = useAtomValue(GridScope.use())
   const layout = useAtomValue(regionLayout)
   const narrow = layout === "narrow"
   const titleId = useId()
   const loading = props.state === "loading"
   const failed = props.state === "error"
-  const readOnly = props.readOnly === true
+  const readOnly = useAtomValue(region.input.readOnly)
   const embedded = props.embedded === true
   useAtomMount(readOnly ? noKeys : regionTable.keys)
   // After a decision focus goes to the next row that needs one; after an undo, back to the row.
@@ -270,10 +307,10 @@ function RegionBody(
   const setFacetPicked = (update: (before: RegionUi["facetPicked"]) => RegionUi["facetPicked"]) =>
     change((before) => ({ facetPicked: update(before.facetPicked) }))
 
-  const { problemKinds } = props
+  const problemKinds = useAtomValue(region.input.problemKinds)
   const rows = useAtomValue(region.input.rows)
   const columns = useAtomValue(region.input.columns)
-  const { words } = region
+  const words = useAtomValue(region.words)
   const views = useAtomValue(region.views)
   const counts = useAtomValue(region.counts)
   const left = useAtomValue(region.left)
@@ -284,7 +321,7 @@ function RegionBody(
   const activeKind = useAtomValue(region.activeKind)
   const ordered = useAtomValue(regionTable.ordered)
   const facets = useAtomValue(region.facets)
-  const leadInView = useAtomValue(region.leadInView)
+  const leadInView = useAtomValue(grid.leadInView)
   const listMode = useAtomValue(region.listMode)
   // On the other tabs Import waits too while a decision is open: filled there, it invited skipping every row
   // that still needs the person.
@@ -312,23 +349,22 @@ function RegionBody(
     setPicked("needs")
     setKind(kindId)
   }
-  const pressMain = () => {
-    if (!main.blocked) {
-      if (counts.needs + counts.cannot + counts.out > 0) setConfirmOpen(true)
-      else props.onImport(result({ views, problemKinds, words }))
-      return
-    }
-    // Never offered as a press: an idle button is disabled, and a finished review shows words instead.
-    if ("idle" in main || "done" in main) return
-    if (main.columnId !== undefined) {
-      // On a desk the choice is in the column's own header; on a phone it is in the columns sheet.
-      const select = document.getElementById(`review-match-${main.columnId}`)
-      if (select !== null) select.focus()
-      else props.onShowMatching?.()
-      return
-    }
-    step(false)
-  }
+  const pressMain = () =>
+    Primary.$match(main, {
+      Import: () => {
+        if (counts.needs + counts.cannot + counts.out > 0) setConfirmOpen(true)
+        else props.onImport(result({ views, problemKinds, words }))
+      },
+      // Never offered as a press: an idle button is disabled, and a finished review shows words instead.
+      Idle: () => undefined,
+      Done: () => undefined,
+      Blocked: ({ columnId }) => {
+        // On a desk the choice is in the column's own header; on a phone it is in the columns sheet.
+        const select = document.getElementById(`review-match-${columnId}`)
+        if (select !== null) select.focus()
+        else props.onShowMatching?.()
+      }
+    })
   // The confirm step is opened by the import button without being its trigger, so it hands focus back itself.
   const backToImport = (event: Event) => {
     event.preventDefault()
@@ -532,8 +568,9 @@ function RegionBody(
     </DropdownMenu>
   )
 
-  // The rows that will not be imported, as a file with a reason on each line; nothing to download while none is held.
-  const heldFile = `data:text/csv;charset=utf-8,${encodeURIComponent(heldCsv({ views, columns, problemKinds, words }))}`
+  // The rows that will not be imported, as a file with a reason on each line: written out when the person asks for
+  // it, never while they decide. Nothing to download while none is held.
+  const saveHeld = () => saveCsv(heldFileName, region.notImported())
   const heldWords = `Download the ${whole.format(held)} ${held === 1 ? "row" : "rows"} not imported (CSV)`
   const download =
     held === 0 ? (
@@ -541,22 +578,13 @@ function RegionBody(
         <DownloadIcon aria-hidden />
       </ToolButton>
     ) : (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button variant="ghost" size={narrow ? "icon-touch" : "icon-sm"} asChild>
-            <a download="not-imported.csv" href={heldFile} aria-label={heldWords}>
-              <DownloadIcon aria-hidden />
-            </a>
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>{heldWords}</TooltipContent>
-      </Tooltip>
+      <ToolButton label={heldWords} narrow={narrow} onClick={saveHeld}>
+        <DownloadIcon aria-hidden />
+      </ToolButton>
     )
 
   // "Why flagged?": every reason of every flagged row on screen, in the caller's words, in a side panel.
-  const flaggedOnScreen = ordered
-    .filter((view) => view.status === "needs" || view.status === "cannot")
-    .map((view) => view.row)
+  const flaggedOnScreen = useAtomValue(regionTable.flagged)
   const whyButton =
     props.explain === undefined || loading ? null : (
       <ToolButton
@@ -605,13 +633,13 @@ function RegionBody(
   const importLabel =
     props.importing === true
       ? `Importing ${whole.format(counts.ready)}`
-      : counts.ready > 0 && skipped > 0 && !main.blocked
+      : counts.ready > 0 && skipped > 0 && isPrimaryImport(main)
         ? `Import ${whole.format(counts.ready)}, skip ${whole.format(skipped)}`
         : main.label
   // With nothing to import and nothing to decide there is no button to press: the words say so, and the caller's
   // next step (`emptyAction`, "Choose another file") stands beside them.
-  const finished = main.blocked && "done" in main
-  const idle = main.blocked && "idle" in main
+  const finished = isPrimaryDone(main)
+  const idle = isPrimaryIdle(main)
   const importButtonNode =
     readOnly || loading || rows.length === 0 || embedded ? null : finished ? (
       // On a phone the words take two lines rather than push the next step past the screen's edge.
@@ -706,11 +734,9 @@ function RegionBody(
           </li>
         ))}
       </ul>
-      <Button variant="outline" size={narrow ? "touch" : "sm"} asChild>
-        <a download="not-imported.csv" href={heldFile}>
-          <DownloadIcon aria-hidden />
-          {heldWords}
-        </a>
+      <Button variant="outline" size={narrow ? "touch" : "sm"} onClick={saveHeld}>
+        <DownloadIcon aria-hidden />
+        {heldWords}
       </Button>
     </div>
   ) : null
@@ -761,15 +787,10 @@ function RegionBody(
     <ReviewGrid
       table={table}
       framed
-      density={density}
-      // Not while the confirm step is open: its own button is then the screen's filled one.
-      canLead={!readOnly && filter === "needs" && !confirmOpen}
-      readOnly={readOnly}
       loading={loading}
       caption={caption}
       empty={empty}
       onMatch={readOnly ? undefined : props.onMatchColumn}
-      rowAction={props.rowAction}
       cellEditor={props.cellEditor}
     />
   )
@@ -855,11 +876,9 @@ function RegionBody(
                 }
                 onSplit={(groupId) => setSplit((before) => HashSet.add(before, groupId))}
                 undo={undoButton}
-                readOnly={readOnly}
                 loading={loading}
                 caption={caption}
                 empty={empty}
-                rowAction={props.rowAction}
                 cellEditor={props.cellEditor}
               />
               <div className="flex h-16 flex-none items-center gap-2 px-4">

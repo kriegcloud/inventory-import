@@ -453,6 +453,7 @@
       "dependencies": {
         "@beep/identity": "workspace:*",
         "@beep/schema": "workspace:*",
+        "@effect/atom-react": "4.1.4",
         "@inventory/ui": "workspace:*",
         "@tanstack/react-table": "^9.3.1",
         "@tanstack/react-virtual": "^3.14.26",

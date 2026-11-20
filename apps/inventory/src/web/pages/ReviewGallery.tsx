@@ -138,11 +138,13 @@ const monthRows: ReadonlyArray<ReviewRow> = monthItems.flatMap((item, index) =>
   })
 )
 
-/** The item's own answer on each of its months: every record of its line goes. Module level, so it is stable. */
-const leaveItemOut = (row: ReviewRow) => ({
-  label: `Leave ${row.cells.name ?? "the item"} out, every month`,
-  onSelect: () => toast(`Would leave every month of line ${row.line} out`)
-})
+/** The item's own answer on each of its months: every record of its line goes. An atom, as the region takes it. */
+const leaveItemOut = Atom.make(
+  O.some((row: ReviewRow) => ({
+    label: `Leave ${row.cells.name ?? "the item"} out, every month`,
+    onSelect: () => toast(`Would leave every month of line ${row.line} out`)
+  }))
+)
 
 /** Which state the gallery shows, first from the address (`?state=`). */
 const galleryState = Atom.make<GalleryState>(readState())
@@ -167,6 +169,11 @@ const galleryRows = Atom.map(galleryState, (state): ReadonlyArray<ReviewRow> =>
 // What the regions are given, as the atoms they follow.
 const galleryColumns = Atom.map(galleryState, (state) => (state === "unmatched" ? columnsUnmatched : columns))
 const galleryRecheck = Atom.make(O.some(recheck))
+const galleryKinds = Atom.map(galleryState, (state): ReadonlyArray<ProblemKind> =>
+  state === "elsewhere" ? elsewhereKinds : problemKinds
+)
+const monthKinds = Atom.make<ReadonlyArray<ProblemKind>>(problemKinds)
+const galleryLooking = Atom.map(galleryState, (state) => state === "readonly")
 const monthColumnsAtom = Atom.make(monthColumns)
 const monthRowsAtom = Atom.make(monthRows)
 const monthRecheck = Atom.make(
@@ -232,7 +239,7 @@ export default function ReviewGallery() {
           columns={monthColumnsAtom}
           rows={monthRowsAtom}
           decisions={monthDecisions}
-          problemKinds={problemKinds}
+          problemKinds={monthKinds}
           summary={[`${monthItems.length} rows in the file, ${monthRows.length} records`]}
           recheck={monthRecheck}
           rowAction={leaveItemOut}
@@ -246,14 +253,14 @@ export default function ReviewGallery() {
           columns={galleryColumns}
           rows={galleryRows}
           decisions={galleryDecisions}
-          problemKinds={state === "elsewhere" ? elsewhereKinds : problemKinds}
+          problemKinds={galleryKinds}
           summary={[]}
           activity={activity(rows.length)}
           recheck={galleryRecheck}
           state={state === "loading" ? "loading" : state === "error" ? "error" : "ready"}
           error="The file could not be read: the first sheet has no header row. Check the file and upload it again."
           onRetry={() => choose("default")}
-          readOnly={state === "readonly"}
+          readOnly={galleryLooking}
           importNote="Each row becomes a new item; nothing already in stock is updated."
           readOnlyNote="View only. An editor can import."
           emptyAction={

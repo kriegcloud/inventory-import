@@ -15,6 +15,7 @@ import { isNarrow } from "@inventory/ui/ContentWidth"
 import { Button } from "@inventory/ui/components/button"
 import { Spinner } from "@inventory/ui/components/spinner"
 import { member } from "@inventory/client/MemberAtoms"
+import { hasRole } from "@inventory/kernel/Role"
 import { invalidate, perKey } from "@inventory/client/Api"
 import {
   draftEvents,
@@ -22,9 +23,10 @@ import {
   regionEpoch,
   reviewInput,
   reviewLocal,
-  reviewState,
+  reviewStateAt,
   shownDecisions,
-  unconfirmedRows
+  unconfirmedRows,
+  whileCurrent
 } from "./ReviewDraft.atoms.ts"
 import { deltaOf, DraftEvent } from "./Draft.machine.ts"
 import { confirmImport, matchColumn, suggestFixes } from "./Imports.atoms.ts"
@@ -81,19 +83,26 @@ const currentReview = perKey((id: ImportId) =>
   })
 )
 
+// What the region is given that never changes, each as the atom it takes.
+const kindsAtom = Atom.make(regionKinds)
+const wordsAtom = Atom.make(reviewStepWords)
+const ruleFixesAtom = Atom.make(ruleFixes)
+/** True while the person signed in may look at an import but not decide on it: the page's own rule, as an atom. */
+const lookingOnly = Atom.map(member, (signedIn) => !O.exists(signedIn, (actor) => hasRole(actor.role, "editor")))
+
 const noRows: ReadonlyArray<ReviewRow> = []
 const noColumns: ReadonlyArray<ReviewColumn> = []
 
-/** The review's rows and columns as the region takes them: atoms it follows, empty until the review is worked out. */
-const regionRows = perKey((id: ImportId) =>
+/** The review's rows and columns as a region takes them: atoms it follows, empty until the review is worked out. */
+const rowsOf = perKey((id: ImportId) =>
   Atom.map(currentReview(id), (worked) => O.match(worked, { onNone: () => noRows, onSome: (now) => now.rows }))
 )
-const regionColumnsOf = perKey((id: ImportId) =>
+const columnsOf = perKey((id: ImportId) =>
   Atom.map(currentReview(id), (worked) => O.match(worked, { onNone: () => noColumns, onSome: (now) => now.columns }))
 )
 
 /** The check the region runs on a row as the person types: the review's own, for one row. */
-const rowRecheck = perKey((id: ImportId) =>
+const recheckOf = perKey((id: ImportId) =>
   Atom.readable((get) =>
     O.map(get(reviewInput(id)), (input) => {
       const check = recheckRow(input)
@@ -107,6 +116,19 @@ const rowRecheck = perKey((id: ImportId) =>
       }
     })
   )
+)
+
+/**
+ * What the region drawn at one epoch of the draft is given. Each follows the review while that epoch is the draft's
+ * and keeps its last value after, so a region about to be drawn again is not first handed the newer draft.
+ */
+const regionGiven = perKey((id: ImportId) =>
+  perKey((epoch: number) => ({
+    rows: whileCurrent({ id, epoch, source: rowsOf(id) }),
+    columns: whileCurrent({ id, epoch, source: columnsOf(id) }),
+    recheck: whileCurrent({ id, epoch, source: recheckOf(id) }),
+    decisions: reviewStateAt(id)(epoch)
+  }))
 )
 
 /**
@@ -140,7 +162,8 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
   const shownRead = useAtomValue(shownDecisions(view.id))
   const decisions = O.getOrElse(shownRead, () => view.decisions)
   const worked = useAtomValue(currentReview(view.id))
-  const recheckRead = useAtomValue(rowRecheck(view.id))
+  const recheckRead = useAtomValue(recheckOf(view.id))
+  const given = regionGiven(view.id)(epoch)
 
   // Follows the import's draft while this screen is open (`followDraft`): where it starts, and a newer draft.
   useAtomMount(followDraft(view.id))
@@ -278,12 +301,12 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
         key={`${view.id}:${epoch}`}
         title={`Review ${view.fileName}`}
         noun={["item", "items"]}
-        columns={regionColumnsOf(view.id)}
-        rows={regionRows(view.id)}
+        columns={given.columns}
+        rows={given.rows}
         // The decisions with their undo are this import's own atom: the region writes it, and the write saves them.
-        decisions={reviewState(view.id)}
-        problemKinds={regionKinds}
-        words={reviewStepWords}
+        decisions={given.decisions}
+        problemKinds={kindsAtom}
+        words={wordsAtom}
         summary={summary}
         summaryAction={summaryAction}
         // The sums of the rows that will be imported, as the domain reads them from the digits: unit cost times
@@ -294,11 +317,11 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
           ...sums.readyQuantities.map((total) => ({ label: total.unit, value: whole.format(total.quantity) }))
         ]}
         activity={activity}
-        recheck={rowRecheck(view.id)}
+        recheck={given.recheck}
         cellEditor={cellEditor}
         explain={(flagged) => <WhyFlagged rows={flagged} current={current} />}
-        ruleFixes={ruleFixes}
-        readOnly={!props.canImport}
+        ruleFixes={ruleFixesAtom}
+        readOnly={lookingOnly}
         readOnlyNote="View only. An editor can import."
         importNote="Each row becomes a new item. A SKU already there is skipped; if its values differ, you choose to keep or replace it."
         // Reopened after it created its items: with nothing more to add, the person can still close it again.

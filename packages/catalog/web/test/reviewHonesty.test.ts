@@ -23,6 +23,7 @@ import {
   heldCsv,
   heldLine,
   kindsOf,
+  Primary,
   primary,
   reasonOf,
   restored,
@@ -142,10 +143,9 @@ describe("rows that cannot be fixed here", () => {
   })
 
   it("do not hold the import back", () => {
-    expect(primary({ columns, counts: count(views), noun: ["item", "items"] })).toEqual({
-      label: "Import 1 item",
-      blocked: false
-    })
+    expect(primary({ columns, counts: count(views), noun: ["item", "items"] })).toEqual(
+      Primary.Import({ label: "Import 1 item" })
+    )
   })
 })
 
@@ -154,16 +154,12 @@ describe("a button that could do nothing is never offered", () => {
 
   it("is idle while decisions are open and nothing is ready", () => {
     const counts = count(viewRows({ rows: [row(2, { problem: { kind: "unit", column: "name" } })], state: emptyState }))
-    expect(primary({ columns, counts, noun })).toEqual({ label: "No items ready yet", blocked: true, idle: true })
+    expect(primary({ columns, counts, noun })).toEqual(Primary.Idle({ label: "No items ready yet" }))
   })
 
   it("gives way to words when only rows nothing here can fix are left", () => {
     const counts = count(viewRows({ rows: [unknownItem(2)], state: emptyState, fixable: fixableBy(kinds) }))
-    expect(primary({ columns, counts, noun })).toEqual({
-      label: defaultReviewWords.nothingToImport,
-      blocked: true,
-      done: true
-    })
+    expect(primary({ columns, counts, noun })).toEqual(Primary.Done({ label: defaultReviewWords.nothingToImport }))
   })
 
   it.effect("ends a second load of the same file on 'Nothing new' once every row is already there", () =>
@@ -175,11 +171,9 @@ describe("a button that could do nothing is never offered", () => {
       const { rows } = yield* sampleRows("items_clean.csv", items)
       const counts = count(viewRows({ rows, state: emptyState }))
       expect(counts.stored).toBe(25)
-      expect(primary({ columns, counts, noun })).toEqual({
-        label: "Nothing new: this file is already in",
-        blocked: true,
-        done: true
-      })
+      expect(primary({ columns, counts, noun })).toEqual(
+        Primary.Done({ label: "Nothing new: this file is already in" })
+      )
     })
   )
 })

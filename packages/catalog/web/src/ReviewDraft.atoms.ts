@@ -16,20 +16,12 @@ import type { ImportId } from "@inventory/catalog-contract/Ids"
 import type { ImportView, SuggestOutcome } from "@inventory/catalog-contract/Import"
 import { restored, saved } from "@inventory/review/ReviewDraft"
 import type { ReviewState } from "@inventory/review/ReviewTypes"
-import { restoredDecisions, storedReview } from "@inventory/review/SavedProgress"
+import { restoredReview, storedReview } from "@inventory/review/SavedProgress"
 import { progressOf, progressWith } from "@inventory/review/SavedProgressHook"
 import type { review } from "@inventory/catalog-model/Review"
 import { callWrite } from "./Catalog.runtime.ts"
 import { draftOf } from "./Draft.atoms.ts"
-import {
-  changesBetween,
-  type DraftEffect,
-  DraftEvent,
-  type RowChanges,
-  shown,
-  step,
-  unconfirmed
-} from "./Draft.machine.ts"
+import { changesBetween, DraftEffect, DraftEvent, type RowChanges, shown, step, unconfirmed } from "./Draft.machine.ts"
 import { toRegionDecisions, toServerDecisions } from "./ImportReview.controller.ts"
 import { changeView, importTable, importView, importViewShown, viewWith } from "./Imports.atoms.ts"
 
@@ -92,21 +84,24 @@ const registryOf = Atom.readable((get) => get.registry)
 /** A write with nothing to read. */
 const noValue = (): void => undefined
 
+/** True for what changes only what this tab holds; false for what goes to the server. */
+const isLocal = DraftEffect.$match({ Put: () => true, Restart: () => true, Send: () => false, Ask: () => false })
+
 /** Does what the machine asks: sends, asks, puts the person's own save into the view, starts the region again. */
 const perform = (input: {
   readonly registry: AtomRegistry.AtomRegistry
   readonly id: ImportId
   readonly effect: DraftEffect
 }): void => {
-  const { registry, id, effect } = input
+  const { registry, id } = input
   const happened = (event: DraftEvent) => registry.set(draftEvents(id), event)
-  switch (effect._tag) {
-    case "Send":
-      // A failure that may pass (the network, a server error) was sent again under the same rows already; if it
-      // still fails the rows stay on screen and wait for "Save again": they are the person's work. A refusal (the
-      // import was confirmed or removed meanwhile, the role was taken away) puts the screen back to what the server
-      // holds, and the toast says why.
-      void callWrite((api) => api.imports.decide({ params: { id }, payload: effect.delta })).then(
+  DraftEffect.$match(input.effect, {
+    // A failure that may pass (the network, a server error) was sent again under the same rows already; if it
+    // still fails the rows stay on screen and wait for "Save again": they are the person's work. A refusal (the
+    // import was confirmed or removed meanwhile, the role was taken away) puts the screen back to what the server
+    // holds, and the toast says why.
+    Send: ({ delta }) =>
+      void callWrite((api) => api.imports.decide({ params: { id }, payload: delta })).then(
         ({ revision }) => happened(DraftEvent.SaveAnswered({ revision })),
         (error: unknown) => {
           if (isTransient(error)) {
@@ -120,27 +115,20 @@ const perform = (input: {
             happened(DraftEvent.SaveRefused())
           }
         }
-      )
-      return
-    case "Ask":
-      registry.refresh(importView(id))
-      return
-    case "Put":
-      // Only the decisions and the revision, and never over a later revision already held.
+      ),
+    Ask: () => registry.refresh(importView(id)),
+    // Only the decisions and the revision, and never over a later revision already held.
+    Put: ({ decisions, revision }) =>
       changeView({
         registry,
         id,
-        change: (held) =>
-          held.revision >= effect.revision
-            ? held
-            : viewWith(held, { decisions: effect.decisions, revision: effect.revision })
-      })
-      return
-    case "Restart":
+        change: (held) => (held.revision >= revision ? held : viewWith(held, { decisions, revision }))
+      }),
+    Restart: ({ announce }) => {
       registry.update(reviewLocal(id), (now) => ({ ...now, state: O.none() }))
-      if (effect.announce) toast("Updated with what changed on another screen")
-      return
-  }
+      if (announce) toast("Updated with what changed on another screen")
+    }
+  })
 }
 
 /**
@@ -151,8 +139,14 @@ export const draftEvents = perKey((id: ImportId) =>
   Atom.writable(noValue, (ctx, event: DraftEvent) => {
     const registry = ctx.get(registryOf)
     const stepped = step(registry.get(draftOf(id)), event)
-    registry.set(draftOf(id), stepped.draft)
-    for (const effect of stepped.effects) perform({ registry, id, effect })
+    // One change for whoever follows the draft: the new draft and what it changes in this tab are in place before
+    // anything is worked out from them (the epoch, before what a region of that epoch is given). What goes to the
+    // server goes after.
+    Atom.batch(() => {
+      registry.set(draftOf(id), stepped.draft)
+      for (const effect of stepped.effects) if (isLocal(effect)) perform({ registry, id, effect })
+    })
+    for (const effect of stepped.effects) if (!isLocal(effect)) perform({ registry, id, effect })
   })
 )
 
@@ -222,15 +216,13 @@ const startState = perKey((id: ImportId) =>
     const decisions = O.getOrElse(get(shownDecisions(id)), (): SavedDecisions => ({}))
     // Read as it stands when the review starts: every decision after that is kept there, and starts nothing again.
     const kept = O.flatMap(get.once(progressFor(get, id)), (progress) => progress.review)
-    return restored(
-      O.match(kept, {
-        onNone: () => toRegionDecisions(decisions),
-        onSome: (review) =>
-          Eq.equals(toServerDecisions(review.decisions), decisions)
-            ? restoredDecisions(review)
-            : toRegionDecisions(decisions)
-      })
-    )
+    return O.match(kept, {
+      onNone: () => restored(toRegionDecisions(decisions)),
+      onSome: (review) =>
+        Eq.equals(toServerDecisions(review.decisions), decisions)
+          ? restoredReview(review)
+          : restored(toRegionDecisions(decisions))
+    })
   })
 )
 
@@ -254,11 +246,44 @@ export const reviewState = perKey((id: ImportId) =>
         kept,
         progressWith({
           before: ctx.get(kept),
-          change: { step: "review", review: O.some(storedReview(decisions)), decided: R.keys(decisions).length }
+          change: { step: "review", review: O.some(storedReview(next)), decided: R.keys(decisions).length }
         })
       )
     }
   )
+)
+
+/**
+ * What the region drawn at one epoch is given: `source` for as long as that epoch is the draft's, and from then on the
+ * last value it had. When the draft changes on another screen the region is drawn again from the new one (a new
+ * epoch); the one about to go is not handed the new draft first, where it would work every row out again only to leave.
+ *
+ * @example whileCurrent({ id, epoch: 3, source: reviewState(id) })
+ */
+export const whileCurrent = <A>(input: {
+  readonly id: ImportId
+  readonly epoch: number
+  readonly source: Atom.Atom<A>
+}): Atom.Atom<A> =>
+  Atom.readable((get) => {
+    const held = get.self<A>()
+    return O.isSome(held) && get(regionEpoch(input.id)) !== input.epoch ? held.value : get(input.source)
+  })
+
+/**
+ * The decisions of the region drawn at one epoch of an import's draft: `reviewState` while that epoch is the
+ * draft's. A region that has been replaced reads what it last had and writes nothing.
+ */
+export const reviewStateAt = perKey((id: ImportId) =>
+  perKey((epoch: number) => {
+    const read = whileCurrent({ id, epoch, source: reviewState(id) })
+    return Atom.writable(
+      (get): ReviewState => get(read),
+      (ctx, next: ReviewState) => {
+        if (ctx.get(regionEpoch(id)) === epoch) ctx.set(reviewState(id), next)
+      }
+    )
+  })
 )
 
 export { draftOf }

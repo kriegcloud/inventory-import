@@ -636,8 +636,7 @@ export function ItemsPage() {
       quick={quickFilters}
       search={
         <TableSearch
-          value={searched}
-          onSearch={(text) => table.setGlobalFilter(text)}
+          table={table}
           placeholder="Search items"
           working={page.updating}
           maxLength={maxSearch}

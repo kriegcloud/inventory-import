@@ -1,4 +1,3 @@
-import { stringify } from "@inventory/ui/Json"
 // The two cells of an item that hold JSON, fixed in a small form instead of as raw text. The form writes the cell back
 // as the brief's own JSON; the one thing not to break: nothing is saved that the domain's readers (`readDimensions`,
 // `readVendors`) would refuse, and their sentence is what the person reads under the fields.
@@ -8,6 +7,7 @@ import * as ScopedAtom from "@effect/atom-react/ScopedAtom"
 import * as O from "effect/Option"
 import * as Atom from "effect/reactivity/Atom"
 import { useId } from "react"
+import { stringify } from "@inventory/ui/Json"
 import { Button } from "@inventory/ui/components/button"
 import { Field, FieldError, FieldLabel, FieldLegend, FieldSet } from "@inventory/ui/components/field"
 import { Input } from "@inventory/ui/components/input"

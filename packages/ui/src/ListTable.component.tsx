@@ -59,9 +59,6 @@ const chrome = 36 * 2 + 2
 // The least a column without a width gets when the others take the room: a sentence still shows a few words.
 const leastFlexible = 160
 
-// Each row's searchable text, kept while the visible columns stay the same: the search tests a row once per column.
-const searchText = new WeakMap<object, { readonly columns: string; readonly text: string }>()
-
 /**
  * The search box's rule for a held list: every word typed, in any order, is somewhere in the row's visible columns
  * that are searched, ignoring case. "rule cost" finds a cost decided by a rule.
@@ -72,23 +69,17 @@ const everyWord: FilterFn<DataTableFeatures, RowData> = (row, _columnId, filterV
     .split(/\s+/)
     .filter((word) => word !== "")
   if (words.length === 0) return true
-  const columns = row.table.getVisibleLeafColumns().filter((column) => column.getCanGlobalFilter())
-  const key = columns.map((column) => column.id).join("|")
-  const original = row.original
-  const holder = typeof original === "object" && original !== null ? original : undefined
-  const kept = holder === undefined ? undefined : searchText.get(holder)
-  let text = kept?.columns === key ? kept.text : undefined
-  if (text === undefined) {
-    text = columns
-      .map((column) => {
-        const value = row.getValue(column.id)
-        return typeof value === "string" || typeof value === "number" ? String(value) : ""
-      })
-      .join(" ")
-      .toLowerCase()
-    if (holder !== undefined) searchText.set(holder, { columns: key, text })
-  }
-  const found = text
+  // The row's text is put together each time it is asked for, and nothing of it is kept: these lists are held whole
+  // and are short (the server sends at most a few thousand rows), and the table keeps each cell's value itself.
+  const found = row.table
+    .getVisibleLeafColumns()
+    .filter((column) => column.getCanGlobalFilter())
+    .map((column) => {
+      const value = row.getValue(column.id)
+      return typeof value === "string" || typeof value === "number" ? String(value) : ""
+    })
+    .join(" ")
+    .toLowerCase()
   return words.every((word) => found.includes(word))
 }
 
@@ -286,8 +277,7 @@ function ListBody<Row extends RowData>(props: ListTableProps<Row>) {
         quick={columns.filter((column) => column.facet === true).map((column) => column.id)}
         search={
           <TableSearch
-            value={searched}
-            onSearch={(text) => table.setGlobalFilter(text)}
+            table={table}
             placeholder={props.searchLabel}
             working={props.updating === true}
             maxLength={maxSearch}

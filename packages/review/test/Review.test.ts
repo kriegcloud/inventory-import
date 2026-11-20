@@ -26,6 +26,7 @@ import {
   nextProblem,
   otherAnswers,
   pickedChoice,
+  Primary,
   primary,
   proposing,
   restored,
@@ -34,6 +35,8 @@ import {
   result,
   saved,
   shownWith,
+  toDraft,
+  fromDraft,
   viewRows,
   visible,
   waitingGroups,
@@ -93,7 +96,7 @@ describe("counts", () => {
       Action.LeaveOut({ rowIds: [firstOf("cost").id] })
     )
     const counts = count(views(state))
-    expect(primary({ columns, counts, noun })).toEqual({ label: `Import ${counts.ready} items`, blocked: false })
+    expect(primary({ columns, counts, noun })).toEqual(Primary.Import({ label: `Import ${counts.ready} items` }))
     expect(counts.ready).toBe(145)
     // Each count under the word its tab says, so the line and the tabs never disagree.
     expect(heldLine(counts)).toBe("33 won't be imported: Needs a decision 32, Left out 1")
@@ -223,11 +226,9 @@ describe("groups", () => {
 describe("the import button and the queue", () => {
   it("names the blocker when a column has no match", () => {
     const counts = count(viewRows({ rows: makeRows({ size: 178, withoutUnit: true }), state: emptyState }))
-    expect(primary({ columns: columnsUnmatched, counts, noun })).toEqual({
-      label: "Match Unit to import",
-      blocked: true,
-      columnId: "unit"
-    })
+    expect(primary({ columns: columnsUnmatched, counts, noun })).toEqual(
+      Primary.Blocked({ label: "Match Unit to import", columnId: "unit" })
+    )
   })
 
   it("moves to the next undecided row and wraps round", () => {
@@ -588,7 +589,7 @@ describe("records with a parent: label, choices, rowAction, and undo across view
     expect(otherAnswers({ view: lineView(done, lineOf("comma").id), extra })).toBeUndefined()
   })
 
-  it("undo survives the region being drawn again from the object onDecisionsChange gave", () => {
+  it("undo survives the decisions being kept as a draft and started from again", () => {
     const state = A.reduce(
       [
         Action.AcceptGroup({ groupId: "qty:comma", except: [] }),
@@ -597,16 +598,15 @@ describe("records with a parent: label, choices, rowAction, and undo across view
       emptyState,
       (before, action) => lineRun(before, action).state
     )
-    const kept: SavedDecisions = saved(state)
-    // The page switched views and back: the region starts again from what the page kept.
-    const again = restored(kept)
+    // The page kept the review as plain data (a refresh, a closed tab) and starts the region from it again.
+    const again = fromDraft(toDraft(state))
     expect(again.undo).toHaveLength(2)
     const undone = lineRun(again, Action.Undo())
     expect(undone.label).toBe("Undone: Value changed")
     expect(lineView(undone.state, lineOf("unit").id).status).toBe("needs")
     expect(lineView(undone.state, lineOf("comma").id).cells.qty).toBe("1.5")
-    // A copy is new data: the same decisions, and a new history.
-    const copy = restored({ ...kept })
+    // The decisions alone are plain data: the same decisions, and a new history.
+    const copy = restored(saved(state))
     expect([HashMap.size(copy.decisions), copy.undo.length]).toEqual([HashMap.size(state.decisions), 0])
   })
 

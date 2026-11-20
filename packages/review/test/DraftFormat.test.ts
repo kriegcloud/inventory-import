@@ -10,9 +10,9 @@ import * as A from "effect/Array"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import { putBack, ReviewDecision, ReviewDecisionFromFlags } from "@inventory/review/ReviewDecision"
-import { Action, act, restored } from "@inventory/review/ReviewDraft"
+import { Action, act } from "@inventory/review/ReviewDraft"
 import type { ReviewRow } from "@inventory/review/ReviewTypes"
-import { restoredDecisions, SavedProgress } from "@inventory/review/SavedProgress"
+import { restoredReview, SavedProgress } from "@inventory/review/SavedProgress"
 import before from "./fixtures/draft-before-the-move.txt?raw"
 
 const asText = S.fromJsonString(SavedProgress)
@@ -31,7 +31,7 @@ describe("a draft saved by the build before the move", () => {
     Effect.gen(function* () {
       const progress = yield* S.decodeEffect(asText)(before)
       const review = O.getOrThrow(progress.review)
-      const state = restored(restoredDecisions(review))
+      const state = restoredReview(review)
       expect(A.sort([...HashMap.keys(state.decisions)], Order.String)).toEqual(["row-148", "row-195"])
       expect(O.map(HashMap.get(state.decisions, "row-148"), (d) => d.accepted)).toEqual(O.some(["sku"]))
       expect(A.map(state.undo, (step) => step.label)).toEqual(["2 fixes accepted"])

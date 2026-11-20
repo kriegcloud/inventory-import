@@ -1,4 +1,3 @@
-import type { ReviewDecision } from "@inventory/review/ReviewDecision"
 /**
  * The data a review region shows. Everything here comes from the caller: the primitive holds no field names, status
  * words or rules of its own. Do not add one product's vocabulary to this file.
@@ -8,6 +7,7 @@ import type * as HashMap from "effect/HashMap"
 import type * as O from "effect/Option"
 import type * as Atom from "effect/reactivity/Atom"
 import type { ReactNode } from "react"
+import type { ReviewDecision } from "@inventory/review/ReviewDecision"
 
 /** Amber for a choice only the person can make, red for a value that cannot be imported as it is. */
 export type ProblemTone = "decision" | "blocker"
@@ -437,8 +437,8 @@ export type ReviewRegionProps = {
    * region, starts the review again.
    */
   decisions: Atom.Writable<ReviewState>
-  /** Taken when the region is first drawn. */
-  problemKinds: ReadonlyArray<ProblemKind>
+  /** The kinds of problem the rows can have, in the order the work list shows them, as an atom the region follows. */
+  problemKinds: Atom.Atom<ReadonlyArray<ProblemKind>>
   /** Past-tense facts about the run, a few words each ("178 rows read"). Columns and fixes are added for you. */
   summary: ReadonlyArray<string>
   activity?: Activity
@@ -461,8 +461,11 @@ export type ReviewRegionProps = {
   /** One sentence for the error state, and what to try. */
   error?: string
   onRetry?: () => void
-  /** The person may look but not decide. `readOnlyNote` says who can, in the caller's words. */
-  readOnly?: boolean
+  /**
+   * True while the person may look but not decide, as an atom: the region's widths, its keys and its buttons follow
+   * it. `readOnlyNote` says who can decide, in the caller's words.
+   */
+  readOnly?: Atom.Atom<boolean>
   readOnlyNote?: string
   /**
    * The one action when the file has no rows, or when nothing in it can be imported (every row already there, left
@@ -478,9 +481,9 @@ export type ReviewRegionProps = {
   /**
    * What happens to the rules' own lossless fixes (`row.applied`). "propose" (the default) asks first: they are
    * proposals the person takes in one click, counted under Needs you until then. "apply" puts them in force on
-   * arrival, shown with a tick and an Undo per group. Taken when the region is first drawn.
+   * arrival, shown with a tick and an Undo per group. An atom, as everything the region works from is.
    */
-  ruleFixes?: "propose" | "apply"
+  ruleFixes?: Atom.Atom<"propose" | "apply">
   /** One sentence for the confirm step: what the import does to what is already there ("Each row becomes a new item."). */
   importNote?: string
   /**
@@ -499,9 +502,9 @@ export type ReviewRegionProps = {
   /**
    * The caller's words for the tabs and the statuses, when the task has its own ("Waiting on you" for Needs you,
    * "Will be created" for Ready). Each word is set once here and used on every tab, tag, count and file that says it;
-   * what is not given keeps its default (`defaultReviewWords`). Taken when the region is first drawn.
+   * what is not given keeps its default (`defaultReviewWords`). An atom the region follows.
    */
-  words?: Partial<ReviewWords>
+  words?: Atom.Atom<Partial<ReviewWords>>
   /**
    * The sums that matter, worked out by the caller from the rows it will import, each with its unit or currency
    * ("Purchase $12,480.20"). Shown in the table's footer beside the counts. Never add different units in one.
@@ -511,9 +514,10 @@ export type ReviewRegionProps = {
    * One more answer on a row that needs the person, for rows that belong to a parent record ("Leave job J-2044
    * out"). With it each such row keeps its own answers, under a group heading too: its fix or its choices, then
    * "Other answers" with typing a value, leaving the row out and this action, each named in full. Return
-   * `undefined` for a row it does not fit. Taken when the region is first drawn: a function at module level, or one an atom holds.
+   * `undefined` for a row it does not fit. An atom (none while there is no such answer): the widths of the table's
+   * answers are worked out from it.
    */
-  rowAction?: (row: ReviewRow) => RowAction | undefined
+  rowAction?: Atom.Atom<O.Option<(row: ReviewRow) => RowAction | undefined>>
   /**
    * "Why flagged?": the caller's own account of the flagged rows on screen (what the view, the problem kind, the
    * search and the filters narrow it to), each row named with every reason it has. Shown in a side panel from the
@@ -524,7 +528,7 @@ export type ReviewRegionProps = {
    * The caller's own form for a value the person has to give, where one box of text would not do (a cell that holds
    * several values). It stands where the region's one field would, behind the same button, and what it saves is the
    * cell's text: one undo step, checked again by `recheck`, as a typed value is. `undefined` for a cell it does not
-   * fit. Keep the function stable.
+   * fit. Read when a row is drawn, and kept nowhere.
    */
   cellEditor?: (input: { row: ReviewRow; column: string; value: string }) => CellEditor | undefined
 }

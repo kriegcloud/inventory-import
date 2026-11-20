@@ -1,13 +1,15 @@
 import { Search, X } from "lucide-react"
-import { useAtom, useAtomMount, useAtomValue } from "@effect/atom-react"
+import type { RowData, Table } from "@tanstack/react-table"
+import { useAtomMount, useAtomValue } from "@effect/atom-react"
 import * as ScopedAtom from "@effect/atom-react/ScopedAtom"
 import * as O from "effect/Option"
 import * as Atom from "effect/reactivity/Atom"
-import { useId, useRef } from "react"
+import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
+import { useId } from "react"
+import type { DataTableFeatures } from "@inventory/ui/components/data-table/data-table-features"
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@inventory/ui/components/input-group"
 import { Kbd } from "@inventory/ui/components/kbd"
 import { Spinner } from "@inventory/ui/components/spinner"
-import { useDebouncedCallback } from "@inventory/ui/hooks/use-debounced-callback"
 
 /** How long a typed search waits for the next keystroke before it is asked for, as the column filters wait. */
 const typingPause = 300
@@ -30,14 +32,83 @@ interface Box {
   readonly asked: O.Option<string>
 }
 
-/**
- * One box's own, made when the box is first drawn from the id of its field: its state, and the keys that put the
- * caret in it. "/" or Ctrl+K (⌘K) anywhere focuses the field while the box is on screen: an atom that listens to the
- * page for as long as the box mounts it, and is let go with the box at once.
- */
-const BoxScope = ScopedAtom.make((fieldId: string) =>
-  Atom.readable(() => ({
-    box: Atom.make<Box>({ typed: O.none(), waiting: false, asked: O.none() }),
+/** What the box shows: the text in the field, the search it stands for, and whether an ask is on its way. */
+interface Shown {
+  readonly draft: string
+  readonly asked: string
+  readonly waiting: boolean
+}
+
+/** The part of a data table the box works with: the search it holds, and the way to ask it for another. */
+type Searched = Pick<Table<DataTableFeatures, RowData>, "atoms" | "setGlobalFilter">
+
+/** One box's atoms and what its field can ask of them. */
+interface BoxScoped {
+  readonly shown: Atom.Atom<Shown>
+  /** Mounted while the box is drawn: asks the table for the typed text once the typing has paused. */
+  readonly asks: Atom.Atom<void>
+  /** Mounted while the box is drawn: "/" or Ctrl+K (⌘K) anywhere puts the caret in the field. */
+  readonly keys: Atom.Atom<void>
+  readonly type: (text: string) => void
+  /** Enter: asks now, without the pause. */
+  readonly askNow: () => void
+  /** Escape or the cross: empties the field and the search, and puts the caret back. */
+  readonly clear: () => void
+}
+
+const makeBox = (
+  input: { readonly fieldId: string; readonly table: Searched },
+  registry: AtomRegistry.AtomRegistry
+): BoxScoped => {
+  const { fieldId, table } = input
+  const heldNow = (): string => {
+    const search: unknown = table.atoms.globalFilter.get()
+    return typeof search === "string" ? search : ""
+  }
+  // The search the table holds now (the page address, where the table keeps it there): the table's own state, which
+  // the box listens to as an atom listens to anything outside. The assistant, Reset or a link changes what it says.
+  const held = Atom.readable((get) => {
+    const subscription = table.atoms.globalFilter.subscribe(() => get.setSelf(heldNow()))
+    get.addFinalizer(() => subscription.unsubscribe())
+    return heldNow()
+  })
+  const box = Atom.make<Box>({ typed: O.none(), waiting: false, asked: O.none() })
+  // What was typed counts while the table's search is still the last one this box asked for (its own echo) or, before
+  // it asked anything, the one it was typed over. A search changed from elsewhere (the assistant, Reset, a link) shows
+  // instead, even one back to where the typing started, and a pause that was still running asks nothing.
+  const shown = Atom.readable((get): Shown => {
+    const now = get(box)
+    const value = get(held)
+    const ours = O.filter(now.typed, (typed) => O.getOrElse(now.asked, () => typed.over) === value)
+    return {
+      draft: O.match(ours, { onNone: () => value, onSome: (typed) => typed.text }),
+      asked: O.isSome(ours) ? O.getOrElse(now.asked, () => value) : value,
+      waiting: now.waiting && O.isSome(ours)
+    }
+  })
+  const ask = (text: string) => {
+    registry.update(box, (now) => ({ ...now, asked: O.some(text), waiting: false }))
+    table.setGlobalFilter(text)
+  }
+  // The typed text, published once the typing has stopped for the pause.
+  const typed = Atom.map(box, (now) => now.typed)
+  const paused = Atom.debounce(typed, typingPause)
+  const field = () => document.getElementById(fieldId)
+  return {
+    shown,
+    // Let go the moment nothing mounts it: a box that has gone asks nothing and hears no key.
+    asks: Atom.setIdleTTL(
+      Atom.readable((get) => {
+        get.subscribe(paused, (after) => {
+          const now = registry.get(box)
+          // Asked after the pause, unless it was asked already (Enter, the cross), the person typed on, or the search
+          // was changed from elsewhere meanwhile.
+          if (O.isNone(after) || !now.waiting || now.typed !== after || after.value.over !== heldNow()) return
+          ask(after.value.text.trim())
+        })
+      }),
+      0
+    ),
     keys: Atom.setIdleTTL(
       Atom.readable((get) => {
         const onKey = (event: KeyboardEvent) => {
@@ -46,23 +117,53 @@ const BoxScope = ScopedAtom.make((fieldId: string) =>
           const command = event.key.toLowerCase() === "k" && (event.ctrlKey || event.metaKey) && !event.altKey
           // A dialog open over the table keeps its keys.
           const inDialog = event.target instanceof Element && event.target.closest("[role=dialog]") !== null
-          const field = document.getElementById(fieldId)
-          if ((!slash && !command) || inDialog || !(field instanceof HTMLInputElement)) return
+          const node = field()
+          if ((!slash && !command) || inDialog || !(node instanceof HTMLInputElement)) return
           event.preventDefault()
-          field.focus()
-          field.select()
+          node.focus()
+          node.select()
         }
         document.addEventListener("keydown", onKey)
         get.addFinalizer(() => document.removeEventListener("keydown", onKey))
       }),
       0
-    )
-  }))
+    ),
+    type: (text) => {
+      const same = text.trim() === registry.get(shown).asked.trim()
+      // Typing starts again from the search the table holds now: the last ask is behind it.
+      registry.update(box, (now) => ({
+        ...now,
+        typed: O.some({ text, over: heldNow() }),
+        asked: O.none(),
+        waiting: !same
+      }))
+    },
+    askNow: () => {
+      const now = registry.get(shown)
+      if (now.draft.trim() !== now.asked) ask(now.draft.trim())
+      else registry.update(box, (before) => ({ ...before, waiting: false }))
+    },
+    clear: () => {
+      const { asked } = registry.get(shown)
+      registry.update(box, (now) => ({ ...now, typed: O.some({ text: "", over: heldNow() }), asked: O.none() }))
+      if (asked !== "") ask("")
+      else registry.update(box, (now) => ({ ...now, waiting: false }))
+      field()?.focus()
+    }
+  }
+}
+
+/**
+ * One box's own, made when the box is first drawn from the id of its field and the table it searches: what was typed,
+ * the pause before it is asked for (`Atom.debounce`), and the keys that put the caret in it.
+ */
+const BoxScope = ScopedAtom.make((input: { readonly fieldId: string; readonly table: Searched }) =>
+  Atom.readable((get) => makeBox(input, get.registry))
 )
 
-type TableSearchProps = {
-  readonly value: string
-  readonly onSearch: (text: string) => void
+type TableSearchProps<Row extends RowData> = {
+  /** The table whose rows are searched: the box shows the search it holds, and asks it for the typed one. */
+  readonly table: Pick<Table<DataTableFeatures, Row>, "atoms" | "setGlobalFilter">
   readonly placeholder: string
   /**
    * The table is fetching rows (for this search, or again for a return to the page): the box shows it is working, the
@@ -76,51 +177,25 @@ type TableSearchProps = {
 }
 
 /**
- * The person types words to find in a table; the table asks for them after a pause in the typing. "/" or Ctrl+K
- * (⌘K) puts the caret here, Escape or the cross empties it. `value` is the search the table holds now (the page
- * address), so the assistant, Reset or a link changes what the box shows.
+ * The person types words to find in a table; the table is asked for them after a pause in the typing. "/" or Ctrl+K
+ * (⌘K) puts the caret here, Escape or the cross empties it. The box shows the search the table holds now (the page
+ * address, where the table keeps it there), so the assistant, Reset or a link changes what the box shows.
  */
-export function TableSearch(props: TableSearchProps) {
+export function TableSearch<Row extends RowData>(props: TableSearchProps<Row>) {
   const fieldId = useId()
   return (
-    <BoxScope.Provider value={fieldId}>
+    // One scope serves every kind of row: the box reads the table's search and nothing of its rows.
+    <BoxScope.Provider value={{ fieldId, table: props.table as never }}>
       <SearchBox {...props} fieldId={fieldId} />
     </BoxScope.Provider>
   )
 }
 
-function SearchBox(props: TableSearchProps & { readonly fieldId: string }) {
-  const scope = useAtomValue(BoxScope.use())
-  const [box, setBox] = useAtom(scope.box)
-  useAtomMount(scope.keys)
-  const { fieldId } = props
-  // The field itself, to put the caret back after the cross.
-  const field = useRef<HTMLInputElement | null>(null)
-  // What was typed counts while the table's search is still the last one this box asked for (its own echo) or, before
-  // it asked anything, the one it was typed over. A search changed from elsewhere (the assistant, Reset, a link) shows
-  // instead, even one back to where the typing started, and a pause that was still running asks nothing.
-  const ours = O.filter(box.typed, (typed) => O.getOrElse(box.asked, () => typed.over) === props.value)
-  const draft = O.match(ours, { onNone: () => props.value, onSome: (typed) => typed.text })
-  const asked = O.isSome(ours) ? O.getOrElse(box.asked, () => props.value) : props.value
-  const waiting = box.waiting && O.isSome(ours)
-
-  const ask = (text: string) => {
-    setBox((now) => ({ ...now, asked: O.some(text), waiting: false }))
-    props.onSearch(text)
-  }
-  // Asked after the pause, unless the search was changed from elsewhere meanwhile.
-  const askAfterPause = useDebouncedCallback((text: string, over: string) => {
-    if (over === props.value) ask(text)
-  }, typingPause)
-
-  const clear = () => {
-    askAfterPause.cancel()
-    setBox((now) => ({ ...now, typed: O.some({ text: "", over: props.value }), asked: O.none() }))
-    if (asked !== "") ask("")
-    else setBox((now) => ({ ...now, waiting: false }))
-    field.current?.focus()
-  }
-
+function SearchBox<Row extends RowData>(props: TableSearchProps<Row> & { readonly fieldId: string }) {
+  const box = useAtomValue(BoxScope.use())
+  const { draft, waiting } = useAtomValue(box.shown)
+  useAtomMount(box.asks)
+  useAtomMount(box.keys)
   const busy = waiting || props.working
   return (
     <InputGroup className={props.className}>
@@ -128,8 +203,7 @@ function SearchBox(props: TableSearchProps & { readonly fieldId: string }) {
         <Search />
       </InputGroupAddon>
       <InputGroupInput
-        ref={field}
-        id={fieldId}
+        id={props.fieldId}
         // A plain text field with the search role: the browser's own clear button would be a second cross.
         type="text"
         role="searchbox"
@@ -143,22 +217,12 @@ function SearchBox(props: TableSearchProps & { readonly fieldId: string }) {
         maxLength={props.maxLength}
         autoComplete="off"
         spellCheck={false}
-        onChange={(event) => {
-          const text = event.target.value
-          const same = text.trim() === asked.trim()
-          // Typing starts again from the search the table holds now: the last ask is behind it.
-          setBox((now) => ({ ...now, typed: O.some({ text, over: props.value }), asked: O.none(), waiting: !same }))
-          if (same) askAfterPause.cancel()
-          else askAfterPause(text.trim(), props.value)
-        }}
+        onChange={(event) => box.type(event.target.value)}
         onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            askAfterPause.cancel()
-            if (draft.trim() !== asked) ask(draft.trim())
-          }
+          if (event.key === "Enter") box.askNow()
           if (event.key === "Escape" && draft !== "") {
             event.preventDefault()
-            clear()
+            box.clear()
           }
         }}
       />
@@ -169,7 +233,7 @@ function SearchBox(props: TableSearchProps & { readonly fieldId: string }) {
             <Kbd aria-hidden>/</Kbd>
           ) : null
         ) : (
-          <InputGroupButton size="icon-xs" aria-label="Clear the search" title="Clear the search" onClick={clear}>
+          <InputGroupButton size="icon-xs" aria-label="Clear the search" title="Clear the search" onClick={box.clear}>
             <X />
           </InputGroupButton>
         )}

@@ -1,6 +1,7 @@
 // The assistant's conversation for one table, kept in this browser so a hard refresh brings it back: each request,
 // who answered, and the changes it made with what takes each back. It is keyed like the import's saved progress
 // (`progressKey`: per person, organization and screen) and decoded on the way back, so an older shape is dropped.
+import * as O from "effect/Option"
 import * as S from "effect/Schema"
 import { ViewChange } from "@inventory/catalog-contract/TableView"
 import { progressKey, type ProgressScope } from "@inventory/review/SavedProgress"
@@ -52,7 +53,7 @@ export const readConversation = (key: string): Conversation => {
     const text = localStorage.getItem(key)
     if (text === null) return emptyConversation
     const found = decode(text)
-    if (found._tag === "Some") return found.value
+    if (O.isSome(found)) return found.value
     localStorage.removeItem(key)
   } catch {
     // A private window or a refused store: the conversation starts empty, and the table still works.
@@ -63,7 +64,7 @@ export const readConversation = (key: string): Conversation => {
 /** Writes the conversation. A refusal (a private window, a full disk) is ignored: only the refresh loses it. */
 export const writeConversation = (key: string, conversation: Conversation) => {
   const text = encode(conversation)
-  if (text._tag === "None") return
+  if (O.isNone(text)) return
   try {
     localStorage.setItem(key, text.value)
   } catch {

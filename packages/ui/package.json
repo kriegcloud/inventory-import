@@ -135,6 +135,7 @@
     "./PageHeader": "./src/PageHeader.component.tsx",
     "./ProposalSource": "./src/ProposalSource.words.ts",
     "./ProposedValue": "./src/ProposedValue.component.tsx",
+    "./SaveFile": "./src/SaveFile.browser.ts",
     "./Route": "./src/Route.atoms.ts",
     "./Skeletons": "./src/Skeletons.component.tsx",
     "./StatusPill": "./src/StatusPill.component.tsx",

@@ -49,22 +49,27 @@ const jobReviews = Atom.readable((get) => reviewJobs({ jobs, decisions: get(jobD
 /** The questions on the lines of the jobs still in. */
 const jobQuestionRows = Atom.map(jobsLeftOut, (leftOut) => questionRows(jobs, leftOut))
 
-/** "Leave job … out" on every question's row: one function for the region, kept the same between draws. */
-const leaveJobAction = Atom.readable((get) => (row: ReviewRow) => {
-  const code = row.cells.job
-  return code === undefined
-    ? undefined
-    : {
-        label: `Leave job ${code} out`,
-        onSelect: () =>
-          get.registry.update(jobsLeftOut, (before) =>
-            A.append(
-              A.filter(before, (at) => at !== code),
-              code
+/** "Leave job … out" on every question's row, as the atom the region takes its rows' own answer from. */
+const leaveJobAction = Atom.readable((get) =>
+  O.some((row: ReviewRow) => {
+    const code = row.cells.job
+    return code === undefined
+      ? undefined
+      : {
+          label: `Leave job ${code} out`,
+          onSelect: () =>
+            get.registry.update(jobsLeftOut, (before) =>
+              A.append(
+                A.filter(before, (at) => at !== code),
+                code
+              )
             )
-          )
-      }
-})
+        }
+  })
+)
+const jobLineKinds = Atom.make(lineKinds)
+// A line's own "ready" is an answered question: the job it belongs to is what is Ready.
+const lineWords = Atom.make({ needs: pageWords.needs, ready: "Answered", out: pageWords.out })
 
 /**
  * Records with a parent, the way `docs/review-table.md` says to build them: the page's own table of jobs (each with
@@ -79,7 +84,6 @@ export function JobsReview() {
   const [filter, setFilter] = useAtom(jobsFilter)
   const [, setLeftOut] = useAtom(jobsLeftOut)
   const reviews = useAtomValue(jobReviews)
-  const rowAction = useAtomValue(leaveJobAction)
 
   const tally = { ready: 0, waiting: 0, out: 0 }
   for (const review of reviews) tally[review.status] += 1
@@ -213,12 +217,11 @@ export function JobsReview() {
             columns={lineColumnsAtom}
             rows={jobQuestionRows}
             decisions={jobState}
-            problemKinds={lineKinds}
+            problemKinds={jobLineKinds}
             summary={[]}
             recheck={lineRecheck}
-            // A line's own "ready" is an answered question: the job it belongs to is what is Ready.
-            words={{ needs: pageWords.needs, ready: "Answered", out: pageWords.out }}
-            rowAction={rowAction}
+            words={lineWords}
+            rowAction={leaveJobAction}
             onImport={() => undefined}
           />
         </div>

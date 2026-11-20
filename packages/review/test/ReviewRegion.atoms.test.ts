@@ -1,11 +1,10 @@
 // The review region with no screen: its atoms in a registry, a table made and drawn as the screen's hook makes and
-// draws one, a virtual list as the grid has one, and the person's actions called as a button, a key or a toast calls
+// draws one, the grid's own virtual list in a frame, and the person's actions called as a button, a key or a toast calls
 // them. The rules here are the ones a wrong result breaks without a word: a decision that is not undone or brought
 // back, a caller told twice or not at all, a second search that shows the first one's rows, a filled button on a
 // heading that is not on screen, and a region that has left the page still writing the decisions of the one that took
 // its place.
 import { constructTable, functionalUpdate, type SortingState, type Updater } from "@tanstack/react-table"
-import { elementScroll, observeElementOffset, Virtualizer } from "@tanstack/react-virtual"
 import { batch, createAtom, shallow } from "@tanstack/store"
 import { createRenderPhaseSource, renderPhaseReactivity } from "@tanstack/table-core/reactivity"
 import { table_publishExternalState, table_setOptions } from "@tanstack/table-core/static-functions"
@@ -19,7 +18,7 @@ import { describe, expect, it, vi } from "vitest"
 import { dataTableFeatures } from "@inventory/ui/components/data-table/data-table-features"
 import { choicesOf, proposing, saved, waitingGroups } from "@inventory/review/ReviewDraft"
 import { Entry, type ProblemKind, type ReviewRow, type ReviewState, type RowView } from "@inventory/review/ReviewTypes"
-import { makeGrid } from "../src/internal/ReviewGrid.tsx"
+import { gridAtom } from "../src/internal/ReviewGrid.tsx"
 import { regionAtom, regionTableAtom, Wanted } from "../src/ReviewRegion.atoms.ts"
 import { columns, makeRows, problemKinds, recheck } from "./fixtures/fabrication.ts"
 
@@ -187,11 +186,18 @@ const world = (
   }
   // The hook hands the screen a copy of the table, made when it is first drawn: the region is given that.
   const table = { ...core, options: options() }
-  const regionTable = registry.get(regionTableAtom({ region, table }))
+  // The region's table and its grid are atoms the screen keeps mounted while the region is drawn.
+  const tableAtom = regionTableAtom({ region, table })
+  const keepTable = registry.mount(tableAtom)
+  const regionTable = registry.get(tableAtom)
   draw()
-  const grid = makeGrid({ region, table: regionTable, registry })
+  const gridOf = gridAtom({ region, table: regionTable })
+  const keepGrid = registry.mount(gridOf)
+  const grid = registry.get(gridOf)
   // What the screen keeps mounted while the region is drawn.
   const release = [
+    keepTable,
+    keepGrid,
     registry.mount(regionTable.moves),
     registry.mount(region.views),
     registry.mount(region.ui),
@@ -214,6 +220,7 @@ const world = (
     regionTable,
     grid,
     table,
+    core,
     told,
     needs,
     ordered,
@@ -397,6 +404,25 @@ describe("the review region's atoms", () => {
     expect(at.registry.get(at.region.shown)).toBe(at.registry.get(at.region.list))
   })
 
+  it("gives the table the rows in the change that works them out, so no read of the order writes its options", () => {
+    const at = onPage()
+    // Only the region's table stays: nothing reads the order until the reads below, the first since the change.
+    for (const stop of at.release.splice(1)) stop()
+    at.region.change(() => ({ picked: "all" }))
+    const options = at.core.options
+    expect(options.data).toBe(at.registry.get(at.region.tableData))
+
+    const ordered = at.registry.get(at.regionTable.ordered)
+    at.registry.get(at.regionTable.lines)
+    at.registry.get(at.regionTable.flagged)
+    expect(at.core.options).toBe(options)
+    // And the order read is of these rows, not of the ones the table held before.
+    expect(ordered).toHaveLength(at.registry.get(at.region.tableData).length)
+    expect(A.map(ordered, (view) => view.row.id)).toEqual(
+      A.map(at.registry.get(at.region.tableData), (view) => view.row.id)
+    )
+  })
+
   it("shows the rows of each search and sort in turn: the second search is not the first one's rows", () => {
     const at = onPage()
     at.region.change(() => ({ picked: "all" }))
@@ -493,27 +519,11 @@ describe("the review grid's atoms", () => {
     }
   }
 
-  /** The grid's virtual list, made as the grid's draw makes it and never told of a new number of lines. */
+  /** The grid's own virtual list, given its frame as the grid's draw gives it one, and never drawn again. */
   const listed = (at: ReturnType<typeof world>) => {
     const { frame, scrollTo } = framed()
-    const options = (count: number) => ({
-      count,
-      getScrollElement: () => frame as unknown as HTMLDivElement,
-      estimateSize: at.grid.sizeOf,
-      overscan: 12,
-      observeElementRect: at.grid.watch,
-      observeElementOffset,
-      onChange: at.grid.told,
-      scrollToFn: elementScroll
-    })
-    const virtual = new Virtualizer<HTMLDivElement, Element>(
-      options(at.registry.get(at.grid.entries).length) as ConstructorParameters<
-        typeof Virtualizer<HTMLDivElement, Element>
-      >[0]
-    )
-    virtual._didMount()
-    virtual._willUpdate()
-    return { virtual, scrollTo }
+    at.grid.frame(frame as unknown as HTMLDivElement)
+    return { virtual: at.grid.list, scrollTo }
   }
 
   const leadable = (line: Entry) => Entry.guards.group(line) && !line.applied && choicesOf(line.group) === undefined
@@ -585,6 +595,37 @@ describe("the review grid's atoms", () => {
     // On another tab no heading leads.
     at.region.change(() => ({ picked: "all" }))
     expect(at.registry.get(at.grid.lead)).toBeUndefined()
+  })
+
+  it("gives the virtual list its lines' number in the decision that changes them, so no read of the view writes it", () => {
+    const at = onPage()
+    const { virtual } = listed(at)
+    // Nothing mounts the lead or the lines drawn: the reads below are the first to ask since the decision.
+    const lines = () => at.registry.get(at.grid.entries) as ReadonlyArray<Entry>
+    const first = A.findFirst(lines(), leadable).pipe(O.getOrUndefined)
+    if (first === undefined || !Entry.guards.group(first)) throw new Error("the fixture has no rule group waiting")
+    const setOptions = vi.spyOn(virtual, "setOptions")
+    const before = lines().length
+
+    at.regionTable.groupActions.accept(first.group.id)
+    // Given the new number in the decision itself, before anything read what is in view.
+    expect(setOptions).toHaveBeenCalled()
+    expect(lines().length).toBeLessThan(before)
+    expect(virtual.options.count).toBe(lines().length)
+
+    setOptions.mockClear()
+    const options = virtual.options
+    at.registry.get(at.grid.leadInView)
+    at.registry.get(at.grid.seen)
+    const drawn = at.registry.get(at.grid.drawn)
+    expect(setOptions).not.toHaveBeenCalled()
+    expect(virtual.options).toBe(options)
+    // What is read is of these lines: the lead is the first rule group in view among them, and every line drawn is one.
+    const next = A.findFirst(lines(), leadable).pipe(O.getOrUndefined)
+    expect(at.registry.get(at.grid.lead)).toBe(next !== undefined && Entry.guards.group(next) ? next.group.id : "")
+    expect(drawn.items.length).toBeGreaterThan(0)
+    expect(A.every(drawn.items, (item) => item.index < lines().length)).toBe(true)
+    setOptions.mockRestore()
   })
 
   it("scrolls the list to the row the region asks to see, with one function for the grid's life", () => {

@@ -579,12 +579,16 @@ const isTyping = (target: EventTarget | null): boolean =>
     ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) ||
     target.closest("[role=dialog], [role=alertdialog], [role=menu]") !== null)
 
-/** Makes what a region has once its table exists. */
+/**
+ * Makes what a region has once its table exists, in the atom that holds it (`ctx`): the table is given the region's
+ * rows by a subscription that lives as long as that atom.
+ */
 const makeRegionTable = (
   input: { readonly region: Region; readonly table: Table<DataTableFeatures, RowView> },
-  registry: AtomRegistry.AtomRegistry
+  ctx: Atom.AtomContext
 ): RegionTable => {
   const { region, table } = input
+  const registry = ctx.registry
   const folded = Atom.map(region.ui, (now) => now.folded)
 
   // The table's sort and search are its own store's. This is what they say, as one text: the store tells its
@@ -598,17 +602,29 @@ const makeRegionTable = (
     }
     return said()
   })
+  // The hook hands the screen a copy of the table; the table itself is the one its columns belong to.
+  const core = () => table.getAllLeafColumns()[0]?.table ?? table
+  // How many times the table was given rows here: the order is read again after each.
+  const given = Atom.make(0)
+  ctx.mount(given)
+  // The table is given the same rows when the region is drawn. It is given them where the region works them out,
+  // in the change that changed them, so the order read next is of these rows and not of the ones it was last drawn
+  // with. Given as the table's own hook gives them while it is drawn: the options alone, with nothing published. No
+  // read of an atom and no draw of ours writes the table's options.
+  ctx.subscribe(region.tableData, (data) => {
+    const own = core()
+    if (own.options.data !== data) {
+      table_setOptions(own, (before) => ({ ...before, data }), { syncExternalState: false })
+    }
+    registry.update(given, (n) => n + 1)
+  })
   const ordered = Atom.readable((get): ReadonlyArray<RowView> => {
     const data = get(region.tableData)
+    get(given)
     get(sorted)
-    // The table is given the same rows when the region is drawn. It is given them here first, so the order read now
-    // is of these rows and not of the ones it was last drawn with.
-    // Given as the table's own hook gives them while it is drawn: the options alone, with nothing published. The
-    // hook hands the screen a copy of the table; the table itself is the one its columns belong to.
-    const core = table.getAllLeafColumns()[0]?.table ?? table
-    if (core.options.data !== data) {
-      table_setOptions(core, (before) => ({ ...before, data }), { syncExternalState: false })
-    }
+    // Between the region working the rows out and the table being given them (the same change), the table still
+    // holds the rows before: the order already read is kept, and `given` reads it again a moment later.
+    if (core().options.data !== data) return O.getOrElse(get.self<ReadonlyArray<RowView>>(), A.empty)
     return table.getPrePaginatedRowModel().rows.map((row) => row.original)
   })
   const visibility = Atom.readable((get): Readonly<Record<string, boolean>> => {
@@ -948,7 +964,7 @@ const makeRegionTable = (
 export const regionTableAtom = (input: {
   readonly region: Region
   readonly table: Table<DataTableFeatures, RowView>
-}) => Atom.readable((get) => makeRegionTable(input, get.registry))
+}) => Atom.readable((get) => makeRegionTable(input, get))
 
 /** What a region has once its table exists, made once from the table the region was first drawn with. */
 export const TableScope = ScopedAtom.make(regionTableAtom)

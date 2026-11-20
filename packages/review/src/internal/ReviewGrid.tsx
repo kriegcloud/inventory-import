@@ -1,13 +1,18 @@
 import { CellMark, ColumnMatch, Entry } from "@inventory/review/ReviewTypes"
 import { OtherAnswer } from "@inventory/review/ReviewDraft"
-import { observeElementRect, useVirtualizer, type Virtualizer } from "@tanstack/react-virtual"
+import {
+  elementScroll,
+  observeElementOffset,
+  observeElementRect,
+  type VirtualItem,
+  Virtualizer
+} from "@tanstack/react-virtual"
 import { ChevronDownIcon, ChevronRightIcon, CircleHelpIcon, SparklesIcon } from "lucide-react"
 import type { Table as TanstackTable } from "@tanstack/react-table"
-import { Fragment, type ReactNode, memo, useRef } from "react"
+import { Fragment, type ReactNode, memo } from "react"
 import { useAtomSubscribe, useAtomValue } from "@effect/atom-react"
 import * as ScopedAtom from "@effect/atom-react/ScopedAtom"
 import * as Atom from "effect/reactivity/Atom"
-import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import {
   type Density,
   density as keptDensity,
@@ -1309,11 +1314,19 @@ type Sign = {
   readonly top: number
 }
 
-/** The virtual list of one grid: TanStack's, which keeps the scroll position and the lines' measured sizes. */
+/**
+ * The virtual list of one grid: TanStack's, which keeps the scroll position and the lines' measured sizes. The grid
+ * makes it and owns it; no draw writes its options.
+ */
 type Lines = Virtualizer<HTMLDivElement, Element>
 
 /** The first and last line in view. */
 type Seen = { readonly startIndex: number; readonly endIndex: number }
+
+/** The lines drawn and where (each one's place and height), and the height of all of them. */
+type Drawn = { readonly items: ReadonlyArray<VirtualItem>; readonly total: number }
+
+const nothingDrawn: Drawn = { items: [], total: 0 }
 
 /** What one grid works out for the room it has, and the rows the person opened in it. */
 export interface Grid {
@@ -1347,10 +1360,11 @@ export interface Grid {
   readonly top: Atom.Atom<number>
   /**
    * The lines in view, of the lines as they are now: none before the list has a frame, or with nothing to show.
-   * What the virtual list says of a scroll, a new size of its frame or a line measured anew reaches it through
-   * `watch` and `told`.
+   * What the virtual list says of a scroll, a new size of its frame or a line measured anew reaches it as it says it.
    */
   readonly seen: Atom.Atom<O.Option<Seen>>
+  /** The lines to draw and where, with the height of all of them: what the grid's draw reads of the virtual list. */
+  readonly drawn: Atom.Atom<Drawn>
   /**
    * The rule group whose accept is the screen's one filled button: the first in view that the person can take in
    * one press, while they can decide here and the confirm step is not open. Scrolled away, it hands the role back.
@@ -1363,12 +1377,17 @@ export interface Grid {
   /** Where a row is among the lines drawn, or -1. */
   readonly indexOf: (rowId: string) => number
   readonly toTop: () => void
-  /** For the virtual list: the height a line is drawn at before it is measured. */
-  readonly sizeOf: (index: number) => number
-  /** For the virtual list, in place of its own watch on the frame's size: the grid learns of the list and its frame. */
-  readonly watch: (list: Lines, onRect: Parameters<typeof observeElementRect>[1]) => undefined | (() => void)
-  /** For the virtual list: called when what is in view may have changed. */
-  readonly told: () => void
+  /** The virtual list itself, made with the grid and owned by it. */
+  readonly list: Lines
+  /**
+   * The frame's ref: the element the list scrolls. The list follows it as TanStack's React adapter has it follow one
+   * after a draw: a new frame is watched (its size, its scroll), a frame gone is let go of.
+   */
+  readonly frame: (element: HTMLDivElement | null) => void
+  /** A drawn line's ref: the list measures it, and measures it again whenever its size changes. */
+  readonly measureLine: (element: Element | null) => void
+  /** Measures every line again, for when the lines changed shape. */
+  readonly remeasure: () => void
   /** For the region's ask to have a row in view: scrolls the list to it. */
   readonly bring: (asked: O.Option<{ readonly rowId: string }>) => void
 }
@@ -1396,12 +1415,13 @@ const sameSeen = (before: O.Option<Seen>, next: O.Option<Seen>): boolean =>
 const canLeadLine = (line: Line): line is Extract<Line, { readonly type: "group" }> =>
   isEntryGroup(line) && !line.applied && choicesOf(line.group) === undefined
 
-export const makeGrid = (input: {
-  readonly region: Region
-  readonly table: RegionTable
-  readonly registry: AtomRegistry.AtomRegistry
-}): Grid => {
-  const { region, table, registry } = input
+/**
+ * Makes one grid's atoms and its virtual list, in the atom that holds the grid (`ctx`): the list is given the number
+ * of lines by a subscription that lives as long as that atom.
+ */
+const makeGrid = (input: { readonly region: Region; readonly table: RegionTable }, ctx: Atom.AtomContext): Grid => {
+  const { region, table } = input
+  const registry = ctx.registry
   const readOnly = region.input.readOnly
   const rowAction = Atom.map(region.input.rowAction, O.getOrUndefined)
   const banding = Atom.map(rowAction, (answer) => answer === undefined)
@@ -1571,30 +1591,88 @@ export const makeGrid = (input: {
     get(keptDensity) === "comfortable" || get(parts).under.length > 0 ? tallRowHeight : rowHeight
   )
 
+  const sizeOf = (index: number): number => {
+    const line = registry.get(entries)[index]
+    return line === undefined
+      ? bandHeight
+      : lineMatch(line, {
+          Row: () => registry.get(rowSize),
+          Group: () => groupHeight,
+          Kind: () => bandHeight,
+          Rest: () => bandHeight,
+          Detail: () => bandHeight
+        })
+  }
+
   // -- The virtual list is TanStack's: where the frame is scrolled to and how tall each line was measured are its
-  // own. The grid listens to it as an atom listens to anything outside: `list` is the list once it has a frame, and
-  // `heard` goes up whenever it says what is in view may have changed.
-  const list = Atom.make<O.Option<Lines>>(O.none())
+  // own. The grid makes it and owns it, and listens to it as an atom listens to anything outside: `heard` goes up
+  // whenever it says what is in view may have changed, `given` whenever it is given another number of lines, and
+  // `scroller` is the frame it scrolls. Each lives as long as the grid.
   const heard = Atom.make(0)
-  const told = () => registry.update(heard, (n) => n + 1)
+  const given = Atom.make(0)
+  const scroller = Atom.make<O.Option<HTMLDivElement>>(O.none())
+  ctx.mount(heard)
+  ctx.mount(given)
+  ctx.mount(scroller)
+  // What TanStack's React adapter does after each draw, once the screen shows what the list last said: a correction
+  // the browser clamped because the space below had not grown yet is written again, a held one is written.
+  const afterDraw = () => list._willUpdate()
+  const told = () => {
+    registry.update(heard, (n) => n + 1)
+    requestAnimationFrame(afterDraw)
+  }
+  const list: Lines = new Virtualizer<HTMLDivElement, Element>({
+    count: registry.get(entries).length,
+    getScrollElement: () => O.getOrNull(registry.get(scroller)),
+    estimateSize: sizeOf,
+    overscan: 12,
+    // A new size of the frame is told even when the range stays: the lines in view are read again all the same.
+    observeElementRect: (instance, onRect) =>
+      observeElementRect(instance, (rect) => {
+        onRect(rect)
+        told()
+      }),
+    observeElementOffset,
+    scrollToFn: elementScroll,
+    onChange: told
+  })
+  // The list is given the number of lines where the lines are worked out: whenever they change, in the change that
+  // changed them, before anything reads what is in view. No read of an atom and no draw writes the list's options.
+  ctx.subscribe(entries, (lines) => {
+    if (list.options.count === lines.length) return
+    list.setOptions({ ...list.options, count: lines.length })
+    registry.update(given, (n) => n + 1)
+    requestAnimationFrame(afterDraw)
+  })
+  // The lines' number and the list's agree, but for the moment between the lines being worked out and the list being
+  // given their number (the same change): a read then keeps what it had, and `given` reads it again a moment later.
+  const inStep = (lines: ReadonlyArray<Line>): boolean => list.options.count === lines.length
   const seen = Atom.withEquality(
     Atom.readable((get): O.Option<Seen> => {
       const lines = get(entries)
+      get(given)
       get(heard)
       get(rowSize)
-      const virtual = get(list)
-      if (O.isNone(virtual)) return O.none()
-      // The list is given its lines when the grid is drawn, and it says nothing of a range that changes because their
-      // number did. It is given their number here first, so the range read now is of these lines and not of the ones
-      // it was last drawn with.
-      const options = virtual.value.options
-      if (options.count !== lines.length) virtual.value.setOptions({ ...options, count: lines.length })
-      return O.map(O.fromNullOr(virtual.value.calculateRange()), ({ endIndex, startIndex }) => ({
+      if (O.isNone(get(scroller))) return O.none()
+      if (!inStep(lines)) return O.flatten(get.self<O.Option<Seen>>())
+      return O.map(O.fromNullOr(list.calculateRange()), ({ endIndex, startIndex }) => ({
         startIndex,
         endIndex
       }))
     }),
     sameSeen
+  )
+  const drawn = Atom.withEquality(
+    Atom.readable((get): Drawn => {
+      const lines = get(entries)
+      get(given)
+      get(heard)
+      get(rowSize)
+      get(scroller)
+      if (!inStep(lines)) return O.getOrElse(get.self<Drawn>(), () => nothingDrawn)
+      return { items: list.getVirtualItems(), total: list.getTotalSize() }
+    }),
+    (before, next) => before.items === next.items && before.total === next.total
   )
   const canLead = Atom.readable(
     (get) => !get(readOnly) && get(region.filter) === "needs" && !get(region.ui).confirmOpen
@@ -1628,6 +1706,7 @@ export const makeGrid = (input: {
     measured: Atom.map(sign, (now) => now.measure),
     top: Atom.map(sign, (now) => now.top),
     seen,
+    drawn,
     lead,
     leadInView: Atom.map(lead, (id) => id !== undefined),
     toggle: (rowId) =>
@@ -1639,39 +1718,27 @@ export const makeGrid = (input: {
       document
         .querySelector(`[data-review-region="${region.id}"] [data-slot="sticky-table-frame"]`)
         ?.scrollTo({ top: 0 }),
-    sizeOf: (index) => {
-      const line = registry.get(entries)[index]
-      return line === undefined
-        ? bandHeight
-        : lineMatch(line, {
-            Row: () => registry.get(rowSize),
-            Group: () => groupHeight,
-            Kind: () => bandHeight,
-            Rest: () => bandHeight,
-            Detail: () => bandHeight
-          })
+    list,
+    frame: (element) => {
+      registry.set(scroller, O.fromNullOr(element))
+      list._willUpdate()
     },
-    watch: (virtual, onRect) => {
-      registry.set(list, O.some(virtual))
-      return observeElementRect(virtual, (rect) => {
-        onRect(rect)
-        told()
-      })
-    },
-    told,
+    measureLine: list.measureElement,
+    remeasure: list.measure,
     bring: (asked) => {
-      const virtual = registry.get(list)
-      if (O.isNone(asked) || O.isNone(virtual)) return
+      if (O.isNone(asked) || O.isNone(registry.get(scroller))) return
       const index = indexOf(asked.value.rowId)
-      if (index !== -1) virtual.value.scrollToIndex(index, { align: "auto" })
+      if (index !== -1) list.scrollToIndex(index, { align: "auto" })
     }
   }
 }
 
+/** One grid's atoms and its virtual list, as an atom made in the registry that first reads it. */
+export const gridAtom = (input: { readonly region: Region; readonly table: RegionTable }) =>
+  Atom.readable((get) => makeGrid(input, get))
+
 /** One grid's atoms, made once from the region it is in: its parts and the region's footer read them from here. */
-export const GridScope = ScopedAtom.make((input: { readonly region: Region; readonly table: RegionTable }) =>
-  Atom.readable((get) => makeGrid({ ...input, registry: get.registry }))
-)
+export const GridScope = ScopedAtom.make(gridAtom)
 
 type GridProps = {
   /** The one table instance: its column headers carry the sort and hide menu. */
@@ -1696,7 +1763,6 @@ export function ReviewGrid(props: GridProps) {
   const region = useAtomValue(RegionScope.use())
   const regionTable = useAtomValue(TableScope.use())
   const grid = useAtomValue(GridScope.use())
-  const scroller = useRef<HTMLDivElement>(null)
   const allColumns = useAtomValue(region.input.columns)
   const excluded = useAtomValue(region.ui).excluded
   const density = useAtomValue(keptDensity)
@@ -1720,24 +1786,16 @@ export function ReviewGrid(props: GridProps) {
   const actions = useAtomValue(region.rejects) ? regionTable.actions : regionTable.plainActions
   const groupActions = regionTable.groupActions
 
-  const virtual = useVirtualizer({
-    count: entries.length,
-    getScrollElement: () => scroller.current,
-    estimateSize: grid.sizeOf,
-    overscan: 12,
-    // The grid follows the list: what is in view is an atom of the grid's, which the lead and the region read.
-    observeElementRect: grid.watch,
-    onChange: grid.told
-  })
+  // The virtual list is the grid's, given its lines' number where the lines are worked out: the draw only reads it.
+  const { items, total } = useAtomValue(grid.drawn)
   // When the lines change shape the sizes are measured again, and another list starts at its first line.
-  useAtomSubscribe(grid.measured, virtual.measure)
+  useAtomSubscribe(grid.measured, grid.remeasure)
   useAtomSubscribe(grid.top, grid.toTop)
   // The region asks for a row to be in view before it puts the focus there.
   useAtomSubscribe(region.reveal, grid.bring)
 
-  const items = virtual.getVirtualItems()
   const padTop = items[0]?.start ?? 0
-  const padBottom = virtual.getTotalSize() - (items[items.length - 1]?.end ?? 0)
+  const padBottom = total - (items[items.length - 1]?.end ?? 0)
   const span = columns.length + (showStatus ? 2 : 1)
   // The flex column is drawn without a width and takes what the others leave, so rounding never opens a gap.
   const widthOf = (id: string): number | undefined =>
@@ -1749,7 +1807,7 @@ export function ReviewGrid(props: GridProps) {
     actionsWidth
   ]
   return (
-    <StickyTableFrame ref={scroller} label={props.caption} framed={props.framed === true}>
+    <StickyTableFrame ref={grid.frame} label={props.caption} framed={props.framed === true}>
       <StickyTable
         caption={props.caption}
         widths={widths}
@@ -1836,7 +1894,7 @@ export function ReviewGrid(props: GridProps) {
                       key={`detail:${view.row.id}`}
                       span={span}
                       quiet
-                      ref={virtual.measureElement}
+                      ref={grid.measureLine}
                       data-index={item.index}
                       aria-rowindex={item.index + 2}
                     >
@@ -1876,7 +1934,7 @@ export function ReviewGrid(props: GridProps) {
                       readOnly={readOnly}
                       indent={folded.length > 0}
                       actionsWidth={actionsWidth}
-                      measure={virtual.measureElement}
+                      measure={grid.measureLine}
                     />
                   ),
                   Row: ({ view }) => {
@@ -1888,7 +1946,7 @@ export function ReviewGrid(props: GridProps) {
                         key={view.row.id}
                         view={view}
                         index={item.index}
-                        measure={virtual.measureElement}
+                        measure={grid.measureLine}
                         columns={columns}
                         allColumns={allColumns}
                         under={under}

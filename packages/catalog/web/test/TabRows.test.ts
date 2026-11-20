@@ -209,6 +209,9 @@ describe("two tabs of one person", () => {
       yield* settle
       expect(A.map(third.saves, (save) => R.keys(save.set))).toEqual([["row-2"]])
       expect(A.filter(R.keys(entriesOf(id)), (key) => Str.endsWith(first.id)(key))).toEqual([])
+      // The rows are this tab's now, kept under its own key until the server takes them: never neither.
+      const own = A.filter(R.toEntries(entriesOf(id)), ([key]) => Str.endsWith(third.id)(key))
+      expect(A.map(own, ([, text]) => Str.includes('"row-2"')(text))).toEqual([true])
     })
   )
 

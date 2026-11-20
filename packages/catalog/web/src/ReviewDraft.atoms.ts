@@ -320,7 +320,13 @@ export const draftEvents = perKey((id: ImportId) =>
       registry,
       id,
       waits: waiting(stepped.draft),
-      pressed: DraftEvent.$is("Opened")(event) || DraftEvent.$is("Decided")(event)
+      // The person's own doing: the step opened, a row decided or a held one settled, rows taken up from a tab of
+      // theirs that is gone. The rows are then theirs, kept under their key.
+      pressed:
+        DraftEvent.$is("Opened")(event) ||
+        DraftEvent.$is("Decided")(event) ||
+        DraftEvent.$is("HoldSettled")(event) ||
+        DraftEvent.$is("TakenUp")(event)
     })
     for (const effect of stepped.effects) if (!isLocal(effect)) perform({ registry, id, effect })
   })

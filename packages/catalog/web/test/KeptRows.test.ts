@@ -19,6 +19,7 @@ import { decisionFromFlags, type SaveRequest } from "@inventory/catalog-contract
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import type { ImportView } from "@inventory/catalog-contract/Import"
 import { DraftEvent } from "../src/Draft.machine.ts"
+import { tabId } from "../src/Draft.atoms.ts"
 import { askBeforeLeaving, importView, importViewShown, removeImport } from "../src/Imports.atoms.ts"
 import { draftEvents, followDraft, namingLeftOver, reviewLocal, rowsLeftOver } from "../src/ReviewDraft.atoms.ts"
 import { importNo, registryFor, viewAt } from "./support/catalog.ts"
@@ -80,9 +81,9 @@ const person = (id: string, organizationId: string) =>
   )
 const dana = person("mem_dana", "org_prairie")
 
-/** Where one member's waiting rows of one import are kept. */
+/** Where one member's waiting rows of one import are kept, by this tab. */
 const keyOf = (id: ImportId, memberId: string, organizationId = "org_prairie") =>
-  progressKey({ organizationId, memberId, screen: `import:${id}:waiting` })
+  progressKey({ organizationId, memberId, screen: `import:${id}:waiting:${tabId()}` })
 
 /** One page of the app, on the shared storage: the server answers each save only when the test says. */
 const page = (id: ImportId, signedIn = dana) => {

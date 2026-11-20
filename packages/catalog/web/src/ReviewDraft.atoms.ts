@@ -31,7 +31,7 @@ import * as S from "effect/Schema"
 import type { review } from "@inventory/catalog-model/Review"
 import { call, callWrite, catalogRuntime } from "./Catalog.runtime.ts"
 import { importAddress } from "./internal/route.ts"
-import { draftOf, keepWaiting, keptWaiting } from "./Draft.atoms.ts"
+import { draftOf, keepWaiting, keptWaiting, takeUpGoneTabs } from "./Draft.atoms.ts"
 import { leftOverLines } from "./internal/leftOver.ts"
 import {
   changesBetween,
@@ -394,6 +394,8 @@ export const followDraft = perKey((id: ImportId) =>
       const registry = get.registry
       // What this browser kept of the person's waiting rows (from before a reload) comes back with the step.
       registry.set(draftEvents(id), DraftEvent.Opened({ kept: keptWaiting({ registry, id }) }))
+      // And what the person's tabs that are gone kept for it: taken up by this one (never from a tab still open).
+      takeUpGoneTabs({ registry, id, take: (kept) => registry.set(draftEvents(id), DraftEvent.TakenUp({ kept })) })
       get.addFinalizer(() => registry.set(draftEvents(id), DraftEvent.Left()))
       // (The browser asks before the page is left while rows wait wherever the person is: `askBeforeLeaving`.)
       get.subscribe(

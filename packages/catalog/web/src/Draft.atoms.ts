@@ -4,20 +4,27 @@
 // can empty its draft and erase its kept rows without knowing how the Review step runs it.
 //
 // The one thing not to break: rows are kept, and cleared, under the member who decided them, whoever is signed in
-// when the server answers (a switch of organization can fall between the two).
+// when the server answers (a switch of organization can fall between the two); and under the tab that decided them
+// (Benjamin, 2026-11-20, "Each tab keeps its own"): a tab keeps and sends only its own, takes up rows only from a tab
+// that is gone, and never writes over or erases another tab's entry.
+import * as A from "effect/Array"
+import * as SecureRandom from "effect/crypto/SecureRandom"
+import * as Effect from "effect/Effect"
 import * as Eq from "effect/Equal"
+import { pipe } from "effect/Function"
 import * as HashSet from "effect/HashSet"
 import * as MutableHashMap from "effect/MutableHashMap"
 import * as O from "effect/Option"
 import * as P from "effect/Predicate"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
+import * as Str from "effect/String"
 import * as Atom from "effect/reactivity/Atom"
 import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import { perKey } from "@inventory/client/Api"
 import { member } from "@inventory/client/MemberAtoms"
 import { RowDecision } from "@inventory/catalog-contract/Decision"
-import type { ImportId } from "@inventory/catalog-contract/Ids"
+import { ImportId } from "@inventory/catalog-contract/Ids"
 import { kept } from "@inventory/review/Kept"
 import { progressKey } from "@inventory/review/SavedProgress"
 import { leavingApp } from "@inventory/ui/Route"
@@ -99,9 +106,138 @@ const waitingAt = Atom.family((key: string) =>
   kept({ key, schema: StoredWaiting, defaultValue: (): StoredWaiting => O.none() })
 )
 
-/** The key one import's waiting rows are kept under for one member, in one organization. */
+/** The browser's storage of one kind, or none where reading it is itself refused (some private windows). */
+const storageOf = (kind: "localStorage" | "sessionStorage"): Storage | undefined => {
+  try {
+    return window[kind]
+  } catch {
+    return undefined
+  }
+}
+
+/** Where this tab keeps its id: in the tab's own storage, which a reload of the tab keeps and a new tab does not. */
+const tabSlot = "inventory:tab"
+
+/** This tab's id among the person's tabs, made when first asked for. */
+const thisTab = { id: "" }
+
+/** A new id for this tab, kept for a reload of it. */
+const newTab = (): string => {
+  const id = SecureRandom.uuidV4Unsafe()
+  try {
+    storageOf("sessionStorage")?.setItem(tabSlot, id)
+  } catch {
+    // Storage refused: the id lasts as long as the page, and a reload is another tab.
+  }
+  thisTab.id = id
+  return id
+}
+
+/** This tab's id: the one it had before a reload, or a new one. */
+export const tabId = (): string => {
+  if (thisTab.id !== "") return thisTab.id
+  let held: string | null = null
+  try {
+    held = storageOf("sessionStorage")?.getItem(tabSlot) ?? null
+  } catch {
+    held = null
+  }
+  if (held === null) return newTab()
+  thisTab.id = held
+  return held
+}
+
+/** The lock a tab holds for as long as it is open: another tab tells it is gone when nobody holds it. */
+const lockOf = (tab: string): string => `inventory-tab:${tab}`
+
+/** The browser's locks, or none where it has none (an old browser, a test). */
+const locksOf = (): LockManager | undefined =>
+  typeof navigator === "undefined" || navigator.locks === undefined ? undefined : navigator.locks
+
+/**
+ * Holds this tab's lock for the page's life. A tab opened as a copy of another (its storage copied, the id with it)
+ * finds the lock held and takes a new id, so two open tabs never share one.
+ */
+export const holdThisTab = (): void => {
+  const locks = locksOf()
+  if (locks === undefined) return
+  const hold = (tab: string): void =>
+    void locks
+      .request(lockOf(tab), { ifAvailable: true }, (lock) =>
+        lock === null ? Effect.runPromise(Effect.succeed("taken" as const)) : Effect.runPromise(Effect.never)
+      )
+      .then((answer) => {
+        if (answer === "taken") hold(newTab())
+      })
+  hold(tabId())
+}
+
+/** The scope one import's waiting rows are kept under for one member, in one organization: every tab's begins so. */
+const scopeOf = (actor: { readonly organizationId: string; readonly id: string }, id: ImportId) => ({
+  organizationId: actor.organizationId,
+  memberId: actor.id,
+  screen: `import:${id}:waiting`
+})
+
+/** The key one import's waiting rows are kept under for one member, in one organization, by this tab. */
 const keyOf = (actor: { readonly organizationId: string; readonly id: string }, id: ImportId): string =>
-  progressKey({ organizationId: actor.organizationId, memberId: actor.id, screen: `import:${id}:waiting` })
+  progressKey({ ...scopeOf(actor, id), screen: `import:${id}:waiting:${tabId()}` })
+
+/**
+ * The entries kept for one import by the member's other tabs, by key, with the tab each belongs to: the one an older
+ * page kept for every tab (no tab in its key) counts as a tab that is gone.
+ */
+const otherTabs = (
+  actor: { readonly organizationId: string; readonly id: string },
+  id: ImportId
+): ReadonlyArray<{ readonly key: string; readonly tab: O.Option<string> }> => {
+  const storage = storageOf("localStorage")
+  if (storage === undefined) return []
+  const legacy = progressKey(scopeOf(actor, id))
+  const prefix = progressKey({ ...scopeOf(actor, id), screen: `import:${id}:waiting:` })
+  const found: Array<{ readonly key: string; readonly tab: O.Option<string> }> = []
+  try {
+    for (let index = 0; index < storage.length; index += 1) {
+      const key = storage.key(index)
+      if (key === null || key === keyOf(actor, id)) continue
+      if (key === legacy) found.push({ key, tab: O.none() })
+      else if (Str.startsWith(prefix)(key)) found.push({ key, tab: O.some(Str.slice(Str.length(prefix))(key)) })
+    }
+  } catch {
+    return []
+  }
+  return found
+}
+
+/**
+ * The waiting rows the member's tabs that are gone (closed or crashed) kept for one import, taken up by this tab: each
+ * is read, its entry erased, and handed over. A tab still open is never taken from; without the browser's locks no
+ * tab can be told gone, and only an older page's entry is taken up.
+ */
+export const takeUpGoneTabs = (input: {
+  readonly registry: AtomRegistry.AtomRegistry
+  readonly id: ImportId
+  readonly take: (kept: Waiting) => void
+}): void => {
+  const { registry, id } = input
+  O.map(registry.get(member), (actor) => {
+    const others = otherTabs(actor, id)
+    if (!A.isReadonlyArrayNonEmpty(others)) return
+    const takeFrom = (gone: ReadonlyArray<{ readonly key: string }>) => {
+      for (const entry of gone) {
+        const waits = toWaiting(registry.get(waitingAt(entry.key)))
+        registry.set(waitingAt(entry.key), O.none())
+        O.map(waits, input.take)
+      }
+    }
+    const locks = locksOf()
+    if (locks === undefined) return takeFrom(A.filter(others, (entry) => O.isNone(entry.tab)))
+    void locks.query().then((snapshot) => {
+      const open = A.map(snapshot.held ?? [], (lock) => lock.name ?? "")
+      takeFrom(A.filter(others, (entry) => !O.exists(entry.tab, (tab) => A.contains(open, lockOf(tab)))))
+    })
+  })
+}
 
 /** The member each import's waiting rows belong to: whoever decided them, taken when the step opens or rows wait. */
 const keptKeys = MutableHashMap.empty<ImportId, string>()
@@ -158,6 +294,48 @@ export const forgetDraft = (input: { readonly registry: AtomRegistry.AtomRegistr
   registry.update(waitingImports, HashSet.remove(id))
 }
 
+/**
+ * The imports this tab kept rows to be sent for, read from the keys in the browser's storage: each key is the
+ * member's scope, then `import:<id>:waiting:<tab>` (escaped by `progressKey`).
+ */
+const waitingOfThisTab = (input: {
+  readonly registry: AtomRegistry.AtomRegistry
+  readonly actor: { readonly organizationId: string; readonly id: string }
+}): ReadonlyArray<ImportId> => {
+  const storage = storageOf("localStorage")
+  if (storage === undefined) return []
+  const { actor, registry } = input
+  const scope = { organizationId: actor.organizationId, memberId: actor.id }
+  const start = progressKey({ ...scope, screen: "import:" })
+  // The escaped end of every key this tab writes, whatever the import.
+  const bare = progressKey({ organizationId: "", memberId: "", screen: "" })
+  const end = Str.slice(Str.length(bare))(
+    progressKey({ organizationId: "", memberId: "", screen: `:waiting:${tabId()}` })
+  )
+  const ids: Array<ImportId> = []
+  try {
+    for (let index = 0; index < storage.length; index += 1) {
+      const key = storage.key(index)
+      if (key === null || !Str.startsWith(start)(key) || !Str.endsWith(end)(key)) continue
+      const id = pipe(
+        key,
+        Str.slice(Str.length(start), Str.length(key) - Str.length(end)),
+        Str.replaceAll("%3A", ":"),
+        Str.replaceAll("%25", "%")
+      )
+      // Only an entry with rows still to be sent: rows left over are only to be named.
+      const sends = O.exists(
+        toWaiting(registry.get(waitingAt(key))),
+        (waits) => !waits.leftOver && !R.isEmptyReadonlyRecord(waits.rows)
+      )
+      if (sends && S.is(ImportId)(id)) ids.push(id)
+    }
+  } catch {
+    return []
+  }
+  return ids
+}
+
 /** The imports whose drafts have rows still to be sent, in this tab: rows left over to be named are not counted. */
 const waitingImports = Atom.make(HashSet.empty<ImportId>()).pipe(Atom.keepAlive)
 
@@ -170,6 +348,12 @@ const waitingImports = Atom.make(HashSet.empty<ImportId>()).pipe(Atom.keepAlive)
 export const askBeforeLeaving = Atom.readable((get) => {
   if (typeof window === "undefined") return
   const registry = get.registry
+  holdThisTab()
+  // Rows this tab kept before a reload wait to be sent wherever the person is, whether or not their import's step is
+  // opened again: they count from the start.
+  O.map(registry.get(member), (actor) => {
+    for (const id of waitingOfThisTab({ registry, actor })) registry.update(waitingImports, HashSet.add(id))
+  })
   const ask = (event: BeforeUnloadEvent) => {
     if (HashSet.size(registry.get(waitingImports)) > 0) event.preventDefault()
   }

@@ -250,6 +250,11 @@ export type DraftEvent = Data.TaggedEnum<{
   Opened: { readonly kept: O.Option<Waiting> }
   /** The Review step left the screen. */
   Left: {}
+  /**
+   * The waiting rows a tab of the person's that is gone (closed or crashed) kept for this import, taken up by this
+   * tab: added where this tab holds nothing of the row, and sent as this tab's own.
+   */
+  TakenUp: { readonly kept: Waiting }
   /** The person changed these rows. */
   Decided: { readonly changes: RowChanges }
   /**
@@ -819,6 +824,43 @@ const transition = (draft: Draft, event: DraftEvent): Stepped =>
       }
     },
     Left: () => ({ draft: letGo({ ...draft, onScreen: false, matching: false }), effects: none }),
+    // Rows a gone tab kept: never over a row this tab holds anything of, never into a closed draft (rows left over by
+    // a closed import are named as this tab's own are), and not into an import confirmed since they were decided.
+    TakenUp: ({ kept }) => {
+      const ours = { ...mine(draft), ...draft.onHold }
+      const fresh = R.filter(kept.rows, (_row, rowId) => !R.has(ours, rowId))
+      const freshHeld = R.filter(kept.held, (_held, rowId) => !R.has(ours, rowId) && !R.has(fresh, rowId))
+      if (draft.ended || kept.leftOver) {
+        return draft.ended && kept.leftOver
+          ? {
+              draft: {
+                ...draft,
+                leftOver: O.some({ ...fresh, ...O.getOrElse(draft.leftOver, (): RowChanges => ({})) })
+              },
+              effects: none
+            }
+          : { draft, effects: none }
+      }
+      const outlived = O.exists(kept.confirms, (before) => O.exists(draft.confirms, (now) => now > before))
+      if (outlived) {
+        const rows = { ...fresh, ...R.map(freshHeld, (held) => held.mine) }
+        return R.isEmptyReadonlyRecord(rows)
+          ? { draft, effects: none }
+          : { draft, effects: [DraftEffect.Say({ what: Said.Outlived({ rows }) })] }
+      }
+      const next: Draft = {
+        ...draft,
+        unsent: { ...fresh, ...draft.unsent },
+        unsentOn: { ...madeOnOf(fresh, kept.madeOn), ...draft.unsentOn },
+        seen: { ...R.filter(kept.seen, (_values, rowId) => R.has(fresh, rowId)), ...draft.seen },
+        onHold: { ...freshHeld, ...draft.onHold },
+        // Sent by the tab that is gone, or not: not known.
+        sentBefore: A.dedupe([...draft.sentBefore, ...R.keys(fresh)]),
+        stalled: draft.stalled || !R.isEmptyReadonlyRecord(fresh)
+      }
+      // Sent now when the screen holds a picture of the import; otherwise when the first one arrives.
+      return O.isSome(draft.held) ? sending(next) : { draft: next, effects: none }
+    },
     LeftOverNamed: () => ({ draft: draft.ended ? { ...draft, leftOver: O.none() } : draft, effects: none }),
     // The draft ends on the picture the confirm answered with: rows the person decided while it was out were not part
     // of it, and the result names them; the rows it carried are in that picture, and are not.

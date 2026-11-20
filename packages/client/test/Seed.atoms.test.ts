@@ -90,3 +90,39 @@ describe("a read the screen gives its answer", () => {
     })
   )
 })
+
+describe("an answer given while the read is being asked again", () => {
+  it.live("shows at once, and the server is asked again behind it: the request that was out is not lost", () =>
+    Effect.gen(function* () {
+      const t = world()
+      t.registry.mount(t.rows)
+      yield* Effect.sleep("50 millis")
+      expect(t.seen(t.rows)).toBe("server's rows 1")
+      // Asked again (a save said somebody else changed it); before the answer, another answer is put in place.
+      t.registry.refresh(t.rows)
+      yield* Effect.sleep("2 millis")
+      t.registry.set(t.rows, "a save's own answer")
+      yield* Effect.sleep("3 millis")
+      expect(t.seen(t.rows)).toBe("a save's own answer")
+      // The answer that was on its way was cut off by the put; the server is asked again and its word arrives.
+      yield* Effect.sleep("80 millis")
+      expect(t.seen(t.rows)).toMatch(/^server's rows/)
+      expect(t.seen(t.rows)).not.toBe("server's rows 1")
+    })
+  )
+
+  it.live("a look without asking: what is held, an answer given and not yet taken, or nothing, and no request", () =>
+    Effect.gen(function* () {
+      const t = world()
+      expect(O.isNone(t.rows.peek(t.registry))).toBe(true)
+      t.registry.set(t.rows, "the staged view")
+      expect(t.rows.peek(t.registry)).toEqual(O.some("the staged view"))
+      yield* Effect.sleep("30 millis")
+      expect(t.reads()).toBe(0)
+      t.registry.mount(t.rows)
+      yield* Effect.sleep("30 millis")
+      expect(t.rows.peek(t.registry)).toEqual(O.some("the staged view"))
+      expect(t.reads()).toBe(0)
+    })
+  )
+})

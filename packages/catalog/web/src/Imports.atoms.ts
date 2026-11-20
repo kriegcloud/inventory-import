@@ -2,6 +2,8 @@
 // this file protects: what one screen learned (a staged file's view and rows, a draft's new revision) is put in place
 // for the next screen, which then does not wait on a request; and a staged file's rows, which never change, are asked
 // for once and kept for the page.
+import { draftOf } from "./Draft.atoms.ts"
+import { emptyDraft } from "./Draft.machine.ts"
 import { optimisticChange, optimisticWrite, shown } from "@inventory/client/OptimisticAtoms"
 import { apiRuntime, invalidate, perKey } from "@inventory/client/Api"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
@@ -11,7 +13,6 @@ import * as Effect from "effect/Effect"
 import { dual } from "effect/Function"
 import * as MutableHashMap from "effect/MutableHashMap"
 import * as O from "effect/Option"
-import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as Atom from "effect/reactivity/Atom"
 import * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import type { ImportView, OpenImports } from "@inventory/catalog-contract/Import"
@@ -60,10 +61,11 @@ export const changeView = (input: {
   readonly change: (held: ImportView) => ImportView
 }): void => {
   const read = importView(input.id)
-  const now = input.registry.get(read)
-  if (!AsyncResult.isSuccess(now)) return
-  const next = input.change(now.value)
-  if (next !== now.value) input.registry.set(read, next)
+  // Looked at without asking: with no view held there is nothing to change.
+  O.map(read.peek(input.registry), (now) => {
+    const next = input.change(now)
+    if (next !== now) input.registry.set(read, next)
+  })
 }
 
 /**
@@ -72,8 +74,8 @@ export const changeView = (input: {
  */
 export const putView = (input: { readonly registry: AtomRegistry.AtomRegistry; readonly view: ImportView }): void => {
   const read = importView(input.view.id)
-  const now = input.registry.get(read)
-  if (AsyncResult.isSuccess(now) && now.value.revision > input.view.revision) return
+  // Looked at without asking: a card's Continue must not start a request for the view it is about to give.
+  if (O.exists(read.peek(input.registry), (now) => now.revision > input.view.revision)) return
   input.registry.set(read, input.view)
 }
 
@@ -113,8 +115,8 @@ export const pastImports = catalogApi.query((api) => api.imports.past(), {
  * the reason, if the server refuses. Either way the list is asked for again, which also brings in an older file, and
  * takes away one somebody else removed meanwhile. One write per import, so removing one file leaves the others'
  * Remove buttons alone. An import that is already gone (someone else removed it, or the first answer was lost and the
- * request went again) is what the person asked for: it counts as removed. Afterwards nothing of it is left in this
- * tab: its view and its staged rows are let go.
+ * request went again) is what the person asked for: it counts as removed. Afterwards the tab keeps nothing of it: its
+ * view and its staged rows are let go, its draft is emptied and the workbook it was read from is forgotten.
  */
 export const removeImport = Atom.family((id: ImportId) =>
   optimisticWrite({
@@ -134,6 +136,8 @@ export const removeImport = Atom.family((id: ImportId) =>
       toast(`Removed ${view.fileName}`)
       importView(id).letGo(registry)
       importTable(id).letGo(registry)
+      registry.set(draftOf(id), emptyDraft)
+      MutableHashMap.remove(workbooks, id)
     },
     readAgainAfterRefusal: true,
     settled: catalogKeys.activity
@@ -142,12 +146,12 @@ export const removeImport = Atom.family((id: ImportId) =>
 
 /**
  * Puts a view the screen already has in place for the next screen (the card's Continue): one write for every card,
- * so a card mounts no read of its own and the first screen asks for no import it only lists. Put without looking at
- * what is held (`putView` looks first, and looking at a read nobody shows starts a request): the list the card comes
- * from is asked again on every return to the first screen, so its view is the latest this tab knows.
+ * so a card mounts no read of its own and the first screen asks for no import it only lists. Never over a later
+ * revision the tab already holds, like every other answer put in place: the list the card comes from can be behind
+ * what the import's own screens have since been told.
  */
 export const giveView = Atom.fnSync((view: ImportView, get) => {
-  get.registry.set(importView(view.id), view)
+  putView({ registry: get.registry, view })
 })
 
 /** Which file column fills a field of one import, or none. */
@@ -220,10 +224,15 @@ export const suggestFixes = apiRuntime.fn<ImportId>()(
   { concurrent: true }
 )
 
-/** One confirm: the import and the decisions it carries, all of them, so the server reviews the same rows. */
+/**
+ * One confirm: the import, the decisions the screen shows, all of them, so the server reviews the same rows, and the
+ * rows whose decision the person took back that the server has not been told yet (a save still out, or one that
+ * failed and waits): without them an undo the server never heard of would be confirmed as decided.
+ */
 export interface Confirm {
   readonly id: ImportId
   readonly decisions: SavedDecisions
+  readonly clear: ReadonlyArray<string>
 }
 
 /**
@@ -233,7 +242,7 @@ export interface Confirm {
 export const confirmImport = apiRuntime.fn<Confirm>()(
   Effect.fnUntraced(function* (confirm: Confirm) {
     const done = yield* catalogApi.ask((api) =>
-      api.imports.commit({ params: { id: confirm.id }, payload: { set: confirm.decisions, clear: [] } })
+      api.imports.commit({ params: { id: confirm.id }, payload: { set: confirm.decisions, clear: [...confirm.clear] } })
     )
     const registry = yield* AtomRegistry.AtomRegistry
     registry.set(importView(confirm.id), done)

@@ -1,6 +1,7 @@
-// The review's draft while its screen is open, without the screen: what a saved decision puts into the import's view,
-// when the region starts again, and what the saver may be made to forget. Each rule is one where a wrong result loses
-// a decision without a word: the person's own, or one somebody else made on the same import.
+// The review's draft while its screen is open, without the screen: the machine (`Draft.machine.ts`, tested on its own
+// against every ordering) wired to the import's read and to the server. What is held here is the wiring: that a save
+// sends the rows the person changed and nothing else, that its answer goes into the view held, that the server is
+// asked again when it must be and the ask is not lost, and that leaving and coming back loses nothing.
 import { describe, expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Deferred from "effect/Deferred"
@@ -14,10 +15,13 @@ import { type DecisionDelta, decisionFromFlags, type SavedDecisions } from "@inv
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import type { ImportView } from "@inventory/catalog-contract/Import"
 import type { StagedTable } from "@inventory/catalog-contract/Staged"
-import { importTable, importView, importViewShown } from "../src/Imports.atoms.ts"
+import { DraftEvent, type RowChanges, settled } from "../src/Draft.machine.ts"
+import { giveView, importTable, importView, importViewShown } from "../src/Imports.atoms.ts"
 import {
-  decideRows,
+  draftEvents,
+  draftOf,
   followDraft,
+  regionEpoch,
   reviewInput,
   reviewLocal,
   reviewState,
@@ -29,12 +33,15 @@ const settle = Effect.sleep("15 millis")
 const out = decisionFromFlags({ out: true })
 const kept = decisionFromFlags({ kept: true })
 
+/** The server's refusal of a save: the import is no longer open. */
+type Refusal = { readonly _tag: "AlreadyImported" }
+
 /** A server for one import: `get` and `decide` answer only when the test says so, and keep what they were sent. */
 const world = (id: ImportId) => {
   const gets: Array<Deferred.Deferred<ImportView>> = []
   const saves: Array<{
     readonly delta: DecisionDelta
-    readonly answer: Deferred.Deferred<{ readonly revision: number }>
+    readonly answer: Deferred.Deferred<{ readonly revision: number }, Refusal>
   }> = []
   const registry = registryWith({
     imports: {
@@ -44,7 +51,7 @@ const world = (id: ImportId) => {
         return Deferred.await(answer)
       },
       decide: (request: { readonly payload: DecisionDelta }) => {
-        const answer = Deferred.makeUnsafe<{ readonly revision: number }>()
+        const answer = Deferred.makeUnsafe<{ readonly revision: number }, Refusal>()
         saves.push({ delta: request.payload, answer })
         return Deferred.await(answer)
       }
@@ -55,175 +62,243 @@ const world = (id: ImportId) => {
     registry,
     at,
     saves,
-    /** The screen opens: the import's read and the follower are mounted, as the Review step mounts them. */
+    deltas: () => A.map(saves, (save) => save.delta),
+    /** The Review step is drawn: the import's read and the follower are mounted, as the step mounts them. */
     open: () => {
-      registry.mount(importViewShown(id))
+      const stopShown = registry.mount(importViewShown(id))
       const stopLocal = registry.mount(reviewLocal(id))
       const stopFollow = registry.mount(followDraft(id))
-      const stopDecide = registry.mount(decideRows(id))
       // Leaving lets the screen's own state go; the import's read stays, as the import page keeps it.
       return () => {
-        stopDecide()
         stopFollow()
         stopLocal()
+        stopShown()
+        registry.mount(importView(id))
       }
     },
     give: (view: ImportView) => registry.set(importView(id), view),
-    askAgain: () => registry.refresh(importView(id)),
     answerGet: (n: number, view: ImportView) => Deferred.succeed(gets[n]!, view),
     answerSave: (n: number, revision: number) => Deferred.succeed(saves[n]!.answer, { revision }),
+    refuseSave: (n: number) => Deferred.fail(saves[n]!.answer, { _tag: "AlreadyImported" } as const),
     gets: () => gets.length,
     held: () => registry.get(importView(id)).pipe(AsyncResult.value, O.getOrThrow),
-    local: () => registry.get(reviewLocal(id))
+    draft: () => registry.get(draftOf(id)),
+    shown: () => O.getOrThrow(registry.get(shownDecisions(id))),
+    epoch: () => registry.get(regionEpoch(id))
   }
 }
 
-/** The person changes the screen's decisions. */
-const decide = (registry: AtomRegistry.AtomRegistry, id: ImportId, decisions: SavedDecisions) =>
-  registry.set(decideRows(id), decisions)
+/** The person changes rows on the screen. */
+const decide = (registry: AtomRegistry.AtomRegistry, id: ImportId, changes: RowChanges) =>
+  registry.set(draftEvents(id), DraftEvent.Decided({ changes }))
 
 describe("a saved decision", () => {
-  it.live("changes only the decisions and the revision of the view held when the save answers", () =>
-    Effect.gen(function* () {
-      const id = importNo(1)
-      const t = world(id)
-      t.give(t.at({ revision: 10 }))
-      t.open()
-      yield* settle
-      decide(t.registry, id, { "row-1": out })
-      yield* settle
-      // Suggestions arrive while the save is out.
-      const suggestions = [{ rowId: "row-3" }] as unknown as ImportView["suggestions"]
-      t.give(t.at({ revision: 10, suggestions }))
-      yield* t.answerSave(0, 11)
-      yield* settle
-      const held = t.held()
-      expect([held.revision, held.decisions, held.suggestions]).toEqual([11, { "row-1": out }, suggestions])
-      // The next revision of this screen's own save: nothing to ask the server for.
-      expect(t.gets()).toBe(0)
-    })
+  it.live(
+    "sends the rows the person changed and nothing else, and changes only the decisions and the revision of the view held",
+    () =>
+      Effect.gen(function* () {
+        const id = importNo(1)
+        const t = world(id)
+        t.give(t.at({ revision: 10, decisions: { "row-7": kept } }))
+        t.open()
+        yield* settle
+        decide(t.registry, id, { "row-1": O.some(out) })
+        yield* settle
+        expect(t.deltas()).toEqual([{ set: { "row-1": out }, clear: [] }])
+        // Suggestions arrive while the save is out.
+        const suggestions = [{ rowId: "row-3" }] as unknown as ImportView["suggestions"]
+        t.give(t.at({ revision: 10, decisions: { "row-7": kept }, suggestions }))
+        yield* t.answerSave(0, 11)
+        yield* settle
+        const held = t.held()
+        expect([held.revision, held.decisions, held.suggestions]).toEqual([
+          11,
+          { "row-7": kept, "row-1": out },
+          suggestions
+        ])
+        // The next revision of this screen's own save: nothing to ask the server for.
+        expect(t.gets()).toBe(0)
+        expect(settled(t.draft())).toBe(true)
+      })
   )
 
-  it.live("that finds someone else saved in between brings their decisions onto the screen", () =>
-    Effect.gen(function* () {
-      const id = importNo(2)
-      const t = world(id)
-      t.give(t.at({ revision: 10 }))
-      t.open()
-      yield* settle
-      decide(t.registry, id, { "row-1": out })
-      yield* settle
-      // The server answers revision 13: two other saves landed before this one.
-      yield* t.answerSave(0, 13)
-      yield* settle
-      expect(t.gets()).toBe(1)
-      const theirs = { "row-1": out, "row-7": kept, "row-8": kept }
-      yield* t.answerGet(0, t.at({ revision: 13, decisions: theirs }))
-      yield* settle
-      // The region starts again from everything the server holds, and the saver from the same.
-      expect([t.local().epoch, O.getOrNull(t.local().decisions), O.getOrNull(t.local().known)]).toEqual([1, theirs, 13])
-      decide(t.registry, id, { ...theirs, "row-9": out })
-      yield* settle
-      expect(t.saves[1]!.delta).toEqual({ set: { "row-9": out }, clear: [] })
-    })
-  )
-})
-
-describe("after a saved decision", () => {
-  it.live("the import is not asked for again when no SKU was typed, however many rows were decided", () =>
-    Effect.gen(function* () {
-      const id = importNo(6)
-      const t = world(id)
-      t.give(t.at({ revision: 10 }))
-      t.open()
-      yield* settle
-      // One press that settles three rows: the next revision, nobody else in between, nothing typed.
-      decide(t.registry, id, { "row-1": out, "row-2": out, "row-3": out })
-      yield* settle
-      yield* t.answerSave(0, 11)
-      yield* settle
-      expect(t.gets()).toBe(0)
-    })
+  it.live(
+    "that finds someone else saved in between asks again, keeps the person's row on screen, and never sends theirs",
+    () =>
+      Effect.gen(function* () {
+        const id = importNo(2)
+        const t = world(id)
+        t.give(t.at({ revision: 10 }))
+        t.open()
+        yield* settle
+        decide(t.registry, id, { "row-1": O.some(out) })
+        yield* settle
+        // Two revisions on: somebody else saved between.
+        yield* t.answerSave(0, 12)
+        yield* settle
+        expect(t.gets()).toBe(1)
+        expect(t.shown()).toEqual({ "row-1": out })
+        const theirs: SavedDecisions = { "row-1": out, "row-5": kept }
+        yield* t.answerGet(0, t.at({ revision: 12, decisions: theirs }))
+        yield* settle
+        expect([t.epoch(), t.shown(), O.map(t.draft().held, (held) => held.revision)]).toEqual([1, theirs, O.some(12)])
+        // The next decision carries its own row only.
+        decide(t.registry, id, { "row-9": O.some(out) })
+        yield* settle
+        expect(t.deltas()[1]).toEqual({ set: { "row-9": out }, clear: [] })
+      })
   )
 
-  it.live("the review's input stays the same object when the import is read again and only its draft moved", () =>
-    Effect.gen(function* () {
-      const id = importNo(7)
-      const t = world(id)
-      const stored = [{ sku: "ABC-0001" }] as unknown as ImportView["storedItems"]
-      t.give(t.at({ revision: 10, storedItems: stored, createdIds: [] }))
-      t.registry.set(importTable(id), { columns: [], rows: [] } as unknown as StagedTable)
-      t.registry.mount(importTable(id))
-      t.open()
-      let built = 0
-      const stop = t.registry.subscribe(reviewInput(id), () => built++, { immediate: true })
-      yield* settle
-      const first = t.registry.get(reviewInput(id))
-      expect(O.isSome(first)).toBe(true)
-      // Read again: a newer revision, and every part decoded anew, equal to what was held.
-      t.askAgain()
-      yield* settle
-      const again = [{ sku: "ABC-0001" }] as unknown as ImportView["storedItems"]
-      yield* t.answerGet(0, t.at({ revision: 11, storedItems: again, createdIds: [], decisions: { "row-1": out } }))
-      yield* settle
-      expect(t.held().revision).toBe(11)
-      expect(t.registry.get(reviewInput(id))).toBe(first)
-      expect(built).toBe(1)
-      stop()
-    })
-  )
-})
-
-describe("the review's follower", () => {
-  it.live("starts the region again when a view newer than the one it was drawn from arrives", () =>
+  it.live("that typed a SKU asks which items are already there, and the next save's answer does not end that ask", () =>
     Effect.gen(function* () {
       const id = importNo(3)
       const t = world(id)
-      t.give(t.at({ revision: 20 }))
-      const stop = t.registry.mount(importViewShown(id))
+      t.give(t.at({ revision: 10 }))
+      t.open()
       yield* settle
-      // The person comes back to the tab: the import is asked again, and the Review opens before it answers.
-      t.askAgain()
+      const typed = decisionFromFlags({ edits: { sku: "AB-1" } })
+      decide(t.registry, id, { "row-1": O.some(typed) })
       yield* settle
-      expect(t.held().revision).toBe(20)
-      const stopFollow = t.open()
+      yield* t.answerSave(0, 11)
       yield* settle
-      // Someone else decided five rows meanwhile.
-      const theirs = { "row-1": kept, "row-2": kept, "row-3": kept, "row-4": kept, "row-5": kept }
-      yield* t.answerGet(0, t.at({ revision: 25, decisions: theirs }))
+      // Asked, and still out.
+      expect(t.gets()).toBe(1)
+      decide(t.registry, id, { "row-2": O.some(out) })
       yield* settle
-      expect([t.local().epoch, O.getOrNull(t.local().decisions), O.getOrNull(t.local().known)]).toEqual([1, theirs, 25])
-      // The next decision is sent on top of theirs: nothing of theirs is cleared.
-      decide(t.registry, id, { ...theirs, "row-9": out })
+      yield* t.answerSave(1, 12)
       yield* settle
-      expect(t.saves[0]!.delta).toEqual({ set: { "row-9": out }, clear: [] })
-      stopFollow()
-      stop()
+      // The second save's answer was put into the view while the ask was out: the server is asked again.
+      expect(t.gets()).toBe(2)
+      const stored = [{ sku: "AB-1" }] as unknown as ImportView["storedItems"]
+      yield* t.answerGet(1, t.at({ revision: 12, decisions: { "row-1": typed, "row-2": out }, storedItems: stored }))
+      yield* settle
+      expect(t.held().storedItems).toEqual(stored)
+      expect(t.shown()).toEqual({ "row-1": typed, "row-2": out })
     })
   )
 
-  it.live("coming back while a save is out keeps the person's decision on screen and in the saver", () =>
+  it.live("is not followed by a request when no SKU was typed, however many rows were decided", () =>
     Effect.gen(function* () {
       const id = importNo(4)
       const t = world(id)
       t.give(t.at({ revision: 10 }))
+      t.open()
+      yield* settle
+      decide(t.registry, id, { "row-1": O.some(out), "row-2": O.some(out), "row-3": O.some(out) })
+      yield* settle
+      yield* t.answerSave(0, 11)
+      yield* settle
+      expect(t.gets()).toBe(0)
+    })
+  )
+
+  it.live("the server refuses puts the screen back, asks again, and is not shown or sent again on the next visit", () =>
+    Effect.gen(function* () {
+      const id = importNo(5)
+      const t = world(id)
+      t.give(t.at({ revision: 10, decisions: { "row-7": kept } }))
       const leave = t.open()
       yield* settle
-      decide(t.registry, id, { "row-12": out })
+      decide(t.registry, id, { "row-1": O.some(out) })
       yield* settle
-      // To Match and back: the screen's own state is let go, the save is still out.
+      yield* t.refuseSave(0)
+      yield* settle
+      expect([t.shown(), t.gets(), t.epoch()]).toEqual([{ "row-7": kept }, 1, 1])
       leave()
       yield* settle
       t.open()
       yield* settle
-      // The view held does not have row 12 yet; the screen shows it all the same.
-      expect(t.held().decisions).toEqual({})
-      expect(O.getOrNull(t.local().decisions)).toEqual({ "row-12": out })
+      expect(t.shown()).toEqual({ "row-7": kept })
+      decide(t.registry, id, { "row-2": O.some(out) })
+      yield* settle
+      expect(t.deltas()[1]).toEqual({ set: { "row-2": out }, clear: [] })
+    })
+  )
+})
+
+describe("leaving the Review step and coming back", () => {
+  it.live(
+    "while a save is out keeps the person's decision on screen; its answer is the person's own and starts nothing again",
+    () =>
+      Effect.gen(function* () {
+        const id = importNo(6)
+        const t = world(id)
+        t.give(t.at({ revision: 10 }))
+        const leave = t.open()
+        yield* settle
+        decide(t.registry, id, { "row-12": O.some(out) })
+        yield* settle
+        leave()
+        yield* settle
+        yield* t.answerSave(0, 11)
+        yield* settle
+        expect([t.held().revision, t.held().decisions]).toEqual([11, { "row-12": out }])
+        t.open()
+        yield* settle
+        expect([t.shown(), t.epoch()]).toEqual([{ "row-12": out }, 0])
+      })
+  )
+
+  it.live("keeps nothing of the draft once the server has everything", () =>
+    Effect.gen(function* () {
+      const id = importNo(7)
+      const t = world(id)
+      t.give(t.at({ revision: 10 }))
+      const leave = t.open()
+      yield* settle
+      decide(t.registry, id, { "row-1": O.some(out) })
+      yield* settle
       yield* t.answerSave(0, 11)
       yield* settle
-      // Nothing more is sent: no request that takes row 12 back.
-      expect(t.saves).toHaveLength(1)
-      expect(t.held().decisions).toEqual({ "row-12": out })
+      leave()
+      yield* settle
+      expect(O.isNone(t.draft().held)).toBe(true)
+      expect(R.isEmptyReadonlyRecord(t.draft().unsent)).toBe(true)
+    })
+  )
+})
+
+describe("a view put in place from a card's Continue", () => {
+  it.live("never replaces a later revision the tab holds, and asks the server for nothing", () =>
+    Effect.gen(function* () {
+      const id = importNo(8)
+      const t = world(id)
+      t.registry.mount(giveView)
+      // Nothing held: the card's view is the one, with no request.
+      t.registry.set(giveView, t.at({ revision: 10 }))
+      yield* settle
+      expect(t.gets()).toBe(0)
+      t.registry.mount(importView(id))
+      yield* settle
+      expect(t.held().revision).toBe(10)
+      // The import's own screens were told of revision 12 since.
+      t.give(t.at({ revision: 12, decisions: { "row-1": out } }))
+      yield* settle
+      t.registry.set(giveView, t.at({ revision: 10 }))
+      yield* settle
+      expect([t.held().revision, t.held().decisions]).toEqual([12, { "row-1": out }])
+    })
+  )
+})
+
+describe("the review's input", () => {
+  it.live("stays the same object when the import is read again and only its draft moved", () =>
+    Effect.gen(function* () {
+      const id = importNo(9)
+      const t = world(id)
+      const table = { rows: [] } as unknown as StagedTable
+      t.registry.set(importTable(id), table)
+      t.registry.mount(importTable(id))
+      t.give(t.at({ revision: 10 }))
+      t.open()
+      t.registry.mount(reviewInput(id))
+      yield* settle
+      const first = t.registry.get(reviewInput(id))
+      expect(O.isSome(first)).toBe(true)
+      // The same import decoded anew, one revision on: every part a new object with the same values.
+      t.give(t.at({ revision: 11, decisions: { "row-1": out }, suggestions: [], choices: [] }))
+      yield* settle
+      expect(t.registry.get(reviewInput(id))).toBe(first)
     })
   )
 })
@@ -231,26 +306,19 @@ describe("the review's follower", () => {
 describe("the decisions the review is worked out from", () => {
   it.live("stay the same object while the view answers the same and the screen's own state changes", () =>
     Effect.gen(function* () {
-      const id = importNo(5)
+      const id = importNo(10)
       const t = world(id)
-      const decisions = { "row-1": out }
-      t.give(t.at({ revision: 10, decisions }))
-      let worked = 0
-      const stop = t.registry.subscribe(shownDecisions(id), () => worked++, { immediate: true })
+      t.give(t.at({ revision: 10, decisions: { "row-1": out } }))
       t.open()
+      t.registry.mount(shownDecisions(id))
       yield* settle
       const first = t.registry.get(shownDecisions(id))
-      // The tab comes back: the import is asked again and answers the same.
-      t.askAgain()
-      yield* settle
-      yield* t.answerGet(0, t.at({ revision: 10, decisions }))
-      yield* settle
-      // A match made on this screen is on its way.
-      t.registry.set(reviewLocal(id), { ...t.local(), matching: true })
+      // The view is read again and answers the same; a match starts and ends.
+      t.give(t.at({ revision: 10, decisions: { "row-1": out } }))
+      t.registry.set(draftEvents(id), DraftEvent.MatchStarted())
+      t.registry.set(draftEvents(id), DraftEvent.MatchEnded())
       yield* settle
       expect(t.registry.get(shownDecisions(id))).toBe(first)
-      expect(worked).toBe(1)
-      stop()
     })
   )
 })
@@ -269,25 +337,26 @@ describe("the region's decisions for one import", () => {
       expect(R.keys(saved(first))).toEqual(["row-1"])
 
       // What the screen changes while it is drawn again and again: none of it is the decisions.
-      t.registry.update(reviewLocal(id), (now) => ({ ...now, matching: true }))
-      t.registry.update(reviewLocal(id), (now) => ({ ...now, matching: false, typed: "A=1" }))
+      t.registry.update(reviewLocal(id), (now) => ({ ...now, suggested: O.none() }))
+      t.registry.set(draftEvents(id), DraftEvent.MatchStarted())
       yield* settle
       expect(t.registry.get(reviewState(id))).toBe(first)
       expect(started).toBe(0)
     })
   )
 
-  it.live("written by the region are shown, sent to the server once and kept for the next read", () =>
+  it.live("written by the region are shown, and the server is sent the rows the action changed, once", () =>
     Effect.gen(function* () {
       const id = importNo(41)
       const t = world(id)
-      t.give(t.at({ revision: 10 }))
+      t.give(t.at({ revision: 10, decisions: { "row-7": kept } }))
       t.open()
       t.registry.mount(reviewState(id))
       yield* settle
       const before = t.registry.get(reviewState(id))
-      const next = act({
-        rows: [{ id: "row-2", line: 2, cells: {} }],
+      const rows = [{ id: "row-2", line: 2, cells: {} }]
+      const left = act({
+        rows,
         state: before,
         action: Action.LeaveOut({ rowIds: ["row-2"] }),
         recheck: undefined,
@@ -295,11 +364,26 @@ describe("the region's decisions for one import", () => {
         rejects: false
       }).state
 
-      t.registry.set(reviewState(id), next)
+      t.registry.set(reviewState(id), left)
       yield* settle
-      expect(t.registry.get(reviewState(id))).toBe(next)
-      expect(O.getOrThrow(t.registry.get(shownDecisions(id)))).toEqual({ "row-2": out })
-      expect(A.map(t.saves, (save) => save.delta)).toEqual([{ set: { "row-2": out }, clear: [] }])
+      expect(t.registry.get(reviewState(id))).toBe(left)
+      expect(t.shown()).toEqual({ "row-7": kept, "row-2": out })
+      expect(t.deltas()).toEqual([{ set: { "row-2": out }, clear: [] }])
+
+      // The undo takes back exactly the row of the step it undoes, while the first save is still out.
+      const undone = act({
+        rows,
+        state: left,
+        action: Action.Undo(),
+        recheck: undefined,
+        fixable: () => false,
+        rejects: false
+      })
+      t.registry.set(reviewState(id), undone.state)
+      yield* t.answerSave(0, 11)
+      yield* settle
+      expect(t.deltas()[1]).toEqual({ set: {}, clear: ["row-2"] })
+      expect(t.shown()).toEqual({ "row-7": kept })
     })
   )
 })

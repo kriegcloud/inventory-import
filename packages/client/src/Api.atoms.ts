@@ -50,8 +50,8 @@ export const provideApi = <R>(layer: Layer.Layer<R>): readonly [Atom.Atom<unknow
 
 /**
  * The tab's one record of what changed: a write names its keys here and every read that shows one of them asks again.
- * One instance for the tab, not one per registry, so code that is not an atom (an upload, the review's saver) can say
- * what it changed with `invalidate`.
+ * One instance for the tab, not one per registry, so code that is not an atom (an upload when it lands, a confirm or a
+ * take-back once the server has answered) can say what it changed with `invalidate`.
  */
 const reactivity: Reactivity.Reactivity = Effect.runSync(Reactivity.make)
 
@@ -93,7 +93,6 @@ export const keepWhenEqual: {
 const heldSuccess = <A, E>(previous: O.Option<AsyncResult.AsyncResult<A, E>>): O.Option<A> =>
   O.flatMap(previous, AsyncResult.value)
 
-/** An answer put in place by the screen, numbered so the read uses each one once. */
 /** An answer a screen gave a read, and when: one given a while before it is first shown is asked again behind it. */
 interface Given<A> {
   readonly answer: A
@@ -115,6 +114,8 @@ interface PerMember<A, E> {
   readonly held: Atom.Atom<AsyncResult.AsyncResult<A, E>>
   readonly read: Atom.Atom<AsyncResult.AsyncResult<A, E>>
   readonly give: (answer: A) => Atom.Writable<number>
+  /** An answer given that the read has not taken yet. */
+  readonly waiting: () => O.Option<A>
 }
 
 /** How long a read nobody looks at is kept: `keepUnwatched`, or the page's life for an answer that never changes. */
@@ -191,6 +192,12 @@ export interface Query<A, E> extends Atom.Writable<AsyncResult.AsyncResult<A, E>
    * in the tab, and the next look asks the server.
    */
   readonly letGo: (registry: AtomRegistry.AtomRegistry) => void
+  /**
+   * The answer the tab holds for whoever is signed in, or none, without asking the server: looking at a read with the
+   * registry starts a request when nothing is held. For code that puts an answer in place only if it is not older
+   * than the one held.
+   */
+  readonly peek: (registry: AtomRegistry.AtomRegistry) => O.Option<A>
 }
 
 /**
@@ -278,8 +285,13 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
         if (O.isSome(taken)) {
           // The answer once: a later refresh asks the server. Given a while ago (an upload that landed while the
           // person was elsewhere), it is shown at once and asked again behind, as any answer of that age is.
+          //
+          // And never at the cost of a request that was out: taking the answer ends that request, whose answer may
+          // have been newer than the one given (a re-read asked for after a save, cut off by the next save's
+          // answer). So the server is asked again behind the answer shown.
           const age = DateTime.distance(taken.value.at, DateTime.nowUnsafe())
-          if (keeping !== "page" && Duration.isGreaterThan(age, freshEnough)) {
+          const wasAsking = O.exists(get.self<AsyncResult.AsyncResult<A, E>>(), (before) => before.waiting)
+          if (keeping !== "page" && (wasAsking || Duration.isGreaterThan(age, freshEnough))) {
             const registry = get.registry
             Effect.runFork(Effect.sync(() => registry.refresh(held)).pipe(Effect.delay(Duration.zero)))
           }
@@ -301,6 +313,7 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
           given = O.some({ answer, at: DateTime.nowUnsafe() })
           return nudge
         },
+        waiting: () => O.map(given, (taken) => taken.answer),
         read: options?.reactivityKeys === undefined ? fresh : fresh.pipe(followKeys(options.reactivityKeys))
       }
     }
@@ -364,7 +377,14 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
         const member = registry.get(memberKey)
         stopKeeping(member)
         MutableHashMap.remove(reads, member)
-      }
+      },
+      peek: (registry: AtomRegistry.AtomRegistry): O.Option<A> =>
+        O.flatMap(MutableHashMap.get(reads, registry.get(memberKey)), (per) =>
+          O.orElse(per.waiting(), () =>
+            // Only a read the registry already holds is looked at: looking at any other would ask the server.
+            registry.getNodes().has(per.held) ? AsyncResult.value(registry.get(per.held)) : O.none()
+          )
+        )
     })
   }
   function send<A, E>(use: (client: Client) => Effect.Effect<A, E>): Effect.Effect<A, E, Id> {

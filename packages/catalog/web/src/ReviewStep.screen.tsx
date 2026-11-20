@@ -16,7 +16,17 @@ import { Button } from "@inventory/ui/components/button"
 import { Spinner } from "@inventory/ui/components/spinner"
 import { member } from "@inventory/client/MemberAtoms"
 import { invalidate, perKey } from "@inventory/client/Api"
-import { followDraft, reviewInput, reviewLocal, reviewState, shownDecisions } from "./ReviewDraft.atoms.ts"
+import {
+  draftEvents,
+  followDraft,
+  regionEpoch,
+  reviewInput,
+  reviewLocal,
+  reviewState,
+  shownDecisions,
+  unconfirmedRows
+} from "./ReviewDraft.atoms.ts"
+import { deltaOf, DraftEvent } from "./Draft.machine.ts"
 import { confirmImport, matchColumn, suggestFixes } from "./Imports.atoms.ts"
 import { navigate } from "@inventory/ui/Route"
 import { importAddress } from "./internal/route.ts"
@@ -113,6 +123,9 @@ export function ReviewStep(props: { view: ImportView; table: StagedTable; canImp
 function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: boolean }) {
   const { view, table } = props
   const [local, setLocal] = useAtom(reviewLocal(view.id))
+  const happened = useAtomSet(draftEvents(view.id))
+  const epoch = useAtomValue(regionEpoch(view.id))
+  const unconfirmed = useAtomValue(unconfirmedRows(view.id))
   // The decisions are the server's; the undo history behind them is kept in this browser, per person and import, so
   // a refresh brings "Undo last step" back too. It is used only while it ends at the decisions the server holds: a
   // change made on another screen since starts a new history from the server's.
@@ -138,8 +151,9 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
   const match = (pick: { field: Field; column: number }, done?: () => void) => {
     // True between a match made on this screen and the new view it returns, so the update is not announced as
     // someone else's.
-    setLocal((now) => ({ ...now, matching: true }))
+    happened(DraftEvent.MatchStarted())
     void matchOne({ id: view.id, field: pick.field, column: O.some(pick.column) }).then((exit) => {
+      happened(DraftEvent.MatchEnded())
       done?.()
       if (Exit.isFailure(exit)) toastError(exit.cause.pipe(Cause.squash))
     })
@@ -157,16 +171,15 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
   const committing = useAtomValue(confirmImport).waiting
   const commitNow = useAtomSet(confirmImport, { mode: "promiseExit" })
   const commit = () =>
-    void commitNow({ id: view.id, decisions }).then((exit) => {
+    void commitNow({ id: view.id, decisions, clear: deltaOf(unconfirmed).clear }).then((exit) => {
       if (Exit.isFailure(exit)) {
         toastError(exit.cause.pipe(Cause.squash))
         // Someone else confirmed it meanwhile: ask what happened, which moves this screen to the result.
         invalidate(catalogKeys.import(view.id))
         return
       }
-      // The confirm saved this screen's own decisions: not a change made somewhere else. Confirm ends the undo
-      // history: nothing of it comes back on the next visit.
-      setLocal((now) => ({ ...now, known: O.some(exit.value.revision) }))
+      // Confirm ends the draft and its undo history: nothing of either comes back on the next visit.
+      happened(DraftEvent.Dropped())
       progress.clear()
       navigate(importAddress(exit.value.id, "result"))
     })
@@ -262,7 +275,7 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
     <>
       <ReaderWarnings table={table} />
       <ReviewRegion
-        key={`${view.id}:${local.epoch}`}
+        key={`${view.id}:${epoch}`}
         title={`Review ${view.fileName}`}
         noun={["item", "items"]}
         columns={regionColumnsOf(view.id)}

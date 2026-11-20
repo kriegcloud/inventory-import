@@ -1,59 +1,49 @@
 // The review's draft as atoms, with no screen in it: what the Review step holds for one import besides the server's
 // view, the decisions it shows, how it follows the draft while it is open, and what a decision does. The rule this
 // file protects: the screen never shows, and never sends, less than the person and the others have decided.
-import * as Data from "effect/Data"
 import * as Eq from "effect/Equal"
 import * as O from "effect/Option"
+import * as R from "effect/Record"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as Atom from "effect/reactivity/Atom"
+import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import { toast } from "sonner"
 import { perKey } from "@inventory/client/Api"
-import { toastError } from "@inventory/client/SayError"
+import { member } from "@inventory/client/MemberAtoms"
+import { isTransient, toastError } from "@inventory/client/SayError"
 import type { SavedDecisions } from "@inventory/catalog-contract/Decision"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import type { ImportView, SuggestOutcome } from "@inventory/catalog-contract/Import"
-import { member } from "@inventory/client/MemberAtoms"
 import { restored, saved } from "@inventory/review/ReviewDraft"
-import type { ReviewState, SavedDecisions as RegionDecisions } from "@inventory/review/ReviewTypes"
+import type { ReviewState } from "@inventory/review/ReviewTypes"
 import { restoredDecisions, storedReview } from "@inventory/review/SavedProgress"
 import { progressOf, progressWith } from "@inventory/review/SavedProgressHook"
-import { decisionSaver } from "./Draft.controller.ts"
-import { toRegionDecisions, toServerDecisions } from "./ImportReview.controller.ts"
 import type { review } from "@inventory/catalog-model/Review"
+import { callWrite } from "./Catalog.runtime.ts"
+import { draftOf } from "./Draft.atoms.ts"
+import {
+  changesBetween,
+  type DraftEffect,
+  DraftEvent,
+  type RowChanges,
+  shown,
+  step,
+  unconfirmed
+} from "./Draft.machine.ts"
+import { toRegionDecisions, toServerDecisions } from "./ImportReview.controller.ts"
 import { changeView, importTable, importView, importViewShown, viewWith } from "./Imports.atoms.ts"
 
 /**
- * What this screen holds for one import besides the server's view: the decisions it shows (until the first change,
- * the server's), the revision of the draft it has caught up with (none until it first sees the import), the region's
- * starting decisions and a count that starts the region again, what the person last typed as a SKU, whether a match
- * made here is on its way, and the last suggestions. Let go with the screen, so the next visit starts from the server.
+ * What the Review step holds for one import besides its draft: the region's decisions with their undo history (none
+ * until the person's first decision on this visit, and again whenever the region starts again) and the last
+ * suggestions. Let go with the screen: the draft itself (`draftOf`) is what outlives it.
  */
 export interface ReviewLocal {
-  readonly known: O.Option<number>
-  readonly decisions: O.Option<SavedDecisions>
-  readonly start: O.Option<RegionDecisions>
-  /** The region's decisions with their undo history, none until the person's first decision on this visit. */
   readonly state: O.Option<ReviewState>
-  readonly epoch: number
-  readonly typed: string
-  readonly matching: boolean
-  readonly putBack: boolean
   readonly suggested: O.Option<SuggestOutcome>
 }
 
-export const reviewLocal = perKey((_id: ImportId) =>
-  Atom.make<ReviewLocal>({
-    known: O.none(),
-    decisions: O.none(),
-    start: O.none(),
-    state: O.none(),
-    epoch: 0,
-    typed: "",
-    matching: false,
-    putBack: false,
-    suggested: O.none()
-  })
-)
+export const reviewLocal = perKey((_id: ImportId) => Atom.make<ReviewLocal>({ state: O.none(), suggested: O.none() }))
 
 /** The view's answer, once there is one. */
 const viewOf = (get: Atom.AtomContext, id: ImportId): O.Option<ImportView> => AsyncResult.value(get(importView(id)))
@@ -96,172 +86,118 @@ export const reviewInput = perKey((id: ImportId) =>
 )
 export type ReviewInput = Omit<Parameters<typeof review>[0], "decisions">
 
-/**
- * The decisions the screen shows: its own once the person has changed one, the server's until then. The same object
- * while the decisions are: the whole review is worked out from it, and a refresh of the view that answers the same,
- * or a change to something else the screen holds, must not work out 50,000 rows again.
- */
-export const shownDecisions = perKey((id: ImportId) =>
-  Atom.readable((get): O.Option<SavedDecisions> => {
-    const next = O.orElse(get(reviewLocal(id)).decisions, () => O.map(viewOf(get, id), (view) => view.decisions))
-    const held = O.flatten(get.self<O.Option<SavedDecisions>>())
-    return O.isSome(held) && O.isSome(next) && held.value === next.value ? held : next
-  })
-)
-
-/** What the follower does with a view of the draft it has just seen. */
-export type FollowStep = Data.TaggedEnum<{
-  /** The first view seen: the one the region is drawn from. */
-  Start: {}
-  /** A newer draft, or the server's after a refusal: the region starts again from it. `announce` tells the person. */
-  Restart: { readonly announce: boolean }
-  Stay: {}
-}>
-export const FollowStep = Data.taggedEnum<FollowStep>()
-
-/**
- * What to do with a view of the draft, from where the screen stands. The first one seen is where the region starts,
- * even while the import is being asked again: the region is drawn from it, so its revision is the one to compare the
- * next with. After a refusal the server's decisions are put back. A newer revision starts the region again, unless
- * the saver still has a save out or a change unsent: the view is then behind this page, and the save's own answer
- * will ask for the newer one.
- *
- * @example follow({ known: O.some(20), putBack: false, matching: false, unsettled: false, waiting: false, revision: 25 }) // Restart, announced
- */
-export const follow = (seen: {
-  readonly known: O.Option<number>
-  readonly putBack: boolean
-  readonly matching: boolean
-  readonly unsettled: boolean
-  readonly waiting: boolean
-  readonly revision: number
-}): FollowStep => {
-  if (O.isNone(seen.known)) return FollowStep.Start()
-  if (seen.waiting) return FollowStep.Stay()
-  if (seen.putBack) return FollowStep.Restart({ announce: false })
-  if (seen.revision <= seen.known.value || seen.unsettled) return FollowStep.Stay()
-  return FollowStep.Restart({ announce: !seen.matching })
-}
-
-/**
- * Follows one import's draft while its review is open (`follow` says what each view means). An atom, so it reads the
- * screen's state as it is now, not as it was when the screen last drew.
- */
-export const followDraft = perKey((id: ImportId) =>
-  Atom.readable((get) => {
-    get.subscribe(
-      importViewShown(id),
-      (result) => {
-        if (!AsyncResult.isSuccess(result)) return
-        const now = result.value
-        const registry = get.registry
-        const local = registry.get(reviewLocal(id))
-        const saver = decisionSaver(id)
-        const restartFrom = (decisions: SavedDecisions): ReviewLocal => ({
-          ...local,
-          known: O.some(now.revision),
-          decisions: O.some(decisions),
-          start: O.some(toRegionDecisions(decisions)),
-          state: O.none(),
-          epoch: local.epoch + 1,
-          matching: false,
-          putBack: false
-        })
-        FollowStep.$match(
-          follow({
-            known: local.known,
-            putBack: local.putBack,
-            matching: local.matching,
-            unsettled: saver.unsettled(),
-            waiting: result.waiting,
-            revision: now.revision
-          }),
-          {
-            Start: () => {
-              // A save of an earlier visit to this screen is still out: the view does not hold it yet, so the screen
-              // shows what the saver is sending, and the saver keeps it.
-              if (saver.reset(now.decisions)) registry.set(reviewLocal(id), { ...local, known: O.some(now.revision) })
-              else
-                registry.set(reviewLocal(id), {
-                  ...local,
-                  known: O.some(now.revision),
-                  decisions: O.some(saver.wanted()),
-                  // No starting decisions of its own: the screen starts the region from the ones it shows, with the
-                  // undo history this browser kept for them.
-                  start: O.none(),
-                  state: O.none(),
-                  epoch: local.epoch + 1
-                })
-            },
-            Restart: ({ announce }) => {
-              saver.restart(now.decisions)
-              registry.set(reviewLocal(id), restartFrom(now.decisions))
-              if (announce) toast("Updated with what changed on another screen")
-            },
-            Stay: () => undefined
-          }
-        )
-      },
-      { immediate: true }
-    )
-  })
-)
-
-/**
- * The SKUs the person typed, as one text: a change means the server must say again which items are already there.
- * Only the rows where one was typed count. With an empty place for every other decision, the text changed whenever
- * the number of decisions did, and every save asked for the import again.
- */
-const typedSkus = (saved: SavedDecisions): string =>
-  Object.entries(saved)
-    .flatMap(([rowId, decision]) => (decision.edits?.sku === undefined ? [] : [`${rowId}=${decision.edits.sku}`]))
-    .join("|")
-
-/** The registry these atoms live in, for a write whose answer arrives later. */
+/** The registry these atoms live in, for what answers later. */
 const registryOf = Atom.readable((get) => get.registry)
 
 /** A write with nothing to read. */
 const noValue = (): void => undefined
 
-/**
- * The person changed a decision: the screen shows it at once and the saver sends it. What the save's answer does is
- * worked out from what is held when it arrives, never from the screen as it was drawn: suggestions, a match or another
- * save may have landed in between.
- */
-export const decideRows = perKey((id: ImportId) =>
-  Atom.writable(noValue, (ctx, decisions: SavedDecisions) => {
-    const registry = ctx.get(registryOf)
-    registry.update(reviewLocal(id), (now) => ({ ...now, decisions: O.some(decisions) }))
-    decisionSaver(id).change(decisions, {
-      onSaved: (revision, saved) => {
-        const typed = typedSkus(saved)
-        const now = registry.get(reviewLocal(id))
-        // The next revision after the one this screen knows: nobody else saved in between.
-        if (O.exists(now.known, (known) => revision === known + 1)) {
-          registry.set(reviewLocal(id), { ...now, known: O.some(revision), typed })
-          // Only the decisions and the revision, and never over a later revision already held.
-          changeView({
-            registry,
-            id,
-            change: (held) => (held.revision >= revision ? held : viewWith(held, { decisions: saved, revision }))
-          })
-          // A SKU the person typed may belong to an item that is already there: ask the server which are.
-          if (typed !== now.typed) registry.refresh(importView(id))
-          return
+/** Does what the machine asks: sends, asks, puts the person's own save into the view, starts the region again. */
+const perform = (input: {
+  readonly registry: AtomRegistry.AtomRegistry
+  readonly id: ImportId
+  readonly effect: DraftEffect
+}): void => {
+  const { registry, id, effect } = input
+  const happened = (event: DraftEvent) => registry.set(draftEvents(id), event)
+  switch (effect._tag) {
+    case "Send":
+      // A failure that may pass (the network, a server error) was sent again under the same rows already; if it
+      // still fails the rows stay on screen and wait for "Save again": they are the person's work. A refusal (the
+      // import was confirmed or removed meanwhile, the role was taken away) puts the screen back to what the server
+      // holds, and the toast says why.
+      void callWrite((api) => api.imports.decide({ params: { id }, payload: effect.delta })).then(
+        ({ revision }) => happened(DraftEvent.SaveAnswered({ revision })),
+        (error: unknown) => {
+          if (isTransient(error)) {
+            happened(DraftEvent.SaveFailed())
+            toastError(error, {
+              lead: "Your last decision is on this screen but not saved yet.",
+              action: { label: "Save again", onClick: () => happened(DraftEvent.SaveAgain()) }
+            })
+          } else {
+            toastError(error, { lead: "Your last decision was not saved, so the review shows what was saved." })
+            happened(DraftEvent.SaveRefused())
+          }
         }
-        // Someone else saved in between: the revision this screen knows stays, so the view asked for now, which
-        // holds their decisions too, is newer than it and starts the region again from everything the server holds.
-        registry.set(reviewLocal(id), { ...now, typed })
-        registry.refresh(importView(id))
-      },
-      // Refused: the screen goes back to the decisions the server holds, and the toast says why.
-      onRefused: (error) => {
-        toastError(error, { lead: "Your last decision was not saved, so the review shows what was saved." })
-        registry.update(reviewLocal(id), (now) => ({ ...now, putBack: true }))
-        registry.refresh(importView(id))
-      }
-    })
+      )
+      return
+    case "Ask":
+      registry.refresh(importView(id))
+      return
+    case "Put":
+      // Only the decisions and the revision, and never over a later revision already held.
+      changeView({
+        registry,
+        id,
+        change: (held) =>
+          held.revision >= effect.revision
+            ? held
+            : viewWith(held, { decisions: effect.decisions, revision: effect.revision })
+      })
+      return
+    case "Restart":
+      registry.update(reviewLocal(id), (now) => ({ ...now, state: O.none() }))
+      if (effect.announce) toast("Updated with what changed on another screen")
+      return
+  }
+}
+
+/**
+ * Everything that happens to one import's draft goes in here: the machine says what the draft becomes and what to
+ * do, and this does it. Written to, never read.
+ */
+export const draftEvents = perKey((id: ImportId) =>
+  Atom.writable(noValue, (ctx, event: DraftEvent) => {
+    const registry = ctx.get(registryOf)
+    const stepped = step(registry.get(draftOf(id)), event)
+    registry.set(draftOf(id), stepped.draft)
+    for (const effect of stepped.effects) perform({ registry, id, effect })
   })
+)
+
+/**
+ * The decisions the screen shows: the server's as this tab holds them, with the person's own changes over them. The
+ * same object while the decisions are: the whole review is worked out from it, and a refresh of the view that answers
+ * the same, or a change to something else the screen holds, must not work out 50,000 rows again.
+ */
+export const shownDecisions = perKey((id: ImportId) =>
+  Atom.readable((get): O.Option<SavedDecisions> => {
+    const draft = get(draftOf(id))
+    const next = O.isSome(draft.held) ? O.some(shown(draft)) : O.map(viewOf(get, id), (view) => view.decisions)
+    const held = O.flatten(get.self<O.Option<SavedDecisions>>())
+    return O.isSome(held) && O.isSome(next) && Eq.equals(held.value, next.value) ? held : next
+  })
+)
+
+/** The rows of the person's that the server has not confirmed: what a confirm carries beside the decisions shown. */
+export const unconfirmedRows = perKey((id: ImportId) => Atom.map(draftOf(id), unconfirmed))
+
+/** Goes up when the region must be drawn again from what is shown: the decisions under it changed elsewhere. */
+export const regionEpoch = perKey((id: ImportId) => Atom.map(draftOf(id), (draft) => draft.epoch))
+
+/**
+ * Follows one import's draft while its Review step is drawn: the step is on screen from when this is mounted until it
+ * is let go, and every view of the import the tab comes to hold is handed to the machine.
+ */
+export const followDraft = perKey((id: ImportId) =>
+  Atom.setIdleTTL(
+    Atom.readable((get) => {
+      const registry = get.registry
+      registry.set(draftEvents(id), DraftEvent.Opened())
+      get.addFinalizer(() => registry.set(draftEvents(id), DraftEvent.Left()))
+      get.subscribe(
+        importViewShown(id),
+        (result) => {
+          if (!AsyncResult.isSuccess(result)) return
+          const { revision, decisions } = result.value
+          registry.set(draftEvents(id), DraftEvent.ViewArrived({ revision, decisions }))
+        },
+        { immediate: true }
+      )
+    }),
+    0
+  )
 )
 
 /** Where this browser keeps one import's review for the person signed in: the undo history behind the decisions. */
@@ -274,19 +210,15 @@ const progressFor = (get: <A>(atom: Atom.Atom<A>) => A, id: ImportId) =>
   )
 
 const stateHeld = perKey((id: ImportId) => Atom.map(reviewLocal(id), (local) => local.state))
-const startHeld = perKey((id: ImportId) => Atom.map(reviewLocal(id), (local) => local.start))
 
 /**
- * Where the person starts: the decisions the screen shows (the draft the server holds, or what this page is still
- * sending), with their undo history when this browser kept one that ends at them, so a refresh brings "Undo last
- * step" back too. A change made on another screen since starts a new history from the server's. The region holds a
- * keep-or-replace answer as a value of its own column; the server keeps it apart (`toServerDecisions`,
- * `toRegionDecisions`).
+ * Where the region starts: the decisions the screen shows, with their undo history when this browser kept one that
+ * ends at them, so a refresh brings "Undo last step" back too. A change made on another screen since starts a new
+ * history from what is shown. The region holds a keep-or-replace answer as a value of its own column; the server
+ * keeps it apart (`toServerDecisions`, `toRegionDecisions`).
  */
 const startState = perKey((id: ImportId) =>
   Atom.readable((get): ReviewState => {
-    const start = get(startHeld(id))
-    if (O.isSome(start)) return restored(start.value)
     const decisions = O.getOrElse(get(shownDecisions(id)), (): SavedDecisions => ({}))
     // Read as it stands when the review starts: every decision after that is kept there, and starts nothing again.
     const kept = O.flatMap(get.once(progressFor(get, id)), (progress) => progress.review)
@@ -304,24 +236,29 @@ const startState = perKey((id: ImportId) =>
 
 /**
  * The review region's decisions with their undo, for one import: the region reads them here and writes them here with
- * every action. A write is shown at once, sent to the server (`decideRows`), and kept in this browser with its undo
- * history, so nothing has to be told to the screen that draws the region.
+ * every action. A write is shown at once; the rows it changed (the difference between what the region held before the
+ * action and after it, never a difference from the server's picture) go to the draft, which sends them; and the
+ * decisions are kept in this browser with their undo history.
  */
 export const reviewState = perKey((id: ImportId) =>
   Atom.writable(
     (get): ReviewState => O.getOrElse(get(stateHeld(id)), () => get(startState(id))),
     (ctx, next: ReviewState) => {
+      const before = toServerDecisions(saved(ctx.get(reviewState(id))))
       const decisions = saved(next)
+      const changes: RowChanges = changesBetween({ before, after: toServerDecisions(decisions) })
       ctx.set(reviewLocal(id), { ...ctx.get(reviewLocal(id)), state: O.some(next) })
-      ctx.set(decideRows(id), toServerDecisions(decisions))
+      if (!R.isEmptyReadonlyRecord(changes)) ctx.set(draftEvents(id), DraftEvent.Decided({ changes }))
       const kept = progressFor((atom) => ctx.get(atom), id)
       ctx.set(
         kept,
         progressWith({
           before: ctx.get(kept),
-          change: { step: "review", review: O.some(storedReview(decisions)), decided: Object.keys(decisions).length }
+          change: { step: "review", review: O.some(storedReview(decisions)), decided: R.keys(decisions).length }
         })
       )
     }
   )
 )
+
+export { draftOf }

@@ -24,7 +24,6 @@
     "./ItemEditor": "./src/ItemEditor.screen.tsx",
     "./TableAssistant": "./src/TableAssistant.screen.tsx",
     "./Imports": "./src/Imports.atoms.ts",
-    "./Draft": "./src/Draft.controller.ts",
     "./Upload": "./src/Upload.controller.ts",
     "./Spreadsheet": "./src/internal/spreadsheet/index.ts",
     "./SpreadsheetCsv": "./src/internal/spreadsheet/csv.ts",

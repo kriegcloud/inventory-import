@@ -32,8 +32,18 @@ export interface DecisionSaver {
   readonly change: (next: SavedDecisions, listeners: SaveListeners) => void
   /** What the server has not been sent, or has not answered for, yet. */
   readonly pending: () => DecisionDelta
-  /** The draft was fetched again (it changed on another screen): start from what the server holds now. */
-  readonly reset: (decisions: SavedDecisions) => void
+  /** The decisions the person has made on this page: what the server holds once the saves are in. */
+  readonly wanted: () => SavedDecisions
+  /** True while a save is out or a change has not been sent: the server's view is then behind this page. */
+  readonly unsettled: () => boolean
+  /**
+   * The draft was fetched again (it changed on another screen): start from what the server holds now. Refused, with
+   * false, while the saver is unsettled: a view fetched before the save lands does not hold the person's decision,
+   * and starting from it would make the next request take that decision back.
+   */
+  readonly reset: (decisions: SavedDecisions) => boolean
+  /** The server refused the page's decisions: start from what it holds, whatever was on its way. */
+  readonly restart: (decisions: SavedDecisions) => void
 }
 
 /**
@@ -48,13 +58,16 @@ export interface DecisionSaver {
  * away) is told to `onRefused`, which puts the screen back to what the server holds.
  *
  * One per import, outside the screen (`decisionSaver`): what it holds is the save under way, not something drawn, so
- * it is the saver's own, not React's or an atom's. The screen resets it when it first sees the import.
+ * it is the saver's own, not React's or an atom's. The screen resets it when it first sees the import, unless a save
+ * of an earlier visit is still out. `send` is the request, given so the saver can be tested without a server.
  */
-const makeSaver = (importId: ImportId): DecisionSaver => {
+export const makeSaver = (send: (delta: DecisionDelta) => Promise<{ readonly revision: number }>): DecisionSaver => {
   let onServer: SavedDecisions = {}
   let wanted: SavedDecisions = {}
   let busy = false
   let listeners: SaveListeners = { onSaved: () => {}, onRefused: () => {} }
+
+  const unsettled = (): boolean => busy || !isEmpty(deltaOf(onServer, wanted))
 
   const flush = (): Promise<void> => {
     if (busy) return Promise.resolve()
@@ -63,13 +76,11 @@ const makeSaver = (importId: ImportId): DecisionSaver => {
       const target = wanted
       const delta = deltaOf(onServer, target)
       if (isEmpty(delta)) return Promise.resolve()
-      return callWrite((api) => api.imports.decide({ params: { id: importId }, payload: delta })).then(
-        ({ revision }) => {
-          onServer = target
-          listeners.onSaved(revision, target)
-          return saveNext()
-        }
-      )
+      return send(delta).then(({ revision }) => {
+        onServer = target
+        listeners.onSaved(revision, target)
+        return saveNext()
+      })
     }
     return Promise.resolve()
       .then(saveNext)
@@ -95,7 +106,15 @@ const makeSaver = (importId: ImportId): DecisionSaver => {
       void flush()
     },
     pending: () => deltaOf(onServer, wanted),
+    wanted: () => wanted,
+    unsettled,
     reset: (decisions) => {
+      if (unsettled()) return false
+      onServer = decisions
+      wanted = decisions
+      return true
+    },
+    restart: (decisions) => {
       onServer = decisions
       wanted = decisions
     }
@@ -103,4 +122,6 @@ const makeSaver = (importId: ImportId): DecisionSaver => {
 }
 
 /** The saver of one import, the same for the page's life. */
-export const decisionSaver = perKey(makeSaver)
+export const decisionSaver = perKey((importId: ImportId) =>
+  makeSaver((delta) => callWrite((api) => api.imports.decide({ params: { id: importId }, payload: delta })))
+)

@@ -1,4 +1,4 @@
-import { useAtom, useAtomMount, useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
+import { useAtom, useAtomMount, useAtomSet, useAtomValue } from "@effect/atom-react"
 import * as A from "effect/Array"
 import * as Cause from "effect/Cause"
 import * as Eq from "effect/Equal"
@@ -18,19 +18,18 @@ import { Button } from "@inventory/ui/components/button"
 import { Spinner } from "@inventory/ui/components/spinner"
 import { member } from "@inventory/client/MemberAtoms"
 import { invalidate, perKey } from "@inventory/client/Api"
-import { decisionSaver } from "./Draft.controller.ts"
-import { confirmImport, importTable, importView, importViewShown, matchColumn, suggestFixes } from "./Imports.atoms.ts"
+import { decideRows, followDraft, reviewLocal, shownDecisions } from "./ReviewDraft.atoms.ts"
+import { confirmImport, importTable, importView, matchColumn, suggestFixes } from "./Imports.atoms.ts"
 import { navigate } from "@inventory/ui/Route"
 import { importAddress } from "./internal/route.ts"
 import { restoredDecisions, storedReview } from "@inventory/review/SavedProgress"
 import { useSavedProgress } from "@inventory/review/SavedProgressHook"
 import type { SavedDecisions as RegionDecisions } from "@inventory/review/ReviewTypes"
 import { catalogRuntime } from "./Catalog.runtime.ts"
-import type { ImportView, SuggestOutcome } from "@inventory/catalog-contract/Import"
+import type { ImportView } from "@inventory/catalog-contract/Import"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import { recheckRow, review, ruleFixes } from "@inventory/catalog-model/Review"
 import { readerWarnings } from "@inventory/catalog-model/Staging"
-import { type SavedDecisions } from "@inventory/catalog-contract/Decision"
 import { matchedColumn } from "@inventory/catalog-contract/Mapping"
 import { type Field, fieldLabels, fields, type StagedTable } from "@inventory/catalog-contract/Staged"
 import { type Suggestion } from "@inventory/catalog-contract/Suggestion"
@@ -69,36 +68,6 @@ const cellEditor = (input: { row: ReviewRow; column: string; value: string }) =>
         }
       : undefined
 
-/**
- * What this screen holds for one import besides the server's view: the decisions it shows (until the first change,
- * the server's), the revision of the draft it has caught up with (none until it first sees the import), the region's
- * starting decisions and a count that starts the region again, what the person last typed as a SKU, whether a match
- * made here is on its way, and the last suggestions. Let go with the screen, so the next visit starts from the server.
- */
-interface ReviewLocal {
-  readonly known: O.Option<number>
-  readonly decisions: O.Option<SavedDecisions>
-  readonly start: O.Option<RegionDecisions>
-  readonly epoch: number
-  readonly typed: string
-  readonly matching: boolean
-  readonly putBack: boolean
-  readonly suggested: O.Option<SuggestOutcome>
-}
-
-const reviewLocal = perKey((_id: ImportId) =>
-  Atom.make<ReviewLocal>({
-    known: O.none(),
-    decisions: O.none(),
-    start: O.none(),
-    epoch: 0,
-    typed: "",
-    matching: false,
-    putBack: false,
-    suggested: O.none()
-  })
-)
-
 /** The view's answer, once there is one. */
 const viewOf = (get: Atom.AtomContext, id: ImportId): O.Option<ImportView> => AsyncResult.value(get(importView(id)))
 
@@ -135,13 +104,6 @@ const reviewInput = perKey((id: ImportId) =>
 )
 type ReviewInput = Omit<Parameters<typeof review>[0], "decisions">
 
-/** The decisions the screen shows: its own once the person has changed one, the server's until then. */
-const shownDecisions = perKey((id: ImportId) =>
-  Atom.readable((get) =>
-    O.orElse(get(reviewLocal(id)).decisions, () => O.map(viewOf(get, id), (view) => view.decisions))
-  )
-)
-
 /** The review of every row with the decisions shown: the same pure review the server runs at the confirm. */
 const currentReview = perKey((id: ImportId) =>
   Atom.readable((get) => {
@@ -175,43 +137,6 @@ const rowRecheck = perKey((id: ImportId) =>
 )
 
 /**
- * Follows one import's draft while its review is open. The first view seen sets where the screen starts; a later one
- * with a newer draft (another tab, another person) starts the region again from it, with the person told, and one
- * asked for after a refusal puts the screen back to what the server holds. An atom, so it reads the screen's state as
- * it is now: a save records its revision before its view is put in place, and is never taken for someone else's.
- */
-const followDraft = perKey((id: ImportId) =>
-  Atom.readable((get) => {
-    get.subscribe(
-      importViewShown(id),
-      (result) => {
-        if (!AsyncResult.isSuccess(result) || result.waiting) return
-        const now = result.value
-        const local = get.registry.get(reviewLocal(id))
-        if (O.isNone(local.known)) {
-          decisionSaver(id).reset(now.decisions)
-          get.registry.set(reviewLocal(id), { ...local, known: O.some(now.revision) })
-          return
-        }
-        if (!local.putBack && now.revision <= local.known.value) return
-        decisionSaver(id).reset(now.decisions)
-        get.registry.set(reviewLocal(id), {
-          ...local,
-          known: O.some(now.revision),
-          decisions: O.some(now.decisions),
-          start: O.some(toRegionDecisions(now.decisions)),
-          epoch: local.epoch + 1,
-          matching: false,
-          putBack: false
-        })
-        if (!local.putBack && !local.matching) toast("Updated with what changed on another screen")
-      },
-      { immediate: true }
-    )
-  })
-)
-
-/**
  * The review: every row that needs the person, what the rules propose for it, and one button that says what it
  * will import. The rows and proposals come from the same pure review the server runs at the confirm. Working out a
  * review of 50,000 rows takes the browser most of a second in one go: the skeleton is drawn first (a deferred value),
@@ -225,9 +150,6 @@ export function ReviewStep(props: { view: ImportView; table: StagedTable; canImp
 function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: boolean }) {
   const { view, table } = props
   const [local, setLocal] = useAtom(reviewLocal(view.id))
-  const seedView = useAtomSet(importView(view.id))
-  const askViewAgain = useAtomRefresh(importView(view.id))
-  const saver = decisionSaver(view.id)
   // The decisions are the server's; the undo history behind them is kept in this browser, per person and import, so
   // a refresh brings "Undo last step" back too. It is used only while it ends at the decisions the server holds: a
   // change made on another screen since starts a new history from the server's.
@@ -240,50 +162,26 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
     catalogRuntime()
   )
   const kept = progress.saved === undefined ? null : O.getOrNull(progress.saved.review)
-  // Where the person starts: the draft the server holds, with its undo history when this browser kept it. The region
-  // reads it once, when it is drawn (and again after `epoch` moves). The region holds a keep-or-replace answer as a
-  // value of its own column; the server keeps it apart (`toServerDecisions`, `toRegionDecisions`).
-  const start = O.getOrElse(local.start, () =>
-    kept !== null && Eq.equals(toServerDecisions(kept.decisions), view.decisions)
-      ? restoredDecisions(kept)
-      : toRegionDecisions(view.decisions)
-  )
   const shownRead = useAtomValue(shownDecisions(view.id))
   const decisions = O.getOrElse(shownRead, () => view.decisions)
+  // Where the person starts: the decisions the screen shows (the draft the server holds, or what this page is still
+  // sending), with their undo history when this browser kept one that ends at them. The region reads it once, when
+  // it is drawn (and again after `epoch` moves). The region holds a keep-or-replace answer as a value of its own
+  // column; the server keeps it apart (`toServerDecisions`, `toRegionDecisions`).
+  const start = O.getOrElse(local.start, () =>
+    kept !== null && Eq.equals(toServerDecisions(kept.decisions), decisions)
+      ? restoredDecisions(kept)
+      : toRegionDecisions(decisions)
+  )
   const worked = useAtomValue(currentReview(view.id))
   const recheckRead = useAtomValue(rowRecheck(view.id))
 
   // Follows the import's draft while this screen is open (`followDraft`): where it starts, and a newer draft.
   useAtomMount(followDraft(view.id))
 
+  const decide = useAtomSet(decideRows(view.id))
   const decided = (next: RegionDecisions) => {
-    const server = toServerDecisions(next)
-    setLocal((now) => ({ ...now, decisions: O.some(server) }))
-    saver.change(server, {
-      onSaved: (revision, saved) => {
-        // A SKU the person typed may belong to an item that is already there: ask the server which are.
-        const typed = Object.values(saved)
-          .map((decision) => decision.edits?.sku ?? "")
-          .join("|")
-        // Read from the state as it is now, not as it was drawn: saves can follow each other faster than draws.
-        let alone = false
-        let retyped = false
-        setLocal((now) => {
-          // A jump of more than one means someone else saved in between: ask for their decisions too.
-          alone = O.exists(now.known, (known) => revision === known + 1)
-          retyped = typed !== now.typed
-          return { ...now, known: O.some(revision), typed }
-        })
-        seedView({ ...view, decisions: saved, revision })
-        if (!alone || retyped) askViewAgain()
-      },
-      // Refused: the screen goes back to the decisions the server holds, and the toast says why.
-      onRefused: (error) => {
-        toastError(error, { lead: "Your last decision was not saved, so the review shows what was saved." })
-        setLocal((now) => ({ ...now, putBack: true }))
-        askViewAgain()
-      }
-    })
+    decide(toServerDecisions(next))
     progress.save({ step: "review", review: O.some(storedReview(next)), decided: Object.keys(next).length })
   }
 
@@ -303,7 +201,7 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
   const suggesting = useAtomValue(suggestFixes).waiting
   const suggestNow = useAtomSet(suggestFixes, { mode: "promiseExit" })
   const suggest = () =>
-    void suggestNow(view).then((exit) => {
+    void suggestNow(view.id).then((exit) => {
       if (Exit.isSuccess(exit)) setLocal((now) => ({ ...now, suggested: O.some(exit.value) }))
       else toastError(exit.cause.pipe(Cause.squash), { lead: "No suggestions were made." })
     })

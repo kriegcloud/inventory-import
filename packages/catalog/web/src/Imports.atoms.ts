@@ -7,8 +7,10 @@ import { apiRuntime, invalidate, perKey } from "@inventory/client/Api"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
+import { dual } from "effect/Function"
 import * as MutableHashMap from "effect/MutableHashMap"
 import * as O from "effect/Option"
+import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as Atom from "effect/reactivity/Atom"
 import * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import type { ImportView, OpenImports } from "@inventory/catalog-contract/Import"
@@ -33,6 +35,46 @@ export const importViewShown = perKey((id: ImportId) => Atom.refreshOnWindowFocu
 export const importTable = perKey((id: ImportId) =>
   catalogApi.query((api) => api.imports.table({ params: { id } }), { keep: "page" })
 )
+
+/**
+ * A view with some of its parts replaced: a copy of the same class, not decoded again. The view was decoded when it
+ * arrived and the parts come typed from another answer; a view can hold thousands of stored items.
+ */
+export const viewWith: {
+  (parts: Partial<ImportView>): (held: ImportView) => ImportView
+  (held: ImportView, parts: Partial<ImportView>): ImportView
+} = dual(2, (held: ImportView, parts: Partial<ImportView>): ImportView => {
+  const copy: ImportView = Object.create(Object.getPrototypeOf(held))
+  return Object.assign(copy, held, parts)
+})
+
+/**
+ * Changes the view held for an import, worked out from the view as it is held at this moment: an answer that took
+ * its time (suggestions, a saved decision) changes only its own part, and never takes back what landed meanwhile.
+ * With no view held there is nothing to change: the next screen asks the server.
+ */
+export const changeView = (input: {
+  readonly registry: AtomRegistry.AtomRegistry
+  readonly id: ImportId
+  readonly change: (held: ImportView) => ImportView
+}): void => {
+  const read = importView(input.id)
+  const now = input.registry.get(read)
+  if (!AsyncResult.isSuccess(now)) return
+  const next = input.change(now.value)
+  if (next !== now.value) input.registry.set(read, next)
+}
+
+/**
+ * Puts a view the server answered with in place, unless the one held is of a later revision: two requests can answer
+ * in the other order, and the earlier answer must not replace the later one.
+ */
+export const putView = (input: { readonly registry: AtomRegistry.AtomRegistry; readonly view: ImportView }): void => {
+  const read = importView(input.view.id)
+  const now = input.registry.get(read)
+  if (AsyncResult.isSuccess(now) && now.value.revision > input.view.revision) return
+  input.registry.set(read, input.view)
+}
 
 /** A workbook chosen in this tab, kept so the person can read another of its sheets without choosing it again. */
 export type OpenWorkbook = { file: File; sheets: ReadonlyArray<SheetSummary>; chosen: SheetChoice }
@@ -98,7 +140,7 @@ export const matchColumn = apiRuntime.fn<ColumnPick>()(
       api.imports.match({ params: { id: pick.id }, payload: { field: pick.field, column: pick.column } })
     )
     const registry = yield* AtomRegistry.AtomRegistry
-    registry.set(importView(pick.id), view)
+    putView({ registry, view })
     return view
   }),
   { concurrent: true }
@@ -138,13 +180,14 @@ export const takeBackImport = apiRuntime.fn<ImportView>()(
 
 /**
  * Asks for suggestions where the rules have none. Nothing it returns changes a row: each waits for the person. The
- * suggestions are put into the import's view at once, where the review reads them.
+ * suggestions are put into the import's view as it is held when they arrive, where the review reads them: decisions
+ * saved and a column matched while the model worked stay.
  */
-export const suggestFixes = apiRuntime.fn<ImportView>()(
-  Effect.fnUntraced(function* (view: ImportView) {
-    const outcome = yield* catalogApi.ask((api) => api.imports.suggest({ params: { id: view.id } }))
+export const suggestFixes = apiRuntime.fn<ImportId>()(
+  Effect.fnUntraced(function* (id: ImportId) {
+    const outcome = yield* catalogApi.ask((api) => api.imports.suggest({ params: { id } }))
     const registry = yield* AtomRegistry.AtomRegistry
-    registry.set(importView(view.id), { ...view, suggestions: outcome.suggestions })
+    changeView({ registry, id, change: viewWith({ suggestions: outcome.suggestions }) })
     return outcome
   }),
   { concurrent: true }

@@ -148,10 +148,29 @@ const closedEditor: EditorState = { open: false, base: O.none(), form: O.none(),
  */
 const openEditors = Atom.make(HashMap.empty<string, EditorState>()).pipe(Atom.keepAlive)
 
-/** One item's editor: closed with nothing in it until it is opened, and again once it is closed. */
+/**
+ * What the server answered to the last save of each item: the item as stored, at its new revision. Kept for the
+ * page's life. A save is counted out until it answers, but the row is read again only after that (and only once the
+ * last write in flight has answered), and until then it shows the saved values on the old revision; an editor opened
+ * in between takes its revision from here, or its save goes out on the old one and is refused as someone else's.
+ */
+const savedItems = Atom.make(HashMap.empty<string, StoredItem>()).pipe(Atom.keepAlive)
+
+/** The newer of the item an editor was opened on and the server's answer to its last save: the base of the next. */
+const newerOf = (base: StoredItem, saved: O.Option<StoredItem>): StoredItem =>
+  O.match(saved, { onNone: () => base, onSome: (answer) => (answer.revision > base.revision ? answer : base) })
+
+/**
+ * One item's editor: closed with nothing in it until it is opened, and again once it is closed. Its base is never
+ * older than the last save's answer, whether that answer came before the editor opened or while it was open.
+ */
 export const itemEditor = Atom.family((id: string) =>
   Atom.writable(
-    (get) => O.getOrElse(HashMap.get(get(openEditors), id), () => closedEditor),
+    (get) => {
+      const editor = O.getOrElse(HashMap.get(get(openEditors), id), () => closedEditor)
+      const saved = HashMap.get(get(savedItems), id)
+      return { ...editor, base: O.map(editor.base, (base) => newerOf(base, saved)) }
+    },
     (ctx, next: EditorState) =>
       ctx.set(
         openEditors,
@@ -243,10 +262,8 @@ export const editItem = Atom.family((id: StoredItem["id"]) =>
     }),
     settled: [...catalogKeys.imports, ...catalogKeys.itemFacets, ...catalogKeys.activity],
     onAnswer: (saved, _save, registry) => {
-      // An editor still open on this item (opened again meanwhile) is now on the saved revision.
-      if (registry.get(itemEditor(id)).open) {
-        registry.set(itemEditor(id), { ...registry.get(itemEditor(id)), base: O.some(saved) })
-      }
+      // An editor open on this item now, or opened before the row is read again, is on the saved revision.
+      registry.update(savedItems, (held) => HashMap.set(held, id, saved))
       toast.success(`Saved ${saved.sku}`)
     },
     onRefused: (error, save, registry) => {

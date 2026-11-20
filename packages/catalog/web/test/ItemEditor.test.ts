@@ -2,14 +2,19 @@
 // row, so two things must outlive the row: that a save of the item is out (or the row that comes back offers Edit on
 // the revision the first save is about to move, and the second save is refused as "changed by someone else": their
 // own), and what the person typed (or "Edit again" on a save that failed opens nothing, and their typing is gone).
+// And once a save has answered, the next edit is made on the revision it answered with, even while the table, read
+// again only after it, still shows the saved values on the old one.
 import { describe, expect, it } from "@effect/vitest"
+import * as A from "effect/Array"
 import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
+import * as AsyncResult from "effect/reactivity/AsyncResult"
 import { vi } from "vitest"
 import type { ItemEdit, StoredItem } from "@inventory/catalog-contract/Item"
 import type { ItemForm } from "@inventory/catalog-model/ItemEdit"
 import { editItem, itemEditor, saveOut } from "../src/ItemEditor.screen.tsx"
+import { itemsPage } from "../src/ItemsPage.screen.tsx"
 import { registryFor } from "./support/catalog.ts"
 
 // A desk-wide page on another screen than Items, with no row of any item drawn unless the test says so; where the
@@ -156,6 +161,83 @@ describe("a save of an item whose row has left the screen", () => {
       // Closed again, the editor holds nothing.
       t.registry.set(itemEditor(itemId), { ...editor, open: false })
       expect(t.registry.get(itemEditor(itemId)).form).toEqual(O.none())
+    })
+  )
+})
+
+describe("an item edited again after its save has answered, before the table is read again", () => {
+  it.live("is saved on the revision the first save made, not refused as someone else's change", () =>
+    Effect.gen(function* () {
+      // The server keeps the item and refuses an edit on any revision but the stored one, as the real one does, a
+      // moment after the request (an answer is never in the same tick as the press). The table's first read answers
+      // at once; every read after it (the one a save asks for) answers when the test says.
+      const server = { stored: item, reads: 0 }
+      const late = Deferred.makeUnsafe<void>()
+      const pageOf = (row: StoredItem) => ({ data: [row], total: 1, pageCount: 1 })
+      const registry = registryFor({
+        endpoints: {
+          items: {
+            edit: (request: { readonly payload: ItemEdit }) =>
+              Effect.sleep("1 millis").pipe(
+                Effect.andThen(() =>
+                  request.payload.revision === server.stored.revision
+                    ? Effect.sync(() => {
+                        const { revision: _revision, ...values } = request.payload
+                        server.stored = { ...server.stored, ...values, revision: server.stored.revision + 1 }
+                        return server.stored
+                      })
+                    : Effect.fail({ _tag: "ItemChanged", item: server.stored })
+                )
+              ),
+            page: () => {
+              server.reads += 1
+              return server.reads === 1
+                ? Effect.succeed(pageOf(server.stored))
+                : Deferred.await(late).pipe(Effect.map(() => pageOf(server.stored)))
+            },
+            facets: () => Effect.succeed({})
+          }
+        }
+      })
+      const rowShown = () =>
+        registry.get(itemsPage).pipe(
+          AsyncResult.value,
+          O.flatMap((shown) => A.head(shown.data)),
+          O.getOrThrow
+        )
+      registry.mount(itemsPage)
+      registry.mount(editItem(itemId))
+      yield* Effect.sleep("10 millis")
+      const toastsBefore = page.toasts.length
+
+      registry.set(editItem(itemId), { base: rowShown(), edit, form: typed })
+      yield* Effect.sleep("20 millis")
+      // The save has answered and is no longer out, so Edit is offered; the table has not been read again, and its
+      // row shows the saved values on the revision before the save.
+      expect(registry.get(saveOut(itemId))).toBe(false)
+      expect(rowShown()).toMatchObject({ name: "Hex bolt M6 × 16", revision: 3 })
+
+      // The person opens the editor from that row, as the pencil does, and saves again on the editor's base.
+      registry.set(itemEditor(itemId), {
+        open: true,
+        base: O.some(rowShown()),
+        form: O.some(typed),
+        problems: {},
+        notice: null
+      })
+      const base = O.getOrThrow(registry.get(itemEditor(itemId)).base)
+      const again = { name: "Hex bolt M6 × 20", revision: base.revision } as unknown as ItemEdit
+      registry.set(editItem(itemId), { base, edit: again, form: typed })
+      yield* Effect.sleep("20 millis")
+
+      // Nobody else touched the item: the second save is kept, on the revision the first one made.
+      const refused = A.filter(A.drop(page.toasts, toastsBefore), (said) => said.title === "Changed by someone else")
+      expect(refused).toEqual([])
+      expect(server.stored).toMatchObject({ name: "Hex bolt M6 × 20", revision: 5 })
+
+      yield* Deferred.succeed(late, undefined)
+      yield* Effect.sleep("20 millis")
+      expect(rowShown()).toMatchObject({ name: "Hex bolt M6 × 20", revision: 5 })
     })
   )
 })

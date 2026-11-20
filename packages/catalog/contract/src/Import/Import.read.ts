@@ -43,8 +43,8 @@ class DecidedByNobody extends S.Opaque<DecidedByNobody, { readonly brand: unique
 
 /** For a row that was not imported: the person who left it out, or that nobody had settled it yet. */
 export const DecidedBy = DecidedByKind.mapMembers(() => Tuple.make(DecidedByPerson, DecidedByNobody)).pipe(
-  S.toTaggedUnion("kind"),
-  S.annotate({ identifier: "DecidedBy", description: "Who left a row out, or that nobody had settled it" })
+  S.annotate({ identifier: "DecidedBy", description: "Who left a row out, or that nobody had settled it" }),
+  S.toTaggedUnion("kind")
 )
 /** The decoded value of `DecidedBy`. */
 export type DecidedBy = typeof DecidedBy.Type
@@ -127,15 +127,15 @@ class RowTakenBack extends S.Opaque<RowTakenBack, { readonly brand: unique symbo
 export const RowOutcome = OutcomeKind.mapMembers(() =>
   Tuple.make(RowCreated, RowUpdated, RowAlready, RowNotImported, RowTakenBack)
 ).pipe(
-  S.toTaggedUnion("outcome"),
-  S.annotate({ identifier: "RowOutcome", description: "What the confirms did with one row of the file" })
+  S.annotate({ identifier: "RowOutcome", description: "What the confirms did with one row of the file" }),
+  S.toTaggedUnion("outcome")
 )
 /** The decoded value of `RowOutcome`: what the confirms did with one row of the file. */
 export type RowOutcome = typeof RowOutcome.Type
 
 /** The row's reason, for the two outcomes that have one. */
 export const outcomeReasonOf = (row: RowOutcome): O.Option<string> =>
-  row.outcome === "already" || row.outcome === "notImported" ? O.some(row.reason) : O.none()
+  RowOutcome.guards.already(row) || RowOutcome.guards.notImported(row) ? O.some(row.reason) : O.none()
 
 /**
  * The outcome a stored row says, from the columns `importOutcome` keeps: every outcome has every column there, so

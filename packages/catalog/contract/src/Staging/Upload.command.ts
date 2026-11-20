@@ -31,8 +31,8 @@ class NothingToDiscard extends S.Opaque<NothingToDiscard, { readonly brand: uniq
 
 /** What cancelling an upload came to. */
 export const UploadDiscard = UploadDiscardKind.mapMembers(() => Tuple.make(UploadDiscarded, NothingToDiscard)).pipe(
-  S.toTaggedUnion("kind"),
-  S.annotate({ identifier: "UploadDiscard", description: "Whether an unfinished upload was deleted" })
+  S.annotate({ identifier: "UploadDiscard", description: "Whether an unfinished upload was deleted" }),
+  S.toTaggedUnion("kind")
 )
 /** The decoded value of `UploadDiscard`. */
 export type UploadDiscard = typeof UploadDiscard.Type

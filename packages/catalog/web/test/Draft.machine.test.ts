@@ -6,6 +6,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Eq from "effect/Equal"
+import * as Formatter from "effect/Formatter"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
@@ -904,10 +905,8 @@ const enabled = (world: World, may: Play): ReadonlyArray<ReadonlyArray<Command>>
 }
 
 /** A command as one word or three, for the ordering a failure prints. */
-const said = (command: Command): string =>
-  Command.guards.Decide(command) || Command.guards.SomeoneElse(command)
-    ? `${command._tag} ${command.row} ${command.to}`
-    : command._tag
+// Each command as Effect prints a value, its case and fields in full: a failure's ordering reads back as it played.
+const said = (command: Command): string => Formatter.format(command)
 
 const Pick = S.Int.check(S.isBetween({ minimum: 0, maximum: 999 }))
 /** Which kind of thing happens next, and which of that kind: each drawn from what is enabled when its turn comes. */

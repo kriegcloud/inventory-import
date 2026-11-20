@@ -1,6 +1,7 @@
 // The assistant's conversation for one table, kept in this browser so a hard refresh brings it back: each request,
 // who answered, and the changes it made with what takes each back. It is keyed like the import's saved progress
-// (`progressKey`: per person, organization and screen) and decoded on the way back, so an older shape is dropped.
+// (`progressKey`: per person, organization and screen) and decoded on the way back: a version 1 conversation is
+// converted, so its Undo buttons and the columns it left come back; any other shape is dropped.
 import * as A from "effect/Array"
 import * as O from "effect/Option"
 import * as S from "effect/Schema"
@@ -32,7 +33,7 @@ const Entry = S.Struct({
 /** One request and what came of it. */
 export type Entry = typeof Entry.Type
 
-// Version 2 keeps who answered as its case; a version 1 conversation (a name) no longer decodes, so it is dropped.
+// Version 2 keeps who answered as its case.
 const Conversation = S.Struct({
   version: S.Literal(2),
   entries: S.Array(Entry),
@@ -40,6 +41,34 @@ const Conversation = S.Struct({
 })
 /** Everything kept for one table. `visibility` is the columns as the assistant left them, which the address does not hold. */
 export type Conversation = typeof Conversation.Type
+
+// Version 1 kept who answered as a name: "Rules", or the model's id. Everything else is the same shape.
+const EntryV1 = S.Struct({ ...Entry.fields, answeredBy: S.NullOr(S.String) })
+const ConversationV1 = S.Struct({
+  version: S.Literal(1),
+  entries: S.Array(EntryV1),
+  visibility: S.Record(S.String, S.Boolean)
+})
+
+/**
+ * Who answered a version 1 request, as its case: the name "Rules" is the rules, with the line kept under it (what
+ * the rules read) as the reason; any other name is the model of that id, asked through OpenRouter, the only provider
+ * version 1 knew, as its first choice.
+ */
+const answeredByV1 = (name: string, note: string | null): AnsweredBy =>
+  name === "Rules"
+    ? AnsweredBy.cases.Rules.make({ reason: note ?? "" })
+    : AnsweredBy.cases.Model.make({ provider: "openrouter", model: name, fallback: false })
+
+/** A version 1 conversation as version 2: each entry's answerer turned into its case, the rest kept as it was. */
+const fromV1 = (old: typeof ConversationV1.Type): Conversation => ({
+  version: 2,
+  entries: A.map(old.entries, (entry) => ({
+    ...entry,
+    answeredBy: entry.answeredBy === null ? null : answeredByV1(entry.answeredBy, entry.note)
+  })),
+  visibility: old.visibility
+})
 
 /** The name an entry's "Answered by" line gives: "Rules", or the model's own name. */
 export const answererName: (answeredBy: AnsweredBy) => string = AnsweredBy.match({
@@ -61,18 +90,19 @@ export const lastAnsweredByRules = (entries: ReadonlyArray<Entry>): boolean =>
 export const emptyConversation: Conversation = { version: 2, entries: [], visibility: {} }
 
 const decode = S.decodeUnknownOption(S.fromJsonString(Conversation))
+const decodeV1 = S.decodeUnknownOption(S.fromJsonString(ConversationV1))
 const encode = S.encodeOption(S.fromJsonString(Conversation))
 
 /** The storage key of one table's conversation for one person. */
 export const conversationKey = (scope: Omit<ProgressScope, "screen">, table: string) =>
   progressKey({ ...scope, screen: `assistant:${table}` })
 
-/** Reads the conversation, dropping one that no longer decodes. */
+/** Reads the conversation, converting a version 1 one and dropping one that decodes as neither. */
 export const readConversation = (key: string): Conversation => {
   try {
     const text = localStorage.getItem(key)
     if (text === null) return emptyConversation
-    const found = decode(text)
+    const found = O.orElse(decode(text), () => O.map(decodeV1(text), fromV1))
     if (O.isSome(found)) return found.value
     localStorage.removeItem(key)
   } catch {

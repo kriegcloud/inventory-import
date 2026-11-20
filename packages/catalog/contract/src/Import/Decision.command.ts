@@ -87,8 +87,8 @@ class PlaceLeftOut extends S.Opaque<PlaceLeftOut, { readonly brand: unique symbo
  * import.
  */
 export const RowPlace = RowPlaceKind.mapMembers(() => Tuple.make(PlaceOpen, PlaceKept, PlaceLeftOut)).pipe(
-  S.toTaggedUnion("kind"),
-  S.annotate({ identifier: "RowPlace", description: "Where a row stands by the person's own word" })
+  S.annotate({ identifier: "RowPlace", description: "Where a row stands by the person's own word" }),
+  S.toTaggedUnion("kind")
 )
 /** The decoded value of `RowPlace`. */
 export type RowPlace = typeof RowPlace.Type
@@ -101,11 +101,11 @@ export const placeKept: RowPlace = PlaceKept.make({})
 export const placeLeftOut = (wasKept: boolean): RowPlace => PlaceLeftOut.make({ wasKept })
 
 /** True when the row is left out. */
-export const isLeftOut = (decision: { readonly place: RowPlace }): boolean => decision.place.kind === "leftOut"
+export const isLeftOut = (decision: { readonly place: RowPlace }): boolean => RowPlace.guards.leftOut(decision.place)
 
 /** True when the person kept the row over its rivals, whether or not they then left it out (the stored `kept` flag). */
 export const hasKeep = (decision: { readonly place: RowPlace }): boolean =>
-  decision.place.kind === "kept" || (decision.place.kind === "leftOut" && decision.place.wasKept)
+  RowPlace.guards.kept(decision.place) || (RowPlace.guards.leftOut(decision.place) && decision.place.wasKept)
 
 /** What to do with a row whose SKU is stored with other values. */
 export const StoredChoiceKind = LiteralKit(["undecided", "keep", "replace"]).annotate({
@@ -139,8 +139,11 @@ class StoredReplace extends S.Opaque<StoredReplace, { readonly brand: unique sym
 export const StoredChoice = StoredChoiceKind.mapMembers(() =>
   Tuple.make(StoredUndecided, StoredKeep, StoredReplace)
 ).pipe(
-  S.toTaggedUnion("kind"),
-  S.annotate({ identifier: "StoredChoice", description: "What to do with a row whose SKU is stored with other values" })
+  S.annotate({
+    identifier: "StoredChoice",
+    description: "What to do with a row whose SKU is stored with other values"
+  }),
+  S.toTaggedUnion("kind")
 )
 /** The decoded value of `StoredChoice`. */
 export type StoredChoice = typeof StoredChoice.Type
@@ -161,7 +164,10 @@ type DecisionShape = {
   readonly edits: { readonly [field: string]: string }
 }
 
-/** The flags of a decision: the stored form, every part that says nothing left out. */
+/**
+ * The flags of a decision: the stored form, every part that says nothing left out. It reads the parts' `kind` as the
+ * data the encoding turns into flags (either side of the schema), not a decoded value's case: so by its field.
+ */
 const flagsOf = (parts: DecisionShape): RowDecisionFlags => ({
   ...(parts.place.kind === "leftOut" ? { out: true } : {}),
   ...(parts.place.kind === "kept" || (parts.place.kind === "leftOut" && parts.place.wasKept) ? { kept: true } : {}),

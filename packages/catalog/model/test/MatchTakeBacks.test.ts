@@ -1,19 +1,39 @@
 // What a match took back is named (Benjamin, 2026-11-20, group 3: "the screen names it as taken back"): the match keeps
 // it with the draft by field and kind, its answer and every later view carry it until the import is confirmed, and its
 // audit line counts it. Also, over the twins: a Replace whose row stops reading under the new column is taken back,
-// a draft overtaken on every try is a typed refusal in both the match and the save, and a `madeOn` key naming no row
-// of the save is not read. The D1 side of the same rules is in the app's Rematch and MatchAtomic slow tests.
+// and a confirm carrying it is refused in words naming the column; a request overtaken on every try is a typed refusal
+// in the match, the save and the confirm, in words saying what kept changing; a `madeOn` key naming no row of the save
+// is not read; and an item stocked or a suggestion stored between a judgement and its write makes it be worked out
+// again, never adding a take-back. The D1 side of the same rules is in the app's Rematch and MatchAtomic slow tests.
 import { describe, expect, it, layer } from "@effect/vitest"
 import { decisionFromFlags, type RowDecisionFlags } from "@inventory/catalog-contract/Decision"
-import { RowId } from "@inventory/catalog-contract/Ids"
+import { ItemId, RowId, SuggestionId } from "@inventory/catalog-contract/Ids"
 import type { MatchTakeBack } from "@inventory/catalog-contract/Import"
 import { AcceptsTakenBack, DraftBusy, RevisionAhead } from "@inventory/catalog-contract/ImportRejection"
 import type { StagedTable } from "@inventory/catalog-contract/Staged"
-import { type ConfirmWrite, decisionsRematched, draftTries, ImportStore } from "@inventory/catalog-model/ImportStore"
+import { storedSuggestion, suggestedByRule } from "@inventory/catalog-contract/Suggestion"
+import {
+  confirmItemsChanged,
+  type ConfirmWrite,
+  decisionsItemsChanged,
+  decisionsRematched,
+  draftTries,
+  ImportStore
+} from "@inventory/catalog-model/ImportStore"
 import { importsEndpoints } from "@inventory/catalog-model/ImportsHandler"
 import { catalogMemory, CatalogMemoryRef } from "@inventory/catalog-model/Memory"
-import { takenBackOfMatch, withTakeBacks } from "@inventory/catalog-model/Rematch"
+import {
+  ItemsAsRead,
+  noItemsRead,
+  stillAsRead,
+  takenBackOfMatch,
+  withTakeBacks
+} from "@inventory/catalog-model/Rematch"
+import { StoreSuggestions, SuggestionStore } from "@inventory/catalog-model/SuggestionStore"
+import { Activity } from "@inventory/kernel/Activity"
+import { ActivityId } from "@inventory/kernel/Ids"
 import * as A from "effect/Array"
+import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as MutableRef from "effect/MutableRef"
@@ -201,6 +221,19 @@ describe("a Replace across a re-match of another column", () => {
             .decide({ params, payload: { madeOn: { "row-3": view.revision }, set: replace, clear: [] } })
             .pipe(as(marcus))
           expect(saved.notApplied).toEqual([{ rowId: "row-3", field: "unitCost", kind: "stored" }])
+          // A confirm carrying it is refused, in words that name the column matched again and the rows resting on it.
+          const refused = yield* Effect.flip(
+            imports
+              .commit({
+                params,
+                payload: { revision: saved.revision, madeOn: { "row-3": view.revision }, set: replace, clear: [] }
+              })
+              .pipe(as(marcus))
+          )
+          expect(S.is(AcceptsTakenBack)(refused) ? [refused.reason, refused.accepts] : refused).toEqual([
+            "Unit cost was matched again after you decided 1 row that rests on it. Nothing was imported: look at the row it changed, then confirm again.",
+            [{ rowId: "row-3", field: "unitCost", kind: "stored" }]
+          ])
         })
     )
 
@@ -256,7 +289,7 @@ describe("a draft that keeps changing under a request", () => {
                 Effect.sync(() => MutableRef.update(asked, (n) => n + 1)),
                 Ref.update(ref, (state) => ({ ...state, activity: [...state.activity] }))
               ),
-              { changed: [], read: { keys: [], items: [] } }
+              { changed: [], read: noItemsRead }
             )
         )
         expect([answer, MutableRef.get(asked)]).toEqual(["busy", draftTries])
@@ -295,6 +328,48 @@ describe("a draft that keeps changing under a request", () => {
           draftTries,
           true
         ])
+        // The save gave up because the import kept being matched; the match cannot tell which kept changing.
+        expect([
+          S.is(DraftBusy)(saving) ? saving.reason : "",
+          S.is(DraftBusy)(matching) ? matching.reason : ""
+        ]).toEqual([
+          "Others kept changing this import while your request was worked out, so nothing was written. Try again in a moment.",
+          "This import, or items it would change, kept being changed elsewhere (by others, another import or the Items page) while your request was worked out, so nothing was written. Try again in a moment."
+        ])
+      })
+    )
+
+    it.effect("a save and a confirm whose items kept changing say so, not that the import did", () =>
+      Effect.gen(function* () {
+        const { view, params } = yield* seeded(reviewed)
+        const inner = yield* ImportStore
+        // A store whose every save and confirm finds an item its judgement read changed since.
+        const overtaken = ImportStore.of({
+          ...inner,
+          decide: Effect.fn("overtaken.decide")(function* () {
+            return yield* Effect.succeed(decisionsItemsChanged)
+          }),
+          commit: Effect.fn("overtaken.commit")(function* () {
+            return yield* Effect.succeed(confirmItemsChanged)
+          })
+        })
+        const imports = yield* importsEndpoints.pipe(Effect.provideService(ImportStore, overtaken))
+        const saving = yield* Effect.flip(
+          imports
+            .decide({ params, payload: { madeOn: {}, set: flags({ "row-2": { out: true } }), clear: [] } })
+            .pipe(as(marcus))
+        )
+        const confirming = yield* Effect.flip(
+          imports
+            .commit({ params, payload: { revision: view.revision, madeOn: {}, set: {}, clear: [] } })
+            .pipe(as(marcus))
+        )
+        const words =
+          "Items this would change kept being changed elsewhere (by another import, on the Items page or by a take-back), or suggestions kept arriving for this import, while your request was worked out, so nothing was written. The import itself did not change. Try again in a moment."
+        expect([
+          S.is(DraftBusy)(saving) ? saving.reason : "",
+          S.is(DraftBusy)(confirming) ? confirming.reason : ""
+        ]).toEqual([words, words])
       })
     )
   })
@@ -366,80 +441,173 @@ describe("what a draft keeps of its matches' take-backs", () => {
   })
 })
 
-describe("a stored item that changes between a judgement of the decisions and its write", () => {
+describe("what changes between a judgement of the decisions and its write", () => {
   // Row 2 costs 9.00 under "unit_cost" and 3 under "Net cost"; nothing is stocked under its SKU when it is judged.
-  // Stocked at 3, a Replace made while the cost read "unit_cost" compares otherwise under "Net cost".
+  // Stocked at 3, a Replace made while the cost read "unit_cost" would compare otherwise under "Net cost": a take-back
+  // comes only from a column matched again after the decision, never from an item stocked in between.
   const lone = tableOf("lone.csv", [
     { ...item, sku: "AAA-0002", name: "Steel Bolt", unit_cost: "9.00", "Net cost": "3" }
   ])
   const replace = flags({ "row-2": { stored: "replace" } })
-  const named = [{ rowId: "row-2", field: "unitCost", kind: "stored" }]
 
-  /** The file staged and its cost matched to "Net cost"; the stocking import is confirmed once, as `step` writes. */
-  const windowed = Effect.fn("windowed")(function* (step: "decide" | "commit") {
+  /**
+   * The file staged and its cost matched to "Net cost"; once, just before the store's save or confirm (`step`), the
+   * stocking import is confirmed (`stock`) or a suggestion is stored for the import (`suggest`). `tries` counts the
+   * store's saves or confirms.
+   */
+  const windowed = Effect.fn("windowed")(function* (step: "decide" | "commit", between: "stock" | "suggest") {
     const plain = yield* importsEndpoints
     const inner = yield* ImportStore
+    const suggestions = yield* SuggestionStore
     const first = yield* stage(stocked).pipe(as(marcus))
     const view = yield* stage(lone).pipe(as(marcus))
     const params = { id: view.id }
     const matched = yield* plain
       .match({ params, payload: { field: "unitCost", column: O.some(column("Net cost")) } })
       .pipe(as(dana))
+    const at = yield* DateTime.now
+    const stock = plain
+      .commit({ params: { id: first.id }, payload: { revision: first.revision, madeOn: {}, set: {}, clear: [] } })
+      .pipe(as(marcus), Effect.asVoid, Effect.orDie)
+    const suggest = Effect.asVoid(
+      suggestions.store(
+        StoreSuggestions.make({
+          draft: view.id,
+          suggestions: [
+            storedSuggestion({
+              id: SuggestionId.make("00000000-0000-4000-8000-000000000201"),
+              made: {
+                kind: "name",
+                rowId: RowId.make("row-2"),
+                rowNumber: 2,
+                from: "Steel Bolt",
+                to: "Steel Bolt M6",
+                by: suggestedByRule,
+                confidence: "low",
+                basis: "A suggestion stored while the request was worked out"
+              }
+            })
+          ],
+          audit: Activity.make({
+            id: ActivityId.make("00000000-0000-4000-8000-000000000202"),
+            organizationId: marcus.organizationId,
+            actorId: marcus.id,
+            actorName: marcus.name,
+            action: "Asked for suggestions",
+            detail: "",
+            agent: O.none(),
+            createdAt: at
+          })
+        })
+      )
+    )
     const waiting = MutableRef.make(true)
-    const stockOnce = Effect.suspend(() => {
+    const tries = MutableRef.make(0)
+    const once = Effect.suspend(() => {
+      MutableRef.update(tries, (n) => n + 1)
       if (!MutableRef.get(waiting)) return Effect.void
       MutableRef.set(waiting, false)
-      return plain
-        .commit({ params: { id: first.id }, payload: { revision: first.revision, madeOn: {}, set: {}, clear: [] } })
-        .pipe(as(marcus), Effect.asVoid, Effect.orDie)
+      return between === "stock" ? stock : suggest
     })
     const windowedStore = ImportStore.of({
       ...inner,
       decide: Effect.fn("windowed.decide")(function* (...args: Parameters<ImportStore["Service"]["decide"]>) {
-        if (step === "decide") yield* stockOnce
+        if (step === "decide") yield* once
         return yield* inner.decide(...args)
       }),
       commit: Effect.fn("windowed.commit")(function* (write: ConfirmWrite) {
-        if (step === "commit") yield* stockOnce
+        if (step === "commit") yield* once
         return yield* inner.commit(write)
       })
     })
     const imports = yield* importsEndpoints.pipe(Effect.provideService(ImportStore, windowedStore))
-    return { imports, view, params, matched }
+    return { imports, view, params, matched, tries }
   })
 
   // Each on its own twins: the item one stocks must not be there already when the other is judged.
-  layer(App)("the save is judged again against the items as they are", (it) => {
-    it.effect("a save judged with no item stored: the item stocked before its write takes the Replace back", () =>
+  layer(App)("an item stocked between a save's judgement and its write", (it) => {
+    it.effect("the save is worked out again, and the item stocked takes nothing back: the Replace stands", () =>
       Effect.gen(function* () {
-        const { imports, view, params } = yield* windowed("decide")
+        const { imports, view, params, tries } = yield* windowed("decide", "stock")
         const saved = yield* imports
           .decide({ params, payload: { madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
           .pipe(as(marcus))
-        expect(saved.notApplied).toEqual(named)
+        expect([saved.notApplied, MutableRef.get(tries)]).toEqual([[], 2])
         const after = yield* imports.get({ params }).pipe(as(marcus))
-        expect(R.get(after.decisions, "row-2")).toEqual(O.some(decisionFromFlags({})))
+        expect(R.get(after.decisions, "row-2")).toEqual(O.some(decisionFromFlags({ stored: "replace" })))
       })
     )
   })
 
-  layer(App)("the confirm is judged again against the items as they are", (it) => {
-    it.effect(
-      "a confirm judged with no item stored: the item stocked before its batch refuses it, nothing imported",
-      () =>
-        Effect.gen(function* () {
-          const { imports, view, params, matched } = yield* windowed("commit")
-          const refused = yield* Effect.flip(
-            imports
-              .commit({
-                params,
-                payload: { revision: matched.revision, madeOn: { "row-2": view.revision }, set: replace, clear: [] }
-              })
-              .pipe(as(marcus))
-          )
-          expect(S.is(AcceptsTakenBack)(refused) ? refused.accepts : []).toEqual(named)
-          expect((yield* imports.get({ params }).pipe(as(marcus))).status).toBe("open")
-        })
+  layer(App)("an item stocked between a confirm's judgement and its write", (it) => {
+    it.effect("the confirm is worked out again, the item stocked takes nothing back, and it is imported", () =>
+      Effect.gen(function* () {
+        const { imports, view, params, matched, tries } = yield* windowed("commit", "stock")
+        const confirmed = yield* imports
+          .commit({
+            params,
+            payload: { revision: matched.revision, madeOn: { "row-2": view.revision }, set: replace, clear: [] }
+          })
+          .pipe(as(marcus))
+        expect([confirmed.status, MutableRef.get(tries)]).toEqual(["imported", 2])
+      })
     )
+  })
+
+  layer(App)("a suggestion stored between a save's judgement and its write", (it) => {
+    it.effect("the save is worked out again: storing a suggestion moves no revision, and is still caught", () =>
+      Effect.gen(function* () {
+        const { imports, view, params, tries } = yield* windowed("decide", "suggest")
+        const saved = yield* imports
+          .decide({ params, payload: { madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
+          .pipe(as(marcus))
+        expect([saved.notApplied, MutableRef.get(tries)]).toEqual([[], 2])
+      })
+    )
+  })
+
+  layer(App)("a suggestion stored between a confirm's judgement and its write", (it) => {
+    it.effect("the confirm is worked out again, and imported", () =>
+      Effect.gen(function* () {
+        const { imports, view, params, matched, tries } = yield* windowed("commit", "suggest")
+        const confirmed = yield* imports
+          .commit({
+            params,
+            payload: { revision: matched.revision, madeOn: { "row-2": view.revision }, set: replace, clear: [] }
+          })
+          .pipe(as(marcus))
+        expect([confirmed.status, MutableRef.get(tries)]).toEqual(["imported", 2])
+      })
+    )
+  })
+})
+
+describe("what a judgement read, and whether it is still so", () => {
+  const item = { id: "00000000-0000-4000-8000-000000000401", sku: "AAA-0002", revision: 1 }
+  const suggestion = "00000000-0000-4000-8000-000000000402"
+  const read = ItemsAsRead.make({
+    asked: true,
+    keys: ["AAA-0002"],
+    items: [{ id: ItemId.make(item.id), revision: 1 }],
+    created: [{ rowNumber: 3, part: 0 }],
+    suggestions: [SuggestionId.make(suggestion)]
+  })
+  const now = { items: [item], created: [{ rowNumber: 3, part: 0 }], suggestions: [suggestion] }
+
+  it("is a schema of its own: an item's id is an ItemId, and nothing read is a value it built", () => {
+    expect([S.is(ItemsAsRead)(read), S.is(ItemsAsRead)(noItemsRead), noItemsRead.asked]).toEqual([true, true, false])
+    expect(S.is(ItemsAsRead)({ ...read, items: [{ id: "item-1", revision: 1 }] })).toBe(false)
+  })
+
+  it("is still so only while the items, the created rows and the suggestions it read are all as read", () => {
+    const states = [
+      now,
+      { ...now, items: [{ ...item, revision: 2 }] },
+      { ...now, created: [] },
+      { ...now, suggestions: [suggestion, "00000000-0000-4000-8000-000000000403"] }
+    ]
+    expect(A.map(states, stillAsRead(read))).toEqual([true, false, false, false])
+    // Nothing read: nothing is checked.
+    expect(stillAsRead(noItemsRead)({ ...now, created: [] })).toBe(true)
   })
 })

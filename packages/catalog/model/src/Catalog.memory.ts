@@ -5,7 +5,7 @@
 //
 // Two things a twin does not imitate, and a test of them belongs on D1: the size limits of a stored value, and the
 // search's forgiveness of one wrong letter (the twin finds a word only as it is typed).
-import { type Change, changeDecidedBy } from "@inventory/catalog-contract/Change"
+import { Change, changeDecidedBy } from "@inventory/catalog-contract/Change"
 import { RowDecision, type DecisionDelta } from "@inventory/catalog-contract/Decision"
 import type { FileProblem } from "@inventory/catalog-contract/FileProblem"
 import { type ConfirmId, ImportId, type ItemId } from "@inventory/catalog-contract/Ids"
@@ -30,13 +30,14 @@ import {
   type ItemEdit,
   type ItemFields,
   skuKey,
+  Stocking,
   type StoredItem
 } from "@inventory/catalog-contract/Item"
 import { FilterOperator, ItemFilterColumn, ItemSortColumn } from "@inventory/catalog-contract/ItemQuery"
 import type { ItemFacets, ItemFilter, ItemPage, ItemQuery, ItemSort } from "@inventory/catalog-contract/ItemQuery"
 import { ColumnMove, MappingChoice } from "@inventory/catalog-contract/Mapping"
 import { type Field, StagedHead, type StagedRow, type StagedTable } from "@inventory/catalog-contract/Staged"
-import type { Suggestion } from "@inventory/catalog-contract/Suggestion"
+import { Suggestion } from "@inventory/catalog-contract/Suggestion"
 import { Activity } from "@inventory/kernel/Activity"
 import { ActivityId, type MemberId, type OrganizationId } from "@inventory/kernel/Ids"
 import type { Member } from "@inventory/kernel/Member"
@@ -59,7 +60,7 @@ import { Answerer } from "./Answer/Answerer.external.ts"
 import { ModelAllowance } from "./Answer/ModelAllowance.external.ts"
 import { AssistantLog } from "./Assistant/AssistantLog.store.ts"
 import type { CatalogPorts } from "./Catalog.ports.ts"
-import { plannedItems, type PlannedRow } from "./Confirm/Confirm.rules.ts"
+import { plannedItems, PlannedRow } from "./Confirm/Confirm.rules.ts"
 import {
   type ChoicesSaved,
   confirmClosed,
@@ -282,6 +283,9 @@ const isOpen = (state: CatalogState, organizationId: OrganizationId, id: string)
 
 const byMoment = Order.mapInput(DateTime.Order, (confirm: MemConfirm) => confirm.at)
 
+// Whether two stockings say the same: the same case, and the same day for a discontinued one.
+const sameStocking = S.toEquivalence(Stocking)
+
 // The fields a replace writes over and a take-back puts back: every value but the SKU and the item's origin.
 const withFields = (item: StoredItem, fields: ItemFields): StoredItem => ({
   ...item,
@@ -300,6 +304,26 @@ const withFields = (item: StoredItem, fields: ItemFields): StoredItem => ({
   vendors: fields.vendors
 })
 
+// What a judgement's read is checked against now: the organization's items, and the import's created rows and its
+// suggestions, as `createdRows` and the suggestion store's `list` read them.
+const readNow = (state: CatalogState, organizationId: OrganizationId, importId: string) => ({
+  items: A.map(
+    A.filter(state.items, (entry) => entry.organizationId === organizationId),
+    (entry) => entry.item
+  ),
+  created: A.map(
+    A.filter(
+      state.outcomes,
+      (row) => row.organizationId === organizationId && row.importId === importId && row.outcome === "created"
+    ),
+    (row) => ({ rowNumber: row.rowNumber, part: row.part })
+  ),
+  suggestions: A.map(
+    A.filter(state.suggestions, (entry) => entry.organizationId === organizationId && entry.importId === importId),
+    (entry) => entry.suggestion.id
+  )
+})
+
 // -- The confirm, as one step -----------------------------------------------------------------------------------
 
 const alreadyThere = "This SKU is already there. It is skipped, not changed."
@@ -316,16 +340,13 @@ const commitStep = (
   if (O.isNone(open)) return [confirmClosed, state]
   // Made on another revision than the draft is at: nothing is written.
   if (open.value.draft.revision !== write.expected) return [confirmMoved(open.value.draft.revision), state]
-  // A stored item the confirm's judgement read changed since: nothing is written, and the confirm is judged again.
-  const orgItems = A.map(
-    A.filter(state.items, (entry) => entry.organizationId === org),
-    (entry) => entry.item
-  )
-  if (!stillAsRead(write.read)(orgItems)) return [confirmItemsChanged, state]
+  // A stored item, created row or suggestion the confirm's judgement read changed since: nothing is written, and the
+  // confirm is judged again.
+  if (!stillAsRead(write.read)(readNow(state, org, write.draft))) return [confirmItemsChanged, state]
   const at = audit.createdAt
   const written = plannedItems(write.plan)
-  const ready = A.filter(written, (row) => row.status === "ready")
-  const replacing = A.filter(written, (row) => row.status === "update")
+  const ready = A.filter(written, PlannedRow.guards.ready)
+  const replacing = A.filter(written, PlannedRow.guards.update)
   const ownedKey = (entry: MemItem): string => skuKey(entry.item)
 
   // New items: a code the organization already has is left as it is.
@@ -400,11 +421,24 @@ const commitStep = (
       sku: row.sku,
       name: row.name
     }
-    if (row.status === "update") return { ...at, outcome: "updated", reason: "", decidedBy: decidedByNobody }
+    if (PlannedRow.guards.update(row)) return { ...at, outcome: "updated", reason: "", decidedBy: decidedByNobody }
     if (landed(row)) return { ...at, outcome: "created", reason: "", decidedBy: decidedByNobody }
-    if (row.status === "ready") return { ...at, outcome: "already", reason: alreadyThere, decidedBy: decidedByNobody }
-    if (row.status === "already") return { ...at, outcome: "already", reason: row.reason, decidedBy: decidedByNobody }
-    return { ...at, outcome: "notImported", reason: row.reason, decidedBy: row.decidedBy }
+    return PlannedRow.match(row, {
+      ready: (): MemOutcome => ({ ...at, outcome: "already", reason: alreadyThere, decidedBy: decidedByNobody }),
+      update: (): MemOutcome => ({ ...at, outcome: "updated", reason: "", decidedBy: decidedByNobody }),
+      already: (skipped): MemOutcome => ({
+        ...at,
+        outcome: "already",
+        reason: skipped.reason,
+        decidedBy: decidedByNobody
+      }),
+      notImported: (left): MemOutcome => ({
+        ...at,
+        outcome: "notImported",
+        reason: left.reason,
+        decidedBy: left.decidedBy
+      })
+    })
   }
   const fresh = A.map(write.plan.rows, outcomeFor)
   const sameRow = (a: MemOutcome, b: MemOutcome): boolean =>
@@ -416,7 +450,7 @@ const commitStep = (
   // A changed value is recorded only for a row this confirm really wrote, and only once.
   const changes = A.reduce(written, state.changes, (list, row) => {
     const wrote =
-      row.status === "update" ||
+      PlannedRow.guards.update(row) ||
       A.some(
         items,
         (entry) =>
@@ -842,7 +876,7 @@ const sameAsEdit = (item: StoredItem, edit: ItemEdit): boolean =>
   BigDecimal.equals(item.unitCost, edit.unitCost) &&
   item.quantityOnHand === edit.quantityOnHand &&
   Eq.equals(item.reorderPoint, edit.reorderPoint) &&
-  item.stocking.kind === edit.stocking.kind &&
+  sameStocking(item.stocking, edit.stocking) &&
   Eq.equals(discontinuedOn(item.stocking), discontinuedOn(edit.stocking)) &&
   item.lotTracked === edit.lotTracked &&
   Eq.equals(item.firstReceivedOn, edit.firstReceivedOn)
@@ -1015,8 +1049,9 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
         if (O.isNone(found) || found.value.draft.status !== "open") return [decisionsClosed, state]
         // Checked against other choices than the draft has now: a match came between, and nothing is saved.
         if (found.value.draft.choicesJson !== draft.choicesJson) return [decisionsRematched, state]
-        // Judged against stored items that changed since (a Replace or Keep-stored across a re-match): nothing is saved.
-        if (!stillAsRead(read)(itemsOfOrg(state, org))) return [decisionsItemsChanged, state]
+        // Judged against stored items, created rows or suggestions that changed since (a Replace or Keep-stored across a
+        // re-match): nothing is saved.
+        if (!stillAsRead(read)(readNow(state, org, draft.id))) return [decisionsItemsChanged, state]
         const stored = found.value
         const differs = A.some(
           sets,
@@ -1490,7 +1525,7 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
             entry.organizationId === organizationId &&
             entry.importId === importId &&
             changeDecidedBy(entry.change) === "rule" &&
-            entry.change.how === "appliedByRule" &&
+            Change.guards.appliedByRule(entry.change) &&
             A.some(
               state.outcomes,
               (row) =>
@@ -1635,7 +1670,11 @@ export const SuggestionStoreMemory: Layer.Layer<SuggestionStore, never, CatalogM
   Effect.gen(function* () {
     const ref = yield* CatalogMemoryRef
     const where = (suggestion: Suggestion): string =>
-      suggestion.kind === "column" ? `:${suggestion.field}` : `${suggestion.rowId}:${suggestion.kind}`
+      Suggestion.match(suggestion, {
+        column: (column) => `:${column.field}`,
+        name: (cell) => `${cell.rowId}:name`,
+        category: (cell) => `${cell.rowId}:category`
+      })
     return SuggestionStore.of({
       list: Effect.fnUntraced(function* (organizationId: OrganizationId, importId: ImportId) {
         const state = yield* Ref.get(ref)

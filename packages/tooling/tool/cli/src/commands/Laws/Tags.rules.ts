@@ -14,8 +14,12 @@
  * template that is only the tag, what a function that hands the tag back answers (`kindOf(x)`, a function declared
  * after its first use, a record's method `k.of(x)`, `Effect.map(effect, (error) => error._tag)`, then `yield*`); a tag
  * handed to a call (`A.contains(["A", "B"], x._tag)`, `expect(tag).toBe("A")`); a sentence that names a tag (a
- * template with words, tags joined: `A.join([x._tag], "")`, `[x._tag].join("")`) compared or handed to an expectation;
- * a method called on a tag (`x._tag.startsWith("Sav")`); a record read by a tag (`handlers[x._tag]`); and an object
+ * template with words) compared or handed to an expectation; a method called on a tag (`x._tag.startsWith("Sav")`);
+ * a record read by a tag (`handlers[x._tag]`). A value that holds a tag is the tag in each of these: tags joined
+ * (`A.join([x._tag], "")`, `[x._tag].join("")`, the join itself included), a list or a record with one in it
+ * (`expect({ k: x._tag })`, `[x._tag].includes("A")`), a list spread (`[...tags]`, `f(...tags)`), taken out again
+ * (`[t] = [x._tag]`, `for (const t of A.map(xs, (e) => e._tag))`). `P.isTagged(x, "A")` is refused too: it takes any
+ * value, so a misspelled tag compiles where the type's guards would not. And an object
  * literal with a `_tag` key, unless its tag is written out and the module types that case itself as a plain type (a
  * type alias or an interface with `_tag: "A"`; a `_tag` inside another type's arguments, `Extract<Opened, { _tag:
  * "Detail" }>`, declares nothing). What passes: `"_tag" in x`, a `_tag` read and handed on as a value (returned, or
@@ -34,6 +38,8 @@
 import { $RepoCliId } from "@beep/identity/packages"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
+import * as O from "effect/Option"
+import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import { Repo } from "../../Repo.service.ts"
@@ -86,7 +92,7 @@ export const TagsFinding = S.TaggedUnion({
     how: S.String.pipe(
       S.annotateKey({
         description:
-          'How: "===" and its kin, "switch", "argument" (a tag handed to a call), "method" (a method of a tag), "key" (a record read by a tag) or "literal" (an object built with a _tag key)'
+          'How: "===" and its kin, "switch", "argument" (a tag handed to a call), "method" (a method of a tag), "key" (a record read by a tag), "literal" (an object built with a _tag key) or "isTagged" (P.isTagged with a tag as a string)'
       })
     )
   }
@@ -103,18 +109,18 @@ export const TagsFinding = S.TaggedUnion({
  */
 export type TagsFinding = typeof TagsFinding.Type
 
-const sayHow = (how: string): string =>
-  how === "switch"
-    ? "switch over a _tag"
-    : how === "argument"
-      ? "a _tag handed to a call"
-      : how === "method"
-        ? "a method called on a _tag"
-        : how === "key"
-          ? "a record read by a _tag"
-          : how === "literal"
-            ? "an object built with a _tag key: use the case's own constructor or .make"
-            : `_tag ${how}`
+/** The words for each way a tag is told apart by hand; a comparison is said with its operator. */
+const howWords: Readonly<Record<string, string>> = {
+  switch: "switch over a _tag",
+  argument: "a _tag handed to a call",
+  method: "a method called on a _tag",
+  key: "a record read by a _tag",
+  literal: "an object built with a _tag key: use the case's own constructor or .make",
+  isTagged:
+    "P.isTagged with a tag as a string: it takes any value, so a misspelled tag compiles. Use the type's guards, match or Match.valueTags"
+}
+
+const sayHow = (how: string): string => O.getOrElse(R.get(howWords, how), () => `_tag ${how}`)
 
 /**
  * The line each finding prints.

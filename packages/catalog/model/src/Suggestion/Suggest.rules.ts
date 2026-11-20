@@ -8,9 +8,10 @@ import { matchedColumn } from "@inventory/catalog-contract/Mapping"
 import { type Field, fieldLabels, fields, type StagedTable } from "@inventory/catalog-contract/Staged"
 import {
   type NewSuggestion,
-  type Suggestion,
-  type SuggestionBy,
+  Suggestion,
+  SuggestionBy,
   type SuggestionKind,
+  suggestionField,
   suggestionFits
 } from "@inventory/catalog-contract/Suggestion"
 
@@ -61,7 +62,10 @@ export type SuggestSource = {
 }
 
 const has = (source: SuggestSource, row: ReviewedRow, field: Field): boolean =>
-  A.some(source.suggestions, (s) => s.kind !== "column" && s.rowId === row.id && s.kind === field)
+  A.some(
+    source.suggestions,
+    (s) => Suggestion.isAnyOf(["name", "category"])(s) && s.rowId === row.id && suggestionField(s) === field
+  )
 
 const open = (row: ReviewedRow, kind: "missing" | "category", field: Field): boolean =>
   A.some(row.problems, (problem) => problem.kind === kind && problem.field === field && problem.proposal === null)
@@ -83,7 +87,7 @@ export const digest = (source: SuggestSource) => {
     source.review.mapping,
     (match) =>
       O.isNone(matchedColumn(match)) &&
-      !A.some(source.suggestions, (s) => s.kind === "column" && s.field === match.field)
+      !A.some(source.suggestions, (s) => Suggestion.guards.column(s) && s.field === match.field)
   )
   return {
     rowsWithoutName: A.map(A.take(nameless, suggestCap), (row) => ({
@@ -207,7 +211,7 @@ export const guard = (input: {
       const description = Str.trim(row.value.file.description)
       const told = words(description)
       // Medium only when every word of the name is a word of the description: then it says nothing the file does not.
-      const drawn = by.kind === "model" && A.every(words(to), (word) => A.contains(told, word))
+      const drawn = SuggestionBy.guards.model(by) && A.every(words(to), (word) => A.contains(told, word))
       return yes({
         kind: "name",
         rowId: row.value.id,
@@ -217,7 +221,7 @@ export const guard = (input: {
         by,
         confidence: drawn ? "medium" : "low",
         basis: `Name is empty on row ${row.value.rowNumber}; its description says "${Str.slice(0, 200)(description)}"${
-          by.kind === "rule"
+          SuggestionBy.guards.rule(by)
             ? ", and the name is its first words."
             : drawn
               ? ", and every word of the name is in it."

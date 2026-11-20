@@ -83,8 +83,8 @@ class PlannedNotImported extends S.Opaque<PlannedNotImported, { readonly brand: 
 export const PlannedRow = PlannedStatus.mapMembers(() =>
   Tuple.make(PlannedReady, PlannedUpdate, PlannedAlready, PlannedNotImported)
 ).pipe(
-  S.toTaggedUnion("status"),
-  S.annotate({ identifier: "PlannedRow", description: "What a confirm does with one item of the file" })
+  S.annotate({ identifier: "PlannedRow", description: "What a confirm does with one item of the file" }),
+  S.toTaggedUnion("status")
 )
 /** The decoded value of `PlannedRow`. */
 export type PlannedRow = typeof PlannedRow.Type
@@ -104,7 +104,7 @@ export const plannedItems = (
   A.filter(
     plan.rows,
     (row): row is Extract<PlannedRow, { readonly status: "ready" | "update" }> =>
-      row.status === "ready" || row.status === "update"
+      PlannedRow.guards.ready(row) || PlannedRow.guards.update(row)
   )
 
 /**

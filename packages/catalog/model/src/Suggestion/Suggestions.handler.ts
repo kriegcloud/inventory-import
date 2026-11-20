@@ -97,7 +97,7 @@ export const propose = Effect.fn("Suggestions.propose")(function* <R>(input: {
       lines: suggestLines({ made: checked.suggestions, refused: checked.refused.length, asked, by: "rule" })
     }
   }
-  if (call.kind === "usedUp") return byRules(usedUpSentence(call.reason))
+  if (AllowanceAnswer.guards.usedUp(call)) return byRules(usedUpSentence(call.reason))
   const sent = yield* toJson(asked).pipe(Effect.orDie)
   const answer = yield* answerer
     .ask(

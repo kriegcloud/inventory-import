@@ -3,10 +3,13 @@
 // between a save's check of the choices and its write. The match reads the draft, its decisions and the stored items
 // inside the store, then writes one batch: so the other write is run inside the D1 store itself, just before (or just
 // after) its batch, through a D1 whose batches the test steps into. The save's window is the handler's: a stand-in
-// around the store runs the other write once, just before the store's save.
+// around the store runs the other write once, just before the store's save. What a judgement of a Replace across a
+// re-match read beside the draft (the stored items, the import's created rows, its suggestions) is checked the same
+// way: a change to any of them in the window makes the request be worked out again, and never adds a take-back.
 import { D1 } from "@beep/d1/D1"
-import { beforeEach, expect, layer } from "@effect/vitest"
+import { afterEach, beforeEach, expect, layer } from "@effect/vitest"
 import * as A from "effect/Array"
+import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as MutableRef from "effect/MutableRef"
@@ -16,11 +19,15 @@ import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import * as HttpApiTest from "effect/http-api/HttpApiTest"
 import { decisionFromFlags, type RowDecisionFlags } from "@inventory/catalog-contract/Decision"
-import { AcceptsTakenBack, DraftBusy } from "@inventory/catalog-contract/ImportRejection"
+import { ImportId, RowId, SuggestionId } from "@inventory/catalog-contract/Ids"
+import { storedSuggestion, suggestedByRule } from "@inventory/catalog-contract/Suggestion"
+import { DraftBusy } from "@inventory/catalog-contract/ImportRejection"
 import type { StagedTable } from "@inventory/catalog-contract/Staged"
 import { ImportStoreD1 } from "@inventory/catalog-host/ImportStoreD1"
 import { draftTries, ImportStore } from "@inventory/catalog-model/ImportStore"
-import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
+import { StoreSuggestions, SuggestionStore } from "@inventory/catalog-model/SuggestionStore"
+import { Activity } from "@inventory/kernel/Activity"
+import { ActivityId, MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
 import messy from "../../public/samples/items_messy.csv?raw"
 import { Api } from "../../src/api/v1/Api.ts"
@@ -80,14 +87,32 @@ const between = MutableRef.make(O.none<Between>())
 const putBetween = (before: Step, run: Between["run"]) =>
   Effect.sync(() => MutableRef.set(between, O.some({ before, run })))
 
-// Every test starts with nothing waiting: a test that failed before its batches ran leaves its entries, its count or
-// its stand-in behind, and the next test's batches would run them.
-beforeEach(() => {
+// Every test starts with nothing waiting, and leaves nothing waiting: a test that failed before its batches ran leaves
+// its entries, its count or its stand-in behind, and the next test's batches would run them, whichever test it is.
+const nothingWaiting = () => {
   MutableRef.set(coming, [])
   MutableRef.set(sent, 0)
   MutableRef.set(inside, false)
   MutableRef.set(between, O.none())
-})
+}
+beforeEach(nothingWaiting)
+afterEach(nothingWaiting)
+
+/** What is waiting for the next batches and saves: all empty when a test starts. */
+const waitingNow = () => [
+  MutableRef.get(coming).length,
+  MutableRef.get(sent),
+  MutableRef.get(inside),
+  MutableRef.get(between).pipe(O.isSome)
+]
+
+/** Everything waiting, as a test that failed before its batches ran would leave it. */
+const leaveEverythingWaiting = () => {
+  MutableRef.set(coming, [{ before: Effect.die("a batch of the test before") }])
+  MutableRef.set(sent, 3)
+  MutableRef.set(inside, true)
+  MutableRef.set(between, O.some({ before: "decide", run: () => Effect.die("a save of the test before") }))
+}
 
 // The real D1 store, built afresh (the app's own is shared, on the plain D1) on the stepped D1, with a stand-in around
 // its save.
@@ -171,9 +196,47 @@ const tableOf = (fileName: string, lines: ReadonlyArray<Line>): StagedTable => (
 })
 const item = { category: "packaging", uom: "EA", quantity_on_hand: "10" }
 
-/** A Replace on row 2, and what judging it after the cost's re-match takes back once the item is stocked. */
+/** A Replace on row 2. */
 const replace = flags({ "row-2": { stored: "replace" } })
-const taken = [{ rowId: "row-2", field: "unitCost", kind: "stored" }]
+
+/** A suggestion for row 2 of the import, stored through the suggestion store with its audit line. */
+const suggestionStored = Effect.fn("suggestionStored")(function* (
+  suggestions: SuggestionStore["Service"],
+  importId: ImportId,
+  ids: { readonly suggestion: string; readonly line: string }
+) {
+  const at = yield* DateTime.now
+  yield* suggestions.store(
+    StoreSuggestions.make({
+      draft: importId,
+      suggestions: [
+        storedSuggestion({
+          id: SuggestionId.make(ids.suggestion),
+          made: {
+            kind: "name",
+            rowId: RowId.make("row-2"),
+            rowNumber: 2,
+            from: "Brass Hinge",
+            to: "Brass Hinge M6",
+            by: suggestedByRule,
+            confidence: "low",
+            basis: "A suggestion stored while the request was worked out"
+          }
+        })
+      ],
+      audit: Activity.make({
+        id: ActivityId.make(ids.line),
+        organizationId: prairie,
+        actorId: MemberId.make("mem_marcus"),
+        actorName: "Marcus Oyelaran",
+        action: "Asked for suggestions",
+        detail: "",
+        agent: O.none(),
+        createdAt: at
+      })
+    })
+  )
+})
 
 /**
  * A file whose row 2 (under `sku`) costs 9.00 under "unit_cost" and 3 under "List cost", staged with its cost matched to
@@ -446,7 +509,7 @@ layer(App)("a match and another person's write that fall into each other", (it) 
   )
 
   it.effect(
-    "a stored item created between a save's judgement and its write: the batch writes nothing, the save is judged again against it",
+    "a stored item created between a save's judgement and its write: the save is worked out again, and the item takes nothing back",
     () =>
       Effect.gen(function* () {
         const { client, view, params, stock } = yield* judgedAgainst("EEE-0001")
@@ -456,52 +519,213 @@ layer(App)("a match and another person's write that fall into each other", (it) 
         const saved = yield* client.imports
           .decide({ params, payload: { madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
           .pipe(as("mem_marcus"))
-        // Two batches: the first found an item it was not judged against, the second is the save judged again.
-        expect([MutableRef.get(sent), saved.notApplied]).toEqual([2, taken])
+        // Two batches: the first found an item it was not judged against, the second is the save worked out again.
+        // Only an item changed, not a column: what the first try found stands, and the Replace with it.
+        expect([MutableRef.get(sent), saved.notApplied]).toEqual([2, []])
         const after = yield* client.imports.get({ params }).pipe(as("mem_marcus"))
-        expect(R.get(after.decisions, "row-2")).toEqual(O.some(decisionFromFlags({})))
+        expect(R.get(after.decisions, "row-2")).toEqual(R.get(replace, "row-2"))
       })
   )
 
   it.effect(
-    "a stored item created between a confirm's judgement and its batch: nothing is imported, the confirm is judged again and refused",
+    "a stored item created between a confirm's judgement and its batch: the confirm is worked out again, the item takes nothing back, and it is imported",
     () =>
       Effect.gen(function* () {
         const { client, view, params, matched, stock } = yield* judgedAgainst("EEE-0002")
-        yield* around([{ before: stock }])
-        const refused = yield* Effect.flip(
-          client.imports
-            .commit({
-              params,
-              payload: { revision: matched.revision, madeOn: { "row-2": view.revision }, set: replace, clear: [] }
-            })
-            .pipe(as("mem_marcus"))
+        const seen = MutableRef.make("")
+        const look = Effect.orDie(
+          Effect.map(client.imports.get({ params }).pipe(as("mem_marcus")), (now) => MutableRef.set(seen, now.status))
         )
-        expect([MutableRef.get(sent), S.is(AcceptsTakenBack)(refused) ? refused.accepts : []]).toEqual([1, taken])
-        const after = yield* client.imports.get({ params }).pipe(as("mem_marcus"))
-        expect([after.status, after.revision]).toEqual(["open", matched.revision])
+        yield* around([{ before: stock, after: look }])
+        const confirmed = yield* client.imports
+          .commit({
+            params,
+            payload: { revision: matched.revision, madeOn: { "row-2": view.revision }, set: replace, clear: [] }
+          })
+          .pipe(as("mem_marcus"))
+        // The first batch wrote nothing (the import still open right after it); the confirm worked out again did.
+        expect([MutableRef.get(seen), confirmed.status, confirmed.takenBack]).toEqual(["open", "imported", []])
       })
   )
 
-  // The two below run in this order. The first leaves everything waiting, as a test that failed before its batches ran
-  // would; the second finds nothing of it.
-  it.effect("a test that stops before its batches leaves entries, a count and a stand-in waiting", () =>
+  it.effect(
+    "the confirm's judgement reads item X, X is edited, the confirm is worked out again: nothing is taken back, and X is replaced as edited",
+    () =>
+      Effect.gen(function* () {
+        const client = yield* HttpApiTest.groups(Api, ["imports", "items"])
+        // X is stocked at 3 by a first import. In the file, row 2 names it otherwise and costs 3 under both columns.
+        const stocking = yield* upload({
+          client,
+          table: tableOf("x-stocked.csv", [{ ...item, sku: "XXX-0001", name: "Brass Hinge", unit_cost: "3" }])
+        }).pipe(as("mem_marcus"))
+        yield* client.imports
+          .commit({
+            params: { id: stocking.id },
+            payload: { revision: stocking.revision, madeOn: {}, set: {}, clear: [] }
+          })
+          .pipe(as("mem_marcus"))
+        const view = yield* upload({
+          client,
+          table: tableOf("x-judged.csv", [
+            { ...item, sku: "XXX-0001", name: "Brass Hinge XL", unit_cost: "3", "List cost": "3.00" }
+          ])
+        }).pipe(as("mem_marcus"))
+        const params = { id: view.id }
+        const matched = yield* client.imports
+          .match({ params, payload: { field: "unitCost", column: O.some(column("List cost")) } })
+          .pipe(as("mem_dana"))
+        const listed = yield* client.items.list().pipe(as("mem_marcus"))
+        const stored = O.getOrThrow(A.findFirst(listed, (found) => found.sku === "XXX-0001"))
+        // Once Marcus's confirm has read X (the cost reads 3 under either column: the Replace stands) and is about
+        // to be written, Dana edits X on the Items page.
+        const edit = Effect.orDie(
+          client.items
+            .edit({
+              params: { id: stored.id },
+              payload: {
+                revision: stored.revision,
+                name: "Brass Hinge, edited",
+                description: stored.description,
+                category: stored.category,
+                uom: stored.uom,
+                unitCost: stored.unitCost,
+                quantityOnHand: stored.quantityOnHand,
+                reorderPoint: stored.reorderPoint,
+                stocking: stored.stocking,
+                lotTracked: stored.lotTracked,
+                firstReceivedOn: stored.firstReceivedOn
+              }
+            })
+            .pipe(as("mem_dana"))
+        )
+        const seen = MutableRef.make("")
+        const look = Effect.orDie(
+          Effect.map(client.imports.get({ params }).pipe(as("mem_marcus")), (now) => MutableRef.set(seen, now.status))
+        )
+        yield* around([{ before: edit, after: look }])
+        const confirmed = yield* client.imports
+          .commit({
+            params,
+            payload: { revision: matched.revision, madeOn: { "row-2": view.revision }, set: replace, clear: [] }
+          })
+          .pipe(as("mem_marcus"))
+        // The first batch found X edited since it read it and wrote nothing; the confirm worked out again wrote.
+        expect([MutableRef.get(seen), confirmed.status, O.getOrUndefined(confirmed.result)?.updated]).toEqual([
+          "open",
+          "imported",
+          1
+        ])
+        const now = yield* client.items.list().pipe(as("mem_marcus"))
+        const after = O.getOrThrow(A.findFirst(now, (found) => found.sku === "XXX-0001"))
+        expect(after.name).toBe("Brass Hinge XL")
+      })
+  )
+
+  it.effect(
+    "a suggestion stored between a save's judgement and its write: storing it moves no revision, and the save is still worked out again",
+    () =>
+      Effect.gen(function* () {
+        const { client, view, params } = yield* judgedAgainst("EEE-0003")
+        const suggestions = yield* SuggestionStore
+        const stored = suggestionStored(suggestions, view.id, {
+          suggestion: "00000000-0000-4000-8000-000000000301",
+          line: "00000000-0000-4000-8000-000000000302"
+        })
+        yield* around([{ before: stored }, {}])
+        const saved = yield* client.imports
+          .decide({ params, payload: { madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
+          .pipe(as("mem_marcus"))
+        expect([MutableRef.get(sent), saved.notApplied]).toEqual([2, []])
+      })
+  )
+
+  it.effect(
+    "a suggestion stored between a confirm's judgement and its batch: the confirm is worked out again, and imported",
+    () =>
+      Effect.gen(function* () {
+        const { client, view, params, matched } = yield* judgedAgainst("EEE-0004")
+        const suggestions = yield* SuggestionStore
+        const seen = MutableRef.make("")
+        const look = Effect.orDie(
+          Effect.map(client.imports.get({ params }).pipe(as("mem_marcus")), (now) => MutableRef.set(seen, now.status))
+        )
+        const stored = suggestionStored(suggestions, view.id, {
+          suggestion: "00000000-0000-4000-8000-000000000303",
+          line: "00000000-0000-4000-8000-000000000304"
+        })
+        yield* around([{ before: stored, after: look }])
+        const confirmed = yield* client.imports
+          .commit({
+            params,
+            payload: { revision: matched.revision, madeOn: { "row-2": view.revision }, set: replace, clear: [] }
+          })
+          .pipe(as("mem_marcus"))
+        // The first batch found a suggestion it had not read and wrote nothing; the confirm worked out again wrote.
+        expect([MutableRef.get(seen), confirmed.status]).toEqual(["open", "imported"])
+      })
+  )
+
+  it.effect(
+    "a created row taken back between a save's judgement and its write, its item under a SKU typed on another row: the save is worked out again",
+    () =>
+      Effect.gen(function* () {
+        const client = yield* HttpApiTest.groups(Api, ["imports", "items"])
+        const view = yield* upload({
+          client,
+          table: tableOf("created.csv", [
+            { ...item, sku: "FFF-0001", name: "Brass Hinge", unit_cost: "9.00", "List cost": "3" },
+            { ...item, sku: "FFF-0002", name: "Oak Crate", unit_cost: "4" }
+          ])
+        }).pipe(as("mem_marcus"))
+        const params = { id: view.id }
+        // Row 2 left out; row 3 imported under a SKU typed for it, which no question to the review looks up.
+        const first = flags({ "row-2": { out: true }, "row-3": { edits: { sku: "TYP-0001" } } })
+        const confirmed = yield* client.imports
+          .commit({
+            params,
+            payload: { revision: view.revision, madeOn: R.map(first, () => view.revision), set: first, clear: [] }
+          })
+          .pipe(as("mem_marcus"))
+        const reopened = yield* client.imports.reopen({ params }).pipe(as("mem_marcus"))
+        const matched = yield* client.imports
+          .match({ params, payload: { field: "unitCost", column: O.some(column("List cost")) } })
+          .pipe(as("mem_dana"))
+        expect(matched.createdIds).toEqual(["row-3"])
+        // Once Marcus's save of a Replace on row 2, made before the match, has been judged and is about to be written,
+        // Dana takes the import's confirm back: row 3's item goes, and no item under a key the review read changes.
+        yield* around([
+          {
+            before: Effect.orDie(
+              client.imports
+                .takeBack({ params, payload: { confirms: confirmed.takeBack.confirms } })
+                .pipe(as("mem_dana"))
+            )
+          },
+          {}
+        ])
+        yield* client.imports
+          .decide({ params, payload: { madeOn: { "row-2": reopened.revision }, set: replace, clear: [] } })
+          .pipe(as("mem_marcus"))
+        // Two batches: the first found the import's created rows otherwise than its judgement read them.
+        expect(MutableRef.get(sent)).toBe(2)
+        const after = yield* client.imports.get({ params }).pipe(as("mem_marcus"))
+        expect(after.createdIds).toEqual([])
+      })
+  )
+
+  // Each of the two below starts by finding nothing waiting, then leaves everything waiting, as a test that failed
+  // before its batches ran would: whichever runs second, in any order, shows that what the other left was cleared.
+  it.effect("a test starts with nothing waiting, and may leave entries, a count and a stand-in behind (one)", () =>
     Effect.sync(() => {
-      MutableRef.set(coming, [{ before: Effect.die("a batch of the test before") }])
-      MutableRef.set(sent, 3)
-      MutableRef.set(inside, true)
-      MutableRef.set(between, O.some({ before: "decide", run: () => Effect.die("a save of the test before") }))
+      expect(waitingNow()).toEqual([0, 0, false, false])
+      leaveEverythingWaiting()
     })
   )
 
-  it.effect("the next test starts with nothing waiting", () =>
+  it.effect("a test starts with nothing waiting, and may leave entries, a count and a stand-in behind (two)", () =>
     Effect.sync(() => {
-      expect([
-        MutableRef.get(coming).length,
-        MutableRef.get(sent),
-        MutableRef.get(inside),
-        MutableRef.get(between)
-      ]).toEqual([0, 0, false, O.none()])
+      expect(waitingNow()).toEqual([0, 0, false, false])
+      leaveEverythingWaiting()
     })
   )
 })

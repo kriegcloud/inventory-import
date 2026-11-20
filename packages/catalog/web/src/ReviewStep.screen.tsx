@@ -23,6 +23,7 @@ import { hasRole } from "@inventory/kernel/Role"
 import { perKey } from "@inventory/client/Api"
 import {
   confirmHeldBack,
+  confirmHeldForLines,
   confirmingImport,
   dismissTakeBack,
   rowsNotSaved,
@@ -191,6 +192,7 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
   // written; the screen then takes the newer picture and says so above the review, until the person confirms again.
   const committing = useAtomValue(confirmingImport(view.id))
   const heldBack = useAtomValue(confirmHeldBack(view.id))
+  const heldForLines = useAtomValue(confirmHeldForLines(view.id))
   const notSaved = useAtomValue(rowsNotSaved(view.id))
   const onHold = useAtomValue(rowsOnHold(view.id))
   const takenBack = useAtomValue(takeBacksNamed(view.id))
@@ -295,6 +297,7 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
         onSettle={(rowId, keep) => happened(DraftEvent.HoldSettled({ rowId, keep }))}
         canDecide={props.canImport}
       />
+      <NotImportedForLines held={heldForLines} />
       <MatchTakeBacks taken={takenBack} onDismiss={dismiss} />
       <ReviewRegion
         key={`${view.id}:${epoch}`}
@@ -477,6 +480,28 @@ function NotImportedYet(props: { why: O.Option<HeldBack> }) {
       <AlertTitle>Nothing was imported</AlertTitle>
       <AlertDescription>
         <p>{heldBackSentence({ why: props.why.value, accepts: acceptsWords(props.why.value.accepts) })}</p>
+      </AlertDescription>
+    </Alert>
+  )
+}
+
+/**
+ * Said above the review when a confirm was not made because a line above it asks which of two decisions of a row
+ * stands (one from a tab of the person's that is gone): nothing was imported; the person settles those lines, then
+ * imports. It goes once they are settled.
+ */
+function NotImportedForLines(props: { held: boolean }) {
+  const narrow = useAtomValue(isNarrow)
+  if (!props.held) return null
+  return (
+    <Alert role="alert" className={narrow ? "mx-4 mt-3 w-auto" : "mx-6 mt-4 w-auto"}>
+      <TriangleAlertIcon aria-hidden />
+      <AlertTitle>Nothing was imported</AlertTitle>
+      <AlertDescription>
+        <p>
+          A row is listed above with a decision from your other tab beside this tab's own. Pick which one stands on each
+          of those lines, then import.
+        </p>
       </AlertDescription>
     </Alert>
   )

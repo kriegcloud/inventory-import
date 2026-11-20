@@ -173,6 +173,11 @@ export interface Draft {
    */
   readonly heldBack: O.Option<HeldBack>
   /**
+   * The last confirm was not made because a line above the review asks which of two decisions of a row stands (a gone
+   * tab's beside this tab's): said on the screen until those lines are settled, when the person imports again.
+   */
+  readonly heldForLines: boolean
+  /**
    * What the screen showed when the person pressed the confirm: a held-back confirm counts the rows decided otherwise
    * since against it, not picture by picture (a row changed and changed back is not decided otherwise).
    */
@@ -254,6 +259,7 @@ export const emptyDraft: Draft = {
   onScreen: false,
   confirm: "idle",
   heldBack: O.none(),
+  heldForLines: false,
   leftOver: O.none(),
   closedSeen: O.none(),
   ended: false,
@@ -829,9 +835,10 @@ const confirming = (draft: Draft): Stepped =>
     onNone: () => ({ draft: confirmAt(draft, "idle"), effects: none }),
     onSome: (held) => {
       // A row whose line above the review asks which decision stands (a gone tab's beside this tab's) is settled
-      // first: a confirm would carry one of them unasked. Nothing is confirmed; the line says why.
-      if (A.some(R.keys(draft.unsent), (rowId) => besideOwn(draft, rowId))) {
-        return { draft: confirmAt(draft, "idle"), effects: none }
+      // first: a confirm would carry one of them unasked. Nothing is confirmed, whether pressed now or waiting on a
+      // save: the screen says why until the lines are settled, and the person imports then.
+      if (linesAsk(draft)) {
+        return { draft: { ...confirmAt(draft, "idle"), heldForLines: true, seenWhileWaiting: O.none() }, effects: none }
       }
       // A waiting row is checked against the picture the confirm names: the server makes the confirm only while it is
       // still at that picture's revision, so what it holds then is what the picture holds. A row decided elsewhere
@@ -866,6 +873,13 @@ const confirming = (draft: Draft): Stepped =>
       }
     }
   })
+
+/** True while a line above the review asks which of two decisions of a row of this tab's waiting rows stands. */
+const linesAsk = (draft: Draft): boolean => A.some(R.keys(draft.unsent), (rowId) => besideOwn(draft, rowId))
+
+/** A confirm held for the lines above the review is free again once no line asks. */
+const linesSettled = (draft: Draft): Draft =>
+  draft.heldForLines && !linesAsk(draft) ? { ...draft, heldForLines: false } : draft
 
 /** The rows that rode with a confirm that was not made go back under whatever was changed since. */
 const unconfirming = (draft: Draft): Draft =>
@@ -908,7 +922,7 @@ export const step: {
     onNone: () => stepped.effects,
     onSome: (first) => A.filter(stepped.effects, (effect, at) => at === first || !DraftEffect.$is("Ask")(effect))
   })
-  return told(draft, event, { draft: reached(stepped.draft), effects })
+  return told(draft, event, { draft: linesSettled(reached(stepped.draft)), effects })
 })
 
 /**
@@ -1161,7 +1175,7 @@ const transition = (draft: Draft, event: DraftEvent): Stepped =>
       if (draft.confirm !== "idle" || O.isNone(draft.held) || O.exists(draft.heldBack, (why) => !why.read)) {
         return { draft, effects: none }
       }
-      const pressed: Draft = { ...draft, heldBack: O.none(), pressedOn: shown(draft) }
+      const pressed: Draft = { ...draft, heldBack: O.none(), heldForLines: false, pressedOn: shown(draft) }
       // Their own save is out: the confirm waits for its answer, and goes on the picture that save leaves.
       if (O.isSome(pressed.flight)) return { draft: confirmAt(pressed, "waiting"), effects: none }
       // The picture held is known to be behind (somebody else saved before the person's last save): the newer one
@@ -1322,13 +1336,12 @@ const transition = (draft: Draft, event: DraftEvent): Stepped =>
         : O.match(draft.flight, {
             onNone: () => ({ draft, effects: none }),
             onSome: (rows) => {
-              // A gone tab's refused decision held beside this tab's: this tab's own, refused now too, is held in its
-              // place with its own reason, and the gone tab's is named, not dropped unsaid.
-              const goneRefused = (rowId: string): boolean =>
-                O.exists(R.get(draft.onHold, rowId), (held) => Hold.$is("Refused")(held.why))
+              // A gone tab's decision held beside this tab's (refused there, or from the other tab): this tab's own,
+              // refused now, is held in its place as refused, its reason on the screen, and the gone tab's is named,
+              // not dropped unsaid. "Keep this tab's" can then never send again what the server has just refused.
               const refusedHere = R.filter(
                 rows,
-                (_row, rowId) => !R.has(draft.unsent, rowId) && (!R.has(draft.onHold, rowId) || goneRefused(rowId))
+                (_row, rowId) => !R.has(draft.unsent, rowId) && ownBesideHold(draft, rowId)
               )
               const replaced = R.filter(
                 heldDecisions(draft),

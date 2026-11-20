@@ -20,6 +20,8 @@ import {
 import { ItemChanged } from "@inventory/catalog-contract/Catalog"
 import { Forbidden } from "@inventory/kernel/AccessError"
 import { AnsweredBy } from "@inventory/catalog-contract/Answer"
+import { DecidedBy, RowOutcome } from "@inventory/catalog-contract/Import"
+import { Suggestion } from "@inventory/catalog-contract/Suggestion"
 import type { ColumnCatalog } from "@inventory/catalog-contract/TableView"
 import * as A from "effect/Array"
 import * as BigDecimal from "effect/BigDecimal"
@@ -256,7 +258,9 @@ describe("an import, over the twins", () => {
             O.flatMap(
               A.findFirst(result.rows, (row) => row.rowNumber === n),
               (row) =>
-                row.outcome === "notImported" && row.decidedBy.kind === "person" ? O.some(row.decidedBy.name) : O.none()
+                RowOutcome.guards.notImported(row) && DecidedBy.guards.person(row.decidedBy)
+                  ? O.some(row.decidedBy.name)
+                  : O.none()
             )
           expect([leftOutBy(2), leftOutBy(3)]).toEqual([O.some("Dana Whitfield"), O.some("Marcus Oyelaran")])
         })
@@ -274,9 +278,9 @@ describe("suggestions, over the twins", () => {
         yield* refusedAs(imports.suggest({ params }).pipe(as(priya)), Forbidden)
         const first = yield* imports.suggest({ params }).pipe(as(marcus))
         expect(AnsweredBy.guards.Rules(first.answeredBy)).toBe(true)
-        expect(A.map(first.made, (s) => (s.kind === "column" ? [] : [s.rowId, s.kind, s.to, s.by.kind]))).toEqual([
-          ["row-5", "name", "Copper Plate", "rule"]
-        ])
+        expect(
+          A.map(first.made, (s) => (Suggestion.guards.column(s) ? [] : [s.rowId, s.kind, s.to, s.by.kind]))
+        ).toEqual([["row-5", "name", "Copper Plate", "rule"]])
         const second = yield* imports.suggest({ params }).pipe(as(marcus))
         expect([second.made.length, second.suggestions.length]).toEqual([0, 1])
         const after = yield* imports.get({ params }).pipe(as(marcus))

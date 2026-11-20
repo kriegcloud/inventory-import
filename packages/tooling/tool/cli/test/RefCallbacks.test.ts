@@ -276,6 +276,53 @@ export function List() {
 }
 `
 
+// Two names for two parts of one module record are not one record: a write into one part leaves the other's refs
+// steady. A part written into is refused, and so is the part of the record it is, read from the record.
+const parts = `type Fn = (node: HTMLElement | null) => void
+const big: { a: Record<string, Fn>; b: Record<string, Fn> } = { a: {}, b: { lead: (node) => node?.focus() } }
+const a = big.a
+const b = big.b
+export function List(props: { id: string }) {
+  a[props.id] ??= (node) => node?.focus()
+  return (
+    <section>
+      <p ref={b.lead} />
+      <p ref={big.b.lead} />
+      <p ref={a[props.id]} />
+      <p ref={big.a[props.id]} />
+    </section>
+  )
+}
+`
+
+// A module record filled in place by the forms the fourth review found passing: \`Object.assign\` taken out of
+// \`Object\` by name or read by its key, a record assigned to a name declared with another value, and a record
+// given through \`??\`.
+const filledOtherwise = `type Fn = (node: HTMLElement | null) => void
+const one: Record<string, Fn> = {}
+const two: Record<string, Fn> = {}
+const three: Record<string, Fn> = {}
+const four: Record<string, Fn> = {}
+const { assign } = Object
+export function List(props: { id: string }) {
+  assign(one, { [props.id]: (node: HTMLElement | null) => node?.focus() })
+  Object["assign"](two, { [props.id]: (node: HTMLElement | null) => node?.focus() })
+  let r: Record<string, Fn> = {}
+  r = three
+  r[props.id] ??= (node) => node?.focus()
+  const s = four ?? {}
+  s[props.id] ??= (node) => node?.focus()
+  return (
+    <section>
+      <p ref={one[props.id]} />
+      <p ref={two[props.id]} />
+      <p ref={three[props.id]} />
+      <p ref={four[props.id]} />
+    </section>
+  )
+}
+`
+
 /** The workspaces whose exports name modules of hooks: the vendored kit's `src/hooks`, and a `*.hook.ts` file. */
 const hookPackages = {
   "packages/ui/package.json": json({
@@ -308,6 +355,27 @@ describe("laws ref-callbacks", () => {
         "err: src/List.tsx:10  ref: refs is",
         "err: src/List.tsx:11  ref: kept is",
         "err: src/List.tsx:12  ref: shared is"
+      ])
+    })
+  )
+
+  it.effect("refuses only the part of a module record a function writes into, never a part beside it", () =>
+    Effect.gen(function* () {
+      const report = yield* inTree({ "src/List.tsx": parts }, inRepository)
+      expect(report.failed).toBe(true)
+      expect(refusals(report)).toEqual(["err: src/List.tsx:11  ref: a is", "err: src/List.tsx:12  ref: big is"])
+    })
+  )
+
+  it.effect("refuses a record filled by Object.assign by another name or key, an assigned name, and a ?? default", () =>
+    Effect.gen(function* () {
+      const report = yield* inTree({ "src/List.tsx": filledOtherwise }, inRepository)
+      expect(report.failed).toBe(true)
+      expect(refusals(report)).toEqual([
+        "err: src/List.tsx:17  ref: one is",
+        "err: src/List.tsx:18  ref: two is",
+        "err: src/List.tsx:19  ref: three is",
+        "err: src/List.tsx:20  ref: four is"
       ])
     })
   )

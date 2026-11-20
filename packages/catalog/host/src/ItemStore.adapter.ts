@@ -29,7 +29,10 @@ import * as SqlClient from "effect/sql/SqlClient"
 import * as SqlSchema from "effect/sql/SqlSchema"
 import * as S from "effect/Schema"
 import { OrganizationId, MemberId } from "@inventory/kernel/Ids"
-import { ItemEdit, StoredItem, discontinuedOn } from "@inventory/catalog-contract/Item"
+import { ItemEdit, Stocking, StoredItem, discontinuedOn } from "@inventory/catalog-contract/Item"
+
+// Whether two stockings say the same: the same case, and the same day for a discontinued one.
+const sameStocking = S.toEquivalence(Stocking)
 import { EditOutcome, ItemStore } from "@inventory/catalog-model/ItemStore"
 import { D1, NoRows } from "@beep/d1/D1"
 import * as SecureRandom from "effect/crypto/SecureRandom"
@@ -477,9 +480,9 @@ export const ItemStoreD1 = Layer.effect(
       execute: ({ org, id }) => sql`SELECT ${itemColumns(sql)} FROM item WHERE organizationId = ${org} AND id = ${id}`
     })
     // The edit's stocking as the two columns that store it: the active bit, and the discontinued day or NULL.
-    const activeBit = (edit: (typeof ItemEdit)["Encoded"]): number => (edit.stocking.kind === "active" ? 1 : 0)
+    const activeBit = (edit: (typeof ItemEdit)["Encoded"]): number => (Stocking.guards.active(edit.stocking) ? 1 : 0)
     const discontinuedDay = (edit: (typeof ItemEdit)["Encoded"]): string | null =>
-      edit.stocking.kind === "discontinued" ? edit.stocking.on : null
+      Stocking.guards.discontinued(edit.stocking) ? edit.stocking.on : null
     // True while the item is at the revision the edit was made on and holds something other than the edit says.
     const editable = (r: typeof EditRequest.Encoded) => sql`EXISTS (SELECT 1 FROM item
       WHERE organizationId = ${r.org} AND id = ${r.id} AND revision = ${r.edit.revision}
@@ -518,7 +521,7 @@ export const ItemStoreD1 = Layer.effect(
       BigDecimal.equals(item.unitCost, edit.unitCost) &&
       item.quantityOnHand === edit.quantityOnHand &&
       Eq.equals(item.reorderPoint, edit.reorderPoint) &&
-      item.stocking.kind === edit.stocking.kind &&
+      sameStocking(item.stocking, edit.stocking) &&
       Eq.equals(discontinuedOn(item.stocking), discontinuedOn(edit.stocking)) &&
       item.lotTracked === edit.lotTracked &&
       Eq.equals(item.firstReceivedOn, edit.firstReceivedOn)

@@ -1,6 +1,6 @@
-import * as P from "effect/Predicate"
 import * as Match from "effect/Match"
 import * as O from "effect/Option"
+import * as S from "effect/Schema"
 import { PencilIcon } from "lucide-react"
 import { useAtom, useAtomSet, useAtomValue } from "@effect/atom-react"
 import * as A from "effect/Array"
@@ -46,6 +46,7 @@ import {
   costDigits
 } from "@inventory/catalog-contract/Item"
 import type { ItemPage } from "@inventory/catalog-contract/ItemQuery"
+import { ItemChanged } from "@inventory/catalog-contract/Catalog"
 import { sayError } from "@inventory/client/SayError"
 import { catalogKeys } from "./Catalog.keys.ts"
 import { costOf, dimensionsText } from "./internal/itemText.ts"
@@ -77,9 +78,10 @@ const putItem = (page: ItemPage, item: StoredItem): ItemPage => ({
   data: A.map(page.data, (row) => (row.id === item.id ? item : row))
 })
 
+const isItemChanged = S.is(ItemChanged)
+
 /** `ItemChanged`: someone saved this item between the person opening it and saving it. */
-const changedMeanwhile = (error: unknown): StoredItem | undefined =>
-  P.isTagged(error, "ItemChanged") && P.hasProperty(error, "item") ? (error.item as StoredItem) : undefined
+const changedMeanwhile = (error: unknown): StoredItem | undefined => (isItemChanged(error) ? error.item : undefined)
 
 /** What only an import writes, shown and not changed here: the tags, the dimensions and every vendor. */
 function FromTheFile(props: { item: StoredItem }) {

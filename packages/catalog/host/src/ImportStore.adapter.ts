@@ -21,7 +21,7 @@ import { RowDecision, DecisionDelta } from "@inventory/catalog-contract/Decision
 import { ColumnMove, MappingChoice } from "@inventory/catalog-contract/Mapping"
 import { OrganizationId, MemberId } from "@inventory/kernel/Ids"
 import { ChangeSource, Confidence, changeToStored, changeFromStored } from "@inventory/catalog-contract/Change"
-import { ImportId, ConfirmId } from "@inventory/catalog-contract/Ids"
+import { ImportId, ConfirmId, ItemId } from "@inventory/catalog-contract/Ids"
 import { Instant, DisplayName } from "@inventory/kernel/Text"
 import {
   OutcomeKind,
@@ -114,8 +114,10 @@ const DecisionJson = S.fromJsonString(RowDecision)
 const ChoicesJson = MappingChoice.pipe(S.Array, S.fromJsonString)
 const MovesJson = ColumnMove.pipe(S.Array, S.fromJsonString)
 const TakenBackJson = MatchTakeBack.pipe(S.Array, S.fromJsonString)
-// The stored items a match's question to the review read, each at its revision, as one JSON parameter.
-const ItemsRead = S.Struct({ id: S.String, revision: S.Int }).pipe(S.Array, S.fromJsonString)
+// The stored items a question to the review read, each at its revision, as one JSON parameter.
+const ItemsRead = S.Struct({ id: ItemId, revision: S.Int }).pipe(S.Array, S.fromJsonString)
+// The import's created rows a question to the review read, by row and part, as one JSON parameter.
+const CreatedRead = S.Struct({ rowNumber: S.Int, part: S.Int }).pipe(S.Array, S.fromJsonString)
 const IdList = S.String.pipe(S.Array, S.fromJsonString).annotate({
   description: "Ids or keys bound as one JSON parameter and read with json_each"
 })
@@ -566,31 +568,71 @@ export const ImportStoreD1 = Layer.effect(
         AND d.rowId = json_extract(j.value, '$.rowId') AND d.decisionJson = json_extract(j.value, '$.json')))`
     const clears = (org: string, id: string, rowIds: string) => sql`EXISTS (SELECT 1 FROM importDecision
       WHERE organizationId = ${org} AND importId = ${id} AND rowId IN (SELECT value FROM json_each(${rowIds})))`
-    // The stored items a judgement of the decisions read (a match's, a save's, a confirm's), in pieces of 5,000 so no
-    // JSON value nears D1's limit: the keys it looked up and the items it found, each with its revision. Empty when the
-    // file's review was not asked.
-    const ItemsGuard = S.Struct({ keys: S.Array(IdList), items: S.Array(ItemsRead), found: S.Int })
+    // What a judgement of the decisions read (a match's, a save's, a confirm's), in pieces of 5,000 so no JSON value
+    // nears D1's limit: the keys it looked up and the items it found, each with its revision; the import's created rows;
+    // and its suggestions. `asked` 0 when the file's review was not asked: nothing was read, nothing is checked.
+    const ItemsGuard = S.Struct({
+      asked: S.Int,
+      keys: S.Array(IdList),
+      items: S.Array(ItemsRead),
+      found: S.Int,
+      created: S.Array(CreatedRead),
+      createdCount: S.Int,
+      suggestions: S.Array(IdList),
+      suggestionCount: S.Int
+    })
     const guardOf = (read: ItemsAsRead): typeof ItemsGuard.Type => ({
+      asked: read.asked ? 1 : 0,
       keys: A.chunksOf(read.keys, 5000),
       items: A.chunksOf(read.items, 5000),
-      found: read.items.length
+      found: read.items.length,
+      created: A.chunksOf(read.created, 5000),
+      createdCount: read.created.length,
+      suggestions: A.chunksOf(read.suggestions, 5000),
+      suggestionCount: read.suggestions.length
     })
-    // The organization's items under those keys are exactly the ones read, each still at the revision read: one edited,
-    // replaced, created or taken back since makes this false. A count and a check of each, so nothing is missed.
-    const itemsAsRead = (org: string, guard: typeof ItemsGuard.Encoded) =>
-      guard.keys.length === 0
-        ? sql`1=1`
-        : sql`(SELECT COUNT(*) FROM item WHERE organizationId = ${org} AND (${sql.or(
-            A.map(guard.keys, (keys) => sql`skuKey IN (SELECT value FROM json_each(${keys}))`)
-          )})) = ${guard.found}
-          AND ${sql.and(
-            A.map(
-              guard.items,
-              (items) => sql`NOT EXISTS (SELECT 1 FROM json_each(${items}) AS j WHERE NOT EXISTS (SELECT 1 FROM item i
-                WHERE i.organizationId = ${org} AND i.id = json_extract(j.value, '$.id')
-                  AND i.revision = json_extract(j.value, '$.revision')))`
-            )
-          )}`
+    // Every piece of a list read is still there: `there` says whether one value of the piece (`j.value`) is.
+    const eachThere = (pieces: ReadonlyArray<string>, there: Statement.Fragment): ReadonlyArray<Statement.Fragment> =>
+      A.map(pieces, (piece) => sql`NOT EXISTS (SELECT 1 FROM json_each(${piece}) AS j WHERE NOT ${there})`)
+    // What the judgement read of import `id` is still so: the organization's items under those keys exactly the ones
+    // read, each still at the revision read (one edited, replaced, created or taken back since makes this false); the
+    // import's created rows exactly those read (a take-back marks them); its suggestions exactly those read (a request
+    // for suggestions stores more, and storing one moves no revision). A count and a check of each, so nothing is
+    // missed.
+    const itemsAsRead = (org: string, id: string, guard: typeof ItemsGuard.Encoded) => {
+      if (guard.asked === 0) return sql`1=1`
+      const created = sql`(SELECT COUNT(*) FROM importOutcome WHERE organizationId = ${org} AND importId = ${id}
+        AND outcome = 'created') = ${guard.createdCount}`
+      const suggestions = sql`(SELECT COUNT(*) FROM importSuggestion WHERE organizationId = ${org}
+        AND importId = ${id}) = ${guard.suggestionCount}`
+      const items =
+        guard.keys.length === 0
+          ? sql`${guard.found} = 0`
+          : sql`(SELECT COUNT(*) FROM item WHERE organizationId = ${org} AND (${sql.or(
+              A.map(guard.keys, (keys) => sql`skuKey IN (SELECT value FROM json_each(${keys}))`)
+            )})) = ${guard.found}`
+      return sql.and([
+        items,
+        ...eachThere(
+          guard.items,
+          sql`EXISTS (SELECT 1 FROM item i WHERE i.organizationId = ${org} AND i.id = json_extract(j.value, '$.id')
+            AND i.revision = json_extract(j.value, '$.revision'))`
+        ),
+        created,
+        ...eachThere(
+          guard.created,
+          sql`EXISTS (SELECT 1 FROM importOutcome o WHERE o.organizationId = ${org} AND o.importId = ${id}
+            AND o.outcome = 'created' AND o.rowNumber = json_extract(j.value, '$.rowNumber')
+            AND o.part = json_extract(j.value, '$.part'))`
+        ),
+        suggestions,
+        ...eachThere(
+          guard.suggestions,
+          sql`EXISTS (SELECT 1 FROM importSuggestion s WHERE s.organizationId = ${org} AND s.importId = ${id}
+            AND s.id = j.value)`
+        )
+      ])
+    }
 
     // The draft is open, its column choices are still those the save's decisions were judged against, and the stored
     // items that judgement read are as read: a match or an item change since writes nothing of the save. Part of every
@@ -598,7 +640,7 @@ export const ImportStoreD1 = Layer.effect(
     const sameChoices = (org: string, id: string, choices: string, guard: typeof ItemsGuard.Encoded) =>
       sql`EXISTS (SELECT 1 FROM importDraft
       WHERE organizationId = ${org} AND id = ${id} AND status = 'open' AND choicesJson = ${choices})
-      AND ${itemsAsRead(org, guard)}`
+      AND ${itemsAsRead(org, id, guard)}`
     const DeltaRequest = S.Struct({
       org: OrganizationId,
       id: S.String,
@@ -618,7 +660,7 @@ export const ImportStoreD1 = Layer.effect(
         ]
         return sql`UPDATE importDraft SET revision = revision + 1
           WHERE organizationId = ${r.org} AND id = ${r.id} AND status = 'open' AND choicesJson = ${r.choices}
-            AND ${itemsAsRead(r.org, r)} AND (${sql.or(changes)})`
+            AND ${itemsAsRead(r.org, r.id, r)} AND (${sql.or(changes)})`
       }
     })
     const upsertDecisions = D1.statement({
@@ -660,7 +702,7 @@ export const ImportStoreD1 = Layer.effect(
       Result: S.Array(S.Struct({ revision: S.Int, choicesJson: S.String, itemsSame: S.Int })),
       execute: (
         r
-      ) => sql`SELECT revision, choicesJson, CASE WHEN ${itemsAsRead(r.org, r)} THEN 1 ELSE 0 END AS itemsSame
+      ) => sql`SELECT revision, choicesJson, CASE WHEN ${itemsAsRead(r.org, r.id, r)} THEN 1 ELSE 0 END AS itemsSame
         FROM importDraft WHERE organizationId = ${r.org} AND id = ${r.id} AND status = 'open'`
     })
 
@@ -882,7 +924,7 @@ export const ImportStoreD1 = Layer.effect(
         SELECT ${r.activity}, ${r.org}, ${r.actor}, ${r.name}, 'Matched a column', ${r.detail}, ${r.at}
         WHERE EXISTS (SELECT 1 FROM importDraft WHERE organizationId = ${r.org} AND id = ${r.id} AND status = 'open'
           AND revision = ${r.revision} AND choicesJson = ${r.before})
-          AND ${itemsAsRead(r.org, r)}`
+          AND ${itemsAsRead(r.org, r.id, r)}`
     })
     const thisMatch = (org: string, activity: string) =>
       sql`EXISTS (SELECT 1 FROM activity WHERE organizationId = ${org} AND id = ${activity})`
@@ -1020,7 +1062,7 @@ export const ImportStoreD1 = Layer.effect(
         SELECT ${r.batch}, ${r.org}, ${r.id}, ${r.actor}, ${r.name}, ${r.at}
         WHERE EXISTS (SELECT 1 FROM importDraft WHERE organizationId = ${r.org} AND id = ${r.id}
           AND status = 'open' AND revision = ${r.expected})
-          AND ${itemsAsRead(r.org, r)}
+          AND ${itemsAsRead(r.org, r.id, r)}
         RETURNING id`
     })
     const thisConfirm = (org: string, batchId: string) =>
@@ -1201,8 +1243,8 @@ export const ImportStoreD1 = Layer.effect(
       }
       const rows = write.plan.rows
       const written = plannedItems(write.plan)
-      const ready = A.filter(written, (row) => row.status === "ready")
-      const replacing = A.filter(written, (row) => row.status === "update")
+      const ready = A.filter(written, PlannedRow.guards.ready)
+      const replacing = A.filter(written, PlannedRow.guards.update)
       const entries = (list: ReadonlyArray<readonly [(typeof written)[number], string]>) =>
         A.map(
           bySize(list, ([row]) => textOf(row.item)),
@@ -1219,11 +1261,11 @@ export const ImportStoreD1 = Layer.effect(
       const replacements = entries(A.map(replacing, (row) => [row, ""] as const))
       // What the outcome rows store: the reason of a row that is not written, and who left it out.
       const reasonOf = (row: PlannedRow): string =>
-        row.status === "ready" || row.status === "update" ? "" : row.reason
+        PlannedRow.guards.already(row) || PlannedRow.guards.notImported(row) ? row.reason : ""
       const decidedBy = (row: PlannedRow): "person" | "nobody" | null =>
-        row.status === "notImported" ? row.decidedBy.kind : null
+        PlannedRow.guards.notImported(row) ? row.decidedBy.kind : null
       const decidedByName = (row: PlannedRow): string | null =>
-        row.status === "notImported" && row.decidedBy.kind === "person" ? row.decidedBy.name : null
+        PlannedRow.guards.notImported(row) && DecidedBy.guards.person(row.decidedBy) ? row.decidedBy.name : null
       const outcomes = A.map(
         bySize(rows, (row) => row.sku.length + row.name.length + reasonOf(row).length),
         (chunk) =>
@@ -1246,7 +1288,7 @@ export const ImportStoreD1 = Layer.effect(
             rowNumber: row.rowNumber,
             part: row.part,
             sku: row.sku,
-            update: row.status === "update"
+            update: PlannedRow.guards.update(row)
           }))
         ),
         (change) => change.from.length + change.to.length + (change.basis ?? "").length + change.sku.length

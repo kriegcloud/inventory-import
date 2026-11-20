@@ -61,7 +61,11 @@ import {
   wasRead,
   withPreferred
 } from "./CellReading.rules.ts"
-import { Suggestion, suggestionFits } from "@inventory/catalog-contract/Suggestion"
+import {
+  Suggestion,
+  suggestionField as suggestionFieldOf,
+  suggestionFits
+} from "@inventory/catalog-contract/Suggestion"
 import { matchColumns, shownText, totalRowNumbers } from "./Mapping.rules.ts"
 import {
   rowId,
@@ -69,7 +73,8 @@ import {
   decisionOf,
   SavedDecisions,
   isLeftOut,
-  hasKeep
+  hasKeep,
+  StoredChoice
 } from "@inventory/catalog-contract/Decision"
 
 /** Fields read from a cell's stored text, not from what Excel shows: a cost from the digits, a date cell as ISO. */
@@ -596,15 +601,15 @@ const proposeStored = (ctx: Context, row: FileRow, field: Field): O.Option<Propo
       ctx.suggestions,
       // A row's suggestion for this very cell: a column's is offered beside the review, not on a row.
       (s): s is Exclude<Suggestion, { readonly kind: "column" }> =>
-        s.kind !== "column" &&
-        s.kind === field &&
+        Suggestion.isAnyOf(["name", "category"])(s) &&
+        suggestionFieldOf(s) === field &&
         s.rowId === row.id &&
         s.from === row.file[field] &&
         suggestionFits({ kind: s.kind, to: s.to, file: row.file })
     ),
     (s): Proposal => ({
       field,
-      kind: s.kind === "name" ? "missing" : "category",
+      kind: Suggestion.guards.name(s) ? "missing" : "category",
       to: s.to,
       by: s.by.kind,
       suggestionId: s.id,
@@ -1285,8 +1290,9 @@ export const review = (input: {
     // reads it is skipped (it says what is stored) or asks (it says something else).
     const stored = O.isSome(storedItem) && item !== null ? differences(storedItem.value, item) : []
     const differs = stored.length > 0
-    const replace = differs && decision.stored.kind === "replace"
-    const already = mine || (O.isSome(storedItem) && item !== null && (!differs || decision.stored.kind === "keep"))
+    const replace = differs && StoredChoice.guards.replace(decision.stored)
+    const already =
+      mine || (O.isSome(storedItem) && item !== null && (!differs || StoredChoice.guards.keep(decision.stored)))
     return {
       row,
       decision,
@@ -1300,7 +1306,7 @@ export const review = (input: {
       replace,
       already,
       mine,
-      keptStored: differs && decision.stored.kind === "keep",
+      keptStored: differs && StoredChoice.guards.keep(decision.stored),
       out: isLeftOut(decision)
     }
   })
@@ -1321,7 +1327,7 @@ export const review = (input: {
       hasKeep(entry.decision) && !A.some(live, (other) => hasKeep(other.decision) && other.row.order < entry.row.order)
     const sku = Str.trim(entry.values.sku)
     const changed: Problem | null =
-      entry.differs && entry.decision.stored.kind === "undecided"
+      entry.differs && StoredChoice.guards.undecided(entry.decision.stored)
         ? {
             kind: "changed",
             tone: "decision",
@@ -1415,7 +1421,7 @@ export const review = (input: {
   })
   const byRule = A.map(
     A.filter(rows, (row) => row.status === "ready" || row.status === "needs"),
-    (row) => A.filter(row.changes, (change) => change.how === "appliedByRule").length
+    (row) => A.filter(row.changes, Change.guards.appliedByRule).length
   )
 
   return {

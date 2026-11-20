@@ -7,7 +7,7 @@ import { appLayer, appRuntime } from "@/lib/api"
 import { modelSentences } from "@inventory/catalog-web/AnsweredByWords"
 import { startTelemetry } from "@/lib/telemetry"
 import { provideApi } from "@inventory/client/Api"
-import { provideMember } from "@inventory/client/MemberAtoms"
+import { provideMember, provideWhoIsSignedInAsked } from "@inventory/client/MemberAtoms"
 import { actor, session } from "@inventory/access-web/Session"
 import * as Atom from "effect/reactivity/Atom"
 import { installTroubleSentences } from "@inventory/client/SayError"
@@ -34,9 +34,12 @@ const signedIn = Atom.readable(
   (refresh) => refresh(session)
 )
 
+// Whether that session is being asked (again): a write waits for its answer, and goes only for the member it names.
+const signedInAsked = Atom.map(session, (result) => result.waiting)
+
 // What the atoms of every web package read the API through (the app's one runtime), and who they read it for: given
 // to the registry once.
-const initialAtoms = [provideApi(appLayer), provideMember(signedIn)]
+const initialAtoms = [provideApi(appLayer), provideMember(signedIn), provideWhoIsSignedInAsked(signedInAsked)]
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

@@ -10,6 +10,7 @@ import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as Str from "effect/String"
 import * as Atom from "effect/reactivity/Atom"
+import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import * as HttpApiError from "effect/http-api/HttpApiError"
 import { vi } from "vitest"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
@@ -34,7 +35,8 @@ import {
   reviewLocal,
   rowsLeftOver,
   rowsNotSaved,
-  rowsOnHold
+  rowsOnHold,
+  shownDecisions
 } from "../src/ReviewDraft.atoms.ts"
 import { importNo, registryFor, viewAt } from "./support/catalog.ts"
 
@@ -142,18 +144,24 @@ const keyOf = (id: ImportId, memberId: string, organizationId = "org_prairie") =
 /**
  * One page of the app, on the shared storage: the server answers each save only when the test says, and refuses it as
  * nobody signed in while `server.signedOut`; a read of the import never answers, unless the import was removed. Asking
- * who is signed in again is counted (`asked`); the test says who is.
+ * who is signed in again is counted (`asked`); the test says who is. With `server.askHangs`, the question stays out
+ * (`asking` true) until the test answers it.
  */
 const page = (
   id: ImportId,
   signedIn = dana,
-  server: { signedOut: boolean; removed: boolean; view?: ImportView } = { signedOut: false, removed: false }
+  server: { signedOut: boolean; removed: boolean; view?: ImportView; askHangs?: boolean } = {
+    signedOut: false,
+    removed: false
+  }
 ) => {
   const saves: Array<{ readonly payload: SaveRequest; readonly answer: Deferred.Deferred<unknown, SaveFailure> }> = []
   // The confirms sent; the server never answers one.
   const commits: Array<SaveRequest & { readonly revision: number }> = []
   const who = Atom.make(signedIn)
+  const asking = Atom.make(false).pipe(Atom.keepAlive)
   const asked = { times: 0 }
+  const held: { registry: AtomRegistry.AtomRegistry | undefined } = { registry: undefined }
   const registry = registryFor({
     endpoints: {
       imports: {
@@ -183,14 +191,18 @@ const page = (
       (get) => get(who),
       () => {
         asked.times += 1
+        if (server.askHangs === true) held.registry?.set(asking, true)
       }
-    )
+    ),
+    asked: asking
   })
+  held.registry = registry
   return {
     registry,
     saves,
     commits,
     who,
+    asking,
     asked,
     /** The Review step is drawn over this view. */
     open: (view: ImportView) => {
@@ -531,14 +543,25 @@ describe("the third check of round one, through the runner", () => {
         yield* settle
         yield* Deferred.fail(t.saves[0]!.answer, HttpApiError.InternalServerErrorProblem.make({}))
         yield* settle
-        // Marcus signs in on this page, and presses the confirm.
+        // Marcus signs in on this page, and presses the confirm on a screen that still shows Dana's row 2 left out.
         t.registry.set(t.who, marcus)
         yield* settle
+        browser.said.length = 0
+        t.registry.set(draftEvents(id), DraftEvent.ConfirmPressed())
+        yield* settle
+        // The button said what that screen showed: nothing is confirmed, row 2 is not imported unseen. The screen is
+        // drawn again for Marcus (row 2 as the server holds it), and says why.
+        expect([t.commits, t.registry.get(shownDecisions(id)), browser.said]).toEqual([
+          [],
+          O.some({}),
+          ["Nothing was imported"]
+        ])
+        // Dana's row stays kept for her.
+        expect(R.has(browser.kept, keyOf(id, "mem_dana"))).toBe(true)
+        // Marcus presses again, on what he now sees: that is confirmed.
         t.registry.set(draftEvents(id), DraftEvent.ConfirmPressed())
         yield* settle
         expect(A.map(t.commits, (commit) => [commit.revision, R.keys(commit.set)])).toEqual([[4, []]])
-        // Dana's row stays kept for her.
-        expect(R.has(browser.kept, keyOf(id, "mem_dana"))).toBe(true)
       })
   )
 
@@ -648,5 +671,158 @@ describe("the third check of round one, through the runner", () => {
       yield* settle
       expect(R.has(browser.kept, key)).toBe(false)
     })
+  )
+
+  it.live(
+    "a new owner's rows are kept under their key from the first one, and their own entry this page had not read is taken in, never erased (keysread-new-owner)",
+    () =>
+      Effect.gen(function* () {
+        emptyStorage()
+        const id = importNo(78)
+        const server: { signedOut: boolean; removed: boolean; view?: ImportView } = {
+          signedOut: false,
+          removed: false,
+          view: viewAt({ id, revision: 4 })
+        }
+        // Marcus left row 5 out on this tab earlier; its save failed, and it is kept for him.
+        const before = page(id, marcus, server)
+        before.open(viewAt({ id, revision: 4 }))
+        yield* settle
+        before.decide("row-5")
+        yield* settle
+        yield* Deferred.fail(before.saves[0]!.answer, HttpApiError.InternalServerErrorProblem.make({}))
+        yield* settle
+        // The page is loaded again: Dana opens the Review step, with nothing of hers pending.
+        const t = page(id, dana, server)
+        t.open(viewAt({ id, revision: 4 }))
+        yield* settle
+        // Marcus signs in on the page and leaves row 3 out; its save fails.
+        t.registry.set(t.who, marcus)
+        yield* settle
+        t.decide("row-3")
+        yield* settle
+        const rowsKept = () => Str.includes('"row-3"')(browser.kept[keyOf(id, "mem_marcus")] ?? "")
+        const fiveKept = () => Str.includes('"row-5"')(browser.kept[keyOf(id, "mem_marcus")] ?? "")
+        expect([rowsKept(), fiveKept()]).toEqual([true, true])
+        for (const save of t.saves) yield* Deferred.fail(save.answer, HttpApiError.InternalServerErrorProblem.make({}))
+        yield* settle
+        expect([rowsKept(), fiveKept()]).toEqual([true, true])
+        // A reload, as Marcus: both rows come back, and are sent once the import's picture has checked them.
+        const again = page(id, marcus, server)
+        again.open(viewAt({ id, revision: 4 }))
+        yield* settle
+        expect(A.map(again.saves, (save) => A.sort(R.keys(save.payload.set), Str.Order))).toEqual([["row-3", "row-5"]])
+      })
+  )
+
+  it.live(
+    "a confirm that waited on a save goes as the member who pressed it or not at all, when someone else signed in meanwhile (confirm-owner-gate)",
+    () =>
+      Effect.gen(function* () {
+        emptyStorage()
+        browser.said.length = 0
+        const id = importNo(79)
+        const t = page(id, dana, { signedOut: false, removed: false, view: viewAt({ id, revision: 4 }) })
+        t.open(viewAt({ id, revision: 4 }))
+        yield* settle
+        // Dana leaves row 2 out, and presses the confirm while its save is out: the confirm waits.
+        t.decide("row-2")
+        yield* settle
+        t.registry.set(draftEvents(id), DraftEvent.ConfirmPressed())
+        yield* settle
+        // Marcus signs in on this page; then Dana's save answers, and the confirm that waited for it is due.
+        t.registry.set(t.who, marcus)
+        yield* settle
+        yield* t.answer(0, 5)
+        yield* settle
+        expect([t.commits, A.contains(browser.said, "Not imported: someone else is signed in")]).toEqual([[], true])
+      })
+  )
+
+  it.live(
+    "while who is signed in is asked again after a save refused for nobody signed in, nothing of the draft is sent: the answer decides (send-on-stale-member)",
+    () =>
+      Effect.gen(function* () {
+        emptyStorage()
+        const id = importNo(80)
+        const server: { signedOut: boolean; removed: boolean; view?: ImportView; askHangs?: boolean } = {
+          signedOut: true,
+          removed: false,
+          view: viewAt({ id, revision: 4 }),
+          askHangs: true
+        }
+        const t = page(id, dana, server)
+        t.open(viewAt({ id, revision: 4 }))
+        yield* settle
+        t.decide("row-2")
+        yield* settle
+        // Refused for nobody signed in: who is signed in is asked again, and has not answered.
+        expect([A.length(t.saves), t.asked.times, t.registry.get(t.asking)]).toEqual([1, 1, true])
+        // The cookie is Marcus's now; the page still says Dana. She presses Save again: the picture is read, the row
+        // is checked, and the save waits for the answer.
+        server.signedOut = false
+        t.registry.set(draftEvents(id), DraftEvent.SaveAgain())
+        yield* settle
+        expect(A.length(t.saves)).toBe(1)
+        // The answer: Marcus. Nothing of Dana's goes as him; her row stays kept for her.
+        t.registry.set(t.who, marcus)
+        t.registry.set(t.asking, false)
+        yield* settle
+        expect([A.length(t.saves), R.has(browser.kept, keyOf(id, "mem_dana"))]).toEqual([1, true])
+      })
+  )
+
+  it.live("a save held while who is signed in is asked again goes once the answer is its member", () =>
+    Effect.gen(function* () {
+      emptyStorage()
+      const id = importNo(81)
+      const server: { signedOut: boolean; removed: boolean; view?: ImportView; askHangs?: boolean } = {
+        signedOut: true,
+        removed: false,
+        view: viewAt({ id, revision: 4 }),
+        askHangs: true
+      }
+      const t = page(id, dana, server)
+      t.open(viewAt({ id, revision: 4 }))
+      yield* settle
+      t.decide("row-2")
+      yield* settle
+      server.signedOut = false
+      t.registry.set(draftEvents(id), DraftEvent.SaveAgain())
+      yield* settle
+      expect(A.length(t.saves)).toBe(1)
+      // The answer: Dana is still signed in. The held save goes.
+      t.registry.set(t.asking, false)
+      yield* settle
+      expect(A.map(t.saves, (save) => R.keys(save.payload.set))).toEqual([["row-2"], ["row-2"]])
+    })
+  )
+
+  it.live(
+    "a confirm pressed while who is signed in is asked again waits for the answer, and is not made as someone else",
+    () =>
+      Effect.gen(function* () {
+        emptyStorage()
+        const id = importNo(82)
+        const server: { signedOut: boolean; removed: boolean; view?: ImportView; askHangs?: boolean } = {
+          signedOut: true,
+          removed: false,
+          view: viewAt({ id, revision: 4 }),
+          askHangs: true
+        }
+        const t = page(id, dana, server)
+        t.open(viewAt({ id, revision: 4 }))
+        yield* settle
+        t.decide("row-2")
+        yield* settle
+        server.signedOut = false
+        t.registry.set(draftEvents(id), DraftEvent.ConfirmPressed())
+        yield* settle
+        expect(t.commits).toEqual([])
+        t.registry.set(t.who, marcus)
+        t.registry.set(t.asking, false)
+        yield* settle
+        expect([t.commits, R.has(browser.kept, keyOf(id, "mem_dana"))]).toEqual([[], true])
+      })
   )
 })

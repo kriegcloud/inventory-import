@@ -2,6 +2,7 @@
 // and prints its sentence.
 // Each table is keyed by the union's own tags, so a new member without a row here does not compile.
 import { describe, expect, it } from "@effect/vitest"
+import * as O from "effect/Option"
 import * as P from "effect/Predicate"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
@@ -30,7 +31,7 @@ type Rows<F extends { readonly _tag: string }> = {
 
 const members = <F extends { readonly _tag: string }>(
   name: string,
-  schema: S.Codec<F, unknown>,
+  schema: S.Codec<F, unknown> & { readonly guards: Readonly<Record<string, (input: unknown) => boolean>> },
   sentence: (finding: F) => Line | string,
   rows: Rows<F>
 ) =>
@@ -38,7 +39,8 @@ const members = <F extends { readonly _tag: string }>(
     for (const [tag, row] of R.toEntries<string, readonly [F, string]>(rows)) {
       it(tag, () => {
         const [finding, printed] = row
-        expect(P.isTagged(finding, tag)).toBe(true)
+        // The row's key is the member's own case, told by the union's guard for it.
+        expect(O.exists(R.get(schema.guards, tag), (is) => is(finding))).toBe(true)
         expect(S.is(schema)(finding)).toBe(true)
         const said = sentence(finding)
         expect(P.isString(said) ? said : `${said.to}: ${said.text}`).toBe(printed)

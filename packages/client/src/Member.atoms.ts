@@ -27,10 +27,31 @@ export const member: Atom.Atom<O.Option<Member>> = Atom.readable((get) => get(ge
 /**
  * Asks who is signed in again, as the member's source asks it (the app's asks the session): a write the server refused
  * because nobody is signed in means the page's idea of who is signed in is out of date, and the tab then shows the
- * sign-in page, or the member signed in now.
+ * sign-in page, or the member signed in now. Until the answer comes, `whoIsSignedInAsked` is true.
  */
 export const askWhoIsSignedIn = (registry: AtomRegistry.AtomRegistry): void =>
   registry.refresh(registry.get(memberSource))
+
+const neverAsked: Atom.Atom<boolean> = Atom.make(false)
+
+/**
+ * Where the page reads whether who is signed in is being asked (again). The app gives it its session's own word at the
+ * root (`provideWhoIsSignedInAsked`); until then, and in a test that gives none, it is never being asked.
+ */
+export const whoIsSignedInAskedSource: Atom.Atom<Atom.Atom<boolean>> = Atom.make<Atom.Atom<boolean>>(neverAsked).pipe(
+  Atom.keepAlive
+)
+
+/** The atom's initial value, for `RegistryProvider`'s `initialValues`: whether it is being asked is read from `from`. */
+export const provideWhoIsSignedInAsked = (from: Atom.Atom<boolean>): readonly [Atom.Atom<unknown>, unknown] =>
+  Atom.initialValue(whoIsSignedInAskedSource, from)
+
+/**
+ * True while who is signed in is being asked (again) and has not answered: `member` then says what the page last
+ * knew, which may not be who the session's cookie is now. A write made for one member waits for the answer, and goes
+ * only if that member is the one it names.
+ */
+export const whoIsSignedInAsked: Atom.Atom<boolean> = Atom.readable((get) => get(get(whoIsSignedInAskedSource)))
 
 /**
  * Who the API is being asked for, as one string ("member/organization", empty when nobody is known): a read is kept per

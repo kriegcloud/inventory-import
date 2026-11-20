@@ -15,7 +15,6 @@ import * as ByteSize from "effect/ByteSize"
 import * as Channel from "effect/Channel"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
-import * as P from "effect/Predicate"
 import * as R from "effect/Record"
 import * as Result from "effect/Result"
 import * as S from "effect/Schema"
@@ -287,6 +286,9 @@ type Pending =
 
 type Emitted = A.NonEmptyReadonlyArray<CsvRecordSlice> | CsvParseError
 
+/** True for the reader's failure among what it emits, told by its own class. */
+const isParseError = S.is(CsvParseError)
+
 const slicesOf = (step: Step): ReadonlyArray<Emitted> => {
   const fatals = fatalsOf(step.diagnostics)
   const slices = A.map(step.records, (record) =>
@@ -328,9 +330,7 @@ const haltText = (pending: Pending, options: ReadOptions): ReadonlyArray<Emitted
 }
 
 const failOnError = (emitted: Emitted): Effect.Effect<A.NonEmptyReadonlyArray<CsvRecordSlice>, CsvParseError> =>
-  P.isTagged(emitted, "CsvParseError")
-    ? Effect.fail(emitted as CsvParseError)
-    : Effect.succeed(emitted as A.NonEmptyReadonlyArray<CsvRecordSlice>)
+  isParseError(emitted) ? Effect.fail(emitted) : Effect.succeed(emitted)
 
 const decodeStringChannel = <IE, Done>(
   options: ReadOptions
@@ -496,11 +496,7 @@ const bytesToText = <IE, Done>(
         ),
       { onHalt: (pending) => [...haltBytes(pending, options)] }
     ),
-    Channel.mapEffect((text) =>
-      P.isTagged(text, "CsvParseError")
-        ? Effect.fail(text as CsvParseError)
-        : Effect.succeed(A.of(text as string) as A.NonEmptyReadonlyArray<string>)
-    )
+    Channel.mapEffect((text) => (isParseError(text) ? Effect.fail(text) : Effect.succeed(A.of(text))))
   )
 
 const encodeStringChannel = <IE, Done>(

@@ -5,7 +5,7 @@ import * as Str from "effect/String"
 import * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import { provideApi } from "@inventory/client/Api"
 import { makeApi } from "@inventory/client/ApiRuntime"
-import { provideMember } from "@inventory/client/MemberAtoms"
+import { provideMember, provideWhoIsSignedInAsked } from "@inventory/client/MemberAtoms"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import type { ImportView } from "@inventory/catalog-contract/Import"
 import * as Effect from "effect/Effect"
@@ -26,6 +26,8 @@ export const registryFor = (input: {
   readonly endpoints: object
   readonly idleTTL?: number
   readonly signedIn?: Parameters<typeof provideMember>[0]
+  /** True while who is signed in is being asked again, as the app reads it from its session. */
+  readonly asked?: Parameters<typeof provideWhoIsSignedInAsked>[0]
   /** Writes go through the app's own `callWrite`: a failure that may pass is sent again, as it is in the app. */
   readonly writesRetried?: boolean
 }): AtomRegistry.AtomRegistry => {
@@ -40,7 +42,8 @@ export const registryFor = (input: {
   return AtomRegistry.make({
     initialValues: [
       provideApi(Layer.succeed(CatalogClient, client)),
-      ...(input.signedIn === undefined ? [] : [provideMember(input.signedIn)])
+      ...(input.signedIn === undefined ? [] : [provideMember(input.signedIn)]),
+      ...(input.asked === undefined ? [] : [provideWhoIsSignedInAsked(input.asked)])
     ],
     ...(input.idleTTL === undefined ? {} : { defaultIdleTTL: input.idleTTL })
   })

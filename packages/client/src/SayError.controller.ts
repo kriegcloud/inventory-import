@@ -8,6 +8,7 @@ import * as O from "effect/Option"
 import * as P from "effect/Predicate"
 import * as S from "effect/Schema"
 import * as HttpClientError from "effect/http/HttpClientError"
+import * as HttpApiError from "effect/http-api/HttpApiError"
 import { Forbidden, NotSignedIn } from "@inventory/kernel/AccessError"
 import { toast } from "sonner"
 
@@ -32,6 +33,20 @@ export const installTroubleSentences = (sentences: Readonly<Record<string, strin
 const troubleSentence = (kind: string): string =>
   (Object.hasOwn(troubles, kind) ? troubles[kind] : troubles["down"]) ??
   "The model is not answering right now. Try again later."
+
+// The failures of other packages said here by their shape: this package holds no contract, so each is its schema's
+// shape, checked whole (its tag and every field read from it), never a tag looked at alone. The API's own problem
+// documents are Effect's classes, checked by class.
+const ModelTrouble = S.TaggedStruct("AiUnavailable", { kind: S.String })
+const DraftBusy = S.TaggedStruct("DraftBusy", {})
+const FileProblem = S.TaggedStruct("FileProblem", { problem: S.String, todo: S.String })
+const ReadFailed = S.TaggedStruct("ReadFailed", { message: S.String })
+const FileNotKept = S.TaggedStruct("FileNotKept", {})
+const isBadRequest = S.is(HttpApiError.BadRequestProblem)
+const isServerProblem = S.is(HttpApiError.InternalServerErrorProblem)
+const isFileProblem = S.is(FileProblem)
+const isReadFailed = S.is(ReadFailed)
+const isFileNotKept = S.is(FileNotKept)
 
 const reasonOf = (error: unknown): string | undefined =>
   P.hasProperty(error, "reason") && P.isString(error.reason) && error.reason.trim() !== "" ? error.reason : undefined
@@ -101,11 +116,8 @@ export const sayError = (
     ),
     // Said by its kind, from the sentences the app installed (the contract's `modelSentences`), never by the error's
     // own text: a provider's words never reach the screen.
-    Match.when(P.isTagged("AiUnavailable"), () => {
-      const kind = P.hasProperty(error, "kind") && P.isString(error.kind) ? error.kind : "down"
-      return said("The model did not answer", troubleSentence(kind))
-    }),
-    Match.when(P.isTagged("BadRequestProblem"), () => {
+    Match.when(S.is(ModelTrouble), (trouble) => said("The model did not answer", troubleSentence(trouble.kind))),
+    Match.when(isBadRequest, () => {
       const problems = requestProblems(error, options.fields ?? {})
       return said(
         "This was not accepted",
@@ -119,10 +131,10 @@ export const sayError = (
     }),
     // The import kept changing while a save, a confirm or a match was worked out (others saving or matching at the
     // same moment): nothing was written, and its reason says to try again.
-    Match.when(P.isTagged("DraftBusy"), () =>
+    Match.when(S.is(DraftBusy), () =>
       said("The import kept changing", reasonOf(error) ?? "Nothing was written. Try again in a moment.")
     ),
-    Match.when(P.isTagged("InternalServerErrorProblem"), () =>
+    Match.when(isServerProblem, () =>
       said(
         "Something went wrong on our side",
         "Nothing was changed. Try again; if it keeps happening, reload the page."
@@ -149,15 +161,10 @@ export const sayError = (
     return said("The server's answer could not be read", "Reload the page and try again.")
   }
   // A file's own problem (`FileProblem`, read by its tag) is written for the person: what is wrong, then what to do.
-  if (P.isTagged(error, "FileProblem") && P.hasProperty(error, "problem") && P.hasProperty(error, "todo")) {
-    if (P.isString(error.problem) && P.isString(error.todo))
-      return said("The file was not read", `${error.problem} ${error.todo}`)
-  }
+  if (isFileProblem(error)) return said("The file was not read", `${error.problem} ${error.todo}`)
   // The reader itself failed: its sentence says what to do.
-  if (P.isTagged(error, "ReadFailed") && P.hasProperty(error, "message") && P.isString(error.message)) {
-    return said("The file was not read", error.message)
-  }
-  if (P.isTagged(error, "FileNotKept")) {
+  if (isReadFailed(error)) return said("The file was not read", error.message)
+  if (isFileNotKept(error)) {
     return said(
       "This browser would not keep your progress",
       "Your work on this page is fine, but a refresh would lose it. Finish here, or allow this site to store data."
@@ -194,7 +201,7 @@ const unreachable = (error: HttpClientError.HttpClientError): boolean =>
  */
 export const isTransient = (error: unknown): boolean => {
   // The server's own 500, as the API's problem document: the request was fine, so another try may pass.
-  if (P.isTagged(error, "InternalServerErrorProblem")) return true
+  if (isServerProblem(error)) return true
   if (!HttpClientError.isHttpClientError(error)) return false
   if (unreachable(error)) return true
   const status = statusOf(error)

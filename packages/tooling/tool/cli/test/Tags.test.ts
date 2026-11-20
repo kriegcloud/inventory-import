@@ -25,7 +25,7 @@ import { Upload } from "./machine"
 export const line = (state: Upload, held: O.Option<string>, error: unknown) => {
   if (Upload.guards.Saving(state)) return "Saving"
   if (O.isSome(held)) return held.value
-  if (P.isTagged(error, "Failed")) return "Failed"
+  if (Upload.guards.Idle(error)) return "Failed"
   if (typeof error === "object" && error !== null && "_tag" in error) return "Tagged"
   return Upload.match(state, { Idle: () => "", Saving: () => "Saving" })
 }
@@ -134,17 +134,66 @@ export const yes: Answer = { _tag: "Yes" }
 export const no = (why: string): Answer => ({ _tag: "No", why })
 `
 
-// Tags joined into words are a sentence: handed on it passes, compared or expected it tells a case. The forms the
-// third review found passing once a call named join was let through whole.
+// Tags joined are the tag itself: with no words between them a joined tag is the tag, and the join is refused where
+// it is made (its list is handed to it, or its method is called on a list that holds a tag). The forms round one let
+// through once a call named join was let through whole: a joined tag switched over (directly or through a name), handed
+// to a call, read as a key, a method called on it, and joined tags handed on as a message.
 const joined = `import * as A from "effect/Array"
+import * as Equal from "effect/Equal"
 import type { Upload } from "./machine"
-export const line = (x: Upload, xs: ReadonlyArray<Upload>) => {
+export const line = (x: Upload, xs: ReadonlyArray<Upload>, table: Record<string, number>, toast: (words: string) => void) => {
   if (A.join([x._tag], "") === "Idle") return "Idle"
   expect(A.join([x._tag], "")).toBe("Idle")
   expect(A.join(A.map(xs, (e) => e._tag), ",")).toBe("A,B")
   if ([x._tag].join("") === "Idle") return "Idle"
   expect(${tick}tag \${x._tag}${tick}).toBe("tag Idle")
+  ${keyword} (A.join([x._tag], "")) { case "Idle": return "Idle" }
+  const s = A.join([x._tag], "")
+  ${keyword} (s) { default: break }
+  if (A.contains(["Idle"], A.join([x._tag], ""))) return "Idle"
+  if (Equal.equals([x._tag].join(""), "Idle")) return "Idle"
+  if (table[[x._tag].join("")] === 1) return "One"
+  if ([x._tag].join("").startsWith("Id")) return "Id"
+  toast(A.join(A.map(xs, (e) => e._tag), ", "))
+  toast([x._tag].join(""))
   return ""
+}
+`
+
+// A value that holds a tag is the tag in every check: a record or a list of one handed to an expectation or a call,
+// a list spread into a call, a tag taken out again by an assignment that takes a list or a record apart, a loop over
+// tags, a list a spread put tags in, a record holding one switched over by its place, and a method of a list of one.
+const held = `import * as A from "effect/Array"
+import type { Upload } from "./machine"
+export const line = (x: Upload, xs: ReadonlyArray<Upload>, see: (...values: ReadonlyArray<unknown>) => void) => {
+  expect({ k: x._tag }).toEqual({ k: "Idle" })
+  let t = ""
+  ;[t] = [x._tag]
+  if (t === "Idle") return "Idle"
+  let k = ""
+  ;({ k } = { k: x._tag })
+  if (k === "Idle") return "Idle"
+  for (const each of A.map(xs, (e) => e._tag)) {
+    if (each === "Idle") return "Idle"
+  }
+  const all = [...A.map(xs, (e) => e._tag)]
+  if (all[0] === "Idle") return "Idle"
+  see(...A.map(xs, (e) => e._tag))
+  const o = { k: x._tag, n: 1 }
+  ${keyword} (o.k) { default: break }
+  see(o)
+  if ([x._tag].includes("Idle")) return "Idle"
+  return o.n
+}
+`
+
+// \`P.isTagged\` takes any value, so its tag is a string nothing checks: refused as written, curried, and taken by name.
+const isTagged = `import * as P from "effect/Predicate"
+const { isTagged: tagged } = P
+export const line = (error: unknown) => {
+  if (P.isTagged(error, "Failed")) return "Failed"
+  if (P.isTagged("Faild")(error)) return "Failed"
+  return P["isTagged"](error, "Failed") || tagged(error, "Failed")
 }
 `
 
@@ -179,18 +228,18 @@ function second(e: Upload) { return e._tag }
 `
 
 // The same shapes with nothing of a tag in what is compared: a plain value assigned, listed, put in a record or handed
-// back; tags joined into a message handed on; a sentence handed to an expectation as its message.
+// back; plain words joined; a sentence handed to an expectation as its message.
 const steadyShapes = `import * as A from "effect/Array"
 import type { Upload } from "./machine"
 export const count = (x: Upload) => size(x)
 export const line = (x: Upload, xs: ReadonlyArray<Upload>, toast: (words: string) => void) => {
   let n = 0
   n = 1
-  if (n === 1) toast(A.join(A.map(xs, (e) => e._tag), ", "))
+  if (n === 1) toast("one")
   const [first] = [1, x._tag]
   const o = { k: x._tag, n: 1 }
   const k = { of: (e: Upload) => e, size }
-  toast([x._tag].join(""))
+  toast(A.join(["a", "b"], ""))
   toast(${tick}while \${x._tag}${tick})
   expect(o.n === 1, ${tick}while \${x._tag}${tick}).toBe(true)
   return first === 1 && o.n === 1 && k.of(x) === x && k.size(x) === 1 && count(x) === 1
@@ -288,7 +337,7 @@ describe("laws tags", () => {
     })
   )
 
-  it.effect("refuses tags joined into words and then compared or expected", () =>
+  it.effect("refuses tags joined, the join itself and every use of it", () =>
     Effect.gen(function* () {
       const report = yield* inTree(
         { "packages/catalog/web/src/Step.ts": joined, "packages/catalog/web/test/Step.test.ts": joined },
@@ -296,15 +345,70 @@ describe("laws tags", () => {
       )
       expect(report.failed).toBe(true)
       const places = (file: string) => [
-        `err: ${file}:4  _tag ===`,
+        `err: ${file}:5  _tag ===`,
         `err: ${file}:5  a _tag handed to a call`,
         `err: ${file}:6  a _tag handed to a call`,
-        `err: ${file}:7  _tag ===`,
-        `err: ${file}:8  a _tag handed to a call`
+        `err: ${file}:6  a _tag handed to a call`,
+        `err: ${file}:7  a _tag handed to a call`,
+        `err: ${file}:7  a _tag handed to a call`,
+        `err: ${file}:8  _tag ===`,
+        `err: ${file}:8  a method called on a _tag`,
+        `err: ${file}:9  a _tag handed to a call`,
+        `err: ${file}:10  switch over a _tag`,
+        `err: ${file}:10  a _tag handed to a call`,
+        `err: ${file}:11  a _tag handed to a call`,
+        `err: ${file}:12  switch over a _tag`,
+        `err: ${file}:13  a _tag handed to a call`,
+        `err: ${file}:13  a _tag handed to a call`,
+        `err: ${file}:14  a _tag handed to a call`,
+        `err: ${file}:14  a method called on a _tag`,
+        `err: ${file}:15  a record read by a _tag`,
+        `err: ${file}:15  a method called on a _tag`,
+        `err: ${file}:16  a method called on a _tag`,
+        `err: ${file}:16  a method called on a _tag`,
+        `err: ${file}:17  a _tag handed to a call`,
+        `err: ${file}:17  a _tag handed to a call`,
+        `err: ${file}:18  a _tag handed to a call`,
+        `err: ${file}:18  a method called on a _tag`
       ]
       expect(printed(report).slice(1)).toEqual([
         ...places("packages/catalog/web/src/Step.ts"),
         ...places("packages/catalog/web/test/Step.test.ts")
+      ])
+    })
+  )
+
+  it.effect("refuses a value that holds a tag in every check: a record, a list, a spread, a loop, a reassignment", () =>
+    Effect.gen(function* () {
+      const file = "packages/catalog/web/src/Step.ts"
+      const report = yield* inTree({ [file]: held }, inRepository)
+      expect(report.failed).toBe(true)
+      expect(printed(report).slice(1)).toEqual([
+        `err: ${file}:4  a _tag handed to a call`,
+        `err: ${file}:7  _tag ===`,
+        `err: ${file}:10  _tag ===`,
+        `err: ${file}:12  _tag ===`,
+        `err: ${file}:15  _tag ===`,
+        `err: ${file}:16  a _tag handed to a call`,
+        `err: ${file}:18  switch over a _tag`,
+        `err: ${file}:19  a _tag handed to a call`,
+        `err: ${file}:20  a method called on a _tag`
+      ])
+    })
+  )
+
+  it.effect("refuses P.isTagged with a tag as a string, curried, by its key and by another name", () =>
+    Effect.gen(function* () {
+      const file = "packages/foundation/modeling/xlsx/src/internal/sheet.ts"
+      const report = yield* inTree({ [file]: isTagged }, inRepository)
+      expect(report.failed).toBe(true)
+      const said =
+        "P.isTagged with a tag as a string: it takes any value, so a misspelled tag compiles. Use the type's guards, match or Match.valueTags"
+      expect(printed(report).slice(1)).toEqual([
+        `err: ${file}:4  ${said}`,
+        `err: ${file}:5  ${said}`,
+        `err: ${file}:6  ${said}`,
+        `err: ${file}:6  ${said}`
       ])
     })
   )

@@ -10,7 +10,7 @@ import * as O from "effect/Option"
 import * as Order from "effect/Order"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
-import { RowId } from "@inventory/catalog-contract/Ids"
+import { ItemId, RowId, SuggestionId } from "@inventory/catalog-contract/Ids"
 import { type MatchTakeBack, takenBackRowsNamed } from "@inventory/catalog-contract/Import"
 import { type Field, fields, type StagedHead, type StagedTable } from "@inventory/catalog-contract/Staged"
 import { type ColumnMove, type MappingChoice, matchedColumn } from "@inventory/catalog-contract/Mapping"
@@ -22,6 +22,7 @@ import {
   RowDecision,
   type SavedDecisions,
   type StaleAccept,
+  StoredChoice,
   storedUndecided,
   type TakenBackKind
 } from "@inventory/catalog-contract/Decision"
@@ -150,12 +151,11 @@ const judgeRow = (input: {
 }): { readonly decision: RowDecision; readonly taken: ReadonlyArray<StaleAccept> } => {
   const { rowId, decision, stale } = input
   const skuMoved = stale("sku")
-  const storedBy: O.Option<Field> =
-    decision.stored.kind === "undecided"
-      ? O.none()
-      : skuMoved
-        ? O.some("sku")
-        : A.findFirst(otherFields, (field) => stale(field) && input.changed(field))
+  const storedBy: O.Option<Field> = StoredChoice.guards.undecided(decision.stored)
+    ? O.none()
+    : skuMoved
+      ? O.some("sku")
+      : A.findFirst(otherFields, (field) => stale(field) && input.changed(field))
   const twin = skuMoved && hasKeep(decision)
   const taken: ReadonlyArray<StaleAccept> = [
     ...A.map(A.filter(decision.accepted, stale), (field) => ({ rowId, field, kind: "accept" as const })),
@@ -192,7 +192,7 @@ export const comparisonQuestions = (input: {
   A.flatMap(R.toEntries(input.set), ([rowId, decision]) => {
     const made = O.getOrElse(R.get(input.madeOn, rowId), () => 0)
     const stale = matchedAfter(input)(made)
-    if (decision.stored.kind === "undecided" || stale("sku")) return []
+    if (StoredChoice.guards.undecided(decision.stored) || stale("sku")) return []
     const now = judgeRow({ rowId, decision, stale, changed: () => false }).decision
     return A.map(
       A.filter(otherFields, (field) => stale(field)),
@@ -342,49 +342,136 @@ export const comparisonsChanged = (input: {
   return A.map([...unknown, ...changed], ({ rowId, field }) => ({ rowId, field }))
 }
 
-/**
- * The stored items a question to the file's review was answered from (a match's, a save's or a confirm's judgement of
- * a Replace or Keep-stored across a re-match): every SKU key it looked up, and the items it found under them, each at
- * its revision. Both stores write the match, the save and the confirm only while the organization's items under those
- * keys are still exactly these, so an item edited, replaced, created or taken back in between makes the judgement be
- * worked out again, never written with take-backs judged against an item that is no longer there. No keys: the review
- * was not asked, and nothing is checked.
- */
-export const ItemsAsRead = S.Struct({
-  keys: S.Array(S.String).annotateKey({ description: "Every SKU key the review looked up, as `skuKey` makes them" }),
-  items: S.Array(
-    S.Struct({ id: S.String, revision: S.Int }).annotate({
-      description: "One stored item the review compared with, at the revision it read"
-    })
-  ).annotateKey({ description: "Every item the organization had under those keys when the review read them" })
+const ItemAsRead = S.Struct({
+  id: ItemId.annotateKey({ description: "The stored item's id" }),
+  revision: S.Int.annotateKey({ description: "The item's revision when the review read it" })
 }).annotate({
-  identifier: "ItemsAsRead",
-  description: "The stored items a judgement of the decisions across a re-match was worked out from"
+  identifier: "ItemAsRead",
+  description: "One stored item the review compared with, at the revision it read"
 })
-/** The decoded value of `ItemsAsRead`. */
-export type ItemsAsRead = typeof ItemsAsRead.Type
 
-/** A judgement that did not ask the file's review: it read no stored item, so no item change can overtake it. */
-export const noItemsRead: ItemsAsRead = { keys: [], items: [] }
+const CreatedAsRead = S.Struct({
+  rowNumber: S.Int.annotateKey({
+    description: "The file's row an earlier confirm of this import created an item from"
+  }),
+  part: S.Int.annotateKey({ description: "Which of the row's items it is, 0 when the row is one item" })
+}).annotate({
+  identifier: "CreatedAsRead",
+  description: "One row of the file an earlier confirm of this import created an item from, as the review read it"
+})
 
 /**
- * Whether the organization's items (`items`, every one it has) are still those a judgement read: under its keys
- * exactly the items it found, each at the revision it found. The in-memory store's form of the check the D1 store makes
- * in its write; true when nothing was read.
+ * Everything a question to the file's review was answered from, beyond the draft itself (a match's, a save's or a
+ * confirm's judgement of a Replace or Keep-stored across a re-match): every SKU key it looked up and the items it found
+ * under them, each at its revision; the rows an earlier confirm of the import created; and the import's suggestions.
+ * None of them moves the draft's revision (an item is edited on the Items page or stocked by another import, a
+ * take-back marks created rows, a request for suggestions stores some), so both stores write the match, the save and
+ * the confirm only while all of them are still exactly these: a change in between makes the judgement be worked out
+ * again, never written with take-backs judged against something that is no longer there. Not `asked`: the review was
+ * not asked, nothing was read, and nothing is checked.
+ */
+export class ItemsAsRead extends S.Opaque<ItemsAsRead, { readonly brand: unique symbol }>()(
+  S.Struct({
+    asked: S.Boolean.annotateKey({
+      description: "Whether the file's review was asked; when not, nothing was read and the write checks nothing"
+    }),
+    keys: S.Array(S.String).annotateKey({ description: "Every SKU key the review looked up, as `skuKey` makes them" }),
+    items: S.Array(ItemAsRead).annotateKey({
+      description: "Every item the organization had under those keys when the review read them"
+    }),
+    created: S.Array(CreatedAsRead).annotateKey({
+      description: "Every row an earlier confirm of the import had created and still had when the review read them"
+    }),
+    suggestions: S.Array(SuggestionId).annotateKey({
+      description: "Every suggestion stored for the import when the review read them"
+    })
+  }).annotate({
+    identifier: "ItemsAsRead",
+    description:
+      "The stored items, created rows and suggestions a judgement of the decisions across a re-match was worked out from"
+  })
+) {}
+
+/** A judgement that did not ask the file's review: it read nothing, so nothing can overtake it. */
+export const noItemsRead: ItemsAsRead = ItemsAsRead.make({
+  asked: false,
+  keys: [],
+  items: [],
+  created: [],
+  suggestions: []
+})
+
+/**
+ * Whether what a judgement read is still so: the organization's items (`items`, every one it has) under its keys are
+ * exactly the items it found, each at the revision it found; the import's created rows (`created`) are the ones it
+ * found; and its suggestions (`suggestions`) are the ones it found. The in-memory store's form of the check the D1
+ * store makes in its write; true when nothing was read.
  *
- * @example stillAsRead({ keys: ["AAA-0002"], items: [{ id: "item-1", revision: 1 }] })(itemsNow) // false once edited
+ * @example stillAsRead(read)({ items: itemsNow, created: createdNow, suggestions: suggestionIdsNow }) // false once an item is edited
  */
 export const stillAsRead =
   (read: ItemsAsRead) =>
-  (items: ReadonlyArray<{ readonly id: string; readonly sku: string; readonly revision: number }>): boolean => {
-    if (read.keys.length === 0) return true
+  (now: {
+    readonly items: ReadonlyArray<{ readonly id: string; readonly sku: string; readonly revision: number }>
+    readonly created: ReadonlyArray<{ readonly rowNumber: number; readonly part: number }>
+    readonly suggestions: ReadonlyArray<string>
+  }): boolean => {
+    if (!read.asked) return true
     const keys = HashSet.fromIterable(read.keys)
-    const under = A.filter(items, (item) => HashSet.has(keys, skuKey(item)))
-    return (
+    const under = A.filter(now.items, (item) => HashSet.has(keys, skuKey(item)))
+    const sameItems =
       under.length === read.items.length &&
       A.every(read.items, (seen) => A.some(under, (item) => item.id === seen.id && item.revision === seen.revision))
-    )
+    const sameCreated =
+      now.created.length === read.created.length &&
+      A.every(read.created, (seen) =>
+        A.some(now.created, (row) => row.rowNumber === seen.rowNumber && row.part === seen.part)
+      )
+    const sameSuggestions =
+      now.suggestions.length === read.suggestions.length &&
+      A.every(read.suggestions, (seen) => A.contains(now.suggestions, seen))
+    return sameItems && sameCreated && sameSuggestions
   }
+
+/** One question to the file's review, and whether one try of a request found the row's comparison changed. */
+export type Answered = { readonly question: ComparisonQuestion; readonly changed: boolean }
+
+const sameQuestion = (a: ComparisonQuestion, b: ComparisonQuestion): boolean =>
+  a.rowId === b.rowId && a.field === b.field && a.made === b.made && S.toEquivalence(RowDecision)(a.then, b.then)
+
+/**
+ * The review's answer to one try of a request (a match, a save or a confirm worked out again because something it read
+ * changed), held to what the earlier tries of the same request answered: a question asked before stands as taken back
+ * only while every try found it so. A take-back comes from a column matched again after the decision, never from an
+ * item stocked or edited, a created row or a suggestion that changed between two tries: those can drop a take-back an
+ * earlier try found (what it rested on is gone), never add one. A question no earlier try asked (the row was decided
+ * again in between) takes this try's answer. `answered` is what the next try is held to.
+ *
+ * @example
+ * // The first try found row 2's Replace standing (nothing stored under its SKU); an item stocked since makes the
+ * // second try find it changed: it still stands.
+ * answeredAcrossTries({ earlier: [{ question, changed: false }], questions: [question], changed: [{ rowId: "row-2", field: "unitCost" }] })
+ * // { changed: [], answered: [{ question, changed: false }] }
+ */
+export const answeredAcrossTries = (input: {
+  readonly earlier: ReadonlyArray<Answered>
+  readonly questions: ReadonlyArray<ComparisonQuestion>
+  readonly changed: ReadonlyArray<ComparisonChanged>
+}): { readonly changed: ReadonlyArray<ComparisonChanged>; readonly answered: ReadonlyArray<Answered> } => {
+  const now = A.map(input.questions, (question): Answered => {
+    const found = A.some(input.changed, (row) => row.rowId === question.rowId && row.field === question.field)
+    const before = A.findFirst(input.earlier, (old) => sameQuestion(old.question, question))
+    return { question, changed: O.match(before, { onNone: () => found, onSome: (old) => old.changed && found }) }
+  })
+  const kept = A.filter(input.earlier, (old) => !A.some(now, (answer) => sameQuestion(answer.question, old.question)))
+  return {
+    changed: A.map(
+      A.filter(now, (answer) => answer.changed),
+      ({ question }) => ({ rowId: question.rowId, field: question.field })
+    ),
+    answered: [...kept, ...now]
+  }
+}
 
 /** The review's answer to a match's question, and the stored items it was worked out from. */
 export type Compared = { readonly changed: ReadonlyArray<ComparisonChanged>; readonly read: ItemsAsRead }
@@ -402,7 +489,7 @@ export type CompareAtMatch = (asked: {
 }) => Effect.Effect<Compared>
 
 /** A match that does not have the file's review at hand: no Replace is taken back for a column other than the SKU. */
-export const noComparison: CompareAtMatch = () => Effect.succeed({ changed: [], read: { keys: [], items: [] } })
+export const noComparison: CompareAtMatch = () => Effect.succeed({ changed: [], read: noItemsRead })
 
 // A row id's place in the file: its row's number, then its part. A key that is not a row id goes last.
 const placeInFile = (rowId: string): readonly [number, number] => {

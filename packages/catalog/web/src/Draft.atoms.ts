@@ -15,7 +15,6 @@ import { pipe } from "effect/Function"
 import * as HashSet from "effect/HashSet"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
-import * as Schedule from "effect/Schedule"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import * as Atom from "effect/reactivity/Atom"
@@ -41,7 +40,7 @@ import { StoredWaiting, toStored, toWaiting, waitingFromText } from "./internal/
 export const draftOf = perKey((_id: ImportId) => Atom.keepAlive(Atom.make<Draft>(emptyDraft)))
 
 /** A member as the draft knows whom its rows belong to. */
-interface Owner {
+export interface Owner {
   readonly organizationId: string
   readonly id: string
 }
@@ -67,23 +66,49 @@ export const ownedByAnother = ({ id, registry }: DraftIn): boolean =>
     O.exists(registry.get(member), (actor) => !sameMember(owner, actor))
   )
 
+/** The member one import's draft belongs to now: none while it holds nothing of anyone's the server has not. */
+export const ownerOf = ({ id, registry }: DraftIn): O.Option<Owner> => registry.get(draftOwner(id))
+
 /**
- * True while the member the draft's rows belong to is the one signed in: only then are they sent. Rows that waited
- * after a save refused for nobody signed in go only once that member is signed in again, never as whoever signs in
- * next (Benjamin, 2026-11-20, G3). Rows nobody was known to be signed in for when they were decided belong to nobody,
- * and are compared with nobody.
+ * True while `owner` is the member signed in: only then are the rows that member decided sent or confirmed. Rows that
+ * waited after a save refused for nobody signed in go only once that member is signed in again, never as whoever
+ * signs in next (Benjamin, 2026-11-20, G3). Rows nobody was known to be signed in for when they were decided belong to
+ * nobody, and are compared with nobody.
  */
-export const sentByOwner = ({ id, registry }: DraftIn): boolean =>
-  O.match(registry.get(draftOwner(id)), {
+export const signedInAs = (input: {
+  readonly registry: AtomRegistry.AtomRegistry
+  readonly owner: O.Option<Owner>
+}): boolean =>
+  O.match(input.owner, {
     onNone: () => true,
-    onSome: (owner) => O.exists(registry.get(member), (actor) => sameMember(owner, actor))
+    onSome: (owner) => O.exists(input.registry.get(member), (actor) => sameMember(owner, actor))
   })
+
+/** True when somebody other than `owner` is signed in now: said so, not as a sign-out. */
+export const anotherThan = (input: {
+  readonly registry: AtomRegistry.AtomRegistry
+  readonly owner: O.Option<Owner>
+}): boolean =>
+  O.exists(input.owner, (owner) => O.exists(input.registry.get(member), (actor) => !sameMember(owner, actor)))
+
+/**
+ * The member signed in now acts on the draft (opens the step, decides a row, settles one, takes rows up, presses the
+ * confirm): from here on its rows are theirs, kept under their key. With nobody signed in, it stays whose it was.
+ */
+export const claimDraft = ({ id, registry }: DraftIn): void =>
+  void O.map(registry.get(member), (actor) =>
+    registry.set(draftOwner(id), O.some({ organizationId: actor.organizationId, id: actor.id }))
+  )
 
 /**
  * Lets the draft in memory go because it belongs to another member than the one signed in now: its rows stay kept in
- * this browser under its owner's key, for that member's next visit, and nothing of it is written or sent here.
+ * this browser under its owner's key, for that member's next visit, and nothing of it is written or sent here. The
+ * entry is no longer the draft's: it is read again before it is written again.
  */
 export const letAnothersDraftGo = ({ id, registry }: DraftIn): void => {
+  O.map(O.all({ owner: registry.get(draftOwner(id)), tab: registry.get(thisTab) }), ({ owner, tab }) =>
+    registry.update(keysRead, HashSet.remove(keyOf(owner, id, tab)))
+  )
   registry.set(draftOf(id), { ...emptyDraft, epoch: registry.get(draftOf(id)).epoch + 1 })
   registry.set(draftOwner(id), O.none())
 }
@@ -200,47 +225,33 @@ export const takeUpGoneTabs = (input: {
   })
 }
 
-/** The text kept under a key in the browser's storage as it is now: null where there is none or it cannot be read. */
-const keptNow = (key: string): string | null => {
-  try {
-    return sharedStorage()?.getItem(key) ?? null
-  } catch {
-    return null
-  }
-}
-
 /**
- * How long a claim is kept after the entry it took reads as erased here: another tab's copy of the browser's storage
- * can lag behind this tab's erase, so a claim let go at once could be granted to a tab that still reads the entry.
+ * How long a claim is kept after this tab has read and erased the entry it took. An assumption, not a guarantee: that
+ * every other tab of this browser sees the erase in its own copy of the browser's storage within half a second. Nothing
+ * here can check that: this tab's own copy reads the entry as gone at once, whatever the others read. A tab whose copy
+ * lags longer than that, and that claims the same entry after this claim is let go, would find it still there and take
+ * it up a second time. Kept short so that a tab of that id that comes back and is gone again (a reload, then a close)
+ * is soon taken up again.
  */
 const claimKept = "500 millis"
 
 /**
  * Claims one entry of a tab that is gone and, once claimed, does `then` with it: of two tabs that find the same tab
- * gone at once, only one gets it. The claim is let go once the take-up is done (the entry reads as erased here, and a
- * moment more for other tabs' copies of the storage): a tab of that id that comes back and is gone again later (a
- * reload, then a close) is taken up again, by this page or another.
+ * gone at once, only one gets it. The claim is let go `claimKept` after the take-up is done, so that a tab of that id
+ * that comes back and is gone again later (a reload, then a close) is taken up again, by this page or another.
  */
 const claiming = (locks: LockManager, entry: { readonly key: string }, then: () => void): void =>
   void locks.request(claimOf(entry), { ifAvailable: true }, (lock) =>
     lock === null
       ? Effect.runPromise(Effect.void)
-      : Effect.runPromise(
-          Effect.sync(then).pipe(
-            Effect.andThen(
-              Effect.sync(() => keptNow(entry.key)).pipe(
-                Effect.repeat({ until: (text) => text === null, schedule: Schedule.spaced("10 millis"), times: 100 })
-              )
-            ),
-            Effect.andThen(Effect.sleep(claimKept))
-          )
-        )
+      : Effect.runPromise(Effect.sync(then).pipe(Effect.andThen(Effect.sleep(claimKept))))
   )
 
 /**
- * The keys of the waiting rows this page has read into a draft: only those are ever written by `keepWaiting`. A draft
- * whose entry was not read yet (the step opened before this tab's id was its own) holds none of what the entry keeps,
- * and writing it there would erase the rows kept before a reload.
+ * The keys of the waiting rows this page has read into the draft it holds: only those are ever written by
+ * `keepWaiting`. A draft whose entry was not read yet (the step opened before this tab's id was its own, or the draft
+ * is another member's now) holds none of what the entry keeps, and writing it there would erase the rows kept before a
+ * reload: such an entry is read into the draft first (`unreadKept`).
  */
 const keysRead = Atom.make(HashSet.empty<string>()).pipe(Atom.keepAlive)
 
@@ -263,23 +274,31 @@ export const keptWaiting = (input: {
   )
 
 /**
- * Keeps what waits of one import's draft after an event, under the member the rows belong to: the person signed in
- * when the step opened or a row was decided, not whoever is signed in when the server answers. Nothing waiting is no
- * entry, and the import's draft then belongs to nobody until the next press.
+ * The waiting rows this browser kept for one import under the member signed in now, by this tab, when that entry has
+ * not been read into the draft this page holds: read now, so the draft takes them in before anything is written over
+ * the entry. None when it was read already, holds nothing, or nobody is signed in, or before this tab's id is its own.
+ */
+export const unreadKept = (input: {
+  readonly registry: AtomRegistry.AtomRegistry
+  readonly id: ImportId
+}): O.Option<Waiting> =>
+  pipe(
+    O.all({ actor: input.registry.get(member), tab: input.registry.get(thisTab) }),
+    O.filter(({ actor, tab }) => !HashSet.has(input.registry.get(keysRead), keyOf(actor, input.id, tab))),
+    O.flatMap(() => keptWaiting(input))
+  )
+
+/**
+ * Keeps what waits of one import's draft after an event, under the member the rows belong to (`claimDraft`): the
+ * person signed in when the step opened or a row was decided, not whoever is signed in when the server answers.
+ * Nothing waiting is no entry, and the import's draft then belongs to nobody until the next press.
  */
 export const keepWaiting = (input: {
   readonly registry: AtomRegistry.AtomRegistry
   readonly id: ImportId
   readonly waits: O.Option<Waiting>
-  /** True for an event the person signed in now caused (the step opened, a row decided): the rows are theirs. */
-  readonly pressed: boolean
 }): void => {
   const { registry, id } = input
-  if (input.pressed) {
-    O.map(registry.get(member), (actor) =>
-      registry.set(draftOwner(id), O.some({ organizationId: actor.organizationId, id: actor.id }))
-    )
-  }
   O.map(O.all({ owner: registry.get(draftOwner(id)), tab: registry.get(thisTab) }), ({ owner, tab }) => {
     const key = keyOf(owner, id, tab)
     // An entry not read into the draft yet is left as it is: the draft does not hold what it keeps.

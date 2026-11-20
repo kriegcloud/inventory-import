@@ -1,10 +1,11 @@
 // The places one file tells a tagged value's case by its `_tag` by hand, or builds one by hand: `x._tag === "Saving"`,
-// `x?._tag !== "None"`, a `switch` on `x._tag`, the same through anything the tag flows into (a name it was read or
-// assigned into, a list or a record it was put in and read back out of, `x._tag ?? ""`, a template, a method of it,
-// what a function that hands it back answers, a method of a record included), a tag handed to a call, a tag used as a
-// key, a sentence that names a tag compared or handed to an expectation, and an object literal with a `_tag` key,
-// unless the case has no constructor and this module types it. Read from the syntax tree, the parser's plain data, as
-// records of unknown values: a comparison split over lines, or written with `==`, is the same node.
+// `x?._tag !== "None"`, a `switch` on `x._tag`, the same through anything that holds the tag (a name it was read or
+// assigned into, a list or a record it was put in, spread into or read back out of, a loop over such a list, tags
+// joined, `x._tag ?? ""`, a template, a method of it, what a function that hands it back answers, a method of a record
+// included), a tag handed to a call, a tag used as a key, a sentence that names a tag compared or handed to an
+// expectation, `P.isTagged` (it takes any value, so its tag is never checked), and an object literal with a `_tag`
+// key, unless the case has no constructor and this module types it. Read from the syntax tree, the parser's plain
+// data, as records of unknown values: a comparison split over lines, or written with `==`, is the same node.
 import * as A from "effect/Array"
 import * as O from "effect/Option"
 import * as P from "effect/Predicate"
@@ -53,6 +54,8 @@ const keyOf = (holder: Node, key: string): O.Option<string> =>
   )
 
 const isTagKey = (holder: Node, key: string): boolean => O.exists(keyOf(holder, key), (name) => name === "_tag")
+/** True for `isTagged` as a key: `P.isTagged`, `P["isTagged"]`, `{ isTagged }`. */
+const isTaggedKey = (holder: Node, key: string): boolean => O.exists(keyOf(holder, key), (name) => name === "isTagged")
 
 /** The value under the wrappers that do not change it: brackets, `?.`, a non-null mark, a type assertion. */
 const unwrapped = (node: Node): Node =>
@@ -82,15 +85,30 @@ interface Fields {
 /**
  * What a name one function (or the file) binds holds: a tag read by hand (`tag` in `const tag = x._tag`), a function
  * that hands a tag back (`tagOf` in `const tagOf = (e) => e._tag`), a sentence that names a tag (a template with words,
- * tags joined), a list or a record of these (`const o = { k: x._tag }`, `const t = [x._tag]`), or none of them.
+ * tags joined), `P.isTagged` under another name (`const { isTagged } = P`, `const is = P.isTagged`), a list or a record
+ * of these (`const o = { k: x._tag }`, `const t = [x._tag]`), or none of them.
  */
-type Held = "tag" | "reader" | "sentence" | "neither" | Fields
+type Held = "tag" | "reader" | "sentence" | "isTagged" | "neither" | Fields
+
+/**
+ * The place of a list no position names: what a spread put in it, and everything after the spread (`[...tags]`,
+ * `[n, ...rest, x._tag]`). Read for any position the list has no own place for.
+ */
+const anyPlace = "…"
 
 const isFields = (held: Held): held is Fields => P.isObject(held)
 const fieldOf = (held: Held, key: string): Held =>
-  isFields(held) ? O.getOrElse(R.get(held.fields, key), (): Held => "neither") : "neither"
+  isFields(held)
+    ? O.getOrElse(
+        O.orElse(R.get(held.fields, key), () => R.get(held.fields, anyPlace)),
+        (): Held => "neither"
+      )
+    : "neither"
 /** True for a tag, or a list or a record with one somewhere in it. */
 const holdsTag = (held: Held): boolean => held === "tag" || (isFields(held) && A.some(R.values(held.fields), holdsTag))
+/** True for a sentence that names a tag, or a list or a record with one somewhere in it. */
+const holdsSentence = (held: Held): boolean =>
+  held === "sentence" || (isFields(held) && A.some(R.values(held.fields), holdsSentence))
 
 /** The names one function (or the file) binds, each with what it holds. */
 type Scope = Readonly<Record<string, Held>>
@@ -126,10 +144,12 @@ const namesIn = (pattern: Node, held: Held): ReadonlyArray<readonly [string, Hel
                 value,
                 isTagKey(property, "key")
                   ? "tag"
-                  : O.match(keyOf(property, "key"), {
-                      onNone: (): Held => "neither",
-                      onSome: (key) => fieldOf(held, key)
-                    })
+                  : isTaggedKey(property, "key")
+                    ? "isTagged"
+                    : O.match(keyOf(property, "key"), {
+                        onNone: (): Held => "neither",
+                        onSome: (key) => fieldOf(held, key)
+                      })
               )
           })
     )
@@ -173,12 +193,14 @@ const memberHeld = (member: Node, scopes: ReadonlyArray<Scope>): Held =>
 /**
  * True for a value a tag flows into: `x._tag`, a name it was read into, a place of a list or a record it was put in,
  * `x._tag ?? ""`, a choice or a template with it, a method of it (`x._tag.toLowerCase()`), what a function that hands
- * a tag back answers (`kindOf(x)`, `k.of(x)`, `Effect.map(e, (error) => error._tag)`), and what `yield*` or `await`
- * takes out of any of these.
+ * a tag back answers (`kindOf(x)`, `k.of(x)`, `Effect.map(e, (error) => error._tag)`), tags joined (`A.join([x._tag],
+ * "")`, `[x._tag].join("")`: with no words between them a joined tag is the tag, with words it is still compared as
+ * one), and what `yield*` or `await` takes out of any of these.
  */
 const carriesTag = (value: Node, scopes: ReadonlyArray<Scope>): boolean => {
   const node = unwrapped(value)
   if (isTagRead(node)) return true
+  if (isJoin(node)) return A.some(joinedLists(node), (list) => holdsTag(heldOf(list, scopes)))
   const any = (key: string): boolean => O.exists(child(node, key), (inner) => carriesTag(inner, scopes))
   if (node.type === "Identifier") return heldBy(scopes, nameOf(node)) === "tag"
   if (node.type === "LogicalExpression") return any("left") || any("right")
@@ -215,21 +237,31 @@ const isBareTemplate = (template: Node): boolean =>
 const templateHoldsTag = (template: Node, scopes: ReadonlyArray<Scope>): boolean =>
   A.some(nodes(template["expressions"]), (inner) => carriesTag(inner, scopes))
 
-/** The name a call is made by: `join` in `A.join(…)`, `names.join(…)` and `join(…)`. */
+/** The name a call is made by: `join` in `A.join(…)`, `names.join(…)`, `names["join"](…)` and `join(…)`. */
 const calledAs = (callee: Node): string =>
-  callee.type === "MemberExpression" && callee["computed"] !== true
-    ? O.getOrElse(O.map(child(callee, "property"), nameOf), () => "")
-    : nameOf(callee)
+  callee.type === "MemberExpression" ? O.getOrElse(keyOf(callee, "property"), () => "") : nameOf(callee)
 
 /** True for a call that joins a list into words: `A.join(list, ", ")`, `list.join(", ")`. */
 const isJoin = (node: Node): boolean =>
   typeIs(node, "CallExpression", "NewExpression") &&
   O.exists(O.map(child(node, "callee"), unwrapped), (callee) => calledAs(callee) === "join")
 
+/** The list a join joins: what the method is called on (`list.join(…)`), or the first argument (`A.join(list, …)`). */
+const joinedLists = (join: Node): ReadonlyArray<Node> =>
+  A.appendAll(
+    O.toArray(
+      O.flatMap(
+        O.filter(O.map(child(join, "callee"), unwrapped), (callee) => callee.type === "MemberExpression"),
+        (callee) => child(callee, "object")
+      )
+    ),
+    A.take(nodes(join["arguments"]), 1)
+  )
+
 /**
- * True for a sentence that names a tag: a template with words around one (`${x._tag}:1`), tags joined into words
- * (`A.join([x._tag], "")`, `[x._tag].join("")`, `A.join(A.map(xs, (e) => e._tag), ",")`), a name one was put in, and
- * a choice of these. Handed on (a message, a key) it passes; compared, or handed to an expectation, it tells a case.
+ * True for a sentence that names a tag: a template with words around one (`${x._tag}:1`), sentences joined, a name
+ * one was put in, and a choice of these. Handed on (a message, a key) it passes; compared, or handed to an
+ * expectation, it tells a case. Tags joined are the tag itself (`carriesTag`).
  */
 const namesTag = (value: Node, scopes: ReadonlyArray<Scope>): boolean => {
   const node = unwrapped(value)
@@ -240,19 +272,14 @@ const namesTag = (value: Node, scopes: ReadonlyArray<Scope>): boolean => {
   if (node.type === "LogicalExpression") return any("left") || any("right")
   if (node.type === "ConditionalExpression") return any("consequent") || any("alternate")
   if (node.type === "BinaryExpression") return node["operator"] === "+" && (any("left") || any("right"))
-  if (!isJoin(node)) return false
-  // The list joined: what the method is called on (`list.join(…)`), or the first argument (`A.join(list, …)`).
-  const listed = A.appendAll(
-    O.toArray(
-      O.flatMap(
-        O.filter(O.map(child(node, "callee"), unwrapped), (callee) => callee.type === "MemberExpression"),
-        (callee) => child(callee, "object")
-      )
-    ),
-    A.take(nodes(node["arguments"]), 1)
-  )
-  return A.some(listed, (list) => holdsTag(heldOf(list, scopes)))
+  return isJoin(node) && A.some(joinedLists(node), (list) => holdsSentence(heldOf(list, scopes)))
 }
+
+/**
+ * True for a value that holds a tag: the tag itself (read, joined, flowed into a name), or a list or a record with one
+ * somewhere in it (`[x._tag]`, `{ k: x._tag }`, `[...tags]`). Each check treats it as the tag.
+ */
+const holdsTagIn = (value: Node, scopes: ReadonlyArray<Scope>): boolean => holdsTag(heldOf(value, scopes))
 
 /** True for a function that hands a tag back, written in place or named: `(error) => error._tag`, `tagOf`, `k.of`. */
 const readsTagOut = (value: Node, scopes: ReadonlyArray<Scope>): boolean => {
@@ -268,15 +295,29 @@ const heldOf = (value: Node, scopes: ReadonlyArray<Scope>): Held => {
   if (carriesTag(node, scopes)) return "tag"
   if (readsTagOut(node, scopes)) return "reader"
   if (namesTag(node, scopes)) return "sentence"
+  if (node.type === "MemberExpression" && isTaggedKey(node, "property")) return "isTagged"
   if (node.type === "Identifier") return heldBy(scopes, nameOf(node))
   if (node.type === "MemberExpression") return memberHeld(node, scopes)
   if (node.type === "ArrayExpression") {
-    // By position, up to the first spread: after it no place is known.
+    // By position, up to the first spread: after it no place is known, so what the spreads and the places after
+    // them hold is held by any place (`[...tags]`, `[...rest, x._tag]`).
     const elements: ReadonlyArray<unknown> = A.isArray(node["elements"]) ? node["elements"] : []
-    const known = A.takeWhile(elements, (each) => !(isNode(each) && each.type === "SpreadElement"))
+    const isSpread = (each: unknown): boolean => isNode(each) && each.type === "SpreadElement"
+    const known = A.takeWhile(elements, (each) => !isSpread(each))
+    const after = A.drop(elements, known.length)
+    const unplaced = A.some(after, (each) =>
+      isNode(each)
+        ? isSpread(each)
+          ? O.exists(child(each, "argument"), (inner) => holdsTagIn(inner, scopes))
+          : holdsTagIn(each, scopes)
+        : false
+    )
     return {
       fields: R.fromEntries(
-        A.flatMap(known, (each, index) => (isNode(each) ? [[`${index}`, heldOf(each, scopes)] as const] : []))
+        A.appendAll(
+          A.flatMap(known, (each, index) => (isNode(each) ? [[`${index}`, heldOf(each, scopes)] as const] : [])),
+          unplaced ? [[anyPlace, "tag"] as const] : []
+        )
       )
     }
   }
@@ -339,21 +380,39 @@ const declared = (declaration: Node, scopes: ReadonlyArray<Scope>): ReadonlyArra
 }
 
 /**
- * What an assignment to a name puts in it (`t = x._tag`, `t += x._tag`, `t ??= x._tag`): what the value holds, when
- * it holds anything. A later assignment of a plain value does not take it back: the tag was in the name once.
+ * What an assignment puts in the names it sets (`t = x._tag`, `t += x._tag`, `t ??= x._tag`, `[t] = [x._tag]`,
+ * `({ k: t } = { k: x._tag })`): what the value holds, when it holds anything. A later assignment of a plain value
+ * does not take it back: the tag was in the name once.
  */
 const assigned = (assignment: Node, scopes: ReadonlyArray<Scope>): ReadonlyArray<readonly [string, Held]> =>
   O.match(O.map(child(assignment, "left"), unwrapped), {
     onNone: () => [],
     onSome: (left) => {
-      if (left.type !== "Identifier") return []
+      if (!typeIs(left, "Identifier", "ArrayPattern", "ObjectPattern")) return []
       const held = O.match(child(assignment, "right"), {
         onNone: (): Held => "neither",
         onSome: (right) => heldOf(right, scopes)
       })
-      return held === "neither" ? [] : [[nameOf(left), held] as const]
+      return A.filter(namesIn(left, held), ([, each]) => each !== "neither")
     }
   })
+
+/**
+ * What a loop over a list binds (`for (const t of A.map(xs, (e) => e._tag))`, `for (t of tags)`): a tag, when the
+ * list holds one anywhere.
+ */
+const iterated = (loop: Node, scopes: ReadonlyArray<Scope>): ReadonlyArray<readonly [string, Held]> => {
+  const held: Held = O.exists(child(loop, "right"), (list) => holdsTagIn(list, scopes)) ? "tag" : "neither"
+  return O.match(child(loop, "left"), {
+    onNone: () => [],
+    onSome: (left) =>
+      left.type === "VariableDeclaration"
+        ? A.flatMap(nodes(left["declarations"]), (declarator) =>
+            O.match(child(declarator, "id"), { onNone: () => [], onSome: (id) => namesIn(id, held) })
+          )
+        : namesIn(unwrapped(left), held)
+  })
+}
 
 /** True when two scopes say the same of every name a function declaration binds. */
 const sameReaders = (before: Scope, after: Scope): boolean =>
@@ -367,11 +426,19 @@ const sameReaders = (before: Scope, after: Scope): boolean =>
 const scopeOf = (holder: Node, outer: ReadonlyArray<Scope>): Scope => {
   const params = A.flatMap(nodes(holder["params"]), (param) => namesIn(param, "neither"))
   const body = holder.type === "Program" ? O.some(holder) : child(holder, "body")
-  const own = O.match(body, {
-    onNone: () => [],
+  const found = O.match(body, {
+    onNone: (): ReadonlyArray<Node> => [],
     onSome: (inside) =>
-      ownNodes(inside, (node) => typeIs(node, "VariableDeclaration", "FunctionDeclaration", "AssignmentExpression"))
+      ownNodes(inside, (node) =>
+        typeIs(node, "VariableDeclaration", "FunctionDeclaration", "AssignmentExpression", "ForOfStatement")
+      )
   })
+  // A loop's own declaration (`const t` in `for (const t of tags)`) is bound by the loop, from the list it walks.
+  const loopHeads = A.flatMap(
+    A.filter(found, (node) => node.type === "ForOfStatement"),
+    (loop: Node) => O.toArray(O.map(child(loop, "left"), (left) => left.start))
+  )
+  const own = A.filter(found, (node) => !(node.type === "VariableDeclaration" && A.contains(loopHeads, node.start)))
   const hoisted = A.filter(own, (node) => node.type === "FunctionDeclaration")
   const readFunctions = (scope: Scope): Scope => ({
     ...scope,
@@ -387,9 +454,11 @@ const scopeOf = (holder: Node, outer: ReadonlyArray<Scope>): Scope => {
     ...R.fromEntries(
       node.type === "AssignmentExpression"
         ? assigned(node, A.append(outer, scope))
-        : node.type === "FunctionDeclaration"
-          ? []
-          : declared(node, A.append(outer, scope))
+        : node.type === "ForOfStatement"
+          ? iterated(node, A.append(outer, scope))
+          : node.type === "FunctionDeclaration"
+            ? []
+            : declared(node, A.append(outer, scope))
     )
   }))
 }
@@ -477,31 +546,37 @@ export const readTags = (input: { readonly file: string; readonly source: string
   const found: Array<ByHand> = []
   const walk = (node: Node, scopes: ReadonlyArray<Scope>): void => {
     const here = isFunction(node) ? A.append(scopes, scopeOf(node, scopes)) : scopes
-    const carries = (inner: Node): boolean => carriesTag(inner, here)
+    // A value that holds a tag is the tag in every check: read, joined, flowed into a name, or kept in a list or a
+    // record (`[x._tag]`, `{ k: x._tag }`, `[...tags]`).
+    const carries = (inner: Node): boolean => holdsTagIn(inner, here)
+    // A side that names a tag compares by it, words or none (`${x._tag}:${n}` === "Idle:1").
+    const tells = (inner: Node): boolean => carries(inner) || namesTag(inner, here)
     if (node.type === "BinaryExpression" && A.contains(comparisons, node["operator"])) {
-      // A side that names a tag compares by it, words or none (`${x._tag}:${n}` === "Idle:1", tags joined).
-      const side = (inner: Node): boolean => carries(inner) || namesTag(inner, here)
-      if (A.some(A.getSomes([child(node, "left"), child(node, "right")]), side)) {
+      if (A.some(A.getSomes([child(node, "left"), child(node, "right")]), tells)) {
         found.push({ line: lineAt(node.start), how: String(node["operator"]) })
       }
     }
-    if (node.type === "SwitchStatement" && O.exists(child(node, "discriminant"), carries)) {
+    if (node.type === "SwitchStatement" && O.exists(child(node, "discriminant"), tells)) {
       found.push({ line: lineAt(node.start), how: "switch" })
     }
     if (typeIs(node, "CallExpression", "NewExpression")) {
-      // A tag handed over, alone or in a list handed over whole (`expect([status, x._tag]).toEqual(…)`). Tags joined
-      // into words are a sentence that names them (`A.join(A.map(steps, said), ", ")`), as a template with words is:
-      // the join itself is not a refusal, what is done with its words may be. An expectation compares what it is
-      // handed, so a sentence that names a tag handed to one is refused too.
+      // A tag handed over: alone, joined (`A.contains(["Idle"], A.join([x._tag], ""))`, and the join itself), in a
+      // list or a record handed over whole (`expect([status, x._tag]).toEqual(…)`, `expect({ k: x._tag })`), or
+      // spread into the call. An expectation compares what it is handed, so a sentence that names a tag handed to
+      // one is refused too.
       const spread = (argument: Node): ReadonlyArray<Node> => {
         const value = unwrapped(argument)
-        return value.type === "ArrayExpression" ? nodes(value["elements"]) : [argument]
+        if (value.type === "SpreadElement") return O.toArray(child(value, "argument"))
+        return value.type === "ArrayExpression" ? A.flatMap(nodes(value["elements"]), spread) : [argument]
       }
       const handed = A.flatMap(nodes(node["arguments"]), spread)
-      if (!isJoin(node)) {
-        for (const argument of handed) {
-          if (carries(argument)) found.push({ line: lineAt(argument.start), how: "argument" })
-        }
+      for (const argument of handed) {
+        if (carries(argument)) found.push({ line: lineAt(argument.start), how: "argument" })
+      }
+      // `P.isTagged(x, "Text")` is handed `unknown`, so a misspelled tag compiles: the type's own guards, match or
+      // `Match.valueTags` check the name against its cases.
+      if (O.exists(child(node, "callee"), (called) => heldOf(called, here) === "isTagged")) {
+        found.push({ line: lineAt(node.start), how: "isTagged" })
       }
       // What an expectation compares: the value `expect` is handed (its second argument is the message said when it
       // fails), and every value a matcher of it is handed.

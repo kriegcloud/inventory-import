@@ -86,10 +86,10 @@ describe("the command a model may answer", () => {
       const outcome = check([change])
       if (Result.isFailure(outcome)) return
       for (const passed of outcome.success) {
-        if (passed.kind === "clear" || passed.kind === "search") continue
+        if (ViewChange.isAnyOf(["clear", "search"])(passed)) continue
         const found = A.findFirst(items, (c) => c.id === passed.column)
         expect(O.isSome(found)).toBe(true)
-        if (passed.kind === "filter" && O.isSome(found)) {
+        if (ViewChange.guards.filter(passed) && O.isSome(found)) {
           expect(found.value.operators).toContain(passed.operator)
           if (found.value.type === "select") {
             for (const value of passed.values) expect(found.value.values).toContain(value)

@@ -29,16 +29,20 @@ const isFunction = (node: Node): boolean => typeIs(node, ...functions)
 type Binding =
   /**
    * At the file's top level, or imported: made once. `hooks` says it is imported from a module of hooks
-   * (`isHookModule`), `fn` is the function a top-level declaration is, `reassigned` says a function sets the name
-   * again (a `let` that holds what the last draw gave it is made on every draw all the same), and `filled` says a
-   * function writes into what it holds (`refs[id] ??= …`): a cache by hand, whose entries a draw made.
+   * (`isHookModule`), `fn` is the function a top-level declaration is, `init` what a declaration gives it and `prop`
+   * the key it is taken out by, `reassigned` says a function sets the name again (a `let` that holds what the last
+   * draw gave it is made on every draw all the same), and `filled` holds each place under it a function writes into
+   * (`refs[id] ??= …` writes into the whole record, `[]`; `big.a[id] = …` into `["a"]`): a cache by hand, whose
+   * entries a draw made.
    */
   | {
       readonly kind: "module"
       readonly hooks: boolean
       readonly fn: O.Option<Node>
+      readonly init: O.Option<Node>
+      readonly prop: O.Option<string>
       readonly reassigned: boolean
-      readonly filled: boolean
+      readonly filled: ReadonlyArray<ReadonlyArray<string>>
     }
   /** A parameter of a function (a component's props), or a name taken out of one in the parameter list. */
   | { readonly kind: "param"; readonly prop: O.Option<string> }
@@ -54,8 +58,16 @@ type Binding =
     }
   /** A function declared inside another function: made again each time that one runs. */
   | { readonly kind: "inner-function" }
-  /** A `const`, `let` or `var` inside a function: `init` is what it is given, `prop` the key when it is taken out of it. */
-  | { readonly kind: "inner"; readonly init: O.Option<Node>; readonly prop: O.Option<string> }
+  /**
+   * A `const`, `let` or `var` inside a function: `init` is what it is given, `prop` the key when it is taken out of it,
+   * `also` what the function assigns it afterwards (`r = refs`).
+   */
+  | {
+      readonly kind: "inner"
+      readonly init: O.Option<Node>
+      readonly prop: O.Option<string>
+      readonly also: ReadonlyArray<Node>
+    }
 
 /** The names one function (or the file) binds. */
 type Scope = Readonly<Record<string, Binding>>
@@ -108,8 +120,25 @@ interface ElementOf {
 }
 
 /** What one function binds: its parameters (the first an element of the list it maps over), and what its body declares. */
-const scopeOf = (fn: Node, element: O.Option<ElementOf> = O.none()): Scope =>
-  bind([
+const scopeOf = (fn: Node, element: O.Option<ElementOf> = O.none()): Scope => {
+  // What the function assigns its own names after declaring them: `r = refs` makes `r` another name for `refs`.
+  const assignments = O.match(child(fn, "body"), {
+    onNone: (): ReadonlyArray<Node> => [],
+    onSome: (body) =>
+      ownNodes(
+        body,
+        (node) =>
+          node.type === "AssignmentExpression" &&
+          O.exists(O.map(child(node, "left"), unwrapped), (left) => left.type === "Identifier")
+      )
+  })
+  const assignedTo = (name: string): ReadonlyArray<Node> =>
+    A.flatMap(assignments, (assignment) =>
+      O.exists(O.map(child(assignment, "left"), unwrapped), (left) => nameOf(left) === name)
+        ? O.toArray(child(assignment, "right"))
+        : []
+    )
+  return bind([
     ...A.flatMap(nodes(fn["params"]), (param, index) =>
       A.map(namesIn(param), (found): readonly [string, Binding] =>
         index === 0 && O.isSome(element)
@@ -136,13 +165,23 @@ const scopeOf = (fn: Node, element: O.Option<ElementOf> = O.none()): Scope =>
               onSome: (id) =>
                 A.map(
                   namesIn(id),
-                  (found) => [found.name, { kind: "inner", init: child(declarator, "init"), prop: found.prop }] as const
+                  (found) =>
+                    [
+                      found.name,
+                      {
+                        kind: "inner",
+                        init: child(declarator, "init"),
+                        prop: found.prop,
+                        also: assignedTo(found.name)
+                      }
+                    ] as const
                 )
             })
           )
         })
     })
   ])
+}
 
 /** The value under the wrappers that do not change it: a type assertion, a non-null mark, parentheses. */
 const unwrapped = (node: Node): Node =>
@@ -280,6 +319,11 @@ const judge = (value: Node, scopes: ReadonlyArray<Scope>, depth = 0): Verdict =>
   if (node.type === "CallExpression") return judgeCall(node, scopes, depth)
   if (node.type === "Literal" || (node.type === "Identifier" && nameOf(node) === "undefined")) return steady
   if (node.type === "ThisExpression") return steady
+  // The place read under its name, as far as its keys are written out: `["lead"]` in `b.lead`, `[]` in `refs[id]`.
+  const readPath = O.getOrElse(
+    O.map(A.head(placesOf(node)), (place) => place.path),
+    (): ReadonlyArray<string> => []
+  )
   const named = (name: string, path: ReadonlyArray<string>): Verdict =>
     O.match(lookUpAt(scopes, name), {
       // Not bound in the file: a global.
@@ -289,7 +333,8 @@ const judge = (value: Node, scopes: ReadonlyArray<Scope>, depth = 0): Verdict =>
           if (binding.reassigned) {
             return refused(`${name} is a module variable a function sets again: it holds what the last draw gave it`)
           }
-          return binding.filled
+          // Only a write into the place read, or into what holds it, or under it: `a[id] = …` leaves `b.lead` alone.
+          return A.some(binding.filled, (written) => overlaps(written, readPath))
             ? refused(`${name} is a module record a function fills in place: a cache by hand, holding what a draw made`)
             : steady
         }
@@ -411,10 +456,13 @@ const judgeReturns = (fn: Node, scopes: ReadonlyArray<Scope>, depth: number): Ve
   return first.kind === "prop" ? refused("it hands back what it is given") : first
 }
 
-/** What functions do to the names of the file's top level: set them again, or write into what they hold. */
+/**
+ * What functions do to the names of the file's top level: set them again, or write into what they hold (`filledAt`:
+ * each place under a name a function writes into, `[]` for the whole of it).
+ */
 interface Written {
   readonly reassigned: ReadonlyArray<string>
-  readonly filled: ReadonlyArray<string>
+  readonly filledAt: (name: string) => ReadonlyArray<ReadonlyArray<string>>
 }
 
 /**
@@ -425,13 +473,24 @@ const topLevel = (program: Node, written: Written, hookModules: ReadonlyArray<st
   bind(
     A.flatMap(nodes(program["body"]), (statement): ReadonlyArray<readonly [string, Binding]> => {
       const declared = O.getOrElse(child(statement, "declaration"), () => statement)
-      const filled = (name: string): boolean => A.contains(written.filled, name)
+      const filled = written.filledAt
       if (declared.type === "ImportDeclaration") {
         const source = O.flatMap(child(declared, "source"), (literal) => O.liftPredicate(literal["value"], P.isString))
         const hooks = O.exists(source, isHookModule(hookModules))
         return A.map(nodes(declared["specifiers"]), (specifier) => {
           const name = O.getOrElse(O.map(child(specifier, "local"), nameOf), () => "")
-          return [name, { kind: "module", hooks, fn: O.none(), reassigned: false, filled: filled(name) }] as const
+          return [
+            name,
+            {
+              kind: "module",
+              hooks,
+              fn: O.none(),
+              init: O.none(),
+              prop: O.none(),
+              reassigned: false,
+              filled: filled(name)
+            }
+          ] as const
         })
       }
       if (declared.type === "VariableDeclaration") {
@@ -446,6 +505,8 @@ const topLevel = (program: Node, written: Written, hookModules: ReadonlyArray<st
                   kind: "module",
                   hooks: false,
                   fn: O.filter(O.map(child(declarator, "init"), unwrapped), isFunction),
+                  init: child(declarator, "init"),
+                  prop: found.prop,
                   reassigned: !constant && A.contains(written.reassigned, found.name),
                   filled: filled(found.name)
                 }
@@ -462,6 +523,8 @@ const topLevel = (program: Node, written: Written, hookModules: ReadonlyArray<st
               kind: "module",
               hooks: false,
               fn: O.liftPredicate(declared, isFunction),
+              init: O.none(),
+              prop: O.none(),
               reassigned: false,
               filled: filled(nameOf(id))
             }
@@ -471,12 +534,111 @@ const topLevel = (program: Node, written: Written, hookModules: ReadonlyArray<st
     })
   )
 
-/** The name a member write starts from: `refs` in `refs[id] = …`, `refs.a.b ??= …` and `delete refs[id]`. */
-const rootOf = (target: Node): O.Option<string> => {
-  const node = unwrapped(target)
-  if (node.type === "Identifier") return O.some(nameOf(node))
-  return node.type === "MemberExpression" ? O.flatMap(child(node, "object"), rootOf) : O.none()
+/**
+ * A place a value is read from or written into: the name it starts from and the keys after it, as far as they are
+ * written out. `open` says a key after them is not (`refs[id]`, `big[k].x`): what is past it may be any place.
+ */
+interface Place {
+  readonly root: string
+  readonly path: ReadonlyArray<string>
+  readonly open: boolean
 }
+
+/** A member's key when it is written out: `a` in `x.a`, `"a"` in `x["a"]`, `0` in `x[0]`; none in `x[id]`. */
+const writtenKey = (member: Node): O.Option<string> =>
+  member["computed"] === true
+    ? O.flatMap(child(member, "property"), (key) =>
+        key.type === "Literal" && (P.isString(key["value"]) || P.isNumber(key["value"]))
+          ? O.some(`${key["value"]}`)
+          : O.none()
+      )
+    : O.map(child(member, "property"), nameOf)
+
+/**
+ * The places a value stands for: a name (`refs`), a member read (`big.a`, `Object["assign"]`, `refs[id]`), either
+ * side of `??`, `||` and `&&` (`refs ?? {}`), and either branch of a choice. Anything else is a value made there.
+ */
+const placesOf = (value: Node): ReadonlyArray<Place> => {
+  const node = value.type === "ChainExpression" ? O.getOrElse(child(value, "expression"), () => value) : value
+  const bare = unwrapped(node)
+  if (bare !== node || node !== value) return placesOf(bare)
+  const of = (key: string): ReadonlyArray<Place> => O.match(child(bare, key), { onNone: () => [], onSome: placesOf })
+  if (bare.type === "Identifier") return [{ root: nameOf(bare), path: [], open: false }]
+  if (bare.type === "LogicalExpression") return A.appendAll(of("left"), of("right"))
+  if (bare.type === "ConditionalExpression") return A.appendAll(of("consequent"), of("alternate"))
+  if (bare.type !== "MemberExpression") return []
+  return A.map(of("object"), (place) =>
+    place.open
+      ? place
+      : O.match(writtenKey(bare), {
+          onNone: () => ({ ...place, open: true }),
+          onSome: (key) => ({ ...place, path: A.append(place.path, key) })
+        })
+  )
+}
+
+/** A place followed by more keys: `base` then `prop` (a key a pattern took it out by) then `rest`'s keys. */
+const extended = (base: Place, prop: O.Option<string>, rest: Place): Place => {
+  if (base.open) return base
+  const withProp = O.match(prop, { onNone: () => base, onSome: (key) => ({ ...base, path: A.append(base.path, key) }) })
+  return { root: withProp.root, path: A.appendAll(withProp.path, rest.path), open: rest.open }
+}
+
+const startsWith = (path: ReadonlyArray<string>, prefix: ReadonlyArray<string>): boolean =>
+  prefix.length <= path.length && A.every(prefix, (key, index) => path[index] === key)
+
+/** True when a write into one place reaches what the other holds: one is the other, holds it, or is held by it. */
+const overlaps = (written: ReadonlyArray<string>, read: ReadonlyArray<string>): boolean =>
+  startsWith(read, written) || startsWith(written, read)
+
+/** A value assigned to a top-level name somewhere in the file (`r = refs`), with the scopes it is written in. */
+interface TopAssigned {
+  readonly name: string
+  readonly value: Node
+  readonly scopes: ReadonlyArray<Scope>
+}
+
+/** How many other names a place is followed through to the top level. */
+const maxAliases = 8
+
+/**
+ * The places at the file's top level (or a global's, `Object`) a place stands for. A top-level name is itself and
+ * whatever it was given or assigned (`const shared = kept`, `const b = big.b`, `const { assign } = Object`); a name
+ * inside a function is what it was given or assigned (`const r = refs`, `r = refs`, `const r = refs ?? {}`), followed
+ * to the top; a parameter or an element of a list stands for no place of the file. Only what is the same object is
+ * followed: `const a = big.a` is `big`'s place `["a"]`, never `big` itself, so a write into `a` reaches `big.a` and
+ * not `big.b`.
+ */
+const resolved = (
+  place: Place,
+  scopes: ReadonlyArray<Scope>,
+  topAssigned: ReadonlyArray<TopAssigned>,
+  depth = 0
+): ReadonlyArray<Place> =>
+  O.match(lookUpAt(scopes, place.root), {
+    onNone: () => [place],
+    onSome: ({ at, binding }): ReadonlyArray<Place> => {
+      if (depth > maxAliases) return binding.kind === "module" ? [place] : []
+      const where = A.take(scopes, at + 1)
+      const through = (source: Node, sourceScopes: ReadonlyArray<Scope>, prop: O.Option<string>) =>
+        A.flatMap(placesOf(source), (from) =>
+          resolved(extended(from, prop, place), sourceScopes, topAssigned, depth + 1)
+        )
+      if (binding.kind === "module") {
+        const given = A.flatMap(O.toArray(binding.init), (init) => through(init, where, binding.prop))
+        const assigned = A.flatMap(
+          A.filter(topAssigned, (each) => each.name === place.root),
+          (each: TopAssigned) => through(each.value, each.scopes, O.none())
+        )
+        return A.prepend(A.appendAll(given, assigned), place)
+      }
+      if (binding.kind !== "inner") return []
+      return A.appendAll(
+        A.flatMap(O.toArray(binding.init), (init) => through(init, where, binding.prop)),
+        A.flatMap(binding.also, (value) => through(value, where, O.none()))
+      )
+    }
+  })
 
 /** The calls that write into the object they are handed first: `Object.assign(refs, { [id]: fn })` and its kin. */
 const writesInto = [
@@ -487,104 +649,70 @@ const writesInto = [
   "Reflect.defineProperty"
 ]
 
-/** The name a call is made by, with what it is called on: `Object.assign` in `Object.assign(refs, …)`. */
-const calledPath = (callee: Node): string =>
-  O.getOrElse(
-    O.map(memberOf(unwrapped(callee)), ({ path, root }) => A.join([nameOf(root), ...path], ".")),
-    () => nameOf(unwrapped(callee))
-  )
-
-/** How many other names a write is followed through to the top-level name it writes into. */
-const maxAliases = 8
-
-/**
- * The top-level name a name inside a function stands for: itself when the file's top level binds it, or what another
- * name of the function was given (`const r = refs`, `const { inner } = refs`), followed to the top.
- */
-const topNameOf = (name: string, scopes: ReadonlyArray<Scope>, depth = 0): O.Option<string> =>
-  O.flatMap(lookUpAt(scopes, name), ({ at, binding }) => {
-    if (at === 0) return O.some(name)
-    if (binding.kind !== "inner" || depth > maxAliases) return O.none()
-    return O.flatMap(O.flatMap(binding.init, rootOf), (other) => topNameOf(other, A.take(scopes, at + 1), depth + 1))
-  })
-
-/**
- * The top level's other names for one another: `const r = refs` makes `r` and `refs` one record, so a write into
- * either fills both.
- */
-const topAliases = (program: Node): ReadonlyArray<readonly [string, string]> =>
-  A.flatMap(nodes(program["body"]), (statement) => {
-    const declared = O.getOrElse(child(statement, "declaration"), () => statement)
-    if (declared.type !== "VariableDeclaration") return []
-    return A.flatMap(nodes(declared["declarations"]), (declarator) =>
-      O.match(child(declarator, "init"), {
-        onNone: () => [],
-        onSome: (init) =>
-          O.match(rootOf(init), {
-            onNone: () => [],
-            onSome: (other) =>
-              O.match(child(declarator, "id"), {
-                onNone: () => [],
-                onSome: (id) => A.map(namesIn(id), ({ name }) => [name, other] as const)
-              })
-          })
-      })
-    )
-  })
-
-/** Every name `filled` names, with each top-level name that is another name for one of them. */
-const withAliases = (filled: ReadonlyArray<string>, aliases: ReadonlyArray<readonly [string, string]>) => {
-  const grow = (names: ReadonlyArray<string>, rounds: number): ReadonlyArray<string> => {
-    const next = A.dedupe(
-      A.appendAll(
-        names,
-        A.flatMap(aliases, ([name, other]) =>
-          A.contains(names, name) ? [other] : A.contains(names, other) ? [name] : []
-        )
-      )
-    )
-    return next.length === names.length || rounds <= 0 ? next : grow(next, rounds - 1)
-  }
-  return grow(A.dedupe(filled), aliases.length)
-}
-
 /**
  * What the functions of a file do to its top level's names: assign one again (`current = next`, `count++`), or write
  * into what one holds (`refs[id] = …`, `refs[id] ??= …`, `refs.count++`, `delete refs[id]`,
- * `Object.assign(refs, { [id]: fn })`), directly or through another name for it (`const r = refs; r[id] ??= fn`).
+ * `Object.assign(refs, { [id]: fn })`, under any name for `Object.assign`: `Object["assign"]`, `const { assign } =
+ * Object`), directly or through another name for it (`const r = refs; r[id] ??= fn`, `r = refs`, `refs ?? {}`).
  */
 const writtenInFunctions = (program: Node, top: Scope): Written => {
   const reassigned: Array<string> = []
-  const filled: Array<string> = []
+  const writes: Array<{ readonly target: Node; readonly scopes: ReadonlyArray<Scope> }> = []
+  const calls: Array<{ readonly call: Node; readonly scopes: ReadonlyArray<Scope> }> = []
+  const topAssigned: Array<TopAssigned> = []
   const visit = (node: Node, scopes: ReadonlyArray<Scope>): void => {
     const here = isFunction(node) ? A.append(scopes, scopeOf(node)) : scopes
     const atTop = (name: string): boolean => O.exists(lookUpAt(here, name), (bound) => bound.at === 0)
-    const fill = (target: Node): void => {
-      for (const name of O.toArray(O.flatMap(rootOf(target), (root) => topNameOf(root, here)))) filled.push(name)
-    }
     const deleted = node.type === "UnaryExpression" && node["operator"] === "delete"
-    if (here.length > 1 && (deleted || typeIs(node, "AssignmentExpression", "UpdateExpression"))) {
+    if (deleted || typeIs(node, "AssignmentExpression", "UpdateExpression")) {
       const target = child(node, node.type === "AssignmentExpression" ? "left" : "argument")
       const member = O.exists(target, (left) => unwrapped(left).type === "MemberExpression")
       if (member) {
-        for (const left of O.toArray(target)) fill(left)
+        if (here.length > 1) for (const left of O.toArray(target)) writes.push({ target: left, scopes: here })
       } else {
         for (const { name } of O.match(target, { onNone: () => [], onSome: (left) => namesIn(unwrapped(left)) })) {
-          if (atTop(name)) reassigned.push(name)
+          if (!atTop(name)) continue
+          if (here.length > 1) reassigned.push(name)
+          // `r = refs`, wherever it is written, makes `r` another name for `refs`.
+          const simple = O.exists(O.map(target, unwrapped), (left) => left.type === "Identifier")
+          if (simple)
+            for (const value of O.toArray(child(node, "right"))) topAssigned.push({ name, value, scopes: here })
         }
       }
     }
-    if (
-      here.length > 1 &&
-      node.type === "CallExpression" &&
-      O.exists(child(node, "callee"), (callee) => A.contains(writesInto, calledPath(callee)))
-    ) {
-      for (const first of A.take(nodes(node["arguments"]), 1)) fill(first)
-    }
+    if (here.length > 1 && node.type === "CallExpression") calls.push({ call: node, scopes: here })
     for (const next of children(node)) visit(next, here)
   }
   visit(program, [top])
-  return { reassigned, filled: withAliases(filled, topAliases(program)) }
+  const placesIn = (value: Node, scopes: ReadonlyArray<Scope>): ReadonlyArray<Place> =>
+    A.flatMap(placesOf(value), (place) => resolved(place, scopes, topAssigned))
+  // A call writes into its first argument when what it calls is `Object.assign` or its kin, under any name.
+  const filling = A.flatMap(calls, ({ call, scopes }) =>
+    O.exists(child(call, "callee"), (callee) =>
+      A.some(
+        placesIn(callee, scopes),
+        (place) => !place.open && A.contains(writesInto, A.join([place.root, ...place.path], "."))
+      )
+    )
+      ? A.map(A.take(nodes(call["arguments"]), 1), (target) => ({ target, scopes }))
+      : []
+  )
+  const slots = A.flatMap(A.appendAll(writes, filling), ({ target, scopes }) => placesIn(target, scopes))
+  const filledAt = (name: string): ReadonlyArray<ReadonlyArray<string>> =>
+    A.dedupeWith(
+      A.flatMap(resolved({ root: name, path: [], open: false }, [top], topAssigned), (own) =>
+        A.flatMap(
+          A.filter(slots, (slot) => slot.root === own.root),
+          (slot: Place): ReadonlyArray<ReadonlyArray<string>> => {
+            if (own.open) return overlaps(slot.path, own.path) ? [[]] : []
+            if (startsWith(slot.path, own.path)) return [A.drop(slot.path, own.path.length)]
+            return startsWith(own.path, slot.path) ? [[]] : []
+          }
+        )
+      ),
+      (a, b) => a.length === b.length && startsWith(a, b)
+    )
+  return { reassigned, filledAt }
 }
 
 /** One place a screen hands a value over: where, what it is handed as, and the verdict. */
@@ -626,7 +754,7 @@ export const readScreen = (input: {
   const lineAt = (offset: number): number => A.filter(starts, (start) => start <= offset).length
   const top = topLevel(
     program,
-    writtenInFunctions(program, topLevel(program, { reassigned: [], filled: [] }, hookModules)),
+    writtenInFunctions(program, topLevel(program, { reassigned: [], filledAt: () => [] }, hookModules)),
     hookModules
   )
   const refs: Array<Handed> = []

@@ -103,11 +103,11 @@ class NotMatched extends S.Opaque<NotMatched, { readonly brand: unique symbol }>
  * they chose, or none on purpose), or not at all. `matchedColumn` answers the column whatever settled it.
  */
 export const ColumnMatch = MatchHow.mapMembers(() => Tuple.make(MatchedByHeading, MatchedByPerson, NotMatched)).pipe(
-  S.toTaggedUnion("how"),
   S.annotate({
     identifier: "ColumnMatch",
     description: "How one field is filled: from which file column, and how that was settled"
-  })
+  }),
+  S.toTaggedUnion("how")
 )
 /** The decoded value of `ColumnMatch`: how one field is filled. */
 export type ColumnMatch = typeof ColumnMatch.Type
@@ -118,7 +118,11 @@ export type ColumnMatch = typeof ColumnMatch.Type
  * @example matchedColumn(match) // O.some({ index: 3, header: "Unit", examples: ["EA", "BX"] })
  */
 export const matchedColumn = (match: ColumnMatch): O.Option<ColumnPick> =>
-  match.how === "heading" ? O.some(match.column) : match.how === "person" ? match.column : O.none()
+  ColumnMatch.match(match, {
+    heading: (byHeading) => O.some(byHeading.column),
+    person: (byPerson) => byPerson.column,
+    none: () => O.none()
+  })
 
 /** A file column no field reads, and how many rows hold a value in it: said on screen, never stored. */
 export const UnusedColumn = S.Struct({

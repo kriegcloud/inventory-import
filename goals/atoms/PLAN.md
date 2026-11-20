@@ -709,7 +709,7 @@ reach: a read ended by a later save's answer (group 8; `put` re-issues the read,
 | 3 Confirm | Closed by "Refuse, show, confirm again" (`42c8303`); the confirm's `clear` has its test | Named tests, `ConfirmDraft.test.ts`, `ConfirmRevision.slow.test.ts` |
 | 4 a SKU typed while a save is out | `typed` is worked out from what the server is known to hold, so the read goes out once the server has the SKU | Named test: the first answer sends the SKU and asks nothing, the second asks |
 | 5 a save that failed waits on nothing | Rows that wait are sent again when a picture arrives; a line above the review stays while they wait, with Save again; the failed-save words never say "reload the page". What a reload does and what a confirm elsewhere does are Benjamin's answers, below | Named tests; `DraftRegion.test.ts` (the wired failure and Save again); seen on screen |
-| 6 a waiting accept survives a match | Benjamin's answer "Server refuses, screen says so", below | below |
+| 6 a waiting accept survives a match | Benjamin's answer "Server refuses, screen says so", below; atomic with the match since `4b06d1a` | below; `MatchAtomic.slow.test.ts` |
 | 7 toasts outside the machine | Saying it is an effect (`Say`), returned only when a save was out; `SaveRefused` has the flight guard | Named test: a stray answer says nothing and changes nothing |
 | 8 the read that is out is ended by a later save | `14d737e`, three faults of it fixed in `d1e31bf`: below | `Seed.atoms.test.ts`, `ReviewDraft.test.ts` |
 | 9 Continue over a confirmed view | Closed by the confirm raising the revision (`42c8303`) | `ConfirmRevision.slow.test.ts` asserts the revision goes up |
@@ -750,11 +750,24 @@ discriminators" below. Then the groups the draft review's table above left open:
   later failure of the read (a removed import's review went on showing the saved view); a late landing of a read
   already let go released the hold of the read made since for the same member; the once more refreshed over a
   request that had left in the gap, ending it. A test for each, each failing with its fix taken out.
-- **Not settled: the rule "a read that left after the save was sent includes it".** The review found two orderings
-  where it loses an `Ask`: the server serves a read that left after the save before the save's write commits, and a
-  save retried by `callWrite` (its first attempt failed) whose time sent is the first attempt's. The draft is left
-  with `landed` over a picture that lacks it until the next read; a confirm then holds back once for nothing. The
-  rule is the review's own wording; whether to count from when the save was answered instead is put to the lead.
+- **Counted from the answer** (`6b53d73`, the lead's ruling). The rule as first built (a read that left after the
+  save was *sent* includes it) lost an `Ask` in two orderings: a read served before the save's write committed, and
+  a save `callWrite` sent again after a failure, counted from its first try. A read must now have left after the
+  server *answered* the write; one out before that lands and is asked once more. A test for each ordering, each
+  failing with the old rule; the second goes through the app's own `callWrite` (the test registry can now).
+- **The match is atomic with the stale-accept check** (`4b06d1a`). The match was three writes (a stamp from the
+  handler's read, the field's accepts taken out by rewriting rows from an earlier read, then the choices), and a save
+  checked the choices and wrote unguarded: in the windows, an accept made before the match was applied with
+  `notApplied` empty, and a save landing mid-match was overwritten whole. Now `matchColumn` is one batch (the choice
+  stamped in SQL with the revision that statement writes; the field's accepts taken out in SQL by name from the rows
+  as they are; the audit line), and every write of a save holds only while the draft's choices are those it was
+  checked against: otherwise `rematched`, and the handler checks it again on the new choices. The twin does the
+  same. Slow tests (`MatchAtomic.slow.test.ts`) put the other person's write at the one place it can fall, through a
+  stand-in around the real D1 store: a save between the match's read and write (fails with the stamp one revision
+  earlier), a match between a save's check and write (fails without the guard), and a save just before the match's
+  write (its leave-out stands).
+- **Not built, Benjamin's to answer:** a kept waiting row sent again over a decision somebody else saved since
+  (`Draft.machine.ts` `Opened` and `ViewArrived`); the lead puts it to him.
 - **Group 11** (`e7ca8df`). Category and UoM in the toolbar are the kit's `DataTableFacetedFilter`, fed from
   `quickFilterOptions`; the toolbar is given `quick={[]}`. Only the Filter menu's values travel on the columns'
   meta. Every cell and heading is a named component at module level, and the editor's and viewer's columns are made

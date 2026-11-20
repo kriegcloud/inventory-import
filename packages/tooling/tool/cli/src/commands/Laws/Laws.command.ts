@@ -15,6 +15,7 @@ import { exactExports, exportsSentence } from "./Exports.rules.ts"
 import { keys, keysSentence } from "./Keys.rules.ts"
 import { refCallbacks, refCallbacksSentence } from "./RefCallbacks.rules.ts"
 import { screens, screensSentence } from "./Screens.rules.ts"
+import { tags, tagsSentence } from "./Tags.rules.ts"
 
 /** `laws exports`: the package in the current folder has exact exports, one per component and hook. */
 export const exportsCommand = Command.make("exports", {}, () =>
@@ -40,6 +41,11 @@ export const keysCommand = Command.make("keys", {}, () => Effect.flatMap(keys(),
 export const refCallbacksCommand = Command.make("ref-callbacks", {}, () =>
   Effect.flatMap(refCallbacks(), emit(refCallbacksSentence))
 ).pipe(Command.withDescription("Every ref is a DOM ref or a callback that stays the same across draws"))
+
+/** `laws tags`: no `_tag` is compared by hand in the packages with screens. */
+export const tagsCommand = Command.make("tags", {}, () => Effect.flatMap(tags(), emit(tagsSentence))).pipe(
+  Command.withDescription("No _tag is compared by hand in the packages with screens")
+)
 
 const write = Flag.Boolean("write").pipe(
   Flag.withDescription("Repair the code that can be repaired mechanically, then check"),
@@ -68,6 +74,7 @@ export const lawsCommand = Command.make("laws").pipe(
     exportsCommand,
     keysCommand,
     refCallbacksCommand,
-    screensCommand
+    screensCommand,
+    tagsCommand
   ])
 )

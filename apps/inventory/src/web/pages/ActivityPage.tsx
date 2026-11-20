@@ -36,7 +36,7 @@ export function ActivityPage() {
   // Each list in the same shape, for the one error and skeleton below.
   const shapeOf = <A,>(read: AsyncResult.AsyncResult<A, unknown>, refetch: () => void) => ({
     data: read.pipe(AsyncResult.value, O.getOrUndefined),
-    error: read._tag === "Failure" && !read.waiting ? read.cause.pipe(Cause.squash) : null,
+    error: AsyncResult.isFailure(read) && !read.waiting ? read.cause.pipe(Cause.squash) : null,
     updating: read.waiting,
     refetch: () => {
       refetch()

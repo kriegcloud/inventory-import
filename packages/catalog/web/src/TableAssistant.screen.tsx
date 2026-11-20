@@ -1,3 +1,4 @@
+import * as Match from "effect/Match"
 import { stringify } from "@inventory/ui/Json"
 import { ArrowUp, ChevronRight, MessageSquarePlus, Sparkles, Undo2, X } from "lucide-react"
 import { useAtom, useAtomMount, useAtomSet, useAtomSubscribe } from "@effect/atom-react"
@@ -40,9 +41,10 @@ const whoAnswered = (answer: {
   readonly answeredBy: AnsweredBy
   readonly note: O.Option<string>
 }): { readonly answeredBy: string; readonly note: string | null } =>
-  answer.answeredBy._tag === "Rules"
-    ? { answeredBy: "Rules", note: answer.answeredBy.reason }
-    : { answeredBy: answer.answeredBy.model, note: O.getOrNull(answer.note) }
+  Match.valueTags(answer.answeredBy, {
+    Rules: (by) => ({ answeredBy: "Rules", note: by.reason }),
+    Model: (by) => ({ answeredBy: by.model, note: O.getOrNull(answer.note) })
+  })
 
 /** The parts of a TanStack table the assistant reads and writes: the table's own state, never a copy of it. */
 export type AssistedTable = {

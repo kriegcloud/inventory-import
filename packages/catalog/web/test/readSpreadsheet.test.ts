@@ -6,7 +6,14 @@ import { describe, expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
-import type { Note, NoteKind, Row, SpreadsheetTable } from "@inventory/catalog-model/Spreadsheet"
+import * as S from "effect/Schema"
+import {
+  type Note,
+  type NoteKind,
+  type Row,
+  type SpreadsheetTable,
+  WorkbookFormat
+} from "@inventory/catalog-model/Spreadsheet"
 import { sayError } from "@inventory/client/SayError"
 import { readSpreadsheet } from "@inventory/catalog-web/Spreadsheet"
 
@@ -160,7 +167,7 @@ describe("Workbook", () => {
   it.effect("picks the visible sheet with the most data, says why, and lists every sheet", () =>
     Effect.gen(function* () {
       const table = yield* readSpreadsheet({ file: fixture("sheets.xlsx") })
-      if (table.format._tag !== "xlsx") throw new Error("expected a workbook")
+      if (!S.is(WorkbookFormat)(table.format)) throw new Error("expected a workbook")
       expect(A.map(table.format.sheets, (s) => [s.name, s.visibility, s.rowCount])).toEqual([
         ["Read me", "visible", 2],
         ["Empty", "visible", 0],
@@ -182,7 +189,7 @@ describe("Workbook", () => {
   it.effect("reads the sheet the person chose, even a hidden one", () =>
     Effect.gen(function* () {
       const table = yield* readSpreadsheet({ file: fixture("sheets.xlsx"), sheet: "Lookup" })
-      if (table.format._tag !== "xlsx") throw new Error("expected a workbook")
+      if (!S.is(WorkbookFormat)(table.format)) throw new Error("expected a workbook")
       expect(table.format.chosen).toMatchObject({ name: "Lookup", reason: "chosenByPerson" })
       expect(texts(rowAt(table, 2))).toEqual(["Each", "One piece"])
     })

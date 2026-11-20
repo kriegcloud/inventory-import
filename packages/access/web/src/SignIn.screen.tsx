@@ -112,7 +112,7 @@ const organizationName = Atom.make("")
  * for a failure that is not a refusal.
  */
 const refusalOf = (result: AsyncResult.AsyncResult<void, AuthRefused>): string | undefined =>
-  result._tag !== "Failure" || result.waiting
+  !AsyncResult.isFailure(result) || result.waiting
     ? undefined
     : O.match(AsyncResult.error(result), {
         onNone: () => "Something went wrong. Try again.",

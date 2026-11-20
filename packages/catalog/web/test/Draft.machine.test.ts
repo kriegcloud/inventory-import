@@ -28,29 +28,27 @@ const kept = decisionFromFlags({ kept: true })
 
 const Row = S.Literals(["a", "b", "c"])
 const To = S.Literals(["out", "kept", "nothing"])
-const tagged = <const Tag extends string>(tag: Tag) => S.Struct({ _tag: S.tag(tag) })
-
 /** Everything that can happen, in any order. */
-const Command = S.Union([
-  S.Struct({ _tag: S.tag("Decide"), row: Row, to: To }),
-  S.Struct({ _tag: S.tag("SomeoneElse"), row: Row, to: To }),
-  tagged("ServerTakesSave"),
-  tagged("SaveAnswers"),
-  tagged("SaveFails"),
-  tagged("SaveRefused"),
-  tagged("SaveAgain"),
-  tagged("ReturnToTab"),
-  tagged("ServerTakesRead"),
-  tagged("ReadArrives"),
-  tagged("OtherAnswerSent"),
-  tagged("OtherAnswerArrives"),
-  tagged("Leave"),
-  tagged("ComeBack"),
-  tagged("PressConfirm"),
-  tagged("ServerTakesConfirm"),
-  tagged("ConfirmAnswers"),
-  tagged("ConfirmFails")
-])
+const Command = S.TaggedUnion({
+  Decide: { row: Row, to: To },
+  SomeoneElse: { row: Row, to: To },
+  ServerTakesSave: {},
+  SaveAnswers: {},
+  SaveFails: {},
+  SaveRefused: {},
+  SaveAgain: {},
+  ReturnToTab: {},
+  ServerTakesRead: {},
+  ReadArrives: {},
+  OtherAnswerSent: {},
+  OtherAnswerArrives: {},
+  Leave: {},
+  ComeBack: {},
+  PressConfirm: {},
+  ServerTakesConfirm: {},
+  ConfirmAnswers: {},
+  ConfirmFails: {}
+})
 type Command = typeof Command.Type
 
 const change = (row: string, to: "out" | "kept" | "nothing"): RowChanges => ({
@@ -175,13 +173,14 @@ const sentRows = (delta: DecisionDelta): ReadonlyArray<string> => [...R.keys(del
 
 const run = (world: World, command: Command): void => {
   // A confirmed import is closed: all that is left to happen is the confirm's own answer.
-  if (O.isSome(world.closed) && command._tag !== "ConfirmAnswers") return
-  switch (command._tag) {
-    case "PressConfirm":
+  if (O.isSome(world.closed) && !Command.guards.ConfirmAnswers(command)) return
+  Command.match(command, {
+    PressConfirm: () => {
       if (world.draft.onScreen && O.isSome(world.draft.held)) dispatch(world, DraftEvent.ConfirmPressed())
       return
-    case "ServerTakesConfirm":
-      return O.match(world.confirm, {
+    },
+    ServerTakesConfirm: () =>
+      O.match(world.confirm, {
         onNone: () => {},
         onSome: (confirm) => {
           if (O.isSome(confirm.answer)) return
@@ -201,9 +200,9 @@ const run = (world: World, command: Command): void => {
           world.closed = O.some(written)
           world.confirm = O.some({ ...confirm, answer: O.some("made") })
         }
-      })
-    case "ConfirmAnswers":
-      return O.match(world.confirm, {
+      }),
+    ConfirmAnswers: () =>
+      O.match(world.confirm, {
         onNone: () => {},
         onSome: (confirm) => {
           if (O.isNone(confirm.answer)) return
@@ -213,21 +212,22 @@ const run = (world: World, command: Command): void => {
           world.confirmed = {}
           dispatch(world, DraftEvent.ConfirmDone())
         }
-      })
-    case "ConfirmFails":
+      }),
+    ConfirmFails: () => {
       // Lost on its way to the server: nothing was written.
       if (!O.exists(world.confirm, (confirm) => O.isNone(confirm.answer))) return
       world.confirm = O.none()
       return dispatch(world, DraftEvent.ConfirmFailed())
-    case "Decide": {
+    },
+    Decide: (command) => {
       const changes = change(command.row, command.to)
       if (!world.draft.onScreen || O.isNone(world.draft.held)) return
       if (Eq.equals(over(shown(world.draft), changes), shown(world.draft))) return
       world.dirty[command.row] = command.to
       delete world.confirmed[command.row]
       return dispatch(world, DraftEvent.Decided({ changes }))
-    }
-    case "SomeoneElse":
+    },
+    SomeoneElse: (command) => {
       if (serverTakes(world, change(command.row, command.to))) {
         delete world.confirmed[command.row]
         // Decided after the server took the person's save of the same row: theirs is the later word.
@@ -236,8 +236,9 @@ const run = (world: World, command: Command): void => {
         }
       }
       return
-    case "ServerTakesSave":
-      return O.match(world.save, {
+    },
+    ServerTakesSave: () =>
+      O.match(world.save, {
         onNone: () => {},
         onSome: (save) => {
           if (O.isSome(save.answer)) return
@@ -247,9 +248,9 @@ const run = (world: World, command: Command): void => {
           })
           world.save = O.some({ delta: save.delta, answer: O.some({ revision: world.server.revision, changed }) })
         }
-      })
-    case "SaveAnswers":
-      return O.match(world.save, {
+      }),
+    SaveAnswers: () =>
+      O.match(world.save, {
         onNone: () => {},
         onSome: (save) => {
           if (O.isNone(save.answer)) return
@@ -265,52 +266,60 @@ const run = (world: World, command: Command): void => {
           world.overtaken = {}
           dispatch(world, DraftEvent.SaveAnswered(save.answer.value))
         }
-      })
-    case "SaveFails":
+      }),
+    SaveFails: () => {
       if (O.isNone(world.save)) return
       world.save = O.none()
       return dispatch(world, DraftEvent.SaveFailed())
-    case "SaveRefused":
+    },
+    SaveRefused: () => {
       if (!O.exists(world.save, (save) => O.isNone(save.answer))) return
       world.save = O.none()
       world.dirty = {}
       return dispatch(world, DraftEvent.SaveRefused())
-    case "SaveAgain":
+    },
+    SaveAgain: () => {
       if (world.draft.stalled) dispatch(world, DraftEvent.SaveAgain())
       return
-    case "ReturnToTab":
+    },
+    ReturnToTab: () => {
       if (world.draft.onScreen) world.read = O.some(O.none())
       return
-    case "ServerTakesRead":
+    },
+    ServerTakesRead: () => {
       if (O.exists(world.read, O.isNone)) world.read = O.some(O.some(world.server))
       return
-    case "ReadArrives":
-      return O.match(O.flatten(world.read), {
+    },
+    ReadArrives: () =>
+      O.match(O.flatten(world.read), {
         onNone: () => {},
         onSome: (picture) => {
           world.read = O.none()
           put(world, picture)
         }
-      })
-    case "OtherAnswerSent":
+      }),
+    OtherAnswerSent: () => {
       world.late.push(world.server)
       return
-    case "OtherAnswerArrives": {
+    },
+    OtherAnswerArrives: () => {
       const picture = world.late.shift()
       if (picture !== undefined) put(world, picture)
       return
-    }
-    case "Leave":
+    },
+    Leave: () => {
       if (world.draft.onScreen) dispatch(world, DraftEvent.Left())
       return
-    case "ComeBack":
+    },
+    ComeBack: () => {
       if (world.draft.onScreen) return
       dispatch(world, DraftEvent.Opened())
       // The step reads the view it finds, and asks again behind it.
       O.map(world.view, (view) => dispatch(world, DraftEvent.ViewArrived(view)))
       world.read = O.some(O.none())
       return
-  }
+    }
+  })
 }
 
 /** Holds after every step, whatever happened before it. */

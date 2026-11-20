@@ -77,6 +77,19 @@
       "inputs": ["apps/**/src/**/*.tsx", "packages/**/src/**/*.tsx", "packages/tooling/tool/cli/src/**"],
       "outputs": []
     },
+    // No `_tag` is compared by hand in the packages with screens (`beep laws tags`).
+    "//#tags:check": {
+      "inputs": [
+        "apps/*/src/web/**/*.{ts,tsx}",
+        "apps/*/test/web/**/*.{ts,tsx}",
+        "packages/*/web/**/*.{ts,tsx}",
+        "packages/client/**/*.{ts,tsx}",
+        "packages/review/**/*.{ts,tsx}",
+        "packages/ui/**/*.{ts,tsx}",
+        "packages/tooling/tool/cli/src/**"
+      ],
+      "outputs": []
+    },
     // Every Effect import from its own path under its own name (`beep laws effect-imports`,
     // docs/standards/effect-imports.md): code, the examples in its comments, and the standing documents.
     "//#imports:check": {

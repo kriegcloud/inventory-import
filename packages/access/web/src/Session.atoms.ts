@@ -172,7 +172,7 @@ export const sessionView: Atom.Atom<SessionView> = Atom.map(session, (result): S
     organizations: state === undefined || state.status === "signed-out" ? [] : state.organizations,
     features: state?.features,
     probablySignedOut: state === undefined && !wasSignedIn(),
-    error: result._tag === "Failure" && !result.waiting ? Cause.squash(result.cause) : null
+    error: AsyncResult.isFailure(result) && !result.waiting ? Cause.squash(result.cause) : null
   }
 })
 

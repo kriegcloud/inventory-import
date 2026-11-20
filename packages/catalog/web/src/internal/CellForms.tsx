@@ -1,6 +1,7 @@
 // The two cells of an item that hold JSON, fixed in a small form instead of as raw text. The form writes the cell back
 // as the brief's own JSON; the one thing not to break: nothing is saved that the domain's readers (`readDimensions`,
 // `readVendors`) would refuse, and their sentence is what the person reads under the fields.
+import * as Match from "effect/Match"
 import { PlusIcon, Trash2Icon } from "lucide-react"
 import { useAtom } from "@effect/atom-react"
 import * as ScopedAtom from "@effect/atom-react/ScopedAtom"
@@ -70,8 +71,7 @@ function DimensionsFields(props: CellFormProps) {
         event.preventDefault()
         const cell = dimensionsCell(draft)
         const read = readDimensions(cell)
-        if (read._tag === "bad") setError(read.message)
-        else props.onSave(cell)
+        Match.valueTags(read, { bad: (bad) => setError(bad.message), ok: () => props.onSave(cell) })
       }}
     >
       <div className="grid grid-cols-2 gap-3">
@@ -162,8 +162,7 @@ function VendorsFields(props: CellFormProps) {
         event.preventDefault()
         const cell = vendorsCell(vendors)
         const read = readVendors(cell)
-        if (read._tag === "bad") setError(read.message)
-        else props.onSave(cell)
+        Match.valueTags(read, { bad: (bad) => setError(bad.message), ok: () => props.onSave(cell) })
       }}
     >
       <RadioGroup

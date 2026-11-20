@@ -145,7 +145,7 @@ function AddPerson() {
   const pending = result.waiting
   const outcome = result.pipe(AsyncResult.value, O.getOrUndefined)
   const problem = !pending && outcome !== undefined && Result.isFailure(outcome) ? outcome.failure : undefined
-  const failed = !pending && result._tag === "Failure" ? Cause.squash(result.cause) : null
+  const failed = !pending && AsyncResult.isFailure(result) ? Cause.squash(result.cause) : null
   return (
     <Dialog
       open={open}
@@ -355,7 +355,7 @@ export function PeoplePage() {
   useAtomMount(remove)
   const columns = useAtomValue(peopleColumns)
   const data = list.pipe(AsyncResult.value, O.getOrUndefined)
-  const error = list._tag === "Failure" && !list.waiting ? Cause.squash(list.cause) : null
+  const error = AsyncResult.isFailure(list) && !list.waiting ? Cause.squash(list.cause) : null
   const count = data?.length ?? 0
   return (
     <div className="flex h-full flex-col">

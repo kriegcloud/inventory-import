@@ -29,7 +29,7 @@ import { navigate } from "@inventory/ui/Route"
 import { importAddress } from "./internal/route.ts"
 import {
   type ChangedItem,
-  type ImportEvent,
+  ImportEvent,
   type ImportResult,
   type ImportView,
   outcomeReasonOf,
@@ -116,10 +116,12 @@ function ChangedList(props: { items: ReadonlyArray<ChangedItem>; count: number }
 }
 
 /** One line of the import's history, from what its confirms and take-backs stored. */
-const eventLine = (event: ImportEvent): string =>
-  event._tag === "Confirmed"
-    ? `Imported ${items(event.created)}${event.updated === 0 ? "" : `, updated ${event.updated}`}, ${event.by}, ${whenShort(event.at)}`
-    : `Took back ${items(event.removed)}${event.restored === 0 ? "" : `, restored ${event.restored}`}${event.kept === 0 ? "" : `, kept ${event.kept}`}, ${event.by}, ${whenShort(event.at)}`
+const eventLine: (event: ImportEvent) => string = ImportEvent.match({
+  Confirmed: (event) =>
+    `Imported ${items(event.created)}${event.updated === 0 ? "" : `, updated ${event.updated}`}, ${event.by}, ${whenShort(event.at)}`,
+  TakenBack: (event) =>
+    `Took back ${items(event.removed)}${event.restored === 0 ? "" : `, restored ${event.restored}`}${event.kept === 0 ? "" : `, kept ${event.kept}`}, ${event.by}, ${whenShort(event.at)}`
+})
 
 /** The view the person chose on one import's result; none until they choose, and the step opens on its own. */
 const chosenFilter = perKey((_id: ImportId) => Atom.make<O.Option<Filter>>(O.none()))
@@ -182,12 +184,14 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
         return
       }
       const done = exit.value
-      const last = done.history.at(-1)
+      const last = O.filter(A.last(done.history), ImportEvent.guards.TakenBack)
       toast.success(
-        last?._tag === "TakenBack"
-          ? // The event's numbers are the whole take-back's, over every confirm it undid.
-            `Took back ${items(last.removed)} from ${done.fileName}${last.restored === 0 ? "" : `, restored ${last.restored}`}${last.kept === 0 ? "" : `, kept ${last.kept}`}`
-          : `${done.fileName} has nothing left to take back`
+        O.match(last, {
+          // The event's numbers are the whole take-back's, over every confirm it undid.
+          onSome: (event) =>
+            `Took back ${items(event.removed)} from ${done.fileName}${event.restored === 0 ? "" : `, restored ${event.restored}`}${event.kept === 0 ? "" : `, kept ${event.kept}`}`,
+          onNone: () => `${done.fileName} has nothing left to take back`
+        })
       )
       setFilter("takenBack")
     })
@@ -206,7 +210,7 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
 
   const { removable, restorable, changed, changedCount, kept, keptCount, confirms } = view.takeBack
   const takenBack = view.status === "takenBack"
-  const lastTakeBack = view.history.findLast((event) => event._tag === "TakenBack")
+  const lastTakeBack = O.getOrUndefined(A.findLast(view.history, ImportEvent.guards.TakenBack))
   // A take-back is possible while a confirm is in force and one of its items is as it created or replaced it.
   const canTakeBack = props.canImport && !takenBack && confirms.length > 0 && (removable > 0 || restorable > 0)
   const noLonger = !takenBack && confirms.length > 0 && removable === 0 && restorable === 0 && changedCount > 0
@@ -290,7 +294,7 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
         title={takenBack ? `Took back ${view.fileName}` : `Imported ${view.fileName}`}
         line={
           takenBack && lastTakeBack !== undefined
-            ? `${lastTakeBack.by} · ${when(lastTakeBack.at)} · removed ${items(lastTakeBack._tag === "TakenBack" ? lastTakeBack.removed : 0)}${lastTakeBack._tag === "TakenBack" && lastTakeBack.restored > 0 ? ` · restored ${lastTakeBack.restored}` : ""}`
+            ? `${lastTakeBack.by} · ${when(lastTakeBack.at)} · removed ${items(lastTakeBack.removed)}${lastTakeBack.restored > 0 ? ` · restored ${lastTakeBack.restored}` : ""}`
             : // What the form-only rules changed without the person, counted from what the confirms stored.
               `${result.importedBy} · ${when(result.importedAt)}${result.fixed.cells === 0 ? "" : ` · ${result.fixed.cells} values fixed for you in ${result.fixed.rows} ${result.fixed.rows === 1 ? "row" : "rows"}`}`
         }

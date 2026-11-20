@@ -1,3 +1,4 @@
+import * as Match from "effect/Match"
 import { useAtom, useAtomMount, useAtomSet, useAtomValue } from "@effect/atom-react"
 import * as A from "effect/Array"
 import * as Cause from "effect/Cause"
@@ -207,9 +208,10 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
   const answered =
     suggested === undefined
       ? undefined
-      : suggested.answeredBy._tag === "Model"
-        ? `Answered by the model ${suggested.answeredBy.model}.`
-        : `Answered by the fixed rules, not a model: ${suggested.answeredBy.reason}`
+      : Match.valueTags(suggested.answeredBy, {
+          Model: (by) => `Answered by the model ${by.model}.`,
+          Rules: (by) => `Answered by the fixed rules, not a model: ${by.reason}`
+        })
   // Offered for a row that cannot be imported, and for a heading no field reads while a field has no column.
   const canSuggest = offersSuggestions({
     cannot: counts.cannot,

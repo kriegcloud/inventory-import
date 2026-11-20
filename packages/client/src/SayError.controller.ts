@@ -126,7 +126,7 @@ export const sayError = (
   }
   if (HttpClientError.isHttpClientError(error)) {
     const status = statusOf(error)
-    if (error.reason._tag === "TransportError") {
+    if (unreachable(error)) {
       return said(
         "The server could not be reached",
         "Check the connection and try again. Nothing was lost on this page."
@@ -177,6 +177,10 @@ export const toastError = (
   })
 }
 
+/** True when the request never got an answer: the server could not be reached. */
+const unreachable = (error: HttpClientError.HttpClientError): boolean =>
+  error.reason instanceof HttpClientError.TransportError
+
 /**
  * True for a failure that asking again may fix: the network, a server error, "too many requests". A typed refusal
  * (a role, a bad request, a missing record) gets the same answer every time, so it is never asked again.
@@ -185,7 +189,7 @@ export const isTransient = (error: unknown): boolean => {
   // The server's own 500, as the API's problem document: the request was fine, so another try may pass.
   if (tagOf(error) === "InternalServerErrorProblem") return true
   if (!HttpClientError.isHttpClientError(error)) return false
-  if (error.reason._tag === "TransportError") return true
+  if (unreachable(error)) return true
   const status = statusOf(error)
   return status !== undefined && (status === 429 || status >= 500)
 }

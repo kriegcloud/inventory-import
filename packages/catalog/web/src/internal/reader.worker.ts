@@ -1,3 +1,4 @@
+import * as Match from "effect/Match"
 import { stringify } from "@inventory/ui/Json"
 // The spreadsheet reader, off the page's thread. A module worker that the build emits as its own file on our origin,
 // so the content security policy's `script-src 'self'` covers it; never a blob: worker, which the policy blocks (a
@@ -65,7 +66,10 @@ const read = ({ file, sheet }: ReadRequest) =>
         _tag: "Head",
         head,
         chunkSizes: chunks.map((chunk) => chunk.length),
-        workbook: table.format._tag === "xlsx" ? { sheets: table.format.sheets, chosen: table.format.chosen } : null
+        workbook: Match.valueTags(table.format, {
+          xlsx: (format) => ({ sheets: format.sheets, chosen: format.chosen }),
+          csv: () => null
+        })
       })
       chunks.forEach((chunk, seq) => post({ _tag: "Chunk", seq, rows: chunk }))
       post({ _tag: "Done" })

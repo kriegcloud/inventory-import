@@ -11,6 +11,7 @@ import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Fiber from "effect/Fiber"
 import * as HashSet from "effect/HashSet"
+import * as Match from "effect/Match"
 import * as O from "effect/Option"
 import * as Atom from "effect/reactivity/Atom"
 import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
@@ -29,7 +30,7 @@ import { matchedColumn } from "@inventory/catalog-contract/Mapping"
 import { requiredFields, type StagedHead, type StagedRow, type StagedTable } from "@inventory/catalog-contract/Staged"
 import type { SheetChoice, SheetSummary } from "@inventory/catalog-model/Spreadsheet"
 import { savedRows } from "@inventory/catalog-model/Upload"
-import { rowsOf, type UploadState } from "./Upload.machine.ts"
+import { rowsOf, UploadState } from "./Upload.machine.ts"
 import { type Client, fork, runExit, apiPrefixOf } from "./Catalog.runtime.ts"
 import { importTable, importView, rememberWorkbook } from "./Imports.atoms.ts"
 import { navigate } from "@inventory/ui/Route"
@@ -77,7 +78,7 @@ const stateNow = (): UploadState => (registry === undefined ? { _tag: "Idle" } :
 const set = (next: UploadState) => {
   registry?.set(uploadState, next)
   // While the rows are saving, fetch the review's code, so it is ready when the import is.
-  if (next._tag === "Saving") void import("./ReviewStep.screen.tsx")
+  if (UploadState.guards.Saving(next)) void import("./ReviewStep.screen.tsx")
 }
 
 /** How an upload ended, for a caller that keeps something until it does (the chosen file, for Continue). */
@@ -137,6 +138,9 @@ const reader = (request: ReadRequest) =>
   )
 
 /** Reads `file` in the worker, sends it in chunks as they arrive, and finishes it. Reports each step to the store. */
+/** One kind of message the reader sends. */
+type Sent<Tag extends ReadMessage["_tag"]> = Extract<ReadMessage, { readonly _tag: Tag }>
+
 const program = Effect.fn("upload.program")(function* (client: Client, request: ReadRequest) {
   const fileName = request.file.name
   const begun = yield* Deferred.make<{ readonly id: ImportId; readonly sizes: ReadonlyArray<number> }>()
@@ -147,61 +151,56 @@ const program = Effect.fn("upload.program")(function* (client: Client, request: 
 
   // Every step's own errors (a typed refusal, the network) end the stream the same way, so they are not told apart
   // here: the observer in `start` turns whatever ended it into a sentence.
-  const handle = (message: ReadMessage): Effect.Effect<void, UploadError> => {
-    switch (message._tag) {
-      case "Progress":
-        return Effect.sync(() =>
+  const handle = (read: ReadMessage): Effect.Effect<void, UploadError> =>
+    Match.valueTags(read, {
+      Progress: (message) =>
+        Effect.sync(() =>
           set({
             _tag: "Reading",
             fileName,
             rowsRead: message.rowsRead,
             rows: rowsOf(message)
           })
-        )
-      case "Head":
-        return Effect.gen(function* () {
-          // The sheet crossed the threads as its name or null: the Option is made again here.
-          const read: StagedHead = { ...message.head, sheet: O.fromNullOr(message.head.sheet) }
-          head = read
-          workbook = message.workbook
-          const rows = message.chunkSizes.reduce((sum, size) => sum + size, 0)
-          // One key for this file: a begin sent again after a lost answer is the same upload on the server, so the
-          // begin can be retried like every other step.
-          const key = UploadKey.make(SecureRandom.uuidV4Unsafe())
-          const { id } = yield* staged(
-            client.imports.beginUpload({
-              payload: { key, head: read, rowCount: rows, chunkCount: message.chunkSizes.length }
-            })
-          )
-          if (running !== null) running.uploadId = id
-          set({ _tag: "Saving", fileName, uploadId: id, rowsSaved: 0, rows })
-          yield* Deferred.succeed(begun, { id, sizes: message.chunkSizes })
-        })
-      case "Chunk":
-        return Effect.gen(function* () {
-          chunks[message.seq] = message.rows
-          const { id, sizes } = yield* Deferred.await(begun)
-          yield* staged(client.imports.putChunk({ params: { id }, payload: { seq: message.seq, rows: message.rows } }))
-          acknowledged.push(message.seq)
-          const rows = sizes.reduce((sum, size) => sum + size, 0)
-          set({
-            _tag: "Saving",
-            fileName,
-            uploadId: id,
-            rowsSaved: savedRows({ chunkSizes: sizes, acknowledged }),
-            rows
+        ),
+      Head: Effect.fnUntraced(function* (message: Sent<"Head">) {
+        // The sheet crossed the threads as its name or null: the Option is made again here.
+        const read: StagedHead = { ...message.head, sheet: O.fromNullOr(message.head.sheet) }
+        head = read
+        workbook = message.workbook
+        const rows = message.chunkSizes.reduce((sum, size) => sum + size, 0)
+        // One key for this file: a begin sent again after a lost answer is the same upload on the server, so the
+        // begin can be retried like every other step.
+        const key = UploadKey.make(SecureRandom.uuidV4Unsafe())
+        const { id } = yield* staged(
+          client.imports.beginUpload({
+            payload: { key, head: read, rowCount: rows, chunkCount: message.chunkSizes.length }
           })
+        )
+        if (running !== null) running.uploadId = id
+        set({ _tag: "Saving", fileName, uploadId: id, rowsSaved: 0, rows })
+        yield* Deferred.succeed(begun, { id, sizes: message.chunkSizes })
+      }),
+      Chunk: Effect.fnUntraced(function* (message: Sent<"Chunk">) {
+        chunks[message.seq] = message.rows
+        const { id, sizes } = yield* Deferred.await(begun)
+        yield* staged(client.imports.putChunk({ params: { id }, payload: { seq: message.seq, rows: message.rows } }))
+        acknowledged.push(message.seq)
+        const rows = sizes.reduce((sum, size) => sum + size, 0)
+        set({
+          _tag: "Saving",
+          fileName,
+          uploadId: id,
+          rowsSaved: savedRows({ chunkSizes: sizes, acknowledged }),
+          rows
         })
-      case "Done":
-        return Effect.void
-      case "Refused": {
+      }),
+      Done: () => Effect.void,
+      Refused: (message) => {
         const { kind, fileName: name, problem, todo } = message.problem
         return Effect.fail(FileProblem.make({ kind, fileName: name, problem, todo }))
-      }
-      case "Crashed":
-        return Effect.fail(ReadFailed.make({ message: message.message }))
-    }
-  }
+      },
+      Crashed: (message) => Effect.fail(ReadFailed.make({ message: message.message }))
+    })
 
   yield* reader(request).pipe(Stream.mapEffect(handle, { concurrency: inFlight }), Stream.runDrain)
   const { id, sizes } = yield* Deferred.await(begun)
@@ -292,7 +291,7 @@ const start = (file: File, sheet: string | null, onEnd: (end: UploadEnd) => void
 const cancel = (): Promise<void> => {
   const current = running
   const state = stateNow()
-  if (current === null || state._tag === "Preparing" || state._tag === "Cancelling") return Promise.resolve()
+  if (current === null || UploadState.isAnyOf(["Preparing", "Cancelling"])(state)) return Promise.resolve()
   set({ _tag: "Cancelling", fileName: current.fileName, uploadId: current.uploadId })
   return current.fiber
     .pipe(Fiber.interrupt, runExit)

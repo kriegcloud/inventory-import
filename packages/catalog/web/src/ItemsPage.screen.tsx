@@ -433,7 +433,7 @@ const buildColumns = (canImport: boolean) => {
 const itemsQuestion = Atom.readable((get) => {
   const { path, params } = get(location)
   const held = get.self<ItemsQuestion>()
-  if (path !== "/items" && held._tag === "Some") return held.value
+  if (path !== "/items" && O.isSome(held)) return held.value
   const searching = (params.get(itemsTable.urlKeys.search) ?? "").trim() !== ""
   const config = searching ? searchedTable : itemsTable
   return { searching, config, query: config.parse(params.toString()) }

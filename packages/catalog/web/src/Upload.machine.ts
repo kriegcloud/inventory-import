@@ -87,18 +87,38 @@ export type UploadState = typeof UploadState.Type
  * // { done: 52000, total: 52000 }
  */
 export const progressOf = (input: { readonly state: UploadState }): { done: number; total: number | null } => {
-  const { state } = input
-  switch (state._tag) {
-    case "Reading":
-      return {
-        done: Math.max(0, state.rowsRead),
-        total: state.rows.kind === "unknown" ? null : Math.max(state.rows.n, state.rowsRead, 0)
-      }
-    case "Saving":
-      return { done: Math.min(Math.max(0, state.rowsSaved), state.rows), total: state.rows }
-    case "Preparing":
-      return { done: state.rows, total: state.rows }
-    default:
-      return { done: 0, total: null }
-  }
+  const nothing = () => ({ done: 0, total: null })
+  return UploadState.match(input.state, {
+    Reading: (state) => ({
+      done: Math.max(0, state.rowsRead),
+      total: state.rows.kind === "unknown" ? null : Math.max(state.rows.n, state.rowsRead, 0)
+    }),
+    Saving: (state) => ({ done: Math.min(Math.max(0, state.rowsSaved), state.rows), total: state.rows }),
+    Preparing: (state) => ({ done: state.rows, total: state.rows }),
+    Idle: nothing,
+    Cancelling: nothing,
+    Refused: nothing,
+    Failed: nothing
+  })
 }
+
+/**
+ * The file an upload is of, as its state names it; none while nothing is chosen.
+ *
+ * @example fileNameOf({ _tag: "Preparing", fileName: "items_messy.csv", uploadId, rows: 200 }) // "items_messy.csv"
+ */
+export const fileNameOf: (state: UploadState) => string = UploadState.match({
+  Idle: () => "",
+  Refused: (state) => state.problem.fileName,
+  Reading: (state) => state.fileName,
+  Saving: (state) => state.fileName,
+  Preparing: (state) => state.fileName,
+  Cancelling: (state) => state.fileName,
+  Failed: (state) => state.fileName
+})
+
+/** True while Cancel still stops something: the file is being read or its rows saved. */
+export const isStoppable = UploadState.isAnyOf(["Reading", "Saving"])
+
+/** True from the moment a file is chosen until its upload has ended: arrived, cancelled, failed or refused. */
+export const isBusy = (state: UploadState): boolean => !UploadState.isAnyOf(["Idle", "Failed", "Refused"])(state)

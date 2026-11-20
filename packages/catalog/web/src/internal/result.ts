@@ -17,7 +17,7 @@ export interface Drawn<A> {
 
 /** One read as a screen draws it. */
 export const resultOf = <A, E>(result: AsyncResult.AsyncResult<A, E>): Drawn<A> => {
-  const error = result._tag === "Failure" && !result.waiting ? Cause.squash(result.cause) : null
+  const error = AsyncResult.isFailure(result) && !result.waiting ? Cause.squash(result.cause) : null
   return {
     data: result.pipe(AsyncResult.value, O.getOrUndefined),
     error,

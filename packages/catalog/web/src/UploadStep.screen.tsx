@@ -33,10 +33,10 @@ import { importAddress } from "./internal/route.ts"
 import { StoredFile } from "@inventory/review/SavedProgress"
 import { useSavedProgress } from "@inventory/review/SavedProgressHook"
 import { catalogRuntime } from "./Catalog.runtime.ts"
-import { cancelUpload, startUpload, UploadEnd, uploadState, type UploadState } from "./Upload.controller.ts"
+import { cancelUpload, startUpload, UploadEnd, uploadState } from "./Upload.controller.ts"
 import type { ImportView } from "@inventory/catalog-contract/Import"
 import { fileProblemTitle } from "@inventory/catalog-contract/FileProblem"
-import { progressOf } from "./Upload.machine.ts"
+import { fileNameOf, isBusy, isStoppable, progressOf, UploadState } from "./Upload.machine.ts"
 import { sayError } from "@inventory/client/SayError"
 
 /**
@@ -57,28 +57,26 @@ const count = (n: number, noun: string): string => `${whole.format(n)} ${noun}${
 /** Where an upload stands, in words and numbers: "Reading 12,400 of about 50,000 rows". */
 const line = (state: UploadState): string => {
   const { done, total } = progressOf({ state })
-  switch (state._tag) {
-    case "Reading":
-      return total === null
+  return UploadState.match(state, {
+    Reading: (reading) =>
+      total === null
         ? "Reading"
-        : `Reading ${whole.format(done)} of ${state.rows.kind === "counted" ? "" : "about "}${whole.format(total)} rows`
-    case "Saving":
-      return `Saving ${whole.format(done)} of ${whole.format(total ?? done)} rows`
-    case "Preparing":
-      return "Preparing the review"
-    case "Cancelling":
-      return "Cancelling"
-    default:
-      return ""
-  }
+        : `Reading ${whole.format(done)} of ${reading.rows.kind === "counted" ? "" : "about "}${whole.format(total)} rows`,
+    Saving: () => `Saving ${whole.format(done)} of ${whole.format(total ?? done)} rows`,
+    Preparing: () => "Preparing the review",
+    Cancelling: () => "Cancelling",
+    Idle: () => "",
+    Refused: () => "",
+    Failed: () => ""
+  })
 }
 
 /** The file on its way in: its name, how far it is, and Cancel while cancelling still stops something. */
 function UploadProgress(props: { state: UploadState; onCancel: () => void }) {
   const { state } = props
   const { done, total } = progressOf({ state })
-  const fileName = state._tag === "Idle" ? "" : state._tag === "Refused" ? state.problem.fileName : state.fileName
-  const stoppable = state._tag === "Reading" || state._tag === "Saving"
+  const fileName = fileNameOf(state)
+  const stoppable = isStoppable(state)
   return (
     <div className="flex w-full max-w-md flex-col items-center gap-3">
       <div role="status" className="flex w-full flex-col gap-1.5">
@@ -319,7 +317,7 @@ export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
   const askOpenAgain = useAtomRefresh(openImportsRead)
   const open = openImports.data
   const views = open?.views ?? []
-  const busy = state._tag !== "Idle" && state._tag !== "Failed" && state._tag !== "Refused"
+  const busy = isBusy(state)
 
   // Keeps the file until the upload ends: arrived or cancelled, nothing is left to continue; a file that cannot be
   // staged (its own problem) is not worth reading again; a save that failed (the network) can be continued.
@@ -387,8 +385,8 @@ export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
   const fileInput = () => picker.current?.querySelector<HTMLInputElement>('input[type="file"]') ?? null
   const dragging = useAtomValue(fileOverPage) && props.canImport && !busy
 
-  const failed = state._tag === "Failed" ? state : undefined
-  const refused = state._tag === "Refused" ? state.problem : undefined
+  const failed = UploadState.guards.Failed(state) ? state : undefined
+  const refused = UploadState.guards.Refused(state) ? state.problem : undefined
   return (
     <div
       data-upload-step=""

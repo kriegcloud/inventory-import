@@ -1,3 +1,5 @@
+import * as P from "effect/Predicate"
+import * as Match from "effect/Match"
 import * as O from "effect/Option"
 import { PencilIcon } from "lucide-react"
 import { useAtom, useAtomSet, useAtomValue } from "@effect/atom-react"
@@ -76,9 +78,7 @@ const putItem = (page: ItemPage, item: StoredItem): ItemPage => ({
 
 /** `ItemChanged`: someone saved this item between the person opening it and saving it. */
 const changedMeanwhile = (error: unknown): StoredItem | undefined =>
-  typeof error === "object" && error !== null && "_tag" in error && error._tag === "ItemChanged" && "item" in error
-    ? (error.item as StoredItem)
-    : undefined
+  P.isTagged(error, "ItemChanged") && P.hasProperty(error, "item") ? (error.item as StoredItem) : undefined
 
 /** What only an import writes, shown and not changed here: the tags, the dimensions and every vendor. */
 function FromTheFile(props: { item: StoredItem }) {
@@ -305,14 +305,14 @@ export function ItemEditor(props: {
   const save = useAtomSet(editItem(itemId))
 
   const submit = () => {
-    const read = readItemForm({ form, revision: base.revision })
-    if (read._tag === "Problems") {
-      setEditor((now) => ({ ...now, notice: null, problems: read.problems }))
-      return
-    }
-    // Optimistic: the row shows the new values now; the dialog closes without waiting for the server.
-    setEditor((now) => ({ ...now, notice: null, problems: {}, open: false }))
-    save({ base, edit: read.edit, form })
+    Match.valueTags(readItemForm({ form, revision: base.revision }), {
+      Problems: (read) => setEditor((now) => ({ ...now, notice: null, problems: read.problems })),
+      Edit: (read) => {
+        // Optimistic: the row shows the new values now; the dialog closes without waiting for the server.
+        setEditor((now) => ({ ...now, notice: null, problems: {}, open: false }))
+        save({ base, edit: read.edit, form })
+      }
+    })
   }
 
   const invalid = (key: keyof ItemFormProblems) => (problems[key] === undefined ? {} : { "aria-invalid": true })

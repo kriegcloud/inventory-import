@@ -30,7 +30,7 @@ const memory = (): ProgressStorage & { readonly items: Record<string, string> } 
   const items: Record<string, string> = {}
   return {
     items,
-    getItem: (key) => R.get(items, key).pipe((found) => (found._tag === "Some" ? found.value : null)),
+    getItem: (key) => R.get(items, key).pipe((found) => (O.isSome(found) ? found.value : null)),
     setItem: (key, value) => {
       items[key] = value
     },

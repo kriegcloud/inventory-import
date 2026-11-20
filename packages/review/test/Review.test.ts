@@ -7,7 +7,7 @@ import * as O from "effect/Option"
 import * as Str from "effect/String"
 import * as S from "effect/Schema"
 import { describe, expect, it } from "vitest"
-import { CellMark } from "@inventory/review/ReviewTypes"
+import { CellMark, Entry } from "@inventory/review/ReviewTypes"
 import {
   act,
   Action,
@@ -57,12 +57,12 @@ const after = (...actions: ReadonlyArray<Action>): ReviewState =>
   A.reduce(actions, emptyState, (state, action) => run(state, action).state)
 const firstOf = (kind: string): ReviewRow => {
   const row = A.findFirst(rows, (candidate) => candidate.problem?.kind === kind)
-  if (row._tag === "None") throw new Error(`no ${kind} row in the gallery file`)
+  if (O.isNone(row)) throw new Error(`no ${kind} row in the gallery file`)
   return row.value
 }
 const viewOf = (state: ReviewState, rowId: string) => {
   const view = A.findFirst(views(state), (candidate) => candidate.row.id === rowId)
-  if (view._tag === "None") throw new Error(`no row ${rowId}`)
+  if (O.isNone(view)) throw new Error(`no row ${rowId}`)
   return view.value
 }
 
@@ -116,7 +116,7 @@ describe("counts", () => {
 describe("a proposal never overwrites the person's decision", () => {
   it("a group accept skips a row the person typed a value into, and a row they left out", () => {
     const group = A.findFirst(waitingGroups({ views: views(emptyState) }), (candidate) => candidate.id === "unit:each")
-    if (group._tag === "None") throw new Error("no group")
+    if (O.isNone(group)) throw new Error("no group")
     const [typed, left] = group.value.rowIds
     if (typed === undefined || left === undefined) throw new Error("group too small")
     const state = after(
@@ -181,7 +181,7 @@ describe("one undo step per accept", () => {
 
   it("an action that fits no row adds no step", () => {
     const ready = A.findFirst(rows, (row) => row.problem === undefined)
-    if (ready._tag === "None") throw new Error("no ready row")
+    if (O.isNone(ready)) throw new Error("no ready row")
     expect(run(emptyState, Action.Accept({ rowIds: [ready.value.id] })).state).toBe(emptyState)
     expect(run(emptyState, Action.Undo()).label).toBe("")
   })
@@ -288,7 +288,7 @@ describe("what the table and the phone show", () => {
     const lines = entries({ list, groups: waitingGroups({ views: all, kind: "unit" }) })
     expect(
       A.join(
-        A.map(lines, (line) => (line._tag === "Group" ? line.group.id : "row")),
+        A.map(lines, (line) => (Entry.$is("Group")(line) ? line.group.id : "row")),
         " "
       )
     ).toBe(A.join(["unit:each", ...A.makeBy(9, () => "row"), "unit:length", "row", "row", "row"], " "))
@@ -300,11 +300,11 @@ describe("what the table and the phone show", () => {
       waitingGroups({ views: views(emptyState) }),
       (candidate) => candidate.id === "unit:length"
     )
-    if (group._tag === "None") throw new Error("no group")
+    if (O.isNone(group)) throw new Error("no group")
     expect(choicesOf(group.value)).toEqual(["m", "pcs"])
     expect(group.value.why.basis).toMatch(/^\d+ other Bar rows in this file use m; 0 use pcs\.$/)
     const each = A.findFirst(waitingGroups({ views: views(emptyState) }), (candidate) => candidate.id === "unit:each")
-    expect(each._tag === "Some" ? choicesOf(each.value) : "missing").toBeUndefined()
+    expect(O.isSome(each) ? choicesOf(each.value) : "missing").toBeUndefined()
 
     const chosen = run(emptyState, Action.ChooseGroup({ groupId: "unit:length", value: "pcs", except: [] }))
     expect(chosen.label).toBe("3 rows set to pcs")
@@ -335,18 +335,17 @@ describe("the first screen and the confirm step", () => {
       collapsed: (_kind, hasGroups) => !hasGroups
     })
     expect(
-      A.map(
-        A.filter(lines, (line) => line._tag === "Kind"),
-        (line) => (line._tag === "Kind" ? `${line.kind.id} ${line.rowIds.length} ${line.collapsed}` : "")
+      A.map(A.filter(lines, Entry.$is("Kind")), (line) =>
+        Entry.$is("Kind")(line) ? `${line.kind.id} ${line.rowIds.length} ${line.collapsed}` : ""
       )
     ).toEqual(["unit 12 false", "cost 9 true", "copy 8 true", "below 7 true", "name 6 true"])
-    expect(A.filter(lines, (line) => line._tag === "Row")).toHaveLength(12)
-    expect(A.filter(lines, (line) => line._tag === "Group")).toHaveLength(2)
+    expect(A.filter(lines, Entry.$is("Row"))).toHaveLength(12)
+    expect(A.filter(lines, Entry.$is("Group"))).toHaveLength(2)
   })
 
   it("a group accept leaves out the rows the person unticked", () => {
     const group = A.findFirst(waitingGroups({ views: views(emptyState) }), (candidate) => candidate.id === "unit:each")
-    if (group._tag === "None") throw new Error("no group")
+    if (O.isNone(group)) throw new Error("no group")
     const unticked = group.value.rowIds[0] ?? ""
     const outcome = run(emptyState, Action.AcceptGroup({ groupId: "unit:each", except: [unticked] }))
     expect(outcome.label).toBe("8 fixes accepted")
@@ -379,7 +378,7 @@ describe("the approved standards", () => {
       problemKinds,
       collapsed: () => false
     })
-    const safe = A.flatMap(lines, (line) => (line._tag === "Kind" ? line.safe : []))
+    const safe = A.flatMap(lines, (line) => (Entry.$is("Kind")(line) ? line.safe : []))
     expect(safe).toHaveLength(17)
     const taken = act({ rows, state: start, action: Action.Accept({ rowIds: safe }), recheck })
     expect(taken.label).toBe("17 fixes accepted")
@@ -475,12 +474,12 @@ describe("records with a parent: label, choices, rowAction, and undo across view
   const lineRun = (state: ReviewState, action: Action) => act({ rows: lines, state, action, recheck: recheckLine })
   const lineOf = (kind: string): ReviewRow => {
     const row = A.findFirst(lines, (candidate) => candidate.problem?.kind === kind)
-    if (row._tag === "None") throw new Error(`no ${kind} line in the gallery's jobs`)
+    if (O.isNone(row)) throw new Error(`no ${kind} line in the gallery's jobs`)
     return row.value
   }
   const lineView = (state: ReviewState, rowId: string) => {
     const view = A.findFirst(lineViews(state), (candidate) => candidate.row.id === rowId)
-    if (view._tag === "None") throw new Error(`no line ${rowId}`)
+    if (O.isNone(view)) throw new Error(`no line ${rowId}`)
     return view.value
   }
   const extra = { label: "Leave job J-2045 out", onSelect: () => undefined }
@@ -494,13 +493,13 @@ describe("records with a parent: label, choices, rowAction, and undo across view
 
   it("label: a group whose rows end in different values is named by its label, and each row takes its own value", () => {
     const group = A.findFirst(waitingGroups({ views: lineViews(emptyState) }), (found) => found.id === "qty:comma")
-    if (group._tag === "None") throw new Error("no comma group")
+    if (O.isNone(group)) throw new Error("no comma group")
     expect([group.value.label, group.value.rowIds.length]).toEqual(["a decimal point", 3])
     expect(groupUse({ group: group.value, n: 3, ticks: true })).toBe("Use a decimal point for the 3 ticked")
     // Where each row keeps its own answers (`rowAction`) there is no tick: the button acts on all of them.
     expect(groupUse({ group: group.value, n: 3, ticks: false })).toBe("Use a decimal point for all 3")
     const unit = A.findFirst(waitingGroups({ views: views(emptyState) }), (found) => found.id === "unit:each")
-    if (unit._tag === "None") throw new Error("no unit group")
+    if (O.isNone(unit)) throw new Error("no unit group")
     expect(groupUse({ group: unit.value, n: 9, ticks: true })).toBe("Use pcs for the 9 ticked")
 
     const taken = lineRun(emptyState, Action.AcceptGroup({ groupId: "qty:comma", except: [] }))
@@ -541,7 +540,7 @@ describe("records with a parent: label, choices, rowAction, and undo across view
       result({ views: lineViews(picked.state), problemKinds: lineKinds }).ready,
       (row) => row.id === unit.id
     )
-    expect(change._tag === "Some" ? change.value.changes : []).toEqual([
+    expect(O.isSome(change) ? change.value.changes : []).toEqual([
       {
         column: "unit",
         from: "length",

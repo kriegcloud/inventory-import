@@ -104,7 +104,7 @@ describe("the screen and the server apply decisions the same way", () => {
             waitingGroups({ views: s.derive().views }),
             (candidate) => !O.contains(candidate.confidence, "low")
           )
-          if (group._tag === "None") break
+          if (O.isNone(group)) break
           s.press(Action.AcceptGroup({ groupId: group.value.id, except: [] }))
           s.agree()
         }
@@ -112,7 +112,7 @@ describe("the screen and the server apply decisions the same way", () => {
         const left = A.filter(s.derive().views, (view) => view.status === "needs")
         expect(left.length).toBeGreaterThan(0)
         const typed = A.findFirst(left, (view) => view.problem?.column === "sku" && view.problem.rivals === undefined)
-        if (typed._tag === "Some") {
+        if (O.isSome(typed)) {
           s.press(Action.Edit({ rowId: typed.value.row.id, column: "sku", value: "ZZZ-9999" }))
           s.agree()
         }
@@ -120,7 +120,7 @@ describe("the screen and the server apply decisions the same way", () => {
           s.derive().views,
           (view) => view.status === "needs" && view.problem?.choices !== undefined && view.problem.column !== undefined
         )
-        if (picked._tag === "Some") {
+        if (O.isSome(picked)) {
           const choice = picked.value.problem?.choices?.[0]
           const column = picked.value.problem?.column
           if (choice !== undefined && column !== undefined) {
@@ -132,7 +132,7 @@ describe("the screen and the server apply decisions the same way", () => {
           s.derive().views,
           (view) => view.status === "needs" && view.problem?.rivals !== undefined
         )
-        if (rivals._tag === "Some") {
+        if (O.isSome(rivals)) {
           s.press(Action.Keep({ rowId: rivals.value.row.id }))
           s.agree()
           // Only the first kept row may win: keeping its rival too must not make both ready.
@@ -143,7 +143,7 @@ describe("the screen and the server apply decisions the same way", () => {
           }
         }
         const out = A.findFirst(s.derive().views, (view) => view.status === "needs")
-        if (out._tag === "Some") {
+        if (O.isSome(out)) {
           s.press(Action.LeaveOut({ rowIds: [out.value.row.id] }))
           s.agree()
           s.press(Action.Undo())

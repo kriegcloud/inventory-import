@@ -35,8 +35,9 @@ can follow.
 - **Data already fetched shows at once.** A read is an atom (`makeApiAtoms(tag).query` in `@inventory/client/Api`): what
   it answered is kept for five minutes after the last screen stops reading it, a return shows it at once and asks
   again behind it, the session is asked once, a write says what it changed (`invalidate(keys)`, the keys in each
-  package's `*.keys.ts`), and its button is disabled while it is pending (the record editor's Save, `packages/catalog/web/src/ItemEditor.screen.tsx`). Check: switch views twice;
-  the network panel shows no second request for data that did not change.
+  package's `*.keys.ts`), and its button is disabled while it is pending (the record editor's Save, `packages/catalog/web/src/ItemEditor.screen.tsx`). Check: switch views twice
+  within a second and the network panel shows no second request; after a second, the rows show at once and one
+  request goes out behind them.
 - **Pressing twice does nothing twice.** A button is disabled while its request is pending, and the write names
   what it acts on (an upload's key, an edit's revision, an import still open), so the server writes a repeat once;
   a new write with nothing of its own sends one `requestId` per press (`newRequestId()` from `@inventory/client/ApiRuntime`). Check:

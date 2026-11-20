@@ -669,9 +669,10 @@ table its rows.
 The review of the rebuilt draft came back with 19 groups, and Benjamin answered three more questions. Head of this
 section: `fa83274` and what follows it.
 
-**The property, as it is now** (`Draft.machine.test.ts`). Each run plays 30 to 60 commands (`size: 60` is given to
-the runner, with a minimum length), each drawn from the kinds enabled in the world as it stands, so a run is that
-many things that happened. What must hold is checked after every command, those of `quiet` included. Four
+**The property, as it is now** (`Draft.machine.test.ts`). Each run draws 30 to 60 picks (`size: 60` is given to
+the runner, with a minimum length), each drawn from the kinds enabled in the world as it stands. The runner grows
+the size over the runs, so about the first half play 30 picks; a run ends early when nothing is enabled, and a few
+enabled commands can change nothing, so a run is up to that many things that happened. What must hold is checked after every command, those of `quiet` included. Four
 properties, 1,000 runs each: saves and reads; with the person confirming; with the page loaded again at any moment;
 with somebody else confirming the import. A failure is thrown under its shortest ordering (each command left out that
 it still fails without) with the rule that broke, in words. The world gained: the region's own state (reset by a
@@ -885,15 +886,16 @@ undo step's `focus` are an `Option`, and `accepted` and `redo` are always there.
   region writes the decisions with every action and whoever keeps them reads them there, so `savedDecisions` and
   `onDecisionsChange` are gone, and so is `internal/remember.ts`. The Review step's decisions are one atom per import
   (`reviewState` in `ReviewDraft.atoms.ts`): a write shows them, sends them and keeps them with their undo.
-- **The table's order is an atom that listens to the table** (`ordered` in `TableScope`). The sort, the search and the
-  column filters are TanStack Table's own state, a store outside React; the atom subscribes to those three and cleans
-  up with `get.addFinalizer`, as any atom over something outside does. It gives the table its rows itself before it
-  reads the order, so the order it reads is of the rows the atoms hold now and not of the ones the table was last
-  drawn with.
-- **The facets are the table's controlled state** (the brief's row for the facets effect). TanStack Table takes an
-  external atom per slice of its state (`atoms: { columnFilters }`), and the data-table hook passes it through; the
-  region's `tableFilters` is that atom, written from the derived facets by an atom mounted while the region is
-  (`followFacets`). `@tanstack/store` is a dependency of the review package for it.
+- **The table's order is an atom that listens to the table** (`ordered` in `TableScope`). The sort and the search are
+  TanStack Table's own state, a store outside React; the atom hears those two and cleans up with `get.addFinalizer`,
+  as any atom over something outside does. The table is given its rows by a subscription on the rows the region gives
+  it, in the change that works them out (`f922f9f`), never by a read: `ordered` only reads, and keeps its last order
+  while the table does not hold the current rows yet.
+- **The facets filter the rows before the table has them** (`shown`, after Benjamin's "Effect atoms only",
+  `bc789bf`): a facet is not the table's column filter (`enableColumnFilter: false`), so nothing of the facets lives
+  in the table's store. `@tanstack/store` is only a devDependency of the review package, for its test's table.
+- **The virtual list is the grid's atom's** (`f922f9f`): the grid's atom holds the Virtualizer core (no
+  `useVirtualizer` in our code), sets its count in the change that works the lines out, and no draw writes it.
 - **After a decision the wanted move is an atom, followed with `useAtomSubscribe`** (the brief's row, and Benjamin's
   answer "No, follow the brief", 2026-11-19): `nav` holds where focus goes next, `moves` changes when the lines or the
   move do, and the region subscribes to it. The atoms change before the rows are drawn, so the subscription settles

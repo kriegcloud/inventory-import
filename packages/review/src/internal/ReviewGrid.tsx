@@ -1,3 +1,5 @@
+import { CellMark, ColumnMatch, Entry } from "@inventory/review/ReviewTypes"
+import { OtherAnswer } from "@inventory/review/ReviewDraft"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { ChevronDownIcon, ChevronRightIcon, CircleHelpIcon, SparklesIcon } from "lucide-react"
 import type { Table as TanstackTable } from "@tanstack/react-table"
@@ -77,7 +79,6 @@ import {
   WhyBody
 } from "./parts.tsx"
 import type {
-  Entry,
   Fix,
   FixGroup,
   ProblemKind,
@@ -118,7 +119,7 @@ const nameOf = (view: RowView, first: ReviewColumn | undefined): string => {
 /** A column that could not be found in the file: the choice sits in its own header, where the values will appear. */
 function MatchSelect(props: { column: ReviewColumn; onMatch: (columnId: string, source: string) => void }) {
   const match = props.column.match
-  if (match === undefined || match._tag !== "Unmatched") return null
+  if (match === undefined || !ColumnMatch.$is("Unmatched")(match)) return null
   return (
     <NativeSelect
       size="sm"
@@ -284,22 +285,26 @@ const measureNeeds = (input: {
       const mark = view.marks[column.id]
       if (mark === undefined || mark.from === mark.to || view.status === "out") continue
       const from = textWidth(spellingOf(shownWith(column, mark.from, view.cells)), { mono })
-      const guess = mark._tag === "Proposed" && choicesOf(mark.fix) !== undefined
+      const guess = CellMark.$is("Proposed")(mark) && choicesOf(mark.fix) !== undefined
       // A mark that draws an icon: a model's sparkle, or the question mark of a suggestion nobody was named for.
       const icon = mark.by === "model" || mark.by === "unknown" ? sparkle : 0
       const to = shownWith(column, mark.to, view.cells)
       const chip = textWidth(to, { mono, medium: true }) + chipChrome + icon
       const value = guess
         ? from + 6 + icon + textWidth(`${to}?`, { mono })
-        : mark._tag === "Proposed" && mark.from.trim() === mark.to && to.length > longValue
+        : CellMark.$is("Proposed")(mark) && mark.from.trim() === mark.to && to.length > longValue
           ? chip
           : from + arrowGap + chip
       // A proposal carries its "Why?" in the cell, except under a group heading, which says why for all its rows.
       // A question's rows (a `low` fix) keep their own "Why?" under its heading, as the row draws them.
       const banded =
-        input.banding && mark._tag === "Proposed" && mark.fix.group !== undefined && !guess && view.status === "needs"
+        input.banding &&
+        CellMark.$is("Proposed")(mark) &&
+        mark.fix.group !== undefined &&
+        !guess &&
+        view.status === "needs"
       // A fix in force carries its "Why?" too, with the way to undo it.
-      const asks = mark._tag === "Proposed" ? !banded : mark.by !== "you" && O.isSome(mark.fix)
+      const asks = CellMark.$is("Proposed")(mark) ? !banded : mark.by !== "you" && O.isSome(mark.fix)
       widest = Math.max(widest, value + (asks ? whyButton : 0))
     }
     const cell = index === 0 ? widest + firstChrome + (input.expandable ? expander : 0) : widest + cellChrome
@@ -325,15 +330,15 @@ export const actionsFit = (input: {
   rowAction: ReviewRegionProps["rowAction"]
 }): number => {
   if (input.readOnly) return actionsQuiet
-  if (!input.entries.some((entry) => entry._tag !== "Row" || entry.view.status === "needs")) return actionsQuiet
+  if (!input.entries.some((entry) => !Entry.$is("Row")(entry) || entry.view.status === "needs")) return actionsQuiet
   let widest = 0
   for (const entry of input.entries) {
-    if (entry._tag !== "Row" || entry.view.status !== "needs") continue
+    if (!Entry.$is("Row")(entry) || entry.view.status !== "needs") continue
     const problem = entry.view.problem
     const subject = problem?.column
     if (problem === undefined) continue
     const proposed = subject === undefined ? undefined : entry.view.marks[subject]
-    const fix = proposed !== undefined && proposed._tag === "Proposed" ? proposed.fix : undefined
+    const fix = proposed !== undefined && CellMark.$is("Proposed")(proposed) ? proposed.fix : undefined
     const choices = fix === undefined ? undefined : choicesOf(fix)
     const label = input.columns.find((column) => column.id === subject)?.label ?? subject ?? ""
     const only = problem.choices?.length === 1 ? problem.choices[0] : undefined
@@ -401,7 +406,7 @@ const Row = memo(function Row(props: {
   const out = view.status === "out"
   const subject = shownProblem?.column
   const proposed = subject === undefined ? undefined : view.marks[subject]
-  const fix = proposed !== undefined && proposed._tag === "Proposed" ? proposed.fix : undefined
+  const fix = proposed !== undefined && CellMark.$is("Proposed")(proposed) ? proposed.fix : undefined
   const choices = fix === undefined ? undefined : choicesOf(fix)
   // One status mark per row: the tag. Only a required cell with nothing in it is also tinted, because an empty cell
   // has no ink to point at; a bad value is red text, a proposal is its own mark.
@@ -484,7 +489,7 @@ const Row = memo(function Row(props: {
   // A fix already in force on a cell says why too, and can be taken out again from there.
   const whyApplied = (column: ReviewColumn): ReactNode => {
     const mark = view.marks[column.id]
-    if (props.readOnly || out || mark === undefined || mark._tag !== "Applied" || mark.by === "you") return null
+    if (props.readOnly || out || mark === undefined || !CellMark.$is("Applied")(mark) || mark.by === "you") return null
     if (O.isNone(mark.fix) || mark.from === mark.to) return null
     const made = mark.fix.value
     return (
@@ -901,7 +906,7 @@ const Row = memo(function Row(props: {
                   {(close) => (
                     <span className="flex flex-col gap-3">
                       {others.map((answer) =>
-                        answer._tag === "Type" ? (
+                        OtherAnswer.$is("Type")(answer) ? (
                           subject === undefined ? null : (
                             <EditForm
                               key="type"
@@ -921,7 +926,7 @@ const Row = memo(function Row(props: {
                             size="sm"
                             onClick={() => {
                               close()
-                              if (answer._tag === "LeaveOut") actions.leaveOut(view.row.id)
+                              if (OtherAnswer.$is("LeaveOut")(answer)) actions.leaveOut(view.row.id)
                               else extra.onSelect()
                             }}
                           >
@@ -1351,7 +1356,7 @@ const makeGrid = (
     return get(reasons) && columns.length > 0 ? [...columns.slice(0, 1), reasonColumn, ...columns.slice(1)] : columns
   })
   // Group headings are drawn in this view: a row under one has no "Why?" of its own.
-  const bands = Atom.readable((get) => banding && get(table.lines).some((entry) => entry._tag === "Group"))
+  const bands = Atom.readable((get) => banding && get(table.lines).some((entry) => Entry.$is("Group")(entry)))
   const needs = Atom.readable((get) =>
     measureNeeds({ columns: get(shownColumns), views: get(region.list), banding: get(bands), expandable: false })
   )
@@ -1392,7 +1397,7 @@ const makeGrid = (
     return get(parts).folded.length === 0 || HashSet.size(open) === 0
       ? lines
       : lines.flatMap((entry): ReadonlyArray<Line> =>
-          entry._tag === "Row" && HashSet.has(open, entry.view.row.id)
+          Entry.$is("Row")(entry) && HashSet.has(open, entry.view.row.id)
             ? [entry, Opened.Detail({ view: entry.view })]
             : [entry]
         )
@@ -1405,10 +1410,10 @@ const makeGrid = (
     const now = get(entries)
     let hash = 0
     for (const entry of now) {
-      hash = (Math.imul(hash, 31) + (entry._tag === "Row" ? 1 : entry._tag === "Detail" ? 2 : 3)) | 0
+      hash = (Math.imul(hash, 31) + (Entry.$is("Row")(entry) ? 1 : Opened.$is("Detail")(entry) ? 2 : 3)) | 0
     }
     const head = now[0]
-    const firstKey = head === undefined ? "" : head._tag === "Row" ? head.view.row.id : head._tag
+    const firstKey = head === undefined ? "" : Entry.$is("Row")(head) ? head.view.row.id : head._tag
     return O.match(get.self<Sign>(), {
       onNone: () => ({ hash, firstKey, length: now.length, measure: 0, top: 0 }),
       onSome: (before) =>
@@ -1439,7 +1444,8 @@ const makeGrid = (
       registry.update(expanded, (before) =>
         HashSet.has(before, rowId) ? HashSet.remove(before, rowId) : HashSet.add(before, rowId)
       ),
-    indexOf: (rowId) => registry.get(entries).findIndex((entry) => entry._tag === "Row" && entry.view.row.id === rowId),
+    indexOf: (rowId) =>
+      registry.get(entries).findIndex((entry) => Entry.$is("Row")(entry) && entry.view.row.id === rowId),
     toTop: () =>
       document
         .querySelector(`[data-review-region="${region.id}"] [data-slot="sticky-table-frame"]`)
@@ -1518,7 +1524,7 @@ function GridBody(props: GridProps & { region: Region; regionTable: RegionTable 
     count: entries.length,
     getScrollElement: () => scroller.current,
     estimateSize: (index) =>
-      entries[index]?._tag === "Row" ? height : entries[index]?._tag === "Group" ? groupHeight : bandHeight,
+      Entry.$is("Row")(entries[index]) ? height : Entry.$is("Group")(entries[index]) ? groupHeight : bandHeight,
     overscan: 12
   })
   // When the lines change shape the sizes are measured again, and another list starts at its first line.
@@ -1540,7 +1546,7 @@ function GridBody(props: GridProps & { region: Region; regionTable: RegionTable 
           .slice(range.startIndex, range.endIndex + 1)
           .find(
             (entry): entry is Extract<Line, { readonly _tag: "Group" }> =>
-              entry._tag === "Group" && !entry.applied && choicesOf(entry.group) === undefined
+              Entry.$is("Group")(entry) && !entry.applied && choicesOf(entry.group) === undefined
           )?.group.id
 
   const items = virtual.getVirtualItems()
@@ -1578,10 +1584,11 @@ function GridBody(props: GridProps & { region: Region; regionTable: RegionTable 
                     align={column.align}
                     // A sortable heading is one control as large as its cell, so the cell keeps no padding of its own.
                     flush={
-                      sortable !== undefined && !(column.match?._tag === "Unmatched" && props.onMatch !== undefined)
+                      sortable !== undefined &&
+                      !(ColumnMatch.$is("Unmatched")(column.match) && props.onMatch !== undefined)
                     }
                   >
-                    {column.match?._tag === "Unmatched" && props.onMatch !== undefined ? (
+                    {ColumnMatch.$is("Unmatched")(column.match) && props.onMatch !== undefined ? (
                       <MatchSelect column={column} onMatch={props.onMatch} />
                     ) : (
                       <span className={cn("flex min-w-0 items-center", column.align === "right" && "justify-end")}>
@@ -1640,7 +1647,7 @@ function GridBody(props: GridProps & { region: Region; regionTable: RegionTable 
               {items.map((item) => {
                 const entry = entries[item.index]
                 if (entry === undefined) return null
-                if (entry._tag === "Detail") {
+                if (Opened.$is("Detail")(entry)) {
                   return (
                     <StickyTableBand
                       key={`detail:${entry.view.row.id}`}
@@ -1654,7 +1661,7 @@ function GridBody(props: GridProps & { region: Region; regionTable: RegionTable 
                     </StickyTableBand>
                   )
                 }
-                if (entry._tag === "Kind") {
+                if (Entry.$is("Kind")(entry)) {
                   return (
                     <KindRow
                       key={`kind:${entry.kind.id}`}
@@ -1666,7 +1673,7 @@ function GridBody(props: GridProps & { region: Region; regionTable: RegionTable 
                     />
                   )
                 }
-                if (entry._tag === "Rest") {
+                if (Entry.$is("Rest")(entry)) {
                   return (
                     <StickyTableBand key={`rest:${item.index}`} span={span} aria-rowindex={item.index + 2}>
                       <span className="pl-6 text-sm text-muted-foreground">
@@ -1675,7 +1682,7 @@ function GridBody(props: GridProps & { region: Region; regionTable: RegionTable 
                     </StickyTableBand>
                   )
                 }
-                if (entry._tag === "Group") {
+                if (Entry.$is("Group")(entry)) {
                   return (
                     <GroupRow
                       key={`group:${entry.group.id}`}
@@ -1703,11 +1710,11 @@ function GridBody(props: GridProps & { region: Region; regionTable: RegionTable 
                 let sought = true
                 for (let at = item.index - 1; at >= 0; at -= 1) {
                   const above = entries[at]
-                  if (above?._tag === "Group" && sought) {
+                  if (Entry.$is("Group")(above) && sought) {
                     if (above.group.rowIds.includes(entry.view.row.id)) group = above.group
                     sought = false
                   }
-                  if (above?._tag === "Kind") {
+                  if (Entry.$is("Kind")(above)) {
                     sectioned = true
                     break
                   }

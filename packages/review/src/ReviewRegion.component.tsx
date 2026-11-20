@@ -1,3 +1,4 @@
+import { ColumnMatch } from "@inventory/review/ReviewTypes"
 import type { Column } from "@tanstack/react-table"
 import {
   CheckIcon,
@@ -461,7 +462,7 @@ function RegionBody(
 
   // Which columns show: the data table's own column toggle, on the review's one table instance. Which file column
   // fed each field is the Match step's to say: the button beside it goes there, amber while a field has no column.
-  const unmatched = columns.filter((column) => column.match?._tag === "Unmatched").length
+  const unmatched = columns.filter((column) => ColumnMatch.$is("Unmatched")(column.match)).length
   const matchButton =
     props.onShowMatching === undefined ? null : (
       <ToolButton

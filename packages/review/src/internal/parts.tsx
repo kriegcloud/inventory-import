@@ -1,3 +1,4 @@
+import { CellMark } from "@inventory/review/ReviewTypes"
 import * as O from "effect/Option"
 import {
   ArrowRightIcon,
@@ -33,7 +34,6 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@inventory/ui/components/tooltip"
 import { choicesOf, pickedChoice, spellingOf, valueWords, variantsText } from "@inventory/review/ReviewDraft"
 import type {
-  CellMark,
   Fix,
   FixGroup,
   MarkSource,
@@ -50,7 +50,7 @@ import { defaultReviewWords } from "@inventory/review/ReviewWords"
 
 export type Layout = "wide" | "medium" | "narrow"
 
-// Widths of the page's own area (the window less the sidebar), from `lib/content-width.ts`.
+// Widths of the page's own area (the window less the sidebar), from `@inventory/ui/ContentWidth`.
 const narrowUnder = narrowBelow
 const mediumUnder = 1101
 
@@ -346,7 +346,7 @@ export function CellValue(props: {
   if (raw === undefined) return props.value === "" ? (props.empty ?? null) : <>{shown(props.value)}</>
   const mark = { ...raw, from: shown(raw.from), to: shown(raw.to) }
   if (mark.from === mark.to) return <>{mark.to}</>
-  if (mark._tag === "Proposed" && choicesOf(mark.fix) !== undefined) {
+  if (CellMark.$is("Proposed")(mark) && choicesOf(mark.fix) !== undefined) {
     // A question, marked with who asks it: a sparkle only when the caller says a model made it.
     return (
       <span className="inline-flex items-center gap-1.5">
@@ -359,7 +359,7 @@ export function CellValue(props: {
     )
   }
   // A value typed into an empty cell has nothing to strike through: the value and a check say it changed.
-  if (mark.from === "" && mark._tag === "Applied") {
+  if (mark.from === "" && CellMark.$is("Applied")(mark)) {
     return (
       <span className="inline-flex items-center gap-1">
         {mark.to}
@@ -374,7 +374,7 @@ export function CellValue(props: {
   // change can be seen; a long one (a name) would not fit twice and stands alone.
   const spacesOnly = mark.from !== "" && mark.from.trim() === mark.to
   const alone = spacesOnly && mark.to.length > longValue
-  if (mark._tag === "Proposed" && ((mark.from === "" && props.stated === true) || alone)) {
+  if (CellMark.$is("Proposed")(mark) && ((mark.from === "" && props.stated === true) || alone)) {
     return (
       <Tooltip>
         <TooltipTrigger asChild>
@@ -392,8 +392,11 @@ export function CellValue(props: {
       </Tooltip>
     )
   }
-  const state =
-    mark._tag === "Applied" ? (props.accepted === true && mark.by !== "you" ? "accepted" : "applied") : "proposed"
+  const state = CellMark.$is("Applied")(mark)
+    ? props.accepted === true && mark.by !== "you"
+      ? "accepted"
+      : "applied"
+    : "proposed"
   const source = mark.by === "you" ? null : <FixMark by={mark.by} />
   // The file's value struck through and the value that would be imported beside it, as real `<del>` and `<ins>` with
   // hidden "was" and "now". Short of room the old value is the part that is cut; its whole spelling is then one hover

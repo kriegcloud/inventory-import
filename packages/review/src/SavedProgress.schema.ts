@@ -193,7 +193,7 @@ export const storedReview = (decisions: SavedDecisions): StoredReview => {
   })
 }
 
-/** Stored decisions, ready to hand back to the review region as `savedDecisions`, undo history included. */
+/** Stored decisions, ready to start the review region's decisions from again (`restored`), undo history included. */
 export const restoredDecisions = (review: StoredReview): SavedDecisions =>
   fromDraft({
     decisions: review.decisions,

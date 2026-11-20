@@ -425,35 +425,51 @@ Not discriminators, and not changed: string-literal domains with no data of thei
 
 ## Choices made
 
-- **The review region keeps what it owns in one atom per region** (`regions`, by the region's `useId`; step 7), not
-  the brief's `ScopedAtom` (not yet confirmed by Benjamin): a family by `useId` needs no provider, and lets the atom go with the region as React state
-  went. It holds the decisions with their undo, the tab and kind, the drawers, the search, the folds, the ticks, the
-  announcement. The first state is not stored: until the first decision it is worked out from the caller's saved
-  decisions or the file, and remembered by those inputs. Measured on 50,000 rows before and after ("Proof", step 7):
-  not slower, so it is not split by row.
-- **What the region works out from its props is remembered by its inputs, not held in atoms** (not yet confirmed by
-  Benjamin; `remember` in
-  `packages/review/src/internal/remember.ts`): the rows as they stand, the counts, the list on screen, the facets, the
-  column plan. Props arrive on the caller's draw, and an atom could take them in only through an effect or a write
-  during a draw. `remember` keeps the last answer beside its first input in a `WeakMap` and answers again only when an
-  input is another object: what `useMemo` did, per region, with no hook.
-- **The region's actions are made once per region and read its last draw.** `run`, the row and group actions and the
-  stepping are built on the region's first draw and kept beside its atom, so the drawn rows keep their memo; each
-  reads the rows, state and view of the last draw from the same place. The caller is told of new decisions where they
-  are written (`run`), not in an effect after the draw.
-- **What ran after a draw runs from a ref callback.** The section's ref callback is new on every draw, so React calls
-  it after each one: it moves focus where a decision wanted it and hands the table the ticked facet values, and acts
-  only when one is waiting. The grid's does the same for its handle, measuring again and going back to the top for a
-  new list, and telling the region when a lead group comes into view. The undo, redo and stepping keys are an atom
-  mounted while the region is (`regionKeys`), with its listener removed by `get.addFinalizer`.
+- **The review region is made in its own provider** (`RegionScope`, a `ScopedAtom`, in
+  `packages/review/src/ReviewRegion.atoms.ts`; Benjamin's answer "ScopedAtom", 2026-11-19). Its parts read its atoms
+  from the provider, not from props handed down. The same holds for everything that keeps state of its own while it is
+  on screen: the grid, the phone's queue, the work list's strip, an overlay, a cut text, an edit form, and outside the
+  review the search box, the list table and the two cell forms. No state is looked up by `useId`.
+- **What the region works out is derived atoms** (Benjamin's answer "Derived atoms", 2026-11-19): the rows as they
+  stand, the counts, the work list, the list on screen, the facets, the lines drawn, the stops of "Next problem", the
+  column plan. The caller passes the rows, the columns, the re-check and the decisions with their undo as atoms; the
+  region writes the decisions with every action and whoever keeps them reads them there, so `savedDecisions` and
+  `onDecisionsChange` are gone, and so is `internal/remember.ts`. The Review step's decisions are one atom per import
+  (`reviewState` in `ReviewDraft.atoms.ts`): a write shows them, sends them and keeps them with their undo.
+- **The table's order is an atom that listens to the table** (`ordered` in `TableScope`). The sort, the search and the
+  column filters are TanStack Table's own state, a store outside React; the atom subscribes to those three and cleans
+  up with `get.addFinalizer`, as any atom over something outside does. It gives the table its rows itself before it
+  reads the order, so the order it reads is of the rows the atoms hold now and not of the ones the table was last
+  drawn with.
+- **The facets are the table's controlled state** (the brief's row for the facets effect). TanStack Table takes an
+  external atom per slice of its state (`atoms: { columnFilters }`), and the data-table hook passes it through; the
+  region's `tableFilters` is that atom, written from the derived facets by an atom mounted while the region is
+  (`followFacets`). `@tanstack/store` is a dependency of the review package for it.
+- **After a decision the wanted move is an atom, followed with `useAtomSubscribe`** (the brief's row, and Benjamin's
+  answer "No, follow the brief", 2026-11-19): `nav` holds where focus goes next, `moves` changes when the lines or the
+  move do, and the region subscribes to it. The atoms change before the rows are drawn, so the subscription settles
+  the move one animation frame later, when they are on screen; the move itself is read from the atoms then.
+- **Every ref callback is the same function across draws**, and only sets up its own node: the region's section (says
+  the region is on the page), the lead group's accept (says a lead is in view), the phone's card (keyed by the
+  decision: focus goes to the card that takes a decided one's place), the strip (its scroll, its size, its wheel) and a
+  cut text (its size). `bun run check` refuses any other form (`laws ref-callbacks`).
+- **Whether a lead group is in view is an atom its accept writes when its node appears and goes.** The brief's row
+  says "the lead is derived state the parent reads". Which lines are in view is the virtual list's own state, not an
+  atom, so it cannot be derived from atoms alone: the grid works out which group leads when it is drawn, as before,
+  and that group's accept carries the ref callback. The parent reads the atom.
+- **The grid measures again and goes back to the top from `useAtomSubscribe`** (the brief's row): the lines the grid
+  draws are a derived atom, and two derived signals say when their shape changed and when the list is another list.
+- **The region's actions are made once per region and read the atoms when they are pressed**, so the drawn rows keep
+  their memo and no action reads a draw. A region whose section has left the page does nothing: its actions, its keys
+  and a toast's Undo return at once, and its key listener is let go with it (no idle time).
 - **The layout is one atom, and its context went** (`regionLayout` in `parts.tsx`): the context only passed down what
   ui's content width already says.
 - **Saved progress is an atom per key over the browser's storage** (`SavedProgress.hook.ts`): the storage is the
   record, every write goes to it before the atom shows it, and an atom let go reads it again. `useSavedProgress` keeps
   its name and its shape, built from the atom hooks only.
-- **`viewRows` reads a row's decision as `undefined` when it has none, not an `Option`** (not yet confirmed by
-  Benjamin; A6 says `Option` for a row's decision): it runs once per row, and 50,000 rows would each allocate one. Everywhere a decision is handed on (an
-  undo step, `act`) it is an `Option`.
+- **`viewRows` reads a row's decision as an `Option`** (A6; Benjamin's answer "Option there too, measured",
+  2026-11-19). Measured on 50,000 rows before and after that one change: an accept of 500 took 1.51 s and 1.28 s
+  before, 1.16 s to 1.35 s after (four runs); Ctrl+Z 1.42 s and 1.27 s before, 1.06 s to 1.21 s after. Not slower.
 - **`Fix.confidence` is an `Option` the caller always gives** (A6), so the catalog writes `O.some(proposal.confidence)`
   and the result's changes carry `O.none()` for a typed value.
 - **The review's draft is a module with no screen in it** (`ReviewDraft.atoms.ts`): what the Review step holds
@@ -464,7 +480,7 @@ Not discriminators, and not changed: string-literal domains with no data of thei
 - **An answer given to a read is a value the read takes once**, with the time it was given; it is not an atom, and
   is not kept past the read. A read can be let go for whoever is signed in (`letGo`).
 - **What is built from a read's data is built from its answer** (`answerOf`), never from the read.
-- **The theme is kept in plain `localStorage`, against the brief's wording** (not yet confirmed by Benjamin).
+- **The theme is kept in plain `localStorage`, against the brief's wording.** Benjamin accepted it (2026-11-19).
   The brief names `Atom.kvs` for it. `Atom.kvs` stores the value as JSON (`"dark"` with its quotes), and
   `public/theme-init.js`, which sets the theme before the first paint so the page never flashes the wrong one, reads
   the bare word; every choice already stored would also be lost. `theme` is a writable atom over `localStorage`

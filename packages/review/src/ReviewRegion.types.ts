@@ -395,7 +395,7 @@ export type ImportResult = {
   held: ReadonlyArray<{ id: string; line: number; reason: string; decidedBy: "person" | "nobody" | "stored" }>
 }
 
-/** The person's decisions as plain data: safe to JSON.stringify, keep in a draft, and hand back as `savedDecisions`. */
+/** The person's decisions as plain data: safe to JSON.stringify, keep in a draft, and start the region from again (`restored`). */
 export type SavedDecisions = Readonly<Record<string, RowDecision>>
 
 /**
@@ -511,7 +511,7 @@ export type ReviewRegionProps = {
    * One more answer on a row that needs the person, for rows that belong to a parent record ("Leave job J-2044
    * out"). With it each such row keeps its own answers, under a group heading too: its fix or its choices, then
    * "Other answers" with typing a value, leaving the row out and this action, each named in full. Return
-   * `undefined` for a row it does not fit. Keep the function stable (`useCallback`).
+   * `undefined` for a row it does not fit. Taken when the region is first drawn: a function at module level, or one an atom holds.
    */
   rowAction?: (row: ReviewRow) => RowAction | undefined
   /**

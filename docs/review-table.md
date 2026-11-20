@@ -42,7 +42,7 @@ month its own row of the region, labelled "3 · Feb").
 | `words` | The task's own words for the tabs and the statuses, each set once and used on every tab, tag, count, sentence and downloaded file; what is left out keeps its default (`defaultReviewWords` in `words.ts`). The tabs: `needs` (Needs you), `cannot` (Can't fix here), `ready`, `out` (Left out), `all`; a row's tag: `stored` (Already there), `auto` (Auto-fixed), `accepted`, `kept`, `edited`, `chosen`; and `nothingNew` ("Nothing new: this file is already in") and `nothingToImport` ("Nothing here can be imported") in place of the import button. `{ needs: "Waiting on you" }`. The table's caption follows them |
 | `totals` | `[{ label, value }]`: the sums that matter, worked out by you from the rows you will import ("Purchase $3,771.18"), shown in the footer. Never add different units or currencies in one |
 | `rowAction` | `(row) => ({ label, onSelect }) \| undefined`: one more answer on a row that needs the person, for rows with a parent ("Leave job J-2044 out"). Each such row keeps its own answers, under a group heading too (no ticks there; the heading's button then says "for all 3"): its fix, pick or typing, then "Other answers" with typing a value beside a fix, "Leave row 8 out" and yours, each in full; a phone card lists them as buttons. Return `undefined` for a row it does not fit. Keep it stable (`useCallback`) |
-| `savedDecisions`, `onDecisionsChange` | The decisions as plain data, for the caller to keep (below). Hand back the very object `onDecisionsChange` gave and Undo and Redo come back with them. The region reads the callback from a ref, so a new function on every render (`(next) => setDraft(next)`) is called once per change, not again on each render |
+| `decisions` | The person's decisions with their undo and redo, as the caller's own atom (`Atom.Writable<ReviewState>`). The region writes it with every action; whoever keeps the decisions reads it there (`saved(state)` is the plain data). Start it with `proposing(rows)` (the rules' fixes as proposals), `emptyState`, or `restored(saved)` for decisions kept before: the very object `saved` gave brings Undo and Redo back with it |
 
 ## From the spreadsheet reader to the review
 
@@ -116,11 +116,11 @@ const review = (file: ReadonlyArray<Record<string, string>>): ReadonlyArray<Revi
   })
 
 export function ReviewStep(props: { file: ReadonlyArray<Record<string, string>>; onImport: (cells: unknown) => void }) {
-  const rows = useMemo(() => review(props.file), [props.file])
   return (
     <AppShell fill title="Import records">
-      <ReviewRegion title="Review items_messy.csv" noun={["record", "records"]} columns={columns} rows={rows} problemKinds={kinds}
-        summary={[`${rows.length} rows read`]} recheck={({ cells }) => check(cells)}
+      <ReviewRegion title="Review items_messy.csv" noun={["record", "records"]} columns={columnsAtom} rows={rowsAtom}
+        decisions={decisionsAtom} problemKinds={kinds} summary={[`${useAtomValue(rowsAtom).length} rows read`]}
+        recheck={recheckAtom}
         onImport={(result) => props.onImport(result.ready.map((row) => row.cells))} />
     </AppShell>
   )
@@ -128,7 +128,10 @@ export function ReviewStep(props: { file: ReadonlyArray<Record<string, string>>;
 ```
 
 - `AppShell fill` gives the region the screen below the header. Inside another frame, give its parent a height.
-- Keep `rows`, `columns` and `recheck` stable (`useMemo`, module level): the region re-derives everything from them.
+- `rows`, `columns`, `recheck` and `decisions` are atoms, made at module level beside the file's own atom
+  (`const rowsAtom = Atom.map(fileAtom, review)`, `const columnsAtom = Atom.make(columns)`,
+  `const recheckAtom = Atom.make(O.some(({ cells }) => check(cells)))`,
+  `const decisionsAtom = Atom.make(emptyState)`): the region derives everything from them, once per change.
 - A model's proposals are the same `fix` with `by: "model"`; they get a sparkle. Merge them into `rows` when they
   arrive. A row the person already decided keeps the person's decision. Give the region a new `key` for a new file.
 - The server still decides: send `result.ready` to an endpoint that runs the same `check` and refuses what it refuses.
@@ -147,8 +150,8 @@ holds several records, is [patterns](patterns.md) section 16):
   `problem` and `fix` as above, and a column for the parent's number (`code: true`, and `context: true` for the
   phone card), so every row says which order it belongs to. Pass `embedded`: the title becomes an `h2` under the
   page's heading, and the region shows neither its own tally nor its import button.
-- **The page counts, not the region.** Keep the decisions with `onDecisionsChange` (`savedDecisions` brings them
-  back), turn them into the project's answers, and run the project's own pure review of the parents with them. That
+- **The page counts, not the region.** Read the decisions from the atom the region writes
+  (`Atom.map(decisionsAtom, saved)`), turn them into the project's answers, and run the project's own pure review of the parents with them. That
   one function gives every count on the page and what its button imports: the region counts rows, and an order is
   ready only when every one of its lines is.
 - **The filter words follow the task's own names.** Where the task calls the waiting ones "Waiting on you", pass
@@ -158,10 +161,9 @@ holds several records, is [patterns](patterns.md) section 16):
   person ("Leave job J-2044 out"), beside "Leave row 8 out"; the page leaves the parent out and drops its lines from
   `rows`. A question with no default is `problem.choices`, one of them `suggested` with its reason in `note`.
 - **Two views, one history.** A page that shows the parent table and the questions as two views unmounts the region
-  when it switches. Keep the decisions in the page (`onDecisionsChange={setDecisions}`,
-  `savedDecisions={decisions}`), as they are: the region comes back with its answers and with "Undo last step". A
-  copy of the object (`{ ...saved }`), JSON or a refresh brings the decisions back and starts a new history. A page
-  that keeps no decisions loses both on every switch: keep the region mounted and hide it instead.
+  when it switches. The decisions are the page's atom, so they outlive the region: it comes back with its answers
+  and with "Undo last step". After a refresh, `restored(fromDraft(draft))` brings the decisions and their history
+  back; a plain copy of the decisions (`{ ...saved }`, JSON) brings them back and starts a new history.
 - **Twelve parent rows at 1440 by 900.** The parent table is the data table (`RecordsTable`), one line a row with
   the reason cut to one line and the whole sentence in its `title`, one status pill, the totals on one line beside
   the import button and the filters on the same row as the view tabs.
@@ -249,8 +251,15 @@ choice suggested), a decimal comma under one labelled group, a SKU not in stock,
   it is, also keeps "Undo last step" when the region is drawn again in the same page: "Two views, one history"):
 
 ```tsx
-const [draft, setDraft] = useState<SavedDecisions | undefined>(() => readDraft(fileId)) // your server draft or localStorage
-<ReviewRegion key={fileId} savedDecisions={draft} onDecisionsChange={(next) => { setDraft(next); writeDraft(fileId, next) }} … />
+// One atom per file: read is what is held, or what was kept; a write holds it and keeps it (your server draft or localStorage).
+const decisionsOf = perKey((fileId: string) => {
+  const held = Atom.make<O.Option<ReviewState>>(O.none())
+  return Atom.writable(
+    (get) => O.getOrElse(get(held), () => restored(readDraft(fileId) ?? {})),
+    (ctx, next: ReviewState) => { ctx.set(held, O.some(next)); writeDraft(fileId, saved(next)) }
+  )
+})
+<ReviewRegion key={fileId} decisions={decisionsOf(fileId)} … />
 ```
 
 ## Not included
@@ -266,11 +275,11 @@ const [draft, setDraft] = useState<SavedDecisions | undefined>(() => readDraft(f
 - Editing is one field, the one that is wrong. For editing many cells use the data grid ([the kit](kit.md)).
 - No sums of its own: it cannot know which columns add up or in what units. Pass yours in `totals`, and a check
   against the file in `summary` ("Totals match file").
-- Decisions live in the region until Import unless the caller saves them: pass `savedDecisions` and `onDecisionsChange`
-  (see "A refresh does not lose work"). Without them a reload, or a view switch that unmounts the region, starts the
-  review again. The undo and redo history lives in the decisions object the region handed out; to keep it across a
-  refresh, store `toDraft(decisions)` and hand back `fromDraft(draft)` as `savedDecisions` (`useSavedProgress` does
-  this; a draft saved before redo existed opens with nothing to redo).
+- It keeps no decisions of its own: they live in the caller's `decisions` atom, for as long as the caller keeps that
+  atom, and across a reload only if the caller's atom writes them somewhere (see "A refresh does not lose work"). The
+  undo and redo history lives in the state the atom holds; to keep it across a refresh, store `toDraft(saved(state))`
+  and start again from `restored(fromDraft(draft))` (the Review step does this with the saved progress; a draft saved
+  before redo existed opens with nothing to redo).
 
 ## Wired to the example Record
 

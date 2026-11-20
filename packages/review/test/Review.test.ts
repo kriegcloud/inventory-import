@@ -7,6 +7,7 @@ import * as O from "effect/Option"
 import * as Str from "effect/String"
 import * as S from "effect/Schema"
 import { describe, expect, it } from "vitest"
+import { CellMark } from "@inventory/review/ReviewTypes"
 import {
   act,
   Action,
@@ -121,7 +122,9 @@ describe("a proposal never overwrites the person's decision", () => {
       Action.AcceptGroup({ groupId: "unit:each", except: [] })
     )
     expect(viewOf(state, typed).cells.unit).toBe("kg")
-    expect(viewOf(state, typed).marks.unit).toMatchObject({ _tag: "Applied", by: "you", to: "kg" })
+    const typedMark = viewOf(state, typed).marks.unit
+    expect(CellMark.$is("Applied")(typedMark)).toBe(true)
+    expect(typedMark).toMatchObject({ by: "you", to: "kg" })
     expect(viewOf(state, left).status).toBe("out")
     expect(O.getOrUndefined(HashMap.get(state.decisions, left))?.accepted ?? []).toEqual([])
     expect(state.undo[state.undo.length - 1]?.label).toBe("7 fixes accepted")

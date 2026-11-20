@@ -9,6 +9,7 @@
 // The table itself stays TanStack's (its sort, its hidden columns, its search). Its state is a store outside React:
 // `ordered` listens to it as any atom listens to something outside, and the facets the person ticked reach it as its
 // own controlled state (`tableFilters`).
+import { CellMark, Entry } from "@inventory/review/ReviewTypes"
 import * as ScopedAtom from "@effect/atom-react/ScopedAtom"
 import { type ColumnFiltersState, createColumnHelper, type Table } from "@tanstack/react-table"
 import { createAtom } from "@tanstack/store"
@@ -43,7 +44,6 @@ import {
 } from "@inventory/review/ReviewDraft"
 import type {
   Counts,
-  Entry,
   FilterId,
   FixGroup,
   Problem,
@@ -408,7 +408,9 @@ const makeRegion = (input: RegionInput, registry: AtomRegistry.AtomRegistry): Re
         ? rows.flatMap((view) => (view.problem?.column === undefined ? [] : [view.problem.column]))
         : now === "auto"
           ? // The fixes made for the person are what this view is about: their cells stay in the row.
-            rows.flatMap((view) => Object.keys(view.marks).filter((column) => view.marks[column]?._tag === "Applied"))
+            rows.flatMap((view) =>
+              Object.keys(view.marks).filter((column) => CellMark.$is("Applied")(view.marks[column]))
+            )
           : []
     )
   })
@@ -612,13 +614,19 @@ const makeRegionTable = (
   })
   const stops = Atom.map(lines, (now): ReadonlyArray<Stop> => {
     const found: Array<Stop> = []
+    // Every kind of line is named, so a new one cannot be drawn without saying whether "Next problem" stops at it.
     for (const entry of now) {
-      if (entry._tag === "Row") {
-        if (entry.view.status === "needs") found.push({ rowId: entry.view.row.id })
-      } else if (entry._tag === "Kind" && entry.collapsed) {
-        const first = entry.rowIds[0]
-        if (first !== undefined) found.push({ rowId: first, kindId: entry.kind.id, among: entry.rowIds })
-      }
+      Entry.$match(entry, {
+        Row: ({ view }) => {
+          if (view.status === "needs") found.push({ rowId: view.row.id })
+        },
+        Kind: ({ collapsed, kind, rowIds }) => {
+          const first = rowIds[0]
+          if (collapsed && first !== undefined) found.push({ rowId: first, kindId: kind.id, among: rowIds })
+        },
+        Group: () => undefined,
+        Rest: () => undefined
+      })
     }
     return found
   })

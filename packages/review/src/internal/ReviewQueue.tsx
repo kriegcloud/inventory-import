@@ -1,3 +1,5 @@
+import { CellMark, Entry } from "@inventory/review/ReviewTypes"
+import { OtherAnswer } from "@inventory/review/ReviewDraft"
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
 import * as HashMap from "effect/HashMap"
 import * as HashSet from "effect/HashSet"
@@ -151,7 +153,7 @@ function Decision(props: {
   const { entry, actions, groupActions, labels } = props
   const columnOf = (id: string | undefined) => props.columns.find((column) => column.id === id)
 
-  if (entry._tag === "Group") {
+  if (Entry.$is("Group")(entry)) {
     const { group } = entry
     const n = group.rowIds.filter((rowId) => !HashSet.has(props.excluded, rowId)).length
     const choices = choicesOf(group)
@@ -249,7 +251,7 @@ function Decision(props: {
   const problem = view.problem
   const subject = problem?.column
   const mark = subject === undefined ? undefined : view.marks[subject]
-  const fix = mark !== undefined && mark._tag === "Proposed" ? mark.fix : undefined
+  const fix = mark !== undefined && CellMark.$is("Proposed")(mark) ? mark.fix : undefined
   const choices = fix === undefined ? undefined : choicesOf(fix)
   const rival = problem?.rivals?.[0] === undefined ? undefined : actions.peek(problem.rivals[0])
   const label = subject === undefined ? "" : O.getOrElse(HashMap.get(labels, subject), () => subject)
@@ -413,7 +415,7 @@ function Decision(props: {
           ) : (
             // The caller's own answer for the row: each answer in full words, as on a desk.
             others.map((answer) =>
-              answer._tag === "Type" ? (
+              OtherAnswer.$is("Type")(answer) ? (
                 subject === undefined ? null : (
                   <Overlay
                     key="type"
@@ -443,8 +445,10 @@ function Decision(props: {
                   key={answer._tag}
                   variant="outline"
                   size="touch"
-                  {...(main === null && answer._tag === "LeaveOut" ? first : {})}
-                  onClick={() => (answer._tag === "LeaveOut" ? actions.leaveOut(view.row.id) : extra.onSelect())}
+                  {...(main === null && OtherAnswer.$is("LeaveOut")(answer) ? first : {})}
+                  onClick={() =>
+                    OtherAnswer.$is("LeaveOut")(answer) ? actions.leaveOut(view.row.id) : extra.onSelect()
+                  }
                 >
                   {answer.label}
                 </Button>
@@ -506,7 +510,7 @@ function QueueBody(props: QueueProps & { region: Region }) {
   const groupActions = table.groupActions
   const index = Math.min(at, Math.max(0, decisions.length - 1))
   const entry = decisions[index]
-  const key = entry === undefined ? "" : entry._tag === "Group" ? `g:${entry.group.id}` : entry.view.row.id
+  const key = entry === undefined ? "" : Entry.$is("Group")(entry) ? `g:${entry.group.id}` : entry.view.row.id
   const nameColumn = columns[0]
 
   if (props.loading) {

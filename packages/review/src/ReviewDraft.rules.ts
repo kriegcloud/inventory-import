@@ -9,14 +9,14 @@
  * collection.
  */
 import { LiteralKit } from "@beep/schema/LiteralKit"
-import { isKept, isLeftOut, kept, leftOut, putBack, ReviewDecision } from "@inventory/review/ReviewDecision"
+import { isKept, isLeftOut, kept, leftOut, putBack, ReviewDecision, RowPlace } from "@inventory/review/ReviewDecision"
 import * as Data from "effect/Data"
 import * as HashMap from "effect/HashMap"
 import * as HashSet from "effect/HashSet"
 import * as MutableHashMap from "effect/MutableHashMap"
 import * as MutableHashSet from "effect/MutableHashSet"
 import * as O from "effect/Option"
-import { CellMark, Entry } from "@inventory/review/ReviewTypes"
+import { CellMark, ColumnMatch, Entry } from "@inventory/review/ReviewTypes"
 import type {
   DraftStep,
   Choice,
@@ -55,7 +55,7 @@ const undecided = ReviewDecision.make({})
 
 /** Kept over its rivals, now or before it was left out: what today's rows read as the `kept` flag. */
 const keptFlag = (decision: RowDecision): boolean =>
-  isKept(decision.place) || (decision.place.kind === "leftOut" && decision.place.wasKept)
+  isKept(decision.place) || (RowPlace.guards.leftOut(decision.place) && decision.place.wasKept)
 
 /** True when the person left the row out. */
 const leftOutRow = (decision: O.Option<RowDecision>): boolean => O.isSome(decision) && isLeftOut(decision.value.place)
@@ -128,7 +128,7 @@ export const toDraft = (decisions: SavedDecisions): ReviewDraft => ({
 })
 
 /**
- * Decisions to hand the region back after a refresh (`savedDecisions`): the very object it restores with its undo
+ * Decisions to start the region from again after a refresh (`restored`): the very object it restores with its undo
  * history, rebuilt from a `toDraft` draft. Undoing after the refresh then takes back the last step taken before it.
  */
 export const fromDraft = (draft: ReviewDraft): SavedDecisions =>
@@ -369,7 +369,7 @@ export function count(views: ReadonlyArray<RowView>): Counts {
     }
     for (const fix of view.row.applied ?? []) {
       const mark = view.marks[fix.column]
-      if (mark !== undefined && mark._tag === "Applied" && mark.by !== "you" && !mark.accepted) applied += 1
+      if (mark !== undefined && CellMark.$is("Applied")(mark) && mark.by !== "you" && !mark.accepted) applied += 1
     }
   }
   return {
@@ -471,7 +471,7 @@ export function appliedGroups(views: ReadonlyArray<RowView>): ReadonlyArray<FixG
   for (const view of views) {
     for (const fix of view.row.applied ?? []) {
       const mark = view.marks[fix.column]
-      if (mark === undefined || mark._tag !== "Applied" || mark.by === "you") continue
+      if (mark === undefined || !CellMark.$is("Applied")(mark) || mark.by === "you") continue
       const id = fix.group ?? `${fix.column}:${fix.to}`
       const group = O.getOrElse(MutableHashMap.get(found, id), (): Gathered => ({ fix, rowIds: [], froms: [] }))
       MutableHashMap.set(found, id, gather(group, view.row.id, mark.from, fix))
@@ -831,7 +831,7 @@ export function primary(input: {
   words?: ReviewWords | undefined
 }): Primary {
   const words = input.words ?? defaultReviewWords
-  const unmatched = input.columns.find((column) => column.match?._tag === "Unmatched")
+  const unmatched = input.columns.find((column) => ColumnMatch.$is("Unmatched")(column.match))
   if (unmatched !== undefined) {
     return { label: `Match ${unmatched.label} to import`, blocked: true, columnId: unmatched.id }
   }
@@ -1051,7 +1051,7 @@ export function result(input: {
     if (view.status === "ready") {
       const changes: Array<ImportChange> = []
       for (const [column, mark] of Object.entries(view.marks)) {
-        if (mark._tag !== "Applied" || mark.from === mark.to) continue
+        if (!CellMark.$is("Applied")(mark) || mark.from === mark.to) continue
         const person = mark.by === "you"
         changes.push({
           column,
@@ -1189,7 +1189,7 @@ export function otherAnswers(input: {
   if (problem === undefined || extra === undefined) return undefined
   const subject = problem.column
   const proposed = subject === undefined ? undefined : view.marks[subject]
-  const typing = problem.choices === undefined && proposed?._tag === "Proposed"
+  const typing = problem.choices === undefined && CellMark.$is("Proposed")(proposed)
   return [
     ...(typing ? [OtherAnswer.Type()] : []),
     OtherAnswer.LeaveOut({ label: `Leave row ${rowName(view.row)} out` }),

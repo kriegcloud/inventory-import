@@ -72,6 +72,11 @@
       ],
       "outputs": []
     },
+    // Every ref is a DOM ref or a callback that stays the same across draws (`beep laws ref-callbacks`).
+    "//#refs:check": {
+      "inputs": ["apps/**/src/**/*.tsx", "packages/**/src/**/*.tsx", "packages/tooling/tool/cli/src/**"],
+      "outputs": []
+    },
     // Every Effect import from its own path under its own name (`beep laws effect-imports`,
     // docs/standards/effect-imports.md): code, the examples in its comments, and the standing documents.
     "//#imports:check": {

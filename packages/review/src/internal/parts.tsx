@@ -478,14 +478,13 @@ export function CutText(props: CutTextProps) {
 function CutBody(props: CutTextProps) {
   const scope = useAtomValue(CutScope.use())
   const [{ cut, open }, setHeld] = useAtom(scope.held)
-  const ref = scope.measured
   const setOpen = (next: boolean | ((before: boolean) => boolean)) =>
     setHeld((before) => ({ ...before, open: typeof next === "function" ? next(before.open) : next }))
   return (
     <HoverCard openDelay={350} closeDelay={100} open={open && cut} onOpenChange={setOpen}>
       <HoverCardTrigger asChild>
         <span
-          ref={ref}
+          ref={scope.measured}
           className={cn(
             "block truncate",
             cut && "cursor-default rounded-xs focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",

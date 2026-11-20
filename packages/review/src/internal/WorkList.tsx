@@ -136,14 +136,14 @@ function Strip(props: { children: React.ReactNode }) {
 }
 
 function StripBody(props: { children: React.ReactNode }) {
-  const { more: moreOf, follow } = useAtomValue(StripScope.use())
-  const more = useAtomValue(moreOf)
+  const strip = useAtomValue(StripScope.use())
+  const more = useAtomValue(strip.more)
   const move = (target: HTMLElement, by: number) => {
     const element = viewportOf(target.closest("nav"))
     element?.scrollBy({ left: by * element.clientWidth * 0.8, behavior: "smooth" })
   }
   return (
-    <nav ref={follow} aria-label="Problems to settle" className="relative flex-none border-b">
+    <nav ref={strip.follow} aria-label="Problems to settle" className="relative flex-none border-b">
       <ScrollArea className="w-full">
         <div className="w-max px-3 py-2">{props.children}</div>
         {/* Mounted so the line scrolls sideways; never drawn. */}

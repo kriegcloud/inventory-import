@@ -8,17 +8,9 @@ import {
   WandSparklesIcon,
   XIcon
 } from "lucide-react"
-import {
-  createContext,
-  lazy,
-  type ReactNode,
-  Suspense,
-  useContext,
-  useId,
-  useLayoutEffect,
-  useRef,
-  useState
-} from "react"
+import { useAtom, useAtomValue } from "@effect/atom-react"
+import * as Atom from "effect/reactivity/Atom"
+import { lazy, type ReactNode, Suspense, useId, useRef } from "react"
 import { cn } from "cn"
 import { Slot } from "radix-ui"
 import { ProposedChip, SourceMark } from "@inventory/ui/ProposedValue"
@@ -28,7 +20,7 @@ import { Button } from "@inventory/ui/components/button"
 import { Field, FieldLabel } from "@inventory/ui/components/field"
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@inventory/ui/components/hover-card"
 import { Input } from "@inventory/ui/components/input"
-import { narrowBelow, useContentBelow } from "@inventory/ui/ContentWidth"
+import { contentBelow, narrowBelow } from "@inventory/ui/ContentWidth"
 import {
   Popover,
   PopoverArrow,
@@ -63,15 +55,11 @@ const mediumUnder = 1101
 
 /**
  * The layout for the room the page has. Worked out from the window and the sidebar's width, never from an element,
- * so nothing measures layout.
+ * so nothing measures layout. Every part of the region reads it here.
  */
-export function useLayout(): Layout {
-  const narrow = useContentBelow(narrowUnder)
-  const medium = useContentBelow(mediumUnder)
-  return narrow ? "narrow" : medium ? "medium" : "wide"
-}
-
-export const LayoutContext = createContext<Layout>("wide")
+export const regionLayout: Atom.Atom<Layout> = Atom.readable((get) =>
+  get(contentBelow(narrowUnder)) ? "narrow" : get(contentBelow(mediumUnder)) ? "medium" : "wide"
+)
 
 // ---------------------------------------------------------------------------------------------------------------
 // A popover on a desk, a bottom sheet on a phone
@@ -80,6 +68,20 @@ export const LayoutContext = createContext<Layout>("wide")
 // The phone's bottom sheet (vaul) is its own chunk, fetched when one first opens (and ahead of that on a phone by
 // ReviewRegion), never on a desk.
 const PhoneDrawer = lazy(() => import("./PhoneDrawer.tsx").then((module) => ({ default: module.PhoneDrawer })))
+
+/**
+ * What one overlay holds: open when nobody controls it, mounted once opened (so closing slides it away), and how the
+ * pointer opened it. One per overlay on screen, by its `useId`.
+ */
+type OverlayHeld = {
+  readonly open: boolean
+  readonly opened: boolean
+  /** Changed in place: a resting mouse and its timer redraw nothing. */
+  readonly pointer: { byHover: boolean; timer: number }
+}
+const overlays = Atom.family((_overlay: string) =>
+  Atom.make<OverlayHeld>({ open: false, opened: false, pointer: { byHover: false, timer: 0 } })
+)
 
 /** One-click-away detail. The same content points at its trigger on a wide screen and rises from the bottom on a phone. */
 export function Overlay(props: {
@@ -106,18 +108,19 @@ export function Overlay(props: {
    */
   card?: boolean
 }) {
-  const layout = useContext(LayoutContext)
-  const hovered = useRef(false)
-  const timer = useRef(0)
-  const [inner, setInner] = useState(false)
-  const open = props.open ?? inner
+  const layout = useAtomValue(regionLayout)
+  const [held, setHeld] = useAtom(overlays(useId()))
+  const open = props.open ?? held.open
   const setOpen = (next: boolean) => {
-    setInner(next)
+    setHeld((before) => ({ ...before, open: next }))
     props.onOpenChange?.(next)
   }
   const body = typeof props.children === "function" ? props.children(() => setOpen(false)) : props.children
-  // Mounted from its first opening on, so closing it slides it away instead of cutting it off.
-  const [opened, setOpened] = useState(false)
+  const opened = held.opened
+  const setOpened = (next: boolean) => setHeld((before) => ({ ...before, opened: next }))
+  // Whether it was opened by a resting mouse, and the timer that will open or close it: changed without drawing.
+  const hovered = held.pointer
+  const timer = held.pointer
   const trigger = useRef<HTMLElement>(null)
   if (layout === "narrow") {
     return (
@@ -154,9 +157,9 @@ export function Overlay(props: {
     )
   }
   const later = (next: boolean, wait: number) => {
-    window.clearTimeout(timer.current)
-    timer.current = window.setTimeout(() => {
-      hovered.current = next
+    window.clearTimeout(timer.timer)
+    timer.timer = window.setTimeout(() => {
+      hovered.byHover = next
       setOpen(next)
     }, wait)
   }
@@ -165,8 +168,8 @@ export function Overlay(props: {
     <Popover
       open={open}
       onOpenChange={(next) => {
-        window.clearTimeout(timer.current)
-        hovered.current = false
+        window.clearTimeout(timer.timer)
+        hovered.byHover = false
         setOpen(next)
       }}
     >
@@ -177,15 +180,15 @@ export function Overlay(props: {
         }}
         onPointerLeave={(event) => {
           if (!mouse(event)) return
-          if (open && hovered.current) later(false, 200)
-          else window.clearTimeout(timer.current)
+          if (open && hovered.byHover) later(false, 200)
+          else window.clearTimeout(timer.timer)
         }}
         onClick={(event) => {
           // Pressed while open from a hover: it stays open, now as if pressed, instead of closing under the click.
-          if (open && hovered.current) {
+          if (open && hovered.byHover) {
             event.preventDefault()
-            window.clearTimeout(timer.current)
-            hovered.current = false
+            window.clearTimeout(timer.timer)
+            hovered.byHover = false
           }
         }}
       >
@@ -196,13 +199,13 @@ export function Overlay(props: {
         side={props.side ?? "bottom"}
         sideOffset={props.card === true ? 4 : 6}
         onOpenAutoFocus={(event) => {
-          if (hovered.current) event.preventDefault()
+          if (hovered.byHover) event.preventDefault()
         }}
         onPointerEnter={(event) => {
-          if (mouse(event) && hovered.current) window.clearTimeout(timer.current)
+          if (mouse(event) && hovered.byHover) window.clearTimeout(timer.timer)
         }}
         onPointerLeave={(event) => {
-          if (mouse(event) && hovered.current) later(false, 200)
+          if (mouse(event) && hovered.byHover) later(false, 200)
         }}
         {...(props.className === undefined ? {} : { className: props.className })}
       >
@@ -413,6 +416,9 @@ export function CellValue(props: {
   )
 }
 
+/** Whether one cut text is cut, and its card open; by its `useId`. */
+const cutTexts = Atom.family((_text: string) => Atom.make({ cut: false, open: false }))
+
 /**
  * Text in one line that may be cut short. Once it is cut (measured after it is drawn, again when its cell changes
  * width), the whole text is in a hover card: on hover, on keyboard focus (the cut text joins the tab order) and on a
@@ -427,18 +433,22 @@ export function CutText(props: {
   card?: ReactNode
   className?: string
 }) {
-  const ref = useRef<HTMLSpanElement>(null)
-  const [cut, setCut] = useState(false)
-  const [open, setOpen] = useState(false)
-  useLayoutEffect(() => {
-    const element = ref.current
+  const [held, setHeld] = useAtom(cutTexts(useId()))
+  const { cut, open } = held
+  const setOpen = (next: boolean | ((before: boolean) => boolean)) =>
+    setHeld((before) => ({ ...before, open: typeof next === "function" ? next(before.open) : next }))
+  // Measured once drawn, and again whenever its box changes size.
+  const ref = (element: HTMLSpanElement | null) => {
     if (element === null) return
-    const measure = () => setCut(element.scrollWidth > element.clientWidth + 1)
+    const measure = () => {
+      const now = element.scrollWidth > element.clientWidth + 1
+      setHeld((before) => (before.cut === now ? before : { ...before, cut: now }))
+    }
     measure()
     const observer = new ResizeObserver(measure)
     observer.observe(element)
     return () => observer.disconnect()
-  }, [props.text])
+  }
   return (
     <HoverCard openDelay={350} closeDelay={100} open={open && cut} onOpenChange={setOpen}>
       <HoverCardTrigger asChild>
@@ -589,6 +599,9 @@ export function WhyBody(props: {
   )
 }
 
+/** What was typed in one edit form, none until something was; by its `useId`. */
+const editForms = Atom.family((_form: string) => Atom.make<O.Option<string>>(O.none()))
+
 /** One field for the value that is wrong. Enter saves; the row is checked again by the caller's rule. */
 export function EditForm(props: {
   label: string
@@ -597,7 +610,9 @@ export function EditForm(props: {
   onSave: (value: string) => void
 }) {
   const id = useId()
-  const [value, setValue] = useState(props.value)
+  const [typed, setTyped] = useAtom(editForms(id))
+  const value = O.getOrElse(typed, () => props.value)
+  const setValue = (next: string) => setTyped(O.some(next))
   return (
     <form
       className="flex flex-col gap-3"

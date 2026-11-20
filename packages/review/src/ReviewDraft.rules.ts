@@ -214,8 +214,8 @@ function build(
         from: row.cells[fix.column] ?? "",
         to: fix.to,
         by: sourceOf(fix),
-        fix,
-        ...(accepted.includes(fix.column) ? { accepted: true } : {})
+        fix: O.some(fix),
+        accepted: accepted.includes(fix.column)
       })
       cells[fix.column] = fix.to
     }
@@ -231,7 +231,7 @@ function build(
         from: row.cells[fix.column] ?? "",
         to: fix.to,
         by: sourceOf(fix),
-        fix,
+        fix: O.some(fix),
         accepted: true
       })
       cells[fix.column] = fix.to
@@ -248,7 +248,13 @@ function build(
   let typed = false
   for (const column of Object.keys(edits)) {
     const value = edits[column] ?? ""
-    marks[column] = CellMark.Applied({ from: row.cells[column] ?? "", to: value, by: "you" })
+    marks[column] = CellMark.Applied({
+      from: row.cells[column] ?? "",
+      to: value,
+      by: "you",
+      fix: O.none(),
+      accepted: false
+    })
     cells[column] = value
     typed = true
   }
@@ -358,7 +364,7 @@ export function count(views: ReadonlyArray<RowView>): Counts {
     }
     for (const fix of view.row.applied ?? []) {
       const mark = view.marks[fix.column]
-      if (mark !== undefined && mark._tag === "Applied" && mark.by !== "you" && mark.accepted !== true) applied += 1
+      if (mark !== undefined && mark._tag === "Applied" && mark.by !== "you" && !mark.accepted) applied += 1
     }
   }
   return {
@@ -1047,10 +1053,10 @@ export function result(input: {
           from: mark.from,
           to: mark.to,
           source: mark.by === "you" ? "person" : mark.by,
-          decidedBy: person || mark.accepted === true ? "person" : "rule",
-          how: person ? "typed or chose a value" : mark.accepted === true ? "accepted a proposal" : "applied by a rule",
-          ...(mark.fix === undefined ? {} : { basis: mark.fix.why.basis }),
-          confidence: mark.fix === undefined ? O.none() : mark.fix.confidence
+          decidedBy: person || mark.accepted ? "person" : "rule",
+          how: person ? "typed or chose a value" : mark.accepted ? "accepted a proposal" : "applied by a rule",
+          ...(O.isNone(mark.fix) ? {} : { basis: mark.fix.value.why.basis }),
+          confidence: O.flatMap(mark.fix, (fix) => fix.confidence)
         })
       }
       ready.push({ id: view.row.id, line: view.row.line, cells: view.cells, changes, kept: view.decided === "kept" })

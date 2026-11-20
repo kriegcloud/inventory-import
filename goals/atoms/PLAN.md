@@ -18,13 +18,13 @@ from: explorations/ideal-architecture
 | 4 | The app's shell: the content width, the development sign-in, the Activity page | done |
 | 5 | `@inventory/ui`'s own pieces: the theme, the table search, content width, the run log | done |
 | 6 | `@inventory/catalog-web`: the upload, the Items page and its editor, the assistant, the import's steps | done |
-| 7 | `@inventory/review`: the region's state with undo, saved progress, the grid, the queue; the A6 remodel | todo |
+| 7 | `@inventory/review`: the region's state with undo, saved progress, the grid, the queue; the A6 remodel | done |
 | 8 | TanStack Query removed (A2); the lint everywhere; the documents the move made false | todo |
 
 ## Current blocker
 
-Step 7 waits for Benjamin's uncommitted edit to `packages/review/src/ReviewDecision.schema.ts` in the main checkout to
-be here.
+None. Benjamin's edit to `packages/review/src/ReviewDecision.schema.ts` is on main as `3951945`, under this
+branch's step 6; the remodel keeps its forms (`putBack` with `identity`, `RowPlace.guards`, `A.isReadonlyArrayEmpty`).
 
 ## The hook count
 
@@ -75,6 +75,14 @@ After each package, the same count:
   and the app's `src/web` none either. `@tanstack/react-query` is imported in 2 files (the app's `main.tsx` and the
   client's `QueryClient.runtime.ts`), both for step 8. Strict ceilings: `catalog-web` 245 → 240, `client` 22 → 20
   (sum 645).
+- **After step 7 (`review`)**: `review` holds no banned hook: `useEffect` 9 → 0, `useLayoutEffect` 2 → 0, `useState`
+  22 → 0, `useMemo` 27 → 0, `useCallback` 11 → 0, `useContext` 1 → 0, `useImperativeHandle` 1 → 0. `useRef` 24 → 4,
+  each a DOM node (the import button and the activity button for focus to return to, an overlay's trigger, the grid's
+  scrolling frame, which the virtual list reads). It keeps `useId` (7: each region, grid, queue, strip, overlay, cut
+  text and edit form has its own atom), the vendored `useDataTable` and TanStack Virtual's `useVirtualizer` (A4), and
+  calls `useAtomValue` 5, `useAtom` 7, `useAtomSet` 2, `useAtomMount` 1. Every web package and the app's `src/web`
+  now hold no banned hook; `@tanstack/react-query` is still imported in 2 files, for step 8. The review's strict
+  ceiling fell from 283 to 282 (sum 644).
 
 ## Proof
 
@@ -265,6 +273,73 @@ Caught on screen and fixed before the commit: the Review step's first version to
 else's change, and drew the region again, which emptied Undo. The step that follows the import's revision is now an
 atom that reads the review's state as it is, not as it was when the screen last drew.
 
+**Step 7, `review`.** `bun run check` and `bun run check:full -- --force` pass (76 tasks, none from cache); the review
+lint (`packages/review/.oxlintrc.json`) is on with no file excepted. Three commits: the A6 remodel of the rules, the
+other discriminators, then the hooks.
+
+Measured before and after the hooks moved, as the brief's rabbit hole asks: a 50,000-row file (the messy sample
+repeated with its SKUs made unique, 5.5 MB) on the dev server in a headless browser, two runs each.
+
+| | Before (hooks) | After (atoms) |
+| --- | --- | --- |
+| Reload to the region drawn | 10.7 s, 9.4 s | 8.2 s, 8.4 s |
+| One accept (500 rows), press to counts | 1.67 s, 1.47 s | 1.31 s, 1.31 s |
+| Ctrl+Z, press to counts | 1.79 s, 1.42 s | 1.19 s, 1.14 s |
+| All 50,000 scrolled top to bottom in 40 jumps | 4.6 s, 4.75 s | 3.6 s, 3.6 s |
+| Frames over 50 ms during the scroll (worst) | 33, 37 (717 ms, 633 ms) | 21, 24 (300 ms, 317 ms) |
+
+No measure is slower, so the state stays one atom per region and is not split by row. The counts read "Needs a
+decision 3,250 · Cannot import 3,250 · Ready 43,500 · All 50,000"; the last row drawn after the scroll was row 50,001.
+
+Browser, on a fresh database, a new browser context, the dev server on port 5220:
+
+- The messy sample: "Needs a decision 24 · Cannot import 21 · Ready 155 · All 200", "Import 155, skip 45", the work
+  list "SKU 2 · Category 3 · Cost 2 · Number 2 · Vendors 2 · True or false 1 · Date 3 · Discontinued 2 · SKU clash 7".
+- SKU picked on the work list, "Accept for the 2 ticked": SKU ticked off, "SKU clash 9" (the two rows now clash, so
+  the tab counts stay), the table on Category with focus on "Use finished-goods for the 2 ticked" 50 ms after the
+  press. That button: 24 → 22, 155 → 157, focus on "Use components for the 1 ticked".
+- Ctrl+Z, Ctrl+Shift+Z and the Undo button: each took back or brought back one step ("Undo: 2 fixes accepted", "Redo:
+  2 fixes accepted"); reloaded mid-review: Redo still offered. `j`, `j`, `k`: focus moved row by row, then down the
+  work list to the next kind.
+- "Type another SKU for Oak Cutting Oil": the box held YDR-8742; typed ZZZ-0001, Save: 24 → 22, 155 → 157, "Undo: Value
+  changed". "Leave out Aluminum Bracket": "Left out 1", focus on the next row's first action; Put back: "Left out 0".
+- All: "all, 200 items"; searched "hinge": 4 rows; Category, packaging ticked: "all, 34 items"; unticked: 200. Row
+  height on a 1900 px window: 36 px compact, 44 px comfortable, the choice stored. A row opened to its detail stayed
+  open after the table was scrolled away and back, and closed again. Category hidden and shown from View; SKU sorted
+  descending. A cut-off value (VUR-1717) showed whole in its card on keyboard focus.
+- "Why flagged?": the 43 flagged rows with their reasons. Activity: the steps of the run; Escape put focus back on its
+  button.
+- At 390 px: the queue, "Decision 1 of 17", "Accept for 2": 19 → 17, the next card with focus on "Use 1200 for 2";
+  Undo: the card back; "Why?" as a drawer; "Review 2 one by one": 18 decisions; Import: the drawer "Import 160
+  items? 40 items won't be imported (Needs a decision 19, Cannot import 21)", "Keep reviewing" put focus back on the
+  import button. No sideways scroll.
+- At 1150 px the work list is a row of chips; at 1030 px it overflows: "More problems" scrolled it and "Earlier
+  problems" appeared, then back.
+- Confirm at 1440 px: "Import 160 items"; the result "Not imported 40 · Imported 160 · Already there 0 · All 200";
+  stored in D1: 160. The three numbers agree (200 in the file, 160 on screen, 160 stored).
+- The gallery (`/gallery/review`): ready, a column to match ("Match Unit to import"), records with a parent, loading,
+  error and empty all drew. "Accept 17 safe fixes": 59 → 42, the toast's Undo: 59. Under Questions, "Other answers"
+  offered "Leave row 8 out" and "Leave job J-2042 out"; the first: Questions 9 → 8, "Left out 1".
+- The 50,000-row import's auto-fixed view, looked at after an applied mark's fix became an `Option`: "4,250
+  auto-fixed", each row's "Why? First received was fixed for …", the group's "Undo 500 fixes" and its reason.
+- Console over the pass: two "change in the order of Hooks" errors for the catalog's `ReviewBody`, each at the moment
+  the review's sources were swapped under the running page (below) and gone after the page load that followed; no
+  other error.
+
+Not seen on screen in this step: a refresh in the middle of an upload ("Continue" from the saved file), dark theme
+(nothing in this step touches colour; it is in the final proof).
+
+Caught on screen and fixed before the commit: the first version of the saved progress wrote nothing, so "Use
+items_messy.csv" said the sample could not be loaded. `useAtomSet` calls a function it is given as "from the value
+now to the next", so an atom whose write itself took a function never received it; the write takes the next value
+now.
+
+Two things seen that were already so before this step, checked by putting the old review sources back under the
+running page and looking again, then restoring the new ones (identical to the saved copy): finishing a kind while
+no kind has been picked on the work list goes to the kind after next (SKU done lands on Cost, skipping Category;
+Category done lands on Number, skipping Cost); and closing "Why flagged?" leaves focus on the page's body, not on its
+button. Neither is changed here; both are reported.
+
 ## Legacy in the client
 
 The client's lint is on (`packages/client/.oxlintrc.json` extends `.oxlintrc.atoms.json`), with one file excepted by
@@ -285,12 +360,12 @@ package moves.
 
 | Where | Union | Told apart by | Lives | Becomes | Step |
 | --- | --- | --- | --- | --- | --- |
-| `review/src/ReviewDraft.rules.ts` | `Action` (12 members) | `type` | in memory | `Data.taggedEnum`, `$match` in `act` (A6) | 7 |
-| `review/src/ReviewDraft.rules.ts` | `OtherAnswer` | `type` | in memory | `Data.taggedEnum` | 7 |
-| `review/src/ReviewRegion.types.ts` | `ColumnMatch` | `state` | in memory (built from a staged file's headings) | `Data.taggedEnum` | 7 |
-| `review/src/ReviewRegion.types.ts` | `CellMark` | `state` | in memory | `Data.taggedEnum`, with `Option` for `fix` and `accepted` | 7 |
-| `review/src/ReviewRegion.types.ts` | `Entry`, `QueueEntry` | `type` | in memory | `Data.taggedEnum` | 7 |
-| `review/src/internal/ReviewGrid.tsx` | `Line` | `type` | in memory | `Data.taggedEnum` | 7 |
+| `review/src/ReviewDraft.rules.ts` | `Action` (12 members) | `type` | in memory | `Data.taggedEnum`, `$match` in `act` (A6) (done: 11 members, `Undo` and `Redo` among them; `act` is one `$match`) | 7 |
+| `review/src/ReviewDraft.rules.ts` | `OtherAnswer` | `type` | in memory | `Data.taggedEnum` (done: `Type`, `LeaveOut`, `Extra`) | 7 |
+| `review/src/ReviewRegion.types.ts` | `ColumnMatch` | `state` | in memory (built from a staged file's headings) | `Data.taggedEnum` (done: `Matched`, `Unmatched`) | 7 |
+| `review/src/ReviewRegion.types.ts` | `CellMark` | `state` | in memory | `Data.taggedEnum`, with `Option` for `fix` and `accepted` (done: `Proposed`, `Applied`; an applied mark's `fix` is an `Option` and `accepted` a boolean) | 7 |
+| `review/src/ReviewRegion.types.ts` | `Entry`, `QueueEntry` | `type` | in memory | `Data.taggedEnum` (done: `Kind`, `Group`, `Rest`, `Row`) | 7 |
+| `review/src/internal/ReviewGrid.tsx` | `Line` | `type` | in memory | `Data.taggedEnum` (done: `Entry` or the opened row's `Detail`) | 7 |
 | `review/src/ReviewDecision.schema.ts` | `place` of a row's history | `kind` | stored in the saved draft | already a schema; a `S.toTaggedUnion("kind")` member set, encoded bytes unchanged | 7 |
 | `catalog-web/src/internal/spreadsheet/read.ts` | what a chosen file is | `kind` | in memory | `Data.taggedEnum` (done: `Sniffed`, `Csv`, `Xlsx`, `Archive`, `Refuse`) | 6 |
 | `catalog-web/src/Upload.controller.ts` | `UploadEnd`, `Failure` | `_tag`, by hand | in memory | `Data.taggedEnum` (done: `UploadEnd`, `$match` where the Upload step hears how it ended; `Upload.machine.ts`'s `UploadState` is already a schema union) | 6 |
@@ -301,6 +376,36 @@ Not discriminators, and not changed: string-literal domains with no data of thei
 
 ## Choices made
 
+- **The review region keeps what it owns in one atom per region** (`regions`, by the region's `useId`; step 7), not
+  the brief's `ScopedAtom`: a family by `useId` needs no provider, and lets the atom go with the region as React state
+  went. It holds the decisions with their undo, the tab and kind, the drawers, the search, the folds, the ticks, the
+  announcement. The first state is not stored: until the first decision it is worked out from the caller's saved
+  decisions or the file, and remembered by those inputs. Measured on 50,000 rows before and after ("Proof", step 7):
+  not slower, so it is not split by row.
+- **What the region works out from its props is remembered by its inputs, not held in atoms** (`remember` in
+  `packages/review/src/internal/remember.ts`): the rows as they stand, the counts, the list on screen, the facets, the
+  column plan. Props arrive on the caller's draw, and an atom could take them in only through an effect or a write
+  during a draw. `remember` keeps the last answer beside its first input in a `WeakMap` and answers again only when an
+  input is another object: what `useMemo` did, per region, with no hook.
+- **The region's actions are made once per region and read its last draw.** `run`, the row and group actions and the
+  stepping are built on the region's first draw and kept beside its atom, so the drawn rows keep their memo; each
+  reads the rows, state and view of the last draw from the same place. The caller is told of new decisions where they
+  are written (`run`), not in an effect after the draw.
+- **What ran after a draw runs from a ref callback.** The section's ref callback is new on every draw, so React calls
+  it after each one: it moves focus where a decision wanted it and hands the table the ticked facet values, and acts
+  only when one is waiting. The grid's does the same for its handle, measuring again and going back to the top for a
+  new list, and telling the region when a lead group comes into view. The undo, redo and stepping keys are an atom
+  mounted while the region is (`regionKeys`), with its listener removed by `get.addFinalizer`.
+- **The layout is one atom, and its context went** (`regionLayout` in `parts.tsx`): the context only passed down what
+  ui's content width already says.
+- **Saved progress is an atom per key over the browser's storage** (`SavedProgress.hook.ts`): the storage is the
+  record, every write goes to it before the atom shows it, and an atom let go reads it again. `useSavedProgress` keeps
+  its name and its shape, built from the atom hooks only.
+- **`viewRows` reads a row's decision as `undefined` when it has none, not an `Option`** (A6 says `Option` for a row's
+  decision): it runs once per row, and 50,000 rows would each allocate one. Everywhere a decision is handed on (an
+  undo step, `act`) it is an `Option`.
+- **`Fix.confidence` is an `Option` the caller always gives** (A6), so the catalog writes `O.some(proposal.confidence)`
+  and the result's changes carry `O.none()` for a typed value.
 - **The theme is kept in plain `localStorage`, against the brief's wording** (the lead agreed, for Benjamin to see).
   The brief names `Atom.kvs` for it. `Atom.kvs` stores the value as JSON (`"dark"` with its quotes), and
   `public/theme-init.js`, which sets the theme before the first paint so the page never flashes the wrong one, reads

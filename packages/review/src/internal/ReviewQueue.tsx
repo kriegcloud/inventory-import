@@ -2,7 +2,10 @@ import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
 import * as HashMap from "effect/HashMap"
 import * as HashSet from "effect/HashSet"
 import * as O from "effect/Option"
-import { Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from "react"
+import { useAtom } from "@effect/atom-react"
+import * as Atom from "effect/reactivity/Atom"
+import { Fragment, type ReactNode, useId } from "react"
+import { remember } from "./remember.ts"
 import { Button } from "@inventory/ui/components/button"
 import { Checkbox } from "@inventory/ui/components/checkbox"
 import { ButtonGroup } from "@inventory/ui/components/button-group"
@@ -44,6 +47,28 @@ import type {
 } from "@inventory/review/ReviewTypes"
 
 const page = 30
+
+/** The column labels by id, worked out once per list of columns. */
+const labelsOf = remember((columns: ReadonlyArray<ReviewColumn>) =>
+  HashMap.fromIterable(columns.map((column) => [column.id, column.label] as const))
+)
+
+/** The decisions the queue goes through, worked out once per set of rows, split groups and view. */
+const decisionsOf = remember((views: ReadonlyArray<RowView>, split: HashSet.HashSet<string>, blocked: boolean) =>
+  queue({ views, split, blocked })
+)
+
+/**
+ * Where one queue is: the card shown, how many rows of a plain list are drawn, and the card focus last went to
+ * (changed in place: noting it draws nothing). One per queue on screen, by its `useId`.
+ */
+const queues = Atom.family((_queue: string) =>
+  Atom.make<{ readonly at: number; readonly shown: number; readonly card: { key: O.Option<string> } }>({
+    at: 0,
+    shown: page,
+    card: { key: O.none() }
+  })
+)
 
 /**
  * How far through the decisions the person is: how many are done and how many there are in all. More can need the
@@ -108,10 +133,7 @@ function Decision(props: {
   cellEditor: ReviewRegionProps["cellEditor"]
 }) {
   const { entry, actions, groupActions } = props
-  const labels = useMemo(
-    () => HashMap.fromIterable(props.columns.map((column) => [column.id, column.label] as const)),
-    [props.columns]
-  )
+  const labels = labelsOf(props.columns)
   const columnOf = (id: string | undefined) => props.columns.find((column) => column.id === id)
 
   if (entry._tag === "Group") {
@@ -455,25 +477,26 @@ export function ReviewQueue(props: {
   cellEditor: ReviewRegionProps["cellEditor"]
 }) {
   const { split } = props
-  const [at, setAt] = useState(0)
-  const [shown, setShown] = useState(page)
-  const decisions = useMemo(
-    () => queue({ views: props.views, split, blocked: props.blocked === true }),
-    [props.views, split, props.blocked]
-  )
+  const [held, setHeld] = useAtom(queues(useId()))
+  const { at, shown } = held
+  const setAt = (next: number) => setHeld((before) => ({ ...before, at: next }))
+  const setShown = (next: number) => setHeld((before) => ({ ...before, shown: next }))
+  const decisions = decisionsOf(props.views, split, props.blocked === true)
   const index = Math.min(at, Math.max(0, decisions.length - 1))
   const entry = decisions[index]
   const key = entry === undefined ? "" : entry._tag === "Group" ? `g:${entry.group.id}` : entry.view.row.id
   const nameColumn = props.columns[0]
 
-  // After a decision the next card takes its place, and focus goes to its first button.
-  const region = useRef<HTMLDivElement>(null)
-  const before = useRef(key)
-  useEffect(() => {
-    if (before.current === key) return
-    before.current = key
-    region.current?.querySelector<HTMLElement>("[data-first-action]")?.focus()
-  }, [key])
+  // After a decision the next card takes its place, and focus goes to its first button: checked each time the queue
+  // is drawn, acted on only when the card changed.
+  const region = (element: HTMLDivElement | null) => {
+    if (element === null) return
+    const last = held.card
+    if (O.contains(last.key, key)) return
+    const first = O.isNone(last.key)
+    last.key = O.some(key)
+    if (!first) element.querySelector<HTMLElement>("[data-first-action]")?.focus()
+  }
 
   if (props.loading) {
     return (

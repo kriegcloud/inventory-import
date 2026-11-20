@@ -1,5 +1,7 @@
 import { CheckIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useAtom } from "@effect/atom-react"
+import * as Atom from "effect/reactivity/Atom"
+import { useId } from "react"
 import { Button } from "@inventory/ui/components/button"
 import { ScrollArea, ScrollBar } from "@inventory/ui/components/scroll-area"
 import { ToggleGroup, ToggleGroupItem } from "@inventory/ui/components/toggle-group"
@@ -75,27 +77,31 @@ export function WorkList(props: {
   )
 }
 
+/** Whether a strip has chips hidden past its left and right edges. */
+type More = { readonly left: boolean; readonly right: boolean }
+
+/** Each strip on screen has its own, by its `useId`; let go with it. */
+const moreOf = Atom.family((_strip: string) => Atom.make<More>({ left: false, right: false }))
+
+/** The strip's scrolling box, where the scroll area draws it. */
+const viewportOf = (root: HTMLElement | null): HTMLElement | null =>
+  root?.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]') ?? null
+
 /**
  * One line of chips that scrolls sideways with no bar drawn: by wheel, by touch, by the arrow keys (focus brings a
  * chip into view), and by a round button over a fade at each edge that has more behind it.
  */
 function Strip(props: { children: React.ReactNode }) {
-  const root = useRef<HTMLDivElement>(null)
-  const [more, setMore] = useState({ left: false, right: false })
-  const viewport = useCallback(
-    () => root.current?.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]') ?? null,
-    []
-  )
-  const measure = useCallback(() => {
-    const element = viewport()
+  const [more, setMore] = useAtom(moreOf(useId()))
+  // Heard from the moment the strip is drawn until it goes: its scroll, its size, and a wheel that turns down.
+  const follow = (root: HTMLElement | null) => {
+    const element = viewportOf(root)
     if (element === null) return
-    const left = element.scrollLeft > 1
-    const right = element.scrollLeft + element.clientWidth < element.scrollWidth - 1
-    setMore((before) => (before.left === left && before.right === right ? before : { left, right }))
-  }, [viewport])
-  useEffect(() => {
-    const element = viewport()
-    if (element === null) return
+    const measure = () => {
+      const left = element.scrollLeft > 1
+      const right = element.scrollLeft + element.clientWidth < element.scrollWidth - 1
+      setMore((before) => (before.left === left && before.right === right ? before : { left, right }))
+    }
     measure()
     // A wheel that turns down moves the line along: a mouse has no sideways wheel.
     const onWheel = (event: WheelEvent) => {
@@ -113,13 +119,13 @@ function Strip(props: { children: React.ReactNode }) {
       element.removeEventListener("wheel", onWheel)
       observer.disconnect()
     }
-  }, [viewport, measure])
-  const move = (by: number) => {
-    const element = viewport()
+  }
+  const move = (target: HTMLElement, by: number) => {
+    const element = viewportOf(target.closest("nav"))
     element?.scrollBy({ left: by * element.clientWidth * 0.8, behavior: "smooth" })
   }
   return (
-    <nav ref={root} aria-label="Problems to settle" className="relative flex-none border-b">
+    <nav ref={follow} aria-label="Problems to settle" className="relative flex-none border-b">
       <ScrollArea className="w-full">
         <div className="w-max px-3 py-2">{props.children}</div>
         {/* Mounted so the line scrolls sideways; never drawn. */}
@@ -127,14 +133,24 @@ function Strip(props: { children: React.ReactNode }) {
       </ScrollArea>
       {more.left ? (
         <span className="absolute inset-y-0 left-0 flex items-center bg-linear-to-r from-background from-60% to-transparent pr-6 pl-2">
-          <Button variant="outline" size="icon-xs" aria-label="Earlier problems" onClick={() => move(-1)}>
+          <Button
+            variant="outline"
+            size="icon-xs"
+            aria-label="Earlier problems"
+            onClick={(event) => move(event.currentTarget, -1)}
+          >
             <ChevronLeftIcon aria-hidden />
           </Button>
         </span>
       ) : null}
       {more.right ? (
         <span className="absolute inset-y-0 right-0 flex items-center bg-linear-to-l from-background from-60% to-transparent pr-2 pl-6">
-          <Button variant="outline" size="icon-xs" aria-label="More problems" onClick={() => move(1)}>
+          <Button
+            variant="outline"
+            size="icon-xs"
+            aria-label="More problems"
+            onClick={(event) => move(event.currentTarget, 1)}
+          >
             <ChevronRightIcon aria-hidden />
           </Button>
         </span>

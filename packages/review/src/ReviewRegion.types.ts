@@ -264,10 +264,10 @@ export type CellMark = Data.TaggedEnum<{
     readonly from: string
     readonly to: string
     readonly by: MarkSource | "you"
-    /** The fix this value came from, when it came from one. */
-    readonly fix?: Fix
-    /** True when the person took the fix; absent when a rule applied it by itself. */
-    readonly accepted?: boolean
+    /** The fix this value came from; none for a value the person typed. */
+    readonly fix: O.Option<Fix>
+    /** True when the person took the fix; false when a rule applied it by itself, or the person typed the value. */
+    readonly accepted: boolean
   }
 }>
 /** Builds and tells apart a cell's mark. */

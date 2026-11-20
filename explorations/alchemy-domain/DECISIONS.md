@@ -35,9 +35,9 @@ The packet first listed eleven questions. They became these: 1 is now 4; 2 and 8
 10; 7 is 11; 9 is 13 to 16; 10 is 8; 11 is 12. Questions 1 to 3 are new, from the trial on saving review decisions.
 
 Not in this list: the four small choices of Discord sign-in, asked when that move starts
-([Discord sign-in](research/concepts/discord-sign-in.md)); and two questions on today's contract that are with
-Benjamin separately (what Confirm writes when the screen is behind the server's draft, and whether a save's answer
-says that it changed nothing). The brief says what the model does with either answer to each.
+([Discord sign-in](research/concepts/discord-sign-in.md)). Two questions on today's contract (what Confirm does when
+the screen is behind the draft, and whether a save's answer says that it changed nothing) were answered on
+2026-11-19 and are under "Answered" below, with what the model does with each.
 
 ## Answered
 
@@ -56,3 +56,28 @@ make use of ever single thing". The default for every concept is to use it; "can
 what removes it. This reverses the 2026-11-18 decision "core" in
 [ideal-architecture](../ideal-architecture/DECISIONS.md), where it is recorded as "core, reversed". Reverse: a new
 decision by him.
+
+### 2026-11-19 — a confirm when the screen is behind the draft
+
+Asked on today's contract, by dialog; the atoms branch builds it. Question: what does Confirm do when the draft has
+moved on from what the screen shows? Answer: "Refuse, show, confirm again". The confirm names the draft revision the
+screen shows and carries only the person's own unsent rows; if the draft has moved on nothing is written, the screen
+shows what changed with its new totals, and the person confirms again. His rule: nothing is confirmed that was not on
+screen, and nobody's decision is overwritten at Confirm. Rejected: "Their decision stands"; "As today: your screen
+wins".
+
+In the model ([brief](BRIEF.md), "His two answers on today's contract"): `ConfirmImport` names `reviewedAt` and
+carries the person's unsent acts; the aggregate records the acts and the confirm in one commit when its version is
+`reviewedAt`, and otherwise records nothing and answers `ReviewMovedOn { current }`. Reverse: a new decision by him;
+in the model it is the one comparison in `ConfirmImport`'s `decide`.
+
+### 2026-11-19 — a save that changes nothing
+
+Asked on today's contract, by dialog; the atoms branch builds it. Question: does a save's answer say that it changed
+nothing? Answer: "Answer says 'no change'". The save's answer says whether it changed anything, and the screen asks
+for the picture when it did not. Rejected: "Leave it until the domain model"; "Always re-read after a save".
+
+In the model: a command that changes nothing records no event and the version stays; its reply names the rows it
+changed and the rows it left, with the reason; the screen does not ask for the picture, because it follows the view.
+Reverse: a new decision by him; in the model, the command's reply.
+

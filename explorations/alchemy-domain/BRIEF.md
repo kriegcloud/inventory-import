@@ -68,7 +68,7 @@ A command says what the person did. It never says what the whole picture should 
 | --- | --- | --- | --- |
 | `DecideRows { importId, step, rows: [{ row, decision, seen }] }` | One act of the review, on one row or on a group: accept a fix, keep a row, leave rows out, type a value, choose what happens to a stored item. `step` is the act's id, made once at the press. `seen` is how many changes of that row the screen had been told | `RowsDecided { by, step, rows }`, naming only the rows it changed | `ImportNotOpen`, `NotPermitted` |
 | `UndoStep { importId, step }` | Take back my step | `StepUndone { by, step, rows }` | `ImportNotOpen`, `NotPermitted`, `NotYourStep` |
-| `ConfirmImport { importId, reviewedAt, … }` | Confirm what I was shown, at the version I was told | `ImportConfirmed { … }` | `ImportNotOpen`, `NotPermitted`, `ReviewMovedOn { current }` |
+| `ConfirmImport { importId, reviewedAt, unsent, … }` | Confirm what I was shown, at the version I was told, with my own acts that are not sent yet | The unsent acts' `RowsDecided`, then `ImportConfirmed { … }`, in one commit | `ImportNotOpen`, `NotPermitted`, `ReviewMovedOn { current }` |
 
 Each command's reply says which rows it changed and which it left, with the reason for each row it left. An act that
 changes nothing records nothing, and the version does not move.
@@ -153,6 +153,7 @@ export class Import extends Domain.Aggregate("Import", {
 | Two people's decisions on different rows both survive any ordering | `AnActTouchesOnlyTheRowsItNames`, checked; the instance gives the two acts one order whichever arrives first |
 | A decision is made on what its sender saw | `seen` against the row's count of changes; proved on the row, not yet run on a draft |
 | An undo takes back only its sender's own step, and puts back what was under it | `isOwnStep` and `undone`, proved on the row |
+| Nothing is confirmed that was not on screen, and nobody's decision is overwritten at Confirm (his rule, 2026-11-19) | `reviewedAt` against the aggregate's version in `ConfirmImport`'s `decide`. The trial's draft reaches the refusal; it is not yet stated there as a rule of its own |
 | Nothing changes after the confirm | The draft's transition, checked |
 | What a screen shows is never ahead of what it has been told | Not the aggregate's: the client fold below, checked by a property test |
 
@@ -199,7 +200,7 @@ stays, smaller.
 | `landed`: rows the server confirmed at a revision the picture has not reached | Folds into that list: an act leaves it when the view has reached its receipt's version |
 | `shown(draft)`, `epoch`, `Restart`, `onScreen`, leaving and returning | Stay. `shown` is the fold the rule "never ahead of what it has been told" is checked against |
 | `Send { delta }`, `deltaOf`, `changesBetween`, `over` with a clear | Go: the aggregate takes acts |
-| `SaveAnswered`'s three cases on the revision, `Put`, `Ask` | Go: an answer carries its version and the view is pushed |
+| `SaveAnswered`'s three cases on the revision, `Put`, `Ask`, and the "no change" answer being added now | Go: an answer carries its version and the rows it left, and the view is pushed |
 | `SaveRefused`, one case for every refusal | Becomes one case per typed rejection |
 | `matching`, `MatchStarted`, `MatchEnded` | Go: entries carry the command id |
 | `typed` and the re-ask for typed SKUs | Stays as a query, `SkusAlreadyThere` |
@@ -230,21 +231,29 @@ browser's storage. Under the model:
   the aggregate cannot check. The build settles it with a test of three undos on one row before the screen moves.
 - The browser's saved progress keeps what is not the server's: the chosen file and the place in the list.
 
-### Today's two interim questions, under the model
+### His two answers on today's contract, carried into the model
 
-Two questions on today's contract are with Benjamin now. This brief decides neither. It says what the model does with
-each answer.
+Benjamin answered two questions on today's contract by dialog on 2026-11-19, and the atoms branch is building both.
+Each has a direct form in the model.
 
-- **What Confirm writes when the screen is behind the server's draft.** `ConfirmImport` names `reviewedAt`, the
-  version the screen had been told, and the aggregate knows its own. "Refuse" is the rejection
-  `ReviewMovedOn { current }`: the screen shows what changed and the person confirms what they now see (the trial's
-  `DraftOfCells` does this; the first trial showed the same refusal on the published release). "Write what the server
-  holds" is the same command accepted, with the receipt's version saying which draft was confirmed. Either answer is
-  one line of `decide`. The model makes the two cases different on the wire, which today's contract cannot.
-- **Whether a save's answer says that it changed nothing.** A command that changes nothing records no event and the
-  version stays. Its reply names the rows it changed and the rows it left, so the answer says so by itself, and the
-  case the machine's test calls `mayLack` (an answer naming another person's revision as the sender's own) cannot
-  occur.
+- **A confirm when the screen is behind the draft: "Refuse, show, confirm again".** On today's contract the confirm
+  names the draft revision the screen shows and carries only the person's own unsent rows. If the draft has moved on,
+  nothing is written, the screen shows what changed with its new totals, and the person confirms again. His rule:
+  nothing is confirmed that was not on screen, and nobody's decision is overwritten at Confirm.
+  *In the model* it is the same sentence. `ConfirmImport` names `reviewedAt`, the version the screen shows, and
+  carries the person's acts that are not sent yet. The aggregate knows its own version. When the two are equal, the
+  acts and the confirm are recorded in one commit. When they are not, nothing is recorded: the rejection
+  `ReviewMovedOn { current }` reaches the screen, which already follows the entries that moved the draft and shows
+  them with the new totals. The trial's `DraftOfCells` refuses this way, and the first trial showed the same refusal
+  on the published release; a confirm that carries acts was not run. He rejected "Their decision stands" and "As
+  today: your screen wins".
+- **A save that changes nothing: "Answer says 'no change'".** On today's contract the save's answer says whether it
+  changed anything, and the screen asks for the picture when it did not.
+  *In the model* the answer says more and the screen asks less. A command that changes nothing records no event and
+  the version stays. Its reply names the rows it changed and the rows it left, with the reason. The screen does not
+  ask for the picture: whatever made the act change nothing is an entry on the view it already follows. The case the
+  machine's test calls `mayLack` (an answer naming another person's revision as the sender's own) cannot occur. He
+  rejected "Leave it until the domain model" and "Always re-read after a save".
 
 ## What every other part of the app becomes
 
@@ -302,7 +311,7 @@ the workflow files from the GitHub provider (nothing in it writes repository con
 | Today (`packages/catalog/contract/src/Catalog.contract.ts`) | After |
 | --- | --- |
 | `PUT /imports/:id/decisions`, a `DecisionDelta`, answering a revision | Gone. `DecideRows` and `UndoStep` |
-| `POST /imports/:id/commit`, a `DecisionDelta`, answering the import | `ConfirmImport { reviewedAt }`; the result is read from `ImportResult` with the receipt |
+| `POST /imports/:id/commit`, a `DecisionDelta`, answering the import | Its payload becomes `reviewedAt` and the person's unsent acts. Under decision 5's first option it stays a thin handler: it runs `review`, stages the plan and sends `ConfirmImport` as the person; the result is read from `ImportResult` with the receipt |
 | `GET /imports/:id` | `ImportReview`, read once and then followed. `GET /imports/:id/table` stays HTTP: 50,000 rows are not a view's state |
 | `POST /imports/:id/mapping`, `/take-back`, `/reopen`, `DELETE /imports/:id` | `MatchColumns`, `TakeBackImport`, `ReopenImport`, `RemoveImport` |
 | `POST /imports/:id/suggest` | `AskForSuggestions`; the suggestions arrive on `ImportReview` |
@@ -334,8 +343,8 @@ out; where a thing cannot be used yet, the option says what is in the way.
 
 - **One instance per import holds every row's decision (Recommended).** One act is one command, one commit and one
   undo step, whatever number of rows it names; the confirm is the same instance's next command.
-  *At Confirm:* the confirm covers exactly the decisions made before it. One made after the screen's version is the
-  case of the interim question above, and the instance can tell.
+  *At Confirm:* the confirm covers exactly the decisions made before it. When one was made after the version the
+  screen shows, the confirm is refused and the screen shows it, as he decided for today's contract.
   *Two people, one row:* the instance orders the two acts, and the second is handled as decision 2 says.
   *Rests on:* accepting a fix for a group is the review's main act, and here it is one command (575 KB for an act
   naming 50,000 rows). The row's rules are proved; the draft's are checked to 3 commands.

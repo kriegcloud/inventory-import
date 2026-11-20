@@ -16,6 +16,31 @@ import {
   RowPlace
 } from "@inventory/review/ReviewDecision"
 import { ProgressStep, SavedProgress, StoredFile, StoredReview, StoredStep } from "@inventory/review/SavedProgress"
+import {
+  Activity,
+  ActivityStep,
+  CellMark,
+  Choice,
+  ColumnMatch,
+  Counts,
+  DraftStep,
+  Entry,
+  Fix,
+  FixGroup,
+  ImportChange,
+  ImportResult,
+  Problem,
+  ProblemKind,
+  QueueEntry,
+  ReviewDraft,
+  ReviewRow,
+  ReviewState,
+  ReviewWords,
+  RowView,
+  SavedDecisions,
+  UndoStep,
+  Why
+} from "@inventory/review/ReviewTypes"
 
 const runs = { arbitrary: { runs: 50 } }
 const schemas = {
@@ -29,7 +54,31 @@ const schemas = {
   StoredStep,
   StoredReview,
   StoredFile,
-  SavedProgress
+  SavedProgress,
+  // The region's own shapes. `ReviewColumn` is not here: its `display` is a function, which nothing generates.
+  ProblemKind,
+  ColumnMatch,
+  Why,
+  Fix,
+  Choice,
+  Problem,
+  ReviewRow,
+  UndoStep,
+  ReviewState,
+  CellMark,
+  RowView,
+  FixGroup,
+  Entry,
+  QueueEntry,
+  Counts,
+  ActivityStep,
+  Activity,
+  ImportChange,
+  ImportResult,
+  SavedDecisions,
+  DraftStep,
+  ReviewDraft,
+  ReviewWords
 }
 
 describe("every exported schema generates only valid values", () => {

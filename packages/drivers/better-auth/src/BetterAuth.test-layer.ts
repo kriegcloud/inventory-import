@@ -23,10 +23,10 @@ export class BetterAuthTest {
     BetterAuth,
     BetterAuth.of({
       handle: Effect.fn("BetterAuth.handle")(function* () {
-        return new Response(null, { status: 404 })
+        return yield* Effect.succeed(new Response(null, { status: 404 }))
       }),
       session: Effect.fn("BetterAuth.session")(function* () {
-        return O.none()
+        return yield* Effect.succeedNone
       }),
       publicOrigin: O.none()
     })
@@ -38,10 +38,10 @@ export class BetterAuthTest {
       BetterAuth,
       BetterAuth.of({
         handle: Effect.fn("BetterAuth.handle")(function* () {
-          return new Response(null, { status: 404 })
+          return yield* Effect.succeed(new Response(null, { status: 404 }))
         }),
         session: Effect.fn("BetterAuth.session")(function* () {
-          return O.some(session)
+          return yield* Effect.succeedSome(session)
         }),
         publicOrigin: O.none()
       })

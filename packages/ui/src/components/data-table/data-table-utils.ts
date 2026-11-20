@@ -11,7 +11,9 @@ import type {
   FilterVariant
 } from "@inventory/ui/components/data-table/data-table-types"
 
+import { LiteralKit } from "@beep/schema/LiteralKit"
 import { formatDate } from "@inventory/ui/components/data-table/format"
+import * as React from "react"
 
 export const FILTER_VARIANTS = ["text", "number", "date", "boolean", "select"] as const
 
@@ -32,6 +34,27 @@ export const FILTER_OPERATORS = {
 } as const
 
 export const JOIN_OPERATORS = ["and", "or"] as const
+
+// Local change: the variants and the operators as LiteralKits, so the data table branches on them with
+// `FilterVariants.match` and `FilterOperators.match` (every case named, checked by the compiler), not a `switch`.
+export const FilterVariants = LiteralKit(FILTER_VARIANTS)
+export const FilterOperators = LiteralKit([
+  "iLike",
+  "notILike",
+  "eq",
+  "ne",
+  "inArray",
+  "notInArray",
+  "isEmpty",
+  "isNotEmpty",
+  "lt",
+  "lte",
+  "gt",
+  "gte",
+  "isBetween"
+])
+/** The four operators that put a cell before or after a value. */
+export const OrderingOperators = FilterOperators.pick(["lt", "lte", "gt", "gte"])
 
 export const DEFAULT_PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50] as const
 
@@ -314,16 +337,15 @@ export function getIsValidFilterValue(filter: ColumnFilterItem) {
 
   const values = Array.isArray(filter.value) ? filter.value : [filter.value]
 
-  switch (filter.variant) {
-    case "number":
-      return values.every((value) => value.trim() === "" || Number.isFinite(Number(value)))
-    case "date":
-      return values.every((value) => value === "" || parseFilterDate(value) !== undefined)
-    case "boolean":
-      return values.every((value) => value === "true" || value === "false")
-    default:
-      return true
-  }
+  return FilterVariants.matchOrElse(
+    filter.variant,
+    {
+      number: () => values.every((value) => value.trim() === "" || Number.isFinite(Number(value))),
+      date: () => values.every((value) => value === "" || parseFilterDate(value) !== undefined),
+      boolean: () => values.every((value) => value === "true" || value === "false")
+    },
+    () => true
+  )
 }
 
 export function parseFilterDate(value: unknown): Date | undefined {

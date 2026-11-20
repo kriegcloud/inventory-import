@@ -38,6 +38,7 @@ import {
   weakGuess,
   whyWords
 } from "@inventory/review/ReviewDraft"
+import { Choice } from "@inventory/review/ReviewTypes"
 import type { ReviewRow, ReviewState, SavedDecisions } from "@inventory/review/ReviewTypes"
 import { columns, columnsUnmatched, makeRows, problemKinds, recheck } from "./fixtures/fabrication.ts"
 import { lineKinds, makeJobs, questionRows, recheckLine, reviewJobs } from "./fixtures/jobs.ts"
@@ -552,10 +553,10 @@ describe("records with a parent: label, choices, rowAction, and undo across view
     const choices = lineOf("unit").problem?.choices ?? []
     expect(A.map(choices, choiceText)).toEqual(["m, as 13 of 13 lines with this SKU say (suggested)", "pcs"])
     expect(A.filter(choices, (choice) => choice.suggested === true)).toHaveLength(1)
-    expect(choiceText({ value: "40", label: "40 L", note: "as 6 of 7 lines say", suggested: true })).toBe(
+    expect(choiceText(Choice.make({ value: "40", label: "40 L", note: "as 6 of 7 lines say", suggested: true }))).toBe(
       "40 L, as 6 of 7 lines say (suggested)"
     )
-    expect(choiceText({ value: "40", label: "40 L", suggested: true })).toBe("40 L (suggested)")
+    expect(choiceText(Choice.make({ value: "40", label: "40 L", suggested: true }))).toBe("40 L (suggested)")
   })
 
   it("rowAction: a row keeps its own answer, then typing (beside a fix), leaving the row out and the page's answer", () => {

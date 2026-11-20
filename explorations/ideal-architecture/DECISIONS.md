@@ -671,3 +671,15 @@ organization they left for the five minutes. Rejected: keyed reads as built (row
 registry, as the brief said. Built in `@inventory/client/Api` (`forgetReads`, called when the session answers that
 nobody is signed in, and by sign-out and sign-in-as before their reload), with a test. Reverse: `forgetReads` and its
 three callers.
+
+### 2026-11-20 — no `switch`, the vendored components included
+
+Every `switch` in the repository was to be replaced, in this order of preference: a struct union becomes an
+`S.TaggedUnion` (or `S.toTaggedUnion`, or a `Data.TaggedEnum`) and is read with its `match`; a literal union becomes a
+`LiteralKit` and is read with its `match` or `matchOrElse`; anything else is read with `effect/Match`. Thirty-three
+were in our own code and fourteen in the vendored components (`packages/ui/src/components`: file-upload, data-table,
+data-grid), which this repository otherwise keeps as published. Question: convert those fourteen too? Answer: "Convert
+all 14"; the agent recommended leaving them. Read as: the vendored components may be changed for this rule, each change
+marked "Local change" where it is made; a later `shadcn add` of one of those files is compared by hand. Rejected:
+leaving them as published; converting only the data table. Built with `@beep/schema` added to `@inventory/ui`. Reverse:
+the "Local change" blocks in those eleven files.

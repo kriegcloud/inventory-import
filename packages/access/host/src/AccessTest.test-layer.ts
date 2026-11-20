@@ -72,10 +72,10 @@ export const actingAs = (options: { readonly member: Member; readonly lines?: Re
       return MemberDirectory.of({
         ...memory,
         byId: Effect.fn("Members.findById")(function* () {
-          return O.some(options.member)
+          return yield* Effect.succeedSome(options.member)
         }),
         actorFor: Effect.fn("Members.findByUser")(function* () {
-          return O.some(options.member)
+          return yield* Effect.succeedSome(options.member)
         })
       })
     })

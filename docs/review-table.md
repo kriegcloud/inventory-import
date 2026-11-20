@@ -51,7 +51,7 @@ header as found, rows with the row number the person sees in Excel, and notes. T
 
 ```tsx
 import type { SpreadsheetTable } from "../../domain/Spreadsheet.ts"
-import type { Activity, ReviewRow } from "@inventory/review/ReviewTypes"
+import { Activity, ReviewRow } from "@inventory/review/ReviewTypes"
 
 const headers = { name: "Name", unit: "UOM", qty: "Qty on hand" } // our field id -> the file's header
 
@@ -63,38 +63,48 @@ export const toReviewRows = (table: SpreadsheetTable): ReadonlyArray<ReviewRow> 
       cells[id] = cell === undefined ? "" : (cell.shown ?? cell.text)
     }
     const problem = check(cells) // your pure rule, below
-    return { id: `row-${row.rowNumber}`, line: row.rowNumber, cells, ...(problem === undefined ? {} : { problem }) }
+    return ReviewRow.make({
+      id: `row-${row.rowNumber}`,
+      line: row.rowNumber,
+      cells,
+      ...(problem === undefined ? {} : { problem })
+    })
   })
 
 // The reader's notes are sentences, so they go in the Activity drawer, not in a chip.
-export const toActivity = (table: SpreadsheetTable): Activity => ({
-  steps: table.notes.map((note, index) => ({ id: String(index), by: "read" as const, label: note.message })),
-  allowed: ["Read the uploaded file"],
-  facts: [{ label: "File", value: table.fileName }]
-})
+export const toActivity = (table: SpreadsheetTable): Activity =>
+  Activity.make({
+    steps: table.notes.map((note, index) => ({ id: String(index), by: "read" as const, label: note.message })),
+    allowed: ["Read the uploaded file"],
+    facts: [{ label: "File", value: table.fileName }]
+  })
 ```
+
+What you hand the region (a row, a column, a problem kind, a problem, a fix, the activity) is built with its schema's
+`make`, which checks it: `ReviewRow.make({...})`. The parts inside may be plain objects, so one `make` on the outside
+is enough. A row id or a column id is 1 to 64 characters.
 
 `line` is Excel's row number, so the Row column and every "row 56" match what the person sees in the file. A header the
 file does not have is a `match: { state: "unmatched", candidates }` on that column (below), not a guess. Then
 `<ReviewRegion rows={toReviewRows(table)} activity={toActivity(table)} summary={[`${table.rows.length} rows read`]} …
-/>`. Checked: this hand-off type-checks as written against the reader's types.
+/>`. 
 
 ## Wiring it to a pure review function
 
 ```tsx
 import { AppShell } from "@/components/app/AppShell"
 import { ReviewRegion } from "@inventory/review/ReviewRegion"
-import type { Problem, ReviewColumn, ReviewRow } from "@inventory/review/ReviewTypes"
+import { Problem, ProblemKind, ReviewColumn, ReviewRow } from "@inventory/review/ReviewTypes"
 
 const columns: ReadonlyArray<ReviewColumn> = [
-  { id: "name", label: "Name", width: 220, core: true },
-  { id: "unit", label: "Unit", width: 150, core: true },
-  { id: "qty", label: "On hand", width: 90, align: "right", core: true }
+  ReviewColumn.make({ id: "name", label: "Name", width: 220, core: true }),
+  ReviewColumn.make({ id: "unit", label: "Unit", width: 150, core: true }),
+  ReviewColumn.make({ id: "qty", label: "On hand", width: 90, align: "right", core: true })
 ]
-const kinds = [
-  { id: "unit", label: "Unknown unit", tone: "decision" },
-  { id: "qty", label: "Below zero", tone: "blocker" }
-] as const
+const kinds: ReadonlyArray<ProblemKind> = [
+  ProblemKind.make({ id: "unit", label: "Unknown unit", tone: "decision" }),
+  ProblemKind.make({ id: "qty", label: "Below zero", tone: "blocker" })
+]
 const spellings: Record<string, string> = { ea: "pcs", each: "pcs" } // your rule table; Record.get in the model package
 
 // The same pure function the server runs. One problem per row: the first rule that fails.
@@ -103,16 +113,17 @@ const check = (cells: Readonly<Record<string, string>>): Problem | undefined => 
   const to = Object.hasOwn(spellings, unit) ? spellings[unit] : undefined
   if (to !== undefined) {
     const why = { basis: `Fixed rule: "${unit}" means ${to}.` }
-    return { kind: "unit", column: "unit", fix: { column: "unit", to, by: "rule", kind: "unit", group: `unit:${to}`, why } }
+    const fix = { column: "unit", to, by: "rule" as const, kind: "unit", group: `unit:${to}`, why }
+    return Problem.make({ kind: "unit", column: "unit", fix })
   }
-  if (!["pcs", "kg", "m"].includes(unit)) return { kind: "unit", column: "unit" }
-  if ((cells.qty ?? "").startsWith("-")) return { kind: "qty", column: "qty" }
+  if (!["pcs", "kg", "m"].includes(unit)) return Problem.make({ kind: "unit", column: "unit" })
+  if ((cells.qty ?? "").startsWith("-")) return Problem.make({ kind: "qty", column: "qty" })
   return undefined
 }
 const review = (file: ReadonlyArray<Record<string, string>>): ReadonlyArray<ReviewRow> =>
   file.map((cells, index) => {
     const problem = check(cells)
-    return { id: `line-${index + 2}`, line: index + 2, cells, ...(problem === undefined ? {} : { problem }) }
+    return ReviewRow.make({ id: `line-${index + 2}`, line: index + 2, cells, ...(problem === undefined ? {} : { problem }) })
   })
 
 export function ReviewStep(props: { file: ReadonlyArray<Record<string, string>>; onImport: (cells: unknown) => void }) {

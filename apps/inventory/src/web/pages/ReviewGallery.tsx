@@ -4,7 +4,7 @@ import * as Atom from "effect/reactivity/Atom"
 import { toast } from "sonner"
 import { AppShell } from "@/components/app/AppShell"
 import { ReviewRegion } from "@inventory/review/ReviewRegion"
-import type { ProblemKind, ReviewColumn, ReviewRow } from "@inventory/review/ReviewTypes"
+import { Problem, ProblemKind, ReviewColumn, ReviewRow } from "@inventory/review/ReviewTypes"
 import { Button } from "@inventory/ui/components/button"
 import {
   DropdownMenu,
@@ -48,37 +48,37 @@ const readState = (): GalleryState => {
 
 /** Rows whose items are in stock already: nothing is written for them and nothing is asked. */
 const storedRows: ReadonlyArray<ReviewRow> = [
-  {
+  ReviewRow.make({
     id: "stored-1",
     line: 180,
     cells: { name: "Hex bolt M8 × 30", sku: "HB-M8-30", unit: "pcs", onHand: "400" },
     stored: true
-  },
-  {
+  }),
+  ReviewRow.make({
     id: "stored-2",
     line: 181,
     cells: { name: "Flat bar 40 × 5", sku: "FB-40-5", unit: "m", onHand: "60" },
     stored: true
-  },
-  {
+  }),
+  ReviewRow.make({
     id: "stored-3",
     line: 182,
     cells: { name: "Weld wire 0.9 mm", sku: "WW-09", unit: "kg", onHand: "15" },
     stored: true
-  }
+  })
 ]
 
 /**
  * A kind of problem nothing on the review can settle: the supplier is not in the shop's supplier list yet, and only
  * that list can add one. Its rows are counted apart, say why, and hold nothing back.
  */
-const newSupplier: ProblemKind = {
+const newSupplier: ProblemKind = ProblemKind.make({
   id: "supplier",
   label: "New supplier",
   tone: "blocker",
   help: "Add the supplier to your supplier list, then load the file again.",
   fixable: false
-}
+})
 const elsewhereKinds: ReadonlyArray<ProblemKind> = [...problemKinds, newSupplier]
 
 /** Rows whose supplier is not in the list yet, each with its own reason. */
@@ -86,16 +86,18 @@ const elsewhereRows: ReadonlyArray<ReviewRow> = [
   ["Square tube 40 × 40", "ST-40-2", "Ridgeline Metals"],
   ["Angle iron 30 × 3", "AI-30-3", "Ridgeline Metals"],
   ["Cutting disc 125 mm", "CD-125", "Sample Abrasives"]
-].map(([name = "", sku = "", supplier = ""], index) => ({
-  id: `elsewhere-${index + 1}`,
-  line: 183 + index,
-  cells: { name, sku, unit: "pcs", onHand: "10", supplier },
-  problem: {
-    kind: newSupplier.id,
-    column: "supplier",
-    reason: `Supplier ${supplier} is not in your supplier list yet.`
-  }
-}))
+].map(([name = "", sku = "", supplier = ""], index) =>
+  ReviewRow.make({
+    id: `elsewhere-${index + 1}`,
+    line: 183 + index,
+    cells: { name, sku, unit: "pcs", onHand: "10", supplier },
+    problem: {
+      kind: newSupplier.id,
+      column: "supplier",
+      reason: `Supplier ${supplier} is not in your supplier list yet.`
+    }
+  })
+)
 
 /**
  * A file with a line per item and a count per month: each month is its own record, so two rows share a line. The
@@ -103,11 +105,11 @@ const elsewhereRows: ReadonlyArray<ReviewRow> = [
  * 3 · Feb out").
  */
 const monthColumns: ReadonlyArray<ReviewColumn> = [
-  { id: "name", label: "Item", size: "fill", width: 200, core: true },
-  { id: "sku", label: "SKU", code: true, search: true, core: true, under: true },
-  { id: "month", label: "Month", core: true, context: true, facet: true },
-  { id: "unit", label: "Unit", core: true },
-  { id: "onHand", label: "On hand", align: "right", core: true, context: true }
+  ReviewColumn.make({ id: "name", label: "Item", size: "fill", width: 200, core: true }),
+  ReviewColumn.make({ id: "sku", label: "SKU", code: true, search: true, core: true, under: true }),
+  ReviewColumn.make({ id: "month", label: "Month", core: true, context: true, facet: true }),
+  ReviewColumn.make({ id: "unit", label: "Unit", core: true }),
+  ReviewColumn.make({ id: "onHand", label: "On hand", align: "right", core: true, context: true })
 ]
 
 const monthItems = [
@@ -118,7 +120,7 @@ const monthItems = [
 
 const belowZero = (month: string, onHand: string) =>
   onHand.trim().startsWith("-")
-    ? { kind: "below", column: "onHand", reason: `On hand "${onHand}" for ${month} is below zero.` }
+    ? Problem.make({ kind: "below", column: "onHand", reason: `On hand "${onHand}" for ${month} is below zero.` })
     : undefined
 
 const monthRows: ReadonlyArray<ReviewRow> = monthItems.flatMap((item, index) =>
@@ -126,13 +128,13 @@ const monthRows: ReadonlyArray<ReviewRow> = monthItems.flatMap((item, index) =>
     const line = index + 2
     const month = part === 0 ? "Jan" : "Feb"
     const problem = belowZero(month, onHand)
-    return {
+    return ReviewRow.make({
       id: `line-${line}.${part + 1}`,
       line,
       label: `${line} · ${month}`,
       cells: { name: item.name, sku: item.sku, month, unit: item.unit, onHand },
       ...(problem === undefined ? {} : { problem })
-    }
+    })
   })
 )
 

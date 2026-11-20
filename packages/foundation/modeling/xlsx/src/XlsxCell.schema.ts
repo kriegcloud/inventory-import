@@ -16,6 +16,7 @@ import { $XlsxId } from "./internal/identity.ts"
 import {
   builtinFormats,
   classify,
+  RawFormatKind,
   isDateFormat,
   renderDate,
   renderGeneral,
@@ -175,29 +176,18 @@ export class XlsxNumberFormat extends S.Opaque<XlsxNumberFormat, { readonly bran
   static readonly isDate = (format: Pick<XlsxNumberFormat, "code">): boolean => isDateFormat(format.code)
 
   /** What a format is, as far as displayed text is worked out for it. */
-  static readonly kind = (format: Pick<XlsxNumberFormat, "code">): XlsxFormatKind => {
-    const raw = classify(format.code)
-    switch (raw.kind) {
-      case "General":
-        return XlsxGeneralFormat.make({})
-      case "Date":
-        return XlsxDateFormat.make({})
-      case "ZeroPadded":
-        return raw.width <= 255 ? XlsxZeroPaddedFormat.make({ width: raw.width }) : XlsxOtherFormat.make({})
-      case "Fixed":
-        return raw.decimals <= 30
-          ? XlsxFixedFormat.make({
-              decimals: raw.decimals,
-              thousands: raw.thousands,
-              percent: raw.percent,
-              prefix: raw.prefix,
-              suffix: raw.suffix
-            })
-          : XlsxOtherFormat.make({})
-      case "Other":
-        return XlsxOtherFormat.make({})
-    }
-  }
+  static readonly kind = (format: Pick<XlsxNumberFormat, "code">): XlsxFormatKind =>
+    RawFormatKind.match(classify(format.code), {
+      General: (): XlsxFormatKind => XlsxGeneralFormat.make({}),
+      Date: (): XlsxFormatKind => XlsxDateFormat.make({}),
+      ZeroPadded: ({ width }): XlsxFormatKind =>
+        width <= 255 ? XlsxZeroPaddedFormat.make({ width }) : XlsxOtherFormat.make({}),
+      Fixed: ({ decimals, thousands, percent, prefix, suffix }): XlsxFormatKind =>
+        decimals <= 30
+          ? XlsxFixedFormat.make({ decimals, thousands, percent, prefix, suffix })
+          : XlsxOtherFormat.make({}),
+      Other: (): XlsxFormatKind => XlsxOtherFormat.make({})
+    })
 }
 
 const cellText = S.String.check(S.isMaxLength(MAX_CELL_CHARS))

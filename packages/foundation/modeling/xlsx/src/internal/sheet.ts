@@ -3,6 +3,7 @@
 // any length costs one row of memory until the caller keeps the rows. Nothing here trusts the file: a reference
 // that cannot be read is placed after the one before it, and a value that cannot be read is kept as what was
 // written and reported.
+import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as A from "effect/Array"
 import * as MutableHashMap from "effect/MutableHashMap"
 import * as O from "effect/Option"
@@ -72,6 +73,24 @@ export interface SheetLayout {
 }
 
 const none: ReadonlyArray<ReadRow> = []
+/**
+ * What the `t` attribute of a cell says it holds (ECMA-376 part 1, 18.18.11): a shared string, a formula's string,
+ * a boolean, an error, an ISO date, inline text, or a number. A cell with no `t`, or one nobody knows, is a number.
+ */
+const CellType = LiteralKit(["s", "str", "b", "e", "d", "inlineStr", "n"])
+type CellType = typeof CellType.Type
+
+/** The cell types by the text a file writes for them. */
+const cellTypes: Readonly<Record<string, CellType>> = {
+  s: "s",
+  str: "str",
+  b: "b",
+  e: "e",
+  d: "d",
+  inlineStr: "inlineStr",
+  n: "n"
+}
+
 const numberText = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/
 const isoDate = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?Z?)?$/
 const general: StyleFormat = { format: XlsxNumberFormat.general, dated: false, notShown: false }
@@ -148,7 +167,7 @@ export class SheetReader {
 
   private inCell = false
   private cellColumn = 0
-  private cellType = ""
+  private cellType: CellType = "n"
   private cellStyle = -1
   private cellReference = ""
   private target: "" | "v" | "f" | "t" = ""
@@ -366,7 +385,7 @@ export class SheetReader {
     this.inCell = true
     this.cellColumn = column
     this.cellReference = written ?? ""
-    this.cellType = attributes["t"] ?? "n"
+    this.cellType = O.getOrElse(R.get(cellTypes, attributes["t"] ?? "n"), (): CellType => "n")
     const style = attributes["s"]
     this.cellStyle = style === undefined ? -1 : Number(style)
     this.hasValue = false
@@ -440,58 +459,52 @@ export class SheetReader {
     if (this.cellType === "inlineStr") {
       if (this.hasInline) value = trusted<XlsxText>({ kind: "Text", text: detached(unescaped(raw)) })
     } else if (this.hasValue || this.hasInline) {
-      switch (this.cellType) {
-        case "s": {
-          const index = Number(Str.trim(raw))
-          const text = Number.isInteger(index) && index >= 0 ? this.strings[index] : undefined
-          value = text === undefined ? unreadable("sharedString") : trusted<XlsxText>({ kind: "Text", text })
-          break
-        }
-        case "str":
-          value = trusted<XlsxText>({ kind: "Text", text: detached(unescaped(raw)) })
-          break
-        case "b": {
-          const text = Str.toLowerCase(Str.trim(raw))
-          value = text === "1" || text === "true" ? yes : text === "0" || text === "false" ? no : unreadable("boolean")
-          break
-        }
-        case "e": {
-          value = S.is(XlsxErrorCode)(raw) ? XlsxError.make({ code: raw }) : unreadable("errorCode")
-          break
-        }
-        case "d": {
-          const found = isoDate.exec(Str.trim(raw))
-          const serial =
-            found === null
-              ? undefined
-              : serialOf({
-                  parts: {
-                    year: Number(found[1]),
-                    month: Number(found[2]),
-                    day: Number(found[3]),
-                    hour: Number(found[4] ?? "0"),
-                    minute: Number(found[5] ?? "0"),
-                    second: Number(found[6] ?? "0")
-                  },
-                  date1904: this.date1904
-                })
-          if (serial === undefined || serial > MAX_SERIAL) value = unreadable("date")
-          else {
+      value = CellType.matchOrElse(
+        this.cellType,
+        {
+          s: () => {
+            const index = Number(Str.trim(raw))
+            const text = Number.isInteger(index) && index >= 0 ? this.strings[index] : undefined
+            return text === undefined ? unreadable("sharedString") : trusted<XlsxText>({ kind: "Text", text })
+          },
+          str: () => trusted<XlsxText>({ kind: "Text", text: detached(unescaped(raw)) }),
+          b: () => {
+            const text = Str.toLowerCase(Str.trim(raw))
+            return text === "1" || text === "true" ? yes : text === "0" || text === "false" ? no : unreadable("boolean")
+          },
+          e: (): XlsxValue => (S.is(XlsxErrorCode)(raw) ? XlsxError.make({ code: raw }) : unreadable("errorCode")),
+          d: () => {
+            const found = isoDate.exec(Str.trim(raw))
+            const serial =
+              found === null
+                ? undefined
+                : serialOf({
+                    parts: {
+                      year: Number(found[1]),
+                      month: Number(found[2]),
+                      day: Number(found[3]),
+                      hour: Number(found[4] ?? "0"),
+                      minute: Number(found[5] ?? "0"),
+                      second: Number(found[6] ?? "0")
+                    },
+                    date1904: this.date1904
+                  })
+            if (serial === undefined || serial > MAX_SERIAL) return unreadable("date")
             if (!style.dated) style = shortDate
-            value = trusted<XlsxDate>({ kind: "Date", serial })
+            return trusted<XlsxDate>({ kind: "Date", serial })
           }
-          break
-        }
-        default: {
+        },
+        // A number, which is also what a cell of no type or of a type nobody knows holds.
+        () => {
           const text = Str.trim(raw)
-          if (text === "") break
+          if (text === "") return blank
           const number = numberText.test(text) ? Number(text) : Number.NaN
-          if (!Number.isFinite(number)) value = unreadable("number")
-          else if (style.dated && number >= 0 && number <= MAX_SERIAL)
-            value = trusted<XlsxDate>({ kind: "Date", serial: number })
-          else value = trusted<XlsxNumber>({ kind: "Number", value: number })
+          if (!Number.isFinite(number)) return unreadable("number")
+          return style.dated && number >= 0 && number <= MAX_SERIAL
+            ? trusted<XlsxDate>({ kind: "Date", serial: number })
+            : trusted<XlsxNumber>({ kind: "Number", value: number })
         }
-      }
+      )
     }
     if (value.kind === "Blank") {
       if (O.isNone(formula)) return

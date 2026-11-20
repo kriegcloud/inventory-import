@@ -18,7 +18,8 @@ import {
   XlsxErrorCode,
   XlsxNumber,
   XlsxNumberFormat,
-  XlsxText
+  XlsxText,
+  XlsxValue
 } from "@beep/xlsx/XlsxCell"
 import { XlsxLimits, XlsxReadOptions } from "@beep/xlsx/XlsxOptions"
 import { XlsxDateSystem } from "@beep/xlsx/XlsxSerial"
@@ -43,7 +44,7 @@ const Value = S.Union([
   S.Struct({ kind: S.tag("error"), code: XlsxErrorCode }),
   S.Struct({ kind: S.tag("date"), day: S.Int.check(S.isBetween({ minimum: 1, maximum: 80_000 })) }),
   S.Struct({ kind: S.tag("formula"), hundredths: Decimal })
-])
+]).pipe(S.toTaggedUnion("kind"))
 const Table = S.Array(S.Array(Value).check(S.isMaxLength(8))).check(S.isMaxLength(12))
 // Each name gets its place in the workbook after it, so no two are the same.
 const SheetNames = S.NonEmptyArray(S.String.check(S.isPattern(/^[A-Za-z][A-Za-z0-9 ]{0,20}$/))).check(S.isMaxLength(3))
@@ -69,26 +70,23 @@ const ours = (book: typeof Book.Type): XlsxWorkbook =>
           rows: A.map(book.table, (cells, r) =>
             XlsxRow.make({
               number: r + 1,
-              cells: A.map(cells, (cell, column) => {
-                switch (cell.kind) {
-                  case "text":
-                    return XlsxCell.make({ column, value: XlsxText.make({ text: cell.text }) })
-                  case "number":
-                    return XlsxCell.make({ column, value: XlsxNumber.make({ value: cell.hundredths / 100 }) })
-                  case "boolean":
-                    return XlsxCell.make({ column, value: XlsxBoolean.make({ value: cell.value }) })
-                  case "error":
-                    return XlsxCell.make({ column, value: XlsxError.make({ code: cell.code }) })
-                  case "date":
-                    return XlsxCell.make({ column, value: XlsxDate.make({ serial: cell.day }), format: dateFormat })
-                  case "formula":
-                    return XlsxCell.make({
+              cells: A.map(cells, (cell, column) =>
+                Value.match(cell, {
+                  text: ({ text }) => XlsxCell.make({ column, value: XlsxText.make({ text }) }),
+                  number: ({ hundredths }) =>
+                    XlsxCell.make({ column, value: XlsxNumber.make({ value: hundredths / 100 }) }),
+                  boolean: ({ value }) => XlsxCell.make({ column, value: XlsxBoolean.make({ value }) }),
+                  error: ({ code }) => XlsxCell.make({ column, value: XlsxError.make({ code }) }),
+                  date: ({ day }) =>
+                    XlsxCell.make({ column, value: XlsxDate.make({ serial: day }), format: dateFormat }),
+                  formula: ({ hundredths }) =>
+                    XlsxCell.make({
                       column,
-                      value: XlsxNumber.make({ value: cell.hundredths / 100 }),
-                      formula: O.some(`${cell.hundredths}/100`)
+                      value: XlsxNumber.make({ value: hundredths / 100 }),
+                      formula: O.some(`${hundredths}/100`)
                     })
-                }
-              })
+                })
+              )
             })
           )
         })
@@ -99,21 +97,17 @@ const ours = (book: typeof Book.Type): XlsxWorkbook =>
 /** One of our cells as SheetJS would hold it: its type, its value, its formula and its format. */
 const asSheetJs = (cell: XlsxWorkbook["sheets"][number]["rows"][number]["cells"][number]) => {
   const formula = O.getOrUndefined(cell.formula)
-  const value = cell.value
-  switch (value.kind) {
-    case "Text":
-      return value.text === "" ? undefined : ["s", value.text, formula, undefined]
-    case "Number":
-      return ["n", value.value, formula, cell.format.code === "General" ? undefined : cell.format.code]
-    case "Date":
-      return ["n", value.serial, formula, cell.format.code]
-    case "Boolean":
-      return ["b", value.value, formula, undefined]
-    case "Error":
-      return ["e", value.code, formula, undefined]
-    default:
-      return undefined
-  }
+  return XlsxValue.matchOrElse(
+    cell.value,
+    {
+      Text: ({ text }) => (text === "" ? undefined : ["s", text, formula, undefined]),
+      Number: ({ value }) => ["n", value, formula, cell.format.code === "General" ? undefined : cell.format.code],
+      Date: ({ serial }) => ["n", serial, formula, cell.format.code],
+      Boolean: ({ value }) => ["b", value, formula, undefined],
+      Error: ({ code }) => ["e", code, formula, undefined]
+    },
+    () => undefined
+  )
 }
 
 const errorCodes: { readonly [code: number]: string } = {
@@ -190,22 +184,16 @@ describe("the package reads what SheetJS writes", () => {
         const theirs = utils.book_new()
         for (const name of named(book)) {
           const rows = A.map(book.table, (cells) =>
-            A.map(cells, (cell): CellObject => {
-              switch (cell.kind) {
-                case "text":
-                  return { t: "s", v: cell.text }
-                case "number":
-                  return { t: "n", v: cell.hundredths / 100 }
-                case "boolean":
-                  return { t: "b", v: cell.value }
-                case "error":
-                  return { t: "e", v: errorNumbers[cell.code] }
-                case "date":
-                  return { t: "n", v: cell.day, z: "yyyy-mm-dd" }
-                case "formula":
-                  return { t: "n", v: cell.hundredths / 100, f: `${cell.hundredths}/100` }
-              }
-            })
+            A.map(cells, (cell) =>
+              Value.match(cell, {
+                text: ({ text }): CellObject => ({ t: "s", v: text }),
+                number: ({ hundredths }): CellObject => ({ t: "n", v: hundredths / 100 }),
+                boolean: ({ value }): CellObject => ({ t: "b", v: value }),
+                error: ({ code }): CellObject => ({ t: "e", v: errorNumbers[code] }),
+                date: ({ day }): CellObject => ({ t: "n", v: day, z: "yyyy-mm-dd" }),
+                formula: ({ hundredths }): CellObject => ({ t: "n", v: hundredths / 100, f: `${hundredths}/100` })
+              })
+            )
           )
           utils.book_append_sheet(theirs, utils.aoa_to_sheet(rows, { dense: true }), name)
         }

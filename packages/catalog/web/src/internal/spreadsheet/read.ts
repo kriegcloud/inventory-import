@@ -4,7 +4,7 @@ import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import { type FileProblem, fileProblem } from "@inventory/catalog-contract/FileProblem"
-import type { XlsxContainer } from "@beep/xlsx/XlsxDiagnostic"
+import { XlsxContainer } from "@beep/xlsx/XlsxDiagnostic"
 import { maxFileBytes, type Note, type SpreadsheetTable } from "@inventory/catalog-model/Spreadsheet"
 
 /**
@@ -86,33 +86,26 @@ export const sniff = (fileName: string, bytes: Uint8Array): Sniffed => {
 
 /** What an archive is to the person: a workbook to read, or the sentence that says what it is instead. */
 const archiveKind = (fileName: string, bytes: Uint8Array, container: XlsxContainer): Sniffed => {
-  switch (container) {
-    case "workbook":
-    case "macroWorkbook":
-      return { kind: "xlsx" }
-    case "binaryWorkbook":
-      return refuse(fileName, "an Excel binary workbook (.xlsb)", "Open it in Excel and save it as .xlsx or CSV UTF-8.")
-    case "openDocument":
-      return refuse(
-        fileName,
-        "an OpenDocument spreadsheet (.ods)",
-        "Save it as .xlsx or CSV UTF-8 and choose it again."
-      )
-    case "word":
-      return refuse(fileName, "a Word document")
-    case "otherZip":
-      // An Office file cut short (a failed download, a full disk) loses the list of its parts at the end.
-      return contains(bytes, "[Content_Types].xml") || /\.xls[xm]$/i.test(fileName)
+  const workbook = (): Sniffed => ({ kind: "xlsx" })
+  const olderOffice = (): Sniffed => refuse(fileName, "an older Office document")
+  return XlsxContainer.match(container, {
+    workbook,
+    macroWorkbook: workbook,
+    binaryWorkbook: () =>
+      refuse(fileName, "an Excel binary workbook (.xlsb)", "Open it in Excel and save it as .xlsx or CSV UTF-8."),
+    openDocument: () =>
+      refuse(fileName, "an OpenDocument spreadsheet (.ods)", "Save it as .xlsx or CSV UTF-8 and choose it again."),
+    word: () => refuse(fileName, "a Word document"),
+    // An Office file cut short (a failed download, a full disk) loses the list of its parts at the end.
+    otherZip: (): Sniffed =>
+      contains(bytes, "[Content_Types].xml") || /\.xls[xm]$/i.test(fileName)
         ? { kind: "refuse", error: fileProblem.unreadable({ fileName, why: ": it looks damaged or incomplete" }) }
-        : refuse(fileName, "a zip archive")
-    case "encrypted":
-      return { kind: "refuse", error: fileProblem.protectedWorkbook({ fileName }) }
-    case "legacyXls":
-      return { kind: "refuse", error: fileProblem.oldExcel({ fileName }) }
-    case "otherOle":
-    case "notAnArchive":
-      return refuse(fileName, "an older Office document")
-  }
+        : refuse(fileName, "a zip archive"),
+    encrypted: (): Sniffed => ({ kind: "refuse", error: fileProblem.protectedWorkbook({ fileName }) }),
+    legacyXls: (): Sniffed => ({ kind: "refuse", error: fileProblem.oldExcel({ fileName }) }),
+    otherOle: olderOffice,
+    notAnArchive: olderOffice
+  })
 }
 
 const extensionOf = (fileName: string): string => /\.([^.]+)$/.exec(fileName)?.[1]?.toLowerCase() ?? ""

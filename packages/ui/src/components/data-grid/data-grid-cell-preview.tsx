@@ -3,6 +3,7 @@ import type { Cell, ColumnPinningPosition, RowData } from "@tanstack/react-table
 import { cn } from "cn"
 import * as React from "react"
 
+import * as Match from "effect/Match"
 import type { DataGridFeatures } from "@inventory/ui/components/data-grid/data-grid-features"
 import type { RowHeightValue } from "@inventory/ui/components/data-grid/data-grid-types"
 
@@ -112,6 +113,11 @@ export function DataGridCellPreview<TData extends RowData>({
   )
 }
 
+type CellPreview = {
+  className?: string
+  content: React.ReactNode
+}
+
 function getPreviewContent<TData extends RowData>({
   cell,
   value,
@@ -119,15 +125,12 @@ function getPreviewContent<TData extends RowData>({
   rowHeight
 }: Pick<DataGridCellPreviewProps<TData>, "cell" | "width" | "rowHeight"> & {
   value: unknown
-}): {
-  className?: string
-  content: React.ReactNode
-} {
+}): CellPreview {
   const meta = cell.column.columnDef.meta
   const lineClampClassName = cn("w-fit max-w-full wrap-anywhere", LINE_CLAMP_CLASS_NAMES[rowHeight])
 
-  switch (meta?.variant) {
-    case "boolean": {
+  return Match.value(meta).pipe(
+    Match.when({ variant: "boolean" }, (meta): CellPreview => {
       const isChecked = getBooleanCellValue(value)
 
       if (meta.control === "switch") {
@@ -156,8 +159,8 @@ function getPreviewContent<TData extends RowData>({
           </span>
         )
       }
-    }
-    case "select": {
+    }),
+    Match.when({ variant: "select" }, (meta): CellPreview => {
       const selectedValue = getOptionCellValue(value)
       const label = meta.options.find((option) => option.value === selectedValue)?.label ?? selectedValue
 
@@ -168,8 +171,8 @@ function getPreviewContent<TData extends RowData>({
           </span>
         ) : null
       }
-    }
-    case "multi-select": {
+    }),
+    Match.when({ variant: "multi-select" }, (meta): CellPreview => {
       const values = getOptionsCellValue(value)
       if (values.length === 0) return { content: null }
 
@@ -207,8 +210,8 @@ function getPreviewContent<TData extends RowData>({
           </>
         )
       }
-    }
-    case "file": {
+    }),
+    Match.when({ variant: "file" }, (): CellPreview => {
       const files = getFilesCellValue(value)
       if (files.length === 0) return { content: null }
 
@@ -245,8 +248,8 @@ function getPreviewContent<TData extends RowData>({
           </>
         )
       }
-    }
-    case "date": {
+    }),
+    Match.when({ variant: "date" }, (): CellPreview => {
       const date = getDateCellValue(value)
       return {
         content: (
@@ -259,8 +262,8 @@ function getPreviewContent<TData extends RowData>({
           </div>
         )
       }
-    }
-    case "url": {
+    }),
+    Match.when({ variant: "url" }, (): CellPreview => {
       const url = getTextCellValue(value)
       if (!url) return { content: null }
 
@@ -276,8 +279,8 @@ function getPreviewContent<TData extends RowData>({
           </div>
         )
       }
-    }
-    case "number": {
+    }),
+    Match.when({ variant: "number" }, (meta): CellPreview => {
       const number = getNumberCellValue(value)
       return {
         content: (
@@ -286,8 +289,8 @@ function getPreviewContent<TData extends RowData>({
           </div>
         )
       }
-    }
-    default:
+    }),
+    Match.orElse((): CellPreview => {
       return {
         content: (
           <div dir="auto" className={lineClampClassName}>
@@ -295,5 +298,6 @@ function getPreviewContent<TData extends RowData>({
           </div>
         )
       }
-  }
+    })
+  )
 }

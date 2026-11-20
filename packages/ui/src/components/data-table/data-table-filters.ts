@@ -20,6 +20,8 @@ import type {
 
 import {
   asFilterItems,
+  FilterOperators,
+  OrderingOperators,
   createPlainFilter,
   getActiveFiltersKey,
   getFilterVariant,
@@ -42,49 +44,42 @@ export function matchesFilter(
   const isDate = variant === "date"
   const isNumeric = variant === "number"
 
-  switch (operator) {
-    case "iLike":
-      return typeof value === "string" ? getLowercaseText(cellValue).includes(value.toLowerCase()) : true
+  const ordered = (ordering: typeof OrderingOperators.Type) => compare(cellValue, value, ordering, isDate)
 
-    case "notILike":
-      return typeof value === "string" ? !getLowercaseText(cellValue).includes(value.toLowerCase()) : true
+  return FilterOperators.match(operator, {
+    iLike: () => (typeof value === "string" ? getLowercaseText(cellValue).includes(value.toLowerCase()) : true),
 
-    case "eq":
+    notILike: () => (typeof value === "string" ? !getLowercaseText(cellValue).includes(value.toLowerCase()) : true),
+
+    eq: () => {
       if (variant === "boolean") return getBooleanString(cellValue) === value
       if (isDate) return getIsSameDay(cellValue, value)
       if (isNumeric) return parseNumber(cellValue) === parseNumber(value)
       return stringifyFilterValue(cellValue) === String(value)
+    },
 
-    case "ne":
+    ne: () => {
       if (variant === "boolean") return getBooleanString(cellValue) !== value
       if (isDate) return !getIsSameDay(cellValue, value)
       if (isNumeric) return parseNumber(cellValue) !== parseNumber(value)
       return stringifyFilterValue(cellValue) !== String(value)
+    },
 
-    case "inArray":
-      return Array.isArray(value) ? value.includes(stringifyFilterValue(cellValue)) : true
+    inArray: () => (Array.isArray(value) ? value.includes(stringifyFilterValue(cellValue)) : true),
 
-    case "notInArray":
-      return Array.isArray(value) ? !value.includes(stringifyFilterValue(cellValue)) : true
+    notInArray: () => (Array.isArray(value) ? !value.includes(stringifyFilterValue(cellValue)) : true),
 
-    case "lt":
-    case "lte":
-    case "gt":
-    case "gte":
-      return compare(cellValue, value, operator, isDate)
+    lt: ordered,
+    lte: ordered,
+    gt: ordered,
+    gte: ordered,
 
-    case "isBetween":
-      return getIsBetween(cellValue, value, isDate)
+    isBetween: () => getIsBetween(cellValue, value, isDate),
 
-    case "isEmpty":
-      return getIsEmptyValue(cellValue)
+    isEmpty: () => getIsEmptyValue(cellValue),
 
-    case "isNotEmpty":
-      return !getIsEmptyValue(cellValue)
-
-    default:
-      return true
-  }
+    isNotEmpty: () => !getIsEmptyValue(cellValue)
+  })
 }
 
 export const dataTableFilterFn = constructFilterFn({
@@ -211,16 +206,12 @@ function compare(cellValue: unknown, value: unknown, operator: "lt" | "lte" | "g
 
   if (Number.isNaN(cell) || Number.isNaN(target)) return false
 
-  switch (operator) {
-    case "lt":
-      return cell < target
-    case "lte":
-      return cell <= target
-    case "gt":
-      return cell > target
-    default:
-      return cell >= target
-  }
+  return OrderingOperators.match(operator, {
+    lt: () => cell < target,
+    lte: () => cell <= target,
+    gt: () => cell > target,
+    gte: () => cell >= target
+  })
 }
 
 function getIsBetween(cellValue: unknown, value: unknown, isDate: boolean) {

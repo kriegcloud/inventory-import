@@ -72,12 +72,12 @@ import {
   ReasonTag,
   WhyBody
 } from "./parts.tsx"
+import { ReviewColumn } from "@inventory/review/ReviewTypes"
 import type {
   Entry,
   Fix,
   FixGroup,
   ProblemKind,
-  ReviewColumn,
   ReviewRegionProps,
   ReviewWords,
   RowView
@@ -87,7 +87,12 @@ import type {
  * The region's own Reason column: the sentence behind each row that needs the person or cannot be fixed here, with or
  * without a fix. A `fill` column, cut to one line with the whole sentence one hover, focus or tap away.
  */
-export const reasonColumn: ReviewColumn = { id: "review:reason", label: "Reason", size: "fill", width: 240 }
+export const reasonColumn: ReviewColumn = ReviewColumn.make({
+  id: "review:reason",
+  label: "Reason",
+  size: "fill",
+  width: 240
+})
 
 /** What a row can ask the region to do. Stable for the life of the region, so rows do not re-render for nothing. */
 export type RowActions = {

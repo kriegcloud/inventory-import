@@ -6,7 +6,11 @@ import * as React from "react"
 import type { DataGridFeatures } from "@inventory/ui/components/data-grid/data-grid-features"
 import type { DataGridCellProps } from "@inventory/ui/components/data-grid/data-grid-types"
 
-import { getHasCustomCell, getHasCustomDisplay } from "@inventory/ui/components/data-grid/data-grid-utils"
+import {
+  ColumnVariants,
+  getHasCustomCell,
+  getHasCustomDisplay
+} from "@inventory/ui/components/data-grid/data-grid-utils"
 import { DataGridCell } from "@inventory/ui/components/data-grid/data-grid-cell"
 import { DataGridCellPreview } from "@inventory/ui/components/data-grid/data-grid-cell-preview"
 import {
@@ -109,41 +113,19 @@ function DataGridDataCellImpl<TData extends RowData>({ isScrolling, ...props }: 
 
   const variant = cell.column.columnDef.meta?.variant ?? "text"
 
-  let Comp: React.ComponentType<DataGridCellProps<TData>>
+  type CellComponent = React.ComponentType<DataGridCellProps<TData>>
 
-  switch (variant) {
-    case "text":
-      Comp = ShortTextCell
-      break
-    case "long-text":
-      Comp = LongTextCell
-      break
-    case "number":
-      Comp = NumberCell
-      break
-    case "url":
-      Comp = UrlCell
-      break
-    case "boolean":
-      Comp = BooleanCell
-      break
-    case "select":
-      Comp = SelectCell
-      break
-    case "multi-select":
-      Comp = MultiSelectCell
-      break
-    case "date":
-      Comp = DateCell
-      break
-    case "file":
-      Comp = FileCell
-      break
-
-    default:
-      Comp = ShortTextCell
-      break
-  }
+  const Comp = ColumnVariants.match(variant, {
+    text: (): CellComponent => ShortTextCell,
+    "long-text": (): CellComponent => LongTextCell,
+    number: (): CellComponent => NumberCell,
+    url: (): CellComponent => UrlCell,
+    boolean: (): CellComponent => BooleanCell,
+    select: (): CellComponent => SelectCell,
+    "multi-select": (): CellComponent => MultiSelectCell,
+    date: (): CellComponent => DateCell,
+    file: (): CellComponent => FileCell
+  })
 
   return <Comp key={rowId} {...props} />
 }

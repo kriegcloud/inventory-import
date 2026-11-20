@@ -12,7 +12,8 @@ import * as S from "effect/Schema"
 import { describe, expect, it as plain } from "vitest"
 import { ReviewDecision } from "@inventory/review/ReviewDecision"
 import { act, emptyState, restored, saved } from "@inventory/review/ReviewDraft"
-import type { ReviewRow, ReviewState } from "@inventory/review/ReviewTypes"
+import { ReviewRow } from "@inventory/review/ReviewTypes"
+import type { ReviewState } from "@inventory/review/ReviewTypes"
 import {
   clearProgress,
   progressKey,
@@ -92,12 +93,14 @@ describe("saved progress", () => {
   })
 
   // Rows with a problem in one column; the person types values and leaves rows out in any order.
-  const rows: ReadonlyArray<ReviewRow> = A.makeBy(6, (i) => ({
-    id: `row-${i + 2}`,
-    line: i + 2,
-    cells: { name: `Item ${i}`, qty: "" },
-    problem: { kind: "blank", column: "qty" }
-  }))
+  const rows: ReadonlyArray<ReviewRow> = A.makeBy(6, (i) =>
+    ReviewRow.make({
+      id: `row-${i + 2}`,
+      line: i + 2,
+      cells: { name: `Item ${i}`, qty: "" },
+      problem: { kind: "blank", column: "qty" }
+    })
+  )
   const Step = S.Struct({
     row: S.Int.check(S.isBetween({ minimum: 0, maximum: 5 })),
     leaveOut: S.Boolean,

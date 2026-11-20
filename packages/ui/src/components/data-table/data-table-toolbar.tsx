@@ -7,6 +7,7 @@ import * as React from "react"
 import type { DataTableFeatures } from "@inventory/ui/components/data-table/data-table-features"
 
 import {
+  FilterVariants,
   getColumnNumberOptions,
   getColumnSelectOptions,
   getFilterVariant,
@@ -148,17 +149,16 @@ function DataTableToolbarFilter<TData extends RowData>({ column }: DataTableTool
   const placeholder = columnMeta.placeholder ?? columnMeta.label
   const filterVariant = getFilterVariant(columnMeta)
 
-  switch (filterVariant) {
-    case "text":
-      return (
-        <DataTableFilterInput
-          column={column}
-          placeholder={placeholder}
-          className="w-40 grow text-ellipsis sm:grow-0 lg:w-56"
-        />
-      )
+  return FilterVariants.match(filterVariant, {
+    text: () => (
+      <DataTableFilterInput
+        column={column}
+        placeholder={placeholder}
+        className="w-40 grow text-ellipsis sm:grow-0 lg:w-56"
+      />
+    ),
 
-    case "number": {
+    number: () => {
       if (getIsNumberRangeColumn(column)) {
         return (
           <React.Suspense fallback={<FilterStandIn title={title} icon={<PlusCircle />} />}>
@@ -177,31 +177,25 @@ function DataTableToolbarFilter<TData extends RowData>({ column }: DataTableTool
           className="w-30"
         />
       )
-    }
+    },
 
-    case "date":
-      return (
-        <React.Suspense fallback={<FilterStandIn title={title} icon={<CalendarIcon />} />}>
-          <DataTableDateFilter column={column} title={title} multiple />
-        </React.Suspense>
-      )
+    date: () => (
+      <React.Suspense fallback={<FilterStandIn title={title} icon={<CalendarIcon />} />}>
+        <DataTableDateFilter column={column} title={title} multiple />
+      </React.Suspense>
+    ),
 
-    case "select":
-      return (
-        <DataTableFacetedFilter
-          column={column}
-          title={title}
-          options={getColumnSelectOptions(columnMeta)}
-          multiple={columnMeta.multiple ?? true}
-        />
-      )
+    select: () => (
+      <DataTableFacetedFilter
+        column={column}
+        title={title}
+        options={getColumnSelectOptions(columnMeta)}
+        multiple={columnMeta.multiple ?? true}
+      />
+    ),
 
-    case "boolean":
-      return <DataTableFacetedFilter column={column} title={title} options={BOOLEAN_OPTIONS} />
-
-    default:
-      return null
-  }
+    boolean: () => <DataTableFacetedFilter column={column} title={title} options={BOOLEAN_OPTIONS} />
+  })
 }
 
 interface DataTableFilterInputProps<TData extends RowData> extends React.ComponentProps<"input"> {

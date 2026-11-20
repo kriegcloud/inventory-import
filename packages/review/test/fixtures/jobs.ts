@@ -6,38 +6,36 @@
  * whose rows end in different values), and a SKU that is not on the item list (type one, or leave the job out).
  */
 import * as O from "effect/Option"
-import type {
-  Choice,
-  Problem,
-  ProblemKind,
-  ReviewColumn,
-  ReviewRow,
-  RowDecision,
-  SavedDecisions
-} from "@inventory/review/ReviewTypes"
+import { Choice, Problem, ProblemKind, ReviewColumn, ReviewRow } from "@inventory/review/ReviewTypes"
+import type { RowDecision, SavedDecisions } from "@inventory/review/ReviewTypes"
 
 export const lineKinds: ReadonlyArray<ProblemKind> = [
-  {
+  ProblemKind.make({
     id: "unit",
     label: "Unit to pick",
     tone: "decision",
     help: "The file says “length”. Pick the unit the job counts it in."
-  },
-  { id: "comma", label: "Decimal comma", tone: "decision", help: "The quantity is written with a comma." },
-  {
+  }),
+  ProblemKind.make({
+    id: "comma",
+    label: "Decimal comma",
+    tone: "decision",
+    help: "The quantity is written with a comma."
+  }),
+  ProblemKind.make({
     id: "stock",
     label: "Not in stock",
     tone: "blocker",
     help: "The SKU is not on your item list. Type one, or leave it out."
-  }
+  })
 ]
 
 export const lineColumns: ReadonlyArray<ReviewColumn> = [
-  { id: "material", label: "Material", size: "fill", width: 200, core: true },
-  { id: "job", label: "Job", core: true, code: true, context: true, search: true },
-  { id: "sku", label: "SKU", core: true, code: true, under: true, search: true, context: true },
-  { id: "qty", label: "Qty", core: true, align: "right" },
-  { id: "unit", label: "Unit", core: true }
+  ReviewColumn.make({ id: "material", label: "Material", size: "fill", width: 200, core: true }),
+  ReviewColumn.make({ id: "job", label: "Job", core: true, code: true, context: true, search: true }),
+  ReviewColumn.make({ id: "sku", label: "SKU", core: true, code: true, under: true, search: true, context: true }),
+  ReviewColumn.make({ id: "qty", label: "Qty", core: true, align: "right" }),
+  ReviewColumn.make({ id: "unit", label: "Unit", core: true })
 ]
 
 type Material = { name: string; sku: string; unit: "m" | "pcs" | "kg" | "L" }
@@ -157,7 +155,7 @@ export function makeJobs(): ReadonlyArray<Job> {
         material: bar.name,
         sku: bar.sku,
         unit: "length",
-        problem: { kind: "unit", column: "unit", ask: "Pick a unit" }
+        problem: Problem.make({ kind: "unit", column: "unit", ask: "Pick a unit" })
       }
     }
     if (kind === "comma") {
@@ -170,7 +168,7 @@ export function makeJobs(): ReadonlyArray<Job> {
         sku: material.sku,
         unit: material.unit,
         qty,
-        problem: {
+        problem: Problem.make({
           kind: "comma",
           column: "qty",
           fix: {
@@ -186,7 +184,7 @@ export function makeJobs(): ReadonlyArray<Job> {
               detail: "Every other quantity in the file uses a point."
             }
           }
-        }
+        })
       }
     }
     if (kind === "stock") {
@@ -197,7 +195,7 @@ export function makeJobs(): ReadonlyArray<Job> {
         material: material.name,
         sku: material.sku,
         unit: material.unit,
-        problem: { kind: "stock", column: "sku", ask: "Type a SKU" }
+        problem: Problem.make({ kind: "stock", column: "sku", ask: "Type a SKU" })
       }
     }
     job.lines = lines
@@ -223,9 +221,9 @@ const unitChoices = (target: Line, all: ReadonlyArray<Line>): ReadonlyArray<Choi
   const suggested = total > 0 && metres * 2 > total
   return [
     suggested
-      ? { value: "m", label: "m", suggested, note: `as ${metres} of ${total} lines with this SKU say` }
-      : { value: "m", label: "m" },
-    { value: "pcs", label: "pcs" }
+      ? Choice.make({ value: "m", label: "m", suggested, note: `as ${metres} of ${total} lines with this SKU say` })
+      : Choice.make({ value: "m", label: "m" }),
+    Choice.make({ value: "pcs", label: "pcs" })
   ]
 }
 
@@ -238,21 +236,21 @@ export const questionRows = (jobs: ReadonlyArray<Job>, leftOut: ReadonlyArray<st
       entry.problem === undefined
         ? []
         : [
-            {
+            ReviewRow.make({
               id: `line-${entry.line}`,
               line: entry.line,
               cells: { material: entry.material, job: entry.job, sku: entry.sku, qty: entry.qty, unit: entry.unit },
               problem: entry.problem
-            }
+            })
           ]
     )
 
 /** The page's own check of a line after the person typed or picked a value: the same rule the server would run. */
 export function recheckLine(input: { cells: Readonly<Record<string, string>> }): Problem | undefined {
   const { cells } = input
-  if (!knownSkus.includes(cells.sku ?? "")) return { kind: "stock", column: "sku", ask: "Type a SKU" }
-  if (!/^\d+(\.\d+)?$/.test(cells.qty ?? "")) return { kind: "comma", column: "qty" }
-  if (!["m", "pcs", "kg", "L"].includes(cells.unit ?? "")) return { kind: "unit", column: "unit" }
+  if (!knownSkus.includes(cells.sku ?? "")) return Problem.make({ kind: "stock", column: "sku", ask: "Type a SKU" })
+  if (!/^\d+(\.\d+)?$/.test(cells.qty ?? "")) return Problem.make({ kind: "comma", column: "qty" })
+  if (!["m", "pcs", "kg", "L"].includes(cells.unit ?? "")) return Problem.make({ kind: "unit", column: "unit" })
   return undefined
 }
 

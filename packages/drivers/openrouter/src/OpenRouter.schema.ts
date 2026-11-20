@@ -7,6 +7,7 @@
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import type * as AiError from "effect/ai/AiError"
 import * as Effect from "effect/Effect"
+import * as Match from "effect/Match"
 import * as O from "effect/Option"
 import type * as Redacted from "effect/Redacted"
 import * as S from "effect/Schema"
@@ -182,31 +183,32 @@ export const isTransient = (error: AiError.AiError): boolean => {
  *
  * @category behaviour
  */
-export const troubleOf = (error: AiError.AiError): { readonly trouble: ModelTrouble; readonly retryable: boolean } => {
-  const reason = error.reason
-  switch (reason._tag) {
-    case "AuthenticationError":
-    case "QuotaExhaustedError":
-      return { trouble: "refused", retryable: false }
-    case "RateLimitError":
-      return { trouble: "busy", retryable: true }
-    case "StructuredOutputError":
-    case "InvalidOutputError":
-    case "InvalidResponseError":
-    case "UnsupportedSchemaError":
-      return { trouble: "badAnswer", retryable: false }
-    case "UnknownError":
-      return reason.http?.response?.status === 402
+export const troubleOf = (error: AiError.AiError): Trouble =>
+  Match.value(error.reason).pipe(
+    Match.tag("AuthenticationError", "QuotaExhaustedError", (): Trouble => ({ trouble: "refused", retryable: false })),
+    Match.tag("RateLimitError", (): Trouble => ({ trouble: "busy", retryable: true })),
+    Match.tag(
+      "StructuredOutputError",
+      "InvalidOutputError",
+      "InvalidResponseError",
+      "UnsupportedSchemaError",
+      (): Trouble => ({ trouble: "badAnswer", retryable: false })
+    ),
+    Match.tag("UnknownError", (reason): Trouble =>
+      reason.http?.response?.status === 402
         ? { trouble: "refused", retryable: false }
         : { trouble: "down", retryable: false }
-    case "InternalProviderError":
-      return { trouble: "down", retryable: true }
-    case "NetworkError":
-      return { trouble: "down", retryable: reason.reason === "TransportError" }
-    default:
-      return { trouble: "down", retryable: false }
-  }
-}
+    ),
+    Match.tag("InternalProviderError", (): Trouble => ({ trouble: "down", retryable: true })),
+    Match.tag("NetworkError", (reason): Trouble => ({
+      trouble: "down",
+      retryable: reason.reason === "TransportError"
+    })),
+    Match.orElse((): Trouble => ({ trouble: "down", retryable: false }))
+  )
+
+/** A model failure as its kind, and whether asking again could help. */
+type Trouble = { readonly trouble: ModelTrouble; readonly retryable: boolean }
 
 /**
  * One structured question: its name (the object the model is asked for), an optional system message, the prompt, and

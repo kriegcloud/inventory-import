@@ -29,6 +29,8 @@ import {
   ToggleRightIcon
 } from "lucide-react"
 
+import { LiteralKit } from "@beep/schema/LiteralKit"
+import * as Match from "effect/Match"
 import type { DataGridFeatures } from "@inventory/ui/components/data-grid/data-grid-features"
 import type {
   CellPosition,
@@ -154,37 +156,72 @@ export function serializeCellValue(value: unknown, variant: ColumnVariant | unde
   return stringifyUnknown(value)
 }
 
-export function parsePastedCellValue(text: string, meta: DataGridColumnMeta | undefined): { value: unknown } | null {
-  switch (meta?.variant) {
-    case "number": {
+// Local change: the column variants and the directions of a move as LiteralKits, and the column meta read with
+// `effect/Match`, so the grid branches on them without a `switch`. The meta is matched, not modelled as a schema: its
+// variants hold React components and number formats, and a column may leave `variant` out.
+export const ColumnVariants = LiteralKit([
+  "text",
+  "long-text",
+  "url",
+  "date",
+  "number",
+  "boolean",
+  "select",
+  "multi-select",
+  "file"
+])
+export const NavigationDirections = LiteralKit([
+  "up",
+  "down",
+  "left",
+  "right",
+  "home",
+  "end",
+  "ctrl+up",
+  "ctrl+down",
+  "ctrl+home",
+  "ctrl+end",
+  "pageup",
+  "pagedown",
+  "pageleft",
+  "pageright",
+  "tab",
+  "shift+tab"
+])
+
+type PastedValue = { value: unknown } | null
+
+export function parsePastedCellValue(text: string, meta: DataGridColumnMeta | undefined): PastedValue {
+  return Match.value(meta).pipe(
+    Match.when({ variant: "number" }, (): PastedValue => {
       if (!text) return { value: null }
       const num = Number.parseFloat(text)
       return Number.isNaN(num) ? null : { value: num }
-    }
-    case "boolean": {
+    }),
+    Match.when({ variant: "boolean" }, (): PastedValue => {
       if (!text) return { value: false }
       const lower = text.toLowerCase()
       return VALID_BOOLEANS.has(lower) ? { value: TRUTHY_BOOLEANS.has(lower) } : null
-    }
-    case "date": {
+    }),
+    Match.when({ variant: "date" }, (): PastedValue => {
       if (!text) return { value: null }
       const date = new Date(text)
       return Number.isNaN(date.getTime()) ? null : { value: date }
-    }
-    case "select": {
+    }),
+    Match.when({ variant: "select" }, (meta): PastedValue => {
       if (!text) return { value: null }
       const matched = matchSelectOption(text, meta.options)
       return matched ? { value: matched } : null
-    }
-    case "multi-select": {
+    }),
+    Match.when({ variant: "multi-select" }, (meta): PastedValue => {
       const values = parseMultiSelectValues(text)
       const validated = values.flatMap((item) => {
         const matched = matchSelectOption(item, meta.options)
         return matched ? [matched] : []
       })
       return values.length > 0 && validated.length === 0 ? null : { value: validated }
-    }
-    case "file": {
+    }),
+    Match.when({ variant: "file" }, (): PastedValue => {
       if (!text) return { value: [] }
       try {
         const parsed: unknown = JSON.parse(text)
@@ -194,8 +231,8 @@ export function parsePastedCellValue(text: string, meta: DataGridColumnMeta | un
       } catch {
         return null
       }
-    }
-    case "url": {
+    }),
+    Match.when({ variant: "url" }, (): PastedValue => {
       if (!text) return { value: "" }
       if (text[0] === "[" || text[0] === "{") return null
       try {
@@ -204,10 +241,9 @@ export function parsePastedCellValue(text: string, meta: DataGridColumnMeta | un
       } catch {
         return DOMAIN_REGEX.test(text) ? { value: text } : null
       }
-    }
-    default:
-      return { value: text ? parseTextValue(text) : "" }
-  }
+    }),
+    Match.orElse((): PastedValue => ({ value: text ? parseTextValue(text) : "" }))
+  )
 }
 
 export function parseTsv(text: string, fallbackColumnCount: number): string[][] {
@@ -394,30 +430,21 @@ export function getColumnVariantLabel(meta?: DataGridColumnMeta): {
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>
   label: string
 } | null {
-  switch (meta?.variant) {
-    case "text":
-      return { label: "Short text", icon: BaselineIcon }
-    case "long-text":
-      return { label: "Long text", icon: TextInitialIcon }
-    case "number":
-      return { label: "Number", icon: HashIcon }
-    case "url":
-      return { label: "URL", icon: LinkIcon }
-    case "boolean":
-      return meta.control === "switch"
+  if (meta?.variant === undefined) return null
+  return ColumnVariants.match(meta.variant, {
+    text: () => ({ label: "Short text", icon: BaselineIcon }),
+    "long-text": () => ({ label: "Long text", icon: TextInitialIcon }),
+    number: () => ({ label: "Number", icon: HashIcon }),
+    url: () => ({ label: "URL", icon: LinkIcon }),
+    boolean: () =>
+      meta.variant === "boolean" && meta.control === "switch"
         ? { label: "Switch", icon: ToggleRightIcon }
-        : { label: "Checkbox", icon: CheckSquareIcon }
-    case "select":
-      return { label: "Select", icon: ListIcon }
-    case "multi-select":
-      return { label: "Multi-select", icon: ListChecksIcon }
-    case "date":
-      return { label: "Date", icon: CalendarIcon }
-    case "file":
-      return { label: "File", icon: FileIcon }
-    default:
-      return null
-  }
+        : { label: "Checkbox", icon: CheckSquareIcon },
+    select: () => ({ label: "Select", icon: ListIcon }),
+    "multi-select": () => ({ label: "Multi-select", icon: ListChecksIcon }),
+    date: () => ({ label: "Date", icon: CalendarIcon }),
+    file: () => ({ label: "File", icon: FileIcon })
+  })
 }
 
 export function swapItems<T>(items: T[], first: T, second: T) {

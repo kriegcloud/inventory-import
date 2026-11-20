@@ -19,17 +19,17 @@ import {
   StrayQuote,
   TextAfterClosingQuote,
   UnterminatedQuote,
-  type CsvTextLimit
+  CsvTextLimit
 } from "../CsvDiagnostic.schema.ts"
 import {
   applyTrim,
   judgeQuote,
   judgeRagged,
-  type CsvBlankLineRule,
-  type CsvReadOptions,
-  type CsvQuoteRule,
-  type CsvRaggedRule,
-  type CsvTrimRule
+  CsvBlankLineRule,
+  CsvReadOptions,
+  CsvQuoteRule,
+  CsvRaggedRule,
+  CsvTrimRule
 } from "../CsvOptions.schema.ts"
 import { CsvIndex, CsvRecordEnd, CsvTextSpan } from "../CsvPosition.schema.ts"
 import { CsvCell, CsvRecord } from "../CsvTable.schema.ts"
@@ -66,9 +66,10 @@ export class AfterQuoteSpaces extends S.Opaque<AfterQuoteSpaces, { readonly bran
 ) {}
 
 /** Where the machine is inside a record. */
-export const MachineMode = LiteralKit(["fieldStart", "unquoted", "quoted", "quoteInQuoted", "afterQuoteSpaces"])
-  .mapMembers(() => Tuple.make(FieldStart, Unquoted, Quoted, QuoteInQuoted, AfterQuoteSpaces))
-  .pipe(S.toTaggedUnion("mode"), $I.annoteSchema("MachineMode", { description: "Where the machine is in a record" }))
+const Mode = LiteralKit(["fieldStart", "unquoted", "quoted", "quoteInQuoted", "afterQuoteSpaces"])
+export const MachineMode = Mode.mapMembers(() =>
+  Tuple.make(FieldStart, Unquoted, Quoted, QuoteInQuoted, AfterQuoteSpaces)
+).pipe(S.toTaggedUnion("mode"), $I.annoteSchema("MachineMode", { description: "Where the machine is in a record" }))
 export type MachineMode = typeof MachineMode.Type
 
 const point = CsvIndex
@@ -176,14 +177,21 @@ export class RawRecord extends S.Opaque<RawRecord, { readonly brand: unique symb
 ) {}
 
 /** The rules the machine reads by. */
-export interface MachineConfig {
-  readonly delimiter: string
-  readonly quotes: CsvQuoteRule
-  readonly ragged: CsvRaggedRule
-  readonly blankLines: CsvBlankLineRule
-  readonly trim: CsvTrimRule
-  readonly limits: CsvReadOptions["limits"]
-}
+export class MachineConfig extends S.Opaque<
+  MachineConfig,
+  {
+    readonly brand: unique symbol
+  }
+>()(
+  S.Struct({
+    delimiter: S.String,
+    quotes: CsvQuoteRule,
+    ragged: CsvRaggedRule,
+    blankLines: CsvBlankLineRule,
+    trim: CsvTrimRule,
+    limits: CsvReadOptions.fields.limits
+  })
+) {}
 
 /** What one step produced. */
 export interface Step {
@@ -194,7 +202,7 @@ export interface Step {
 
 // ── the machine ──────────────────────────────────────────────────────────────────────────────────────────────────────
 
-type Mode = MachineMode["mode"]
+type Mode = typeof Mode.Type
 
 /** The mutable working copy of a state, for one chunk. */
 class Run {
@@ -441,13 +449,11 @@ class Run {
   }
 
   push(text: string): void {
-    const delimiter = this.config.delimiter
     const length = text.length
     let i = 0
     while (i < length && !this.stopped) {
-      const c = text[i]
       if (this.held) {
-        if (c === "\n") {
+        if (text[i] === "\n") {
           this.releaseHeld(true)
           i += 1
           continue
@@ -455,163 +461,177 @@ class Run {
         this.releaseHeld(false)
         if (this.stopped) break
       }
-      switch (this.mode) {
-        case "fieldStart":
-        case "unquoted": {
-          if (c === "\r" || c === "\n") {
-            if (this.mode === "fieldStart" && !this.content) {
-              // A blank line: a record of one empty cell.
-              this.startRecordIfNeeded()
-            }
-            if (c === "\r") {
-              this.breakLine(1)
-              this.held = true
-            } else {
-              this.breakLine(1)
-              this.endRecord("LF")
-            }
-            i += 1
-            continue
-          }
-          this.startRecordIfNeeded()
-          if (c === delimiter) {
-            this.endField()
-            this.advance(1)
-            i += 1
-            continue
-          }
-          if (c === '"' && this.mode === "fieldStart") {
-            this.mode = "quoted"
-            this.fieldQuoted = true
-            this.quoteOffset = this.offset
-            this.quoteLine = this.line
-            this.quoteCharacter = this.character
-            this.advance(1)
-            i += 1
-            continue
-          }
-          if (c === '"') {
-            this.quoteFinding("stray")
-            if (this.stopped) break
-            this.field += '"'
-            this.advance(1)
-            i += 1
-            continue
-          }
-          // A run of ordinary characters.
-          this.mode = "unquoted"
-          let j = i + 1
-          while (j < length) {
-            const d = text[j]
-            if (d === delimiter || d === '"' || d === "\r" || d === "\n") break
-            j += 1
-          }
-          this.field += Str.slice(i, j)(text)
-          this.advance(j - i)
-          i = j
-          this.checkField()
-          continue
-        }
-        case "quoted": {
-          if (c === '"') {
-            this.mode = "quoteInQuoted"
-            this.advance(1)
-            i += 1
-            continue
-          }
-          let j = i
-          while (j < length) {
-            const d = text[j]
-            if (d === '"') break
-            if (d === "\r") {
-              this.line += 1
-              this.character = 0
-              this.offset += 1
-              this.crInQuotes = true
-            } else if (d === "\n") {
-              if (!this.crInQuotes) {
-                this.line += 1
-              }
-              this.character = 0
-              this.offset += 1
-              this.crInQuotes = false
-            } else {
-              this.crInQuotes = false
-              this.advance(1)
-            }
-            j += 1
-          }
-          this.field += Str.slice(i, j)(text)
-          i = j
-          this.checkField()
-          continue
-        }
-        case "quoteInQuoted": {
-          this.crInQuotes = false
-          if (c === '"') {
-            this.field += '"'
-            this.mode = "quoted"
-            this.advance(1)
-            i += 1
-            continue
-          }
-          if (c === delimiter) {
-            this.endField()
-            this.advance(1)
-            i += 1
-            continue
-          }
-          if (c === "\r" || c === "\n") {
-            this.mode = "unquoted"
-            continue
-          }
-          if (c === " ") {
-            this.mode = "afterQuoteSpaces"
-            this.spaces = 1
-            this.advance(1)
-            i += 1
-            continue
-          }
-          this.quoteFinding("after")
-          if (this.stopped) break
-          this.field += '"'
-          this.mode = "quoted"
-          continue
-        }
-        case "afterQuoteSpaces": {
-          if (c === " ") {
-            this.spaces += 1
-            this.advance(1)
-            i += 1
-            continue
-          }
-          if (c === delimiter || c === "\r" || c === "\n") {
-            if (this.config.quotes === "strict") {
-              this.quoteFinding("after")
-              break
-            }
-            if (c === delimiter) {
-              this.endField()
-              this.advance(1)
-              i += 1
-            } else {
-              this.mode = "unquoted"
-            }
-            continue
-          }
-          this.quoteFinding("after")
-          if (this.stopped) break
-          this.field += `"${Str.repeat(this.spaces)(" ")}`
-          this.spaces = 0
-          this.mode = c === '"' ? "quoteInQuoted" : "quoted"
-          if (c === '"') {
-            this.advance(1)
-            i += 1
-          }
-          continue
-        }
-      }
+      i = this.step(this.mode)(text, i)
     }
+  }
+
+  /**
+   * The step each mode takes at `text[i]`: it reads what it can and answers where the next step starts. A step that
+   * answers `i` itself has changed the mode, or stopped the run, and the same unit is read again.
+   */
+  private readonly step = Mode.match({
+    fieldStart: () => this.plainStep,
+    unquoted: () => this.plainStep,
+    quoted: () => this.quotedStep,
+    quoteInQuoted: () => this.closingQuoteStep,
+    afterQuoteSpaces: () => this.afterSpacesStep
+  })
+
+  /** At the start of a field, or inside one written without quotes. */
+  private readonly plainStep = (text: string, i: number): number => {
+    const delimiter = this.config.delimiter
+    const length = text.length
+    const c = text[i]
+    if (c === "\r" || c === "\n") {
+      if (this.mode === "fieldStart" && !this.content) {
+        // A blank line: a record of one empty cell.
+        this.startRecordIfNeeded()
+      }
+      if (c === "\r") {
+        this.breakLine(1)
+        this.held = true
+      } else {
+        this.breakLine(1)
+        this.endRecord("LF")
+      }
+      return i + 1
+    }
+    this.startRecordIfNeeded()
+    if (c === delimiter) {
+      this.endField()
+      this.advance(1)
+      return i + 1
+    }
+    if (c === '"' && this.mode === "fieldStart") {
+      this.mode = "quoted"
+      this.fieldQuoted = true
+      this.quoteOffset = this.offset
+      this.quoteLine = this.line
+      this.quoteCharacter = this.character
+      this.advance(1)
+      return i + 1
+    }
+    if (c === '"') {
+      this.quoteFinding("stray")
+      if (this.stopped) return i
+      this.field += '"'
+      this.advance(1)
+      return i + 1
+    }
+    // A run of ordinary characters.
+    this.mode = "unquoted"
+    let j = i + 1
+    while (j < length) {
+      const d = text[j]
+      if (d === delimiter || d === '"' || d === "\r" || d === "\n") break
+      j += 1
+    }
+    this.field += Str.slice(i, j)(text)
+    this.advance(j - i)
+    this.checkField()
+    return j
+  }
+
+  /** Inside quotes: everything up to the next quote is the field's text, line breaks included. */
+  private readonly quotedStep = (text: string, i: number): number => {
+    const length = text.length
+    if (text[i] === '"') {
+      this.mode = "quoteInQuoted"
+      this.advance(1)
+      return i + 1
+    }
+    let j = i
+    while (j < length) {
+      const d = text[j]
+      if (d === '"') break
+      if (d === "\r") {
+        this.line += 1
+        this.character = 0
+        this.offset += 1
+        this.crInQuotes = true
+      } else if (d === "\n") {
+        if (!this.crInQuotes) {
+          this.line += 1
+        }
+        this.character = 0
+        this.offset += 1
+        this.crInQuotes = false
+      } else {
+        this.crInQuotes = false
+        this.advance(1)
+      }
+      j += 1
+    }
+    this.field += Str.slice(i, j)(text)
+    this.checkField()
+    return j
+  }
+
+  /** Just after a quote inside quotes: a second quote is a quote in the text, anything else closes the field. */
+  private readonly closingQuoteStep = (text: string, i: number): number => {
+    const c = text[i]
+    this.crInQuotes = false
+    if (c === '"') {
+      this.field += '"'
+      this.mode = "quoted"
+      this.advance(1)
+      return i + 1
+    }
+    if (c === this.config.delimiter) {
+      this.endField()
+      this.advance(1)
+      return i + 1
+    }
+    if (c === "\r" || c === "\n") {
+      this.mode = "unquoted"
+      return i
+    }
+    if (c === " ") {
+      this.mode = "afterQuoteSpaces"
+      this.spaces = 1
+      this.advance(1)
+      return i + 1
+    }
+    this.quoteFinding("after")
+    if (this.stopped) return i
+    this.field += '"'
+    this.mode = "quoted"
+    return i
+  }
+
+  /** Spaces after a closing quote: a delimiter or a line break next drops them. */
+  private readonly afterSpacesStep = (text: string, i: number): number => {
+    const delimiter = this.config.delimiter
+    const c = text[i]
+    if (c === " ") {
+      this.spaces += 1
+      this.advance(1)
+      return i + 1
+    }
+    if (c === delimiter || c === "\r" || c === "\n") {
+      if (this.config.quotes === "strict") {
+        this.quoteFinding("after")
+        return i
+      }
+      if (c === delimiter) {
+        this.endField()
+        this.advance(1)
+        return i + 1
+      }
+      this.mode = "unquoted"
+      return i
+    }
+    this.quoteFinding("after")
+    if (this.stopped) return i
+    this.field += `"${Str.repeat(this.spaces)(" ")}`
+    this.spaces = 0
+    if (c !== '"') {
+      this.mode = "quoted"
+      return i
+    }
+    this.mode = "quoteInQuoted"
+    this.advance(1)
+    return i + 1
   }
 
   end(): void {

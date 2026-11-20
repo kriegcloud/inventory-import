@@ -15,6 +15,7 @@ import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
 import { DisplayName } from "@inventory/kernel/Text"
 import { Action, act, saved } from "@inventory/review/ReviewDraft"
+import { ReviewRow } from "@inventory/review/ReviewTypes"
 import type { ReviewState } from "@inventory/review/ReviewTypes"
 import { decisionFromFlags, type SavedDecisions, type SaveRequest } from "@inventory/catalog-contract/Decision"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
@@ -100,7 +101,7 @@ const visit = (id: ImportId, options: { readonly member?: string; readonly saves
     /** The person takes a step on the region. */
     run: (action: Action) => {
       const next = act({
-        rows: A.map(["row-2", "row-3"], (rowId, index) => ({ id: rowId, line: index + 2, cells: {} })),
+        rows: A.map(["row-2", "row-3"], (rowId, index) => ReviewRow.make({ id: rowId, line: index + 2, cells: {} })),
         state: registry.get(reviewState(id)),
         action,
         recheck: undefined,
@@ -125,8 +126,8 @@ describe("the undo history kept in the browser", () => {
         first.open(10, {})
         yield* settle
         expect(labels(first.state())).toEqual([])
-        first.run(Action.LeaveOut({ rowIds: ["row-2"] }))
-        const left = first.run(Action.LeaveOut({ rowIds: ["row-3"] }))
+        first.run({ type: "leaveOut" as const, rowIds: ["row-2"] })
+        const left = first.run({ type: "leaveOut" as const, rowIds: ["row-3"] })
         yield* settle
         expect(labels(left)).toHaveLength(2)
         // Written to the browser with each step, not when the screen leaves.
@@ -138,7 +139,7 @@ describe("the undo history kept in the browser", () => {
         yield* settle
         expect(labels(again.state())).toEqual(labels(left))
         // "Undo last step" takes back the last step taken before the refresh.
-        const undone = again.run(Action.Undo())
+        const undone = again.run({ type: "undo" as const })
         expect(R.keys(saved(undone))).toEqual(["row-2"])
       })
   )
@@ -151,7 +152,7 @@ describe("the undo history kept in the browser", () => {
         const first = visit(id)
         first.open(10, {})
         yield* settle
-        first.run(Action.LeaveOut({ rowIds: ["row-2"] }))
+        first.run({ type: "leaveOut" as const, rowIds: ["row-2"] })
         yield* settle
 
         // Somebody else has since put row 2 back and left row 3 out: the kept history ends somewhere else.
@@ -172,7 +173,7 @@ describe("the undo history kept in the browser", () => {
         const first = visit(id, { saves: "lost" })
         first.open(10, {})
         yield* settle
-        first.run(Action.LeaveOut({ rowIds: ["row-2"] }))
+        first.run({ type: "leaveOut" as const, rowIds: ["row-2"] })
         yield* settle
         expect(first.sent).toEqual([{ madeOn: 10, set: { "row-2": out }, clear: [] }])
 
@@ -196,7 +197,7 @@ describe("the undo history kept in the browser", () => {
       const first = visit(id)
       first.open(10, {})
       yield* settle
-      first.run(Action.LeaveOut({ rowIds: ["row-2"] }))
+      first.run({ type: "leaveOut" as const, rowIds: ["row-2"] })
       yield* settle
 
       const other = visit(id, { member: "mem_lee" })

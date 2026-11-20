@@ -14,7 +14,6 @@ import { firstDecisions, review } from "@inventory/catalog-model/Review"
 import { type StagedTable } from "@inventory/catalog-contract/Staged"
 import { sourceLead, sourceWordsFor } from "@inventory/ui/ProposalSource"
 import {
-  Action,
   act,
   count,
   decisionsLeft,
@@ -31,7 +30,7 @@ import {
   visible
 } from "@inventory/review/ReviewDraft"
 import { planColumns, type SizedColumn } from "../../../review/src/internal/sizing.ts"
-import type { ProblemKind, ReviewColumn, ReviewRow } from "@inventory/review/ReviewTypes"
+import { ProblemKind, ReviewColumn, ReviewRow } from "@inventory/review/ReviewTypes"
 import { defaultReviewWords, reviewWords } from "@inventory/review/ReviewWords"
 import { readSpreadsheet } from "@inventory/catalog-web/Spreadsheet"
 import type { ItemFields } from "@inventory/catalog-contract/Item"
@@ -109,16 +108,17 @@ describe("every row says why", () => {
 
 // A kind nothing on the screen can settle: the item the row names is not in the system yet.
 const kinds: ReadonlyArray<ProblemKind> = [
-  { id: "unit", label: "Unit", tone: "decision" },
-  { id: "unknown", label: "Not in system", tone: "blocker", fixable: false }
+  ProblemKind.make({ id: "unit", label: "Unit", tone: "decision" }),
+  ProblemKind.make({ id: "unknown", label: "Not in system", tone: "blocker", fixable: false })
 ]
-const columns: ReadonlyArray<ReviewColumn> = [{ id: "name", label: "Name" }]
-const row = (line: number, extra: Partial<ReviewRow> = {}): ReviewRow => ({
-  id: `row-${line}`,
-  line,
-  cells: { name: `Item ${line}` },
-  ...extra
-})
+const columns: ReadonlyArray<ReviewColumn> = [ReviewColumn.make({ id: "name", label: "Name" })]
+const row = (line: number, extra: Partial<typeof ReviewRow.Encoded> = {}): ReviewRow =>
+  ReviewRow.make({
+    id: `row-${line}`,
+    line,
+    cells: { name: `Item ${line}` },
+    ...extra
+  })
 const unknownItem = (line: number) =>
   row(line, { problem: { kind: "unknown", reason: `Item ${line} is not in the system yet.` } })
 
@@ -138,7 +138,9 @@ describe("rows that cannot be fixed here", () => {
     expect(cannot === undefined ? "" : reasonOf({ view: cannot, kinds: kindsOf(kinds) })).toBe(
       "Item 3 is not in the system yet."
     )
-    expect(act({ rows, state: emptyState, action: Action.LeaveOut({ rowIds: ["row-3"] }), fixable }).label).toBe("")
+    expect(
+      act({ rows, state: emptyState, action: { type: "leaveOut" as const, rowIds: ["row-3"] }, fixable }).label
+    ).toBe("")
     expect(heldLine(counts)).toBe("3 won't be imported: Needs a decision 1, Cannot import 2")
   })
 
@@ -182,7 +184,7 @@ describe("status words", () => {
   it("are set once by the caller and said everywhere they show", () => {
     const words = reviewWords({ out: "Skipped", stored: "In stock already", needs: "Waiting on you" })
     const rows = [row(2, { problem: { kind: "unit", column: "name" } }), row(3), row(4, { stored: true })]
-    const left = act({ rows, state: emptyState, action: Action.LeaveOut({ rowIds: ["row-3"] }) }).state
+    const left = act({ rows, state: emptyState, action: { type: "leaveOut" as const, rowIds: ["row-3"] } }).state
     const views = viewRows({ rows, state: left })
     const csv = heldCsv({ views, columns, problemKinds: kinds, words })
     expect(csv).toContain("3,Skipped,Item 3")

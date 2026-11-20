@@ -820,6 +820,16 @@ package moves.
 Not discriminators, and not changed: string-literal domains with no data of their own (`RowStatus`, `FilterId`,
 `ColumnSize`, `AgentRun`'s `status`), which are `LiteralKit`s where a schema needs them.
 
+**After the merge of main (Benjamin's "no `switch`" commit of 2026-11-20).** His commit made the review package's
+types schemas, and four of the unions above are now his forms, not this table's: `Action` is a literal kit's tagged
+union on `type` (`{ type: "keep", rowId }`, read with `Action.match` or `matchOrElse`), `ColumnMatch` and `CellMark` are
+`S.toTaggedUnion("state")` (`{ state: "unmatched", candidates }`, `ColumnMatch.guards.unmatched`), and `Entry` is
+`S.toTaggedUnion("type")` (`kind`, `group`, `rest`, `row`). The branch's code that built or read them the enum's way
+was converted to his. What the branch added to their fields stays: a fix's `confidence`, an applied mark's `fix` and an
+undo step's `focus` are an `Option`, and `accepted` and `redo` are always there. `OtherAnswer`, `Sniffed`,
+`UploadEnd` and `Attempt`, which his commit did not turn into schemas, stay tagged enums, and a grid `Line` is his
+`Entry` or the opened row's `Detail`.
+
 ## Choices made
 
 - **The review region is made in its own provider** (`RegionScope`, a `ScopedAtom`, in

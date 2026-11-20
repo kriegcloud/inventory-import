@@ -3,6 +3,7 @@
 import { StoredItem, ItemEdit } from "@inventory/catalog-contract/Item"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
+import * as S from "effect/Schema"
 import { OrganizationId } from "@inventory/kernel/Ids"
 import { ItemQuery, ItemPage, ItemFacets } from "@inventory/catalog-contract/ItemQuery"
 import { Member } from "@inventory/kernel/Member"
@@ -11,11 +12,16 @@ import { Member } from "@inventory/kernel/Member"
  * What an edit did: changed the item (`Edited`), found it already as asked (`Same`: the same edit sent again, which
  * writes nothing), found someone else's change in between (`Changed`, with the item as it is now), or found none.
  */
-export type EditOutcome =
-  | { readonly _tag: "Edited"; readonly item: StoredItem }
-  | { readonly _tag: "Same"; readonly item: StoredItem }
-  | { readonly _tag: "Changed"; readonly item: StoredItem }
-  | { readonly _tag: "Missing" }
+export const EditOutcome = S.TaggedUnion({
+  Edited: { item: StoredItem },
+  Same: { item: StoredItem },
+  Changed: { item: StoredItem },
+  Missing: {}
+}).annotate({
+  description: "What an edit did: changed the item, found it as asked, found another change, or found none"
+})
+/** The decoded value of `EditOutcome`. Branch with `EditOutcome.match`. */
+export type EditOutcome = typeof EditOutcome.Type
 
 /**
  * Reads of the items for the Items table, a page at a time, sorted and filtered by the database, so a list

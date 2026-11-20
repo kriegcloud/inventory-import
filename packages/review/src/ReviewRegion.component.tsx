@@ -50,7 +50,7 @@ import { ToggleGroup, ToggleGroupItem } from "@inventory/ui/components/toggle-gr
 import { Tooltip, TooltipContent, TooltipTrigger } from "@inventory/ui/components/tooltip"
 import { useDataTable } from "@inventory/ui/hooks/use-data-table"
 import { saveCsv } from "@inventory/ui/SaveFile"
-import { Action, confirmLine, heldLine, importSummary, Primary, primary, result } from "@inventory/review/ReviewDraft"
+import { confirmLine, heldLine, importSummary, Primary, primary, result } from "@inventory/review/ReviewDraft"
 import { regionLayout } from "./internal/parts.tsx"
 import { GridScope, ReviewGrid } from "./internal/ReviewGrid.tsx"
 import { ReviewQueue } from "./internal/ReviewQueue.tsx"
@@ -67,8 +67,8 @@ import {
 } from "./ReviewRegion.atoms.ts"
 import type { Activity, FilterId, ReviewRegionProps, RowView } from "@inventory/review/ReviewTypes"
 
-// Each enum's own guard, made once: these run for every row and every cell.
-const isColumnMatchUnmatched = ColumnMatch.$is("Unmatched")
+// Each union's own guard, made once: these run for every row and every cell.
+const isColumnMatchUnmatched = ColumnMatch.guards.unmatched
 const isPrimaryImport = Primary.$is("Import")
 const isPrimaryIdle = Primary.$is("Idle")
 const isPrimaryDone = Primary.$is("Done")
@@ -436,7 +436,7 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
         tip={lastStep === undefined ? "Nothing to undo" : `Undo: ${lastStep.label.toLowerCase()} (${undoKeys})`}
         narrow={narrow}
         disabled={lastStep === undefined}
-        onClick={() => run(Action.Undo())}
+        onClick={() => run({ type: "undo" as const })}
       >
         <Undo2Icon aria-hidden />
       </ToolButton>
@@ -445,7 +445,7 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
         tip={nextRedo === undefined ? "Nothing to redo" : `Redo: ${nextRedo.label.toLowerCase()} (${redoKeys})`}
         narrow={narrow}
         disabled={nextRedo === undefined}
-        onClick={() => run(Action.Redo())}
+        onClick={() => run({ type: "redo" as const })}
       >
         <Redo2Icon aria-hidden />
       </ToolButton>

@@ -63,9 +63,9 @@ import { Density, density } from "./Density.atoms.ts"
 import { type Layout, regionLayout } from "./internal/parts.tsx"
 
 // Each enum's own guard, made once: these run for every row and every cell.
-const isCellMarkApplied = CellMark.$is("Applied")
-const isActionUndo = Action.$is("Undo")
-const isActionRedo = Action.$is("Redo")
+const isCellMarkApplied = CellMark.guards.applied
+const isActionUndo = Action.guards.undo
+const isActionRedo = Action.guards.redo
 
 /** The caller's rule for a row whose value the person typed: what is still wrong with it, or nothing. */
 export type Recheck = (input: { row: ReviewRow; cells: Readonly<Record<string, string>> }) => Problem | undefined
@@ -636,17 +636,17 @@ const makeRegionTable = (
     const found: Array<Stop> = []
     // Every kind of line is named, so a new one cannot be drawn without saying whether "Next problem" stops at it.
     for (const entry of now) {
-      Entry.$match(entry, {
-        Row: ({ view }) => {
+      Entry.match(entry, {
+        row: ({ view }) => {
           if (view.status === "needs") found.push(Stop.Row({ rowId: view.row.id }))
         },
-        Kind: ({ collapsed, kind, rowIds }) => {
+        kind: ({ collapsed, kind, rowIds }) => {
           const first = rowIds[0]
           if (collapsed && first !== undefined)
             found.push(Stop.Folded({ rowId: first, kindId: kind.id, among: rowIds }))
         },
-        Group: () => undefined,
-        Rest: () => undefined
+        group: () => undefined,
+        rest: () => undefined
       })
     }
     return found
@@ -775,7 +775,7 @@ const makeRegionTable = (
           label: "Undo",
           onClick: () => {
             const undo = registry.get(region.input.decisions).undo
-            if (undo[undo.length - 1] === step) run(Action.Undo())
+            if (undo[undo.length - 1] === step) run({ type: "undo" as const })
           }
         }
       })
@@ -876,21 +876,21 @@ const makeRegionTable = (
 
   const excluded = () => [...registry.get(region.ui).excluded]
   const actions: RowActions = {
-    accept: (rowId) => run(Action.Accept({ rowIds: [rowId] }), rowId),
-    keep: (rowId) => run(Action.Keep({ rowId }), rowId),
-    leaveOut: (rowId) => run(Action.LeaveOut({ rowIds: [rowId] }), rowId),
-    putBack: (rowId) => run(Action.PutBack({ rowId }), rowId),
-    edit: (rowId, column, value) => run(Action.Edit({ rowId, column, value }), rowId),
-    undoFix: (rowId, column) => run(Action.Revert({ rowId, column, how: "undo" }), rowId),
-    reject: (rowId, column) => run(Action.Revert({ rowId, column, how: "reject" }), rowId),
+    accept: (rowId) => run({ type: "accept" as const, rowIds: [rowId] }, rowId),
+    keep: (rowId) => run({ type: "keep" as const, rowId }, rowId),
+    leaveOut: (rowId) => run({ type: "leaveOut" as const, rowIds: [rowId] }, rowId),
+    putBack: (rowId) => run({ type: "putBack" as const, rowId }, rowId),
+    edit: (rowId, column, value) => run({ type: "edit" as const, rowId, column, value }, rowId),
+    undoFix: (rowId, column) => run({ type: "revert" as const, rowId, column, how: "undo" }, rowId),
+    reject: (rowId, column) => run({ type: "revert" as const, rowId, column, how: "reject" }, rowId),
     peek: (rowId) => O.getOrUndefined(A.findFirst(registry.get(region.views), (view) => view.row.id === rowId))
   }
   const groupActions: GroupActions = {
-    accept: (groupId) => run(Action.AcceptGroup({ groupId, except: excluded() })),
-    choose: (groupId, value) => run(Action.ChooseGroup({ groupId, value, except: excluded() })),
-    leaveOut: (rowIds) => run(Action.LeaveOut({ rowIds })),
-    revert: (groupId) => run(Action.RevertGroup({ groupId })),
-    acceptRows: (rowIds) => run(Action.Accept({ rowIds })),
+    accept: (groupId) => run({ type: "acceptGroup" as const, groupId, except: excluded() }),
+    choose: (groupId, value) => run({ type: "chooseGroup" as const, groupId, value, except: excluded() }),
+    leaveOut: (rowIds) => run({ type: "leaveOut" as const, rowIds }),
+    revert: (groupId) => run({ type: "revertGroup" as const, groupId }),
+    acceptRows: (rowIds) => run({ type: "accept" as const, rowIds }),
     toggle: (rowId) => {
       if (onPage()) region.change((before) => ({ excluded: flip(before.excluded, rowId) }))
     },
@@ -909,12 +909,12 @@ const makeRegionTable = (
         const key = event.key.toLowerCase()
         if ((event.ctrlKey || event.metaKey) && !event.altKey && key === "z") {
           event.preventDefault()
-          run(event.shiftKey ? Action.Redo() : Action.Undo())
+          run(event.shiftKey ? { type: "redo" as const } : { type: "undo" as const })
           return
         }
         if (event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && key === "y") {
           event.preventDefault()
-          run(Action.Redo())
+          run({ type: "redo" as const })
           return
         }
         if (event.ctrlKey || event.metaKey || event.altKey || registry.get(regionLayout) === "narrow") return

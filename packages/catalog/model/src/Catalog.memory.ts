@@ -31,6 +31,7 @@ import {
   skuKey,
   type StoredItem
 } from "@inventory/catalog-contract/Item"
+import { FilterOperator, ItemFilterColumn, ItemSortColumn } from "@inventory/catalog-contract/ItemQuery"
 import type { ItemFacets, ItemFilter, ItemPage, ItemQuery, ItemSort } from "@inventory/catalog-contract/ItemQuery"
 import { MappingChoice } from "@inventory/catalog-contract/Mapping"
 import { StagedHead, type StagedRow, type StagedTable } from "@inventory/catalog-contract/Staged"
@@ -654,28 +655,18 @@ const takeBackStep = (state: CatalogState, write: TakeBackWrite): readonly [Took
 
 // -- Items: the page's questions, answered over a list --------------------------------------------------------
 
-const textOf = (item: StoredItem, column: ItemFilter["id"]): O.Option<string> => {
-  switch (column) {
-    case "name":
-      return O.some(item.name)
-    case "sku":
-      return O.some(item.sku)
-    case "description":
-      return item.description
-    case "category":
-      return O.some(item.category)
-    case "uom":
-      return O.some(item.uom)
-    case "isActive":
-      return O.some(`${isActive(item.stocking)}`)
-    case "lotTracked":
-      return O.some(`${item.lotTracked}`)
-    case "quantityOnHand":
-      return O.some(`${item.quantityOnHand}`)
-    case "unitCost":
-      return item.unitCost.pipe(costDigits, O.some)
-  }
-}
+const textOf = (item: StoredItem, column: ItemFilter["id"]): O.Option<string> =>
+  ItemFilterColumn.match(column, {
+    name: () => O.some(item.name),
+    sku: () => O.some(item.sku),
+    description: () => item.description,
+    category: () => O.some(item.category),
+    uom: () => O.some(item.uom),
+    isActive: () => O.some(`${isActive(item.stocking)}`),
+    lotTracked: () => O.some(`${item.lotTracked}`),
+    quantityOnHand: () => O.some(`${item.quantityOnHand}`),
+    unitCost: () => item.unitCost.pipe(costDigits, O.some)
+  })
 
 const numberOf = (item: StoredItem, column: ItemFilter["id"]): O.Option<number> =>
   column === "quantityOnHand"
@@ -697,24 +688,25 @@ const passes = (item: StoredItem, filter: ItemFilter): O.Option<boolean> => {
   if (filter.operator === "isEmpty") return O.some(O.isNone(has) || O.getOrElse(has, () => "") === "")
   if (filter.operator === "isNotEmpty") return O.some(O.isSome(has) && O.getOrElse(has, () => "") !== "")
   const text = Str.toLowerCase(O.getOrElse(has, () => ""))
-  switch (filter.operator) {
-    case "iLike":
-      return first === "" ? O.none() : O.some(Str.includes(Str.toLowerCase(first))(text))
-    case "notILike":
-      return first === "" ? O.none() : O.some(!Str.includes(Str.toLowerCase(first))(text))
-    case "inArray":
-      return values.length === 0 ? O.none() : O.some(A.some(values, (value) => Str.toLowerCase(value) === text))
-    case "notInArray":
-      return values.length === 0 ? O.none() : O.some(!A.some(values, (value) => Str.toLowerCase(value) === text))
-    default: {
+  return FilterOperator.matchOrElse(
+    filter.operator,
+    {
+      iLike: () => (first === "" ? O.none() : O.some(Str.includes(Str.toLowerCase(first))(text))),
+      notILike: () => (first === "" ? O.none() : O.some(!Str.includes(Str.toLowerCase(first))(text))),
+      inArray: () =>
+        values.length === 0 ? O.none() : O.some(A.some(values, (value) => Str.toLowerCase(value) === text)),
+      notInArray: () =>
+        values.length === 0 ? O.none() : O.some(!A.some(values, (value) => Str.toLowerCase(value) === text))
+    },
+    (operator) => {
       const number = numberOf(item, filter.id)
       if (O.isNone(number)) {
-        if (filter.operator === "eq") return first === "" ? O.none() : O.some(Str.toLowerCase(first) === text)
-        if (filter.operator === "ne") return first === "" ? O.none() : O.some(Str.toLowerCase(first) !== text)
+        if (operator === "eq") return first === "" ? O.none() : O.some(Str.toLowerCase(first) === text)
+        if (operator === "ne") return first === "" ? O.none() : O.some(Str.toLowerCase(first) !== text)
         return O.none()
       }
       const n = number.value
-      if (filter.operator === "isBetween") {
+      if (operator === "isBetween") {
         const low = O.flatMap(A.get(values, 0), asNumber)
         const high = O.flatMap(A.get(values, 1), asNumber)
         if (O.isNone(low) && O.isNone(high)) return O.none()
@@ -723,48 +715,35 @@ const passes = (item: StoredItem, filter: ItemFilter): O.Option<boolean> => {
             O.match(high, { onNone: () => true, onSome: (max) => n <= max })
         )
       }
-      return O.map(asNumber(first), (wanted) => {
-        switch (filter.operator) {
-          case "eq":
-            return n === wanted
-          case "ne":
-            return n !== wanted
-          case "lt":
-            return n < wanted
-          case "lte":
-            return n <= wanted
-          case "gt":
-            return n > wanted
-          default:
-            return n >= wanted
-        }
-      })
+      return O.map(asNumber(first), (wanted) =>
+        FilterOperator.matchOrElse(
+          operator,
+          {
+            eq: () => n === wanted,
+            ne: () => n !== wanted,
+            lt: () => n < wanted,
+            lte: () => n <= wanted,
+            gt: () => n > wanted
+          },
+          () => n >= wanted
+        )
+      )
     }
-  }
+  )
 }
 
-const sortKey = (item: StoredItem, column: ItemSort["id"]): string | number => {
-  switch (column) {
-    case "name":
-      return Str.toLowerCase(item.name)
-    case "sku":
-      return item.sku
-    case "category":
-      return item.category
-    case "uom":
-      return item.uom
-    case "unitCost":
-      return Number(costDigits(item.unitCost))
-    case "quantityOnHand":
-      return item.quantityOnHand
-    case "reorderPoint":
-      return O.getOrElse(item.reorderPoint, () => -1)
-    case "firstReceivedOn":
-      return O.getOrElse(item.firstReceivedOn, () => "")
-    case "createdAt":
-      return DateTime.toEpochMillis(item.createdAt)
-  }
-}
+const sortKey = (item: StoredItem, column: ItemSort["id"]): string | number =>
+  ItemSortColumn.match(column, {
+    name: () => Str.toLowerCase(item.name),
+    sku: () => item.sku,
+    category: () => item.category,
+    uom: () => item.uom,
+    unitCost: () => Number(costDigits(item.unitCost)),
+    quantityOnHand: () => item.quantityOnHand,
+    reorderPoint: () => O.getOrElse(item.reorderPoint, () => -1),
+    firstReceivedOn: () => O.getOrElse(item.firstReceivedOn, () => ""),
+    createdAt: () => DateTime.toEpochMillis(item.createdAt)
+  })
 
 const compareBy =
   (sorting: ReadonlyArray<ItemSort>) =>

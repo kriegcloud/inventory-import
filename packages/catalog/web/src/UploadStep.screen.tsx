@@ -57,18 +57,19 @@ const count = (n: number, noun: string): string => `${whole.format(n)} ${noun}${
 /** Where an upload stands, in words and numbers: "Reading 12,400 of about 50,000 rows". */
 const line = (state: UploadState): string => {
   const { done, total } = progressOf({ state })
-  return UploadState.match(state, {
-    Reading: (reading) =>
-      total === null
-        ? "Reading"
-        : `Reading ${whole.format(done)} of ${reading.rows.kind === "counted" ? "" : "about "}${whole.format(total)} rows`,
-    Saving: () => `Saving ${whole.format(done)} of ${whole.format(total ?? done)} rows`,
-    Preparing: () => "Preparing the review",
-    Cancelling: () => "Cancelling",
-    Idle: () => "",
-    Refused: () => "",
-    Failed: () => ""
-  })
+  return UploadState.matchOrElse(
+    state,
+    {
+      Reading: ({ rows }) =>
+        total === null
+          ? "Reading"
+          : `Reading ${whole.format(done)} of ${rows.kind === "counted" ? "" : "about "}${whole.format(total)} rows`,
+      Saving: () => `Saving ${whole.format(done)} of ${whole.format(total ?? done)} rows`,
+      Preparing: () => "Preparing the review",
+      Cancelling: () => "Cancelling"
+    },
+    () => ""
+  )
 }
 
 /** The file on its way in: its name, how far it is, and Cancel while cancelling still stops something. */

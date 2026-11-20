@@ -3,47 +3,59 @@
  * the app imports this. The shape of the mess is fixed per block of 178 rows: 136 ready (17 of them with a
  * spelling fix already applied) and 42 that need the person, across five kinds.
  */
+import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as A from "effect/Array"
 import * as MutableHashMap from "effect/MutableHashMap"
 import * as O from "effect/Option"
-import {
-  type Activity,
-  ColumnMatch,
-  type Fix,
-  type Problem,
-  type ProblemKind,
-  type ReviewColumn,
-  type ReviewRow
-} from "@inventory/review/ReviewTypes"
+import { Activity, Fix, Problem, ProblemKind, ReviewColumn, ReviewRow } from "@inventory/review/ReviewTypes"
 
 export const problemKinds: ReadonlyArray<ProblemKind> = [
-  { id: "unit", label: "Unknown unit", tone: "decision", help: "The unit is not on your unit list." },
-  { id: "cost", label: "No cost", tone: "blocker", help: "Each needs a cost before it can be imported." },
-  {
+  ProblemKind.make({ id: "unit", label: "Unknown unit", tone: "decision", help: "The unit is not on your unit list." }),
+  ProblemKind.make({
+    id: "cost",
+    label: "No cost",
+    tone: "blocker",
+    help: "Each needs a cost before it can be imported."
+  }),
+  ProblemKind.make({
     id: "copy",
     label: "Same SKU",
     tone: "decision",
     help: "Two different rows share a SKU. Give one a new SKU, or leave one out."
-  },
-  { id: "below", label: "Below zero", tone: "blocker", help: "Stock cannot be below zero. Type the count." },
-  { id: "name", label: "No name", tone: "blocker", help: "No name in the file. The SKU is offered as the name." }
+  }),
+  ProblemKind.make({
+    id: "below",
+    label: "Below zero",
+    tone: "blocker",
+    help: "Stock cannot be below zero. Type the count."
+  }),
+  ProblemKind.make({
+    id: "name",
+    label: "No name",
+    tone: "blocker",
+    help: "No name in the file. The SKU is offered as the name."
+  })
 ]
 
 const units = ["pcs", "kg", "m", "L"] as const
 
-const matched = (source: string, samples: ReadonlyArray<string>, by: "name" | "model" = "name") =>
-  ColumnMatch.Matched({ source, by, samples })
+const matched = (source: string, samples: ReadonlyArray<string>, by: "name" | "model" = "name") => ({
+  state: "matched" as const,
+  source,
+  by,
+  samples
+})
 
 export const columns: ReadonlyArray<ReviewColumn> = [
-  {
+  ReviewColumn.make({
     id: "name",
     label: "Item",
     size: "fill",
     width: 200,
     core: true,
     match: matched("Item name", ["Flat bar 40 × 5", "Hex bolt M8 × 30", "Weld wire 0.9 mm"])
-  },
-  {
+  }),
+  ReviewColumn.make({
     id: "sku",
     code: true,
     search: true,
@@ -52,51 +64,57 @@ export const columns: ReadonlyArray<ReviewColumn> = [
     core: true,
     under: true,
     match: matched("SKU", ["FB-40-5", "HB-M8-30", "WW-09"])
-  },
-  {
+  }),
+  ReviewColumn.make({
     id: "category",
     facet: true,
     label: "Category",
     match: matched("Group", ["Bar", "Fasteners", "Welding"], "model")
-  },
-  { id: "unit", label: "Unit", core: true, priority: 2, match: matched("UOM", ["m", "PCS", "kg"]) },
-  {
+  }),
+  ReviewColumn.make({ id: "unit", label: "Unit", core: true, priority: 2, match: matched("UOM", ["m", "PCS", "kg"]) }),
+  ReviewColumn.make({
     id: "onHand",
     context: true,
     label: "On hand",
     align: "right",
     core: true,
     match: matched("Qty on hand", ["120", "1,200", "45"])
-  },
-  {
+  }),
+  ReviewColumn.make({
     id: "reorder",
     hidden: true,
     label: "Reorder at",
     align: "right",
     match: matched("Reorder point", ["20", "200", "10"])
-  },
-  {
+  }),
+  ReviewColumn.make({
     id: "cost",
     label: "Cost",
     align: "right",
     match: matched("Unit cost", ["$4.85", "$0.18", "$3.40"])
-  },
-  {
+  }),
+  ReviewColumn.make({
     id: "supplier",
     facet: true,
     context: true,
     label: "Supplier",
     match: matched("Vendor", ["Harlow Steel", "Tri-County Fasteners", "Weldcraft Supply"], "model")
-  },
-  { id: "bin", code: true, hidden: true, label: "Bin", match: matched("Bin", ["A-04", "C-11", "D-02"]) },
-  {
+  }),
+  ReviewColumn.make({
+    id: "bin",
+    code: true,
+    hidden: true,
+    label: "Bin",
+    match: matched("Bin", ["A-04", "C-11", "D-02"])
+  }),
+  ReviewColumn.make({
     id: "lead",
     hidden: true,
     label: "Lead time",
     unit: "days",
     align: "right",
     match: matched("Lead time (days)", ["5", "3", "7"])
-  }
+  })
 ]
 
 /** The same columns with Unit tied between two file columns, so the import is blocked until the person picks. */
@@ -104,12 +122,13 @@ export const columnsUnmatched: ReadonlyArray<ReviewColumn> = columns.map((column
   column.id === "unit"
     ? {
         ...column,
-        match: ColumnMatch.Unmatched({
+        match: {
+          state: "unmatched" as const,
           candidates: [
             { source: "UOM", samples: ["m", "PCS", "kg"] },
             { source: "Pack", samples: ["bundle", "box 100", "spool"] }
           ]
-        })
+        }
       }
     : column
 )
@@ -404,7 +423,9 @@ const block = 178
 /** Rank 0..177 for each position, spread through the file so the rows that need the person are not in one clump. */
 const rankOf = (position: number): number => (position * 7) % block
 
-type Role = "each" | "length" | "cost" | "copyA" | "copyB" | "below" | "name" | "kg" | "pcs" | "clean"
+/** What a row of the block is: clean, or the one kind of mess it carries. */
+const Role = LiteralKit(["each", "length", "cost", "copyA", "copyB", "below", "name", "kg", "pcs", "clean"])
+type Role = typeof Role.Type
 
 const roleOf = (rank: number): Role => {
   if (rank < 9) return "each"
@@ -421,17 +442,18 @@ const roleOf = (rank: number): Role => {
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" })
 const whole = new Intl.NumberFormat("en-US")
 
-const eachFix = (from: string): Fix => ({
-  column: "unit",
-  to: "pcs",
-  by: "rule",
-  confidence: O.some("high"),
-  kind: "unit",
-  group: "unit:each",
-  why: { basis: `"${from}" means each: one piece.`, detail: "Matched against your unit list: pcs, kg, m, L." }
-})
+const eachFix = (from: string): Fix =>
+  Fix.make({
+    column: "unit",
+    to: "pcs",
+    by: "rule",
+    confidence: O.some("high"),
+    kind: "unit",
+    group: "unit:each",
+    why: { basis: `"${from}" means each: one piece.`, detail: "Matched against your unit list: pcs, kg, m, L." }
+  })
 
-const lengthFix: Fix = {
+const lengthFix: Fix = Fix.make({
   column: "unit",
   to: "pcs",
   by: "model",
@@ -443,17 +465,18 @@ const lengthFix: Fix = {
     detail: "Choose m if you count this stock in metres. Only the unit changes; quantities stay as they are.",
     alternatives: ["m"]
   }
-}
-
-const caseFix = (to: "kg" | "pcs"): Fix => ({
-  column: "unit",
-  to,
-  by: "rule",
-  confidence: O.some("high"),
-  kind: "unit",
-  group: `unit:case:${to}`,
-  why: { basis: `The same unit as ${to}, spelled another way.` }
 })
+
+const caseFix = (to: "kg" | "pcs"): Fix =>
+  Fix.make({
+    column: "unit",
+    to,
+    by: "rule",
+    confidence: O.some("high"),
+    kind: "unit",
+    group: `unit:case:${to}`,
+    why: { basis: `The same unit as ${to}, spelled another way.` }
+  })
 
 /** The file as the review reads it: `size` rows, the same mix in every block of 178. `clean` removes every problem. */
 export function makeRows(input: { size: number; clean?: boolean; withoutUnit?: boolean }): ReadonlyArray<ReviewRow> {
@@ -496,44 +519,40 @@ export function makeRows(input: { size: number; clean?: boolean; withoutUnit?: b
     }
     let problem: Problem | undefined
     let applied: ReadonlyArray<Fix> | undefined
-    switch (role) {
-      case "each": {
+    // Ranks pair up (21 with 22, 23 with 24, ...): the later row repeats the earlier row's SKU.
+    const copy = (): void => {
+      const otherRank = role === "copyA" ? rank + 1 : rank - 1
+      const otherPosition = lot * block + ((otherRank * 51) % block)
+      if (otherPosition >= input.size) return
+      problem = Problem.make({
+        kind: "copy",
+        column: "sku",
+        ask: "Type a new SKU",
+        rivals: [`r${otherPosition + 1}`]
+      })
+    }
+    Role.match(role, {
+      each: () => {
         cells.unit = rank < 6 ? "ea" : "each"
-        problem = { kind: "unit", column: "unit", fix: eachFix(cells.unit) }
-        break
-      }
-      case "length": {
+        problem = Problem.make({ kind: "unit", column: "unit", fix: eachFix(cells.unit) })
+      },
+      length: () => {
         cells.unit = "length"
-        problem = { kind: "unit", column: "unit", fix: lengthFix }
-        break
-      }
-      case "cost": {
+        problem = Problem.make({ kind: "unit", column: "unit", fix: lengthFix })
+      },
+      cost: () => {
         cells.cost = ""
-        problem = { kind: "cost", column: "cost", ask: "Type a cost" }
-        break
-      }
-      case "copyA":
-      case "copyB": {
-        // Ranks pair up (21 with 22, 23 with 24, ...): the later row repeats the earlier row's SKU.
-        const otherRank = role === "copyA" ? rank + 1 : rank - 1
-        const otherPosition = lot * block + ((otherRank * 51) % block)
-        if (otherPosition >= input.size) break
-        problem = {
-          kind: "copy",
-          column: "sku",
-          ask: "Type a new SKU",
-          rivals: [`r${otherPosition + 1}`]
-        }
-        break
-      }
-      case "below": {
+        problem = Problem.make({ kind: "cost", column: "cost", ask: "Type a cost" })
+      },
+      copyA: copy,
+      copyB: copy,
+      below: () => {
         cells.onHand = `-${(position % 9) + 3}`
-        problem = { kind: "below", column: "onHand", ask: "Type the count" }
-        break
-      }
-      case "name": {
+        problem = Problem.make({ kind: "below", column: "onHand", ask: "Type the count" })
+      },
+      name: () => {
         cells.name = ""
-        problem = {
+        problem = Problem.make({
           kind: "name",
           column: "name",
           fix: {
@@ -547,34 +566,32 @@ export function makeRows(input: { size: number; clean?: boolean; withoutUnit?: b
               detail: "Its SKU is the only label it has, so the SKU is offered as the name."
             }
           }
-        }
-        break
-      }
-      case "kg": {
+        })
+      },
+      kg: () => {
         cells.unit = rank < 47 ? "KG" : "Kgs"
         applied = [caseFix("kg")]
-        break
-      }
-      case "pcs": {
+      },
+      pcs: () => {
         cells.unit = rank < 56 ? "PCS" : "Pcs."
         applied = [caseFix("pcs")]
-        break
-      }
-      case "clean":
-        break
-    }
+      },
+      clean: () => undefined
+    })
     if (input.withoutUnit === true) {
       cells.unit = ""
       applied = undefined
       if (problem?.kind === "unit") problem = undefined
     }
-    rows.push({
-      id,
-      line,
-      cells,
-      ...(applied === undefined ? {} : { applied }),
-      ...(problem === undefined ? {} : { problem })
-    })
+    rows.push(
+      ReviewRow.make({
+        id,
+        line,
+        cells,
+        ...(applied === undefined ? {} : { applied }),
+        ...(problem === undefined ? {} : { problem })
+      })
+    )
   }
   // The guess for "length" is made from the file, not from a sentence: which unit the other rows of the same
   // categories use decides what is suggested, and the count is the basis shown to the person.
@@ -592,7 +609,7 @@ export function makeRows(input: { size: number; clean?: boolean; withoutUnit?: b
     const m = counted("m")
     const pcs = counted("pcs")
     const [to, other] = m >= pcs ? (["m", "pcs"] as const) : (["pcs", "m"] as const)
-    const fix: Fix = {
+    const fix: Fix = Fix.make({
       ...lengthFix,
       to,
       why: {
@@ -600,7 +617,7 @@ export function makeRows(input: { size: number; clean?: boolean; withoutUnit?: b
         detail: "Only the unit changes; quantities stay as they are.",
         alternatives: [other]
       }
-    }
+    })
     for (const [index, row] of rows.entries()) {
       if (row.problem?.fix?.group === "unit:length") rows[index] = { ...row, problem: { ...row.problem, fix } }
     }
@@ -618,42 +635,44 @@ export function makeRows(input: { size: number; clean?: boolean; withoutUnit?: b
 /** The gallery's pure check of one row after the person typed a value. Copies need the whole file, so not here. */
 export function recheck(input: { row: ReviewRow; cells: Readonly<Record<string, string>> }): Problem | undefined {
   const { cells } = input
-  if ((cells.name ?? "").trim() === "") return { kind: "name", column: "name" }
-  if (!(units as ReadonlyArray<string>).includes(cells.unit ?? "")) return { kind: "unit", column: "unit" }
-  if (!/^\$?\d[\d,]*(\.\d+)?$/.test((cells.cost ?? "").trim())) return { kind: "cost", column: "cost" }
-  if ((cells.onHand ?? "").trim().startsWith("-")) return { kind: "below", column: "onHand" }
+  if ((cells.name ?? "").trim() === "") return Problem.make({ kind: "name", column: "name" })
+  if (!(units as ReadonlyArray<string>).includes(cells.unit ?? ""))
+    return Problem.make({ kind: "unit", column: "unit" })
+  if (!/^\$?\d[\d,]*(\.\d+)?$/.test((cells.cost ?? "").trim())) return Problem.make({ kind: "cost", column: "cost" })
+  if ((cells.onHand ?? "").trim().startsWith("-")) return Problem.make({ kind: "below", column: "onHand" })
   return undefined
 }
 
-export const activity = (rows: number): Activity => ({
-  steps: [
-    {
-      id: "read",
-      by: "read",
-      label: `Read ${whole.format(rows)} rows and 10 columns`,
-      detail: "items.csv, first sheet, header on line 1"
-    },
-    { id: "match", by: "rule", label: "Matched 8 columns by name", detail: "Exact after trimming case and spaces" },
-    {
-      id: "match-model",
-      by: "model",
-      label: "Matched 2 columns by meaning",
-      detail: "Group → Category, Vendor → Supplier"
-    },
-    { id: "fix", by: "rule", label: "Applied 17 spelling fixes", detail: "KG, Kgs → kg · PCS, Pcs. → pcs" },
-    { id: "flag", by: "rule", label: "Flagged 42 rows", detail: "Unit, cost, SKU, stock level and name checks" },
-    {
-      id: "propose",
-      by: "model",
-      label: "Guessed a unit for 3 rows",
-      detail: "length → pcs or m, low confidence: left for you to choose"
-    }
-  ],
-  allowed: ["Read the uploaded file", "Read your unit list and stored SKUs", "Propose a value from your lists"],
-  facts: [
-    { label: "Model calls", value: "2 of 4" },
-    { label: "Cost", value: "$0.004" },
-    { label: "File", value: "items.csv, 14 kB" },
-    { label: "Uploaded by", value: "Jess, 09:14" }
-  ]
-})
+export const activity = (rows: number): Activity =>
+  Activity.make({
+    steps: [
+      {
+        id: "read",
+        by: "read",
+        label: `Read ${whole.format(rows)} rows and 10 columns`,
+        detail: "items.csv, first sheet, header on line 1"
+      },
+      { id: "match", by: "rule", label: "Matched 8 columns by name", detail: "Exact after trimming case and spaces" },
+      {
+        id: "match-model",
+        by: "model",
+        label: "Matched 2 columns by meaning",
+        detail: "Group → Category, Vendor → Supplier"
+      },
+      { id: "fix", by: "rule", label: "Applied 17 spelling fixes", detail: "KG, Kgs → kg · PCS, Pcs. → pcs" },
+      { id: "flag", by: "rule", label: "Flagged 42 rows", detail: "Unit, cost, SKU, stock level and name checks" },
+      {
+        id: "propose",
+        by: "model",
+        label: "Guessed a unit for 3 rows",
+        detail: "length → pcs or m, low confidence: left for you to choose"
+      }
+    ],
+    allowed: ["Read the uploaded file", "Read your unit list and stored SKUs", "Propose a value from your lists"],
+    facts: [
+      { label: "Model calls", value: "2 of 4" },
+      { label: "Cost", value: "$0.004" },
+      { label: "File", value: "items.csv, 14 kB" },
+      { label: "Uploaded by", value: "Jess, 09:14" }
+    ]
+  })

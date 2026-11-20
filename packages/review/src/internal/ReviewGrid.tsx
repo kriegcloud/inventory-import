@@ -83,28 +83,26 @@ import {
   regionLayout,
   WhyBody
 } from "./parts.tsx"
-import type {
-  Fix,
-  FixGroup,
-  ProblemKind,
-  ReviewColumn,
-  ReviewRegionProps,
-  ReviewWords,
-  RowView
-} from "@inventory/review/ReviewTypes"
+import { ReviewColumn } from "@inventory/review/ReviewTypes"
+import type { Fix, FixGroup, ProblemKind, ReviewRegionProps, ReviewWords, RowView } from "@inventory/review/ReviewTypes"
 
 // Each enum's own guard, made once: these run for every row and every cell.
-const isCellMarkApplied = CellMark.$is("Applied")
-const isCellMarkProposed = CellMark.$is("Proposed")
-const isColumnMatchUnmatched = ColumnMatch.$is("Unmatched")
-const isEntryGroup = Entry.$is("Group")
-const isEntryRow = Entry.$is("Row")
+const isCellMarkApplied = CellMark.guards.applied
+const isCellMarkProposed = CellMark.guards.proposed
+const isColumnMatchUnmatched = ColumnMatch.guards.unmatched
+const isEntryGroup = Entry.guards.group
+const isEntryRow = Entry.guards.row
 
 /**
  * The region's own Reason column: the sentence behind each row that needs the person or cannot be fixed here, with or
  * without a fix. A `fill` column, cut to one line with the whole sentence one hover, focus or tap away.
  */
-export const reasonColumn: ReviewColumn = { id: "review:reason", label: "Reason", size: "fill", width: 240 }
+export const reasonColumn: ReviewColumn = ReviewColumn.make({
+  id: "review:reason",
+  label: "Reason",
+  size: "fill",
+  width: 240
+})
 
 export type { Density, GroupActions, RowActions }
 
@@ -1004,16 +1002,16 @@ type Line = Entry | Opened
 const lineMatch = <R,>(
   line: Line,
   cases: {
-    readonly Row: (line: Extract<Entry, { readonly _tag: "Row" }>) => R
-    readonly Group: (line: Extract<Entry, { readonly _tag: "Group" }>) => R
-    readonly Kind: (line: Extract<Entry, { readonly _tag: "Kind" }>) => R
-    readonly Rest: (line: Extract<Entry, { readonly _tag: "Rest" }>) => R
+    readonly Row: (line: Extract<Entry, { readonly type: "row" }>) => R
+    readonly Group: (line: Extract<Entry, { readonly type: "group" }>) => R
+    readonly Kind: (line: Extract<Entry, { readonly type: "kind" }>) => R
+    readonly Rest: (line: Extract<Entry, { readonly type: "rest" }>) => R
     readonly Detail: (line: Extract<Opened, { readonly _tag: "Detail" }>) => R
   }
 ) =>
   isOpenedDetail(line)
     ? Opened.$match(line, { Detail: cases.Detail })
-    : Entry.$match(line, { Row: cases.Row, Group: cases.Group, Kind: cases.Kind, Rest: cases.Rest })
+    : Entry.match(line, { row: cases.Row, group: cases.Group, kind: cases.Kind, rest: cases.Rest })
 
 /** The columns with no room in the table at this width, under their row: each label and its value, change and all. */
 /** An empty cell that takes a default when imported: the default, quieter, and said to be one ("0 EA, default"). */
@@ -1063,7 +1061,7 @@ function Detail(props: { view: RowView; columns: ReadonlyArray<ReviewColumn> }) 
  * The work list beside the table picks the kind, so the heading no longer folds.
  */
 function KindRow(props: {
-  entry: Extract<Entry, { readonly _tag: "Kind" }>
+  entry: Extract<Entry, { readonly type: "kind" }>
   span: number
   index: number
   actions: GroupActions
@@ -1395,7 +1393,7 @@ const sameSeen = (before: O.Option<Seen>, next: O.Option<Seen>): boolean =>
     : O.isNone(before) && O.isNone(next)
 
 /** A group heading whose accept can lead: a rule's fix waiting, taken in one press (no choice to make). */
-const canLeadLine = (line: Line): line is Extract<Line, { readonly _tag: "Group" }> =>
+const canLeadLine = (line: Line): line is Extract<Line, { readonly type: "group" }> =>
   isEntryGroup(line) && !line.applied && choicesOf(line.group) === undefined
 
 export const makeGrid = (input: {
@@ -1542,7 +1540,16 @@ export const makeGrid = (input: {
       hash = (Math.imul(hash, 31) + shape) | 0
     }
     const head = now[0]
-    const firstKey = head === undefined ? "" : isEntryRow(head) ? head.view.row.id : head._tag
+    const firstKey =
+      head === undefined
+        ? ""
+        : lineMatch(head, {
+            Row: (line) => line.view.row.id,
+            Detail: () => "detail",
+            Group: () => "group",
+            Kind: () => "kind",
+            Rest: () => "rest"
+          })
     return O.match(get.self<Sign>(), {
       onNone: () => ({ hash, firstKey, length: now.length, measure: 0, top: 0 }),
       onSome: (before) =>

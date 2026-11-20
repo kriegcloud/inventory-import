@@ -51,7 +51,7 @@ import type {
 } from "@inventory/review/ReviewTypes"
 
 // Each enum's own guard, made once: these run for every row and every cell.
-const isCellMarkProposed = CellMark.$is("Proposed")
+const isCellMarkProposed = CellMark.guards.proposed
 
 const page = 30
 
@@ -176,21 +176,21 @@ type CardProps = {
 /** The one decision on screen: a group of identical fixes, or a row. Everything needed to decide is on the card. */
 function Decision(props: CardProps & { entry: QueueEntry }) {
   const { entry, ...card } = props
-  return Entry.$match(entry, {
-    Group: ({ group }) => <GroupCard {...card} group={group} />,
-    Row: ({ view }) => <RowCard {...card} view={view} />,
+  return Entry.match(entry, {
+    group: ({ group }) => <GroupCard {...card} group={group} />,
+    row: ({ view }) => <RowCard {...card} view={view} />,
     // A heading is never a decision.
-    Kind: () => null,
-    Rest: () => null
+    kind: () => null,
+    rest: () => null
   })
 }
 
 /** What names one decision's card: its group, or its row. */
-const cardKey = Entry.$match({
-  Group: ({ group }) => `g:${group.id}`,
-  Row: ({ view }) => view.row.id,
-  Kind: () => "",
-  Rest: () => ""
+const cardKey = Entry.match({
+  group: ({ group }) => `g:${group.id}`,
+  row: ({ view }) => view.row.id,
+  kind: () => "",
+  rest: () => ""
 })
 
 function GroupCard(props: CardProps & { group: FixGroup }) {

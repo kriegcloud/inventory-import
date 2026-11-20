@@ -17,7 +17,7 @@ import * as Atom from "effect/reactivity/Atom"
 import * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import { describe, expect, it, vi } from "vitest"
 import { dataTableFeatures } from "@inventory/ui/components/data-table/data-table-features"
-import { Action, choicesOf, proposing, saved, waitingGroups } from "@inventory/review/ReviewDraft"
+import { choicesOf, proposing, saved, waitingGroups } from "@inventory/review/ReviewDraft"
 import { Entry, type ProblemKind, type ReviewRow, type ReviewState, type RowView } from "@inventory/review/ReviewTypes"
 import { makeGrid } from "../src/internal/ReviewGrid.tsx"
 import { regionAtom, regionTableAtom, Wanted } from "../src/ReviewRegion.atoms.ts"
@@ -247,22 +247,22 @@ describe("the review region's atoms", () => {
     const group = firstGroup(at)
     const start = saved(at.registry.get(at.region.input.decisions))
 
-    at.regionTable.run(Action.AcceptGroup({ groupId: group.id, except: [] }))
+    at.regionTable.run({ type: "acceptGroup" as const, groupId: group.id, except: [] })
     expect(at.needs()).toBe(before - group.rowIds.length)
     expect(at.told).toHaveLength(1)
     expect(at.registry.get(at.region.input.decisions)).toBe(at.told[0])
 
-    at.regionTable.run(Action.Undo())
+    at.regionTable.run({ type: "undo" as const })
     expect(at.needs()).toBe(before)
     expect(at.told).toHaveLength(2)
     expect(saved(at.told[1] as ReviewState)).toEqual(start)
 
-    at.regionTable.run(Action.Redo())
+    at.regionTable.run({ type: "redo" as const })
     expect(at.needs()).toBe(before - group.rowIds.length)
     expect(at.told).toHaveLength(3)
 
     // With nothing to bring back, the caller is told nothing.
-    at.regionTable.run(Action.Redo())
+    at.regionTable.run({ type: "redo" as const })
     expect(at.told).toHaveLength(3)
   })
 
@@ -273,7 +273,7 @@ describe("the review region's atoms", () => {
     const stopKeys = at.registry.mount(at.regionTable.keys)
     expect(page.keys).toHaveLength(heard + 1)
 
-    at.regionTable.run(Action.AcceptGroup({ groupId: group.id, except: [] }))
+    at.regionTable.run({ type: "acceptGroup" as const, groupId: group.id, except: [] })
     expect(at.told).toHaveLength(1)
     // On the page, Ctrl+Z is the region's: it takes the key and undoes the step.
     expect(press("z", { ctrl: true })).toBe(true)
@@ -294,7 +294,7 @@ describe("the review region's atoms", () => {
     expect(press("z", { ctrl: true })).toBe(false)
     expect(press("y", { ctrl: true })).toBe(false)
     expect(press("j")).toBe(false)
-    at.regionTable.run(Action.Undo())
+    at.regionTable.run({ type: "undo" as const })
     at.regionTable.actions.leaveOut(group.rowIds[0] ?? "")
     at.regionTable.groupActions.toggle(group.rowIds[0] ?? "")
     at.regionTable.step(false)
@@ -312,7 +312,7 @@ describe("the review region's atoms", () => {
 
   it("does nothing before its section is on the page either", () => {
     const at = world()
-    at.regionTable.run(Action.AcceptGroup({ groupId: firstGroup(at).id, except: [] }))
+    at.regionTable.run({ type: "acceptGroup" as const, groupId: firstGroup(at).id, except: [] })
     at.regionTable.groupActions.toggle(firstGroup(at).rowIds[0] ?? "")
     expect(at.told).toHaveLength(0)
     expect(at.registry.get(at.region.ui).excluded.pipe((set) => [...set])).toEqual([])
@@ -331,7 +331,7 @@ describe("the review region's atoms", () => {
     expect(at.registry.get(at.region.views)).toBe(first)
     expect(worked).toBe(0)
 
-    at.regionTable.run(Action.AcceptGroup({ groupId: firstGroup(at).id, except: [] }))
+    at.regionTable.run({ type: "acceptGroup" as const, groupId: firstGroup(at).id, except: [] })
     expect(worked).toBe(1)
   })
 
@@ -343,7 +343,7 @@ describe("the review region's atoms", () => {
     const group = firstGroup(at)
     const before = at.registry.get(at.region.views)
     const decided = at.registry.get(at.region.input.decisions).decisions
-    at.regionTable.run(Action.AcceptGroup({ groupId: group.id, except: [] }))
+    at.regionTable.run({ type: "acceptGroup" as const, groupId: group.id, except: [] })
     const after = at.registry.get(at.region.views)
     // The rows nobody has decided anything on, not even to hold a rule's fix back as a proposal; a row that shares
     // its SKU with another is read again with every decision, since the other's may settle it.
@@ -516,7 +516,7 @@ describe("the review grid's atoms", () => {
     return { virtual, scrollTo }
   }
 
-  const leadable = (line: Entry) => Entry.$is("Group")(line) && !line.applied && choicesOf(line.group) === undefined
+  const leadable = (line: Entry) => Entry.guards.group(line) && !line.applied && choicesOf(line.group) === undefined
 
   it("keeps the columns' parts while a decision changes no width, so the rows drawn are not drawn again", () => {
     const at = onPage()
@@ -528,7 +528,7 @@ describe("the review grid's atoms", () => {
     expect(at.told).toHaveLength(1)
     expect(at.registry.get(at.grid.parts)).toBe(parts)
     expect(at.registry.get(at.grid.plan)).toBe(plan)
-    at.regionTable.run(Action.Undo())
+    at.regionTable.run({ type: "undo" as const })
     expect(at.registry.get(at.grid.parts)).toBe(parts)
     // A new width is a new plan: the table's room changed.
     at.region.change(() => ({ picked: "all" }))
@@ -545,7 +545,7 @@ describe("the review grid's atoms", () => {
     const lines = () => at.registry.get(at.grid.entries) as ReadonlyArray<Entry>
     const groupsAt = () => A.filter(lines(), leadable)
     const first = groupsAt()[0]
-    if (first === undefined || !Entry.$is("Group")(first)) throw new Error("the fixture has no rule group waiting")
+    if (first === undefined || !Entry.guards.group(first)) throw new Error("the fixture has no rule group waiting")
     // The first rule group waiting is in view: its accept is the screen's filled button, and Import waits.
     expect(at.registry.get(at.grid.lead)).toBe(first.group.id)
     expect(at.registry.get(at.grid.leadInView)).toBe(true)
@@ -571,7 +571,7 @@ describe("the review grid's atoms", () => {
     expect(lines().length).toBeLessThan(before)
     const next = groupsAt()[0]
     expect(next).toBeDefined()
-    expect(at.registry.get(at.grid.lead)).toBe(next !== undefined && Entry.$is("Group")(next) ? next.group.id : "")
+    expect(at.registry.get(at.grid.lead)).toBe(next !== undefined && Entry.guards.group(next) ? next.group.id : "")
     expect(virtual.options.count).toBe(lines().length)
 
     // While the confirm step is open its own button is the filled one; someone only looking is offered none.

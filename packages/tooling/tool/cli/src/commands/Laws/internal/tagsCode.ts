@@ -1,5 +1,5 @@
 // The places one file tells a tagged value's case by comparing its `_tag` by hand: `x._tag === "Saving"`,
-// `x?._tag !== "None"`, `switch (x._tag)`. Read from the syntax tree, the parser's plain data, as records of unknown
+// `x?._tag !== "None"`, a `switch` on `x._tag`. Read from the syntax tree, the parser's plain data, as records of unknown
 // values: a comparison split over lines, or written with `==`, is the same node.
 import * as A from "effect/Array"
 import * as O from "effect/Option"

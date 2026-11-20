@@ -45,8 +45,8 @@ import type {
 import { defaultReviewWords } from "@inventory/review/ReviewWords"
 
 // Each enum's own guard, made once: these run for every row and every cell.
-const isCellMarkApplied = CellMark.$is("Applied")
-const isCellMarkProposed = CellMark.$is("Proposed")
+const isCellMarkApplied = CellMark.guards.applied
+const isCellMarkProposed = CellMark.guards.proposed
 
 // ---------------------------------------------------------------------------------------------------------------
 // Layout: a table when the page has 1101px, a shorter table on a tablet, one decision at a time on a phone

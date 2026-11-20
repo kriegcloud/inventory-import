@@ -6,7 +6,7 @@
  * a new case draws nothing for it, without a word.
  *
  * What is refused: `x._tag === "A"` with any of `===`, `!==`, `==`, `!=`, on either side, through `?.` and
- * brackets, and `switch (x._tag)`. What passes: `"_tag" in x`, and a `_tag` read and handed on (a guard's own body
+ * brackets, and a `switch` on `x._tag`. What passes: `"_tag" in x`, and a `_tag` read and handed on (a guard's own body
  * is written once, in the module that owns the type, outside these packages or with `Predicate.isTagged`).
  *
  * Where: the app's screens and their tests, and every package that holds screens or their state. The vendored kit

@@ -7,7 +7,8 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as R from "effect/Record"
 import { vi } from "vitest"
-import { Action, act, saved } from "@inventory/review/ReviewDraft"
+import { act, saved } from "@inventory/review/ReviewDraft"
+import { ReviewRow } from "@inventory/review/ReviewTypes"
 import { type DecisionDelta, type SaveRequest, decisionFromFlags } from "@inventory/catalog-contract/Decision"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import type { ImportView } from "@inventory/catalog-contract/Import"
@@ -41,10 +42,7 @@ vi.mock("sonner", () => ({
 
 const settle = Effect.sleep("15 millis")
 const out = decisionFromFlags({ out: true })
-const rows = [
-  { id: "row-2", line: 2, cells: {} },
-  { id: "row-5", line: 5, cells: {} }
-]
+const rows = [ReviewRow.make({ id: "row-2", line: 2, cells: {} }), ReviewRow.make({ id: "row-5", line: 5, cells: {} })]
 
 /** One import with a server that takes every save and answers the next revision; the app's idle time is 120 ms here. */
 const world = (id: ImportId, network: { down: boolean } = { down: false }) => {
@@ -92,7 +90,7 @@ const world = (id: ImportId, network: { down: boolean } = { down: false }) => {
         act({
           rows,
           state: registry.get(reviewState(id)),
-          action: Action.LeaveOut({ rowIds: [rowId] }),
+          action: { type: "leaveOut" as const, rowIds: [rowId] },
           recheck: undefined,
           fixable: () => false,
           rejects: false

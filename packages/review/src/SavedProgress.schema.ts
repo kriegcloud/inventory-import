@@ -11,7 +11,8 @@ import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import { ReviewDecisionFromFlags, RowKey } from "@inventory/review/ReviewDecision"
 import { fromDraft, toDraft } from "@inventory/review/ReviewDraft"
-import type { DraftStep, ReviewState } from "@inventory/review/ReviewTypes"
+import { DraftStep, ReviewDraft } from "@inventory/review/ReviewTypes"
+import type { ReviewState } from "@inventory/review/ReviewTypes"
 import { $ReviewId } from "./internal/identity.ts"
 
 /** Who the progress belongs to, and which screen. Every part comes from the session, never from the page's address. */
@@ -131,11 +132,12 @@ const toStoredStep = (step: DraftStep): StoredStep =>
     focus: O.fromNullOr(step.focus)
   })
 
-const fromStoredStep = (step: StoredStep): DraftStep => ({
-  label: step.label,
-  before: step.before.map(([rowId, decision]) => [rowId, O.getOrNull(decision)] as const),
-  focus: O.getOrNull(step.focus)
-})
+const fromStoredStep = (step: StoredStep): DraftStep =>
+  DraftStep.make({
+    label: step.label,
+    before: step.before.map(([rowId, decision]) => [rowId, O.getOrNull(decision)] as const),
+    focus: O.getOrNull(step.focus)
+  })
 
 /** The review region's decisions with their undo and redo history, as stored. */
 export const storedReview = (state: ReviewState): StoredReview => {
@@ -149,8 +151,10 @@ export const storedReview = (state: ReviewState): StoredReview => {
 
 /** A stored review as the region's decisions hold it: where the region starts again, its history with it. */
 export const restoredReview = (review: StoredReview): ReviewState =>
-  fromDraft({
-    decisions: review.decisions,
-    undo: review.undo.map(fromStoredStep),
-    redo: review.redo.map(fromStoredStep)
-  })
+  fromDraft(
+    ReviewDraft.make({
+      decisions: review.decisions,
+      undo: review.undo.map(fromStoredStep),
+      redo: review.redo.map(fromStoredStep)
+    })
+  )

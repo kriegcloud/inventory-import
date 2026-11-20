@@ -14,6 +14,7 @@ import {
   type Updater,
   useTable
 } from "@tanstack/react-table"
+import * as Match from "effect/Match"
 import * as React from "react"
 import { toast } from "sonner"
 
@@ -675,10 +676,13 @@ function useDataGrid<TData extends RowData>({
         currentTable.setColumnSizing((prev) => ({ ...prev, [columnId]: size }))
       }
 
-      switch (key) {
-        case "ArrowLeft":
-        case "ArrowRight": {
-          const step = (key === "ArrowRight") !== isRtl ? 1 : -1
+      // Local change: the key is read with `effect/Match` instead of a `switch`. Each key answers what the handler
+      // does with the event: "prevent" (handled, and the browser's own action is stopped), "keep" (handled, the
+      // browser's action stands) or "ignore" (not a key the header takes).
+      type Handled = "prevent" | "keep" | "ignore"
+      const handled = Match.value(key).pipe(
+        Match.when(Match.is("ArrowLeft", "ArrowRight"), (arrow): Handled => {
+          const step = (arrow === "ArrowRight") !== isRtl ? 1 : -1
           if (altKey) {
             resizeColumnBy(step * COLUMN_RESIZE_STEP)
           } else if (shiftKey) {
@@ -687,33 +691,35 @@ function useDataGrid<TData extends RowData>({
           } else {
             focusColumnHeaderAt(headerIndex + step)
           }
-          break
-        }
-        case "Home":
+          return "prevent"
+        }),
+        Match.when("Home", (): Handled => {
           focusColumnHeaderAt(0)
-          break
-        case "End":
+          return "prevent"
+        }),
+        Match.when("End", (): Handled => {
           focusColumnHeaderAt(headerColumnIds.length - 1)
-          break
-        case "ArrowUp":
-          break
-        case "ArrowDown": {
+          return "prevent"
+        }),
+        Match.when("ArrowUp", (): Handled => "prevent"),
+        Match.when("ArrowDown", (): Handled => {
           // Stops the menu trigger from opening its menu.
           event.stopPropagation()
           const firstRowId = getRowIdAtDisplayIndex(0)
-          if (!firstRowId) break
+          if (!firstRowId) return "prevent"
           tableRef.current?.clearRowSelection()
           focusCell(firstRowId, columnId)
-          break
-        }
-        case "Escape":
+          return "prevent"
+        }),
+        Match.when("Escape", (): Handled => {
           dataGridRef.current?.focus()
-          break
-        case "Tab":
+          return "prevent"
+        }),
+        Match.when("Tab", (): Handled => {
           if (shiftKey) {
             if (headerIndex === 0) {
               skipDataGridTabStop()
-              return true
+              return "keep"
             }
             focusColumnHeaderAt(headerIndex - 1)
           } else if (headerIndex < headerColumnIds.length - 1) {
@@ -721,14 +727,16 @@ function useDataGrid<TData extends RowData>({
           } else {
             const firstRowId = getRowIdAtDisplayIndex(0)
             const firstColumnId = getNavigableColumnIds()[0]
-            if (!firstRowId || !firstColumnId) return true
+            if (!firstRowId || !firstColumnId) return "keep"
             tableRef.current?.clearRowSelection()
             focusCell(firstRowId, firstColumnId)
           }
-          break
-        default:
-          return false
-      }
+          return "prevent"
+        }),
+        Match.orElse((): Handled => "ignore")
+      )
+      if (handled === "ignore") return false
+      if (handled === "keep") return true
 
       event.preventDefault()
       return true
@@ -914,58 +922,41 @@ function useDataGrid<TData extends RowData>({
 
       const isRtl = dir === "rtl"
 
-      switch (key) {
-        case "ArrowUp":
-          if (altKey && !isCtrlPressed && !shiftKey) {
-            direction = "pageup"
-          } else if (isCtrlPressed) {
-            direction = "ctrl+up"
-          } else if (
+      // Local change: the key is read with `effect/Match` instead of a `switch`. Each key answers the direction to
+      // move in, or null when it moves nowhere (the key was handled another way, or is not one the grid takes).
+      type Move = NavigationDirection | null
+      direction = Match.value(key).pipe(
+        Match.when("ArrowUp", (): Move => {
+          if (altKey && !isCtrlPressed && !shiftKey) return "pageup"
+          if (isCtrlPressed) return "ctrl+up"
+          if (
             !shiftKey &&
             getRowDisplayIndex(currentTable, focusedCell.rowId) === 0 &&
             focusColumnHeader(focusedCell.columnId)
           ) {
             event.preventDefault()
-            return
-          } else {
-            direction = "up"
+            return null
           }
-          break
-        case "ArrowDown":
-          if (altKey && !isCtrlPressed && !shiftKey) {
-            direction = "pagedown"
-          } else {
-            direction = isCtrlPressed ? "ctrl+down" : "down"
-          }
-          break
-        case "ArrowLeft":
-          if (isCtrlPressed) {
-            direction = isRtl ? "end" : "home"
-          } else {
-            direction = "left"
-          }
-          break
-        case "ArrowRight":
-          if (isCtrlPressed) {
-            direction = isRtl ? "home" : "end"
-          } else {
-            direction = "right"
-          }
-          break
-        case "Home":
-          direction = isCtrlPressed ? "ctrl+home" : "home"
-          break
-        case "End":
-          direction = isCtrlPressed ? "ctrl+end" : "end"
-          break
-        case "PageUp":
-          direction = altKey ? "pageleft" : "pageup"
-          break
-        case "PageDown":
-          direction = altKey ? "pageright" : "pagedown"
-          break
-        case "Escape":
-          if (event.defaultPrevented) return
+          return "up"
+        }),
+        Match.when("ArrowDown", (): Move => {
+          if (altKey && !isCtrlPressed && !shiftKey) return "pagedown"
+          return isCtrlPressed ? "ctrl+down" : "down"
+        }),
+        Match.when("ArrowLeft", (): Move => {
+          if (isCtrlPressed) return isRtl ? "end" : "home"
+          return "left"
+        }),
+        Match.when("ArrowRight", (): Move => {
+          if (isCtrlPressed) return isRtl ? "home" : "end"
+          return "right"
+        }),
+        Match.when("Home", (): Move => (isCtrlPressed ? "ctrl+home" : "home")),
+        Match.when("End", (): Move => (isCtrlPressed ? "ctrl+end" : "end")),
+        Match.when("PageUp", (): Move => (altKey ? "pageleft" : "pageup")),
+        Match.when("PageDown", (): Move => (altKey ? "pageright" : "pagedown")),
+        Match.when("Escape", (): Move => {
+          if (event.defaultPrevented) return null
           event.preventDefault()
           if (hasCellRangeSelection || currentTable.getHasRowSelection()) {
             currentTable.clearSelection()
@@ -973,14 +964,16 @@ function useDataGrid<TData extends RowData>({
             blurCell()
             dataGridRef.current?.focus()
           }
-          return
-        case "Tab": {
+          return null
+        }),
+        Match.when("Tab", (): Move => {
           // Local patch: Tab leaves the grid, as the ARIA grid pattern expects; arrow keys move between cells.
           // Upstream moves cell by cell, so the action bar (portalled after the grid) was out of keyboard reach.
           if (shiftKey) skipDataGridTabStop()
-          return
-        }
-      }
+          return null
+        }),
+        Match.orElse((): Move => null)
+      )
 
       if (!direction) return
       event.preventDefault()

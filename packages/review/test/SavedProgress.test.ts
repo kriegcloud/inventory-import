@@ -12,8 +12,9 @@ import * as S from "effect/Schema"
 import * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import { describe, expect, vi } from "vitest"
 import { ReviewDecision } from "@inventory/review/ReviewDecision"
-import { Action, act, emptyState } from "@inventory/review/ReviewDraft"
-import type { ReviewRow, ReviewState } from "@inventory/review/ReviewTypes"
+import { act, emptyState } from "@inventory/review/ReviewDraft"
+import { ReviewRow } from "@inventory/review/ReviewTypes"
+import type { ReviewState } from "@inventory/review/ReviewTypes"
 import {
   progressKey,
   restoredReview,
@@ -169,12 +170,14 @@ describe("saved progress", () => {
   )
 
   // Rows with a problem in one column; the person types values and leaves rows out in any order.
-  const rows: ReadonlyArray<ReviewRow> = A.makeBy(6, (i) => ({
-    id: `row-${i + 2}`,
-    line: i + 2,
-    cells: { name: `Item ${i}`, qty: "" },
-    problem: { kind: "blank", column: "qty" }
-  }))
+  const rows: ReadonlyArray<ReviewRow> = A.makeBy(6, (i) =>
+    ReviewRow.make({
+      id: `row-${i + 2}`,
+      line: i + 2,
+      cells: { name: `Item ${i}`, qty: "" },
+      problem: { kind: "blank", column: "qty" }
+    })
+  )
   const Step = S.Struct({
     row: S.Int.check(S.isBetween({ minimum: 0, maximum: 5 })),
     leaveOut: S.Boolean,
@@ -196,13 +199,13 @@ describe("saved progress", () => {
           const row = rows[step.row]
           if (row === undefined) continue
           const action = step.leaveOut
-            ? Action.LeaveOut({ rowIds: [row.id] })
-            : Action.Edit({ rowId: row.id, column: "qty", value: step.value })
+            ? { type: "leaveOut" as const, rowIds: [row.id] }
+            : { type: "edit" as const, rowId: row.id, column: "qty", value: step.value }
           state = act({ rows, state, action }).state
         }
-        for (let i = 0; i < undos; i++) state = act({ rows, state, action: Action.Undo() }).state
+        for (let i = 0; i < undos; i++) state = act({ rows, state, action: { type: "undo" as const } }).state
         // And one redo, so the redo history makes the trip too.
-        if (undos > 1) state = act({ rows, state, action: Action.Redo() }).state
+        if (undos > 1) state = act({ rows, state, action: { type: "redo" as const } }).state
         // What a refresh does: the decisions handed out, kept as JSON text, decoded and handed back.
         const text = yield* S.encodeEffect(asText)(storedReview(state))
         const stored = yield* S.decodeEffect(asText)(text)
@@ -217,8 +220,8 @@ describe("saved progress", () => {
         expect(redoHistory(back)).toEqual(redoHistory(state))
         // Undo after the refresh takes back the same step it would have taken before it.
         if (state.undo.length > 0) {
-          expect(plainOf(act({ rows, state: back, action: Action.Undo() }).state.decisions)).toEqual(
-            plainOf(act({ rows, state, action: Action.Undo() }).state.decisions)
+          expect(plainOf(act({ rows, state: back, action: { type: "undo" as const } }).state.decisions)).toEqual(
+            plainOf(act({ rows, state, action: { type: "undo" as const } }).state.decisions)
           )
         }
       })

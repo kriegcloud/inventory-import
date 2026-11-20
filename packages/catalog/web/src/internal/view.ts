@@ -2,7 +2,8 @@
 // that takes back just that change. The table's own state is read and written by `useTableView`, so the sort and filter
 // menus show exactly what the assistant set: it is the same state, never a copy beside it.
 import * as S from "effect/Schema"
-import type { CatalogColumn, ColumnCatalog, ViewChange, ViewOperator } from "@inventory/catalog-contract/TableView"
+import { ViewChange } from "@inventory/catalog-contract/TableView"
+import type { CatalogColumn, ColumnCatalog, ViewOperator } from "@inventory/catalog-contract/TableView"
 const Sort = S.Struct({ id: S.String, desc: S.Boolean })
 const FilterItem = S.Struct({
   id: S.String,
@@ -69,9 +70,9 @@ const valueWords = (column: CatalogColumn | undefined, values: ReadonlyArray<str
  *
  * @example describe(columns, { kind: "sort", column: "name", direction: "desc" }) // "Sorted by Name, Z to A"
  */
-export const describe = (columns: ColumnCatalog, change: ViewChange): string => {
-  switch (change.kind) {
-    case "sort": {
+export const describe = (columns: ColumnCatalog, change: ViewChange): string =>
+  ViewChange.match(change, {
+    sort: (change) => {
       const column = columns.find((c) => c.id === change.column)
       const words =
         column?.type === "number"
@@ -82,27 +83,23 @@ export const describe = (columns: ColumnCatalog, change: ViewChange): string => 
             ? "Z to A"
             : "A to Z"
       return `Sorted by ${labelOf(columns, change.column)}, ${words}`
-    }
-    case "filter": {
+    },
+    filter: (change) => {
       const column = columns.find((c) => c.id === change.column)
       const values =
         change.operator === "isEmpty" || change.operator === "isNotEmpty" ? "" : ` ${valueWords(column, change.values)}`
       return `Filtered: ${labelOf(columns, change.column)} ${operatorWords[change.operator]}${values}`
-    }
-    case "search":
-      return change.text === "" ? "Stopped searching" : `Searched for “${change.text}”`
-    case "hide":
-      return `Hid ${labelOf(columns, change.column)}`
-    case "show":
-      return `Showed ${labelOf(columns, change.column)}`
-    case "clear":
-      return change.what === "everything"
+    },
+    search: (change) => (change.text === "" ? "Stopped searching" : `Searched for “${change.text}”`),
+    hide: (change) => `Hid ${labelOf(columns, change.column)}`,
+    show: (change) => `Showed ${labelOf(columns, change.column)}`,
+    clear: (change) =>
+      change.what === "everything"
         ? "Cleared the search, the filters, the order and the hidden columns"
         : change.what === "sorting"
           ? "Cleared the order"
           : `Cleared the ${change.what}`
-  }
-}
+  })
 
 /**
  * Applies one change and returns the view after it, with the patch that takes it back. `opened` is the view as the
@@ -114,14 +111,18 @@ export const applyChange = (input: {
   readonly columns: ColumnCatalog
   readonly opened: ViewState
 }): { readonly state: ViewState; readonly patch: Patch } => {
-  const { state, change, columns, opened } = input
-  switch (change.kind) {
-    case "sort":
-      return {
-        state: { ...state, sorting: [{ id: change.column, desc: change.direction === "desc" }] },
-        patch: { sorting: state.sorting }
-      }
-    case "filter": {
+  const { state, columns, opened } = input
+  // Hiding and showing a column are one change to its visibility: the patch remembers how it stood.
+  const visible = (column: string, shown: boolean): { readonly state: ViewState; readonly patch: Patch } => ({
+    state: { ...state, visibility: { ...state.visibility, [column]: shown } },
+    patch: { visibility: { [column]: state.visibility[column] ?? true } }
+  })
+  return ViewChange.match(input.change, {
+    sort: (change) => ({
+      state: { ...state, sorting: [{ id: change.column, desc: change.direction === "desc" }] },
+      patch: { sorting: state.sorting }
+    }),
+    filter: (change) => {
       const column = columns.find((c) => c.id === change.column)
       const value = column?.type === "select" ? change.values : (change.values[0] ?? "")
       const filter: ViewFilter = {
@@ -136,18 +137,11 @@ export const applyChange = (input: {
         state: { ...state, filters: [...others, filter] },
         patch: { column: change.column, columnFilters: state.filters.filter((f) => f.id === change.column) }
       }
-    }
-    case "search":
-      return { state: { ...state, search: change.text }, patch: { search: state.search } }
-    case "hide":
-    case "show": {
-      const before = state.visibility[change.column] ?? true
-      return {
-        state: { ...state, visibility: { ...state.visibility, [change.column]: change.kind === "show" } },
-        patch: { visibility: { [change.column]: before } }
-      }
-    }
-    case "clear": {
+    },
+    search: (change) => ({ state: { ...state, search: change.text }, patch: { search: state.search } }),
+    hide: (change) => visible(change.column, false),
+    show: (change) => visible(change.column, true),
+    clear: (change) => {
       const all = change.what === "everything"
       return {
         state: {
@@ -164,7 +158,7 @@ export const applyChange = (input: {
         }
       }
     }
-  }
+  })
 }
 
 /** Puts back what one patch holds, leaving every other part of the view as it is now. */
@@ -200,27 +194,21 @@ export const applyAll = (input: {
 export const revertAll = (state: ViewState, patches: ReadonlyArray<Patch>): ViewState =>
   patches.reduceRight((view, patch) => revert(view, patch), state)
 
-const targets = (change: ViewChange): ReadonlyArray<string> => {
-  switch (change.kind) {
-    case "sort":
-      return ["sorting"]
-    case "filter":
-      return [`filter:${change.column}`]
-    case "search":
-      return ["search"]
-    case "hide":
-    case "show":
-      return [`column:${change.column}`]
-    case "clear":
-      return change.what === "everything"
-        ? ["sorting", "filter:*", "search", "column:*"]
-        : change.what === "filters"
-          ? ["filter:*"]
-          : change.what === "columns"
-            ? ["column:*"]
-            : [change.what]
-  }
-}
+const targets: (change: ViewChange) => ReadonlyArray<string> = ViewChange.match({
+  sort: () => ["sorting"],
+  filter: (change) => [`filter:${change.column}`],
+  search: () => ["search"],
+  hide: (change) => [`column:${change.column}`],
+  show: (change) => [`column:${change.column}`],
+  clear: (change) =>
+    change.what === "everything"
+      ? ["sorting", "filter:*", "search", "column:*"]
+      : change.what === "filters"
+        ? ["filter:*"]
+        : change.what === "columns"
+          ? ["column:*"]
+          : [change.what]
+})
 
 const touches = (a: string, b: string) => {
   if (a === b) return true

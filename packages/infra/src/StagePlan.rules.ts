@@ -18,7 +18,7 @@ import {
   OnWorkersDev,
   StagePlan,
   type SettingSource,
-  type StageKind,
+  StageKind,
   type TestPassword
 } from "./Stage.schema.ts"
 import { $InfraId } from "./internal/identity.ts"
@@ -76,9 +76,20 @@ const nowhere = NotGiven.make({})
  */
 export const planFor = (stage: string): Result.Result<StagePlan, UnknownStage> =>
   Result.map(kindOf(stage), (kind) => {
-    switch (kind) {
-      case "production":
-        return StagePlan.make({
+    // A stage that is not production: the test organizations and accounts, sign-up closed, no model key.
+    const rehearsal = (deployed: boolean): StagePlan =>
+      StagePlan.make({
+        stage,
+        kind,
+        address: OnWorkersDev.make({}),
+        seeds: ["organizations", "accounts"],
+        modelKey: nowhere,
+        signUp: nowhere,
+        deployed
+      })
+    return StageKind.match(kind, {
+      production: () =>
+        StagePlan.make({
           stage,
           kind,
           address: OnHostname.make(production),
@@ -86,38 +97,11 @@ export const planFor = (stage: string): Result.Result<StagePlan, UnknownStage> =
           modelKey: FromEnvironment.make({ variable: "OPENROUTER_API_KEY" }),
           signUp: FromEnvironment.make({ variable: "SIGN_UP" }),
           deployed: true
-        })
-      case "preview":
-        return StagePlan.make({
-          stage,
-          kind,
-          address: OnWorkersDev.make({}),
-          seeds: ["organizations", "accounts"],
-          modelKey: nowhere,
-          signUp: nowhere,
-          deployed: true
-        })
-      case "test":
-        return StagePlan.make({
-          stage,
-          kind,
-          address: OnWorkersDev.make({}),
-          seeds: ["organizations", "accounts"],
-          modelKey: nowhere,
-          signUp: nowhere,
-          deployed: true
-        })
-      case "personal":
-        return StagePlan.make({
-          stage,
-          kind,
-          address: OnWorkersDev.make({}),
-          seeds: ["organizations", "accounts"],
-          modelKey: nowhere,
-          signUp: nowhere,
-          deployed: false
-        })
-    }
+        }),
+      preview: () => rehearsal(true),
+      test: () => rehearsal(true),
+      personal: () => rehearsal(false)
+    })
   })
 
 /**

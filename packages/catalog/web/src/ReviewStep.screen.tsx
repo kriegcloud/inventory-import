@@ -10,7 +10,8 @@ import { TriangleAlertIcon } from "lucide-react"
 import { toast } from "sonner"
 import { ReviewSkeleton } from "@inventory/ui/Skeletons"
 import { ReviewRegion } from "@inventory/review/ReviewRegion"
-import type { Activity, Problem, ReviewColumn, ReviewRow } from "@inventory/review/ReviewTypes"
+import { Activity } from "@inventory/review/ReviewTypes"
+import type { Problem, ReviewColumn, ReviewRow } from "@inventory/review/ReviewTypes"
 import { Alert, AlertDescription, AlertTitle } from "@inventory/ui/components/alert"
 import { isNarrow } from "@inventory/ui/ContentWidth"
 import { Button } from "@inventory/ui/components/button"
@@ -247,7 +248,7 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
         )}
       </>
     )
-  const activity: Activity = {
+  const activity: Activity = Activity.make({
     steps: [
       ...table.notes.map((note, index) => ({ id: `note-${index}`, by: "read" as const, label: note.message })),
       // A column of the file no field of an item reads: said here, never stored.
@@ -271,7 +272,7 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
       { label: "Prepared by", value: "The fixed rules" },
       { label: "Stock value in the file", value: totalText(sums.fileStockValue) }
     ]
-  }
+  })
 
   return (
     <>

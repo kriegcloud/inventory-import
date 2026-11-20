@@ -179,7 +179,7 @@ export const screens = Effect.fn("Screens.screens")(function* () {
     A.appendAll(A.flatten(noPackage), A.flatten(noSourceFolder))
   )
   return A.isArrayNonEmpty(problems)
-    ? A.prepend<ScreensFinding, ScreensFinding>(problems, ScreensFinding.cases.Refused.make({}))
+    ? A.prepend<ScreensFinding, ScreensFinding>(problems, ScreensFinding.cases.Refused.make({ _tag: "Refused" }))
     : A.of<ScreensFinding>(
         ScreensFinding.cases.Listed.make({
           names: A.map(withScreens, (workspace) => String(workspace.manifest.name))

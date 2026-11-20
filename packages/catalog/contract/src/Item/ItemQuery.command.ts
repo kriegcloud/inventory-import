@@ -1,3 +1,4 @@
+import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as S from "effect/Schema"
 import { StoredItem } from "./Item.read.ts"
 import { ItemSearchText } from "./ItemSearch.read.ts"
@@ -24,7 +25,7 @@ export const itemSortColumns = [
   "createdAt"
 ] as const
 /** A column the Items table can be sorted by. */
-export const ItemSortColumn = S.Literals(itemSortColumns).annotate({
+export const ItemSortColumn = LiteralKit(itemSortColumns).annotate({
   description: "A column the Items table can be sorted by"
 })
 /** The decoded value of `ItemSortColumn`: a column the Items table can be sorted by. */
@@ -47,7 +48,7 @@ export const itemFilterVariants = {
   unitCost: "number"
 } as const
 /** A column the Items table can be filtered by. */
-export const ItemFilterColumn = S.Literals([
+export const ItemFilterColumn = LiteralKit([
   "name",
   "sku",
   "description",
@@ -64,7 +65,7 @@ export const ItemFilterColumn = S.Literals([
 export type ItemFilterColumn = typeof ItemFilterColumn.Type
 
 /** The comparisons the data table kit can ask for. Which of them a column honours depends on its variant. */
-export const FilterOperator = S.Literals([
+export const FilterOperator = LiteralKit([
   "iLike",
   "notILike",
   "eq",
@@ -83,11 +84,18 @@ export const FilterOperator = S.Literals([
 export type FilterOperator = typeof FilterOperator.Type
 
 /** What kind of value a filter carries, as the data table kit names it. */
-export const FilterVariant = S.Literals(["text", "number", "date", "boolean", "select"]).annotate({
+export const FilterVariant = LiteralKit(["text", "number", "date", "boolean", "select"]).annotate({
   description: "What kind of value a filter carries, as the data table kit names it"
 })
 /** The decoded value of `FilterVariant`: what kind of value a filter carries, as the data table kit names it. */
 export type FilterVariant = typeof FilterVariant.Type
+
+/** The variants the Items table's own columns have (`itemFilterVariants`): it has no date and no boolean column. */
+export const ItemFilterVariant = FilterVariant.pick(["text", "select", "number"]).annotate({
+  description: "How a column of the Items table is compared: searched text, one of a list, or a number"
+})
+/** The decoded value of `ItemFilterVariant`. */
+export type ItemFilterVariant = typeof ItemFilterVariant.Type
 
 const FilterText = S.String.check(S.isMaxLength(200))
 

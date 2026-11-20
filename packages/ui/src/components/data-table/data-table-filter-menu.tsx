@@ -14,6 +14,7 @@ import type {
 
 import {
   coerceFilterValue,
+  FilterVariants,
   getColumnSelectOptions,
   getDateFilterLabel,
   getDefaultFilter,
@@ -523,42 +524,35 @@ function FilterValueInput<TData extends RowData>(props: FilterValueInputProps<TD
     )
   }
 
-  switch (filter.variant) {
-    case "text":
-    case "number":
-      if (filter.operator === "isBetween") {
-        return (
-          <DataTableRangeFilter filter={filter} column={column} inputId={inputId} onFilterUpdate={onFilterUpdate} />
-        )
-      }
+  // Text and numbers share one box (or two, for a range).
+  const typed = () => {
+    if (filter.operator === "isBetween") {
+      return <DataTableRangeFilter filter={filter} column={column} inputId={inputId} onFilterUpdate={onFilterUpdate} />
+    }
 
-      return (
-        <Input
-          // Local change: keyed by the column, so choosing another field starts with an empty box. The box is
-          // uncontrolled, and without the key it kept showing the old field's text after that value was cleared.
-          key={filter.id}
-          id={inputId}
-          type={filter.variant === "text" ? "text" : "number"}
-          aria-label={`${columnMeta?.label ?? column.id} filter value`}
-          inputMode={filter.variant === "text" ? undefined : "numeric"}
-          placeholder={columnMeta?.placeholder ?? "Enter a value..."}
-          defaultValue={typeof filter.value === "string" ? filter.value : undefined}
-          onChange={(event) => onFilterUpdate(filter.filterId, { value: event.target.value })}
-        />
-      )
-
-    case "boolean":
-      return <BooleanFilterValue {...props} />
-
-    case "select":
-      return <SelectFilterValue {...props} />
-
-    case "date":
-      return <DateFilterValue {...props} />
-
-    default:
-      return null
+    return (
+      <Input
+        // Local change: keyed by the column, so choosing another field starts with an empty box. The box is
+        // uncontrolled, and without the key it kept showing the old field's text after that value was cleared.
+        key={filter.id}
+        id={inputId}
+        type={filter.variant === "text" ? "text" : "number"}
+        aria-label={`${columnMeta?.label ?? column.id} filter value`}
+        inputMode={filter.variant === "text" ? undefined : "numeric"}
+        placeholder={columnMeta?.placeholder ?? "Enter a value..."}
+        defaultValue={typeof filter.value === "string" ? filter.value : undefined}
+        onChange={(event) => onFilterUpdate(filter.filterId, { value: event.target.value })}
+      />
+    )
   }
+
+  return FilterVariants.match(filter.variant, {
+    text: typed,
+    number: typed,
+    boolean: () => <BooleanFilterValue {...props} />,
+    select: () => <SelectFilterValue {...props} />,
+    date: () => <DateFilterValue {...props} />
+  })
 }
 
 function BooleanFilterValue<TData extends RowData>({

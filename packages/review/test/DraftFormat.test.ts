@@ -10,8 +10,8 @@ import * as A from "effect/Array"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import { putBack, ReviewDecision, ReviewDecisionFromFlags } from "@inventory/review/ReviewDecision"
-import { Action, act } from "@inventory/review/ReviewDraft"
-import type { ReviewRow } from "@inventory/review/ReviewTypes"
+import { act } from "@inventory/review/ReviewDraft"
+import { ReviewRow } from "@inventory/review/ReviewTypes"
 import { restoredReview, SavedProgress } from "@inventory/review/SavedProgress"
 import before from "./fixtures/draft-before-the-move.txt?raw"
 
@@ -42,12 +42,14 @@ describe("a draft saved by the build before the move", () => {
         O.some({ kind: "leftOut", wasKept: false })
       )
       // Redo after the restore puts the two rows back out.
-      const rows: ReadonlyArray<ReviewRow> = A.map(["row-55", "row-191", "row-148", "row-195"], (id, i) => ({
-        id,
-        line: i + 2,
-        cells: {}
-      }))
-      const after = act({ rows, state, action: Action.Redo() }).state
+      const rows: ReadonlyArray<ReviewRow> = A.map(["row-55", "row-191", "row-148", "row-195"], (id, i) =>
+        ReviewRow.make({
+          id,
+          line: i + 2,
+          cells: {}
+        })
+      )
+      const after = act({ rows, state, action: { type: "redo" } }).state
       expect(O.map(R.get(R.fromEntries(after.decisions), "row-191"), (d) => d.place.kind)).toEqual(O.some("leftOut"))
     })
   )

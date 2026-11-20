@@ -10,7 +10,8 @@ import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
 import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
-import { Action, act, saved } from "@inventory/review/ReviewDraft"
+import { act, saved } from "@inventory/review/ReviewDraft"
+import { ReviewRow } from "@inventory/review/ReviewTypes"
 import {
   type DecisionDelta,
   type SaveRequest,
@@ -375,11 +376,11 @@ describe("the region's decisions for one import", () => {
       t.registry.mount(reviewState(id))
       yield* settle
       const before = t.registry.get(reviewState(id))
-      const rows = [{ id: "row-2", line: 2, cells: {} }]
+      const rows = [ReviewRow.make({ id: "row-2", line: 2, cells: {} })]
       const left = act({
         rows,
         state: before,
-        action: Action.LeaveOut({ rowIds: ["row-2"] }),
+        action: { type: "leaveOut" as const, rowIds: ["row-2"] },
         recheck: undefined,
         fixable: () => false,
         rejects: false
@@ -395,7 +396,7 @@ describe("the region's decisions for one import", () => {
       const undone = act({
         rows,
         state: left,
-        action: Action.Undo(),
+        action: { type: "undo" as const },
         recheck: undefined,
         fixable: () => false,
         rejects: false
@@ -437,11 +438,11 @@ describe("the region's decisions for one import", () => {
       expect(R.keys(saved(t.registry.get(reviewStateAt(id)(epoch + 1))))).toEqual(["row-1", "row-5"])
 
       // And a write the replaced region still makes reaches nobody.
-      const rowsOf = [{ id: "row-2", line: 2, cells: {} }]
+      const rowsOf = [ReviewRow.make({ id: "row-2", line: 2, cells: {} })]
       const late = act({
         rows: rowsOf,
         state: t.registry.get(mine),
-        action: Action.LeaveOut({ rowIds: ["row-2"] }),
+        action: { type: "leaveOut" as const, rowIds: ["row-2"] },
         recheck: undefined,
         fixable: () => false,
         rejects: false

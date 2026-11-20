@@ -2,6 +2,7 @@
 // that brings back something other than what was undone, a work list whose counts do not add up, a button that reads
 // "Type a item #", and a row already in the system offered "Leave out".
 import { describe, expect, it } from "@effect/vitest"
+import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as A from "effect/Array"
 import * as HashSet from "effect/HashSet"
 import * as O from "effect/Option"
@@ -22,7 +23,8 @@ import {
   workList
 } from "@inventory/review/ReviewDraft"
 import { planColumns, priorityOf, type SizedColumn } from "../src/internal/sizing.ts"
-import type { ReviewRow, ReviewState } from "@inventory/review/ReviewTypes"
+import { ReviewRow } from "@inventory/review/ReviewTypes"
+import type { ReviewState } from "@inventory/review/ReviewTypes"
 import { defaultReviewWords } from "@inventory/review/ReviewWords"
 import { columns, makeRows, problemKinds, recheck } from "./fixtures/fabrication.ts"
 
@@ -110,25 +112,26 @@ describe("column sizing", () => {
 describe("undo and redo", () => {
   const ready = A.filter(rows, (row) => row.problem === undefined)
   const needing = A.filter(rows, (row) => row.problem !== undefined)
+  const PickKind = LiteralKit(["leaveOut", "edit", "accept", "undo", "redo"])
   const Pick = S.Struct({
-    kind: S.Literals(["leaveOut", "edit", "accept", "undo", "redo"]),
+    kind: PickKind,
     at: S.Int.check(S.isBetween({ minimum: 0, maximum: 40 }))
   })
   const actionOf = (pick: typeof Pick.Type): Action => {
     const one = ready[pick.at % ready.length] ?? ready[0]!
     const open = needing[pick.at % needing.length] ?? needing[0]!
-    switch (pick.kind) {
-      case "leaveOut":
-        return Action.LeaveOut({ rowIds: [one.id] })
-      case "edit":
-        return Action.Edit({ rowId: open.id, column: open.problem?.column ?? "name", value: `v${pick.at}` })
-      case "accept":
-        return Action.Accept({ rowIds: [open.id] })
-      case "undo":
-        return Action.Undo()
-      case "redo":
-        return Action.Redo()
-    }
+    return PickKind.match(pick.kind, {
+      leaveOut: (): Action => ({ type: "leaveOut", rowIds: [one.id] }),
+      edit: (): Action => ({
+        type: "edit",
+        rowId: open.id,
+        column: open.problem?.column ?? "name",
+        value: `v${pick.at}`
+      }),
+      accept: (): Action => ({ type: "accept", rowIds: [open.id] }),
+      undo: (): Action => ({ type: "undo" }),
+      redo: (): Action => ({ type: "redo" })
+    })
   }
   const play = (picks: ReadonlyArray<typeof Pick.Type>): ReviewState =>
     A.reduce(picks, emptyState, (state, pick) => act({ rows, state, action: actionOf(pick), recheck }).state)
@@ -139,8 +142,8 @@ describe("undo and redo", () => {
     ({ picks }) => {
       const state = play(picks)
       if (state.undo.length === 0) return
-      const undone = act({ rows, state, action: Action.Undo(), recheck }).state
-      const redone = act({ rows, state: undone, action: Action.Redo(), recheck }).state
+      const undone = act({ rows, state, action: { type: "undo" as const }, recheck }).state
+      const redone = act({ rows, state: undone, action: { type: "redo" as const }, recheck }).state
       expect(plain(redone)).toEqual(plain(state))
       expect(redone.undo.length).toBe(state.undo.length)
       expect(redone.redo?.length ?? 0).toBe(state.redo?.length ?? 0)
@@ -153,30 +156,32 @@ describe("undo and redo", () => {
     ({ picks }) => {
       const state = play(picks)
       if ((state.redo ?? []).length === 0) return
-      const redone = act({ rows, state, action: Action.Redo(), recheck }).state
-      expect(plain(act({ rows, state: redone, action: Action.Undo(), recheck }).state)).toEqual(plain(state))
+      const redone = act({ rows, state, action: { type: "redo" as const }, recheck }).state
+      expect(plain(act({ rows, state: redone, action: { type: "undo" as const }, recheck }).state)).toEqual(
+        plain(state)
+      )
     }
   )
 
   it.prop("any new decision empties the redo stack", { picks: S.Array(Pick).check(S.isMaxLength(15)) }, ({ picks }) => {
     const state = play(picks)
     const row = ready[0]!
-    const outcome = act({ rows, state, action: Action.Edit({ rowId: row.id, column: "name", value: "New" }) })
+    const outcome = act({ rows, state, action: { type: "edit" as const, rowId: row.id, column: "name", value: "New" } })
     expect(outcome.state.redo ?? []).toEqual([])
   })
 
   it("undo moves a step to redo, redo moves it back, and each says what it did", () => {
     const row = ready[0]!
-    const left = act({ rows, state: emptyState, action: Action.LeaveOut({ rowIds: [row.id] }) })
-    const undone = act({ rows, state: left.state, action: Action.Undo() })
+    const left = act({ rows, state: emptyState, action: { type: "leaveOut" as const, rowIds: [row.id] } })
+    const undone = act({ rows, state: left.state, action: { type: "undo" as const } })
     expect([undone.state.undo.length, undone.state.redo.length]).toEqual([0, 1])
     expect(undone.label).toBe("Undone: 1 row left out")
-    const redone = act({ rows, state: undone.state, action: Action.Redo() })
+    const redone = act({ rows, state: undone.state, action: { type: "redo" as const } })
     expect([redone.state.undo.length, redone.state.redo.length]).toEqual([1, 0])
     expect(redone.label).toBe("Redone: 1 row left out")
     expect(redone.focus).toEqual(O.some(row.id))
     // Nothing to redo: nothing happens.
-    expect(act({ rows, state: redone.state, action: Action.Redo() }).label).toBe("")
+    expect(act({ rows, state: redone.state, action: { type: "redo" as const } }).label).toBe("")
   })
 })
 
@@ -192,7 +197,7 @@ describe("the work list", () => {
       A.filter(rows, (row) => row.problem?.kind === first.kind.id),
       (row) => row.id
     )
-    const state = act({ rows, state: emptyState, action: Action.LeaveOut({ rowIds: ids }) }).state
+    const state = act({ rows, state: emptyState, action: { type: "leaveOut" as const, rowIds: ids } }).state
     const after = workList({ counts: count(views(state)), problemKinds, seen })
     expect(after[0]).toEqual({ kind: first.kind, left: 0, done: true })
     expect(A.reduce(after, 0, (sum, item) => sum + item.left)).toBe(count(views(state)).needs)
@@ -231,7 +236,12 @@ describe("words for a typed value", () => {
 })
 
 describe("a row already in the system", () => {
-  const stored: ReviewRow = { id: "row-900", line: 900, cells: { name: "Hex bolt M6", sku: "HB-M6" }, stored: true }
+  const stored: ReviewRow = ReviewRow.make({
+    id: "row-900",
+    line: 900,
+    cells: { name: "Hex bolt M6", sku: "HB-M6" },
+    stored: true
+  })
   const all = [...rows, stored]
   const viewsOf = (state: ReviewState) => viewRows({ rows: all, state, recheck })
 
@@ -251,9 +261,15 @@ describe("a row already in the system", () => {
   })
 
   it("cannot be left out or edited: there is nothing to decide", () => {
-    expect(act({ rows: all, state: emptyState, action: Action.LeaveOut({ rowIds: [stored.id] }) }).label).toBe("")
     expect(
-      act({ rows: all, state: emptyState, action: Action.Edit({ rowId: stored.id, column: "name", value: "X" }) }).label
+      act({ rows: all, state: emptyState, action: { type: "leaveOut" as const, rowIds: [stored.id] } }).label
+    ).toBe("")
+    expect(
+      act({
+        rows: all,
+        state: emptyState,
+        action: { type: "edit" as const, rowId: stored.id, column: "name", value: "X" }
+      }).label
     ).toBe("")
   })
 })

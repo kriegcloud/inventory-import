@@ -1,6 +1,6 @@
 import * as A from "effect/Array"
 import * as O from "effect/Option"
-import { createColumnHelper, type ReactTable } from "@tanstack/react-table"
+import { type Column, createColumnHelper, type ReactTable } from "@tanstack/react-table"
 import { ArrowDownUp, ListFilter } from "lucide-react"
 import { type ComponentType, lazy, Suspense } from "react"
 import { Code } from "@inventory/ui/Code"
@@ -12,6 +12,7 @@ import { Button } from "@inventory/ui/components/button"
 import { DataTable } from "@inventory/ui/components/data-table/data-table"
 import { DataTableCards } from "@inventory/ui/components/data-table/data-table-cards"
 import { DataTableColumnHeader } from "@inventory/ui/components/data-table/data-table-column-header"
+import { DataTableFacetedFilter } from "@inventory/ui/components/data-table/data-table-faceted-filter"
 import { createDataTableConfig } from "@inventory/ui/components/data-table/data-table-config"
 import type { DataTableFeatures } from "@inventory/ui/components/data-table/data-table-features"
 import { DataTablePagination } from "@inventory/ui/components/data-table/data-table-pagination"
@@ -160,9 +161,9 @@ const itemsTable = createDataTableConfig({ ...tableOptions, defaultSorting: [{ i
 // While searching, no order chosen means best matches first: no heading claims an order the rows do not have.
 const searchedTable = createDataTableConfig({ ...tableOptions, defaultSorting: [] })
 
-// The list filters used all day sit in the toolbar, after the search box. Every column that can be filtered, with
-// every comparison and "all of" or "any of", is in the Filter menu beside it: a search in one column (only the name,
-// only the SKU) is a text filter there.
+// The list filters used all day sit in the toolbar, after the search box (`QuickFilters`). Every column that can be
+// filtered, with every comparison and "all of" or "any of", is in the Filter menu beside it: a search in one column
+// (only the name, only the SKU) is a text filter there.
 const quickFilters = ["category", "uom"] as const
 
 const col = createColumnHelper<DataTableFeatures, StoredItem>()
@@ -239,14 +240,91 @@ const range = (
         onSome: (min) => ({ min: Math.floor(min), max: Math.ceil(O.getOrElse(found.max, () => min)) })
       })
 
-/** The pencil at the end of an item's row: the same component for as long as the table is, so no answer remounts it. */
-const EditCell = (props: { readonly row: { readonly original: StoredItem } }) => (
-  <ItemEditor item={props.row.original} trigger="icon" />
+// Every cell and heading of the table is a component made once, here: the table hands each the row or the column it
+// draws, so an answer that changes what the filters offer gives React the very same components, and it keeps what they
+// drew (an open row editor stays open when a save changes a category, a unit or a count).
+type CellProps = { readonly row: { readonly original: StoredItem } }
+
+/** A heading that sorts, and hides its column from the View menu. */
+function SortHeader<TValue>(props: { readonly column: Column<DataTableFeatures, StoredItem, TValue> }) {
+  return <DataTableColumnHeader column={props.column} />
+}
+/** The same, at the end of a column of numbers, so the label lines up with its values. */
+function SortHeaderEnd<TValue>(props: { readonly column: Column<DataTableFeatures, StoredItem, TValue> }) {
+  return <DataTableColumnHeader column={props.column} className="justify-end" />
+}
+const EditHeader = () => <span className="sr-only">Edit</span>
+
+/** The pencil at the end of an item's row. */
+const EditCell = (props: CellProps) => <ItemEditor item={props.row.original} trigger="icon" />
+// A long name ends in an ellipsis, with the whole name on hover, instead of being cut by the next column.
+const NameCell = ({ row }: CellProps) => (
+  <span className="block truncate font-semibold" title={row.original.name}>
+    {row.original.name}
+  </span>
+)
+const SkuCell = ({ row }: CellProps) => <Code>{row.original.sku}</Code>
+const UnitCostCell = ({ row }: CellProps) => (
+  <div className="text-right tabular-nums">{costOf(row.original.unitCost)}</div>
+)
+// The quantity carries its unit of measure: "3,911 BX".
+const QuantityCell = ({ row }: CellProps) => (
+  <div className="text-right tabular-nums">
+    {whole.format(row.original.quantityOnHand)} {row.original.uom}
+  </div>
+)
+const ReorderPointCell = ({ row }: CellProps) => (
+  <div className="text-right tabular-nums">
+    {O.match(row.original.reorderPoint, {
+      onNone: () => <NotSet />,
+      onSome: (point) => <>{`${whole.format(point)} ${row.original.uom}`}</>
+    })}
+  </div>
+)
+const ActiveCell = ({ row }: CellProps) => yesNo(isActive(row.original.stocking))
+const LotTrackedCell = ({ row }: CellProps) => yesNo(row.original.lotTracked)
+const TagsCell = ({ row }: CellProps) =>
+  row.original.tags.length === 0 ? (
+    <NotSet />
+  ) : (
+    <span className="block truncate" title={row.original.tags.join(", ")}>
+      {row.original.tags.join(", ")}
+    </span>
+  )
+const FirstReceivedCell = ({ row }: CellProps) =>
+  O.match(row.original.firstReceivedOn, {
+    onNone: () => <NotSet />,
+    onSome: (day) => <span className="tabular-nums">{day}</span>
+  })
+const DiscontinuedCell = ({ row }: CellProps) =>
+  O.match(discontinuedOn(row.original.stocking), {
+    onNone: () => <NotSet />,
+    onSome: (day) => <span className="tabular-nums">{day}</span>
+  })
+const DimensionsCell = ({ row }: CellProps) =>
+  O.match(row.original.dimensions, {
+    onNone: () => <NotSet />,
+    onSome: (size) => <span className="tabular-nums">{dimensionsText(size)}</span>
+  })
+// How many, and the preferred one by name; every vendor with its cost and lead time is in the editor.
+const VendorsCell = ({ row }: CellProps) => {
+  const vendors = row.original.vendors.map((vendor) => ({ name: vendor.vendorName, preferred: vendor.isPreferred }))
+  if (vendors.length === 0) return <NotSet />
+  return (
+    <span className="block truncate" title={vendors.map((vendor) => vendor.name).join(", ")}>
+      {vendorsText(vendors)}
+    </span>
+  )
+}
+const AddedCell = ({ row }: CellProps) => (
+  <span title={`${when(row.original.createdAt)} · ${row.original.createdBy}`}>
+    {day(row.original.createdAt)} · {row.original.createdBy}
+  </span>
 )
 
 /**
- * The columns of the Items table, made once for an editor or a viewer (`baseColumns`): every cell and heading is
- * the same function for as long as the page lives. What the filters offer is not in them (`withFilterValues`).
+ * The columns of the Items table for an editor or a viewer, made once when the page's code loads. What the Filter
+ * menu offers is not in them (`withFilterValues`); the two toolbar filters read theirs from an atom (`QuickFilters`).
  */
 const buildColumns = (canImport: boolean) => {
   // An editor can change an item, from the pencil at the end of its row. A changed item stays if the import
@@ -255,7 +333,7 @@ const buildColumns = (canImport: boolean) => {
     ? [
         col.display({
           id: "edit",
-          header: () => <span className="sr-only">Edit</span>,
+          header: EditHeader,
           cell: EditCell,
           meta: { label: "Edit" },
           enableHiding: false,
@@ -266,164 +344,110 @@ const buildColumns = (canImport: boolean) => {
   return col.columns([
     col.accessor("name", {
       id: "name",
-      header: ({ column }) => <DataTableColumnHeader column={column} />,
-      // A long name ends in an ellipsis, with the whole name on hover, instead of being cut by the next column.
-      cell: ({ row }) => (
-        <span className="block truncate font-semibold" title={row.original.name}>
-          {row.original.name}
-        </span>
-      ),
+      header: SortHeader,
+      cell: NameCell,
       meta: { label: labels.name },
       enableHiding: false,
       size: widths.name[0]
     }),
     col.accessor("sku", {
       id: "sku",
-      header: ({ column }) => <DataTableColumnHeader column={column} />,
-      cell: ({ row }) => <Code>{row.original.sku}</Code>,
+      header: SortHeader,
+      cell: SkuCell,
       meta: { label: labels.sku },
       size: widths.sku[0]
     }),
     col.accessor("category", {
       id: "category",
-      header: ({ column }) => <DataTableColumnHeader column={column} />,
+      header: SortHeader,
       meta: { label: labels.category },
       size: widths.category[0]
     }),
-    col.accessor("uom", {
-      id: "uom",
-      header: ({ column }) => <DataTableColumnHeader column={column} />,
-      meta: { label: labels.uom },
-      size: widths.uom[0]
-    }),
+    col.accessor("uom", { id: "uom", header: SortHeader, meta: { label: labels.uom }, size: widths.uom[0] }),
     col.accessor("unitCost", {
       id: "unitCost",
-      header: ({ column }) => <DataTableColumnHeader column={column} className="justify-end" />,
-      cell: ({ row }) => <div className="text-right tabular-nums">{costOf(row.original.unitCost)}</div>,
-      // A range in whole dollars, wide enough to hold the lowest and the highest cost there is.
+      header: SortHeaderEnd,
+      cell: UnitCostCell,
       meta: { label: labels.unitCost },
       size: widths.unitCost[0]
     }),
     col.accessor("quantityOnHand", {
       id: "quantityOnHand",
-      header: ({ column }) => <DataTableColumnHeader column={column} className="justify-end" />,
-      // The quantity carries its unit of measure: "3,911 BX".
-      cell: ({ row }) => (
-        <div className="text-right tabular-nums">
-          {whole.format(row.original.quantityOnHand)} {row.original.uom}
-        </div>
-      ),
+      header: SortHeaderEnd,
+      cell: QuantityCell,
       meta: { label: labels.quantityOnHand },
       size: widths.quantityOnHand[0]
     }),
     col.accessor("reorderPoint", {
       id: "reorderPoint",
-      header: ({ column }) => <DataTableColumnHeader column={column} className="justify-end" />,
-      cell: ({ row }) => (
-        <div className="text-right tabular-nums">
-          {O.match(row.original.reorderPoint, {
-            onNone: () => <NotSet />,
-            onSome: (point) => <>{`${whole.format(point)} ${row.original.uom}`}</>
-          })}
-        </div>
-      ),
+      header: SortHeaderEnd,
+      cell: ReorderPointCell,
       meta: { label: labels.reorderPoint },
       size: widths.reorderPoint[0]
     }),
     col.accessor((item) => isActive(item.stocking), {
       id: "isActive",
       header: labels.isActive,
-      cell: ({ row }) => yesNo(isActive(row.original.stocking)),
+      cell: ActiveCell,
       meta: { label: labels.isActive },
       size: widths.isActive[0]
     }),
     col.accessor("lotTracked", {
       id: "lotTracked",
       header: labels.lotTracked,
-      cell: ({ row }) => yesNo(row.original.lotTracked),
+      cell: LotTrackedCell,
       meta: { label: labels.lotTracked },
       size: widths.lotTracked[0]
     }),
     col.accessor((item) => item.tags.join(", "), {
       id: "tags",
       header: labels.tags,
-      cell: ({ row }) =>
-        row.original.tags.length === 0 ? (
-          <NotSet />
-        ) : (
-          <span className="block truncate" title={row.original.tags.join(", ")}>
-            {row.original.tags.join(", ")}
-          </span>
-        ),
+      cell: TagsCell,
       meta: { label: labels.tags },
       size: widths.tags[0]
     }),
     col.accessor("firstReceivedOn", {
       id: "firstReceivedOn",
-      header: ({ column }) => <DataTableColumnHeader column={column} />,
-      cell: ({ row }) =>
-        O.match(row.original.firstReceivedOn, {
-          onNone: () => <NotSet />,
-          onSome: (day) => <span className="tabular-nums">{day}</span>
-        }),
+      header: SortHeader,
+      cell: FirstReceivedCell,
       meta: { label: labels.firstReceivedOn },
       size: widths.firstReceivedOn[0]
     }),
     col.accessor((item) => O.getOrElse(discontinuedOn(item.stocking), () => ""), {
       id: "discontinuedOn",
       header: labels.discontinuedOn,
-      cell: ({ row }) =>
-        O.match(discontinuedOn(row.original.stocking), {
-          onNone: () => <NotSet />,
-          onSome: (day) => <span className="tabular-nums">{day}</span>
-        }),
+      cell: DiscontinuedCell,
       meta: { label: labels.discontinuedOn },
       size: widths.discontinuedOn[0]
     }),
     col.accessor((item) => O.match(item.dimensions, { onNone: () => "", onSome: dimensionsText }), {
       id: "dimensions",
       header: labels.dimensions,
-      cell: ({ row }) =>
-        O.match(row.original.dimensions, {
-          onNone: () => <NotSet />,
-          onSome: (size) => <span className="tabular-nums">{dimensionsText(size)}</span>
-        }),
+      cell: DimensionsCell,
       meta: { label: labels.dimensions },
       size: widths.dimensions[0]
     }),
     col.accessor((item) => item.vendors.length, {
       id: "vendors",
       header: labels.vendors,
-      // How many, and the preferred one by name; every vendor with its cost and lead time is in the editor.
-      cell: ({ row }) => {
-        const vendors = row.original.vendors.map((vendor) => ({
-          name: vendor.vendorName,
-          preferred: vendor.isPreferred
-        }))
-        if (vendors.length === 0) return <NotSet />
-        return (
-          <span className="block truncate" title={vendors.map((vendor) => vendor.name).join(", ")}>
-            {vendorsText(vendors)}
-          </span>
-        )
-      },
+      cell: VendorsCell,
       meta: { label: labels.vendors },
       size: widths.vendors[0]
     }),
     col.accessor("createdAt", {
       id: "createdAt",
-      header: ({ column }) => <DataTableColumnHeader column={column} />,
-      cell: ({ row }) => (
-        <span title={`${when(row.original.createdAt)} · ${row.original.createdBy}`}>
-          {day(row.original.createdAt)} · {row.original.createdBy}
-        </span>
-      ),
+      header: SortHeader,
+      cell: AddedCell,
       meta: { label: labels.createdAt },
       size: widths.createdAt[0]
     }),
     ...edit
   ])
 }
+
+/** The columns for an editor and for a viewer, made once: nothing in them comes from an answer. */
+const editorColumns = buildColumns(true)
+const viewerColumns = buildColumns(false)
 
 /**
  * The question the address asks the server: the page, its size, the order, the filters and the search, read the way
@@ -513,17 +537,13 @@ const flagOptions = (listed: Counted) =>
     count: entry.count
   }))
 
-/** The columns for an editor or a viewer, made once: nothing in them comes from an answer. */
-const baseColumns = perKey((canImport: boolean) => buildColumns(canImport))
-
 /**
- * The columns with what the filters offer now: the values a list filter lists and the ends of a range. The data
- * table copies a column's meta when it takes the columns, so a filter's values can reach its control only through
- * the column it is given; what stays the very same is everything a cell is drawn with. Each column here is the base
- * column with another meta: its cell, its heading and its pencil are the same functions, so React keeps what they
- * drew, and an open row editor stays open when a save changes a category, a unit or a count.
+ * The columns with what the Filter menu offers now: the values a list filter lists and the ends of a range. The data
+ * table copies a column's meta when it takes the columns (`applyColumnConfig`), so the Filter menu can read them only
+ * from the column it is given; the two toolbar filters read theirs from `quickFilterOptions` instead. Each column here
+ * is the column made once with another meta: its cell, its heading and its pencil are the same components.
  */
-const withFilterValues = (columns: ReturnType<typeof buildColumns>, found: Found): ReturnType<typeof buildColumns> => {
+const withFilterValues = (columns: typeof editorColumns, found: Found): typeof editorColumns => {
   const values: Partial<Record<string, object>> = {
     category: { options: options(found?.category) },
     uom: { options: options(found?.uom) },
@@ -536,16 +556,43 @@ const withFilterValues = (columns: ReturnType<typeof buildColumns>, found: Found
   return A.map(columns, (column) => {
     const extra = column.id === undefined ? undefined : values[column.id]
     return extra === undefined ? column : { ...column, meta: { ...column.meta, ...extra } }
-  }) as ReturnType<typeof buildColumns>
+  }) as typeof editorColumns
 }
 
 /**
- * The table's columns for an editor or a viewer, with the filters' values of the answer held: the same array while
- * the answer is, and the same cells whatever it says.
+ * The table's columns for an editor or a viewer, with the Filter menu's values of the answer held: the same array
+ * while the answer is, and the same cells whatever it says.
  */
 export const itemColumns = perKey((canImport: boolean) =>
-  Atom.readable((get) => withFilterValues(baseColumns(canImport), get(itemFacetValues)))
+  Atom.readable((get) => withFilterValues(canImport ? editorColumns : viewerColumns, get(itemFacetValues)))
 )
+
+/** What the two toolbar filters offer, Category and UoM: the organization's values with how many items have each. */
+export const quickFilterOptions = Atom.readable((get) => {
+  const found = get(itemFacetValues)
+  return { category: options(found?.category), uom: options(found?.uom) }
+})
+
+/** The page's sorting and filtering as the table reads it, for a test to put the columns through as the table does. */
+export const itemsTableConfig = itemsTable
+
+/**
+ * The list filters used all day, in the toolbar beside the menus: Category and UoM, each offering what
+ * `quickFilterOptions` holds, so a new answer reaches them without a new column.
+ */
+function QuickFilters(props: { readonly table: ReactTable<DataTableFeatures, StoredItem, unknown> }) {
+  const offered = useAtomValue(quickFilterOptions)
+  return (
+    <>
+      {A.map(quickFilters, (id) => {
+        const column = props.table.getColumn(id)
+        return column === undefined ? null : (
+          <DataTableFacetedFilter key={id} column={column} title={labels[id]} options={offered[id]} multiple />
+        )
+      })}
+    </>
+  )
+}
 
 /** What the assistant knows of the columns, built from the filters' values. */
 const itemsCatalogAtom = Atom.readable((get) => itemsCatalog(get(itemFacetValues)))
@@ -633,7 +680,7 @@ export function ItemsPage() {
   const toolbar = (
     <DataTableToolbar
       table={table}
-      quick={quickFilters}
+      quick={[]}
       search={
         <TableSearch
           table={table}
@@ -645,6 +692,7 @@ export function ItemsPage() {
         />
       }
     >
+      <QuickFilters table={table} />
       <TableMenus table={table} />
       <TableAssistant
         table={table}

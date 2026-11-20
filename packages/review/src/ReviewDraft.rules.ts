@@ -57,11 +57,8 @@ const undecided = ReviewDecision.make({})
 const keptFlag = (decision: RowDecision): boolean =>
   isKept(decision.place) || (decision.place.kind === "leftOut" && decision.place.wasKept)
 
-/**
- * True when the person left the row out. Takes the row's decision as `undefined` when it has none, not an `Option`:
- * it runs per row inside `viewRows`, where 50,000 rows must not each allocate one.
- */
-const leftOutRow = (decision: RowDecision | undefined): boolean => decision !== undefined && isLeftOut(decision.place)
+/** True when the person left the row out. */
+const leftOutRow = (decision: O.Option<RowDecision>): boolean => O.isSome(decision) && isLeftOut(decision.value.place)
 
 /** The decision with the row left out, remembering whether it had been kept. */
 const leaveOut = (decision: O.Option<RowDecision>): RowDecision =>
@@ -164,7 +161,7 @@ const untouched = new WeakMap<ReviewRow, { fixable: Fixable; view: RowView }>()
 function viewUntouched(row: ReviewRow, fixable: Fixable): RowView {
   const known = untouched.get(row)
   if (known !== undefined && known.fixable === fixable) return known.view
-  const view = build(row, undefined, () => false, undefined, fixable)
+  const view = build(row, O.none(), () => false, undefined, fixable)
   untouched.set(row, { fixable, view })
   return view
 }
@@ -177,9 +174,13 @@ const withoutFix = (problem: Problem): Problem => {
   return rest
 }
 
+/** What a row with no decision has accepted, undone and typed: nothing, the same two objects for every such row. */
+const noColumns: ReadonlyArray<string> = []
+const noEdits: Readonly<Record<string, string>> = {}
+
 function build(
   row: ReviewRow,
-  decision: RowDecision | undefined,
+  decision: O.Option<RowDecision>,
   settled: (rowId: string, column: string | undefined) => boolean,
   recheck: Recheck,
   fixable: Fixable,
@@ -188,14 +189,14 @@ function build(
   if (row.stored === true) return { row, status: "stored", cells: row.cells, marks: {} }
   const cells: Record<string, string> = { ...row.cells }
   const marks: Record<string, CellMark> = {}
-  const reverted = decision?.reverted ?? []
+  const reverted = O.isSome(decision) ? decision.value.reverted : noColumns
   // Where a fix the person undid or rejected stays rejected (`rejects`), its problem is left without the proposal:
   // the file's value stands and the row waits for a typed value.
   const gone = (fix: Fix | undefined): boolean => rejects && fix !== undefined && reverted.includes(fix.column)
   const open: Array<Problem> =
     row.problem === undefined ? [] : [gone(row.problem.fix) ? withoutFix(row.problem) : row.problem]
-  const accepted = decision?.accepted ?? []
-  const edits = decision?.edits ?? {}
+  const accepted = O.isSome(decision) ? decision.value.accepted : noColumns
+  const edits = O.isSome(decision) ? decision.value.edits : noEdits
   let auto = false
   let took = false
 
@@ -239,7 +240,7 @@ function build(
       continue
     }
     if (candidate.rivals !== undefined) {
-      if (decision !== undefined && keptFlag(decision)) continue
+      if (O.isSome(decision) && keptFlag(decision.value)) continue
       if (candidate.rivals.every((rival) => settled(rival, column))) continue
     }
     problem ??= candidate
@@ -286,7 +287,7 @@ function build(
   }
   const decided = typed
     ? "edited"
-    : decision !== undefined && keptFlag(decision)
+    : O.isSome(decision) && keptFlag(decision.value)
       ? "kept"
       : took
         ? "accepted"
@@ -315,20 +316,24 @@ export function viewRows(input: {
   const decisions = input.state.decisions
   const none = HashMap.isEmpty(decisions)
   // Read once into a record, then looked up per row: at 50,000 rows a HashMap lookup per row (twice per decision
-  // press, once in `act` and once for the screen) made a press measurably slower. Row ids are the region's own.
-  const byRow: Readonly<Record<string, RowDecision>> = Object.fromEntries(decisions)
-  const decisionOf = (rowId: string): RowDecision | undefined =>
-    Object.hasOwn(byRow, rowId) ? byRow[rowId] : undefined
+  // press, once in `act` and once for the screen) made a press measurably slower. Row ids are the region's own. Each
+  // decision is wrapped once here, so a row with none is the one shared `none` and no row allocates on its lookup.
+  const byRow: Readonly<Record<string, O.Option<RowDecision>>> = Object.fromEntries(
+    HashMap.map(decisions, (decision) => O.some(decision))
+  )
+  const noDecision = O.none<RowDecision>()
+  const decisionOf = (rowId: string): O.Option<RowDecision> =>
+    Object.hasOwn(byRow, rowId) ? byRow[rowId]! : noDecision
   // A copy is settled once it is left out, or once the person typed a new value into the cell they shared.
   const settled = (rowId: string, column: string | undefined): boolean => {
     const decision = decisionOf(rowId)
-    if (decision === undefined) return false
-    if (isLeftOut(decision.place)) return true
-    return column !== undefined && Object.hasOwn(decision.edits, column)
+    if (O.isNone(decision)) return false
+    if (isLeftOut(decision.value.place)) return true
+    return column !== undefined && Object.hasOwn(decision.value.edits, column)
   }
   return input.rows.map((row) => {
-    const decision = none ? undefined : decisionOf(row.id)
-    if (decision === undefined && (row.problem?.rivals === undefined || none)) {
+    const decision = none ? noDecision : decisionOf(row.id)
+    if (O.isNone(decision) && (row.problem?.rivals === undefined || none)) {
       return viewUntouched(row, fixable)
     }
     return build(row, decision, settled, input.recheck, fixable, input.rejects === true)

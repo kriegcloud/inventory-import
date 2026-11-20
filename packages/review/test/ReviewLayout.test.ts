@@ -10,7 +10,7 @@ import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import {
   act,
-  Action,
+  type Action,
   askFor,
   count,
   decisionsLeft,
@@ -142,8 +142,8 @@ describe("undo and redo", () => {
     ({ picks }) => {
       const state = play(picks)
       if (state.undo.length === 0) return
-      const undone = act({ rows, state, action: { type: "undo" as const }, recheck }).state
-      const redone = act({ rows, state: undone, action: { type: "redo" as const }, recheck }).state
+      const undone = act({ rows, state, action: { type: "undo" }, recheck }).state
+      const redone = act({ rows, state: undone, action: { type: "redo" }, recheck }).state
       expect(plain(redone)).toEqual(plain(state))
       expect(redone.undo.length).toBe(state.undo.length)
       expect(redone.redo?.length ?? 0).toBe(state.redo?.length ?? 0)
@@ -156,32 +156,30 @@ describe("undo and redo", () => {
     ({ picks }) => {
       const state = play(picks)
       if ((state.redo ?? []).length === 0) return
-      const redone = act({ rows, state, action: { type: "redo" as const }, recheck }).state
-      expect(plain(act({ rows, state: redone, action: { type: "undo" as const }, recheck }).state)).toEqual(
-        plain(state)
-      )
+      const redone = act({ rows, state, action: { type: "redo" }, recheck }).state
+      expect(plain(act({ rows, state: redone, action: { type: "undo" }, recheck }).state)).toEqual(plain(state))
     }
   )
 
   it.prop("any new decision empties the redo stack", { picks: S.Array(Pick).check(S.isMaxLength(15)) }, ({ picks }) => {
     const state = play(picks)
     const row = ready[0]!
-    const outcome = act({ rows, state, action: { type: "edit" as const, rowId: row.id, column: "name", value: "New" } })
+    const outcome = act({ rows, state, action: { type: "edit", rowId: row.id, column: "name", value: "New" } })
     expect(outcome.state.redo ?? []).toEqual([])
   })
 
   it("undo moves a step to redo, redo moves it back, and each says what it did", () => {
     const row = ready[0]!
-    const left = act({ rows, state: emptyState, action: { type: "leaveOut" as const, rowIds: [row.id] } })
-    const undone = act({ rows, state: left.state, action: { type: "undo" as const } })
+    const left = act({ rows, state: emptyState, action: { type: "leaveOut", rowIds: [row.id] } })
+    const undone = act({ rows, state: left.state, action: { type: "undo" } })
     expect([undone.state.undo.length, undone.state.redo.length]).toEqual([0, 1])
     expect(undone.label).toBe("Undone: 1 row left out")
-    const redone = act({ rows, state: undone.state, action: { type: "redo" as const } })
+    const redone = act({ rows, state: undone.state, action: { type: "redo" } })
     expect([redone.state.undo.length, redone.state.redo.length]).toEqual([1, 0])
     expect(redone.label).toBe("Redone: 1 row left out")
     expect(redone.focus).toEqual(O.some(row.id))
     // Nothing to redo: nothing happens.
-    expect(act({ rows, state: redone.state, action: { type: "redo" as const } }).label).toBe("")
+    expect(act({ rows, state: redone.state, action: { type: "redo" } }).label).toBe("")
   })
 })
 
@@ -197,7 +195,7 @@ describe("the work list", () => {
       A.filter(rows, (row) => row.problem?.kind === first.kind.id),
       (row) => row.id
     )
-    const state = act({ rows, state: emptyState, action: { type: "leaveOut" as const, rowIds: ids } }).state
+    const state = act({ rows, state: emptyState, action: { type: "leaveOut", rowIds: ids } }).state
     const after = workList({ counts: count(views(state)), problemKinds, seen })
     expect(after[0]).toEqual({ kind: first.kind, left: 0, done: true })
     expect(A.reduce(after, 0, (sum, item) => sum + item.left)).toBe(count(views(state)).needs)
@@ -261,14 +259,12 @@ describe("a row already in the system", () => {
   })
 
   it("cannot be left out or edited: there is nothing to decide", () => {
-    expect(
-      act({ rows: all, state: emptyState, action: { type: "leaveOut" as const, rowIds: [stored.id] } }).label
-    ).toBe("")
+    expect(act({ rows: all, state: emptyState, action: { type: "leaveOut", rowIds: [stored.id] } }).label).toBe("")
     expect(
       act({
         rows: all,
         state: emptyState,
-        action: { type: "edit" as const, rowId: stored.id, column: "name", value: "X" }
+        action: { type: "edit", rowId: stored.id, column: "name", value: "X" }
       }).label
     ).toBe("")
   })

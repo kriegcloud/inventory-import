@@ -39,12 +39,8 @@ export const problemKinds: ReadonlyArray<ProblemKind> = [
 
 const units = ["pcs", "kg", "m", "L"] as const
 
-const matched = (source: string, samples: ReadonlyArray<string>, by: "name" | "model" = "name") => ({
-  state: "matched" as const,
-  source,
-  by,
-  samples
-})
+const matched = (source: string, samples: ReadonlyArray<string>, by: "name" | "model" = "name") =>
+  ({ state: "matched", source, by, samples }) as const
 
 export const columns: ReadonlyArray<ReviewColumn> = [
   ReviewColumn.make({
@@ -123,7 +119,7 @@ export const columnsUnmatched: ReadonlyArray<ReviewColumn> = columns.map((column
     ? {
         ...column,
         match: {
-          state: "unmatched" as const,
+          state: "unmatched",
           candidates: [
             { source: "UOM", samples: ["m", "PCS", "kg"] },
             { source: "Pack", samples: ["bundle", "box 100", "spool"] }

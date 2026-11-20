@@ -8,7 +8,7 @@ import * as Effect from "effect/Effect"
 import * as R from "effect/Record"
 import { vi } from "vitest"
 import { Action, act, saved } from "@inventory/review/ReviewDraft"
-import { type DecisionDelta, decisionFromFlags } from "@inventory/catalog-contract/Decision"
+import { type DecisionDelta, type SaveRequest, decisionFromFlags } from "@inventory/catalog-contract/Decision"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import type { ImportView } from "@inventory/catalog-contract/Import"
 import { DraftEvent } from "../src/Draft.machine.ts"
@@ -49,10 +49,11 @@ const world = (id: ImportId) => {
     endpoints: {
       imports: {
         get: () => Effect.never,
-        decide: (request: { readonly payload: DecisionDelta }) => {
-          saves.push(request.payload)
+        decide: (request: { readonly payload: SaveRequest }) => {
+          const { madeOn: _madeOn, ...delta } = request.payload
+          saves.push(delta)
           revision.now += 1
-          return Effect.succeed({ revision: revision.now, changed: true })
+          return Effect.succeed({ revision: revision.now, changed: true, notApplied: [] })
         }
       }
     },

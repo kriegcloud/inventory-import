@@ -41,7 +41,7 @@ layer(TypedApp)("suggestions for an import", (it) => {
       yield* client.imports
         .decide({
           params: { id: staged.id },
-          payload: { set: { "row-7": decisionFromFlags({ accepted: ["name"] }) }, clear: [] }
+          payload: { madeOn: view.revision, set: { "row-7": decisionFromFlags({ accepted: ["name"] }) }, clear: [] }
         })
         .pipe(marcus)
       const accepted = yield* client.imports.get({ params: { id: staged.id } }).pipe(marcus)

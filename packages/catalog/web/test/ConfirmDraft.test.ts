@@ -10,7 +10,12 @@ import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
 import { vi } from "vitest"
-import { type ConfirmRequest, type DecisionDelta, decisionFromFlags } from "@inventory/catalog-contract/Decision"
+import {
+  type ConfirmRequest,
+  type DecisionDelta,
+  decisionFromFlags,
+  type SaveRequest
+} from "@inventory/catalog-contract/Decision"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import type { ImportView } from "@inventory/catalog-contract/Import"
 import { DraftMoved } from "@inventory/catalog-contract/ImportRejection"
@@ -52,6 +57,13 @@ vi.mock("sonner", () => ({
   })
 }))
 
+/** What the server answers a save with. */
+type Saved = {
+  readonly revision: number
+  readonly changed: boolean
+  readonly notApplied: ReadonlyArray<{ readonly rowId: string; readonly field: string }>
+}
+
 const settle = Effect.sleep("15 millis")
 const out = decisionFromFlags({ out: true })
 const kept = decisionFromFlags({ kept: true })
@@ -64,7 +76,8 @@ const world = (id: ImportId) => {
   const gets: Array<Deferred.Deferred<ImportView>> = []
   const saves: Array<{
     readonly delta: DecisionDelta
-    readonly answer: Deferred.Deferred<{ readonly revision: number; readonly changed: boolean }>
+    readonly madeOn: number
+    readonly answer: Deferred.Deferred<Saved>
   }> = []
   const confirms: Array<{ readonly payload: ConfirmRequest; readonly answer: Deferred.Deferred<ImportView, Refusal> }> =
     []
@@ -75,9 +88,11 @@ const world = (id: ImportId) => {
         gets.push(answer)
         return Deferred.await(answer)
       },
-      decide: (request: { readonly payload: DecisionDelta }) => {
-        const answer = Deferred.makeUnsafe<{ readonly revision: number; readonly changed: boolean }>()
-        saves.push({ delta: request.payload, answer })
+      decide: (request: { readonly payload: SaveRequest }) => {
+        const answer = Deferred.makeUnsafe<Saved>()
+        // What it was made on is kept beside the rows, so a test of the rows reads the rows.
+        const { madeOn, ...delta } = request.payload
+        saves.push({ delta, madeOn, answer })
         return Deferred.await(answer)
       },
       commit: (request: { readonly payload: ConfirmRequest }) => {
@@ -121,10 +136,10 @@ describe("a confirm", () => {
       t.press()
       yield* settle
       expect([t.sent(), t.confirming()]).toEqual([[], true])
-      yield* Deferred.succeed(t.saves[0]!.answer, { revision: 11, changed: true })
+      yield* Deferred.succeed(t.saves[0]!.answer, { revision: 11, changed: true, notApplied: [] })
       yield* settle
       // Row 1 is saved; the confirm carries no row at all, only the revision the screen now holds.
-      expect(t.sent()).toEqual([{ revision: 11, set: {}, clear: [] }])
+      expect(t.sent()).toEqual([{ revision: 11, madeOn: 11, set: {}, clear: [] }])
       expect(t.saves.length).toBe(1)
     })
   )
@@ -140,7 +155,7 @@ describe("a confirm", () => {
         page.said.length = 0
         t.press()
         yield* settle
-        expect(t.sent()).toEqual([{ revision: 10, set: {}, clear: [] }])
+        expect(t.sent()).toEqual([{ revision: 10, madeOn: 10, set: {}, clear: [] }])
         const asked = t.gets.length
         yield* Deferred.fail(
           t.confirms[0]!.answer,
@@ -178,7 +193,7 @@ describe("a confirm", () => {
       yield* settle
       t.decide("row-1")
       yield* settle
-      yield* Deferred.succeed(t.saves[0]!.answer, { revision: 11, changed: true })
+      yield* Deferred.succeed(t.saves[0]!.answer, { revision: 11, changed: true, notApplied: [] })
       yield* settle
       page.said.length = 0
       page.went.length = 0

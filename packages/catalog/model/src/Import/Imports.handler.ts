@@ -21,7 +21,15 @@ import { ItemsOfRow } from "../Review/ItemsOfRow.context.ts"
 import { Member } from "@inventory/kernel/Member"
 import { StagedTable, StagedHead, Field, fieldLabels } from "@inventory/catalog-contract/Staged"
 import { MappingChoice } from "@inventory/catalog-contract/Mapping"
-import { SavedDecisions, rowId, DecisionDelta, ConfirmRequest, RowDecision } from "@inventory/catalog-contract/Decision"
+import {
+  SavedDecisions,
+  rowId,
+  DecisionDelta,
+  ConfirmRequest,
+  RowDecision,
+  SaveRequest,
+  type StaleAccept
+} from "@inventory/catalog-contract/Decision"
 import {
   review,
   carryDecisions,
@@ -35,6 +43,7 @@ import { ImportView, openImportsShown, pastImportsShown } from "@inventory/catal
 import {
   ImportNotFound,
   UploadNotFound,
+  AcceptsTakenBack,
   AlreadyImported,
   DraftMoved,
   ImportKept,
@@ -47,6 +56,33 @@ import { fileProblem } from "@inventory/catalog-contract/FileProblem"
 import { ImportId, ConfirmId } from "@inventory/catalog-contract/Ids"
 import * as S from "effect/Schema"
 import { stagingProblem } from "../Staging/Staging.rules.ts"
+
+/**
+ * Decisions as they may be applied: an accept of a proposal for a field whose column was matched again after the
+ * revision the decisions were made on (`madeOn`) is taken out, and named. The person accepted what the field read
+ * before the match; the row now has another proposal, or none.
+ *
+ * @example withoutStaleAccepts({ choices: [{ field: "unitCost", column: 7, by: "person", at: 12 }], madeOn: 11, set })
+ * // an accept of unitCost in `set` is in `notApplied`; made on revision 12 or later it is applied
+ */
+export const withoutStaleAccepts = (input: {
+  readonly choices: ReadonlyArray<MappingChoice>
+  readonly madeOn: number
+  readonly set: SavedDecisions
+}): { readonly applied: SavedDecisions; readonly notApplied: ReadonlyArray<StaleAccept> } => {
+  const rematched = A.map(
+    A.filter(input.choices, (choice) => choice.at > input.madeOn),
+    (choice): string => choice.field
+  )
+  if (!A.isReadonlyArrayNonEmpty(rematched)) return { applied: input.set, notApplied: [] }
+  const stale = (field: string): boolean => A.contains(rematched, field)
+  return {
+    applied: R.map(input.set, (decision) => ({ ...decision, accepted: A.filter(decision.accepted, (f) => !stale(f)) })),
+    notApplied: A.flatMap(R.toEntries(input.set), ([id, decision]) =>
+      A.map(A.filter(decision.accepted, stale), (field) => ({ rowId: id, field }))
+    )
+  }
+}
 
 /**
  * A draft's stored decisions with one person's unsaved ones laid over them, as the confirm will store them: a row
@@ -358,7 +394,8 @@ export const importsEndpoints = Effect.gen(function* () {
       }
       const next: ReadonlyArray<MappingChoice> = [
         ...A.filter(before, (choice) => choice.field !== payload.field),
-        { field: payload.field, column: asked, by: "person" }
+        // From the next revision on: a decision made on this one or an earlier one was made before the match.
+        { field: payload.field, column: asked, by: "person", at: draft.revision + 1 }
       ]
       // This field will read another column: an accept of a proposal about it goes.
       yield* dropAccepts(actor, draft, (proposal) => proposal.field === payload.field)
@@ -427,13 +464,16 @@ export const importsEndpoints = Effect.gen(function* () {
       payload
     }: {
       readonly params: { readonly id: ImportId }
-      readonly payload: DecisionDelta
+      readonly payload: SaveRequest
     }) {
       const actor = yield* requireRole("editor")
       const draft = yield* find(actor, params.id)
-      const saved = yield* imports.decide(actor, draft, payload)
+      // An accept made before its field's column was matched again is not applied; the rest of the row's decision is.
+      const choices = yield* imports.choices(draft)
+      const { applied, notApplied } = withoutStaleAccepts({ choices, madeOn: payload.madeOn, set: payload.set })
+      const saved = yield* imports.decide(actor, draft, { set: applied, clear: payload.clear })
       if (O.isNone(saved)) return yield* closed(draft)
-      return saved.value
+      return { ...saved.value, notApplied }
     }),
     commit: Effect.fn("imports.commit")(function* ({
       params,
@@ -448,6 +488,17 @@ export const importsEndpoints = Effect.gen(function* () {
       // Somebody has changed the draft since the picture this confirm was made on: nothing is written, and the
       // person is shown the newer picture before they confirm. The store checks the same again inside its write.
       if (draft.revision !== payload.revision) return yield* moved(draft.revision)
+      // An accept among the decisions it carries, made before its field's column was matched again, is for a proposal
+      // the row no longer has: confirming would write another thing than the screen shows. Nothing is written.
+      const choices = yield* imports.choices(draft)
+      const stale = withoutStaleAccepts({ choices, madeOn: payload.madeOn, set: payload.set }).notApplied
+      if (A.isReadonlyArrayNonEmpty(stale)) {
+        return yield* AcceptsTakenBack.make({
+          reason:
+            "A column was matched again after you accepted a proposal for it. Nothing was imported: look at the rows it changed, then confirm again.",
+          accepts: stale
+        })
+      }
       // Decisions made a moment before the confirm, not saved yet, are the person's own: the review counts them, and
       // the store saves them in the confirm's own write.
       const unsaved: DecisionDelta = { set: payload.set, clear: payload.clear }

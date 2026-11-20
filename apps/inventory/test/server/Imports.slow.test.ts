@@ -46,6 +46,7 @@ layer(TypedApp)("an import of items", (it) => {
         const decisions = {
           params: { id: staged.id },
           payload: {
+            madeOn: staged.revision,
             set: {
               "row-55": decisionFromFlags({ accepted: ["unitCost"] }),
               "row-18": decisionFromFlags({ reverted: ["uom"] })
@@ -55,11 +56,14 @@ layer(TypedApp)("an import of items", (it) => {
         }
         const saved = yield* client.imports.decide(decisions).pipe(marcus)
         // The answer says this save moved the draft by one; the same save sent again changes nothing and says so.
-        expect(saved).toEqual({ revision: staged.revision + 1, changed: true })
+        expect(saved).toEqual({ revision: staged.revision + 1, changed: true, notApplied: [] })
         const savedAgain = yield* client.imports.decide(decisions).pipe(marcus)
-        expect(savedAgain).toEqual({ revision: saved.revision, changed: false })
+        expect(savedAgain).toEqual({ revision: saved.revision, changed: false, notApplied: [] })
         const confirmed = yield* client.imports
-          .commit({ params: { id: staged.id }, payload: { revision: saved.revision, set: {}, clear: [] } })
+          .commit({
+            params: { id: staged.id },
+            payload: { revision: saved.revision, madeOn: saved.revision, set: {}, clear: [] }
+          })
           .pipe(marcus)
         const result = O.getOrThrow(confirmed.result)
         expect([result.created, result.updated, result.already, result.notImported]).toEqual([155, 0, 0, 45])
@@ -127,7 +131,10 @@ layer(TypedApp)("an import of items", (it) => {
         const again = yield* upload({ client, table }).pipe(marcus)
         expect(again.progress).toMatchObject({ ready: 1, needs: 45 })
         const second = yield* client.imports
-          .commit({ params: { id: again.id }, payload: { revision: again.revision, set: {}, clear: [] } })
+          .commit({
+            params: { id: again.id },
+            payload: { revision: again.revision, madeOn: again.revision, set: {}, clear: [] }
+          })
           .pipe(marcus)
         expect([
           O.getOrUndefined(second.result)?.created,
@@ -142,7 +149,10 @@ layer(TypedApp)("an import of items", (it) => {
         )
         const first = yield* upload({ client, table: yield* stage(new File([clean], "items_clean.csv")) }).pipe(marcus)
         yield* client.imports
-          .commit({ params: { id: first.id }, payload: { revision: first.revision, set: {}, clear: [] } })
+          .commit({
+            params: { id: first.id },
+            payload: { revision: first.revision, madeOn: first.revision, set: {}, clear: [] }
+          })
           .pipe(marcus)
         const third = yield* upload({ client, table: changed }).pipe(marcus)
         expect([third.progress.decision, third.storedItems.length]).toEqual([1, 25])
@@ -151,6 +161,7 @@ layer(TypedApp)("an import of items", (it) => {
             params: { id: third.id },
             payload: {
               revision: third.revision,
+              madeOn: third.revision,
               set: { "row-2": decisionFromFlags({ stored: "replace" }) },
               clear: []
             }

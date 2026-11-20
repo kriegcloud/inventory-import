@@ -297,9 +297,48 @@ export const DecisionDelta = S.Struct({
 /** The decoded value of `DecisionDelta`: what changed in the draft since the last save. */
 export type DecisionDelta = typeof DecisionDelta.Type
 
+const madeOn = S.Int.annotate({
+  description:
+    "The draft's revision the screen held when the earliest of these decisions was made (`ImportView.revision` as it was read then)",
+  examples: [11]
+}).annotateKey({
+  description:
+    "The revision of the draft these decisions were made on. An accept of a proposal for a field whose column was matched again after that revision is not applied: the person accepted what the field read before",
+  messageMissingKey:
+    "Send `madeOn`: the import's revision as the screen held it when the first of these rows was decided."
+})
+
+/**
+ * An accept the server did not apply: the field's column was matched again after the decision was made, so the
+ * proposal the person accepted is no longer the one the row has.
+ */
+export const StaleAccept = S.Struct({
+  rowId: S.String.annotateKey({ description: "The row (`row-7`)" }),
+  field: S.String.annotateKey({ description: "The field whose proposal was accepted (`unitCost`)" })
+}).annotate({
+  identifier: "StaleAccept",
+  description: "An accept made before its field's column was matched again: not applied"
+})
+/** The decoded value of `StaleAccept`. */
+export type StaleAccept = typeof StaleAccept.Type
+
+/**
+ * What a save sends: the decisions made since the last save, and the revision of the draft they were made on. The
+ * difference only, so two screens deciding different rows do not collide; and what they were made on, so an accept
+ * made before its field's column was matched again is not applied.
+ */
+export const SaveRequest = S.Struct({ madeOn, ...DecisionDelta.fields }).annotate({
+  identifier: "SaveRequest",
+  description:
+    "A save of decisions: the revision of the draft they were made on, the rows whose decision is new or different, and the rows whose decision was taken back"
+})
+/** The decoded value of `SaveRequest`. */
+export type SaveRequest = typeof SaveRequest.Type
+
 /**
  * What a confirm sends: the revision of the draft its screen shows, and the person's own decisions that screen
- * holds and the server has not been sent yet. Never anybody else's decision, and never one the screen did not show.
+ * holds and the server has not been sent yet, with the revision those were made on. Never anybody else's decision,
+ * and never one the screen did not show.
  */
 export const ConfirmRequest = S.Struct({
   revision: S.Int.annotate({
@@ -311,6 +350,7 @@ export const ConfirmRequest = S.Struct({
       "The revision of the draft the screen shows. The confirm is written only while the stored draft is still at this revision",
     messageMissingKey: "Send `revision`: the import's revision as this screen last read it."
   }),
+  madeOn,
   ...DecisionDelta.fields
 }).annotate({
   identifier: "ConfirmRequest",

@@ -720,3 +720,45 @@ is asked for, the review is drawn again from it with its totals, and a line abov
 how many rows were decided elsewhere, until the person confirms again. Reverse: the `revision` field and the
 `DraftMoved` error in the contract, the `revision = expected` condition in `insertBatch`, and `ConfirmPressed` in
 the machine.
+
+### 2026-11-20 — atoms, rows that wait unsaved when the page is reloaded
+
+A save that failed left its rows on the screen and in memory only; a reload dropped them, and the browser's kept
+copy of the review was thrown away because it differed from the server's. Question: a save failed, rows wait
+unsaved, and the person reloads: what becomes of them? Options: "Keep them and send them (Recommended)"; "Warn before
+leaving only"; "Drop them and say which". Answer: "Keep them and send them". I chose; the agent recommended the same.
+Built: the rows the server has not taken (the save that is out, and what waits behind it) are kept in the browser per
+person and import, through `Atom.kvs` like the saved progress (`waitingKept` in `ReviewDraft.atoms.ts`, written after
+every event of the draft). When the step is drawn they come back as the person's waiting rows (`Opened { kept }` in
+`Draft.machine.ts`), over whatever the server holds, are said as not saved yet above the review, and are sent again
+when the import's picture arrives, made on the revision they were made on. The browser asks before the page is left
+while rows wait. This replaces the rule that the kept copy is used only while it ends at the server's decisions: the
+server's picture is followed, and the waiting rows go over it. Reverse: the `kept` of `Opened`, and `waitingKept`.
+
+### 2026-11-20 — atoms, rows that wait unsaved when somebody else confirms the import
+
+Rows that waited after a failed save outlived a confirm made by somebody else: the result said nothing of them, and
+they were sent with the next decision when the import was opened again. Question: rows wait unsaved and someone else
+confirms the import: what becomes of them? Options: "Name the rows, then drop them (Recommended)"; "Drop them without
+a word". Answer: "Name the rows, then drop them". I chose; the agent recommended the same. Built: the import's status
+reaches the machine with every picture (`ViewArrived { open }`); a picture of an import that can no longer be decided
+ends the draft, nothing more is sent to it, and the person's rows the confirmed import does not already say are kept
+aside (`leftOver`). The result names each, with what the person had decided ("Row 55: you left out"), and they are
+kept in the browser only until that screen has been left. A row the server refused while the import was still open
+is set aside the same way and let go when the person decides again. Reverse: `closing` in the machine and the alert
+on the Result step.
+
+### 2026-11-20 — atoms, an accept that waits while its field's column is matched again
+
+An accept that was unsent or on its way when its field's column was matched again stayed over the match's view and
+was sent afterwards, for a proposal the person had not seen; the server takes stored accepts back at a match for
+exactly this reason. Question: what happens to that accept? Options: "Server refuses, screen says so (Recommended)";
+"Screen drops it only"; "As today". Answer: "Server refuses, screen says so". I chose; the agent recommended the
+same. Built, with the revision at Confirm and the no-change answer as one shape: a save names the revision of the
+draft its decisions were made on (`madeOn`, one field in) and its answer names the accepts it did not apply
+(`notApplied`, one list out); a confirm names the revision it confirms and, for the rows it carries, the same
+`madeOn`, and is refused whole with `AcceptsTakenBack` when one of them is such an accept. Each column choice records
+the first revision that has it (`MappingChoice.at`), so the server can tell without a history of matches. The screen
+takes the accepts out of the rows, draws the review again with their proposals open, and says which were taken back;
+a match made on this screen is not announced as a change on another screen. Reverse: `madeOn`, `notApplied`, `at`,
+and `withoutStaleAccepts`.

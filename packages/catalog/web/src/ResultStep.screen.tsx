@@ -1,4 +1,7 @@
-import { useAtom, useAtomSet, useAtomValue } from "@effect/atom-react"
+import { useAtom, useAtomMount, useAtomSet, useAtomValue } from "@effect/atom-react"
+import * as R from "effect/Record"
+import { followDraft, namingLeftOver, rowsLeftOver } from "./ReviewDraft.atoms.ts"
+import { leftOverLines } from "./internal/leftOver.ts"
 import * as A from "effect/Array"
 import * as Cause from "effect/Cause"
 import * as Exit from "effect/Exit"
@@ -208,6 +211,12 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
     ["all", importWords.all, result.rows.length]
   ]
 
+  // The draft is followed here too: rows this browser kept, waiting, for an import somebody else then confirmed are
+  // found by it, named below, and let go when this screen leaves.
+  useAtomMount(followDraft(view.id))
+  useAtomMount(namingLeftOver(view.id))
+  const leftOver = useAtomValue(rowsLeftOver(view.id))
+
   const { removable, restorable, changed, changedCount, kept, keptCount, confirms } = view.takeBack
   const takenBack = view.status === "takenBack"
   const lastTakeBack = O.getOrUndefined(A.findLast(view.history, ImportEvent.guards.TakenBack))
@@ -324,6 +333,33 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
           )
         }
       />
+      {O.match(leftOver, {
+        onNone: () => null,
+        onSome: (rows) => (
+          <div className="px-4 pb-3 sm:px-9">
+            <Alert role="alert">
+              <AlertTitle>
+                {R.keys(rows).length === 1
+                  ? "1 decision of yours was not part of this import"
+                  : `${R.keys(rows).length} decisions of yours were not part of this import`}
+              </AlertTitle>
+              <AlertDescription>
+                <p>
+                  The import was confirmed before {R.keys(rows).length === 1 ? "it was" : "they were"} saved, so the
+                  rows were imported as the review stood without {R.keys(rows).length === 1 ? "it" : "them"}:
+                </p>
+                <ul className="list-disc pl-4">
+                  {A.map(leftOverLines(rows), (line) => (
+                    <li key={line.id}>
+                      {line.row}: you {line.decided}
+                    </li>
+                  ))}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          </div>
+        )
+      })}
       {changedCount > 0 && !takenBack ? (
         <div className="px-4 pb-3 sm:px-9">
           <Alert>

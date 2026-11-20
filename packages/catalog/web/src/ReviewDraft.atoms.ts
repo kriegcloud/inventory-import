@@ -10,7 +10,7 @@ import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import { toast } from "sonner"
 import { invalidate, perKey } from "@inventory/client/Api"
 import { member } from "@inventory/client/MemberAtoms"
-import { isTransient, toastError } from "@inventory/client/SayError"
+import { isTransient, sayError, toastError } from "@inventory/client/SayError"
 import type { SavedDecisions } from "@inventory/catalog-contract/Decision"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import type { ImportView, SuggestOutcome } from "@inventory/catalog-contract/Import"
@@ -19,7 +19,13 @@ import type { ReviewState } from "@inventory/review/ReviewTypes"
 import { restoredReview, storedReview } from "@inventory/review/SavedProgress"
 import { dropFile, progressOf, progressWith } from "@inventory/review/SavedProgressHook"
 import { navigate } from "@inventory/ui/Route"
-import { DraftMoved } from "@inventory/catalog-contract/ImportRejection"
+import { AcceptsTakenBack, DraftMoved } from "@inventory/catalog-contract/ImportRejection"
+import { RowDecision } from "@inventory/catalog-contract/Decision"
+import { fieldLabels } from "@inventory/catalog-contract/Staged"
+import { kept } from "@inventory/review/Kept"
+import { progressKey } from "@inventory/review/SavedProgress"
+import * as A from "effect/Array"
+import * as Str from "effect/String"
 import * as Effect from "effect/Effect"
 import * as S from "effect/Schema"
 import type { review } from "@inventory/catalog-model/Review"
@@ -27,7 +33,17 @@ import { call, callWrite, catalogRuntime } from "./Catalog.runtime.ts"
 import { catalogKeys } from "./Catalog.keys.ts"
 import { importAddress } from "./internal/route.ts"
 import { draftOf } from "./Draft.atoms.ts"
-import { changesBetween, DraftEffect, DraftEvent, type RowChanges, shown, step } from "./Draft.machine.ts"
+import {
+  changesBetween,
+  DraftEffect,
+  DraftEvent,
+  type RowChanges,
+  Said,
+  shown,
+  type StaleAccept,
+  step,
+  waiting
+} from "./Draft.machine.ts"
 import { toRegionDecisions, toServerDecisions } from "./ImportReview.controller.ts"
 import { changeView, importTable, importView, importViewShown, putConfirmed, viewWith } from "./Imports.atoms.ts"
 
@@ -96,8 +112,46 @@ const isLocal = DraftEffect.$match({
   Restart: () => true,
   Send: () => false,
   Ask: () => false,
-  Confirm: () => false
+  Confirm: () => false,
+  Say: () => false
 })
+
+/** A row as the person knows it: "row 55". */
+const rowWords = (rowId: string): string => Str.replace("-", " ")(rowId)
+
+/** The accepts the server did not apply, in a sentence: "Unit cost on row 55; Name on row 7". */
+const acceptsWords = (accepts: ReadonlyArray<StaleAccept>): string =>
+  A.join(
+    A.map(
+      accepts,
+      (accept) =>
+        `${O.getOrElse(R.get<string, string>(fieldLabels, accept.field), () => accept.field)} on ${rowWords(accept.rowId)}`
+    ),
+    "; "
+  )
+
+/**
+ * What this browser keeps of one import's waiting rows for the person signed in: the rows the server has not taken,
+ * so a reload does not lose them. None while nothing waits.
+ */
+const KeptWaiting = S.OptionFromNullOr(
+  S.Struct({ madeOn: S.Int, leftOver: S.Boolean, rows: S.Record(S.String, S.OptionFromNullOr(RowDecision)) })
+)
+const noneKept = Atom.writable(
+  (): typeof KeptWaiting.Type => O.none(),
+  () => undefined
+)
+const waitingAt = Atom.family((key: string) =>
+  kept({ key, schema: KeptWaiting, defaultValue: (): typeof KeptWaiting.Type => O.none() })
+)
+const waitingKept = (registry: AtomRegistry.AtomRegistry, id: ImportId) =>
+  O.match(registry.get(member), {
+    onNone: () => noneKept,
+    onSome: (actor) =>
+      waitingAt(
+        progressKey({ organizationId: actor.organizationId, memberId: actor.id, screen: `import:${id}:waiting` })
+      )
+  })
 
 /** The scope this browser keeps one import's review under, for the person signed in; none while nobody is. */
 const scopeFor = (signedIn: O.Option<{ readonly organizationId: string; readonly id: string }>, id: ImportId) =>
@@ -126,22 +180,37 @@ const perform = (input: {
     // still fails the rows stay on screen and wait for "Save again": they are the person's work. A refusal (the
     // import was confirmed or removed meanwhile, the role was taken away) puts the screen back to what the server
     // holds, and the toast says why.
-    Send: ({ delta }) =>
-      void callWrite((api) => api.imports.decide({ params: { id }, payload: delta })).then(
-        ({ changed, revision }) => happened(DraftEvent.SaveAnswered({ revision, changed })),
-        (error: unknown) => {
-          if (isTransient(error)) {
-            happened(DraftEvent.SaveFailed())
-            toastError(error, {
-              lead: "Your last decision is on this screen but not saved yet.",
-              action: { label: "Save again", onClick: () => happened(DraftEvent.SaveAgain()) }
-            })
-          } else {
-            toastError(error, { lead: "Your last decision was not saved, so the review shows what was saved." })
-            happened(DraftEvent.SaveRefused())
-          }
-        }
+    Send: ({ delta, madeOn }) =>
+      void callWrite((api) => api.imports.decide({ params: { id }, payload: { madeOn, ...delta } })).then(
+        ({ changed, notApplied, revision }) => happened(DraftEvent.SaveAnswered({ revision, changed, notApplied })),
+        (error: unknown) =>
+          happened(
+            isTransient(error) ? DraftEvent.SaveFailed() : DraftEvent.SaveRefused({ reason: sayError(error).sentence })
+          )
       ),
+    // Said only when the machine says so: an answer it no longer waits for is not told to anybody.
+    Say: ({ what }) =>
+      Said.$match(what, {
+        // The rows stay on screen and are kept in this browser: they are sent again when the server answers again,
+        // or now. Never "reload the page": a reload sends them too, but there is nothing to gain by it.
+        NotSaved: () =>
+          void toast.error("Not saved yet", {
+            description:
+              "Your last decision is on this screen, and the server did not take it. It is sent again when the server answers; nothing is lost.",
+            action: { label: "Save again", onClick: () => happened(DraftEvent.SaveAgain()) }
+          }),
+        Refused: ({ reason }) =>
+          void toast.error("Your last decision was not saved", {
+            description: `${reason} The review shows what was saved.`
+          }),
+        AcceptsTakenBack: ({ accepts }) =>
+          void toast.error(
+            accepts.length === 1 ? "An accept was taken back" : `${accepts.length} accepts were taken back`,
+            {
+              description: `The column was matched again after you accepted: ${acceptsWords(accepts)}. Each row shows its proposal again.`
+            }
+          )
+      }),
     Ask: () => registry.refresh(importView(id)),
     // Only the decisions and the revision, and never over a later revision already held.
     Put: ({ decisions, revision }) =>
@@ -158,8 +227,8 @@ const perform = (input: {
     // made because the draft had moved on: the machine asks for the newer picture and the screen says so above the
     // review. Any other failure (somebody else confirmed it, the role was taken away, the network) is said, and the
     // import asked again, which moves the screen to the result where there is one.
-    Confirm: ({ delta, revision }) =>
-      void call((api) => api.imports.commit({ params: { id }, payload: { revision, ...delta } })).then(
+    Confirm: ({ delta, madeOn, revision }) =>
+      void call((api) => api.imports.commit({ params: { id }, payload: { revision, madeOn, ...delta } })).then(
         (view) => {
           const onScreen = registry.get(draftOf(id)).onScreen
           putConfirmed({ registry, view })
@@ -169,6 +238,7 @@ const perform = (input: {
         },
         (error: unknown) => {
           if (S.is(DraftMoved)(error)) return happened(DraftEvent.ConfirmMoved())
+          if (S.is(AcceptsTakenBack)(error)) return happened(DraftEvent.ConfirmStale({ accepts: error.accepts }))
           toastError(error)
           happened(DraftEvent.ConfirmFailed())
           invalidate(catalogKeys.import(id))
@@ -192,6 +262,10 @@ export const draftEvents = perKey((id: ImportId) =>
       registry.set(draftOf(id), stepped.draft)
       for (const effect of stepped.effects) if (isLocal(effect)) perform({ registry, id, effect })
     })
+    // What waits is kept in this browser as it changes, so a reload finds it; nothing waiting is no entry.
+    const waits = waiting(stepped.draft)
+    const keptAt = waitingKept(registry, id)
+    if (!Eq.equals(registry.get(keptAt), waits)) registry.set(keptAt, waits)
     for (const effect of stepped.effects) if (!isLocal(effect)) perform({ registry, id, effect })
   })
 )
@@ -213,6 +287,33 @@ export const shownDecisions = perKey((id: ImportId) =>
 /** True from the press of the confirm button until the server has answered it, or it is held back. */
 export const confirmingImport = perKey((id: ImportId) => Atom.map(draftOf(id), (draft) => draft.confirm !== "idle"))
 
+/** How many of the person's rows wait after a save that failed, for the line that says so; 0 while none do. */
+export const rowsNotSaved = perKey((id: ImportId) =>
+  Atom.map(draftOf(id), (draft) => (draft.stalled ? R.keys(draft.unsent).length : 0))
+)
+
+/**
+ * The person's rows that were not part of the confirm that closed the import (they were never saved), for the
+ * result to name: none while there are none, or while the import can still be decided.
+ */
+export const rowsLeftOver = perKey((id: ImportId) =>
+  Atom.map(draftOf(id), (draft) => (draft.ended ? draft.leftOver : O.none()))
+)
+
+/**
+ * Mounted by the screen that names the rows left over: when it leaves, they have been named, and nothing of them is
+ * kept any more.
+ */
+export const namingLeftOver = perKey((id: ImportId) =>
+  Atom.setIdleTTL(
+    Atom.readable((get) => {
+      const registry = get.registry
+      get.addFinalizer(() => registry.set(draftEvents(id), DraftEvent.LeftOverNamed()))
+    }),
+    0
+  )
+)
+
 /**
  * The last confirm was not made because the import had changed since the picture it was pressed on: how many rows
  * the newer picture decides otherwise (none where it was a match or a suggestion), until the person confirms again.
@@ -230,14 +331,24 @@ export const followDraft = perKey((id: ImportId) =>
   Atom.setIdleTTL(
     Atom.readable((get) => {
       const registry = get.registry
-      registry.set(draftEvents(id), DraftEvent.Opened())
+      // What this browser kept of the person's waiting rows (from before a reload) comes back with the step.
+      registry.set(draftEvents(id), DraftEvent.Opened({ kept: registry.get(waitingKept(registry, id)) }))
       get.addFinalizer(() => registry.set(draftEvents(id), DraftEvent.Left()))
+      // The browser asks before the page is left while rows wait: closing it now would leave them to the next visit.
+      const ask = (event: BeforeUnloadEvent) => {
+        if (O.isSome(waiting(registry.get(draftOf(id))))) event.preventDefault()
+      }
+      // (Where there is a page to leave: a test of the draft has none.)
+      if (typeof window !== "undefined") {
+        window.addEventListener("beforeunload", ask)
+        get.addFinalizer(() => window.removeEventListener("beforeunload", ask))
+      }
       get.subscribe(
         importViewShown(id),
         (result) => {
           if (!AsyncResult.isSuccess(result)) return
-          const { revision, decisions } = result.value
-          registry.set(draftEvents(id), DraftEvent.ViewArrived({ revision, decisions }))
+          const { revision, decisions, status } = result.value
+          registry.set(draftEvents(id), DraftEvent.ViewArrived({ revision, decisions, open: status === "open" }))
         },
         { immediate: true }
       )

@@ -21,6 +21,7 @@ import { perKey } from "@inventory/client/Api"
 import {
   confirmHeldBack,
   confirmingImport,
+  rowsNotSaved,
   draftEvents,
   followDraft,
   regionEpoch,
@@ -181,6 +182,7 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
   // written; the screen then takes the newer picture and says so above the review, until the person confirms again.
   const committing = useAtomValue(confirmingImport(view.id))
   const heldBack = useAtomValue(confirmHeldBack(view.id))
+  const notSaved = useAtomValue(rowsNotSaved(view.id))
   const commit = () => happened(DraftEvent.ConfirmPressed())
 
   if (O.isNone(worked) || O.isNone(recheckRead)) return <ReviewSkeleton title={`Review ${view.fileName}`} />
@@ -275,6 +277,7 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
     <>
       <ReaderWarnings table={table} />
       <NotImportedYet rows={heldBack} />
+      <NotSavedYet rows={notSaved} onSaveAgain={() => happened(DraftEvent.SaveAgain())} />
       <ReviewRegion
         key={`${view.id}:${epoch}`}
         title={`Review ${view.fileName}`}
@@ -323,6 +326,32 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
         onImport={commit}
       />
     </>
+  )
+}
+
+/**
+ * Said above the review while decisions wait after a save that failed: they are on the screen and kept in this
+ * browser, not on the server yet. It stays until they are saved; the button sends them now.
+ */
+function NotSavedYet(props: { rows: number; onSaveAgain: () => void }) {
+  const narrow = useAtomValue(isNarrow)
+  if (props.rows === 0) return null
+  return (
+    <Alert role="status" className={narrow ? "mx-4 mt-3 w-auto" : "mx-6 mt-4 w-auto"}>
+      <TriangleAlertIcon aria-hidden />
+      <AlertTitle>
+        {props.rows === 1 ? "1 decision is not saved yet" : `${props.rows} decisions are not saved yet`}
+      </AlertTitle>
+      <AlertDescription>
+        <p>
+          The server did not take {props.rows === 1 ? "it" : "them"}. {props.rows === 1 ? "It is" : "They are"} kept in
+          this browser and sent again when the server answers.
+        </p>
+        <Button variant="outline" size="xs" onClick={props.onSaveAgain}>
+          Save again
+        </Button>
+      </AlertDescription>
+    </Alert>
   )
 }
 

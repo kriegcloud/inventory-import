@@ -56,7 +56,9 @@ describe("an import, over the twins", () => {
           const items = yield* itemsEndpoints
           const open = yield* imports.open().pipe(as(marcus))
           const { id, revision } = O.getOrThrow(A.head(open.views))
-          const confirmed = yield* imports.commit({ params: { id }, payload: { ...none, revision } }).pipe(as(marcus))
+          const confirmed = yield* imports
+            .commit({ params: { id }, payload: { ...none, revision, madeOn: revision } })
+            .pipe(as(marcus))
           const result = O.getOrThrow(confirmed.result)
           expect([confirmed.status, result.created, result.updated, result.already, result.notImported]).toEqual([
             "imported",
@@ -76,7 +78,9 @@ describe("an import, over the twins", () => {
           // Another organization sees none of them.
           const got12 = yield* items.list().pipe(as(elena))
           expect(got12.length).toBe(0)
-          const again = yield* tag(imports.commit({ params: { id }, payload: { ...none, revision } }).pipe(as(marcus)))
+          const again = yield* tag(
+            imports.commit({ params: { id }, payload: { ...none, revision, madeOn: revision } }).pipe(as(marcus))
+          )
           expect(again).toBe("AlreadyImported")
           const got13 = yield* items.list().pipe(as(marcus))
           expect(got13.length).toBe(3)
@@ -156,14 +160,20 @@ describe("an import, over the twins", () => {
           const view = yield* stage(tableOf({ fileName: "five.csv", lines: fiveLines })).pipe(as(marcus))
           const params = { id: view.id }
           const set = { "row-2": decisionFromFlags({ out: true }) }
-          const first = yield* imports.decide({ params, payload: { set, clear: [] } }).pipe(as(marcus))
-          const second = yield* imports.decide({ params, payload: { set, clear: [] } }).pipe(as(marcus))
+          const first = yield* imports
+            .decide({ params, payload: { madeOn: view.revision, set, clear: [] } })
+            .pipe(as(marcus))
+          const second = yield* imports
+            .decide({ params, payload: { madeOn: view.revision, set, clear: [] } })
+            .pipe(as(marcus))
           expect(second.revision).toBe(first.revision)
           // The answer says which save moved the draft: the first did, the same one again did not.
           expect([first.changed, second.changed]).toEqual([true, false])
           const after = yield* imports.get({ params }).pipe(as(marcus))
           expect(after.progress.ready).toBe(2)
-          const cleared = yield* imports.decide({ params, payload: { set: {}, clear: ["row-2"] } }).pipe(as(marcus))
+          const cleared = yield* imports
+            .decide({ params, payload: { madeOn: view.revision, set: {}, clear: ["row-2"] } })
+            .pipe(as(marcus))
           expect(cleared.revision).toBe(first.revision + 1)
           expect(cleared.changed).toBe(true)
           // Nothing of it is in the system, so it may be removed, once.
@@ -185,12 +195,18 @@ describe("an import, over the twins", () => {
           const params = { id: view.id }
           // Dana leaves row 2 out; Marcus's screen has not shown it.
           const theirs = yield* imports
-            .decide({ params, payload: { set: { "row-2": decisionFromFlags({ out: true }) }, clear: [] } })
+            .decide({
+              params,
+              payload: { madeOn: view.revision, set: { "row-2": decisionFromFlags({ out: true }) }, clear: [] }
+            })
             .pipe(as(dana))
           const mine = { "row-3": decisionFromFlags({ out: true }) }
           const refused = yield* Effect.flip(
             imports
-              .commit({ params, payload: { revision: view.revision, set: mine, clear: ["row-2"] } })
+              .commit({
+                params,
+                payload: { revision: view.revision, madeOn: view.revision, set: mine, clear: ["row-2"] }
+              })
               .pipe(as(marcus))
           )
           expect([refused._tag, refused._tag === "DraftMoved" ? refused.revision : -1]).toEqual([
@@ -207,7 +223,7 @@ describe("an import, over the twins", () => {
           // On the picture he has now, the confirm writes: one ready row is left, hers and his are left out, and each
           // is said under the name of who left it out.
           const confirmed = yield* imports
-            .commit({ params, payload: { revision: still.revision, set: mine, clear: [] } })
+            .commit({ params, payload: { revision: still.revision, madeOn: still.revision, set: mine, clear: [] } })
             .pipe(as(marcus))
           const result = O.getOrThrow(confirmed.result)
           expect([confirmed.status, confirmed.revision, result.created, result.notImported]).toEqual([

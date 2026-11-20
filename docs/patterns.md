@@ -382,6 +382,12 @@ step (`packages/catalog/web/src/ResultStep.screen.tsx`) says what it will do and
 - **Each Confirm is a recorded batch.** One `importBatch` row per Confirm; each record it creates names it
   (`batchId`) and starts at `revision` 1. Records, outcomes, changes, the audit line and the import's status are one
   atomic batch, and every statement checks that the import is still open, so a second Confirm writes nothing.
+- **A save names what its decisions were made on.** `PUT /api/v1/imports/:id/decisions` takes `SaveRequest`: the
+  rows whose decision is new or taken back, and `madeOn`, the draft's revision the screen held when the earliest of
+  them was decided. Each column choice records the first revision that has it (`MappingChoice.at`); an accept of a
+  proposal for a field matched again after `madeOn` is not applied, the rest of the row's decision is, and the
+  answer names it in `notApplied` (`withoutStaleAccepts` in `Imports.handler.ts`). A confirm carries the same
+  `madeOn` for the rows it carries, and is refused whole (`AcceptsTakenBack`, 409) when one of them is such an accept.
 - **A Confirm names the draft it was made on.** Its payload is the revision of the draft the screen shows and the
   person's own decisions not saved yet (`ConfirmRequest`), never the screen's whole picture. The batch's first
   statement writes the confirm's row only while the import is open at that revision, and everything after it,

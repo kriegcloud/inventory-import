@@ -11,7 +11,12 @@ import * as R from "effect/Record"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
 import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import { Action, act, saved } from "@inventory/review/ReviewDraft"
-import { type DecisionDelta, decisionFromFlags, type SavedDecisions } from "@inventory/catalog-contract/Decision"
+import {
+  type DecisionDelta,
+  type SaveRequest,
+  decisionFromFlags,
+  type SavedDecisions
+} from "@inventory/catalog-contract/Decision"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import type { ImportView } from "@inventory/catalog-contract/Import"
 import type { StagedTable } from "@inventory/catalog-contract/Staged"
@@ -31,6 +36,13 @@ import {
 } from "../src/ReviewDraft.atoms.ts"
 import { importNo, registryWith, viewAt } from "./support/catalog.ts"
 
+/** What the server answers a save with. */
+type Saved = {
+  readonly revision: number
+  readonly changed: boolean
+  readonly notApplied: ReadonlyArray<{ readonly rowId: string; readonly field: string }>
+}
+
 const settle = Effect.sleep("15 millis")
 const out = decisionFromFlags({ out: true })
 const kept = decisionFromFlags({ kept: true })
@@ -43,7 +55,8 @@ const world = (id: ImportId) => {
   const gets: Array<Deferred.Deferred<ImportView>> = []
   const saves: Array<{
     readonly delta: DecisionDelta
-    readonly answer: Deferred.Deferred<{ readonly revision: number; readonly changed: boolean }, Refusal>
+    readonly madeOn: number
+    readonly answer: Deferred.Deferred<Saved, Refusal>
   }> = []
   const registry = registryWith({
     imports: {
@@ -52,9 +65,11 @@ const world = (id: ImportId) => {
         gets.push(answer)
         return Deferred.await(answer)
       },
-      decide: (request: { readonly payload: DecisionDelta }) => {
-        const answer = Deferred.makeUnsafe<{ readonly revision: number; readonly changed: boolean }, Refusal>()
-        saves.push({ delta: request.payload, answer })
+      decide: (request: { readonly payload: SaveRequest }) => {
+        const answer = Deferred.makeUnsafe<Saved, Refusal>()
+        // What it was made on is kept beside the rows, so a test of the rows reads the rows.
+        const { madeOn, ...delta } = request.payload
+        saves.push({ delta, madeOn, answer })
         return Deferred.await(answer)
       }
     }
@@ -82,7 +97,7 @@ const world = (id: ImportId) => {
     answerGet: (n: number, view: ImportView) => Deferred.succeed(gets[n]!, view),
     /** The server answers a save: at this revision, and (unless the test says otherwise) as the save that moved it. */
     answerSave: (n: number, revision: number, changed = true) =>
-      Deferred.succeed(saves[n]!.answer, { revision, changed }),
+      Deferred.succeed(saves[n]!.answer, { revision, changed, notApplied: [] }),
     refuseSave: (n: number) => Deferred.fail(saves[n]!.answer, { _tag: "AlreadyImported" } as const),
     gets: () => gets.length,
     held: () => registry.get(importView(id)).pipe(AsyncResult.value, O.getOrThrow),

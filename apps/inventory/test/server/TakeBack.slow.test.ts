@@ -27,7 +27,7 @@ layer(TypedApp)("a take-back after two confirms", (it) => {
       const staged = yield* upload({ client, table }).pipe(marcus)
       const params = { id: staged.id }
       const first = yield* client.imports
-        .commit({ params, payload: { revision: staged.revision, set: {}, clear: [] } })
+        .commit({ params, payload: { revision: staged.revision, madeOn: staged.revision, set: {}, clear: [] } })
         .pipe(marcus)
       expect(O.getOrUndefined(first.result)?.created).toBe(155)
       // Listed among the past imports at once, its items counted from what is stored.
@@ -42,6 +42,7 @@ layer(TypedApp)("a take-back after two confirms", (it) => {
           params,
           payload: {
             revision: reopened.revision,
+            madeOn: reopened.revision,
             set: { "row-55": decisionFromFlags({ accepted: ["unitCost"] }) },
             clear: []
           }
@@ -88,7 +89,10 @@ const replaceRow2 = Effect.fn("test.replaceRow2")(function* () {
   const marcus = as("mem_marcus")
   const first = yield* upload({ client, table: yield* stage(new File([clean], "items_clean.csv")) }).pipe(marcus)
   yield* client.imports
-    .commit({ params: { id: first.id }, payload: { revision: first.revision, set: {}, clear: [] } })
+    .commit({
+      params: { id: first.id },
+      payload: { revision: first.revision, madeOn: first.revision, set: {}, clear: [] }
+    })
     .pipe(marcus)
   const copy = Str.replace(
     "SHH-9574,Oak Foam Insert,Oak foam insert for general use.,packaging,EA,12.33,",
@@ -101,6 +105,7 @@ const replaceRow2 = Effect.fn("test.replaceRow2")(function* () {
       params: { id: second.id },
       payload: {
         revision: second.revision,
+        madeOn: second.revision,
         set: { "row-2": decisionFromFlags({ stored: "replace" }) },
         clear: []
       }

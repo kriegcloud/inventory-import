@@ -2,6 +2,7 @@
 // a file column no field reads.
 import * as O from "effect/Option"
 import * as Tuple from "effect/Tuple"
+import * as Effect from "effect/Effect"
 import * as S from "effect/Schema"
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import { Field, StagedColumn } from "../Staging/Staged.read.ts"
@@ -13,7 +14,11 @@ export const MappingChoice = S.Struct({
   column: S.NullOr(S.Int).annotateKey({
     description: "The file column's position, from 0; null for none, on purpose"
   }),
-  by: S.Literals(["person"]).annotateKey({ description: "Who chose it: always a person" })
+  by: S.Literals(["person"]).annotateKey({ description: "Who chose it: always a person" }),
+  at: S.Int.pipe(S.withDecodingDefaultKey(Effect.succeed(0))).annotateKey({
+    description:
+      "The first revision of the draft that has this choice: a decision made on an earlier revision was made before the field read this column, so an accept of the field's proposal in it is not applied"
+  })
 }).annotate({
   identifier: "MappingChoice",
   description: "A column the person chose for a field; column null means none, on purpose"

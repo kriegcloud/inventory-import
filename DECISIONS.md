@@ -84,6 +84,9 @@ means I chose and the agent recommended the same.
 | A model's name guess the guard rates low | Typed by the person, the guess offered beside the box; one press | the agent's default after the hour | "the app never invents a value" |
 | What "Why flagged?" asks about | The rows on screen (view, kind, search); rows ticked one by one | the agent's default after the hour: it needs no new control | the standard's "the answer names them" |
 | A .txt file | A table only when most rows have as many cells as the heading; any text with commas | the agent's default after the hour | a letter read as two columns |
+| A save failed, rows wait unsaved, and the person reloads | Keep them and send them; warn before leaving only; drop them and say which | same, 2026-11-20 | row 130 left out with the network down: the browser asked before the reload, the row came back "not saved yet", and was sent when the network returned |
+| Rows wait unsaved and someone else confirms the import | Name the rows, then drop them; drop them without a word | same, 2026-11-20 | rows 55 and 191 left out and waiting, the import confirmed in another browser: the result says "Row 55: you left out", "Row 191: you left out" |
+| An accept waits while its field's column is matched again | Server refuses, screen says so; screen drops it only; as today | same, 2026-11-20 | Unit cost matched again from another screen, then rows 55 and 191 accepted: "2 accepts were taken back", both rows still open |
 | Confirm, when someone else decided a row this screen has not shown | Refuse, show, confirm again; their decision stands; your screen wins | same, 2026-11-19 | two tabs on items_clean.csv: row 3 left out in one, "Import 25 items" in the other imports nothing, shows 24 and asks again |
 
 **Reference ledger.** My own app stockroom (MIT): `src/domain/Prep.ts`, functions taken and rewritten (`inspect`,

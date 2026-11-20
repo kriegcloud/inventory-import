@@ -50,6 +50,13 @@ export const importNo = (n: number): ImportId =>
 
 /** An import's view with the fields the draft rules read; the rest is never looked at. */
 export const viewAt = (parts: Partial<ImportView> & { readonly revision: number }): ImportView => {
-  const view: Record<string, unknown> = { id: importId, decisions: {}, suggestions: [], choices: [], ...parts }
+  const view: Record<string, unknown> = {
+    id: importId,
+    status: "open",
+    decisions: {},
+    suggestions: [],
+    choices: [],
+    ...parts
+  }
   return view as unknown as ImportView
 }

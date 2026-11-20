@@ -1,6 +1,7 @@
 // Why a request about an import or an upload is refused, each with a sentence for the person.
 import * as S from "effect/Schema"
 import { reasonForPerson } from "../internal/Described.ts"
+import { StaleAccept } from "./Decision.command.ts"
 
 /** The import id in the address matches nothing in the caller's organization. */
 export class ImportNotFound extends S.TaggedError<ImportNotFound, { readonly brand: unique symbol }>()(
@@ -41,6 +42,27 @@ export class DraftMoved extends S.TaggedError<DraftMoved, { readonly brand: uniq
   {
     description:
       "The confirm named an older revision of the draft than the one stored: somebody changed the import since this screen read it. Nothing was written",
+    httpApiStatus: 409
+  }
+) {}
+
+/**
+ * The confirm carried an accept made before its field's column was matched again: the proposal the person accepted
+ * is no longer the one the row has, so confirming would import a row the screen does not show as it would be
+ * written. Nothing was written. `accepts` names each such accept; the screen takes them back, shows the rows with
+ * their proposals open, and the person confirms again.
+ */
+export class AcceptsTakenBack extends S.TaggedError<AcceptsTakenBack, { readonly brand: unique symbol }>()(
+  "AcceptsTakenBack",
+  {
+    reason: reasonForPerson,
+    accepts: S.Array(StaleAccept).annotateKey({
+      description: "The accepts that were not applied, each by row and field"
+    })
+  },
+  {
+    description:
+      "The confirm carried accepts made before their field's column was matched again. Nothing was written; `accepts` names them",
     httpApiStatus: 409
   }
 ) {}

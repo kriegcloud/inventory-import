@@ -8,6 +8,7 @@ import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
+import * as Str from "effect/String"
 import * as Atom from "effect/reactivity/Atom"
 import { vi } from "vitest"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
@@ -15,7 +16,7 @@ import { Member } from "@inventory/kernel/Member"
 import { DisplayName } from "@inventory/kernel/Text"
 import { Action, act, saved } from "@inventory/review/ReviewDraft"
 import type { ReviewState } from "@inventory/review/ReviewTypes"
-import { decisionFromFlags, type SavedDecisions } from "@inventory/catalog-contract/Decision"
+import { decisionFromFlags, type SavedDecisions, type SaveRequest } from "@inventory/catalog-contract/Decision"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import type { ImportView } from "@inventory/catalog-contract/Import"
 import { importView, importViewShown } from "../src/Imports.atoms.ts"
@@ -43,6 +44,13 @@ const browser = vi.hoisted(() => {
   return { kept }
 })
 
+/** What the server answers a save with. */
+type Saved = {
+  readonly revision: number
+  readonly changed: boolean
+  readonly notApplied: ReadonlyArray<{ readonly rowId: string; readonly field: string }>
+}
+
 const settle = Effect.sleep("15 millis")
 const out = decisionFromFlags({ out: true })
 
@@ -58,20 +66,30 @@ const memberOf = (member: string) =>
   )
 
 /** The Review step of one import opened in a page of its own: a refresh is another page on the same storage. */
-const visit = (id: ImportId, member = "mem_dana") => {
+const visit = (id: ImportId, options: { readonly member?: string; readonly saves?: "taken" | "lost" } = {}) => {
+  const server = { revision: 0 }
+  const sent: Array<SaveRequest> = []
   const registry = registryFor({
     endpoints: {
       imports: {
         get: () => Deferred.await(Deferred.makeUnsafe<ImportView>()),
-        decide: () => Deferred.await(Deferred.makeUnsafe<{ readonly revision: number; readonly changed: boolean }>())
+        // The server takes every save, unless the test says the network loses them: those never answer.
+        decide: (request: { readonly payload: SaveRequest }) => {
+          sent.push(request.payload)
+          if (options.saves === "lost") return Deferred.await(Deferred.makeUnsafe<Saved>())
+          server.revision += 1
+          return Effect.succeed({ revision: server.revision, changed: true, notApplied: [] })
+        }
       }
     },
-    signedIn: Atom.make(memberOf(member))
+    signedIn: Atom.make(memberOf(options.member ?? "mem_dana"))
   })
   return {
     registry,
+    sent,
     /** The server's view is in the tab and the step is drawn. */
     open: (revision: number, decisions: SavedDecisions) => {
+      server.revision = revision
       registry.set(importView(id), viewAt({ id, revision, decisions }))
       registry.mount(importViewShown(id))
       registry.mount(reviewLocal(id))
@@ -145,6 +163,33 @@ describe("the undo history kept in the browser", () => {
       })
   )
 
+  it.live(
+    "does not decide what comes back: rows the server never took come back over what it holds, and are sent again",
+    () =>
+      Effect.gen(function* () {
+        const id = importNo(63)
+        // The network loses the save: row 2 is on the screen, kept in this browser, and not on the server.
+        const first = visit(id, { saves: "lost" })
+        first.open(10, {})
+        yield* settle
+        first.run(Action.LeaveOut({ rowIds: ["row-2"] }))
+        yield* settle
+        expect(first.sent).toEqual([{ madeOn: 10, set: { "row-2": out }, clear: [] }])
+
+        // A refresh. Somebody else has left row 3 out meanwhile: the server holds that, and not row 2.
+        const again = visit(id)
+        again.open(13, { "row-3": out })
+        yield* settle
+        // Both are on the screen: what the server holds, with the person's waiting row over it.
+        expect(R.keys(saved(again.state()))).toEqual(["row-2", "row-3"])
+        // And the row is sent again as the person's decision, made on the revision it was made on.
+        expect(again.sent).toEqual([{ madeOn: 10, set: { "row-2": out }, clear: [] }])
+        yield* settle
+        // The server took it: nothing of it waits in this browser any more.
+        expect(A.filter(R.keys(browser.kept), Str.includes("waiting"))).toEqual([])
+      })
+  )
+
   it.live("is one person's: another member opening the same import in this browser starts with none", () =>
     Effect.gen(function* () {
       const id = importNo(62)
@@ -154,7 +199,7 @@ describe("the undo history kept in the browser", () => {
       first.run(Action.LeaveOut({ rowIds: ["row-2"] }))
       yield* settle
 
-      const other = visit(id, "mem_lee")
+      const other = visit(id, { member: "mem_lee" })
       other.open(11, { "row-2": out })
       yield* settle
       expect(labels(other.state())).toEqual([])

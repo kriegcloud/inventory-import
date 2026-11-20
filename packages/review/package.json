@@ -14,7 +14,8 @@
     "./ReviewDecision": "./src/ReviewDecision.schema.ts",
     "./ReviewDraft": "./src/ReviewDraft.rules.ts",
     "./SavedProgress": "./src/SavedProgress.schema.ts",
-    "./SavedProgressHook": "./src/SavedProgress.hook.ts"
+    "./SavedProgressHook": "./src/SavedProgress.hook.ts",
+    "./Kept": "./src/Kept.atoms.ts"
   },
   "scripts": {
     "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json && beep-cli quality strict strict-ceiling.json",

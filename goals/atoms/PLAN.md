@@ -21,15 +21,12 @@ from: explorations/ideal-architecture
 | 7 | `@inventory/review`: the region's state with undo, saved progress, the grid, the queue; the A6 remodel | done |
 | 8 | TanStack Query removed (A2); the lint everywhere; the documents the move made false | todo |
 
-## Current blocker
-
-None. Benjamin's edit to `packages/review/src/ReviewDecision.schema.ts` is on main as `3951945`, under this
-branch's step 6; the remodel keeps its forms (`putBack` with `identity`, `RowPlace.guards`, `A.isReadonlyArrayEmpty`).
-
 ## The hook count
 
 Counted with one pattern per hook (a call, with or without `React.`), as the brief's inventory. "ui-own" is
-`packages/ui/src` without `components/` and `hooks/`.
+`packages/ui/src` without `components/` and `hooks/`. The table below is the brief's, whose pattern missed a call
+written with a type argument (`useState<T>(`); the lines after it for steps 6 and 7 count those too
+(`\buseX\s*[<(]`), which is why their starting numbers are a little higher than the table's.
 
 Before, at `9b6418f` (the same numbers as the brief's table):
 
@@ -67,16 +64,17 @@ After each package, the same count:
   `useSyncExternalStore` 3 → 0, `useRef` 2 → 1 (the search field's element, for the caret after the cross); `useId` 1
   (each search box's own atom). The app's `src/web` now reads the ui atoms directly (`useAtomValue` 11 → 17). The ui
   strict ceiling fell from 52 to 51 (sum 652). The run log (`AgentRun`) held no hook.
-- **After step 6 (`catalog-web`)**: `catalog-web` holds no banned hook: `useEffect` 6 → 0, `useState` 23 → 0,
-  `useMemo` 10 → 0, `useCallback` 8 → 0, `useRef` 10 → 0, `useContext` 1 → 0, `useSyncExternalStore` 1 → 0, and
-  TanStack Query's 20 → 0. It keeps `useId` (14: each form's and each cell editor's own atom) and `useDeferredValue` (1:
+- **After step 6 (`catalog-web`)**: `catalog-web` holds no banned hook: `useEffect` 6 → 0, `useState` 24 → 0,
+  `useMemo` 10 → 0, `useCallback` 8 → 0, `useContext` 1 → 0, `useSyncExternalStore` 1 → 0, and TanStack Query's
+  20 → 0. `useRef` 11 → 2, both DOM nodes (the assistant's prompt field, the upload's picker). It keeps `useId` (14:
+  11 field ids in the item editor, 2 that key a cell form's atom, 1 in the sheet chooser) and `useDeferredValue` (1:
   the Review step draws its skeleton first, then the region) and calls `useAtomValue` 34, `useAtom` 8, `useAtomSet` 14,
   `useAtomRefresh` 4, `useAtomMount` 1. `client` now holds no React hook at all (`useContext` 1 → 0: `useMember` went),
   and the app's `src/web` none either. `@tanstack/react-query` is imported in 2 files (the app's `main.tsx` and the
   client's `QueryClient.runtime.ts`), both for step 8. Strict ceilings: `catalog-web` 245 → 240, `client` 22 → 20
   (sum 645).
 - **After step 7 (`review`)**: `review` holds no banned hook: `useEffect` 9 → 0, `useLayoutEffect` 2 → 0, `useState`
-  22 → 0, `useMemo` 27 → 0, `useCallback` 11 → 0, `useContext` 1 → 0, `useImperativeHandle` 1 → 0. `useRef` 24 → 4,
+  27 → 0, `useMemo` 28 → 0, `useCallback` 11 → 0, `useContext` 1 → 0, `useImperativeHandle` 1 → 0. `useRef` 25 → 4,
   each a DOM node (the import button and the activity button for focus to return to, an overlay's trigger, the grid's
   scrolling frame, which the virtual list reads). It keeps `useId` (7: each region, grid, queue, strip, overlay, cut
   text and edit form has its own atom), the vendored `useDataTable` and TanStack Virtual's `useVirtualizer` (A4), and
@@ -231,7 +229,8 @@ Browser, on a fresh database, a new browser context, the dev server on port 5220
 
 - Upload: a file dragged over the page showed "Drop the file to load it"; dropped beside the box, it started ("Saving 0
   of 200 rows · Cancel") and arrived at Review with no request for the import or its rows (the upload's answer is
-  given to both reads).
+  given to both reads). That drop was sent from a script, which runs both listeners back to back; a drop the browser
+  itself sends did not work, and is fixed and checked under "Fixes after the review of step 6", group 5.
 - Review: "Needs a decision 24 · Cannot import 21 · Ready 155 · All 200". Accepting a fix saved once and asked for the
   import once. "Use finished-goods for the 2 ticked": 24 → 22, 155 → 157, "Import 157, skip 43"; Undo: 24 and 155;
   Redo: 22 and 157; Undo and Redo still offered after each save ("Undo: 2 fixes accepted"). Reloaded mid-review:
@@ -340,6 +339,56 @@ no kind has been picked on the work list goes to the kind after next (SKU done l
 Category done lands on Number, skipping Cost); and closing "Why flagged?" leaves focus on the page's body, not on its
 button. Neither is changed here; both are reported.
 
+## Fixes after the review of step 6
+
+A review of step 6 (`6d30446`) found seven serious defects and twelve smaller ones; each is fixed on top of step 7,
+one commit per defect where the code allows. For the serious ones a test was written first and seen to fail on the
+rule as it was. `bun run check:full -- --force` passes with none from cache. What was looked at is on the dev
+server (port 5220), in a headless browser, with requests slowed where the defect needs a slow answer.
+
+| # | Defect | Change | Test | Seen on screen |
+| --- | --- | --- | --- | --- |
+| 1 | An item's save was cut off when its row left the screen | A press of an optimistic write cannot be interrupted (`Optimistic.atoms.ts`) | client `Optimistic.atoms.test.ts`: the holder is let go while the save is out; it ends saved, not waiting, read again once; a later edit settles too. Failed first: the item stayed "Bolt" | Save held 3 s, Qty 777, straight to Activity; back on Items the row reads "777 BX", nothing marked updating; D1 holds 777, revision 2 |
+| 2 | Answers put into the import's view were built from the view at the press | `changeView` changes the view as held when the answer arrives; `suggestFixes` takes the id; a saved decision changes only decisions and revision (`ReviewDraft.atoms.ts`, `Imports.atoms.ts`) | catalog-web `ImportViewAnswers.test.ts`, `ReviewDraft.test.ts`. Failed first: the view went back to revision 10; the suggestions were wiped | Suggestions held 4 s while a row was decided (20 → 18); they arrived ("Suggested 2 names from the description"); to Match and back: still 18, Undo offered |
+| 3 | A Review drawn while the import was being asked again never restarted | `follow` takes the first view seen as the one drawn from, even while waiting, and restarts on a newer one | `ReviewDraft.test.ts`. Failed first: epoch 0 at revision 25 | Two tabs: A on Match, B accepts two costs; A's refresh held 3 s, Review opened before it answered (22, Cost 2), then 20, Ready 2 and "Updated with what changed on another screen" |
+| 4 | Coming back to Review while a save was out reset the saver | `reset` is refused while a save is out or a change unsent; the screen shows what the saver is sending, with its undo | `DecisionSaver.test.ts`, `ReviewDraft.test.ts`. Failed first: a second request, the clear | Save held 4 s, "Use finished-goods" (24 → 22), to Match and back while it was out: 22, "Undo: 2 fixes accepted"; one request, clearing nothing; reloaded: 22 |
+| 5 | A file dropped beside the box was opened by the browser | One `drop` listener for as long as the step is on screen cancels the drop, hands the files over, then lowers the flag | None (needs a browser's own drop) | Reproduced with a drop the browser sends (CDP `Input.dispatchDragEvent` with a file): before, `defaultPrevented` false and nothing loaded; after, true, "Review items_clean.csv", "Import 25 items" |
+| 6 | The Items columns were rebuilt on every read of the filters' values | Built from the answer alone (`answerOf`), the same object while the server answers the same | client `Answer.atoms.test.ts`: built once per answer; built on the read itself, built again for every refresh | A's save held 2.5 s, B's editor open, typing in Reorder point through A's "Saved" and the re-read: the caret stayed ("2301234"), Name untouched |
+| 7 | Until the first decision the whole review was worked out again on every refresh | `shownDecisions` keeps its object while the decisions are the same | `ReviewDraft.test.ts`. Failed first: a new object each time | 50,000 rows, a tab return that answers the same: longest tasks 175 ms and 236 ms, no second review (one is about 1.2 s) |
+| 8 | A refused remove never read the open list again | `readAgainAfterRefusal` on the write; an import already gone counts as removed | client `Optimistic.atoms.test.ts`; catalog-web `RemoveImport.test.ts` | Not seen (a refusal needs a second person); the tests hold it |
+| 9 | An upload's answer was taken as fresh whenever first opened | A given answer carries when it was given: older than a second, it is shown and asked again behind. An upload that lands after a switch of organization is not put in place or opened | client `Seed.atoms.test.ts` | Not seen |
+| 10 | An assistant answer that arrived after leaving Items was applied | Applied only while the person is still on the table's page; otherwise the conversation says so | None | Answer held 3 s, to Activity meanwhile: the address stayed `/activity`; back on Items the conversation reads "The answer came after you left Items, so nothing was changed. Ask again." |
+| 11 | The assistant's conversation jumped to the bottom on every draw | One ref callback for the page's life | None | Conversation 976 px tall in 518, scrolled to the top, typed "abc": still at the top |
+| 12 | Removing one import disabled Remove on every card | One write per import | `RemoveImport.test.ts` | Remove of items_clean.csv held 3.5 s: the other two cards' Remove stayed enabled; "Removed items_clean.csv" 452 ms after the press |
+| 13 | Each card mounted its import's read | Continue puts the card's view in place through one write | None | The first screen asked for `/imports/open` and `/imports/past` only; Continue asked only for the staged rows |
+| 14 | Given answers were kept for the page's life | The given answer is a plain value the read takes once, and goes with the read; `forgetReads` drops it with the read | `Seed.atoms.test.ts`, `SignOut.atoms.test.ts` | Not something a screen shows |
+| 15 | Each item's editor atoms were kept forever | Held weakly (`Atom.family`) | None | Not something a screen shows |
+| 16 | A removed import kept its view and rows | `letGo` on a read; the remove lets both go | `Seed.atoms.test.ts`, `RemoveImport.test.ts` | Not something a screen shows |
+| 17 | `Sniffed` was branched by hand | `formatOf`, one exhaustive `$match` | The readers' tests | Nothing to see |
+| 18 | The skeleton-first wait was not measured | Measured, below | | |
+| 19 | Counts and comments this step left false | The step 6 and 7 hook counts above; the legacy table; `UploadStep`'s doc block; `preload.ts`'s comment; the session's two `resetQueries` calls removed | | |
+| 20 | Two older races in the review's saving | A save that finds someone else saved in between leaves the revision it knows, so the view it asks for restarts the region from everything the server holds; a view of an earlier revision never replaces a later one (`putView`) | `ReviewDraft.test.ts`, `ImportViewAnswers.test.ts`. Failed first: the others' decisions hidden at revision 13; revision 11 over 12 | Covered by 3's two tabs |
+| 21 | The atoms lint could be passed by a hook not from `react` | `use`, `useOptimistic`, `useActionState`; `useFormStatus`; the kit's three effect and ref hooks, by package path and by a relative one; `radix-ui/internal`; the query client | A planted file per spelling, refused by the lint, then deleted | |
+
+**Group 18, measured.** The 50,000-row file, the dev server, a headless browser; a frame counts as painted with the
+skeleton when an animation frame ran after the skeleton was in the page and before the task that works out the
+review began.
+
+| | Skeleton in the page | Frames painted with it before the review task | The review task | Region drawn |
+| --- | --- | --- | --- | --- |
+| Continue from the first screen (rows fetched) | 94 ms | 75 | 1.38 s, from 1.5 s | 3.5 s |
+| Match to Review, rows held, three runs | 105, 114, 115 ms | 1, 2, 3 | 1.33, 1.23, 1.22 s, from 124 to 135 ms | 1.99, 1.79, 1.79 s |
+
+So the skeleton does paint first, by one to three frames when the rows are already held. That is a narrow margin,
+and it is React's to keep (`useDeferredValue`), not a timer's.
+
+**Found while looking, and fixed in the same commits:** the review's undo history was lost when the screen came back
+during a save (group 4), and "Removed <file>" waited for the open list to be read again, which takes seconds while
+a 50,000-row import is open (group 12); it is said when the server answers.
+
+**Left as they were, older than step 6:** a retried item save that the server answers "changed meanwhile" for the
+person's own save still says "Changed by someone else" (group 8's older part).
+
 ## Legacy in the client
 
 The client's lint is on (`packages/client/.oxlintrc.json` extends `.oxlintrc.atoms.json`), with one file excepted by
@@ -350,7 +399,7 @@ caller has moved.
 | --- | --- | --- |
 | `CurrentMember.controller.ts` (`useMember`) | gone at step 6, with `Rollback.rules.ts` | 6 |
 | `Optimistic.controller.ts` (`useOptimisticWriteVia`, `makeOptimisticWrite`, `cacheChange`) | gone at step 6, with its test | 6 |
-| `QueryClient.runtime.ts` | the app's `main.tsx` and `lib/queries.ts` (`Workspace.tsx`'s prefetch went at step 6) | 8 |
+| `QueryClient.runtime.ts` | the app's `main.tsx` and `lib/queries.ts`, and its own test (`Workspace.tsx`'s prefetch went at step 6; the session's two `resetQueries` calls, which emptied a cache nothing reads, went after the step 6 review; the atoms lint now refuses any other import of it) | 8 |
 
 ## Hand-written discriminators in the web packages
 
@@ -377,12 +426,13 @@ Not discriminators, and not changed: string-literal domains with no data of thei
 ## Choices made
 
 - **The review region keeps what it owns in one atom per region** (`regions`, by the region's `useId`; step 7), not
-  the brief's `ScopedAtom`: a family by `useId` needs no provider, and lets the atom go with the region as React state
+  the brief's `ScopedAtom` (not yet confirmed by Benjamin): a family by `useId` needs no provider, and lets the atom go with the region as React state
   went. It holds the decisions with their undo, the tab and kind, the drawers, the search, the folds, the ticks, the
   announcement. The first state is not stored: until the first decision it is worked out from the caller's saved
   decisions or the file, and remembered by those inputs. Measured on 50,000 rows before and after ("Proof", step 7):
   not slower, so it is not split by row.
-- **What the region works out from its props is remembered by its inputs, not held in atoms** (`remember` in
+- **What the region works out from its props is remembered by its inputs, not held in atoms** (not yet confirmed by
+  Benjamin; `remember` in
   `packages/review/src/internal/remember.ts`): the rows as they stand, the counts, the list on screen, the facets, the
   column plan. Props arrive on the caller's draw, and an atom could take them in only through an effect or a write
   during a draw. `remember` keeps the last answer beside its first input in a `WeakMap` and answers again only when an
@@ -401,12 +451,20 @@ Not discriminators, and not changed: string-literal domains with no data of thei
 - **Saved progress is an atom per key over the browser's storage** (`SavedProgress.hook.ts`): the storage is the
   record, every write goes to it before the atom shows it, and an atom let go reads it again. `useSavedProgress` keeps
   its name and its shape, built from the atom hooks only.
-- **`viewRows` reads a row's decision as `undefined` when it has none, not an `Option`** (A6 says `Option` for a row's
-  decision): it runs once per row, and 50,000 rows would each allocate one. Everywhere a decision is handed on (an
+- **`viewRows` reads a row's decision as `undefined` when it has none, not an `Option`** (not yet confirmed by
+  Benjamin; A6 says `Option` for a row's decision): it runs once per row, and 50,000 rows would each allocate one. Everywhere a decision is handed on (an
   undo step, `act`) it is an `Option`.
 - **`Fix.confidence` is an `Option` the caller always gives** (A6), so the catalog writes `O.some(proposal.confidence)`
   and the result's changes carry `O.none()` for a typed value.
-- **The theme is kept in plain `localStorage`, against the brief's wording** (the lead agreed, for Benjamin to see).
+- **The review's draft is a module with no screen in it** (`ReviewDraft.atoms.ts`): what the Review step holds
+  for one import, the decisions it shows, `follow` (what a view of the draft means from where the screen stands) and
+  what a decision does. The saver (`Draft.controller.ts`) is given its request, so it is tested without a server.
+- **A press of an optimistic write cannot be interrupted.** The registry lets a write's atom go 400 ms after its row
+  or screen has left and interrupts what it started; a save must still land and clear up after itself.
+- **An answer given to a read is a value the read takes once**, with the time it was given; it is not an atom, and
+  is not kept past the read. A read can be let go for whoever is signed in (`letGo`).
+- **What is built from a read's data is built from its answer** (`answerOf`), never from the read.
+- **The theme is kept in plain `localStorage`, against the brief's wording** (not yet confirmed by Benjamin).
   The brief names `Atom.kvs` for it. `Atom.kvs` stores the value as JSON (`"dark"` with its quotes), and
   `public/theme-init.js`, which sets the theme before the first paint so the page never flashes the wrong one, reads
   the bare word; every choice already stored would also be lost. `theme` is a writable atom over `localStorage`
@@ -423,7 +481,8 @@ Not discriminators, and not changed: string-literal domains with no data of thei
   the optimistic edits did. The item editor and removing an open import are optimistic writes (`optimisticWrite`).
 - **The Review step follows the import's revision from an atom** (`followDraft`, mounted by the step): when a newer
   revision arrives from another screen it puts the region back to it with the toast, and its own saves never count as
-  someone else's. The skeleton-first wait is `useDeferredValue`, not a timer in an effect.
+  someone else's. The skeleton-first wait is `useDeferredValue`, not a timer in an effect, with the first paint
+  measured on 50,000 rows ("Fixes after the review of step 6", group 18).
 - **The draft's saver is a plain object per import** (`decisionSaver` in `Draft.controller.ts`), not a hook: it holds
   the decisions waiting to be saved and tells the step when a save is answered.
 - **ui's own pieces are atoms** (`ContentWidth.atoms.ts`, `Route.atoms.ts`, `Theme.provider.tsx`, the search box).
@@ -464,7 +523,8 @@ Not discriminators, and not changed: string-literal domains with no data of thei
   skeleton, then their own rows, never the first one's; a switch and back shows the first organization's rows at
   once.
 
-- **A read belongs to the member who asked; no new registry on a switch** (asked of Benjamin, not decided). The brief's
+- **A read belongs to the member who asked; no new registry on a switch** (Benjamin since: "Keyed reads, and drop
+  them on sign-out", above). The brief's
   rabbit holes say a sign-in or a switch of organization is "a new registry, through `RegistryProvider`'s React
   `key`". That key would have to change from something outside the registry it resets: a second registry holding the
   session, or a hook the rule now bans. Built instead, and kept in one place (`makeApiAtoms`'s `query` in

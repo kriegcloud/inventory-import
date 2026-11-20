@@ -292,14 +292,14 @@ function PastImports() {
   )
 }
 
+/** A sentence for a file the screen itself could not take (a sample that would not load, a file no longer kept). */
+const uploadProblem = Atom.make<string | undefined>(undefined)
+
 /**
  * The first screen: choose or drop a file, or take the sample list, which goes through the same code. The chosen
  * file is kept in this browser until the server has it all (`useSavedProgress`): a reload or a closed tab in the
  * middle of an upload offers Continue, which reads the same file again, instead of asking for it again.
  */
-/** A sentence for a file the screen itself could not take (a sample that would not load, a file no longer kept). */
-const uploadProblem = Atom.make<string | undefined>(undefined)
-
 export function UploadStep(props: { canImport: boolean; viewOnly: boolean }) {
   const state = useAtomValue(uploadState)
   const startOne = useAtomSet(startUpload)

@@ -11,7 +11,6 @@ import { toast } from "sonner"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import { dual } from "effect/Function"
-import * as MutableHashMap from "effect/MutableHashMap"
 import * as O from "effect/Option"
 import * as Atom from "effect/reactivity/Atom"
 import * as AtomRegistry from "effect/reactivity/AtomRegistry"
@@ -81,16 +80,13 @@ export const putView = (input: { readonly registry: AtomRegistry.AtomRegistry; r
 /** A workbook chosen in this tab, kept so the person can read another of its sheets without choosing it again. */
 export type OpenWorkbook = { file: File; sheets: ReadonlyArray<SheetSummary>; chosen: SheetChoice }
 
-const workbooks = MutableHashMap.empty<string, OpenWorkbook>()
-
-/** Remembers the chosen workbook for an import. Gone after a reload: a browser cannot keep the file. */
-export const rememberWorkbook = (importId: string, workbook: OpenWorkbook) => {
-  MutableHashMap.set(workbooks, importId, workbook)
-}
-
-/** The workbook behind an import, when it was chosen in this tab. */
-export const workbookOf = (importId: string): OpenWorkbook | undefined =>
-  O.getOrUndefined(MutableHashMap.get(workbooks, importId))
+/**
+ * The workbook behind an import, when it was chosen in this tab: kept for the page so the person can read another of
+ * its sheets without choosing it again. Gone after a reload: a browser cannot keep the file.
+ */
+export const openWorkbook = perKey((_importId: string) =>
+  Atom.make<O.Option<OpenWorkbook>>(O.none()).pipe(Atom.keepAlive)
+)
 
 /**
  * The imports nobody has confirmed yet, newest first, each a file of its own: the first screen offers to continue or
@@ -136,7 +132,7 @@ export const removeImport = Atom.family((id: ImportId) =>
       importView(id).letGo(registry)
       importTable(id).letGo(registry)
       registry.set(draftOf(id), emptyDraft)
-      MutableHashMap.remove(workbooks, id)
+      registry.set(openWorkbook(id), O.none())
     },
     readAgainAfterRefusal: true,
     settled: catalogKeys.activity

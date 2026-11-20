@@ -32,7 +32,7 @@ import type { SheetChoice, SheetSummary } from "@inventory/catalog-model/Spreads
 import { savedRows } from "@inventory/catalog-model/Upload"
 import { rowsOf, UploadState } from "./Upload.machine.ts"
 import { type Client, fork, runExit, apiPrefixOf } from "./Catalog.runtime.ts"
-import { importTable, importView, rememberWorkbook } from "./Imports.atoms.ts"
+import { importTable, importView, openWorkbook } from "./Imports.atoms.ts"
 import { navigate } from "@inventory/ui/Route"
 import { importAddress } from "./internal/route.ts"
 import type { ReadMessage, ReadRequest } from "./internal/protocol.ts"
@@ -72,11 +72,9 @@ const retrying = <A, E>(effect: Effect.Effect<A, E>) =>
 /** Where the upload of this tab stands: kept for the page, as the upload carries on across pages. */
 export const uploadState = Atom.make<UploadState>({ _tag: "Idle" }).pipe(Atom.keepAlive)
 
-// The registry the upload reports to: the tab's one, handed over when an upload starts (`startUpload`).
-let registry: AtomRegistry.AtomRegistry | undefined
-const stateNow = (): UploadState => (registry === undefined ? { _tag: "Idle" } : registry.get(uploadState))
-const set = (next: UploadState) => {
-  registry?.set(uploadState, next)
+/** Says where the upload stands, in the registry it was started from (the tab's one). */
+const set = (registry: AtomRegistry.AtomRegistry, next: UploadState) => {
+  registry.set(uploadState, next)
   // While the rows are saving, fetch the review's code, so it is ready when the import is.
   if (UploadState.guards.Saving(next)) void import("./ReviewStep.screen.tsx")
 }
@@ -93,13 +91,21 @@ export type UploadEnd = Data.TaggedEnum<{
 /** Builds and tells apart how an upload ended. */
 export const UploadEnd = Data.taggedEnum<UploadEnd>()
 
-/** What is running now: its fiber, the server's id for it once the server has one, and who to tell how it ends. */
-let running: {
-  fiber: Fiber.Fiber<Finished, UploadError>
-  fileName: string
-  uploadId: ImportId | null
-  onEnd: (end: UploadEnd) => void
-} | null = null
+/**
+ * The upload under way: its fiber, the server's id for it once the server has one, who started it and who to tell
+ * how it ends. Kept for the page, as the upload carries on across pages; none while none is under way.
+ */
+interface Running {
+  readonly fiber: Fiber.Fiber<Finished, UploadError>
+  readonly fileName: string
+  readonly uploadId: ImportId | null
+  readonly onEnd: (end: UploadEnd) => void
+  /** Who the upload was started as: its import is theirs, whoever is signed in when it lands. */
+  readonly startedAs: string
+  /** Stops listening for the page being left. */
+  readonly stop: () => void
+}
+const uploadRunning = Atom.make<O.Option<Running>>(O.none()).pipe(Atom.keepAlive)
 
 type Finished = {
   readonly view: ImportView
@@ -141,7 +147,11 @@ const reader = (request: ReadRequest) =>
 /** One kind of message the reader sends. */
 type Sent<Tag extends ReadMessage["_tag"]> = Extract<ReadMessage, { readonly _tag: Tag }>
 
-const program = Effect.fn("upload.program")(function* (client: Client, request: ReadRequest) {
+const program = Effect.fn("upload.program")(function* (
+  registry: AtomRegistry.AtomRegistry,
+  client: Client,
+  request: ReadRequest
+) {
   const fileName = request.file.name
   const begun = yield* Deferred.make<{ readonly id: ImportId; readonly sizes: ReadonlyArray<number> }>()
   const chunks: Array<ReadonlyArray<StagedRow>> = []
@@ -155,7 +165,7 @@ const program = Effect.fn("upload.program")(function* (client: Client, request: 
     Match.valueTags(read, {
       Progress: (message) =>
         Effect.sync(() =>
-          set({
+          set(registry, {
             _tag: "Reading",
             fileName,
             rowsRead: message.rowsRead,
@@ -176,8 +186,11 @@ const program = Effect.fn("upload.program")(function* (client: Client, request: 
             payload: { key, head: read, rowCount: rows, chunkCount: message.chunkSizes.length }
           })
         )
-        if (running !== null) running.uploadId = id
-        set({ _tag: "Saving", fileName, uploadId: id, rowsSaved: 0, rows })
+        registry.update(
+          uploadRunning,
+          O.map((now) => ({ ...now, uploadId: id }))
+        )
+        set(registry, { _tag: "Saving", fileName, uploadId: id, rowsSaved: 0, rows })
         yield* Deferred.succeed(begun, { id, sizes: message.chunkSizes })
       }),
       Chunk: Effect.fnUntraced(function* (message: Sent<"Chunk">) {
@@ -186,7 +199,7 @@ const program = Effect.fn("upload.program")(function* (client: Client, request: 
         yield* staged(client.imports.putChunk({ params: { id }, payload: { seq: message.seq, rows: message.rows } }))
         acknowledged.push(message.seq)
         const rows = sizes.reduce((sum, size) => sum + size, 0)
-        set({
+        set(registry, {
           _tag: "Saving",
           fileName,
           uploadId: id,
@@ -205,7 +218,7 @@ const program = Effect.fn("upload.program")(function* (client: Client, request: 
   yield* reader(request).pipe(Stream.mapEffect(handle, { concurrency: inFlight }), Stream.runDrain)
   const { id, sizes } = yield* Deferred.await(begun)
   const rows = sizes.reduce((sum, size) => sum + size, 0)
-  set({ _tag: "Preparing", fileName, uploadId: id, rows })
+  set(registry, { _tag: "Preparing", fileName, uploadId: id, rows })
   const view = yield* staged(client.imports.finishUpload({ params: { id } }))
   if (head === undefined) return yield* Effect.die("the reader sent chunks without a head")
   const table: StagedTable = { ...head, rows: chunks.flat() }
@@ -219,20 +232,28 @@ const discard = (uploadId: ImportId): Promise<boolean> =>
     .then(Exit.isSuccess)
 
 /** Puts a finished upload where the next screen looks for it, and moves on to it if the person is still here. */
-const arrive = (file: File, done: Finished, startedAs: string | undefined) => {
-  const { view, table, workbook } = done
+const arrive = (input: {
+  readonly registry: AtomRegistry.AtomRegistry
+  readonly file: File
+  readonly done: Finished
+  readonly startedAs: string
+}) => {
+  const { registry } = input
+  const { view, table, workbook } = input.done
   // The person changed organization while the file was on its way: the import belongs to the one they left, and is
   // listed there. Nothing of it is put in place or opened where they are now.
-  if (registry?.get(memberKey) !== startedAs) {
+  if (registry.get(memberKey) !== input.startedAs) {
     // Said where the person is now, with no way to open it: it is not this organization's to open.
     toast(`${view.fileName} was uploaded for the organization you were in when you chose it. It is listed there.`)
     return
   }
-  registry?.set(importView(view.id), view)
-  registry?.set(importTable(view.id), table)
+  registry.set(importView(view.id), view)
+  registry.set(importTable(view.id), table)
   invalidate(catalogKeys.openImports)
   invalidate(catalogKeys.activity)
-  if (workbook !== null) rememberWorkbook(view.id, { file, sheets: workbook.sheets, chosen: workbook.chosen })
+  if (workbook !== null) {
+    registry.set(openWorkbook(view.id), O.some({ file: input.file, sheets: workbook.sheets, chosen: workbook.chosen }))
+  }
   // Straight to the review when every required field found its column by heading; to Match when one did not.
   const unmatched = view.mapping.some((entry) => O.isNone(matchedColumn(entry)) && requiredFields.includes(entry.field))
   const next = importAddress(view.id, unmatched ? "match" : "review")
@@ -241,41 +262,64 @@ const arrive = (file: File, done: Finished, startedAs: string | undefined) => {
 }
 
 /** Starts reading and sending `file`; `onEnd` is told how it ended. Ignored while another upload is under way. */
-const start = (file: File, sheet: string | null, onEnd: (end: UploadEnd) => void) => {
-  if (running !== null) return
-  set({ _tag: "Reading", fileName: file.name, rowsRead: 0, rows: rowsOf({ rowsAbout: null, exact: false }) })
-  const fiber = fork((client) => program(client, { file, sheet }))
-  const current = {
-    fiber,
-    fileName: file.name,
-    uploadId: null as ImportId | null,
-    onEnd,
-    // Who the upload was started as: its import is theirs, whoever is signed in when it lands.
-    startedAs: registry?.get(memberKey)
+const start = (input: {
+  readonly registry: AtomRegistry.AtomRegistry
+  readonly file: File
+  readonly sheet: string | null
+  readonly onEnd: (end: UploadEnd) => void
+}) => {
+  const { file, registry } = input
+  if (O.isSome(registry.get(uploadRunning))) return
+  set(registry, { _tag: "Reading", fileName: file.name, rowsRead: 0, rows: rowsOf({ rowsAbout: null, exact: false }) })
+  const fiber = fork((client) => program(registry, client, { file, sheet: input.sheet }))
+  /** This upload, while it is still the one under way. */
+  const mine = () => O.filter(registry.get(uploadRunning), (now) => now.fiber === fiber)
+  // Leaving the page mid-upload: ask the server to delete what arrived, in a request that outlives the page.
+  const onHide = () => {
+    const id = O.getOrNull(O.map(mine(), (now) => now.uploadId))
+    if (id === null) return
+    void request(`${apiPrefixOf()}/imports/uploads/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      keepalive: true
+    }).catch(() => {})
   }
-  running = current
+  window.addEventListener("pagehide", onHide)
+  registry.set(
+    uploadRunning,
+    O.some({
+      fiber,
+      fileName: file.name,
+      uploadId: null,
+      onEnd: input.onEnd,
+      startedAs: registry.get(memberKey),
+      stop: () => window.removeEventListener("pagehide", onHide)
+    })
+  )
   fiber.addObserver((exit) => {
+    const current = mine()
     // Cancel handles its own ending.
-    if (running !== current || (Exit.isFailure(exit) && Cause.hasInterruptsOnly(exit.cause))) return
-    running = null
+    if (O.isNone(current) || (Exit.isFailure(exit) && Cause.hasInterruptsOnly(exit.cause))) return
+    const { onEnd, startedAs, stop, uploadId } = current.value
+    registry.set(uploadRunning, O.none())
+    stop()
     if (Exit.isSuccess(exit)) {
-      set({ _tag: "Idle" })
-      current.onEnd(UploadEnd.Arrived())
-      arrive(file, exit.value, current.startedAs)
+      set(registry, { _tag: "Idle" })
+      onEnd(UploadEnd.Arrived())
+      arrive({ registry, file, done: exit.value, startedAs })
       return
     }
     const error = Cause.squash(exit.cause)
     // Nothing half-sent stays behind; the server would also delete it within the hour.
-    if (current.uploadId !== null) void discard(current.uploadId)
+    if (uploadId !== null) void discard(uploadId)
     // The file's own problem is said as data: what is wrong with it and what to do.
     if (S.is(FileProblem)(error)) {
-      current.onEnd(UploadEnd.Refused())
-      set({ _tag: "Refused", problem: error })
+      onEnd(UploadEnd.Refused())
+      set(registry, { _tag: "Refused", problem: error })
       return
     }
     const read = S.is(ReadFailed)(error)
-    current.onEnd(UploadEnd.Failed({ step: read ? "read" : "save" }))
-    set({
+    onEnd(UploadEnd.Failed({ step: read ? "read" : "save" }))
+    set(registry, {
       _tag: "Failed",
       fileName: file.name,
       step: read ? "read" : "save",
@@ -288,20 +332,28 @@ const start = (file: File, sheet: string | null, onEnd: (end: UploadEnd) => void
  * Stops the upload under way: the worker ends, requests in flight are aborted, and what reached the server is
  * deleted. Once the import is being prepared it is too late, and Cancel is not offered then.
  */
-const cancel = (): Promise<void> => {
-  const current = running
-  const state = stateNow()
-  if (current === null || UploadState.isAnyOf(["Preparing", "Cancelling"])(state)) return Promise.resolve()
-  set({ _tag: "Cancelling", fileName: current.fileName, uploadId: current.uploadId })
+const cancel = (registry: AtomRegistry.AtomRegistry): Promise<void> => {
+  const running = registry.get(uploadRunning)
+  if (O.isNone(running) || UploadState.isAnyOf(["Preparing", "Cancelling"])(registry.get(uploadState))) {
+    return Promise.resolve()
+  }
+  const current = running.value
+  set(registry, { _tag: "Cancelling", fileName: current.fileName, uploadId: current.uploadId })
   return current.fiber
     .pipe(Fiber.interrupt, runExit)
     .then(() => {
-      running = null
+      // The server may have given the upload its id while the cancel was on its way.
+      const uploadId = O.getOrElse(
+        O.map(registry.get(uploadRunning), (now) => now.uploadId),
+        () => current.uploadId
+      )
+      registry.set(uploadRunning, O.none())
+      current.stop()
       current.onEnd(UploadEnd.Cancelled())
-      return current.uploadId === null ? true : discard(current.uploadId)
+      return uploadId === null ? true : discard(uploadId)
     })
     .then((answered) => {
-      set({ _tag: "Idle" })
+      set(registry, { _tag: "Idle" })
       if (answered) toast(`Cancelled. Nothing from ${current.fileName} was saved.`)
       else
         toast.error(
@@ -309,16 +361,6 @@ const cancel = (): Promise<void> => {
         )
     })
 }
-
-// Leaving the page mid-upload: ask the server to delete what arrived, in a request that outlives the page.
-window.addEventListener("pagehide", () => {
-  const id = running?.uploadId
-  if (id === null || id === undefined) return
-  void request(`${apiPrefixOf()}/imports/uploads/${encodeURIComponent(id)}`, {
-    method: "DELETE",
-    keepalive: true
-  }).catch(() => {})
-})
 
 /** What starting an upload takes: the file, the sheet of a workbook, and who to tell how the upload ended. */
 export interface UploadStart {
@@ -332,18 +374,15 @@ export interface UploadStart {
  * `onEnd` says how it ended. The upload carries on while the person opens another page.
  */
 export const startUpload = Atom.fnSync((input: UploadStart, get) => {
-  registry = get.registry
-  start(input.file, input.sheet ?? null, input.onEnd ?? (() => {}))
+  start({ registry: get.registry, file: input.file, sheet: input.sheet ?? null, onEnd: input.onEnd ?? (() => {}) })
 })
 
 /** Stops the upload under way and deletes what reached the server; not offered once the import is being prepared. */
 export const cancelUpload = Atom.fnSync((_: void, get) => {
-  registry = get.registry
-  void cancel()
+  void cancel(get.registry)
 })
 
 /** Puts away what the last upload said (a problem with the file, a failure), back to choosing a file. */
 export const dismissUpload = Atom.fnSync((_: void, get) => {
-  registry = get.registry
-  set({ _tag: "Idle" })
+  set(get.registry, { _tag: "Idle" })
 })

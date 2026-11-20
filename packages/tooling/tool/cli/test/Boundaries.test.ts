@@ -53,6 +53,40 @@ describe("laws boundaries", () => {
     })
   )
 
+  it.effect("names a third-party package a workspace imports without declaring it, under any hoisted name", () =>
+    Effect.gen(function* () {
+      const report = yield* inTree(
+        {
+          ...base,
+          "package.json": json({
+            name: "root",
+            workspaces: ["packages/*", "apps/*"],
+            devDependencies: { vitest: "5.1.0" }
+          }),
+          "packages/ui/package.json": pkg("@x/ui", { family: "ui-system" }, { react: "19.0.0" }),
+          // Declared, the root's own tool, a built-in, a path, and words that only look like an import: all pass.
+          "packages/ui/src/fine.ts":
+            'import { useRef } from "react"\nimport { it } from "vitest"\nimport "node:path"\nimport "./local"\n' +
+            '// import x from "use-callback-ref"\nexport const text = `import y from "@tanstack/react-store"`\n',
+          // The same hooks under the names another package's dependencies were hoisted as.
+          "packages/ui/src/hoisted.tsx":
+            'import { useCallbackRef } from "use-callback-ref"\nexport * from "@tanstack/react-store"\n' +
+            'export const late = () => import("@base-ui/utils/useForcedRerendering")\n',
+          "apps/shop/package.json": pkg("@x/shop", {}),
+          "apps/shop/src/main.ts": 'import { a } from "@/lib/a"\nimport "@dnd-kit/utilities"\nexport { a }\n'
+        },
+        Effect.map(boundaries(), render(boundariesSentence))
+      )
+      expect(printed(report)).toEqual([
+        "err: check-boundaries FAIL",
+        "err:   apps/shop/src/main.ts imports @dnd-kit/utilities, which @x/shop does not declare (add it where it is used)",
+        "err:   packages/ui/src/hoisted.tsx imports use-callback-ref, which @x/ui does not declare (add it where it is used)",
+        "err:   packages/ui/src/hoisted.tsx imports @tanstack/react-store, which @x/ui does not declare (add it where it is used)",
+        "err:   packages/ui/src/hoisted.tsx imports @base-ui/utils, which @x/ui does not declare (add it where it is used)"
+      ])
+    })
+  )
+
   it.effect("lets nothing depend on the tooling package, not even an app", () =>
     Effect.gen(function* () {
       const report = yield* inTree(

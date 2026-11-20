@@ -6,9 +6,10 @@
  *
  * - a workspace package imported but not declared in dependencies, devDependencies or peerDependencies;
  * - a declared or imported workspace package the importer's row does not allow;
- * - a path into `apps/` from a package.
- *
- * Third-party packages are not this rule's business.
+ * - a path into `apps/` from a package;
+ * - a third-party package imported but not declared by the importer (or, for what every workspace is run with, by
+ *   the root): hoisting would let a package reach any hook or store another one installed, under its hoisted name,
+ *   past the lint that refuses them by the names it knows.
  *
  * @packageDocumentation
  */
@@ -21,6 +22,7 @@ import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import { Repo, type Workspace } from "../../Repo.service.ts"
 import { err, type Line, out } from "../../Report.schema.ts"
+import { readImports } from "./internal/importsCode.ts"
 
 const $I = $RepoCliId.create("commands/Laws/Boundaries.rules")
 
@@ -44,6 +46,11 @@ export const BoundariesFinding = S.TaggedUnion({
   Undeclared: {
     where: S.String.pipe(S.annotateKey({ description: "The file, from the root" })),
     imported: S.String.pipe(S.annotateKey({ description: "The workspace package it imports" })),
+    name: S.String.pipe(S.annotateKey({ description: "The workspace that does not declare it" }))
+  },
+  UndeclaredThirdParty: {
+    where: S.String.pipe(S.annotateKey({ description: "The file, from the root" })),
+    imported: S.String.pipe(S.annotateKey({ description: "The third-party package it imports" })),
     name: S.String.pipe(S.annotateKey({ description: "The workspace that does not declare it" }))
   },
   ImportedAgainstRow: {
@@ -72,6 +79,8 @@ export const boundariesSentence: (finding: BoundariesFinding) => Line = Boundari
   DeclaredAgainstRow: ({ name, dependency }) => err(`  ${name} declares ${dependency}, which its layer may not use`),
   IntoApps: ({ where, specifier }) => err(`  ${where} imports "${specifier}": a package never reaches into apps/`),
   Undeclared: ({ where, imported, name }) => err(`  ${where} imports ${imported}, which ${name} does not declare`),
+  UndeclaredThirdParty: ({ where, imported, name }) =>
+    err(`  ${where} imports ${imported}, which ${name} does not declare (add it where it is used)`),
   ImportedAgainstRow: ({ where, imported }) => err(`  ${where} imports ${imported}, which its layer may not use`)
 })
 
@@ -130,13 +139,25 @@ export const allowed =
     return false
   }
 
-const specifiers =
-  /(?:import|export)\s[^"'`;]*?from\s*["']([^"']+)["']|import\s*["']([^"']+)["']|import\(\s*["']([^"']+)["']\s*\)/g
+const Declared = S.optionalKey(S.Record(S.String, S.String))
+/** The part of the root manifest this rule reads: what it declares for every workspace. */
+const RootDeclared = S.Struct({ dependencies: Declared, devDependencies: Declared })
 
 const packageOf = (specifier: string): string =>
   Str.startsWith("@")(specifier)
     ? A.join(A.take(Str.split("/")(specifier), 2), "/")
     : A.head(Str.split("/")(specifier)).pipe(O.getOrElse(() => specifier))
+
+// A package's name as npm allows it, with or without a scope and a path inside it: the app's own `@/` alias and a
+// path are not one.
+const packageName = /^(?:@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*(?:\/[A-Za-z0-9._~@/-]*)?(?:\?[a-z]+)?$/
+
+/**
+ * True for a specifier that names a package to install: not a path, not a built-in of the runtime, not one of the
+ * build's own modules.
+ */
+const isThirdParty = (specifier: string): boolean =>
+  packageName.test(specifier) && !/^(node|bun|virtual|cloudflare):/.test(specifier)
 
 /**
  * Checks every workspace under `apps` and `packages`.
@@ -147,6 +168,9 @@ export const boundaries = Effect.fn("Boundaries.boundaries")(function* () {
   const repo = yield* Repo
   const workspaces = yield* repo.workspaces
   const byName = R.fromEntries(A.map(workspaces, (workspace) => [String(workspace.manifest.name), workspace] as const))
+  // What the root declares is there for every workspace: the test runner, the type-checker, the build's own tools.
+  const root = yield* repo.json(RootDeclared)(repo.join(repo.root, "package.json"))
+  const rootDeclared = { ...root.dependencies, ...root.devDependencies }
   const sources = Effect.fn("Boundaries.sources")(function* (dir: string) {
     const files = yield* repo.files(dir)
     return A.filter(files, (file) => !Str.includes("/node_modules/")(file) && /\.(m?ts|tsx)$/.test(file))
@@ -165,6 +189,13 @@ export const boundaries = Effect.fn("Boundaries.boundaries")(function* () {
         }),
         (dependency) => R.has(byName, dependency)
       )
+      // What the workspace declares of the world outside, with what the root declares for every workspace.
+      const thirdParty = R.keys({
+        ...rootDeclared,
+        ...workspace.manifest.dependencies,
+        ...workspace.manifest.devDependencies,
+        ...workspace.manifest.peerDependencies
+      })
       const fromManifest = A.flatMap(declared, (dependency) =>
         may(dependency)
           ? A.empty<BoundariesFinding>()
@@ -178,13 +209,17 @@ export const boundaries = Effect.fn("Boundaries.boundaries")(function* () {
           repo.text(file).pipe(
             Effect.map((text) => {
               const where = repo.relative(repo.root, file)
-              return A.flatMap(A.fromIterable(Str.matchAll(specifiers)(text)), (match) => {
-                const specifier = match[1] ?? match[2] ?? match[3] ?? ""
+              return A.flatMap(readImports({ file, source: text }), (specifier) => {
                 if (kind.family !== "app" && Str.startsWith(".")(specifier) && Str.includes("apps/")(specifier)) {
                   return A.of<BoundariesFinding>({ _tag: "IntoApps", where, specifier })
                 }
                 const imported = packageOf(specifier)
-                if (!R.has(byName, imported) || imported === name) return A.empty<BoundariesFinding>()
+                if (imported === name) return A.empty<BoundariesFinding>()
+                if (!R.has(byName, imported)) {
+                  return isThirdParty(specifier) && !A.contains(thirdParty, imported)
+                    ? A.of<BoundariesFinding>({ _tag: "UndeclaredThirdParty", where, imported, name })
+                    : A.empty<BoundariesFinding>()
+                }
                 if (!A.contains(declared, imported)) {
                   return A.of<BoundariesFinding>({ _tag: "Undeclared", where, imported, name })
                 }

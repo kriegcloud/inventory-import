@@ -114,6 +114,15 @@ members<BoundariesFinding>("laws boundaries", BoundariesFinding, boundariesSente
     { _tag: "Undeclared", where: "packages/kernel/src/a.ts", imported: "@inventory/ui", name: "@inventory/kernel" },
     "err:   packages/kernel/src/a.ts imports @inventory/ui, which @inventory/kernel does not declare"
   ],
+  UndeclaredThirdParty: [
+    {
+      _tag: "UndeclaredThirdParty",
+      where: "packages/ui/src/a.tsx",
+      imported: "use-callback-ref",
+      name: "@inventory/ui"
+    },
+    "err:   packages/ui/src/a.tsx imports use-callback-ref, which @inventory/ui does not declare (add it where it is used)"
+  ],
   ImportedAgainstRow: [
     { _tag: "ImportedAgainstRow", where: "packages/kernel/src/a.ts", imported: "@inventory/ui" },
     "err:   packages/kernel/src/a.ts imports @inventory/ui, which its layer may not use"

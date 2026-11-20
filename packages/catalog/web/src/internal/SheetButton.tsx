@@ -1,10 +1,11 @@
-import { useAtomSet } from "@effect/atom-react"
+import { useAtomSet, useAtomValue } from "@effect/atom-react"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import { SheetIcon } from "lucide-react"
 import { SheetChooser } from "./SheetChooser.tsx"
 import { Button } from "@inventory/ui/components/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@inventory/ui/components/popover"
-import { workbookOf } from "../Imports.atoms.ts"
+import { openWorkbook } from "../Imports.atoms.ts"
+import * as O from "effect/Option"
 import { navigate } from "@inventory/ui/Route"
 import { importAddress } from "./route.ts"
 import { startUpload } from "../Upload.controller.ts"
@@ -17,7 +18,8 @@ import { startUpload } from "../Upload.controller.ts"
  */
 export function SheetButton(props: { importId: ImportId }) {
   const start = useAtomSet(startUpload)
-  const workbook = workbookOf(props.importId)
+  const opened = useAtomValue(openWorkbook(props.importId))
+  const workbook = O.getOrUndefined(opened)
   if (workbook === undefined || workbook.sheets.filter((sheet) => sheet.rowCount > 0).length < 2) return null
   return (
     <Popover>

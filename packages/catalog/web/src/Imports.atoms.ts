@@ -5,6 +5,7 @@
 import { optimisticChange, optimisticWrite, shown } from "@inventory/client/OptimisticAtoms"
 import { apiRuntime, invalidate, perKey } from "@inventory/client/Api"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
+import { toast } from "sonner"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import { dual } from "effect/Function"
@@ -109,18 +110,44 @@ export const pastImports = catalogApi.query((api) => api.imports.past(), {
 /**
  * Removes an import nobody has confirmed: its staged rows and the decisions made on it. The server refuses one that
  * has created records. Optimistic: the card goes the moment the person confirms, and comes back in its place, with
- * the reason, if the server refuses. Either way the list is asked for again, which also brings in an older file.
+ * the reason, if the server refuses. Either way the list is asked for again, which also brings in an older file, and
+ * takes away one somebody else removed meanwhile. One write per import, so removing one file leaves the others'
+ * Remove buttons alone. An import that is already gone (someone else removed it, or the first answer was lost and the
+ * request went again) is what the person asked for: it counts as removed. Afterwards nothing of it is left in this
+ * tab: its view and its staged rows are let go.
  */
-export const removeImport = optimisticWrite({
-  send: (view: ImportView) => catalogApi.send((api) => api.imports.remove({ params: { id: view.id } })),
-  changes: [
-    optimisticChange(openImports, (list: OpenImports, view: ImportView) => ({
-      ...list,
-      views: A.filter(list.views, (entry) => entry.id !== view.id)
-    }))
-  ],
-  failed: (view) => `${view.fileName} was not removed.`,
-  settled: catalogKeys.activity
+export const removeImport = Atom.family((id: ImportId) =>
+  optimisticWrite({
+    send: (_view: ImportView) =>
+      catalogApi
+        .send((api) => api.imports.remove({ params: { id } }))
+        .pipe(Effect.catchTag("ImportNotFound", () => Effect.void)),
+    changes: [
+      optimisticChange(openImports, (list: OpenImports, _view: ImportView) => ({
+        ...list,
+        views: A.filter(list.views, (entry) => entry.id !== id)
+      }))
+    ],
+    failed: (view) => `${view.fileName} was not removed.`,
+    onAnswer: (_answer, view, registry) => {
+      // Said when the server answers, not after the list has been read again: that read can take seconds.
+      toast(`Removed ${view.fileName}`)
+      importView(id).letGo(registry)
+      importTable(id).letGo(registry)
+    },
+    readAgainAfterRefusal: true,
+    settled: catalogKeys.activity
+  })
+)
+
+/**
+ * Puts a view the screen already has in place for the next screen (the card's Continue): one write for every card,
+ * so a card mounts no read of its own and the first screen asks for no import it only lists. Put without looking at
+ * what is held (`putView` looks first, and looking at a read nobody shows starts a request): the list the card comes
+ * from is asked again on every return to the first screen, so its view is the latest this tab knows.
+ */
+export const giveView = Atom.fnSync((view: ImportView, get) => {
+  get.registry.set(importView(view.id), view)
 })
 
 /** Which file column fills a field of one import, or none. */

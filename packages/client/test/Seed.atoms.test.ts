@@ -57,4 +57,36 @@ describe("a read the screen gives its answer", () => {
       expect(t.reads()).toBe(1)
     })
   )
+
+  it.live("given a while before it is first shown: shown at once, and asked again behind it", () =>
+    Effect.gen(function* () {
+      const t = world()
+      // An upload lands while the person is on another page; they open it later.
+      t.registry.set(t.rows, "the staged view")
+      yield* Effect.sleep("1100 millis")
+      t.registry.mount(t.rows)
+      yield* Effect.sleep("5 millis")
+      expect(t.seen(t.rows)).toBe("the staged view")
+      yield* Effect.sleep("80 millis")
+      expect(t.seen(t.rows)).toBe("server's rows 1")
+      expect(t.reads()).toBe(1)
+    })
+  )
+
+  it.live("let go: the answer it held and the answer it was given are gone, and the next look asks the server", () =>
+    Effect.gen(function* () {
+      const t = world()
+      const leave = t.registry.mount(t.forever)
+      yield* Effect.sleep("50 millis")
+      expect(t.seen(t.forever)).toBe("server's rows 1")
+      leave()
+      // The import was removed: nothing of it stays in this tab, not even what a screen put in place for it.
+      t.registry.set(t.forever, "rows given by a screen")
+      t.forever.letGo(t.registry)
+      yield* Effect.sleep("80 millis")
+      t.registry.mount(t.forever)
+      yield* Effect.sleep("50 millis")
+      expect(t.seen(t.forever)).toBe("server's rows 2")
+    })
+  )
 })

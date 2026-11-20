@@ -103,6 +103,11 @@ export interface OptimisticWrite<Input, A, E, R> {
   readonly settled?: Reactivity.KeysInput
   readonly onAnswer?: (answer: A, input: Input, registry: AtomRegistry.AtomRegistry) => void
   readonly onRefused?: (error: E, input: Input, registry: AtomRegistry.AtomRegistry) => boolean
+  /**
+   * True when a refusal can mean the screen is behind the server (a remove refused because it is already gone): the
+   * reads it changes are then read again after a refusal too, once the last write has answered.
+   */
+  readonly readAgainAfterRefusal?: boolean
 }
 
 /** Numbers each press of every write, so a change can be found again on the read it was put on. */
@@ -144,6 +149,7 @@ export const optimisticWrite = <Input, A, E, R>(
   // The presses of this write on their way, and those already saved, in the registry: a new registry starts empty.
   const inFlight = Atom.make(0).pipe(Atom.keepAlive)
   const saved = Atom.make<ReadonlyArray<number>>([]).pipe(Atom.keepAlive)
+  const refusals = Atom.make(0).pipe(Atom.keepAlive)
   return apiRuntime.fn<Input>()(
     Effect.fnUntraced(function* (input: Input) {
       const registry = yield* AtomRegistry.AtomRegistry
@@ -159,6 +165,7 @@ export const optimisticWrite = <Input, A, E, R>(
       } else {
         // Taken back at once: the other changes still on their way keep showing.
         for (const change of spec.changes) change.takeOff(registry, [press])
+        registry.update(refusals, (n) => n + 1)
         const error = Cause.findErrorOption(exit.cause)
         if (!(O.isSome(error) && spec.onRefused?.(error.value, input, registry) === true)) {
           const retry = spec.retry?.(input, registry)
@@ -175,8 +182,10 @@ export const optimisticWrite = <Input, A, E, R>(
         // The last write has answered: read what they changed again once, then drop the saved changes, which the
         // fresh read now holds.
         const done = registry.get(saved)
+        const refused = registry.get(refusals)
         registry.set(saved, [])
-        if (done.length > 0) {
+        registry.set(refusals, 0)
+        if (done.length > 0 || (spec.readAgainAfterRefusal === true && refused > 0)) {
           yield* Effect.forEach(spec.changes, (change) => readAgain(registry, change.source), {
             concurrency: "unbounded",
             discard: true

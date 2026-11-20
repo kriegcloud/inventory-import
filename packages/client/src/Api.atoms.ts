@@ -6,6 +6,7 @@
 // the object held, so nothing derived from it is rebuilt; a read belongs to the member who asked, so another member or
 // another organization starts from nothing instead of seeing the last one's answer.
 import * as A from "effect/Array"
+import * as DateTime from "effect/DateTime"
 import * as Duration from "effect/Duration"
 import type * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
@@ -93,19 +94,27 @@ const heldSuccess = <A, E>(previous: O.Option<AsyncResult.AsyncResult<A, E>>): O
   O.flatMap(previous, AsyncResult.value)
 
 /** An answer put in place by the screen, numbered so the read uses each one once. */
-interface Seed<A> {
+/** An answer a screen gave a read, and when: one given a while before it is first shown is asked again behind it. */
+interface Given<A> {
   readonly answer: A
-  readonly version: number
+  readonly at: DateTime.Utc
 }
 
 /**
- * One member's read: the answer itself (`held`, which is what is kept), what a screen reads (`read`), and the answer
- * a screen can put in place of a request (`seed`).
+ * How old an answer may be and still count as the server's word: under a second. A read answered before its first
+ * look would otherwise be asked twice; anything older is shown at once and asked again behind it.
+ */
+const freshEnough = Duration.seconds(1)
+
+/**
+ * One member's read: the answer itself (`held`, which is what is kept), what a screen reads (`read`), and how a
+ * screen puts an answer in place of a request (`give`, which answers the atom to nudge so a read on screen takes it).
+ * The given answer is a plain value the read takes once: it goes with the read, and is never kept past it.
  */
 interface PerMember<A, E> {
   readonly held: Atom.Atom<AsyncResult.AsyncResult<A, E>>
   readonly read: Atom.Atom<AsyncResult.AsyncResult<A, E>>
-  readonly seed: Atom.Writable<O.Option<Seed<A>>>
+  readonly give: (answer: A) => Atom.Writable<number>
 }
 
 /** How long a read nobody looks at is kept: `keepUnwatched`, or the page's life for an answer that never changes. */
@@ -175,7 +184,14 @@ export interface QueryOptions {
  * A read. Its value is the answer as an `AsyncResult`; setting it to an answer puts that answer in place without a
  * request (a staged file's view, a draft's new revision), until the read is asked again.
  */
-export type Query<A, E> = Atom.Writable<AsyncResult.AsyncResult<A, E>, A>
+export interface Query<A, E> extends Atom.Writable<AsyncResult.AsyncResult<A, E>, A> {
+  /**
+   * Lets go of what this read holds for whoever is signed in: its answer, the hold that keeps it while nobody looks,
+   * and an answer a screen gave it. For something that is gone on the server (a removed import): nothing of it stays
+   * in the tab, and the next look asks the server.
+   */
+  readonly letGo: (registry: AtomRegistry.AtomRegistry) => void
+}
 
 /**
  * Only a read's answer: undefined until there is one, and the same object for as long as the server answers the same.
@@ -252,14 +268,22 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
     // collected one would be made anew on a return, empty (measured: after 35 s away).
     const reads = MutableHashMap.empty<string, PerMember<A, E>>()
     const make = (): PerMember<A, E> => {
-      const seed = Atom.make<O.Option<Seed<A>>>(O.none()).pipe(Atom.keepAlive)
-      // The last seed used: a seed is the answer once, and a later refresh asks the server.
-      let used = 0
-      const held = apiRuntime.atom((get) => {
-        const given = O.filter(get(seed), (one) => one.version > used)
-        if (O.isSome(given)) {
-          used = given.value.version
-          return Effect.succeed(given.value.answer)
+      // An answer a screen gave, until the read takes it; `nudge` only tells a read on screen that there is one.
+      let given: O.Option<Given<A>> = O.none()
+      const nudge = Atom.make(0)
+      const held: Atom.Atom<AsyncResult.AsyncResult<A, E>> = apiRuntime.atom((get) => {
+        get(nudge)
+        const taken = given
+        given = O.none()
+        if (O.isSome(taken)) {
+          // The answer once: a later refresh asks the server. Given a while ago (an upload that landed while the
+          // person was elsewhere), it is shown at once and asked again behind, as any answer of that age is.
+          const age = DateTime.distance(taken.value.at, DateTime.nowUnsafe())
+          if (keeping !== "page" && Duration.isGreaterThan(age, freshEnough)) {
+            const registry = get.registry
+            Effect.runFork(Effect.sync(() => registry.refresh(held)).pipe(Effect.delay(Duration.zero)))
+          }
+          return Effect.succeed(taken.value.answer)
         }
         return Effect.flatMap(client, (c) => use(c, get)).pipe(
           Effect.retry(readRetry),
@@ -270,15 +294,16 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
       // `keepUnwatched` (kept below), this wrapper does not, so a screen that mounts it again starts a new look. An
       // answer under a second old counts as fresh, or a read answered before its first look would be asked twice. An
       // answer kept for the page is never asked again.
-      const fresh = keeping === "page" ? held : Atom.swr(held, { staleTime: "1 second" })
+      const fresh = keeping === "page" ? held : Atom.swr(held, { staleTime: freshEnough })
       return {
         held,
-        seed,
+        give: (answer) => {
+          given = O.some({ answer, at: DateTime.nowUnsafe() })
+          return nudge
+        },
         read: options?.reactivityKeys === undefined ? fresh : fresh.pipe(followKeys(options.reactivityKeys))
       }
     }
-    // Numbers each seed of this read.
-    let seeds = 0
     const forMember = (member: string): PerMember<A, E> =>
       O.getOrElse(MutableHashMap.get(reads, member), () => {
         const made = make()
@@ -311,10 +336,12 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
       },
       members: () => reads.pipe(MutableHashMap.keys, A.fromIterable)
     })
+    // Numbers each answer given to this read, so each one nudges.
+    let gives = 0
     // The member it last read for, so a refresh of this atom (an optimistic write's, when the last one has answered)
     // reaches the read it shows. One registry holds it in the app; a test that makes several shares the key "".
     let shown = ""
-    return Atom.writable(
+    const atom = Atom.writable(
       (get) => {
         const member = get(memberKey)
         shown = member
@@ -327,11 +354,18 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
       },
       // An answer put in place for whoever is signed in now, whether or not a screen shows this read yet.
       (ctx, answer: A) => {
-        seeds += 1
-        ctx.set(forMember(ctx.get(memberKey)).seed, O.some({ answer, version: seeds }))
+        gives += 1
+        ctx.set(forMember(ctx.get(memberKey)).give(answer), gives)
       },
       (refresh) => refresh(forMember(shown).read)
     )
+    return Object.assign(atom, {
+      letGo: (registry: AtomRegistry.AtomRegistry) => {
+        const member = registry.get(memberKey)
+        stopKeeping(member)
+        MutableHashMap.remove(reads, member)
+      }
+    })
   }
   function send<A, E>(use: (client: Client) => Effect.Effect<A, E>): Effect.Effect<A, E, Id> {
     return Effect.flatMap(client, use).pipe(Effect.retry(writeRetry))

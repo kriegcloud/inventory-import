@@ -15,6 +15,7 @@ import * as O from "effect/Option"
 import * as Atom from "effect/reactivity/Atom"
 import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import { invalidate } from "@inventory/client/Api"
+import { memberKey } from "@inventory/client/MemberAtoms"
 import * as Queue from "effect/Queue"
 import * as Result from "effect/Result"
 import * as Schedule from "effect/Schedule"
@@ -219,8 +220,11 @@ const discard = (uploadId: ImportId): Promise<boolean> =>
     .then(Exit.isSuccess)
 
 /** Puts a finished upload where the next screen looks for it, and moves on to it if the person is still here. */
-const arrive = (file: File, done: Finished) => {
+const arrive = (file: File, done: Finished, startedAs: string | undefined) => {
   const { view, table, workbook } = done
+  // The person changed organization while the file was on its way: the import belongs to the one they left, and is
+  // listed there. Nothing of it is put in place or opened where they are now.
+  if (registry?.get(memberKey) !== startedAs) return
   registry?.set(importView(view.id), view)
   registry?.set(importTable(view.id), table)
   invalidate(catalogKeys.openImports)
@@ -238,7 +242,14 @@ const start = (file: File, sheet: string | null, onEnd: (end: UploadEnd) => void
   if (running !== null) return
   set({ _tag: "Reading", fileName: file.name, rowsRead: 0, rows: rowsOf({ rowsAbout: null, exact: false }) })
   const fiber = fork((client) => program(client, { file, sheet }))
-  const current = { fiber, fileName: file.name, uploadId: null as ImportId | null, onEnd }
+  const current = {
+    fiber,
+    fileName: file.name,
+    uploadId: null as ImportId | null,
+    onEnd,
+    // Who the upload was started as: its import is theirs, whoever is signed in when it lands.
+    startedAs: registry?.get(memberKey)
+  }
   running = current
   fiber.addObserver((exit) => {
     // Cancel handles its own ending.
@@ -247,7 +258,7 @@ const start = (file: File, sheet: string | null, onEnd: (end: UploadEnd) => void
     if (Exit.isSuccess(exit)) {
       set({ _tag: "Idle" })
       current.onEnd(UploadEnd.Arrived())
-      arrive(file, exit.value)
+      arrive(file, exit.value, current.startedAs)
       return
     }
     const error = Cause.squash(exit.cause)

@@ -3,10 +3,8 @@ import * as DateTime from "effect/DateTime"
 import * as O from "effect/Option"
 import { request } from "@inventory/client/Http"
 import { useAtom, useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
-import * as Exit from "effect/Exit"
 import * as Atom from "effect/reactivity/Atom"
 import { useRef } from "react"
-import { toast } from "sonner"
 import { PageHeader } from "@inventory/ui/PageHeader"
 import { Alert, AlertDescription, AlertTitle } from "@inventory/ui/components/alert"
 import {
@@ -26,7 +24,7 @@ import { FileUpload, FileUploadDropzone } from "@inventory/ui/components/file-up
 import { Progress } from "@inventory/ui/components/progress"
 import { member } from "@inventory/client/MemberAtoms"
 import { when, whenShort } from "@inventory/ui/Dates"
-import { importView, openImports as openImportsRead, pastImports, removeImport } from "./Imports.atoms.ts"
+import { giveView, openImports as openImportsRead, pastImports, removeImport } from "./Imports.atoms.ts"
 import { resultOf } from "./internal/result.ts"
 import { ListTable } from "@inventory/ui/ListTable"
 import { pastImportColumnsShort } from "./PastImports.screen.tsx"
@@ -178,9 +176,9 @@ const fileOverPage: Atom.Atom<boolean> = Atom.readable((get) => {
  */
 function OpenImport(props: { view: ImportView; lead: boolean; canImport: boolean }) {
   const { view } = props
-  const seedView = useAtomSet(importView(view.id))
-  const removing = useAtomValue(removeImport).waiting
-  const remove = useAtomSet(removeImport, { mode: "promiseExit" })
+  const giveNext = useAtomSet(giveView)
+  const removing = useAtomValue(removeImport(view.id)).waiting
+  const remove = useAtomSet(removeImport(view.id))
   return (
     <Item variant="outline" className="flex-wrap">
       <ItemContent className="min-w-56">
@@ -219,12 +217,9 @@ function OpenImport(props: { view: ImportView; lead: boolean; canImport: boolean
               <AlertDialogFooter>
                 <AlertDialogCancel>Keep</AlertDialogCancel>
                 <AlertDialogAction
-                  onClick={() =>
-                    // The card goes at once; a refusal puts it back and says why (useRemoveImport).
-                    void remove(view).then((exit) => {
-                      if (Exit.isSuccess(exit)) toast(`Removed ${view.fileName}`)
-                    })
-                  }
+                  // The card goes at once; a refusal puts it back and says why, and the server's yes is said the
+                  // moment it comes (`removeImport`).
+                  onClick={() => remove(view)}
                 >
                   Remove
                 </AlertDialogAction>
@@ -236,7 +231,7 @@ function OpenImport(props: { view: ImportView; lead: boolean; canImport: boolean
           // A viewer can look and cannot decide: for them it is not the screen's filled button, and it says "Open".
           variant={props.lead && props.canImport ? "default" : "outline"}
           onClick={() => {
-            seedView(view)
+            giveNext(view)
             navigate(importAddress(view.id, "review"))
           }}
         >

@@ -29,7 +29,7 @@ class Server extends Context.Service<Server, FakeServer>()("@inventory/client/te
 /** Long enough for the registry to run what a write started. */
 const settle = Effect.sleep("10 millis")
 
-const world = (options: { readonly idleTTL?: number } = {}) => {
+const world = (options: { readonly idleTTL?: number; readonly readAgainAfterRefusal?: boolean } = {}) => {
   let item: Item = { name: "Bolt", unit: "each" }
   let reads = 0
   const answers: Array<Deferred.Deferred<void, Refused>> = []
@@ -52,7 +52,8 @@ const world = (options: { readonly idleTTL?: number } = {}) => {
     send: (input: Edit) => api.send((server) => server.edit(input)),
     changes: [optimisticChange(itemShown, (now: Item, input: Edit) => ({ ...now, ...input }))],
     failed: () => "The item was not saved.",
-    onRefused: () => true
+    onRefused: () => true,
+    ...(options.readAgainAfterRefusal === undefined ? {} : { readAgainAfterRefusal: options.readAgainAfterRefusal })
   })
   const registry = AtomRegistry.make({
     initialValues: [provideApi(layer)],
@@ -68,7 +69,12 @@ const world = (options: { readonly idleTTL?: number } = {}) => {
   const press = (input: Edit) => registry.set(edit, input)
   const answer = (n: number) => Deferred.succeed(answers[n]!, undefined)
   const refuse = (n: number) => Deferred.fail(answers[n]!, Refused.make({}))
-  return { seen, press, answer, refuse, leave, reads: () => reads, stored: () => item }
+  /** The write's own result, as the row's Save button reads it: busy while a press is out, then the answer. */
+  const write = () => {
+    const result = registry.get(edit)
+    return { waiting: result.waiting, tag: result._tag }
+  }
+  return { seen, press, answer, refuse, leave, write, reads: () => reads, stored: () => item }
 }
 
 describe("two optimistic edits in flight", () => {
@@ -89,6 +95,8 @@ describe("two optimistic edits in flight", () => {
       expect(t.stored()).toEqual({ name: "Hex bolt", unit: "box" })
       // The first read, and one read after the last answer.
       expect(t.reads()).toBe(2)
+      // The write itself has settled: the button that pressed it is free again.
+      expect(t.write()).toEqual({ waiting: false, tag: "Success" })
     })
   )
 
@@ -153,6 +161,23 @@ describe("an optimistic edit whose row leaves the screen", () => {
       yield* Effect.sleep("40 millis")
       expect(t.seen()).toEqual({ item: { name: "Hex bolt", unit: "box" }, waiting: false })
       expect(t.reads()).toBe(3)
+    })
+  )
+})
+
+describe("a refused write that asks for its reads again", () => {
+  it.live("takes the change back at once, then shows what the server holds now", () =>
+    Effect.gen(function* () {
+      // A remove refused because someone else already removed it: the list must not keep showing what is gone.
+      const t = world({ readAgainAfterRefusal: true })
+      yield* settle
+      t.press({ name: "Hex bolt" })
+      yield* settle
+      yield* t.refuse(0)
+      yield* Effect.sleep("40 millis")
+      expect(t.seen()).toEqual({ item: { name: "Bolt", unit: "each" }, waiting: false })
+      // The first read, and one more after the refusal.
+      expect(t.reads()).toBe(2)
     })
   )
 })

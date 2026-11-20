@@ -245,7 +245,7 @@ describe("a confirm", () => {
   )
 
   it.live(
-    "refused for an accept made before its column was matched again: nothing was imported, the accept is named once the newer picture is read, and the row is saved without it",
+    "refused for an accept made before its column was matched again: nothing was imported, the accept is named, the button is free at once, and the row is saved without it",
     () =>
       Effect.gen(function* () {
         const id = importNo(36)
@@ -270,10 +270,12 @@ describe("a confirm", () => {
           })
         )
         yield* settle
-        // Nothing was imported, said above the review, while the newer picture is read; the row goes without the accept.
+        // Nothing was imported, said above the review with the accept named; the server checked the revision first, so
+        // the screen already holds the picture the confirm named and the button is free at once. The row goes without
+        // the accept, and the import is asked for.
         expect([t.heldBack(), t.confirming(), t.gets.length]).toEqual([
-          O.some({ read: false, apart: 0, accepts: [{ rowId: "row-55", field: "unitCost", kind: "accept" }] }),
-          true,
+          O.some({ read: true, apart: 0, accepts: [{ rowId: "row-55", field: "unitCost", kind: "accept" }] }),
+          false,
           asked + 1
         ])
         expect(A.map(t.saves, (save) => save.delta)[1]).toEqual({ set: { "row-55": decisionFromFlags({}) }, clear: [] })

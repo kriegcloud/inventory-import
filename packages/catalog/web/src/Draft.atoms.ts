@@ -21,7 +21,7 @@ import type { ImportId } from "@inventory/catalog-contract/Ids"
 import { kept } from "@inventory/review/Kept"
 import { progressKey } from "@inventory/review/SavedProgress"
 import { leavingApp } from "@inventory/ui/Route"
-import { type Draft, emptyDraft, type Waiting } from "./Draft.machine.ts"
+import { type Draft, emptyDraft, Hold, type HeldRow, type Waiting } from "./Draft.machine.ts"
 
 /**
  * One import's draft: what this tab holds of the server's decisions and what the person changed here that the server
@@ -31,15 +31,26 @@ import { type Draft, emptyDraft, type Waiting } from "./Draft.machine.ts"
  */
 export const draftOf = perKey((_id: ImportId) => Atom.keepAlive(Atom.make<Draft>(emptyDraft)))
 
+/** Why a row is held, as this browser keeps it: refused with the server's sentence, or decided elsewhere since. */
+const StoredHold = S.Union([
+  S.Struct({ kind: S.tag("refused"), reason: S.String }),
+  S.Struct({ kind: S.tag("elsewhere"), theirs: S.OptionFromNullOr(RowDecision) })
+]).pipe(S.toTaggedUnion("kind"))
+
+/** One row on hold as this browser keeps it. */
+const StoredHeld = S.Struct({ mine: S.OptionFromNullOr(RowDecision), madeOn: S.Int, why: StoredHold })
+
 /**
  * One import's waiting rows as this browser keeps them. Read too as an older page of the app kept them: one revision
- * for all the rows (`madeOn` a number) and no count of confirms.
+ * for all the rows (`madeOn` a number), no count of confirms, no values seen and no rows on hold.
  */
 const StoredWaiting = S.Struct({
   madeOn: S.Union([S.Int, S.Record(S.String, S.Int)]),
   confirms: S.Int.pipe(S.NullOr, S.optionalKey),
   leftOver: S.Boolean,
-  rows: S.Record(S.String, S.OptionFromNullOr(RowDecision))
+  rows: S.Record(S.String, S.OptionFromNullOr(RowDecision)),
+  seen: S.Record(S.String, RowDecision.pipe(S.OptionFromNullOr, S.Array)).pipe(S.optionalKey),
+  held: S.Record(S.String, StoredHeld).pipe(S.optionalKey)
 }).pipe(S.OptionFromNullOr)
 type StoredWaiting = typeof StoredWaiting.Type
 
@@ -50,7 +61,16 @@ const toWaiting = (stored: StoredWaiting): O.Option<Waiting> =>
       rows: entry.rows,
       madeOn: P.isNumber(made) ? R.map(entry.rows, () => made) : made,
       confirms: O.fromNullishOr(entry.confirms),
-      leftOver: entry.leftOver
+      leftOver: entry.leftOver,
+      seen: entry.seen ?? {},
+      held: R.map(entry.held ?? {}, (held): HeldRow => ({
+        mine: held.mine,
+        madeOn: held.madeOn,
+        why: StoredHold.match(held.why, {
+          refused: ({ reason }) => Hold.Refused({ reason }),
+          elsewhere: ({ theirs }) => Hold.Elsewhere({ theirs })
+        })
+      }))
     }
   })
 
@@ -59,7 +79,20 @@ const toStored = (waits: O.Option<Waiting>): StoredWaiting =>
     madeOn: entry.madeOn,
     confirms: O.getOrNull(entry.confirms),
     leftOver: entry.leftOver,
-    rows: entry.rows
+    rows: entry.rows,
+    ...(R.isEmptyReadonlyRecord(entry.seen) ? {} : { seen: entry.seen }),
+    ...(R.isEmptyReadonlyRecord(entry.held)
+      ? {}
+      : {
+          held: R.map(entry.held, (held) => ({
+            mine: held.mine,
+            madeOn: held.madeOn,
+            why: Hold.$match(held.why, {
+              Refused: ({ reason }) => ({ kind: "refused" as const, reason }),
+              Elsewhere: ({ theirs }) => ({ kind: "elsewhere" as const, theirs })
+            })
+          }))
+        })
   }))
 
 const waitingAt = Atom.family((key: string) =>
@@ -105,7 +138,10 @@ export const keepWaiting = (input: {
     if (O.isNone(input.waits)) MutableHashMap.remove(keptKeys, id)
   })
   registry.update(waitingImports, (now) =>
-    O.exists(input.waits, (waits) => !waits.leftOver) ? HashSet.add(now, id) : HashSet.remove(now, id)
+    // Rows on hold are kept, and not to be sent by themselves: they ask nothing before the page is left.
+    O.exists(input.waits, (waits) => !waits.leftOver && !R.isEmptyReadonlyRecord(waits.rows))
+      ? HashSet.add(now, id)
+      : HashSet.remove(now, id)
   )
 }
 

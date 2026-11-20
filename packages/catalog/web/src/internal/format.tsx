@@ -1,3 +1,4 @@
+import * as A from "effect/Array"
 import { NotSet } from "@inventory/ui/NotSet"
 import { StatusPill, type Tone } from "@inventory/ui/StatusPill"
 import type { ReviewWords } from "@inventory/review/ReviewTypes"
@@ -35,7 +36,11 @@ export const reviewStepWords: Partial<ReviewWords> = { stored: importWords.alrea
  * @example heldBackSentence({ why: { read: true, apart: 1, accepts: [] }, accepts: "" }) // "Nothing was imported: 1 row is decided otherwise since you pressed Import. …"
  */
 export const heldBackSentence = (input: {
-  readonly why: { readonly read: boolean; readonly apart: number; readonly accepts: ReadonlyArray<unknown> }
+  readonly why: {
+    readonly read: boolean
+    readonly apart: number
+    readonly accepts: ReadonlyArray<{ readonly kind?: string }>
+  }
   /** The accepts taken back, in words. */
   readonly accepts: string
 }): string => {
@@ -49,10 +54,13 @@ export const heldBackSentence = (input: {
       : why.apart === 1
         ? "1 row is decided otherwise since you pressed Import."
         : `${why.apart} rows are decided otherwise since you pressed Import.`
+  const one = why.accepts.length === 1
   const taken =
     why.accepts.length === 0
       ? ""
-      : ` A column was matched again after you accepted its proposal, so ${why.accepts.length === 1 ? "that accept was" : "those accepts were"} taken back: ${accepts}.`
+      : A.every(why.accepts, (taken) => (taken.kind ?? "accept") === "accept")
+        ? ` A column was matched again after you accepted its proposal, so ${one ? "that accept was" : "those accepts were"} taken back: ${accepts}.`
+        : ` A column was matched again after you decided, so ${one ? "that decision was" : "those decisions were"} taken back: ${accepts}.`
   return `Nothing was imported: ${rows}${taken} The review and its totals below show the import as it is now. Check them, then import again.`
 }
 

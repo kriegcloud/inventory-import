@@ -11,9 +11,10 @@ import * as Atom from "effect/reactivity/Atom"
 import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import { toast } from "sonner"
 import { perKey } from "@inventory/client/Api"
+import { NotSignedIn } from "@inventory/kernel/AccessError"
 import { member } from "@inventory/client/MemberAtoms"
 import { isTransient, sayError, toastError } from "@inventory/client/SayError"
-import type { SavedDecisions } from "@inventory/catalog-contract/Decision"
+import type { SavedDecisions, TakenBackKind } from "@inventory/catalog-contract/Decision"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import { ImportEvent, type ImportView, type SuggestOutcome } from "@inventory/catalog-contract/Import"
 import { restored, saved } from "@inventory/review/ReviewDraft"
@@ -118,16 +119,32 @@ const isLocal = DraftEffect.$match({
 /** A row as the person knows it: "row 55". */
 const rowWords = (rowId: string): string => Str.replace("-", " ")(rowId)
 
-/** The accepts the server did not apply, in a sentence: "Unit cost on row 55; Name on row 7". */
+/** A field as the person knows it: "Unit cost". */
+const fieldWords = (field: string): string => O.getOrElse(R.get<string, string>(fieldLabels, field), () => field)
+
+/**
+ * The decisions the server did not apply, in a sentence, each by what it was and its row: "Unit cost on row 55; the
+ * Replace on row 7 (SKU matched again)". An accept is named by its field alone, as it always was.
+ */
 export const acceptsWords = (accepts: ReadonlyArray<StaleAccept>): string =>
   A.join(
-    A.map(
-      accepts,
-      (accept) =>
-        `${O.getOrElse(R.get<string, string>(fieldLabels, accept.field), () => accept.field)} on ${rowWords(accept.rowId)}`
-    ),
+    A.map(accepts, (taken) => {
+      const row = rowWords(taken.rowId)
+      const field = fieldWords(taken.field)
+      const said: Record<TakenBackKind, string> = {
+        accept: `${field} on ${row}`,
+        stored: `the keep-or-replace on ${row} (${field} matched again)`,
+        twin: `the row kept of two on ${row} (${field} matched again)`,
+        undo: `the undone fix of ${field} on ${row}`
+      }
+      return said[taken.kind ?? "accept"]
+    }),
     "; "
   )
+
+/** True when every decision taken back was an accept: said in the words an accept always had. */
+const onlyAccepts = (accepts: ReadonlyArray<StaleAccept>): boolean =>
+  A.every(accepts, (taken) => (taken.kind ?? "accept") === "accept")
 
 /** The scope this browser keeps one import's review under, for the person signed in; none while nobody is. */
 const scopeFor = (signedIn: O.Option<{ readonly organizationId: string; readonly id: string }>, id: ImportId) =>
@@ -176,8 +193,13 @@ const perform = (input: {
         },
         (error: unknown) => {
           answered(id)
+          // Nobody signed in is not a refusal: the rows wait, kept in this browser, and are sent after sign-in.
           happened(
-            isTransient(error) ? DraftEvent.SaveFailed() : DraftEvent.SaveRefused({ reason: sayError(error).sentence })
+            S.is(NotSignedIn)(error)
+              ? DraftEvent.SaveSignedOut()
+              : isTransient(error)
+                ? DraftEvent.SaveFailed()
+                : DraftEvent.SaveRefused({ reason: sayError(error).sentence })
           )
         }
       ),
@@ -192,15 +214,29 @@ const perform = (input: {
               "Your last decision is on this screen, and the server did not take it. It is sent again when the server answers; nothing is lost.",
             action: { label: "Save again", onClick: () => happened(DraftEvent.SaveAgain()) }
           }),
+        SignedOut: () =>
+          void toast.error("Not saved: you are signed out", {
+            description:
+              "Your last decision is on this screen and kept in this browser. It is sent once you sign in again; nothing is lost.",
+            action: { label: "Save again", onClick: () => happened(DraftEvent.SaveAgain()) }
+          }),
         Refused: ({ reason }) =>
           void toast.error("Your last decision was not saved", {
-            description: `${reason} The review shows what was saved.`
+            description: `${reason} It is listed above the review until you decide that row again or dismiss it; the review shows what was saved.`
           }),
         AcceptsTakenBack: ({ accepts }) =>
           void toast.error(
-            accepts.length === 1 ? "An accept was taken back" : `${accepts.length} accepts were taken back`,
+            onlyAccepts(accepts)
+              ? accepts.length === 1
+                ? "An accept was taken back"
+                : `${accepts.length} accepts were taken back`
+              : accepts.length === 1
+                ? "A decision was taken back"
+                : `${accepts.length} decisions were taken back`,
             {
-              description: `The column was matched again after you accepted: ${acceptsWords(accepts)}. Each row shows its proposal again.`
+              description: onlyAccepts(accepts)
+                ? `The column was matched again after you accepted: ${acceptsWords(accepts)}. Each row shows its proposal again.`
+                : `A column was matched again after you decided: ${acceptsWords(accepts)}. Each row shows what it reads now, to decide again.`
             }
           ),
         // Named once, and let go: the import was confirmed, and opened again, before these rows were sent.
@@ -308,6 +344,9 @@ export const shownDecisions = perKey((id: ImportId) =>
 export const confirmingImport = perKey((id: ImportId) =>
   Atom.map(draftOf(id), (draft) => draft.confirm !== "idle" || O.exists(draft.heldBack, (why) => !why.read))
 )
+
+/** The person's rows on hold (refused, or decided elsewhere since), for the lines above the review that list them. */
+export const rowsOnHold = perKey((id: ImportId) => Atom.map(draftOf(id), (draft) => draft.onHold))
 
 /** How many of the person's rows wait after a save that failed, for the line that says so; 0 while none do. */
 export const rowsNotSaved = perKey((id: ImportId) =>

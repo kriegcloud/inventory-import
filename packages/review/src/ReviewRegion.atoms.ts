@@ -59,15 +59,13 @@ import type {
 } from "@inventory/review/ReviewTypes"
 import type { RowAction } from "@inventory/review/ReviewTypes"
 import { reviewWords } from "@inventory/review/ReviewWords"
+import { Density, density } from "./Density.atoms.ts"
 import { type Layout, regionLayout } from "./internal/parts.tsx"
 
 // Each enum's own guard, made once: these run for every row and every cell.
 const isCellMarkApplied = CellMark.$is("Applied")
 const isActionUndo = Action.$is("Undo")
 const isActionRedo = Action.$is("Redo")
-
-/** 36 px rows, or 44 px with more air between them. */
-export type Density = "compact" | "comfortable"
 
 /** The caller's rule for a row whose value the person typed: what is still wrong with it, or nothing. */
 export type Recheck = (input: { row: ReviewRow; cells: Readonly<Record<string, string>> }) => Problem | undefined
@@ -141,7 +139,6 @@ export type RegionUi = {
   readonly split: HashSet.HashSet<string>
   readonly facetPicked: Readonly<Record<string, ReadonlyArray<string>>>
   /** The row height: the browser's remembered choice, read once when the region is made, then what the person picks. */
-  readonly density: Density
 }
 
 /** One facet column's choices: spellings that read the same are one choice, with the rows it has in the view on screen. */
@@ -250,24 +247,6 @@ export interface Region {
   readonly notImported: () => string
 }
 
-/** Compact (36 px rows) or comfortable (44 px), remembered in this browser: a preference, not progress. */
-const densityKey = "review-density"
-export const storedDensity = (): Density => {
-  try {
-    return window.localStorage.getItem(densityKey) === "comfortable" ? "comfortable" : "compact"
-  } catch {
-    return "compact"
-  }
-}
-/** Remembers the row height the person chose; a private window refuses, and the choice lasts for the visit. */
-export const keepDensity = (next: Density): void => {
-  try {
-    window.localStorage.setItem(densityKey, next)
-  } catch {
-    // Refused: nothing to do.
-  }
-}
-
 const facetsOf = (
   facetColumns: ReadonlyArray<ReviewColumn>,
   facetPicked: RegionUi["facetPicked"],
@@ -332,8 +311,7 @@ const makeRegion = (input: RegionInput, registry: AtomRegistry.AtomRegistry): Re
     folded: HashSet.empty(),
     said: "",
     split: HashSet.empty(),
-    facetPicked: {},
-    density: storedDensity()
+    facetPicked: {}
   })
   // One part of what the region owns each, so what is worked out from one is not worked out again for another.
   const picked = Atom.map(ui, (now) => now.picked)
@@ -974,3 +952,5 @@ export const regionTableAtom = (input: {
 
 /** What a region has once its table exists, made once from the table the region was first drawn with. */
 export const TableScope = ScopedAtom.make(regionTableAtom)
+
+export { Density, density }

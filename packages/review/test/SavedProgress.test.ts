@@ -1,6 +1,6 @@
 // What a refresh brings back. The rules that would hurt if wrong: progress saved for one person in one organization is
-// never read for anyone else; the decisions and the undo history come back exactly as they were left; and a draft
-// that no longer decodes is dropped, never shown half.
+// never read for anyone else; the decisions and the undo history come back exactly as they were left; a draft that no
+// longer decodes is never shown half; and what this browser kept before the atoms kept it is still read.
 import { it } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as ByteSize from "effect/ByteSize"
@@ -9,36 +9,49 @@ import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
-import { describe, expect, it as plain } from "vitest"
+import * as AtomRegistry from "effect/reactivity/AtomRegistry"
+import { describe, expect, vi } from "vitest"
 import { ReviewDecision } from "@inventory/review/ReviewDecision"
 import { Action, act, emptyState } from "@inventory/review/ReviewDraft"
 import type { ReviewRow, ReviewState } from "@inventory/review/ReviewTypes"
 import {
-  clearProgress,
   progressKey,
-  type ProgressStorage,
-  readProgress,
   restoredReview,
   SavedProgress,
   StoredFile,
   storedReview,
-  StoredReview,
-  writeProgress
+  StoredReview
 } from "@inventory/review/SavedProgress"
+import { progressOf } from "@inventory/review/SavedProgressHook"
+import { density } from "../src/Density.atoms.ts"
 
-const memory = (): ProgressStorage & { readonly items: Record<string, string> } => {
-  const items: Record<string, string> = {}
-  return {
-    items,
-    getItem: (key) => R.get(items, key).pipe((found) => (O.isSome(found) ? found.value : null)),
-    setItem: (key, value) => {
-      items[key] = value
-    },
-    removeItem: (key) => {
-      delete items[key]
+// The browser's storage, which outlives a refresh. `refuse` makes it a full disk: every write throws.
+const browser = vi.hoisted(() => {
+  const state = { items: {} as Record<string, string>, refuse: false }
+  Object.assign(globalThis, {
+    window: {
+      localStorage: {
+        getItem: (key: string) => state.items[key] ?? null,
+        setItem: (key: string, value: string) => {
+          if (state.refuse) throw new Error("QuotaExceededError")
+          state.items[key] = value
+        },
+        removeItem: (key: string) => {
+          delete state.items[key]
+        }
+      }
     }
-  }
-}
+  })
+  return state
+})
+
+/** A page: its own registry on the same storage. A refresh is the next page. */
+const page = () => AtomRegistry.make()
+const settle = Effect.sleep("10 millis")
+const fresh = Effect.sync(() => {
+  browser.items = {}
+  browser.refuse = false
+})
 
 const progress = (step: string): SavedProgress =>
   SavedProgress.make({
@@ -72,24 +85,88 @@ describe("saved progress", () => {
     }
   )
 
-  plain("never reads one member's progress for another member or another organization", () => {
-    const storage = memory()
-    const dana = { organizationId: "org_prairie", memberId: "mem_dana", screen: "import" }
-    expect(writeProgress(storage, dana, progress("review"))).toBe(true)
-    expect(readProgress(storage, dana)?.step).toBe("review")
-    expect(readProgress(storage, { ...dana, memberId: "mem_marcus" })).toBeUndefined()
-    expect(readProgress(storage, { ...dana, organizationId: "org_northline" })).toBeUndefined()
-    clearProgress(storage, dana)
-    expect(readProgress(storage, dana)).toBeUndefined()
-  })
+  it.live(
+    "never reads one member's progress for another member or another organization, and a clear leaves nothing",
+    () =>
+      Effect.gen(function* () {
+        yield* fresh
+        const dana = { organizationId: "org_prairie", memberId: "mem_dana", screen: "import" }
+        // Written with nobody reading it, as a Confirm or a decision made outside any screen writes it.
+        page().set(progressOf(dana), O.some(progress("review")))
+        yield* settle
+        expect(R.keys(browser.items)).toEqual([progressKey(dana)])
+        const next = page()
+        expect(O.map(next.get(progressOf(dana)), (kept) => kept.step)).toEqual(O.some("review"))
+        expect(next.get(progressOf({ ...dana, memberId: "mem_marcus" }))).toEqual(O.none())
+        expect(next.get(progressOf({ ...dana, organizationId: "org_northline" }))).toEqual(O.none())
+        yield* settle
+        // Looking at somebody's progress that is not there writes nothing under their key.
+        expect(R.keys(browser.items)).toEqual([progressKey(dana)])
+        next.set(progressOf(dana), O.none())
+        yield* settle
+        expect(R.keys(browser.items)).toEqual([])
+        expect(page().get(progressOf(dana))).toEqual(O.none())
+      })
+  )
 
-  plain("drops a stored draft that does not decode, and does not offer it again", () => {
-    const storage = memory()
-    const scope = { organizationId: "org_prairie", memberId: "mem_dana", screen: "import" }
-    storage.setItem(progressKey(scope), '{"version":0,"step":"review"}')
-    expect(readProgress(storage, scope)).toBeUndefined()
-    expect(R.keys(storage.items)).toEqual([])
-  })
+  it.live("reads the progress this browser kept before the atom kept it: the same text under the same key", () =>
+    Effect.gen(function* () {
+      yield* fresh
+      const scope = { organizationId: "org_prairie", memberId: "mem_dana", screen: "import" }
+      const text = yield* S.encodeEffect(S.fromJsonString(SavedProgress))(progress("review"))
+      browser.items[progressKey(scope)] = text
+      const read = page().get(progressOf(scope))
+      expect(O.map(read, (kept) => [kept.step, kept.decided, kept.needed])).toEqual(O.some(["review", 1, 4]))
+      // And what the atom writes is that text: an older page of the app still reads it.
+      delete browser.items[progressKey(scope)]
+      page().set(progressOf(scope), read)
+      yield* settle
+      expect(browser.items[progressKey(scope)]).toBe(text)
+    })
+  )
+
+  it.live("does not offer a stored draft that no longer decodes, and the next write replaces it", () =>
+    Effect.gen(function* () {
+      yield* fresh
+      const scope = { organizationId: "org_prairie", memberId: "mem_dana", screen: "import" }
+      browser.items[progressKey(scope)] = '{"version":0,"step":"review"}'
+      const first = page()
+      expect(first.get(progressOf(scope))).toEqual(O.none())
+      first.set(progressOf(scope), O.some(progress("match")))
+      yield* settle
+      expect(O.map(page().get(progressOf(scope)), (kept) => kept.step)).toEqual(O.some("match"))
+    })
+  )
+
+  it.live("holds the progress for the visit where the browser keeps nothing, and says nothing", () =>
+    Effect.gen(function* () {
+      yield* fresh
+      browser.refuse = true
+      const scope = { organizationId: "org_prairie", memberId: "mem_dana", screen: "import" }
+      const here = page()
+      const stop = here.mount(progressOf(scope))
+      here.set(progressOf(scope), O.some(progress("review")))
+      yield* settle
+      expect(O.map(here.get(progressOf(scope)), (kept) => kept.step)).toEqual(O.some("review"))
+      expect(R.keys(browser.items)).toEqual([])
+      stop()
+    })
+  )
+
+  it.live("keeps the row height, and reads the bare word an older page of the app kept", () =>
+    Effect.gen(function* () {
+      yield* fresh
+      browser.items["review-density"] = "comfortable"
+      const first = page()
+      expect(first.get(density)).toBe("comfortable")
+      first.set(density, "compact")
+      yield* settle
+      expect(page().get(density)).toBe("compact")
+      // With nothing kept it is compact, and reading it keeps that.
+      yield* fresh
+      expect(page().get(density)).toBe("compact")
+    })
+  )
 
   // Rows with a problem in one column; the person types values and leaves rows out in any order.
   const rows: ReadonlyArray<ReviewRow> = A.makeBy(6, (i) => ({

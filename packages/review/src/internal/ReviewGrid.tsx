@@ -10,6 +10,7 @@ import * as Atom from "effect/reactivity/Atom"
 import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import {
   type Density,
+  density as keptDensity,
   type GroupActions,
   type Region,
   RegionScope,
@@ -1560,7 +1561,7 @@ export const makeGrid = (input: {
   // A value under the name takes a second line: such rows are 44 px whatever the density, so the virtual list's
   // estimate matches what is drawn.
   const rowSize = Atom.readable((get) =>
-    get(region.ui).density === "comfortable" || get(parts).under.length > 0 ? tallRowHeight : rowHeight
+    get(keptDensity) === "comfortable" || get(parts).under.length > 0 ? tallRowHeight : rowHeight
   )
 
   // -- The virtual list is TanStack's: where the frame is scrolled to and how tall each line was measured are its
@@ -1691,7 +1692,7 @@ export function ReviewGrid(props: GridProps) {
   const scroller = useRef<HTMLDivElement>(null)
   const allColumns = useAtomValue(region.input.columns)
   const excluded = useAtomValue(region.ui).excluded
-  const density = useAtomValue(region.ui).density
+  const density = useAtomValue(keptDensity)
   const readOnly = useAtomValue(region.input.readOnly)
   const ownAnswer = useAtomValue(region.input.rowAction)
   const rowAction = O.getOrUndefined(ownAnswer)

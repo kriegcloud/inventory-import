@@ -14,7 +14,7 @@ import {
 } from "lucide-react"
 import * as HashSet from "effect/HashSet"
 import * as O from "effect/Option"
-import { useAtomMount, useAtomSubscribe, useAtomValue } from "@effect/atom-react"
+import { useAtomMount, useAtomSet, useAtomSubscribe, useAtomValue } from "@effect/atom-react"
 import * as Atom from "effect/reactivity/Atom"
 import { lazy, type ReactNode, Suspense, useId, useRef } from "react"
 import { AgentRun } from "@inventory/ui/AgentRun"
@@ -57,7 +57,7 @@ import { ReviewQueue } from "./internal/ReviewQueue.tsx"
 import { WorkList } from "./internal/WorkList.tsx"
 import {
   type Density,
-  keepDensity,
+  density as keptDensity,
   type Region,
   type RegionInput,
   type RegionTable,
@@ -326,11 +326,8 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
     ? filter === "needs" && counts.needs > 0
     : !readOnly && (filter === "needs" ? leadInView : counts.needs > 0)
   // Compact (36 px rows) or comfortable (44 px), remembered in this browser: a preference, not progress.
-  const density = own.density
-  const chooseDensity = (next: Density) => {
-    change(() => ({ density: next }))
-    keepDensity(next)
-  }
+  const density = useAtomValue(keptDensity)
+  const chooseDensity = useAtomSet(keptDensity)
   const main = primary({ columns, counts, noun: props.noun, closing: props.closingLabel, words })
 
   const importButton = useRef<HTMLButtonElement>(null)

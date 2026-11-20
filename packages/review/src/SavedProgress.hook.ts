@@ -1,6 +1,6 @@
-// The browser half of saved progress: the chosen file in IndexedDB, the progress as an atom per key over the
-// browser's storage, and the hook a screen reads it with. The rules and the
-// stored shape are in `SavedProgress.schema.ts` (tested without a browser).
+// The browser half of saved progress: the chosen file in IndexedDB, the progress as an atom per key that is the
+// browser's own record of it (`Atom.kvs` over `localStorage`), and the hook a screen reads it with. The stored shape
+// and its keys are in `SavedProgress.schema.ts`.
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import type * as ManagedRuntime from "effect/ManagedRuntime"
@@ -8,14 +8,8 @@ import * as O from "effect/Option"
 import * as S from "effect/Schema"
 import { useAtomSet, useAtomValue } from "@effect/atom-react"
 import * as Atom from "effect/reactivity/Atom"
-import {
-  progressKey,
-  type ProgressScope,
-  type ProgressStorage,
-  readAt,
-  SavedProgress,
-  writeAt
-} from "@inventory/review/SavedProgress"
+import { progressKey, type ProgressScope, SavedProgress } from "@inventory/review/SavedProgress"
+import { keptRuntime } from "./internal/keptStore.ts"
 
 // The chosen file, kept as a Blob in IndexedDB: a whole spreadsheet does not fit localStorage, and a Blob is stored
 // without being copied through the page's thread.
@@ -64,34 +58,16 @@ export const dropFile = Effect.fn("savedProgress.dropFile")(function* (scope: Pr
   yield* inFiles("readwrite", (store) => store.delete(progressKey(scope)))
 })
 
-const browserStorage = (): ProgressStorage | undefined => {
-  try {
-    return window.localStorage
-  } catch {
-    return undefined
-  }
-}
-
-/** The browser's storage, looked up once: undefined where it is refused (some private windows). */
-const storage = browserStorage()
-
-/** True once the browser would not keep progress or a file: the screen says so once. */
-const refusedToKeep = Atom.make(false)
+// None is kept as no entry at all (`keptStore.ts`), so Confirm leaves nothing behind.
+const Kept = S.OptionFromNullOr(SavedProgress)
 
 /**
- * The progress kept under one key. The browser's storage is the record: the atom reads it, and every write goes to
- * it before the atom shows it, so an atom let go and read again finds the same.
+ * The progress kept under one key, as the browser's own record of it (`Atom.kvs`): read from storage when first
+ * read, written there with every write, so an atom let go and read again finds the same. A stored text that no
+ * longer decodes (an older version) reads as none and is replaced by the next write.
  */
 const progressAt = Atom.family((key: string) =>
-  Atom.writable(
-    () => O.fromUndefinedOr(storage === undefined ? undefined : readAt(storage, key)),
-    (ctx, next: O.Option<SavedProgress>) => {
-      if (O.isSome(next)) {
-        if (storage === undefined || !writeAt(storage, key, next.value)) ctx.set(refusedToKeep, true)
-      } else storage?.removeItem(key)
-      ctx.setSelf(next)
-    }
-  )
+  Atom.kvs({ runtime: keptRuntime, key, schema: Kept, defaultValue: () => O.none<SavedProgress>() })
 )
 
 /** No scope yet (the actor still loading): nothing is read or written. */
@@ -123,7 +99,8 @@ export const progressWith = (input: {
 /**
  * One screen's saved progress for the person signed in. `saved` is what is kept now; `save` merges a change and
  * writes it at once; `keepFile` stores the chosen file; `file` reads it back; `clear` removes all of it (on Confirm,
- * or "Start again"). `refused` turns true when the browser would not keep it, so the screen can say so once. With no
+ * or "Start again"). Where the browser keeps nothing (a private window, a full disk) the progress lasts for the
+ * visit and the file is not kept: nothing is said, and the upload goes on. With no
  * scope yet (the actor still loading) nothing is read or written; another person or organization reads their own,
  * never the last one's. `browserRuntime` is the page's one runtime: the file is read and written on it, so a Cancel
  * anywhere interrupts it.
@@ -138,8 +115,6 @@ export function useSavedProgress(
   // Given a function, the setter works the change out from the progress as it stands when written, so two changes in
   // one tick both land.
   const update = useAtomSet(at)
-  const refused = useAtomValue(refusedToKeep)
-  const setRefused = useAtomSet(refusedToKeep)
 
   const save = (change: Partial<Omit<SavedProgress, "version" | "savedAt">>) => {
     if (scope === undefined) return
@@ -148,7 +123,7 @@ export function useSavedProgress(
 
   const keepFile = (file: File) => {
     if (scope === undefined) return
-    browserRuntime.runFork(saveFile(scope, file).pipe(Effect.tapError(() => Effect.sync(() => setRefused(true)))))
+    browserRuntime.runFork(saveFile(scope, file).pipe(Effect.ignore))
   }
 
   const file = (): Promise<File | undefined> =>
@@ -167,5 +142,5 @@ export function useSavedProgress(
     browserRuntime.runFork(dropFile(scope).pipe(Effect.ignore))
   }
 
-  return { saved, save, keepFile, file, clear, refused }
+  return { saved, save, keepFile, file, clear }
 }

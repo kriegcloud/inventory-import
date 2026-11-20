@@ -1,10 +1,12 @@
 import { useAtom, useAtomValue } from "@effect/atom-react"
 import * as A from "effect/Array"
+import * as O from "effect/Option"
 import * as Atom from "effect/reactivity/Atom"
 import { toast } from "sonner"
 import { StatusPill } from "@inventory/ui/StatusPill"
 import { ReviewRegion } from "@inventory/review/ReviewRegion"
-import type { ReviewRow, SavedDecisions } from "@inventory/review/ReviewTypes"
+import { restored, saved } from "@inventory/review/ReviewDraft"
+import type { ReviewRow } from "@inventory/review/ReviewTypes"
 import { Button } from "@inventory/ui/components/button"
 import { type RecordColumn, RecordsTable } from "@inventory/ui/components/data-table/data-table-records"
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@inventory/ui/components/item"
@@ -33,7 +35,12 @@ const statusTone = { ready: "info", waiting: "warning", out: "neutral" } as cons
 /** Which view is open, which jobs it lists, the region's decisions and the jobs left out. */
 const jobsView = Atom.make<View>("jobs")
 const jobsFilter = Atom.make<JobFilter>("waiting")
-const jobDecisions = Atom.make<SavedDecisions>({})
+// The region's decisions with their undo: the region writes them here, and they outlive the region, so switching
+// views and coming back finds every answer and "Undo last step" where they were.
+const jobState = Atom.make(restored({}))
+const jobDecisions = Atom.map(jobState, saved)
+const lineColumnsAtom = Atom.make(lineColumns)
+const lineRecheck = Atom.make(O.some(recheckLine))
 const jobsLeftOut = Atom.make<ReadonlyArray<string>>([])
 
 /** Every job as it stands after the decisions and the jobs left out. */
@@ -64,16 +71,14 @@ const leaveJobAction = Atom.readable((get) => (row: ReviewRow) => {
  * what it becomes and why, on one line, in the app's data table) holds the counts and the import button; the
  * questions on their lines are an
  * embedded `ReviewRegion` in a second view, with picks that have no default, a labelled group, and "Leave job … out"
- * on every row. Switching views unmounts the region; its decisions and its undo come back through `savedDecisions`.
+ * on every row. Switching views unmounts the region; its decisions and its undo are the page's atom, so they come back.
  */
 export function JobsReview() {
   const narrow = useAtomValue(isNarrow)
   const [view, setView] = useAtom(jobsView)
   const [filter, setFilter] = useAtom(jobsFilter)
-  const [decisions, setDecisions] = useAtom(jobDecisions)
   const [, setLeftOut] = useAtom(jobsLeftOut)
   const reviews = useAtomValue(jobReviews)
-  const rows = useAtomValue(jobQuestionRows)
   const rowAction = useAtomValue(leaveJobAction)
 
   const tally = { ready: 0, waiting: 0, out: 0 }
@@ -205,15 +210,14 @@ export function JobsReview() {
             embedded
             title="Lines waiting on you"
             noun={["line", "lines"]}
-            columns={lineColumns}
-            rows={rows}
+            columns={lineColumnsAtom}
+            rows={jobQuestionRows}
+            decisions={jobState}
             problemKinds={lineKinds}
             summary={[]}
-            recheck={recheckLine}
+            recheck={lineRecheck}
             // A line's own "ready" is an answered question: the job it belongs to is what is Ready.
             words={{ needs: pageWords.needs, ready: "Answered", out: pageWords.out }}
-            savedDecisions={decisions}
-            onDecisionsChange={setDecisions}
             rowAction={rowAction}
             onImport={() => undefined}
           />

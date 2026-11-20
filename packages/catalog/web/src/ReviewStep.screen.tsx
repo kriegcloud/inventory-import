@@ -1,7 +1,6 @@
 import { useAtom, useAtomMount, useAtomSet, useAtomValue } from "@effect/atom-react"
 import * as A from "effect/Array"
 import * as Cause from "effect/Cause"
-import * as Eq from "effect/Equal"
 import * as Exit from "effect/Exit"
 import * as O from "effect/Option"
 import * as Atom from "effect/reactivity/Atom"
@@ -10,20 +9,18 @@ import { TriangleAlertIcon } from "lucide-react"
 import { toast } from "sonner"
 import { ReviewSkeleton } from "@inventory/ui/Skeletons"
 import { ReviewRegion } from "@inventory/review/ReviewRegion"
-import type { Activity, Problem, ReviewRow } from "@inventory/review/ReviewTypes"
+import type { Activity, Problem, ReviewColumn, ReviewRow } from "@inventory/review/ReviewTypes"
 import { Alert, AlertDescription, AlertTitle } from "@inventory/ui/components/alert"
 import { isNarrow } from "@inventory/ui/ContentWidth"
 import { Button } from "@inventory/ui/components/button"
 import { Spinner } from "@inventory/ui/components/spinner"
 import { member } from "@inventory/client/MemberAtoms"
 import { invalidate, perKey } from "@inventory/client/Api"
-import { decideRows, followDraft, reviewInput, reviewLocal, shownDecisions } from "./ReviewDraft.atoms.ts"
+import { followDraft, reviewInput, reviewLocal, reviewState, shownDecisions } from "./ReviewDraft.atoms.ts"
 import { confirmImport, matchColumn, suggestFixes } from "./Imports.atoms.ts"
 import { navigate } from "@inventory/ui/Route"
 import { importAddress } from "./internal/route.ts"
-import { restoredDecisions, storedReview } from "@inventory/review/SavedProgress"
 import { useSavedProgress } from "@inventory/review/SavedProgressHook"
-import type { SavedDecisions as RegionDecisions } from "@inventory/review/ReviewTypes"
 import { catalogRuntime } from "./Catalog.runtime.ts"
 import type { ImportView } from "@inventory/catalog-contract/Import"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
@@ -36,15 +33,7 @@ import { WhyFlagged } from "./internal/WhyFlagged.tsx"
 import { DimensionsForm, VendorsForm } from "./internal/CellForms.tsx"
 import { notImportedColumn, reviewStepWords } from "./internal/format.tsx"
 import { totalText } from "./internal/itemText.ts"
-import {
-  regionColumns,
-  regionKinds,
-  storedChoice,
-  toRegionDecisions,
-  toRegionProblem,
-  toRegionRows,
-  toServerDecisions
-} from "./ImportReview.controller.ts"
+import { regionColumns, regionKinds, storedChoice, toRegionProblem, toRegionRows } from "./ImportReview.controller.ts"
 import { toastError } from "@inventory/client/SayError"
 import { catalogKeys } from "./Catalog.keys.ts"
 import { offersSuggestions } from "@inventory/catalog-model/Suggest"
@@ -80,6 +69,17 @@ const currentReview = perKey((id: ImportId) =>
       columns: regionColumns(current.mapping, current.unusedColumns, input.value.table)
     })
   })
+)
+
+const noRows: ReadonlyArray<ReviewRow> = []
+const noColumns: ReadonlyArray<ReviewColumn> = []
+
+/** The review's rows and columns as the region takes them: atoms it follows, empty until the review is worked out. */
+const regionRows = perKey((id: ImportId) =>
+  Atom.map(currentReview(id), (worked) => O.match(worked, { onNone: () => noRows, onSome: (now) => now.rows }))
+)
+const regionColumnsOf = perKey((id: ImportId) =>
+  Atom.map(currentReview(id), (worked) => O.match(worked, { onNone: () => noColumns, onSome: (now) => now.columns }))
 )
 
 /** The check the region runs on a row as the person types: the review's own, for one row. */
@@ -124,29 +124,13 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
       : { organizationId: actor.organizationId, memberId: actor.id, screen: `import:${view.id}` },
     catalogRuntime()
   )
-  const kept = progress.saved === undefined ? null : O.getOrNull(progress.saved.review)
   const shownRead = useAtomValue(shownDecisions(view.id))
   const decisions = O.getOrElse(shownRead, () => view.decisions)
-  // Where the person starts: the decisions the screen shows (the draft the server holds, or what this page is still
-  // sending), with their undo history when this browser kept one that ends at them. The region reads it once, when
-  // it is drawn (and again after `epoch` moves). The region holds a keep-or-replace answer as a value of its own
-  // column; the server keeps it apart (`toServerDecisions`, `toRegionDecisions`).
-  const start = O.getOrElse(local.start, () =>
-    kept !== null && Eq.equals(toServerDecisions(kept.decisions), decisions)
-      ? restoredDecisions(kept)
-      : toRegionDecisions(decisions)
-  )
   const worked = useAtomValue(currentReview(view.id))
   const recheckRead = useAtomValue(rowRecheck(view.id))
 
   // Follows the import's draft while this screen is open (`followDraft`): where it starts, and a newer draft.
   useAtomMount(followDraft(view.id))
-
-  const decide = useAtomSet(decideRows(view.id))
-  const decided = (next: RegionDecisions) => {
-    decide(toServerDecisions(next))
-    progress.save({ step: "review", review: O.some(storedReview(next)), decided: Object.keys(next).length })
-  }
 
   // The person picked a file column for a field the headings left without one, from inside the review.
   const matching = useAtomValue(matchColumn).waiting
@@ -188,8 +172,7 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
     })
 
   if (O.isNone(worked) || O.isNone(recheckRead)) return <ReviewSkeleton title={`Review ${view.fileName}`} />
-  const { current, rows, columns } = worked.value
-  const recheck = recheckRead.value
+  const { current } = worked.value
   const { sums, counts, fixed } = current
   // How many are already there is the region's to say (its tag and its count, in `importWords`), once.
   // Rows are what the person finds in the file, items what they decide on: two counts when a row holds several.
@@ -282,8 +265,10 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
         key={`${view.id}:${local.epoch}`}
         title={`Review ${view.fileName}`}
         noun={["item", "items"]}
-        columns={columns}
-        rows={rows}
+        columns={regionColumnsOf(view.id)}
+        rows={regionRows(view.id)}
+        // The decisions with their undo are this import's own atom: the region writes it, and the write saves them.
+        decisions={reviewState(view.id)}
         problemKinds={regionKinds}
         words={reviewStepWords}
         summary={summary}
@@ -296,12 +281,10 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
           ...sums.readyQuantities.map((total) => ({ label: total.unit, value: whole.format(total.quantity) }))
         ]}
         activity={activity}
-        recheck={recheck}
+        recheck={rowRecheck(view.id)}
         cellEditor={cellEditor}
         explain={(flagged) => <WhyFlagged rows={flagged} current={current} />}
         ruleFixes={ruleFixes}
-        savedDecisions={start}
-        onDecisionsChange={decided}
         readOnly={!props.canImport}
         readOnlyNote="View only. An editor can import."
         importNote="Each row becomes a new item. A SKU already there is skipped; if its values differ, you choose to keep or replace it."

@@ -1,5 +1,4 @@
-import { parse, stringify } from "@inventory/ui/Json"
-import { type Column, createColumnHelper, Subscribe } from "@tanstack/react-table"
+import type { Column } from "@tanstack/react-table"
 import {
   CheckIcon,
   CircleHelpIcon,
@@ -12,13 +11,9 @@ import {
   SearchIcon,
   Undo2Icon
 } from "lucide-react"
-import { toast } from "sonner"
-import * as HashMap from "effect/HashMap"
 import * as HashSet from "effect/HashSet"
-import * as MutableHashMap from "effect/MutableHashMap"
-import * as MutableHashSet from "effect/MutableHashSet"
 import * as O from "effect/Option"
-import { useAtom, useAtomMount, useAtomValue } from "@effect/atom-react"
+import { useAtomMount, useAtomSubscribe, useAtomValue } from "@effect/atom-react"
 import * as Atom from "effect/reactivity/Atom"
 import { lazy, type ReactNode, Suspense, useId, useRef } from "react"
 import { AgentRun } from "@inventory/ui/AgentRun"
@@ -53,75 +48,31 @@ import { Spinner } from "@inventory/ui/components/spinner"
 import { ToggleGroup, ToggleGroupItem } from "@inventory/ui/components/toggle-group"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@inventory/ui/components/tooltip"
 import { useDataTable } from "@inventory/ui/hooks/use-data-table"
-import {
-  Action,
-  act,
-  appliedGroups,
-  confirmLine,
-  count,
-  decisionsLeft,
-  nextKind,
-  workList,
-  emptyState,
-  entries as entriesOf,
-  fixableBy,
-  heldCsv,
-  importSummary,
-  heldLine,
-  kindCount,
-  primary,
-  proposing,
-  restored,
-  result,
-  saved,
-  sections as sectionsOf,
-  viewRows,
-  visible,
-  waitingGroups
-} from "@inventory/review/ReviewDraft"
-import { contentWidth } from "@inventory/ui/ContentWidth"
+import { Action, confirmLine, heldCsv, heldLine, importSummary, primary, result } from "@inventory/review/ReviewDraft"
 import { regionLayout } from "./internal/parts.tsx"
-import { remember } from "./internal/remember.ts"
-import {
-  actionsFit,
-  type Density,
-  type GridHandleHolder,
-  type GroupActions,
-  ReviewGrid,
-  type RowActions
-} from "./internal/ReviewGrid.tsx"
+import { ReviewGrid } from "./internal/ReviewGrid.tsx"
 import { ReviewQueue } from "./internal/ReviewQueue.tsx"
 import { WorkList } from "./internal/WorkList.tsx"
-import type { Activity, FilterId, ReviewRegionProps, ReviewState, RowView } from "@inventory/review/ReviewTypes"
-import { reviewWords } from "@inventory/review/ReviewWords"
+import {
+  type Density,
+  keepDensity,
+  type Region,
+  RegionScope,
+  type RegionUi,
+  storedDensity,
+  TableScope
+} from "./ReviewRegion.atoms.ts"
+import type { Activity, FilterId, ReviewRegionProps, RowView } from "@inventory/review/ReviewTypes"
 
 // The phone's drawers (vaul) are their own chunk: fetched on a phone once the review is drawn, never on a desk.
 const PhoneDrawer = lazy(() => import("./internal/PhoneDrawer.tsx").then((module) => ({ default: module.PhoneDrawer })))
 
-/** The set with `id` taken out when it was in, put in when it was not: a tick or a fold pressed again. */
-const flip = (set: HashSet.HashSet<string>, id: string): HashSet.HashSet<string> =>
-  HashSet.has(set, id) ? HashSet.remove(set, id) : HashSet.add(set, id)
-
-/** A place "Next problem" stops at: a row that needs the person, or a folded kind standing for its rows. */
-type Stop = { rowId: string; kindId?: string; among?: ReadonlyArray<string> }
-
 const whole = new Intl.NumberFormat("en-US")
-const densityKey = "review-density"
-/** The work list's rail beside the table (`w-44`). */
-const railWidth = 176
 /** The keys for undo and redo as the person's keyboard says them: Command on a Mac, Ctrl elsewhere. */
 const onMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform)
 const undoKeys = onMac ? "\u2318Z" : "Ctrl+Z"
 const redoKeys = onMac ? "\u21e7\u2318Z" : "Ctrl+Shift+Z"
 const stepTag = { read: "Read", rule: "Rule", model: "Model" } as const
-const col = createColumnHelper<DataTableFeatures, RowView>()
-
-const isTyping = (target: EventTarget | null): boolean =>
-  target instanceof HTMLElement &&
-  (target.isContentEditable ||
-    ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) ||
-    target.closest("[role=dialog], [role=alertdialog], [role=menu]") !== null)
-
 /** What the run did, behind one button: steps tagged Read, Rule or Model, what it was allowed to do, and what it cost. */
 function ActivityPanel(props: {
   activity: Activity
@@ -239,530 +190,79 @@ function ToolButton({
   )
 }
 
-/** Where focus goes once the next draw is on screen: a row, a folded kind's rows, or on down the work list. */
-type Wanted = {
-  rowId: string | undefined
-  among?: { ids: ReadonlyArray<string>; last: boolean }
-  /** The kind on screen has nothing left: go down the work list to the next kind with rows. */
-  advance?: boolean
-  /** A new kind was just put on screen: its first row that needs the person. */
-  first?: boolean
-  /** Draws waited for the row to come into the list (a caller whose rows follow the decisions is a draw late). */
-  waited?: number
-  /** After a decision: a row under a group's heading hands the focus to the heading's accept. */
-  toGroup?: boolean
-}
-
-/** What the handlers read: the inputs of the region's last draw. */
-type Latest = {
-  rows: ReadonlyArray<ReviewRegionProps["rows"][number]>
-  state: ReviewState
-  recheck: ReviewRegionProps["recheck"]
-  fixable: ReturnType<typeof fixableBy>
-  rejects: boolean
-  list: ReadonlyArray<RowView>
-  views: ReadonlyArray<RowView>
-  narrow: boolean
-  readOnly: boolean
-  sequence: ReadonlyArray<Stop>
-  work: ReturnType<typeof workList>
-  activeKind: string | undefined
-  excluded: HashSet.HashSet<string>
-  told: ReviewRegionProps["onDecisionsChange"]
-}
-
-/**
- * What one region keeps that is not drawn, changed in place: the inputs of its last draw for the handlers, where
- * focus goes next, the row "Next problem" last went to, the view and counts it opened on, the kinds seen since, the
- * facet values last handed to the table, the grid's handle, and the section on screen.
- */
-type Memory = {
-  latest: Latest | undefined
-  wanted: Wanted | undefined
-  stepped: string | undefined
-  opened: { filter: FilterId; needs: number; decisions: number } | undefined
-  seenKinds: HashSet.HashSet<string>
-  facetValues: string
-  grid: GridHandleHolder
-  root: HTMLElement | null
-  /** Made once, on the region's first draw: the actions keep their identity, so drawn rows keep their memo. */
-  handlers: Handlers | undefined
-}
-
-/** What the region owns and draws: the person's decisions with their undo, and where they are in the review. */
-type Held = {
-  /** None until the first decision: the state then starts from the caller's saved decisions or the file. */
-  readonly state: O.Option<ReviewState>
-  readonly picked: FilterId | undefined
-  readonly kind: string | undefined
-  readonly activityOpen: boolean
-  readonly whyOpen: boolean
-  readonly confirmOpen: boolean
-  readonly search: string
-  /** Rows the person took out of their group's one action, and kinds whose rows they folded or unfolded. */
-  readonly excluded: HashSet.HashSet<string>
-  readonly folded: HashSet.HashSet<string>
-  /** The last thing that happened, for a screen reader. */
-  readonly said: string
-  /** Bumped to draw again when nothing else changed (waiting for a row to come into the list). */
-  readonly tick: number
-  /** Groups the person chose to go through row by row on a phone: each of their rows is then a decision of its own. */
-  readonly split: HashSet.HashSet<string>
-  readonly facetPicked: Readonly<Record<string, ReadonlyArray<string>>>
-  /** While a rule group's accept is in view it is the screen's one filled button and Import waits, outlined. */
-  readonly leadInView: boolean
-  /** None until the person picks one: the browser's remembered choice stands until then. */
-  readonly density: O.Option<Density>
-  readonly memory: Memory
-}
-
-/** One region's own atom, by its `useId`; let go with the region, as React state was. */
-const regions = Atom.family((_region: string) =>
-  Atom.make<Held>({
-    state: O.none(),
-    picked: undefined,
-    kind: undefined,
-    activityOpen: false,
-    whyOpen: false,
-    confirmOpen: false,
-    search: "",
-    excluded: HashSet.empty(),
-    folded: HashSet.empty(),
-    said: "",
-    tick: 0,
-    split: HashSet.empty(),
-    facetPicked: {},
-    leadInView: false,
-    density: O.none(),
-    memory: {
-      latest: undefined,
-      wanted: undefined,
-      stepped: undefined,
-      opened: undefined,
-      seenKinds: HashSet.empty(),
-      facetValues: "[]",
-      grid: { current: null },
-      root: null,
-      handlers: undefined
-    }
-  })
-)
-
 /** No keys while the region is only looking. */
 const noKeys: Atom.Atom<void> = Atom.readable(() => undefined)
 
-/** The undo, redo and stepping keys, heard on the page while the region is drawn and not read-only. */
-const regionKeys = Atom.family((region: string) =>
-  Atom.readable((get) => {
-    const memory = get.once(regions(region)).memory
-    const onKey = (event: KeyboardEvent) => {
-      const latest = memory.latest
-      const handlers = memory.handlers
-      if (latest === undefined || handlers === undefined || latest.readOnly) return
-      // Inside a text field the browser's own undo applies.
-      if (event.defaultPrevented || isTyping(event.target)) return
-      const key = event.key.toLowerCase()
-      if ((event.ctrlKey || event.metaKey) && !event.altKey && key === "z") {
-        event.preventDefault()
-        handlers.run(event.shiftKey ? Action.Redo() : Action.Undo())
-        return
-      }
-      if (event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && key === "y") {
-        event.preventDefault()
-        handlers.run(Action.Redo())
-        return
-      }
-      if (event.ctrlKey || event.metaKey || event.altKey || latest.narrow) return
-      if (event.key === "j" || event.key === "J") handlers.step(false)
-      else if (event.key === "k" || event.key === "K") handlers.step(true)
-    }
-    document.addEventListener("keydown", onKey)
-    get.addFinalizer(() => document.removeEventListener("keydown", onKey))
-  })
-)
-
-/** The region's actions, made once per region and reading its last draw. */
-type Handlers = {
-  readonly run: (action: Action, from?: string) => void
-  readonly step: (back: boolean) => void
-  readonly focusRow: (rowId: string | undefined, toGroup?: boolean) => void
-  readonly actions: RowActions
-  readonly plainActions: RowActions
-  readonly groupActions: GroupActions
-}
-
-/** Changes what the region holds: a patch worked out from what it holds now. */
-type Change = (before: Held) => Partial<Omit<Held, "memory">>
-
-// The phone's drawers are fetched once a review is drawn narrow, so the first press opens them at once.
-let drawersFetched = false
-const fetchDrawers = (): void => {
-  if (drawersFetched) return
-  drawersFetched = true
-  void import("./internal/PhoneDrawer.tsx")
-}
-
-/** Where a review starts: the caller's saved decisions, the rules' fixes in force, or the fixes held as proposals. */
-const startOf = remember(
-  (
-    rows: ReviewRegionProps["rows"],
-    saved: ReviewRegionProps["savedDecisions"],
-    ruleFixes: ReviewRegionProps["ruleFixes"]
-  ) => (saved !== undefined ? restored(saved) : ruleFixes === "apply" ? emptyState : proposing(rows))
-)
-const wordsFor = remember((_memory: Memory, key: string) => reviewWords(parse(key) as ReviewRegionProps["words"]))
-const fixableFor = remember((kinds: ReviewRegionProps["problemKinds"]) => fixableBy(kinds))
-const viewsFor = remember(
-  (
-    state: ReviewState,
-    rows: ReviewRegionProps["rows"],
-    recheck: ReviewRegionProps["recheck"],
-    fixable: ReturnType<typeof fixableBy>,
-    rejects: boolean
-  ) => viewRows({ rows, state, recheck, fixable, rejects })
-)
-const countsFor = remember((views: ReadonlyArray<RowView>) => count(views))
-const leftFor = remember((views: ReadonlyArray<RowView>, split: HashSet.HashSet<string>) => decisionsLeft(views, split))
-const workFor = remember(
-  (counts: ReturnType<typeof count>, problemKinds: ReviewRegionProps["problemKinds"], seen: HashSet.HashSet<string>) =>
-    workList({ counts, problemKinds, seen })
-)
-const listFor = remember((views: ReadonlyArray<RowView>, filter: FilterId, kind: string | undefined) =>
-  visible({ views, filter, kind })
-)
-const kindsFor = remember((problemKinds: ReviewRegionProps["problemKinds"]) =>
-  HashMap.fromIterable(problemKinds.map((entry) => [entry.id, entry] as const))
-)
-const defsFor = remember((columns: ReviewRegionProps["columns"]) =>
-  col.columns(
-    columns.map((column, index) =>
-      col.accessor((view) => view.cells[column.id] ?? "", {
-        id: column.id,
-        header: column.label,
-        enableHiding: index !== 0,
-        enableColumnFilter: column.facet === true,
-        enableGlobalFilter: index === 0 || column.search === true,
-        sortFn: "alphanumeric",
-        // A facet column is filtered by a list of values (`multiple`): a row shows when its value is in the list.
-        meta:
-          column.facet === true
-            ? { label: column.label, variant: "select" as const, options: [], multiple: true }
-            : { label: column.label }
-      })
-    )
-  )
-)
-const dataFor = remember((list: ReadonlyArray<RowView>) => [...list])
-const initialStateFor = remember((columns: ReviewRegionProps["columns"]) => ({
-  columnVisibility: Object.fromEntries(
-    columns.filter((column) => column.hidden === true).map((column) => [column.id, false])
-  )
-}))
-const facetColumnsFor = remember((columns: ReviewRegionProps["columns"]) =>
-  columns.filter((column) => column.facet === true)
-)
-const facetsFor = remember(
-  (
-    facetColumns: ReviewRegionProps["columns"],
-    facetPicked: Held["facetPicked"],
-    views: ReadonlyArray<RowView>,
-    list: ReadonlyArray<RowView>
-  ) =>
-    facetColumns.map((column) => {
-      // Spellings that differ only by spaces around them or by capitals ("Packaging" and "packaging") read the
-      // same: one choice that holds both, named by the spelling most rows have.
-      const found = MutableHashMap.empty<
-        string,
-        { values: MutableHashSet.MutableHashSet<string>; n: number; spellings: Record<string, number> }
-      >()
-      const keyOf = (value: string): string => value.trim().toLowerCase()
-      for (const view of views) {
-        const value = view.cells[column.id] ?? ""
-        const key = keyOf(value)
-        if (key === "") continue
-        const entry = O.getOrElse(MutableHashMap.get(found, key), () => ({
-          values: MutableHashSet.empty<string>(),
-          n: 0,
-          spellings: {} as Record<string, number>
-        }))
-        MutableHashSet.add(entry.values, value)
-        entry.spellings[value.trim()] = (entry.spellings[value.trim()] ?? 0) + 1
-        MutableHashMap.set(found, key, entry)
-      }
-      for (const view of list) {
-        const entry = O.getOrUndefined(MutableHashMap.get(found, keyOf(view.cells[column.id] ?? "")))
-        if (entry !== undefined) entry.n += 1
-      }
-      const options = [...found]
-        .map(([key, entry]) => ({
-          key,
-          label: Object.entries(entry.spellings).sort((a, b) => b[1] - a[1])[0]?.[0] ?? key,
-          values: [...entry.values],
-          n: entry.n
-        }))
-        .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }))
-      // A choice whose value is no longer in the file (the person fixed the last row that had it) is dropped.
-      const picked = (facetPicked[column.id] ?? []).filter((key) => MutableHashMap.has(found, key))
-      return { column, options, picked }
-    })
-)
-const groupsFor = remember((views: ReadonlyArray<RowView>, filter: FilterId, kind: string | undefined) =>
-  filter === "auto" ? appliedGroups(views) : filter === "needs" ? waitingGroups({ views, kind }) : []
-)
-const subjectsFor = remember((list: ReadonlyArray<RowView>, filter: FilterId, kind: string | undefined) =>
-  HashSet.fromIterable(
-    filter === "needs" && kind !== undefined
-      ? list.flatMap((view) => (view.problem?.column === undefined ? [] : [view.problem.column]))
-      : filter === "auto"
-        ? // The fixes made for the person are what this view is about: their cells stay in the row.
-          list.flatMap((view) => Object.keys(view.marks).filter((column) => view.marks[column]?._tag === "Applied"))
-        : []
-  )
-)
-
-/** Compact (36 px rows) or comfortable (44 px), remembered in this browser: a preference, not progress. */
-const storedDensity = (): Density => {
-  try {
-    return window.localStorage.getItem(densityKey) === "comfortable" ? "comfortable" : "compact"
-  } catch {
-    return "compact"
-  }
-}
-
-/**
- * The region's actions, made once: each reads the region's last draw from `memory`, and changes what it holds
- * through `change`.
- */
-const makeHandlers = (memory: Memory, change: (update: Change) => void): Handlers => {
-  // With nothing left to go to, focus goes to the one action that is left: the import button, or, where the region
-  // has none (embedded, or only looking), the table itself. Never to the page's body, from where the person had to
-  // press Shift+Tab ninety-nine times to get back.
-  const focusLast = () => {
-    const button = memory.root?.querySelector<HTMLElement>("[data-import-button]") ?? null
-    if (button !== null && button.checkVisibility()) button.focus()
-    else memory.grid.current?.focus()
-  }
-  const focusRow = (rowId: string | undefined, toGroup = false) => {
-    if (rowId === undefined || memory.latest?.list.some((view) => view.row.id === rowId) !== true) {
-      focusLast()
-      return
-    }
-    memory.grid.current?.reveal(rowId)
-    requestAnimationFrame(() => {
-      const root = memory.root
-      const row = root?.querySelector<HTMLElement>(`[data-row-id="${CSS.escape(rowId)}"]`)
-      // A row under a group's heading is decided by the heading: its accept takes the focus, not the row's tick.
-      const group = toGroup ? row?.dataset.group : undefined
-      const target =
-        (group === undefined
-          ? undefined
-          : root?.querySelector<HTMLElement>(`[data-group-id="${CSS.escape(group)}"] [data-group-accept]`)) ??
-        row?.querySelector<HTMLElement>("[data-first-action]")
-      if (target === null || target === undefined) focusLast()
-      else target.focus()
-    })
-  }
-
-  const run = (action: Action, from?: string) => {
-    const now = memory.latest
-    if (now === undefined) return
-    const outcome = act({
-      rows: now.rows,
-      state: now.state,
-      action,
-      recheck: now.recheck,
-      fixable: now.fixable,
-      rejects: now.rejects
-    })
-    if (outcome.label === "") return
-    let unfold: string | undefined
-    // On a phone the queue moves focus to the card that takes the decided one's place.
-    if (now.narrow) memory.wanted = undefined
-    else if (Action.$is("Undo")(action) || Action.$is("Redo")(action))
-      memory.wanted = { rowId: O.getOrUndefined(outcome.focus) }
-    else {
-      // The next place on screen that still needs a decision after this one, in the order the table shows them
-      // (a folded kind is opened to reach its rows); failing that, the row itself when it still needs one.
-      const changed = MutableHashSet.fromIterable(outcome.changed)
-      const origin = from ?? outcome.changed[0]
-      const stops = now.sequence
-      const at = stops.findIndex((stop) => stop.rowId === origin || stop.among?.includes(origin ?? "") === true)
-      const ahead = [...stops.slice(at + 1), ...stops.slice(0, Math.max(0, at))]
-      const next = ahead.find((stop) =>
-        (stop.among ?? [stop.rowId]).some((rowId) => !MutableHashSet.has(changed, rowId))
-      )
-      const stays = from !== undefined && !MutableHashSet.has(changed, from) ? from : undefined
-      if (next?.kindId !== undefined) {
-        const ids = (next.among ?? [next.rowId]).filter((rowId) => !MutableHashSet.has(changed, rowId))
-        memory.wanted = { rowId: ids[0], among: { ids, last: false } }
-        unfold = next.kindId
-      } else if (next === undefined && stays === undefined && now.activeKind !== undefined) {
-        // The kind on screen is done: on to the next one on the work list.
-        memory.wanted = { rowId: undefined, advance: true }
-      } else memory.wanted = { rowId: next?.rowId ?? stays, toGroup: true }
-    }
-    change((before) => ({
-      said: outcome.label,
-      state: O.some(outcome.state),
-      ...(unfold === undefined ? {} : { folded: flip(before.folded, unfold) })
-    }))
-    // The caller keeps the decisions (a server draft, the browser): told with each change, never on the first draw.
-    now.told?.(saved(outcome.state))
-    // A step that settled several rows at once can be taken back from where the eye is: a toast with Undo. It takes
-    // back that step only, and only while it is still the last one.
-    const bulk = !Action.$is("Undo")(action) && !Action.$is("Redo")(action) && outcome.changed.length > 1
-    const step = outcome.state.undo[outcome.state.undo.length - 1]
-    if (bulk && step !== undefined && !now.narrow) {
-      toast(outcome.label, {
-        action: {
-          label: "Undo",
-          onClick: () => {
-            const undo = memory.latest?.state.undo ?? []
-            if (undo[undo.length - 1] === step) run(Action.Undo())
-          }
-        }
-      })
-    }
-  }
-
-  const step = (back: boolean) => {
-    const now = memory.latest
-    if (now === undefined) return
-    const active = document.activeElement
-    const focused =
-      active instanceof HTMLElement ? active.closest<HTMLElement>("[data-row-id]")?.dataset.rowId : undefined
-    // In the order on screen, from the row that has focus or, after a click on "Next problem" (which took the
-    // focus), from the row the last step went to. Stepping by row number skipped every section drawn above.
-    const steps = now.sequence
-    const here = focused ?? memory.stepped
-    const at = here === undefined ? -1 : steps.findIndex((entry) => entry.rowId === here)
-    const next = back ? (at === -1 ? steps[steps.length - 1] : (steps[at - 1] ?? steps[at])) : steps[at + 1]
-    if (next === undefined) {
-      // Past the last row of the kind on screen: down the work list to the next kind with rows left.
-      if (!back && now.activeKind !== undefined) {
-        memory.wanted = { rowId: undefined, advance: true }
-        change((before) => ({ tick: before.tick + 1 }))
-      } else if (steps[at] !== undefined) focusRow(steps[at].rowId)
-      return
-    }
-    memory.stepped = next.rowId
-    if (next.kindId === undefined) {
-      focusRow(next.rowId)
-      return
-    }
-    // The row is under a folded heading: open it, and take the focus there once it is drawn.
-    const kindId = next.kindId
-    memory.wanted = { rowId: next.rowId, among: { ids: next.among ?? [next.rowId], last: back } }
-    change((before) => ({ folded: flip(before.folded, kindId) }))
-  }
-
-  const actions: RowActions = {
-    accept: (rowId) => run(Action.Accept({ rowIds: [rowId] }), rowId),
-    keep: (rowId) => run(Action.Keep({ rowId }), rowId),
-    leaveOut: (rowId) => run(Action.LeaveOut({ rowIds: [rowId] }), rowId),
-    putBack: (rowId) => run(Action.PutBack({ rowId }), rowId),
-    edit: (rowId, column, value) => run(Action.Edit({ rowId, column, value }), rowId),
-    undoFix: (rowId, column) => run(Action.Revert({ rowId, column, how: "undo" }), rowId),
-    reject: (rowId, column) => run(Action.Revert({ rowId, column, how: "reject" }), rowId),
-    peek: (rowId) => memory.latest?.views.find((view) => view.row.id === rowId)
-  }
-  const groupActions: GroupActions = {
-    accept: (groupId) => run(Action.AcceptGroup({ groupId, except: [...(memory.latest?.excluded ?? [])] })),
-    choose: (groupId, value) =>
-      run(Action.ChooseGroup({ groupId, value, except: [...(memory.latest?.excluded ?? [])] })),
-    leaveOut: (rowIds) => run(Action.LeaveOut({ rowIds })),
-    revert: (groupId) => run(Action.RevertGroup({ groupId })),
-    acceptRows: (rowIds) => run(Action.Accept({ rowIds })),
-    toggle: (rowId) => change((before) => ({ excluded: flip(before.excluded, rowId) })),
-    fold: (kindId) => change((before) => ({ folded: flip(before.folded, kindId) }))
-  }
-  // Where the rules' fixes are proposals there is nothing in force to turn down: the rows offer no "Reject".
-  const { reject: _reject, ...plainActions } = actions
-  return { run, step, focusRow, actions, plainActions, groupActions }
-}
-
-/**
- * After a draw: where focus was wanted, it goes now that the rows are on screen; the table is handed the facet
- * values the person ticked when they changed.
- */
-const afterDraw = (
-  memory: Memory,
-  change: (update: Change) => void,
-  facetValues: string,
-  table: ReturnType<typeof useDataTable<RowView>>["table"]
-): void => {
-  if (memory.facetValues !== facetValues) {
-    memory.facetValues = facetValues
-    for (const [id, values] of parse(facetValues) as ReadonlyArray<[string, ReadonlyArray<string>]>) {
-      const target = table.getColumn(id)
-      const next = values.length > 0 ? values : undefined
-      if (target !== undefined && stringify(target.getFilterValue()) !== stringify(next)) target.setFilterValue(next)
-    }
-  }
-  const want = memory.wanted
-  const now = memory.latest
-  const handlers = memory.handlers
-  if (want === undefined || now === undefined || handlers === undefined) return
-  memory.wanted = undefined
-  if (want.advance === true) {
-    // "Next problem" goes down the work list: the next kind with rows left, its first row once it is drawn.
-    const next = nextKind({ list: now.work, from: now.activeKind })
-    if (next === undefined || next === now.activeKind) {
-      handlers.focusRow(now.sequence[0]?.rowId)
-      return
-    }
-    memory.wanted = { rowId: undefined, first: true }
-    change(() => ({ kind: next }))
-    return
-  }
-  if (want.first === true) {
-    memory.stepped = now.sequence[0]?.rowId
-    handlers.focusRow(now.sequence[0]?.rowId, true)
-    return
-  }
-  if (want.among === undefined) {
-    // A caller that works its rows out from the decisions (`onDecisionsChange`) hands the row back a draw later:
-    // after an undo it may not be in the list yet. Wait for two draws before falling back.
-    const waited = want.waited ?? 0
-    if (want.rowId !== undefined && waited < 2 && !now.list.some((view) => view.row.id === want.rowId)) {
-      memory.wanted = { ...want, waited: waited + 1 }
-      requestAnimationFrame(() => change((before) => ({ tick: before.tick + 1 })))
-      return
-    }
-    handlers.focusRow(want.rowId, want.toGroup === true)
-    return
-  }
-  // A kind was just unfolded to step into it: its first row as drawn (its last, stepping backwards).
-  const among = want.among
-  const drawn = now.sequence.filter((stop) => stop.kindId === undefined && among.ids.includes(stop.rowId))
-  const target = (among.last ? drawn[drawn.length - 1] : drawn[0])?.rowId ?? want.rowId
-  memory.stepped = target
-  handlers.focusRow(target)
-}
+/** No rule to check a typed value with. */
+const noRecheck: NonNullable<ReviewRegionProps["recheck"]> = Atom.make(O.none())
 
 /**
  * The review step of an import as one region that fills its frame: counts that filter, the rows with each problem
  * and what each button would do about it, and one button that says what it will import. A table on a desk, a
  * shorter table on a tablet, one decision at a time on a phone. It decides nothing about the data: rows, columns,
- * problem words, proposals and the re-check all come from the caller.
+ * problem words, proposals and the re-check all come from the caller, as atoms, and the decisions are the caller's
+ * atom too: the region writes it with every action, and whoever keeps the decisions reads it there.
  */
 export function ReviewRegion(props: ReviewRegionProps) {
+  const id = useId()
+  return (
+    <RegionScope.Provider
+      value={{
+        rows: props.rows,
+        columns: props.columns,
+        recheck: props.recheck ?? noRecheck,
+        decisions: props.decisions,
+        problemKinds: props.problemKinds,
+        rejects: props.ruleFixes === "apply",
+        words: props.words,
+        id
+      }}
+    >
+      <RegionWithTable {...props} />
+    </RegionScope.Provider>
+  )
+}
+
+/** One table instance: sorting, hidden columns, faceted filters and search come from the data-table parts. */
+function RegionWithTable(props: ReviewRegionProps) {
+  const region = useAtomValue(RegionScope.use())
+  const { table } = useDataTable({
+    data: useAtomValue(region.tableData),
+    columns: useAtomValue(region.columnDefs),
+    mode: "client",
+    initialState: useAtomValue(region.hiddenAtFirst),
+    getRowId: (view) => view.row.id,
+    // The facets the person ticked are the table's column filters, held where the region writes them.
+    atoms: { columnFilters: region.tableFilters }
+  })
+  useAtomMount(region.followFacets)
+  return (
+    <TableScope.Provider value={{ region, table }}>
+      <RegionBody {...props} region={region} table={table} />
+    </TableScope.Provider>
+  )
+}
+
+function RegionBody(
+  props: ReviewRegionProps & { region: Region; table: ReturnType<typeof useDataTable<RowView>>["table"] }
+) {
+  const { region, table } = props
+  const regionTable = useAtomValue(TableScope.use())
   const layout = useAtomValue(regionLayout)
-  const room = useAtomValue(contentWidth)
   const narrow = layout === "narrow"
-  if (narrow) fetchDrawers()
   const titleId = useId()
-  const [own, setHeld] = useAtom(regions(titleId))
-  const memory = own.memory
-  const change = (update: Change) => setHeld((before) => ({ ...before, ...update(before) }))
   const loading = props.state === "loading"
   const failed = props.state === "error"
   const readOnly = props.readOnly === true
   const embedded = props.embedded === true
-  useAtomMount(readOnly ? noKeys : regionKeys(titleId))
+  useAtomMount(readOnly ? noKeys : regionTable.keys)
+  // After a decision focus goes to the next row that needs one; after an undo, back to the row.
+  useAtomSubscribe(regionTable.moves, regionTable.settleSoon)
 
-  const state = O.getOrElse(own.state, () => startOf(props.rows, props.savedDecisions, props.ruleFixes))
-  const { picked, kind, activityOpen, whyOpen, confirmOpen, search, excluded, folded, said, split, facetPicked } = own
+  const own = useAtomValue(region.ui)
+  const change = region.change
+  const state = useAtomValue(region.input.decisions)
+  const { activityOpen, whyOpen, confirmOpen, search, said } = own
   const setPicked = (next: FilterId | undefined) => change(() => ({ picked: next }))
   const setKind = (next: string | undefined) => change(() => ({ kind: next }))
   const setActivityOpen = (next: boolean) => change(() => ({ activityOpen: next }))
@@ -771,152 +271,41 @@ export function ReviewRegion(props: ReviewRegionProps) {
   const setSearch = (next: string) => change(() => ({ search: next }))
   const setSplit = (update: (before: HashSet.HashSet<string>) => HashSet.HashSet<string>) =>
     change((before) => ({ split: update(before.split) }))
-  const setFacetPicked = (update: (before: Held["facetPicked"]) => Held["facetPicked"]) =>
+  const setFacetPicked = (update: (before: RegionUi["facetPicked"]) => RegionUi["facetPicked"]) =>
     change((before) => ({ facetPicked: update(before.facetPicked) }))
-  const setLeadInView = (next: boolean) => change((before) => (before.leadInView === next ? {} : { leadInView: next }))
 
-  const { rows, recheck, problemKinds, columns } = props
-  // The caller's words over the defaults: every tab, tag and count below says these. Keyed on the words themselves,
-  // so a caller that writes the object inline does not redraw the table on every draw.
-  const words = wordsFor(memory, stringify(props.words ?? {}))
-  const fixable = fixableFor(problemKinds)
-  // Where the rules' fixes arrive in force, one the person undid or turned down stays turned down.
-  const rejects = props.ruleFixes === "apply"
-  const views = viewsFor(state, rows, recheck, fixable, rejects)
-  const counts = countsFor(views)
-  // Open on what needs the person; a file with nothing to decide opens on everything.
-  const left = leftFor(views, split)
-  if (memory.opened === undefined && rows.length > 0) {
-    memory.opened = {
-      filter: counts.needs > 0 ? "needs" : counts.blocked > 0 ? "cannot" : "all",
-      needs: counts.needs,
-      decisions: left
-    }
-  }
-  const opened = memory.opened
-  const filter: FilterId = picked ?? opened?.filter ?? "needs"
-  // The work list: every kind that has had rows since the review opened stays on it, ticked once done.
-  for (const entry of problemKinds) {
-    if (kindCount(counts, entry.id) > 0 && !HashSet.has(memory.seenKinds, entry.id)) {
-      memory.seenKinds = HashSet.add(memory.seenKinds, entry.id)
-    }
-  }
-  const work = workFor(counts, problemKinds, memory.seenKinds)
-  // On a desk and a tablet "Needs you" shows one kind at a time, the one picked on the work list (at first, the
-  // first with rows left). A phone goes through every decision in turn.
-  const activeKind =
-    filter !== "needs" || narrow
-      ? undefined
-      : kind !== undefined && work.some((item) => item.kind.id === kind)
-        ? kind
-        : (work.find((item) => item.left > 0)?.kind.id ?? work[0]?.kind.id)
-  const list = listFor(views, filter, activeKind)
-  const kinds = kindsFor(problemKinds)
-
-  // -- One table instance: sorting, hidden columns, faceted filters and search come from the data-table parts. ---
-  const defs = defsFor(columns)
-  const data = dataFor(list)
-  const { table } = useDataTable({
-    data,
-    columns: defs,
-    mode: "client",
-    initialState: initialStateFor(columns),
-    getRowId: (view) => view.row.id
-  })
-  const ordered = table.getPrePaginatedRowModel().rows.map((row) => row.original)
-
-  // -- The Filter panel: for each facet column, the values the file has, as the person reads them. -------------
-  // Two spellings that differ only by spaces around them ("Serialized" and "Serialized ") read the same, so they
-  // are one choice that shows both. `n` counts rows in the view that is showing (Needs you, Ready, All).
-  const facets = facetsFor(facetColumnsFor(columns), facetPicked, views, list)
-  // The table does the filtering; after each draw it is handed the values behind the ticked choices when they change.
-  const facetValues = stringify(
-    facets.map((facet) => [
-      facet.column.id,
-      facet.options.filter((option) => facet.picked.includes(option.key)).flatMap((option) => option.values)
-    ])
-  )
-
-  const groups = groupsFor(views, filter, activeKind)
-  // "Needs you" shows the kind picked on the work list: its heading (what its rows need, and its bulk answers), each
-  // group of identical fixes above its rows, then the rows settled one at a time.
-  const lines =
-    filter === "needs"
-      ? sectionsOf({
-          list: ordered,
-          groups,
-          problemKinds: problemKinds.filter((entry) => activeKind === undefined || entry.id === activeKind),
-          collapsed: (entry) => HashSet.has(folded, entry.id)
-        })
-      : entriesOf({ list: ordered, groups, applied: filter === "auto" })
-  const leadInView = own.leadInView
+  const { problemKinds } = props
+  const rows = useAtomValue(region.input.rows)
+  const columns = useAtomValue(region.input.columns)
+  const { words } = region
+  const views = useAtomValue(region.views)
+  const counts = useAtomValue(region.counts)
+  const left = useAtomValue(region.left)
+  const openedOn = useAtomValue(region.opened)
+  const opened = O.getOrUndefined(openedOn)
+  const filter = useAtomValue(region.filter)
+  const work = useAtomValue(region.work)
+  const activeKind = useAtomValue(region.activeKind)
+  const ordered = useAtomValue(regionTable.ordered)
+  const facets = useAtomValue(region.facets)
+  const leadInView = useAtomValue(region.leadInView)
+  const listMode = useAtomValue(region.listMode)
   // On the other tabs Import waits too while a decision is open: filled there, it invited skipping every row
   // that still needs the person.
   const waits = narrow
     ? filter === "needs" && counts.needs > 0
     : !readOnly && (filter === "needs" ? leadInView : counts.needs > 0)
-  // In the grouped views the headings say the status, so the column would be empty: its width goes to the name.
-  // Nor when every row showing would say the same word ("Ready", before anything was decided).
-  const showStatus =
-    filter !== "auto" &&
-    filter !== "needs" &&
-    ordered.some((view) => view.status !== "ready" || view.decided !== undefined)
-  // The columns the problems on screen are about stay in the table: the person is deciding on their values.
-  const subjects = subjectsFor(list, filter, activeKind)
   // Compact (36 px rows) or comfortable (44 px), remembered in this browser: a preference, not progress.
   const density = O.getOrElse(own.density, storedDensity)
   const chooseDensity = (next: Density) => {
     change(() => ({ density: O.some(next) }))
-    try {
-      window.localStorage.setItem(densityKey, next)
-    } catch {
-      // A private window refuses: the choice lasts for this visit.
-    }
+    keepDensity(next)
   }
   const main = primary({ columns, counts, noun: props.noun, closing: props.closingLabel, words })
-  // As wide as the widest answers showing (a long pick, "Other answers"), so no button runs under the next.
-  const actionsWidth = narrow ? 0 : actionsFit({ entries: lines, columns, readOnly, rowAction: props.rowAction })
 
-  // -- Focus: after a decision it goes to the next row that needs one; after an undo, back to the row. ----------
   const importButton = useRef<HTMLButtonElement>(null)
   const activityReturn = useRef<HTMLButtonElement>(null)
-  // The rows that need the person in the order the table shows them, sections and all. A folded kind is one
-  // stop: its rows are not drawn, and once it is opened they come in the table's order (groups first), which is
-  // not the order the kind lists them in. So the stop carries the kind to unfold and its rows to choose among.
-  const sequence: Array<Stop> = []
-  for (const entry of lines) {
-    if (entry._tag === "Row") {
-      if (entry.view.status === "needs") sequence.push({ rowId: entry.view.row.id })
-    } else if (entry._tag === "Kind" && entry.collapsed) {
-      const first = entry.rowIds[0]
-      if (first !== undefined) sequence.push({ rowId: first, kindId: entry.kind.id, among: entry.rowIds })
-    }
-  }
-  memory.latest = {
-    rows,
-    state,
-    recheck,
-    fixable,
-    rejects,
-    list: ordered,
-    views,
-    narrow,
-    readOnly,
-    sequence,
-    work,
-    activeKind,
-    excluded,
-    told: props.onDecisionsChange
-  }
-  memory.handlers ??= makeHandlers(memory, change)
-  const { run, step, groupActions } = memory.handlers
-  const actions = rejects ? memory.handlers.actions : memory.handlers.plainActions
-  const grid = memory.grid
-  // After each draw: the focus that was wanted, and the facet values for the table.
-  const drawn = (element: HTMLElement | null) => {
-    memory.root = element
-    if (element !== null) afterDraw(memory, change, facetValues, table)
-  }
+  const { run, step } = regionTable
 
   const chooseFilter = (next: FilterId) => {
     setPicked(next)
@@ -978,13 +367,8 @@ export function ReviewRegion(props: ReviewRegionProps) {
     { id: "all", label: words.all, n: counts.total }
   ]
   const lastStep = state.undo[state.undo.length - 1]
-  const nextRedo = state.redo?.[state.redo.length - 1]
+  const nextRedo = state.redo[state.redo.length - 1]
   const held = counts.needs + counts.cannot + counts.out + counts.stored
-  // The work list sits beside the table on a desk, as a row of chips above it on a tablet; only while deciding.
-  const listMode: "rail" | "chips" | undefined =
-    narrow || filter !== "needs" || work.length === 0 ? undefined : layout === "wide" ? "rail" : "chips"
-  // The table's room: the page's, less the card's margins and border, and the rail beside it.
-  const gridRoom = room - (room < 640 ? 32 : 48) - 2 - (listMode === "rail" ? railWidth : 0)
 
   const showAll = (
     <Button variant="link" size="sm" onClick={() => chooseFilter("all")}>
@@ -992,7 +376,7 @@ export function ReviewRegion(props: ReviewRegionProps) {
     </Button>
   )
   const empty: ReactNode =
-    props.rows.length === 0 ? (
+    rows.length === 0 ? (
       <Empty>
         <EmptyHeader>
           <EmptyTitle>No rows in this file</EmptyTitle>
@@ -1102,7 +486,8 @@ export function ReviewRegion(props: ReviewRegionProps) {
   )
 
   // The data table's own filter, one per facet, with the review's filter state behind it: the component reads and
-  // sets a column's filter value, so it is handed those two over `facetPicked` (the effect above then filters).
+  // sets a column's filter value, so it is handed those two over `facetPicked` (the table's own column filters
+  // follow it: `tableFilters`).
   const filterMenu =
     facets.length === 0 ? null : (
       <>
@@ -1232,7 +617,7 @@ export function ReviewRegion(props: ReviewRegionProps) {
   const finished = main.blocked && "done" in main
   const idle = main.blocked && "idle" in main
   const importButtonNode =
-    readOnly || loading || props.rows.length === 0 || embedded ? null : finished ? (
+    readOnly || loading || rows.length === 0 || embedded ? null : finished ? (
       // On a phone the words take two lines rather than push the next step past the screen's edge.
       <span className="flex min-w-0 items-center gap-2">
         <span role="status" className="min-w-0 text-sm leading-tight font-medium">
@@ -1377,45 +762,20 @@ export function ReviewRegion(props: ReviewRegionProps) {
   )
 
   const tableNode = (
-    <Subscribe source={table.atoms.columnVisibility} selector={(visibility) => visibility}>
-      {(visibility) => {
-        // The table is worked out from the columns the person is showing. A column they turned on themselves
-        // (`true`: off is `false`, untouched is absent) never moves into the row's detail: they asked to see it,
-        // so the table scrolls sideways before it goes.
-        const turnedOn = Object.keys(visibility).filter((id) => visibility[id] === true)
-        return (
-          <ReviewGrid
-            entries={lines}
-            table={table}
-            columns={columns.filter((column) => visibility[column.id] !== false)}
-            allColumns={columns}
-            views={list}
-            room={gridRoom}
-            framed
-            showStatus={showStatus}
-            keep={HashSet.union(HashSet.fromIterable(turnedOn), subjects)}
-            density={density}
-            words={words}
-            excluded={excluded}
-            // Not while the confirm step is open: its own button is then the screen's filled one.
-            canLead={!readOnly && filter === "needs" && !confirmOpen}
-            onLead={setLeadInView}
-            kinds={kinds}
-            actions={actions}
-            groupActions={groupActions}
-            readOnly={readOnly}
-            loading={loading}
-            caption={caption}
-            empty={empty}
-            onMatch={readOnly ? undefined : props.onMatchColumn}
-            handle={grid}
-            rowAction={props.rowAction}
-            cellEditor={props.cellEditor}
-            actionsWidth={actionsWidth}
-          />
-        )
-      }}
-    </Subscribe>
+    <ReviewGrid
+      table={table}
+      framed
+      density={density}
+      // Not while the confirm step is open: its own button is then the screen's filled one.
+      canLead={!readOnly && filter === "needs" && !confirmOpen}
+      readOnly={readOnly}
+      loading={loading}
+      caption={caption}
+      empty={empty}
+      onMatch={readOnly ? undefined : props.onMatchColumn}
+      rowAction={props.rowAction}
+      cellEditor={props.cellEditor}
+    />
   )
 
   const confirmStep = narrow ? (
@@ -1472,7 +832,12 @@ export function ReviewRegion(props: ReviewRegionProps) {
   if (narrow) {
     return (
       <>
-        <section ref={drawn} aria-labelledby={titleId} className="flex h-full min-h-0 flex-col">
+        <section
+          ref={region.attach}
+          data-review-region={region.id}
+          aria-labelledby={titleId}
+          className="flex h-full min-h-0 flex-col"
+        >
           <div className="flex flex-none items-center gap-1 px-4 pt-2 pb-1">
             <div className="min-w-0 flex-1">{heading}</div>
             {loading || failed ? null : columnsMenu}
@@ -1485,23 +850,14 @@ export function ReviewRegion(props: ReviewRegionProps) {
             <>
               <div className="flex-none px-4 pb-2">{loading ? <Skeleton className="h-11 w-full" /> : filterGroup}</div>
               <ReviewQueue
-                views={views}
-                list={list}
                 deciding={filter === "needs" || (filter === "cannot" && counts.blocked > 0)}
                 blocked={filter === "cannot"}
-                excluded={excluded}
-                columns={columns}
-                kinds={kinds}
-                actions={actions}
-                groupActions={groupActions}
                 progress={
                   filter === "cannot"
                     ? { total: counts.blocked, left: counts.blocked }
                     : { total: opened?.decisions ?? left, left }
                 }
-                split={split}
                 onSplit={(groupId) => setSplit((before) => HashSet.add(before, groupId))}
-                words={words}
                 undo={undoButton}
                 readOnly={readOnly}
                 loading={loading}
@@ -1540,7 +896,12 @@ export function ReviewRegion(props: ReviewRegionProps) {
 
   return (
     <>
-      <section ref={drawn} aria-labelledby={titleId} className="flex h-full min-h-0 flex-col">
+      <section
+        ref={region.attach}
+        data-review-region={region.id}
+        aria-labelledby={titleId}
+        className="flex h-full min-h-0 flex-col"
+      >
         <div className="flex flex-none flex-col px-4 pt-3 pb-2 sm:px-6">
           {heading}
           {loading ? <Skeleton className="mt-1 h-4 w-48" /> : titleLine}

@@ -6,6 +6,7 @@ import type { ReviewDecision } from "@inventory/review/ReviewDecision"
 import * as Data from "effect/Data"
 import type * as HashMap from "effect/HashMap"
 import type * as O from "effect/Option"
+import type * as Atom from "effect/reactivity/Atom"
 import type { ReactNode } from "react"
 
 /** Amber for a choice only the person can make, red for a value that cannot be imported as it is. */
@@ -421,17 +422,33 @@ export type ReviewRegionProps = {
   title: string
   /** What a row is called, singular and plural. */
   noun: readonly [string, string]
-  columns: ReadonlyArray<ReviewColumn>
-  rows: ReadonlyArray<ReviewRow>
+  /**
+   * The columns and the rows, as atoms: the region and everything it works out from them (the counts, the list on
+   * screen, the facets, the widths) follow them, and a caller whose rows change hands over no new props.
+   */
+  columns: Atom.Atom<ReadonlyArray<ReviewColumn>>
+  rows: Atom.Atom<ReadonlyArray<ReviewRow>>
+  /**
+   * The person's decisions with their undo history: the caller's atom. The region writes it with every action and
+   * every undo, and whoever keeps the decisions (a server draft, the browser) reads it there: `saved(state)` is the
+   * plain data to keep. Start it with `restored(saved)` for kept decisions (handed back as the very object `saved`
+   * gave, or as `fromDraft` rebuilt it after a refresh, they bring "Undo last step" back with them), with
+   * `proposing(rows)` where the rules' fixes are proposals, or with `emptyState`. A new atom, with a new `key` on the
+   * region, starts the review again.
+   */
+  decisions: Atom.Writable<ReviewState>
+  /** Taken when the region is first drawn. */
   problemKinds: ReadonlyArray<ProblemKind>
   /** Past-tense facts about the run, a few words each ("178 rows read"). Columns and fixes are added for you. */
   summary: ReadonlyArray<string>
   activity?: Activity
   /**
-   * The caller's own check, run on a row after the person typed a value. Without it an edit to the problem's cell
-   * settles the problem.
+   * The caller's own check, run on a row after the person typed a value, as an atom (none while there is no rule).
+   * Without it an edit to the problem's cell settles the problem.
    */
-  recheck?: (input: { row: ReviewRow; cells: Readonly<Record<string, string>> }) => Problem | undefined
+  recheck?: Atom.Atom<
+    O.Option<(input: { row: ReviewRow; cells: Readonly<Record<string, string>> }) => Problem | undefined>
+  >
   onImport: (result: ImportResult) => void
   /** The person picked a file column for a field. Re-run the review and pass new `columns` and `rows`. */
   onMatchColumn?: (columnId: string, source: string) => void
@@ -461,21 +478,9 @@ export type ReviewRegionProps = {
   /**
    * What happens to the rules' own lossless fixes (`row.applied`). "propose" (the default) asks first: they are
    * proposals the person takes in one click, counted under Needs you until then. "apply" puts them in force on
-   * arrival, shown with a tick and an Undo per group.
+   * arrival, shown with a tick and an Undo per group. Taken when the region is first drawn.
    */
   ruleFixes?: "propose" | "apply"
-  /**
-   * Decisions to start from: a draft restored after a refresh, or the region drawn again after the page showed
-   * another view. Read once; give the region a new `key` to reset. Handed back as the very object
-   * `onDecisionsChange` gave, or as `fromDraft` rebuilt it after a refresh, it brings "Undo last step" back with it;
-   * a plain copy starts a new history.
-   */
-  savedDecisions?: SavedDecisions
-  /**
-   * Called after every decision and undo with the decisions as plain data, for the caller to keep as it is. Read
-   * through a ref: a new function on each render is fine, and is called once per change.
-   */
-  onDecisionsChange?: (saved: SavedDecisions) => void
   /** One sentence for the confirm step: what the import does to what is already there ("Each row becomes a new item."). */
   importNote?: string
   /**
@@ -494,7 +499,7 @@ export type ReviewRegionProps = {
   /**
    * The caller's words for the tabs and the statuses, when the task has its own ("Waiting on you" for Needs you,
    * "Will be created" for Ready). Each word is set once here and used on every tab, tag, count and file that says it;
-   * what is not given keeps its default (`defaultReviewWords`).
+   * what is not given keeps its default (`defaultReviewWords`). Taken when the region is first drawn.
    */
   words?: Partial<ReviewWords>
   /**

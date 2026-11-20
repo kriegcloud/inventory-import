@@ -12,9 +12,13 @@ import { toastError } from "@inventory/client/SayError"
 import type { SavedDecisions } from "@inventory/catalog-contract/Decision"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import type { ImportView, SuggestOutcome } from "@inventory/catalog-contract/Import"
-import type { SavedDecisions as RegionDecisions } from "@inventory/review/ReviewTypes"
+import { member } from "@inventory/client/MemberAtoms"
+import { restored, saved } from "@inventory/review/ReviewDraft"
+import type { ReviewState, SavedDecisions as RegionDecisions } from "@inventory/review/ReviewTypes"
+import { restoredDecisions, storedReview } from "@inventory/review/SavedProgress"
+import { progressOf, progressWith } from "@inventory/review/SavedProgressHook"
 import { decisionSaver } from "./Draft.controller.ts"
-import { toRegionDecisions } from "./ImportReview.controller.ts"
+import { toRegionDecisions, toServerDecisions } from "./ImportReview.controller.ts"
 import type { review } from "@inventory/catalog-model/Review"
 import { changeView, importTable, importView, importViewShown, viewWith } from "./Imports.atoms.ts"
 
@@ -28,6 +32,8 @@ export interface ReviewLocal {
   readonly known: O.Option<number>
   readonly decisions: O.Option<SavedDecisions>
   readonly start: O.Option<RegionDecisions>
+  /** The region's decisions with their undo history, none until the person's first decision on this visit. */
+  readonly state: O.Option<ReviewState>
   readonly epoch: number
   readonly typed: string
   readonly matching: boolean
@@ -40,6 +46,7 @@ export const reviewLocal = perKey((_id: ImportId) =>
     known: O.none(),
     decisions: O.none(),
     start: O.none(),
+    state: O.none(),
     epoch: 0,
     typed: "",
     matching: false,
@@ -155,6 +162,7 @@ export const followDraft = perKey((id: ImportId) =>
           known: O.some(now.revision),
           decisions: O.some(decisions),
           start: O.some(toRegionDecisions(decisions)),
+          state: O.none(),
           epoch: local.epoch + 1,
           matching: false,
           putBack: false
@@ -181,6 +189,7 @@ export const followDraft = perKey((id: ImportId) =>
                   // No starting decisions of its own: the screen starts the region from the ones it shows, with the
                   // undo history this browser kept for them.
                   start: O.none(),
+                  state: O.none(),
                   epoch: local.epoch + 1
                 })
             },
@@ -208,14 +217,20 @@ const typedSkus = (saved: SavedDecisions): string =>
     .flatMap(([rowId, decision]) => (decision.edits?.sku === undefined ? [] : [`${rowId}=${decision.edits.sku}`]))
     .join("|")
 
+/** The registry these atoms live in, for a write whose answer arrives later. */
+const registryOf = Atom.readable((get) => get.registry)
+
+/** A write with nothing to read. */
+const noValue = (): void => undefined
+
 /**
  * The person changed a decision: the screen shows it at once and the saver sends it. What the save's answer does is
  * worked out from what is held when it arrives, never from the screen as it was drawn: suggestions, a match or another
  * save may have landed in between.
  */
 export const decideRows = perKey((id: ImportId) =>
-  Atom.fnSync((decisions: SavedDecisions, get) => {
-    const registry = get.registry
+  Atom.writable(noValue, (ctx, decisions: SavedDecisions) => {
+    const registry = ctx.get(registryOf)
     registry.update(reviewLocal(id), (now) => ({ ...now, decisions: O.some(decisions) }))
     decisionSaver(id).change(decisions, {
       onSaved: (revision, saved) => {
@@ -247,4 +262,66 @@ export const decideRows = perKey((id: ImportId) =>
       }
     })
   })
+)
+
+/** Where this browser keeps one import's review for the person signed in: the undo history behind the decisions. */
+const progressFor = (get: <A>(atom: Atom.Atom<A>) => A, id: ImportId) =>
+  progressOf(
+    get(member).pipe(
+      O.map((actor) => ({ organizationId: actor.organizationId, memberId: actor.id, screen: `import:${id}` })),
+      O.getOrUndefined
+    )
+  )
+
+const stateHeld = perKey((id: ImportId) => Atom.map(reviewLocal(id), (local) => local.state))
+const startHeld = perKey((id: ImportId) => Atom.map(reviewLocal(id), (local) => local.start))
+
+/**
+ * Where the person starts: the decisions the screen shows (the draft the server holds, or what this page is still
+ * sending), with their undo history when this browser kept one that ends at them, so a refresh brings "Undo last
+ * step" back too. A change made on another screen since starts a new history from the server's. The region holds a
+ * keep-or-replace answer as a value of its own column; the server keeps it apart (`toServerDecisions`,
+ * `toRegionDecisions`).
+ */
+const startState = perKey((id: ImportId) =>
+  Atom.readable((get): ReviewState => {
+    const start = get(startHeld(id))
+    if (O.isSome(start)) return restored(start.value)
+    const decisions = O.getOrElse(get(shownDecisions(id)), (): SavedDecisions => ({}))
+    // Read as it stands when the review starts: every decision after that is kept there, and starts nothing again.
+    const kept = O.flatMap(get.once(progressFor(get, id)), (progress) => progress.review)
+    return restored(
+      O.match(kept, {
+        onNone: () => toRegionDecisions(decisions),
+        onSome: (review) =>
+          Eq.equals(toServerDecisions(review.decisions), decisions)
+            ? restoredDecisions(review)
+            : toRegionDecisions(decisions)
+      })
+    )
+  })
+)
+
+/**
+ * The review region's decisions with their undo, for one import: the region reads them here and writes them here with
+ * every action. A write is shown at once, sent to the server (`decideRows`), and kept in this browser with its undo
+ * history, so nothing has to be told to the screen that draws the region.
+ */
+export const reviewState = perKey((id: ImportId) =>
+  Atom.writable(
+    (get): ReviewState => O.getOrElse(get(stateHeld(id)), () => get(startState(id))),
+    (ctx, next: ReviewState) => {
+      const decisions = saved(next)
+      ctx.set(reviewLocal(id), { ...ctx.get(reviewLocal(id)), state: O.some(next) })
+      ctx.set(decideRows(id), toServerDecisions(decisions))
+      const kept = progressFor((atom) => ctx.get(atom), id)
+      ctx.set(
+        kept,
+        progressWith({
+          before: ctx.get(kept),
+          change: { step: "review", review: O.some(storedReview(decisions)), decided: Object.keys(decisions).length }
+        })
+      )
+    }
+  )
 )

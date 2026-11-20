@@ -1,10 +1,20 @@
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { ChevronDownIcon, ChevronRightIcon, CircleHelpIcon, SparklesIcon } from "lucide-react"
 import type { Table as TanstackTable } from "@tanstack/react-table"
-import { Fragment, type ReactNode, memo, useId, useRef } from "react"
-import { useAtom } from "@effect/atom-react"
+import { Fragment, type ReactNode, memo, useRef } from "react"
+import { useAtomSubscribe, useAtomValue } from "@effect/atom-react"
+import * as ScopedAtom from "@effect/atom-react/ScopedAtom"
 import * as Atom from "effect/reactivity/Atom"
-import { remember } from "./remember.ts"
+import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
+import {
+  type Density,
+  type GroupActions,
+  type Region,
+  RegionScope,
+  type RegionTable,
+  type RowActions,
+  TableScope
+} from "../ReviewRegion.atoms.ts"
 import { cn } from "cn"
 import * as Data from "effect/Data"
 import * as HashMap from "effect/HashMap"
@@ -63,6 +73,7 @@ import {
   Overlay,
   Reason,
   ReasonTag,
+  regionLayout,
   WhyBody
 } from "./parts.tsx"
 import type {
@@ -82,136 +93,7 @@ import type {
  */
 export const reasonColumn: ReviewColumn = { id: "review:reason", label: "Reason", size: "fill", width: 240 }
 
-/** What a row can ask the region to do. Stable for the life of the region, so rows do not re-render for nothing. */
-export type RowActions = {
-  accept: (rowId: string) => void
-  keep: (rowId: string) => void
-  leaveOut: (rowId: string) => void
-  putBack: (rowId: string) => void
-  edit: (rowId: string, column: string, value: string) => void
-  /** Takes a fix that is in force on one cell out again ("Undo this fix"). */
-  undoFix: (rowId: string, column: string) => void
-  /** Turns a proposal down: the file's value stands and the row waits. Absent where a turned-down fix is offered again. */
-  reject?: (rowId: string, column: string) => void
-  /** The row as it stands now, for comparing two rows that cannot both be imported. */
-  peek: (rowId: string) => RowView | undefined
-}
-
-/** What a group heading can ask for. Each is one undo step. */
-export type GroupActions = {
-  accept: (groupId: string) => void
-  choose: (groupId: string, value: string) => void
-  /** Take a row out of its group's action, or put it back. */
-  toggle: (rowId: string) => void
-  /** Take the rules' lossless fixes for these rows in one step. */
-  acceptRows: (rowIds: ReadonlyArray<string>) => void
-  /** Show or hide the rows under a problem kind's heading. */
-  fold: (kindId: string) => void
-  leaveOut: (rowIds: ReadonlyArray<string>) => void
-  revert: (groupId: string) => void
-}
-
-export type GridHandle = {
-  reveal: (rowId: string) => void
-  /** Focus the table's own frame: where focus goes when no row and no import button is left to take it. */
-  focus: () => void
-}
-
-/** Where the grid puts its handle once drawn, for the region to reveal a row or focus the frame. */
-export type GridHandleHolder = { current: GridHandle | null }
-
-/**
- * What one grid keeps: the rows opened to show their detail, and what it last drew (changed in place, so noting it
- * draws nothing): the lines' shape, to measure again and go back to the top for a new list, and whether a lead group
- * was in view, to tell the region only when that changes. One per grid on screen, by its `useId`.
- */
-type GridHeld = {
-  readonly expanded: HashSet.HashSet<string>
-  readonly drawn: { shape: string; firstKey: string; length: number; leading: boolean | undefined }
-}
-const grids = Atom.family((_grid: string) =>
-  Atom.make<GridHeld>({
-    expanded: HashSet.empty(),
-    drawn: { shape: "", firstKey: "", length: -1, leading: undefined }
-  })
-)
-
-/** The Status column's width for the rows in view. */
-const statusWidthOf = remember(
-  (views: ReadonlyArray<RowView>, show: boolean, kinds: HashMap.HashMap<string, ProblemKind>, words: ReviewWords) =>
-    show ? statusFit({ views, kinds, words }) : 0
-)
-
-/** The columns drawn: the reason column after the name when any row says why it needs the person. */
-const shownColumnsOf = remember((columns: ReadonlyArray<ReviewColumn>, reasons: boolean): ReadonlyArray<ReviewColumn> =>
-  reasons && columns.length > 0 ? [...columns.slice(0, 1), reasonColumn, ...columns.slice(1)] : columns
-)
-
-/** Each drawn column's widest value, measured from the rows. */
-const needsOf = remember((columns: ReadonlyArray<ReviewColumn>, views: ReadonlyArray<RowView>, banding: boolean) =>
-  measureNeeds({ columns, views, banding, expandable: false })
-)
-
-/** Which columns are drawn at which width, and which move into the row's detail, for the room there is. */
-const planOf = remember(
-  (
-    shownColumns: ReadonlyArray<ReviewColumn>,
-    needs: ReturnType<typeof measureNeeds>,
-    keep: HashSet.HashSet<string>,
-    fixed: number,
-    room: number
-  ) => {
-    const sized = shownColumns.map((column, index) => ({
-      id: column.id,
-      size: column.size ?? ("fit" as const),
-      need: needs[index] ?? column.width ?? fillLeast,
-      priority: priorityOf(column),
-      keep: index === 0 || column.id === reasonColumn.id || HashSet.has(keep, column.id)
-    }))
-    const first = planColumns({ columns: sized, fixed, room })
-    const detailed = first.folded.some((id) => shownColumns.find((column) => column.id === id)?.under !== true)
-    const head = sized[0]
-    // Rows with a detail carry a button before their number: a first column sized to its values makes room for it.
-    return detailed && head !== undefined && head.size === "fit"
-      ? planColumns({ columns: [{ ...head, need: head.need + expander }, ...sized.slice(1)], fixed, room })
-      : first
-  }
-)
-
-/** The plan's columns in three parts: drawn, under the name, and in the row's detail. */
-const partsOf = remember((plan: ReturnType<typeof planColumns>, shownColumns: ReadonlyArray<ReviewColumn>) => ({
-  columns: shownColumns.filter((column) => plan.shown.some((shown) => shown.id === column.id)),
-  under: shownColumns.filter((column) => plan.folded.includes(column.id) && column.under === true),
-  folded: shownColumns.filter((column) => plan.folded.includes(column.id) && column.under !== true)
-}))
-
-/** The region's entries, with each opened row's detail under it. */
-const linesOf = remember(
-  (entries: ReadonlyArray<Entry>, detail: boolean, expanded: HashSet.HashSet<string>): ReadonlyArray<Line> =>
-    !detail || HashSet.size(expanded) === 0
-      ? entries
-      : entries.flatMap((entry): ReadonlyArray<Line> =>
-          entry._tag === "Row" && HashSet.has(expanded, entry.view.row.id)
-            ? [entry, Opened.Detail({ view: entry.view })]
-            : [entry]
-        )
-)
-
-/** Every column's label by id, once per list of columns. */
-const labelsOf = remember((columns: ReadonlyArray<ReviewColumn>) =>
-  HashMap.fromIterable(columns.map((column) => [column.id, column.label] as const))
-)
-
-/** Opens or closes one row's detail; one function per grid, so the drawn rows keep theirs. */
-const expanderFor = remember(
-  (set: (update: (before: GridHeld) => GridHeld) => void) => (rowId: string) =>
-    set((before) => ({
-      ...before,
-      expanded: HashSet.has(before.expanded, rowId)
-        ? HashSet.remove(before.expanded, rowId)
-        : HashSet.add(before.expanded, rowId)
-    }))
-)
+export type { Density, GroupActions, RowActions }
 
 // The product's own tables run 36px rows. A row with a value under the name needs 44; a group heading has two lines.
 const rowHeight = 36
@@ -1090,9 +972,6 @@ const Opened = Data.taggedEnum<Opened>()
 
 type Line = Entry | Opened
 
-/** 36 px rows, or 44 px with more air between them. */
-export type Density = "compact" | "comfortable"
-
 /** The columns with no room in the table at this width, under their row: each label and its value, change and all. */
 /** An empty cell that takes a default when imported: the default, quieter, and said to be one ("0 EA, default"). */
 function DefaultValue(props: { column: ReviewColumn; cells: Readonly<Record<string, string>> }) {
@@ -1195,6 +1074,8 @@ function GroupRow(props: {
   /** The actions column's width, to tell whether the quiet answers fit beside each other. */
   actionsWidth: number
   measure: (element: Element | null) => void
+  /** For the accept while it leads: tells the region its node is in view, and when it goes. */
+  markLead: Region["markLead"]
   /** How the group's column shows a value (`ReviewColumn.display`). */
   display?: ((value: string) => string) | undefined
 }) {
@@ -1245,6 +1126,7 @@ function GroupRow(props: {
         </ButtonGroup>
       ) : (
         <Button
+          ref={props.lead ? props.markLead : undefined}
           variant={props.lead ? "default" : "secondary"}
           size="xs"
           disabled={n === 0}
@@ -1377,73 +1259,257 @@ function GroupRow(props: {
   )
 }
 
-/**
- * The rows as a native table that scrolls inside its own frame: sticky header, the name column frozen on the left
- * and the row's actions on the right. Only the lines near the viewport are in the document.
- */
-export function ReviewGrid(props: {
-  entries: ReadonlyArray<Entry>
+/** What the grid notes of the lines it was last given: when to measure again, and when to go back to the top. */
+type Sign = {
+  readonly hash: number
+  readonly firstKey: string
+  readonly length: number
+  readonly measure: number
+  readonly top: number
+}
+
+/** What one grid works out for the room it has, and the rows the person opened in it. */
+interface Grid {
+  /** False while every row on screen has the same status and a group heading says it. */
+  readonly showStatus: Atom.Atom<boolean>
+  readonly statusWidth: Atom.Atom<number>
+  /** As wide as the widest answers showing (a long pick, "Other answers"), so no button runs under the next. */
+  readonly actionsWidth: Atom.Atom<number>
+  /** Which columns are drawn at which width, and which move into the row's detail, for the room there is. */
+  readonly plan: Atom.Atom<ReturnType<typeof planColumns>>
+  /** The plan's columns in three parts: drawn, under the name, and in the row's detail. */
+  readonly parts: Atom.Atom<{
+    readonly columns: ReadonlyArray<ReviewColumn>
+    readonly under: ReadonlyArray<ReviewColumn>
+    readonly folded: ReadonlyArray<ReviewColumn>
+  }>
+  /** The rows opened to show their detail. */
+  readonly expanded: Atom.Atom<HashSet.HashSet<string>>
+  /** The region's lines, with each opened row's detail under it. */
+  readonly entries: Atom.Atom<ReadonlyArray<Line>>
+  /** Every column's label by id. */
+  readonly labels: Atom.Atom<HashMap.HashMap<string, string>>
+  /** A new value when the lines' sizes may have changed (a heading came or went, a detail opened). */
+  readonly measured: Atom.Atom<number>
+  /** A new value when the list is another list: a new view starts at its first line. */
+  readonly top: Atom.Atom<number>
+  /** Opens or closes one row's detail. */
+  readonly toggle: (rowId: string) => void
+  /** Where a row is among the lines drawn, or -1. */
+  readonly indexOf: (rowId: string) => number
+  readonly toTop: () => void
+}
+
+const makeGrid = (
+  input: {
+    readonly region: Region
+    readonly table: RegionTable
+    readonly readOnly: boolean
+    readonly rowAction: ReviewRegionProps["rowAction"]
+  },
+  registry: AtomRegistry.AtomRegistry
+): Grid => {
+  const { region, table, readOnly, rowAction } = input
+  const banding = rowAction === undefined
+  // In the grouped views the headings say the status, so the column would be empty: its width goes to the name.
+  // Nor when every row showing would say the same word ("Ready", before anything was decided).
+  const showStatus = Atom.readable((get) => {
+    const filter = get(region.filter)
+    return (
+      filter !== "auto" &&
+      filter !== "needs" &&
+      get(table.ordered).some((view) => view.status !== "ready" || view.decided !== undefined)
+    )
+  })
+  const statusWidth = Atom.readable((get) =>
+    get(showStatus) ? statusFit({ views: get(region.list), kinds: region.kinds, words: region.words }) : 0
+  )
+  const actionsWidth = Atom.readable((get) =>
+    get(regionLayout) === "narrow"
+      ? 0
+      : actionsFit({ entries: get(table.lines), columns: get(region.input.columns), readOnly, rowAction })
+  )
+  // -- Widths: each `fit` column as wide as its widest value, the `fill` columns share the rest; short of room the
+  // lowest priority moves into the row's detail (an `under` column under the name), never cut. -----------------
+  // The table is worked out from the columns the person is showing. A column they turned on themselves (`true`: off
+  // is `false`, untouched is absent) never moves into the row's detail: they asked to see it, so the table scrolls
+  // sideways before it goes. Nor do the columns the problems on screen are about: the person is deciding on them.
+  const keep = Atom.readable((get) => {
+    const visibility = get(table.visibility)
+    return HashSet.union(
+      HashSet.fromIterable(Object.keys(visibility).filter((id) => visibility[id] === true)),
+      get(region.subjects)
+    )
+  })
+  // Every row that needs the person or cannot be fixed here says why, in its own column after the name and status.
+  const reasons = Atom.readable((get) =>
+    get(region.list).some((view) => view.status === "needs" || view.status === "cannot")
+  )
+  const shownColumns = Atom.readable((get): ReadonlyArray<ReviewColumn> => {
+    const visibility = get(table.visibility)
+    const columns = get(region.input.columns).filter((column) => visibility[column.id] !== false)
+    return get(reasons) && columns.length > 0 ? [...columns.slice(0, 1), reasonColumn, ...columns.slice(1)] : columns
+  })
+  // Group headings are drawn in this view: a row under one has no "Why?" of its own.
+  const bands = Atom.readable((get) => banding && get(table.lines).some((entry) => entry._tag === "Group"))
+  const needs = Atom.readable((get) =>
+    measureNeeds({ columns: get(shownColumns), views: get(region.list), banding: get(bands), expandable: false })
+  )
+  const plan = Atom.readable((get) => {
+    const columns = get(shownColumns)
+    const measured = get(needs)
+    const kept = get(keep)
+    const fixed = get(statusWidth) + get(actionsWidth)
+    const room = get(region.gridRoom)
+    const sized = columns.map((column, index) => ({
+      id: column.id,
+      size: column.size ?? ("fit" as const),
+      need: measured[index] ?? column.width ?? fillLeast,
+      priority: priorityOf(column),
+      keep: index === 0 || column.id === reasonColumn.id || HashSet.has(kept, column.id)
+    }))
+    const first = planColumns({ columns: sized, fixed, room })
+    const detailed = first.folded.some((id) => columns.find((column) => column.id === id)?.under !== true)
+    const head = sized[0]
+    // Rows with a detail carry a button before their number: a first column sized to its values makes room for it.
+    return detailed && head !== undefined && head.size === "fit"
+      ? planColumns({ columns: [{ ...head, need: head.need + expander }, ...sized.slice(1)], fixed, room })
+      : first
+  })
+  const parts = Atom.readable((get) => {
+    const now = get(plan)
+    const columns = get(shownColumns)
+    return {
+      columns: columns.filter((column) => now.shown.some((shown) => shown.id === column.id)),
+      under: columns.filter((column) => now.folded.includes(column.id) && column.under === true),
+      folded: columns.filter((column) => now.folded.includes(column.id) && column.under !== true)
+    }
+  })
+  const expanded = Atom.make(HashSet.empty<string>())
+  const entries = Atom.readable((get): ReadonlyArray<Line> => {
+    const lines = get(table.lines)
+    const open = get(expanded)
+    return get(parts).folded.length === 0 || HashSet.size(open) === 0
+      ? lines
+      : lines.flatMap((entry): ReadonlyArray<Line> =>
+          entry._tag === "Row" && HashSet.has(open, entry.view.row.id)
+            ? [entry, Opened.Detail({ view: entry.view })]
+            : [entry]
+        )
+  })
+  const labels = Atom.map(region.input.columns, (columns) =>
+    HashMap.fromIterable(columns.map((column) => [column.id, column.label] as const))
+  )
+  // Group headings change the sizes, and a new filter starts at its first line.
+  const sign = Atom.readable((get): Sign => {
+    const now = get(entries)
+    let hash = 0
+    for (const entry of now) {
+      hash = (Math.imul(hash, 31) + (entry._tag === "Row" ? 1 : entry._tag === "Detail" ? 2 : 3)) | 0
+    }
+    const head = now[0]
+    const firstKey = head === undefined ? "" : head._tag === "Row" ? head.view.row.id : head._tag
+    return O.match(get.self<Sign>(), {
+      onNone: () => ({ hash, firstKey, length: now.length, measure: 0, top: 0 }),
+      onSome: (before) =>
+        before.hash === hash && before.firstKey === firstKey && before.length === now.length
+          ? before
+          : {
+              hash,
+              firstKey,
+              length: now.length,
+              measure: before.measure + 1,
+              top:
+                before.firstKey !== firstKey && Math.abs(before.length - now.length) > 1 ? before.top + 1 : before.top
+            }
+    })
+  })
+  return {
+    showStatus,
+    statusWidth,
+    actionsWidth,
+    plan,
+    parts,
+    expanded,
+    entries,
+    labels,
+    measured: Atom.map(sign, (now) => now.measure),
+    top: Atom.map(sign, (now) => now.top),
+    toggle: (rowId) =>
+      registry.update(expanded, (before) =>
+        HashSet.has(before, rowId) ? HashSet.remove(before, rowId) : HashSet.add(before, rowId)
+      ),
+    indexOf: (rowId) => registry.get(entries).findIndex((entry) => entry._tag === "Row" && entry.view.row.id === rowId),
+    toTop: () =>
+      document
+        .querySelector(`[data-review-region="${region.id}"] [data-slot="sticky-table-frame"]`)
+        ?.scrollTo({ top: 0 })
+  }
+}
+
+/** One grid's atoms, made when it is first drawn from the region it is in. */
+const GridScope = ScopedAtom.make(
+  (input: {
+    readonly region: Region
+    readonly table: RegionTable
+    readonly readOnly: boolean
+    readonly rowAction: ReviewRegionProps["rowAction"]
+  }) => Atom.readable((get) => makeGrid(input, get.registry))
+)
+
+type GridProps = {
   /** The one table instance: its column headers carry the sort and hide menu. */
   table: TanstackTable<DataTableFeatures, RowView>
-  /** The columns the person is showing, the record's own first. */
-  columns: ReadonlyArray<ReviewColumn>
-  allColumns: ReadonlyArray<ReviewColumn>
-  /** The rows of the view on screen, as they stand: the `fit` columns are measured from them. */
-  views: ReadonlyArray<RowView>
-  /** The width the table has, in pixels: the page's room (`lib/content-width.ts`) less what stands beside it. */
-  room: number
-  /** False while every row on screen has the same status and a group heading says it. */
-  showStatus: boolean
-  /** Columns that never move into the detail: the ones the person turned on, the one the problems on screen are in. */
-  keep: HashSet.HashSet<string>
   /** 36 px rows, or 44 px with more air. */
   density: Density
-  /** The status and tab words (`ReviewRegionProps.words` over the defaults). */
-  words: ReviewWords
-  /** Rows the person took out of their group's action. */
-  excluded: HashSet.HashSet<string>
   /** Whether a group's accept may be the screen's one filled button (the person can decide in this view). */
   canLead: boolean
-  /** Told whether such a button is in view, so the import button can step back while it is. */
-  onLead: (inView: boolean) => void
-  kinds: HashMap.HashMap<string, ProblemKind>
-  actions: RowActions
-  groupActions: GroupActions
   readOnly: boolean
   loading: boolean
   caption: string
   /** One row across the table when the filter has nothing to show. */
   empty: ReactNode
   onMatch: ((columnId: string, source: string) => void) | undefined
-  handle: GridHandleHolder
   /** The caller's own answer per row. With it a row under a group heading keeps its own answers, with no tick. */
   rowAction: ReviewRegionProps["rowAction"]
   cellEditor: ReviewRegionProps["cellEditor"]
-  /** The actions column's width for these rows (`actionsFit`). */
-  actionsWidth: number
   /** Inside a card: the card's edge is the gutter, and the frame draws no rules of its own above and below. */
   framed?: boolean
-}) {
+}
+
+/**
+ * The rows as a native table that scrolls inside its own frame: sticky header, the name column frozen on the left
+ * and the row's actions on the right. Only the lines near the viewport are in the document. It reads the region it
+ * is in (`RegionScope`, `TableScope`): the lines, the rows, the actions.
+ */
+export function ReviewGrid(props: GridProps) {
+  const region = useAtomValue(RegionScope.use())
+  const table = useAtomValue(TableScope.use())
+  return (
+    <GridScope.Provider value={{ region, table, readOnly: props.readOnly, rowAction: props.rowAction }}>
+      <GridBody {...props} region={region} regionTable={table} />
+    </GridScope.Provider>
+  )
+}
+
+function GridBody(props: GridProps & { region: Region; regionTable: RegionTable }) {
+  const { region, regionTable } = props
+  const grid = useAtomValue(GridScope.use())
   const scroller = useRef<HTMLDivElement>(null)
-  const [held, setHeld] = useAtom(grids(useId()))
-  const statusWidth = statusWidthOf(props.views, props.showStatus, props.kinds, props.words)
-  const fixed = statusWidth + props.actionsWidth
+  const allColumns = useAtomValue(region.input.columns)
+  const excluded = useAtomValue(region.ui).excluded
+  const showStatus = useAtomValue(grid.showStatus)
+  const statusWidth = useAtomValue(grid.statusWidth)
+  const actionsWidth = useAtomValue(grid.actionsWidth)
+  const plan = useAtomValue(grid.plan)
+  const { columns, under, folded } = useAtomValue(grid.parts)
+  const expanded = useAtomValue(grid.expanded)
+  const entries = useAtomValue(grid.entries)
+  const labels = useAtomValue(grid.labels)
   const banding = props.rowAction === undefined
-
-  // -- Widths: each `fit` column as wide as its widest value, the `fill` columns share the rest; short of room the
-  // lowest priority moves into the row's detail (an `under` column under the name), never cut. -----------------
-  // Group headings are drawn in this view: a row under one has no "Why?" of its own.
-  const bands = banding && props.entries.some((entry) => entry._tag === "Group")
-  // Every row that needs the person or cannot be fixed here says why, in its own column after the name and status.
-  const reasons = props.views.some((view) => view.status === "needs" || view.status === "cannot")
-  const shownColumns = shownColumnsOf(props.columns, reasons)
-  const needs = needsOf(shownColumns, props.views, bands)
-  const plan = planOf(shownColumns, needs, props.keep, fixed, props.room)
-  const { columns, under, folded } = partsOf(plan, shownColumns)
-
-  // -- Lines: the region's entries, with each opened row's detail under it. ------------------------------------
-  const onExpand = expanderFor(setHeld)
-  const entries = linesOf(props.entries, folded.length > 0, held.expanded)
+  const { words, kinds } = region
+  const actions = region.input.rejects ? regionTable.actions : regionTable.plainActions
+  const groupActions = regionTable.groupActions
 
   // A value under the name takes a second line: such rows are 44 px whatever the density, so the virtual list's
   // estimate matches what is drawn.
@@ -1455,10 +1521,15 @@ export function ReviewGrid(props: {
       entries[index]?._tag === "Row" ? height : entries[index]?._tag === "Group" ? groupHeight : bandHeight,
     overscan: 12
   })
-  // Group headings change the sizes, and a new filter starts at its first line.
-  const shape = entries.map((entry) => (entry._tag === "Row" ? "" : entry._tag === "Detail" ? "d" : "g")).join("")
-  const firstKey = entries[0] === undefined ? "" : entries[0]._tag === "Row" ? entries[0].view.row.id : entries[0]._tag
-  const labels = labelsOf(props.allColumns)
+  // When the lines change shape the sizes are measured again, and another list starts at its first line.
+  useAtomSubscribe(grid.measured, virtual.measure)
+  useAtomSubscribe(grid.top, grid.toTop)
+  // The region asks for a row to be in view before it puts the focus there.
+  useAtomSubscribe(region.reveal, (asked) => {
+    if (O.isNone(asked)) return
+    const index = grid.indexOf(asked.value.rowId)
+    if (index !== -1) virtual.scrollToIndex(index, { align: "auto" })
+  })
 
   // The filled button is the first rule group's accept that is in view; scrolled away, it hands the role back.
   const range = virtual.range
@@ -1471,54 +1542,24 @@ export function ReviewGrid(props: {
             (entry): entry is Extract<Line, { readonly _tag: "Group" }> =>
               entry._tag === "Group" && !entry.applied && choicesOf(entry.group) === undefined
           )?.group.id
-  const leading = lead !== undefined
-  const { onLead, handle } = props
-
-  // After each draw: the handle the region reveals rows with, the sizes measured again (and the top for a new
-  // list) when the lines changed, and the region told when a lead group came into view or left it.
-  const frame = (element: HTMLDivElement | null) => {
-    scroller.current = element
-    if (element === null) return
-    handle.current = {
-      reveal: (rowId) => {
-        const index = entries.findIndex((entry) => entry._tag === "Row" && entry.view.row.id === rowId)
-        if (index !== -1) virtual.scrollToIndex(index, { align: "auto" })
-      },
-      focus: () => element.focus()
-    }
-    const drawn = held.drawn
-    if (drawn.shape !== shape || drawn.firstKey !== firstKey || drawn.length !== entries.length) {
-      const before = { firstKey: drawn.firstKey, length: drawn.length }
-      drawn.shape = shape
-      drawn.firstKey = firstKey
-      drawn.length = entries.length
-      virtual.measure()
-      if (before.length !== -1 && before.firstKey !== firstKey && Math.abs(before.length - entries.length) > 1)
-        element.scrollTo({ top: 0 })
-    }
-    if (drawn.leading !== leading) {
-      drawn.leading = leading
-      onLead(leading)
-    }
-  }
 
   const items = virtual.getVirtualItems()
   const padTop = items[0]?.start ?? 0
   const padBottom = virtual.getTotalSize() - (items[items.length - 1]?.end ?? 0)
-  const span = columns.length + (props.showStatus ? 2 : 1)
+  const span = columns.length + (showStatus ? 2 : 1)
   // The flex column is drawn without a width and takes what the others leave, so rounding never opens a gap.
   const widthOf = (id: string): number | undefined =>
     id === plan.flex ? undefined : plan.shown.find((shown) => shown.id === id)?.width
   const widths = [
     widthOf(columns[0]?.id ?? ""),
-    ...(props.showStatus ? [statusWidth] : []),
+    ...(showStatus ? [statusWidth] : []),
     ...columns.slice(1).map((column) => widthOf(column.id)),
-    props.actionsWidth
+    actionsWidth
   ]
   let group: FixGroup | undefined
 
   return (
-    <StickyTableFrame ref={frame} label={props.caption} framed={props.framed === true}>
+    <StickyTableFrame ref={scroller} label={props.caption} framed={props.framed === true}>
       <StickyTable
         caption={props.caption}
         widths={widths}
@@ -1563,7 +1604,7 @@ export function ReviewGrid(props: {
                       </span>
                     )}
                   </StickyTableColumn>
-                  {index === 0 && props.showStatus ? <StickyTableColumn>Status</StickyTableColumn> : null}
+                  {index === 0 && showStatus ? <StickyTableColumn>Status</StickyTableColumn> : null}
                 </Fragment>
               )
             })}
@@ -1620,7 +1661,7 @@ export function ReviewGrid(props: {
                       entry={entry}
                       span={span}
                       index={item.index}
-                      actions={props.groupActions}
+                      actions={groupActions}
                       readOnly={props.readOnly}
                     />
                   )
@@ -1639,19 +1680,20 @@ export function ReviewGrid(props: {
                     <GroupRow
                       key={`group:${entry.group.id}`}
                       group={entry.group}
-                      display={props.allColumns.find((column) => column.id === entry.group.column)?.display}
+                      display={allColumns.find((column) => column.id === entry.group.column)?.display}
                       applied={entry.applied}
                       span={span}
                       index={item.index}
                       lead={entry.group.id === lead}
-                      excluded={props.excluded}
+                      excluded={excluded}
                       ticks={banding}
                       labels={labels}
-                      actions={props.groupActions}
+                      actions={groupActions}
                       readOnly={props.readOnly}
                       indent={folded.length > 0}
-                      actionsWidth={props.actionsWidth}
+                      actionsWidth={actionsWidth}
                       measure={virtual.measureElement}
+                      markLead={region.markLead}
                     />
                   )
                 }
@@ -1677,26 +1719,26 @@ export function ReviewGrid(props: {
                     index={item.index}
                     measure={virtual.measureElement}
                     columns={columns}
-                    allColumns={props.allColumns}
+                    allColumns={allColumns}
                     under={under}
                     dense={props.density === "compact"}
-                    showStatus={props.showStatus}
+                    showStatus={showStatus}
                     folded={folded}
-                    expanded={HashSet.has(held.expanded, entry.view.row.id)}
-                    onExpand={onExpand}
-                    words={props.words}
+                    expanded={HashSet.has(expanded, entry.view.row.id)}
+                    onExpand={grid.toggle}
+                    words={words}
                     group={group}
                     banded={
                       banding && group !== undefined && choicesOf(group) === undefined && entry.view.status === "needs"
                     }
                     rowAction={props.rowAction}
                     cellEditor={props.cellEditor}
-                    included={!HashSet.has(props.excluded, entry.view.row.id)}
+                    included={!HashSet.has(excluded, entry.view.row.id)}
                     sectioned={sectioned}
                     labels={labels}
-                    kinds={props.kinds}
-                    actions={props.actions}
-                    groupActions={props.groupActions}
+                    kinds={kinds}
+                    actions={actions}
+                    groupActions={groupActions}
                     readOnly={props.readOnly}
                   />
                 )

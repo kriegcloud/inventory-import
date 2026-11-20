@@ -2,10 +2,12 @@ import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
 import * as HashMap from "effect/HashMap"
 import * as HashSet from "effect/HashSet"
 import * as O from "effect/Option"
-import { useAtom } from "@effect/atom-react"
+import { useAtom, useAtomValue } from "@effect/atom-react"
+import * as ScopedAtom from "@effect/atom-react/ScopedAtom"
 import * as Atom from "effect/reactivity/Atom"
-import { Fragment, type ReactNode, useId } from "react"
-import { remember } from "./remember.ts"
+import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
+import { Fragment, type ReactNode } from "react"
+import { type Region, RegionScope, TableScope } from "../ReviewRegion.atoms.ts"
 import { Button } from "@inventory/ui/components/button"
 import { Checkbox } from "@inventory/ui/components/checkbox"
 import { ButtonGroup } from "@inventory/ui/components/button-group"
@@ -37,38 +39,51 @@ import {
 } from "@inventory/review/ReviewDraft"
 import { CellValue, ColumnText, DecisionTag, EditForm, GroupChange, Overlay, Reason, ReasonTag } from "./parts.tsx"
 import type { GroupActions, RowActions } from "./ReviewGrid.tsx"
-import type {
-  ProblemKind,
-  QueueEntry,
-  ReviewColumn,
-  ReviewRegionProps,
-  ReviewWords,
-  RowView
-} from "@inventory/review/ReviewTypes"
+import type { ProblemKind, QueueEntry, ReviewColumn, ReviewRegionProps, RowView } from "@inventory/review/ReviewTypes"
 
 const page = 30
 
-/** The column labels by id, worked out once per list of columns. */
-const labelsOf = remember((columns: ReadonlyArray<ReviewColumn>) =>
-  HashMap.fromIterable(columns.map((column) => [column.id, column.label] as const))
-)
+/** Where one queue is: the card shown, how many rows of a plain list are drawn, and the card focus last went to. */
+type Place = { readonly at: number; readonly shown: number; readonly seen: O.Option<string> }
 
-/** The decisions the queue goes through, worked out once per set of rows, split groups and view. */
-const decisionsOf = remember((views: ReadonlyArray<RowView>, split: HashSet.HashSet<string>, blocked: boolean) =>
-  queue({ views, split, blocked })
-)
+/** What one queue holds and works out from the region it is in. */
+interface Queue {
+  readonly place: Atom.Writable<Place>
+  /** The decisions the queue goes through: every one, or the rows that cannot be imported as written. */
+  readonly decisions: Atom.Atom<ReturnType<typeof queue>>
+  /** The column labels by id. */
+  readonly labels: Atom.Atom<HashMap.HashMap<string, string>>
+  /**
+   * For the card on screen, keyed by its decision: after a decision the next card takes its place, and focus goes to
+   * its first button. Not for the first card the queue shows, nor for the same card shown again.
+   */
+  readonly arrived: (node: HTMLElement | null) => void
+}
 
-/**
- * Where one queue is: the card shown, how many rows of a plain list are drawn, and the card focus last went to
- * (changed in place: noting it draws nothing). One per queue on screen, by its `useId`.
- */
-const queues = Atom.family((_queue: string) =>
-  Atom.make<{ readonly at: number; readonly shown: number; readonly card: { key: O.Option<string> } }>({
-    at: 0,
-    shown: page,
-    card: { key: O.none() }
-  })
-)
+const makeQueue = (region: Region, registry: AtomRegistry.AtomRegistry): Queue => {
+  const place = Atom.make<Place>({ at: 0, shown: page, seen: O.none() })
+  const split = Atom.map(region.ui, (now) => now.split)
+  return {
+    place,
+    decisions: Atom.readable((get) =>
+      queue({ views: get(region.views), split: get(split), blocked: get(region.filter) === "cannot" })
+    ),
+    labels: Atom.map(region.input.columns, (columns) =>
+      HashMap.fromIterable(columns.map((column) => [column.id, column.label] as const))
+    ),
+    arrived: (node) => {
+      const key = node?.dataset.card
+      if (node === null || key === undefined) return
+      const seen = registry.get(place).seen
+      if (O.contains(seen, key)) return
+      registry.update(place, (before) => ({ ...before, seen: O.some(key) }))
+      if (O.isSome(seen)) node.querySelector<HTMLElement>("[data-first-action]")?.focus()
+    }
+  }
+}
+
+/** One queue's atoms, made when it is first drawn from the region it is in. */
+const QueueScope = ScopedAtom.make((region: Region) => Atom.readable((get) => makeQueue(region, get.registry)))
 
 /**
  * How far through the decisions the person is: how many are done and how many there are in all. More can need the
@@ -124,6 +139,7 @@ function WhySheet(props: { title: string; about: string; children: ReactNode }) 
 function Decision(props: {
   entry: QueueEntry
   columns: ReadonlyArray<ReviewColumn>
+  labels: HashMap.HashMap<string, string>
   kinds: HashMap.HashMap<string, ProblemKind>
   actions: RowActions
   groupActions: GroupActions
@@ -132,8 +148,7 @@ function Decision(props: {
   rowAction: ReviewRegionProps["rowAction"]
   cellEditor: ReviewRegionProps["cellEditor"]
 }) {
-  const { entry, actions, groupActions } = props
-  const labels = labelsOf(props.columns)
+  const { entry, actions, groupActions, labels } = props
   const columnOf = (id: string | undefined) => props.columns.find((column) => column.id === id)
 
   if (entry._tag === "Group") {
@@ -442,31 +457,14 @@ function Decision(props: {
   )
 }
 
-/**
- * The phone's review: an approval flow, one decision at a time. A group of identical fixes is one decision; then
- * each row that needs the person, with its reason, the change and what each button will do. The other views are a
- * plain two-line list. Nothing scrolls sideways.
- */
-export function ReviewQueue(props: {
-  /** Every row as it stands, for the decisions. */
-  views: ReadonlyArray<RowView>
-  /** The rows of the current view, for the list. */
-  list: ReadonlyArray<RowView>
+type QueueProps = {
   deciding: boolean
   /** The cards are the rows that cannot be imported as written, one by one, instead of the decisions. */
   blocked?: boolean
-  /** Rows the person took out of their group's action. */
-  excluded: HashSet.HashSet<string>
-  columns: ReadonlyArray<ReviewColumn>
-  kinds: HashMap.HashMap<string, ProblemKind>
-  actions: RowActions
-  groupActions: GroupActions
   /** Decisions there were when the review opened, and how many are left (`decisionsLeft`). */
   progress: { total: number; left: number }
-  /** Groups the person chose to go through row by row. Kept by the region, so its count of decisions agrees. */
-  split: HashSet.HashSet<string>
+  /** A group to go through row by row. Kept by the region, so its count of decisions agrees. */
   onSplit: (groupId: string) => void
-  words: ReviewWords
   undo: ReactNode
   readOnly: boolean
   loading: boolean
@@ -475,28 +473,41 @@ export function ReviewQueue(props: {
   /** The caller's own answer per row (`rowAction` on the region). */
   rowAction: ReviewRegionProps["rowAction"]
   cellEditor: ReviewRegionProps["cellEditor"]
-}) {
-  const { split } = props
-  const [held, setHeld] = useAtom(queues(useId()))
-  const { at, shown } = held
-  const setAt = (next: number) => setHeld((before) => ({ ...before, at: next }))
-  const setShown = (next: number) => setHeld((before) => ({ ...before, shown: next }))
-  const decisions = decisionsOf(props.views, split, props.blocked === true)
+}
+
+/**
+ * The phone's review: an approval flow, one decision at a time. A group of identical fixes is one decision; then
+ * each row that needs the person, with its reason, the change and what each button will do. The other views are a
+ * plain two-line list. Nothing scrolls sideways. It reads the region it is in (`RegionScope`, `TableScope`).
+ */
+export function ReviewQueue(props: QueueProps) {
+  const region = useAtomValue(RegionScope.use())
+  return (
+    <QueueScope.Provider value={region}>
+      <QueueBody {...props} region={region} />
+    </QueueScope.Provider>
+  )
+}
+
+function QueueBody(props: QueueProps & { region: Region }) {
+  const { region } = props
+  const table = useAtomValue(TableScope.use())
+  const queueOf = useAtomValue(QueueScope.use())
+  const [{ at, shown }, setPlace] = useAtom(queueOf.place)
+  const setAt = (next: number) => setPlace((before) => ({ ...before, at: next }))
+  const setShown = (next: number) => setPlace((before) => ({ ...before, shown: next }))
+  const decisions = useAtomValue(queueOf.decisions)
+  const labels = useAtomValue(queueOf.labels)
+  const list = useAtomValue(region.list)
+  const columns = useAtomValue(region.input.columns)
+  const excluded = useAtomValue(region.ui).excluded
+  const { kinds, words } = region
+  const actions = region.input.rejects ? table.actions : table.plainActions
+  const groupActions = table.groupActions
   const index = Math.min(at, Math.max(0, decisions.length - 1))
   const entry = decisions[index]
   const key = entry === undefined ? "" : entry._tag === "Group" ? `g:${entry.group.id}` : entry.view.row.id
-  const nameColumn = props.columns[0]
-
-  // After a decision the next card takes its place, and focus goes to its first button: checked each time the queue
-  // is drawn, acted on only when the card changed.
-  const region = (element: HTMLDivElement | null) => {
-    if (element === null) return
-    const last = held.card
-    if (O.contains(last.key, key)) return
-    const first = O.isNone(last.key)
-    last.key = O.some(key)
-    if (!first) element.querySelector<HTMLElement>("[data-first-action]")?.focus()
-  }
+  const nameColumn = columns[0]
 
   if (props.loading) {
     return (
@@ -508,16 +519,15 @@ export function ReviewQueue(props: {
   }
 
   if (!props.deciding || props.readOnly) {
-    const rows = props.list.slice(0, shown)
+    const rows = list.slice(0, shown)
     return (
       <div
-        ref={region}
         role="region"
         aria-label={props.caption}
         data-queue=""
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-y"
       >
-        {props.list.length === 0 ? (
+        {list.length === 0 ? (
           <div className="py-10 text-center text-sm text-muted-foreground">{props.empty}</div>
         ) : (
           <ItemGroup>
@@ -527,18 +537,18 @@ export function ReviewQueue(props: {
                   <ItemTitle>{nameOf(view, nameColumn)}</ItemTitle>
                   <ItemDescription>
                     {view.status === "needs" || view.status === "cannot"
-                      ? reasonOf({ view, kinds: props.kinds, words: props.words })
-                      : contextOf(view, props.columns, undefined)}
+                      ? reasonOf({ view, kinds: kinds, words: words })
+                      : contextOf(view, columns, undefined)}
                   </ItemDescription>
                 </ItemContent>
                 {view.status === "needs" || view.status === "cannot" ? (
                   <ReasonTag
-                    kind={O.getOrUndefined(HashMap.get(props.kinds, view.problem?.kind ?? ""))}
+                    kind={O.getOrUndefined(HashMap.get(kinds, view.problem?.kind ?? ""))}
                     tone={view.problem?.tone}
                     fallback={view.problem?.kind ?? ""}
                   />
                 ) : (
-                  <DecisionTag view={view} words={props.words} />
+                  <DecisionTag view={view} words={words} />
                 )}
                 {props.readOnly ||
                 view.status === "needs" ||
@@ -549,7 +559,7 @@ export function ReviewQueue(props: {
                     size="touch"
                     data-first-action=""
                     onClick={() =>
-                      view.status === "out" ? props.actions.putBack(view.row.id) : props.actions.leaveOut(view.row.id)
+                      view.status === "out" ? actions.putBack(view.row.id) : actions.leaveOut(view.row.id)
                     }
                   >
                     {view.status === "out" ? "Put back" : "Leave out"}
@@ -560,9 +570,9 @@ export function ReviewQueue(props: {
             ))}
           </ItemGroup>
         )}
-        {props.list.length > shown ? (
+        {list.length > shown ? (
           <Button variant="outline" size="touch" className="my-3 w-full" onClick={() => setShown(shown + page)}>
-            Show {Math.min(page, props.list.length - shown)} more
+            Show {Math.min(page, list.length - shown)} more
           </Button>
         ) : null}
       </div>
@@ -571,7 +581,6 @@ export function ReviewQueue(props: {
 
   return (
     <div
-      ref={region}
       role="region"
       aria-label={props.caption}
       data-queue=""
@@ -614,18 +623,21 @@ export function ReviewQueue(props: {
             }
             className="h-1"
           />
-          <Decision
-            key={key}
-            entry={entry}
-            columns={props.columns}
-            kinds={props.kinds}
-            actions={props.actions}
-            groupActions={props.groupActions}
-            excluded={props.excluded}
-            rowAction={props.rowAction}
-            cellEditor={props.cellEditor}
-            onSplit={props.onSplit}
-          />
+          {/* Keyed by the decision, so the card that takes a decided one's place is a new node. */}
+          <div key={key} data-card={key} ref={queueOf.arrived} className="contents">
+            <Decision
+              entry={entry}
+              columns={columns}
+              labels={labels}
+              kinds={kinds}
+              actions={actions}
+              groupActions={groupActions}
+              excluded={excluded}
+              rowAction={props.rowAction}
+              cellEditor={props.cellEditor}
+              onSplit={props.onSplit}
+            />
+          </div>
         </>
       )}
     </div>

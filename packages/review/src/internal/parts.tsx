@@ -9,6 +9,7 @@ import {
   XIcon
 } from "lucide-react"
 import { useAtom, useAtomValue } from "@effect/atom-react"
+import * as ScopedAtom from "@effect/atom-react/ScopedAtom"
 import * as Atom from "effect/reactivity/Atom"
 import { lazy, type ReactNode, Suspense, useId, useRef } from "react"
 import { cn } from "cn"
@@ -70,21 +71,20 @@ export const regionLayout: Atom.Atom<Layout> = Atom.readable((get) =>
 const PhoneDrawer = lazy(() => import("./PhoneDrawer.tsx").then((module) => ({ default: module.PhoneDrawer })))
 
 /**
- * What one overlay holds: open when nobody controls it, mounted once opened (so closing slides it away), and how the
- * pointer opened it. One per overlay on screen, by its `useId`.
+ * What one overlay holds: open when nobody controls it, mounted once opened (so closing slides it away), whether a
+ * resting mouse opened it, and the timer that will open or close it.
  */
 type OverlayHeld = {
   readonly open: boolean
   readonly opened: boolean
-  /** Changed in place: a resting mouse and its timer redraw nothing. */
-  readonly pointer: { byHover: boolean; timer: number }
+  readonly byHover: boolean
+  readonly timer: number
 }
-const overlays = Atom.family((_overlay: string) =>
-  Atom.make<OverlayHeld>({ open: false, opened: false, pointer: { byHover: false, timer: 0 } })
+const OverlayScope = ScopedAtom.make(() =>
+  Atom.make<OverlayHeld>({ open: false, opened: false, byHover: false, timer: 0 })
 )
 
-/** One-click-away detail. The same content points at its trigger on a wide screen and rises from the bottom on a phone. */
-export function Overlay(props: {
+type OverlayProps = {
   trigger: ReactNode
   title: string
   /** For the bottom sheet's hidden description. */
@@ -107,9 +107,20 @@ export function Overlay(props: {
    * or the pointer leaving closes it). For a card that explains; a panel that holds a form keeps its close button.
    */
   card?: boolean
-}) {
+}
+
+/** One-click-away detail. The same content points at its trigger on a wide screen and rises from the bottom on a phone. */
+export function Overlay(props: OverlayProps) {
+  return (
+    <OverlayScope.Provider>
+      <OverlayBody {...props} />
+    </OverlayScope.Provider>
+  )
+}
+
+function OverlayBody(props: OverlayProps) {
   const layout = useAtomValue(regionLayout)
-  const [held, setHeld] = useAtom(overlays(useId()))
+  const [held, setHeld] = useAtom(OverlayScope.use())
   const open = props.open ?? held.open
   const setOpen = (next: boolean) => {
     setHeld((before) => ({ ...before, open: next }))
@@ -118,9 +129,10 @@ export function Overlay(props: {
   const body = typeof props.children === "function" ? props.children(() => setOpen(false)) : props.children
   const opened = held.opened
   const setOpened = (next: boolean) => setHeld((before) => ({ ...before, opened: next }))
-  // Whether it was opened by a resting mouse, and the timer that will open or close it: changed without drawing.
-  const hovered = held.pointer
-  const timer = held.pointer
+  const byHover = held.byHover
+  const setByHover = (next: boolean) =>
+    setHeld((before) => (before.byHover === next ? before : { ...before, byHover: next }))
+  const stopTimer = () => window.clearTimeout(held.timer)
   const trigger = useRef<HTMLElement>(null)
   if (layout === "narrow") {
     return (
@@ -157,19 +169,20 @@ export function Overlay(props: {
     )
   }
   const later = (next: boolean, wait: number) => {
-    window.clearTimeout(timer.timer)
-    timer.timer = window.setTimeout(() => {
-      hovered.byHover = next
+    stopTimer()
+    const timer = window.setTimeout(() => {
+      setByHover(next)
       setOpen(next)
     }, wait)
+    setHeld((before) => ({ ...before, timer }))
   }
   const mouse = (event: React.PointerEvent) => props.hover === true && event.pointerType === "mouse"
   return (
     <Popover
       open={open}
       onOpenChange={(next) => {
-        window.clearTimeout(timer.timer)
-        hovered.byHover = false
+        stopTimer()
+        setByHover(false)
         setOpen(next)
       }}
     >
@@ -180,15 +193,15 @@ export function Overlay(props: {
         }}
         onPointerLeave={(event) => {
           if (!mouse(event)) return
-          if (open && hovered.byHover) later(false, 200)
-          else window.clearTimeout(timer.timer)
+          if (open && byHover) later(false, 200)
+          else stopTimer()
         }}
         onClick={(event) => {
           // Pressed while open from a hover: it stays open, now as if pressed, instead of closing under the click.
-          if (open && hovered.byHover) {
+          if (open && byHover) {
             event.preventDefault()
-            window.clearTimeout(timer.timer)
-            hovered.byHover = false
+            stopTimer()
+            setByHover(false)
           }
         }}
       >
@@ -199,13 +212,13 @@ export function Overlay(props: {
         side={props.side ?? "bottom"}
         sideOffset={props.card === true ? 4 : 6}
         onOpenAutoFocus={(event) => {
-          if (hovered.byHover) event.preventDefault()
+          if (byHover) event.preventDefault()
         }}
         onPointerEnter={(event) => {
-          if (mouse(event) && hovered.byHover) window.clearTimeout(timer.timer)
+          if (mouse(event) && byHover) stopTimer()
         }}
         onPointerLeave={(event) => {
-          if (mouse(event) && hovered.byHover) later(false, 200)
+          if (mouse(event) && byHover) later(false, 200)
         }}
         {...(props.className === undefined ? {} : { className: props.className })}
       >
@@ -416,15 +429,30 @@ export function CellValue(props: {
   )
 }
 
-/** Whether one cut text is cut, and its card open; by its `useId`. */
-const cutTexts = Atom.family((_text: string) => Atom.make({ cut: false, open: false }))
-
 /**
- * Text in one line that may be cut short. Once it is cut (measured after it is drawn, again when its cell changes
- * width), the whole text is in a hover card: on hover, on keyboard focus (the cut text joins the tab order) and on a
- * tap, for a touch screen has no hover. Text that fits is plain, and not a tab stop.
+ * One cut text's own: whether it is cut and its card open, and the ref callback for its span, the same for as long as
+ * the text is drawn: it measures the span when it appears and again whenever its box changes size.
  */
-export function CutText(props: {
+const CutScope = ScopedAtom.make(() =>
+  Atom.readable((get) => {
+    const registry = get.registry
+    const held = Atom.make({ cut: false, open: false })
+    const measured = (element: HTMLSpanElement | null) => {
+      if (element === null) return undefined
+      const measure = () => {
+        const now = element.scrollWidth > element.clientWidth + 1
+        registry.update(held, (before) => (before.cut === now ? before : { ...before, cut: now }))
+      }
+      measure()
+      const observer = new ResizeObserver(measure)
+      observer.observe(element)
+      return () => observer.disconnect()
+    }
+    return { held, measured }
+  })
+)
+
+type CutTextProps = {
   /** The whole text, for the card. */
   text: string
   /** What is drawn, when it is more than the text (a code in its face, hidden words for a screen reader). */
@@ -432,23 +460,27 @@ export function CutText(props: {
   /** What the card shows, when it is more than the text (an old and a new value). */
   card?: ReactNode
   className?: string
-}) {
-  const [held, setHeld] = useAtom(cutTexts(useId()))
-  const { cut, open } = held
+}
+
+/**
+ * Text in one line that may be cut short. Once it is cut (measured after it is drawn, again when its cell changes
+ * width), the whole text is in a hover card: on hover, on keyboard focus (the cut text joins the tab order) and on a
+ * tap, for a touch screen has no hover. Text that fits is plain, and not a tab stop.
+ */
+export function CutText(props: CutTextProps) {
+  return (
+    <CutScope.Provider>
+      <CutBody {...props} />
+    </CutScope.Provider>
+  )
+}
+
+function CutBody(props: CutTextProps) {
+  const scope = useAtomValue(CutScope.use())
+  const [{ cut, open }, setHeld] = useAtom(scope.held)
+  const ref = scope.measured
   const setOpen = (next: boolean | ((before: boolean) => boolean)) =>
     setHeld((before) => ({ ...before, open: typeof next === "function" ? next(before.open) : next }))
-  // Measured once drawn, and again whenever its box changes size.
-  const ref = (element: HTMLSpanElement | null) => {
-    if (element === null) return
-    const measure = () => {
-      const now = element.scrollWidth > element.clientWidth + 1
-      setHeld((before) => (before.cut === now ? before : { ...before, cut: now }))
-    }
-    measure()
-    const observer = new ResizeObserver(measure)
-    observer.observe(element)
-    return () => observer.disconnect()
-  }
   return (
     <HoverCard openDelay={350} closeDelay={100} open={open && cut} onOpenChange={setOpen}>
       <HoverCardTrigger asChild>
@@ -599,18 +631,28 @@ export function WhyBody(props: {
   )
 }
 
-/** What was typed in one edit form, none until something was; by its `useId`. */
-const editForms = Atom.family((_form: string) => Atom.make<O.Option<string>>(O.none()))
+/** What was typed in one edit form, none until something was. */
+const EditScope = ScopedAtom.make(() => Atom.make<O.Option<string>>(O.none()))
 
-/** One field for the value that is wrong. Enter saves; the row is checked again by the caller's rule. */
-export function EditForm(props: {
+type EditFormProps = {
   label: string
   value: string
   size: "sm" | "touch"
   onSave: (value: string) => void
-}) {
+}
+
+/** One field for the value that is wrong. Enter saves; the row is checked again by the caller's rule. */
+export function EditForm(props: EditFormProps) {
+  return (
+    <EditScope.Provider>
+      <EditBody {...props} />
+    </EditScope.Provider>
+  )
+}
+
+function EditBody(props: EditFormProps) {
   const id = useId()
-  const [typed, setTyped] = useAtom(editForms(id))
+  const [typed, setTyped] = useAtom(EditScope.use())
   const value = O.getOrElse(typed, () => props.value)
   const setValue = (next: string) => setTyped(O.some(next))
   return (

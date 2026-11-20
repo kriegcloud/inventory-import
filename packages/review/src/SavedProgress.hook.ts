@@ -101,6 +101,26 @@ const noProgress: Atom.Writable<O.Option<SavedProgress>, O.Option<SavedProgress>
 )
 
 /**
+ * The progress kept for one scope, as the atom a screen's own atoms read and write (the Review step keeps the undo
+ * history there with every decision). With no scope yet nothing is read or written.
+ */
+export const progressOf = (
+  scope: ProgressScope | undefined
+): Atom.Writable<O.Option<SavedProgress>, O.Option<SavedProgress>> =>
+  scope === undefined ? noProgress : progressAt(progressKey(scope))
+
+/** The progress to keep after a change: what was kept (or a first record), the change over it, and the time now. */
+export const progressWith = (input: {
+  readonly before: O.Option<SavedProgress>
+  readonly change: Partial<Omit<SavedProgress, "version" | "savedAt">>
+}): O.Option<SavedProgress> => {
+  const now = DateTime.nowUnsafe()
+  return O.some(
+    SavedProgress.make({ ...O.getOrElse(input.before, () => SavedProgress.first(now)), ...input.change, savedAt: now })
+  )
+}
+
+/**
  * One screen's saved progress for the person signed in. `saved` is what is kept now; `save` merges a change and
  * writes it at once; `keepFile` stores the chosen file; `file` reads it back; `clear` removes all of it (on Confirm,
  * or "Start again"). `refused` turns true when the browser would not keep it, so the screen can say so once. With no
@@ -112,7 +132,7 @@ export function useSavedProgress(
   scope: ProgressScope | undefined,
   browserRuntime: ManagedRuntime.ManagedRuntime<never, never>
 ) {
-  const at = scope === undefined ? noProgress : progressAt(progressKey(scope))
+  const at = progressOf(scope)
   const kept = useAtomValue(at)
   const saved = O.getOrUndefined(kept)
   // Given a function, the setter works the change out from the progress as it stands when written, so two changes in
@@ -123,12 +143,7 @@ export function useSavedProgress(
 
   const save = (change: Partial<Omit<SavedProgress, "version" | "savedAt">>) => {
     if (scope === undefined) return
-    update((before) => {
-      const now = DateTime.nowUnsafe()
-      return O.some(
-        SavedProgress.make({ ...O.getOrElse(before, () => SavedProgress.first(now)), ...change, savedAt: now })
-      )
-    })
+    update((before) => progressWith({ before, change }))
   }
 
   const keepFile = (file: File) => {

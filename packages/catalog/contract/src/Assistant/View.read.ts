@@ -143,14 +143,17 @@ export const ViewChangeKind = LiteralKit(["sort", "filter", "search", "show", "h
 /** The decoded value of `ViewChangeKind`. */
 export type ViewChangeKind = typeof ViewChangeKind.Type
 
-/** One change to a table's view, by `kind`. */
+/**
+ * One change to a table's view, by `kind`. Branch with `ViewChange.match`. The description is given before
+ * `S.toTaggedUnion`: annotating after it rebuilds the union without its `match` and `guards`.
+ */
 export const ViewChange = ViewChangeKind.mapMembers(() =>
   Tuple.make(SortChange, FilterChange, SearchChange, ShowChange, HideChange, ClearChange)
 ).pipe(
-  S.toTaggedUnion("kind"),
   S.annotate({
     description: "One change to a table's view: sort, filter, search, show or hide a column, or clear"
-  })
+  }),
+  S.toTaggedUnion("kind")
 )
 /** The decoded value of `ViewChange`. */
 export type ViewChange = typeof ViewChange.Type

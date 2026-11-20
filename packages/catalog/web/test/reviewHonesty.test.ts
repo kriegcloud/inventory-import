@@ -29,7 +29,7 @@ import {
   visible
 } from "@inventory/review/ReviewDraft"
 import { planColumns, type SizedColumn } from "../../../review/src/internal/sizing.ts"
-import type { ProblemKind, ReviewColumn, ReviewRow } from "@inventory/review/ReviewTypes"
+import { ProblemKind, ReviewColumn, ReviewRow } from "@inventory/review/ReviewTypes"
 import { defaultReviewWords, reviewWords } from "@inventory/review/ReviewWords"
 import { readSpreadsheet } from "@inventory/catalog-web/Spreadsheet"
 import type { ItemFields } from "@inventory/catalog-contract/Item"
@@ -104,16 +104,17 @@ describe("every row says why", () => {
 
 // A kind nothing on the screen can settle: the item the row names is not in the system yet.
 const kinds: ReadonlyArray<ProblemKind> = [
-  { id: "unit", label: "Unit", tone: "decision" },
-  { id: "unknown", label: "Not in system", tone: "blocker", fixable: false }
+  ProblemKind.make({ id: "unit", label: "Unit", tone: "decision" }),
+  ProblemKind.make({ id: "unknown", label: "Not in system", tone: "blocker", fixable: false })
 ]
-const columns: ReadonlyArray<ReviewColumn> = [{ id: "name", label: "Name" }]
-const row = (line: number, extra: Partial<ReviewRow> = {}): ReviewRow => ({
-  id: `row-${line}`,
-  line,
-  cells: { name: `Item ${line}` },
-  ...extra
-})
+const columns: ReadonlyArray<ReviewColumn> = [ReviewColumn.make({ id: "name", label: "Name" })]
+const row = (line: number, extra: Partial<typeof ReviewRow.Encoded> = {}): ReviewRow =>
+  ReviewRow.make({
+    id: `row-${line}`,
+    line,
+    cells: { name: `Item ${line}` },
+    ...extra
+  })
 const unknownItem = (line: number) =>
   row(line, { problem: { kind: "unknown", reason: `Item ${line} is not in the system yet.` } })
 

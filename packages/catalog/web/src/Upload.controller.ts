@@ -32,7 +32,8 @@ import { type Client, fork, runExit, apiPrefixOf } from "./Catalog.runtime.ts"
 import { rememberWorkbook } from "./Imports.controller.ts"
 import { navigate } from "@inventory/ui/Route"
 import { importAddress } from "./internal/route.ts"
-import type { ReadMessage, ReadRequest } from "./internal/protocol.ts"
+import { ReadMessage } from "./internal/protocol.ts"
+import type { ReadRequest } from "./internal/protocol.ts"
 import { sayError } from "@inventory/client/SayError"
 import { queryKeys } from "./Catalog.keys.ts"
 
@@ -145,61 +146,54 @@ const program = Effect.fn("upload.program")(function* (client: Client, request: 
 
   // Every step's own errors (a typed refusal, the network) end the stream the same way, so they are not told apart
   // here: the observer in `start` turns whatever ended it into a sentence.
-  const handle = (message: ReadMessage): Effect.Effect<void, UploadError> => {
-    switch (message._tag) {
-      case "Progress":
-        return Effect.sync(() =>
+  const handle = (message: ReadMessage): Effect.Effect<void, UploadError> =>
+    ReadMessage.$match(message, {
+      Progress: (progress) =>
+        Effect.sync(() =>
           set({
             _tag: "Reading",
             fileName,
-            rowsRead: message.rowsRead,
-            rows: rowsOf(message)
+            rowsRead: progress.rowsRead,
+            rows: rowsOf(progress)
+          })
+        ),
+      Head: Effect.fn("Upload.head")(function* (message) {
+        // The sheet crossed the threads as its name or null: the Option is made again here.
+        const read: StagedHead = { ...message.head, sheet: O.fromNullOr(message.head.sheet) }
+        head = read
+        workbook = message.workbook
+        const rows = message.chunkSizes.reduce((sum, size) => sum + size, 0)
+        // One key for this file: a begin sent again after a lost answer is the same upload on the server, so the
+        // begin can be retried like every other step.
+        const key = UploadKey.make(SecureRandom.uuidV4Unsafe())
+        const { id } = yield* staged(
+          client.imports.beginUpload({
+            payload: { key, head: read, rowCount: rows, chunkCount: message.chunkSizes.length }
           })
         )
-      case "Head":
-        return Effect.gen(function* () {
-          // The sheet crossed the threads as its name or null: the Option is made again here.
-          const read: StagedHead = { ...message.head, sheet: O.fromNullOr(message.head.sheet) }
-          head = read
-          workbook = message.workbook
-          const rows = message.chunkSizes.reduce((sum, size) => sum + size, 0)
-          // One key for this file: a begin sent again after a lost answer is the same upload on the server, so the
-          // begin can be retried like every other step.
-          const key = UploadKey.make(SecureRandom.uuidV4Unsafe())
-          const { id } = yield* staged(
-            client.imports.beginUpload({
-              payload: { key, head: read, rowCount: rows, chunkCount: message.chunkSizes.length }
-            })
-          )
-          if (running !== null) running.uploadId = id
-          set({ _tag: "Saving", fileName, uploadId: id, rowsSaved: 0, rows })
-          yield* Deferred.succeed(begun, { id, sizes: message.chunkSizes })
+        if (running !== null) running.uploadId = id
+        set({ _tag: "Saving", fileName, uploadId: id, rowsSaved: 0, rows })
+        yield* Deferred.succeed(begun, { id, sizes: message.chunkSizes })
+      }),
+      Chunk: Effect.fn("Upload.chunk")(function* (message) {
+        chunks[message.seq] = message.rows
+        const { id, sizes } = yield* Deferred.await(begun)
+        yield* staged(client.imports.putChunk({ params: { id }, payload: { seq: message.seq, rows: message.rows } }))
+        acknowledged.push(message.seq)
+        const rows = sizes.reduce((sum, size) => sum + size, 0)
+        set({
+          _tag: "Saving",
+          fileName,
+          uploadId: id,
+          rowsSaved: savedRows({ chunkSizes: sizes, acknowledged }),
+          rows
         })
-      case "Chunk":
-        return Effect.gen(function* () {
-          chunks[message.seq] = message.rows
-          const { id, sizes } = yield* Deferred.await(begun)
-          yield* staged(client.imports.putChunk({ params: { id }, payload: { seq: message.seq, rows: message.rows } }))
-          acknowledged.push(message.seq)
-          const rows = sizes.reduce((sum, size) => sum + size, 0)
-          set({
-            _tag: "Saving",
-            fileName,
-            uploadId: id,
-            rowsSaved: savedRows({ chunkSizes: sizes, acknowledged }),
-            rows
-          })
-        })
-      case "Done":
-        return Effect.void
-      case "Refused": {
-        const { kind, fileName: name, problem, todo } = message.problem
-        return Effect.fail(FileProblem.make({ kind, fileName: name, problem, todo }))
-      }
-      case "Crashed":
-        return Effect.fail(ReadFailed.make({ message: message.message }))
-    }
-  }
+      }),
+      Done: () => Effect.void,
+      Refused: ({ problem: { kind, fileName: name, problem, todo } }) =>
+        Effect.fail(FileProblem.make({ kind, fileName: name, problem, todo })),
+      Crashed: ({ message }) => Effect.fail(ReadFailed.make({ message }))
+    })
 
   yield* reader(request).pipe(Stream.mapEffect(handle, { concurrency: inFlight }), Stream.runDrain)
   const { id, sizes } = yield* Deferred.await(begun)

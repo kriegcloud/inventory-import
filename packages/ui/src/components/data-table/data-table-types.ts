@@ -6,6 +6,7 @@ import type {
   FILTER_VARIANTS,
   JOIN_OPERATORS
 } from "@inventory/ui/components/data-table/data-table-utils"
+import * as React from "react"
 
 export interface ColumnSelectOption {
   label: string

@@ -102,6 +102,7 @@ import { ReviewQueue } from "./internal/ReviewQueue.tsx"
 import { WorkList } from "./internal/WorkList.tsx"
 import type { Activity, FilterId, ReviewRegionProps, ReviewState, RowView } from "@inventory/review/ReviewTypes"
 import { reviewWords } from "@inventory/review/ReviewWords"
+import * as React from "react"
 
 // The phone's drawers (vaul) are their own chunk: fetched on a phone once the review is drawn, never on a desk.
 const PhoneDrawer = lazy(() => import("./internal/PhoneDrawer.tsx").then((module) => ({ default: module.PhoneDrawer })))

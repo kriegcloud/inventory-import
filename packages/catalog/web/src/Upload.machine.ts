@@ -86,19 +86,16 @@ export type UploadState = typeof UploadState.Type
  * @example progressOf({ state: { _tag: "Reading", fileName: "items.csv", rowsRead: 52000, rows: rowsOf({ rowsAbout: 50000, exact: false }) } })
  * // { done: 52000, total: 52000 }
  */
-export const progressOf = (input: { readonly state: UploadState }): { done: number; total: number | null } => {
-  const { state } = input
-  switch (state._tag) {
-    case "Reading":
-      return {
+export const progressOf = (input: { readonly state: UploadState }): { done: number; total: number | null } =>
+  UploadState.matchOrElse(
+    input.state,
+    {
+      Reading: (state) => ({
         done: Math.max(0, state.rowsRead),
         total: state.rows.kind === "unknown" ? null : Math.max(state.rows.n, state.rowsRead, 0)
-      }
-    case "Saving":
-      return { done: Math.min(Math.max(0, state.rowsSaved), state.rows), total: state.rows }
-    case "Preparing":
-      return { done: state.rows, total: state.rows }
-    default:
-      return { done: 0, total: null }
-  }
-}
+      }),
+      Saving: (state) => ({ done: Math.min(Math.max(0, state.rowsSaved), state.rows), total: state.rows }),
+      Preparing: (state) => ({ done: state.rows, total: state.rows })
+    },
+    () => ({ done: 0, total: null })
+  )

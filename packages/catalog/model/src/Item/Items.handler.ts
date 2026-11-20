@@ -2,7 +2,7 @@
 // named in the request.
 import * as Effect from "effect/Effect"
 import { ImportStore } from "../Import/ImportStore.store.ts"
-import { ItemStore } from "./ItemStore.store.ts"
+import { EditOutcome, ItemStore } from "./ItemStore.store.ts"
 import { CurrentActor, requireRole } from "@inventory/kernel/Actor"
 import { ItemQueryParams, ItemChanged, ItemNotFound } from "@inventory/catalog-contract/Catalog"
 import { ItemId } from "@inventory/catalog-contract/Ids"
@@ -45,20 +45,23 @@ export const itemsEndpoints = Effect.gen(function* () {
     }) {
       const actor = yield* requireRole("editor")
       const done = yield* items.edit(actor, params.id, payload)
-      switch (done._tag) {
-        case "Edited":
-        case "Same":
-          return done.item
-        case "Changed":
-          return yield* ItemChanged.make({
-            reason: `Someone changed ${done.item.sku} while you were editing it. Here is the item as it is now: make your change again.`,
-            item: done.item
-          })
-        case "Missing":
-          return yield* ItemNotFound.make({
-            reason: "This item is not in your organization any more: the import that created it was taken back."
-          })
-      }
+      return yield* EditOutcome.match(done, {
+        Edited: ({ item }) => Effect.succeed(item),
+        Same: ({ item }) => Effect.succeed(item),
+        Changed: ({ item }) =>
+          Effect.fail(
+            ItemChanged.make({
+              reason: `Someone changed ${item.sku} while you were editing it. Here is the item as it is now: make your change again.`,
+              item
+            })
+          ),
+        Missing: () =>
+          Effect.fail(
+            ItemNotFound.make({
+              reason: "This item is not in your organization any more: the import that created it was taken back."
+            })
+          )
+      })
     })
   }
 })

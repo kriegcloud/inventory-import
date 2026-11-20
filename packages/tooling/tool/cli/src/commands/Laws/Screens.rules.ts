@@ -127,17 +127,17 @@ export const screens = Effect.fn("Screens.screens")(function* () {
     })
   )
 
-  const missingBlock = O.isNone(block) ? A.of<ScreensFinding>({ _tag: "NoBlock" }) : A.empty<ScreensFinding>()
+  const missingBlock = O.isNone(block) ? A.of<ScreensFinding>(ScreensFinding.cases.NoBlock.make({})) : A.empty<ScreensFinding>()
   const perPackage = A.flatMap(withScreens, (workspace) => {
     const name = String(workspace.manifest.name)
     const where = repo.relative(repo.root, workspace.dir)
     const src = repo.join(workspace.dir, "src")
     const noSource = A.contains(sources, src)
       ? A.empty<ScreensFinding>()
-      : A.of<ScreensFinding>({ _tag: "NoSource", name, where, add: repo.relative(repo.dirname(css), src) })
+      : A.of<ScreensFinding>(ScreensFinding.cases.NoSource.make({ name, where, add: repo.relative(repo.dirname(css), src) }))
     const notListed = O.contains(R.get(listed, name), workspace.dir)
       ? A.empty<ScreensFinding>()
-      : A.of<ScreensFinding>({ _tag: "NotListed", name, where })
+      : A.of<ScreensFinding>(ScreensFinding.cases.NotListed.make({  name, where }))
     return A.appendAll(noSource, notListed)
   })
   const noPackage = yield* Effect.forEach(
@@ -149,7 +149,7 @@ export const screens = Effect.fn("Screens.screens")(function* () {
           Effect.map((present) =>
             present
               ? A.empty<ScreensFinding>()
-              : A.of<ScreensFinding>({ _tag: "NoPackage", name, where: repo.relative(repo.root, dir) })
+              : A.of<ScreensFinding>(ScreensFinding.cases.NoPackage.make({ name, where: repo.relative(repo.root, dir) }))
           )
         ),
     { concurrency: 1 }
@@ -163,7 +163,7 @@ export const screens = Effect.fn("Screens.screens")(function* () {
           Effect.map((present) =>
             present
               ? A.empty<ScreensFinding>()
-              : A.of<ScreensFinding>({ _tag: "NoFolder", where: repo.relative(repo.root, dir) })
+              : A.of<ScreensFinding>(ScreensFinding.cases.NoFolder.make({ where: repo.relative(repo.root, dir) }))
           )
         ),
     { concurrency: 1 }
@@ -173,9 +173,8 @@ export const screens = Effect.fn("Screens.screens")(function* () {
     A.appendAll(A.flatten(noPackage), A.flatten(noSourceFolder))
   )
   return A.isArrayNonEmpty(problems)
-    ? A.prepend<ScreensFinding, ScreensFinding>(problems, { _tag: "Refused" })
-    : A.of<ScreensFinding>({
-        _tag: "Listed",
+    ? A.prepend<ScreensFinding, ScreensFinding>(problems, ScreensFinding.cases.Refused.make({ _tag: "Refused" }))
+    : A.of<ScreensFinding>(ScreensFinding.cases.Listed.make({
         names: A.map(withScreens, (workspace) => String(workspace.manifest.name))
-      })
+      }))
 })

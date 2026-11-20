@@ -74,6 +74,7 @@ import {
   getRowDisplayIndex,
   getRowHeightValue,
   getTabTargetCell,
+  NavigationDirections,
   parsePastedCellValue,
   parseTsv,
   serializeCellValue,
@@ -1475,78 +1476,63 @@ function getNavigationTarget(
   const lastRowIndex = rows.length - 1
   const pageSize = options.pageSize ?? DEFAULT_PAGE_SIZE
 
-  let nextRowIndex = rowIndex
-  let nextColumnId = from.columnId
-
-  switch (direction) {
-    case "up":
-      nextRowIndex = Math.max(0, rowIndex - 1)
-      break
-    case "down":
-      nextRowIndex = Math.min(lastRowIndex, rowIndex + 1)
-      break
-    case "left":
-    case "right": {
-      const horizontalIds = options.extend ? dataColumnIds : columnIds
-      const columnIndex = horizontalIds.indexOf(from.columnId)
-      const step = (direction === "right") !== (table.options.dir === "rtl") ? 1 : -1
-      const adjacentColumnId = horizontalIds[columnIndex + step]
-      if (columnIndex !== -1 && adjacentColumnId) {
-        nextColumnId = adjacentColumnId
-      }
-      break
-    }
-    case "home":
-      nextColumnId = firstDataColumnId ?? from.columnId
-      break
-    case "end":
-      nextColumnId = lastDataColumnId ?? from.columnId
-      break
-    case "ctrl+home":
-      nextRowIndex = 0
-      nextColumnId = firstDataColumnId ?? from.columnId
-      break
-    case "ctrl+end":
-      nextRowIndex = lastRowIndex
-      nextColumnId = lastDataColumnId ?? from.columnId
-      break
-    case "ctrl+up":
-      nextRowIndex = 0
-      break
-    case "ctrl+down":
-      nextRowIndex = lastRowIndex
-      break
-    case "pageup":
-      nextRowIndex = Math.max(0, rowIndex - pageSize)
-      break
-    case "pagedown":
-      nextRowIndex = Math.min(lastRowIndex, rowIndex + pageSize)
-      break
-    case "pageleft":
-    case "pageright": {
-      const columnIndex = dataColumnIds.indexOf(from.columnId)
-      if (columnIndex === -1) break
-      const step = direction === "pageright" ? HORIZONTAL_PAGE_SIZE : -HORIZONTAL_PAGE_SIZE
-      nextColumnId = dataColumnIds[Math.min(dataColumnIds.length - 1, Math.max(0, columnIndex + step))] ?? from.columnId
-      break
-    }
-    case "tab":
-    case "shift+tab": {
-      const dataColumnIdSet = new Set(dataColumnIds)
-      const target = getTabTargetCell({
-        rowIndex,
-        columnId: from.columnId,
-        columnIds,
-        rowCount: rows.length,
-        isBackward: direction === "shift+tab",
-        getIsColumnTabbable: (columnId) => dataColumnIdSet.has(columnId)
-      })
-      if (!target) return null
-      nextRowIndex = target.rowIndex
-      nextColumnId = target.columnId
-      break
-    }
+  // Local change: each direction answers the cell it lands on (null when Tab has nowhere to go), read with the
+  // directions' LiteralKit instead of a `switch` that wrote to two variables.
+  type Landing = { rowIndex: number; columnId: string } | null
+  const at = (nextRow: number, nextColumn: string = from.columnId): Landing => ({
+    rowIndex: nextRow,
+    columnId: nextColumn
+  })
+  const sideways = (toward: "left" | "right"): Landing => {
+    const horizontalIds = options.extend ? dataColumnIds : columnIds
+    const columnIndex = horizontalIds.indexOf(from.columnId)
+    const step = (toward === "right") !== (table.options.dir === "rtl") ? 1 : -1
+    const adjacentColumnId = horizontalIds[columnIndex + step]
+    return at(rowIndex, columnIndex !== -1 && adjacentColumnId ? adjacentColumnId : from.columnId)
   }
+  const pageSideways = (toward: "pageleft" | "pageright"): Landing => {
+    const columnIndex = dataColumnIds.indexOf(from.columnId)
+    if (columnIndex === -1) return at(rowIndex)
+    const step = toward === "pageright" ? HORIZONTAL_PAGE_SIZE : -HORIZONTAL_PAGE_SIZE
+    return at(
+      rowIndex,
+      dataColumnIds[Math.min(dataColumnIds.length - 1, Math.max(0, columnIndex + step))] ?? from.columnId
+    )
+  }
+  const tabbed = (toward: "tab" | "shift+tab"): Landing => {
+    const dataColumnIdSet = new Set(dataColumnIds)
+    const target = getTabTargetCell({
+      rowIndex,
+      columnId: from.columnId,
+      columnIds,
+      rowCount: rows.length,
+      isBackward: toward === "shift+tab",
+      getIsColumnTabbable: (columnId) => dataColumnIdSet.has(columnId)
+    })
+    return target ? at(target.rowIndex, target.columnId) : null
+  }
+
+  const landing = NavigationDirections.match(direction, {
+    up: () => at(Math.max(0, rowIndex - 1)),
+    down: () => at(Math.min(lastRowIndex, rowIndex + 1)),
+    left: sideways,
+    right: sideways,
+    home: () => at(rowIndex, firstDataColumnId ?? from.columnId),
+    end: () => at(rowIndex, lastDataColumnId ?? from.columnId),
+    "ctrl+home": () => at(0, firstDataColumnId ?? from.columnId),
+    "ctrl+end": () => at(lastRowIndex, lastDataColumnId ?? from.columnId),
+    "ctrl+up": () => at(0),
+    "ctrl+down": () => at(lastRowIndex),
+    pageup: () => at(Math.max(0, rowIndex - pageSize)),
+    pagedown: () => at(Math.min(lastRowIndex, rowIndex + pageSize)),
+    pageleft: pageSideways,
+    pageright: pageSideways,
+    tab: tabbed,
+    "shift+tab": tabbed
+  })
+  if (!landing) return null
+  const nextRowIndex = landing.rowIndex
+  const nextColumnId = landing.columnId
 
   const nextRow = rows[nextRowIndex]
   if (!nextRow) return null

@@ -10,6 +10,7 @@ import {
   ItemSort,
   FilterOperator,
   ItemFilter,
+  ItemFilterVariant,
   itemFilterVariants,
   ItemQuery
 } from "@inventory/catalog-contract/ItemQuery"
@@ -258,18 +259,16 @@ export const ItemStoreD1 = Layer.effect(
     ): O.Option<Statement.Fragment> => {
       if (operator === "isEmpty" || operator === "isNotEmpty") return emptyCondition(column, operator)
       if (typeof value !== "string" || value === "") return O.none()
-      switch (operator) {
-        case "iLike":
-          return O.some(sql`(${column} LIKE ${containsPattern(value)} ESCAPE '\\')`)
-        case "notILike":
-          return O.some(sql`(${column} IS NULL OR ${column} NOT LIKE ${containsPattern(value)} ESCAPE '\\')`)
-        case "eq":
-          return O.some(sql`(${column} = ${value})`)
-        case "ne":
-          return O.some(sql`(${column} IS NOT ${value})`)
-        default:
-          return O.none()
-      }
+      return FilterOperator.matchOrElse(
+        operator,
+        {
+          iLike: () => O.some(sql`(${column} LIKE ${containsPattern(value)} ESCAPE '\\')`),
+          notILike: () => O.some(sql`(${column} IS NULL OR ${column} NOT LIKE ${containsPattern(value)} ESCAPE '\\')`),
+          eq: () => O.some(sql`(${column} = ${value})`),
+          ne: () => O.some(sql`(${column} IS NOT ${value})`)
+        },
+        () => O.none<Statement.Fragment>()
+      )
     }
 
     // Category and unit. A list is one JSON parameter read with json_each, so fifty units are one bound value of
@@ -342,24 +341,20 @@ export const ItemStoreD1 = Layer.effect(
         })
       }
       if (typeof value !== "string") return O.none()
-      return O.flatMap(read(value), (cents) => {
-        switch (operator) {
-          case "eq":
-            return O.some(sql`(${column} = ${cents})`)
-          case "ne":
-            return O.some(sql`(${column} IS NOT ${cents})`)
-          case "lt":
-            return O.some(sql`(${column} < ${cents})`)
-          case "lte":
-            return O.some(sql`(${column} <= ${cents})`)
-          case "gt":
-            return O.some(sql`(${column} > ${cents})`)
-          case "gte":
-            return O.some(sql`(${column} >= ${cents})`)
-          default:
-            return O.none()
-        }
-      })
+      return O.flatMap(read(value), (cents) =>
+        FilterOperator.matchOrElse(
+          operator,
+          {
+            eq: () => O.some(sql`(${column} = ${cents})`),
+            ne: () => O.some(sql`(${column} IS NOT ${cents})`),
+            lt: () => O.some(sql`(${column} < ${cents})`),
+            lte: () => O.some(sql`(${column} <= ${cents})`),
+            gt: () => O.some(sql`(${column} > ${cents})`),
+            gte: () => O.some(sql`(${column} >= ${cents})`)
+          },
+          () => O.none<Statement.Fragment>()
+        )
+      )
     }
 
     // A filter is read by its column's variant, never by the variant the request claims for it.
@@ -367,21 +362,17 @@ export const ItemStoreD1 = Layer.effect(
       const stored = sql(filterColumns[filter.id])
       // The cost is exact text in the table and a number in a comparison.
       const column = filter.id === "unitCost" ? sql`CAST(${stored} AS REAL)` : sql`${stored}`
-      switch (itemFilterVariants[filter.id]) {
-        case "text":
-          return textCondition(column, filter.operator, filter.value)
-        case "select":
-          return filter.id === "isActive" || filter.id === "lotTracked"
-            ? flagCondition(column, filter.operator, filter.value)
-            : yield* selectCondition(column, filter.operator, filter.value)
-        case "number":
-          return numberCondition(
-            column,
-            filter.operator,
-            filter.value,
-            filter.id === "unitCost" ? dollarsOf : quantityOf
+      return yield* ItemFilterVariant.match(itemFilterVariants[filter.id], {
+        text: () => Effect.succeed(textCondition(column, filter.operator, filter.value)),
+        select: () =>
+          filter.id === "isActive" || filter.id === "lotTracked"
+            ? Effect.succeed(flagCondition(column, filter.operator, filter.value))
+            : selectCondition(column, filter.operator, filter.value),
+        number: () =>
+          Effect.succeed(
+            numberCondition(column, filter.operator, filter.value, filter.id === "unitCost" ? dollarsOf : quantityOf)
           )
-      }
+      })
     })
 
     const orderBy = (entry: ItemSort) => {

@@ -3,6 +3,8 @@
 // once per failure, for whoever is debugging; the person reads a sentence. Every screen calls `sayError`, so a new
 // kind of failure is worded here once, not in each component.
 import * as Effect from "effect/Effect"
+import * as Match from "effect/Match"
+import * as O from "effect/Option"
 import * as P from "effect/Predicate"
 import * as HttpClientError from "effect/http/HttpClientError"
 import { toast } from "sonner"
@@ -91,22 +93,21 @@ export const sayError = (
     sentence,
     problems
   })
-  switch (tag) {
-    case "NotSignedIn":
-      // Its reason names what was sent; the person needs only what to do.
-      return said("We could not tell who you are", "Reload the page. If it happens again, sign in again.")
-    case "Forbidden":
-      return said(
-        "Your role does not allow this",
-        reasonOf(error) ?? "Ask an admin in your organization for the editor role."
-      )
-    case "AiUnavailable": {
-      // Said by its kind, from the sentences the app installed (the contract's `modelSentences`), never by the error's
-      // own text: a provider's words never reach the screen.
+  const known = Match.value(tag).pipe(
+    // Its reason names what was sent; the person needs only what to do.
+    Match.when("NotSignedIn", () =>
+      said("We could not tell who you are", "Reload the page. If it happens again, sign in again.")
+    ),
+    Match.when("Forbidden", () =>
+      said("Your role does not allow this", reasonOf(error) ?? "Ask an admin in your organization for the editor role.")
+    ),
+    // Said by its kind, from the sentences the app installed (the contract's `modelSentences`), never by the error's
+    // own text: a provider's words never reach the screen.
+    Match.when("AiUnavailable", () => {
       const kind = P.hasProperty(error, "kind") && P.isString(error.kind) ? error.kind : "down"
       return said("The model did not answer", troubleSentence(kind))
-    }
-    case "BadRequestProblem": {
+    }),
+    Match.when("BadRequestProblem", () => {
       const problems = requestProblems(error, options.fields ?? {})
       return said(
         "This was not accepted",
@@ -117,13 +118,16 @@ export const sayError = (
             : `${problems.length} things need a look before it can be saved.`,
         problems.length > 1 ? problems : []
       )
-    }
-    case "InternalServerErrorProblem":
-      return said(
+    }),
+    Match.when("InternalServerErrorProblem", () =>
+      said(
         "Something went wrong on our side",
         "Nothing was changed. Try again; if it keeps happening, reload the page."
       )
-  }
+    ),
+    Match.option
+  )
+  if (O.isSome(known)) return known.value
   if (HttpClientError.isHttpClientError(error)) {
     const status = statusOf(error)
     if (error.reason._tag === "TransportError") {

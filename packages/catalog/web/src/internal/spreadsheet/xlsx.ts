@@ -4,7 +4,7 @@
 // app's `Cell`: its type, its text without coercion and the text Excel would display.
 import { Xlsx } from "@beep/xlsx/Xlsx"
 import { columnLetters } from "@beep/xlsx/XlsxAddress"
-import { XlsxCell, XlsxNumberFormat, type XlsxValue } from "@beep/xlsx/XlsxCell"
+import { XlsxCell, XlsxNumberFormat, XlsxValue } from "@beep/xlsx/XlsxCell"
 import type { XlsxContainer } from "@beep/xlsx/XlsxDiagnostic"
 import type { XlsxParseError } from "@beep/xlsx/XlsxError"
 import { XlsxLimits, XlsxReadOptions } from "@beep/xlsx/XlsxOptions"
@@ -46,20 +46,17 @@ const withShown = (cell: Cell, shown: O.Option<string>, formula: O.Option<string
 
 /** One cell of the package as the app's cell: its type, its text without coercion, and its displayed text. */
 const toCell = (cell: XlsxRow["cells"][number], system: XlsxDateSystem): Cell => {
-  const value: XlsxValue = cell.value
-  switch (value.kind) {
-    case "Text":
-      return withShown(value.text === "" ? emptyCell : { type: "text", text: value.text }, O.none(), cell.formula)
-    case "Boolean":
-      return withShown({ type: "boolean", text: value.value ? "TRUE" : "FALSE" }, O.none(), cell.formula)
-    case "Error":
-      return withShown({ type: "error", text: value.code }, O.none(), cell.formula)
-    case "Number":
-      return withShown({ type: "number", text: numberText(value.value) }, XlsxCell.shown(cell, system), cell.formula)
-    case "Date": {
-      const at = XlsxCalendar.fromSerial(value.serial, system)
+  const empty = (): Cell => withShown(emptyCell, O.none(), cell.formula)
+  return XlsxValue.match(cell.value, {
+    Text: ({ text }) => withShown(text === "" ? emptyCell : { type: "text", text }, O.none(), cell.formula),
+    Boolean: ({ value }) => withShown({ type: "boolean", text: value ? "TRUE" : "FALSE" }, O.none(), cell.formula),
+    Error: ({ code }) => withShown({ type: "error", text: code }, O.none(), cell.formula),
+    Number: ({ value }) =>
+      withShown({ type: "number", text: numberText(value) }, XlsxCell.shown(cell, system), cell.formula),
+    Date: ({ serial }) => {
+      const at = XlsxCalendar.fromSerial(serial, system)
       const text = dateText({
-        day: Math.floor(value.serial),
+        day: Math.floor(serial),
         y: at.year,
         m: at.month,
         d: at.day,
@@ -68,11 +65,10 @@ const toCell = (cell: XlsxRow["cells"][number], system: XlsxDateSystem): Cell =>
         S: at.second
       })
       return withShown({ type: "date", text }, XlsxCell.shown(cell, system), cell.formula)
-    }
-    case "Blank":
-    case "Unreadable":
-      return withShown(emptyCell, O.none(), cell.formula)
-  }
+    },
+    Blank: empty,
+    Unreadable: empty
+  })
 }
 
 /** Why the package stopped, as the problem the person is told. */

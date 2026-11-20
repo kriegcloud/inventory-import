@@ -31,7 +31,8 @@ import { importAddress } from "./internal/route.ts"
 import { StoredFile } from "@inventory/review/SavedProgress"
 import { useSavedProgress } from "@inventory/review/SavedProgressHook"
 import { catalogRuntime } from "./Catalog.runtime.ts"
-import { type UploadEnd, useUpload, type UploadState } from "./Upload.controller.ts"
+import { type UploadEnd, useUpload } from "./Upload.controller.ts"
+import { UploadState } from "./Upload.machine.ts"
 import type { ImportView } from "@inventory/catalog-contract/Import"
 import { fileProblemTitle } from "@inventory/catalog-contract/FileProblem"
 import { progressOf } from "./Upload.machine.ts"
@@ -55,20 +56,19 @@ const count = (n: number, noun: string): string => `${whole.format(n)} ${noun}${
 /** Where an upload stands, in words and numbers: "Reading 12,400 of about 50,000 rows". */
 const line = (state: UploadState): string => {
   const { done, total } = progressOf({ state })
-  switch (state._tag) {
-    case "Reading":
-      return total === null
-        ? "Reading"
-        : `Reading ${whole.format(done)} of ${state.rows.kind === "counted" ? "" : "about "}${whole.format(total)} rows`
-    case "Saving":
-      return `Saving ${whole.format(done)} of ${whole.format(total ?? done)} rows`
-    case "Preparing":
-      return "Preparing the review"
-    case "Cancelling":
-      return "Cancelling"
-    default:
-      return ""
-  }
+  return UploadState.matchOrElse(
+    state,
+    {
+      Reading: ({ rows }) =>
+        total === null
+          ? "Reading"
+          : `Reading ${whole.format(done)} of ${rows.kind === "counted" ? "" : "about "}${whole.format(total)} rows`,
+      Saving: () => `Saving ${whole.format(done)} of ${whole.format(total ?? done)} rows`,
+      Preparing: () => "Preparing the review",
+      Cancelling: () => "Cancelling"
+    },
+    () => ""
+  )
 }
 
 /** The file on its way in: its name, how far it is, and Cancel while cancelling still stops something. */

@@ -20,6 +20,7 @@ import * as R from "effect/Record"
 import * as Result from "effect/Result"
 import * as S from "effect/Schema"
 import * as SchemaIssue from "effect/SchemaIssue"
+import * as Tuple from "effect/Tuple"
 import * as SchemaTransformation from "effect/SchemaTransformation"
 import * as Str from "effect/String"
 import { makeTextDecodeTo, type TextDecodeTo } from "@beep/utils/Schema"
@@ -56,9 +57,10 @@ import {
 import { CsvRecordSlice, CsvTable, type CsvRecord } from "./CsvTable.schema.ts"
 import { bomOf, decodeBytes, encodeUtf8, firstInvalidUtf8 } from "./internal/encoding.ts"
 import { toHeaderRows, type HeaderRow } from "./internal/header.ts"
-import { end, MachineState, push, type MachineConfig, type RawRecord, type Step } from "./internal/machine.ts"
+import { end, MachineState, push, MachineConfig, type RawRecord, type Step } from "./internal/machine.ts"
 import { SNIFF_WINDOW, sniffDelimiter } from "./internal/sniff.ts"
 import { writeTable } from "./internal/writer.ts"
+import { LiteralKit } from "@beep/schema/LiteralKit"
 
 // ── reading ─────────────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -98,14 +100,14 @@ const prepare = (input: string, options: ReadOptions): Prepared => {
     text,
     bom,
     delimiter,
-    config: {
+    config: MachineConfig.make({
       delimiter: delimiter.delimiter,
       quotes: options.quotes,
       ragged: options.ragged,
       blankLines: options.blankLines,
       trim: options.trim,
       limits: options.limits
-    }
+    })
   }
 }
 
@@ -265,6 +267,21 @@ export interface CsvBoundCodec<T, RD = never, RE = never> {
 
 // ── streaming ────────────────────────────────────────────────────────────────────────────────────────────────────────
 
+export const PendingTag = LiteralKit(["buffering", "running"]).pipe(
+  S.annotate({
+    description: "The literal tag of a pending CSV parse."
+  })
+)
+
+export type PendingTag = typeof PendingTag.Type
+
+export const Pending = PendingTag.mapMembers(
+  Tuple.evolve([
+    () => S.Struct({ phase: S.tag(PendingTag.Enum.buffering), buffer: S.String, first: S.Boolean }),
+    () => S.Struct({ phase: S.tag(PendingTag.Enum.running), state: MachineState, config: MachineConfig })
+  ]),
+
+)
 type Pending =
   | { readonly phase: "buffering"; readonly buffer: string; readonly first: boolean }
   | { readonly phase: "running"; readonly state: MachineState; readonly config: MachineConfig }
@@ -335,11 +352,37 @@ const decodeStringChannel = <IE, Done>(
     ),
     Channel.mapEffect(failOnError)
   )
+const BytesPendingTag = LiteralKit(
+  [
+    "window",
+    "utf8",
+    "fixed"
+  ]
+)
+export type BytesPendingTag = typeof BytesPendingTag.Type;
 
-type BytesPending =
-  | { readonly phase: "window"; readonly bytes: Uint8Array }
-  | { readonly phase: "utf8"; readonly carry: Uint8Array; readonly at: number }
-  | { readonly phase: "fixed"; readonly decoder: InstanceType<typeof TextDecoder> }
+export const BytesPending = BytesPendingTag.mapMembers(
+  Tuple.evolve(
+    [
+      () => S.Struct({
+        phase: S.tag(BytesPendingTag.Enum.window),
+        bytes: S.Uint8Array
+      }),
+      () => S.Struct({
+        phase: S.tag(BytesPendingTag.Enum.utf8),
+        carry: S.Uint8Array,
+        at: S.Finite
+      }),
+      () => S.Struct({
+        phase: S.tag(BytesPendingTag.Enum.fixed),
+        decoder: S.instanceOf(TextDecoder)
+      })
+    ]
+  )
+).pipe(
+  S.toTaggedUnion("phase")
+)
+export type BytesPending = typeof BytesPending.Type
 
 type Text = string | CsvParseError
 
@@ -399,13 +442,14 @@ const stepBytes = (
   pending: BytesPending,
   chunk: Uint8Array,
   options: ReadOptions
-): readonly [BytesPending, ReadonlyArray<Text>] => {
-  switch (pending.phase) {
-    case "fixed":
-      return [pending, [pending.decoder.decode(chunk, { stream: true })]]
-    case "utf8":
-      return utf8Step(pending.carry, pending.at, chunk)
-    case "window": {
+): readonly [BytesPending, ReadonlyArray<Text>] =>
+  BytesPending.match(pending, {
+    fixed: (pending): readonly [BytesPending, ReadonlyArray<Text>] => [
+      pending,
+      [pending.decoder.decode(chunk, { stream: true })]
+    ],
+    utf8: (pending) => utf8Step(pending.carry, pending.at, chunk),
+    window: (pending): readonly [BytesPending, ReadonlyArray<Text>] => {
       const bytes = concatBytes(pending.bytes, chunk)
       if (options.encoding.kind === "fixed") {
         const encoding = options.encoding.encoding
@@ -420,24 +464,21 @@ const stepBytes = (
         ? decideWindow(bytes, options)
         : [{ phase: "window", bytes }, []]
     }
-  }
-}
+  })
 
-const haltBytes = (pending: BytesPending, options: ReadOptions): ReadonlyArray<Text> => {
-  switch (pending.phase) {
-    case "fixed":
-      return [pending.decoder.decode()]
-    case "utf8":
-      return pending.carry.length > 0 ? [fatal(InvalidUtf8.make({ byteOffset: pending.at }))] : []
-    case "window": {
+const haltBytes = (pending: BytesPending, options: ReadOptions): ReadonlyArray<Text> =>
+  BytesPending.match(pending, {
+    fixed: (pending): ReadonlyArray<Text> => [pending.decoder.decode()],
+    utf8: (pending): ReadonlyArray<Text> =>
+      pending.carry.length > 0 ? [fatal(InvalidUtf8.make({ byteOffset: pending.at }))] : [],
+    window: (pending): ReadonlyArray<Text> => {
       const [next, texts] = stepBytes({ phase: "window", bytes: new Uint8Array(0) }, pending.bytes, {
         ...options,
         encoding: CsvDetectEncoding.make({ window: ByteSize.zero })
       })
       return [...texts, ...haltBytes(next, options)]
     }
-  }
-}
+  })
 
 const bytesToText = <IE, Done>(
   options: ReadOptions

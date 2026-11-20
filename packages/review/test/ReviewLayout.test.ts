@@ -2,6 +2,7 @@
 // that brings back something other than what was undone, a work list whose counts do not add up, a button that reads
 // "Type a item #", and a row already in the system offered "Leave out".
 import { describe, expect, it } from "@effect/vitest"
+import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as A from "effect/Array"
 import * as HashSet from "effect/HashSet"
 import * as O from "effect/Option"
@@ -22,7 +23,8 @@ import {
   workList
 } from "@inventory/review/ReviewDraft"
 import { planColumns, priorityOf, type SizedColumn } from "../src/internal/sizing.ts"
-import type { ReviewRow, ReviewState } from "@inventory/review/ReviewTypes"
+import { ReviewRow } from "@inventory/review/ReviewTypes"
+import type { ReviewState } from "@inventory/review/ReviewTypes"
 import { defaultReviewWords } from "@inventory/review/ReviewWords"
 import { columns, makeRows, problemKinds, recheck } from "./fixtures/fabrication.ts"
 
@@ -110,25 +112,26 @@ describe("column sizing", () => {
 describe("undo and redo", () => {
   const ready = A.filter(rows, (row) => row.problem === undefined)
   const needing = A.filter(rows, (row) => row.problem !== undefined)
+  const PickKind = LiteralKit(["leaveOut", "edit", "accept", "undo", "redo"])
   const Pick = S.Struct({
-    kind: S.Literals(["leaveOut", "edit", "accept", "undo", "redo"]),
+    kind: PickKind,
     at: S.Int.check(S.isBetween({ minimum: 0, maximum: 40 }))
   })
   const actionOf = (pick: typeof Pick.Type): Action => {
     const one = ready[pick.at % ready.length] ?? ready[0]!
     const open = needing[pick.at % needing.length] ?? needing[0]!
-    switch (pick.kind) {
-      case "leaveOut":
-        return { type: "leaveOut", rowIds: [one.id] }
-      case "edit":
-        return { type: "edit", rowId: open.id, column: open.problem?.column ?? "name", value: `v${pick.at}` }
-      case "accept":
-        return { type: "accept", rowIds: [open.id] }
-      case "undo":
-        return { type: "undo" }
-      case "redo":
-        return { type: "redo" }
-    }
+    return PickKind.match(pick.kind, {
+      leaveOut: (): Action => ({ type: "leaveOut", rowIds: [one.id] }),
+      edit: (): Action => ({
+        type: "edit",
+        rowId: open.id,
+        column: open.problem?.column ?? "name",
+        value: `v${pick.at}`
+      }),
+      accept: (): Action => ({ type: "accept", rowIds: [open.id] }),
+      undo: (): Action => ({ type: "undo" }),
+      redo: (): Action => ({ type: "redo" })
+    })
   }
   const play = (picks: ReadonlyArray<typeof Pick.Type>): ReviewState =>
     A.reduce(picks, emptyState, (state, pick) => act({ rows, state, action: actionOf(pick), recheck }).state)
@@ -231,7 +234,12 @@ describe("words for a typed value", () => {
 })
 
 describe("a row already in the system", () => {
-  const stored: ReviewRow = { id: "row-900", line: 900, cells: { name: "Hex bolt M6", sku: "HB-M6" }, stored: true }
+  const stored: ReviewRow = ReviewRow.make({
+    id: "row-900",
+    line: 900,
+    cells: { name: "Hex bolt M6", sku: "HB-M6" },
+    stored: true
+  })
   const all = [...rows, stored]
   const viewsOf = (state: ReviewState) => viewRows({ rows: all, state, recheck })
 

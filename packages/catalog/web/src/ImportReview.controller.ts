@@ -3,15 +3,15 @@
 // *given the decisions so far*, because the region re-checks a row only after the person types, not after they
 // accept a fix.
 import * as O from "effect/Option"
-import type {
+import {
   Choice,
   Fix,
   Problem as RegionProblem,
   ProblemKind,
   ReviewColumn,
-  ReviewRow,
-  SavedDecisions as RegionDecisions
+  ReviewRow
 } from "@inventory/review/ReviewTypes"
+import type { SavedDecisions as RegionDecisions } from "@inventory/review/ReviewTypes"
 import { fromFlags, toFlags } from "@inventory/review/ReviewDecision"
 import {
   type Problem,
@@ -39,36 +39,39 @@ import {
 import { costText, countText, dimensionsCellText, tagsCellText, vendorsCellText } from "./internal/itemText.ts"
 
 /** The problem kinds in the region's shape, in the order their headings show. */
-export const regionKinds: ReadonlyArray<ProblemKind> = problemKinds.map((kind) => ({
-  id: kind.id,
-  label: kind.label,
-  tone: kind.tone
-}))
+export const regionKinds: ReadonlyArray<ProblemKind> = problemKinds.map((kind) =>
+  ProblemKind.make({
+    id: kind.id,
+    label: kind.label,
+    tone: kind.tone
+  })
+)
 
 // Spaces round a SKU end in a different value on every row (" BLT-0042" is "BLT-0042", "XRR-0266 " is "XRR-0266"), so the
 // rule's own groups would be one row each. One group per column, named by what the fix does, settles them all at once;
 // each row still shows its own old and new value and is given its own.
 const trimLabel = "the value without its spaces"
 
-const toFix = (proposal: Proposal, reason?: string): Fix => ({
-  ...(reason === undefined ? {} : { reason }),
-  column: proposal.field,
-  to: proposal.to,
-  by: proposal.by,
-  confidence: proposal.confidence,
-  kind: proposal.kind,
-  ...(proposal.kind === "spaces" ? { group: `${proposal.field}:trim`, label: trimLabel } : { group: proposal.group }),
-  why: {
-    basis: proposal.basis,
-    // What each value means, when the values do not speak for themselves ("2024-04-06 (month first)"): the words on
-    // the buttons that take them.
-    ...(proposal.labels.length === 0 ? {} : { labels: proposal.labels }),
-    ...(proposal.alternatives.length === 0 ? {} : { alternatives: proposal.alternatives }),
-    // An answer that writes another column ("No discontinued date" on a question asked on Active): the region
-    // writes it there as a typed value, which the domain's `recheckRow` and the commit read alike.
-    ...(proposal.targets.length === 0 ? {} : { targets: proposal.targets })
-  }
-})
+const toFix = (proposal: Proposal, reason?: string): Fix =>
+  Fix.make({
+    ...(reason === undefined ? {} : { reason }),
+    column: proposal.field,
+    to: proposal.to,
+    by: proposal.by,
+    confidence: proposal.confidence,
+    kind: proposal.kind,
+    ...(proposal.kind === "spaces" ? { group: `${proposal.field}:trim`, label: trimLabel } : { group: proposal.group }),
+    why: {
+      basis: proposal.basis,
+      // What each value means, when the values do not speak for themselves ("2024-04-06 (month first)"): the words on
+      // the buttons that take them.
+      ...(proposal.labels.length === 0 ? {} : { labels: proposal.labels }),
+      ...(proposal.alternatives.length === 0 ? {} : { alternatives: proposal.alternatives }),
+      // An answer that writes another column ("No discontinued date" on a question asked on Active): the region
+      // writes it there as a typed value, which the domain's `recheckRow` and the commit read alike.
+      ...(proposal.targets.length === 0 ? {} : { targets: proposal.targets })
+    }
+  })
 
 /**
  * The column the region records "keep the stored item" or "replace it" under. It is no field of an item: the region
@@ -97,7 +100,7 @@ const choicesFor = (
       problem.kind === "changed"
         ? "Keep or replace"
         : (problem.ask ?? `Choose ${fieldLabels[problem.field].toLowerCase()}`),
-    choices: problem.choices.map((value) => ({ value, label: storedWords[value] ?? value }))
+    choices: problem.choices.map((value) => Choice.make({ value, label: storedWords[value] ?? value }))
   }
 }
 
@@ -110,7 +113,7 @@ export const toRegionProblem = (
   options: { readonly withoutRivals?: boolean } = {}
 ): RegionProblem => {
   const pick = choicesFor(problem)
-  return {
+  return RegionProblem.make({
     kind: problem.kind,
     // Each problem's own tone: a SKU in lower case is a decision, a SKU "ab-12" must be typed again.
     tone: problem.tone,
@@ -130,7 +133,7 @@ export const toRegionProblem = (
     ...(problem.note === null ? {} : { note: problem.note }),
     ...(problem.proposal === null ? {} : { fix: toFix(problem.proposal) }),
     ...(problem.rivals.length === 0 || options.withoutRivals === true ? {} : { rivals: problem.rivals })
-  }
+  })
 }
 
 /**
@@ -150,7 +153,7 @@ const toRegionRow = (row: ReviewedRow, decisions: SavedDecisions): ReviewRow => 
     ...(row.partLabel === undefined ? {} : { label: rowPlace({ rowNumber: row.rowNumber, label: row.partLabel }) })
   }
   // Already stored: nothing to decide and nothing written; the region counts it apart under All with its tag.
-  if (row.status === "already") return { ...where, cells: row.file, stored: true }
+  if (row.status === "already") return ReviewRow.make({ ...where, cells: row.file, stored: true })
   const accepted = decisions[row.id]?.accepted ?? []
   // A lossless rule fix is always offered through `applied` (the region holds it back or puts it in force from
   // the decisions). A fix the person accepted joins them, so the region shows it in force and moves on.
@@ -169,7 +172,7 @@ const toRegionRow = (row: ReviewedRow, decisions: SavedDecisions): ReviewRow => 
     open !== undefined &&
     ((decisions[row.id] !== undefined && hasKeep(decisions[row.id] ?? decisionOf())) ||
       open.rivals.some((id) => decisions[id]?.edits["sku"] !== undefined))
-  return {
+  return ReviewRow.make({
     ...where,
     cells: row.file,
     // Where the domain counts the row: Cannot import when any problem needs a typed value, however the first reads.
@@ -183,7 +186,7 @@ const toRegionRow = (row: ReviewedRow, decisions: SavedDecisions): ReviewRow => 
             reason: reasonShown(open.message, row.reasons.length)
           }
         })
-  }
+  })
 }
 
 /**
@@ -232,7 +235,7 @@ export const toRegionDecisions = (decisions: SavedDecisions): RegionDecisions =>
 // column is as wide as its longest value, measured by the region, and never cut; short of room the lowest priority
 // moves into the row's detail and the SKU under the name. What is drawn for a cost, the tags, the dimensions and the
 // vendors is what the Items page draws; the file's text is what the checks and the edits see.
-const layout: Record<Field, Omit<ReviewColumn, "id" | "label" | "match">> = {
+const layout: Record<Field, Omit<typeof ReviewColumn.Encoded, "id" | "label" | "match">> = {
   name: { size: "fill", width: 200, core: true },
   sku: { search: true, under: true, context: true, code: true, priority: 9 },
   category: { core: true, facet: true, priority: 8 },
@@ -293,7 +296,7 @@ export const regionColumns = (
 ): ReadonlyArray<ReviewColumn> => [
   ...itemColumns(mapping, unused, table),
   // Holds the answer for a row whose SKU is stored with other values; never a column of the file.
-  { id: storedChoice, label: "Stored item", hidden: true }
+  ReviewColumn.make({ id: storedChoice, label: "Stored item", hidden: true })
 ]
 
 const itemColumns = (
@@ -305,7 +308,7 @@ const itemColumns = (
     const match = mapping.find((candidate) => candidate.field === field)
     const column = match === undefined ? O.none() : matchedColumn(match)
     const missing = match !== undefined && O.isNone(column) && requiredFields.includes(field) && unused.length > 0
-    return {
+    return ReviewColumn.make({
       id: field,
       label: fieldLabels[field],
       ...layout[field],
@@ -326,5 +329,5 @@ const itemColumns = (
               samples: column.value.examples
             }
           })
-    }
+    })
   })

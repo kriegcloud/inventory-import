@@ -5,25 +5,24 @@
 //
 // Notice: the format behaviour here follows SheetJS (https://sheetjs.com, Apache License 2.0), which is also this
 // package's test oracle (test/oracle.property.test.ts). The code is this package's own.
+import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as A from "effect/Array"
 import * as O from "effect/Option"
+import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import { partsOf, type SerialParts } from "./serial.ts"
 
-/** What a format code is, to this package. */
-export type RawFormatKind =
-  | { readonly kind: "General" }
-  | { readonly kind: "Date" }
-  | { readonly kind: "ZeroPadded"; readonly width: number }
-  | {
-      readonly kind: "Fixed"
-      readonly decimals: number
-      readonly thousands: boolean
-      readonly percent: boolean
-      readonly prefix: string
-      readonly suffix: string
-    }
-  | { readonly kind: "Other" }
+/** What a format code is, to this package. Branch with `RawFormatKind.match`. */
+export const RawFormatKind = LiteralKit(["General", "Date", "ZeroPadded", "Fixed", "Other"]).toTaggedUnion("kind")({
+  General: {},
+  Date: {},
+  ZeroPadded: { width: S.Finite },
+  Fixed: { decimals: S.Finite, thousands: S.Boolean, percent: S.Boolean, prefix: S.String, suffix: S.String },
+  Other: {}
+})
+
+/** The decoded value of `RawFormatKind`. */
+export type RawFormatKind = typeof RawFormatKind.Type
 
 /** The format codes Excel has built in, by id (ECMA-376 part 1, 18.8.30), as far as a file may leave them unwritten. */
 export const builtinFormats: { readonly [id: number]: string } = {
@@ -211,10 +210,21 @@ export const renderNumber = (input: {
   return `${sign}${kind.prefix}${kind.thousands ? grouped(whole) : whole}${decimals}${kind.percent ? "%" : ""}${kind.suffix}`
 }
 
-type DateToken =
-  | { readonly t: "text"; readonly v: string }
-  | { readonly t: "y" | "m" | "d" | "h" | "M" | "s"; readonly n: number }
-  | { readonly t: "ampm"; readonly short: boolean; readonly am: string; readonly pm: string }
+/** How many letters a date token ran to ("yyyy" is 4). */
+const run = { n: S.Finite }
+
+/** One piece of a date format: literal text, a field of the date by its letter (`m` month, `M` minute), or AM/PM. */
+const DateToken = LiteralKit(["text", "y", "m", "d", "h", "M", "s", "ampm"]).toTaggedUnion("t")({
+  text: { v: S.String },
+  y: run,
+  m: run,
+  d: run,
+  h: run,
+  M: run,
+  s: run,
+  ampm: { short: S.Boolean, am: S.String, pm: S.String }
+})
+type DateToken = typeof DateToken.Type
 
 const months = [
   "January",
@@ -353,48 +363,28 @@ export const renderDate = (input: {
   const twelve = A.some(tokens, (token) => token.t === "ampm")
   const exact = partsOf({ serial, date1904 })
   const parts = timed ? rounded(exact, date1904) : exact
+  // What one token shows, or undefined for a run this package does not render (three or more of h, m or s).
+  const shown = DateToken.match({
+    text: ({ v }): string | undefined => v,
+    ampm: ({ am, pm }): string | undefined => (parts.hour >= 12 ? pm : am),
+    y: ({ n }): string | undefined => (n <= 2 ? padded(parts.year % 100, 2) : padded(parts.year % 10_000, 4)),
+    m: ({ n }): string | undefined => {
+      const name = months[parts.month - 1] ?? ""
+      return n <= 2 ? padded(parts.month, n) : n === 3 ? Str.slice(0, 3)(name) : n === 5 ? Str.slice(0, 1)(name) : name
+    },
+    d: ({ n }): string | undefined => {
+      const name = weekdays[parts.weekday] ?? ""
+      return n <= 2 ? padded(parts.day, n) : n === 3 ? Str.slice(0, 3)(name) : name
+    },
+    h: ({ n }) => (n > 2 ? undefined : padded(twelve ? 1 + ((parts.hour + 11) % 12) : parts.hour, n)),
+    M: ({ n }) => (n > 2 ? undefined : padded(parts.minute, n)),
+    s: ({ n }) => (n > 2 ? undefined : padded(parts.second, n))
+  })
   let text = ""
   for (const token of tokens) {
-    switch (token.t) {
-      case "text":
-        text += token.v
-        break
-      case "ampm":
-        text += parts.hour >= 12 ? token.pm : token.am
-        break
-      case "y":
-        text += token.n <= 2 ? padded(parts.year % 100, 2) : padded(parts.year % 10_000, 4)
-        break
-      case "m": {
-        const name = months[parts.month - 1] ?? ""
-        text +=
-          token.n <= 2
-            ? padded(parts.month, token.n)
-            : token.n === 3
-              ? Str.slice(0, 3)(name)
-              : token.n === 5
-                ? Str.slice(0, 1)(name)
-                : name
-        break
-      }
-      case "d": {
-        const name = weekdays[parts.weekday] ?? ""
-        text += token.n <= 2 ? padded(parts.day, token.n) : token.n === 3 ? Str.slice(0, 3)(name) : name
-        break
-      }
-      case "h":
-        if (token.n > 2) return undefined
-        text += padded(twelve ? 1 + ((parts.hour + 11) % 12) : parts.hour, token.n)
-        break
-      case "M":
-        if (token.n > 2) return undefined
-        text += padded(parts.minute, token.n)
-        break
-      case "s":
-        if (token.n > 2) return undefined
-        text += padded(parts.second, token.n)
-        break
-    }
+    const piece = shown(token)
+    if (piece === undefined) return undefined
+    text += piece
   }
   return text
 }

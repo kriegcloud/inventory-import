@@ -4,6 +4,8 @@ import { cn } from "cn"
 import { Direction as DirectionPrimitive, Slot as SlotPrimitive } from "radix-ui"
 import * as React from "react"
 
+import { LiteralKit } from "@beep/schema/LiteralKit"
+import * as S from "effect/Schema"
 import { useRefWithInit } from "@inventory/ui/hooks/use-ref-with-init"
 import { useValueAsRef } from "@inventory/ui/hooks/use-value-as-ref"
 import {
@@ -84,16 +86,34 @@ interface StoreState {
   invalid: boolean
 }
 
-type StoreAction =
-  | { type: "ADD_FILES"; files: File[] }
-  | { type: "SET_FILES"; files: File[] }
-  | { type: "SET_PROGRESS"; file: File; progress: number }
-  | { type: "SET_SUCCESS"; file: File }
-  | { type: "SET_ERROR"; file: File; error: string }
-  | { type: "REMOVE_FILE"; file: File }
-  | { type: "SET_DRAG_OVER"; dragOver: boolean }
-  | { type: "SET_INVALID"; invalid: boolean }
-  | { type: "CLEAR" }
+// Local change: the store's actions as a tagged union, so the reducer branches with `StoreAction.match` (every action
+// named, checked by the compiler), not a `switch`. An action is still written as a plain object.
+const AnyFile = S.instanceOf(File)
+const StoreAction = LiteralKit([
+  "ADD_FILES",
+  "SET_FILES",
+  "SET_PROGRESS",
+  "SET_SUCCESS",
+  "SET_ERROR",
+  "REMOVE_FILE",
+  "SET_DRAG_OVER",
+  "SET_INVALID",
+  "CLEAR"
+]).toTaggedUnion("type")({
+  ADD_FILES: { files: S.Array(AnyFile) },
+  SET_FILES: { files: S.Array(AnyFile) },
+  SET_PROGRESS: { file: AnyFile, progress: S.Finite },
+  SET_SUCCESS: { file: AnyFile },
+  SET_ERROR: { file: AnyFile, error: S.String },
+  REMOVE_FILE: { file: AnyFile },
+  SET_DRAG_OVER: { dragOver: S.Boolean },
+  SET_INVALID: { invalid: S.Boolean },
+  CLEAR: {}
+})
+type StoreAction = typeof StoreAction.Type
+
+// Local change: how an item's progress is drawn, as a LiteralKit (see `FileUploadItemProgress`).
+const ProgressVariant = LiteralKit(["linear", "circular", "fill"])
 
 type Store = {
   getState: () => StoreState
@@ -239,8 +259,8 @@ function FileUpload(props: FileUploadProps) {
     }
 
     function reducer(state: StoreState, action: StoreAction): StoreState {
-      switch (action.type) {
-        case "ADD_FILES": {
+      return StoreAction.match(action, {
+        ADD_FILES: (action) => {
           for (const file of action.files) {
             files.set(file, {
               file,
@@ -254,9 +274,9 @@ function FileUpload(props: FileUploadProps) {
             propsRef.current.onValueChange(fileList)
           }
           return { ...state, files }
-        }
+        },
 
-        case "SET_FILES": {
+        SET_FILES: (action) => {
           const newFileSet = new Set(action.files)
           for (const existingFile of files.keys()) {
             if (!newFileSet.has(existingFile)) {
@@ -275,9 +295,9 @@ function FileUpload(props: FileUploadProps) {
             }
           }
           return { ...state, files }
-        }
+        },
 
-        case "SET_PROGRESS": {
+        SET_PROGRESS: (action) => {
           const fileState = files.get(action.file)
           if (fileState) {
             files.set(action.file, {
@@ -287,9 +307,9 @@ function FileUpload(props: FileUploadProps) {
             })
           }
           return { ...state, files }
-        }
+        },
 
-        case "SET_SUCCESS": {
+        SET_SUCCESS: (action) => {
           const fileState = files.get(action.file)
           if (fileState) {
             files.set(action.file, {
@@ -299,9 +319,9 @@ function FileUpload(props: FileUploadProps) {
             })
           }
           return { ...state, files }
-        }
+        },
 
-        case "SET_ERROR": {
+        SET_ERROR: (action) => {
           const fileState = files.get(action.file)
           if (fileState) {
             files.set(action.file, {
@@ -311,9 +331,9 @@ function FileUpload(props: FileUploadProps) {
             })
           }
           return { ...state, files }
-        }
+        },
 
-        case "REMOVE_FILE": {
+        REMOVE_FILE: (action) => {
           const cachedUrl = urlCache.get(action.file)
           if (cachedUrl) {
             URL.revokeObjectURL(cachedUrl)
@@ -327,17 +347,17 @@ function FileUpload(props: FileUploadProps) {
             propsRef.current.onValueChange(fileList)
           }
           return { ...state, files }
-        }
+        },
 
-        case "SET_DRAG_OVER": {
+        SET_DRAG_OVER: (action) => {
           return { ...state, dragOver: action.dragOver }
-        }
+        },
 
-        case "SET_INVALID": {
+        SET_INVALID: (action) => {
           return { ...state, invalid: action.invalid }
-        }
+        },
 
-        case "CLEAR": {
+        CLEAR: () => {
           for (const file of files.keys()) {
             const cachedUrl = urlCache.get(file)
             if (cachedUrl) {
@@ -352,10 +372,7 @@ function FileUpload(props: FileUploadProps) {
           }
           return { ...state, files, invalid: false }
         }
-
-        default:
-          return state
-      }
+      })
     }
 
     return {
@@ -1102,24 +1119,27 @@ function FileUploadItemProgress(props: FileUploadItemProgressProps) {
 
   if (!itemContext.fileState) return null
 
-  const shouldRender = forceMount || itemContext.fileState.progress !== 100
+  // Local change: read once here, so the branches below see a file state that is known to be there.
+  const { progress } = itemContext.fileState
+
+  const shouldRender = forceMount || progress !== 100
 
   if (!shouldRender) return null
 
   const ItemProgressPrimitive = asChild ? SlotPrimitive.Slot : "div"
 
-  switch (variant) {
-    case "circular": {
+  return ProgressVariant.match(variant, {
+    circular: () => {
       const circumference = 2 * Math.PI * ((size - 4) / 2)
-      const strokeDashoffset = circumference - (itemContext.fileState.progress / 100) * circumference
+      const strokeDashoffset = circumference - (progress / 100) * circumference
 
       return (
         <ItemProgressPrimitive
           role="progressbar"
           aria-valuemin={0}
           aria-valuemax={100}
-          aria-valuenow={itemContext.fileState.progress}
-          aria-valuetext={`${itemContext.fileState.progress}%`}
+          aria-valuenow={progress}
+          aria-valuetext={`${progress}%`}
           aria-labelledby={itemContext.nameId}
           data-slot="file-upload-progress"
           {...progressProps}
@@ -1147,10 +1167,10 @@ function FileUploadItemProgress(props: FileUploadItemProgressProps) {
           </svg>
         </ItemProgressPrimitive>
       )
-    }
+    },
 
-    case "fill": {
-      const progressPercentage = itemContext.fileState.progress
+    fill: () => {
+      const progressPercentage = progress
       const topInset = 100 - progressPercentage
 
       return (
@@ -1169,30 +1189,29 @@ function FileUploadItemProgress(props: FileUploadItemProgressProps) {
           }}
         />
       )
-    }
+    },
 
-    default:
-      return (
-        <ItemProgressPrimitive
-          role="progressbar"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={itemContext.fileState.progress}
-          aria-valuetext={`${itemContext.fileState.progress}%`}
-          aria-labelledby={itemContext.nameId}
-          data-slot="file-upload-progress"
-          {...progressProps}
-          className={cn("relative h-1.5 w-full overflow-hidden rounded-full bg-muted", className)}
-        >
-          <div
-            className="h-full w-full flex-1 bg-primary transition-transform duration-300 ease-linear"
-            style={{
-              transform: `translateX(-${100 - itemContext.fileState.progress}%)`
-            }}
-          />
-        </ItemProgressPrimitive>
-      )
-  }
+    linear: () => (
+      <ItemProgressPrimitive
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={progress}
+        aria-valuetext={`${progress}%`}
+        aria-labelledby={itemContext.nameId}
+        data-slot="file-upload-progress"
+        {...progressProps}
+        className={cn("relative h-1.5 w-full overflow-hidden rounded-full bg-muted", className)}
+      >
+        <div
+          className="h-full w-full flex-1 bg-primary transition-transform duration-300 ease-linear"
+          style={{
+            transform: `translateX(-${100 - progress}%)`
+          }}
+        />
+      </ItemProgressPrimitive>
+    )
+  })
 }
 
 interface FileUploadItemDeleteProps extends React.ComponentProps<"button"> {

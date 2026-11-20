@@ -22,7 +22,7 @@ import { setOwnProperty } from "@beep/utils/Record"
 import { XlsxBlank, XlsxCell, XlsxNumberFormat, XlsxText, XlsxValue } from "./XlsxCell.schema.ts"
 import { MissingPart, type XlsxContainer, type XlsxFatal, type XlsxWarning } from "./XlsxDiagnostic.schema.ts"
 import { XlsxParseError, XlsxStringifyError } from "./XlsxError.errors.ts"
-import { XlsxCodecOptions, XlsxReadOptions, XlsxWriteOptions } from "./XlsxOptions.schema.ts"
+import { XlsxCodecOptions, XlsxReadOptions, XlsxSheetChoice, XlsxWriteOptions } from "./XlsxOptions.schema.ts"
 import { XlsxOutline, XlsxRead, XlsxSheetOutline } from "./XlsxRead.schema.ts"
 import {
   XlsxRow,
@@ -122,19 +122,15 @@ const readSheets = Effect.fnUntraced(function* (input: {
   return reads
 })
 
-const chosen = (opened: Opened, options: ReadOptions): ReadonlyArray<SheetEntry> => {
-  const choice = options.sheets
-  switch (choice.kind) {
-    case "All":
-      return opened.sheets
-    case "First":
-      return A.take(opened.sheets, 1)
-    case "Named": {
+const chosen = (opened: Opened, options: ReadOptions): ReadonlyArray<SheetEntry> =>
+  XlsxSheetChoice.match(options.sheets, {
+    All: () => opened.sheets,
+    First: () => A.take(opened.sheets, 1),
+    Named: (choice) => {
       const names = MutableHashSet.fromIterable(A.map(choice.names, Str.toLowerCase))
       return A.filter(opened.sheets, (sheet) => MutableHashSet.has(names, Str.toLowerCase(sheet.name)))
     }
-  }
-}
+  })
 
 const infoOf = (entry: SheetEntry, layout: O.Option<SheetLayout>): XlsxSheetInfo =>
   XlsxSheetInfo.make({

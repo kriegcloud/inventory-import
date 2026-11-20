@@ -342,8 +342,8 @@ button. Neither is changed here; both are reported.
 ## Fixes after the review of step 6
 
 A review of step 6 (`6d30446`) found seven serious defects and twelve smaller ones; each is fixed on top of step 7,
-one commit per defect where the code allows. For the serious ones a test was written first and seen to fail on the
-rule as it was. `bun run check:full -- --force` passes with none from cache. What was looked at is on the dev
+one commit per defect where the code allows. For six of the seven serious ones a test was written first and seen to
+fail on the rule as it was; group 5 (the dropped file) has no test, and was looked at in the browser only. `bun run check:full -- --force` passes with none from cache. What was looked at is on the dev
 server (port 5220), in a headless browser, with requests slowed where the defect needs a slow answer.
 
 | # | Defect | Change | Test | Seen on screen |
@@ -367,7 +367,7 @@ server (port 5220), in a headless browser, with requests slowed where the defect
 | 17 | `Sniffed` was branched by hand | `formatOf`, one exhaustive `$match` | The readers' tests | Nothing to see |
 | 18 | The skeleton-first wait was not measured | Measured, below | | |
 | 19 | Counts and comments this step left false | The step 6 and 7 hook counts above; the legacy table; `UploadStep`'s doc block; `preload.ts`'s comment; the session's two `resetQueries` calls removed | | |
-| 20 | Two older races in the review's saving | A save that finds someone else saved in between leaves the revision it knows, so the view it asks for restarts the region from everything the server holds; a view of an earlier revision never replaces a later one (`putView`) | `ReviewDraft.test.ts`, `ImportViewAnswers.test.ts`. Failed first: the others' decisions hidden at revision 13; revision 11 over 12 | Covered by 3's two tabs |
+| 20 | Two older races in the review's saving | A save that finds someone else saved in between leaves the revision it knows, so the view it asks for restarts the region from everything the server holds; a view of an earlier revision never replaces a later one (`putView`) | `ReviewDraft.test.ts`, `ImportViewAnswers.test.ts`. Failed first: the others' decisions hidden at revision 13; revision 11 over 12 | Not seen on screen: 3's two tabs did not produce either race |
 | 21 | The atoms lint could be passed by a hook not from `react` | `use`, `useOptimistic`, `useActionState`; `useFormStatus`; the kit's three effect and ref hooks, by package path and by a relative one; `radix-ui/internal`; the query client | A planted file per spelling, refused by the lint, then deleted | |
 
 **Group 18, measured.** The 50,000-row file, the dev server, a headless browser; a frame counts as painted with the
@@ -477,17 +477,89 @@ return did not ask for the import again in the headless browser, so the region w
 save; the test holds the toast's Undo and the dismissal); a refused save; a file over the limit; a refresh in the
 middle of an upload; a strip too long for its line; a cut text's card; the dark theme in this batch.
 
+## The check of the step 6 fixes: the review's draft, rebuilt
+
+A second check of the twelve fix commits found that the Review draft's saving still lost or hid decisions in four
+orderings, two of them caused by the fixes. They were not fixed one ordering at a time.
+
+**What is sent is what the person did.** A save used to send the difference between two whole pictures (the server's
+as last held, the screen's); whenever either was behind, the difference took back rows nobody had touched. Now the
+region's write gives the rows its action changed, they are kept per row until the server confirms them, and the
+server's picture is something the screen follows, never the base a clear is worked out from. The contract already
+allowed it (`DecisionDelta` is rows to set and rows to clear).
+
+**One pure transition** (`packages/catalog/web/src/Draft.machine.ts`): a draft and an event give the next draft and
+what to send or ask. The draft is the picture held (`held`), and over it the person's rows the server confirmed but no
+picture read yet holds (`landed`), the save that is out (`flight`) and what changed since (`unsent`). Events: the step
+opened or left, decided, a save answered, failed, sent again or refused, a view arrived, a match started or ended, the
+import confirmed or removed. `ReviewDraft.atoms.ts` runs it: one atom takes every event, steps the machine and does
+what it asks. The saver (`Draft.controller.ts`) is gone.
+
+**The property test** (`Draft.machine.test.ts`, `it.prop`) plays random orderings of: the person decides a row,
+somebody else decides a row, the server takes the save, its answer arrives, the save fails, is refused, "Save again",
+a return to the tab, the server takes the read, the read arrives, another request's answer is sent and arrives (a
+match, a card's Continue), leaving and coming back. After every step it holds:
+
+1. A save carries only rows the person changed on this screen that the server has not confirmed, and for each the
+   value they last chose. One save is out at a time.
+2. The revision the screen claims is never ahead of the server's, and while the step is drawn it is the revision of
+   the view the tab holds.
+3. The picture held is what the server held at that revision (except after a save the server counted as no change,
+   until the next read: see below).
+4. The person's own decision stays on screen while it waits to be saved and once the server has it, until somebody
+   else decides that row.
+5. A view put in place never lowers the revision held, and a put while a read is out is followed by a new ask.
+6. Once everything on its way has landed, the screen shows what the server holds, and nothing of the person's waits.
+
+200,000 orderings were run once; the suite runs 5,000. It found one failure, in the test's own bookkeeping (a row
+somebody else decided after the server took the person's save but before its answer), not in the machine. It fails
+when a save is built the old way (the difference from the picture held), when a failed save's rows are dropped, when
+an answered save is always taken for the next revision, when the person's saved rows are forgotten on a jump, and
+when a refusal keeps the person's rows. It cannot run on `ef53dbd`, which has no transition to drive; the four
+orderings from the check are named tests beside it.
+
+Left as it is, and why: a save the server counts as no change (the same decision somebody else just made) is answered
+with their revision, which reads as the person's own next one, so their other rows are not shown until the next read
+of the import (a return to the tab, or any later jump). The machine takes the server's word at the same revision when
+that read arrives. Closing it needs the server to say whether the save changed anything.
+
+| Entry | What became of it | Test |
+| --- | --- | --- |
+| 1, 5, 26, 32 `continue-gives-older-view` | `giveView` goes through `putView`: never an older revision over a newer one. It looks without asking (`peek`), so Continue still starts no request | `ReviewDraft.test.ts` "a view put in place from a card's Continue"; client `Seed.atoms.test.ts` (peek) |
+| 2 `start-else-known-ahead` | Gone with the design: the screen shows the picture held with the person's rows over it, so the revision it claims is the revision of what it shows | property 2, 3; "back on Review with a decision unsaved" |
+| 3 `stale-start-on-quick-return` | No stored start: the region starts from what is shown; the next decision sends its own row | "a quick return after the region was started again" |
+| 4 `typed-sku-check-cancelled` | A put no longer ends a request that was out: the server is asked again behind it (`Api.atoms.ts`) | `ReviewDraft.test.ts` "that typed a SKU" (fails with the re-ask taken out); `Seed.atoms.test.ts` |
+| 5 `late-match-answer-cancels-reread` | The same, and the person's saved rows stay over an older picture (`landed`) | "an answer from another request that lands after a later save" |
+| 6, 33 `items-columns-rebuilt-when-facets-change` | The columns are made once and do not depend on the filters' answer; each filter control reads its values when drawn; the pencil's cell is a module-level component | `ItemColumns.test.ts` |
+| 7, 8, 30 a read let go while on screen | The screen asks the server at once; what was let go is not kept again when the screen leaves; a card removed while the address names it leaves the address first | `Seed.atoms.test.ts` "a read let go while a screen still shows it" |
+| 9, 23 the saver and the workbook outlive a remove | The draft is emptied by the machine when the step has left and the server has everything, and by a remove or a confirm; a remove forgets the workbook | `ReviewDraft.test.ts` "keeps nothing of the draft once the server has everything" |
+| 10 an answer given and never taken | Said as it is (the choice above): kept until the read is let go or the person signs out | |
+| 12 `refused-decision-shown-again-on-return` | The machine drops the refused rows, here and for the next visit | "a decision the server refused" (machine and wiring) |
+| 15, 22 | The comment names who calls `invalidate`; the doubled doc block is one | |
+| 16, 17, 18 the lint | `lib/queries.ts` is gone; the hooks under their hoisted package names, the query client's core and its file by a relative path, and react-dom's default import are refused. Planted: four refusals in a review file, one in the client | |
+| 19, 20, 21, 34 false statements | Corrected above: the test-first sentence, group 20's "seen", the files excepted; the `viewRows` choice says `Option` | |
+| 24 `unsent-decision-freezes-follower` | A save waiting for "Save again" does not stop a newer draft from being followed | "a save waiting for Save again" |
+| 25 `own-save-told-as-someone-elses` | The draft outlives the step while a save is out: its answer is the person's own | "a save answered after the person left" (machine and wiring) |
+| 27 `region-pass-every-render` | Fixed by the rework (the decisions are one atom) | `ReviewDraft.test.ts` "start once" |
+| 28 `must-still-ask-untested` | The typed SKU, the jump and the refusal each have a test that fails when the ask stops | `ReviewDraft.test.ts` |
+| 31 an upload that lands after a switch of organization | Says so where the person is, with no Open | Not tested, not seen |
+| 11, 13, 14, 29 | Not done in this batch: a row that comes back while its save is out offers Edit again; a write that answers after a switch of organization reads the left organization's read again; "Edit again" after the row left opens nothing; an assistant answer applied after a return or a switch | |
+
+A confirm now carries, beside the decisions shown, the rows the person took back that the server has not heard of.
+
 ## Legacy in the client
 
-The client's lint is on (`packages/client/.oxlintrc.json` extends `.oxlintrc.atoms.json`), with one file excepted by
-name (four until step 3, three until step 6): the TanStack Query client the app's root still provides. None may gain a caller; each goes when its last
+The client's lint is on (`packages/client/.oxlintrc.json` extends `.oxlintrc.atoms.json`), with two files excepted by
+name (`QueryClient.runtime.ts` and its own test), and one in the app (`main.tsx`); each exception turns the whole
+import rule off for its file, which is wider than the two TanStack entries it needs, and goes at step 8 with TanStack
+Query itself: the TanStack Query client the app's root still provides. None may gain a caller; each goes when its last
 caller has moved.
 
 | File | What still calls it | Goes at step |
 | --- | --- | --- |
 | `CurrentMember.controller.ts` (`useMember`) | gone at step 6, with `Rollback.rules.ts` | 6 |
 | `Optimistic.controller.ts` (`useOptimisticWriteVia`, `makeOptimisticWrite`, `cacheChange`) | gone at step 6, with its test | 6 |
-| `QueryClient.runtime.ts` | the app's `main.tsx` and `lib/queries.ts`, and its own test (`Workspace.tsx`'s prefetch went at step 6; the session's two `resetQueries` calls, which emptied a cache nothing reads, went after the step 6 review; the atoms lint now refuses any other import of it) | 8 |
+| `QueryClient.runtime.ts` | the app's `main.tsx` (`lib/queries.ts`, which re-exported it, is gone), and its own test (`Workspace.tsx`'s prefetch went at step 6; the session's two `resetQueries` calls, which emptied a cache nothing reads, went after the step 6 review; the atoms lint refuses its package path and its file by a relative path everywhere else) | 8 |
 
 ## Hand-written discriminators in the web packages
 
@@ -565,8 +637,11 @@ Not discriminators, and not changed: string-literal domains with no data of thei
   what a decision does. The saver (`Draft.controller.ts`) is given its request, so it is tested without a server.
 - **A press of an optimistic write cannot be interrupted.** The registry lets a write's atom go 400 ms after its row
   or screen has left and interrupts what it started; a save must still land and clear up after itself.
-- **An answer given to a read is a value the read takes once**, with the time it was given; it is not an atom, and
-  is not kept past the read. A read can be let go for whoever is signed in (`letGo`).
+- **An answer given to a read is a value the read takes once**, with the time it was given; it is not an atom. One
+  that is taken is not kept past the read; one given to a read nobody ever opens stays until the read is let go
+  (`letGo`) or the person signs out. A read can be let go for whoever is signed in, and a screen that still shows it
+  then asks the server at once. Taking a given answer never ends a request that was out without a word: the server is
+  asked again behind it.
 - **What is built from a read's data is built from its answer** (`answerOf`), never from the read.
 - **The theme is kept in plain `localStorage`, against the brief's wording.** Benjamin accepted it (2026-11-19).
   The brief names `Atom.kvs` for it. `Atom.kvs` stores the value as JSON (`"dark"` with its quotes), and

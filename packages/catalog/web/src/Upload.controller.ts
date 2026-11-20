@@ -224,7 +224,11 @@ const arrive = (file: File, done: Finished, startedAs: string | undefined) => {
   const { view, table, workbook } = done
   // The person changed organization while the file was on its way: the import belongs to the one they left, and is
   // listed there. Nothing of it is put in place or opened where they are now.
-  if (registry?.get(memberKey) !== startedAs) return
+  if (registry?.get(memberKey) !== startedAs) {
+    // Said where the person is now, with no way to open it: it is not this organization's to open.
+    toast(`${view.fileName} was uploaded for the organization you were in when you chose it. It is listed there.`)
+    return
+  }
   registry?.set(importView(view.id), view)
   registry?.set(importTable(view.id), table)
   invalidate(catalogKeys.openImports)

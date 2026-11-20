@@ -126,3 +126,20 @@ describe("an answer given while the read is being asked again", () => {
     })
   )
 })
+
+describe("a read let go while a screen still shows it", () => {
+  it.live("asks the server at once, and is asked again by a later refresh: it is not cut off", () =>
+    Effect.gen(function* () {
+      const t = world()
+      t.registry.mount(t.rows)
+      yield* Effect.sleep("50 millis")
+      expect(t.seen(t.rows)).toBe("server's rows 1")
+      t.rows.letGo(t.registry)
+      yield* Effect.sleep("50 millis")
+      expect([t.seen(t.rows), t.reads()]).toEqual(["server's rows 2", 2])
+      t.registry.refresh(t.rows)
+      yield* Effect.sleep("50 millis")
+      expect([t.seen(t.rows), t.reads()]).toEqual(["server's rows 3", 3])
+    })
+  )
+})

@@ -19,6 +19,19 @@
               "**/hooks/use-value-as-ref*"
             ],
             "message": "The kit's effect and ref hooks are for the vendored kit alone: an effect is banned with no exception, and a ref holds a DOM node only (goals/atoms)."
+          },
+          {
+            // The same hooks under the packages they are hoisted as: radix-ui/internal re-exports these, React's
+            // useSyncExternalStore has a shim of its own, and the query client has a core.
+            "group": [
+              "@radix-ui/react-use-*",
+              "@radix-ui/react-compose-refs",
+              "use-sync-external-store",
+              "use-sync-external-store/*",
+              "@tanstack/query-core",
+              "**/QueryClient.runtime*"
+            ],
+            "message": "Effects, state and the query client by another package's name: use an atom, a ref callback, or the component's own controlled props (goals/atoms)."
           }
         ],
         "paths": [
@@ -47,7 +60,7 @@
           },
           {
             "name": "react-dom",
-            "importNames": ["useFormStatus", "useFormState"],
+            "importNames": ["useFormStatus", "useFormState", "default"],
             "message": "A form's pending state is the write atom's own (useAtomValue(write).waiting), not react-dom's (goals/atoms)."
           },
           {

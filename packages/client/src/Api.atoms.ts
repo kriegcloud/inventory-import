@@ -108,7 +108,8 @@ const freshEnough = Duration.seconds(1)
 /**
  * One member's read: the answer itself (`held`, which is what is kept), what a screen reads (`read`), and how a
  * screen puts an answer in place of a request (`give`, which answers the atom to nudge so a read on screen takes it).
- * The given answer is a plain value the read takes once: it goes with the read, and is never kept past it.
+ * The given answer is a plain value the read takes once. One that is taken is not kept past the read; one given to a
+ * read nobody opens stays until the read is let go or the person signs out.
  */
 interface PerMember<A, E> {
   readonly held: Atom.Atom<AsyncResult.AsyncResult<A, E>>
@@ -189,7 +190,8 @@ export interface Query<A, E> extends Atom.Writable<AsyncResult.AsyncResult<A, E>
   /**
    * Lets go of what this read holds for whoever is signed in: its answer, the hold that keeps it while nobody looks,
    * and an answer a screen gave it. For something that is gone on the server (a removed import): nothing of it stays
-   * in the tab, and the next look asks the server.
+   * in the tab, and the next look asks the server. A screen that still shows the read asks at once, and learns what
+   * the server says now.
    */
   readonly letGo: (registry: AtomRegistry.AtomRegistry) => void
   /**
@@ -354,14 +356,23 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
     // The member it last read for, so a refresh of this atom (an optimistic write's, when the last one has answered)
     // reaches the read it shows. One registry holds it in the app; a test that makes several shares the key "".
     let shown = ""
+    // Goes up when the read is let go (`letGo`): a screen that still shows it reads anew, from the server.
+    const letGoes = Atom.make(0)
     const atom = Atom.writable(
       (get) => {
+        get(letGoes)
         const member = get(memberKey)
         shown = member
-        const { held, read } = forMember(member)
-        // Shown again: the screen holds it now. When it is let go (the screen left, or another member), it is kept.
+        const entry = forMember(member)
+        const { held, read } = entry
+        // Shown again: the screen holds it now. When it is let go (the screen left, or another member), it is kept,
+        // unless the read itself was let go meanwhile (what it showed is gone on the server): then nothing is.
         stopKeeping(member)
-        get.addFinalizer(() => startKeeping(get.registry, member, held))
+        get.addFinalizer(() => {
+          if (O.exists(MutableHashMap.get(reads, member), (now) => now === entry)) {
+            startKeeping(get.registry, member, held)
+          }
+        })
         get.subscribe(read, (value) => get.setSelf(value))
         return get.once(read)
       },
@@ -377,6 +388,8 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
         const member = registry.get(memberKey)
         stopKeeping(member)
         MutableHashMap.remove(reads, member)
+        // A screen that still shows it is not left on an answer nothing refreshes: it asks the server now.
+        registry.update(letGoes, (count) => count + 1)
       },
       peek: (registry: AtomRegistry.AtomRegistry): O.Option<A> =>
         O.flatMap(MutableHashMap.get(reads, registry.get(memberKey)), (per) =>

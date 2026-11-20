@@ -19,7 +19,7 @@ from: explorations/ideal-architecture
 | 5 | `@inventory/ui`'s own pieces: the theme, the table search, content width, the run log | done |
 | 6 | `@inventory/catalog-web`: the upload, the Items page and its editor, the assistant, the import's steps | done |
 | 7 | `@inventory/review`: the region's state with undo, saved progress, the grid, the queue; the A6 remodel | done |
-| 8 | TanStack Query removed (A2); the lint everywhere; the documents the move made false | todo |
+| 8 | TanStack Query removed (A2); the lint everywhere; the documents the move made false | done |
 
 ## The hook count
 
@@ -88,6 +88,9 @@ After each package, the same count:
   `catalog-web`: `useId` 14, `useRef` 2, `useDeferredValue` 1, `useAtomValue` 39, `useAtom` 9, `useAtomSet` 14,
   `useAtomMount` 2, `useAtomSubscribe` 1, `useAtomRefresh` 3. Strict ceilings now: `review` 259, `catalog-web` 228,
   `ui` 50, `client` 20, `access-web` 14, the app 37 (sum 608).
+- **After step 8**: `@tanstack/react-query` is imported in no file, declared by no package and absent from the
+  lockfile. `git grep "@tanstack/react-query"` outside `goals/` and `explorations/` finds two lines, both the atoms
+  lint's own refusal of it (`.oxlintrc.atoms.json`). The hook count is the one above: step 8 held no hook.
 
 ## Proof
 
@@ -629,19 +632,68 @@ table its rows.
 **Older, seen in passing and left:** the catalog's own tagged unions still switched on by hand (`Upload.machine.ts`,
 `UploadStep.screen.tsx`, an import's events in `ResultStep.screen.tsx`, `changedMeanwhile` in the item editor).
 
+## Step 8: TanStack Query removed, the lint everywhere, the documents
+
+**What went** (`1aa2788`): `packages/client/src/QueryClient.runtime.ts` and its test, the client's `./QueryClient`
+export, `@tanstack/react-query` from the client's and the app's dependencies, the `QueryClientProvider` at the app's
+root, the two lint exceptions that let them stand, and three helpers nothing called any more (the app's `call`,
+`callWrite`, `fork` and `runExit`, the catalog's `call`). The atoms lint refuses `@tanstack/react-query` and
+`@tanstack/query-core` by every path, so a read cannot come back as a query.
+
+**The documents the move made false**, each brought to what the code is: `CLAUDE.md` ("Adding a feature" step 5; a
+"State is atoms" line under UI; the upload, the session and the layout atoms where hooks were named), `docs/kit.md`
+(reading and writing, the paged table's example, the search box, the upload), `docs/patterns.md` (a read by key, the
+upload), `docs/standards/working.md` and `security.md`, `docs/auth.md`, `docs/review-table.md` (the props that are
+atoms, the draft's functions, the column match and a fix's confidence as they are typed) and the README. Not touched:
+`.claude/agents/frontend.md`, which still names TanStack Query and paths from before the packages; it is an agent's
+own instructions, not on the brief's list.
+
+**The final proof**, the dev server on a fresh database (`bun run db:reset`), headless Chromium, 1440 px unless said:
+
+- The app opened signed in as Dana Whitfield. "Use items_messy.csv": the Review read "200 rows read · 20 values
+  fixed for you", Needs a decision 24, Cannot import 21, Ready 155, All 200, and the button "Import 155, skip 45".
+- A group accepted, Ctrl+Z, Ctrl+Shift+Z: three saves, each of the same two rows (set, clear, set). A refresh: the
+  decision was there and the toolbar said "Undo: 2 fixes accepted"; Ctrl+Z took it back.
+- Confirm: "Import 155 items? 45 items won't be imported (Needs a decision 24, Cannot import 21)". The Result: Not
+  imported 45, Imported 155, Already there 0, All 200. Items: "155 items", 20 rows a page, "Page 2 of 8"; sorted by
+  cost from the address, $862.53, $814.49, $807.76; "washer" typed, "7 of 155 items".
+- An edit whose save was refused (the request answered 403 by the test): the row read "Brass Washer M6 changed" at
+  once, then "Brass Washer M6" again, with the toast and "Edit again", which opened on what was typed; saved for
+  real, "Saved AAT-7076".
+- The assistant with no key: "Only components" gave `/items?category=components`, "29 of 155 items", "Answered by
+  Rules · Filtered: Category is components"; its Undo, 155 again. A longer sentence: "The rules could not read … No
+  AI key is set, so the rules answered."
+- The take-back: "This removes the 154 items … It keeps the item someone changed since: AAT-7076 Brass Washer M6
+  changed"; then "Took back 154 items from items_messy.csv, kept 1", Items "1 item", Activity "Decisions 20, Events
+  4, Imports 1".
+- People: three people, each with a role. From the user menu, Priya Raman (a viewer): the Import page said
+  "Importing needs an editor", Items showed no pencil. Sign out: the sign-in page with its test accounts; "Sign in as
+  Dana Whitfield" signed in.
+- The dark theme from the menu: the page's class `dark`, kept as `dark`, light text on a near-black page, the lead
+  button dark on green.
+- 390 px: "Review again" on the taken-back import, the queue read Needs a decision 24, Cannot import 21, Ready 154,
+  Already there 1, All 200, "Decision 1 of 20", "Import 154, skip 46", nothing scrolled sideways; an accept gave
+  "Decision 2 of 20" with the focus on the next card's button; Undo, back.
+- `items_50000.csv`: at Review after 12.9 s, drawn after 15.1 s, Needs a decision 3,250, Cannot import 3,250, Ready
+  43,500, All 50,000; 40 jumps top to bottom in 3.5 s, 26 frames over 50 ms, the worst 183 ms, the last row drawn
+  row 50,001.
+- The console, read after each part: no error but the 403 the test made.
+
+Not seen in this pass: the Match step (the sample's headings all match), a model's answer (no key), a second
+organization's rows.
+
 ## Legacy in the client
 
-The client's lint is on (`packages/client/.oxlintrc.json` extends `.oxlintrc.atoms.json`), with two files excepted by
-name (`QueryClient.runtime.ts` and its own test), and one in the app (`main.tsx`); each exception turns the whole
-import rule off for its file, which is wider than the two TanStack entries it needs, and goes at step 8 with TanStack
-Query itself: the TanStack Query client the app's root still provides. None may gain a caller; each goes when its last
-caller has moved.
+None is left. The client's lint and the app's extend `.oxlintrc.atoms.json` with no exception: the two files the
+client excepted by name (`QueryClient.runtime.ts` and its test) are deleted, and the app's `main.tsx` no longer
+provides a query cache. The only exception to the atoms rule in the repository is the vendored kit
+(`packages/ui/src/components`, `packages/ui/src/hooks`), by decision A1.
 
-| File | What still calls it | Goes at step |
+| File | What called it | Went at step |
 | --- | --- | --- |
-| `CurrentMember.controller.ts` (`useMember`) | gone at step 6, with `Rollback.rules.ts` | 6 |
-| `Optimistic.controller.ts` (`useOptimisticWriteVia`, `makeOptimisticWrite`, `cacheChange`) | gone at step 6, with its test | 6 |
-| `QueryClient.runtime.ts` | the app's `main.tsx` (`lib/queries.ts`, which re-exported it, is gone), and its own test (`Workspace.tsx`'s prefetch went at step 6; the session's two `resetQueries` calls, which emptied a cache nothing reads, went after the step 6 review; the atoms lint refuses its package path and its file by a relative path everywhere else) | 8 |
+| `CurrentMember.controller.ts` (`useMember`) | the catalog screens | 6, with `Rollback.rules.ts` |
+| `Optimistic.controller.ts` (`useOptimisticWriteVia`, `makeOptimisticWrite`, `cacheChange`) | the catalog screens | 6, with its test |
+| `QueryClient.runtime.ts` | the app's `main.tsx`, and its own test | 8 |
 
 ## Hand-written discriminators in the web packages
 
@@ -782,8 +834,8 @@ Not discriminators, and not changed: string-literal domains with no data of thei
 - **The development sign-in is an atom that signs in when read** (`SignedIn.tsx`), as the brief says: it reads the
   session, and only when nobody is signed in, the server offers test accounts and nobody signed out in this tab does it
   sign in and ask the session again; a failure is logged and the sign-in page drawn.
-- **`main.tsx` keeps the query cache's provider** until TanStack Query leaves (step 8): the one file of the app the
-  atoms lint excepts, by name.
+- **`main.tsx` kept the query cache's provider until step 8**, the one file of the app the atoms lint excepted by
+  name. It provides the atoms' registry, the theme and the tooltips now, and the lint excepts nothing in the app.
 - **A sign-out lets every read go at once; a switch keeps the person's reads** (Benjamin: "Keyed reads, and drop them
   on sign-out (Recommended)"). The five-minute keep is now a hold the client has on the read (`keepFor`: a mount and a
   timer), not the registry's own idle time, because the registry has no public way to let one atom go before its idle
@@ -807,8 +859,8 @@ Not discriminators, and not changed: string-literal domains with no data of thei
   reload the page, as before.
 - **The atoms and TanStack Query share what changed.** The client holds one Reactivity instance for the tab, not one
   per registry, so `invalidate(keys)` works from code that is not an atom; the query client (`BridgedQueryClient`)
-  passes on every key a catalog screen invalidates, so the audit trail, an atom now, asks again when an import is
-  confirmed. It goes with TanStack Query (step 8).
+  passed on every key a catalog screen invalidated, so the audit trail, an atom by then, asked again when an import was
+  confirmed. The bridge went with TanStack Query at step 8; `invalidate(keys)` is what a write says now.
 - **Two stand-in hooks until the app's shell moves (step 4):** `useSession` and `useAuditEvents` in `access-web` keep
   the fields the shell and the Activity page read, built only from the atom hooks; the shell then reads `session`,
   `actor` and `auditEvents` itself and they go.

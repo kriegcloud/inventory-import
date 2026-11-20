@@ -704,21 +704,21 @@ reach: a read ended by a later save's answer (group 8; `put` re-issues the read,
 
 | Group | What became of it | Test |
 | --- | --- | --- |
-| 1 a save answered after a newer view; a return inside the idle time | Every transition is held to one rule after it has run (`told`): a change of what is shown that the person did not make restarts the region, and so does a draft let go while nobody looked. A draft let go keeps its epoch going | The property; `DraftRegion.test.ts` (the region reads the other person's row after it arrives). The wiring test of a quick return does not fail without the let-go restart: in the test's registry the region's own state is already gone at the return; the property's `ComeBackQuickly` holds the rule |
+| 1 a save answered after a newer view; a return inside the idle time | Every transition is held to one rule after it has run (`told`): a change of what is shown that the person did not make restarts the region, and so does a draft let go while nobody looked. A draft let go keeps its epoch going | The property; `DraftRegion.test.ts` (the region reads the other person's row after it arrives). The wiring test of a quick return now fails without the let-go restart (`f8ef35e`): the old one gave the new view before the step's leaving was taken in, so the restart for a changed view covered it |
 | 2 the no-change save | Closed by "Answer says 'no change'" (`7b09ee4`); the ten commands are a named test | Named test |
 | 3 Confirm | Closed by "Refuse, show, confirm again" (`42c8303`); the confirm's `clear` has its test | Named tests, `ConfirmDraft.test.ts`, `ConfirmRevision.slow.test.ts` |
 | 4 a SKU typed while a save is out | `typed` is worked out from what the server is known to hold, so the read goes out once the server has the SKU | Named test: the first answer sends the SKU and asks nothing, the second asks |
 | 5 a save that failed waits on nothing | Rows that wait are sent again when a picture arrives; a line above the review stays while they wait, with Save again; the failed-save words never say "reload the page". What a reload does and what a confirm elsewhere does are Benjamin's answers, below | Named tests; `DraftRegion.test.ts` (the wired failure and Save again); seen on screen |
 | 6 a waiting accept survives a match | Benjamin's answer "Server refuses, screen says so", below | below |
 | 7 toasts outside the machine | Saying it is an effect (`Say`), returned only when a save was out; `SaveRefused` has the flight guard | Named test: a stray answer says nothing and changes nothing |
-| 8 the read that is out is ended by a later save | Not built | None |
+| 8 the read that is out is ended by a later save | `14d737e`, three faults of it fixed in `d1e31bf`: below | `Seed.atoms.test.ts`, `ReviewDraft.test.ts` |
 | 9 Continue over a confirmed view | Closed by the confirm raising the revision (`42c8303`) | `ConfirmRevision.slow.test.ts` asserts the revision goes up |
-| 11 the Items columns | Not built | None |
+| 11 the Items columns | `e7ca8df`: below | `ItemColumns.test.ts` through `applyColumnConfig`; seen on screen |
 | 12 tags by hand | `laws tags` and the 65 places (`3c4515a`) | `Tags.test.ts` |
-| 13 state outside atoms | The upload under way and the chosen workbook are atoms (`632fef8`). The given answer in `Api.atoms.ts` is not changed | None of its own: the upload was seen on screen |
+| 13 state outside atoms | The upload under way and the chosen workbook are atoms (`632fef8`). The given answer in `Api.atoms.ts` is an atom beside the request (`14d737e`) | The upload was seen on screen; the given answer's tests in `Seed.atoms.test.ts` |
 | 14 hooks under other hoisted names | `laws boundaries` refuses a third-party package the importer does not declare, read from the syntax tree. No per-file exception to the atoms lint is left to restate: step 8 removed them | `Boundaries.test.ts`, with planted files |
 | 15, 16, 17 | The property above; `DraftRegion.test.ts` for Restart and `announce`; `Dropped` is gone (nothing sent it) | as said |
-| 18 | The no-change test sends such a save; the wired failure has its test. A remove that empties the draft and forgets the workbook has its test (`RemoveImport.test.ts`; it fails with the two lines taken out). Not written: a test for `Api.atoms.ts` "not kept again when the screen leaves", and for leaving the address of a removed import | as said |
+| 18 | The no-change test sends such a save; the wired failure has its test. A remove that empties the draft and forgets the workbook has its test (`RemoveImport.test.ts`; it fails with the two lines taken out). `Api.atoms.ts` "not kept again when the screen leaves" and leaving the address of a removed import have their tests (`834ad53`) | as said |
 | 19 | The statements in this file: the deleted saver, the ceilings, what the lint refuses, what the property held. 5efcd1b's message says "each filter control reads its values when it is drawn" for a commit whose list filters were empty: a commit message is not rewritten, so it is said here |  |
 
 **Benjamin's answers of 2026-11-19 and 2026-11-20**, each in `DECISIONS.md` and the exploration's log:
@@ -734,6 +734,35 @@ reach: a read ended by a later save's answer (group 8; `put` re-issues the read,
 
 **The rework review's groups 20 to 22**: `laws tags` and the table of step 7's checks (`3c4515a`); the review guide's
 condition for the decisions atom (`edffca6`); the row height and the saved progress through `Atom.kvs` (`3285206`).
+
+## The merge of main, and the groups that were not built (2026-11-20)
+
+Main's "no `switch`" commit (`476d179`) came in as a merge (`ec6de4a`); its paragraph is under "Hand-written
+discriminators" below. Then the groups the draft review's table above left open:
+
+- **Group 8 and group 13's last part** (`14d737e`). An answer a screen gives a read (a save's view, a staged file's
+  view) is an atom beside the request (`beside`), not a variable the read's atom empties inside its own read. A
+  request that is out is never ended by it: it lands, and when something was given or learned while it was out it
+  is asked once more (once, however many saves answered), the given answer staying on screen until then. The
+  review's `Ask` calls `askAgain` with the time the last save or confirm was sent: a read that left after it is let
+  land with nothing more asked. Test: three saves 2 ms apart behind a read of 30 ms.
+- **Three faults of that build**, found by an independent review and fixed in `d1e31bf`: a given answer hid every
+  later failure of the read (a removed import's review went on showing the saved view); a late landing of a read
+  already let go released the hold of the read made since for the same member; the once more refreshed over a
+  request that had left in the gap, ending it. A test for each, each failing with its fix taken out.
+- **Not settled: the rule "a read that left after the save was sent includes it".** The review found two orderings
+  where it loses an `Ask`: the server serves a read that left after the save before the save's write commits, and a
+  save retried by `callWrite` (its first attempt failed) whose time sent is the first attempt's. The draft is left
+  with `landed` over a picture that lacks it until the next read; a confirm then holds back once for nothing. The
+  rule is the review's own wording; whether to count from when the save was answered instead is put to the lead.
+- **Group 11** (`e7ca8df`). Category and UoM in the toolbar are the kit's `DataTableFacetedFilter`, fed from
+  `quickFilterOptions`; the toolbar is given `quick={[]}`. Only the Filter menu's values travel on the columns'
+  meta. Every cell and heading is a named component at module level, and the editor's and viewer's columns are made
+  once. The test puts the columns through `applyColumnConfig` with the page's config.
+- **Group 18's two tests** (`834ad53`). A read let go within the idle time after its screen left keeps nothing but
+  what lives for the page. Leaving the address of a removed import moved from the button's click into
+  `removeImport`, where a test reaches it.
+- **The twin's own check of the confirm's revision, and the quick return** (`f8ef35e`): above.
 
 ## Step 8: TanStack Query removed, the lint everywhere, the documents
 

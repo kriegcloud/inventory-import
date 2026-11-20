@@ -10,8 +10,9 @@ import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import { type DecisionDelta, decisionFromFlags, type SavedDecisions } from "@inventory/catalog-contract/Decision"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import type { ImportView } from "@inventory/catalog-contract/Import"
-import { importView, importViewShown } from "../src/Imports.atoms.ts"
-import { decideRows, followDraft, reviewLocal, shownDecisions } from "../src/ReviewDraft.atoms.ts"
+import type { StagedTable } from "@inventory/catalog-contract/Staged"
+import { importTable, importView, importViewShown } from "../src/Imports.atoms.ts"
+import { decideRows, followDraft, reviewInput, reviewLocal, shownDecisions } from "../src/ReviewDraft.atoms.ts"
 import { importNo, registryWith, viewAt } from "./support/catalog.ts"
 
 const settle = Effect.sleep("15 millis")
@@ -114,6 +115,51 @@ describe("a saved decision", () => {
       decide(t.registry, id, { ...theirs, "row-9": out })
       yield* settle
       expect(t.saves[1]!.delta).toEqual({ set: { "row-9": out }, clear: [] })
+    })
+  )
+})
+
+describe("after a saved decision", () => {
+  it.live("the import is not asked for again when no SKU was typed, however many rows were decided", () =>
+    Effect.gen(function* () {
+      const id = importNo(6)
+      const t = world(id)
+      t.give(t.at({ revision: 10 }))
+      t.open()
+      yield* settle
+      // One press that settles three rows: the next revision, nobody else in between, nothing typed.
+      decide(t.registry, id, { "row-1": out, "row-2": out, "row-3": out })
+      yield* settle
+      yield* t.answerSave(0, 11)
+      yield* settle
+      expect(t.gets()).toBe(0)
+    })
+  )
+
+  it.live("the review's input stays the same object when the import is read again and only its draft moved", () =>
+    Effect.gen(function* () {
+      const id = importNo(7)
+      const t = world(id)
+      const stored = [{ sku: "ABC-0001" }] as unknown as ImportView["storedItems"]
+      t.give(t.at({ revision: 10, storedItems: stored, createdIds: [] }))
+      t.registry.set(importTable(id), { columns: [], rows: [] } as unknown as StagedTable)
+      t.registry.mount(importTable(id))
+      t.open()
+      let built = 0
+      const stop = t.registry.subscribe(reviewInput(id), () => built++, { immediate: true })
+      yield* settle
+      const first = t.registry.get(reviewInput(id))
+      expect(O.isSome(first)).toBe(true)
+      // Read again: a newer revision, and every part decoded anew, equal to what was held.
+      t.askAgain()
+      yield* settle
+      const again = [{ sku: "ABC-0001" }] as unknown as ImportView["storedItems"]
+      yield* t.answerGet(0, t.at({ revision: 11, storedItems: again, createdIds: [], decisions: { "row-1": out } }))
+      yield* settle
+      expect(t.held().revision).toBe(11)
+      expect(t.registry.get(reviewInput(id))).toBe(first)
+      expect(built).toBe(1)
+      stop()
     })
   )
 })

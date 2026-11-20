@@ -2,6 +2,7 @@
 // view, the decisions it shows, how it follows the draft while it is open, and what a decision does. The rule this
 // file protects: the screen never shows, and never sends, less than the person and the others have decided.
 import * as Data from "effect/Data"
+import * as Eq from "effect/Equal"
 import * as O from "effect/Option"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as Atom from "effect/reactivity/Atom"
@@ -14,7 +15,8 @@ import type { ImportView, SuggestOutcome } from "@inventory/catalog-contract/Imp
 import type { SavedDecisions as RegionDecisions } from "@inventory/review/ReviewTypes"
 import { decisionSaver } from "./Draft.controller.ts"
 import { toRegionDecisions } from "./ImportReview.controller.ts"
-import { changeView, importView, importViewShown, viewWith } from "./Imports.atoms.ts"
+import type { review } from "@inventory/catalog-model/Review"
+import { changeView, importTable, importView, importViewShown, viewWith } from "./Imports.atoms.ts"
 
 /**
  * What this screen holds for one import besides the server's view: the decisions it shows (until the first change,
@@ -48,6 +50,44 @@ export const reviewLocal = perKey((_id: ImportId) =>
 
 /** The view's answer, once there is one. */
 const viewOf = (get: Atom.AtomContext, id: ImportId): O.Option<ImportView> => AsyncResult.value(get(importView(id)))
+
+/** True when the two are the same object or hold the same values. */
+const sameValues = (before: unknown, next: unknown): boolean => before === next || Eq.equals(before, next)
+
+/**
+ * What the review is worked out from, besides the decisions: kept as the same object while those parts of the view
+ * hold the same values, so a new revision of the draft (after every saved decision) does not work out 50,000 rows
+ * again. The parts are compared by value, not by object: an import read again comes back decoded anew, every part a
+ * new object, though only its draft moved. The staged rows never change and are compared as the object they are.
+ */
+export const reviewInput = perKey((id: ImportId) =>
+  Atom.readable((get): O.Option<ReviewInput> => {
+    const view = viewOf(get, id)
+    const table = AsyncResult.value(get(importTable(id)))
+    if (O.isNone(view) || O.isNone(table)) return O.none()
+    const held = O.flatten(get.self<O.Option<ReviewInput>>())
+    const next: ReviewInput = {
+      table: table.value,
+      choices: view.value.choices,
+      storedItems: view.value.storedItems,
+      // A server that sends only the row numbers: each row is then one item.
+      createdIds: view.value.createdIds,
+      // The stored suggestions, as the server reads them at the confirm: each is a proposal on its row.
+      suggestions: view.value.suggestions
+    }
+    const same = O.exists(
+      held,
+      (before) =>
+        before.table === next.table &&
+        sameValues(before.choices, next.choices) &&
+        sameValues(before.storedItems, next.storedItems) &&
+        sameValues(before.createdIds, next.createdIds) &&
+        sameValues(before.suggestions, next.suggestions)
+    )
+    return same ? held : O.some(next)
+  })
+)
+export type ReviewInput = Omit<Parameters<typeof review>[0], "decisions">
 
 /**
  * The decisions the screen shows: its own once the person has changed one, the server's until then. The same object
@@ -158,10 +198,14 @@ export const followDraft = perKey((id: ImportId) =>
   })
 )
 
-/** The SKUs the person typed, as one text: a change means the server must say again which items are already there. */
+/**
+ * The SKUs the person typed, as one text: a change means the server must say again which items are already there.
+ * Only the rows where one was typed count. With an empty place for every other decision, the text changed whenever
+ * the number of decisions did, and every save asked for the import again.
+ */
 const typedSkus = (saved: SavedDecisions): string =>
-  Object.values(saved)
-    .map((decision) => decision.edits?.sku ?? "")
+  Object.entries(saved)
+    .flatMap(([rowId, decision]) => (decision.edits?.sku === undefined ? [] : [`${rowId}=${decision.edits.sku}`]))
     .join("|")
 
 /**

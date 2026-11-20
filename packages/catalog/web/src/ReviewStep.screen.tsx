@@ -4,7 +4,6 @@ import * as Cause from "effect/Cause"
 import * as Eq from "effect/Equal"
 import * as Exit from "effect/Exit"
 import * as O from "effect/Option"
-import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as Atom from "effect/reactivity/Atom"
 import { useDeferredValue } from "react"
 import { TriangleAlertIcon } from "lucide-react"
@@ -18,8 +17,8 @@ import { Button } from "@inventory/ui/components/button"
 import { Spinner } from "@inventory/ui/components/spinner"
 import { member } from "@inventory/client/MemberAtoms"
 import { invalidate, perKey } from "@inventory/client/Api"
-import { decideRows, followDraft, reviewLocal, shownDecisions } from "./ReviewDraft.atoms.ts"
-import { confirmImport, importTable, importView, matchColumn, suggestFixes } from "./Imports.atoms.ts"
+import { decideRows, followDraft, reviewInput, reviewLocal, shownDecisions } from "./ReviewDraft.atoms.ts"
+import { confirmImport, matchColumn, suggestFixes } from "./Imports.atoms.ts"
 import { navigate } from "@inventory/ui/Route"
 import { importAddress } from "./internal/route.ts"
 import { restoredDecisions, storedReview } from "@inventory/review/SavedProgress"
@@ -67,42 +66,6 @@ const cellEditor = (input: { row: ReviewRow; column: string; value: string }) =>
           render: (save: (value: string) => void) => <VendorsForm value={input.value} onSave={save} />
         }
       : undefined
-
-/** The view's answer, once there is one. */
-const viewOf = (get: Atom.AtomContext, id: ImportId): O.Option<ImportView> => AsyncResult.value(get(importView(id)))
-
-/**
- * What the review is worked out from, besides the decisions: kept as the same object while those parts of the view
- * are, so a new revision of the draft (after every saved decision) does not work out 50,000 rows again.
- */
-const reviewInput = perKey((id: ImportId) =>
-  Atom.readable((get) => {
-    const view = viewOf(get, id)
-    const table = AsyncResult.value(get(importTable(id)))
-    if (O.isNone(view) || O.isNone(table)) return O.none()
-    const held = O.flatten(get.self<O.Option<ReviewInput>>())
-    const next: ReviewInput = {
-      table: table.value,
-      choices: view.value.choices,
-      storedItems: view.value.storedItems,
-      // A server that sends only the row numbers: each row is then one item.
-      createdIds: view.value.createdIds,
-      // The stored suggestions, as the server reads them at the confirm: each is a proposal on its row.
-      suggestions: view.value.suggestions
-    }
-    const same = O.exists(
-      held,
-      (before) =>
-        before.table === next.table &&
-        before.choices === next.choices &&
-        before.storedItems === next.storedItems &&
-        before.createdIds === next.createdIds &&
-        before.suggestions === next.suggestions
-    )
-    return same ? held : O.some(next)
-  })
-)
-type ReviewInput = Omit<Parameters<typeof review>[0], "decisions">
 
 /** The review of every row with the decisions shown: the same pure review the server runs at the confirm. */
 const currentReview = perKey((id: ImportId) =>

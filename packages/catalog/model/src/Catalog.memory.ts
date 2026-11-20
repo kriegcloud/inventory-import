@@ -6,7 +6,7 @@
 // Two things a twin does not imitate, and a test of them belongs on D1: the size limits of a stored value, and the
 // search's forgiveness of one wrong letter (the twin finds a word only as it is typed).
 import { type Change, changeDecidedBy } from "@inventory/catalog-contract/Change"
-import { RowDecision, type SavedDecisions, type DecisionDelta } from "@inventory/catalog-contract/Decision"
+import { RowDecision, type DecisionDelta } from "@inventory/catalog-contract/Decision"
 import type { FileProblem } from "@inventory/catalog-contract/FileProblem"
 import { type ConfirmId, ImportId, type ItemId } from "@inventory/catalog-contract/Ids"
 import {
@@ -34,7 +34,7 @@ import {
 import { FilterOperator, ItemFilterColumn, ItemSortColumn } from "@inventory/catalog-contract/ItemQuery"
 import type { ItemFacets, ItemFilter, ItemPage, ItemQuery, ItemSort } from "@inventory/catalog-contract/ItemQuery"
 import { MappingChoice } from "@inventory/catalog-contract/Mapping"
-import { StagedHead, type StagedRow, type StagedTable } from "@inventory/catalog-contract/Staged"
+import { type Field, StagedHead, type StagedRow, type StagedTable } from "@inventory/catalog-contract/Staged"
 import type { Suggestion } from "@inventory/catalog-contract/Suggestion"
 import { Activity } from "@inventory/kernel/Activity"
 import { ActivityId, type MemberId, type OrganizationId } from "@inventory/kernel/Ids"
@@ -66,8 +66,11 @@ import {
   confirmMoved,
   confirmWritten,
   type ConfirmWrite,
+  type Decided,
+  decisionsClosed,
+  decisionsRematched,
+  decisionsSaved,
   type Draft,
-  type DraftSaved,
   ImportStore,
   nothingInForce,
   type TakeBackWrite,
@@ -974,10 +977,12 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
           Effect.map(S.encodeEffect(DecisionJson)(decision), (json) => ({ rowId, json, decision })),
         { concurrency: 1 }
       )
-      return yield* Ref.modify(ref, (state): readonly [O.Option<DraftSaved>, CatalogState] => {
+      return yield* Ref.modify(ref, (state): readonly [Decided, CatalogState] => {
         const org = actor.organizationId
         const found = A.findFirst(state.drafts, sameDraft(org, draft.id))
-        if (O.isNone(found) || found.value.draft.status !== "open") return [O.none(), state]
+        if (O.isNone(found) || found.value.draft.status !== "open") return [decisionsClosed, state]
+        // Checked against other choices than the draft has now: a match came between, and nothing is saved.
+        if (found.value.draft.choicesJson !== draft.choicesJson) return [decisionsRematched, state]
         const stored = found.value
         const differs = A.some(
           sets,
@@ -987,7 +992,7 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
         const revision = stored.draft.revision + (differs || clears ? 1 : 0)
         const decisions = withSaved(stored.decisions, { sets, clear: delta.clear, author: actor.name })
         return [
-          O.some({ revision, changed: differs || clears }),
+          decisionsSaved({ revision, changed: differs || clears }),
           mapDraft(state, org, draft.id, (entry) => ({
             ...entry,
             decisions,
@@ -997,67 +1002,78 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
       })
     }, Effect.orDie)
 
-    const setChoices = Effect.fnUntraced(function* (
+    // One match, as the store's one batch: worked out from the state as it is read, and written only if that state
+    // is still the one in place (otherwise worked out again), so nothing falls between its parts.
+    const matchColumn = Effect.fnUntraced(function* (
       actor: Member,
       draft: Draft,
-      list: ReadonlyArray<MappingChoice>,
+      choice: { readonly field: Field; readonly column: number | null },
       detail: string
     ) {
       const id = yield* random.uuidV4()
       const at = yield* DateTime.now
-      const json = yield* S.encodeEffect(ChoicesJson)(list)
-      return yield* Ref.modify(ref, (state): readonly [ChoicesSaved, CatalogState] => {
-        const org = actor.organizationId
+      const org = actor.organizationId
+      const attempt = Effect.gen(function* () {
+        const state = yield* Ref.get(ref)
         const found = A.findFirst(state.drafts, sameDraft(org, draft.id))
-        if (O.isNone(found) || found.value.draft.status !== "open") return ["closed", state]
+        if (O.isNone(found) || found.value.draft.status !== "open") return O.some<ChoicesSaved>("closed")
+        const entry = found.value
+        const before = yield* S.decodeEffect(ChoicesJson)(entry.draft.choicesJson)
         // Choices that are already so are not a change: no audit line and no new revision.
-        if (found.value.draft.choicesJson === json) return ["same", state]
-        const next = mapDraft(state, org, draft.id, (entry) => ({
-          ...entry,
-          draft: { ...entry.draft, choicesJson: json, revision: entry.draft.revision + 1 }
-        }))
-        return [
-          "saved",
-          {
-            ...next,
-            activity: A.append(
-              next.activity,
-              line({
-                id,
-                organizationId: org,
-                actorId: actor.id,
-                actorName: actor.name,
-                action: "Matched a column",
-                detail,
-                at
-              })
-            )
-          }
-        ]
+        if (A.some(before, (old) => old.field === choice.field && old.column === choice.column)) {
+          return O.some<ChoicesSaved>("same")
+        }
+        // The revision this write moves the draft to: a decision made on an earlier one was made before the match.
+        const revision = entry.draft.revision + 1
+        const json = yield* S.encodeEffect(ChoicesJson)([
+          ...A.filter(before, (old) => old.field !== choice.field),
+          { field: choice.field, column: choice.column, by: "person", at: revision }
+        ])
+        // Every stored accept of the field goes, whoever made it.
+        const decisions = yield* Effect.forEach(
+          entry.decisions,
+          (old) => {
+            if (!A.contains(old.decision.accepted, choice.field)) return Effect.succeed(old)
+            const decision = { ...old.decision, accepted: A.filter(old.decision.accepted, (f) => f !== choice.field) }
+            return Effect.map(S.encodeEffect(DecisionJson)(decision), (encoded) => ({
+              ...old,
+              json: encoded,
+              decision
+            }))
+          },
+          { concurrency: 1 }
+        )
+        return yield* Ref.modify(ref, (now): readonly [O.Option<ChoicesSaved>, CatalogState] => {
+          if (now !== state) return [O.none(), now]
+          const next = mapDraft(now, org, draft.id, (held) => ({
+            ...held,
+            decisions,
+            draft: { ...held.draft, choicesJson: json, revision }
+          }))
+          return [
+            O.some("saved"),
+            {
+              ...next,
+              activity: A.append(
+                next.activity,
+                line({
+                  id,
+                  organizationId: org,
+                  actorId: actor.id,
+                  actorName: actor.name,
+                  action: "Matched a column",
+                  detail,
+                  at
+                })
+              )
+            }
+          ]
+        })
       })
-    }, Effect.orDie)
-
-    const rewriteDecisions = Effect.fnUntraced(function* (actor: Member, draft: Draft, set: SavedDecisions) {
-      const entries = yield* Effect.forEach(
-        R.toEntries(set),
-        ([rowId, decision]) =>
-          Effect.map(S.encodeEffect(DecisionJson)(decision), (json) => ({ rowId, json, decision })),
-        { concurrency: 1 }
+      const settle: Effect.Effect<ChoicesSaved, S.SchemaError> = Effect.flatMap(attempt, (done) =>
+        O.match(done, { onNone: () => Effect.suspend(() => settle), onSome: Effect.succeed })
       )
-      if (entries.length === 0) return
-      yield* Ref.update(ref, (state) =>
-        mapDraft(state, actor.organizationId, draft.id, (entry) => ({
-          ...entry,
-          // Only rows that already have a decision, keeping who made it.
-          decisions: A.map(entry.decisions, (old) =>
-            O.match(
-              A.findFirst(entries, (next) => next.rowId === old.rowId),
-              { onNone: () => old, onSome: (next) => ({ ...old, json: next.json, decision: next.decision }) }
-            )
-          ),
-          draft: entry.draft.status === "open" ? { ...entry.draft, revision: entry.draft.revision + 1 } : entry.draft
-        }))
-      )
+      return yield* settle
     }, Effect.orDie)
 
     const reopen = Effect.fnUntraced(function* (actor: Member, draft: Draft) {
@@ -1345,7 +1361,7 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
       choices: Effect.fnUntraced(function* (draft: Draft) {
         return yield* S.decodeEffect(ChoicesJson)(draft.choicesJson)
       }, Effect.orDie),
-      setChoices,
+      matchColumn,
       createdRows: Effect.fnUntraced(function* (organizationId: OrganizationId, importId: string) {
         const state = yield* Ref.get(ref)
         return A.map(
@@ -1356,7 +1372,6 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
           (row) => ({ rowNumber: row.rowNumber, part: row.part })
         )
       }),
-      rewriteDecisions,
       reopen,
       changes: Effect.fnUntraced(function* (organizationId: OrganizationId) {
         const state = yield* Ref.get(ref)

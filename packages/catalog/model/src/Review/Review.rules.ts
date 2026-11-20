@@ -1527,31 +1527,3 @@ export const carryDecisions = (input: {
   })
   return R.fromEntries(merged)
 }
-
-/**
- * Takes back acceptances that no longer mean what the person agreed to. An accept is stored as the field's name,
- * so when the proposal behind a field can change (its column was matched again) the accept must go, or a different
- * value would arrive as "accepted". Returns only the rows whose decision changed.
- *
- * @example
- * // Row 24's unit proposal came from a column that was just matched again: the accept of it goes.
- * dropAccepted({ decisions: { "row-24": decisionOf({ accepted: ["uom"] }) }, rows, drop: (p) => p.field === "uom" })
- * // { "row-24": decisionOf() }
- */
-export const dropAccepted = (input: {
-  readonly decisions: SavedDecisions
-  readonly rows: ReadonlyArray<ReviewedRow>
-  readonly drop: (proposal: Proposal) => boolean
-}): SavedDecisions =>
-  R.fromEntries(
-    keepSome(input.rows, (row) => {
-      const decision = R.get(input.decisions, row.id)
-      if (O.isNone(decision)) return O.none()
-      const accepted = decision.value.accepted
-      const kept = A.filter(accepted, (field) =>
-        A.some(row.proposals, (proposal) => proposal.field === field && !input.drop(proposal))
-      )
-      if (kept.length === accepted.length) return O.none()
-      return O.some([row.id, { ...decision.value, accepted: kept }] as const)
-    })
-  )

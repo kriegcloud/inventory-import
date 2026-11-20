@@ -30,14 +30,7 @@ import {
   SaveRequest,
   type StaleAccept
 } from "@inventory/catalog-contract/Decision"
-import {
-  review,
-  carryDecisions,
-  ruleFixes,
-  type Proposal,
-  dropAccepted,
-  firstDecisions
-} from "../Review/Review.rules.ts"
+import { review, carryDecisions, ruleFixes, firstDecisions } from "../Review/Review.rules.ts"
 import { skuKey, fieldsOf } from "@inventory/catalog-contract/Item"
 import { ImportView, openImportsShown, pastImportsShown } from "@inventory/catalog-contract/Import"
 import {
@@ -257,15 +250,27 @@ export const importsEndpoints = Effect.gen(function* () {
     return draft.value
   })
 
-  // An accept is stored by field. When the proposal behind a field can change, the accept is taken back, so a
-  // different value never arrives as something the person agreed to.
-  const dropAccepts = Effect.fn("imports.dropAccepts")(function* (
+  // A save checked against the draft's column choices as read, and written only while they are still its choices
+  // (the store checks them in the save's own write). A match in between makes the store refuse it: the import is read
+  // again and the save checked against the choices it has now. A match is a person's press, so a few tries settle it.
+  const saveChecked = Effect.fn("imports.saveChecked")(function* (
     actor: Member,
-    draft: Draft,
-    drop: (proposal: Proposal) => boolean
-  ) {
-    const { current, saved } = yield* reviewOf(actor, draft)
-    yield* imports.rewriteDecisions(actor, draft, dropAccepted({ decisions: saved, rows: current.rows, drop }))
+    id: ImportId,
+    payload: SaveRequest,
+    triesLeft: number
+  ): Effect.fn.Return<
+    { readonly revision: number; readonly changed: boolean; readonly notApplied: ReadonlyArray<StaleAccept> },
+    AlreadyImported | ImportNotFound
+  > {
+    const draft = yield* find(actor, id)
+    // An accept made before its field's column was matched again is not applied; the rest of the row's decision is.
+    const choices = yield* imports.choices(draft)
+    const { applied, notApplied } = withoutStaleAccepts({ choices, madeOn: payload.madeOn, set: payload.set })
+    const done = yield* imports.decide(actor, draft, { set: applied, clear: payload.clear })
+    if (done.kind === "saved") return { revision: done.revision, changed: done.changed, notApplied }
+    if (done.kind === "closed") return yield* closed(draft)
+    if (triesLeft === 0) return yield* Effect.die("The import's columns kept being matched while a save was checked.")
+    return yield* saveChecked(actor, id, payload, triesLeft - 1)
   })
 
   const gone = () =>
@@ -392,18 +397,14 @@ export const importsEndpoints = Effect.gen(function* () {
       if (A.some(before, (choice) => choice.field === payload.field && choice.column === asked)) {
         return yield* viewOf(actor, draft)
       }
-      const next: ReadonlyArray<MappingChoice> = [
-        ...A.filter(before, (choice) => choice.field !== payload.field),
-        // From the next revision on: a decision made on this one or an earlier one was made before the match.
-        { field: payload.field, column: asked, by: "person", at: draft.revision + 1 }
-      ]
-      // This field will read another column: an accept of a proposal about it goes.
-      yield* dropAccepts(actor, draft, (proposal) => proposal.field === payload.field)
+      // One write: the choice, stamped with the revision that write moves the draft to (a decision made on an earlier
+      // one was made before the match); every stored accept of the field taken out, since the proposal behind it
+      // reads another column now; and the audit line. Nothing can fall between them.
       const label = fieldLabels[payload.field]
-      const saved = yield* imports.setChoices(
+      const saved = yield* imports.matchColumn(
         actor,
         draft,
-        next,
+        { field: payload.field, column: asked },
         O.match(column, {
           onNone: () => `${label}: no column, in ${draft.fileName}`,
           onSome: (found) => `${label} reads column ${found.letter} "${found.label}" in ${draft.fileName}`
@@ -467,13 +468,7 @@ export const importsEndpoints = Effect.gen(function* () {
       readonly payload: SaveRequest
     }) {
       const actor = yield* requireRole("editor")
-      const draft = yield* find(actor, params.id)
-      // An accept made before its field's column was matched again is not applied; the rest of the row's decision is.
-      const choices = yield* imports.choices(draft)
-      const { applied, notApplied } = withoutStaleAccepts({ choices, madeOn: payload.madeOn, set: payload.set })
-      const saved = yield* imports.decide(actor, draft, { set: applied, clear: payload.clear })
-      if (O.isNone(saved)) return yield* closed(draft)
-      return { ...saved.value, notApplied }
+      return yield* saveChecked(actor, params.id, payload, 5)
     }),
     commit: Effect.fn("imports.commit")(function* ({
       params,

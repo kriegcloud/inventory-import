@@ -54,15 +54,7 @@ import { regionLayout } from "./internal/parts.tsx"
 import { ReviewGrid } from "./internal/ReviewGrid.tsx"
 import { ReviewQueue } from "./internal/ReviewQueue.tsx"
 import { WorkList } from "./internal/WorkList.tsx"
-import {
-  type Density,
-  keepDensity,
-  type Region,
-  RegionScope,
-  type RegionUi,
-  storedDensity,
-  TableScope
-} from "./ReviewRegion.atoms.ts"
+import { type Density, keepDensity, type Region, RegionScope, type RegionUi, TableScope } from "./ReviewRegion.atoms.ts"
 import type { Activity, FilterId, ReviewRegionProps, RowView } from "@inventory/review/ReviewTypes"
 
 // Each enum's own guard, made once: these run for every row and every cell.
@@ -300,9 +292,9 @@ function RegionBody(
     ? filter === "needs" && counts.needs > 0
     : !readOnly && (filter === "needs" ? leadInView : counts.needs > 0)
   // Compact (36 px rows) or comfortable (44 px), remembered in this browser: a preference, not progress.
-  const density = O.getOrElse(own.density, storedDensity)
+  const density = own.density
   const chooseDensity = (next: Density) => {
-    change(() => ({ density: O.some(next) }))
+    change(() => ({ density: next }))
     keepDensity(next)
   }
   const main = primary({ columns, counts, noun: props.noun, closing: props.closingLabel, words })

@@ -410,6 +410,14 @@ rework was under way; its groups are answered in the same commits.
 | 12 | Comments and documents named what was gone | `docs/review-table.md`, the props' comments and this plan say atoms | `bun run docs:check` | |
 | 13 | The inventory of a hook's job done with no hook and no atom | Each item is one of the house forms; what is not is listed under "Choices made" | | |
 | 14 | The lint read imports only | `laws ref-callbacks` (`refs:check`, part of `bun run check`) refuses a ref callback made on each draw | `RefCallbacks.test.ts`, with planted files; on the seven files as they stood before the rework it names all eight | |
+| 16 | After Confirm the bulk toast's Undo still acted on the Result | The same guard; and a region that goes takes its own toasts down (`toasts`, dismissed by the section's ref callback when its node goes) | `ReviewRegion.atoms.test.ts`: the toast is dismissed when the region leaves, and its Undo, pressed all the same, reaches nobody | Accepted a group (toast "2 fixes accepted" with Undo), Import, Confirm: on the Result no toast was left, Ctrl+Z sent nothing, no "not saved" message, and no saved progress for the import was in the browser's storage |
+| 17 | The pass left out items the brief's proof names, without saying so | Walked below; what was not is on the "Not seen" line by name | | |
+
+The same pass asked about two things, and both are put back as they were before step 7: the edit form keeps the value
+it opened with until something is typed (it had come to follow a later value from outside), and the row height is
+read from the browser's storage once, when the region is made (it had come to be read on every draw until picked).
+`docs/review-table.md` was brought up to the region's props in this batch; its older shapes in the examples
+(`match: { state: "unmatched" }`, `confidence?`) are on step 8's list of documents the move made false.
 
 Found while looking, and fixed:
 
@@ -443,8 +451,31 @@ took no focus; "Use 1200 for 2" moved to card 2 with focus on its first button; 
 Ready and back to Needs a decision left the focus on the tab. Import: the confirm said "Import 158 items? 42 items
 won't be imported"; the Result said Not imported 42, Imported 158, All 200. Activity: 22 decisions, "/" put the caret
 in the search, "unit" left 7, Escape 22; Imports 1. People: 3 rows, a role changed to Viewer and back to Editor.
-items_clean.csv dropped on the page beside the box: uploaded, Review 25 Ready. Not seen: two screens on one import
-(the toast pressed after another tab's change is held by the test), a refused save, a file over the limit.
+items_clean.csv dropped on the page beside the box: uploaded, Review 25 Ready. 
+
+A second pass on a fresh database, for what the review's last pass named:
+
+- Two tabs on one import. Tab A accepted the SKU group of 2 (toast with Undo); tab B left row 2 out (its own PUT, one
+  row). In A the toast's Undo, pressed while A's region was still the one on screen, sent `clear` for A's two rows
+  only: B's row was not in it. A's save came back one revision further than A knew, so A read the import again, said
+  "Updated with what changed on another screen" and was drawn again with Left out 2. Ctrl+Z then sent nothing and the
+  Undo button said "Undo" with nothing to undo: the new region has its own history.
+- Another account. Dana left a row out of items_clean.csv ("Undo: 1 row left out"). As Marcus Oyelaran (the user
+  menu), the same import showed Left out 1 and "Undo" with nothing to undo: the history is Dana's. Marcus put the row
+  back ("Undo: Row put back"); the browser then held one saved progress for him and one for Dana. Back as Dana: Ready
+  25, nothing to undo (her kept history no longer ends at what the server holds). Sign out: the sign-in page; "Sign in
+  as Dana Whitfield" there signed in again.
+- Items: 153 items, page 1 of 8; the next page (`?page=2`, opened by its address too); "/" put the caret in the
+  search, "bolt" left 2 rows (`?search=bolt`); a refresh kept the 2 rows and "bolt" in the box.
+- An item edited twice about a third of a second apart (Steel Storage Bin, its name to "... X" then "... Y"): two
+  PUTs, both answered 200, "Saved CJL-7383" twice, the row said Y, and still did after a refresh.
+- The edit form: "Type a cost" opened empty, 12.50 and Enter made the row Ready (Needs a decision 59 to 58). Row
+  height: Comfortable, a reload, still comfortable; back to Compact.
+
+Not seen on screen, by name: a region drawn again from a newer draft while its bulk toast is still up (the tab's
+return did not ask for the import again in the headless browser, so the region was started again only after its own
+save; the test holds the toast's Undo and the dismissal); a refused save; a file over the limit; a refresh in the
+middle of an upload; a strip too long for its line; a cut text's card; the dark theme in this batch.
 
 ## Legacy in the client
 

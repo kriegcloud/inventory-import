@@ -119,8 +119,8 @@ export type RegionUi = {
   /** Groups the person chose to go through row by row on a phone: each of their rows is then a decision of its own. */
   readonly split: HashSet.HashSet<string>
   readonly facetPicked: Readonly<Record<string, ReadonlyArray<string>>>
-  /** None until the person picks one: the browser's remembered choice stands until then. */
-  readonly density: O.Option<Density>
+  /** The row height: the browser's remembered choice, read once when the region is made, then what the person picks. */
+  readonly density: Density
 }
 
 /** One facet column's choices: spellings that read the same are one choice, with the rows it has in the view on screen. */
@@ -227,6 +227,8 @@ export interface Region {
    * a key or a late callback that still holds its actions reaches neither the caller's decisions nor the screen.
    */
   readonly present: Atom.Atom<boolean>
+  /** The toasts the region has put up for a bulk step, each with an Undo: they go when the region goes. */
+  readonly toasts: Atom.Writable<ReadonlyArray<string | number>>
   /** For the region's section: marks the region present while its node is on the page. */
   readonly attach: (node: HTMLElement | null) => undefined | (() => void)
   /** Changes what the region owns: a patch worked out from what it owns now. */
@@ -314,7 +316,7 @@ const makeRegion = (input: RegionInput, registry: AtomRegistry.AtomRegistry): Re
     said: "",
     split: HashSet.empty(),
     facetPicked: {},
-    density: O.none()
+    density: storedDensity()
   })
   // One part of what the region owns each, so what is worked out from one is not worked out again for another.
   const picked = Atom.map(ui, (now) => now.picked)
@@ -449,10 +451,17 @@ const makeRegion = (input: RegionInput, registry: AtomRegistry.AtomRegistry): Re
     return () => registry.set(leadInView, false)
   }
   const present = Atom.make(false)
+  const toasts = Atom.make<ReadonlyArray<string | number>>([])
   const attach = (node: HTMLElement | null) => {
     if (node === null) return undefined
     registry.set(present, true)
-    return () => registry.set(present, false)
+    return () => {
+      registry.set(present, false)
+      // A toast outlives the screen that put it up: the region takes its own with it, so no Undo is left standing
+      // on the next screen (the result of the import, the region drawn again from a newer draft).
+      for (const id of registry.get(toasts)) toast.dismiss(id)
+      registry.set(toasts, [])
+    }
   }
 
   return {
@@ -484,6 +493,7 @@ const makeRegion = (input: RegionInput, registry: AtomRegistry.AtomRegistry): Re
     leadInView,
     markLead,
     present,
+    toasts,
     attach,
     // A change that changes nothing is no change: the region is not drawn again for it.
     change: (update) =>
@@ -650,8 +660,9 @@ const makeRegionTable = (
   const moves = Atom.readable((get) => {
     get(lines)
     get(region.nav)
-    // Held here so the region's presence is kept for as long as its moves are followed.
+    // Held here so the region's presence and its toasts are kept for as long as its moves are followed.
     get(region.present)
+    get(region.toasts)
     return O.getOrElse(get.self<number>(), () => 0) + 1
   })
 
@@ -745,7 +756,7 @@ const makeRegionTable = (
     const bulk = !Action.$is("Undo")(action) && !Action.$is("Redo")(action) && outcome.changed.length > 1
     const step = outcome.state.undo[outcome.state.undo.length - 1]
     if (bulk && step !== undefined && !narrow) {
-      toast(outcome.label, {
+      const shown = toast(outcome.label, {
         action: {
           label: "Undo",
           onClick: () => {
@@ -754,6 +765,7 @@ const makeRegionTable = (
           }
         }
       })
+      registry.update(region.toasts, (before) => [...before, shown])
     }
   }
 

@@ -637,8 +637,8 @@ export function WhyBody(props: {
   )
 }
 
-/** What was typed in one edit form, none until something was. */
-const EditScope = ScopedAtom.make(() => Atom.make<O.Option<string>>(O.none()))
+/** What one edit form holds: the value it opened with, then what was typed. A later value from outside does not move it. */
+const EditScope = ScopedAtom.make((opened: string) => Atom.make(opened))
 
 type EditFormProps = {
   label: string
@@ -650,7 +650,7 @@ type EditFormProps = {
 /** One field for the value that is wrong. Enter saves; the row is checked again by the caller's rule. */
 export function EditForm(props: EditFormProps) {
   return (
-    <EditScope.Provider>
+    <EditScope.Provider value={props.value}>
       <EditBody {...props} />
     </EditScope.Provider>
   )
@@ -658,9 +658,7 @@ export function EditForm(props: EditFormProps) {
 
 function EditBody(props: EditFormProps) {
   const id = useId()
-  const [typed, setTyped] = useAtom(EditScope.use())
-  const value = O.getOrElse(typed, () => props.value)
-  const setValue = (next: string) => setTyped(O.some(next))
+  const [value, setValue] = useAtom(EditScope.use())
   return (
     <form
       className="flex flex-col gap-3"

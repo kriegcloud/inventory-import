@@ -21,12 +21,17 @@ const page = vi.hoisted(() => {
     document: { cookie: "", activeElement: null },
     window: { innerWidth: 1440, addEventListener: () => undefined, removeEventListener: () => undefined }
   })
-  return { toasts: [] as Array<{ label: string; undo: () => void }> }
+  return { toasts: [] as Array<{ id: number; label: string; undo: () => void }>, dismissed: [] as Array<unknown> }
 })
 vi.mock("sonner", () => ({
-  toast: (label: string, options?: { action?: { onClick: () => void } }) => {
-    page.toasts.push({ label, undo: () => options?.action?.onClick() })
-  }
+  toast: Object.assign(
+    (label: string, options?: { action?: { onClick: () => void } }) => {
+      const id = page.toasts.length + 1
+      page.toasts.push({ id, label, undo: () => options?.action?.onClick() })
+      return id
+    },
+    { dismiss: (id: unknown) => page.dismissed.push(id) }
+  )
 }))
 
 /** A node to hand the region's section callback: the region only asks whether it was given one. */
@@ -124,9 +129,11 @@ describe("the review region's atoms", () => {
     const ui = at.registry.get(at.region.ui)
     const nav = at.registry.get(at.region.nav)
 
-    // The bulk step's toast is still up when the region goes; its Undo is pressed afterwards.
+    // The bulk step's toast is still up when the region goes (the import was confirmed, or the region was drawn
+    // again from a newer draft): the region takes it down, and its Undo, pressed all the same, reaches nobody.
     const offered = page.toasts[page.toasts.length - 1]
     at.leave?.()
+    expect(page.dismissed).toContain(offered?.id)
     offered?.undo()
     expect(offered?.label).toBe(at.registry.get(at.region.ui).said)
     at.regionTable.run(Action.Undo())

@@ -484,13 +484,14 @@ const makeRegion = (input: RegionInput, registry: AtomRegistry.AtomRegistry): Re
   }
 }
 
+/** One region's atoms as an atom: made in the registry that first reads it, with that registry to act through. */
+export const regionAtom = (input: RegionInput) => Atom.readable((get) => makeRegion(input, get.registry))
+
 /**
  * One region's atoms, made when the region is first drawn and let go with it: its parts (the table, the phone's
  * queue) read the same atoms from here, not from props handed down.
  */
-export const RegionScope = ScopedAtom.make((input: RegionInput) =>
-  Atom.readable((get) => makeRegion(input, get.registry))
-)
+export const RegionScope = ScopedAtom.make(regionAtom)
 
 // ---------------------------------------------------------------------------------------------------------------
 // With the table: its order as an atom, the lines drawn, the stops of "Next problem", and the person's actions
@@ -586,7 +587,9 @@ const makeRegionTable = (
     get(sorted)
     // The table is given the same rows when the region is drawn. It is given them here first, so the order read now
     // is of these rows and not of the ones it was last drawn with.
-    table.setOptions((before) => (before.data === data ? before : { ...before, data }))
+    if (table.optionsStore?.get().data !== data) {
+      table.setOptions((before) => (before.data === data ? before : { ...before, data }))
+    }
     return table.getPrePaginatedRowModel().rows.map((row) => row.original)
   })
   const visibility = Atom.readable((get): Readonly<Record<string, boolean>> => {
@@ -883,8 +886,11 @@ const makeRegionTable = (
   }
 }
 
+/** What a region has once its table exists, as an atom made in the registry that first reads it. */
+export const regionTableAtom = (input: {
+  readonly region: Region
+  readonly table: Table<DataTableFeatures, RowView>
+}) => Atom.readable((get) => makeRegionTable(input, get.registry))
+
 /** What a region has once its table exists, made once from the table the region was first drawn with. */
-export const TableScope = ScopedAtom.make(
-  (input: { readonly region: Region; readonly table: Table<DataTableFeatures, RowView> }) =>
-    Atom.readable((get) => makeRegionTable(input, get.registry))
-)
+export const TableScope = ScopedAtom.make(regionTableAtom)

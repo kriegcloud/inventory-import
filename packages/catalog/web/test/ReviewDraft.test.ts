@@ -2,17 +2,27 @@
 // when the region starts again, and what the saver may be made to forget. Each rule is one where a wrong result loses
 // a decision without a word: the person's own, or one somebody else made on the same import.
 import { describe, expect, it } from "@effect/vitest"
+import * as A from "effect/Array"
 import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
+import * as R from "effect/Record"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
 import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
+import { Action, act, saved } from "@inventory/review/ReviewDraft"
 import { type DecisionDelta, decisionFromFlags, type SavedDecisions } from "@inventory/catalog-contract/Decision"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import type { ImportView } from "@inventory/catalog-contract/Import"
 import type { StagedTable } from "@inventory/catalog-contract/Staged"
 import { importTable, importView, importViewShown } from "../src/Imports.atoms.ts"
-import { decideRows, followDraft, reviewInput, reviewLocal, shownDecisions } from "../src/ReviewDraft.atoms.ts"
+import {
+  decideRows,
+  followDraft,
+  reviewInput,
+  reviewLocal,
+  reviewState,
+  shownDecisions
+} from "../src/ReviewDraft.atoms.ts"
 import { importNo, registryWith, viewAt } from "./support/catalog.ts"
 
 const settle = Effect.sleep("15 millis")
@@ -241,6 +251,55 @@ describe("the decisions the review is worked out from", () => {
       expect(t.registry.get(shownDecisions(id))).toBe(first)
       expect(worked).toBe(1)
       stop()
+    })
+  )
+})
+
+describe("the region's decisions for one import", () => {
+  it.live("start once: nothing but a decision or a new draft works them out again", () =>
+    Effect.gen(function* () {
+      const id = importNo(40)
+      const t = world(id)
+      t.give(t.at({ revision: 10, decisions: { "row-1": out } }))
+      t.open()
+      let started = 0
+      t.registry.subscribe(reviewState(id), () => (started += 1))
+      yield* settle
+      const first = t.registry.get(reviewState(id))
+      expect(R.keys(saved(first))).toEqual(["row-1"])
+
+      // What the screen changes while it is drawn again and again: none of it is the decisions.
+      t.registry.update(reviewLocal(id), (now) => ({ ...now, matching: true }))
+      t.registry.update(reviewLocal(id), (now) => ({ ...now, matching: false, typed: "A=1" }))
+      yield* settle
+      expect(t.registry.get(reviewState(id))).toBe(first)
+      expect(started).toBe(0)
+    })
+  )
+
+  it.live("written by the region are shown, sent to the server once and kept for the next read", () =>
+    Effect.gen(function* () {
+      const id = importNo(41)
+      const t = world(id)
+      t.give(t.at({ revision: 10 }))
+      t.open()
+      t.registry.mount(reviewState(id))
+      yield* settle
+      const before = t.registry.get(reviewState(id))
+      const next = act({
+        rows: [{ id: "row-2", line: 2, cells: {} }],
+        state: before,
+        action: Action.LeaveOut({ rowIds: ["row-2"] }),
+        recheck: undefined,
+        fixable: () => false,
+        rejects: false
+      }).state
+
+      t.registry.set(reviewState(id), next)
+      yield* settle
+      expect(t.registry.get(reviewState(id))).toBe(next)
+      expect(O.getOrThrow(t.registry.get(shownDecisions(id)))).toEqual({ "row-2": out })
+      expect(A.map(t.saves, (save) => save.delta)).toEqual([{ set: { "row-2": out }, clear: [] }])
     })
   )
 })

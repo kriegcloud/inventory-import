@@ -33,7 +33,7 @@ import {
 } from "@inventory/catalog-contract/Item"
 import { FilterOperator, ItemFilterColumn, ItemSortColumn } from "@inventory/catalog-contract/ItemQuery"
 import type { ItemFacets, ItemFilter, ItemPage, ItemQuery, ItemSort } from "@inventory/catalog-contract/ItemQuery"
-import { MappingChoice } from "@inventory/catalog-contract/Mapping"
+import { ColumnMove, MappingChoice } from "@inventory/catalog-contract/Mapping"
 import { type Field, StagedHead, type StagedRow, type StagedTable } from "@inventory/catalog-contract/Staged"
 import type { Suggestion } from "@inventory/catalog-contract/Suggestion"
 import { Activity } from "@inventory/kernel/Activity"
@@ -80,6 +80,7 @@ import {
 } from "./Import/ImportStore.store.ts"
 import { type EditOutcome, ItemStore } from "./Item/ItemStore.store.ts"
 import { abandonedAfterMinutes } from "./Staging/Upload.rules.ts"
+import { type CompareAtMatch, noComparison, planMatch } from "./Import/Rematch.rules.ts"
 import { type StoreSuggestions, SuggestionStore } from "./Suggestion/SuggestionStore.store.ts"
 import { searchWords } from "./Item/ItemSearch.rules.ts"
 
@@ -222,6 +223,7 @@ export class CatalogMemoryRef extends Context.Service<CatalogMemoryRef, Ref.Ref<
 const HeadJson = S.fromJsonString(StagedHead)
 const DecisionJson = S.fromJsonString(RowDecision)
 const ChoicesJson = MappingChoice.pipe(S.Array, S.fromJsonString)
+const MovesJson = ColumnMove.pipe(S.Array, S.fromJsonString)
 
 const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`
 
@@ -936,7 +938,8 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
             importedAt: O.none(),
             revision: 0,
             needsAtStart,
-            choicesJson: "[]"
+            choicesJson: "[]",
+            movesJson: "[]"
           },
           rows: A.flatMap(
             A.sort(
@@ -1002,13 +1005,15 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
       })
     }, Effect.orDie)
 
-    // One match, as the store's one batch: worked out from the state as it is read, and written only if that state
-    // is still the one in place (otherwise worked out again), so nothing falls between its parts.
+    // One match, as the store's one batch: worked out from the state as it is read (`planMatch`, the same plan the D1
+    // store writes), and written only if that state is still the one in place (otherwise worked out again), so
+    // nothing falls between its parts.
     const matchColumn = Effect.fnUntraced(function* (
       actor: Member,
       draft: Draft,
       choice: { readonly field: Field; readonly column: number | null },
-      detail: string
+      detail: string,
+      compare: CompareAtMatch = noComparison
     ) {
       const id = yield* random.uuidV4()
       const at = yield* DateTime.now
@@ -1023,24 +1028,28 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
         if (A.some(before, (old) => old.field === choice.field && old.column === choice.column)) {
           return O.some<ChoicesSaved>("same")
         }
-        // The revision this write moves the draft to: a decision made on an earlier one was made before the match.
-        const revision = entry.draft.revision + 1
-        const json = yield* S.encodeEffect(ChoicesJson)([
-          ...A.filter(before, (old) => old.field !== choice.field),
-          { field: choice.field, column: choice.column, by: "person", at: revision }
-        ])
-        // Every stored accept of the field goes, whoever made it.
+        const head = yield* S.decodeEffect(HeadJson)(entry.draft.headJson)
+        const moves = yield* S.decodeEffect(MovesJson)(entry.draft.movesJson)
+        const plan = yield* planMatch({
+          head,
+          choices: before,
+          moves,
+          decisions: R.fromEntries(A.map(entry.decisions, (old) => [old.rowId, old.decision] as const)),
+          choice,
+          revision: entry.draft.revision,
+          compare
+        })
+        const choicesJson = yield* S.encodeEffect(ChoicesJson)(plan.choices)
+        const movesJson = yield* S.encodeEffect(MovesJson)(plan.moves)
+        // Every stored decision the match takes back, whoever made it; who made it stays.
         const decisions = yield* Effect.forEach(
           entry.decisions,
-          (old) => {
-            if (!A.contains(old.decision.accepted, choice.field)) return Effect.succeed(old)
-            const decision = { ...old.decision, accepted: A.filter(old.decision.accepted, (f) => f !== choice.field) }
-            return Effect.map(S.encodeEffect(DecisionJson)(decision), (encoded) => ({
-              ...old,
-              json: encoded,
-              decision
-            }))
-          },
+          (old) =>
+            O.match(R.get(plan.rewrites, old.rowId), {
+              onNone: () => Effect.succeed(old),
+              onSome: (decision) =>
+                Effect.map(S.encodeEffect(DecisionJson)(decision), (encoded) => ({ ...old, json: encoded, decision }))
+            }),
           { concurrency: 1 }
         )
         return yield* Ref.modify(ref, (now): readonly [O.Option<ChoicesSaved>, CatalogState] => {
@@ -1048,7 +1057,7 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
           const next = mapDraft(now, org, draft.id, (held) => ({
             ...held,
             decisions,
-            draft: { ...held.draft, choicesJson: json, revision }
+            draft: { ...held.draft, choicesJson, movesJson, revision: plan.at }
           }))
           return [
             O.some("saved"),
@@ -1360,6 +1369,9 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
       decide,
       choices: Effect.fnUntraced(function* (draft: Draft) {
         return yield* S.decodeEffect(ChoicesJson)(draft.choicesJson)
+      }, Effect.orDie),
+      moves: Effect.fnUntraced(function* (draft: Draft) {
+        return yield* S.decodeEffect(MovesJson)(draft.movesJson)
       }, Effect.orDie),
       matchColumn,
       createdRows: Effect.fnUntraced(function* (organizationId: OrganizationId, importId: string) {

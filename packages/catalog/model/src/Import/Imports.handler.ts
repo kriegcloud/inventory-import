@@ -50,12 +50,15 @@ import { fileProblem } from "@inventory/catalog-contract/FileProblem"
 import { ImportId, ConfirmId } from "@inventory/catalog-contract/Ids"
 import * as S from "effect/Schema"
 import { stagingProblem } from "../Staging/Staging.rules.ts"
+import { type CompareAtMatch, comparisonQuestions, comparisonsChanged, withoutStaleDecisions } from "./Rematch.rules.ts"
 
 /**
  * Decisions as they may be applied: an accept of a proposal for a field whose column was matched again after the
  * revision its row was decided on (the row's `madeOn`; 0 when the request names none) is taken out, and named. The
  * person accepted what the field read before the match; the row now has another proposal, or none. Each row on its
- * own revision: a row decided long ago never makes a newer row's accept stale.
+ * own revision: a row decided long ago never makes a newer row's accept stale. The accept rule alone, by the choices'
+ * stamps: the endpoints judge every kind of decision, and fields moved off their column, with `withoutStaleDecisions`
+ * (`Rematch.rules.ts`).
  *
  * @example withoutStaleAccepts({ choices: [{ field: "unitCost", column: 7, by: "person", at: 12 }], madeOn: { "row-55": 11 }, set })
  * // an accept of unitCost on row 55 is in `notApplied`; decided on revision 12 or later it is applied
@@ -151,6 +154,47 @@ export const importsEndpoints = Effect.gen(function* () {
     )
     const found = yield* imports.storedAmong(actor.organizationId, keys)
     return A.map(found, fieldsOf)
+  })
+
+  // The file's review, asked whether re-matches changed how rows compare with their stored items: each side as the
+  // screen would draw it, with the import's stored items, suggestions and created rows. `known` saves a read of the
+  // staged table when the caller holds it.
+  const compareFor =
+    (actor: Member, draft: Draft, known?: StagedTable): CompareAtMatch =>
+    (asked) =>
+      Effect.gen(function* () {
+        const table = known ?? (yield* imports.table(actor.organizationId, draft))
+        const typed = R.fromEntries(A.map(asked.questions, (question) => [question.rowId, question.then] as const))
+        const storedItems = yield* storedFor(actor, table, asked.choices, typed)
+        const created = yield* imports.createdRows(actor.organizationId, draft.id)
+        const suggestions = yield* suggestionStore.list(actor.organizationId, draft.id)
+        return comparisonsChanged({
+          table,
+          choices: asked.choices,
+          moves: asked.moves,
+          storedItems,
+          createdIds: A.map(created, rowId),
+          suggestions,
+          itemsOf,
+          questions: asked.questions
+        })
+      }).pipe(Effect.withSpan("imports.compare"))
+
+  // Decisions as they may be applied, judged against every column matched again since each row's revision; and what
+  // was taken back. The file's review is read only when a Replace or a Keep-stored rests on another column than the
+  // SKU's that was matched again since.
+  const judged = Effect.fn("imports.judged")(function* (
+    actor: Member,
+    draft: Draft,
+    request: { readonly madeOn: Readonly<Record<string, number>>; readonly set: SavedDecisions }
+  ) {
+    const choices = yield* imports.choices(draft)
+    const moves = yield* imports.moves(draft)
+    const questions = comparisonQuestions({ choices, moves, madeOn: request.madeOn, set: request.set })
+    const changed = A.isReadonlyArrayNonEmpty(questions)
+      ? yield* compareFor(actor, draft)({ choices, moves, questions })
+      : []
+    return withoutStaleDecisions({ choices, moves, madeOn: request.madeOn, set: request.set, changed })
   })
 
   // The one place a review is worked out on the server, so the commit applies decisions exactly as the screen did.
@@ -271,9 +315,8 @@ export const importsEndpoints = Effect.gen(function* () {
   > {
     const draft = yield* find(actor, id)
     if (latestNamed(payload.madeOn) > draft.revision) return yield* ahead(draft)
-    // An accept made before its field's column was matched again is not applied; the rest of the row's decision is.
-    const choices = yield* imports.choices(draft)
-    const { applied, notApplied } = withoutStaleAccepts({ choices, madeOn: payload.madeOn, set: payload.set })
+    // A decision made before a column it rests on was matched again is not applied; the rest of the row's decision is.
+    const { applied, notApplied } = yield* judged(actor, draft, payload)
     const done = yield* imports.decide(actor, draft, { set: applied, clear: payload.clear })
     if (done.kind === "saved") return { revision: done.revision, changed: done.changed, notApplied }
     if (done.kind === "closed") return yield* closed(draft)
@@ -413,8 +456,9 @@ export const importsEndpoints = Effect.gen(function* () {
         return yield* viewOf(actor, draft)
       }
       // One write: the choice, stamped with the revision that write moves the draft to (a decision made on an earlier
-      // one was made before the match); every stored accept of the field taken out, since the proposal behind it
-      // reads another column now; and the audit line. Nothing can fall between them.
+      // one was made before the match), and a move for it and for every field it moved off its column; every stored
+      // decision that rests on a column the match moved taken out (the review is asked which Replaces it changed); and
+      // the audit line. Nothing can fall between them.
       const label = fieldLabels[payload.field]
       const saved = yield* imports.matchColumn(
         actor,
@@ -423,7 +467,8 @@ export const importsEndpoints = Effect.gen(function* () {
         O.match(column, {
           onNone: () => `${label}: no column, in ${draft.fileName}`,
           onSome: (found) => `${label} reads column ${found.letter} "${found.label}" in ${draft.fileName}`
-        })
+        }),
+        compareFor(actor, draft, table)
       )
       if (saved === "closed") return yield* closed(draft)
       const after = yield* find(actor, draft.id)
@@ -500,14 +545,14 @@ export const importsEndpoints = Effect.gen(function* () {
       // Somebody has changed the draft since the picture this confirm was made on: nothing is written, and the
       // person is shown the newer picture before they confirm. The store checks the same again inside its write.
       if (draft.revision !== payload.revision) return yield* moved(draft.revision)
-      // An accept among the decisions it carries, made before its field's column was matched again, is for a proposal
-      // the row no longer has: confirming would write another thing than the screen shows. Nothing is written.
-      const choices = yield* imports.choices(draft)
-      const stale = withoutStaleAccepts({ choices, madeOn: payload.madeOn, set: payload.set }).notApplied
+      // A decision among the ones it carries, made before a column it rests on was matched again (an accept, an undone
+      // fix, a Replace or Keep-stored, a keep-one-of-two), is about what the row no longer reads: confirming would
+      // write another thing than the screen shows. Nothing is written.
+      const stale = (yield* judged(actor, draft, payload)).notApplied
       if (A.isReadonlyArrayNonEmpty(stale)) {
         return yield* AcceptsTakenBack.make({
           reason:
-            "A column was matched again after you accepted a proposal for it. Nothing was imported: look at the rows it changed, then confirm again.",
+            "A column was matched again after you decided rows that rest on it. Nothing was imported: look at the rows it changed, then confirm again.",
           accepts: stale
         })
       }

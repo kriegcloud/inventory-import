@@ -17,7 +17,7 @@ export const MappingChoice = S.Struct({
   by: S.Literals(["person"]).annotateKey({ description: "Who chose it: always a person" }),
   at: S.Int.pipe(S.withDecodingDefaultKey(Effect.succeed(0))).annotateKey({
     description:
-      "The first revision of the draft that has this choice: a decision made on an earlier revision was made before the field read this column, so an accept of the field's proposal in it is not applied"
+      "The first revision of the draft that has this choice: a decision made on an earlier revision was made before the field read this column, so a decision that rests on the field's column (an accept, an undone fix, and for the SKU a Replace, a Keep-stored or a keep-one-of-two) is not applied"
   })
 }).annotate({
   identifier: "MappingChoice",
@@ -25,6 +25,34 @@ export const MappingChoice = S.Struct({
 })
 /** The decoded value of `MappingChoice`: the column chosen for a field, or none. */
 export type MappingChoice = typeof MappingChoice.Type
+
+const ColumnIndex = S.NullOr(S.Int.check(S.isGreaterThanOrEqualTo(0)))
+
+/**
+ * A field that began to read another column at a match: the field matched by hand, and any field the match moved off
+ * its column (a field read by its heading moves to its next heading match when a person gives that column to another
+ * field). Stored with the draft, oldest first, never sent to a screen. It is how the server knows, exactly and after
+ * any number of matches, which column a field read at a past revision: the `was` of the first move after that
+ * revision, or the column it reads now when there is none; and when a field last moved, so a decision made before
+ * that is not applied (Benjamin, 2026-11-20: "Server refuses, says so", "Refuse if it changes the row").
+ *
+ * @example
+ * // Unit cost read column 5 ("Cost") until revision 12, when a person matched it to column 7 ("Price").
+ * { field: "unitCost", at: 12, was: 5, column: 7 }
+ */
+export const ColumnMove = S.Struct({
+  field: Field.annotateKey({ description: "The field that moved" }),
+  at: S.Int.check(S.isGreaterThanOrEqualTo(1)).annotateKey({
+    description: "The revision the match moved the draft to: the first revision on which the field reads `column`"
+  }),
+  was: ColumnIndex.annotateKey({ description: "The column the field read before the match; null for none" }),
+  column: ColumnIndex.annotateKey({ description: "The column the field reads from `at` on; null for none" })
+}).annotate({
+  identifier: "ColumnMove",
+  description: "A field that began to read another column at a match, and the column it read before"
+})
+/** The decoded value of `ColumnMove`. */
+export type ColumnMove = typeof ColumnMove.Type
 
 /** A file column that fills a field: where it is, what it is headed, and a few of its values. */
 export const ColumnPick = S.Struct({

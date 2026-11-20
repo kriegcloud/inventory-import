@@ -16,8 +16,9 @@ import { type Field, StagedHead, StagedRow, StagedTable } from "@inventory/catal
 import { FileProblem } from "@inventory/catalog-contract/FileProblem"
 import { OrganizationId } from "@inventory/kernel/Ids"
 import { PastImport, ChangeRecord, ImportEvent, TakeBackState, RowOutcome } from "@inventory/catalog-contract/Import"
-import { MappingChoice } from "@inventory/catalog-contract/Mapping"
+import { ColumnMove, MappingChoice } from "@inventory/catalog-contract/Mapping"
 import { ConfirmPlan } from "../Confirm/Confirm.rules.ts"
+import type { CompareAtMatch } from "./Rematch.rules.ts"
 import { Activity } from "@inventory/kernel/Activity"
 import { LiteralKit } from "@beep/schema/LiteralKit"
 
@@ -34,7 +35,10 @@ export const Draft = S.Struct({
   importedAt: S.OptionFromNullOr(Instant),
   revision: S.Int,
   needsAtStart: S.Int,
-  choicesJson: S.String
+  choicesJson: S.String,
+  movesJson: S.String.annotateKey({
+    description: "Every field that began to read another column at a match, oldest first: `ColumnMove`s as JSON"
+  })
 }).annotate({ description: "An import as stored, without its rows" })
 /** The decoded value of `Draft`: an import as stored, without its rows. */
 export type Draft = typeof Draft.Type
@@ -290,19 +294,25 @@ export class ImportStore extends Context.Service<
     decide(actor: Member, draft: Draft, delta: DecisionDelta): Effect.Effect<Decided>
     /** The columns people chose for fields, as stored with the draft. */
     choices(draft: Draft): Effect.Effect<ReadonlyArray<MappingChoice>>
+    /** Every field that began to read another column at a match, oldest first, as stored with the draft. */
+    moves(draft: Draft): Effect.Effect<ReadonlyArray<ColumnMove>>
     /**
-     * Points one field at a file column (or at none, `column` null), in one atomic write with three parts: the choice,
+     * Points one field at a file column (or at none, `column` null), in one atomic write with four parts: the choice,
      * stamped with the revision this write moves the draft to (a decision made on an earlier one was made before the
-     * field read this column); every stored accept of the field taken out (the proposal behind it reads another
-     * column now), whoever made it; and the audit line. The other fields' choices are kept as they are stored then,
-     * not as `draft` read them. The same choice again writes nothing (`same`); an import no longer open writes nothing
-     * (`closed`).
+     * field read this column); a move for that field and for every field the match moved off its column
+     * (`movesOfMatch`), stamped the same; every stored decision the match takes back (`withoutStaleDecisions`, as if
+     * each was made on the revision before the match), whoever made it: accepts and undone fixes of a moved field,
+     * and when the SKU moved every Replace, Keep-stored and keep-one-of-two, and the Replaces and Keep-storeds whose
+     * comparison `compare` says the match changed; and the audit line. It is worked out from the draft and its
+     * decisions as they are stored when it writes, not as `draft` read them: a save that lands first is in it. The
+     * same choice again writes nothing (`same`); an import no longer open writes nothing (`closed`).
      */
     matchColumn(
       actor: Member,
       draft: Draft,
       choice: { readonly field: Field; readonly column: number | null },
-      detail: string
+      detail: string,
+      compare?: CompareAtMatch
     ): Effect.Effect<ChoicesSaved>
     /**
      * The items of the file an earlier confirm of this import created and still has, by row and part (0 when the

@@ -18,6 +18,7 @@
     "./ImportStore": "./src/Import/ImportStore.store.ts",
     "./ItemStore": "./src/Item/ItemStore.store.ts",
     "./ImportsHandler": "./src/Import/Imports.handler.ts",
+    "./Rematch": "./src/Import/Rematch.rules.ts",
     "./ItemsHandler": "./src/Item/Items.handler.ts",
     "./AssistantHandler": "./src/Assistant/Assistant.handler.ts",
     "./Ports": "./src/Catalog.ports.ts",

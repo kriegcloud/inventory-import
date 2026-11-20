@@ -18,7 +18,7 @@ import { chunkRows } from "@inventory/catalog-contract/Upload"
 import * as S from "effect/Schema"
 import { StagedHead, StagedRow, Field } from "@inventory/catalog-contract/Staged"
 import { RowDecision, DecisionDelta } from "@inventory/catalog-contract/Decision"
-import { MappingChoice } from "@inventory/catalog-contract/Mapping"
+import { ColumnMove, MappingChoice } from "@inventory/catalog-contract/Mapping"
 import { OrganizationId, MemberId } from "@inventory/kernel/Ids"
 import { ChangeSource, Confidence, changeToStored, changeFromStored } from "@inventory/catalog-contract/Change"
 import { ImportId, ConfirmId } from "@inventory/catalog-contract/Ids"
@@ -62,6 +62,7 @@ import { abandonedAfterMinutes, maxChunkChars } from "@inventory/catalog-model/U
 import { fileProblem } from "@inventory/catalog-contract/FileProblem"
 import { lineOf } from "./internal/auditLine.ts"
 import { plannedItems, PlannedRow } from "@inventory/catalog-model/Confirm"
+import { type CompareAtMatch, noComparison, planMatch } from "@inventory/catalog-model/Rematch"
 const textOf = (item: ItemFields | null): number =>
   item === null
     ? 0
@@ -97,6 +98,7 @@ const HeadJson = S.fromJsonString(StagedHead)
 const RowsJson = StagedRow.pipe(S.Array, S.fromJsonString)
 const DecisionJson = S.fromJsonString(RowDecision)
 const ChoicesJson = MappingChoice.pipe(S.Array, S.fromJsonString)
+const MovesJson = ColumnMove.pipe(S.Array, S.fromJsonString)
 const IdList = S.String.pipe(S.Array, S.fromJsonString).annotate({
   description: "Ids or keys bound as one JSON parameter and read with json_each"
 })
@@ -230,7 +232,7 @@ export const ImportStoreD1 = Layer.effect(
     // -- Reads ---------------------------------------------------------------------------------------------------
 
     const draftColumns = sql`id, fileName, headJson, rowCount, status, actorName, createdAt, importedBy, importedAt,
-      revision, needsAtStart, choicesJson`
+      revision, needsAtStart, choicesJson, movesJson`
     const findDraft = SqlSchema.findOneOption({
       Request: Scope,
       Result: Draft,
@@ -786,90 +788,108 @@ export const ImportStoreD1 = Layer.effect(
       return yield* S.decodeEffect(ChoicesJson)(draft.choicesJson)
     }, Effect.orDie)
 
+    const moves = Effect.fn("Imports.moves")(function* (draft: Draft) {
+      return yield* S.decodeEffect(MovesJson)(draft.movesJson)
+    }, Effect.orDie)
+
     const MatchRequest = S.Struct({
       ...Acting,
       id: S.String,
-      field: S.String,
-      column: S.NullOr(S.Int),
+      revision: S.Int,
+      before: S.String,
       activity: S.String,
       detail: S.String,
       at: S.String
     })
-    // The import is open and the field does not read that column already: a match of it changes something. The
-    // statements of one match each ask it before the last one changes the choices, so they agree.
-    const choiceDiffers = (r: {
-      readonly org: string
-      readonly id: string
-      readonly field: string
-      readonly column: number | null
-    }) => sql`EXISTS (SELECT 1 FROM importDraft
-      WHERE organizationId = ${r.org} AND id = ${r.id} AND status = 'open'
-        AND NOT EXISTS (SELECT 1 FROM json_each(importDraft.choicesJson) AS c
-          WHERE json_extract(c.value, '$.field') = ${r.field} AND json_extract(c.value, '$.column') IS ${r.column}))`
+    // The audit line, written only while the import is open at the revision and with the choices the match was worked
+    // out from. It is the match's own row: the statements after the choice is saved check it, as a confirm's do.
     const matchedLine = D1.statement({
       Request: MatchRequest,
       Result: NoRows,
       execute: (r) => sql`INSERT INTO activity (id, organizationId, actorId, actorName, action, detail, createdAt)
         SELECT ${r.activity}, ${r.org}, ${r.actor}, ${r.name}, 'Matched a column', ${r.detail}, ${r.at}
-        WHERE ${choiceDiffers(r)}`
+        WHERE EXISTS (SELECT 1 FROM importDraft WHERE organizationId = ${r.org} AND id = ${r.id} AND status = 'open'
+          AND revision = ${r.revision} AND choicesJson = ${r.before})`
     })
-    // Every stored accept of the field, whoever made it, by the field's name in the decision's own list: an accept
-    // saved a moment before is in what this reads. The list goes when it is left empty, as a decision is encoded.
-    const dropFieldAccepts = D1.statement({
-      Request: MatchRequest,
-      Result: NoRows,
-      execute: (r) => sql`UPDATE importDecision SET decisionJson = CASE
-          WHEN json_array_length(decisionJson, '$.accepted') = 1 THEN json_remove(decisionJson, '$.accepted')
-          ELSE json_set(decisionJson, '$.accepted', json((SELECT json_group_array(a.value)
-            FROM json_each(importDecision.decisionJson, '$.accepted') AS a WHERE a.value IS NOT ${r.field})))
-        END
-        WHERE organizationId = ${r.org} AND importId = ${r.id}
-          AND EXISTS (SELECT 1 FROM json_each(importDecision.decisionJson, '$.accepted') AS a WHERE a.value = ${r.field})
-          AND ${choiceDiffers(r)}`
-    })
-    // The field's choice, stamped with the revision this statement moves the draft to; the other fields' as stored now.
+    // The choices and moves the match leaves, at the revision it moves the draft to, under the same condition.
     const saveChoice = D1.statement({
-      Request: MatchRequest,
+      Request: S.Struct({ ...MatchRequest.fields, choices: ChoicesJson, moves: MovesJson }),
       Result: Ids,
-      execute: (r) => sql`UPDATE importDraft SET
-          choicesJson = (SELECT json_group_array(json(v)) FROM (
-            SELECT c.value AS v FROM json_each(importDraft.choicesJson) AS c
-              WHERE json_extract(c.value, '$.field') IS NOT ${r.field}
-            UNION ALL
-            SELECT json_object('field', ${r.field}, 'column', ${r.column}, 'by', 'person', 'at', importDraft.revision + 1)
-          )),
+      execute: (r) => sql`UPDATE importDraft SET choicesJson = ${r.choices}, movesJson = ${r.moves},
           revision = revision + 1
-        WHERE organizationId = ${r.org} AND id = ${r.id} AND status = 'open'
-          AND NOT EXISTS (SELECT 1 FROM json_each(importDraft.choicesJson) AS c
-            WHERE json_extract(c.value, '$.field') = ${r.field} AND json_extract(c.value, '$.column') IS ${r.column})
+        WHERE organizationId = ${r.org} AND id = ${r.id} AND status = 'open' AND revision = ${r.revision}
+          AND choicesJson = ${r.before}
         RETURNING id`
+    })
+    // The stored decisions the match takes back, as the match worked them out, whoever made them (who made them
+    // stays); only when this batch wrote the match's audit line.
+    const rewriteDecisions = D1.statement({
+      Request: S.Struct({ org: OrganizationId, id: S.String, activity: S.String, entries: DecisionEntries }),
+      Result: NoRows,
+      execute: (r) => sql`UPDATE importDecision SET decisionJson = (SELECT json_extract(j.value, '$.json')
+          FROM json_each(${r.entries}) AS j WHERE json_extract(j.value, '$.rowId') = importDecision.rowId)
+        WHERE organizationId = ${r.org} AND importId = ${r.id}
+          AND rowId IN (SELECT json_extract(value, '$.rowId') FROM json_each(${r.entries}))
+          AND EXISTS (SELECT 1 FROM activity WHERE organizationId = ${r.org} AND id = ${r.activity})`
     })
 
     const matchColumn = Effect.fn("Imports.matchColumn")(function* (
       actor: Member,
       draft: Draft,
       choice: { readonly field: Field; readonly column: number | null },
-      detail: string
+      detail: string,
+      compare: CompareAtMatch = noComparison
     ) {
-      const at = yield* now
-      const activity = yield* random.uuidV4()
-      const request = {
-        ...acting(actor),
-        id: draft.id,
-        field: choice.field,
-        column: choice.column,
-        activity,
-        detail,
-        at
-      }
-      // One atomic batch: the audit line, the accepts taken out and the choice land together, at one revision.
-      const [, , saved, open] = yield* batch([
-        matchedLine(request),
-        dropFieldAccepts(request),
-        saveChoice(request),
-        openRevision({ org: actor.organizationId, id: draft.id })
-      ])
-      return saved.length > 0 ? ("saved" as const) : open.length > 0 ? ("same" as const) : ("closed" as const)
+      const org = actor.organizationId
+      // Worked out from the draft and its decisions as stored, and written in one atomic batch only while the draft is
+      // still at that revision with those choices: a save or a match that lands in between moves it, and the match is
+      // worked out again. A match is a person's press, so a few tries settle it.
+      const attempt = (triesLeft: number): Effect.Effect<"saved" | "same" | "closed"> =>
+        Effect.gen(function* () {
+          const read = yield* findDraft({ org, id: draft.id })
+          if (O.isNone(read) || read.value.status !== "open") return "closed" as const
+          const current = read.value
+          const before = yield* S.decodeEffect(ChoicesJson)(current.choicesJson)
+          // Choices that are already so are not a change: no audit line and no new revision.
+          if (A.some(before, (old) => old.field === choice.field && old.column === choice.column)) {
+            return "same" as const
+          }
+          const head = yield* S.decodeEffect(HeadJson)(current.headJson)
+          const stored = yield* decisions(org, draft.id)
+          const plan = yield* planMatch({
+            head,
+            choices: before,
+            moves: yield* moves(current),
+            decisions: stored.decisions,
+            choice,
+            revision: current.revision,
+            compare
+          })
+          const at = yield* now
+          const activity = yield* random.uuidV4()
+          const request = {
+            ...acting(actor),
+            id: draft.id,
+            revision: current.revision,
+            before: current.choicesJson,
+            activity,
+            detail,
+            at
+          }
+          const rewrites = A.chunksOf(
+            A.map(R.toEntries(plan.rewrites), ([rowId, json]) => ({ rowId, json })),
+            2000
+          )
+          const [, saved] = yield* batch([
+            matchedLine(request),
+            saveChoice({ ...request, choices: plan.choices, moves: plan.moves }),
+            ...A.map(rewrites, (entries) => rewriteDecisions({ org, id: draft.id, activity, entries }))
+          ])
+          if (saved.length > 0) return "saved" as const
+          if (triesLeft === 0) return yield* Effect.die("The import kept changing while a match was worked out.")
+          return yield* attempt(triesLeft - 1)
+        }).pipe(Effect.orDie)
+      return yield* attempt(5)
     }, Effect.orDie)
 
     const createdRows = Effect.fn("Imports.createdRows")(function* (organizationId: OrganizationId, importId: string) {
@@ -1463,6 +1483,7 @@ export const ImportStoreD1 = Layer.effect(
       listPast,
       remove,
       choices,
+      moves,
       matchColumn,
       createdRows,
       changes: Effect.fn("Imports.changes")(function* (organizationId: OrganizationId) {

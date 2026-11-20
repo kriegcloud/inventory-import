@@ -309,7 +309,7 @@ const madeOn = S.Record(S.String, Revision)
   })
   .annotateKey({
     description:
-      "The revision each row's decision was made on. An accept of a proposal for a field whose column was matched again after that row's revision is not applied: the person accepted what the field read before. A row of `set` left out counts as made on revision 0. A revision later than the draft's is refused",
+      "The revision each row's decision was made on. A part of it that rests on a column matched again after that revision is not applied, and the answer names it: an accept or an undone fix of that field, a Replace, Keep-stored or keep-one-of-two after the SKU's column, and a Replace or Keep-stored after another field's column when that changed how the row compares with the stored item. A row of `set` left out counts as made on revision 0. A revision later than the draft's is refused",
     messageMissingKey:
       "Send `madeOn`: for each row in `set`, the import's revision as the screen held it when that row was decided."
   })
@@ -350,8 +350,8 @@ export type StaleAccept = typeof StaleAccept.Type
 
 /**
  * What a save sends: the decisions made since the last save, and the revision of the draft they were made on. The
- * difference only, so two screens deciding different rows do not collide; and what they were made on, so an accept
- * made before its field's column was matched again is not applied.
+ * difference only, so two screens deciding different rows do not collide; and what they were made on, so a decision
+ * made before a column it rests on was matched again is not applied.
  */
 export const SaveRequest = S.Struct({ madeOn, ...DecisionDelta.fields }).annotate({
   identifier: "SaveRequest",

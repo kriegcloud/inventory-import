@@ -1,8 +1,11 @@
 // A read can be given its answer by the screen (a staged file's view, a draft's new revision): the answer shows with
 // no request, and the next refresh asks the server. A read kept for the page (a staged file's rows, which never
-// change) is not asked again when a screen comes back to it.
+// change) is not asked again when a screen comes back to it. An answer given while a request is out never ends that
+// request: it lands, and the server is asked once more, because the given answer may be the newer of the two.
 import { describe, expect, it } from "@effect/vitest"
 import * as Context from "effect/Context"
+import * as DateTime from "effect/DateTime"
+import type * as Duration from "effect/Duration"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as O from "effect/Option"
@@ -15,17 +18,20 @@ interface Rows {
 }
 class RowServer extends Context.Service<RowServer, Rows>()("@inventory/client/test/Seed.atoms.test/RowServer") {}
 
-const world = () => {
+const world = (takes: Duration.Input = "10 millis") => {
   let reads = 0
+  let starts = 0
   const layer = Layer.succeed(RowServer, {
-    rows: Effect.sleep("10 millis").pipe(Effect.andThen(Effect.sync(() => `server's rows ${++reads}`)))
+    rows: Effect.sync(() => {
+      starts += 1
+    }).pipe(Effect.andThen(Effect.sleep(takes)), Effect.andThen(Effect.sync(() => `server's rows ${++reads}`)))
   })
   const api = makeApiAtoms(RowServer)
   const rows = api.query((server) => server.rows)
   const forever = api.query((server) => server.rows, { keep: "page" })
   const registry = AtomRegistry.make({ initialValues: [provideApi(layer)], defaultIdleTTL: 50 })
   const seen = (atom: typeof rows) => registry.get(atom).pipe(AsyncResult.value, O.getOrUndefined)
-  return { registry, rows, forever, seen, reads: () => reads }
+  return { registry, rows, forever, seen, reads: () => reads, starts: () => starts }
 }
 
 describe("a read the screen gives its answer", () => {
@@ -92,7 +98,7 @@ describe("a read the screen gives its answer", () => {
 })
 
 describe("an answer given while the read is being asked again", () => {
-  it.live("shows at once, and the server is asked again behind it: the request that was out is not lost", () =>
+  it.live("shows at once, and the request that was out lands: it is not ended, and the server is asked once more", () =>
     Effect.gen(function* () {
       const t = world()
       t.registry.mount(t.rows)
@@ -103,11 +109,50 @@ describe("an answer given while the read is being asked again", () => {
       yield* Effect.sleep("2 millis")
       t.registry.set(t.rows, "a save's own answer")
       yield* Effect.sleep("3 millis")
-      expect(t.seen(t.rows)).toBe("a save's own answer")
-      // The answer that was on its way was cut off by the put; the server is asked again and its word arrives.
+      expect([t.seen(t.rows), t.starts()]).toEqual(["a save's own answer", 2])
+      // The request that was on its way answers, and because an answer was given while it was out, once more.
       yield* Effect.sleep("80 millis")
-      expect(t.seen(t.rows)).toMatch(/^server's rows/)
-      expect(t.seen(t.rows)).not.toBe("server's rows 1")
+      expect([t.seen(t.rows), t.starts(), t.reads()]).toEqual(["server's rows 3", 3, 3])
+      // The given answer is gone with the request's: a look without asking finds the server's word.
+      expect(t.rows.peek(t.registry)).toEqual(O.some("server's rows 3"))
+    })
+  )
+
+  it.live("three saves 2 ms apart behind a read of 30 ms: the read is asked once, lands, and is asked once more", () =>
+    Effect.gen(function* () {
+      const t = world("30 millis")
+      t.registry.mount(t.rows)
+      yield* Effect.sleep("60 millis")
+      expect([t.seen(t.rows), t.starts()]).toEqual(["server's rows 1", 1])
+      // The read is asked again, and while it is out three saves answer, each putting its own answer in place.
+      t.registry.refresh(t.rows)
+      const shown: Array<string | undefined> = []
+      for (const save of ["save 1", "save 2", "save 3"]) {
+        yield* Effect.sleep("2 millis")
+        t.registry.set(t.rows, save)
+        shown.push(t.seen(t.rows))
+      }
+      expect(shown).toEqual(["save 1", "save 2", "save 3"])
+      yield* Effect.sleep("8 millis")
+      // No save ended the request or started another: one is out, the one asked before the saves.
+      expect([t.seen(t.rows), t.starts(), t.reads()]).toEqual(["save 3", 2, 1])
+      // It lands, and the server is asked once more for what the saves left: once, not once per save. Until that
+      // answer, the last save's answer stays on screen, not the older one the server gave when the request left.
+      yield* Effect.sleep("25 millis")
+      expect([t.seen(t.rows), t.starts(), t.reads()]).toEqual(["save 3", 3, 2])
+      yield* Effect.sleep("60 millis")
+      expect([t.seen(t.rows), t.starts(), t.reads()]).toEqual(["server's rows 3", 3, 3])
+    })
+  )
+
+  it.live("an answer given after the request has landed stays, and nothing more is asked", () =>
+    Effect.gen(function* () {
+      const t = world()
+      t.registry.mount(t.rows)
+      yield* Effect.sleep("50 millis")
+      t.registry.set(t.rows, "a save's own answer")
+      yield* Effect.sleep("60 millis")
+      expect([t.seen(t.rows), t.starts()]).toEqual(["a save's own answer", 1])
     })
   )
 
@@ -140,6 +185,57 @@ describe("a read let go while a screen still shows it", () => {
       t.registry.refresh(t.rows)
       yield* Effect.sleep("50 millis")
       expect([t.seen(t.rows), t.reads()]).toEqual(["server's rows 3", 3])
+    })
+  )
+})
+
+describe("asking again for an answer no older than a write", () => {
+  it.live("with no request out, the server is asked now", () =>
+    Effect.gen(function* () {
+      const t = world("30 millis")
+      t.registry.mount(t.rows)
+      yield* Effect.sleep("60 millis")
+      t.rows.askAgain(t.registry, DateTime.nowUnsafe())
+      yield* Effect.sleep("5 millis")
+      expect(t.starts()).toBe(2)
+      yield* Effect.sleep("60 millis")
+      expect([t.seen(t.rows), t.starts()]).toEqual(["server's rows 2", 2])
+    })
+  )
+
+  it.live("a request that started after the write was sent is the answer wanted: nothing more is asked", () =>
+    Effect.gen(function* () {
+      const t = world("30 millis")
+      t.registry.mount(t.rows)
+      yield* Effect.sleep("60 millis")
+      const sent = DateTime.nowUnsafe()
+      yield* Effect.sleep("3 millis")
+      t.registry.refresh(t.rows)
+      yield* Effect.sleep("3 millis")
+      t.rows.askAgain(t.registry, sent)
+      yield* Effect.sleep("90 millis")
+      expect([t.seen(t.rows), t.starts()]).toEqual(["server's rows 2", 2])
+    })
+  )
+
+  it.live("a request that started before the write was sent is left to land, then asked once more", () =>
+    Effect.gen(function* () {
+      const t = world("30 millis")
+      t.registry.mount(t.rows)
+      yield* Effect.sleep("60 millis")
+      t.registry.refresh(t.rows)
+      yield* Effect.sleep("3 millis")
+      const sent = DateTime.nowUnsafe()
+      yield* Effect.sleep("3 millis")
+      t.rows.askAgain(t.registry, sent)
+      t.rows.askAgain(t.registry, sent)
+      yield* Effect.sleep("10 millis")
+      // Not ended and not started again: the one request is still out.
+      expect([t.starts(), t.reads()]).toEqual([2, 1])
+      yield* Effect.sleep("25 millis")
+      expect([t.seen(t.rows), t.starts()]).toEqual(["server's rows 2", 3])
+      yield* Effect.sleep("60 millis")
+      expect([t.seen(t.rows), t.starts()]).toEqual(["server's rows 3", 3])
     })
   )
 })

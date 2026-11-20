@@ -187,13 +187,70 @@ describe("a saved decision", () => {
       yield* settle
       yield* t.answerSave(1, 12)
       yield* settle
-      // The second save's answer was put into the view while the ask was out: the server is asked again.
-      expect(t.gets()).toBe(2)
+      // The second save's answer is put into the view while the ask is out, and does not end it: one ask, still out.
+      expect([t.gets(), t.held().revision]).toEqual([1, 12])
       const stored = [{ sku: "AB-1" }] as unknown as ImportView["storedItems"]
+      // The ask lands with what the server held when it left. The view keeps the later picture the save put in place,
+      // and the server is asked once more, for what that save changed.
+      yield* t.answerGet(0, t.at({ revision: 11, decisions: { "row-1": typed }, storedItems: stored }))
+      yield* settle
+      expect([t.gets(), t.held().revision]).toEqual([2, 12])
       yield* t.answerGet(1, t.at({ revision: 12, decisions: { "row-1": typed, "row-2": out }, storedItems: stored }))
       yield* settle
       expect(t.held().storedItems).toEqual(stored)
       expect(t.shown()).toEqual({ "row-1": typed, "row-2": out })
+    })
+  )
+
+  it.live("that finds someone else saved, while a read that left after the save is out, lets that read answer", () =>
+    Effect.gen(function* () {
+      const id = importNo(11)
+      const t = world(id)
+      t.give(t.at({ revision: 10 }))
+      t.open()
+      yield* settle
+      decide(t.registry, id, { "row-1": O.some(out) })
+      yield* settle
+      // The import is read again after the save left (the person came back to the tab), and is still out.
+      t.registry.refresh(importView(id))
+      yield* settle
+      expect(t.gets()).toBe(1)
+      // Two revisions on: somebody else saved between. The read that is out left after the save: it is the answer.
+      yield* t.answerSave(0, 12)
+      yield* settle
+      expect(t.gets()).toBe(1)
+      const theirs: SavedDecisions = { "row-1": out, "row-5": kept }
+      yield* t.answerGet(0, t.at({ revision: 12, decisions: theirs }))
+      yield* settle
+      expect([t.gets(), t.shown(), O.map(t.draft().held, (held) => held.revision)]).toEqual([1, theirs, O.some(12)])
+    })
+  )
+
+  it.live("that finds someone else saved, while a read that left before the save is out, asks once more after it", () =>
+    Effect.gen(function* () {
+      const id = importNo(12)
+      const t = world(id)
+      t.give(t.at({ revision: 10 }))
+      t.open()
+      yield* settle
+      t.registry.refresh(importView(id))
+      yield* settle
+      expect(t.gets()).toBe(1)
+      // The save leaves while that read is out, and its answer says somebody else saved between.
+      decide(t.registry, id, { "row-1": O.some(out) })
+      yield* settle
+      yield* t.answerSave(0, 12)
+      yield* settle
+      // The read is not ended: it lands with what the server held before the save, and only then is asked once more.
+      expect(t.gets()).toBe(1)
+      yield* t.answerGet(0, t.at({ revision: 10 }))
+      yield* settle
+      expect(t.gets()).toBe(2)
+      expect(t.shown()).toEqual({ "row-1": out })
+      const theirs: SavedDecisions = { "row-1": out, "row-5": kept }
+      yield* t.answerGet(1, t.at({ revision: 12, decisions: theirs }))
+      yield* settle
+      expect([t.gets(), t.shown(), O.map(t.draft().held, (held) => held.revision)]).toEqual([2, theirs, O.some(12)])
     })
   )
 

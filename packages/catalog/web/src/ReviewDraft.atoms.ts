@@ -1,7 +1,9 @@
 // The review's draft as atoms, with no screen in it: what the Review step holds for one import besides the server's
 // view, the decisions it shows, how it follows the draft while it is open, and what a decision does. The rule this
 // file protects: the screen never shows, and never sends, less than the person and the others have decided.
+import * as DateTime from "effect/DateTime"
 import * as Eq from "effect/Equal"
+import * as MutableHashMap from "effect/MutableHashMap"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
@@ -167,6 +169,9 @@ const forget = (registry: AtomRegistry.AtomRegistry, id: ImportId): void => {
   if (scope !== undefined) catalogRuntime().runFork(dropFile(scope).pipe(Effect.ignore))
 }
 
+/** When this tab last sent a write of each import's draft (a save or a confirm): what an answer must not be older than. */
+const lastSent = MutableHashMap.empty<ImportId, DateTime.Utc>()
+
 /** Does what the machine asks: sends, asks, puts the person's own save into the view, starts the region again. */
 const perform = (input: {
   readonly registry: AtomRegistry.AtomRegistry
@@ -180,14 +185,16 @@ const perform = (input: {
     // still fails the rows stay on screen and wait for "Save again": they are the person's work. A refusal (the
     // import was confirmed or removed meanwhile, the role was taken away) puts the screen back to what the server
     // holds, and the toast says why.
-    Send: ({ delta, madeOn }) =>
+    Send: ({ delta, madeOn }) => {
+      MutableHashMap.set(lastSent, id, DateTime.nowUnsafe())
       void callWrite((api) => api.imports.decide({ params: { id }, payload: { madeOn, ...delta } })).then(
         ({ changed, notApplied, revision }) => happened(DraftEvent.SaveAnswered({ revision, changed, notApplied })),
         (error: unknown) =>
           happened(
             isTransient(error) ? DraftEvent.SaveFailed() : DraftEvent.SaveRefused({ reason: sayError(error).sentence })
           )
-      ),
+      )
+    },
     // Said only when the machine says so: an answer it no longer waits for is not told to anybody.
     Say: ({ what }) =>
       Said.$match(what, {
@@ -211,7 +218,10 @@ const perform = (input: {
             }
           )
       }),
-    Ask: () => registry.refresh(importView(id)),
+    // The import is wanted no older than the last write this screen sent. A read already out that left after it is
+    // that answer, and is let land; one that left before is let land too, and asked once more when it does. A read
+    // that is out is never ended: a save that answers every few milliseconds would otherwise keep it from landing.
+    Ask: () => importView(id).askAgain(registry, O.getOrUndefined(MutableHashMap.get(lastSent, id))),
     // Only the decisions and the revision, and never over a later revision already held.
     Put: ({ decisions, revision }) =>
       changeView({
@@ -227,7 +237,8 @@ const perform = (input: {
     // made because the draft had moved on: the machine asks for the newer picture and the screen says so above the
     // review. Any other failure (somebody else confirmed it, the role was taken away, the network) is said, and the
     // import asked again, which moves the screen to the result where there is one.
-    Confirm: ({ delta, madeOn, revision }) =>
+    Confirm: ({ delta, madeOn, revision }) => {
+      MutableHashMap.set(lastSent, id, DateTime.nowUnsafe())
       void call((api) => api.imports.commit({ params: { id }, payload: { revision, madeOn, ...delta } })).then(
         (view) => {
           const onScreen = registry.get(draftOf(id)).onScreen
@@ -244,6 +255,7 @@ const perform = (input: {
           invalidate(catalogKeys.import(id))
         }
       )
+    }
   })
 }
 

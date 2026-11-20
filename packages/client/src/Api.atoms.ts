@@ -100,23 +100,47 @@ interface Given<A> {
 }
 
 /**
+ * What a read knows beside its request: the answer a screen gave it since the request last answered, and how many
+ * times something newer than a request that is out was learned (an answer given, a write the server took). A request
+ * that lands after `newer` went up may bring an older answer than the tab has seen, so the server is asked once more.
+ */
+interface Beside<A> {
+  readonly newer: number
+  readonly given: O.Option<Given<A>>
+}
+
+/** A request that is out, and when it started. */
+interface Out {
+  readonly at: DateTime.Utc
+}
+
+/**
  * How old an answer may be and still count as the server's word: under a second. A read answered before its first
  * look would otherwise be asked twice; anything older is shown at once and asked again behind it.
  */
 const freshEnough = Duration.seconds(1)
 
+/** After everything that is running now: a write to an atom is never made from inside another atom's read. */
+const later = (act: () => void): void => {
+  Effect.runFork(Effect.sync(act).pipe(Effect.delay(Duration.zero)))
+}
+
+/** The registry an atom is read in, for a write that has to hold something in it. */
+const registryOf = Atom.readable((get) => get.registry)
+
 /**
- * One member's read: the answer itself (`held`, which is what is kept), what a screen reads (`read`), and how a
- * screen puts an answer in place of a request (`give`, which answers the atom to nudge so a read on screen takes it).
- * The given answer is a plain value the read takes once. One that is taken is not kept past the read; one given to a
- * read nobody opens stays until the read is let go or the person signs out.
+ * One member's read: the request (`asked`), what a screen gave it (`beside`), the two as one answer (`held`, which is
+ * what is kept) and what a screen reads (`read`). An answer a screen gives is shown at once and never ends a request
+ * that is out: that request lands, and the server is asked once more because the given answer may be the newer one.
+ * A given answer is let go when a request answers after it; one given to a read nobody opens stays until the read is
+ * let go or the person signs out.
  */
 interface PerMember<A, E> {
+  readonly asked: Atom.Atom<AsyncResult.AsyncResult<A, E>>
+  readonly beside: Atom.Writable<Beside<A>>
+  readonly out: Atom.Writable<O.Option<Out>>
   readonly held: Atom.Atom<AsyncResult.AsyncResult<A, E>>
   readonly read: Atom.Atom<AsyncResult.AsyncResult<A, E>>
-  readonly give: (answer: A) => Atom.Writable<number>
-  /** An answer given that the read has not taken yet. */
-  readonly waiting: () => O.Option<A>
 }
 
 /** How long a read nobody looks at is kept: `keepUnwatched`, or the page's life for an answer that never changes. */
@@ -200,6 +224,13 @@ export interface Query<A, E> extends Atom.Writable<AsyncResult.AsyncResult<A, E>
    * than the one held.
    */
   readonly peek: (registry: AtomRegistry.AtomRegistry) => O.Option<A>
+  /**
+   * Asks the server again without ending a request that is out, for an answer no older than `since` (when a write
+   * the answer must include was sent). With no request out it is asked now. A request that started after `since` is
+   * the answer wanted: nothing is asked. An earlier one, or any one when no `since` is given, is left to land, and
+   * the read is asked once more when it does.
+   */
+  readonly askAgain: (registry: AtomRegistry.AtomRegistry, since?: DateTime.Utc) => void
 }
 
 /**
@@ -276,52 +307,111 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
     // previous organization's rows marked as waiting. Held with ordinary references, not `Atom.family`'s weak ones: a
     // collected one would be made anew on a return, empty (measured: after 35 s away).
     const reads = MutableHashMap.empty<string, PerMember<A, E>>()
-    const make = (): PerMember<A, E> => {
-      // An answer a screen gave, until the read takes it; `nudge` only tells a read on screen that there is one.
-      let given: O.Option<Given<A>> = O.none()
-      const nudge = Atom.make(0)
-      const held: Atom.Atom<AsyncResult.AsyncResult<A, E>> = apiRuntime.atom((get) => {
-        get(nudge)
-        const taken = given
-        given = O.none()
-        if (O.isSome(taken)) {
-          // The answer once: a later refresh asks the server. Given a while ago (an upload that landed while the
-          // person was elsewhere), it is shown at once and asked again behind, as any answer of that age is.
-          //
-          // And never at the cost of a request that was out: taking the answer ends that request, whose answer may
-          // have been newer than the one given (a re-read asked for after a save, cut off by the next save's
-          // answer). So the server is asked again behind the answer shown.
-          const age = DateTime.distance(taken.value.at, DateTime.nowUnsafe())
-          const wasAsking = O.exists(get.self<AsyncResult.AsyncResult<A, E>>(), (before) => before.waiting)
-          if (keeping !== "page" && (wasAsking || Duration.isGreaterThan(age, freshEnough))) {
-            const registry = get.registry
-            Effect.runFork(Effect.sync(() => registry.refresh(held)).pipe(Effect.delay(Duration.zero)))
-          }
-          return Effect.succeed(taken.value.answer)
+    // An answer given to a read nobody shows is held in the registry by this module, until the read takes it, is let
+    // go, or the person signs out.
+    const givenHeld = MutableHashMap.empty<string, () => void>()
+    const letGiven = (member: string): void =>
+      O.match(MutableHashMap.get(givenHeld, member), {
+        onNone: () => {},
+        onSome: (release) => {
+          MutableHashMap.remove(givenHeld, member)
+          release()
         }
-        return Effect.flatMap(client, (c) => use(c, get)).pipe(
-          Effect.retry(readRetry),
-          Effect.map((answer) => keepWhenEqual(heldSuccess(get.self<AsyncResult.AsyncResult<A, E>>()), answer))
+      })
+    const make = (member: string): PerMember<A, E> => {
+      const beside = Atom.make<Beside<A>>({ newer: 0, given: O.none() })
+      // Kept for the page: it holds a time and nothing of a person's, and a request can outlive the screen's look.
+      const out = Atom.make<O.Option<Out>>(O.none()).pipe(Atom.keepAlive)
+      /** Lets `taken` go if it is still the answer given: a later one stays. */
+      const takenUp = (registry: AtomRegistry.AtomRegistry, taken: Given<A>): void => {
+        if (!registry.getNodes().has(beside)) return
+        const now = registry.get(beside)
+        if (O.exists(now.given, (given) => given === taken)) {
+          registry.set(beside, { ...now, given: O.none() })
+          letGiven(member)
+        }
+      }
+      const asked: Atom.Atom<AsyncResult.AsyncResult<A, E>> = apiRuntime.atom((get) => {
+        const registry = get.registry
+        // Looked at without following it: an answer given later must not start this read again.
+        const start = get.once(beside)
+        const first = O.isNone(get.self<AsyncResult.AsyncResult<A, E>>()) ? start.given : O.none()
+        if (O.isSome(first)) {
+          // A screen gave the answer before anything was asked: that answer, and no request. Given a while ago (an
+          // upload that landed while the person was elsewhere), it is shown at once and asked again behind, as any
+          // answer of that age is.
+          const taken = first.value
+          const age = DateTime.distance(taken.at, DateTime.nowUnsafe())
+          later(() => {
+            takenUp(registry, taken)
+            if (keeping !== "page" && Duration.isGreaterThan(age, freshEnough) && registry.getNodes().has(asked)) {
+              registry.refresh(asked)
+            }
+          })
+          return Effect.succeed(taken.answer)
+        }
+        const mine: Out = { at: DateTime.nowUnsafe() }
+        return Effect.sync(() => registry.set(out, O.some(mine))).pipe(
+          Effect.andThen(Effect.flatMap(client, (c) => use(c, get)).pipe(Effect.retry(readRetry))),
+          Effect.map((answer) => {
+            // The same answer as the one on screen keeps the object on screen, whether the request or a screen gave it.
+            const shown = O.orElse(
+              O.map(registry.get(beside).given, (given) => given.answer),
+              () => heldSuccess(get.self<AsyncResult.AsyncResult<A, E>>())
+            )
+            const landedAt = registry.get(beside)
+            // Something newer was learned while it was out (an answer a screen gave, or a write this answer may not
+            // include): asked once more, and what the screen gave stays on screen until that answer lands, so the
+            // screen never steps back to what the server held when this request left.
+            const again = keeping !== "page" && landedAt.newer !== start.newer
+            later(() => {
+              if (!registry.getNodes().has(asked)) return
+              if (again) return registry.refresh(asked)
+              // Nothing was given while it was out: an answer given before it left is older than its answer, and is
+              // let go. One given after it landed stays.
+              O.map(landedAt.given, (given) => takenUp(registry, given))
+            })
+            return keepWhenEqual(shown, answer)
+          }),
+          Effect.ensuring(
+            Effect.sync(() => {
+              if (O.exists(registry.get(out), (now) => now === mine)) registry.set(out, O.none())
+            })
+          )
         )
       })
+      // What the screen shows: the answer a screen gave since the request last answered, else the request's. A given
+      // answer carries the time it was given, so it grows stale as any answer does. Asking again asks the request.
+      const held: Atom.Atom<AsyncResult.AsyncResult<A, E>> = Atom.readable(
+        (get) => {
+          const result = get(asked)
+          return O.match(get(beside).given, {
+            onNone: () => result,
+            onSome: (given) =>
+              AsyncResult.success<A, E>(given.answer, {
+                waiting: result.waiting,
+                timestamp: DateTime.toEpochMillis(given.at)
+              })
+          })
+        },
+        (refresh) => refresh(asked)
+      )
       // Every return to a screen asks again behind the answer it shows: `held` outlives the screen by
       // `keepUnwatched` (kept below), this wrapper does not, so a screen that mounts it again starts a new look. An
       // answer under a second old counts as fresh, or a read answered before its first look would be asked twice. An
       // answer kept for the page is never asked again.
       const fresh = keeping === "page" ? held : Atom.swr(held, { staleTime: freshEnough })
       return {
+        asked,
+        beside,
+        out,
         held,
-        give: (answer) => {
-          given = O.some({ answer, at: DateTime.nowUnsafe() })
-          return nudge
-        },
-        waiting: () => O.map(given, (taken) => taken.answer),
         read: options?.reactivityKeys === undefined ? fresh : fresh.pipe(followKeys(options.reactivityKeys))
       }
     }
     const forMember = (member: string): PerMember<A, E> =>
       O.getOrElse(MutableHashMap.get(reads, member), () => {
-        const made = make()
+        const made = make(member)
         MutableHashMap.set(reads, member, made)
         return made
       })
@@ -335,24 +425,31 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
           keep.letGo()
         }
       })
-    const startKeeping = (registry: AtomRegistry.AtomRegistry, member: string, held: Atom.Atom<unknown>): void => {
+    const startKeeping = (registry: AtomRegistry.AtomRegistry, member: string, entry: PerMember<A, E>): void => {
       stopKeeping(member)
       MutableHashMap.set(
         kept,
         member,
-        keepFor(registry, held, keeping, () => MutableHashMap.remove(kept, member))
+        keepFor(registry, entry.held, keeping, () => {
+          MutableHashMap.remove(kept, member)
+          // Kept as long as the read was, and no longer: an answer a screen gave it goes with it.
+          if (registry.getNodes().has(entry.beside)) {
+            registry.update(entry.beside, (now) => ({ ...now, given: O.none() }))
+          }
+          letGiven(member)
+        })
       )
     }
     heldByQueries.push({
       forget: () => {
         MutableHashMap.forEach(kept, (keep) => keep.letGo())
         MutableHashMap.clear(kept)
+        MutableHashMap.forEach(givenHeld, (release) => release())
+        MutableHashMap.clear(givenHeld)
         MutableHashMap.clear(reads)
       },
       members: () => reads.pipe(MutableHashMap.keys, A.fromIterable)
     })
-    // Numbers each answer given to this read, so each one nudges.
-    let gives = 0
     // The member it last read for, so a refresh of this atom (an optimistic write's, when the last one has answered)
     // reaches the read it shows. One registry holds it in the app; a test that makes several shares the key "".
     let shown = ""
@@ -364,13 +461,13 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
         const member = get(memberKey)
         shown = member
         const entry = forMember(member)
-        const { held, read } = entry
+        const { read } = entry
         // Shown again: the screen holds it now. When it is let go (the screen left, or another member), it is kept,
         // unless the read itself was let go meanwhile (what it showed is gone on the server): then nothing is.
         stopKeeping(member)
         get.addFinalizer(() => {
           if (O.exists(MutableHashMap.get(reads, member), (now) => now === entry)) {
-            startKeeping(get.registry, member, held)
+            startKeeping(get.registry, member, entry)
           }
         })
         get.subscribe(read, (value) => get.setSelf(value))
@@ -378,8 +475,12 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
       },
       // An answer put in place for whoever is signed in now, whether or not a screen shows this read yet.
       (ctx, answer: A) => {
-        gives += 1
-        ctx.set(forMember(ctx.get(memberKey)).give(answer), gives)
+        const member = ctx.get(memberKey)
+        const { beside } = forMember(member)
+        if (!MutableHashMap.has(givenHeld, member)) {
+          MutableHashMap.set(givenHeld, member, ctx.get(registryOf).mount(beside))
+        }
+        ctx.set(beside, { newer: ctx.get(beside).newer + 1, given: O.some({ answer, at: DateTime.nowUnsafe() }) })
       },
       (refresh) => refresh(forMember(shown).read)
     )
@@ -387,17 +488,33 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
       letGo: (registry: AtomRegistry.AtomRegistry) => {
         const member = registry.get(memberKey)
         stopKeeping(member)
+        letGiven(member)
         MutableHashMap.remove(reads, member)
         // A screen that still shows it is not left on an answer nothing refreshes: it asks the server now.
         registry.update(letGoes, (count) => count + 1)
       },
       peek: (registry: AtomRegistry.AtomRegistry): O.Option<A> =>
-        O.flatMap(MutableHashMap.get(reads, registry.get(memberKey)), (per) =>
-          O.orElse(per.waiting(), () =>
-            // Only a read the registry already holds is looked at: looking at any other would ask the server.
-            registry.getNodes().has(per.held) ? AsyncResult.value(registry.get(per.held)) : O.none()
+        O.flatMap(MutableHashMap.get(reads, registry.get(memberKey)), (per) => {
+          // Only what the registry already holds is looked at: looking at a read it does not hold would ask the server.
+          const nodes = registry.getNodes()
+          return O.orElse(
+            nodes.has(per.beside) ? O.map(registry.get(per.beside).given, (given) => given.answer) : O.none(),
+            () => (nodes.has(per.held) ? AsyncResult.value(registry.get(per.held)) : O.none())
           )
+        }),
+      askAgain: (registry: AtomRegistry.AtomRegistry, since?: DateTime.Utc) => {
+        O.map(MutableHashMap.get(reads, registry.get(memberKey)), (per) =>
+          O.match(registry.get(per.out), {
+            onNone: () => registry.refresh(per.read),
+            onSome: (request) => {
+              if (since !== undefined && DateTime.isGreaterThan(request.at, since)) return
+              if (registry.getNodes().has(per.beside)) {
+                registry.update(per.beside, (now) => ({ ...now, newer: now.newer + 1 }))
+              }
+            }
+          })
         )
+      }
     })
   }
   function send<A, E>(use: (client: Client) => Effect.Effect<A, E>): Effect.Effect<A, E, Id> {

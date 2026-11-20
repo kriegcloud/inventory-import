@@ -237,9 +237,11 @@ describe("leaving the Review step and coming back", () => {
         yield* t.answerSave(0, 11)
         yield* settle
         expect([t.held().revision, t.held().decisions]).toEqual([11, { "row-12": out }])
+        // Back on the step: the region is drawn once, from the view as the save left it, and not drawn again.
+        const away = t.epoch()
         t.open()
         yield* settle
-        expect([t.shown(), t.epoch()]).toEqual([{ "row-12": out }, 0])
+        expect([t.shown(), t.epoch()]).toEqual([{ "row-12": out }, away])
       })
   )
 

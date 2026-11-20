@@ -106,8 +106,6 @@ export type DraftEvent = Data.TaggedEnum<{
   ViewArrived: Picture
   MatchStarted: {}
   MatchEnded: {}
-  /** The import was confirmed or removed: nothing of its draft is kept. */
-  Dropped: {}
   /** The person pressed the confirm button. */
   ConfirmPressed: {}
   /** The server made the confirm: the import is closed and nothing of its draft is kept. */
@@ -233,9 +231,14 @@ const sending = (draft: Draft): Stepped =>
         effects: [DraftEffect.Send({ delta: deltaOf(draft.unsent) })]
       }
 
-/** A draft nobody looks at keeps nothing once the server has everything. */
+/**
+ * A draft nobody looks at keeps nothing once the server has everything. Its epoch goes on: the next visit's region
+ * is another one, never taken for one drawn before.
+ */
 const letGo = (draft: Draft): Draft =>
-  !draft.onScreen && settled(draft) && draft.confirm === "idle" ? emptyDraft : draft
+  !draft.onScreen && settled(draft) && draft.confirm === "idle" && O.isSome(draft.held)
+    ? { ...emptyDraft, epoch: draft.epoch + 1 }
+    : draft
 
 /** The draft with its confirm at another stage. */
 const confirmAt = (draft: Draft, confirm: Draft["confirm"]): Draft => ({ ...draft, confirm })
@@ -299,11 +302,36 @@ const then = (first: Stepped, next: (draft: Draft) => Stepped): Stepped => {
 export const step: {
   (event: DraftEvent): (draft: Draft) => Stepped
   (draft: Draft, event: DraftEvent): Stepped
-} = dual(2, (draft: Draft, event: DraftEvent): Stepped =>
+} = dual(2, (draft: Draft, event: DraftEvent): Stepped => told(draft, event, transition(draft, event)))
+
+/**
+ * The rule every transition is held to, whatever it did: when what the screen shows is another thing after an event
+ * that was not the person's own decision, the region is told to start again. Its own state (the decisions it drew,
+ * their undo history) would otherwise go on saying what it said, while the totals and the confirm say the new
+ * thing. A transition that says so itself (with its own `announce`) is left as it is.
+ */
+const told = (before: Draft, event: DraftEvent, stepped: Stepped): Stepped => {
+  if (DraftEvent.$is("Decided")(event) || A.some(stepped.effects, DraftEffect.$is("Restart"))) return stepped
+  if (O.isNone(before.held)) return stepped
+  // The draft was let go while nobody looked: the next visit reads it anew, and the region must too. A return inside
+  // the idle time would otherwise find the region as it was, over a view that may have changed meanwhile.
+  if (O.isNone(stepped.draft.held)) {
+    return stepped.draft.onScreen
+      ? stepped
+      : { draft: stepped.draft, effects: [...stepped.effects, DraftEffect.Restart({ announce: false })] }
+  }
+  return Eq.equals(shown(before), shown(stepped.draft))
+    ? stepped
+    : {
+        draft: { ...stepped.draft, epoch: stepped.draft.epoch + 1 },
+        effects: [...stepped.effects, DraftEffect.Restart({ announce: true })]
+      }
+}
+
+const transition = (draft: Draft, event: DraftEvent): Stepped =>
   DraftEvent.$match(event, {
     Opened: () => ({ draft: { ...draft, onScreen: true }, effects: none }),
     Left: () => ({ draft: letGo({ ...draft, onScreen: false, matching: false }), effects: none }),
-    Dropped: () => ({ draft: { ...emptyDraft, onScreen: draft.onScreen, epoch: draft.epoch }, effects: none }),
     ConfirmDone: () => ({ draft: { ...emptyDraft, onScreen: draft.onScreen, epoch: draft.epoch }, effects: none }),
     ConfirmPressed: () => {
       if (draft.confirm !== "idle" || O.isNone(draft.held)) return { draft, effects: none }
@@ -449,4 +477,3 @@ export const step: {
         }
       })
   })
-)

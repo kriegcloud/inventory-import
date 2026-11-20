@@ -1,0 +1,148 @@
+// The review region's own state beside the draft, wired: the region holds its decisions with their undo history
+// (`reviewState`), and the draft says when it must start again from what is shown now. What is held here is that the
+// region really does: after another person's row arrives, what the region reads is what the screen shows, said once
+// as a change from another screen, and not said for the person's own match; and a return inside the idle time, when
+// the view changed meanwhile, does not find the region as it was.
+import { describe, expect, it } from "@effect/vitest"
+import * as Effect from "effect/Effect"
+import * as R from "effect/Record"
+import { vi } from "vitest"
+import { Action, act, saved } from "@inventory/review/ReviewDraft"
+import { type DecisionDelta, decisionFromFlags } from "@inventory/catalog-contract/Decision"
+import type { ImportId } from "@inventory/catalog-contract/Ids"
+import type { ImportView } from "@inventory/catalog-contract/Import"
+import { DraftEvent } from "../src/Draft.machine.ts"
+import { importView, importViewShown } from "../src/Imports.atoms.ts"
+import {
+  draftEvents,
+  followDraft,
+  regionEpoch,
+  reviewLocal,
+  reviewState,
+  reviewStateAt
+} from "../src/ReviewDraft.atoms.ts"
+import { importNo, registryFor, viewAt } from "./support/catalog.ts"
+
+// What is said to the person.
+const page = vi.hoisted(() => ({ said: [] as Array<string> }))
+vi.mock("sonner", () => ({
+  toast: Object.assign((title: string) => page.said.push(title), {
+    dismiss: () => undefined,
+    success: () => 0,
+    loading: () => 0,
+    error: (title: string) => page.said.push(title)
+  })
+}))
+
+const settle = Effect.sleep("15 millis")
+const out = decisionFromFlags({ out: true })
+const rows = [
+  { id: "row-2", line: 2, cells: {} },
+  { id: "row-5", line: 5, cells: {} }
+]
+
+/** One import with a server that takes every save and answers the next revision; the app's idle time is 120 ms here. */
+const world = (id: ImportId) => {
+  const saves: Array<DecisionDelta> = []
+  const revision = { now: 10 }
+  const registry = registryFor({
+    endpoints: {
+      imports: {
+        get: () => Effect.never,
+        decide: (request: { readonly payload: DecisionDelta }) => {
+          saves.push(request.payload)
+          revision.now += 1
+          return Effect.succeed({ revision: revision.now, changed: true })
+        }
+      }
+    },
+    idleTTL: 120
+  })
+  const at = (parts: Partial<ImportView> & { readonly revision: number }) => viewAt({ id, ...parts })
+  registry.set(importView(id), at({ revision: 10 }))
+  return {
+    registry,
+    at,
+    saves,
+    /** The Review step is drawn: what it mounts, and the region of the epoch it is drawn at. */
+    open: () => {
+      const stops = [
+        registry.mount(importViewShown(id)),
+        registry.mount(reviewLocal(id)),
+        registry.mount(followDraft(id)),
+        registry.mount(reviewStateAt(id)(registry.get(regionEpoch(id))))
+      ]
+      return () => {
+        for (const stop of stops) stop()
+        registry.mount(importView(id))
+      }
+    },
+    /** The person leaves a row out, in the region. */
+    leaveOut: (rowId: string) =>
+      registry.set(
+        reviewState(id),
+        act({
+          rows,
+          state: registry.get(reviewState(id)),
+          action: Action.LeaveOut({ rowIds: [rowId] }),
+          recheck: undefined,
+          fixable: () => false,
+          rejects: false
+        }).state
+      ),
+    /** The rows the region holds a decision for, and how many steps its Undo can take back. */
+    region: () => {
+      const state = registry.get(reviewState(id))
+      return [R.keys(saved(state)), state.undo.length] as const
+    },
+    give: (view: ImportView) => registry.set(importView(id), view),
+    happened: (event: DraftEvent) => registry.set(draftEvents(id), event)
+  }
+}
+
+describe("the region beside the draft", () => {
+  it.live("starts again from what is shown when another person's row arrives, and says so once", () =>
+    Effect.gen(function* () {
+      const id = importNo(41)
+      const t = world(id)
+      t.open()
+      yield* settle
+      page.said.length = 0
+      t.leaveOut("row-2")
+      yield* settle
+      expect([t.saves, t.region()]).toEqual([[{ set: { "row-2": out }, clear: [] }], [["row-2"], 1]])
+      // Somebody else left row 5 out.
+      t.give(t.at({ revision: 12, decisions: { "row-2": out, "row-5": out } }))
+      yield* settle
+      // The region reads both rows now, with a new history: its own state did not go on saying one.
+      expect(t.region()).toEqual([["row-2", "row-5"], 0])
+      expect(page.said).toEqual(["Updated with what changed on another screen"])
+
+      // The person's own match brings a new view too: the region follows it, and nothing is said of another screen.
+      t.happened(DraftEvent.MatchStarted())
+      t.give(t.at({ revision: 13, decisions: { "row-5": out } }))
+      yield* settle
+      t.happened(DraftEvent.MatchEnded())
+      expect([t.region()[0], page.said.length]).toEqual([["row-5"], 1])
+    })
+  )
+
+  it.live("is not found as it was on a return inside the idle time, when the view changed meanwhile", () =>
+    Effect.gen(function* () {
+      const id = importNo(42)
+      const t = world(id)
+      const leave = t.open()
+      yield* settle
+      t.leaveOut("row-2")
+      yield* settle
+      expect(t.region()).toEqual([["row-2"], 1])
+      leave()
+      // Away for less than the idle time: somebody else leaves row 5 out, and the tab's view is told.
+      t.give(t.at({ revision: 12, decisions: { "row-2": out, "row-5": out } }))
+      yield* settle
+      t.open()
+      yield* settle
+      expect(t.region()[0]).toEqual(["row-2", "row-5"])
+    })
+  )
+})

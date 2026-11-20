@@ -530,7 +530,7 @@ that read arrives. Closing it needs the server to say whether the save changed a
 | 3 `stale-start-on-quick-return` | No stored start: the region starts from what is shown; the next decision sends its own row | "a quick return after the region was started again" |
 | 4 `typed-sku-check-cancelled` | A put no longer ends a request that was out: the server is asked again behind it (`Api.atoms.ts`) | `ReviewDraft.test.ts` "that typed a SKU" (fails with the re-ask taken out); `Seed.atoms.test.ts` |
 | 5 `late-match-answer-cancels-reread` | The same, and the person's saved rows stay over an older picture (`landed`) | "an answer from another request that lands after a later save" |
-| 6, 33 `items-columns-rebuilt-when-facets-change` | The columns are made once and do not depend on the filters' answer; each filter control reads its values when drawn; the pencil's cell is a module-level component | `ItemColumns.test.ts` |
+| 6, 33 `items-columns-rebuilt-when-facets-change` | Every cell, heading and the pencil is made once and is the same function whatever the filters answer, so React keeps what they drew and an open editor stays open. The filters' values are not read live from an atom: the data table copies a column's meta when it takes the columns (`applyColumnConfig`), so a control would never see a later answer; they reach the controls as copies of the same columns with another meta. Tried first: meta whose values were read on access; the Category filter then listed nothing | `ItemColumns.test.ts`: the cells and headings are the same functions after a differing answer, the filter's values are the new ones. Seen: an item moved from components to raw-materials, the next row's editor opened at once with text typed stayed open with its text, and the Category filter then said components 28, raw-materials 36 |
 | 7, 8, 30 a read let go while on screen | The screen asks the server at once; what was let go is not kept again when the screen leaves; a card removed while the address names it leaves the address first | `Seed.atoms.test.ts` "a read let go while a screen still shows it" |
 | 9, 23 the saver and the workbook outlive a remove | The draft is emptied by the machine when the step has left and the server has everything, and by a remove or a confirm; a remove forgets the workbook | `ReviewDraft.test.ts` "keeps nothing of the draft once the server has everything" |
 | 10 an answer given and never taken | Said as it is (the choice above): kept until the read is let go or the person signs out | |
@@ -546,6 +546,16 @@ that read arrives. Closing it needs the server to say whether the save changed a
 | 11, 13, 14, 29 | Not done in this batch: a row that comes back while its save is out offers Edit again; a write that answers after a switch of organization reads the left organization's read again; "Edit again" after the row left opens nothing; an assistant answer applied after a return or a switch | |
 
 A confirm now carries, beside the decisions shown, the rows the person took back that the server has not heard of.
+
+**Seen on screen** (dev server, the database of the pass before, 1440 px): items_messy.csv uploaded again (152 rows
+Already there). A group of 2 accepted: `PUT {"set":{"row-148":…,"row-195":…},"clear":[]}`; Ctrl+Z: `PUT
+{"set":{},"clear":["row-148","row-195"]}`. Two tabs on the import: tab B left row 3 out; tab A, still on the older
+picture, left row 7 out: its save was `{"set":{"row-7":{"out":true}},"clear":[]}`, then "Updated with what changed on
+another screen" and Left out 3 in both tabs. "Type the SKU" with CJL-7383 (an item in stock) and another row left out a
+quarter of a second later: two saves of one row each and one read of the import; row 49 then said "SKU CJL-7383 is
+already there: an item your organization has uses it". Not seen: a save refused by the server, a save that fails and
+waits for "Save again", a match's answer arriving after a later save, Continue over a newer view, an import removed
+while its review is open, an upload landing after a switch of organization. The tests hold each of those.
 
 ## Legacy in the client
 

@@ -1,5 +1,5 @@
+import * as A from "effect/Array"
 import * as O from "effect/Option"
-import * as R from "effect/Record"
 import { createColumnHelper, type ReactTable } from "@tanstack/react-table"
 import { ArrowDownUp, ListFilter } from "lucide-react"
 import { type ComponentType, lazy, Suspense } from "react"
@@ -245,26 +245,10 @@ const EditCell = (props: { readonly row: { readonly original: StoredItem } }) =>
 )
 
 /**
- * A column's meta whose filter values are read whenever a filter control asks for them, not copied in when the
- * column is made: the column, and with it every cell and an open editor, stays the same object when the values a
- * filter offers change (a save that adds a category, a count that moved).
+ * The columns of the Items table, made once for an editor or a viewer (`baseColumns`): every cell and heading is
+ * the same function for as long as the page lives. What the filters offer is not in them (`withFilterValues`).
  */
-const following = <Meta extends { readonly label: string }, Key extends string>(
-  fixed: Meta,
-  read: { readonly [K in Key]: () => unknown }
-): Meta => {
-  const meta = { ...fixed }
-  for (const [key, value] of R.toEntries<string, () => unknown>(read)) {
-    Object.defineProperty(meta, key, { enumerable: true, get: value })
-  }
-  return meta
-}
-
-/**
- * The columns of the Items table, made once for an editor or a viewer (`itemColumns`). `found` is asked for the
- * filters' values each time a control reads them.
- */
-const buildColumns = (found: () => Found, canImport: boolean) => {
+const buildColumns = (canImport: boolean) => {
   // An editor can change an item, from the pencil at the end of its row. A changed item stays if the import
   // that created it is taken back.
   const edit = canImport
@@ -279,15 +263,6 @@ const buildColumns = (found: () => Found, canImport: boolean) => {
         })
       ]
     : []
-  const options = (listed: ReadonlyArray<{ readonly value: string; readonly count: number }> | undefined) =>
-    (listed ?? []).map((entry) => ({ label: entry.value, value: entry.value, count: entry.count }))
-  // A flag is stored as "true" or "false" and read as Yes or No, as its cells say.
-  const flagOptions = (listed: ReadonlyArray<{ readonly value: string; readonly count: number }> | undefined) =>
-    (listed ?? []).map((entry) => ({
-      label: entry.value === "true" ? "Yes" : "No",
-      value: entry.value,
-      count: entry.count
-    }))
   return col.columns([
     col.accessor("name", {
       id: "name",
@@ -312,13 +287,13 @@ const buildColumns = (found: () => Found, canImport: boolean) => {
     col.accessor("category", {
       id: "category",
       header: ({ column }) => <DataTableColumnHeader column={column} />,
-      meta: following({ label: labels.category }, { options: () => options(found()?.category) }),
+      meta: { label: labels.category },
       size: widths.category[0]
     }),
     col.accessor("uom", {
       id: "uom",
       header: ({ column }) => <DataTableColumnHeader column={column} />,
-      meta: following({ label: labels.uom }, { options: () => options(found()?.uom) }),
+      meta: { label: labels.uom },
       size: widths.uom[0]
     }),
     col.accessor("unitCost", {
@@ -326,10 +301,7 @@ const buildColumns = (found: () => Found, canImport: boolean) => {
       header: ({ column }) => <DataTableColumnHeader column={column} className="justify-end" />,
       cell: ({ row }) => <div className="text-right tabular-nums">{costOf(row.original.unitCost)}</div>,
       // A range in whole dollars, wide enough to hold the lowest and the highest cost there is.
-      meta: following(
-        { label: labels.unitCost },
-        { min: () => range(found()?.unitCost).min, max: () => range(found()?.unitCost).max }
-      ),
+      meta: { label: labels.unitCost },
       size: widths.unitCost[0]
     }),
     col.accessor("quantityOnHand", {
@@ -341,10 +313,7 @@ const buildColumns = (found: () => Found, canImport: boolean) => {
           {whole.format(row.original.quantityOnHand)} {row.original.uom}
         </div>
       ),
-      meta: following(
-        { label: labels.quantityOnHand },
-        { min: () => range(found()?.quantityOnHand).min, max: () => range(found()?.quantityOnHand).max }
-      ),
+      meta: { label: labels.quantityOnHand },
       size: widths.quantityOnHand[0]
     }),
     col.accessor("reorderPoint", {
@@ -365,14 +334,14 @@ const buildColumns = (found: () => Found, canImport: boolean) => {
       id: "isActive",
       header: labels.isActive,
       cell: ({ row }) => yesNo(isActive(row.original.stocking)),
-      meta: following({ label: labels.isActive }, { options: () => flagOptions(found()?.isActive) }),
+      meta: { label: labels.isActive },
       size: widths.isActive[0]
     }),
     col.accessor("lotTracked", {
       id: "lotTracked",
       header: labels.lotTracked,
       cell: ({ row }) => yesNo(row.original.lotTracked),
-      meta: following({ label: labels.lotTracked }, { options: () => flagOptions(found()?.lotTracked) }),
+      meta: { label: labels.lotTracked },
       size: widths.lotTracked[0]
     }),
     col.accessor((item) => item.tags.join(", "), {
@@ -533,17 +502,49 @@ type Found = Atom.Success<typeof itemFacets> | undefined
  */
 const itemFacetValues = answerOf(itemFacets)
 
+type Counted = ReadonlyArray<{ readonly value: string; readonly count: number }> | undefined
+const options = (listed: Counted) =>
+  (listed ?? []).map((entry) => ({ label: entry.value, value: entry.value, count: entry.count }))
+// A flag is stored as "true" or "false" and read as Yes or No, as its cells say.
+const flagOptions = (listed: Counted) =>
+  (listed ?? []).map((entry) => ({
+    label: entry.value === "true" ? "Yes" : "No",
+    value: entry.value,
+    count: entry.count
+  }))
+
+/** The columns for an editor or a viewer, made once: nothing in them comes from an answer. */
+const baseColumns = perKey((canImport: boolean) => buildColumns(canImport))
+
 /**
- * The table's columns for an editor or a viewer, made once: they do not depend on the filters' values at all. Each
- * filter control reads its values from the filters' answer when it is drawn (`following`), so an answer that differs
- * (a save changed a category, a unit or a count) changes what the controls offer and leaves every column, every cell
- * and an open row editor as they are.
+ * The columns with what the filters offer now: the values a list filter lists and the ends of a range. The data
+ * table copies a column's meta when it takes the columns, so a filter's values can reach its control only through
+ * the column it is given; what stays the very same is everything a cell is drawn with. Each column here is the base
+ * column with another meta: its cell, its heading and its pencil are the same functions, so React keeps what they
+ * drew, and an open row editor stays open when a save changes a category, a unit or a count.
+ */
+const withFilterValues = (columns: ReturnType<typeof buildColumns>, found: Found): ReturnType<typeof buildColumns> => {
+  const values: Partial<Record<string, object>> = {
+    category: { options: options(found?.category) },
+    uom: { options: options(found?.uom) },
+    isActive: { options: flagOptions(found?.isActive) },
+    lotTracked: { options: flagOptions(found?.lotTracked) },
+    // A range in whole numbers, wide enough to hold the lowest and the highest value there is.
+    unitCost: range(found?.unitCost),
+    quantityOnHand: range(found?.quantityOnHand)
+  }
+  return A.map(columns, (column) => {
+    const extra = column.id === undefined ? undefined : values[column.id]
+    return extra === undefined ? column : { ...column, meta: { ...column.meta, ...extra } }
+  }) as ReturnType<typeof buildColumns>
+}
+
+/**
+ * The table's columns for an editor or a viewer, with the filters' values of the answer held: the same array while
+ * the answer is, and the same cells whatever it says.
  */
 export const itemColumns = perKey((canImport: boolean) =>
-  Atom.readable((get) => {
-    const registry = get.registry
-    return buildColumns(() => registry.get(itemFacetValues), canImport)
-  })
+  Atom.readable((get) => withFilterValues(baseColumns(canImport), get(itemFacetValues)))
 )
 
 /** What the assistant knows of the columns, built from the filters' values. */

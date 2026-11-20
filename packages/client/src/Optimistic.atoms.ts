@@ -134,7 +134,9 @@ const readAgain = (
 
 /**
  * One optimistic write as an atom: set it to the input. Its value is the latest press's result; every press runs to
- * its end on its own.
+ * its end on its own, and cannot be cut off: the registry lets the atom go once the row or screen that pressed has
+ * left, and interrupts what it started, but a save must still land, take its change off the read and be counted out
+ * of flight, or the read would show it, marked waiting, for the rest of the page's life.
  */
 export const optimisticWrite = <Input, A, E, R>(
   spec: OptimisticWrite<Input, A, E, R>
@@ -184,7 +186,7 @@ export const optimisticWrite = <Input, A, E, R>(
         if (spec.settled !== undefined) invalidate(spec.settled)
       }
       return yield* exit
-    }),
+    }, Effect.uninterruptible),
     { concurrent: true }
   )
 }

@@ -29,7 +29,7 @@ class Server extends Context.Service<Server, FakeServer>()("@inventory/client/te
 /** Long enough for the registry to run what a write started. */
 const settle = Effect.sleep("10 millis")
 
-const world = () => {
+const world = (options: { readonly idleTTL?: number } = {}) => {
   let item: Item = { name: "Bolt", unit: "each" }
   let reads = 0
   const answers: Array<Deferred.Deferred<void, Refused>> = []
@@ -54,9 +54,13 @@ const world = () => {
     failed: () => "The item was not saved.",
     onRefused: () => true
   })
-  const registry = AtomRegistry.make({ initialValues: [provideApi(layer)] })
+  const registry = AtomRegistry.make({
+    initialValues: [provideApi(layer)],
+    ...(options.idleTTL === undefined ? {} : { defaultIdleTTL: options.idleTTL })
+  })
   registry.mount(itemShown)
-  registry.mount(edit)
+  // The row that holds the write: let go when the row leaves the screen.
+  const leave = registry.mount(edit)
   const seen = () => {
     const result = registry.get(itemShown)
     return { item: result.pipe(AsyncResult.value, O.getOrUndefined), waiting: result.waiting }
@@ -64,7 +68,7 @@ const world = () => {
   const press = (input: Edit) => registry.set(edit, input)
   const answer = (n: number) => Deferred.succeed(answers[n]!, undefined)
   const refuse = (n: number) => Deferred.fail(answers[n]!, Refused.make({}))
-  return { seen, press, answer, refuse, reads: () => reads, stored: () => item }
+  return { seen, press, answer, refuse, leave, reads: () => reads, stored: () => item }
 }
 
 describe("two optimistic edits in flight", () => {
@@ -121,6 +125,34 @@ describe("two optimistic edits in flight", () => {
       yield* settle
       expect(t.seen()).toEqual({ item: { name: "Bolt", unit: "each" }, waiting: false })
       expect(t.reads()).toBe(1)
+    })
+  )
+})
+
+describe("an optimistic edit whose row leaves the screen", () => {
+  it.live("runs to its end: saved, nothing left on its way, read again once", () =>
+    Effect.gen(function* () {
+      // The registry lets an atom nobody reads go after 20 ms, as the app's does after 400.
+      const t = world({ idleTTL: 20 })
+      yield* settle
+      t.press({ name: "Hex bolt" })
+      yield* settle
+      expect(t.seen()).toEqual({ item: { name: "Hex bolt", unit: "each" }, waiting: true })
+      // The row unmounts (another page, another screen) while the save is still out, and its atom is let go.
+      t.leave()
+      yield* Effect.sleep("80 millis")
+      yield* t.answer(0)
+      yield* Effect.sleep("40 millis")
+      expect(t.stored()).toEqual({ name: "Hex bolt", unit: "each" })
+      expect(t.seen()).toEqual({ item: { name: "Hex bolt", unit: "each" }, waiting: false })
+      expect(t.reads()).toBe(2)
+      // A later edit of the same item still settles: the first left nothing counted in flight.
+      t.press({ unit: "box" })
+      yield* settle
+      yield* t.answer(1)
+      yield* Effect.sleep("40 millis")
+      expect(t.seen()).toEqual({ item: { name: "Hex bolt", unit: "box" }, waiting: false })
+      expect(t.reads()).toBe(3)
     })
   )
 })

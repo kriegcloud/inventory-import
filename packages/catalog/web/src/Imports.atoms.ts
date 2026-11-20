@@ -2,8 +2,7 @@
 // this file protects: what one screen learned (a staged file's view and rows, a draft's new revision) is put in place
 // for the next screen, which then does not wait on a request; and a staged file's rows, which never change, are asked
 // for once and kept for the page.
-import { draftOf } from "./Draft.atoms.ts"
-import { emptyDraft } from "./Draft.machine.ts"
+import { forgetDraft } from "./Draft.atoms.ts"
 import { optimisticChange, optimisticWrite, shown } from "@inventory/client/OptimisticAtoms"
 import { apiRuntime, invalidate, perKey } from "@inventory/client/Api"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
@@ -140,7 +139,8 @@ export const removeImport = Atom.family((id: ImportId) =>
       toast(`Removed ${view.fileName}`)
       importView(id).letGo(registry)
       importTable(id).letGo(registry)
-      registry.set(draftOf(id), emptyDraft)
+      // The draft, and every row this browser kept of it, go too.
+      forgetDraft({ registry, id })
       registry.set(openWorkbook(id), O.none())
     },
     readAgainAfterRefusal: true,
@@ -239,3 +239,9 @@ export const putConfirmed = (input: {
   input.registry.set(importView(input.view.id), input.view)
   invalidate([...afterImportChange, ...catalogKeys.items, ...catalogKeys.itemFacets, ...catalogKeys.changes])
 }
+
+/**
+ * The browser asks before the page is left while any import has rows still to be sent, wherever the person is in the
+ * app. The workspace keeps it mounted for the page.
+ */
+export { askBeforeLeaving } from "./Draft.atoms.ts"

@@ -7,6 +7,7 @@
 import { forgetReads } from "@inventory/client/Api"
 import { forgetEarly } from "@inventory/client/Early"
 import { request } from "@inventory/client/Http"
+import { leaveApp } from "@inventory/ui/Route"
 import {
   actorOfSession,
   type OrganizationChoice,
@@ -228,7 +229,7 @@ export const signInAs = (account: { readonly email: string; readonly password: s
       .then(() => {
         forgetReads()
         rememberSignedOut(false)
-        window.location.assign("/")
+        leaveApp("/")
       })
   )
 
@@ -242,7 +243,7 @@ export const signOut = (): Promise<void> =>
         forgetReads()
         rememberSignedIn(false)
         rememberSignedOut(true)
-        window.location.assign("/")
+        leaveApp("/")
       })
   )
 

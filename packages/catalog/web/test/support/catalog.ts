@@ -64,6 +64,8 @@ export const viewAt = (parts: Partial<ImportView> & { readonly revision: number 
     decisions: {},
     suggestions: [],
     choices: [],
+    // Never confirmed, unless the test says otherwise.
+    history: [],
     ...parts
   }
   return view as unknown as ImportView

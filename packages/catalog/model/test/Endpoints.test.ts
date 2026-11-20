@@ -10,6 +10,7 @@ import { type ConfirmWrite, ImportStore } from "@inventory/catalog-model/ImportS
 import { usedUpSentence } from "@inventory/catalog-model/AssistantHandler"
 import { memoryUsedUpWords } from "@inventory/catalog-model/ModelAllowance"
 import { decisionFromFlags } from "@inventory/catalog-contract/Decision"
+import { RevisionAhead } from "@inventory/catalog-contract/ImportRejection"
 import type { ColumnCatalog } from "@inventory/catalog-contract/TableView"
 import * as A from "effect/Array"
 import * as BigDecimal from "effect/BigDecimal"
@@ -58,7 +59,7 @@ describe("an import, over the twins", () => {
           const open = yield* imports.open().pipe(as(marcus))
           const { id, revision } = O.getOrThrow(A.head(open.views))
           const confirmed = yield* imports
-            .commit({ params: { id }, payload: { ...none, revision, madeOn: revision } })
+            .commit({ params: { id }, payload: { ...none, revision, madeOn: {} } })
             .pipe(as(marcus))
           const result = O.getOrThrow(confirmed.result)
           expect([confirmed.status, result.created, result.updated, result.already, result.notImported]).toEqual([
@@ -80,7 +81,7 @@ describe("an import, over the twins", () => {
           const got12 = yield* items.list().pipe(as(elena))
           expect(got12.length).toBe(0)
           const again = yield* tag(
-            imports.commit({ params: { id }, payload: { ...none, revision, madeOn: revision } }).pipe(as(marcus))
+            imports.commit({ params: { id }, payload: { ...none, revision, madeOn: {} } }).pipe(as(marcus))
           )
           expect(again).toBe("AlreadyImported")
           const got13 = yield* items.list().pipe(as(marcus))
@@ -162,10 +163,10 @@ describe("an import, over the twins", () => {
           const params = { id: view.id }
           const set = { "row-2": decisionFromFlags({ out: true }) }
           const first = yield* imports
-            .decide({ params, payload: { madeOn: view.revision, set, clear: [] } })
+            .decide({ params, payload: { madeOn: R.map(set, () => view.revision), set, clear: [] } })
             .pipe(as(marcus))
           const second = yield* imports
-            .decide({ params, payload: { madeOn: view.revision, set, clear: [] } })
+            .decide({ params, payload: { madeOn: R.map(set, () => view.revision), set, clear: [] } })
             .pipe(as(marcus))
           expect(second.revision).toBe(first.revision)
           // The answer says which save moved the draft: the first did, the same one again did not.
@@ -173,7 +174,7 @@ describe("an import, over the twins", () => {
           const after = yield* imports.get({ params }).pipe(as(marcus))
           expect(after.progress.ready).toBe(2)
           const cleared = yield* imports
-            .decide({ params, payload: { madeOn: view.revision, set: {}, clear: ["row-2"] } })
+            .decide({ params, payload: { madeOn: {}, set: {}, clear: ["row-2"] } })
             .pipe(as(marcus))
           expect(cleared.revision).toBe(first.revision + 1)
           expect(cleared.changed).toBe(true)
@@ -198,7 +199,11 @@ describe("an import, over the twins", () => {
           const theirs = yield* imports
             .decide({
               params,
-              payload: { madeOn: view.revision, set: { "row-2": decisionFromFlags({ out: true }) }, clear: [] }
+              payload: {
+                madeOn: { "row-2": view.revision },
+                set: { "row-2": decisionFromFlags({ out: true }) },
+                clear: []
+              }
             })
             .pipe(as(dana))
           const mine = { "row-3": decisionFromFlags({ out: true }) }
@@ -206,7 +211,12 @@ describe("an import, over the twins", () => {
             imports
               .commit({
                 params,
-                payload: { revision: view.revision, madeOn: view.revision, set: mine, clear: ["row-2"] }
+                payload: {
+                  revision: view.revision,
+                  madeOn: R.map(mine, () => view.revision),
+                  set: mine,
+                  clear: ["row-2"]
+                }
               })
               .pipe(as(marcus))
           )
@@ -224,7 +234,10 @@ describe("an import, over the twins", () => {
           // On the picture he has now, the confirm writes: one ready row is left, hers and his are left out, and each
           // is said under the name of who left it out.
           const confirmed = yield* imports
-            .commit({ params, payload: { revision: still.revision, madeOn: still.revision, set: mine, clear: [] } })
+            .commit({
+              params,
+              payload: { revision: still.revision, madeOn: R.map(mine, () => still.revision), set: mine, clear: [] }
+            })
             .pipe(as(marcus))
           const result = O.getOrThrow(confirmed.result)
           expect([confirmed.status, confirmed.revision, result.created, result.notImported]).toEqual([
@@ -367,9 +380,7 @@ describe("a confirm another save overtakes after the handler checked its revisio
         const view = yield* stage(tableOf({ fileName: "five.csv", lines: fiveLines })).pipe(as(marcus))
         const params = { id: view.id }
         const refused = yield* Effect.flip(
-          imports
-            .commit({ params, payload: { ...none, revision: view.revision, madeOn: view.revision } })
-            .pipe(as(marcus))
+          imports.commit({ params, payload: { ...none, revision: view.revision, madeOn: {} } }).pipe(as(marcus))
         )
         expect([refused._tag, refused._tag === "DraftMoved" ? refused.revision : -1]).toEqual([
           "DraftMoved",
@@ -387,6 +398,34 @@ describe("a confirm another save overtakes after the handler checked its revisio
           []
         ])
       })
+    )
+  })
+})
+
+describe("a revision the draft has not reached", () => {
+  layer(withCrypto(catalogMemory()))("is not taken on the client's word", (it) => {
+    it.effect(
+      "a save whose row names a later madeOn, and a confirm naming a later revision, are refused and write nothing",
+      () =>
+        Effect.gen(function* () {
+          const imports = yield* importsEndpoints
+          const view = yield* stage(tableOf({ fileName: "five.csv", lines: fiveLines })).pipe(as(marcus))
+          const params = { id: view.id }
+          const accept = { "row-2": decisionFromFlags({ out: true }) }
+          const save = yield* Effect.flip(
+            imports
+              .decide({ params, payload: { madeOn: { "row-2": view.revision + 1 }, set: accept, clear: [] } })
+              .pipe(as(marcus))
+          )
+          const confirm = yield* Effect.flip(
+            imports
+              .commit({ params, payload: { revision: view.revision + 1, madeOn: {}, set: {}, clear: [] } })
+              .pipe(as(marcus))
+          )
+          expect([S.is(RevisionAhead)(save), S.is(RevisionAhead)(confirm)]).toEqual([true, true])
+          const still = yield* imports.get({ params }).pipe(as(marcus))
+          expect([still.status, still.revision, R.keys(still.decisions)]).toEqual(["open", view.revision, []])
+        })
     )
   })
 })

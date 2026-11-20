@@ -10,31 +10,28 @@ import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as Atom from "effect/reactivity/Atom"
 import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import { toast } from "sonner"
-import { invalidate, perKey } from "@inventory/client/Api"
+import { perKey } from "@inventory/client/Api"
 import { member } from "@inventory/client/MemberAtoms"
 import { isTransient, sayError, toastError } from "@inventory/client/SayError"
 import type { SavedDecisions } from "@inventory/catalog-contract/Decision"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
-import type { ImportView, SuggestOutcome } from "@inventory/catalog-contract/Import"
+import { ImportEvent, type ImportView, type SuggestOutcome } from "@inventory/catalog-contract/Import"
 import { restored, saved } from "@inventory/review/ReviewDraft"
 import type { ReviewState } from "@inventory/review/ReviewTypes"
 import { restoredReview, storedReview } from "@inventory/review/SavedProgress"
 import { dropFile, progressOf, progressWith } from "@inventory/review/SavedProgressHook"
 import { navigate } from "@inventory/ui/Route"
 import { AcceptsTakenBack, DraftMoved } from "@inventory/catalog-contract/ImportRejection"
-import { RowDecision } from "@inventory/catalog-contract/Decision"
 import { fieldLabels } from "@inventory/catalog-contract/Staged"
-import { kept } from "@inventory/review/Kept"
-import { progressKey } from "@inventory/review/SavedProgress"
 import * as A from "effect/Array"
 import * as Str from "effect/String"
 import * as Effect from "effect/Effect"
 import * as S from "effect/Schema"
 import type { review } from "@inventory/catalog-model/Review"
 import { call, callWrite, catalogRuntime } from "./Catalog.runtime.ts"
-import { catalogKeys } from "./Catalog.keys.ts"
 import { importAddress } from "./internal/route.ts"
-import { draftOf } from "./Draft.atoms.ts"
+import { draftOf, keepWaiting, keptWaiting } from "./Draft.atoms.ts"
+import { leftOverLines } from "./internal/leftOver.ts"
 import {
   changesBetween,
   DraftEffect,
@@ -122,7 +119,7 @@ const isLocal = DraftEffect.$match({
 const rowWords = (rowId: string): string => Str.replace("-", " ")(rowId)
 
 /** The accepts the server did not apply, in a sentence: "Unit cost on row 55; Name on row 7". */
-const acceptsWords = (accepts: ReadonlyArray<StaleAccept>): string =>
+export const acceptsWords = (accepts: ReadonlyArray<StaleAccept>): string =>
   A.join(
     A.map(
       accepts,
@@ -131,29 +128,6 @@ const acceptsWords = (accepts: ReadonlyArray<StaleAccept>): string =>
     ),
     "; "
   )
-
-/**
- * What this browser keeps of one import's waiting rows for the person signed in: the rows the server has not taken,
- * so a reload does not lose them. None while nothing waits.
- */
-const KeptWaiting = S.OptionFromNullOr(
-  S.Struct({ madeOn: S.Int, leftOver: S.Boolean, rows: S.Record(S.String, S.OptionFromNullOr(RowDecision)) })
-)
-const noneKept = Atom.writable(
-  (): typeof KeptWaiting.Type => O.none(),
-  () => undefined
-)
-const waitingAt = Atom.family((key: string) =>
-  kept({ key, schema: KeptWaiting, defaultValue: (): typeof KeptWaiting.Type => O.none() })
-)
-const waitingKept = (registry: AtomRegistry.AtomRegistry, id: ImportId) =>
-  O.match(registry.get(member), {
-    onNone: () => noneKept,
-    onSome: (actor) =>
-      waitingAt(
-        progressKey({ organizationId: actor.organizationId, memberId: actor.id, screen: `import:${id}:waiting` })
-      )
-  })
 
 /** The scope this browser keeps one import's review under, for the person signed in; none while nobody is. */
 const scopeFor = (signedIn: O.Option<{ readonly organizationId: string; readonly id: string }>, id: ImportId) =>
@@ -228,6 +202,21 @@ const perform = (input: {
             {
               description: `The column was matched again after you accepted: ${acceptsWords(accepts)}. Each row shows its proposal again.`
             }
+          ),
+        // Named once, and let go: the import was confirmed, and opened again, before these rows were sent.
+        Outlived: ({ rows }) =>
+          void toast.error(
+            R.keys(rows).length === 1
+              ? "1 decision of yours was not part of this import"
+              : `${R.keys(rows).length} decisions of yours were not part of this import`,
+            {
+              duration: Number.POSITIVE_INFINITY,
+              closeButton: true,
+              description: `The import was confirmed, and opened again, before ${R.keys(rows).length === 1 ? "it was" : "they were"} saved, so ${R.keys(rows).length === 1 ? "it was" : "they were"} not sent: ${A.join(
+                A.map(leftOverLines(rows), (line) => `${line.row}: you ${line.decided}`),
+                "; "
+              )}. The review shows the import as it is now.`
+            }
           )
       }),
     // The import is wanted no older than the last write the server answered this screen. A read already out that
@@ -256,7 +245,8 @@ const perform = (input: {
           answered(id)
           const onScreen = registry.get(draftOf(id)).onScreen
           putConfirmed({ registry, view })
-          happened(DraftEvent.ConfirmDone())
+          // The picture the confirm answered with: rows decided while it was out are named on the result.
+          happened(DraftEvent.ConfirmDone({ revision: view.revision, decisions: view.decisions }))
           forget(registry, id)
           if (onScreen) navigate(importAddress(view.id, "result"))
         },
@@ -264,9 +254,10 @@ const perform = (input: {
           answered(id)
           if (S.is(DraftMoved)(error)) return happened(DraftEvent.ConfirmMoved())
           if (S.is(AcceptsTakenBack)(error)) return happened(DraftEvent.ConfirmStale({ accepts: error.accepts }))
+          // Closed already, or the answer was lost: the machine sends nothing and asks for the import, whose picture
+          // says what was written.
           toastError(error)
           happened(DraftEvent.ConfirmFailed())
-          invalidate(catalogKeys.import(id))
         }
       )
   })
@@ -287,10 +278,14 @@ export const draftEvents = perKey((id: ImportId) =>
       registry.set(draftOf(id), stepped.draft)
       for (const effect of stepped.effects) if (isLocal(effect)) perform({ registry, id, effect })
     })
-    // What waits is kept in this browser as it changes, so a reload finds it; nothing waiting is no entry.
-    const waits = waiting(stepped.draft)
-    const keptAt = waitingKept(registry, id)
-    if (!Eq.equals(registry.get(keptAt), waits)) registry.set(keptAt, waits)
+    // What waits is kept in this browser as it changes, so a reload finds it, under the member the rows belong to;
+    // nothing waiting is no entry.
+    keepWaiting({
+      registry,
+      id,
+      waits: waiting(stepped.draft),
+      pressed: DraftEvent.$is("Opened")(event) || DraftEvent.$is("Decided")(event)
+    })
     for (const effect of stepped.effects) if (!isLocal(effect)) perform({ registry, id, effect })
   })
 )
@@ -310,7 +305,9 @@ export const shownDecisions = perKey((id: ImportId) =>
 )
 
 /** True from the press of the confirm button until the server has answered it, or it is held back. */
-export const confirmingImport = perKey((id: ImportId) => Atom.map(draftOf(id), (draft) => draft.confirm !== "idle"))
+export const confirmingImport = perKey((id: ImportId) =>
+  Atom.map(draftOf(id), (draft) => draft.confirm !== "idle" || O.exists(draft.heldBack, (why) => !why.read))
+)
 
 /** How many of the person's rows wait after a save that failed, for the line that says so; 0 while none do. */
 export const rowsNotSaved = perKey((id: ImportId) =>
@@ -357,23 +354,20 @@ export const followDraft = perKey((id: ImportId) =>
     Atom.readable((get) => {
       const registry = get.registry
       // What this browser kept of the person's waiting rows (from before a reload) comes back with the step.
-      registry.set(draftEvents(id), DraftEvent.Opened({ kept: registry.get(waitingKept(registry, id)) }))
+      registry.set(draftEvents(id), DraftEvent.Opened({ kept: keptWaiting({ registry, id }) }))
       get.addFinalizer(() => registry.set(draftEvents(id), DraftEvent.Left()))
-      // The browser asks before the page is left while rows wait: closing it now would leave them to the next visit.
-      const ask = (event: BeforeUnloadEvent) => {
-        if (O.isSome(waiting(registry.get(draftOf(id))))) event.preventDefault()
-      }
-      // (Where there is a page to leave: a test of the draft has none.)
-      if (typeof window !== "undefined") {
-        window.addEventListener("beforeunload", ask)
-        get.addFinalizer(() => window.removeEventListener("beforeunload", ask))
-      }
+      // (The browser asks before the page is left while rows wait wherever the person is: `askBeforeLeaving`.)
       get.subscribe(
         importViewShown(id),
         (result) => {
           if (!AsyncResult.isSuccess(result)) return
-          const { revision, decisions, status } = result.value
-          registry.set(draftEvents(id), DraftEvent.ViewArrived({ revision, decisions, open: status === "open" }))
+          const { revision, decisions, status, history } = result.value
+          // How many times it was confirmed: one more than the person's waiting rows knew means they outlived one.
+          const confirms = A.filter(history, ImportEvent.guards.Confirmed).length
+          registry.set(
+            draftEvents(id),
+            DraftEvent.ViewArrived({ revision, decisions, open: status === "open", confirms })
+          )
         },
         { immediate: true }
       )

@@ -28,8 +28,8 @@ export class AlreadyImported extends S.TaggedError<AlreadyImported, { readonly b
 ) {}
 
 /**
- * The confirm was made on an older draft than the one stored: somebody else decided a row, matched a column or
- * stored a suggestion since the screen that confirmed last read the import. Nothing was written, not an item and not
+ * The confirm was made on an older draft than the one stored: somebody else decided a row or matched a column since
+ * the screen that confirmed last read the import (storing a suggestion does not move the draft). Nothing was written, not an item and not
  * a decision: a confirm writes only what its screen showed. `revision` is where the draft is now, so the screen reads
  * the import again, shows what changed with its new totals, and the person confirms again.
  */
@@ -43,6 +43,24 @@ export class DraftMoved extends S.TaggedError<DraftMoved, { readonly brand: uniq
     description:
       "The confirm named an older revision of the draft than the one stored: somebody changed the import since this screen read it. Nothing was written",
     httpApiStatus: 409
+  }
+) {}
+
+/**
+ * A save or a confirm named a revision of the draft the server has not reached: a `madeOn` of a row, or the confirm's
+ * `revision`, later than the draft's. No screen of ours sends one; the server does not take the client's word for a
+ * revision, so an accept cannot pass as made after a match it was made before. Nothing was written.
+ */
+export class RevisionAhead extends S.TaggedError<RevisionAhead, { readonly brand: unique symbol }>()(
+  "RevisionAhead",
+  {
+    reason: reasonForPerson,
+    revision: S.Int.annotateKey({ description: "The draft's revision now: the latest a request may name" })
+  },
+  {
+    description:
+      "A save or a confirm named a revision later than the draft's (a row's `madeOn`, or the confirm's `revision`). Nothing was written",
+    httpApiStatus: 400
   }
 ) {}
 

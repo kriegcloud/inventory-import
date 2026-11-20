@@ -18,6 +18,7 @@ import {
   DraftMoved,
   ImportKept,
   ImportNotFound,
+  RevisionAhead,
   UploadNotFound
 } from "./Import/Import.rejection.ts"
 import { ItemEdit, StoredItem } from "./Item/Item.read.ts"
@@ -168,7 +169,7 @@ export class ImportsApi extends HttpApiGroup.make("imports")
         revision: S.Int.annotateKey({ description: "The draft's revision after this save" }),
         changed: S.Boolean.annotateKey({
           description:
-            "True when this save changed a decision, so the revision is this save's own: one more than before it. False when every row it names already stood as sent (the same save again, or somebody else decided the same): nothing was written, and the revision is whatever the draft had reached, which may hold other people's decisions the sender has not read"
+            "True when this save changed a decision: the draft moved one revision, from whatever it was at just before this save. That is the sender's own next revision only when it is exactly one more than the revision the sender held; otherwise somebody else saved in between, and the sender reads the import again before counting on it. False when every row it names already stood as sent (the same save again, or somebody else decided the same): nothing was written, and the revision is whatever the draft had reached, which may hold other people's decisions the sender has not read"
         }),
         notApplied: S.Array(StaleAccept).annotateKey({
           description:
@@ -178,7 +179,7 @@ export class ImportsApi extends HttpApiGroup.make("imports")
         description:
           "The decisions are saved: the draft's revision, whether this save is what moved it, and the accepts it did not apply"
       }),
-      error: [Forbidden, ImportNotFound, AlreadyImported]
+      error: [Forbidden, ImportNotFound, AlreadyImported, RevisionAhead]
     })
       .annotate(OpenApi.Summary, "Save the decisions made since the last save")
       .annotate(
@@ -189,12 +190,12 @@ export class ImportsApi extends HttpApiGroup.make("imports")
       params: importId,
       payload: ConfirmRequest,
       success: ImportView,
-      error: [Forbidden, ImportNotFound, AlreadyImported, DraftMoved, AcceptsTakenBack]
+      error: [Forbidden, ImportNotFound, AlreadyImported, DraftMoved, AcceptsTakenBack, RevisionAhead]
     })
       .annotate(OpenApi.Summary, "Confirm: write the items the review says are ready")
       .annotate(
         OpenApi.Description,
-        "The confirm names the revision of the draft its screen shows and carries only that screen's own decisions not saved yet; the rows never travel. The server applies the saved draft and those decisions to the staged file with the same review the screen ran and writes what that says is ready, in one write with the decisions themselves and the close of the import, and only while the stored draft is still at the revision named. If the draft has moved on (somebody else decided a row, matched a column or stored a suggestion), nothing is written and the answer is 409 `DraftMoved` with the draft's revision now: read the import again, show what changed, and confirm again. Two confirms can never both pass, and a confirm never writes a decision its screen did not show. A confirm of an import already confirmed is refused with 409 `AlreadyImported` instead of running again. The answer is the import as it now is, one revision on. Needs the editor role. The decisions the confirm carries name the revision they were made on (`madeOn`), as a save does: if one of them accepts a proposal for a field whose column was matched again since, nothing is written and the answer is 409 `AcceptsTakenBack` naming each such accept."
+        "The confirm names the revision of the draft its screen shows and carries only that screen's own decisions not saved yet; the rows never travel. The server applies the saved draft and those decisions to the staged file with the same review the screen ran and writes what that says is ready, in one write with the decisions themselves and the close of the import, and only while the stored draft is still at the revision named. If the draft has moved on (somebody else decided a row or matched a column; storing a suggestion does not move it), nothing is written and the answer is 409 `DraftMoved` with the draft's revision now: read the import again, show what changed, and confirm again. Two confirms can never both pass, and a confirm never writes a decision its screen did not show. A confirm of an import already confirmed is refused with 409 `AlreadyImported` instead of running again. The answer is the import as it now is, one revision on. Needs the editor role. The decisions the confirm carries name the revision they were made on (`madeOn`), as a save does: if one of them accepts a proposal for a field whose column was matched again since, nothing is written and the answer is 409 `AcceptsTakenBack` naming each such accept."
       ),
     HttpApiEndpoint.post("takeBack", "/:id/take-back", {
       params: importId,

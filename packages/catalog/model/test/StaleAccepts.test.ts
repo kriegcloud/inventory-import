@@ -16,7 +16,7 @@ const set = {
 
 describe("accepts made before a column was matched again", () => {
   it("are taken out and named; the rest of the decision, and every other row, is applied", () => {
-    const made = withoutStaleAccepts({ choices, madeOn: 11, set })
+    const made = withoutStaleAccepts({ choices, madeOn: { "row-55": 11, "row-18": 11 }, set })
     expect(made.notApplied).toEqual([{ rowId: "row-55", field: "unitCost" }])
     expect(made.applied).toEqual({
       "row-55": decisionFromFlags({ accepted: ["uom"], edits: { name: "Steel Tube 1in" } }),
@@ -25,13 +25,29 @@ describe("accepts made before a column was matched again", () => {
   })
 
   it("are applied when the decision was made on the revision that has the match, or a later one", () => {
-    expect(withoutStaleAccepts({ choices, madeOn: 12, set })).toEqual({ applied: set, notApplied: [] })
+    expect(withoutStaleAccepts({ choices, madeOn: { "row-55": 12, "row-18": 12 }, set })).toEqual({
+      applied: set,
+      notApplied: []
+    })
   })
 
   it("names every accept of every field matched since, on a decision made before any match", () => {
-    expect(withoutStaleAccepts({ choices, madeOn: 2, set }).notApplied).toEqual([
+    expect(withoutStaleAccepts({ choices, madeOn: { "row-55": 2, "row-18": 2 }, set }).notApplied).toEqual([
       { rowId: "row-55", field: "unitCost" },
       { rowId: "row-55", field: "uom" }
+    ])
+  })
+
+  it("are judged row by row: an old row never makes a newer row's accept stale, and a row named on no revision counts as made on 0", () => {
+    const both = {
+      "row-55": decisionFromFlags({ accepted: ["unitCost"] }),
+      "row-9": decisionFromFlags({ accepted: ["unitCost"] }),
+      "row-3": decisionFromFlags({ accepted: ["unitCost"] })
+    }
+    // Row 9 waited from revision 10, before unit cost was matched again at 12; row 55 was accepted on 12.
+    expect(withoutStaleAccepts({ choices, madeOn: { "row-55": 12, "row-9": 10 }, set: both }).notApplied).toEqual([
+      { rowId: "row-9", field: "unitCost" },
+      { rowId: "row-3", field: "unitCost" }
     ])
   })
 })

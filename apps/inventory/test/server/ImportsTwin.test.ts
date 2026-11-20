@@ -48,7 +48,7 @@ layer(inMemoryHandlers({ member: marcus, ai: OpenRouterTest.off("noKey", ModelId
         const saved = yield* client.imports.decide({
           params,
           payload: {
-            madeOn: staged.revision,
+            madeOn: { "row-55": staged.revision, "row-18": staged.revision },
             set: {
               "row-55": decisionFromFlags({ accepted: ["unitCost"] }),
               "row-18": decisionFromFlags({ reverted: ["uom"] })
@@ -58,7 +58,7 @@ layer(inMemoryHandlers({ member: marcus, ai: OpenRouterTest.off("noKey", ModelId
         })
         const confirmed = yield* client.imports.commit({
           params,
-          payload: { revision: saved.revision, madeOn: saved.revision, set: {}, clear: [] }
+          payload: { revision: saved.revision, madeOn: {}, set: {}, clear: [] }
         })
         const result = O.getOrThrow(confirmed.result)
         expect([result.created, result.updated, result.already, result.notImported]).toEqual([155, 0, 0, 45])
@@ -102,7 +102,7 @@ layer(inMemoryHandlers({ member: marcus, ai: OpenRouterTest.off("noKey", ModelId
         expect(again.progress).toMatchObject({ ready: 1, needs: 45 })
         const second = yield* client.imports.commit({
           params: { id: again.id },
-          payload: { revision: again.revision, madeOn: again.revision, set: {}, clear: [] }
+          payload: { revision: again.revision, madeOn: {}, set: {}, clear: [] }
         })
         const secondResult = O.getOrThrow(second.result)
         expect([secondResult.created, secondResult.already, secondResult.notImported]).toEqual([1, 154, 45])

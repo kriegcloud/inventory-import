@@ -102,6 +102,8 @@ interface World {
   }>
   /** The server made a confirm: the import is closed, and these are the decisions it was written with. */
   closed: O.Option<SavedDecisions>
+  /** The revision the person's own confirm closed the import at: a picture of that revision or later says so. */
+  madeAt: O.Option<number>
   /** The revision at which somebody else's confirm closed the import: a picture of that revision or later says so. */
   elsewhere: O.Option<number>
   /** The person's waiting rows as the browser keeps them, written after everything that happens. */
@@ -136,6 +138,7 @@ const start = (): World => ({
   said: 0,
   confirm: O.none(),
   closed: O.none(),
+  madeAt: O.none(),
   told: 0,
   region: O.none(),
   elsewhere: O.none(),
@@ -144,9 +147,10 @@ const start = (): World => ({
   named: O.none()
 })
 
-/** Whether a picture says the import can still be decided: one taken after somebody else's confirm says it cannot. */
+/** Whether a picture says the import can still be decided: one taken after a confirm (anybody's) says it cannot. */
 const openIn = (world: World, picture: Picture): boolean =>
-  !O.exists(world.elsewhere, (closedAt) => picture.revision >= closedAt)
+  !O.exists(world.elsewhere, (closedAt) => picture.revision >= closedAt) &&
+  !O.exists(world.madeAt, (closedAt) => picture.revision >= closedAt)
 
 /** True once this tab's view says the import was confirmed by somebody else. */
 const toldClosed = (world: World): boolean => O.exists(world.view, (view) => !openIn(world, view))
@@ -167,7 +171,11 @@ const valueOf = (to: "out" | "kept" | "nothing") => (to === "nothing" ? O.none()
 
 /** A picture reaches the step that is drawn, with whether it says the import can still be decided. */
 const arrive = (world: World, picture: Picture): void =>
-  dispatch(world, DraftEvent.ViewArrived({ ...picture, open: openIn(world, picture) }))
+  dispatch(
+    world,
+    // The import is never reopened here: a picture of a closed import counts its one confirm.
+    DraftEvent.ViewArrived({ ...picture, open: openIn(world, picture), confirms: openIn(world, picture) ? 0 : 1 })
+  )
 
 /** A picture is put into the tab's view: never one of an earlier revision, and an ask that is out is issued again. */
 const put = (world: World, picture: Picture): void => {
@@ -269,9 +277,25 @@ const comeBack = (world: World): void => {
   world.read = O.some(O.none())
 }
 
+/** What can still happen once the person's own confirm was made: its answer (or its loss), a decision, a read. */
+const afterMade = Command.isAnyOf([
+  "ConfirmAnswers",
+  "ConfirmFails",
+  "Decide",
+  "ReturnToTab",
+  "ServerTakesRead",
+  "ReadArrives",
+  "Leave",
+  "ComeBack",
+  "ComeBackQuickly",
+  "SaveAgain",
+  "SaveRefused"
+])
+
 const run = (world: World, command: Command): void => {
-  // A confirmed import is closed: all that is left to happen is the confirm's own answer.
-  if (O.isSome(world.closed) && !Command.guards.ConfirmAnswers(command)) return
+  // A confirmed import is closed: all that is left to happen is the confirm's own answer (or its loss on the way
+  // back), the person's decisions while it is out, and reads of the closed import.
+  if (O.isSome(world.closed) && !afterMade(command)) return
   Command.match(command, {
     PressConfirm: () => {
       if (world.draft.onScreen && O.isSome(world.draft.held)) dispatch(world, DraftEvent.ConfirmPressed())
@@ -297,6 +321,7 @@ const run = (world: World, command: Command): void => {
           world.server = { revision: world.server.revision + 1, decisions: written }
           world.history[world.server.revision] = written
           world.closed = O.some(written)
+          world.madeAt = O.some(world.server.revision)
           world.confirm = O.some({ ...confirm, answer: O.some("made") })
         }
       }),
@@ -307,15 +332,20 @@ const run = (world: World, command: Command): void => {
           if (O.isNone(confirm.answer)) return
           world.confirm = O.none()
           if (confirm.answer.value === "moved") return dispatch(world, DraftEvent.ConfirmMoved())
-          world.dirty = {}
+          // The person's rows decided while it was out stay theirs: the result names them (`holds`). The answer is
+          // the closed import, put into the tab's view first, as the runner does (`putConfirmed`).
           world.confirmed = {}
           world.region = O.none()
-          dispatch(world, DraftEvent.ConfirmDone())
+          const made = { revision: O.getOrThrow(world.madeAt), decisions: O.getOrThrow(world.closed) }
+          world.view = O.some(made)
+          world.told = Math.max(world.told, made.revision)
+          dispatch(world, DraftEvent.ConfirmDone(made))
         }
       }),
+    // Lost on its way to the server (nothing was written), or its answer lost on the way back (made, or refused):
+    // either way the screen does not know what was written.
     ConfirmFails: () => {
-      // Lost on its way to the server: nothing was written.
-      if (!O.exists(world.confirm, (confirm) => O.isNone(confirm.answer))) return
+      if (O.isNone(world.confirm)) return
       world.confirm = O.none()
       return dispatch(world, DraftEvent.ConfirmFailed())
     },
@@ -330,7 +360,11 @@ const run = (world: World, command: Command): void => {
       // Deciding again lets go of the rows a refusal set aside: the person was told they were not saved.
       world.refused = {}
       world.region = O.some(after)
-      return dispatch(world, DraftEvent.Decided({ changes: change(command.row, command.to) }))
+      dispatch(world, DraftEvent.Decided({ changes: change(command.row, command.to) }))
+      // Decided back to what the screen knew before anything of it was sent: an undo, not a decision of its own.
+      const pending = { ...O.getOrElse(world.draft.flight, (): RowChanges => ({})), ...world.draft.unsent }
+      if (!R.has(pending, command.row)) delete world.dirty[command.row]
+      return
     },
     SomeoneElse: (command) => {
       if (O.isSome(world.elsewhere)) return
@@ -583,7 +617,7 @@ const quiet = (world: World): void => {
     then({ _tag: "ServerTakesConfirm" })
     then({ _tag: "ConfirmAnswers" })
     // A closed import refuses what is still out.
-    if (O.isSome(world.elsewhere)) {
+    if (O.isSome(world.elsewhere) || O.isSome(world.closed)) {
       then({ _tag: "SaveRefused" })
       then({ _tag: "ConfirmFails" })
     }
@@ -612,11 +646,28 @@ interface Play {
  */
 const enabled = (world: World, may: Play): ReadonlyArray<ReadonlyArray<Command>> => {
   const { confirms, elsewhere, reloads } = may
-  // A confirmed import is closed: all that is left to happen is the confirm's own answer.
-  if (O.isSome(world.closed)) {
-    return O.exists(world.confirm, (confirm) => O.isSome(confirm.answer)) ? [[{ _tag: "ConfirmAnswers" }]] : []
-  }
   const draft = world.draft
+  // A confirmed import is closed: all that is left to happen is the confirm's own answer (or its loss on the way
+  // back), the person's decisions while it is out, and reads of the closed import.
+  if (O.isSome(world.closed)) {
+    const shows = regionShows(world)
+    const reading = draft.onScreen && O.isSome(draft.held)
+    const decides = A.filter(
+      A.flatMap(rows, (row) => A.map(tos, (to) => ({ row, to }))),
+      (pair) => reading && !Eq.equals(over(shows, change(pair.row, pair.to)), shows)
+    )
+    const left: ReadonlyArray<ReadonlyArray<Command>> = [
+      A.map(decides, (pair): Command => ({ _tag: "Decide", ...pair })),
+      O.isSome(world.confirm) ? [{ _tag: "ConfirmAnswers" }, { _tag: "ConfirmFails" }] : [],
+      O.exists(world.read, O.isNone) ? [{ _tag: "ServerTakesRead" }] : [],
+      O.exists(world.read, O.isSome) ? [{ _tag: "ReadArrives" }] : [],
+      draft.onScreen ? [{ _tag: "Leave" }] : [{ _tag: "ComeBack" }, { _tag: "ComeBackQuickly" }],
+      draft.stalled ? [{ _tag: "SaveAgain" }] : [],
+      // A closed import refuses a save sent to it.
+      O.isSome(world.save) ? [{ _tag: "SaveRefused" }] : []
+    ]
+    return A.filter(left, A.isReadonlyArrayNonEmpty)
+  }
   const reading = draft.onScreen && O.isSome(draft.held)
   const seen = regionShows(world)
   const pairs = A.flatMap(rows, (row) => A.map(tos, (to) => ({ row, to })))
@@ -910,12 +961,22 @@ describe("a confirm", () => {
     run(world, { _tag: "ServerTakesConfirm" })
     expect([O.isNone(world.closed), world.server.decisions]).toEqual([true, { a: out, b: kept }])
     run(world, { _tag: "ConfirmAnswers" })
-    // Not made, and said so; the newer picture is asked for.
-    expect([world.draft.confirm, world.draft.heldBack, O.isSome(world.read)]).toEqual(["idle", O.some(0), true])
+    // Not made, and said so; the newer picture is asked for, and the button waits for it.
+    expect([world.draft.confirm, world.draft.heldBack, O.isSome(world.read)]).toEqual([
+      "idle",
+      O.some({ read: false, apart: 0, accepts: [] }),
+      true
+    ])
+    run(world, { _tag: "PressConfirm" })
+    expect(O.isNone(world.confirm)).toBe(true)
     run(world, { _tag: "ServerTakesRead" })
     run(world, { _tag: "ReadArrives" })
     // Their row is on screen now, counted, and the region was started again from it.
-    expect([shown(world.draft), world.draft.heldBack, world.restarts]).toEqual([{ a: out, b: kept }, O.some(1), 1])
+    expect([shown(world.draft), world.draft.heldBack, world.restarts]).toEqual([
+      { a: out, b: kept },
+      O.some({ read: true, apart: 1, accepts: [] }),
+      1
+    ])
     run(world, { _tag: "PressConfirm" })
     expect([sent(world), world.draft.heldBack]).toEqual([O.some([2, { set: {}, clear: [] }]), O.none()])
     run(world, { _tag: "ServerTakesConfirm" })
@@ -935,7 +996,8 @@ describe("a confirm", () => {
     run(world, { _tag: "ServerTakesConfirm" })
     expect(world.closed).toEqual(O.some({ a: out, b: kept }))
     run(world, { _tag: "ConfirmAnswers" })
-    expect(world.draft).toEqual({ ...emptyDraft, onScreen: true })
+    // Ended on the confirmed picture, with nothing left over: both rows are in it.
+    expect(world.draft).toEqual({ ...emptyDraft, onScreen: true, epoch: 1, ended: true })
   })
 
   it("that waits is held back when its save's answer says somebody else saved in between", () => {
@@ -948,13 +1010,16 @@ describe("a confirm", () => {
     // Two revisions on from the picture held: no confirm goes, the newer picture is asked for.
     expect([world.draft.confirm, world.draft.heldBack, O.isNone(world.confirm), O.isSome(world.read)]).toEqual([
       "idle",
-      O.some(0),
+      O.some({ read: false, apart: 0, accepts: [] }),
       true,
       true
     ])
     run(world, { _tag: "ServerTakesRead" })
     run(world, { _tag: "ReadArrives" })
-    expect([shown(world.draft), world.draft.heldBack]).toEqual([{ a: out, b: kept }, O.some(1)])
+    expect([shown(world.draft), world.draft.heldBack]).toEqual([
+      { a: out, b: kept },
+      O.some({ read: true, apart: 1, accepts: [] })
+    ])
   })
 
   it("that waits is held back by a newer picture that arrives before its save is answered", () => {
@@ -965,7 +1030,7 @@ describe("a confirm", () => {
     run(world, { _tag: "Decide", row: "a", to: "out" })
     run(world, { _tag: "PressConfirm" })
     run(world, { _tag: "ReadArrives" })
-    expect([world.draft.confirm, world.draft.heldBack]).toEqual(["idle", O.some(1)])
+    expect([world.draft.confirm, world.draft.heldBack]).toEqual(["idle", O.some({ read: true, apart: 1, accepts: [] })])
     run(world, { _tag: "ServerTakesSave" })
     run(world, { _tag: "SaveAnswers" })
     expect(O.isNone(world.confirm)).toBe(true)
@@ -982,31 +1047,43 @@ describe("a confirm", () => {
     expect(world.closed).toEqual(O.some({}))
   })
 
-  it("that did not get through leaves the rows it carried to be saved as any decision", () => {
+  it("that did not get through sends nothing before the import is read; the rows then wait, and Save again sends them", () => {
     const world = opened()
     run(world, { _tag: "Decide", row: "a", to: "out" })
     run(world, { _tag: "SaveFails" })
     run(world, { _tag: "PressConfirm" })
     run(world, { _tag: "ConfirmFails" })
-    expect([world.draft.confirm, O.map(world.save, (save) => save.delta)]).toEqual([
+    // Nothing is sent: what the confirm wrote is not known. The import is asked for.
+    expect([world.draft.confirm, O.isNone(world.save), O.isSome(world.read), world.draft.stalled]).toEqual([
       "idle",
-      O.some({ set: { a: out }, clear: [] })
+      true,
+      true,
+      true
     ])
+    // It wrote nothing: the read answers the revision held, which says nothing new, so the rows wait for the person.
+    run(world, { _tag: "ServerTakesRead" })
+    run(world, { _tag: "ReadArrives" })
+    expect(O.isNone(world.save)).toBe(true)
+    run(world, { _tag: "SaveAgain" })
+    expect(O.map(world.save, (save) => save.delta)).toEqual(O.some({ set: { a: out }, clear: [] }))
     quiet(world)
     expect(world.server.decisions).toEqual({ a: out })
   })
 })
 
 describe("rows that wait, kept in the browser", () => {
-  const waitingA = O.some({ rows: { a: O.some(out) }, madeOn: 4, leftOver: false })
+  const waitingA = O.some({ rows: { a: O.some(out) }, madeOn: { a: 4 }, confirms: O.some(0), leftOver: false })
 
   it("come back after a reload over what the server holds, and are sent again as made on the revision they were made on", () => {
     const back = step(emptyDraft, DraftEvent.Opened({ kept: waitingA }))
     // Nothing is sent before the import's picture has arrived: it says whether the import can still be decided.
     expect([back.effects, back.draft.stalled, back.draft.unsent]).toEqual([[], true, { a: O.some(out) }])
-    const arrived = step(back.draft, DraftEvent.ViewArrived({ revision: 9, decisions: { b: kept }, open: true }))
+    const arrived = step(
+      back.draft,
+      DraftEvent.ViewArrived({ revision: 9, decisions: { b: kept }, open: true, confirms: 0 })
+    )
     expect(shown(arrived.draft)).toEqual({ a: out, b: kept })
-    expect(arrived.effects).toEqual([DraftEffect.Send({ delta: { set: { a: out }, clear: [] }, madeOn: 4 })])
+    expect(arrived.effects).toEqual([DraftEffect.Send({ delta: { set: { a: out }, clear: [] }, madeOn: { a: 4 } })])
   })
 
   it("are sent again when a picture arrives after a save that failed, and the failure is said once", () => {
@@ -1038,7 +1115,7 @@ describe("rows that wait, kept in the browser", () => {
       O.some({ a: O.some(out) }),
       true
     ])
-    expect(world.kept).toEqual(O.some({ rows: { a: O.some(out) }, madeOn: 0, leftOver: true }))
+    expect(world.kept).toEqual(O.some({ rows: { a: O.some(out) }, madeOn: {}, confirms: O.none(), leftOver: true }))
     // A reload before the result was left: the rows come back as left over, and are named again, not sent.
     run(world, { _tag: "Reload" })
     run(world, { _tag: "ServerTakesRead" })
@@ -1067,16 +1144,16 @@ describe("a save that names what it was made on", () => {
   // The Review step is drawn, and holds revision 5.
   const held = step(
     step(emptyDraft, DraftEvent.Opened({ kept: O.none() })).draft,
-    DraftEvent.ViewArrived({ revision: 5, decisions: {}, open: true })
+    DraftEvent.ViewArrived({ revision: 5, decisions: {}, open: true, confirms: 0 })
   ).draft
 
   it("names the revision the earliest waiting row was decided on, whatever was read since", () => {
     const first = step(held, DraftEvent.Decided({ changes: { a: O.some(out) } }))
-    expect(first.effects).toEqual([DraftEffect.Send({ delta: { set: { a: out }, clear: [] }, madeOn: 5 })])
+    expect(first.effects).toEqual([DraftEffect.Send({ delta: { set: { a: out }, clear: [] }, madeOn: { a: 5 } })])
     // The save fails; a newer picture arrives (somebody matched a column): the row is sent again as made on 5.
     const failed = step(first.draft, DraftEvent.SaveFailed()).draft
-    const newer = step(failed, DraftEvent.ViewArrived({ revision: 8, decisions: {}, open: true }))
-    expect(newer.effects).toEqual([DraftEffect.Send({ delta: { set: { a: out }, clear: [] }, madeOn: 5 })])
+    const newer = step(failed, DraftEvent.ViewArrived({ revision: 8, decisions: {}, open: true, confirms: 0 }))
+    expect(newer.effects).toEqual([DraftEffect.Send({ delta: { set: { a: out }, clear: [] }, madeOn: { a: 5 } })])
   })
 
   it("takes out the accepts the server did not apply, keeps the rest of the row, and says which", () => {
@@ -1103,5 +1180,160 @@ describe("a save that names what it was made on", () => {
     expect(A.map(one.effects, (effect) => effect._tag)).toEqual(["Put", "Send"])
     const two = step(one.draft, DraftEvent.SaveAnswered({ revision: 7, changed: true, notApplied: [] }))
     expect(A.map(two.effects, (effect) => effect._tag)).toEqual(["Put", "Ask"])
+  })
+})
+
+describe("a confirm and the rows around it (his answers 4 and 5)", () => {
+  it("made while the person decided another row: the draft ends on the confirmed picture and that row is named", () => {
+    const world = opened()
+    run(world, { _tag: "PressConfirm" })
+    run(world, { _tag: "ServerTakesConfirm" })
+    // The commit takes seconds on a large file; the region stays live.
+    run(world, { _tag: "Decide", row: "a", to: "out" })
+    run(world, { _tag: "ConfirmAnswers" })
+    expect([world.draft.ended, world.draft.leftOver, world.kept]).toEqual([
+      true,
+      O.some({ a: O.some(out) }),
+      O.some({ rows: { a: O.some(out) }, madeOn: {}, confirms: O.none(), leftOver: true })
+    ])
+  })
+
+  it("refused because somebody else confirmed it sends nothing: the import is read, and its rows are named", () => {
+    const world = opened()
+    run(world, { _tag: "Decide", row: "a", to: "out" })
+    run(world, { _tag: "SaveFails" })
+    run(world, { _tag: "SomeoneConfirms" })
+    run(world, { _tag: "PressConfirm" })
+    // The server answers AlreadyImported.
+    run(world, { _tag: "ConfirmFails" })
+    expect([O.isNone(world.save), O.isSome(world.read)]).toEqual([true, true])
+    run(world, { _tag: "ServerTakesRead" })
+    run(world, { _tag: "ReadArrives" })
+    expect([O.isNone(world.save), world.draft.ended, world.draft.leftOver]).toEqual([
+      true,
+      true,
+      O.some({ a: O.some(out) })
+    ])
+  })
+
+  it("made, with its answer lost on the way back: nothing is sent, and the closed picture names nothing it wrote", () => {
+    const world = opened()
+    run(world, { _tag: "Decide", row: "a", to: "out" })
+    run(world, { _tag: "SaveFails" })
+    run(world, { _tag: "PressConfirm" })
+    run(world, { _tag: "ServerTakesConfirm" })
+    expect(world.closed).toEqual(O.some({ a: out }))
+    run(world, { _tag: "ConfirmFails" })
+    expect(O.isNone(world.save)).toBe(true)
+    run(world, { _tag: "ServerTakesRead" })
+    run(world, { _tag: "ReadArrives" })
+    expect([O.isNone(world.save), world.draft.ended, world.draft.leftOver]).toEqual([true, true, O.none()])
+  })
+
+  it("kept from before a reload, of an import confirmed and opened again since: named once, and not sent into it", () => {
+    const kept = O.some({ rows: { a: O.some(out) }, madeOn: { a: 4 }, confirms: O.some(0), leftOver: false })
+    const back = step({ ...emptyDraft, onScreen: true }, DraftEvent.Opened({ kept }))
+    const arrived = step(back.draft, DraftEvent.ViewArrived({ revision: 9, decisions: {}, open: true, confirms: 1 }))
+    expect(A.some(arrived.effects, DraftEffect.$is("Send"))).toBe(false)
+    expect(A.filter(arrived.effects, DraftEffect.$is("Say"))).toEqual([
+      DraftEffect.Say({ what: Said.Outlived({ rows: { a: O.some(out) } }) })
+    ])
+    expect([arrived.draft.unsent, waiting(arrived.draft)]).toEqual([{}, O.none()])
+  })
+})
+
+describe("what a save and a confirm name (the review of the rebuilt draft, group 2)", () => {
+  const atFour = step(emptyDraft, DraftEvent.ViewArrived({ revision: 4, decisions: {}, open: true, confirms: 0 })).draft
+
+  it("names each row's own revision: a row waiting from long ago never dates a newer one", () => {
+    const sent = step(atFour, DraftEvent.Decided({ changes: { a: O.some(out) } }))
+    const failed = step(sent.draft, DraftEvent.SaveFailed())
+    // A newer picture: the resend of row a goes, and fails again.
+    const resent = step(failed.draft, DraftEvent.ViewArrived({ revision: 5, decisions: {}, open: true, confirms: 0 }))
+    const again = step(resent.draft, DraftEvent.SaveFailed())
+    const both = step(again.draft, DraftEvent.Decided({ changes: { b: O.some(kept) } }))
+    expect(A.filter(both.effects, DraftEffect.$is("Send"))).toEqual([
+      DraftEffect.Send({ delta: { set: { a: out, b: kept }, clear: [] }, madeOn: { a: 4, b: 5 } })
+    ])
+  })
+
+  it("decided and undone before anything of it was sent: the entry goes, and no clear is sent", () => {
+    const world = opened()
+    run(world, { _tag: "Decide", row: "b", to: "kept" })
+    run(world, { _tag: "Decide", row: "a", to: "out" })
+    run(world, { _tag: "Decide", row: "a", to: "nothing" })
+    expect(world.draft.unsent).toEqual({})
+    run(world, { _tag: "ServerTakesSave" })
+    run(world, { _tag: "SaveAnswers" })
+    expect(O.isNone(world.save)).toBe(true)
+  })
+
+  it("a row decided again behind a save whose accept was not applied loses that accept too", () => {
+    const accepted = decisionFromFlags({ accepted: ["unitCost"] })
+    const named = decisionFromFlags({ accepted: ["unitCost"], edits: { name: "Bolt" } })
+    const out1 = step(atFour, DraftEvent.Decided({ changes: { r: O.some(accepted) } }))
+    const behind = step(out1.draft, DraftEvent.Decided({ changes: { r: O.some(named) } }))
+    const answered = step(
+      behind.draft,
+      DraftEvent.SaveAnswered({ revision: 5, changed: true, notApplied: [{ rowId: "r", field: "unitCost" }] })
+    )
+    expect(A.filter(answered.effects, DraftEffect.$is("Send"))).toEqual([
+      DraftEffect.Send({
+        delta: { set: { r: decisionFromFlags({ edits: { name: "Bolt" } }) }, clear: [] },
+        madeOn: { r: 4 }
+      })
+    ])
+  })
+})
+
+describe("a confirm held back (the line that says nothing was imported)", () => {
+  const atFour = step(emptyDraft, DraftEvent.ViewArrived({ revision: 4, decisions: {}, open: true, confirms: 0 })).draft
+
+  it("that waits for its save goes on the save's own picture, read before the save's answer", () => {
+    const world = opened()
+    run(world, { _tag: "Decide", row: "a", to: "out" })
+    run(world, { _tag: "PressConfirm" })
+    run(world, { _tag: "ServerTakesSave" })
+    // The read taken after the save brings the person's own row back before the save's answer does.
+    run(world, { _tag: "ReturnToTab" })
+    run(world, { _tag: "ServerTakesRead" })
+    run(world, { _tag: "ReadArrives" })
+    expect([world.draft.confirm, world.draft.heldBack]).toEqual(["waiting", O.none()])
+    run(world, { _tag: "SaveAnswers" })
+    expect(O.map(world.confirm, (confirm) => confirm.revision)).toEqual(O.some(2))
+  })
+
+  it("that waits is held back by a picture later than its save's, even one that changes nothing shown", () => {
+    const sending = step(atFour, DraftEvent.Decided({ changes: { a: O.some(out) } }))
+    const waits = step(sending.draft, DraftEvent.ConfirmPressed())
+    // A match elsewhere (no decision changed) and then the person's row, read at 6.
+    const later = step(
+      waits.draft,
+      DraftEvent.ViewArrived({ revision: 6, decisions: { a: out }, open: true, confirms: 0 })
+    )
+    expect(later.draft.confirm).toBe("waiting")
+    const answered = step(later.draft, DraftEvent.SaveAnswered({ revision: 5, changed: true, notApplied: [] }))
+    expect([A.some(answered.effects, DraftEffect.$is("Confirm")), answered.draft.heldBack]).toEqual([
+      false,
+      O.some({ read: true, apart: 0, accepts: [] })
+    ])
+  })
+
+  it("refused for an accept taken back is held back with that accept, and asks for the newer picture", () => {
+    const accepted = decisionFromFlags({ accepted: ["unitCost"] })
+    const decided = step(atFour, DraftEvent.SaveFailed())
+    const withRow = step(decided.draft, DraftEvent.Decided({ changes: { r: O.some(accepted) } }))
+    const failed = step(withRow.draft, DraftEvent.SaveFailed())
+    const pressed = step(failed.draft, DraftEvent.ConfirmPressed())
+    expect(pressed.draft.confirm).toBe("out")
+    const stale = step(pressed.draft, DraftEvent.ConfirmStale({ accepts: [{ rowId: "r", field: "unitCost" }] }))
+    expect([stale.draft.heldBack, A.some(stale.effects, DraftEffect.$is("Ask"))]).toEqual([
+      O.some({ read: false, apart: 0, accepts: [{ rowId: "r", field: "unitCost" }] }),
+      true
+    ])
+    // The row goes as a save, without the accept.
+    expect(A.filter(stale.effects, DraftEffect.$is("Send"))).toEqual([
+      DraftEffect.Send({ delta: { set: { r: decisionFromFlags({}) }, clear: [] }, madeOn: { r: 4 } })
+    ])
   })
 })

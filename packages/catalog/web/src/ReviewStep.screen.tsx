@@ -32,7 +32,8 @@ import {
   shownDecisions,
   whileCurrent
 } from "./ReviewDraft.atoms.ts"
-import { DraftEvent } from "./Draft.machine.ts"
+import { acceptsWords } from "./ReviewDraft.atoms.ts"
+import { DraftEvent, type HeldBack } from "./Draft.machine.ts"
 import { matchColumn, suggestFixes } from "./Imports.atoms.ts"
 import { navigate } from "@inventory/ui/Route"
 import { importAddress } from "./internal/route.ts"
@@ -277,7 +278,7 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
   return (
     <>
       <ReaderWarnings table={table} />
-      <NotImportedYet rows={heldBack} />
+      <NotImportedYet why={heldBack} />
       <NotSavedYet rows={notSaved} onSaveAgain={() => happened(DraftEvent.SaveAgain())} />
       <ReviewRegion
         key={`${view.id}:${epoch}`}
@@ -360,15 +361,15 @@ function NotSavedYet(props: { rows: number; onSaveAgain: () => void }) {
  * Said above the review when a confirm was not made because the import had changed on another screen: nothing was
  * imported, the review below already shows the import as it is now, and the person confirms again.
  */
-function NotImportedYet(props: { rows: O.Option<number> }) {
+function NotImportedYet(props: { why: O.Option<HeldBack> }) {
   const narrow = useAtomValue(isNarrow)
-  if (O.isNone(props.rows)) return null
+  if (O.isNone(props.why)) return null
   return (
     <Alert role="alert" className={narrow ? "mx-4 mt-3 w-auto" : "mx-6 mt-4 w-auto"}>
       <TriangleAlertIcon aria-hidden />
-      <AlertTitle>Nothing was imported yet</AlertTitle>
+      <AlertTitle>Nothing was imported</AlertTitle>
       <AlertDescription>
-        <p>{heldBackSentence(props.rows.value)}</p>
+        <p>{heldBackSentence({ why: props.why.value, accepts: acceptsWords(props.why.value.accepts) })}</p>
       </AlertDescription>
     </Alert>
   )

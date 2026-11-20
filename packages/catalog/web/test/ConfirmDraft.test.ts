@@ -19,7 +19,7 @@ import {
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import type { ImportView } from "@inventory/catalog-contract/Import"
 import { DraftMoved } from "@inventory/catalog-contract/ImportRejection"
-import { DraftEvent, emptyDraft } from "../src/Draft.machine.ts"
+import { DraftEvent } from "../src/Draft.machine.ts"
 import { importView, importViewShown } from "../src/Imports.atoms.ts"
 import {
   confirmHeldBack,
@@ -76,7 +76,7 @@ const world = (id: ImportId) => {
   const gets: Array<Deferred.Deferred<ImportView>> = []
   const saves: Array<{
     readonly delta: DecisionDelta
-    readonly madeOn: number
+    readonly madeOn: Readonly<Record<string, number>>
     readonly answer: Deferred.Deferred<Saved>
   }> = []
   const confirms: Array<{ readonly payload: ConfirmRequest; readonly answer: Deferred.Deferred<ImportView, Refusal> }> =
@@ -139,7 +139,7 @@ describe("a confirm", () => {
       yield* Deferred.succeed(t.saves[0]!.answer, { revision: 11, changed: true, notApplied: [] })
       yield* settle
       // Row 1 is saved; the confirm carries no row at all, only the revision the screen now holds.
-      expect(t.sent()).toEqual([{ revision: 11, madeOn: 11, set: {}, clear: [] }])
+      expect(t.sent()).toEqual([{ revision: 11, madeOn: {}, set: {}, clear: [] }])
       expect(t.saves.length).toBe(1)
     })
   )
@@ -155,15 +155,21 @@ describe("a confirm", () => {
         page.said.length = 0
         t.press()
         yield* settle
-        expect(t.sent()).toEqual([{ revision: 10, madeOn: 10, set: {}, clear: [] }])
+        expect(t.sent()).toEqual([{ revision: 10, madeOn: {}, set: {}, clear: [] }])
         const asked = t.gets.length
         yield* Deferred.fail(
           t.confirms[0]!.answer,
           DraftMoved.make({ reason: "Someone else changed this import.", revision: 11 })
         )
         yield* settle
-        // Nothing was imported and the screen says so above the review, not in a toast that goes away.
-        expect([t.confirming(), t.heldBack(), page.said, page.went]).toEqual([false, O.some(0), [], []])
+        // Nothing was imported and the screen says so above the review, not in a toast that goes away; the button
+        // waits while the newer picture is read.
+        expect([t.confirming(), t.heldBack(), page.said, page.went]).toEqual([
+          true,
+          O.some({ read: false, apart: 0, accepts: [] }),
+          [],
+          []
+        ])
         expect([t.gets.length, t.confirms.length]).toEqual([asked + 1, 1])
         // The newer picture: somebody else left row 5 out.
         yield* Deferred.succeed(
@@ -171,7 +177,11 @@ describe("a confirm", () => {
           t.at({ revision: 11, decisions: { "row-7": kept, "row-5": out } })
         )
         yield* settle
-        expect([t.shown(), t.heldBack()]).toEqual([{ "row-7": kept, "row-5": out }, O.some(1)])
+        expect([t.shown(), t.heldBack(), t.confirming()]).toEqual([
+          { "row-7": kept, "row-5": out },
+          O.some({ read: true, apart: 1, accepts: [] }),
+          false
+        ])
 
         // The person has seen it and confirms again: on the newer revision, and the server makes it.
         t.press()
@@ -181,7 +191,13 @@ describe("a confirm", () => {
         yield* Deferred.succeed(t.confirms[1]!.answer, t.at({ revision: 12, status: "imported", result }))
         yield* settle
         expect([t.held().revision, t.held().status]).toEqual([12, "imported"])
-        expect(t.draft()).toEqual({ ...emptyDraft, onScreen: true, epoch: t.draft().epoch })
+        // The draft ends on the confirmed picture: nothing held, nothing left over (every row was in the confirm).
+        expect([t.draft().ended, t.draft().leftOver, O.isNone(t.draft().held), t.draft().unsent]).toEqual([
+          true,
+          O.none(),
+          true,
+          {}
+        ])
         expect(page.went).toEqual([`/?import=${id}&step=result`])
       })
   )

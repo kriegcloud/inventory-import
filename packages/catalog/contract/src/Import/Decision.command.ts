@@ -297,16 +297,21 @@ export const DecisionDelta = S.Struct({
 /** The decoded value of `DecisionDelta`: what changed in the draft since the last save. */
 export type DecisionDelta = typeof DecisionDelta.Type
 
-const madeOn = S.Int.annotate({
-  description:
-    "The draft's revision the screen held when the earliest of these decisions was made (`ImportView.revision` as it was read then)",
-  examples: [11]
-}).annotateKey({
-  description:
-    "The revision of the draft these decisions were made on. An accept of a proposal for a field whose column was matched again after that revision is not applied: the person accepted what the field read before",
-  messageMissingKey:
-    "Send `madeOn`: the import's revision as the screen held it when the first of these rows was decided."
-})
+/** A draft's revision: 0 for a draft nobody has changed, one more for every change. Never negative. */
+const Revision = S.Int.check(S.isGreaterThanOrEqualTo(0))
+
+const madeOn = S.Record(S.String, Revision)
+  .annotate({
+    description:
+      "For each row in `set`, the draft's revision the screen held when that row was last decided (`ImportView.revision` as it was read then)",
+    examples: [{ "row-55": 11, "row-9": 12 }]
+  })
+  .annotateKey({
+    description:
+      "The revision each row's decision was made on. An accept of a proposal for a field whose column was matched again after that row's revision is not applied: the person accepted what the field read before. A row of `set` left out counts as made on revision 0. A revision later than the draft's is refused",
+    messageMissingKey:
+      "Send `madeOn`: for each row in `set`, the import's revision as the screen held it when that row was decided."
+  })
 
 /**
  * An accept the server did not apply: the field's column was matched again after the decision was made, so the
@@ -341,9 +346,9 @@ export type SaveRequest = typeof SaveRequest.Type
  * and never one the screen did not show.
  */
 export const ConfirmRequest = S.Struct({
-  revision: S.Int.annotate({
+  revision: Revision.annotate({
     description:
-      "The draft's revision as the confirming screen last read it (`ImportView.revision`, or the `revision` a save of this screen's answered with `changed: true`)",
+      "The draft's revision as the confirming screen last read it: `ImportView.revision`, or the `revision` a save of this screen's answered with, but only when that save answered `changed: true` with exactly one more than the revision the screen held. Otherwise somebody else's decision may be in it, and the screen reads the import again before it confirms",
     examples: [12]
   }).annotateKey({
     description:

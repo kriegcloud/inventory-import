@@ -10,11 +10,11 @@ import {
   BreadcrumbSeparator
 } from "@inventory/ui/components/breadcrumb"
 import { ReviewSkeleton, someColumns, StepsSkeleton, TablePageSkeleton, UploadSkeleton } from "@inventory/ui/Skeletons"
-import { useAtomValue } from "@effect/atom-react"
+import { useAtomMount, useAtomValue } from "@effect/atom-react"
 import { sessionView } from "@inventory/access-web/Session"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import { importInAddress } from "@inventory/catalog-web/Route"
-import { importViewShown } from "@inventory/catalog-web/Imports"
+import { askBeforeLeaving, importViewShown } from "@inventory/catalog-web/Imports"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as Atom from "effect/reactivity/Atom"
 import { contentBelow } from "@inventory/ui/ContentWidth"
@@ -123,6 +123,8 @@ function Crumbs(props: { page: AppPage; importId: ImportId | undefined }) {
  */
 export default function Workspace() {
   const { path, params } = useAtomValue(location)
+  // The browser asks before the page is left while an import has rows still to be sent, whatever page is shown.
+  useAtomMount(askBeforeLeaving)
   // An address that names no page shows the first one, as before.
   const current = appPages.find((page) => page.path === path) ?? appPages[0]
   if (current === undefined) return null

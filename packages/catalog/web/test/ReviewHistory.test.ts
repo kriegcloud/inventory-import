@@ -175,7 +175,7 @@ describe("the undo history kept in the browser", () => {
         yield* settle
         first.run({ type: "leaveOut" as const, rowIds: ["row-2"] })
         yield* settle
-        expect(first.sent).toEqual([{ madeOn: 10, set: { "row-2": out }, clear: [] }])
+        expect(first.sent).toEqual([{ madeOn: { "row-2": 10 }, set: { "row-2": out }, clear: [] }])
 
         // A refresh. Somebody else has left row 3 out meanwhile: the server holds that, and not row 2.
         const again = visit(id)
@@ -184,7 +184,7 @@ describe("the undo history kept in the browser", () => {
         // Both are on the screen: what the server holds, with the person's waiting row over it.
         expect(R.keys(saved(again.state()))).toEqual(["row-2", "row-3"])
         // And the row is sent again as the person's decision, made on the revision it was made on.
-        expect(again.sent).toEqual([{ madeOn: 10, set: { "row-2": out }, clear: [] }])
+        expect(again.sent).toEqual([{ madeOn: { "row-2": 10 }, set: { "row-2": out }, clear: [] }])
         yield* settle
         // The server took it: nothing of it waits in this browser any more.
         expect(A.filter(R.keys(browser.kept), Str.includes("waiting"))).toEqual([])

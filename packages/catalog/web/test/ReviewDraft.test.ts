@@ -56,7 +56,7 @@ const world = (id: ImportId) => {
   const gets: Array<Deferred.Deferred<ImportView>> = []
   const saves: Array<{
     readonly delta: DecisionDelta
-    readonly madeOn: number
+    readonly madeOn: Readonly<Record<string, number>>
     readonly answer: Deferred.Deferred<Saved, Refusal>
   }> = []
   const registry = registryFor({

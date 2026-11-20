@@ -46,7 +46,7 @@ layer(TypedApp)("an import of items", (it) => {
         const decisions = {
           params: { id: staged.id },
           payload: {
-            madeOn: staged.revision,
+            madeOn: { "row-55": staged.revision, "row-18": staged.revision },
             set: {
               "row-55": decisionFromFlags({ accepted: ["unitCost"] }),
               "row-18": decisionFromFlags({ reverted: ["uom"] })
@@ -62,7 +62,7 @@ layer(TypedApp)("an import of items", (it) => {
         const confirmed = yield* client.imports
           .commit({
             params: { id: staged.id },
-            payload: { revision: saved.revision, madeOn: saved.revision, set: {}, clear: [] }
+            payload: { revision: saved.revision, madeOn: {}, set: {}, clear: [] }
           })
           .pipe(marcus)
         const result = O.getOrThrow(confirmed.result)
@@ -133,7 +133,7 @@ layer(TypedApp)("an import of items", (it) => {
         const second = yield* client.imports
           .commit({
             params: { id: again.id },
-            payload: { revision: again.revision, madeOn: again.revision, set: {}, clear: [] }
+            payload: { revision: again.revision, madeOn: {}, set: {}, clear: [] }
           })
           .pipe(marcus)
         expect([
@@ -151,7 +151,7 @@ layer(TypedApp)("an import of items", (it) => {
         yield* client.imports
           .commit({
             params: { id: first.id },
-            payload: { revision: first.revision, madeOn: first.revision, set: {}, clear: [] }
+            payload: { revision: first.revision, madeOn: {}, set: {}, clear: [] }
           })
           .pipe(marcus)
         const third = yield* upload({ client, table: changed }).pipe(marcus)
@@ -161,7 +161,7 @@ layer(TypedApp)("an import of items", (it) => {
             params: { id: third.id },
             payload: {
               revision: third.revision,
-              madeOn: third.revision,
+              madeOn: { "row-2": third.revision },
               set: { "row-2": decisionFromFlags({ stored: "replace" }) },
               clear: []
             }

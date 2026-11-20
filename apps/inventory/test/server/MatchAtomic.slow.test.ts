@@ -118,7 +118,7 @@ layer(App)("a match and a save that fall into each other", (it) => {
           .decide({
             params,
             payload: {
-              madeOn: view.revision + 1,
+              madeOn: { "row-55": view.revision + 1 },
               set: { "row-55": decisionFromFlags({ accepted: ["unitCost"] }) },
               clear: []
             }
@@ -148,7 +148,7 @@ layer(App)("a match and a save that fall into each other", (it) => {
           .decide({
             params,
             payload: {
-              madeOn: view.revision,
+              madeOn: { "row-55": view.revision },
               set: { "row-55": decisionFromFlags({ accepted: ["unitCost"] }) },
               clear: []
             }
@@ -171,7 +171,7 @@ layer(App)("a match and a save that fall into each other", (it) => {
           .decide({
             params,
             payload: {
-              madeOn: view.revision,
+              madeOn: { "row-55": view.revision },
               set: { "row-55": decisionFromFlags({ accepted: ["unitCost"] }) },
               clear: []
             }

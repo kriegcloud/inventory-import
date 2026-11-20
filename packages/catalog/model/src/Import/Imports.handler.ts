@@ -40,7 +40,8 @@ import {
   AlreadyImported,
   DraftMoved,
   ImportKept,
-  ColumnNotFound
+  ColumnNotFound,
+  RevisionAhead
 } from "@inventory/catalog-contract/ImportRejection"
 import { UploadStart, UploadChunk, uploadDiscard } from "@inventory/catalog-contract/Upload"
 import { requireRole, CurrentActor } from "@inventory/kernel/Actor"
@@ -52,30 +53,36 @@ import { stagingProblem } from "../Staging/Staging.rules.ts"
 
 /**
  * Decisions as they may be applied: an accept of a proposal for a field whose column was matched again after the
- * revision the decisions were made on (`madeOn`) is taken out, and named. The person accepted what the field read
- * before the match; the row now has another proposal, or none.
+ * revision its row was decided on (the row's `madeOn`; 0 when the request names none) is taken out, and named. The
+ * person accepted what the field read before the match; the row now has another proposal, or none. Each row on its
+ * own revision: a row decided long ago never makes a newer row's accept stale.
  *
- * @example withoutStaleAccepts({ choices: [{ field: "unitCost", column: 7, by: "person", at: 12 }], madeOn: 11, set })
- * // an accept of unitCost in `set` is in `notApplied`; made on revision 12 or later it is applied
+ * @example withoutStaleAccepts({ choices: [{ field: "unitCost", column: 7, by: "person", at: 12 }], madeOn: { "row-55": 11 }, set })
+ * // an accept of unitCost on row 55 is in `notApplied`; decided on revision 12 or later it is applied
  */
 export const withoutStaleAccepts = (input: {
   readonly choices: ReadonlyArray<MappingChoice>
-  readonly madeOn: number
+  readonly madeOn: Readonly<Record<string, number>>
   readonly set: SavedDecisions
 }): { readonly applied: SavedDecisions; readonly notApplied: ReadonlyArray<StaleAccept> } => {
-  const rematched = A.map(
-    A.filter(input.choices, (choice) => choice.at > input.madeOn),
-    (choice): string => choice.field
-  )
-  if (!A.isReadonlyArrayNonEmpty(rematched)) return { applied: input.set, notApplied: [] }
-  const stale = (field: string): boolean => A.contains(rematched, field)
+  const stale = (rowId: string) => {
+    const made = O.getOrElse(R.get(input.madeOn, rowId), () => 0)
+    return (field: string): boolean => A.some(input.choices, (choice) => choice.field === field && choice.at > made)
+  }
   return {
-    applied: R.map(input.set, (decision) => ({ ...decision, accepted: A.filter(decision.accepted, (f) => !stale(f)) })),
-    notApplied: A.flatMap(R.toEntries(input.set), ([id, decision]) =>
-      A.map(A.filter(decision.accepted, stale), (field) => ({ rowId: id, field }))
+    applied: R.map(input.set, (decision, rowId) => ({
+      ...decision,
+      accepted: A.filter(decision.accepted, (field) => !stale(rowId)(field))
+    })),
+    notApplied: A.flatMap(R.toEntries(input.set), ([rowId, decision]) =>
+      A.map(A.filter(decision.accepted, stale(rowId)), (field) => ({ rowId, field }))
     )
   }
 }
+
+/** The latest revision a request names, of a row's `madeOn` and a confirm's `revision`: none ahead of `draft`'s. */
+const latestNamed = (madeOn: Readonly<Record<string, number>>, also: ReadonlyArray<number> = []): number =>
+  A.reduce([...R.values(madeOn), ...also], 0, (latest, revision) => Math.max(latest, revision))
 
 /**
  * A draft's stored decisions with one person's unsaved ones laid over them, as the confirm will store them: a row
@@ -260,9 +267,10 @@ export const importsEndpoints = Effect.gen(function* () {
     triesLeft: number
   ): Effect.fn.Return<
     { readonly revision: number; readonly changed: boolean; readonly notApplied: ReadonlyArray<StaleAccept> },
-    AlreadyImported | ImportNotFound
+    AlreadyImported | ImportNotFound | RevisionAhead
   > {
     const draft = yield* find(actor, id)
+    if (latestNamed(payload.madeOn) > draft.revision) return yield* ahead(draft)
     // An accept made before its field's column was matched again is not applied; the rest of the row's decision is.
     const choices = yield* imports.choices(draft)
     const { applied, notApplied } = withoutStaleAccepts({ choices, madeOn: payload.madeOn, set: payload.set })
@@ -293,6 +301,13 @@ export const importsEndpoints = Effect.gen(function* () {
       reason:
         "Someone else changed this import while you were reviewing it. Nothing was imported: look at what changed, then confirm again.",
       revision
+    })
+
+  const ahead = (draft: Draft) =>
+    RevisionAhead.make({
+      reason:
+        "This request names a version of the import the server has not reached. Nothing was saved: read the import again.",
+      revision: draft.revision
     })
 
   const kept = (draft: Draft) =>
@@ -480,6 +495,8 @@ export const importsEndpoints = Effect.gen(function* () {
       const actor = yield* requireRole("editor")
       const draft = yield* find(actor, params.id)
       if (draft.status !== "open") return yield* closed(draft)
+      // A revision the draft has not reached is not taken on the client's word.
+      if (latestNamed(payload.madeOn, [payload.revision]) > draft.revision) return yield* ahead(draft)
       // Somebody has changed the draft since the picture this confirm was made on: nothing is written, and the
       // person is shown the newer picture before they confirm. The store checks the same again inside its write.
       if (draft.revision !== payload.revision) return yield* moved(draft.revision)

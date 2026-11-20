@@ -34,13 +34,18 @@ export interface StaleAccept {
   readonly field: string
 }
 
+/** For each of the person's rows, the revision of the picture the screen held when the row was last decided. */
+export type MadeOn = Readonly<Record<string, number>>
+
 /**
  * The person's rows the server has not taken, as this browser keeps them between visits: after a reload they come
- * back as the person's waiting rows and are sent again. `madeOn` is the revision the earliest of them was made on.
+ * back as the person's waiting rows and are sent again. `madeOn` says, row by row, the revision each was decided on;
+ * `confirms` how many confirms the import had in the picture they were decided over, none when that is not known.
  */
 export interface Waiting {
   readonly rows: RowChanges
-  readonly madeOn: number
+  readonly madeOn: MadeOn
+  readonly confirms: O.Option<number>
   /**
    * True for rows left over by an import that was closed, kept only until the result has named them: they are never
    * sent again.
@@ -65,12 +70,34 @@ export interface Draft {
   readonly flight: O.Option<RowChanges>
   readonly unsent: RowChanges
   /**
-   * The revision the screen held when the earliest row now in `unsent` was decided, and the same for `flight`: what
-   * a save and a confirm name as `madeOn`, so the server can tell an accept made before its field's column was
-   * matched again. Each means something only while its rows are there.
+   * For each row in `unsent`, and in `flight`, the revision the screen held when it was last decided: what a save and
+   * a confirm name as each row's `madeOn`, so the server can tell an accept made before its field's column was matched
+   * again. One revision per row: a row decided long ago never makes a newer row's accept look stale, and the reverse.
    */
-  readonly unsentOn: number
-  readonly flightOn: number
+  readonly unsentOn: MadeOn
+  readonly flightOn: MadeOn
+  /**
+   * A confirm was refused or lost without the server saying the draft had moved: nothing is sent until a picture
+   * says whether the import can still be decided (a closed one names the rows; an open one has them sent).
+   */
+  readonly waitsForPicture: boolean
+  /**
+   * Rows of the person's that went out in a save or a confirm whose fate is not known (it failed or was lost, so the
+   * server may have taken it), or that came back from before a reload. Decided back to what the screen knew, such a
+   * row is still sent: what the server holds of it is not known.
+   */
+  readonly sentBefore: ReadonlyArray<string>
+  /**
+   * How many confirms the import had in the last picture seen (or, for rows kept from before a reload, the picture
+   * they were decided over): none until known. More in a later picture means the import was confirmed since, and
+   * opened again if it is open: rows still waiting from before that were never part of it.
+   */
+  readonly confirms: O.Option<number>
+  /**
+   * A picture that arrived while the confirm waited for the person's save, and changed nothing the screen shows: its
+   * revision, so the save's answer can tell whether it was this save's own picture or a later one.
+   */
+  readonly seenWhileWaiting: O.Option<number>
   /** A save failed in a way that may pass: the person's rows wait in `unsent` for "Save again" or the next decision. */
   readonly stalled: boolean
   /** Goes up when the region must start again: the decisions under it changed, and not by the person's own hand. */
@@ -88,10 +115,9 @@ export interface Draft {
   readonly confirm: "idle" | "waiting" | "out"
   /**
    * The last confirm was not made because the import had changed since the picture it was pressed on: said on the
-   * screen until the person confirms again, with how many rows the newer picture decided otherwise (none counted
-   * until it is read; a match or a suggestion changes no row).
+   * screen until the person confirms again (`HeldBack`).
    */
-  readonly heldBack: O.Option<number>
+  readonly heldBack: O.Option<HeldBack>
   /**
    * The person's rows that were never saved because the import was closed meanwhile (somebody else confirmed it),
    * or because the server refused them: kept until the result screen has named them, never sent.
@@ -106,14 +132,29 @@ export interface Draft {
   readonly ended: boolean
 }
 
+/**
+ * Why the last confirm was not made, as the screen says it: nothing was imported, and the newer picture is being
+ * read (`read` false: the button waits for it) or has been read, with how many rows it decides otherwise (`apart`; a
+ * match changes no row) and the accepts the server took back because their column was matched again.
+ */
+export interface HeldBack {
+  readonly read: boolean
+  readonly apart: number
+  readonly accepts: ReadonlyArray<StaleAccept>
+}
+
 /** A draft of an import nobody has opened: nothing held, nothing of the person's. */
 export const emptyDraft: Draft = {
   held: O.none(),
   landed: O.none(),
   flight: O.none(),
   unsent: {},
-  unsentOn: 0,
-  flightOn: 0,
+  unsentOn: {},
+  flightOn: {},
+  waitsForPicture: false,
+  sentBefore: [],
+  confirms: O.none(),
+  seenWhileWaiting: O.none(),
   stalled: false,
   epoch: 0,
   matching: false,
@@ -161,16 +202,26 @@ export type DraftEvent = Data.TaggedEnum<{
    * A picture of the import arrived: a read, a match's answer, a card's Continue. `open`: whether the import can
    * still be decided; a picture of one that cannot ends the draft.
    */
-  ViewArrived: Picture & { readonly open: boolean }
+  ViewArrived: Picture & {
+    readonly open: boolean
+    /** How many times the import has been confirmed, taken back ones included: the view's history counts them. */
+    readonly confirms: number
+  }
   MatchStarted: {}
   MatchEnded: {}
   /** The person pressed the confirm button. */
   ConfirmPressed: {}
-  /** The server made the confirm: the import is closed and nothing of its draft is kept. */
-  ConfirmDone: {}
+  /**
+   * The server made the confirm, and answered with the import as it now is: closed, with these decisions. Rows the
+   * person decided while it was out were not part of it.
+   */
+  ConfirmDone: Picture
   /** The server refused the confirm and wrote nothing: the draft is at another revision than the one it named. */
   ConfirmMoved: {}
-  /** The confirm did not get through, or was refused for another reason: nothing is known to be written. */
+  /**
+   * The confirm did not get through, or was refused for another reason (the import is closed): what was written is
+   * not known until the import is read again.
+   */
   ConfirmFailed: {}
   /** The server refused the confirm and wrote nothing: it carried accepts made before their column was matched again. */
   ConfirmStale: { readonly accepts: ReadonlyArray<StaleAccept> }
@@ -187,6 +238,11 @@ export type Said = Data.TaggedEnum<{
   Refused: { readonly reason: string }
   /** Accepts were not applied: each row shows its proposal open again. */
   AcceptsTakenBack: { readonly accepts: ReadonlyArray<StaleAccept> }
+  /**
+   * The person's waiting rows outlived a confirm of the import (it was confirmed, and opened again, before they were
+   * sent): they were not part of it and are not sent into it.
+   */
+  Outlived: { readonly rows: RowChanges }
 }>
 export const Said = Data.taggedEnum<Said>()
 
@@ -196,7 +252,7 @@ export type DraftEffect = Data.TaggedEnum<{
    * Send these rows to the server, made on the revision `madeOn`, and say how it went with `SaveAnswered`,
    * `SaveFailed` or `SaveRefused`.
    */
-  Send: { readonly delta: DecisionDelta; readonly madeOn: number }
+  Send: { readonly delta: DecisionDelta; readonly madeOn: MadeOn }
   /** Tell the person. */
   Say: { readonly what: Said }
   /** Ask the server for the import again. */
@@ -209,7 +265,7 @@ export type DraftEffect = Data.TaggedEnum<{
    * Confirm the import as the screen shows it: the picture of `revision`, with the person's rows the server has not
    * been sent. Sent once; say how it went with `ConfirmDone`, `ConfirmMoved` or `ConfirmFailed`.
    */
-  Confirm: { readonly revision: number; readonly madeOn: number; readonly delta: DecisionDelta }
+  Confirm: { readonly revision: number; readonly madeOn: MadeOn; readonly delta: DecisionDelta }
 }>
 export const DraftEffect = Data.taggedEnum<DraftEffect>()
 
@@ -310,6 +366,9 @@ const withoutAccepts = (rows: RowChanges, stale: ReadonlyArray<StaleAccept>): Ro
       )
     : rows
 
+/** The rows' own revisions, for those rows only. */
+const madeOnOf = (rows: RowChanges, made: MadeOn): MadeOn => R.filter(made, (_revision, rowId) => R.has(rows, rowId))
+
 /** The revision of the picture held, or 0 before one is. */
 const heldAt = (draft: Draft): number => O.match(draft.held, { onNone: () => 0, onSome: (held) => held.revision })
 
@@ -328,14 +387,16 @@ const known = (draft: Draft): SavedDecisions =>
 export const waiting = (draft: Draft): O.Option<Waiting> => {
   // A draft that ended because the import was closed keeps the rows left over until the result has named them: a
   // reload before that brings them back, and the closed import names them again.
-  if (draft.ended) return O.map(draft.leftOver, (rows) => ({ rows, madeOn: 0, leftOver: true }))
+  if (draft.ended) {
+    return O.map(draft.leftOver, (rows) => ({ rows, madeOn: {}, confirms: draft.confirms, leftOver: true }))
+  }
   const rows = unconfirmed(draft)
   if (R.isEmptyReadonlyRecord(rows)) return O.none()
-  const flying = O.isSome(draft.flight)
-  const waits = !R.isEmptyReadonlyRecord(draft.unsent)
+  // A row waiting again over the one on its way is the person's latest decision of it, made on its own revision.
   return O.some({
     rows,
-    madeOn: flying && waits ? Math.min(draft.flightOn, draft.unsentOn) : flying ? draft.flightOn : draft.unsentOn,
+    madeOn: madeOnOf(rows, { ...draft.flightOn, ...draft.unsentOn }),
+    confirms: draft.confirms,
     leftOver: false
   })
 }
@@ -344,21 +405,29 @@ export const waiting = (draft: Draft): O.Option<Waiting> => {
 export const settled = (draft: Draft): boolean =>
   O.isNone(draft.landed) && O.isNone(draft.flight) && R.isEmptyReadonlyRecord(draft.unsent)
 
-/** Sends what is unsent when nothing is out: each save carries the rows changed since the last one was sent. */
-const sending = (draft: Draft): Stepped =>
-  O.isSome(draft.flight) || R.isEmptyReadonlyRecord(draft.unsent)
-    ? { draft, effects: none }
-    : {
-        draft: { ...draft, flight: O.some(draft.unsent), flightOn: draft.unsentOn, unsent: {}, stalled: false },
-        effects: [DraftEffect.Send({ delta: deltaOf(draft.unsent), madeOn: draft.unsentOn })]
-      }
+/**
+ * Sends what is unsent when nothing is out: each save carries the rows changed since the last one was sent, each
+ * with its own revision. Nothing is sent while a picture is awaited after a confirm that was refused or lost.
+ */
+const sending = (draft: Draft): Stepped => {
+  if (O.isSome(draft.flight) || R.isEmptyReadonlyRecord(draft.unsent) || draft.waitsForPicture) {
+    return { draft, effects: none }
+  }
+  const madeOn = madeOnOf(draft.unsent, draft.unsentOn)
+  return {
+    draft: { ...draft, flight: O.some(draft.unsent), flightOn: madeOn, unsent: {}, unsentOn: {}, stalled: false },
+    effects: [DraftEffect.Send({ delta: deltaOf(draft.unsent), madeOn })]
+  }
+}
 
-/** The rows of the save or the confirm that was out go back under whatever was changed since, with their revision. */
+/** The rows of the save or the confirm that was out go back under whatever was changed since, with their revisions. */
 const backToUnsent = (draft: Draft, rows: RowChanges): Draft => ({
   ...draft,
+  sentBefore: A.dedupe([...draft.sentBefore, ...R.keys(rows)]),
   flight: O.none(),
   unsent: { ...rows, ...draft.unsent },
-  unsentOn: R.isEmptyReadonlyRecord(draft.unsent) ? draft.flightOn : Math.min(draft.flightOn, draft.unsentOn)
+  unsentOn: { ...madeOnOf(rows, draft.flightOn), ...draft.unsentOn },
+  flightOn: {}
 })
 
 /**
@@ -378,14 +447,26 @@ const rowsApart = (before: SavedDecisions, after: SavedDecisions): number =>
   R.keys(changesBetween({ before, after })).length
 
 /**
- * The confirm is not made: the import changed since the picture it was pressed on. Said on the screen, with the rows
- * `counted` as decided otherwise so far; the person's rows are saved as any decision is.
+ * The confirm is not made: the import changed since the picture it was pressed on. Said on the screen: nothing was
+ * imported, and the newer picture is asked for (`read` false) or has been read, with the rows `counted` as decided
+ * otherwise so far and any accepts taken back. The person's rows are saved as any decision is.
  */
-const holdingBack = (draft: Draft, counted: number): Draft => ({
-  ...draft,
-  confirm: "idle",
-  heldBack: O.some(O.getOrElse(draft.heldBack, () => 0) + counted)
-})
+const holdingBack = (
+  draft: Draft,
+  why: { readonly read: boolean; readonly counted: number; readonly accepts?: ReadonlyArray<StaleAccept> }
+): Draft => {
+  const before = O.getOrElse(draft.heldBack, (): HeldBack => ({ read: false, apart: 0, accepts: [] }))
+  return {
+    ...draft,
+    confirm: "idle",
+    seenWhileWaiting: O.none(),
+    heldBack: O.some({
+      read: why.read,
+      apart: before.apart + why.counted,
+      accepts: [...before.accepts, ...(why.accepts ?? [])]
+    })
+  }
+}
 
 /**
  * Sends the confirm, when the screen holds a picture with nothing of the person's on its way over it: it names that
@@ -396,11 +477,19 @@ const confirming = (draft: Draft): Stepped =>
   O.match(draft.held, {
     onNone: () => ({ draft: confirmAt(draft, "idle"), effects: none }),
     onSome: (held) => {
-      // With no row of the person's to carry, the confirm was made on the picture it names.
-      const madeOn = R.isEmptyReadonlyRecord(draft.unsent) ? held.revision : draft.unsentOn
+      // Each row it carries names the revision it was decided on.
+      const madeOn = madeOnOf(draft.unsent, draft.unsentOn)
       return {
         draft: confirmAt(
-          { ...draft, flight: O.some(draft.unsent), flightOn: madeOn, unsent: {}, stalled: false },
+          {
+            ...draft,
+            flight: O.some(draft.unsent),
+            flightOn: madeOn,
+            unsent: {},
+            unsentOn: {},
+            stalled: false,
+            seenWhileWaiting: O.none()
+          },
           "out"
         ),
         effects: [DraftEffect.Confirm({ revision: held.revision, madeOn, delta: deltaOf(draft.unsent) })]
@@ -519,9 +608,17 @@ const following = (draft: Draft, picture: Picture): Stepped =>
       const apart = rowsApart(shown(draft), shown(after))
       return restarting({
         before: draft,
-        // A confirm that waits is held back by a newer picture from anywhere but the person's own save; one held
-        // back already counts the rows this picture decides otherwise.
-        after: draft.confirm === "waiting" || O.isSome(draft.heldBack) ? holdingBack(after, apart) : after,
+        after:
+          // A confirm held back already: this is the newer picture, read, with the rows it decides otherwise.
+          O.isSome(draft.heldBack)
+            ? holdingBack(after, { read: true, counted: apart })
+            : draft.confirm === "waiting"
+              ? apart === 0
+                ? // Nothing shown changed: it may be the picture the person's own save leaves. Its answer tells.
+                  { ...after, seenWhileWaiting: O.some(picture.revision) }
+                : // A newer picture from elsewhere holds the confirm back.
+                  holdingBack(after, { read: true, counted: apart })
+              : after,
         announce: !draft.matching
       })
     }
@@ -538,21 +635,37 @@ const transition = (draft: Draft, event: DraftEvent): Stepped =>
         // Rows a closed import left over come back as that, to be named: they are not the person's waiting rows.
         draft: kept.value.leftOver
           ? { ...opened, leftOver: O.some(kept.value.rows), ended: true }
-          : { ...opened, unsent: kept.value.rows, unsentOn: kept.value.madeOn, stalled: true },
+          : {
+              ...opened,
+              unsent: kept.value.rows,
+              unsentOn: kept.value.madeOn,
+              // Sent before the reload, or not: not known.
+              sentBefore: R.keys(kept.value.rows),
+              confirms: kept.value.confirms,
+              stalled: true
+            },
         effects: none
       }
     },
     Left: () => ({ draft: letGo({ ...draft, onScreen: false, matching: false }), effects: none }),
     LeftOverNamed: () => ({ draft: draft.ended ? { ...draft, leftOver: O.none() } : draft, effects: none }),
-    ConfirmDone: () => ({ draft: { ...emptyDraft, onScreen: draft.onScreen, epoch: draft.epoch }, effects: none }),
+    // The draft ends on the picture the confirm answered with: rows the person decided while it was out were not part
+    // of it, and the result names them; the rows it carried are in that picture, and are not.
+    ConfirmDone: ({ decisions, revision }) =>
+      draft.confirm !== "out" ? { draft, effects: none } : closing(confirmAt(draft, "idle"), { revision, decisions }),
     ConfirmPressed: () => {
-      if (draft.confirm !== "idle" || O.isNone(draft.held)) return { draft, effects: none }
+      // While the newer picture is being read after a confirm that was not made, the button waits for it.
+      if (draft.confirm !== "idle" || O.isNone(draft.held) || O.exists(draft.heldBack, (why) => !why.read)) {
+        return { draft, effects: none }
+      }
       const pressed: Draft = { ...draft, heldBack: O.none() }
       // Their own save is out: the confirm waits for its answer, and goes on the picture that save leaves.
       if (O.isSome(pressed.flight)) return { draft: confirmAt(pressed, "waiting"), effects: none }
       // The picture held is known to be behind (somebody else saved before the person's last save): the newer one
       // is asked for, and the confirm waits for the person to have seen it.
-      if (O.isSome(pressed.landed)) return { draft: holdingBack(pressed, 0), effects: [DraftEffect.Ask()] }
+      if (O.isSome(pressed.landed)) {
+        return { draft: holdingBack(pressed, { read: false, counted: 0 }), effects: [DraftEffect.Ask()] }
+      }
       return confirming(pressed)
     },
     // Nothing was written. The newer picture is asked for, and the person's rows are saved as any decision is.
@@ -561,43 +674,64 @@ const transition = (draft: Draft, event: DraftEvent): Stepped =>
         ? { draft, effects: none }
         : O.isSome(draft.closedSeen)
           ? closing(unconfirming(draft), draft.closedSeen.value)
-          : then(sending(holdingBack(unconfirming(draft), 0)), (after) => ({
+          : then(sending(holdingBack(unconfirming(draft), { read: false, counted: 0 })), (after) => ({
               draft: after,
               effects: [DraftEffect.Ask()]
             })),
-    // Somebody else's confirm closed it first: the draft ends on the picture that said so.
+    // Refused for another reason than a moved draft (the import is closed), or the answer was lost on its way back:
+    // what was written is not known. Nothing is sent: the rows wait, and the import is asked for. A closed picture
+    // ends the draft and names what it does not hold; an open one has the rows sent.
     ConfirmFailed: () =>
       draft.confirm !== "out"
         ? { draft, effects: none }
         : O.isSome(draft.closedSeen)
           ? closing(unconfirming(draft), draft.closedSeen.value)
-          : sending(unconfirming(draft)),
+          : // Said as a save's failure is: the rows wait on the screen, with "Save again" for the person to send them
+            // before any picture comes (a confirm that never reached the server wrote nothing, and its read answers
+            // the same revision).
+            { draft: { ...unconfirming(draft), waitsForPicture: true, stalled: true }, effects: [DraftEffect.Ask()] },
     // Nothing was written. The accepts are taken out of the rows the confirm carried, which are then saved as any
     // decision is; the person is told which, and confirms again.
+    // The confirm is held back as a moved draft's is: the line above the review says nothing was imported and names
+    // the accepts, once the newer picture (the match the person had not seen) is read.
     ConfirmStale: ({ accepts }) => {
       if (draft.confirm !== "out") return { draft, effects: none }
       if (O.isSome(draft.closedSeen)) return closing(unconfirming(draft), draft.closedSeen.value)
       const back = unconfirming(draft)
       return then(
-        sending({ ...back, unsent: withoutAccepts(back.unsent, accepts), unsentOn: heldAt(back) }),
+        sending(
+          holdingBack({ ...back, unsent: withoutAccepts(back.unsent, accepts) }, { read: false, counted: 0, accepts })
+        ),
         (after) => ({
           draft: after,
-          effects: [DraftEffect.Say({ what: Said.AcceptsTakenBack({ accepts }) })]
+          effects: [DraftEffect.Say({ what: Said.AcceptsTakenBack({ accepts }) }), DraftEffect.Ask()]
         })
       )
     },
     MatchStarted: () => ({ draft: { ...draft, matching: true }, effects: none }),
     MatchEnded: () => ({ draft: { ...draft, matching: false }, effects: none }),
-    // The person's rows, the latest over the earliest; sent at once unless a save is out. The first row that waits
-    // is made on the picture held now.
-    Decided: ({ changes }) =>
-      sending({
+    // The person's rows, the latest over the earliest; sent at once unless a save is out. Each row decided is made on the picture held now. A row decided back to what the server is known to hold, and
+    // not on its way, was never sent: its entry goes, and nothing is sent for it (a clear would take back a decision
+    // somebody else may have made on that row since).
+    Decided: ({ changes }) => {
+      const flying = O.getOrElse(draft.flight, (): RowChanges => ({}))
+      const held = known(draft)
+      const undone = (change: O.Option<RowDecision>, rowId: string): boolean =>
+        !R.has(flying, rowId) && !A.contains(draft.sentBefore, rowId) && Eq.equals(change, R.get(held, rowId))
+      const unsent = R.filter(
+        { ...draft.unsent, ...changes },
+        (change, rowId) => !(R.has(changes, rowId) && undone(change, rowId))
+      )
+      const at = heldAt(draft)
+      return sending({
         ...draft,
         leftOver: O.none(),
-        unsent: { ...draft.unsent, ...changes },
-        unsentOn: R.isEmptyReadonlyRecord(draft.unsent) ? heldAt(draft) : draft.unsentOn
-      }),
-    SaveAgain: () => sending({ ...draft, stalled: false }),
+        unsent,
+        unsentOn: madeOnOf(unsent, { ...draft.unsentOn, ...R.map(changes, () => at) })
+      })
+    },
+    // The person's own press sends the rows, a picture awaited or not.
+    SaveAgain: () => sending({ ...draft, stalled: false, waitsForPicture: false }),
     // Not lost: the rows go back under whatever was changed since, and wait. A confirm that waited for this save is
     // not made: the person is told the save failed, and presses again.
     SaveFailed: () =>
@@ -638,37 +772,42 @@ const transition = (draft: Draft, event: DraftEvent): Stepped =>
       O.match(draft.confirm === "out" ? O.none() : draft.flight, {
         onNone: () => ({ draft, effects: none }),
         onSome: (sent) => {
-          // What the server saved: the rows as sent, without the accepts it did not apply.
+          // What the server saved: the rows as sent, without the accepts it did not apply. A row decided again since,
+          // waiting behind, loses them too: the person has just been told they were taken back.
           const rows = withoutAccepts(sent, notApplied)
-          const landed = O.match(draft.held, {
+          const base: Draft = {
+            ...draft,
+            unsent: withoutAccepts(draft.unsent, notApplied),
+            flight: O.none(),
+            flightOn: {},
+            // The rows of this save are known to be written now.
+            sentBefore: A.filter(draft.sentBefore, (rowId) => !R.has(sent, rowId))
+          }
+          const landed = O.match(base.held, {
             // No picture to move on: the rows wait over whatever is read next.
             onNone: (): Stepped => ({
-              draft: { ...draft, flight: O.none(), landed: O.some({ rows, at: revision }) },
+              draft: { ...base, landed: O.some({ rows, at: revision }) },
               effects: [DraftEffect.Ask()]
             }),
             onSome: (held): Stepped => {
               // A picture read after the save is already held: the rows are in it.
-              if (revision <= held.revision) return { draft: { ...draft, flight: O.none() }, effects: none }
+              if (revision <= held.revision) return { draft: base, effects: none }
               // This save moved the draft, to the next revision after the one held: nobody else saved in between, so
               // the picture moves on by the person's own rows, with no request. A save that changed nothing moved
               // nothing: its revision is somebody else's, and says nothing of what the picture held lacks.
-              if (changed && revision === held.revision + 1 && O.isNone(draft.landed)) {
+              if (changed && revision === held.revision + 1 && O.isNone(base.landed)) {
                 const picture = { revision, decisions: over(held.decisions, rows) }
-                return {
-                  draft: { ...draft, flight: O.none(), held: O.some(picture) },
-                  effects: [DraftEffect.Put(picture)]
-                }
+                return { draft: { ...base, held: O.some(picture) }, effects: [DraftEffect.Put(picture)] }
               }
               // Somebody else saved in between, or the save changed nothing and the draft is further on than the
               // picture held: that picture is behind. The person's rows stay on screen over it, and the import is
               // asked again, at once, for everything the server holds.
               return {
                 draft: {
-                  ...draft,
-                  flight: O.none(),
+                  ...base,
                   landed: O.some({
                     rows: {
-                      ...O.match(draft.landed, { onNone: (): RowChanges => ({}), onSome: (l) => l.rows }),
+                      ...O.match(base.landed, { onNone: (): RowChanges => ({}), onSome: (l) => l.rows }),
                       ...rows
                     },
                     at: revision
@@ -690,30 +829,57 @@ const transition = (draft: Draft, event: DraftEvent): Stepped =>
               : { draft: { ...landed.draft, typed }, effects: [...told, DraftEffect.Ask()] }
           if (asked.draft.confirm === "waiting") {
             // The confirm that waited for this save goes now, on the picture the save left, when that picture is the
-            // person's own doing: moved on by this save alone, or not moved at all. Otherwise somebody else changed
-            // the import in between: it is held back, and the newer picture is already asked for.
-            return O.isNone(asked.draft.landed) && !A.isReadonlyArrayNonEmpty(notApplied)
-              ? then(asked, confirming)
-              : then({ draft: holdingBack(asked.draft, 0), effects: asked.effects }, sending)
+            // person's own doing: moved on by this save alone, or not moved at all, and no picture later than the
+            // save's own came while it waited. Otherwise the import changed in between: the confirm is held back.
+            const later = O.exists(asked.draft.seenWhileWaiting, (seen) => seen > revision)
+            if (O.isNone(asked.draft.landed) && !A.isReadonlyArrayNonEmpty(notApplied) && !later) {
+              return then(asked, confirming)
+            }
+            // Read already when the later picture is the one held; otherwise the newer picture is asked for.
+            const heldBack = holdingBack(asked.draft, { read: later && O.isNone(asked.draft.landed), counted: 0 })
+            const effects = A.some(asked.effects, DraftEffect.$is("Ask"))
+              ? asked.effects
+              : heldBack.heldBack.pipe(O.exists((why) => why.read))
+                ? asked.effects
+                : [...asked.effects, DraftEffect.Ask()]
+            return then({ draft: heldBack, effects }, sending)
           }
           return then(then(asked, sending), (after) => ({ draft: letGo(after), effects: none }))
         }
       }),
-    ViewArrived: ({ decisions, open, revision }) => {
+    ViewArrived: ({ confirms, decisions, open, revision }) => {
       const picture: Picture = { revision, decisions }
       // The confirm that is out is this screen's own: its answer says whether it is the one that closed the import.
       if (!open) {
         return draft.confirm === "out"
-          ? { draft: { ...draft, closedSeen: O.some(picture) }, effects: none }
+          ? { draft: { ...draft, closedSeen: O.some(picture), confirms: O.some(confirms) }, effects: none }
           : closing(draft, picture)
       }
-      // A picture arrived, so the server can be reached: rows that waited after a failed save, or since before a
-      // reload, are sent again.
       // Open again after it had ended (reopened to review again): the rows left over were named on the result.
-      const now: Draft = draft.ended ? { ...draft, ended: false, leftOver: O.none() } : draft
+      const reopened: Draft = draft.ended ? { ...draft, ended: false, leftOver: O.none() } : draft
+      // The import was confirmed since the person's waiting rows were decided, and opened again: they were not part
+      // of that confirm, and are not sent into the reopened import. They are named, and let go.
+      const outlived = O.exists(reopened.confirms, (before) => confirms > before)
+        ? R.filter(reopened.unsent, (change, rowId) => !Eq.equals(R.get(decisions, rowId), change))
+        : {}
+      // Only a picture newer than the one held (or the first) is the answer a refused or lost confirm waits for: the
+      // view the tab already held, given again when the step is drawn again, says nothing of what that confirm wrote.
+      const newer = O.isNone(reopened.held) || revision > heldAt(reopened)
+      const now: Draft = {
+        ...reopened,
+        ...(R.isEmptyReadonlyRecord(outlived) ? {} : { unsent: {}, unsentOn: {}, stalled: false }),
+        confirms: O.some(confirms),
+        waitsForPicture: reopened.waitsForPicture && !newer
+      }
+      const named: ReadonlyArray<DraftEffect> = R.isEmptyReadonlyRecord(outlived)
+        ? none
+        : [DraftEffect.Say({ what: Said.Outlived({ rows: outlived }) })]
+      // A picture arrived, so the server can be reached and the import can be decided: rows that waited after a failed
+      // save, since before a reload, or after a confirm that was refused or lost, are sent.
       const first = O.isNone(now.held)
-      return then(following(now, picture), (after) =>
-        first || after.stalled ? sending(after) : { draft: after, effects: none }
+      return then(
+        then({ draft: now, effects: named }, (held) => following(held, picture)),
+        (after) => (first || after.stalled || draft.waitsForPicture ? sending(after) : { draft: after, effects: none })
       )
     }
   })

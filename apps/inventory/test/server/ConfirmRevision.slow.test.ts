@@ -39,7 +39,10 @@ layer(TypedApp)("a confirm names the revision its screen showed", (it) => {
         const params = { id: staged.id }
         // Dana decides a row Marcus's screen has not shown: the draft moves on by one.
         const theirs = yield* client.imports
-          .decide({ params, payload: { madeOn: staged.revision, set: acceptComma, clear: [] } })
+          .decide({
+            params,
+            payload: { madeOn: R.map(acceptComma, () => staged.revision), set: acceptComma, clear: [] }
+          })
           .pipe(dana)
         expect(theirs).toEqual({ revision: staged.revision + 1, changed: true, notApplied: [] })
 
@@ -48,7 +51,12 @@ layer(TypedApp)("a confirm names the revision its screen showed", (it) => {
           client.imports
             .commit({
               params,
-              payload: { revision: staged.revision, madeOn: staged.revision, set: undoUnit, clear: ["row-55"] }
+              payload: {
+                revision: staged.revision,
+                madeOn: R.map(undoUnit, () => staged.revision),
+                set: undoUnit,
+                clear: ["row-55"]
+              }
             })
             .pipe(marcus)
         )
@@ -65,7 +73,15 @@ layer(TypedApp)("a confirm names the revision its screen showed", (it) => {
 
         // He has the newer picture now and confirms it: her row and his are both in what is written.
         const confirmed = yield* client.imports
-          .commit({ params, payload: { revision: still.revision, madeOn: still.revision, set: undoUnit, clear: [] } })
+          .commit({
+            params,
+            payload: {
+              revision: still.revision,
+              madeOn: R.map(undoUnit, () => still.revision),
+              set: undoUnit,
+              clear: []
+            }
+          })
           .pipe(marcus)
         const result = O.getOrThrow(confirmed.result)
         expect([confirmed.status, result.created, result.notImported]).toEqual(["imported", 155, 45])
@@ -87,7 +103,11 @@ layer(TypedApp)("a confirm names the revision its screen showed", (it) => {
       const moved = yield* client.imports
         .decide({
           params,
-          payload: { madeOn: staged.revision, set: { "row-2": decisionFromFlags({ out: true }) }, clear: [] }
+          payload: {
+            madeOn: { "row-2": staged.revision },
+            set: { "row-2": decisionFromFlags({ out: true }) },
+            clear: []
+          }
         })
         .pipe(marcus)
       // The write a handler would send had it read the draft a moment before that save landed.
@@ -139,7 +159,7 @@ layer(TypedApp)("a confirm names the revision its screen showed", (it) => {
         client.imports
           .commit({
             params: { id: staged.id },
-            payload: { revision: staged.revision, madeOn: staged.revision, set: {}, clear: [] }
+            payload: { revision: staged.revision, madeOn: {}, set: {}, clear: [] }
           })
           .pipe(marcus)
       )

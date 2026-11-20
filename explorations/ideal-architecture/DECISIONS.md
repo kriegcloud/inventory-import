@@ -763,6 +763,63 @@ takes the accepts out of the rows, draws the review again with their proposals o
 a match made on this screen is not announced as a change on another screen. Reverse: `madeOn`, `notApplied`, `at`,
 and `withoutStaleAccepts`.
 
+### 2026-11-20 — atoms, a Replace or a Keep-stored across a re-match of the SKU column
+
+A decision to replace a stored item, or keep it, was made against the item the row's SKU found; matching the SKU field
+to another column can make the row find another item, or none. Question ("SKU rematch"): what happens to such a
+decision made before the re-match? Options: "Server refuses, says so (Recommended)"; "Keep it as made". Answer:
+"Server refuses, says so". I chose; the agent recommended the same. The server does not apply it, in the same atomic
+batch as the accept rule; the row shows as undecided against what it now reads, and the screen names it as taken
+back.
+
+### 2026-11-20 — atoms, a kept row that was decided elsewhere since
+
+Rows that wait (after a failed save, or kept across a reload) were sent over whatever anybody decided on those rows
+since. Question ("Kept vs newer"): such a row was decided differently since, by somebody else or another tab: what
+happens? Options: "Hold it, show both, ask (Recommended)"; "Send it, last press wins"; "Drop hers, name it". Answer:
+"Hold it, show both, ask". I chose; the agent recommended the same. The row shows "Decided elsewhere since: <theirs>.
+Yours: <yours>" with a choice of which one stands; nothing is sent for that row until the person picks, and the other
+waiting rows go as usual.
+
+### 2026-11-20 — atoms, what a refused save does to waiting rows
+
+A refused save set every waiting row aside, the ones never sent included, and kept none of them. Question ("Refused
+save"): what becomes of them? Options: "Keep them, say why (Recommended)"; "Name them once, drop"; "As built". Answer:
+"Keep them, say why". I chose; the agent recommended the same. A refusal because the person is not signed in counts as
+waiting: the rows are sent after sign-in. A refused row stays kept, marked "not saved" with the reason, until the
+person decides it again or dismisses it; rows behind it that were never sent stay waiting. The rule: a decision is on
+the server or still waiting, never neither.
+
+### 2026-11-20 — atoms, two tabs of one person
+
+Two tabs of one person wrote one kept entry per import: each replaced or erased the other's waiting rows, and a tab that
+opened took the other's rows and sent them. Question ("Two tabs"): how are they kept? Options: "Each tab keeps its own
+(Recommended)"; "One list, merged by row". Answer: "Each tab keeps its own". I chose; the agent recommended the same.
+Each tab keeps and sends only its own waiting rows. A tab opened later takes up rows only from a tab that is gone
+(closed or crashed), never from one still open, and no tab writes over or erases another tab's entry.
+
+### 2026-11-20 — atoms, a keep-one-of-two across a re-match of the SKU column
+
+Question ("Twin rematch"): a keep-one-of-two made before the SKU field's column was matched again: what happens?
+Options: "Server refuses, says so (Recommended)"; "Keep it as made". Answer: "Server refuses, says so". I chose; the
+agent recommended the same. It is not applied; the new pair shows as undecided, and the screen names the keep as taken
+back.
+
+### 2026-11-20 — atoms, a Replace or a Keep-stored across a re-match of another column
+
+Question ("Other rematch"): a column other than SKU is matched again: what happens to a Replace or a Keep-stored made
+before it? Options: "Refuse if it changes the row (Recommended)"; "Refuse every one"; "Keep it as made". Answer:
+"Refuse if it changes the row". I chose; the agent recommended the same. It is taken back only on rows whose comparison
+with the stored item changed because of that column; those rows show as undecided and are named on the screen.
+Replaces on rows the re-match did not change stand.
+
+### 2026-11-20 — atoms, an undone fix across a re-match
+
+Question ("Undone fix"): a fix the person undid, made before its field's column was matched again: what happens?
+Options: "Server refuses, says so (Recommended)"; "Keep it as made". Answer: "Server refuses, says so". I chose; the
+agent recommended the same. It is not applied to the new value; the row shows the new suggested fix as open, and the
+screen names it as taken back.
+
 ### 2026-11-20 — no `switch`, the vendored components included
 
 Every `switch` in the repository was to be replaced, in this order of preference: a struct union becomes an

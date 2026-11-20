@@ -192,7 +192,7 @@ const { table } = useDataTable({ data: page.data?.data ?? [], columns, config: r
 return (
   <DataTable table={table} stickyHeader>
     <DataTableToolbar table={table} quick={["unit"]} search={
-        <TableSearch value={query.globalFilter} onSearch={(text) => table.setGlobalFilter(text)}
+        <TableSearch table={table}
           placeholder="Search records" working={page.isFetching && page.isPlaceholderData} maxLength={200} shortcutHint />}>
       <DataTableSortMenu table={table} align="end" />
       <DataTableFilterMenu table={table} align="end" />
@@ -202,7 +202,8 @@ return (
 ```
 
 - A table has one search box, at the left of its toolbar (`search`, a local addition; `TableSearch` in
-  `components/app` waits 300 ms, says it is working and empties with Escape). With it, the quick filters move to the
+  `@inventory/ui` is given the table: it shows the search the table holds, asks the table for the typed one after a
+  300 ms pause, says it is working and empties with Escape). With it, the quick filters move to the
   right beside the menus. A search in one column is a text filter in the Filter menu, not a second box.
 - The toolbar holds the few filters used all day (`quick`, a local addition: left out, every filterable column gets
   a control). `DataTableFilterMenu` reaches every filterable column with every comparison ("contains", "is not",

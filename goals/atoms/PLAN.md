@@ -81,6 +81,13 @@ After each package, the same count:
   calls `useAtomValue` 5, `useAtom` 7, `useAtomSet` 2, `useAtomMount` 1. Every web package and the app's `src/web`
   now hold no banned hook; `@tanstack/react-query` is still imported in 2 files, for step 8. The review's strict
   ceiling fell from 283 to 282 (sum 644).
+- **After the rework and its two reviews** (counted at `a9d9b63`): `review` keeps `useId` 3 (the region's section
+  and its title, an overlay), `useRef` 4 (each a DOM node), the vendored `useDataTable` and `useVirtualizer`, and
+  calls `useAtomValue` 69, `useAtom` 4, `useAtomSet` 2, `useAtomMount` 2, `useAtomSubscribe` 5. `ui`'s own pieces:
+  `useId` 1 (the search field's id), no `useRef`, `useAtomValue` 17, `useAtomSet` 1, `useAtomMount` 3.
+  `catalog-web`: `useId` 14, `useRef` 2, `useDeferredValue` 1, `useAtomValue` 39, `useAtom` 9, `useAtomSet` 14,
+  `useAtomMount` 2, `useAtomSubscribe` 1, `useAtomRefresh` 3. Strict ceilings now: `review` 259, `catalog-web` 228,
+  `ui` 50, `client` 20, `access-web` 14, the app 37 (sum 608).
 
 ## Proof
 
@@ -400,16 +407,16 @@ rework was under way; its groups are answered in the same commits.
 | --- | --- | --- | --- | --- |
 | 1 | A region that had gone still acted: a bulk toast's Undo, and its keys for up to 600 ms, told the caller the old region's decisions | The region's actions, its stepping and its keys return while its section is off the page (`present`, set by the section's ref callback); the keys atom has no idle time | `ReviewRegion.atoms.test.ts`: the toast's Undo pressed after the region left, and a region not yet on the page. Each fails with the guard taken out | Imported items_messy.csv, then Ctrl+Z on the Result: nothing was sent |
 | 2 | Until the first decision the region worked its state out again on every draw of its caller | The decisions are the caller's atom; the Review step's start is one derived atom, read once | catalog-web `ReviewDraft.test.ts`: the decisions stay the same object while the screen's other state changes, and nothing is told | Not measured apart: the 50,000-row reload below includes it |
-| 3 | No test of undo and redo on the region's atom | The region's atoms and actions are in a file a test can read (`ReviewRegion.atoms.ts`) | `ReviewRegion.atoms.test.ts`, six tests through a registry with a table made as the screen makes one | |
+| 3 | No test of undo and redo on the region's atom | The region's atoms and actions are in a file a test can read (`ReviewRegion.atoms.ts`) | `ReviewRegion.atoms.test.ts`, through a registry. The table those first six tests used was made with the store's own reactivity, not as the screen's hook makes one, so the second search and sort were held by none of them; the review of the rework (below) put that right | |
 | 4 | A change that changed nothing redrew the region | `change` keeps what it holds when every value is the same | The same file. Fails with the check taken out | |
-| 5 | The review package did not declare `@effect/atom-react` | Declared, with `@tanstack/store` (the facets) and `@tanstack/table-core` (the test's table) | `bun run check` (boundaries) | |
+| 5 | The review package did not declare `@effect/atom-react` | `@tanstack/store` (the facets) and `@tanstack/table-core` (the test's table) were declared then; `@effect/atom-react` was not until the review of the rework (below), though this row said so. No law holds a third-party dependency: the boundaries law reads the workspace's own packages only | None | |
 | 6, 7, 8 | Observers rebuilt on every draw; the grid's handle left behind; records changed in place inside atoms | Every ref callback is the same function across draws; there is no handle (the region asks for a row through an atom); what was changed in place is atom state written through the registry | `laws ref-callbacks` and its test | On the gallery: "Why?" opened by a click and closed by Escape; by a resting mouse after the delay, without taking the focus, and closed when the mouse left; a click while it was open by hover kept it open. The work list as chips at 1250 px. Not seen: a strip too long for its line (its edge buttons), and a cut text's card (no text was cut) |
 | 9 | The phone drawers' code was fetched inside a draw, behind a module-level flag | Fetched where the layout is derived to be narrow; no flag | | On the gallery at 390 px: Import opened the confirm drawer at the first press |
-| 10 | Only `Action` was matched by its enum | Every comparison of a tag in the review package is the enum's own guard, made once per file; the stops of "Next problem" are an exhaustive `Entry.$match`; a row's place is read through `RowPlace.guards` | `bun run check` | |
+| 10 | Only `Action` was matched by its enum | A tag in the review package is compared through the enum's own guard, made once per file; the stops of "Next problem" are an exhaustive `Entry.$match`; a row's place is read through `RowPlace.guards`. What was still an if-chain or a flag after this pass (the grid's lines, the queue's card, `OtherAnswer`, `Primary`, `Wanted`, `Stop`, two `Option` tags) is closed in the review of the rework (below) | `bun run check` | |
 | 11 | The column plan was not kept across draws | The plan, the widths, the lines and each row's headings are derived atoms | The same file (the rows are worked out once per change) | 50,000 rows below |
 | 12 | Comments and documents named what was gone | `docs/review-table.md`, the props' comments and this plan say atoms | `bun run docs:check` | |
-| 13 | The inventory of a hook's job done with no hook and no atom | Each item is one of the house forms; what is not is listed under "Choices made" | | |
-| 14 | The lint read imports only | `laws ref-callbacks` (`refs:check`, part of `bun run check`) refuses a ref callback made on each draw | `RefCallbacks.test.ts`, with planted files; on the seven files as they stood before the rework it names all eight | |
+| 13 | The inventory of a hook's job done with no hook and no atom | Each item is one of the house forms; what is not is listed under "Choices made" (the list was not complete until the review of the rework: the debounce, the reveal subscription, three caches and the props taken once were missing from it) | | |
+| 14 | The lint read imports only | `laws ref-callbacks` (`refs:check`, part of `bun run check`) refuses a ref callback made on each draw. As first written it read lines with a pattern and passed several forms; it reads the syntax tree since the review of the rework (below) | `RefCallbacks.test.ts`, with planted files; on the seven files as they stood before the rework it names all eight | |
 | 16 | After Confirm the bulk toast's Undo still acted on the Result | The same guard; and a region that goes takes its own toasts down (`toasts`, dismissed by the section's ref callback when its node goes) | `ReviewRegion.atoms.test.ts`: the toast is dismissed when the region leaves, and its Undo, pressed all the same, reaches nobody | Accepted a group (toast "2 fixes accepted" with Undo), Import, Confirm: on the Result no toast was left, Ctrl+Z sent nothing, no "not saved" message, and no saved progress for the import was in the browser's storage |
 | 17 | The pass left out items the brief's proof names, without saying so | Walked below; what was not is on the "Not seen" line by name | | |
 
@@ -543,7 +550,7 @@ that read arrives. Closing it needs the server to say whether the save changed a
 | 27 `region-pass-every-render` | Fixed by the rework (the decisions are one atom) | `ReviewDraft.test.ts` "start once" |
 | 28 `must-still-ask-untested` | The typed SKU, the jump and the refusal each have a test that fails when the ask stops | `ReviewDraft.test.ts` |
 | 31 an upload that lands after a switch of organization | Says so where the person is, with no Open | Not tested, not seen |
-| 11, 13, 14, 29 | Not done in this batch: a row that comes back while its save is out offers Edit again; a write that answers after a switch of organization reads the left organization's read again; "Edit again" after the row left opens nothing; an assistant answer applied after a return or a switch | |
+| 11, 13, 14, 29 | Not done in that batch, and done in the next ("The review of the rework, and four entries of the check of the step 6 fixes"): a row that comes back while its save is out offers Edit again; a write that answers after a switch of organization reads the left organization's read again; "Edit again" after the row left opens nothing; an assistant answer applied after a return or a switch | |
 
 A confirm now carries, beside the decisions shown, the rows the person took back that the server has not heard of.
 
@@ -556,6 +563,71 @@ quarter of a second later: two saves of one row each and one read of the import;
 already there: an item your organization has uses it". Not seen: a save refused by the server, a save that fails and
 waits for "Save again", a match's answer arriving after a later save, Continue over a newer view, an import removed
 while its review is open, an upload landing after a switch of organization. The tests hold each of those.
+
+## The review of the rework, and four entries of the check of the step 6 fixes
+
+A review of the rework (`ef53dbd..1531c32`) came back with 19 groups, none refuted. Each is answered here; the four
+entries of the check of the step 6 fixes that were left (11, 13, 14, 29) are answered in the same commits
+(`46e95c0`, `a9d9b63`).
+
+| Group | What was wrong | What changed | Test | Seen on screen |
+| --- | --- | --- | --- | --- |
+| 1 | The lead group in view was told by switching a ref on and off: an effect on the condition under another name | The lead is derived: the grid holds what the virtual list says is in view (`seen`), and `lead` is the first group there the person can take in one press. The conditional ref and `markLead` are gone, and the law refuses a ref chosen by a condition | `ReviewRegion.atoms.test.ts`, with a real virtual list on a frame the test scrolls: the lead before the list has a frame, scrolled away and back, after an accept that makes the lines fewer without the list being drawn again, with the confirm open, read-only, on another tab. Fails when the list is not given the lines' number first | Gallery: "Use pcs for the 9 ticked" filled at the top; scrolled 3,000 px, "Use kg for the 8 ticked"; back at the top, the first again; Import outline throughout |
+| 2 | The search box's pause was the kit's debounce hook (a layout effect after every draw) | The typed text is an atom of the box's scope and the pause is `Atom.debounce`. The box is given the table: it reads the table's search as an atom and asks the table itself, so no function goes through a draw. The atoms lint refuses `**/hooks/use-debounced-callback*` | None of its own | Items: "bolt" typed at 60 ms a key gave one request ("2 of 153 items, best matches first") and the field read b, bo, bol, bolt with no step back; " m8" and Enter asked at once; Escape emptied it and kept the caret; "/" put the caret in it. Activity: "quantity" said nothing matches, "cost rule" found 3 rows, Escape 20 again |
+| 3 | The grid's "bring this row into view" subscription was made again after every draw | `grid.bring`: one function for the grid's life | The same file: a row asked for is scrolled to, the same row asked again is a new ask, a row not among the lines is not | |
+| 4 | Caches kept by hand | `histories` is gone: `saved` gives the plain decisions, a draft is made from the whole state (`toDraft(state)`, `fromDraft(draft)`, `storedReview(state)`, `restoredReview(stored)`). `ListTable`'s `searchText` is gone, not replaced: the held lists are short (at most 5,000 rows from the server, 500 for the audit trail) and the table keeps each cell's value itself. `untouched` stays ("Choices made") | `Review.test.ts`, `SavedProgress.test.ts`, `DraftFormat.test.ts` | |
+| 5 | Props taken once when the region was first drawn | `problemKinds`, `ruleFixes`, `words`, `rowAction` and `readOnly` are atoms from the caller, as the rows are. The two the review did not place (`rowAction`, `readOnly`) are atoms because the grid's atoms work from both (the width of the answers). What stays a plain value (`cellEditor`, `explain`, `onImport`, the title and the rest) is read when it is drawn and kept in no atom | The lead's test sets `readOnly` on the caller's atom and the region follows | Gallery: read-only (no Import, no Undo, the answers' column 120 px, Ctrl+Z nothing), the months (a row's own answer under "Other answers", the column 278 px), the jobs page |
+| 6 | `@tanstack/store` in the review package's own code | Not changed: a question for Benjamin ("Open, for Benjamin" below) | | |
+| 7 | `laws ref-callbacks` read lines with a pattern | It reads each screen's syntax tree (the parser the imports law uses) and judges a name by where the file binds it; a prop handed to a ref is followed to every place that hands it; the function given to `useAtomSubscribe` is held to the same; it fails when git cannot list the files; its findings are built with the union's constructors | `RefCallbacks.test.ts`: nineteen planted lines, one per form (a typed arrow, a generic arrow, a declaration broken after `=`, a declared function, `var`, a function returned from a call, a property of an object made in the component, a name taken out of a call, a renamed one, an inline arrow and function, a call, `.bind`, a choice by a condition and by `&&`, a ref over several lines, two subscriptions); a prop handed down through two files; git failing | |
+| 8 | Nothing tested the second search or sort | The test's table is made and drawn as the screen's hook does it (render-phase reactivity, options staged in a draw, state published after it, the hook's copy handed to the region) | Search A, search B, cleared, sorted up, down, cleared, through `regionTable.ordered`. With `86f8efe`'s two lines put back the second search gives the first one's rows and the test fails | Gallery, All: "bolt" 16 items, "tube" 11, cleared 178; Item sorted ascending |
+| 9 | Two gone-region tests did not hold what their names said | The key test mounts the keys and raises Ctrl+Z, Ctrl+Shift+Z, Ctrl+Y and J on the page: taken while the region is there, left alone once it has gone; the listener goes with the change at hand, in a registry that keeps atoms 400 ms. The other test never attaches | Fails with the guard moved below `preventDefault`, and with the keys' idle time put back | |
+| 10 | The kept undo history rule was held by no test | `ReviewHistory.test.ts`, with a member and a browser storage: written with every decision and back after a refresh; not used when the server's decisions changed on another screen; not another member's | Each fails with its half of the rule taken out | |
+| 11 | The review package did not declare `@effect/atom-react` | Declared, 4.1.4 exact, as the others | None: no law reads a package's third-party imports against its manifest | |
+| 12 | Every drawn row was drawn again on every decision | The measured widths, the plan and its three parts are kept while they say the same | `ReviewRegion.atoms.test.ts`: `parts` and `plan` are the same objects after a decision and its undo. Fails with nothing kept | 50,000 rows below |
+| 13 | Guards in if-chains, flags for a union, two `Option` tags compared by hand | `$match` where a branch covers every member (the grid's lines, heights and headings, the queue's card and its key, `OtherAnswer` twice, the draft's effects); `Primary`, `Wanted` and `Stop` are tagged enums built with their constructors; `O.isSome` and `O.isNone` in `SavedProgress.schema.ts` and `Conversation.machine.ts` | `bun run check`; the tests build `Primary` and `Wanted` with the constructors | |
+| 14 | `fixable` was made twice | Once, as an atom of the region | An unfixable kind: the view of every row a decision did not touch is the same object after it. Fails with the test made twice | |
+| 15 | A region about to be replaced worked every row out again first | It stood. Each epoch's region is given atoms that follow the draft while that epoch is the draft's and keep their last value after (`whileCurrent`, `reviewStateAt`); the draft and what it changes in this tab are one batch | `ReviewDraft.test.ts`: the replaced region's decisions and rows are the same objects, nothing is told, its late write reaches nobody. Fails without the keeping | 50,000 rows below. messy sample, two tabs: tab B "Leave out 2" sent one save of rows 148 and 195; tab A on return made one read, said "Updated with what changed on another screen" and showed Needs a decision 22, Ready 2, Left out 6; after B's undo, 26 and 4 again |
+| 16 | A key in Search and a sort drew the region twice, each draw building and encoding the not-imported CSV and filtering the flagged rows | The CSV is written out when the download is pressed (`saveCsv`, shared with the Result step); the flagged rows are a derived atom. The two draws themselves are still two | None | Gallery: the download saved `not-imported.csv`, a header and 59 rows |
+| 17 | The Result's rows were built from the read, not its answer | From `answerOf(importView(id))` | `ResultRows.test.ts`: asked again twice, the same rows, nothing worked out. Fails built from the read | |
+| 18 | Finishing the kind the table chose by itself skipped the next kind | The wanted move carries the kind that was on screen, read before the decision is written | `ReviewRegion.atoms.test.ts`. Fails with the kind read when the move is settled | Gallery, nothing picked: "Unknown unit" finished in six presses, the table went to "No cost" (9), focus on its first row's "Type a cost" |
+| 19 | Statements that were not true | Corrected where they stand: rows 3, 5, 10, 13 and 14 of the table above, the hook count, the ceilings, the ui paragraph, `docs/review-table.md` (`rowAction`, the draft's functions), `docs/kit.md` (the search box), a test's title, two headers with an import above them | `bun run docs:check` | |
+
+**Of `7bbedac`.** Its message says Benjamin's edits are "as he wrote them". Two things differ, and the message does
+not say so: one constructor call (`Refused.make({})` where his line read `Refused.make({ _tag: "Refused" })`, the tag
+dropped as the constructor gives it), and the two `import * as React from "react"` lines of his patch, which were not
+taken (the atoms lint refuses a namespace import of React).
+
+**The four entries of the check of the step 6 fixes.**
+
+| Entry | What was wrong | What changed | Test | Seen on screen |
+| --- | --- | --- | --- | --- |
+| 11 | A row that came back while its save was out offered Edit again | That a save of an item is out is kept for the page's life (`saveOut`), not with the row | `ItemEditor.test.ts`: the write's own atom, read anew, knows of no press; the save is still read as out. | A save held for the test: the pencil was disabled, still disabled after Activity and back, free after "Saved AAT-7076" |
+| 13 | A write that answered after a switch of organization asked the left organization's read again with the new session | The write notes who pressed; answered for somebody who has left, it only takes its change off (a failure is still said) | `Optimistic.atoms.test.ts`, two tests. Fails on the old write: a third read | Not seen |
+| 14 | "Edit again" after the row had left opened nothing, and what was typed was gone | An open editor is kept for the page's life; the press carries the typed form; when the item's row is not on screen the person is taken to it (the Items table, searched for its SKU) | `ItemEditor.test.ts`: refused after the row left, and "changed by someone else" with the row drawn | A save refused while on Activity: the toast offered "Edit again", which went to `/items?search=AAT-7076` with the dialog open on "Brass Washer M6 typed again" |
+| 29 | An assistant's answer was applied through the table the person had left | Applied only on the drawing of the assistant that asked, for the same member; "Working" is kept while a request is out | `TableAssistant.test.ts`, four cases | The rules answered at once, so neither a late answer nor "Working" was on screen: not seen |
+
+**50,000 rows** (`items_50000.csv`, the dev server, headless Chromium, the script of step 7), at `a9d9b63`: reload
+6.8 s and 7.2 s, an accept of 500 1.22 s and 1.27 s, Ctrl+Z 1.07 s and 1.23 s, 40 jumps top to bottom 3.5 s and
+3.3 s with 26 and 20 frames over 50 ms, the worst 183 ms both times; the last row drawn was row 50,001. A restart
+from another tab's change, the long tasks in the tab that is told: before (`1171834`) two each time, 85 + 1,427,
+331 + 1,319, 59 + 1,831 and 62 + 1,427 ms; after, one each time, 1,308, 1,334, 1,487 and 1,337 ms. The counts
+changed 4.6 s to 5.6 s after the tab was told in both, most of it the server's read of the import.
+
+**Not seen on screen, by name:** a search changed from elsewhere while the box's pause is running; a write
+answering after a switch of organization; an assistant's answer arriving after the person left, and its "Working"
+on a return; "Changed by someone else" with its "Edit again"; a ref-callbacks refusal in the editor (it is a check,
+seen in the terminal); the dark theme; the strip too long for its line; a cut text's card.
+
+**Open, for Benjamin** (not built): `@tanstack/store` in the review package's own code, against the brief's "No new
+state library beside atoms" (the table's column filters are its controlled state, which only its own store atom can
+hold from outside); what Confirm sends when the screen is behind; whether a save's answer says that it changed
+nothing.
+
+**Found sound by the review, and kept:** the one-frame wait before a move is settled, and the order atom giving the
+table its rows.
+
+**Older, seen in passing and left:** the catalog's own tagged unions still switched on by hand (`Upload.machine.ts`,
+`UploadStep.screen.tsx`, an import's events in `ResultStep.screen.tsx`, `changedMeanwhile` in the item editor).
 
 ## Legacy in the client
 
@@ -620,15 +692,25 @@ Not discriminators, and not changed: string-literal domains with no data of thei
   move do, and the region subscribes to it. The atoms change before the rows are drawn, so the subscription settles
   the move one animation frame later, when they are on screen; the move itself is read from the atoms then.
 - **Every ref callback is the same function across draws**, and only sets up its own node: the region's section (says
-  the region is on the page), the lead group's accept (says a lead is in view), the phone's card (keyed by the
-  decision: focus goes to the card that takes a decided one's place), the strip (its scroll, its size, its wheel) and a
-  cut text (its size). `bun run check` refuses any other form (`laws ref-callbacks`).
-- **Whether a lead group is in view is an atom its accept writes when its node appears and goes.** The brief's row
-  says "the lead is derived state the parent reads". Which lines are in view is the virtual list's own state, not an
-  atom, so it cannot be derived from atoms alone: the grid works out which group leads when it is drawn, as before,
-  and that group's accept carries the ref callback. The parent reads the atom.
+  the region is on the page, and takes its toasts down when it goes), the strip (its scroll, its size, its wheel), a
+  cut text (its size) and the shell's bar slot. `bun run check` refuses any other form (`laws ref-callbacks`, which
+  reads each screen's syntax tree). No ref is chosen by a condition, and none sits on an element whose `key` is what
+  makes it run: the phone's card and the assistant's newest line, which were such, follow an atom with
+  `useAtomSubscribe` and put the focus, or the scroll, there one frame later.
+- **Whether a rule group's accept leads is derived** (the brief's row: "the lead is derived state the parent reads").
+  The grid's atoms are made above the region's body (`GridScope`), so the footer reads `grid.leadInView`. What is in
+  view is the virtual list's own state (where the frame is scrolled to, how tall each line was measured): the grid
+  listens to it as an atom listens to anything outside (`watch`, `told`), and `seen` is the lines in view. The list
+  says nothing of a range that changes because the number of lines did (it learns the new number when it is next
+  drawn), so `seen` gives the list that number before it reads the range, as `ordered` gives the table its rows.
 - **The grid measures again and goes back to the top from `useAtomSubscribe`** (the brief's row): the lines the grid
   draws are a derived atom, and two derived signals say when their shape changed and when the list is another list.
+  Bringing a row into view is the same: the region's ask is an atom, and the grid's `bring` is one function for the
+  grid's life.
+- **One cache is kept by hand, in a pure rule**: `untouched` in `ReviewDraft.rules.ts`, a `WeakMap` from a row to its
+  view while nobody has decided on it. It predates this goal, is no hook's job, and is what keeps 50,000 undecided
+  rows from being built again at every decision.
+- **The rows not imported are written out at the press**, not kept in a link: the download is a button.
 - **The region's actions are made once per region and read the atoms when they are pressed**, so the drawn rows keep
   their memo and no action reads a draw. A region whose section has left the page does nothing: its actions, its keys
   and a toast's Undo return at once, and its key listener is let go with it (no idle time).
@@ -643,8 +725,8 @@ Not discriminators, and not changed: string-literal domains with no data of thei
 - **`Fix.confidence` is an `Option` the caller always gives** (A6), so the catalog writes `O.some(proposal.confidence)`
   and the result's changes carry `O.none()` for a typed value.
 - **The review's draft is a module with no screen in it** (`ReviewDraft.atoms.ts`): what the Review step holds
-  for one import, the decisions it shows, `follow` (what a view of the draft means from where the screen stands) and
-  what a decision does. The saver (`Draft.controller.ts`) is given its request, so it is tested without a server.
+  for one import, the decisions it shows, how it follows the draft while it is open, and what a decision does. What
+  the draft becomes is one pure transition (`Draft.machine.ts`); there is no saver.
 - **A press of an optimistic write cannot be interrupted.** The registry lets a write's atom go 400 ms after its row
   or screen has left and interrupts what it started; a save must still land and clear up after itself.
 - **An answer given to a read is a value the read takes once**, with the time it was given; it is not an atom. One
@@ -672,16 +754,17 @@ Not discriminators, and not changed: string-literal domains with no data of thei
   revision arrives from another screen it puts the region back to it with the toast, and its own saves never count as
   someone else's. The skeleton-first wait is `useDeferredValue`, not a timer in an effect, with the first paint
   measured on 50,000 rows ("Fixes after the review of step 6", group 18).
-- **The draft's saver is a plain object per import** (`decisionSaver` in `Draft.controller.ts`), not a hook: it holds
-  the decisions waiting to be saved and tells the step when a save is answered.
 - **ui's own pieces are atoms** (`ContentWidth.atoms.ts`, `Route.atoms.ts`, `Theme.provider.tsx`, the search box).
   The sidebar's state, the window's width and the room the page has are atoms in `@inventory/ui/ContentWidth`, so the
   step-4 bridge in the app is gone; the address is one atom over the app's own `navigate` and the back button (A5);
-  each search box keeps what was typed in its own atom (by `useId`), the change from elsewhere worked out at draw time
-  instead of in an effect, and "/" and Ctrl+K heard by a ref callback on the field. The theme is a writable atom over
+  each search box keeps what was typed in an atom of its own scope (`BoxScope`, a `ScopedAtom`), is given the table it
+  searches, reads the search that table holds as an atom over the table's own state, asks for the typed text through
+  `Atom.debounce`, and hears "/" and Ctrl+K from an atom mounted while the box is. The theme is a writable atom over
   `localStorage`, not `Atom.kvs`: `Atom.kvs` stores JSON (`"dark"` in quotes), which `public/theme-init.js` does not
-  read before the first paint, and every choice already stored would be lost. `ListTable` keeps its config by the
-  columns' shape and its columns by the arrays they are made from (a `WeakMap`), with no hook.
+  read before the first paint, and every choice already stored would be lost. `ListTable` works its config and its
+  columns out as derived atoms of its own scope (`ListScope`), and keeps nothing by hand: the text a search tests a
+  row by is put together when it is asked for (these lists are short: the server sends at most 5,000 rows, and the
+  table keeps each cell's value itself).
 - **Four readers of ui atoms stay as hooks for good**: `useLocation`, `useIsNarrow`, `useContentWidth` and `useTheme`.
   The vendored data table and toaster were edited at vendoring to call them, and the kit is not ours to change (A1).
   Each only reads an atom (`useAtomValue`), which the A1 line allows. Our own screens read the atoms; `catalog-web` and

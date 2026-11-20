@@ -607,10 +607,12 @@ const makeRegionTable = (
   // How many times the table was given rows here: the order is read again after each.
   const given = Atom.make(0)
   ctx.mount(given)
-  // The table is given the same rows when the region is drawn. It is given them where the region works them out,
-  // in the change that changed them, so the order read next is of these rows and not of the ones it was last drawn
-  // with. Given as the table's own hook gives them while it is drawn: the options alone, with nothing published. No
-  // read of an atom and no draw of ours writes the table's options.
+  // The table is given its rows where the region works them out, in the change that changed them, so the order read
+  // next is of these rows and not of the ones it was last drawn with: given as the table's own hook gives them, the
+  // options alone, with nothing published. No read of an atom writes the table's options. The vendored hook
+  // (`useDataTable`, over TanStack's `useTable`) still sets the table's options, the rows among them, in every draw of
+  // the region: that is TanStack's React binding, kept by decision A4, and not ours to change without changing the
+  // vendored kit.
   ctx.subscribe(region.tableData, (data) => {
     const own = core()
     if (own.options.data !== data) {

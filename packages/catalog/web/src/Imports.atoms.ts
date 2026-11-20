@@ -139,7 +139,8 @@ export const removeImport = Atom.family((id: ImportId) =>
       toast(`Removed ${view.fileName}`)
       importView(id).letGo(registry)
       importTable(id).letGo(registry)
-      // The draft, and every row this browser kept of it, go too.
+      // The draft goes too, with the rows kept for it by this tab, by tabs that are gone and by an older page; a tab
+      // still open erases its own when it finds the import gone.
       forgetDraft({ registry, id })
       registry.set(openWorkbook(id), O.none())
     },

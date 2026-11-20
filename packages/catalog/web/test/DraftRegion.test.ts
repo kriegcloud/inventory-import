@@ -10,7 +10,12 @@ import * as HttpApiError from "effect/http-api/HttpApiError"
 import { vi } from "vitest"
 import { act, saved } from "@inventory/review/ReviewDraft"
 import { ReviewRow } from "@inventory/review/ReviewTypes"
-import { type DecisionDelta, type SaveRequest, decisionFromFlags } from "@inventory/catalog-contract/Decision"
+import {
+  type DecisionDelta,
+  type SavedDecisions,
+  type SaveRequest,
+  decisionFromFlags
+} from "@inventory/catalog-contract/Decision"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import type { ImportView } from "@inventory/catalog-contract/Import"
 import { DraftEvent } from "../src/Draft.machine.ts"
@@ -27,14 +32,19 @@ import {
 import { importNo, registryFor, viewAt } from "./support/catalog.ts"
 
 // What is said to the person.
-const page = vi.hoisted(() => ({ said: [] as Array<string>, actions: [] as Array<() => void> }))
+const page = vi.hoisted(() => ({
+  said: [] as Array<string>,
+  descriptions: [] as Array<string>,
+  actions: [] as Array<() => void>
+}))
 vi.mock("sonner", () => ({
   toast: Object.assign((title: string) => page.said.push(title), {
     dismiss: () => undefined,
     success: () => 0,
     loading: () => 0,
-    error: (title: string, options?: { action?: { onClick: () => void } }) => {
+    error: (title: string, options?: { description?: string; action?: { onClick: () => void } }) => {
       page.said.push(title)
+      page.descriptions.push(options?.description ?? "")
       if (options?.action !== undefined) page.actions.push(options.action.onClick)
       return 0
     }
@@ -45,27 +55,34 @@ const settle = Effect.sleep("15 millis")
 const out = decisionFromFlags({ out: true })
 const rows = [ReviewRow.make({ id: "row-2", line: 2, cells: {} }), ReviewRow.make({ id: "row-5", line: 5, cells: {} })]
 
-/** One import with a server that takes every save and answers the next revision; the app's idle time is 120 ms here. */
-const world = (id: ImportId, network: { down: boolean } = { down: false }) => {
+/**
+ * One import with a server that takes every save and answers the next revision; the app's idle time is 120 ms here.
+ * With `reads`, the server answers a read of the import with what it holds; otherwise a read never answers.
+ */
+const world = (id: ImportId, network: { down: boolean } = { down: false }, reads = false) => {
   const saves: Array<DecisionDelta> = []
   const revision = { now: 10 }
+  const stored: Record<string, SavedDecisions[string]> = {}
+  const at = (parts: Partial<ImportView> & { readonly revision: number }) => viewAt({ id, ...parts })
   const registry = registryFor({
     endpoints: {
       imports: {
-        get: () => Effect.never,
-        decide: (request: { readonly payload: SaveRequest }) => {
-          const { madeOn: _madeOn, ...delta } = request.payload
-          saves.push(delta)
-          // The server's own failure, as the API says it: the request was fine, so it may pass when sent again.
-          if (network.down) return Effect.fail(HttpApiError.InternalServerErrorProblem.make({}))
-          revision.now += 1
-          return Effect.succeed({ revision: revision.now, changed: true, notApplied: [] })
-        }
+        get: () => (reads ? Effect.sync(() => at({ revision: revision.now, decisions: { ...stored } })) : Effect.never),
+        decide: (request: { readonly payload: SaveRequest }) =>
+          Effect.suspend(() => {
+            const { madeOn: _madeOn, ...delta } = request.payload
+            saves.push(delta)
+            // The server's own failure, as the API says it: the request was fine, so it may pass when sent again.
+            if (network.down) return Effect.fail(HttpApiError.InternalServerErrorProblem.make({}))
+            revision.now += 1
+            Object.assign(stored, delta.set)
+            for (const rowId of delta.clear) delete stored[rowId]
+            return Effect.succeed({ revision: revision.now, changed: true, notApplied: [] })
+          })
       }
     },
     idleTTL: 120
   })
-  const at = (parts: Partial<ImportView> & { readonly revision: number }) => viewAt({ id, ...parts })
   registry.set(importView(id), at({ revision: 10 }))
   return {
     registry,
@@ -161,33 +178,38 @@ describe("the region beside the draft", () => {
     })
   )
 
-  it.live("keeps a row whose save failed, says so once with Save again, and that button sends the same row", () =>
-    Effect.gen(function* () {
-      const id = importNo(43)
-      const network = { down: true }
-      const t = world(id, network)
-      t.open()
-      yield* settle
-      page.said.length = 0
-      page.actions.length = 0
-      t.leaveOut("row-2")
-      yield* settle
-      // Sent once, failed: the row is still what the region shows, and the person is told it is not saved yet.
-      expect([t.saves, t.region()[0], page.said]).toEqual([
-        [{ set: { "row-2": out }, clear: [] }],
-        ["row-2"],
-        ["Not saved yet"]
-      ])
-      expect(t.registry.get(rowsNotSaved(id))).toBe(1)
-      // The network is back, and the person presses Save again on what was said.
-      network.down = false
-      page.actions[0]?.()
-      yield* settle
-      expect(t.saves).toEqual([
-        { set: { "row-2": out }, clear: [] },
-        { set: { "row-2": out }, clear: [] }
-      ])
-      expect([t.registry.get(rowsNotSaved(id)), page.said]).toEqual([0, ["Not saved yet"]])
-    })
+  it.live(
+    "keeps a row whose save failed, says so once with Save again, and that button sends the same row once the import is read",
+    () =>
+      Effect.gen(function* () {
+        const id = importNo(43)
+        const network = { down: true }
+        const t = world(id, network, true)
+        t.open()
+        yield* settle
+        page.said.length = 0
+        page.actions.length = 0
+        t.leaveOut("row-2")
+        yield* settle
+        // Sent once, failed: the row is still what the region shows, and the person is told it is not saved yet.
+        expect([t.saves, t.region()[0], page.said]).toEqual([
+          [{ set: { "row-2": out }, clear: [] }],
+          ["row-2"],
+          ["Not saved yet"]
+        ])
+        expect(t.registry.get(rowsNotSaved(id))).toBe(1)
+        // It says when the row goes by itself: back on this import's review, never "when the server answers" (nothing
+        // sends it while the step is away).
+        expect(page.descriptions.at(-1)).toContain("when you are back on this import's review")
+        // The network is back, and the person presses Save again on what was said.
+        network.down = false
+        page.actions[0]?.()
+        yield* settle
+        expect(t.saves).toEqual([
+          { set: { "row-2": out }, clear: [] },
+          { set: { "row-2": out }, clear: [] }
+        ])
+        expect([t.registry.get(rowsNotSaved(id)), page.said]).toEqual([0, ["Not saved yet"]])
+      })
   )
 })

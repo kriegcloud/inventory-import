@@ -32,6 +32,7 @@ import { NativeSelect, NativeSelectOption } from "@inventory/ui/components/nativ
 import { Switch } from "@inventory/ui/components/switch"
 import { Textarea } from "@inventory/ui/components/textarea"
 import { invalidate } from "@inventory/client/Api"
+import { memberKey } from "@inventory/client/MemberAtoms"
 import { optimisticChange, optimisticWrite } from "@inventory/client/OptimisticAtoms"
 import { catalogApi } from "./Catalog.runtime.ts"
 import { itemsPage } from "./ItemsPage.screen.tsx"
@@ -149,12 +150,20 @@ const closedEditor: EditorState = { open: false, base: O.none(), form: O.none(),
 const openEditors = Atom.make(HashMap.empty<string, EditorState>()).pipe(Atom.keepAlive)
 
 /**
- * What the server answered to the last save of each item: the item as stored, at its new revision. Kept for the
- * page's life. A save is counted out until it answers, but the row is read again only after that (and only once the
- * last write in flight has answered), and until then it shows the saved values on the old revision; an editor opened
- * in between takes its revision from here, or its save goes out on the old one and is refused as someone else's.
+ * What the server answered to the last save of each item: the item as stored, at its new revision. Kept while the same
+ * member is signed in, and let go the moment that changes (a sign-out, another member, another organization), as every
+ * read of the previous person's is. A save is counted out until it answers, but the item's row is read again only after
+ * that item's last write in flight has answered (each item's editor counts its own), and until then it shows the saved
+ * values on the old revision; an editor opened in between takes its revision from here, or its save goes out on the old
+ * one and is refused as someone else's.
  */
-const savedItems = Atom.make(HashMap.empty<string, StoredItem>()).pipe(Atom.keepAlive)
+const savedItems = Atom.writable(
+  (get): HashMap.HashMap<string, StoredItem> => {
+    get(memberKey)
+    return HashMap.empty()
+  },
+  (ctx, next: HashMap.HashMap<string, StoredItem>) => ctx.setSelf(next)
+).pipe(Atom.keepAlive)
 
 /** The newer of the item an editor was opened on and the server's answer to its last save: the base of the next. */
 const newerOf = (base: StoredItem, saved: O.Option<StoredItem>): StoredItem =>

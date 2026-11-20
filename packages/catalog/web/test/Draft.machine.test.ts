@@ -27,6 +27,7 @@ import {
   type Waiting,
   waiting
 } from "../src/Draft.machine.ts"
+import { keptForm } from "../src/internal/storedWaiting.ts"
 
 const out = decisionFromFlags({ out: true })
 const kept = decisionFromFlags({ kept: true })
@@ -119,6 +120,17 @@ interface World {
   /** The latest revision this tab has been told of: by a picture put into its view, or by a save's answer. */
   told: number
   /**
+   * The person's rows that wait (after a save that failed or was refused before them, a confirm not made, a reload):
+   * each is never sent until a fresh picture (an answer, not the view given again) has checked it (G2).
+   */
+  waiting: Record<string, true>
+  /**
+   * For each of the person's rows, the values the server may have of it from this tab: what the screen knew the server
+   * held when the person began deciding it, and every value of it that was sent. Kept across a reload, as the
+   * browser keeps it.
+   */
+  seenBy: Record<string, ReadonlyArray<O.Option<SavedDecisions[string]>>>
+  /**
    * What the review region holds for itself: its decisions since it was last started, or none while it has made
    * none (it then shows what the draft shows). A Restart starts it again; leaving lets it go only after the idle
    * time, so a quick return finds it as it was.
@@ -148,7 +160,9 @@ const start = (): World => ({
   elsewhere: O.none(),
   kept: O.none(),
   held: {},
-  named: O.none()
+  named: O.none(),
+  waiting: {},
+  seenBy: {}
 })
 
 /** Whether a picture says the import can still be decided: one taken after a confirm (anybody's) says it cannot. */
@@ -173,12 +187,21 @@ const serverTakes = (world: World, changes: RowChanges): boolean => {
 
 const valueOf = (to: "out" | "kept" | "nothing") => (to === "nothing" ? O.none() : O.some(to === "out" ? out : kept))
 
-/** A picture reaches the step that is drawn, with whether it says the import can still be decided. */
-const arrive = (world: World, picture: Picture): void =>
+/**
+ * A picture reaches the step that is drawn, with whether it says the import can still be decided. `waiting`: the view
+ * is given while a read of it is out (the view held, given again; or a picture put in place while it is asked), as
+ * the tab's read gives it.
+ */
+const arrive = (world: World, picture: Picture, waiting = false): void =>
   dispatch(
     world,
     // The import is never reopened here: a picture of a closed import counts its one confirm.
-    DraftEvent.ViewArrived({ ...picture, open: openIn(world, picture), confirms: openIn(world, picture) ? 0 : 1 })
+    DraftEvent.ViewArrived({
+      ...picture,
+      open: openIn(world, picture),
+      confirms: openIn(world, picture) ? 0 : 1,
+      waiting
+    })
   )
 
 /** A picture is put into the tab's view: never one of an earlier revision, and an ask that is out is issued again. */
@@ -187,7 +210,36 @@ const put = (world: World, picture: Picture): void => {
   world.view = O.some(picture)
   world.told = Math.max(world.told, picture.revision)
   if (O.isSome(world.read)) world.read = O.some(O.none())
-  if (world.draft.onScreen) arrive(world, picture)
+  // Put in place while a read is out, the tab gives it as waiting: the read's answer is still to come.
+  if (world.draft.onScreen) arrive(world, picture, O.isSome(world.read))
+}
+
+/** What the screen knew the server held of a row: the picture held, with the rows it has confirmed since over it. */
+const knownOf = (draft: Draft, row: string): O.Option<SavedDecisions[string]> =>
+  R.get(
+    over(
+      O.match(draft.held, { onNone: (): SavedDecisions => ({}), onSome: (held) => held.decisions }),
+      O.match(draft.landed, { onNone: (): RowChanges => ({}), onSome: (landed) => landed.rows })
+    ),
+    row
+  )
+
+/**
+ * Whether a waiting row must be held over a picture: the picture holds for it a value the server could not have from
+ * this tab (none of the values it may have of it), and not the person's own.
+ */
+const mustHold = (world: World, row: string, decisions: SavedDecisions): boolean => {
+  const theirs = R.get(decisions, row)
+  return (
+    R.has(world.dirty, row) &&
+    !Eq.equals(theirs, valueOf(world.dirty[row]!)) &&
+    O.exists(R.get(world.seenBy, row), (values) => !A.some(values, (value) => Eq.equals(value, theirs)))
+  )
+}
+
+/** Every row of the person's that is not confirmed waits now (a save failed or was refused, a confirm not made). */
+const allWait = (world: World): void => {
+  for (const row of R.keys(world.dirty)) world.waiting[row] = true
 }
 
 /** Only rows the person changed here and the server has not confirmed, each as the person last chose it. */
@@ -214,6 +266,11 @@ const perform = (world: World, effect: DraftEffect): void =>
       // One save at a time, never beside a confirm, and only of the person's own rows.
       expect([O.isNone(world.save), O.isNone(world.confirm)], "a save beside a save or a confirm").toEqual([true, true])
       ownRows(world, delta)
+      for (const row of sentRows(delta)) {
+        // G2: a waiting row goes only once a fresh picture has checked it.
+        expect(R.has(world.waiting, row), `waiting row ${row} was sent before a fresh picture checked it`).toBe(false)
+        world.seenBy[row] = [...(world.seenBy[row] ?? []), R.get(delta.set, row)]
+      }
       world.save = O.some({ delta, answer: O.none() })
     },
     Ask: () => {
@@ -244,6 +301,18 @@ const perform = (world: World, effect: DraftEffect): void =>
         true
       ])
       ownRows(world, delta)
+      // A waiting row rides with a confirm only when the picture it names (what the server holds, if it makes it)
+      // shows nothing decided otherwise since.
+      const named = O.match(world.draft.held, { onNone: (): SavedDecisions => ({}), onSome: (held) => held.decisions })
+      for (const row of sentRows(delta)) {
+        if (R.has(world.waiting, row)) {
+          expect(mustHold(world, row, named), `waiting row ${row} rode a confirm over a decision made elsewhere`).toBe(
+            false
+          )
+          delete world.waiting[row]
+        }
+        world.seenBy[row] = [...(world.seenBy[row] ?? []), R.get(delta.set, row)]
+      }
       world.confirm = O.some({ revision, delta, shown: shown(world.draft), answer: O.none() })
     }
   })
@@ -279,17 +348,50 @@ const dispatch = (world: World, event: DraftEvent): void => {
       ).toBe(false)
     }
   }
+  // G2: a fresh picture (an answer at least as new as the one held, not the view given again) checks every waiting row;
+  // one it shows decided otherwise since, to a value the server could not have from this tab, must be held.
+  const fresh =
+    DraftEvent.$is("ViewArrived")(event) &&
+    event.open &&
+    event.waiting !== true &&
+    !O.exists(before.held, (held) => event.revision < held.revision)
+  const mustBeHeld = fresh ? A.filter(R.keys(world.waiting), (row) => mustHold(world, row, event.decisions)) : []
   // A waiting row held because it was decided otherwise elsewhere since: the person's choice is not what the server
-  // holds now, and it moves from waiting to held, kept until the person settles it.
+  // holds now (in the picture that arrived, or the one a confirm names), and it moves from waiting to held, kept until
+  // the person settles it.
   for (const [row, held] of R.toEntries(stepped.draft.onHold)) {
     if (R.has(before.onHold, row) || !R.has(world.dirty, row)) continue
+    const theirs = Hold.$match(held.why, {
+      Refused: () => valueOf(world.dirty[row]!),
+      Elsewhere: (why) => why.theirs,
+      OtherTab: () => valueOf(world.dirty[row]!)
+    })
     expect(
-      DraftEvent.$is("ViewArrived")(event) && !Eq.equals(R.get(event.decisions, row), valueOf(world.dirty[row]!)),
+      (DraftEvent.$is("ViewArrived")(event) ||
+        DraftEvent.$is("ConfirmPressed")(event) ||
+        DraftEvent.$is("SaveAnswered")(event)) &&
+        !Eq.equals(theirs, valueOf(world.dirty[row]!)),
       `row ${row} was held (${event._tag}) without a picture that decides it otherwise than the person`
     ).toBe(true)
     expect(held.mine, `row ${row} is held with another decision than the person's`).toEqual(valueOf(world.dirty[row]!))
     world.held[row] = world.dirty[row]!
     delete world.dirty[row]
+    delete world.waiting[row]
+  }
+  for (const row of mustBeHeld) {
+    expect(R.has(world.held, row), `waiting row ${row} was not held over a decision made elsewhere since`).toBe(true)
+  }
+  if (fresh) world.waiting = {}
+  // A hold lets go by itself only once the picture held has the person's own decision: nothing differs any more.
+  if (!DraftEvent.$is("Decided")(event) && !DraftEvent.$is("HoldSettled")(event) && !stepped.draft.ended) {
+    for (const row of R.keys(before.onHold)) {
+      if (R.has(stepped.draft.onHold, row) || !R.has(world.held, row)) continue
+      expect(
+        O.exists(stepped.draft.held, (held) => Eq.equals(R.get(held.decisions, row), valueOf(world.held[row]!))),
+        `the hold of row ${row} went (${event._tag}) while the server did not hold the person's decision`
+      ).toBe(true)
+      delete world.held[row]
+    }
   }
   world.draft = stepped.draft
   for (const effect of stepped.effects) perform(world, effect)
@@ -302,8 +404,9 @@ const sentRows = (delta: DecisionDelta): ReadonlyArray<string> => [...R.keys(del
 /** The Review step is drawn again: it reads the view it finds, and asks again behind it. */
 const comeBack = (world: World): void => {
   dispatch(world, DraftEvent.Opened({ kept: O.none() }))
-  O.map(world.view, (view) => arrive(world, view))
+  // The view held is given again while it is asked anew behind it: as waiting.
   world.read = O.some(O.none())
+  O.map(world.view, (view) => arrive(world, view, true))
 }
 
 /** What can still happen once the person's own confirm was made: its answer (or its loss), a decision, a read. */
@@ -360,7 +463,12 @@ const run = (world: World, command: Command): void => {
         onSome: (confirm) => {
           if (O.isNone(confirm.answer)) return
           world.confirm = O.none()
-          if (confirm.answer.value === "moved") return dispatch(world, DraftEvent.ConfirmMoved())
+          if (confirm.answer.value === "moved") {
+            dispatch(world, DraftEvent.ConfirmMoved())
+            // Nothing was written: the person's rows wait, and are checked by the picture asked for.
+            allWait(world)
+            return
+          }
           // The person's rows decided while it was out stay theirs: the result names them (`holds`). The answer is
           // the closed import, put into the tab's view first, as the runner does (`putConfirmed`).
           world.confirmed = {}
@@ -376,7 +484,9 @@ const run = (world: World, command: Command): void => {
     ConfirmFails: () => {
       if (O.isNone(world.confirm)) return
       world.confirm = O.none()
-      return dispatch(world, DraftEvent.ConfirmFailed())
+      dispatch(world, DraftEvent.ConfirmFailed())
+      allWait(world)
+      return
     },
     Decide: (command) => {
       if (!world.draft.onScreen || O.isNone(world.draft.held)) return
@@ -384,6 +494,9 @@ const run = (world: World, command: Command): void => {
       const before = regionShows(world)
       const after = over(before, change(command.row, command.to))
       if (Eq.equals(after, before)) return
+      // A row the person begins deciding starts from what the screen knew the server held of it.
+      const pendingBefore = { ...O.getOrElse(world.draft.flight, (): RowChanges => ({})), ...world.draft.unsent }
+      if (!R.has(pendingBefore, command.row)) world.seenBy[command.row] = [knownOf(world.draft, command.row)]
       world.dirty[command.row] = command.to
       delete world.confirmed[command.row]
       // Deciding a row on hold again settles it: the new decision is the person's.
@@ -392,7 +505,10 @@ const run = (world: World, command: Command): void => {
       dispatch(world, DraftEvent.Decided({ changes: change(command.row, command.to) }))
       // Decided back to what the screen knew before anything of it was sent: an undo, not a decision of its own.
       const pending = { ...O.getOrElse(world.draft.flight, (): RowChanges => ({})), ...world.draft.unsent }
-      if (!R.has(pending, command.row)) delete world.dirty[command.row]
+      if (!R.has(pending, command.row)) {
+        delete world.dirty[command.row]
+        delete world.waiting[command.row]
+      }
       return
     },
     SomeoneElse: (command) => {
@@ -424,10 +540,13 @@ const run = (world: World, command: Command): void => {
       world.region = O.none()
       world.told = 0
       world.overtaken = {}
-      // Rows on hold are kept in the browser like the waiting rows, and come back with them.
-      const kept = world.kept
+      // Rows on hold are kept in the browser like the waiting rows, and come back with them: written as the browser
+      // keeps them and read back, values seen and holds included.
+      const kept = keptForm(world.kept)
+      expect(kept, "what the browser keeps is not what comes back after a reload").toEqual(world.kept)
       world.draft = emptyDraft
       dispatch(world, DraftEvent.Opened({ kept }))
+      allWait(world)
       world.read = O.some(O.none())
     },
     ServerTakesSave: () =>
@@ -465,7 +584,9 @@ const run = (world: World, command: Command): void => {
     SaveFails: () => {
       if (O.isNone(world.save)) return
       world.save = O.none()
-      return dispatch(world, DraftEvent.SaveFailed())
+      dispatch(world, DraftEvent.SaveFailed())
+      allWait(world)
+      return
     },
     SaveRefused: () => {
       if (!O.exists(world.save, (save) => O.isNone(save.answer))) return
@@ -480,14 +601,20 @@ const run = (world: World, command: Command): void => {
           delete world.dirty[row]
         }
       }
-      return dispatch(world, DraftEvent.SaveRefused({ reason: "The import was already imported." }))
+      dispatch(world, DraftEvent.SaveRefused({ reason: "The import was already imported." }))
+      // The rows behind it wait for the picture asked for.
+      allWait(world)
+      return
     },
     SaveAgain: () => {
       if (world.draft.stalled) dispatch(world, DraftEvent.SaveAgain())
       return
     },
+    // The tab asks for the import again, and gives the view it holds again meanwhile, as waiting.
     ReturnToTab: () => {
-      if (world.draft.onScreen) world.read = O.some(O.none())
+      if (!world.draft.onScreen) return
+      world.read = O.some(O.none())
+      O.map(world.view, (view) => arrive(world, view, true))
       return
     },
     ServerTakesRead: () => {
@@ -894,10 +1021,17 @@ describe("the orderings that lost or hid a decision", () => {
       Command.cases.OtherAnswerSent.make({}),
       Command.cases.Decide.make({ row: "b", to: "nothing" }),
       Command.cases.OtherAnswerArrives.make({}),
-      Command.cases.Reload.make({})
+      Command.cases.Reload.make({}),
+      // The first fresh picture after the reload checks the waiting rows (the late answer above came while a read was
+      // out, as the view given again, and checked nothing).
+      Command.cases.ServerTakesRead.make({}),
+      Command.cases.ReadArrives.make({})
     ])
       run(world, command)
-    expect([R.keys(world.draft.onHold), R.keys(world.draft.unsent)]).toEqual([["b"], ["a"]])
+    expect([R.keys(world.draft.onHold), O.map(world.save, (save) => sentRows(save.delta))]).toEqual([
+      ["b"],
+      O.some(["a"])
+    ])
   })
 
   it("back on Review with a decision unsaved, another person's rows are still followed and never sent over", () => {
@@ -1004,15 +1138,16 @@ describe("the orderings that lost or hid a decision", () => {
     run(world, Command.cases.Decide.make({ row: "a", to: "out" }))
     run(world, Command.cases.Decide.make({ row: "a", to: "nothing" }))
     run(world, Command.cases.SaveFails.make({}))
-    // A read is on its way, taken by the server before somebody else decides another row.
-    run(world, Command.cases.ReturnToTab.make({}))
-    run(world, Command.cases.ServerTakesRead.make({}))
-    run(world, Command.cases.SomeoneElse.make({ row: "b", to: "kept" }))
-    // "Save again" sends a clear of a row the server never had decided: no change, at the other person's revision.
+    // "Save again" asks for the import first; its answer (revision 1) checks the row, and the clear goes.
     run(world, Command.cases.SaveAgain.make({}))
+    run(world, Command.cases.ServerTakesRead.make({}))
+    run(world, Command.cases.ReadArrives.make({}))
+    expect(O.map(world.save, (save) => save.delta)).toEqual(O.some({ set: {}, clear: ["a"] }))
+    // Somebody else decides another row before the server takes the clear of a row it never had decided: no
+    // change, at the other person's revision.
+    run(world, Command.cases.SomeoneElse.make({ row: "b", to: "kept" }))
     run(world, Command.cases.ServerTakesSave.make({}))
     expect(O.flatMap(world.save, (save) => save.answer)).toEqual(O.some({ revision: 2, changed: false }))
-    run(world, Command.cases.ReadArrives.make({}))
     run(world, Command.cases.SaveAnswers.make({}))
     // The screen does not claim revision 2 for a picture without the other person's row: it holds what it read,
     // and has asked for the import again, at once.
@@ -1072,7 +1207,7 @@ describe("a confirm", () => {
     expect(world.closed).toEqual(O.some({ a: out, b: kept }))
     run(world, Command.cases.ConfirmAnswers.make({}))
     // Ended on the confirmed picture, with nothing left over: both rows are in it.
-    expect(world.draft).toEqual({ ...emptyDraft, onScreen: true, epoch: 1, ended: true })
+    expect(world.draft).toEqual({ ...emptyDraft, onScreen: true, epoch: 1, ended: true, endedOn: { a: out, b: kept } })
   })
 
   it("that waits is held back when its save's answer says somebody else saved in between", () => {
@@ -1372,9 +1507,19 @@ describe("what a save and a confirm name (the review of the rebuilt draft, group
     // A newer picture: the resend of row a goes, and fails again.
     const resent = step(failed.draft, DraftEvent.ViewArrived({ revision: 5, decisions: {}, open: true, confirms: 0 }))
     const again = step(resent.draft, DraftEvent.SaveFailed())
+    // Row b goes by itself (row a waits for a fresh picture again), made on 5; row a keeps 4.
     const both = step(again.draft, DraftEvent.Decided({ changes: { b: O.some(kept) } }))
     expect(A.filter(both.effects, DraftEffect.$is("Send"))).toEqual([
-      DraftEffect.Send({ delta: { set: { a: out, b: kept }, clear: [] }, madeOn: { a: 4, b: 5 } })
+      DraftEffect.Send({ delta: { set: { b: kept }, clear: [] }, madeOn: { b: 5 } })
+    ])
+    expect(both.draft.unsentOn).toEqual({ a: 4 })
+    const answered = step(both.draft, DraftEvent.SaveAnswered({ revision: 6, changed: true, notApplied: [] }))
+    const read = step(
+      answered.draft,
+      DraftEvent.ViewArrived({ revision: 6, decisions: { b: kept }, open: true, confirms: 0 })
+    )
+    expect(A.filter(read.effects, DraftEffect.$is("Send"))).toEqual([
+      DraftEffect.Send({ delta: { set: { a: out }, clear: [] }, madeOn: { a: 4 } })
     ])
   })
 
@@ -1455,9 +1600,23 @@ describe("a confirm held back (the line that says nothing was imported)", () => 
       true
     ])
     expect(step(stale.draft, DraftEvent.ConfirmPressed()).draft.confirm).not.toBe("idle")
-    // The row goes as a save, without the accept.
-    expect(A.filter(stale.effects, DraftEffect.$is("Send"))).toEqual([
-      DraftEffect.Send({ delta: { set: { r: decisionFromFlags({}) }, clear: [] }, madeOn: { r: 4 } })
+    // The row's only decision was the accept: without it, it is a decision the person never made, and nothing is
+    // sent or kept for it (confirmstale-sends-empty-decision).
+    expect([A.filter(stale.effects, DraftEffect.$is("Send")), stale.draft.unsent, waiting(stale.draft)]).toEqual([
+      [],
+      {},
+      O.none()
     ])
+  })
+
+  it("refused for an accept taken back keeps the rest of a row that had more than the accept", () => {
+    const named = decisionFromFlags({ accepted: ["unitCost"], edits: { name: "Bolt" } })
+    const failed = step(
+      step(atFour, DraftEvent.Decided({ changes: { r: O.some(named) } })).draft,
+      DraftEvent.SaveFailed()
+    )
+    const pressed = step(failed.draft, DraftEvent.ConfirmPressed())
+    const stale = step(pressed.draft, DraftEvent.ConfirmStale({ accepts: [{ rowId: "r", field: "unitCost" }] }))
+    expect(stale.draft.unsent).toEqual({ r: O.some(decisionFromFlags({ edits: { name: "Bolt" } })) })
   })
 })

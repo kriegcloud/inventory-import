@@ -249,7 +249,7 @@ describe("a confirm", () => {
   )
 
   it.live(
-    "refused for an accept made before its column was matched again: nothing was imported, the accept is named, the button is free at once, and the row is saved without it",
+    "refused for an accept made before its column was matched again: nothing was imported, the accept is named, the button is free at once, and a row that was only that accept writes nothing",
     () =>
       Effect.gen(function* () {
         const id = importNo(36)
@@ -282,7 +282,6 @@ describe("a confirm", () => {
           false,
           asked + 1
         ])
-        expect(A.map(t.saves, (save) => save.delta)[1]).toEqual({ set: { "row-55": decisionFromFlags({}) }, clear: [] })
         expect(page.said).toEqual(["Not saved yet", "An accept was taken back"])
         yield* Deferred.succeed(O.getOrThrow(A.last(t.gets)), t.at({ revision: 11, decisions: { "row-7": kept } }))
         yield* settle
@@ -290,6 +289,9 @@ describe("a confirm", () => {
           O.some({ read: true, apart: 0, accepts: [{ rowId: "row-55", field: "unitCost", kind: "accept" }] }),
           false
         ])
+        // The row's only decision was the accept: without it, it is a decision the person never made, and nothing is
+        // written for it, even once the import has been read again (the server is sent no empty decision for row 55).
+        expect(A.length(t.saves)).toBe(1)
       })
   )
 })

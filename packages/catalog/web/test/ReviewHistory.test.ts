@@ -24,9 +24,11 @@ import { importView, importViewShown } from "../src/Imports.atoms.ts"
 import { followDraft, reviewLocal, reviewState } from "../src/ReviewDraft.atoms.ts"
 import { importNo, registryFor, viewAt } from "./support/catalog.ts"
 
-// The browser's storage, which outlives a refresh: looked up once when the saved progress is first read.
+// The browser's storage, which outlives a refresh: looked up once when the saved progress is first read. And the tab's
+// own storage, which a refresh of the tab keeps: every visit here is a refresh of one tab.
 const browser = vi.hoisted(() => {
   const kept: Record<string, string> = {}
+  const tab: Record<string, string> = {}
   Object.assign(globalThis, {
     window: {
       localStorage: {
@@ -38,10 +40,18 @@ const browser = vi.hoisted(() => {
           delete kept[key]
         }
       },
+      sessionStorage: {
+        getItem: (key: string) => tab[key] ?? null,
+        setItem: (key: string, value: string) => {
+          tab[key] = value
+        }
+      },
       addEventListener: () => undefined,
       removeEventListener: () => undefined
     }
   })
+  // A browser without locks: a refresh here is a page whose old one is gone, and nothing holds the tab's lock.
+  Object.defineProperty(globalThis, "navigator", { configurable: true, value: {} })
   return { kept }
 })
 

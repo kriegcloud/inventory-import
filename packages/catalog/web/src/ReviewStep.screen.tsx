@@ -24,8 +24,10 @@ import { perKey } from "@inventory/client/Api"
 import {
   confirmHeldBack,
   confirmingImport,
+  dismissTakeBack,
   rowsNotSaved,
   rowsOnHold,
+  takeBacksNamed,
   draftEvents,
   followDraft,
   regionEpoch,
@@ -36,13 +38,13 @@ import {
   whileCurrent
 } from "./ReviewDraft.atoms.ts"
 import { acceptsWords } from "./ReviewDraft.atoms.ts"
-import { DraftEvent, Hold, type HeldBack, type HeldRows } from "./Draft.machine.ts"
-import { decisionWords, rowLabel } from "./internal/leftOver.ts"
+import { DraftEvent, type HeldBack, type HeldRows } from "./Draft.machine.ts"
+import { holdLine, takeBackWords } from "./internal/leftOver.ts"
 import { matchColumn, suggestFixes } from "./Imports.atoms.ts"
 import { navigate } from "@inventory/ui/Route"
 import { importAddress } from "./internal/route.ts"
 import { AnsweredBy } from "@inventory/catalog-contract/Answer"
-import type { ImportView } from "@inventory/catalog-contract/Import"
+import type { ImportView, MatchTakeBack } from "@inventory/catalog-contract/Import"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import { recheckRow, review, ruleFixes } from "@inventory/catalog-model/Review"
 import { readerWarnings } from "@inventory/catalog-model/Staging"
@@ -191,6 +193,8 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
   const heldBack = useAtomValue(confirmHeldBack(view.id))
   const notSaved = useAtomValue(rowsNotSaved(view.id))
   const onHold = useAtomValue(rowsOnHold(view.id))
+  const takenBack = useAtomValue(takeBacksNamed(view.id))
+  const dismiss = useAtomSet(dismissTakeBack(view.id))
   const commit = () => happened(DraftEvent.ConfirmPressed())
 
   if (O.isNone(worked) || O.isNone(recheckRead)) return <ReviewSkeleton title={`Review ${view.fileName}`} />
@@ -291,6 +295,7 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
         onSettle={(rowId, keep) => happened(DraftEvent.HoldSettled({ rowId, keep }))}
         canDecide={props.canImport}
       />
+      <MatchTakeBacks taken={takenBack} onDismiss={dismiss} />
       <ReviewRegion
         key={`${view.id}:${epoch}`}
         title={`Review ${view.fileName}`}
@@ -325,8 +330,8 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
           const column = table.columns.find((candidate) => candidate.label === source)
           const field = fields.find((candidate) => candidate === columnId)
           if (column === undefined || field === undefined) return
-          // The server decides what a new match drops (the accepts of that field): it says so while
-          // it works, and the review starts again from its answer.
+          // The server decides what a new match takes back (accepts, keep-or-replace answers, rows kept of two and
+          // undone fixes that rest on the column): the review starts again from its answer, and names them above.
           const working = toast.loading(`Matching ${column.label}`)
           match({ field, column: column.index }, () => toast.dismiss(working))
         }}
@@ -358,7 +363,8 @@ function NotSavedYet(props: { rows: number; onSaveAgain: () => void }) {
       <AlertDescription>
         <p>
           The server did not take {props.rows === 1 ? "it" : "them"}. {props.rows === 1 ? "It is" : "They are"} kept in
-          this browser and sent again when the server answers.
+          this browser and sent again once this screen has read the import again and nobody decided{" "}
+          {props.rows === 1 ? "that row" : "those rows"} otherwise meanwhile.
         </p>
         <Button variant="outline" size="xs" onClick={props.onSaveAgain}>
           Save again
@@ -370,8 +376,9 @@ function NotSavedYet(props: { rows: number; onSaveAgain: () => void }) {
 
 /**
  * The person's decisions held instead of sent, one line each, above the review: refused by the server (with its
- * sentence; dismissed, or settled by deciding the row again), or decided otherwise elsewhere while they waited (both
- * said; the person picks which stands). Nothing here is sent until the person says so.
+ * sentence; dismissed, or settled by deciding the row again), decided otherwise since by someone else or another tab
+ * while they waited, or decided otherwise by a tab of theirs that is gone (both said; the person picks which stands).
+ * Nothing here is sent until the person says so.
  */
 function OnHold(props: {
   rows: HeldRows
@@ -397,38 +404,58 @@ function OnHold(props: {
       </AlertTitle>
       <AlertDescription>
         <ul className="flex flex-col gap-2">
-          {A.map(lines, ([rowId, held]) => (
-            <li key={rowId} className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              {Hold.$match(held.why, {
-                Refused: ({ reason }) => (
-                  <>
-                    <span className="min-w-0">
-                      {rowLabel(rowId)}: you {decisionWords(held.mine)}. Not saved: {reason}
-                    </span>
-                    <Button variant="outline" size="xs" onClick={() => props.onSettle(rowId, "theirs")}>
-                      Dismiss
+          {A.map(lines, ([rowId, held]) => {
+            // "Keep theirs" sends nothing, so anyone may settle a line with it; only an editor can send theirs.
+            const line = holdLine({ rowId, held, canDecide: props.canDecide })
+            return (
+              <li key={rowId} className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="min-w-0">{line.text}</span>
+                <span className="flex gap-2">
+                  {A.map(line.actions, (action) => (
+                    <Button
+                      key={action.keep}
+                      variant="outline"
+                      size="xs"
+                      onClick={() => props.onSettle(rowId, action.keep)}
+                    >
+                      {action.label}
                     </Button>
-                  </>
-                ),
-                Elsewhere: ({ theirs }) => (
-                  <>
-                    <span className="min-w-0">
-                      {rowLabel(rowId)}: decided elsewhere since: {decisionWords(theirs)}. Yours:{" "}
-                      {decisionWords(held.mine)}.
-                    </span>
-                    {props.canDecide ? (
-                      <span className="flex gap-2">
-                        <Button variant="outline" size="xs" onClick={() => props.onSettle(rowId, "mine")}>
-                          Use mine
-                        </Button>
-                        <Button variant="outline" size="xs" onClick={() => props.onSettle(rowId, "theirs")}>
-                          Keep theirs
-                        </Button>
-                      </span>
-                    ) : null}
-                  </>
-                )
-              })}
+                  ))}
+                </span>
+              </li>
+            )
+          })}
+        </ul>
+      </AlertDescription>
+    </Alert>
+  )
+}
+
+/**
+ * What matches took back from decisions already saved, one line each, above the review: who matched which field again,
+ * how many decisions of which kind, on which rows. The review below already shows each row as it reads now; the line
+ * stays until the person dismisses it.
+ */
+function MatchTakeBacks(props: { taken: ReadonlyArray<MatchTakeBack>; onDismiss: (taken: MatchTakeBack) => void }) {
+  const narrow = useAtomValue(isNarrow)
+  if (!A.isReadonlyArrayNonEmpty(props.taken)) return null
+  return (
+    <Alert role="status" className={narrow ? "mx-4 mt-3 w-auto" : "mx-6 mt-4 w-auto"}>
+      <TriangleAlertIcon aria-hidden />
+      <AlertTitle>
+        {A.length(props.taken) === 1 ? "A match took decisions back" : "Matches took decisions back"}
+      </AlertTitle>
+      <AlertDescription>
+        <ul className="flex flex-col gap-2">
+          {A.map(props.taken, (taken) => (
+            <li
+              key={`${taken.revision}:${taken.field}:${taken.kind}`}
+              className="flex flex-wrap items-center gap-x-3 gap-y-1"
+            >
+              <span className="min-w-0">{takeBackWords(taken)} Each row shows what it reads now, to decide again.</span>
+              <Button variant="outline" size="xs" onClick={() => props.onDismiss(taken)}>
+                Dismiss
+              </Button>
             </li>
           ))}
         </ul>

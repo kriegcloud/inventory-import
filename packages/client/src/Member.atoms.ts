@@ -4,6 +4,7 @@
 // refused button off the screen.
 import * as O from "effect/Option"
 import * as Atom from "effect/reactivity/Atom"
+import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import type { Member } from "@inventory/kernel/Member"
 
 const nobody: Atom.Atom<O.Option<Member>> = Atom.make(O.none<Member>())
@@ -22,6 +23,14 @@ export const provideMember = (from: Atom.Atom<O.Option<Member>>): readonly [Atom
 
 /** The signed-in member of the active organization; none while that is not known yet. */
 export const member: Atom.Atom<O.Option<Member>> = Atom.readable((get) => get(get(memberSource)))
+
+/**
+ * Asks who is signed in again, as the member's source asks it (the app's asks the session): a write the server refused
+ * because nobody is signed in means the page's idea of who is signed in is out of date, and the tab then shows the
+ * sign-in page, or the member signed in now.
+ */
+export const askWhoIsSignedIn = (registry: AtomRegistry.AtomRegistry): void =>
+  registry.refresh(registry.get(memberSource))
 
 /**
  * Who the API is being asked for, as one string ("member/organization", empty when nobody is known): a read is kept per

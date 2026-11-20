@@ -8,7 +8,8 @@ import { modelSentences } from "@inventory/catalog-web/AnsweredByWords"
 import { startTelemetry } from "@/lib/telemetry"
 import { provideApi } from "@inventory/client/Api"
 import { provideMember } from "@inventory/client/MemberAtoms"
-import { actor } from "@inventory/access-web/Session"
+import { actor, session } from "@inventory/access-web/Session"
+import * as Atom from "effect/reactivity/Atom"
 import { installTroubleSentences } from "@inventory/client/SayError"
 import { ThemeProvider } from "@inventory/ui/Theme"
 import App from "./App.tsx"
@@ -26,9 +27,16 @@ installTroubleSentences(modelSentences)
 // Traces and logs to a collector when the server says telemetry is on (@/lib/telemetry); off, one small request.
 void appRuntime.runPromise(startTelemetry)
 
-// What the atoms of every web package read the API through (the app's one runtime), and who they read it for (the
-// session's member): given to the registry once.
-const initialAtoms = [provideApi(appLayer), provideMember(actor)]
+// Who the atoms of every web package read the API for: the session's member. Asked again (`askWhoIsSignedIn`), it asks
+// the session again: a write refused for nobody signed in then shows this tab the sign-in page, or who is signed in now.
+const signedIn = Atom.readable(
+  (get) => get(actor),
+  (refresh) => refresh(session)
+)
+
+// What the atoms of every web package read the API through (the app's one runtime), and who they read it for: given
+// to the registry once.
+const initialAtoms = [provideApi(appLayer), provideMember(signedIn)]
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

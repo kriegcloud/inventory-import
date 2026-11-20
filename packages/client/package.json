@@ -14,7 +14,8 @@
     "./SayError": "./src/SayError.controller.ts",
     "./Api": "./src/Api.atoms.ts",
     "./OptimisticAtoms": "./src/Optimistic.atoms.ts",
-    "./MemberAtoms": "./src/Member.atoms.ts"
+    "./MemberAtoms": "./src/Member.atoms.ts",
+    "./TabAtoms": "./src/Tab.atoms.ts"
   },
   "scripts": {
     "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json && beep-cli quality strict strict-ceiling.json",

@@ -11,7 +11,11 @@ import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as S from "effect/Schema"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
+import * as Atom from "effect/reactivity/Atom"
 import { vi } from "vitest"
+import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
+import { Member } from "@inventory/kernel/Member"
+import { DisplayName } from "@inventory/kernel/Text"
 import { type ItemEdit, StoredItem } from "@inventory/catalog-contract/Item"
 import { ItemChanged } from "@inventory/catalog-contract/Catalog"
 import { Forbidden } from "@inventory/kernel/AccessError"
@@ -274,5 +278,46 @@ describe("an item edited again after its save has answered, before the table is 
       yield* Effect.sleep("20 millis")
       expect(rowShown()).toMatchObject({ name: "Hex bolt M6 × 20", revision: 5 })
     })
+  )
+})
+
+describe("the server's answers to the item saves", () => {
+  it.live(
+    "are let go once another member is signed in, as every read of the previous person's is (saved-items-outlive-signout)",
+    () =>
+      Effect.gen(function* () {
+        const member = (id: string) =>
+          O.some(
+            Member.make({
+              id: MemberId.make(id),
+              name: DisplayName.make(id),
+              role: "admin",
+              organizationId: OrganizationId.make("org_prairie"),
+              organizationName: DisplayName.make("Prairie")
+            })
+          )
+        const who = Atom.make(member("mem_dana"))
+        const registry = registryFor({
+          endpoints: {
+            items: {
+              edit: () => Effect.succeed({ ...item, revision: 4 }),
+              page: () => Effect.succeed({ data: [], total: 0, pageCount: 0 }),
+              facets: () => Effect.succeed({})
+            }
+          },
+          signedIn: who
+        })
+        registry.mount(editItem(itemId))
+        registry.mount(itemEditor(itemId))
+        registry.set(editItem(itemId), save)
+        yield* Effect.sleep("20 millis")
+        const opened = { open: true, base: O.some(item), form: O.some(typed), problems: {}, notice: null }
+        registry.set(itemEditor(itemId), opened)
+        // Dana's save answered at revision 4: her editor opened on the row's revision 3 is on 4.
+        expect(O.map(registry.get(itemEditor(itemId)).base, (base) => base.revision)).toEqual(O.some(4))
+        // Somebody else signs in on this page: nothing of Dana's answers is kept for them.
+        registry.set(who, member("mem_lee"))
+        expect(O.map(registry.get(itemEditor(itemId)).base, (base) => base.revision)).toEqual(O.some(3))
+      })
   )
 })

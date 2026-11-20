@@ -1,21 +1,19 @@
 // Where one import's draft is held in the tab, and what of it this browser keeps: the machine's state
-// (`Draft.machine.ts`), one per import; the person's waiting rows, kept under the key of whoever decided them; and the
-// question the browser asks before the page is left while rows wait. A file of its own so that what removes an import
-// can empty its draft and erase its kept rows without knowing how the Review step runs it.
+// (`Draft.machine.ts`), one per import; the member it belongs to; the person's waiting rows, kept under the key of
+// whoever decided them; and the question the browser asks before the page is left while rows wait. A file of its own so
+// that what removes an import can empty its draft and erase its kept rows without knowing how the Review step runs it.
 //
-// The one thing not to break: rows are kept, and cleared, under the member who decided them, whoever is signed in
-// when the server answers (a switch of organization can fall between the two); and under the tab that decided them
-// (Benjamin, 2026-11-20, "Each tab keeps its own"): a tab keeps and sends only its own, takes up rows only from a tab
-// that is gone, and never writes over or erases another tab's entry.
+// The one thing not to break: rows are kept, cleared and sent only under the member who decided them, whoever is signed
+// in when the server answers (a switch of organization, or someone else signing in on this page, can fall between the
+// two; Benjamin, 2026-11-20, G3); and under the tab that decided them ("Each tab keeps its own", G4): a tab keeps and
+// sends only its own, takes up rows only from a tab that is gone, and never writes over or erases another tab's entry.
+// Nothing here is a module-level variable a screen depends on: the tab, the owner and the counts are atoms.
 import * as A from "effect/Array"
-import * as SecureRandom from "effect/crypto/SecureRandom"
 import * as Effect from "effect/Effect"
 import * as Eq from "effect/Equal"
 import { pipe } from "effect/Function"
 import * as HashSet from "effect/HashSet"
-import * as MutableHashMap from "effect/MutableHashMap"
 import * as O from "effect/Option"
-import * as P from "effect/Predicate"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
@@ -23,12 +21,15 @@ import * as Atom from "effect/reactivity/Atom"
 import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import { perKey } from "@inventory/client/Api"
 import { member } from "@inventory/client/MemberAtoms"
-import { RowDecision } from "@inventory/catalog-contract/Decision"
+import { browserLocks, lockOf, thisTab } from "@inventory/client/TabAtoms"
 import { ImportId } from "@inventory/catalog-contract/Ids"
+import { ImportNotFound } from "@inventory/catalog-contract/ImportRejection"
 import { kept } from "@inventory/review/Kept"
 import { progressKey } from "@inventory/review/SavedProgress"
 import { leavingApp } from "@inventory/ui/Route"
-import { type Draft, emptyDraft, Hold, type HeldRow, type Waiting } from "./Draft.machine.ts"
+import { call } from "./Catalog.runtime.ts"
+import { type Draft, emptyDraft, type Waiting } from "./Draft.machine.ts"
+import { StoredWaiting, toStored, toWaiting, waitingFromText } from "./internal/storedWaiting.ts"
 
 /**
  * One import's draft: what this tab holds of the server's decisions and what the person changed here that the server
@@ -38,168 +39,97 @@ import { type Draft, emptyDraft, Hold, type HeldRow, type Waiting } from "./Draf
  */
 export const draftOf = perKey((_id: ImportId) => Atom.keepAlive(Atom.make<Draft>(emptyDraft)))
 
-/** Why a row is held, as this browser keeps it: refused with the server's sentence, or decided elsewhere since. */
-const StoredHold = S.Union([
-  S.Struct({ kind: S.tag("refused"), reason: S.String }),
-  S.Struct({ kind: S.tag("elsewhere"), theirs: S.OptionFromNullOr(RowDecision) })
-]).pipe(S.toTaggedUnion("kind"))
+/** A member as the draft knows whom its rows belong to. */
+interface Owner {
+  readonly organizationId: string
+  readonly id: string
+}
 
-/** One row on hold as this browser keeps it. */
-const StoredHeld = S.Struct({ mine: S.OptionFromNullOr(RowDecision), madeOn: S.Int, why: StoredHold })
+const sameMember = (one: Owner, other: Owner): boolean =>
+  one.id === other.id && one.organizationId === other.organizationId
 
 /**
- * One import's waiting rows as this browser keeps them. Read too as an older page of the app kept them: one revision
- * for all the rows (`madeOn` a number), no count of confirms, no values seen and no rows on hold.
+ * The member one import's draft belongs to: whoever was signed in when the step opened, a row was decided or a held
+ * one settled, rows were taken up. None while the draft holds nothing of anyone's that the server has not.
  */
-const StoredWaiting = S.Struct({
-  madeOn: S.Union([S.Int, S.Record(S.String, S.Int)]),
-  confirms: S.Int.pipe(S.NullOr, S.optionalKey),
-  leftOver: S.Boolean,
-  rows: S.Record(S.String, S.OptionFromNullOr(RowDecision)),
-  seen: S.Record(S.String, RowDecision.pipe(S.OptionFromNullOr, S.Array)).pipe(S.optionalKey),
-  held: S.Record(S.String, StoredHeld).pipe(S.optionalKey)
-}).pipe(S.OptionFromNullOr)
-type StoredWaiting = typeof StoredWaiting.Type
+const draftOwner = perKey((_id: ImportId) => Atom.make<O.Option<Owner>>(O.none()).pipe(Atom.keepAlive))
 
-const toWaiting = (stored: StoredWaiting): O.Option<Waiting> =>
-  O.map(stored, (entry) => {
-    const made = entry.madeOn
-    return {
-      rows: entry.rows,
-      madeOn: P.isNumber(made) ? R.map(entry.rows, () => made) : made,
-      confirms: O.fromNullishOr(entry.confirms),
-      leftOver: entry.leftOver,
-      seen: entry.seen ?? {},
-      held: R.map(entry.held ?? {}, (held): HeldRow => ({
-        mine: held.mine,
-        madeOn: held.madeOn,
-        why: StoredHold.match(held.why, {
-          refused: ({ reason }) => Hold.Refused({ reason }),
-          elsewhere: ({ theirs }) => Hold.Elsewhere({ theirs })
-        })
-      }))
-    }
+/** One import's draft in one registry: what the helpers below look at. */
+interface DraftIn {
+  readonly registry: AtomRegistry.AtomRegistry
+  readonly id: ImportId
+}
+
+/** True when the draft in memory belongs to another member than the one signed in now. */
+export const ownedByAnother = ({ id, registry }: DraftIn): boolean =>
+  O.exists(registry.get(draftOwner(id)), (owner) =>
+    O.exists(registry.get(member), (actor) => !sameMember(owner, actor))
+  )
+
+/**
+ * True while the member the draft's rows belong to is the one signed in: only then are they sent. Rows that waited
+ * after a save refused for nobody signed in go only once that member is signed in again, never as whoever signs in
+ * next (Benjamin, 2026-11-20, G3). Rows nobody was known to be signed in for when they were decided belong to nobody,
+ * and are compared with nobody.
+ */
+export const sentByOwner = ({ id, registry }: DraftIn): boolean =>
+  O.match(registry.get(draftOwner(id)), {
+    onNone: () => true,
+    onSome: (owner) => O.exists(registry.get(member), (actor) => sameMember(owner, actor))
   })
 
-const toStored = (waits: O.Option<Waiting>): StoredWaiting =>
-  O.map(waits, (entry) => ({
-    madeOn: entry.madeOn,
-    confirms: O.getOrNull(entry.confirms),
-    leftOver: entry.leftOver,
-    rows: entry.rows,
-    ...(R.isEmptyReadonlyRecord(entry.seen) ? {} : { seen: entry.seen }),
-    ...(R.isEmptyReadonlyRecord(entry.held)
-      ? {}
-      : {
-          held: R.map(entry.held, (held) => ({
-            mine: held.mine,
-            madeOn: held.madeOn,
-            why: Hold.$match(held.why, {
-              Refused: ({ reason }) => ({ kind: "refused" as const, reason }),
-              Elsewhere: ({ theirs }) => ({ kind: "elsewhere" as const, theirs })
-            })
-          }))
-        })
-  }))
+/**
+ * Lets the draft in memory go because it belongs to another member than the one signed in now: its rows stay kept in
+ * this browser under its owner's key, for that member's next visit, and nothing of it is written or sent here.
+ */
+export const letAnothersDraftGo = ({ id, registry }: DraftIn): void => {
+  registry.set(draftOf(id), { ...emptyDraft, epoch: registry.get(draftOf(id)).epoch + 1 })
+  registry.set(draftOwner(id), O.none())
+}
 
 const waitingAt = Atom.family((key: string) =>
   kept({ key, schema: StoredWaiting, defaultValue: (): StoredWaiting => O.none() })
 )
 
-/** The browser's storage of one kind, or none where reading it is itself refused (some private windows). */
-const storageOf = (kind: "localStorage" | "sessionStorage"): Storage | undefined => {
+/** The browser's storage shared by every tab, or none where reading it is itself refused (some private windows). */
+const sharedStorage = (): Storage | undefined => {
   try {
-    return window[kind]
+    return window.localStorage
   } catch {
     return undefined
   }
 }
 
-/** Where this tab keeps its id: in the tab's own storage, which a reload of the tab keeps and a new tab does not. */
-const tabSlot = "inventory:tab"
-
-/** This tab's id among the person's tabs, made when first asked for. */
-const thisTab = { id: "" }
-
-/** A new id for this tab, kept for a reload of it. */
-const newTab = (): string => {
-  const id = SecureRandom.uuidV4Unsafe()
-  try {
-    storageOf("sessionStorage")?.setItem(tabSlot, id)
-  } catch {
-    // Storage refused: the id lasts as long as the page, and a reload is another tab.
-  }
-  thisTab.id = id
-  return id
-}
-
-/** This tab's id: the one it had before a reload, or a new one. */
-export const tabId = (): string => {
-  if (thisTab.id !== "") return thisTab.id
-  let held: string | null = null
-  try {
-    held = storageOf("sessionStorage")?.getItem(tabSlot) ?? null
-  } catch {
-    held = null
-  }
-  if (held === null) return newTab()
-  thisTab.id = held
-  return held
-}
-
-/** The lock a tab holds for as long as it is open: another tab tells it is gone when nobody holds it. */
-const lockOf = (tab: string): string => `inventory-tab:${tab}`
-
-/** The browser's locks, or none where it has none (an old browser, a test). */
-const locksOf = (): LockManager | undefined =>
-  typeof navigator === "undefined" || navigator.locks === undefined ? undefined : navigator.locks
-
-/**
- * Holds this tab's lock for the page's life. A tab opened as a copy of another (its storage copied, the id with it)
- * finds the lock held and takes a new id, so two open tabs never share one.
- */
-export const holdThisTab = (): void => {
-  const locks = locksOf()
-  if (locks === undefined) return
-  const hold = (tab: string): void =>
-    void locks
-      .request(lockOf(tab), { ifAvailable: true }, (lock) =>
-        lock === null ? Effect.runPromise(Effect.succeed("taken" as const)) : Effect.runPromise(Effect.never)
-      )
-      .then((answer) => {
-        if (answer === "taken") hold(newTab())
-      })
-  hold(tabId())
-}
-
 /** The scope one import's waiting rows are kept under for one member, in one organization: every tab's begins so. */
-const scopeOf = (actor: { readonly organizationId: string; readonly id: string }, id: ImportId) => ({
+const scopeOf = (actor: Owner, id: ImportId) => ({
   organizationId: actor.organizationId,
   memberId: actor.id,
   screen: `import:${id}:waiting`
 })
 
-/** The key one import's waiting rows are kept under for one member, in one organization, by this tab. */
-const keyOf = (actor: { readonly organizationId: string; readonly id: string }, id: ImportId): string =>
-  progressKey({ ...scopeOf(actor, id), screen: `import:${id}:waiting:${tabId()}` })
+/** The key one import's waiting rows are kept under for one member, in one organization, by one tab. */
+const keyOf = (actor: Owner, id: ImportId, tab: string): string =>
+  progressKey({ ...scopeOf(actor, id), screen: `import:${id}:waiting:${tab}` })
 
 /**
  * The entries kept for one import by the member's other tabs, by key, with the tab each belongs to: the one an older
  * page kept for every tab (no tab in its key) counts as a tab that is gone.
  */
 const otherTabs = (
-  actor: { readonly organizationId: string; readonly id: string },
-  id: ImportId
+  actor: Owner,
+  id: ImportId,
+  tab: string
 ): ReadonlyArray<{ readonly key: string; readonly tab: O.Option<string> }> => {
-  const storage = storageOf("localStorage")
+  const storage = sharedStorage()
   if (storage === undefined) return []
   const legacy = progressKey(scopeOf(actor, id))
   const prefix = progressKey({ ...scopeOf(actor, id), screen: `import:${id}:waiting:` })
+  const own = keyOf(actor, id, tab)
   const found: Array<{ readonly key: string; readonly tab: O.Option<string> }> = []
   try {
     for (let index = 0; index < storage.length; index += 1) {
       const key = storage.key(index)
-      if (key === null || key === keyOf(actor, id)) continue
+      if (key === null || key === own) continue
       if (key === legacy) found.push({ key, tab: O.none() })
       else if (Str.startsWith(prefix)(key)) found.push({ key, tab: O.some(Str.slice(Str.length(prefix))(key)) })
     }
@@ -209,10 +139,45 @@ const otherTabs = (
   return found
 }
 
+/** What a tab claims before taking an entry up: a lock named for that entry, so only one tab ever takes it. */
+const claimOf = (entry: { readonly key: string }): string => `inventory-kept:${entry.key}`
+
+/**
+ * The entries of tabs that are gone, from the browser's locks as they are now: a tab still open holds its own lock;
+ * an older page's entry (no tab) belongs to no open tab.
+ */
+const goneOf = <Entry extends { readonly tab: O.Option<string> }>(
+  locks: LockManager,
+  entries: ReadonlyArray<Entry>,
+  then: (gone: ReadonlyArray<Entry>) => void
+): void =>
+  void locks.query().then((snapshot) => {
+    const open = A.map(snapshot.held ?? [], (lock) => lock.name ?? "")
+    then(A.filter(entries, (entry) => !O.exists(entry.tab, (tab) => A.contains(open, lockOf(tab)))))
+  })
+
+/**
+ * Reads one entry from the browser's storage as it is now, erases it there at once, and hands it over: inside the
+ * claim, so another tab that claims it next finds it gone (the atom's own write could land after the claim ends).
+ */
+const takeEntry = (registry: AtomRegistry.AtomRegistry, key: string, take: (kept: Waiting) => void): void => {
+  const storage = sharedStorage()
+  let text: string | null = null
+  try {
+    text = storage?.getItem(key) ?? null
+    storage?.removeItem(key)
+  } catch {
+    return
+  }
+  registry.set(waitingAt(key), O.none())
+  O.map(waitingFromText(text), take)
+}
+
 /**
  * The waiting rows the member's tabs that are gone (closed or crashed) kept for one import, taken up by this tab: each
- * is read, its entry erased, and handed over. A tab still open is never taken from; without the browser's locks no
- * tab can be told gone, and only an older page's entry is taken up.
+ * entry is claimed under the gone tab's own lock, so a tab still open (which holds it) is never taken from, and of two
+ * tabs taking up at once only one gets it; then read, erased and handed over. Without the browser's locks no tab can be
+ * told gone, and only an older page's entry is taken up. Nothing is taken up before this tab's id is its own.
  */
 export const takeUpGoneTabs = (input: {
   readonly registry: AtomRegistry.AtomRegistry
@@ -220,42 +185,49 @@ export const takeUpGoneTabs = (input: {
   readonly take: (kept: Waiting) => void
 }): void => {
   const { registry, id } = input
-  O.map(registry.get(member), (actor) => {
-    const others = otherTabs(actor, id)
+  O.map(O.all({ actor: registry.get(member), tab: registry.get(thisTab) }), ({ actor, tab }) => {
+    const others = otherTabs(actor, id, tab)
     if (!A.isReadonlyArrayNonEmpty(others)) return
-    const takeFrom = (gone: ReadonlyArray<{ readonly key: string }>) => {
-      for (const entry of gone) {
-        const waits = toWaiting(registry.get(waitingAt(entry.key)))
-        registry.set(waitingAt(entry.key), O.none())
-        O.map(waits, input.take)
-      }
+    const locks = browserLocks()
+    if (locks === undefined) {
+      for (const entry of others) if (O.isNone(entry.tab)) takeEntry(registry, entry.key, input.take)
+      return
     }
-    const locks = locksOf()
-    if (locks === undefined) return takeFrom(A.filter(others, (entry) => O.isNone(entry.tab)))
-    void locks.query().then((snapshot) => {
-      const open = A.map(snapshot.held ?? [], (lock) => lock.name ?? "")
-      takeFrom(A.filter(others, (entry) => !O.exists(entry.tab, (tab) => A.contains(open, lockOf(tab)))))
+    goneOf(locks, others, (gone) => {
+      for (const entry of gone) claiming(locks, entry, () => takeEntry(registry, entry.key, input.take))
     })
   })
 }
 
-/** The member each import's waiting rows belong to: whoever decided them, taken when the step opens or rows wait. */
-const keptKeys = MutableHashMap.empty<ImportId, string>()
+/**
+ * Claims one entry of a tab that is gone and, once claimed, does `then` with it, keeping the claim for this page's
+ * life: of two tabs that find the same tab gone at once, only one gets it; and another tab's copy of the browser's
+ * storage can lag behind this tab's erase, so a claim let go at once could be granted to a tab that still reads it.
+ */
+const claiming = (locks: LockManager, entry: { readonly key: string }, then: () => void): void =>
+  void locks.request(claimOf(entry), { ifAvailable: true }, (lock) =>
+    lock === null
+      ? Effect.runPromise(Effect.void)
+      : Effect.runPromise(Effect.sync(then).pipe(Effect.andThen(Effect.never)))
+  )
 
 /**
- * The waiting rows this browser kept for one import, for the person signed in now: what the step reads when it opens.
- * None while nobody is.
+ * The waiting rows this browser kept for one import, for the person signed in now and this tab: what the step reads
+ * when it opens. None while nobody is, or before this tab's id is its own.
  */
 export const keptWaiting = (input: {
   readonly registry: AtomRegistry.AtomRegistry
   readonly id: ImportId
 }): O.Option<Waiting> =>
-  O.flatMap(input.registry.get(member), (actor) => toWaiting(input.registry.get(waitingAt(keyOf(actor, input.id)))))
+  pipe(
+    O.all({ actor: input.registry.get(member), tab: input.registry.get(thisTab) }),
+    O.flatMap(({ actor, tab }) => toWaiting(input.registry.get(waitingAt(keyOf(actor, input.id, tab)))))
+  )
 
 /**
  * Keeps what waits of one import's draft after an event, under the member the rows belong to: the person signed in
  * when the step opened or a row was decided, not whoever is signed in when the server answers. Nothing waiting is no
- * entry, and the import's rows then belong to nobody until the next press.
+ * entry, and the import's draft then belongs to nobody until the next press.
  */
 export const keepWaiting = (input: {
   readonly registry: AtomRegistry.AtomRegistry
@@ -266,13 +238,16 @@ export const keepWaiting = (input: {
 }): void => {
   const { registry, id } = input
   if (input.pressed) {
-    O.map(registry.get(member), (actor) => MutableHashMap.set(keptKeys, id, keyOf(actor, id)))
+    O.map(registry.get(member), (actor) =>
+      registry.set(draftOwner(id), O.some({ organizationId: actor.organizationId, id: actor.id }))
+    )
   }
-  O.map(MutableHashMap.get(keptKeys, id), (key) => {
+  O.map(O.all({ owner: registry.get(draftOwner(id)), tab: registry.get(thisTab) }), ({ owner, tab }) => {
+    const key = keyOf(owner, id, tab)
     const stored = toStored(input.waits)
     if (!Eq.equals(registry.get(waitingAt(key)), stored)) registry.set(waitingAt(key), stored)
-    if (O.isNone(input.waits)) MutableHashMap.remove(keptKeys, id)
   })
+  if (O.isNone(input.waits)) registry.set(draftOwner(id), O.none())
   registry.update(waitingImports, (now) =>
     // Rows on hold are kept, and not to be sent by themselves: they ask nothing before the page is left.
     O.exists(input.waits, (waits) => !waits.leftOver && !R.isEmptyReadonlyRecord(waits.rows))
@@ -282,16 +257,36 @@ export const keepWaiting = (input: {
 }
 
 /**
- * Erases one import's draft and every row kept for it in this browser (the import was removed): under the member
- * the rows belong to, and under the person signed in now.
+ * Erases one import's draft and the rows kept for it in this browser that no open tab holds (the import was removed):
+ * this tab's, under the member the rows belong to and under the person signed in now, a gone tab's and an older page's.
+ * An entry of a tab still open stays: that tab finds the import gone itself, and erases its own.
  */
 export const forgetDraft = (input: { readonly registry: AtomRegistry.AtomRegistry; readonly id: ImportId }): void => {
   const { registry, id } = input
+  const owners = A.dedupeWith(
+    A.getSomes([
+      registry.get(draftOwner(id)),
+      O.map(registry.get(member), (actor) => ({ organizationId: actor.organizationId, id: actor.id }))
+    ]),
+    sameMember
+  )
   registry.set(draftOf(id), emptyDraft)
-  O.map(MutableHashMap.get(keptKeys, id), (key) => registry.set(waitingAt(key), O.none()))
-  O.map(registry.get(member), (actor) => registry.set(waitingAt(keyOf(actor, id)), O.none()))
-  MutableHashMap.remove(keptKeys, id)
+  registry.set(draftOwner(id), O.none())
   registry.update(waitingImports, HashSet.remove(id))
+  O.map(registry.get(thisTab), (tab) => {
+    const locks = browserLocks()
+    for (const owner of owners) {
+      registry.set(waitingAt(keyOf(owner, id, tab)), O.none())
+      const others = otherTabs(owner, id, tab)
+      if (locks === undefined) {
+        for (const entry of others) if (O.isNone(entry.tab)) registry.set(waitingAt(entry.key), O.none())
+        continue
+      }
+      goneOf(locks, others, (gone) => {
+        for (const entry of gone) claiming(locks, entry, () => takeEntry(registry, entry.key, () => undefined))
+      })
+    }
+  })
 }
 
 /**
@@ -300,18 +295,17 @@ export const forgetDraft = (input: { readonly registry: AtomRegistry.AtomRegistr
  */
 const waitingOfThisTab = (input: {
   readonly registry: AtomRegistry.AtomRegistry
-  readonly actor: { readonly organizationId: string; readonly id: string }
+  readonly actor: Owner
+  readonly tab: string
 }): ReadonlyArray<ImportId> => {
-  const storage = storageOf("localStorage")
+  const storage = sharedStorage()
   if (storage === undefined) return []
-  const { actor, registry } = input
+  const { actor, registry, tab } = input
   const scope = { organizationId: actor.organizationId, memberId: actor.id }
   const start = progressKey({ ...scope, screen: "import:" })
   // The escaped end of every key this tab writes, whatever the import.
   const bare = progressKey({ organizationId: "", memberId: "", screen: "" })
-  const end = Str.slice(Str.length(bare))(
-    progressKey({ organizationId: "", memberId: "", screen: `:waiting:${tabId()}` })
-  )
+  const end = Str.slice(Str.length(bare))(progressKey({ organizationId: "", memberId: "", screen: `:waiting:${tab}` }))
   const ids: Array<ImportId> = []
   try {
     for (let index = 0; index < storage.length; index += 1) {
@@ -340,19 +334,34 @@ const waitingOfThisTab = (input: {
 const waitingImports = Atom.make(HashSet.empty<ImportId>()).pipe(Atom.keepAlive)
 
 /**
+ * An import this tab kept rows for is asked for once at page start: one that was removed meanwhile (by anyone) has its
+ * kept rows erased, and asks nothing before the page is left. Any other answer, or none, leaves them.
+ */
+const forgetIfRemoved = (registry: AtomRegistry.AtomRegistry, id: ImportId): void =>
+  void call((api) => api.imports.get({ params: { id } })).then(
+    () => undefined,
+    (error: unknown) => {
+      if (S.is(ImportNotFound)(error)) forgetDraft({ registry, id })
+    }
+  )
+
+/**
  * The browser asks before the page is left while any import has rows still to be sent, wherever the person is in the
  * app: kept for the page by the workspace. Rows left over by a closed import are only to be named, and never sent,
- * so they ask nothing. A page the app leaves on purpose (a sign-out, a sign-in as somebody else) asks nothing either:
- * the session is ended by then, and the rows stay kept in this browser for that person's next visit.
+ * so they ask nothing; nor do rows of an import removed meanwhile. A page the app leaves on purpose (a sign-out, a
+ * sign-in as somebody else) asks nothing either: the session is ended by then, and the rows stay kept in this browser
+ * for that person's next visit. This tab's rows are counted once its id is its own (a copied tab counts none of the
+ * original's), and again for whoever is signed in.
  */
 export const askBeforeLeaving = Atom.readable((get) => {
   if (typeof window === "undefined") return
   const registry = get.registry
-  holdThisTab()
   // Rows this tab kept before a reload wait to be sent wherever the person is, whether or not their import's step is
   // opened again: they count from the start.
-  O.map(registry.get(member), (actor) => {
-    for (const id of waitingOfThisTab({ registry, actor })) registry.update(waitingImports, HashSet.add(id))
+  O.map(O.all({ actor: get(member), tab: get(thisTab) }), ({ actor, tab }) => {
+    const ids = waitingOfThisTab({ registry, actor, tab })
+    registry.set(waitingImports, HashSet.fromIterable(ids))
+    for (const id of ids) forgetIfRemoved(registry, id)
   })
   const ask = (event: BeforeUnloadEvent) => {
     if (HashSet.size(registry.get(waitingImports)) > 0) event.preventDefault()

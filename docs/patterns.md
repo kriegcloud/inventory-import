@@ -72,8 +72,9 @@ record: Effect.fn("records.record")(function* ({ params }) {
   return found.value
 })
 
-// web
-useQuery({ queryKey: ["record", code], queryFn: () => call((api) => api.items.record({ params: { code } })) })
+// web: one read per code, each an atom made once and kept by its key (`perKey` from `@inventory/client/Api`)
+const record = perKey((code: string) => catalogApi.query((api) => api.items.record({ params: { code } })))
+// in the screen: useAtomValue(record(code)), an AsyncResult with the endpoint's own failures
 ```
 
 ## 3. Calling a model
@@ -172,7 +173,7 @@ A route beside the HttpApi (a frame document, a stream):
 
 ## 7. Reading a spreadsheet (.csv and .xlsx)
 
-The reader exists; do not write another. A file the person chooses is read with `useUpload().start(file, sheet?)`
+The reader exists; do not write another. A file the person chooses is read by setting the `startUpload` atom to it
 (`@inventory/catalog-web/Upload`, [the kit](kit.md) "Steps and upload"): a module worker runs the reader, so the page never freezes, and
 the screen shows its progress and Cancel. Inside the worker and in tests, `readSpreadsheet({ file, sheet?,
 onProgress? })` from `@inventory/catalog-web/Spreadsheet` returns an `Effect<SpreadsheetTable, FileProblem>` (shapes in
@@ -185,12 +186,14 @@ look, as sentences to show. A file that cannot be read is a `FileProblem`, data 
 and tests: `packages/catalog/web/test/readSpreadsheet.test.ts`.
 
 ```tsx
-const upload = useUpload()
-upload.start(file)                       // returns at once; upload.state: Reading -> Arriving -> Read, or Refused
-// upload.state._tag === "Read": upload.state.table, and upload.state.workbook for a workbook ->
-// <SheetChooser sheets={workbook.sheets} chosen={workbook.chosen} onChoose={(sheet) => upload.start(file, sheet)} />
-// upload.state._tag === "Refused": upload.state.problem is the file's FileProblem (what is wrong, what to do)
-// upload.state._tag === "Failed": the reader itself broke; upload.state.message says so
+const state = useAtomValue(uploadState)   // Idle -> Reading -> Saving -> Preparing, or Cancelling, Refused, Failed
+const start = useAtomSet(startUpload)
+const cancel = useAtomSet(cancelUpload)
+start({ file, onEnd })                    // returns at once; `onEnd` hears how it ended (an `UploadEnd`: Arrived,
+                                          // Cancelled, Refused or Failed, told apart with `UploadEnd.$match`).
+                                          // Another sheet of a workbook: `start({ file, sheet })`
+// "Refused": state.problem is the file's FileProblem (what is wrong, what to do)
+// "Failed": the reader or the sending broke; the state says so in words
 ```
 
 - **Cell text.** Numbers are plain decimals at Excel's 15 digits (`0.1+0.2` is `"0.3"`, money stays `"12.5"`, so read

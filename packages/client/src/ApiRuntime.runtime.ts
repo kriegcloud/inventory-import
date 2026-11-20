@@ -13,7 +13,7 @@ import * as SecureRandom from "effect/crypto/SecureRandom"
 import { RequestId } from "@inventory/kernel/Ids"
 import { isTransient } from "@inventory/client/SayError"
 
-/** Runs one program against the API as a Promise, for TanStack Query; a typed API error rejects as itself. */
+/** Runs one program against the API as a Promise, for what runs outside an atom; a typed API error rejects as itself. */
 export type Call<Client> = <A, E>(use: (client: Client) => Effect.Effect<A, E>) => Promise<A>
 
 /** Runs a longer program against the API in the background; interrupting the fiber aborts its requests. */

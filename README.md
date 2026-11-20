@@ -157,7 +157,7 @@ packages/catalog/            The catalog context: contract (schemas, API groups)
 packages/access/             The access context, in the same four packages
 apps/inventory/src/api/      The HTTP contract, shared by server and browser (Effect HttpApi)
 apps/inventory/src/server/   Worker: composition, group Layers, settings, the model service's setup
-apps/inventory/src/web/      React 19, Tailwind 4, shadcn/ui, TanStack Query
+apps/inventory/src/web/      React 19, Tailwind 4, shadcn/ui, Effect atoms
 apps/inventory/migrations/   D1 (SQLite) schema
 packages/foundation/         @beep/csv and @beep/xlsx (the CSV and Excel readers and writers) and @beep/types,
                              @beep/identity, @beep/schema, @beep/utils, vendored from beep-effect and hash-checked

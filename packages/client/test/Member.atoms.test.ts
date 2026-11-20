@@ -1,6 +1,6 @@
 // A read belongs to the member who asked: switching organization shows nothing of the previous one's answer, not even
-// marked as waiting, and asks again for the new one. And a key said to have changed from outside the atoms (the
-// catalog screens still on TanStack Query) makes a read registered under it ask again.
+// marked as waiting, and asks again for the new one. And a key said to have changed (`invalidate`) makes a read
+// registered under it ask again.
 import { describe, expect, it } from "@effect/vitest"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"

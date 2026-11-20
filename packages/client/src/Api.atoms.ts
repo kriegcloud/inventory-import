@@ -27,7 +27,7 @@ import { isTransient } from "@inventory/client/SayError"
 /**
  * How long an answer nobody is looking at is kept. A screen opened again within it shows that answer at once, marked
  * waiting, and asks again behind it (Benjamin: "Old rows at once, refreshed behind"); after it, the screen starts from
- * its skeleton. Five minutes, TanStack Query's own keep. A sign-out lets every one go at once (`forgetReads`).
+ * its skeleton. Five minutes. A sign-out lets every one go at once (`forgetReads`).
  */
 export const keepUnwatched = 5 * 60_000
 

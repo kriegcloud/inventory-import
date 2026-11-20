@@ -17,7 +17,7 @@ export const authErrorMessage = (error: { message?: string | undefined; status: 
   return error.message ?? "Something went wrong. Try again."
 }
 
-/** Better Auth's answer as a value, or its error as a thrown `Error` with that sentence, for TanStack Query. */
+/** Better Auth's answer as a value, or its error as a thrown `Error` with that sentence, for an atom's promise. */
 export const orThrow = <A>(
   result: { data: A; error: null } | { data: null; error: { message?: string | undefined; status: number } }
 ): A => {

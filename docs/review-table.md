@@ -29,7 +29,7 @@ month its own row of the region, labelled "3 · Feb").
 | `rows` | One per file line, or one per record when a line holds several (`id` its own, `line` shared, `label` "8 · Feb" for the region's sentences: [patterns](patterns.md) section 16): `{ id, line, label?, cells: { [columnId]: text }, problem?, applied?, stored? }`. `label` names the row in "Leave row 8 · Feb out", "Keep row 8 · Feb", the "row 8 · Feb" link and the download; the Row column keeps `line`. Cells are already formatted text. A row with no `problem` is ready. `stored: true` is a record already in the system: it counts apart (Already there), shows under All with its tag, and offers nothing, not even "Leave out" |
 | `problemKinds` | An atom of `{ id, label, tone, help?, fixable? }`, in the order the work list shows them: the tag in the Problem column, three words at most. `decision` is amber, `blocker` is red. `help` is one line under the kind's heading. `fixable: false` is a kind nothing on this screen can settle (the item it names is not in the system yet): its rows are counted under Can't fix here, offer no answer and never hold the import back |
 | `problem` | `{ kind, reason?, column?, ask?, note?, fix?, rivals?, choices? }`: `kind` is a `problemKinds` id; `reason` is the row's sentence, naming the column and the value ("Code is empty."), shown on every row whatever its kind, a fix or none, and in `result.held` and the download (without it the kind's `help`, then its label, stand in); `column` the cell it is in, `note` a few words beside the tag ("row 31") |
-| `problem.fix` | A proposal: `{ column, to, by?: "rule" \| "model", kind, group?, label?, reason?, confidence?, why: { basis, detail?, alternatives? } }`. Shown struck-old, green new value, button "Use pcs". `by` names who prepared it ("Rule", a sparkle for a model); left out, the change is called a suggestion and names nobody. `reason` is what is wrong with the value, the row's sentence while the fix waits (a rule's lossless fix has no `problem` of its own). Same `group` on identical changes gives a heading above those rows with "Use pcs for 9". `confidence: "low"` makes it a question: the person picks `to` or one of `why.alternatives`, and there is no accept for the group |
+| `problem.fix` | A proposal: `{ column, to, by?: "rule" \| "model", kind, group?, label?, reason?, confidence, why: { basis, detail?, alternatives? } }` (`confidence` is an `Option` the caller always gives: `O.some("high")`, or `O.none()` when nothing rated it). Shown struck-old, green new value, button "Use pcs". `by` names who prepared it ("Rule", a sparkle for a model); left out, the change is called a suggestion and names nobody. `reason` is what is wrong with the value, the row's sentence while the fix waits (a rule's lossless fix has no `problem` of its own). Same `group` on identical changes gives a heading above those rows with "Use pcs for 9". `confidence: "low"` makes it a question: the person picks `to` or one of `why.alternatives`, and there is no accept for the group |
 | `fix.label` | What a group's heading and button call the change when its rows end in different values: one reading of a column, `label: "a decimal point"` for 1,5 → 1.5 and 2,25 → 2.25. The heading reads "1,5 (1) · 2,25 (1) → a decimal point" and the button "Use a decimal point for the 2 ticked"; each row still shows its own old and new value, and an accept gives each row its own `to` |
 | `problem.choices` | A pick with no default: `[{ value, label, note?, suggested? }]`, with a `column` and no `fix`. Equal outline buttons, nothing proposed in the cell; one choice is its own button, several open from one (`problem.ask`, or "Choose"). A pick is the person's own value for `column` (your `recheck` sees it) and the row then says "Chosen". `suggested: true` with the reason in `note` reads "40 L, as 6 of 7 lines say (suggested)": said in words only, never picked for the person, never the filled button |
 | `problem.rivals` | Ids of rows that cannot all go in (the same code). The row gets "Keep row 5", which leaves the rivals out, and a "row 56" link that shows the two side by side |
@@ -77,7 +77,7 @@ export const toActivity = (table: SpreadsheetTable): Activity => ({
 ```
 
 `line` is Excel's row number, so the Row column and every "row 56" match what the person sees in the file. A header the
-file does not have is a `match: { state: "unmatched", candidates }` on that column (below), not a guess. Then
+file does not have is a `match: ColumnMatch.Unmatched({ candidates })` on that column (below), not a guess. Then
 `<ReviewRegion rows={toReviewRows(table)} activity={toActivity(table)} summary={[`${table.rows.length} rows read`]} …
 />`. Checked: this hand-off type-checks as written against the reader's types.
 
@@ -86,7 +86,9 @@ file does not have is a `match: { state: "unmatched", candidates }` on that colu
 ```tsx
 import { AppShell } from "@/components/app/AppShell"
 import { ReviewRegion } from "@inventory/review/ReviewRegion"
-import type { Problem, ReviewColumn, ReviewRow } from "@inventory/review/ReviewTypes"
+import type { Problem, ProblemKind, ReviewColumn, ReviewRow } from "@inventory/review/ReviewTypes"
+import * as O from "effect/Option"
+import * as Atom from "effect/reactivity/Atom"
 
 const columns: ReadonlyArray<ReviewColumn> = [
   { id: "name", label: "Name", width: 220, core: true },
@@ -106,7 +108,7 @@ const check = (cells: Readonly<Record<string, string>>): Problem | undefined => 
   const to = Object.hasOwn(spellings, unit) ? spellings[unit] : undefined
   if (to !== undefined) {
     const why = { basis: `Fixed rule: "${unit}" means ${to}.` }
-    return { kind: "unit", column: "unit", fix: { column: "unit", to, by: "rule", kind: "unit", group: `unit:${to}`, why } }
+    return { kind: "unit", column: "unit", fix: { column: "unit", to, by: "rule", kind: "unit", group: `unit:${to}`, confidence: O.none(), why } }
   }
   if (!["pcs", "kg", "m"].includes(unit)) return { kind: "unit", column: "unit" }
   if ((cells.qty ?? "").startsWith("-")) return { kind: "qty", column: "qty" }
@@ -224,7 +226,8 @@ choice suggested), a decimal comma under one labelled group, a SKU not in stock,
 - Row height is compact (36 px) or comfortable (44 px), from the toolbar, remembered in this browser.
 - The download icon gives the rows that will not be imported as a CSV with a reason on every line.
 - "Import 136 records" opens a confirm when rows are held: what will be imported and what will not.
-- A column with `match: { state: "unmatched", candidates }` turns the Columns icon amber, puts a select in that
+- A column with `match: ColumnMatch.Unmatched({ candidates })` (the enum from `@inventory/review/ReviewTypes`; a
+  column found in the file is `ColumnMatch.Matched({ source, by, samples })`) turns the Columns icon amber, puts a select in that
   column's header and changes the button to "Match Unit to import".
 - Widths are the page's own room, not the window's: the window less a sidebar beside the page, which the shell
   reports with `setContentInset` (`@inventory/ui/ContentWidth`; without one it is the window), less the card's margins and
@@ -248,7 +251,7 @@ choice suggested), a decimal comma under one labelled group, a SKU not in stock,
   heading per spelling. `ruleFixes={Atom.make("apply")}` puts them in force on arrival with a tick, "17 auto-fixed" and Undo.
 - **Who decided each thing** is in `onImport`'s result, ready for an Activity row per change:
   `result.ready[i].changes` is `{ column, from, to, source: "rule" | "model" | "person", decidedBy: "person" | "rule",
-  how, basis?, confidence? }` (`basis` and `confidence` are the fix's `why.basis` and `confidence`), `kept` marks a row
+  how, basis?, confidence }` (`basis` and `confidence` are the fix's `why.basis` and `confidence`, the latter an `Option`), `kept` marks a row
   kept over another, and `result.held[i].decidedBy` is `"person"` for a row left out, `"nobody"` for one still open.
 - **A refresh does not lose work**: decisions are plain data. Keep them and hand them back (the caller's atom keeps
   "Undo last step" too while the page is open: "Two views, one history"):

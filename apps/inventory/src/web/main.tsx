@@ -1,12 +1,10 @@
 import { RegistryProvider } from "@effect/atom-react"
-import { QueryClientProvider } from "@tanstack/react-query"
 import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 import { Toaster } from "@inventory/ui/components/sonner"
 import { TooltipProvider } from "@inventory/ui/components/tooltip"
 import { appLayer, appRuntime } from "@/lib/api"
 import { modelSentences } from "@inventory/catalog-web/AnsweredByWords"
-import { queryClient } from "@inventory/client/QueryClient"
 import { startTelemetry } from "@/lib/telemetry"
 import { provideApi } from "@inventory/client/Api"
 import { provideMember } from "@inventory/client/MemberAtoms"
@@ -34,18 +32,16 @@ const initialAtoms = [provideApi(appLayer), provideMember(actor)]
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    {/* The atoms' registry, beside the query cache while the screens move to atoms (goals/atoms). An atom nobody reads
-        is dropped 400 ms later; a read of the API is kept for `keepUnwatched` (@inventory/client/Api). */}
+    {/* The atoms' registry: everything a screen holds or reads is an atom in it (goals/atoms). An atom nobody reads is
+        dropped 400 ms later; a read of the API is kept for `keepUnwatched` (@inventory/client/Api). */}
     <RegistryProvider initialValues={initialAtoms} defaultIdleTTL={400}>
       <ThemeProvider>
-        <QueryClientProvider client={queryClient}>
-          <TooltipProvider delayDuration={300}>
-            <App />
-            {/* Top centre, under the bar: between a page's title and its buttons, so a message never covers the table's
+        <TooltipProvider delayDuration={300}>
+          <App />
+          {/* Top centre, under the bar: between a page's title and its buttons, so a message never covers the table's
               page controls or a confirm button. */}
-            <Toaster position="top-center" offset={64} richColors closeButton />
-          </TooltipProvider>
-        </QueryClientProvider>
+          <Toaster position="top-center" offset={64} richColors closeButton />
+        </TooltipProvider>
       </ThemeProvider>
     </RegistryProvider>
   </StrictMode>

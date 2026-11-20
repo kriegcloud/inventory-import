@@ -58,7 +58,6 @@
     "@inventory/review": "workspace:*",
     "@inventory/ui": "workspace:*",
     "@shadcn/react": "^0.3.1",
-    "@tanstack/react-query": "^5.107.1",
     "@tanstack/react-table": "^9.3.1",
     "@tanstack/react-virtual": "^3.14.26",
     "better-auth": "1.7.22",

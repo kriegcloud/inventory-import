@@ -2,13 +2,5 @@
   // The client seam's lint: the shared rules for code that runs in the browser, and the atoms rule (goals/atoms).
   "$schema": "../../node_modules/@effect/tsgo/oxlint-schema.json",
   "extends": ["../../.oxlintrc.web.json", "../../.oxlintrc.atoms.json"],
-  "ignorePatterns": ["dist/**"],
-  "overrides": [
-    {
-      // The query client, still provided at the root (the app's main.tsx) until TanStack Query
-      // leaves (goals/atoms, step 8), and its own test. No screen reads through it; it may gain no caller.
-      "files": ["src/QueryClient.runtime.ts", "test/QueryClient.test.ts"],
-      "rules": { "no-restricted-imports": "off" }
-    }
-  ]
+  "ignorePatterns": ["dist/**"]
 }

@@ -52,14 +52,9 @@ const binding = (): CatalogBinding => {
 }
 
 /**
- * Run one API call as a Promise, for TanStack Query.
- * A typed API error rejects with that error object, so the UI can switch on `_tag`.
- */
-export const call: Call<CatalogApiClient> = (use) => binding().call(use)
-
-/**
- * Runs one write as a Promise, for a mutation. A failure that may pass is sent again, twice at most; a refusal is
- * not. A write names what it acts on, so a retry after a lost answer adds nothing.
+ * Runs one write as a Promise, for a write that is not an atom's (the review's draft sends its saves itself). A
+ * failure that may pass is sent again, twice at most; a refusal is not. A write names what it acts on, so a retry
+ * after a lost answer adds nothing.
  */
 export const callWrite: Call<CatalogApiClient> = (use) => binding().callWrite(use)
 

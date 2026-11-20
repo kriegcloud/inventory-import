@@ -42,12 +42,13 @@ browser ── cookie inventory.session_token ──> Worker
   on the server. A refused switch
   clears the active organization (Better Auth's behaviour); the person then acts in their earliest one.
 - **The browser** (`@inventory/access-web/Session`, set up by the app's `src/web/lib/actor.ts`) asks once per page load: `GET /api/v1/identity/session` answers status,
-  email, actor, organizations and the sign-in features, cached with `sessionQuery` (never refetched on its own). A
-  signed-out visit logs no failed request. Signing in, creating an organization or switching drops every cached query
-  and asks again; signing out reloads the page, so nothing the previous person saw stays in memory. `SignedIn` shows
+  email, actor, organizations and the sign-in features, held by the `session` atom (never asked again on its own). A
+  signed-out visit logs no failed request. Signing in, creating an organization or switching asks the session again,
+  and every read is kept per member and organization, so the screens start from nothing for the new one; signing out
+  lets every read go and reloads the page, so nothing the previous person saw stays in memory. `SignedIn` shows
   the sign-in screen, the "create your organization" screen, or the app.
 - **Development opens signed in.** In a development build, when the session answer says nobody is signed in and
-  offers test accounts, `useDevelopmentSignIn` (`src/web/components/app/SignedIn.tsx`) signs in as the first of them
+  offers test accounts, the `developmentSignIn` atom (`src/web/components/app/SignedIn.tsx`) signs in as the first of them
   (Dana Whitfield) through Better Auth's `signIn.email` with the shared password: a real session cookie, no click.
   The user menu at the foot of the sidebar lists the others under "Sign in as a test account": a click signs out,
   signs in as that account and reloads. Signing out marks the tab (`sessionStorage`), so that tab then shows the

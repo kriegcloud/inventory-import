@@ -46,5 +46,6 @@ status: draft
   and a child row references its parent by `(organizationId, id)`. Every tenant-scoped endpoint has the identity
   middleware. Check: read the migrations; each foreign key to a tenant table includes `organizationId`.
 - **A test proves the second organization sees none of the first's rows.** Check: the test exists and passes.
-- **Switching organization drops every cached query, and signing out reloads the page.** An agent acts for a person
+- **Another organization starts from nothing, and signing out reloads the page.** A read is kept per member and
+  organization (`@inventory/client/Api`), so nothing read for one is shown for another; a sign-out lets every read go. An agent acts for a person
   and never above their role. Check: switch organization; the network panel shows every list fetched again.

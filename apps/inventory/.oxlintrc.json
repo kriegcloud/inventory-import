@@ -2,14 +2,5 @@
   // The app's lint: the shared rules for code with screens (../../.oxlintrc.web.json), and the atoms rule (goals/atoms).
   "$schema": "../../node_modules/@effect/tsgo/oxlint-schema.json",
   "extends": ["../../.oxlintrc.web.json", "../../.oxlintrc.atoms.json"],
-  "ignorePatterns": ["dist/**", ".agents/**", ".claude/**", ".codex/**"],
-  "overrides": [
-    {
-      // The query cache's provider and the client it is given, still at the root until TanStack Query leaves
-      // (goals/atoms, step 8). No screen reads through either; neither may gain a use. The one file: nothing else in
-      // the app can reach the client.
-      "files": ["src/web/main.tsx"],
-      "rules": { "no-restricted-imports": "off" }
-    }
-  ]
+  "ignorePatterns": ["dist/**", ".agents/**", ".claude/**", ".codex/**"]
 }

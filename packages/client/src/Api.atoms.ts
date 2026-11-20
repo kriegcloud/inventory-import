@@ -6,11 +6,13 @@
 // the object held, so nothing derived from it is rebuilt; a read belongs to the member who asked, so another member or
 // another organization starts from nothing instead of seeing the last one's answer.
 import * as A from "effect/Array"
+import * as Cause from "effect/Cause"
 import * as DateTime from "effect/DateTime"
 import * as Duration from "effect/Duration"
 import type * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Eq from "effect/Equal"
+import * as Exit from "effect/Exit"
 import * as Fiber from "effect/Fiber"
 import { dual } from "effect/Function"
 import * as Layer from "effect/Layer"
@@ -308,14 +310,19 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
     // collected one would be made anew on a return, empty (measured: after 35 s away).
     const reads = MutableHashMap.empty<string, PerMember<A, E>>()
     // An answer given to a read nobody shows is held in the registry by this module, until the read takes it, is let
-    // go, or the person signs out.
-    const givenHeld = MutableHashMap.empty<string, () => void>()
-    const letGiven = (member: string): void =>
+    // go, or the person signs out. Each hold names the read it holds: a request of a read already let go that lands
+    // late lets go of its own hold only, never the one of the read made since for the same member.
+    const givenHeld = MutableHashMap.empty<
+      string,
+      { readonly beside: Atom.Atom<unknown>; readonly release: () => void }
+    >()
+    const letGiven = (member: string, of?: Atom.Atom<unknown>): void =>
       O.match(MutableHashMap.get(givenHeld, member), {
         onNone: () => {},
-        onSome: (release) => {
+        onSome: (hold) => {
+          if (of !== undefined && hold.beside !== of) return
           MutableHashMap.remove(givenHeld, member)
-          release()
+          hold.release()
         }
       })
     const make = (member: string): PerMember<A, E> => {
@@ -328,8 +335,12 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
         const now = registry.get(beside)
         if (O.exists(now.given, (given) => given === taken)) {
           registry.set(beside, { ...now, given: O.none() })
-          letGiven(member)
+          letGiven(member, beside)
         }
+      }
+      /** Asks once more, unless a request already left since: one that left after what was learned includes it. */
+      const onceMore = (registry: AtomRegistry.AtomRegistry): void => {
+        if (O.isNone(registry.get(out))) registry.refresh(asked)
       }
       const asked: Atom.Atom<AsyncResult.AsyncResult<A, E>> = apiRuntime.atom((get) => {
         const registry = get.registry
@@ -345,7 +356,7 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
           later(() => {
             takenUp(registry, taken)
             if (keeping !== "page" && Duration.isGreaterThan(age, freshEnough) && registry.getNodes().has(asked)) {
-              registry.refresh(asked)
+              onceMore(registry)
             }
           })
           return Effect.succeed(taken.answer)
@@ -366,16 +377,23 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
             const again = keeping !== "page" && landedAt.newer !== start.newer
             later(() => {
               if (!registry.getNodes().has(asked)) return
-              if (again) return registry.refresh(asked)
+              if (again) return onceMore(registry)
               // Nothing was given while it was out: an answer given before it left is older than its answer, and is
               // let go. One given after it landed stays.
               O.map(landedAt.given, (given) => takenUp(registry, given))
             })
             return keepWhenEqual(shown, answer)
           }),
-          Effect.ensuring(
+          Effect.onExit((exit) =>
             Effect.sync(() => {
               if (O.exists(registry.get(out), (now) => now === mine)) registry.set(out, O.none())
+              // The server said no (the import is gone, the role was taken away) or could not be reached: that is
+              // what the screen shows, never an answer a screen gave, which would hide it. Ended to be asked again
+              // is not an answer, and changes nothing.
+              if (Exit.isFailure(exit) && !Cause.hasInterruptsOnly(exit.cause)) {
+                const failedAt = registry.get(beside)
+                later(() => O.map(failedAt.given, (given) => takenUp(registry, given)))
+              }
             })
           )
         )
@@ -436,7 +454,7 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
           if (registry.getNodes().has(entry.beside)) {
             registry.update(entry.beside, (now) => ({ ...now, given: O.none() }))
           }
-          letGiven(member)
+          letGiven(member, entry.beside)
         })
       )
     }
@@ -444,7 +462,7 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
       forget: () => {
         MutableHashMap.forEach(kept, (keep) => keep.letGo())
         MutableHashMap.clear(kept)
-        MutableHashMap.forEach(givenHeld, (release) => release())
+        MutableHashMap.forEach(givenHeld, (hold) => hold.release())
         MutableHashMap.clear(givenHeld)
         MutableHashMap.clear(reads)
       },
@@ -477,8 +495,9 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
       (ctx, answer: A) => {
         const member = ctx.get(memberKey)
         const { beside } = forMember(member)
-        if (!MutableHashMap.has(givenHeld, member)) {
-          MutableHashMap.set(givenHeld, member, ctx.get(registryOf).mount(beside))
+        if (!O.exists(MutableHashMap.get(givenHeld, member), (hold) => hold.beside === beside)) {
+          letGiven(member)
+          MutableHashMap.set(givenHeld, member, { beside, release: ctx.get(registryOf).mount(beside) })
         }
         ctx.set(beside, { newer: ctx.get(beside).newer + 1, given: O.some({ answer, at: DateTime.nowUnsafe() }) })
       },

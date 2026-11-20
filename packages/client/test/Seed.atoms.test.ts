@@ -9,6 +9,7 @@ import * as DateTime from "effect/DateTime"
 import type * as Duration from "effect/Duration"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
+import * as S from "effect/Schema"
 import * as O from "effect/Option"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as Atom from "effect/reactivity/Atom"
@@ -20,7 +21,7 @@ interface Rows {
 }
 class RowServer extends Context.Service<RowServer, Rows>()("@inventory/client/test/Seed.atoms.test/RowServer") {}
 
-const world = (takes: Duration.Input = "10 millis") => {
+const world = (takes: Duration.Input = "10 millis", idle = 50) => {
   let reads = 0
   let starts = 0
   const layer = Layer.succeed(RowServer, {
@@ -31,7 +32,7 @@ const world = (takes: Duration.Input = "10 millis") => {
   const api = makeApiAtoms(RowServer)
   const rows = api.query((server) => server.rows)
   const forever = api.query((server) => server.rows, { keep: "page" })
-  const registry = AtomRegistry.make({ initialValues: [provideApi(layer)], defaultIdleTTL: 50 })
+  const registry = AtomRegistry.make({ initialValues: [provideApi(layer)], defaultIdleTTL: idle })
   const seen = (atom: typeof rows) => registry.get(atom).pipe(AsyncResult.value, O.getOrUndefined)
   return { registry, rows, forever, seen, reads: () => reads, starts: () => starts }
 }
@@ -187,6 +188,73 @@ describe("a read let go while a screen still shows it", () => {
       t.registry.refresh(t.rows)
       yield* Effect.sleep("50 millis")
       expect([t.seen(t.rows), t.reads()]).toEqual(["server's rows 3", 3])
+    })
+  )
+})
+
+/** The server refused: the import is gone, or the person may no longer read it. */
+class Gone extends S.TaggedError<Gone, { readonly brand: unique symbol }>()("Gone", {}) {}
+class GoneServer extends Context.Service<GoneServer, { readonly rows: Effect.Effect<string, Gone> }>()(
+  "@inventory/client/test/Seed.atoms.test/GoneServer"
+) {}
+
+describe("what a read shows besides the answer a screen gave", () => {
+  it.live("a request that fails after an answer was given shows the failure, not the given answer", () =>
+    Effect.gen(function* () {
+      let asked = 0
+      const api = makeApiAtoms(GoneServer)
+      const rows = api.query((server) => server.rows)
+      const layer = Layer.succeed(GoneServer, {
+        rows: Effect.suspend(() => (++asked === 1 ? Effect.succeed("server's rows 1") : Effect.fail(Gone.make({}))))
+      })
+      const registry = AtomRegistry.make({ initialValues: [provideApi(layer)], defaultIdleTTL: 50 })
+      registry.mount(rows)
+      yield* Effect.sleep("30 millis")
+      registry.set(rows, "a save's own answer")
+      expect(registry.get(rows).pipe(AsyncResult.value, O.getOrUndefined)).toBe("a save's own answer")
+      // The import was removed elsewhere: the next look is refused, and the screen is told so.
+      registry.refresh(rows)
+      yield* Effect.sleep("30 millis")
+      const now = registry.get(rows)
+      expect([AsyncResult.isFailure(now), now.waiting, asked]).toEqual([true, false, 2])
+    })
+  )
+
+  it.live("a request of a read let go that lands late leaves the answer given to the read made since", () =>
+    Effect.gen(function* () {
+      const t = world("200 millis", 400)
+      const leave = t.registry.mount(t.rows)
+      yield* Effect.sleep("250 millis")
+      t.registry.set(t.rows, "given to the first")
+      t.registry.refresh(t.rows)
+      yield* Effect.sleep("20 millis")
+      leave()
+      t.rows.letGo(t.registry)
+      // Given to the read made since, which no screen shows: it stays until a screen takes it.
+      t.registry.set(t.rows, "given to the second")
+      yield* Effect.sleep("1500 millis")
+      expect(t.rows.peek(t.registry)).toEqual(O.some("given to the second"))
+    })
+  )
+
+  it.live("an ask after a request lands and before its once more is not ended by it", () =>
+    Effect.gen(function* () {
+      const t = world("20 millis")
+      t.registry.mount(t.rows)
+      yield* Effect.sleep("40 millis")
+      t.registry.refresh(t.rows)
+      yield* Effect.sleep("5 millis")
+      t.registry.set(t.rows, "a save's own answer")
+      // The moment the request lands, a save's answer asks again: nothing is out then, so a request leaves now.
+      let asked = false
+      t.registry.subscribe(t.rows, (now) => {
+        if (asked || now.waiting) return
+        asked = true
+        t.rows.askAgain(t.registry)
+      })
+      yield* Effect.sleep("80 millis")
+      // That request left after the save's answer was given: it is the once more, and nothing ends it.
+      expect([t.seen(t.rows), t.starts(), t.reads()]).toEqual(["server's rows 3", 3, 3])
     })
   )
 })

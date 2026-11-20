@@ -254,11 +254,8 @@ function RegionWithTable(props: ReviewRegionProps) {
     columns: useAtomValue(region.columnDefs),
     mode: "client",
     initialState: useAtomValue(region.hiddenAtFirst),
-    getRowId: (view) => view.row.id,
-    // The facets the person ticked are the table's column filters, held where the region writes them.
-    atoms: { columnFilters: region.tableFilters }
+    getRowId: (view) => view.row.id
   })
-  useAtomMount(region.followFacets)
   return (
     <TableScope.Provider value={{ region, table }}>
       <RegionWithGrid {...props} region={region} table={table} />
@@ -517,9 +514,9 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
     </>
   )
 
-  // The data table's own filter, one per facet, with the review's filter state behind it: the component reads and
-  // sets a column's filter value, so it is handed those two over `facetPicked` (the table's own column filters
-  // follow it: `tableFilters`).
+  // The data table's own filter control, one per facet, with the review's filter state behind it: the component
+  // reads and sets a column's filter value, so it is handed those two over `facetPicked`. The rows are filtered by the
+  // region's own atom (`shown`), not by the table.
   const filterMenu =
     facets.length === 0 ? null : (
       <>

@@ -163,7 +163,6 @@ const world = (
     data: registry.get(region.tableData),
     columns: registry.get(region.columnDefs),
     getRowId: (view: RowView) => view.row.id,
-    atoms: { columnFilters: region.tableFilters },
     state: { sorting: state.sorting, globalFilter: state.globalFilter },
     // As React state: the handler keeps the new value, and the table hears of it when the screen is next drawn.
     onSortingChange: (updater: Updater<SortingState>) => {
@@ -194,7 +193,6 @@ const world = (
   // What the screen keeps mounted while the region is drawn.
   const release = [
     registry.mount(regionTable.moves),
-    registry.mount(region.followFacets),
     registry.mount(region.views),
     registry.mount(region.ui),
     registry.subscribe(regionTable.moves, regionTable.settleSoon)
@@ -372,7 +370,7 @@ describe("the review region's atoms", () => {
     expect(drawn).toBe(1)
   })
 
-  it("filters the table by the facets the person ticked, as the table's own column filters", () => {
+  it("filters the rows by the facets the person ticked before the table has them, and counts each choice", () => {
     const at = onPage()
     at.region.change(() => ({ picked: "all" }))
     const all = at.registry.get(at.regionTable.ordered).length
@@ -384,11 +382,19 @@ describe("the review region's atoms", () => {
     const shown = at.registry.get(at.regionTable.ordered)
     expect(shown.length).toBe(option.n)
     expect(shown.length).toBeLessThan(all)
-    expect(at.region.tableFilters.get()).toHaveLength(1)
+    // The table is given the filtered rows; it holds no filter of its own.
+    expect(at.registry.get(at.region.tableData)).toHaveLength(option.n)
+    expect(at.table.atoms.columnFilters.get()).toEqual([])
+    expect(A.every(shown, (view) => A.contains(option.values, view.cells[facet.column.id] ?? ""))).toBe(true)
+    // The choices and their counts are of the view showing, not of what is ticked: every choice is still offered.
+    expect(at.registry.get(at.region.facets)[0]?.options).toEqual(facet.options)
+    // A search narrows what the facet left, and the tab's own list is untouched.
+    expect(at.registry.get(at.region.list)).toHaveLength(all)
 
     at.region.change(() => ({ facetPicked: {} }))
     expect(at.registry.get(at.regionTable.ordered).length).toBe(all)
-    expect(at.region.tableFilters.get()).toEqual([])
+    // Nothing ticked: the table holds the very rows of the list.
+    expect(at.registry.get(at.region.shown)).toBe(at.registry.get(at.region.list))
   })
 
   it("shows the rows of each search and sort in turn: the second search is not the first one's rows", () => {

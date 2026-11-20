@@ -6,14 +6,14 @@
 // protects: nothing the region shows is kept anywhere but an atom, so two parts of it can never disagree about what
 // the person decided.
 //
-// The table itself stays TanStack's (its sort, its hidden columns, its search). Its state is a store outside React:
-// `ordered` listens to it as any atom listens to something outside, and the facets the person ticked reach it as its
-// own controlled state (`tableFilters`).
+// The table itself stays TanStack's, for its sort, its hidden columns and its search only. Its state is a store
+// outside React: `ordered` listens to it as any atom listens to something outside. The facets the person ticked are
+// not the table's: they filter the rows here, in a derived atom, before the table is given them (Benjamin, 2026-11-19:
+// "Effect atoms only"), so no state library but atoms holds anything of the region's.
 import { CellMark, Entry } from "@inventory/review/ReviewTypes"
 import * as ScopedAtom from "@effect/atom-react/ScopedAtom"
-import { type ColumnFiltersState, createColumnHelper, type Table } from "@tanstack/react-table"
+import { createColumnHelper, type Table } from "@tanstack/react-table"
 import { table_setOptions } from "@tanstack/react-table/static-functions"
-import { createAtom } from "@tanstack/store"
 import * as A from "effect/Array"
 import * as Data from "effect/Data"
 import * as HashMap from "effect/HashMap"
@@ -26,7 +26,6 @@ import * as Atom from "effect/reactivity/Atom"
 import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import { toast } from "sonner"
 import type { DataTableFeatures } from "@inventory/ui/components/data-table/data-table-features"
-import { createPlainFilter } from "@inventory/ui/components/data-table/data-table-utils"
 import { contentWidth } from "@inventory/ui/ContentWidth"
 import { stringify } from "@inventory/ui/Json"
 import {
@@ -184,14 +183,11 @@ const defsOf = (columns: ReadonlyArray<ReviewColumn>) =>
         id: column.id,
         header: column.label,
         enableHiding: index !== 0,
-        enableColumnFilter: column.facet === true,
+        // A facet is not the table's filter: the region filters the rows before the table has them (`shown`).
+        enableColumnFilter: false,
         enableGlobalFilter: index === 0 || column.search === true,
         sortFn: "alphanumeric",
-        // A facet column is filtered by a list of values (`multiple`): a row shows when its value is in the list.
-        meta:
-          column.facet === true
-            ? { label: column.label, variant: "select" as const, options: [], multiple: true }
-            : { label: column.label }
+        meta: { label: column.label }
       })
     )
   )
@@ -216,7 +212,9 @@ export interface Region {
   readonly activeKind: Atom.Atom<string | undefined>
   /** The rows of the view on screen, before the table sorts and searches them. */
   readonly list: Atom.Atom<ReadonlyArray<RowView>>
-  /** `list` as the array the table holds, the same array while the list is. */
+  /** `list` with the facets the person ticked applied: a row shows when each ticked facet lists its value. */
+  readonly shown: Atom.Atom<ReadonlyArray<RowView>>
+  /** `shown` as the array the table holds, the same array while the rows shown are. */
   readonly tableData: Atom.Atom<Array<RowView>>
   readonly columnDefs: Atom.Atom<ReturnType<typeof defsOf>>
   readonly hiddenAtFirst: Atom.Atom<{ readonly columnVisibility: Record<string, boolean> }>
@@ -227,13 +225,6 @@ export interface Region {
   /** True where the rules' fixes arrive in force, so a row offers "Reject". */
   readonly rejects: Atom.Atom<boolean>
   readonly facets: Atom.Atom<ReadonlyArray<Facet>>
-  /**
-   * The table's own column filters, as TanStack holds controlled state: what `facets` has ticked, written here
-   * whenever it changes (`followFacets`) and by nothing else.
-   */
-  readonly tableFilters: ReturnType<typeof createAtom<ColumnFiltersState>>
-  /** Mounted while the region is drawn: keeps `tableFilters` at what the facets say. */
-  readonly followFacets: Atom.Atom<void>
   readonly groups: Atom.Atom<ReadonlyArray<FixGroup>>
   /** The columns the problems on screen are about: they stay in the table. */
   readonly subjects: Atom.Atom<HashSet.HashSet<string>>
@@ -396,7 +387,6 @@ const makeRegion = (input: RegionInput, registry: AtomRegistry.AtomRegistry): Re
       : (list.find((item) => item.left > 0)?.kind.id ?? list[0]?.kind.id)
   })
   const list = Atom.readable((get) => visible({ views: get(views), filter: get(filter), kind: get(activeKind) }))
-  const tableData = Atom.map(list, (rows) => [...rows])
   const columnDefs = Atom.map(input.columns, defsOf)
   // The columns hidden until the person turns them on, as the table is first drawn; later columns do not change it.
   const hiddenAtFirst = Atom.readable((get) => ({
@@ -412,28 +402,24 @@ const makeRegion = (input: RegionInput, registry: AtomRegistry.AtomRegistry): Re
   // that shows both. `n` counts rows in the view that is showing (Needs you, Ready, All).
   const facetColumns = Atom.map(input.columns, (columns) => columns.filter((column) => column.facet === true))
   const facets = Atom.readable((get) => facetsOf(get(facetColumns), get(facetPicked), get(views), get(list)))
-  // The table does the filtering: its column filters are the file's values behind the ticked choices.
-  const facetFilters = Atom.map(facets, (now): ColumnFiltersState =>
-    now.flatMap((facet) => {
-      const values = facet.options
-        .filter((option) => facet.picked.includes(option.key))
-        .flatMap((option) => option.values)
-      // The filter as the data table writes one for a list of values: a row shows when its value is in the list.
-      const filter = createPlainFilter(facet.column.id, "select", values)
-      return filter === null ? [] : [filter]
+  // The ticked choices filter the rows here, before the table is given them: for each facet with a choice ticked,
+  // the file's values behind the ticked choices (two spellings of one choice both count).
+  const ticked = Atom.map(facets, (now) =>
+    A.flatMap(now, (facet) => {
+      const picked = A.filter(facet.options, (option) => A.contains(facet.picked, option.key))
+      const values = HashSet.fromIterable(A.flatMap(picked, (option): ReadonlyArray<string> => option.values))
+      return HashSet.size(values) === 0 ? [] : [{ column: facet.column.id, values }]
     })
   )
-  const tableFilters = createAtom<ColumnFiltersState>([])
-  const followFacets = Atom.readable((get) => {
-    // Written only when the filters say something else: the table tells its listeners of every write.
-    get.subscribe(
-      facetFilters,
-      (next) => {
-        if (stringify(tableFilters.get()) !== stringify(next)) tableFilters.set(next)
-      },
-      { immediate: true }
-    )
+  const shown = Atom.readable((get): ReadonlyArray<RowView> => {
+    const rows = get(list)
+    const wanted = get(ticked)
+    // Nothing ticked: the very list, so nothing that follows it is worked out again.
+    return wanted.length === 0
+      ? rows
+      : A.filter(rows, (view) => A.every(wanted, (facet) => HashSet.has(facet.values, view.cells[facet.column] ?? "")))
   })
+  const tableData = Atom.map(shown, (rows) => [...rows])
   const groups = Atom.readable((get): ReadonlyArray<FixGroup> => {
     const now = get(filter)
     return now === "auto"
@@ -506,8 +492,7 @@ const makeRegion = (input: RegionInput, registry: AtomRegistry.AtomRegistry): Re
     fixable,
     rejects,
     facets,
-    tableFilters,
-    followFacets,
+    shown,
     groups,
     subjects,
     listMode,
@@ -624,13 +609,12 @@ const makeRegionTable = (
   const { region, table } = input
   const folded = Atom.map(region.ui, (now) => now.folded)
 
-  // The table's sort, search and column filters are its own store's. This is what they say, as one text: the store
-  // tells its listeners whenever the table is drawn, and the order is worked out again only when the text is another.
-  const said = (): string =>
-    stringify([table.atoms.sorting.get(), table.atoms.globalFilter.get(), table.atoms.columnFilters.get()])
+  // The table's sort and search are its own store's. This is what they say, as one text: the store tells its
+  // listeners whenever the table is drawn, and the order is worked out again only when the text is another.
+  const said = (): string => stringify([table.atoms.sorting.get(), table.atoms.globalFilter.get()])
   const sorted = Atom.readable((get) => {
     const again = () => get.setSelf(said())
-    for (const slice of [table.atoms.sorting, table.atoms.globalFilter, table.atoms.columnFilters]) {
+    for (const slice of [table.atoms.sorting, table.atoms.globalFilter]) {
       const subscription = slice.subscribe(again)
       get.addFinalizer(() => subscription.unsubscribe())
     }

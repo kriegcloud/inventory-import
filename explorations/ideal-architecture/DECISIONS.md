@@ -671,3 +671,17 @@ organization they left for the five minutes. Rejected: keyed reads as built (row
 registry, as the brief said. Built in `@inventory/client/Api` (`forgetReads`, called when the session answers that
 nobody is signed in, and by sign-out and sign-in-as before their reload), with a test. Reverse: `forgetReads` and its
 three callers.
+
+### 2026-11-19 — atoms, the table's own store in the review package
+
+The review region held the facets the person ticked as the table's column filters, in an atom of TanStack's own
+store (`createAtom` from `@tanstack/store`, imported by the review package's code), kept in step with the region's
+derived facets. The brief says "No new state library beside atoms". A second reason came from the review: the review
+package pinned the store exactly beside react-table's own range, so a lockfile refresh could leave two copies, and a
+ticked facet would stop filtering. Question: may the review package's own code use the table's store? Options:
+"Effect atoms only (Recommended)"; "Keep it for this one slice". Answer: "Effect atoms only". I chose; the agent
+recommended the same. Built in `packages/review/src/ReviewRegion.atoms.ts`: the ticked facets filter the rows in a
+derived Effect atom (`shown`) before the table is given them, and the table keeps only its sort, its search and its
+hidden columns. `@tanstack/store` is no dependency of the package any more; it stays a development dependency, with
+`@tanstack/table-core`, for the one test that makes a table as the screen's hook does. Reverse: `shown` and the
+column definitions' `enableColumnFilter`.

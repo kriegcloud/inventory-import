@@ -9,7 +9,9 @@ import * as O from "effect/Option"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import { AlreadyImported, ImportNotFound } from "@inventory/catalog-contract/ImportRejection"
-import { importTable, openImports, removeImport } from "../src/Imports.atoms.ts"
+import { draftOf } from "../src/Draft.atoms.ts"
+import { emptyDraft } from "../src/Draft.machine.ts"
+import { importTable, openImports, openWorkbook, removeImport } from "../src/Imports.atoms.ts"
 import { importNo, registryWith, viewAt } from "./support/catalog.ts"
 
 const settle = Effect.sleep("40 millis")
@@ -87,6 +89,30 @@ describe("removing an open import", () => {
       t.registry.mount(importTable(t.first.id))
       yield* settle
       expect(t.asked.table).toBe(2)
+    })
+  )
+
+  it.live("empties its draft and forgets the workbook it was read from, and leaves the other import's alone", () =>
+    Effect.gen(function* () {
+      const t = world(() => Effect.void)
+      yield* settle
+      // Both imports have a decision waiting in their draft, and the workbook each was read from is in the tab.
+      const waits = { ...emptyDraft, unsent: { "row-2": O.none() }, stalled: true }
+      const book = O.some({ file: new File([], "a.xlsx"), sheets: [], chosen: { name: "Items" } as never })
+      for (const view of [t.first, t.second]) {
+        t.registry.set(draftOf(view.id), waits)
+        t.registry.set(openWorkbook(view.id), book)
+      }
+      yield* t.press(t.first)
+      yield* settle
+      expect([t.registry.get(draftOf(t.first.id)), t.registry.get(openWorkbook(t.first.id))]).toEqual([
+        emptyDraft,
+        O.none()
+      ])
+      expect([t.registry.get(draftOf(t.second.id)), O.isSome(t.registry.get(openWorkbook(t.second.id)))]).toEqual([
+        waits,
+        true
+      ])
     })
   )
 

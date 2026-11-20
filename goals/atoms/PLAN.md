@@ -718,7 +718,7 @@ reach: a read ended by a later save's answer (group 8; `put` re-issues the read,
 | 13 state outside atoms | The upload under way and the chosen workbook are atoms (`632fef8`). The given answer in `Api.atoms.ts` is not changed | None of its own: the upload was seen on screen |
 | 14 hooks under other hoisted names | `laws boundaries` refuses a third-party package the importer does not declare, read from the syntax tree. No per-file exception to the atoms lint is left to restate: step 8 removed them | `Boundaries.test.ts`, with planted files |
 | 15, 16, 17 | The property above; `DraftRegion.test.ts` for Restart and `announce`; `Dropped` is gone (nothing sent it) | as said |
-| 18 | The no-change test sends such a save; the wired failure has its test. Not written: a test for `Api.atoms.ts` "not kept again when the screen leaves", for the remove that empties the draft and forgets the workbook, and for leaving the address of a removed import | as said |
+| 18 | The no-change test sends such a save; the wired failure has its test. A remove that empties the draft and forgets the workbook has its test (`RemoveImport.test.ts`; it fails with the two lines taken out). Not written: a test for `Api.atoms.ts` "not kept again when the screen leaves", and for leaving the address of a removed import | as said |
 | 19 | The statements in this file: the deleted saver, the ceilings, what the lint refuses, what the property held. 5efcd1b's message says "each filter control reads its values when it is drawn" for a commit whose list filters were empty: a commit message is not rewritten, so it is said here |  |
 
 **Benjamin's answers of 2026-11-19 and 2026-11-20**, each in `DECISIONS.md` and the exploration's log:

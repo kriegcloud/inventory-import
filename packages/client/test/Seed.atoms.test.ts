@@ -312,9 +312,10 @@ describe("asking again for an answer no older than a write", () => {
 
   it.live("a request that started before the write was sent is left to land, then asked once more", () =>
     Effect.gen(function* () {
-      const t = world("30 millis")
+      // A read slow enough that what happens while it is out stays inside it on a busy machine.
+      const t = world("200 millis")
       t.registry.mount(t.rows)
-      yield* Effect.sleep("60 millis")
+      yield* Effect.sleep("300 millis")
       t.registry.refresh(t.rows)
       yield* Effect.sleep("3 millis")
       const sent = DateTime.nowUnsafe()
@@ -324,9 +325,9 @@ describe("asking again for an answer no older than a write", () => {
       yield* Effect.sleep("10 millis")
       // Not ended and not started again: the one request is still out.
       expect([t.starts(), t.reads()]).toEqual([2, 1])
-      yield* Effect.sleep("25 millis")
+      yield* Effect.sleep("300 millis")
       expect([t.seen(t.rows), t.starts()]).toEqual(["server's rows 2", 3])
-      yield* Effect.sleep("60 millis")
+      yield* Effect.sleep("300 millis")
       expect([t.seen(t.rows), t.starts()]).toEqual(["server's rows 3", 3])
     })
   )

@@ -213,13 +213,8 @@ function OpenImport(props: { view: ImportView; lead: boolean; canImport: boolean
                 <AlertDialogCancel>Keep</AlertDialogCancel>
                 <AlertDialogAction
                   // The card goes at once; a refusal puts it back and says why, and the server's yes is said the
-                  // moment it comes (`removeImport`).
-                  onClick={() => {
-                    // The address still names it (its own Upload step): leave first, or the page would go on
-                    // asking for an import that is gone.
-                    if (new URLSearchParams(window.location.search).get("import") === view.id) navigate("/")
-                    remove(view)
-                  }}
+                  // moment it comes. An address that names it is left first (`removeImport`).
+                  onClick={() => remove(view)}
                 >
                   Remove
                 </AlertDialogAction>

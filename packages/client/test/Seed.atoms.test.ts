@@ -3,6 +3,7 @@
 // change) is not asked again when a screen comes back to it. An answer given while a request is out never ends that
 // request: it lands, and the server is asked once more, because the given answer may be the newer of the two.
 import { describe, expect, it } from "@effect/vitest"
+import * as A from "effect/Array"
 import * as Context from "effect/Context"
 import * as DateTime from "effect/DateTime"
 import type * as Duration from "effect/Duration"
@@ -10,6 +11,7 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as O from "effect/Option"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
+import * as Atom from "effect/reactivity/Atom"
 import * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import { makeApiAtoms, provideApi } from "@inventory/client/Api"
 
@@ -185,6 +187,28 @@ describe("a read let go while a screen still shows it", () => {
       t.registry.refresh(t.rows)
       yield* Effect.sleep("50 millis")
       expect([t.seen(t.rows), t.reads()]).toEqual(["server's rows 3", 3])
+    })
+  )
+})
+
+describe("a read let go after the screen left it", () => {
+  it.live("is not kept again: nothing of it stays in this tab but what lives for the page", () =>
+    Effect.gen(function* () {
+      const t = world()
+      const leave = t.registry.mount(t.rows)
+      yield* Effect.sleep("40 millis")
+      expect(t.seen(t.rows)).toBe("server's rows 1")
+      // The screen leaves, and within the idle time the read is let go (the import was removed).
+      leave()
+      yield* Effect.sleep("10 millis")
+      t.rows.letGo(t.registry)
+      // Past the idle time: what it showed and what asked for it are gone. Kept again, they would stay for minutes.
+      yield* Effect.sleep("300 millis")
+      expect(
+        A.filter(A.fromIterable(t.registry.getNodes().keys()), (key) => Atom.isAtom(key) && !key.keepAlive)
+      ).toEqual([])
+      expect(O.isNone(t.rows.peek(t.registry))).toBe(true)
+      expect(t.reads()).toBe(1)
     })
   )
 })

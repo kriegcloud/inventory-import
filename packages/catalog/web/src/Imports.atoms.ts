@@ -8,6 +8,7 @@ import { optimisticChange, optimisticWrite, shown } from "@inventory/client/Opti
 import { apiRuntime, invalidate, perKey } from "@inventory/client/Api"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import { toast } from "sonner"
+import { navigate } from "@inventory/ui/Route"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import { dual } from "effect/Function"
@@ -104,6 +105,11 @@ export const pastImports = catalogApi.query((api) => api.imports.past(), {
   reactivityKeys: catalogKeys.pastImports
 })
 
+/** Goes to the first screen when the address names this import, and stays where it is otherwise. */
+const leaveIfNamed = (id: ImportId): void => {
+  if (new URLSearchParams(window.location.search).get("import") === id) navigate("/")
+}
+
 /**
  * Removes an import nobody has confirmed: its staged rows and the decisions made on it. The server refuses one that
  * has created records. Optimistic: the card goes the moment the person confirms, and comes back in its place, with
@@ -115,10 +121,13 @@ export const pastImports = catalogApi.query((api) => api.imports.past(), {
  */
 export const removeImport = Atom.family((id: ImportId) =>
   optimisticWrite({
+    // The address may still name it (its own Upload step): the page leaves it first, or it would go on asking for
+    // an import that is gone.
     send: (_view: ImportView) =>
-      catalogApi
-        .send((api) => api.imports.remove({ params: { id } }))
-        .pipe(Effect.catchTag("ImportNotFound", () => Effect.void)),
+      Effect.sync(() => leaveIfNamed(id)).pipe(
+        Effect.andThen(catalogApi.send((api) => api.imports.remove({ params: { id } }))),
+        Effect.catchTag("ImportNotFound", () => Effect.void)
+      ),
     changes: [
       optimisticChange(openImports, (list: OpenImports, _view: ImportView) => ({
         ...list,

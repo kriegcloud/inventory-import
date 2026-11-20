@@ -8,11 +8,18 @@ import * as Exit from "effect/Exit"
 import * as O from "effect/Option"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as AtomRegistry from "effect/reactivity/AtomRegistry"
+import { vi } from "vitest"
 import { AlreadyImported, ImportNotFound } from "@inventory/catalog-contract/ImportRejection"
 import { draftOf } from "../src/Draft.atoms.ts"
 import { emptyDraft } from "../src/Draft.machine.ts"
 import { importTable, openImports, openWorkbook, removeImport } from "../src/Imports.atoms.ts"
 import { importNo, registryWith, viewAt } from "./support/catalog.ts"
+
+// Removing reads the browser's address (it leaves one that names the import: `RemoveImportAddress.test.ts`); here it
+// names none.
+vi.hoisted(() => {
+  Object.assign(globalThis, { window: { location: { pathname: "/", search: "" } } })
+})
 
 const settle = Effect.sleep("40 millis")
 

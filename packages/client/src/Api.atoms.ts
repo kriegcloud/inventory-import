@@ -178,6 +178,19 @@ export interface QueryOptions {
 export type Query<A, E> = Atom.Writable<AsyncResult.AsyncResult<A, E>, A>
 
 /**
+ * Only a read's answer: undefined until there is one, and the same object for as long as the server answers the same.
+ * What is built from a read's data (a table's columns, a review of every row) is built from this, never from the read
+ * itself: the read's `AsyncResult` is a new object every time it is asked again (waiting, then answered), and
+ * everything built on it would be built again, twice per refresh, for an answer that did not change.
+ *
+ * Made once, beside the read, not inside another atom's read (each call makes a new atom).
+ *
+ * @example const facetValues = answerOf(itemFacets) // then: Atom.readable((get) => buildColumns(get(facetValues)))
+ */
+export const answerOf = <A, E>(read: Atom.Atom<AsyncResult.AsyncResult<A, E>>): Atom.Atom<A | undefined> =>
+  Atom.readable((get) => get(read).pipe(AsyncResult.value, O.getOrUndefined))
+
+/**
  * One atom per key, made on first use and held with an ordinary reference (`Atom.family` holds them weakly, and a
  * read made anew after a garbage collection starts empty). For reads per import: a tab opens a handful.
  */

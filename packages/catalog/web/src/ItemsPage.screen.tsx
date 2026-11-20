@@ -26,7 +26,7 @@ import { contentWidth, isNarrow } from "@inventory/ui/ContentWidth"
 import { location, navigate } from "@inventory/ui/Route"
 import { resultOf } from "./internal/result.ts"
 import { hasRole } from "@inventory/kernel/Role"
-import { perKey } from "@inventory/client/Api"
+import { answerOf, perKey } from "@inventory/client/Api"
 import { discontinuedOn, isActive, type StoredItem } from "@inventory/catalog-contract/Item"
 import { itemPageSizes } from "@inventory/catalog-contract/ItemQuery"
 import { day, when } from "./internal/format.tsx"
@@ -497,15 +497,21 @@ export const itemFacets = catalogApi.query((api) => api.items.facets(), { reacti
 type Found = Atom.Success<typeof itemFacets> | undefined
 
 /**
+ * The filters' values alone: the same object while the server answers the same, however often it is asked. The
+ * columns are built from this and not from the read, which changes twice every time it is asked again.
+ */
+const itemFacetValues = answerOf(itemFacets)
+
+/**
  * The table's columns for an editor or a viewer, built from the filters' values: the same object while they are, so
  * an open row editor is never rebuilt by a fetch that answered the same.
  */
 const itemColumns = perKey((canImport: boolean) =>
-  Atom.readable((get) => buildColumns(resultOf(get(itemFacets)).data, canImport))
+  Atom.readable((get) => buildColumns(get(itemFacetValues), canImport))
 )
 
 /** What the assistant knows of the columns, built from the filters' values. */
-const itemsCatalogAtom = Atom.readable((get) => itemsCatalog(resultOf(get(itemFacets)).data))
+const itemsCatalogAtom = Atom.readable((get) => itemsCatalog(get(itemFacetValues)))
 
 /** The columns shown when the page opens: the ones it has room for; on a phone, all of them (cards). Once per visit. */
 const firstFits = Atom.readable((get) => (get.once(isNarrow) ? {} : fitting(get.once(contentWidth))))

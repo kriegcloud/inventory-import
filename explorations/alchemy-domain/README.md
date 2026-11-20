@@ -3,8 +3,8 @@ type: Exploration
 title: Alchemy domain
 description: Everything @alchemy.run/domain and what plugs into it offers, concept by concept, with how inventory-import would use each. The reference the brief is built on, written so its pages can later become agent skills.
 status: active
-stage: research
-next: Benjamin reads the map and the findings below; then BRIEF.md puts the decisions to him
+stage: shape
+next: Benjamin answers the brief's sixteen decisions and says whether it matches; the build starts after that and after the atoms goal is merged
 goals: []
 ---
 
@@ -17,15 +17,20 @@ its designs before porting beep-effect to it. His words are in [CAPTURE.md](CAPT
 This packet is the reading that comes before the design. It holds one page for every concept of the library and of
 what he asked to have used beside it, each saying what the thing is, how it is declared, what to avoid, what it
 would be in this app, how to check it, and where it was read. Nothing here is built. The design, with the decisions
-only he can make, is the brief (`BRIEF.md`, written after he has read this).
+only he can make, is [the brief](BRIEF.md).
 
 ## How to read it
+
+Start with [the brief](BRIEF.md): the design, the saving of review decisions modelled first, and the sixteen
+decisions. The research under it:
 
 1. [The map](research/00-map.md): every concept on one page, with its verdict. Fifty-four pages give 59 verdicts:
    46 "use" on the published release, 8 "use, from main", and 5 "cannot yet", each with what is in the way.
 2. [The pull request he pointed at](research/01-pr-3260-verify.md): `Verify`, which proves a model's rules.
 3. [This app's rules under Verify](research/03-this-apps-rules-under-verify.md): the app's own rules, declared and
-   proved, and [the trial](research/04-trial.md) that ran them.
+   proved, and [the trial](research/04-trial.md) that ran them. Then
+   [the trial on saving review decisions](research/07-review-decisions-trial.md): five models, their sources and
+   Verify's reports.
 4. [What was merged since the published release](research/02-merged-since-beta-87.md): what `main` has that npm
    does not.
 5. The concept pages, in [research/concepts/](research/concepts/), one file per concept under a stable name.
@@ -58,6 +63,12 @@ A model of this app, outside the repository ([the trial](research/04-trial.md)):
   `Verify`. Nineteen of the app's rules were proved for every state and every input, and one was checked over 5,173
   sequences of commands. A rule broken on purpose came back with the state, the command and the shortest sequence
   that breaks it.
+- On `main`, the saving of review decisions, five ways ([07](research/07-review-decisions-trial.md)). Today's
+  set-and-clear difference breaks "no command clears a decision its sender did not make", and Verify gives the three
+  commands that do it. With commands that say what the person did, a row's eight rules are proved; one instance per
+  import that applies the same functions holds its six rules in every sequence of up to 3 commands, checked and not
+  proved. Four of the five ran from the library's own preview build of that commit, installed with bun beside the
+  app's Effect.
 
 ## What the reading found
 
@@ -74,6 +85,18 @@ Each line is argued on the page it links to. These are findings, not decisions.
   ([command](research/concepts/command.md), [view security](research/concepts/view-security.md)).
 - A rejected command is not kept under its command id, so sending it again decides it again
   ([command](research/concepts/command.md)).
+- The library publishes a build of every `main` commit to its own preview registry. It installs beside Effect 4.1.4
+  and `Verify` runs from it; every build still calls itself `2.0.0-beta.87`, and its peers are that commit's own
+  builds ([07](research/07-review-decisions-trial.md), "How it was run").
+
+**How review decisions are saved**
+
+- The request that saves decisions does not say which picture of the draft it was worked out from, so no check on
+  the server can tell a decision its maker took back from one a stale screen cleared
+  ([07](research/07-review-decisions-trial.md)).
+- An aggregate's state is one stored value of at most 8 MB, written again at every accepted command. A draft with
+  every one of 50,000 rows decided measures 10 MB as JSON with ids written out and 3.3 to 4.2 MB in a compact form
+  ([07](research/07-review-decisions-trial.md), "How large one draft's state is").
 
 **What the prover asks of this repository's code**
 
@@ -165,3 +188,7 @@ pages whose "Where this was read" names a file that changed.
 - 2026-11-19: packet opened. Every docs page and source file read at both refs; one page per concept written,
   checked against the source in a second pass, then extended by a third pass over what the first had only
   outlined; the trial run on the published release and on `main`. Awaiting Benjamin's reading, then the brief.
+- 2026-11-20: the brief written, with the saving of review decisions modelled first from a second trial under
+  Verify ([07](research/07-review-decisions-trial.md)); the open questions renumbered to the brief's sixteen.
+  Benjamin's reversal of "core" recorded in ideal-architecture. Nothing built; awaiting his answers and "the brief
+  matches".

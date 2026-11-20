@@ -153,7 +153,7 @@ What happens to it when the domain comes in. The domain names below are the ones
 | --- | --- |
 | `imports.commit` `POST /imports/:id/commit` | thin handler: sends `ConfirmImport`, reads the import's view at the receipt, maps it to `ImportView` |
 | `imports.takeBack` `POST /imports/:id/take-back` | thin handler: sends `TakeBackImport` |
-| `imports.decide` `PUT /imports/:id/decisions` | thin handler: sends `SettleRow` / `LeaveRowOut` for the delta, answers the new `revision` |
+| `imports.decide` `PUT /imports/:id/decisions` | goes. Its payload is the difference between two pictures of the draft, which no handler can turn back into what the person did; the screen sends each act as a command (`DecideRows`, `UndoStep`) through the Api's typed client instead ([the brief](../../BRIEF.md), [the trial](../07-review-decisions-trial.md)) |
 | `imports.reopen` `POST /imports/:id/reopen`, `imports.remove` `DELETE /imports/:id` | thin handlers over a command each |
 | `imports.match` `POST /imports/:id/mapping` | thin handler over a command, once matching is modelled |
 | `imports.open`, `imports.past`, `imports.changes`, `imports.get` | thin handlers over queries and the import's view |

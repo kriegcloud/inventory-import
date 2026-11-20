@@ -6,25 +6,38 @@ description: Alchemy domain decisions. The open questions the research raised, i
 
 # Decisions
 
-Open questions are listed first, in the order they block work. Each names the page that argues it. They are put to
-Benjamin by the brief, one at a time, with options; nothing below is decided until he answers. Answered decisions
-move under "Answered" with the date, the answer and how to reverse it.
+Open questions are listed first, with the numbers [the brief](BRIEF.md) gives them. Each is put to Benjamin with its
+options, the recommended one first; nothing below is decided until he answers. Answered decisions move under
+"Answered" with the date, the answer and how to reverse it.
 
 ## Open
 
-| # | Question | Where it is argued |
-| --- | --- | --- |
-| 1 | How does the app take what exists only on the library's `main` (`Decision`, `Relation`, invariants and transitions, `Verify`, commands without `target`): the next release that has it, or a pinned build from `main`? | [02 merged since beta.87](research/02-merged-since-beta-87.md), [04 trial](research/04-trial.md) |
-| 2 | What are Confirm and take-back in the new model, and what does the person see if one stops halfway? An aggregate's commit and a D1 batch cannot be one transaction. | [projection](research/concepts/projection.md), [decision](research/concepts/decision.md), [host on Cloudflare](research/concepts/host-cloudflare.md) |
-| 3 | Where do an aggregate's commands, events and rejections live? The prover follows relative imports only, so it cannot read blocks that the `model` package imports from the `contract` package by name. | [project layout](research/concepts/project-layout.md), [prove](research/concepts/prove.md), [04 trial](research/04-trial.md) |
-| 4 | Does the rule "schema classes are built with `.make`" get an exception for domain blocks? The prover reads `new Event(...)` and not `Event.make(...)`. | [prove](research/concepts/prove.md), [event](research/concepts/event.md), [rejection](research/concepts/rejection.md) |
-| 5 | Where does the model run? The Cloudflare host needs an Effect-native Worker, and the app's Worker is a plain module built with the screens: a second Worker beside it behind a service binding, or one Effect-native Worker that also serves the API and the screens. | [host on Cloudflare](research/concepts/host-cloudflare.md), [platform contract](research/concepts/platform-contract.md) |
-| 6 | What answers the Items page's paging, sorting, filtering and search? A paged query answers entries and a cursor, with no total and no page number. | [query](research/concepts/query.md) |
-| 7 | How do the rows already in D1 arrive in the new model? | [backfill](research/concepts/backfill.md), [projection](research/concepts/projection.md) |
-| 8 | Is every item its own aggregate, or a row a projection writes? | [host on Cloudflare](research/concepts/host-cloudflare.md), [unique values](research/concepts/unique-values.md) |
-| 9 | Which of the extras he asked for are built as he pictured them, and which in the nearest form that works (a GraphQL surface, confidence scores, Cluster, Alchemy Git)? | [graphql](research/concepts/graphql.md), [confidence scores](research/concepts/confidence-scores.md), [cluster](research/concepts/cluster.md), [Alchemy Git](research/concepts/alchemy-git.md) |
-| 10 | Inside a `decide` or a handler the engine already opens a span. Does the rule "a named `Effect.fn` for every Effect function" hold there? | [observability](research/concepts/observability.md) |
-| 11 | In what order do the moves happen, so that each leaves the app working? | the brief |
+| # | Question | Recommended in the brief | Where it is argued |
+| --- | --- | --- | --- |
+| 1 | Where do review decisions live: one instance per import, one per row, or both? | One instance per import | [07 the review-decisions trial](research/07-review-decisions-trial.md) |
+| 2 | What does a person see when someone else decided the row they are deciding? | Theirs is not applied to that row; they see the other's decision and decide again | [07](research/07-review-decisions-trial.md), section 3 |
+| 3 | What does an undo do to a row someone else changed since? | It takes back the rows still as the step left them, and says which it left | [07](research/07-review-decisions-trial.md), sections 3 and 4 |
+| 4 | How does the app take what exists only on the library's `main` (`Decision`, `Relation`, invariants and transitions, `Verify`, commands without `target`)? | Pin the preview build of one `main` commit, for every Alchemy package together | [02 merged since beta.87](research/02-merged-since-beta-87.md), [07](research/07-review-decisions-trial.md), "How it was run" |
+| 5 | What do Confirm and a take-back become, and what does the person see if one stops halfway? Is every item its own instance? | The event names a plan staged in D1; one projection writes the items in one batch | [projection](research/concepts/projection.md), [decision](research/concepts/decision.md), [host on Cloudflare](research/concepts/host-cloudflare.md) |
+| 6 | Where do an aggregate's commands, events and rejections live? The prover follows relative imports only. | In the context's `model` package, one folder per aggregate | [project layout](research/concepts/project-layout.md), [prove](research/concepts/prove.md) |
+| 7 | Are domain blocks built with `new`? The prover reads `new Event(...)` and not `Event.make(...)`. | `new` in files that hold a `decide`, with the diagnostic off for that file | [prove](research/concepts/prove.md), [event](research/concepts/event.md) |
+| 8 | Does a handler the engine runs keep a named `Effect.fn`? | No: the engine names the span | [observability](research/concepts/observability.md) |
+| 9 | Where does the model run: a second Effect-native Worker beside the site's, or one that also serves the API and the screens? | A second Worker, reached by a service binding | [host on Cloudflare](research/concepts/host-cloudflare.md) |
+| 10 | What answers the Items page's paging, sorting, filtering and search? | A query that answers today's page | [query](research/concepts/query.md) |
+| 11 | How do the rows already in D1 arrive in the model? | Adopt at first touch | [backfill](research/concepts/backfill.md), [projection](research/concepts/projection.md) |
+| 12 | In what order do the moves happen? | The review's decisions first | the brief, "Order of moves" |
+| 13 | Which model runs on which host? | `Catalog` on Durable Objects, `Access` on Effect Cluster's pool | [cluster](research/concepts/cluster.md), [host on Effect Cluster](research/concepts/host-effect-cluster.md) |
+| 14 | What is GraphQL used for? | A client of Cloudflare's analytics, in the operator's command line | [graphql](research/concepts/graphql.md) |
+| 15 | What do confidence scores decide? | The closed questions themselves, behind a `Decider` port | [confidence scores](research/concepts/confidence-scores.md) |
+| 16 | Which mails does the app send? | The three a person is stuck without, then the two notices | [Resend](research/concepts/resend.md) |
+
+The packet first listed eleven questions. They became these: 1 is now 4; 2 and 8 are 5; 3 is 6; 4 is 7; 5 is 9; 6 is
+10; 7 is 11; 9 is 13 to 16; 10 is 8; 11 is 12. Questions 1 to 3 are new, from the trial on saving review decisions.
+
+Not in this list: the four small choices of Discord sign-in, asked when that move starts
+([Discord sign-in](research/concepts/discord-sign-in.md)); and two questions on today's contract that are with
+Benjamin separately (what Confirm writes when the screen is behind the server's draft, and whether a save's answer
+says that it changed nothing). The brief says what the model does with either answer to each.
 
 ## Answered
 
@@ -41,5 +54,5 @@ concept pages are written to be lifted into a skill's `references/` folder uncha
 Question: does the app use the library, or take its ideas? Answer: "Not borrow use.", and "if possible find a way to
 make use of ever single thing". The default for every concept is to use it; "cannot yet" needs the exact blocker and
 what removes it. This reverses the 2026-11-18 decision "core" in
-[ideal-architecture](../ideal-architecture/DECISIONS.md); the reversal is written into that file in the same commit
-as the brief. Reverse: a new decision by him.
+[ideal-architecture](../ideal-architecture/DECISIONS.md), where it is recorded as "core, reversed". Reverse: a new
+decision by him.

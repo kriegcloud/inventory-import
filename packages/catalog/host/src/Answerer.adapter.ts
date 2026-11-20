@@ -17,7 +17,7 @@ type AnswerSchema = S.Codec<unknown, Record<string, unknown>, never, never>
 /** A structured answer, and which model gave it (the screen says which one answered). */
 export interface AiAnswer<A> {
   readonly value: A
-  readonly answeredBy: Extract<AnsweredBy, { readonly _tag: "Model" }>
+  readonly answeredBy: typeof AnsweredBy.cases.Model.Type
 }
 
 /** True when a model can be asked; with none, a feature goes straight to its rules and takes no call. */

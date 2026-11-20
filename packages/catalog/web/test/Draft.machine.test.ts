@@ -1280,10 +1280,20 @@ describe("a save that names what it was made on", () => {
     // Typed while the first save is out: it waits behind it.
     const typed = step(first, DraftEvent.Decided({ changes: { b: O.some(sku) } })).draft
     const one = step(typed, DraftEvent.SaveAnswered({ revision: 6, changed: true, notApplied: [] }))
+    const kinds = A.map(
+      DraftEffect.$match({
+        Send: () => "send",
+        Say: () => "say",
+        Ask: () => "ask",
+        Put: () => "put",
+        Restart: () => "restart",
+        Confirm: () => "confirm"
+      })
+    )
     // The first save's answer sends the SKU, and asks nothing yet: the server does not have it.
-    expect(A.map(one.effects, (effect) => effect._tag)).toEqual(["Put", "Send"])
+    expect(kinds(one.effects)).toEqual(["put", "send"])
     const two = step(one.draft, DraftEvent.SaveAnswered({ revision: 7, changed: true, notApplied: [] }))
-    expect(A.map(two.effects, (effect) => effect._tag)).toEqual(["Put", "Ask"])
+    expect(kinds(two.effects)).toEqual(["put", "ask"])
   })
 })
 

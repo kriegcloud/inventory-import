@@ -41,7 +41,7 @@ export type AnswerSchema = S.Codec<unknown, Record<string, unknown>, never, neve
 /** A structured answer, and which model gave it (the screen says which one answered). */
 export interface ModelAnswered<A> {
   readonly value: A
-  readonly answeredBy: Extract<AnsweredBy, { readonly _tag: "Model" }>
+  readonly answeredBy: typeof AnsweredBy.cases.Model.Type
 }
 
 /** What a twin answers one question with: a value (decoded through the question's schema), or a trouble. */

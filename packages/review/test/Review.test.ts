@@ -585,13 +585,13 @@ describe("records with a parent: label, choices, rowAction, and undo across view
       OtherAnswer.Extra({ label: "Leave job J-2045 out" })
     ])
     // A pick and a row with nothing proposed have no typing among the others: the first is chosen, the second typed.
-    expect(A.map(otherAnswers({ view: at("unit"), extra }) ?? [], (answer) => answer._tag)).toEqual([
-      "LeaveOut",
-      "Extra"
+    expect(otherAnswers({ view: at("unit"), extra })).toEqual([
+      OtherAnswer.LeaveOut({ label: `Leave row ${lineOf("unit").line} out` }),
+      OtherAnswer.Extra({ label: "Leave job J-2045 out" })
     ])
-    expect(A.map(otherAnswers({ view: at("stock"), extra }) ?? [], (answer) => answer._tag)).toEqual([
-      "LeaveOut",
-      "Extra"
+    expect(otherAnswers({ view: at("stock"), extra })).toEqual([
+      OtherAnswer.LeaveOut({ label: `Leave row ${lineOf("stock").line} out` }),
+      OtherAnswer.Extra({ label: "Leave job J-2045 out" })
     ])
     // Without the page's answer, and on a row that is ready, there is nothing more: "Leave out" as before.
     expect(otherAnswers({ view: at("comma"), extra: undefined })).toBeUndefined()

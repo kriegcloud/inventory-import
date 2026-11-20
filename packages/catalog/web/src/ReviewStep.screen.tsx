@@ -1,4 +1,3 @@
-import * as Match from "effect/Match"
 import { useAtom, useAtomMount, useAtomSet, useAtomValue } from "@effect/atom-react"
 import * as A from "effect/Array"
 import * as Cause from "effect/Cause"
@@ -42,6 +41,7 @@ import { decisionWords, rowLabel } from "./internal/leftOver.ts"
 import { matchColumn, suggestFixes } from "./Imports.atoms.ts"
 import { navigate } from "@inventory/ui/Route"
 import { importAddress } from "./internal/route.ts"
+import { AnsweredBy } from "@inventory/catalog-contract/Answer"
 import type { ImportView } from "@inventory/catalog-contract/Import"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import { recheckRow, review, ruleFixes } from "@inventory/catalog-model/Review"
@@ -218,7 +218,7 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
   const answered =
     suggested === undefined
       ? undefined
-      : Match.valueTags(suggested.answeredBy, {
+      : AnsweredBy.match(suggested.answeredBy, {
           Model: (by) => `Answered by the model ${by.model}.`,
           Rules: (by) => `Answered by the fixed rules, not a model: ${by.reason}`
         })

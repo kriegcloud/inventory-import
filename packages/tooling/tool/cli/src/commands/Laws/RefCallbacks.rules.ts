@@ -7,16 +7,21 @@
  * unsubscribes and subscribes after every draw.
  *
  * Each screen is read from its syntax tree, and a name is judged by where the file binds it. What passes: a name the
- * file binds at its top level or imports and no function sets again; what a hook holds (`useRef(null)`, a member of
- * what `useAtomValue` gave, through a namespace import too); a member of either; an element of a list that is
- * itself steady. A hook is a `use…` name imported from react, @effect/atom-react, or a module of hooks (a `hooks` or
- * `components` folder, a `…Hook` module): a function merely named `use…` is judged by what it returns.
+ * file binds at its top level or imports and no function sets again or writes into; what a hook holds (`useRef(null)`,
+ * a member of what `useAtomValue` gave, through a namespace import too); a member of either; an element of a list that
+ * is itself steady. A hook is a `use…` name imported from react, react-dom, @effect/atom-react, or a module the
+ * repository names as one of hooks by its exact path (an export of a package whose file is a `*.hook.ts` or sits in
+ * its `src/hooks`, as the vendored kit's do; a `*.hook.ts` file imported by its path): a function merely named `use…`,
+ * or one from a module that only sits in a `hooks` or `components` folder, is judged by what it returns.
  *
  * What is refused: a function written where it is handed over; a call (a function returned from a call, `.bind`, a
  * `use…` helper that is not a hook); a choice by a condition (a ref switched on and off is an effect on that
  * condition); a name bound inside a function to a function (typed, generic, `var` and declared ones too), an object,
  * a call that is not a hook's, or taken out of one; a module `let` a function sets again (it holds what the last draw
- * gave it); and an element of a list (`rows.map((row) => <li ref={row.measure} />)`) made in the draw. A prop handed
+ * gave it); a module record a function writes into (`refs[id] ??= …`: a cache by hand, holding what a draw made); the
+ * `.current` of what a hook holds (`useRef(fn).current`: useRef is for a DOM node, and `.current` is what it held when
+ * the draw read it); a value followed more than eight names deep (nothing there was shown steady); and an element of
+ * a list (`rows.map((row) => <li ref={row.measure} />)`) made in the draw. A prop handed
  * to a ref, at any depth (`ref={props.measure}`, `ref={props.on.measure}`), is the caller's to keep steady: every
  * attribute of that name, in every screen, is judged the same way, and so is a list a prop hands in.
  *
@@ -33,9 +38,11 @@ import { $RepoCliId } from "@beep/identity/packages"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as HashSet from "effect/HashSet"
+import * as P from "effect/Predicate"
+import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
-import { Repo } from "../../Repo.service.ts"
+import { Repo, type Workspace } from "../../Repo.service.ts"
 import { err, type Line, out } from "../../Report.schema.ts"
 import { type Handed, readScreen } from "./internal/refCallbacksCode.ts"
 
@@ -88,6 +95,26 @@ export const refCallbacksSentence: (finding: RefCallbacksFinding) => Line = RefC
 })
 
 /**
+ * The modules of the repository whose `use…` exports are hooks, each by the exact specifier a screen imports it by:
+ * an export of a package whose file is a `*.hook.ts` (`@inventory/review/SavedProgressHook`) or sits in the package's
+ * `src/hooks` folder, where the vendored kit keeps its hooks (`@inventory/ui/hooks/use-data-table`). Nothing else is
+ * taken for a hook because of where it lives or what it is named.
+ *
+ * @example hookModulesOf([{ dir: "packages/ui", manifest: { name: "@inventory/ui", exports: { "./hooks/use-mobile": "./src/hooks/use-mobile.ts" } } }]) // ["@inventory/ui/hooks/use-mobile"]
+ * @category rules
+ */
+export const hookModulesOf = (workspaces: ReadonlyArray<Pick<Workspace, "manifest">>): ReadonlyArray<string> =>
+  A.flatMap(workspaces, ({ manifest }) =>
+    A.flatMap(R.toEntries(manifest.exports ?? {}), ([entry, target]) =>
+      P.isString(target) &&
+      P.isString(manifest.name) &&
+      (/\.hook\.tsx?$/.test(target) || Str.startsWith("./src/hooks/")(target))
+        ? [entry === "." ? manifest.name : `${manifest.name}/${Str.slice(2)(entry)}`]
+        : []
+    )
+  )
+
+/**
  * Reads every screen of our own from the repository's root.
  *
  * @category rules
@@ -107,10 +134,15 @@ export const refCallbacks = Effect.fn("RefCallbacks.refCallbacks")(function* () 
     (file) => repo.exists(repo.join(repo.root, file)),
     { concurrency: 1 }
   )
+  const workspaces = yield* repo.workspaces
+  const hookModules = hookModulesOf(workspaces)
   const read = yield* Effect.forEach(
     files,
     (file) =>
-      Effect.map(repo.text(repo.join(repo.root, file)), (source) => ({ file, ...readScreen({ file, source }) })),
+      Effect.map(repo.text(repo.join(repo.root, file)), (source) => ({
+        file,
+        ...readScreen({ file, source, hookModules })
+      })),
     { concurrency: 1 }
   )
   const at = (file: string, handed: Handed, why: string): RefCallbacksFinding =>

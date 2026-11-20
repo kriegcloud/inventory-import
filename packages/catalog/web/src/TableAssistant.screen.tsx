@@ -1,4 +1,3 @@
-import * as Match from "effect/Match"
 import { stringify } from "@inventory/ui/Json"
 import { ArrowUp, ChevronRight, MessageSquarePlus, Sparkles, Undo2, X } from "lucide-react"
 import { useAtom, useAtomMount, useAtomSet, useAtomSubscribe } from "@effect/atom-react"
@@ -30,7 +29,7 @@ import {
   writeConversation
 } from "./Conversation.machine.ts"
 import { applyAll, describe, overtaken, takeBack, type ViewFilter, type ViewState } from "./internal/view.ts"
-import type { AnsweredBy } from "@inventory/catalog-contract/Answer"
+import { AnsweredBy } from "@inventory/catalog-contract/Answer"
 import { rulesRead } from "@inventory/catalog-model/TableViewRules"
 import { type ColumnCatalog, maxPrompt } from "@inventory/catalog-contract/TableView"
 /**
@@ -41,7 +40,7 @@ const whoAnswered = (answer: {
   readonly answeredBy: AnsweredBy
   readonly note: O.Option<string>
 }): { readonly answeredBy: string; readonly note: string | null } =>
-  Match.valueTags(answer.answeredBy, {
+  AnsweredBy.match(answer.answeredBy, {
     Rules: (by) => ({ answeredBy: "Rules", note: by.reason }),
     Model: (by) => ({ answeredBy: by.model, note: O.getOrNull(answer.note) })
   })

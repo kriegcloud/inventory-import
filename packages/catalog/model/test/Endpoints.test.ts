@@ -10,7 +10,15 @@ import { type ConfirmWrite, ImportStore } from "@inventory/catalog-model/ImportS
 import { usedUpSentence } from "@inventory/catalog-model/AssistantHandler"
 import { memoryUsedUpWords } from "@inventory/catalog-model/ModelAllowance"
 import { decisionFromFlags } from "@inventory/catalog-contract/Decision"
-import { AcceptsTakenBack, DraftMoved, RevisionAhead } from "@inventory/catalog-contract/ImportRejection"
+import {
+  AcceptsTakenBack,
+  AlreadyImported,
+  DraftMoved,
+  ImportNotFound,
+  RevisionAhead
+} from "@inventory/catalog-contract/ImportRejection"
+import { ItemChanged } from "@inventory/catalog-contract/Catalog"
+import { Forbidden } from "@inventory/kernel/AccessError"
 import { AnsweredBy } from "@inventory/catalog-contract/Answer"
 import type { ColumnCatalog } from "@inventory/catalog-contract/TableView"
 import * as A from "effect/Array"
@@ -28,8 +36,11 @@ import { as, dana, elena, fiveLines, marcus, priya, stage, tableOf } from "./sup
 
 const withCrypto = <A, E>(memory: Layer.Layer<A, E>) => Layer.mergeAll(memory, SecureRandom.layerWebCrypto)
 const App = withCrypto(catalogMemory())
-const tag = <A, E extends { readonly _tag: string }, R>(effect: Effect.Effect<A, E, R>) =>
-  Effect.map(Effect.flip(effect), (error) => error._tag)
+/** Runs `effect`, which must be refused, and expects the refusal to be of `kind`. */
+const refusedAs = <A, E, R>(effect: Effect.Effect<A, E, R>, kind: abstract new (...args: never) => unknown) =>
+  Effect.map(Effect.flip(effect), (error) => {
+    expect(error).toBeInstanceOf(kind)
+  })
 const lines = Effect.gen(function* () {
   const ref = yield* CatalogMemoryRef
   const state = yield* Ref.get(ref)
@@ -42,8 +53,7 @@ describe("an import, over the twins", () => {
   layer(App)("staged, confirmed, confirmed again, taken back twice", (it) => {
     it.effect("a viewer may not stage a file; an editor's upload is an open import with its counts", () =>
       Effect.gen(function* () {
-        const refused = yield* tag(stage(tableOf({ fileName: "five.csv", lines: fiveLines })).pipe(as(priya)))
-        expect(refused).toBe("Forbidden")
+        yield* refusedAs(stage(tableOf({ fileName: "five.csv", lines: fiveLines })).pipe(as(priya)), Forbidden)
         const view = yield* stage(tableOf({ fileName: "five.csv", lines: fiveLines })).pipe(as(marcus))
         expect([view.status, view.rowCount, view.progress.ready, view.progress.needs]).toEqual(["open", 5, 3, 2])
         const got6 = yield* lines
@@ -81,10 +91,10 @@ describe("an import, over the twins", () => {
           // Another organization sees none of them.
           const got12 = yield* items.list().pipe(as(elena))
           expect(got12.length).toBe(0)
-          const again = yield* tag(
-            imports.commit({ params: { id }, payload: { ...none, revision, madeOn: {} } }).pipe(as(marcus))
+          yield* refusedAs(
+            imports.commit({ params: { id }, payload: { ...none, revision, madeOn: {} } }).pipe(as(marcus)),
+            AlreadyImported
           )
-          expect(again).toBe("AlreadyImported")
           const got13 = yield* items.list().pipe(as(marcus))
           expect(got13.length).toBe(3)
           const got1 = yield* said("Imported items")
@@ -110,16 +120,15 @@ describe("an import, over the twins", () => {
           lotTracked: crate.lotTracked,
           firstReceivedOn: crate.firstReceivedOn
         }
-        const got7 = yield* tag(items.edit({ params: { id: crate.id }, payload: edit }).pipe(as(priya)))
-        expect(got7).toBe("Forbidden")
+        yield* refusedAs(items.edit({ params: { id: crate.id }, payload: edit }).pipe(as(priya)), Forbidden)
         const edited = yield* items.edit({ params: { id: crate.id }, payload: edit }).pipe(as(dana))
         expect([edited.name, edited.revision]).toEqual(["Oak Crate, large", 2])
         const same = yield* items.edit({ params: { id: crate.id }, payload: edit }).pipe(as(dana))
         expect(same.revision).toBe(2)
-        const stale = yield* tag(
-          items.edit({ params: { id: crate.id }, payload: { ...edit, name: "Oak Crate, small" } }).pipe(as(dana))
+        yield* refusedAs(
+          items.edit({ params: { id: crate.id }, payload: { ...edit, name: "Oak Crate, small" } }).pipe(as(dana)),
+          ItemChanged
         )
-        expect(stale).toBe("ItemChanged")
         const got2 = yield* said("Edited an item")
         expect(got2).toEqual(["Dana Whitfield: Edited an item: AAA-0001 Oak Crate, large"])
       })
@@ -181,8 +190,7 @@ describe("an import, over the twins", () => {
           expect(cleared.changed).toBe(true)
           // Nothing of it is in the system, so it may be removed, once.
           yield* imports.remove({ params }).pipe(as(marcus))
-          const got8 = yield* tag(imports.get({ params }).pipe(as(marcus)))
-          expect(got8).toBe("ImportNotFound")
+          yield* refusedAs(imports.get({ params }).pipe(as(marcus)), ImportNotFound)
           const got4 = yield* said("Removed an import")
           expect(got4).toEqual(["Marcus Oyelaran: Removed an import: five.csv: 5 rows, nothing had been imported"])
         })
@@ -263,8 +271,7 @@ describe("suggestions, over the twins", () => {
         const imports = yield* importsEndpoints
         const view = yield* stage(tableOf({ fileName: "five.csv", lines: fiveLines })).pipe(as(marcus))
         const params = { id: view.id }
-        const got9 = yield* tag(imports.suggest({ params }).pipe(as(priya)))
-        expect(got9).toBe("Forbidden")
+        yield* refusedAs(imports.suggest({ params }).pipe(as(priya)), Forbidden)
         const first = yield* imports.suggest({ params }).pipe(as(marcus))
         expect(AnsweredBy.guards.Rules(first.answeredBy)).toBe(true)
         expect(A.map(first.made, (s) => (s.kind === "column" ? [] : [s.rowId, s.kind, s.to, s.by.kind]))).toEqual([

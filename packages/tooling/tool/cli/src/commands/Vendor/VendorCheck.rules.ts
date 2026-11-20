@@ -164,13 +164,13 @@ export const vendorCheck = Effect.fn("VendorCheck.vendorCheck")(function* (sourc
       const checkFile = Effect.fnUntraced(function* (entry: VendorFile) {
         const name = `${where}/${entry.path}`
         const file = repo.join(dir, entry.path)
-        if (!(yield* repo.exists(file))) return problem({ _tag: "Missing", file: name })
+        if (!(yield* repo.exists(file))) return problem(VendorCheckFinding.cases.Missing.make({ file: name }))
         const content = yield* repo.bytes(file)
         const newline = content.indexOf(0x0a)
         const first = decoder.decode(content.subarray(0, newline))
         const expectedFirst = `// Vendored from beep-effect ${commit}:${upstreamDir}/${entry.path} `
         if (newline === -1 || !Str.startsWith(expectedFirst)(first)) {
-          return problem({ _tag: "NoProvenance", file: name, expected: Str.trim(expectedFirst) })
+          return problem(VendorCheckFinding.cases.NoProvenance.make({ file: name, expected: Str.trim(expectedFirst) }))
         }
         const actual = yield* repo.sha256(content.subarray(newline + 1))
         const patches = entry.patches ?? []
@@ -185,25 +185,27 @@ export const vendorCheck = Effect.fn("VendorCheck.vendorCheck")(function* (sourc
         const one = (finding: VendorCheckFinding) => A.of(finding)
         const none = A.empty<VendorCheckFinding>()
         const problems = A.flatten([
-          actual !== entry.sha256 ? one({ _tag: "Changed", file: name, sha256: actual }) : none,
+          actual !== entry.sha256 ? one(VendorCheckFinding.cases.Changed.make({ file: name, sha256: actual })) : none,
           entry.rewrites.length === 0 && patches.length === 0 && entry.sha256 !== entry.sourceSha256
-            ? one({ _tag: "HashDiffers", file: name })
+            ? one(VendorCheckFinding.cases.HashDiffers.make({ file: name }))
             : none,
           patches.length > 0 && entry.sha256 === entry.sourceSha256
-            ? one({ _tag: "PatchEqualsUpstream", file: name })
+            ? one(VendorCheckFinding.cases.PatchEqualsUpstream.make({ file: name }))
             : none,
           patches.length > 0 && !A.every(patches, (patch) => P.isString(patch.reason) && patch.reason.length > 0)
-            ? one({ _tag: "PatchWithoutReason", file: name })
+            ? one(VendorCheckFinding.cases.PatchWithoutReason.make({ file: name }))
             : none,
           patches.length > 0 && !Str.includes("Patched on purpose")(first)
-            ? one({ _tag: "PatchUnsaid", file: name })
+            ? one(VendorCheckFinding.cases.PatchUnsaid.make({ file: name }))
             : none,
           O.exists(upstreamHash, (hash) => hash !== entry.sourceSha256)
-            ? one({ _tag: "SourceHashWrong", file: name, commit })
+            ? one(VendorCheckFinding.cases.SourceHashWrong.make({ file: name, commit }))
             : none
         ])
         const patched =
-          patches.length > 0 ? one({ _tag: "Patched", file: name, patches: patches.length, commit }) : none
+          patches.length > 0
+            ? one(VendorCheckFinding.cases.Patched.make({ file: name, patches: patches.length, commit }))
+            : none
         return { problems, patched, counted: 1 } satisfies Checked
       })
       const files = yield* Effect.forEach(manifest.files, checkFile, { concurrency: 1 })
@@ -217,7 +219,7 @@ export const vendorCheck = Effect.fn("VendorCheck.vendorCheck")(function* (sourc
                 const inside = repo.relative(dir, file)
                 return A.contains(listed, inside)
                   ? A.empty<VendorCheckFinding>()
-                  : A.of<VendorCheckFinding>({ _tag: "Stray", file: `${where}/${inside}` })
+                  : A.of<VendorCheckFinding>(VendorCheckFinding.cases.Stray.make({ file: `${where}/${inside}` }))
               })
             )
           ),
@@ -227,7 +229,8 @@ export const vendorCheck = Effect.fn("VendorCheck.vendorCheck")(function* (sourc
       const own = yield* repo.json(ExportsOnly)(repo.join(dir, "package.json"))
       const ownExports = yield* asJson(own.exports).pipe(Effect.orDie)
       const recorded = yield* asJson(manifest.exports).pipe(Effect.orDie)
-      const exportsDiffer = ownExports === recorded ? nothing : problem({ _tag: "ExportsDiffer", where })
+      const exportsDiffer =
+        ownExports === recorded ? nothing : problem(VendorCheckFinding.cases.ExportsDiffer.make({ where }))
       return merge([
         ...files,
         { problems: A.flatten(strays), patched: A.empty<VendorCheckFinding>(), counted: 0 },
@@ -238,15 +241,17 @@ export const vendorCheck = Effect.fn("VendorCheck.vendorCheck")(function* (sourc
   )
   const all = merge(perPackage)
   if (A.isReadonlyArrayNonEmpty(all.problems)) {
-    return A.append<VendorCheckFinding, VendorCheckFinding>(all.problems, {
-      _tag: "Failed",
-      problems: all.problems.length
-    })
+    return A.append<VendorCheckFinding, VendorCheckFinding>(
+      all.problems,
+      VendorCheckFinding.cases.Failed.make({ problems: all.problems.length })
+    )
   }
-  return A.prepend<VendorCheckFinding, VendorCheckFinding>(all.patched, {
-    _tag: "Matched",
-    files: all.counted,
-    packages: manifests.length,
-    againstSource: O.isSome(source)
-  })
+  return A.prepend<VendorCheckFinding, VendorCheckFinding>(
+    all.patched,
+    VendorCheckFinding.cases.Matched.make({
+      files: all.counted,
+      packages: manifests.length,
+      againstSource: O.isSome(source)
+    })
+  )
 })

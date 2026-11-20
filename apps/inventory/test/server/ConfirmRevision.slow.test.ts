@@ -17,7 +17,7 @@ import messy from "../../public/samples/items_messy.csv?raw"
 import { Api } from "../../src/api/v1/Api.ts"
 import { decisionFromFlags } from "@inventory/catalog-contract/Decision"
 import { ConfirmId } from "@inventory/catalog-contract/Ids"
-import { DraftMoved } from "@inventory/catalog-contract/ImportRejection"
+import { AlreadyImported, DraftMoved } from "@inventory/catalog-contract/ImportRejection"
 import { ConfirmPlan } from "@inventory/catalog-model/Confirm"
 import { ConfirmWrite, ImportStore } from "@inventory/catalog-model/ImportStore"
 import { Activity } from "@inventory/kernel/Activity"
@@ -165,7 +165,7 @@ layer(TypedApp)("a confirm names the revision its screen showed", (it) => {
       const answers = yield* Effect.all([confirm, confirm], { concurrency: 2 })
       const passed = A.filter(answers, Result.isSuccess)
       const failed = A.filter(answers, Result.isFailure)
-      expect([passed.length, A.map(failed, (answer) => answer.failure._tag)]).toEqual([1, ["AlreadyImported"]])
+      expect([passed.length, A.map(failed, (answer) => S.is(AlreadyImported)(answer.failure))]).toEqual([1, [true]])
       const made = O.getOrThrow(O.getOrThrow(A.head(passed)).success.result)
       expect(made.created).toBe(25)
       expect((yield* client.items.list().pipe(marcus)).length).toBe(before + 25)

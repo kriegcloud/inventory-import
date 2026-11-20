@@ -1,5 +1,5 @@
-// The modules one file imports, read from its syntax tree: `import … from "x"`, `export … from "x"`, `import "x"`
-// and `import("x")` with a written-out name. A pattern over the text would also take the word out of a comment, and
+// The modules one file imports, read from its syntax tree: `import … from "x"`, `export … from "x"`, `import "x"`,
+// `import x = require("x")` and `import("x")` with a written-out name. A pattern over the text would also take the word out of a comment, and
 // an import planted in a test's fixture text for one of the file's own.
 import * as A from "effect/Array"
 import * as O from "effect/Option"
@@ -33,6 +33,15 @@ export const readImports = (input: { readonly file: string; readonly source: str
         O.flatMap((source) => O.liftPredicate(source["value"], P.isString))
       )
       if (O.isSome(named)) found.push(named.value)
+    }
+    // `import x = require("x")`: TypeScript's own form, the module named inside its external reference.
+    if (node.type === "TSImportEqualsDeclaration") {
+      const required = O.liftPredicate(node["moduleReference"], isNode).pipe(
+        O.filter((reference) => reference.type === "TSExternalModuleReference"),
+        O.flatMap((reference) => O.liftPredicate(reference["expression"], isNode)),
+        O.flatMap((literal) => O.liftPredicate(literal["value"], P.isString))
+      )
+      if (O.isSome(required)) found.push(required.value)
     }
     for (const next of children(node)) walk(next)
   }

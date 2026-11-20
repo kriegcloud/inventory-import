@@ -5,7 +5,7 @@ import * as Str from "effect/String"
 import { tags, tagsSentence } from "../src/commands/Laws/Tags.rules.ts"
 import { Repo } from "../src/Repo.service.ts"
 import { render } from "../src/Report.schema.ts"
-import { inTree, printed } from "./support/tree.ts"
+import { inTree, json, printed } from "./support/tree.ts"
 
 // git answers "every file git would commit", so the folder is made a repository first.
 const inRepository = Effect.gen(function* () {
@@ -36,6 +36,10 @@ const named = (state: Upload) => {
   return { tag }
 }
 export const other = (tag: string) => tag === "Idle" || named(idle).tag.length > 0
+export const said = (state: Upload) => {
+  if (Upload.guards.Idle(state)) throw new Error(\`no file is chosen while \${state._tag}\`)
+  return <li key={\`row:\${state._tag}\`}>{state._tag}</li>
+}
 `
 
 // Every form a tag is compared by hand in. The keyword of the last one is put in when the text is made, so the
@@ -85,6 +89,42 @@ export const line = (state: typeof Step.Type, error: { readonly _tag: string }, 
 }
 export const idle: typeof Step.Type = { _tag: "Idle" }
 export const saving = Step.cases.Saving.make({ fileName: "a.csv" })
+`
+
+// The forms the second review found passing: a tag read into a name through a default, a method of a tag, a record
+// read by a tag, a template that is only the tag, a template with words compared, what a function that hands the tag
+// back answers, and a tag read through a function handed to a call, taken out with yield* and then expected.
+const tick = "`"
+const flowed = `import * as Effect from "effect/Effect"
+import type { Upload } from "./machine"
+const kindOf = (state: Upload) => state._tag
+export const line = (state: Upload, effect: Effect.Effect<number, { readonly _tag: string }>) =>
+  Effect.gen(function* () {
+    const tag = state._tag ?? ""
+    if (tag === "Saving") return "Saving"
+    if (state._tag.startsWith("Sav")) return "Saving"
+    const handlers = { Idle: () => "", Saving: () => "Saving" }
+    const chosen = handlers[state._tag]
+    if (${tick}\${state._tag}${tick} === "Idle") return chosen()
+    if (${tick}\${state._tag}:1${tick} === "Idle:1") return "One"
+    if (kindOf(state) === "Idle") return "Idle"
+    const refused = yield* Effect.map(Effect.flip(effect), (error) => error._tag)
+    expect(refused).toBe("Forbidden")
+    return state.fileName
+  })
+`
+
+// A case picked out of another type (\`Extract<…, { _tag: "Detail" }>\`) is not a case this module types, and a tag
+// that is not written out is never a case the module types: both are built by hand.
+const picked = `import * as Data from "effect/Data"
+type Opened = Data.TaggedEnum<{ Detail: { readonly id: string }; Closed: {} }>
+const Opened = Data.taggedEnum<Opened>()
+export type Detail = Extract<Opened, { readonly _tag: "Detail" }>
+export const open = (id: string): Opened => ({ _tag: "Detail", id })
+export type Answer = { readonly _tag: "Yes" } | { readonly _tag: "No" }
+export const either = (kind: "Yes" | "No"): Answer => ({ _tag: kind })
+export const yes: Answer = { _tag: "Yes" }
+export const closed = Opened.Closed()
 `
 
 // A union typed by hand has no constructor: the module that types it builds it, and a test of it builds it with what
@@ -145,6 +185,60 @@ describe("laws tags", () => {
     })
   )
 
+  it.effect("refuses a tag through a default, a method, a key, a template, a function that hands it back", () =>
+    Effect.gen(function* () {
+      const report = yield* inTree({ "packages/catalog/web/src/Step.ts": flowed }, inRepository)
+      expect(report.failed).toBe(true)
+      const file = "packages/catalog/web/src/Step.ts"
+      expect(printed(report).slice(1)).toEqual([
+        `err: ${file}:7  _tag ===`,
+        `err: ${file}:8  a method called on a _tag`,
+        `err: ${file}:10  a record read by a _tag`,
+        `err: ${file}:11  _tag ===`,
+        `err: ${file}:12  _tag ===`,
+        `err: ${file}:13  _tag ===`,
+        `err: ${file}:15  a _tag handed to a call`
+      ])
+    })
+  )
+
+  it.effect("refuses a case picked out of another type, and a tag not written out, built by hand", () =>
+    Effect.gen(function* () {
+      const report = yield* inTree({ "packages/review/src/internal/Grid.ts": picked }, inRepository)
+      const literal = "an object built with a _tag key: use the case's own constructor or .make"
+      expect(printed(report).slice(1)).toEqual([
+        `err: packages/review/src/internal/Grid.ts:5  ${literal}`,
+        `err: packages/review/src/internal/Grid.ts:7  ${literal}`
+      ])
+    })
+  )
+
+  it.effect("holds a file the ledger records to its count: no more, and lowered when it has fewer", () =>
+    Effect.gen(function* () {
+      const file = "packages/catalog/model/src/Rules.ts"
+      const ledger = (files: Record<string, number>) => json({ files })
+      const held = yield* inTree({ [file]: byHand, "tags-ledger.json": ledger({ [file]: 8 }) }, inRepository)
+      expect(printed(held)).toEqual([
+        clean,
+        "out:   8 places in 1 files are still recorded in tags-ledger.json: none more, and the count only falls"
+      ])
+      const more = yield* inTree({ [file]: byHand, "tags-ledger.json": ledger({ [file]: 7 }) }, inRepository)
+      expect(more.failed).toBe(true)
+      expect(printed(more).slice(1, 3)).toEqual([
+        `err: ${file}  8 places, and tags-ledger.json records 7: it may have no more`,
+        `err: ${file}:3  _tag ===`
+      ])
+      const fewer = yield* inTree(
+        { [file]: byHand, "tags-ledger.json": ledger({ [file]: 9, "packages/catalog/model/src/Gone.ts": 2 }) },
+        inRepository
+      )
+      expect(printed(fewer).slice(1)).toEqual([
+        `err: ${file}  8 places, and tags-ledger.json records 9: lower it to 8`,
+        "err: packages/catalog/model/src/Gone.ts  has no place left, and tags-ledger.json records 2: take it out of the ledger"
+      ])
+    })
+  )
+
   it.effect("lets the module that types a union build it, and refuses the same literals in a test", () =>
     Effect.gen(function* () {
       const report = yield* inTree(
@@ -159,33 +253,33 @@ describe("laws tags", () => {
     })
   )
 
-  it.effect(
-    "reads every test, the server's and the model's too; the server's code and the vendored kit keep their own",
-    () =>
-      Effect.gen(function* () {
-        const report = yield* inTree(
-          {
-            "packages/catalog/model/src/Rules.ts": byHand,
-            "packages/catalog/model/test/Rules.test.ts": byHand,
-            "apps/inventory/test/server/App.test.ts": byHand,
-            "packages/ui/src/components/table.tsx": byHand,
-            "packages/foundation/modeling/schema/vendor.json": "{}",
-            "packages/foundation/modeling/schema/test/Schema.test.ts": byHand,
-            "apps/inventory/src/server/App.ts": byHand,
-            "apps/inventory/src/web/App.tsx": byHand
-          },
-          inRepository
-        )
-        // Each file once, read from "err: file:line  how".
-        const files = A.dedupe(
-          A.map(A.drop(printed(report), 1), (line) => A.headNonEmpty(Str.split(":")(Str.slice(5)(line))))
-        )
-        expect(files).toEqual([
-          "apps/inventory/src/web/App.tsx",
-          "apps/inventory/test/server/App.test.ts",
-          "packages/catalog/model/test/Rules.test.ts"
-        ])
-      })
+  it.effect("reads our own code and every test, the server's and the model's too; the vendored kit keeps its own", () =>
+    Effect.gen(function* () {
+      const report = yield* inTree(
+        {
+          "packages/catalog/model/src/Rules.ts": byHand,
+          "packages/catalog/model/test/Rules.test.ts": byHand,
+          "apps/inventory/test/server/App.test.ts": byHand,
+          "packages/ui/src/components/table.tsx": byHand,
+          "packages/foundation/modeling/schema/vendor.json": "{}",
+          "packages/foundation/modeling/schema/test/Schema.test.ts": byHand,
+          "apps/inventory/src/server/App.ts": byHand,
+          "apps/inventory/src/web/App.tsx": byHand
+        },
+        inRepository
+      )
+      // Each file once, read from "err: file:line  how".
+      const files = A.dedupe(
+        A.map(A.drop(printed(report), 1), (line) => A.headNonEmpty(Str.split(":")(Str.slice(5)(line))))
+      )
+      expect(files).toEqual([
+        "apps/inventory/src/server/App.ts",
+        "apps/inventory/src/web/App.tsx",
+        "apps/inventory/test/server/App.test.ts",
+        "packages/catalog/model/src/Rules.ts",
+        "packages/catalog/model/test/Rules.test.ts"
+      ])
+    })
   )
 
   it.effect("fails when git cannot list the files: nothing checked is not nothing found", () =>

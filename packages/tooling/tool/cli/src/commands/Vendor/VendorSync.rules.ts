@@ -442,13 +442,12 @@ here under the same name and the same export subpaths, and is replaced by the pu
       local
     }).pipe(Effect.orDie)
     yield* repo.write(repo.join(target, "vendor.json"), `${manifest}\n`)
-    return {
-      _tag: "Vendored",
+    return VendorSyncFinding.cases.Vendored.make({
       name: pkg.name,
       sources: sources.length,
       tests: (tests[pkg.name] ?? []).length
-    } satisfies VendorSyncFinding
+    }) satisfies VendorSyncFinding
   })
   const written: ReadonlyArray<VendorSyncFinding> = yield* Effect.forEach(packages, vendorPackage, { concurrency: 1 })
-  return A.append<VendorSyncFinding, VendorSyncFinding>(written, { _tag: "From", commit })
+  return A.append<VendorSyncFinding, VendorSyncFinding>(written, VendorSyncFinding.cases.From.make({ commit }))
 })

@@ -101,8 +101,12 @@ export const ceilings = Effect.fn("Ceilings.ceilings")(function* () {
   )
   const sum = Num.sumAll(A.map(rows, (row) => row.ceiling))
   const said = A.append<CeilingsFinding, CeilingsFinding>(
-    A.map(rows, (row): CeilingsFinding => ({ _tag: "Ceiling", where: row.where, ceiling: row.ceiling })),
-    { _tag: "Sum", sum, cap }
+    A.map(rows, (row): CeilingsFinding =>
+      CeilingsFinding.cases.Ceiling.make({ where: row.where, ceiling: row.ceiling })
+    ),
+    CeilingsFinding.cases.Sum.make({ sum, cap })
   )
-  return sum > cap ? A.append<CeilingsFinding, CeilingsFinding>(said, { _tag: "AboveCap", sum, cap }) : said
+  return sum > cap
+    ? A.append<CeilingsFinding, CeilingsFinding>(said, CeilingsFinding.cases.AboveCap.make({ sum, cap }))
+    : said
 })

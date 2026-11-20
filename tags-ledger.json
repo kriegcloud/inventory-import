@@ -1,0 +1,19 @@
+{
+  "description": "The files that still tell a _tag apart or build one by hand, each with how many places it has (bun run beep laws tags). Each count only falls: a file may have no more, and when one has fewer its count is lowered, or the file taken out at none. Recorded when the law first read the server, model, host and driver code; each file is converted by the work that owns it.",
+  "files": {
+    "apps/inventory/src/server/RequestTelemetry.ts": 1,
+    "apps/inventory/src/server/Telemetry.ts": 1,
+    "packages/access/host/src/SignIn.route.ts": 1,
+    "packages/catalog/host/src/ItemStore.adapter.ts": 7,
+    "packages/catalog/model/src/Catalog.memory.ts": 4,
+    "packages/catalog/model/src/Reading/SheetLayout.rules.ts": 2,
+    "packages/catalog/model/src/Review/CellReading.rules.ts": 3,
+    "packages/catalog/model/src/Review/Review.rules.ts": 5,
+    "packages/catalog/model/src/Staging/Staging.rules.ts": 1,
+    "packages/drivers/openrouter/src/OpenRouter.schema.ts": 3,
+    "packages/drivers/openrouter/src/OpenRouter.test-layer.ts": 1,
+    "packages/foundation/modeling/xlsx/src/internal/formula.ts": 1,
+    "packages/foundation/modeling/xlsx/src/internal/sheet.ts": 3,
+    "packages/foundation/modeling/xlsx/src/internal/workbookPart.ts": 3
+  }
+}

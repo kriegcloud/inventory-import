@@ -28,15 +28,17 @@ const isFunction = (node: Node): boolean => typeIs(node, ...functions)
 /** How a file binds a name. */
 type Binding =
   /**
-   * At the file's top level, or imported: made once. `source` is the module an import names, `fn` the function a
-   * top-level declaration is, and `reassigned` says a function sets the name again: a `let` that holds what the last
-   * draw gave it is made on every draw all the same.
+   * At the file's top level, or imported: made once. `hooks` says it is imported from a module of hooks
+   * (`isHookModule`), `fn` is the function a top-level declaration is, `reassigned` says a function sets the name
+   * again (a `let` that holds what the last draw gave it is made on every draw all the same), and `filled` says a
+   * function writes into what it holds (`refs[id] ??= …`): a cache by hand, whose entries a draw made.
    */
   | {
       readonly kind: "module"
-      readonly source: O.Option<string>
+      readonly hooks: boolean
       readonly fn: O.Option<Node>
       readonly reassigned: boolean
+      readonly filled: boolean
     }
   /** A parameter of a function (a component's props), or a name taken out of one in the parameter list. */
   | { readonly kind: "param"; readonly prop: O.Option<string> }
@@ -187,15 +189,21 @@ const calleeName = (callee: Node): string =>
 
 const namedAsHook = (name: string): boolean => /^use[A-Z0-9]/.test(name)
 
+/** The modules whose `use…` exports are hooks wherever they are imported: React's and the atoms' bindings. */
+const hookLibraries = ["react", "react-dom", "@effect/atom-react"]
+
 /**
- * The modules whose `use…` exports are hooks: React's, the atoms' bindings, and a module in a `hooks` or `components`
- * folder or named `…Hook` (the vendored kit's hooks, `SavedProgressHook`). A `use…` name from anywhere else is only a
- * name: what it gives is judged as any other call's answer.
+ * The modules whose `use…` exports are hooks: React's, the atoms' bindings, a module the repository names as one of
+ * hooks (`hookModules`, each by its exact specifier: the vendored kit's hooks, a package's `*.hook.ts` export), and a
+ * file of ours named `*.hook.ts` imported by its path. A `use…` name from anywhere else, a module that merely sits in
+ * a `hooks` or `components` folder among them, is only a name: what it gives is judged as any other call's answer.
  */
-const isHookModule = (source: string): boolean =>
-  A.contains(["react", "react-dom", "@effect/atom-react"], source) ||
-  /(^|\/)(hooks|components)\//.test(source) ||
-  Str.endsWith("Hook")(source)
+const isHookModule =
+  (hookModules: ReadonlyArray<string>) =>
+  (source: string): boolean =>
+    A.contains(hookLibraries, source) ||
+    A.contains(hookModules, source) ||
+    (Str.startsWith(".")(source) && /\.hook(\.tsx?)?$/.test(source))
 
 /**
  * True for a call of a hook (`useRef(null)`, `useAtomValue(scope)`, `React.useRef()`, `AtomReact.useAtomValue(x)`): a
@@ -211,10 +219,7 @@ const isHookCall = (node: Node, scopes: ReadonlyArray<Scope>): boolean =>
       root,
       (name) =>
         name.type === "Identifier" &&
-        O.exists(
-          lookUp(scopes, nameOf(name)),
-          (binding) => binding.kind === "module" && O.exists(binding.source, isHookModule)
-        )
+        O.exists(lookUp(scopes, nameOf(name)), (binding) => binding.kind === "module" && binding.hooks)
     )
   })
 
@@ -226,6 +231,10 @@ type Verdict =
 
 const steady: Verdict = { kind: "steady" }
 const refused = (why: string): Verdict => ({ kind: "refused", why })
+
+/** How many names deep a value is followed; past it, nothing is shown steady, so it is refused. */
+const maxDepth = 8
+const tooDeep = refused(`followed more than ${maxDepth} names deep: hand the ref a name the file binds nearer to it`)
 
 /** The list methods whose callback is given one element at a time: `rows.map(fn)` and `A.map(rows, fn)`. */
 const iterators = [
@@ -277,8 +286,11 @@ const judge = (value: Node, scopes: ReadonlyArray<Scope>, depth = 0): Verdict =>
       onNone: () => steady,
       onSome: ({ at, binding }): Verdict => {
         if (binding.kind === "module") {
-          return binding.reassigned
-            ? refused(`${name} is a module variable a function sets again: it holds what the last draw gave it`)
+          if (binding.reassigned) {
+            return refused(`${name} is a module variable a function sets again: it holds what the last draw gave it`)
+          }
+          return binding.filled
+            ? refused(`${name} is a module record a function fills in place: a cache by hand, holding what a draw made`)
             : steady
         }
         if (binding.kind === "inner-function") {
@@ -289,7 +301,7 @@ const judge = (value: Node, scopes: ReadonlyArray<Scope>, depth = 0): Verdict =>
           const prop = O.getOrElse(binding.prop, () => path[0] ?? "")
           return O.isSome(binding.prop) || A.isReadonlyArrayNonEmpty(path) ? { kind: "prop", name: prop } : steady
         }
-        if (depth > 8) return steady
+        if (depth > maxDepth) return tooDeep
         if (binding.kind === "element") {
           // One element of a list is as steady as the list: a list made in the draw makes what it holds in the draw.
           const from = judge(binding.list, binding.listScopes, depth + 1)
@@ -299,7 +311,14 @@ const judge = (value: Node, scopes: ReadonlyArray<Scope>, depth = 0): Verdict =>
         const init = unwrapped(binding.init.value)
         // What it is given is read where it is declared.
         const where = A.take(scopes, at + 1)
-        if (isHookCall(init, where)) return steady
+        if (isHookCall(init, where)) {
+          // A ref object's `.current` is what it held when the draw read it; `useRef` is for a DOM node, never a
+          // function kept across draws by hand.
+          const current = A.contains(path, "current") || O.exists(binding.prop, (prop) => prop === "current")
+          return current
+            ? refused(`${name} reads .current of a useRef during the draw: useRef holds a DOM node, never a function`)
+            : steady
+        }
         // Another name for something else (`const actions = props.actions`, `const { attach } = region`).
         if (typeIs(init, "Identifier", "MemberExpression")) {
           const from = judge(init, where, depth + 1)
@@ -362,10 +381,10 @@ const judgeCall = (call: Node, scopes: ReadonlyArray<Scope>, depth: number): Ver
   return O.match(localFunction(call, scopes), {
     onNone: () =>
       refused(
-        `${name} is named as a hook but is not one from react or @effect/atom-react: its answer is new on every draw`
+        `${name} is named as a hook but is not one from react, @effect/atom-react or a module of hooks: its answer is new on every draw`
       ),
     onSome: (fn) => {
-      const from = depth > 8 ? steady : judgeReturns(fn, scopes, depth + 1)
+      const from = depth > maxDepth ? tooDeep : judgeReturns(fn, scopes, depth + 1)
       return from.kind === "refused" ? refused(`${name} is not a hook, and what it returns: ${from.why}`) : from
     }
   })
@@ -392,17 +411,28 @@ const judgeReturns = (fn: Node, scopes: ReadonlyArray<Scope>, depth: number): Ve
   return first.kind === "prop" ? refused("it hands back what it is given") : first
 }
 
-/** The names the file's top level binds, each with the module it is imported from or the function it declares. */
-const topLevel = (program: Node, reassigned: ReadonlyArray<string>): Scope =>
+/** What functions do to the names of the file's top level: set them again, or write into what they hold. */
+interface Written {
+  readonly reassigned: ReadonlyArray<string>
+  readonly filled: ReadonlyArray<string>
+}
+
+/**
+ * The names the file's top level binds, each with whether it is imported from a module of hooks or the function it
+ * declares, and what functions do to it.
+ */
+const topLevel = (program: Node, written: Written, hookModules: ReadonlyArray<string>): Scope =>
   bind(
     A.flatMap(nodes(program["body"]), (statement): ReadonlyArray<readonly [string, Binding]> => {
       const declared = O.getOrElse(child(statement, "declaration"), () => statement)
+      const filled = (name: string): boolean => A.contains(written.filled, name)
       if (declared.type === "ImportDeclaration") {
         const source = O.flatMap(child(declared, "source"), (literal) => O.liftPredicate(literal["value"], P.isString))
-        return A.map(nodes(declared["specifiers"]), (specifier) => [
-          O.getOrElse(O.map(child(specifier, "local"), nameOf), () => ""),
-          { kind: "module", source, fn: O.none(), reassigned: false } as const
-        ])
+        const hooks = O.exists(source, isHookModule(hookModules))
+        return A.map(nodes(declared["specifiers"]), (specifier) => {
+          const name = O.getOrElse(O.map(child(specifier, "local"), nameOf), () => "")
+          return [name, { kind: "module", hooks, fn: O.none(), reassigned: false, filled: filled(name) }] as const
+        })
       }
       if (declared.type === "VariableDeclaration") {
         const constant = declared["kind"] === "const"
@@ -414,9 +444,10 @@ const topLevel = (program: Node, reassigned: ReadonlyArray<string>): Scope =>
                 found.name,
                 {
                   kind: "module",
-                  source: O.none(),
+                  hooks: false,
                   fn: O.filter(O.map(child(declarator, "init"), unwrapped), isFunction),
-                  reassigned: !constant && A.contains(reassigned, found.name)
+                  reassigned: !constant && A.contains(written.reassigned, found.name),
+                  filled: filled(found.name)
                 }
               ])
           })
@@ -427,28 +458,52 @@ const topLevel = (program: Node, reassigned: ReadonlyArray<string>): Scope =>
         onSome: (id) => [
           [
             nameOf(id),
-            { kind: "module", source: O.none(), fn: O.liftPredicate(declared, isFunction), reassigned: false }
+            {
+              kind: "module",
+              hooks: false,
+              fn: O.liftPredicate(declared, isFunction),
+              reassigned: false,
+              filled: filled(nameOf(id))
+            }
           ] as const
         ]
       })
     })
   )
 
-/** The names of the file's top level that a function assigns to (`current = next`, `count++`). */
-const reassignedInFunctions = (program: Node, top: Scope): ReadonlyArray<string> => {
-  const found: Array<string> = []
+/** The name a member write starts from: `refs` in `refs[id] = …`, `refs.a.b ??= …` and `delete refs[id]`. */
+const rootOf = (target: Node): O.Option<string> => {
+  const node = unwrapped(target)
+  if (node.type === "Identifier") return O.some(nameOf(node))
+  return node.type === "MemberExpression" ? O.flatMap(child(node, "object"), rootOf) : O.none()
+}
+
+/**
+ * What the functions of a file do to its top level's names: assign one again (`current = next`, `count++`), or write
+ * into what one holds (`refs[id] = …`, `refs[id] ??= …`, `refs.count++`, `delete refs[id]`).
+ */
+const writtenInFunctions = (program: Node, top: Scope): Written => {
+  const reassigned: Array<string> = []
+  const filled: Array<string> = []
   const visit = (node: Node, scopes: ReadonlyArray<Scope>): void => {
     const here = isFunction(node) ? A.append(scopes, scopeOf(node)) : scopes
-    if (here.length > 1 && typeIs(node, "AssignmentExpression", "UpdateExpression")) {
+    const atTop = (name: string): boolean => O.exists(lookUpAt(here, name), (bound) => bound.at === 0)
+    const deleted = node.type === "UnaryExpression" && node["operator"] === "delete"
+    if (here.length > 1 && (deleted || typeIs(node, "AssignmentExpression", "UpdateExpression"))) {
       const target = child(node, node.type === "AssignmentExpression" ? "left" : "argument")
-      for (const { name } of O.match(target, { onNone: () => [], onSome: (left) => namesIn(unwrapped(left)) })) {
-        if (O.exists(lookUpAt(here, name), (bound) => bound.at === 0)) found.push(name)
+      const member = O.exists(target, (left) => unwrapped(left).type === "MemberExpression")
+      if (member) {
+        for (const name of O.toArray(O.flatMap(target, rootOf))) if (atTop(name)) filled.push(name)
+      } else {
+        for (const { name } of O.match(target, { onNone: () => [], onSome: (left) => namesIn(unwrapped(left)) })) {
+          if (atTop(name)) reassigned.push(name)
+        }
       }
     }
     for (const next of children(node)) visit(next, here)
   }
   visit(program, [top])
-  return found
+  return { reassigned, filled }
 }
 
 /** One place a screen hands a value over: where, what it is handed as, and the verdict. */
@@ -468,12 +523,19 @@ export interface ScreenRefs {
 }
 
 /**
- * Reads one screen. A file the parser cannot read gives nothing: the type-check says so, with the line.
+ * Reads one screen. A file the parser cannot read gives nothing: the type-check says so, with the line. `hookModules`
+ * names, each by its exact specifier, the modules of the repository whose `use…` exports are hooks besides React's
+ * and the atoms' (`@inventory/ui/hooks/use-data-table`).
  *
  * @example readScreen({ file: "List.tsx", source: "const List = () => <p ref={(node) => node?.focus()} />" }).refs[0]?.verdict.kind // "refused"
  */
-export const readScreen = (input: { readonly file: string; readonly source: string }): ScreenRefs => {
+export const readScreen = (input: {
+  readonly file: string
+  readonly source: string
+  readonly hookModules?: ReadonlyArray<string>
+}): ScreenRefs => {
   const { file, source } = input
+  const hookModules = input.hookModules ?? []
   const parsed = parseSync(file, source)
   const program: unknown = parsed.program
   if (!isNode(program)) return { refs: [], attributes: [] }
@@ -481,7 +543,11 @@ export const readScreen = (input: { readonly file: string; readonly source: stri
     A.append(offsets, (offsets[offsets.length - 1] ?? 0) + line.length + 1)
   )
   const lineAt = (offset: number): number => A.filter(starts, (start) => start <= offset).length
-  const top = topLevel(program, reassignedInFunctions(program, topLevel(program, [])))
+  const top = topLevel(
+    program,
+    writtenInFunctions(program, topLevel(program, { reassigned: [], filled: [] }, hookModules)),
+    hookModules
+  )
   const refs: Array<Handed> = []
   const attributes: Array<Handed> = []
   const walk = (node: Node, scopes: ReadonlyArray<Scope>, element: O.Option<ElementOf>): void => {

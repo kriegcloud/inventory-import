@@ -5,7 +5,7 @@ import * as Str from "effect/String"
 import { refCallbacks, refCallbacksSentence } from "../src/commands/Laws/RefCallbacks.rules.ts"
 import { Repo } from "../src/Repo.service.ts"
 import { render } from "../src/Report.schema.ts"
-import { inTree, printed } from "./support/tree.ts"
+import { inTree, json, printed } from "./support/tree.ts"
 
 // git answers "every file git would commit", so the folder is made a repository first.
 const inRepository = Effect.gen(function* () {
@@ -190,7 +190,91 @@ export function List() {
 }
 `
 
+// The forms the second review found passing, one each: a module record a function fills in place (a cache by hand),
+// a function kept in a useRef and handed over as \`.current\` (taken out by a pattern too), a \`use…\` name from a
+// module that only sits in a \`components\` or \`hooks\` folder, and a value followed past the depth limit.
+const deeper = A.join(
+  A.makeBy(11, (at) => `  const d${at + 1} = d${at}`),
+  "\n"
+)
+const cached = `import { useRef } from "react"
+import { useStable } from "./components/stable"
+import { useHeld } from "../hooks/held"
+const refs: Record<string, (node: HTMLElement | null) => void> = {}
+export function List(props: { id: string }) {
+  refs[props.id] ??= (node) => node?.focus()
+  const holder = useRef((node: HTMLElement | null) => node?.focus())
+  const { current } = useRef((node: HTMLElement | null) => node?.focus())
+  const d0 = useHeld()
+${deeper}
+  return (
+    <section>
+      <p ref={refs[props.id]} />
+      <p ref={holder.current} />
+      <p ref={current} />
+      <p ref={useStable((node: HTMLElement | null) => node?.focus())} />
+      <p ref={d11} />
+    </section>
+  )
+}
+`
+
+// What still passes in those shapes: a module record nothing fills, a DOM ref from useRef, a hook of the vendored kit
+// imported by the exact path its package exports, and a file of hooks named \`*.hook.ts\` imported by its path.
+const exactHooks = `import { useRef } from "react"
+import { useDataTable } from "@x/ui/hooks/use-data-table"
+import { useKept } from "@x/review/KeptHook"
+import { useSaved } from "./Saved.hook.ts"
+const refs: Record<string, (node: HTMLElement | null) => void> = { lead: (node) => node?.focus() }
+export function List() {
+  const frame = useRef<HTMLDivElement>(null)
+  const table = useDataTable()
+  const kept = useKept()
+  const saved = useSaved()
+  return (
+    <section ref={frame}>
+      <p ref={refs.lead} />
+      <p ref={table.measure} />
+      <p ref={kept.attach} />
+      <p ref={saved.attach} />
+    </section>
+  )
+}
+`
+
+/** The workspaces whose exports name modules of hooks: the vendored kit's `src/hooks`, and a `*.hook.ts` file. */
+const hookPackages = {
+  "packages/ui/package.json": json({
+    name: "@x/ui",
+    exports: { "./hooks/use-data-table": "./src/hooks/use-data-table.ts", "./Table": "./src/Table.tsx" }
+  }),
+  "packages/review/package.json": json({ name: "@x/review", exports: { "./KeptHook": "./src/Kept.hook.ts" } })
+}
+
 describe("laws ref-callbacks", () => {
+  it.effect("refuses a module record filled in place, a useRef's .current, a use* only by folder, past the depth", () =>
+    Effect.gen(function* () {
+      const report = yield* inTree({ "src/List.tsx": cached }, inRepository)
+      expect(report.failed).toBe(true)
+      expect(refusals(report)).toEqual([
+        "err: src/List.tsx:23  ref: refs is",
+        "err: src/List.tsx:24  ref: holder reads",
+        "err: src/List.tsx:25  ref: current reads",
+        "err: src/List.tsx:26  ref: useStable is",
+        "err: src/List.tsx:27  ref: followed more"
+      ])
+    })
+  )
+
+  it.effect("passes a record nothing fills, a DOM ref, and hooks from the exact modules a package names", () =>
+    Effect.gen(function* () {
+      const report = yield* inTree({ ...hookPackages, "src/List.tsx": exactHooks }, inRepository)
+      expect(printed(report)).toEqual([
+        "out: refs:check OK  every ref is a DOM ref or a callback that stays the same across draws"
+      ])
+    })
+  )
+
   it.effect("refuses each form that once passed: deep props, mapped lists, a module let set again, a false hook", () =>
     Effect.gen(function* () {
       const report = yield* inTree({ "src/List.tsx": hidden }, inRepository)

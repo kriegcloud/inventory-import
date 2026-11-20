@@ -7,7 +7,7 @@ import * as P from "effect/Predicate"
 import * as R from "effect/Record"
 import * as Str from "effect/String"
 import { parseSync } from "oxc-parser"
-import type { RepairLeft } from "../EffectImports.schema.ts"
+import { ImportFault, RepairLeft } from "../EffectImports.schema.ts"
 import {
   canonicalOf,
   type Hit,
@@ -122,7 +122,7 @@ export const judgeCode =
         }))
       }
       return shape(from.value) !== "leaf"
-        ? [{ offset: node.start, fault: { _tag: "ReExport", source: from.value }, inComment: false }]
+        ? [{ offset: node.start, fault: ImportFault.cases.ReExport.make({ source: from.value }), inComment: false }]
         : []
     })
     let dynamic: ReadonlyArray<Hit> = []
@@ -138,7 +138,7 @@ export const judgeCode =
       ) {
         dynamic = A.append(dynamic, {
           offset: node.start,
-          fault: { _tag: "DynamicImport", source: from.value },
+          fault: ImportFault.cases.DynamicImport.make({ source: from.value }),
           inComment: false
         })
       }
@@ -297,7 +297,7 @@ export const repairCode =
     // A module's name must not collide with another module's in the same file.
     const finals = A.map(named, (entry) => entry.final)
     if (A.dedupe(finals).length !== finals.length) {
-      return { text: source, left: [{ _tag: "SharedName" }] }
+      return { text: source, left: [RepairLeft.cases.SharedName.make({})] }
     }
     const moduleOf = (modulePath: string) => A.findFirst(named, (entry) => entry.path === modulePath)
 
@@ -353,11 +353,9 @@ export const repairCode =
       const shorthand = O.exists(parent, (above) => above.type === "Property" && above["shorthand"] === true)
       return [{ start: node.start, end: node.end, replacement: shorthand ? `${name}: ${next}` : next }]
     })
-    const left = A.map(A.dedupe(shadowed), (name): RepairLeft => ({
-      _tag: "DeclaredAgain",
-      name,
-      to: renames[name] ?? name
-    }))
+    const left = A.map(A.dedupe(shadowed), (name): RepairLeft =>
+      RepairLeft.cases.DeclaredAgain.make({ name, to: renames[name] ?? name })
+    )
     // Examples in comments follow the names of the file they sit in.
     const commentEdits = A.isReadonlyArrayNonEmpty(renamed)
       ? A.flatMap(parsed.comments, (comment): ReadonlyArray<Edit> => {
@@ -378,7 +376,7 @@ export const repairCode =
       const before = sorted[index - 1]
       return index > 0 && before !== undefined && edit.end > before.start
     })
-    if (overlapping) return { text: source, left: [{ _tag: "Overlap" }] }
+    if (overlapping) return { text: source, left: [RepairLeft.cases.Overlap.make({})] }
     const edited = A.reduce(
       sorted,
       source,

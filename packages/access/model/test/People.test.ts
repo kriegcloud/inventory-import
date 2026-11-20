@@ -2,6 +2,8 @@
 // scenario runs on D1 through HTTP in the app's People.slow.test.ts.
 import { describe, expect, layer } from "@effect/vitest"
 import { AddPerson, ChangeRole } from "@inventory/access-contract/PeopleCommand"
+import { LastAdmin, PersonNotFound } from "@inventory/access-contract/PeopleRejection"
+import { Forbidden } from "@inventory/kernel/AccessError"
 import { accessMemory } from "@inventory/access-model/Memory"
 import { addPerson, changeRole, listPeople, removePerson } from "@inventory/access-model/PeopleHandler"
 import { recentActivity } from "@inventory/access-model/ActivityHandler"
@@ -21,8 +23,11 @@ import { as, dana, elena, marcus, priya, seed } from "./support.ts"
 const App = Layer.mergeAll(accessMemory(seed), SecureRandom.layerWebCrypto)
 const add = (email: string, role: "viewer" | "editor" | "admin") =>
   Effect.flatMap(S.decodeEffect(AddPerson)({ email, role }), addPerson)
-const tag = <A, E extends { readonly _tag: string }, R>(effect: Effect.Effect<A, E, R>) =>
-  Effect.map(Effect.flip(effect), (error) => error._tag)
+/** Runs `effect`, which must be refused, and expects the refusal to be of `kind`. */
+const refusedAs = <A, E, R>(effect: Effect.Effect<A, E, R>, kind: abstract new (...args: never) => unknown) =>
+  Effect.map(Effect.flip(effect), (error) => {
+    expect(error).toBeInstanceOf(kind)
+  })
 /** Runs `effect` and expects what it answers. */
 const reads = <A, E, R>(effect: Effect.Effect<A, E, R>, expected: unknown) =>
   Effect.map(effect, (answer) => {
@@ -40,8 +45,8 @@ describe("people", () => {
           ["Marcus Oyelaran", "editor", "marcus@example-works.test"],
           ["Priya Raman", "viewer", null]
         ])
-        yield* reads(tag(add("sam@example.test", "editor").pipe(as(priya))), "Forbidden")
-        yield* reads(tag(add("sam@example.test", "editor").pipe(as(marcus))), "Forbidden")
+        yield* refusedAs(add("sam@example.test", "editor").pipe(as(priya)), Forbidden)
+        yield* refusedAs(add("sam@example.test", "editor").pipe(as(marcus)), Forbidden)
 
         // Typed with spaces and capitals, found whatever the case the account was made with.
         const sam = yield* add("  SAM@example.TEST ", "editor").pipe(as(dana), Effect.flatMap(Effect.fromResult))
@@ -75,8 +80,8 @@ describe("people", () => {
       Effect.gen(function* () {
         const role = (role: "viewer" | "editor" | "admin") => ChangeRole.make({ role })
         const self = dana.member.id
-        yield* reads(tag(changeRole({ member: self, command: role("editor") }).pipe(as(dana))), "LastAdmin")
-        yield* reads(tag(removePerson(self).pipe(as(dana))), "LastAdmin")
+        yield* refusedAs(changeRole({ member: self, command: role("editor") }).pipe(as(dana)), LastAdmin)
+        yield* refusedAs(removePerson(self).pipe(as(dana)), LastAdmin)
         // A refused change writes no audit line.
         yield* reads(lines.pipe(as(dana)), [])
         // Asked for the role they have, nothing changes and nothing is recorded.
@@ -90,13 +95,10 @@ describe("people", () => {
         expect(stepped.role).toBe("editor")
         // An admin who has no account does not count: Marcus is now the only admin who can sign in.
         yield* changeRole({ member: priya.member.id, command: role("admin") }).pipe(as(marcus))
-        yield* reads(
-          tag(changeRole({ member: marcus.member.id, command: role("viewer") }).pipe(as(marcus))),
-          "LastAdmin"
-        )
+        yield* refusedAs(changeRole({ member: marcus.member.id, command: role("viewer") }).pipe(as(marcus)), LastAdmin)
 
         // Dana is an editor now and can no longer manage people.
-        yield* reads(tag(removePerson(priya.member.id).pipe(as(dana))), "Forbidden")
+        yield* refusedAs(removePerson(priya.member.id).pipe(as(dana)), Forbidden)
 
         yield* removePerson(self).pipe(as(marcus))
         const left = yield* listPeople().pipe(as(marcus))
@@ -109,7 +111,7 @@ describe("people", () => {
         })
         const refused = yield* O.some(user).pipe(actorOf, Effect.flip)
         expect(refused.reason).toBe("You are no longer a member of that organization.")
-        yield* reads(tag(removePerson(self).pipe(as(marcus))), "PersonNotFound")
+        yield* refusedAs(removePerson(self).pipe(as(marcus)), PersonNotFound)
         yield* reads(lines.pipe(as(marcus)), [
           "Removed a person: Dana Whitfield (editor)",
           "Changed a role: Priya Raman: viewer to admin",

@@ -4,10 +4,9 @@ import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
 import * as HashMap from "effect/HashMap"
 import * as HashSet from "effect/HashSet"
 import * as O from "effect/Option"
-import { useAtom, useAtomValue } from "@effect/atom-react"
+import { useAtom, useAtomSubscribe, useAtomValue } from "@effect/atom-react"
 import * as ScopedAtom from "@effect/atom-react/ScopedAtom"
 import * as Atom from "effect/reactivity/Atom"
-import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import { Fragment, type ReactNode } from "react"
 import { type Region, RegionScope, TableScope } from "../ReviewRegion.atoms.ts"
 import { Button } from "@inventory/ui/components/button"
@@ -56,8 +55,11 @@ const isCellMarkProposed = CellMark.$is("Proposed")
 
 const page = 30
 
-/** Where one queue is: the card shown, how many rows of a plain list are drawn, and the card focus last went to. */
-type Place = { readonly at: number; readonly shown: number; readonly seen: O.Option<string> }
+/** Where one queue is: the card shown, and how many rows of a plain list are drawn. */
+type Place = { readonly at: number; readonly shown: number }
+
+/** The card on screen: what names its decision, and whether it has just taken another card's place. */
+type Card = { readonly key: string; readonly moved: boolean }
 
 /** What one queue holds and works out from the region it is in. */
 interface Queue {
@@ -66,37 +68,48 @@ interface Queue {
   readonly decisions: Atom.Atom<ReturnType<typeof queue>>
   /** The column labels by id. */
   readonly labels: Atom.Atom<HashMap.HashMap<string, string>>
+  /** The card on screen. `moved` is true when it took another card's place: after a decision, or a step along. */
+  readonly card: Atom.Atom<Card>
   /**
-   * For the card on screen, keyed by its decision: after a decision the next card takes its place, and focus goes to
-   * its first button. Not for the first card the queue shows, nor for the same card shown again.
+   * For `card`: once a card that took another's place is drawn, focus goes to its first button. Not for the first
+   * card the queue shows, nor for a card that is still the one on screen.
    */
-  readonly arrived: (node: HTMLElement | null) => void
+  readonly focusCard: (now: Card) => void
 }
 
-const makeQueue = (region: Region, registry: AtomRegistry.AtomRegistry): Queue => {
-  const place = Atom.make<Place>({ at: 0, shown: page, seen: O.none() })
+const makeQueue = (region: Region): Queue => {
+  const place = Atom.make<Place>({ at: 0, shown: page })
   const split = Atom.map(region.ui, (now) => now.split)
+  const decisions = Atom.readable((get) =>
+    queue({ views: get(region.views), split: get(split), blocked: get(region.filter) === "cannot" })
+  )
   return {
     place,
-    decisions: Atom.readable((get) =>
-      queue({ views: get(region.views), split: get(split), blocked: get(region.filter) === "cannot" })
-    ),
+    decisions,
     labels: Atom.map(region.input.columns, (columns) =>
       HashMap.fromIterable(columns.map((column) => [column.id, column.label] as const))
     ),
-    arrived: (node) => {
-      const key = node?.dataset.card
-      if (node === null || key === undefined) return
-      const seen = registry.get(place).seen
-      if (O.contains(seen, key)) return
-      registry.update(place, (before) => ({ ...before, seen: O.some(key) }))
-      if (O.isSome(seen)) node.querySelector<HTMLElement>("[data-first-action]")?.focus()
+    card: Atom.readable((get): Card => {
+      const list = get(decisions)
+      const shown = list[Math.min(get(place).at, Math.max(0, list.length - 1))]
+      const now = shown === undefined ? "" : cardKey(shown)
+      const before = get.self<Card>()
+      return { key: now, moved: now !== "" && O.exists(before, (was) => was.key !== "" && was.key !== now) }
+    }),
+    // The atoms change before the card is drawn: the focus is put there a frame later, when it is on screen.
+    focusCard: (now) => {
+      if (!now.moved) return
+      requestAnimationFrame(() =>
+        document
+          .querySelector<HTMLElement>(`[data-review-region="${CSS.escape(region.id)}"] [data-card] [data-first-action]`)
+          ?.focus()
+      )
     }
   }
 }
 
 /** One queue's atoms, made when it is first drawn from the region it is in. */
-const QueueScope = ScopedAtom.make((region: Region) => Atom.readable((get) => makeQueue(region, get.registry)))
+const QueueScope = ScopedAtom.make((region: Region) => Atom.make(makeQueue(region)))
 
 /**
  * How far through the decisions the person is: how many are done and how many there are in all. More can need the
@@ -546,7 +559,9 @@ function QueueBody(props: QueueProps & { region: Region }) {
   const groupActions = table.groupActions
   const index = Math.min(at, Math.max(0, decisions.length - 1))
   const entry = decisions[index]
-  const key = entry === undefined ? "" : cardKey(entry)
+  const key = useAtomValue(queueOf.card).key
+  // After a decision the next card takes the decided one's place, and focus goes to its first button.
+  useAtomSubscribe(queueOf.card, queueOf.focusCard)
   const nameColumn = columns[0]
 
   if (props.loading) {
@@ -661,7 +676,7 @@ function QueueBody(props: QueueProps & { region: Region }) {
             className="h-1"
           />
           {/* Keyed by the decision, so the card that takes a decided one's place is a new node. */}
-          <div key={key} data-card={key} ref={queueOf.arrived} className="contents">
+          <div key={key} data-card={key} className="contents">
             <Decision
               entry={entry}
               columns={columns}

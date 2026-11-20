@@ -2,7 +2,9 @@
 // person acts; the request goes once per press (retried only for a failure that may pass, with the press's own key, so
 // a repeat is the same write); a second press never interrupts the first; a refused change is taken back the moment
 // it is refused, beside the sentence that says why, while any other change still on its way keeps showing; when the
-// last write in flight has answered, what they changed is read again once, so the screen ends at the server's word.
+// last write in flight has answered, what they changed is read again once, so the screen ends at the server's word;
+// and a write that answers for somebody who is no longer the one signed in (another account, another organization)
+// only takes its change off: nothing on the screen that is there now is read again, let go or told for it.
 // A write whose outcome only the server knows (lines it checks one by one, a take-back, a model's answer) is not
 // written here: it shows its progress instead.
 //
@@ -21,6 +23,7 @@ import * as Atom from "effect/reactivity/Atom"
 import * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import type * as Reactivity from "effect/reactivity/Reactivity"
 import { apiRuntime, invalidate } from "@inventory/client/Api"
+import { memberKey } from "@inventory/client/MemberAtoms"
 import { toastError } from "@inventory/client/SayError"
 
 /** One change on its way to the server, as it shows on a read: which press made it, and what it does to the value. */
@@ -146,21 +149,38 @@ const readAgain = (
 export const optimisticWrite = <Input, A, E, R>(
   spec: OptimisticWrite<Input, A, E, R>
 ): Atom.AtomResultFn<Input, A, E> => {
-  // The presses of this write on their way, and those already saved, in the registry: a new registry starts empty.
+  // The presses of this write on their way, and those already saved (each with who was signed in when it was
+  // pressed), in the registry: a new registry starts empty.
   const inFlight = Atom.make(0).pipe(Atom.keepAlive)
-  const saved = Atom.make<ReadonlyArray<number>>([]).pipe(Atom.keepAlive)
+  const saved = Atom.make<ReadonlyArray<{ readonly press: number; readonly member: string }>>([]).pipe(Atom.keepAlive)
   const refusals = Atom.make(0).pipe(Atom.keepAlive)
   return apiRuntime.fn<Input>()(
     Effect.fnUntraced(function* (input: Input) {
       const registry = yield* AtomRegistry.AtomRegistry
       registry.update(pressCount, (n) => n + 1)
       const press = registry.get(pressCount)
+      // Who the press is for: the request carries no name, the session does.
+      const pressedAs = registry.get(memberKey)
       registry.update(inFlight, (n) => n + 1)
       for (const change of spec.changes) change.put(registry, press, input)
       const exit = yield* Effect.exit(spec.send(input))
       registry.update(inFlight, (n) => n - 1)
-      if (Exit.isSuccess(exit)) {
-        registry.update(saved, A.append(press))
+      // The press runs to its end whatever happens to the screen that made it. When somebody else is signed in by
+      // then (the person signed in as another account, or switched organization), the reads on screen are theirs:
+      // reading them again here would ask with the new session and keep its answer under the old member.
+      const signedIn = registry.get(memberKey)
+      const left = signedIn !== pressedAs
+      if (left) {
+        for (const change of spec.changes) change.takeOff(registry, [press])
+        if (Exit.isFailure(exit)) {
+          // Still said: the change was theirs, and it was not saved.
+          toastError(
+            O.getOrElse(Cause.findErrorOption(exit.cause), () => Cause.squash(exit.cause)),
+            { lead: spec.failed(input) }
+          )
+        }
+      } else if (Exit.isSuccess(exit)) {
+        registry.update(saved, A.append({ press, member: pressedAs }))
         spec.onAnswer?.(exit.value, input, registry)
       } else {
         // Taken back at once: the other changes still on their way keep showing.
@@ -180,19 +200,26 @@ export const optimisticWrite = <Input, A, E, R>(
       }
       if (registry.get(inFlight) === 0) {
         // The last write has answered: read what they changed again once, then drop the saved changes, which the
-        // fresh read now holds.
+        // fresh read now holds. Only what was saved for whoever is signed in now is read again: a change saved for
+        // somebody who has left is dropped unread.
         const done = registry.get(saved)
+        const mine = A.filter(done, (one) => one.member === signedIn)
         const refused = registry.get(refusals)
         registry.set(saved, [])
         registry.set(refusals, 0)
-        if (done.length > 0 || (spec.readAgainAfterRefusal === true && refused > 0)) {
+        if (mine.length > 0 || (spec.readAgainAfterRefusal === true && refused > 0 && !left)) {
           yield* Effect.forEach(spec.changes, (change) => readAgain(registry, change.source), {
             concurrency: "unbounded",
             discard: true
           })
-          for (const change of spec.changes) change.takeOff(registry, done)
         }
-        if (spec.settled !== undefined) invalidate(spec.settled)
+        for (const change of spec.changes) {
+          change.takeOff(
+            registry,
+            A.map(done, (one) => one.press)
+          )
+        }
+        if (spec.settled !== undefined && (mine.length > 0 || !left)) invalidate(spec.settled)
       }
       return yield* exit
     }, Effect.uninterruptible),

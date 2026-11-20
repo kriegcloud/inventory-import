@@ -1,10 +1,16 @@
 import * as O from "effect/Option"
 import { PencilIcon } from "lucide-react"
 import { useAtom, useAtomSet, useAtomValue } from "@effect/atom-react"
+import * as A from "effect/Array"
 import * as Cause from "effect/Cause"
+import * as Effect from "effect/Effect"
+import * as HashMap from "effect/HashMap"
+import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as Atom from "effect/reactivity/Atom"
+import * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import { useId } from "react"
 import { toast } from "sonner"
+import { navigate } from "@inventory/ui/Route"
 import { Code } from "@inventory/ui/Code"
 import { NotSet } from "@inventory/ui/NotSet"
 import { Alert, AlertDescription, AlertTitle } from "@inventory/ui/components/alert"
@@ -65,7 +71,7 @@ const withEdit = (item: StoredItem, edit: ItemEdit): StoredItem => {
 /** Every fetched page of items, with `item` in place of the row that has its id. */
 const putItem = (page: ItemPage, item: StoredItem): ItemPage => ({
   ...page,
-  data: page.data.map((row) => (row.id === item.id ? item : row))
+  data: A.map(page.data, (row) => (row.id === item.id ? item : row))
 })
 
 /** `ItemChanged`: someone saved this item between the person opening it and saving it. */
@@ -132,19 +138,87 @@ interface EditorState {
   readonly notice: string | null
 }
 
+/** An editor nobody has opened. */
+const closedEditor: EditorState = { open: false, base: O.none(), form: O.none(), problems: {}, notice: null }
+
 /**
- * Each item's editor, let go with its row: held weakly (`Atom.family`), since a person can page through thousands of
- * items and each one drawn would otherwise leave its atoms behind for the page's life.
+ * The editors that are open, by item. Kept for the page's life, and small: an editor is in it only while its dialog
+ * is open. A save outlives the row that pressed it (the person pages on, or opens another screen), so "Edit again"
+ * on a save that failed must find its editor whether or not the row is drawn; held with the row, it was gone.
  */
-const itemEditor = Atom.family((_id: string) =>
-  Atom.make<EditorState>({ open: false, base: O.none(), form: O.none(), problems: {}, notice: null })
+const openEditors = Atom.make(HashMap.empty<string, EditorState>()).pipe(Atom.keepAlive)
+
+/** One item's editor: closed with nothing in it until it is opened, and again once it is closed. */
+export const itemEditor = Atom.family((id: string) =>
+  Atom.writable(
+    (get) => O.getOrElse(HashMap.get(get(openEditors), id), () => closedEditor),
+    (ctx, next: EditorState) =>
+      ctx.set(
+        openEditors,
+        next.open ? HashMap.set(ctx.get(openEditors), id, next) : HashMap.remove(ctx.get(openEditors), id)
+      )
+  )
 )
 
-/** One save of an item: the item as the person saw it (its revision) and the change. */
-interface ItemSave {
+/**
+ * The items with a save on its way, each with how many. Kept for the page's life: a save runs to its end after the
+ * row that pressed it has left, and the row that comes back must still read it as out, or it would offer Edit on
+ * the revision the first save is about to move.
+ */
+const savesOut = Atom.make(HashMap.empty<string, number>()).pipe(Atom.keepAlive)
+
+/** True while a save of this item is on its way, wherever it was pressed from. */
+export const saveOut = Atom.family((id: string) => Atom.map(savesOut, HashMap.has(id)))
+
+/** One save of an item: the item as the person saw it (its revision), the change, and the form as they typed it. */
+export interface ItemSave {
   readonly base: StoredItem
   readonly edit: ItemEdit
+  readonly form: ItemForm
 }
+
+/** Where the Items table is, and how its address names a search. */
+const itemsAddress = "/items"
+
+/**
+ * "Edit again" on a save that was not kept: the editor opens with what the person typed, on the item as it stands
+ * (`base`). When the item's row is not on screen (they paged on, or opened another screen meanwhile) they are taken
+ * to it: the Items table, searched for its SKU.
+ */
+const editAgain =
+  (input: {
+    readonly registry: AtomRegistry.AtomRegistry
+    readonly save: ItemSave
+    readonly base: StoredItem
+    readonly notice: string | null
+  }) =>
+  (): void => {
+    const { base, notice, registry, save } = input
+    registry.set(itemEditor(base.id), {
+      open: true,
+      base: O.some(base),
+      form: O.some(save.form),
+      problems: {},
+      notice
+    })
+    const drawn = document.querySelector(`[data-edit-item="${CSS.escape(base.id)}"]`) !== null
+    if (!drawn) navigate(`${itemsAddress}?search=${encodeURIComponent(base.sku)}`)
+  }
+
+/** The request that saves one item, counted as out from when it is sent until it has answered or failed. */
+const sendEdit = (id: StoredItem["id"]) =>
+  Effect.fnUntraced(function* (save: ItemSave) {
+    const registry = yield* AtomRegistry.AtomRegistry
+    const count = (by: number) =>
+      registry.update(savesOut, (out) => {
+        const next = O.getOrElse(HashMap.get(out, id), () => 0) + by
+        return next > 0 ? HashMap.set(out, id, next) : HashMap.remove(out, id)
+      })
+    count(1)
+    return yield* catalogApi
+      .send((api) => api.items.edit({ params: { id }, payload: save.edit }))
+      .pipe(Effect.ensuring(Effect.sync(() => count(-1))))
+  })
 
 /**
  * Saving one item. Optimistic: the row shows the new values at once, and a refusal takes them back with the reason,
@@ -152,37 +226,39 @@ interface ItemSave {
  * back), the filters' values and the audit trail are asked again. Someone else's save in between is shown, not
  * overwritten: the table shows their values and the form keeps the person's, on their revision.
  */
-const editItem = Atom.family((id: StoredItem["id"]) =>
+export const editItem = Atom.family((id: StoredItem["id"]) =>
   optimisticWrite({
-    send: (save: ItemSave) => catalogApi.send((api) => api.items.edit({ params: { id }, payload: save.edit })),
+    send: sendEdit(id),
     changes: [
       optimisticChange(itemsPage, (page: ItemPage, save: ItemSave) => {
-        const row = page.data.find((entry) => entry.id === id)
-        return row === undefined ? page : putItem(page, withEdit(row, save.edit))
+        const row = A.findFirst(page.data, (entry) => entry.id === id)
+        return O.match(row, { onNone: () => page, onSome: (found) => putItem(page, withEdit(found, save.edit)) })
       })
     ],
     failed: (save) => `${save.base.name} was not saved.`,
-    // The form still holds what the person typed: open it again rather than make them type it again.
-    retry: (_save, registry) => ({
+    // The press carries what the person typed: the editor opens on it again rather than make them type it again.
+    retry: (save, registry) => ({
       label: "Edit again",
-      onClick: () => registry.update(itemEditor(id), (now) => ({ ...now, open: true }))
+      onClick: editAgain({ registry, save, base: save.base, notice: null })
     }),
     settled: [...catalogKeys.imports, ...catalogKeys.itemFacets, ...catalogKeys.activity],
     onAnswer: (saved, _save, registry) => {
-      registry.update(itemEditor(id), (now) => ({ ...now, base: O.some(saved) }))
+      // An editor still open on this item (opened again meanwhile) is now on the saved revision.
+      if (registry.get(itemEditor(id)).open) {
+        registry.set(itemEditor(id), { ...registry.get(itemEditor(id)), base: O.some(saved) })
+      }
       toast.success(`Saved ${saved.sku}`)
     },
-    onRefused: (error, _save, registry) => {
+    onRefused: (error, save, registry) => {
       const now = changedMeanwhile(error)
       if (now === undefined) return false
       // Their values in the table; the person's in the form, on their revision.
       invalidate(catalogKeys.items)
-      registry.update(itemEditor(id), (held) => ({ ...held, base: O.some(now), notice: sayError(error).sentence }))
       toast.error("Changed by someone else", {
         description: `${now.name} was changed by someone else just before you saved, so your change was not saved. Their values are showing.`,
         action: {
           label: "Edit again",
-          onClick: () => registry.update(itemEditor(id), (held) => ({ ...held, open: true }))
+          onClick: editAgain({ registry, save, base: now, notice: sayError(error).sentence })
         }
       })
       return true
@@ -223,8 +299,9 @@ export function ItemEditor(props: {
   const set = <K extends keyof ItemForm>(key: K, value: ItemForm[K]) =>
     setEditor((now) => ({ ...now, form: O.some({ ...O.getOrElse(now.form, () => formOf(props.item)), [key]: value }) }))
   const saveResult = useAtomValue(editItem(itemId))
-  const saving = saveResult.waiting
-  const saveError = saveResult._tag === "Failure" && !saving ? saveResult.cause.pipe(Cause.squash) : null
+  // Read from what outlives the row: a save pressed before the row left and came back is still out.
+  const saving = useAtomValue(saveOut(itemId))
+  const saveError = AsyncResult.isFailure(saveResult) && !saving ? saveResult.cause.pipe(Cause.squash) : null
   const save = useAtomSet(editItem(itemId))
 
   const submit = () => {
@@ -235,7 +312,7 @@ export function ItemEditor(props: {
     }
     // Optimistic: the row shows the new values now; the dialog closes without waiting for the server.
     setEditor((now) => ({ ...now, notice: null, problems: {}, open: false }))
-    save({ base, edit: read.edit })
+    save({ base, edit: read.edit, form })
   }
 
   const invalid = (key: keyof ItemFormProblems) => (problems[key] === undefined ? {} : { "aria-invalid": true })
@@ -259,11 +336,17 @@ export function ItemEditor(props: {
       {/* While a save is on its way the row already shows it; the next edit waits for the server's answer. */}
       <DialogTrigger asChild>
         {props.trigger === "button" ? (
-          <Button variant="outline" size="touch" disabled={saving}>
+          <Button variant="outline" size="touch" disabled={saving} data-edit-item={itemId}>
             Edit<span className="sr-only"> {props.item.name}</span>
           </Button>
         ) : (
-          <Button variant="ghost" size="icon-xs" title={`Edit ${props.item.name}`} disabled={saving}>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            title={`Edit ${props.item.name}`}
+            disabled={saving}
+            data-edit-item={itemId}
+          >
             <PencilIcon aria-hidden />
             <span className="sr-only">Edit {props.item.name}</span>
           </Button>

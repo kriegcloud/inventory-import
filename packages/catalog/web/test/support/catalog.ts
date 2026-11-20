@@ -4,6 +4,7 @@ import * as Layer from "effect/Layer"
 import * as Str from "effect/String"
 import * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import { provideApi } from "@inventory/client/Api"
+import { provideMember } from "@inventory/client/MemberAtoms"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import type { ImportView } from "@inventory/catalog-contract/Import"
 import * as Effect from "effect/Effect"
@@ -16,15 +17,29 @@ import {
 
 /**
  * A registry whose catalog client answers with `endpoints`; the calls made outside atoms (the review's saver) reach
- * the same stand-in.
+ * the same stand-in. With `idleTTL`, it keeps an atom nobody reads for that long, as the app's does for 400 ms; with
+ * `signedIn`, the member is read from that atom, as the app reads it from the session.
  */
-export const registryWith = (endpoints: object): AtomRegistry.AtomRegistry => {
+export const registryFor = (input: {
+  readonly endpoints: object
+  readonly idleTTL?: number
+  readonly signedIn?: Parameters<typeof provideMember>[0]
+}): AtomRegistry.AtomRegistry => {
   // The stand-in holds only the endpoints the test calls: the rest of the client is never reached.
-  const client = endpoints as CatalogApiClient
+  const client = input.endpoints as CatalogApiClient
   const run: CatalogBinding["call"] = (use) => Effect.runPromise(use(client))
   configureCatalog({ call: run, callWrite: run } as CatalogBinding)
-  return AtomRegistry.make({ initialValues: [provideApi(Layer.succeed(CatalogClient, client))] })
+  return AtomRegistry.make({
+    initialValues: [
+      provideApi(Layer.succeed(CatalogClient, client)),
+      ...(input.signedIn === undefined ? [] : [provideMember(input.signedIn)])
+    ],
+    ...(input.idleTTL === undefined ? {} : { defaultIdleTTL: input.idleTTL })
+  })
 }
+
+/** A registry whose catalog client answers with `endpoints`, which lets an atom go the moment nobody reads it. */
+export const registryWith = (endpoints: object): AtomRegistry.AtomRegistry => registryFor({ endpoints })
 
 /** The id an import has when a test needs only one. */
 export const importId = "00000000-0000-4000-8000-000000000001" as ImportId

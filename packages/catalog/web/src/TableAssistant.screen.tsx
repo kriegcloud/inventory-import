@@ -1,10 +1,11 @@
 import { stringify } from "@inventory/ui/Json"
 import { ArrowUp, ChevronRight, MessageSquarePlus, Sparkles, Undo2, X } from "lucide-react"
-import { useAtom, useAtomSet } from "@effect/atom-react"
+import { useAtom, useAtomMount, useAtomSet, useAtomSubscribe } from "@effect/atom-react"
 import * as Cause from "effect/Cause"
 import * as Exit from "effect/Exit"
 import * as O from "effect/Option"
 import * as Atom from "effect/reactivity/Atom"
+import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import { type FormEvent, useRef } from "react"
 import * as Clock from "effect/Clock"
 import * as Effect from "effect/Effect"
@@ -14,7 +15,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@inventory/
 import { Input } from "@inventory/ui/components/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@inventory/ui/components/popover"
 import { Spinner } from "@inventory/ui/components/spinner"
-import { member } from "@inventory/client/MemberAtoms"
+import { member, memberKey } from "@inventory/client/MemberAtoms"
 import { apiRuntime, perKey } from "@inventory/client/Api"
 import { useAtomValue } from "@effect/atom-react"
 import { catalogApi } from "./Catalog.runtime.ts"
@@ -114,14 +115,82 @@ const conversationOf = perKey((key: string) =>
 /** The conversation while nobody is known yet: nothing to keep. */
 const noConversation = Atom.make<Conversation>(emptyConversation)
 
-/** One table's assistant on screen: open or not, what is typed, and the request on its way. */
+/** One table's assistant on screen: open or not, and what is typed. */
 const assistantOf = perKey((_table: string) =>
-  Atom.make<{ readonly open: boolean; readonly prompt: string; readonly pending: O.Option<string> }>({
-    open: false,
-    prompt: "",
-    pending: O.none()
-  })
+  Atom.make<{ readonly open: boolean; readonly prompt: string }>({ open: false, prompt: "" })
 )
+
+/**
+ * The request on its way for one person's conversation about one table: what they asked. Kept while it is out, since
+ * the request outlives the screen: a person who leaves the table and comes back before the answer still reads
+ * "Working", and cannot ask a second time.
+ */
+const assistantPending = perKey((_conversation: string) => Atom.make<O.Option<string>>(O.none()).pipe(Atom.keepAlive))
+const noPending = Atom.make<O.Option<string>>(O.none())
+
+/** A drawing of one table's assistant: another number each time the assistant comes on screen. */
+export type AssistantScreen = { readonly table: string; readonly drawing: number }
+
+/** Counts the drawings of every assistant, so no two are the same. */
+const drawings = Atom.make(0).pipe(Atom.keepAlive)
+
+/** Which drawing of a table's assistant is on screen now; none while it is not drawn. */
+export const assistantScreen = perKey((_table: string) =>
+  Atom.make<O.Option<AssistantScreen>>(O.none()).pipe(Atom.keepAlive)
+)
+
+/**
+ * Mounted while a table's assistant is drawn: names this drawing as the one on screen, and takes that back the moment
+ * it leaves (no idle time: an answer that lands just after must not find the screen it left).
+ */
+export const assistantPresent = perKey((table: string) =>
+  Atom.setIdleTTL(
+    Atom.readable((get) => {
+      const registry = get.registry
+      registry.update(drawings, (n) => n + 1)
+      const drawing = registry.get(drawings)
+      registry.set(assistantScreen(table), O.some({ table, drawing }))
+      get.addFinalizer(() =>
+        registry.update(assistantScreen(table), (now) =>
+          O.exists(now, (drawn) => drawn.drawing === drawing) ? O.none() : now
+        )
+      )
+    }),
+    0
+  )
+)
+
+/** Where a request was asked from: who was signed in to which organization, and which drawing of the assistant. */
+export interface AskedFrom {
+  readonly member: string
+  readonly screen: O.Option<AssistantScreen>
+}
+
+/** Where a request asked now would be asked from. */
+export const askingFrom = (registry: AtomRegistry.AtomRegistry, table: string): AskedFrom => ({
+  member: registry.get(memberKey),
+  screen: registry.get(assistantScreen(table))
+})
+
+/**
+ * True when an answer may still change the table: the same person is signed in to the same organization, and the
+ * drawing of the assistant that asked is still the one on screen. The path alone does not say so: the person may have
+ * left the table and come back to a fresh view of it, or switched organization without leaving the address.
+ */
+export const stillAsked = (input: {
+  readonly registry: AtomRegistry.AtomRegistry
+  readonly table: string
+  readonly asked: AskedFrom
+}): boolean => {
+  const now = askingFrom(input.registry, input.table)
+  return (
+    now.member === input.asked.member &&
+    O.exists(now.screen, (here) => O.exists(input.asked.screen, (asked) => asked.drawing === here.drawing))
+  )
+}
+
+/** The registry these atoms live in, for what answers after the draw that asked. */
+const registryOf = Atom.readable((get) => get.registry)
 
 /** What the assistant is asked: the words, the table, its columns, and whether it can be searched. */
 interface Asked {
@@ -136,11 +205,32 @@ const askAssistant = apiRuntime.fn<Asked>()((asked: Asked) =>
   catalogApi.ask((api) => api.assistant.view({ payload: asked }))
 )
 
+/** Where one table's conversation ends now: a new value when it has a new last line. */
+type LastLine = { readonly table: string; readonly line: string }
+
 /**
- * Brings the newest line of the conversation into view. One function for the page's life: React calls a ref callback
- * again only when it, or its element, is new, and the element's key is what says "a line was added".
+ * What says the conversation about one table has a new last line: a line was added, a request started or ended, or
+ * the panel opened. One atom per table and conversation.
  */
-const intoView = (node: HTMLElement | null): void => node?.scrollIntoView({ block: "nearest" })
+const lastLine = perKey((table: string) =>
+  perKey((conversation: string) =>
+    Atom.withEquality(
+      Atom.readable((get): LastLine => ({
+        table,
+        line: `${get(conversationOf(conversation)).entries.length}:${O.getOrElse(get(assistantPending(conversation)), () => "")}:${get(assistantOf(table)).open}`
+      })),
+      (before, next) => before.line === next.line
+    )
+  )
+)
+const noLine: Atom.Atom<LastLine> = Atom.make<LastLine>({ table: "", line: "" })
+
+/** For `lastLine`: brings the newest line of that table's conversation into view, a frame later, when it is drawn. */
+const bringNewest = (now: LastLine): void => {
+  requestAnimationFrame(() =>
+    document.querySelector(`[data-assistant-end="${CSS.escape(now.table)}"]`)?.scrollIntoView({ block: "nearest" })
+  )
+}
 
 /**
  * The person types what they want to see in a table; the assistant changes the table's sort, filters and columns, and
@@ -161,45 +251,59 @@ export function TableAssistant(props: {
     actor === undefined
       ? undefined
       : conversationKey({ organizationId: actor.organizationId, memberId: actor.id }, props.name)
-  const [conversation, save] = useAtom(key === undefined ? noConversation : conversationOf(key))
+  const conversationAtom = key === undefined ? noConversation : conversationOf(key)
+  const [conversation, save] = useAtom(conversationAtom)
   const [ui, setUi] = useAtom(assistantOf(props.name))
   const { open, prompt } = ui
-  const pending = O.getOrNull(ui.pending)
+  const [out, setOut] = useAtom(key === undefined ? noPending : assistantPending(key))
+  const pending = O.getOrNull(out)
+  const registry = useAtomValue(registryOf)
+  // This drawing of the assistant is the one on screen for as long as it is mounted.
+  useAtomMount(assistantPresent(props.name))
+  // The newest line is brought into view when it arrives.
+  useAtomSubscribe(key === undefined ? noLine : lastLine(props.name)(key), bringNewest)
   const setOpen = (next: boolean) => setUi((now) => ({ ...now, open: next }))
   const setPrompt = (next: string) => setUi((now) => ({ ...now, prompt: next }))
   const view = useTableView(props.table, props.searchable)
   const promptField = useRef<HTMLInputElement>(null)
   const ask = useAtomSet(askAssistant, { mode: "promiseExit" })
 
-  const record = (entry: Entry, visibility: Readonly<Record<string, boolean>>) =>
-    save({ ...conversation, entries: [...conversation.entries, entry], visibility: { ...visibility } })
+  // Added to the conversation as it stands when the answer lands, not as it stood when the question was asked.
+  const record = (entry: Entry, visibility?: Readonly<Record<string, boolean>>) => {
+    const now = registry.get(conversationAtom)
+    registry.set(conversationAtom, {
+      ...now,
+      entries: [...now.entries, entry],
+      visibility: { ...(visibility ?? now.visibility) }
+    })
+  }
 
   const send = (words: string) => {
     const typed = words.trim()
     if (typed === "" || pending !== null) return
-    setUi((now) => ({ ...now, prompt: "", pending: O.some(typed) }))
+    setUi((now) => ({ ...now, prompt: "" }))
+    setOut(O.some(typed))
     const id = `${Effect.runSync(Clock.currentTimeMillis)}`
-    // The page the table is on: an answer that arrives after the person has left it changes nothing.
-    const askedOn = window.location.pathname
+    // Who asked, and from which drawing of this table's assistant: an answer that arrives after the person has left
+    // it (another screen, the same table opened again, another organization) changes nothing.
+    const asked = askingFrom(registry, props.name)
     void ask({ prompt: typed, table: props.name, columns: props.columns, searchable: props.searchable }).then(
       (exit) => {
-        setUi((now) => ({ ...now, pending: O.none() }))
-        if (window.location.pathname !== askedOn) {
-          // The request outlives the screen. Applied now, the view would be written into the address of the page the
-          // person is on, and the conversation would list changes the table never showed.
-          record(
-            {
-              id,
-              prompt: typed,
-              outcome: "failed",
-              answeredBy: null,
-              note: null,
-              reason: `The answer came after you left ${props.name}, so nothing was changed. Ask again.`,
-              applied: [],
-              undone: false
-            },
-            view.read().visibility
-          )
+        setOut(O.none())
+        if (!stillAsked({ registry, table: props.name, asked })) {
+          // The request outlives the screen. Applied now, the view would be written through the table the person
+          // left into the address of whatever they are on, and the conversation would list changes the table never
+          // showed.
+          record({
+            id,
+            prompt: typed,
+            outcome: "failed",
+            answeredBy: null,
+            note: null,
+            reason: `The answer came after you left ${props.name}, so nothing was changed. Ask again.`,
+            applied: [],
+            undone: false
+          })
           return
         }
         if (Exit.isFailure(exit)) {
@@ -449,9 +553,8 @@ export function TableAssistant(props: {
               </li>
             )}
           </ol>
-          {/* The newest line is brought into view when it arrives: the key makes the element anew when a line is
-              added, a request starts or ends, or the panel opens, and only then is `intoView` called. */}
-          <div key={`${conversation.entries.length}:${pending ?? ""}:${open}`} ref={intoView} />
+          {/* Where the conversation ends: brought into view when a line arrives (`lastLine`). */}
+          <div data-assistant-end={props.name} />
         </div>
         <div className="flex flex-col gap-2 border-t pt-2">
           <form className="flex gap-2" onSubmit={submit}>

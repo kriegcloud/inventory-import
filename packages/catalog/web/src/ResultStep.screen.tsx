@@ -3,7 +3,6 @@ import * as A from "effect/Array"
 import * as Cause from "effect/Cause"
 import * as Exit from "effect/Exit"
 import * as O from "effect/Option"
-import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as Atom from "effect/reactivity/Atom"
 import { toast } from "sonner"
 import { Code } from "@inventory/ui/Code"
@@ -24,7 +23,7 @@ import { Button } from "@inventory/ui/components/button"
 import { type RecordColumn, RecordsTable } from "@inventory/ui/components/data-table/data-table-records"
 import { whenShort } from "@inventory/ui/Dates"
 import { importView, reopenImport, takeBackImport } from "./Imports.atoms.ts"
-import { invalidate, perKey } from "@inventory/client/Api"
+import { answerOf, invalidate, perKey } from "@inventory/client/Api"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import { navigate } from "@inventory/ui/Route"
 import { importAddress } from "./internal/route.ts"
@@ -137,13 +136,20 @@ const filterOf = (input: {
 
 const noResultRows: ImportResult["rows"] = []
 
+/**
+ * One import as the server last answered it, not the read itself: the read is a new object when it starts asking
+ * again and another when it has answered (every return to the tab asks again), and the rows would be filtered, and
+ * the table worked out, for each. From the answer they are worked out once per answer.
+ */
+const viewAnswer = perKey((id: ImportId) => answerOf(importView(id)))
+
 /** The rows the view on screen shows: the same rows while the result and the view are the same, so the table keeps its state. */
-const shownRows = perKey((id: ImportId) =>
+export const shownRows = perKey((id: ImportId) =>
   Atom.readable((get): ImportResult["rows"] => {
-    const view = get(importView(id)).pipe(AsyncResult.value)
-    if (O.isNone(view) || O.isNone(view.value.result)) return noResultRows
-    const result = view.value.result.value
-    const filter = filterOf({ view: view.value, result, chosen: get(chosenFilter(id)) })
+    const view = get(viewAnswer(id))
+    if (view === undefined || O.isNone(view.result)) return noResultRows
+    const result = view.result.value
+    const filter = filterOf({ view, result, chosen: get(chosenFilter(id)) })
     return A.filter(result.rows, (row) => filter === "all" || row.outcome === filter)
   })
 )

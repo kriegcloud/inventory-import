@@ -25,7 +25,9 @@ import {
   reviewInput,
   reviewLocal,
   reviewState,
-  shownDecisions
+  reviewStateAt,
+  shownDecisions,
+  whileCurrent
 } from "../src/ReviewDraft.atoms.ts"
 import { importNo, registryWith, viewAt } from "./support/catalog.ts"
 
@@ -384,6 +386,51 @@ describe("the region's decisions for one import", () => {
       yield* settle
       expect(t.deltas()[1]).toEqual({ set: {}, clear: ["row-2"] })
       expect(t.shown()).toEqual({ "row-7": kept })
+    })
+  )
+
+  it.live("of a region about to be drawn again from a newer draft are not handed to it first", () =>
+    Effect.gen(function* () {
+      const id = importNo(42)
+      const t = world(id)
+      t.give(t.at({ revision: 10, decisions: { "row-1": out } }))
+      t.open()
+      yield* settle
+      const epoch = t.epoch()
+      // What the region drawn at this epoch is given: its decisions, and something worked out from the draft (as
+      // its rows are), each counted when it is worked out again.
+      const mine = reviewStateAt(id)(epoch)
+      const rows = whileCurrent({ id, epoch, source: shownDecisions(id) })
+      let worked = 0
+      t.registry.subscribe(mine, () => (worked += 1))
+      t.registry.subscribe(rows, () => (worked += 1))
+      const before = [t.registry.get(mine), t.registry.get(rows)]
+
+      // Somebody else left another row out: the draft is newer, and the region is to be drawn again from it.
+      t.give(t.at({ revision: 12, decisions: { "row-1": out, "row-5": out } }))
+      yield* settle
+      expect(t.epoch()).toBe(epoch + 1)
+      // The region on its way out holds what it had: every row of it is not worked out again only to leave.
+      expect([t.registry.get(mine), t.registry.get(rows)]).toEqual(before)
+      expect(t.registry.get(mine)).toBe(before[0])
+      expect(worked).toBe(0)
+      // The region drawn at the new epoch starts from the newer draft.
+      expect(R.keys(saved(t.registry.get(reviewStateAt(id)(epoch + 1))))).toEqual(["row-1", "row-5"])
+
+      // And a write the replaced region still makes reaches nobody.
+      const rowsOf = [{ id: "row-2", line: 2, cells: {} }]
+      const late = act({
+        rows: rowsOf,
+        state: t.registry.get(mine),
+        action: Action.LeaveOut({ rowIds: ["row-2"] }),
+        recheck: undefined,
+        fixable: () => false,
+        rejects: false
+      }).state
+      t.registry.set(mine, late)
+      yield* settle
+      expect(t.deltas()).toEqual([])
+      expect(t.shown()).toEqual({ "row-1": out, "row-5": out })
     })
   )
 })

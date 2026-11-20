@@ -42,6 +42,11 @@ import type {
 } from "@inventory/review/ReviewTypes"
 import { defaultReviewWords } from "@inventory/review/ReviewWords"
 
+// Each enum's own guard, made once: these run for every row and every cell.
+const isCellMarkApplied = CellMark.$is("Applied")
+const isCellMarkProposed = CellMark.$is("Proposed")
+const isColumnMatchUnmatched = ColumnMatch.$is("Unmatched")
+
 /**
  * How a sentence names a row after "row": its label when the caller gave one ("8 · Feb", one of several records on
  * line 8), otherwise its line.
@@ -369,7 +374,7 @@ export function count(views: ReadonlyArray<RowView>): Counts {
     }
     for (const fix of view.row.applied ?? []) {
       const mark = view.marks[fix.column]
-      if (mark !== undefined && CellMark.$is("Applied")(mark) && mark.by !== "you" && !mark.accepted) applied += 1
+      if (mark !== undefined && isCellMarkApplied(mark) && mark.by !== "you" && !mark.accepted) applied += 1
     }
   }
   return {
@@ -471,7 +476,7 @@ export function appliedGroups(views: ReadonlyArray<RowView>): ReadonlyArray<FixG
   for (const view of views) {
     for (const fix of view.row.applied ?? []) {
       const mark = view.marks[fix.column]
-      if (mark === undefined || !CellMark.$is("Applied")(mark) || mark.by === "you") continue
+      if (mark === undefined || !isCellMarkApplied(mark) || mark.by === "you") continue
       const id = fix.group ?? `${fix.column}:${fix.to}`
       const group = O.getOrElse(MutableHashMap.get(found, id), (): Gathered => ({ fix, rowIds: [], froms: [] }))
       MutableHashMap.set(found, id, gather(group, view.row.id, mark.from, fix))
@@ -831,7 +836,7 @@ export function primary(input: {
   words?: ReviewWords | undefined
 }): Primary {
   const words = input.words ?? defaultReviewWords
-  const unmatched = input.columns.find((column) => ColumnMatch.$is("Unmatched")(column.match))
+  const unmatched = input.columns.find((column) => isColumnMatchUnmatched(column.match))
   if (unmatched !== undefined) {
     return { label: `Match ${unmatched.label} to import`, blocked: true, columnId: unmatched.id }
   }
@@ -1051,7 +1056,7 @@ export function result(input: {
     if (view.status === "ready") {
       const changes: Array<ImportChange> = []
       for (const [column, mark] of Object.entries(view.marks)) {
-        if (!CellMark.$is("Applied")(mark) || mark.from === mark.to) continue
+        if (!isCellMarkApplied(mark) || mark.from === mark.to) continue
         const person = mark.by === "you"
         changes.push({
           column,
@@ -1189,7 +1194,7 @@ export function otherAnswers(input: {
   if (problem === undefined || extra === undefined) return undefined
   const subject = problem.column
   const proposed = subject === undefined ? undefined : view.marks[subject]
-  const typing = problem.choices === undefined && CellMark.$is("Proposed")(proposed)
+  const typing = problem.choices === undefined && isCellMarkProposed(proposed)
   return [
     ...(typing ? [OtherAnswer.Type()] : []),
     OtherAnswer.LeaveOut({ label: `Leave row ${rowName(view.row)} out` }),

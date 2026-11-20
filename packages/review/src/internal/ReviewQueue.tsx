@@ -43,6 +43,12 @@ import { CellValue, ColumnText, DecisionTag, EditForm, GroupChange, Overlay, Rea
 import type { GroupActions, RowActions } from "./ReviewGrid.tsx"
 import type { ProblemKind, QueueEntry, ReviewColumn, ReviewRegionProps, RowView } from "@inventory/review/ReviewTypes"
 
+// Each enum's own guard, made once: these run for every row and every cell.
+const isCellMarkProposed = CellMark.$is("Proposed")
+const isEntryGroup = Entry.$is("Group")
+const isOtherAnswerLeaveOut = OtherAnswer.$is("LeaveOut")
+const isOtherAnswerType = OtherAnswer.$is("Type")
+
 const page = 30
 
 /** Where one queue is: the card shown, how many rows of a plain list are drawn, and the card focus last went to. */
@@ -153,7 +159,7 @@ function Decision(props: {
   const { entry, actions, groupActions, labels } = props
   const columnOf = (id: string | undefined) => props.columns.find((column) => column.id === id)
 
-  if (Entry.$is("Group")(entry)) {
+  if (isEntryGroup(entry)) {
     const { group } = entry
     const n = group.rowIds.filter((rowId) => !HashSet.has(props.excluded, rowId)).length
     const choices = choicesOf(group)
@@ -251,7 +257,7 @@ function Decision(props: {
   const problem = view.problem
   const subject = problem?.column
   const mark = subject === undefined ? undefined : view.marks[subject]
-  const fix = mark !== undefined && CellMark.$is("Proposed")(mark) ? mark.fix : undefined
+  const fix = mark !== undefined && isCellMarkProposed(mark) ? mark.fix : undefined
   const choices = fix === undefined ? undefined : choicesOf(fix)
   const rival = problem?.rivals?.[0] === undefined ? undefined : actions.peek(problem.rivals[0])
   const label = subject === undefined ? "" : O.getOrElse(HashMap.get(labels, subject), () => subject)
@@ -415,7 +421,7 @@ function Decision(props: {
           ) : (
             // The caller's own answer for the row: each answer in full words, as on a desk.
             others.map((answer) =>
-              OtherAnswer.$is("Type")(answer) ? (
+              isOtherAnswerType(answer) ? (
                 subject === undefined ? null : (
                   <Overlay
                     key="type"
@@ -445,10 +451,8 @@ function Decision(props: {
                   key={answer._tag}
                   variant="outline"
                   size="touch"
-                  {...(main === null && OtherAnswer.$is("LeaveOut")(answer) ? first : {})}
-                  onClick={() =>
-                    OtherAnswer.$is("LeaveOut")(answer) ? actions.leaveOut(view.row.id) : extra.onSelect()
-                  }
+                  {...(main === null && isOtherAnswerLeaveOut(answer) ? first : {})}
+                  onClick={() => (isOtherAnswerLeaveOut(answer) ? actions.leaveOut(view.row.id) : extra.onSelect())}
                 >
                   {answer.label}
                 </Button>
@@ -510,7 +514,7 @@ function QueueBody(props: QueueProps & { region: Region }) {
   const groupActions = table.groupActions
   const index = Math.min(at, Math.max(0, decisions.length - 1))
   const entry = decisions[index]
-  const key = entry === undefined ? "" : Entry.$is("Group")(entry) ? `g:${entry.group.id}` : entry.view.row.id
+  const key = entry === undefined ? "" : isEntryGroup(entry) ? `g:${entry.group.id}` : entry.view.row.id
   const nameColumn = columns[0]
 
   if (props.loading) {

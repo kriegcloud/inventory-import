@@ -27,6 +27,7 @@ import { toast } from "sonner"
 import type { DataTableFeatures } from "@inventory/ui/components/data-table/data-table-features"
 import { createPlainFilter } from "@inventory/ui/components/data-table/data-table-utils"
 import { contentWidth } from "@inventory/ui/ContentWidth"
+import { stringify } from "@inventory/ui/Json"
 import {
   Action,
   act,
@@ -58,6 +59,9 @@ import type {
 } from "@inventory/review/ReviewTypes"
 import { reviewWords } from "@inventory/review/ReviewWords"
 import { type Layout, regionLayout } from "./internal/parts.tsx"
+
+// Each enum's own guard, made once: these run for every row and every cell.
+const isCellMarkApplied = CellMark.$is("Applied")
 
 /** 36 px rows, or 44 px with more air between them. */
 export type Density = "compact" | "comfortable"
@@ -391,7 +395,14 @@ const makeRegion = (input: RegionInput, registry: AtomRegistry.AtomRegistry): Re
   )
   const tableFilters = createAtom<ColumnFiltersState>([])
   const followFacets = Atom.readable((get) => {
-    get.subscribe(facetFilters, (next) => tableFilters.set(next), { immediate: true })
+    // Written only when the filters say something else: the table tells its listeners of every write.
+    get.subscribe(
+      facetFilters,
+      (next) => {
+        if (stringify(tableFilters.get()) !== stringify(next)) tableFilters.set(next)
+      },
+      { immediate: true }
+    )
   })
   const groups = Atom.readable((get): ReadonlyArray<FixGroup> => {
     const now = get(filter)
@@ -409,9 +420,7 @@ const makeRegion = (input: RegionInput, registry: AtomRegistry.AtomRegistry): Re
         ? rows.flatMap((view) => (view.problem?.column === undefined ? [] : [view.problem.column]))
         : now === "auto"
           ? // The fixes made for the person are what this view is about: their cells stay in the row.
-            rows.flatMap((view) =>
-              Object.keys(view.marks).filter((column) => CellMark.$is("Applied")(view.marks[column]))
-            )
+            rows.flatMap((view) => Object.keys(view.marks).filter((column) => isCellMarkApplied(view.marks[column])))
           : []
     )
   })
@@ -577,13 +586,17 @@ const makeRegionTable = (
   const folded = Atom.map(region.ui, (now) => now.folded)
 
   // The table's sort, search and column filters are its own store's: a new value here whenever one of them changes.
+  // The table's sort, search and column filters are its own store's. This is what they say, as one text: the store
+  // tells its listeners whenever the table is drawn, and the order is worked out again only when the text is another.
+  const said = (): string =>
+    stringify([table.atoms.sorting.get(), table.atoms.globalFilter.get(), table.atoms.columnFilters.get()])
   const sorted = Atom.readable((get) => {
-    const again = () => get.setSelf(O.getOrElse(get.self<number>(), () => 0) + 1)
+    const again = () => get.setSelf(said())
     for (const slice of [table.atoms.sorting, table.atoms.globalFilter, table.atoms.columnFilters]) {
       const subscription = slice.subscribe(again)
       get.addFinalizer(() => subscription.unsubscribe())
     }
-    return 0
+    return said()
   })
   const ordered = Atom.readable((get): ReadonlyArray<RowView> => {
     const data = get(region.tableData)

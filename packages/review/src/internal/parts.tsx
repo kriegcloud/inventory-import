@@ -44,6 +44,10 @@ import type {
 } from "@inventory/review/ReviewTypes"
 import { defaultReviewWords } from "@inventory/review/ReviewWords"
 
+// Each enum's own guard, made once: these run for every row and every cell.
+const isCellMarkApplied = CellMark.$is("Applied")
+const isCellMarkProposed = CellMark.$is("Proposed")
+
 // ---------------------------------------------------------------------------------------------------------------
 // Layout: a table when the page has 1101px, a shorter table on a tablet, one decision at a time on a phone
 // ---------------------------------------------------------------------------------------------------------------
@@ -346,7 +350,7 @@ export function CellValue(props: {
   if (raw === undefined) return props.value === "" ? (props.empty ?? null) : <>{shown(props.value)}</>
   const mark = { ...raw, from: shown(raw.from), to: shown(raw.to) }
   if (mark.from === mark.to) return <>{mark.to}</>
-  if (CellMark.$is("Proposed")(mark) && choicesOf(mark.fix) !== undefined) {
+  if (isCellMarkProposed(mark) && choicesOf(mark.fix) !== undefined) {
     // A question, marked with who asks it: a sparkle only when the caller says a model made it.
     return (
       <span className="inline-flex items-center gap-1.5">
@@ -359,7 +363,7 @@ export function CellValue(props: {
     )
   }
   // A value typed into an empty cell has nothing to strike through: the value and a check say it changed.
-  if (mark.from === "" && CellMark.$is("Applied")(mark)) {
+  if (mark.from === "" && isCellMarkApplied(mark)) {
     return (
       <span className="inline-flex items-center gap-1">
         {mark.to}
@@ -374,7 +378,7 @@ export function CellValue(props: {
   // change can be seen; a long one (a name) would not fit twice and stands alone.
   const spacesOnly = mark.from !== "" && mark.from.trim() === mark.to
   const alone = spacesOnly && mark.to.length > longValue
-  if (CellMark.$is("Proposed")(mark) && ((mark.from === "" && props.stated === true) || alone)) {
+  if (isCellMarkProposed(mark) && ((mark.from === "" && props.stated === true) || alone)) {
     return (
       <Tooltip>
         <TooltipTrigger asChild>
@@ -392,7 +396,7 @@ export function CellValue(props: {
       </Tooltip>
     )
   }
-  const state = CellMark.$is("Applied")(mark)
+  const state = isCellMarkApplied(mark)
     ? props.accepted === true && mark.by !== "you"
       ? "accepted"
       : "applied"

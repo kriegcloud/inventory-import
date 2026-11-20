@@ -65,6 +65,9 @@ import {
 } from "./ReviewRegion.atoms.ts"
 import type { Activity, FilterId, ReviewRegionProps, RowView } from "@inventory/review/ReviewTypes"
 
+// Each enum's own guard, made once: these run for every row and every cell.
+const isColumnMatchUnmatched = ColumnMatch.$is("Unmatched")
+
 // The phone's drawers (vaul) are their own chunk: fetched on a phone once the review is drawn, never on a desk.
 const PhoneDrawer = lazy(() => import("./internal/PhoneDrawer.tsx").then((module) => ({ default: module.PhoneDrawer })))
 
@@ -462,7 +465,7 @@ function RegionBody(
 
   // Which columns show: the data table's own column toggle, on the review's one table instance. Which file column
   // fed each field is the Match step's to say: the button beside it goes there, amber while a field has no column.
-  const unmatched = columns.filter((column) => ColumnMatch.$is("Unmatched")(column.match)).length
+  const unmatched = columns.filter((column) => isColumnMatchUnmatched(column.match)).length
   const matchButton =
     props.onShowMatching === undefined ? null : (
       <ToolButton

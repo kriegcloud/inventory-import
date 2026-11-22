@@ -14,8 +14,17 @@ import { retriedReporters } from "./vitest.retries.ts"
 // (`{ timeout }`) and writes beside it what was measured; one that needs less takes the shared limit. Every
 // package uses these, the vendored kit's too (vendor sync writes them into its configs) and the scratchpad.
 
-/** The limits of a fast test and of a hook. */
-export const limits = { testTimeout: 30_000, hookTimeout: 60_000 } as const
+/**
+ * The limits of a fast test and of a hook, and where the package keeps vitest's module cache. Vitest keeps one cache
+ * folder for the whole repository by default and empties it after a change to `bun.lock`; the first package's tests
+ * to start then emptied it while other packages' tests were reading it, and those failed with ENOENT (seen here after
+ * a merge, and in beep-effect, whose `vitest.shared.ts` gives each package its own folder for the same reason).
+ */
+export const limits = {
+  testTimeout: 30_000,
+  hookTimeout: 60_000,
+  fsModuleCachePath: `${process.cwd()}/node_modules/.vitest-cache`
+} as const
 
 /** The limits of a slow test (`*.slow.test.ts`: a real database, sign-in, or 50,000 rows). */
 export const slowLimits = { testTimeout: 120_000, hookTimeout: 120_000 } as const

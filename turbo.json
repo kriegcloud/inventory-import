@@ -234,11 +234,13 @@
       "outputs": []
     },
     // Its tests run that law with the root's own profile and the installed packages, whose deprecation notes they
-    // expect word for word: the same installed manifests are inputs here.
+    // expect word for word: the same installed manifests are inputs here. One of its tests reads the workflows GitHub
+    // runs (test/DeployWorkflow.test.ts), so a change to a workflow alone runs the tests again and is never replayed.
     "@beep/repo-cli#test": {
       "dependsOn": ["transit"],
       "inputs": [
         "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/.github/workflows/**",
         "$TURBO_ROOT$/vitest.shared.ts",
         "$TURBO_ROOT$/vitest.retries.ts",
         "$TURBO_ROOT$/.oxlintrc.deprecated-apis.json",

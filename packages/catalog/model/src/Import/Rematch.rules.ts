@@ -656,18 +656,20 @@ const indexIn = <A>(list: ReadonlyArray<A>, value: A): number =>
  * kind (fields in the item's order, kinds as the screen names them), each with the revision the match wrote, who
  * matched, the field they picked a column for (`matched`), whether the entry's field reads a column after it (`reads`,
  * worked out from what the match leaves: `plan.reads`), how many rows and the first `takenBackRowsNamed` of them in the
- * file's order. A taken-back key that is not a row id is not counted, and a field and kind left with no row has no
- * entry.
+ * file's order, each with the revision its stored decision was saved at as the match read it (`savedAt`): which
+ * decision the part was taken from. A taken-back key that is not a row id is not counted, and a field and kind left
+ * with no row has no entry.
  *
  * @example
- * takenBackOfMatch({ revision: 13, by: "Dana Whitfield", matched: "sku", reads: plan.reads, notApplied: [{ rowId: "row-9", field: "sku", kind: "stored" }, { rowId: "row-4", field: "sku", kind: "stored" }] })
- * // [{ revision: 13, by: "Dana Whitfield", field: "sku", matched: "sku", reads: true, kind: "stored", count: 2, rows: ["row-4", "row-9"] }]
+ * takenBackOfMatch({ revision: 13, by: "Dana Whitfield", matched: "sku", reads: plan.reads, savedAt: { "row-4": 6, "row-9": 11 }, notApplied: [{ rowId: "row-9", field: "sku", kind: "stored" }, { rowId: "row-4", field: "sku", kind: "stored" }] })
+ * // [{ revision: 13, by: "Dana Whitfield", field: "sku", matched: "sku", reads: true, kind: "stored", count: 2, rows: ["row-4", "row-9"], saved: { "row-4": 6, "row-9": 11 } }]
  */
 export const takenBackOfMatch = (input: {
   readonly revision: number
   readonly by: string
   readonly matched: Field
   readonly reads: (field: Field) => boolean
+  readonly savedAt: Readonly<Record<string, number>>
   readonly notApplied: ReadonlyArray<StaleAccept>
 }): ReadonlyArray<MatchTakeBack> => {
   const isRowId = S.is(RowId)
@@ -683,6 +685,7 @@ export const takenBackOfMatch = (input: {
           isRowId
         )
       )
+      const named = A.take(A.sort(rows, fileOrder), takenBackRowsNamed)
       return O.flatMap(
         A.findFirst(fields, (known) => known === first.field),
         (field): O.Option<MatchTakeBack> =>
@@ -696,7 +699,10 @@ export const takenBackOfMatch = (input: {
                 reads: input.reads(field),
                 kind: first.kind,
                 count: rows.length,
-                rows: A.take(A.sort(rows, fileOrder), takenBackRowsNamed)
+                rows: named,
+                saved: R.fromEntries(
+                  A.getSomes(A.map(named, (rowId) => O.map(R.get(input.savedAt, rowId), (at) => [rowId, at] as const)))
+                )
               })
       )
     })

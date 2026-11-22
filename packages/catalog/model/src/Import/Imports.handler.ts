@@ -15,6 +15,7 @@ import {
   ImportStore,
   Draft,
   draftTries,
+  noStoredDecisions,
   type StoredDecisions,
   TakeBackWrite
 } from "./ImportStore.store.ts"
@@ -132,7 +133,7 @@ const latestNamed = (madeOn: Readonly<Record<string, number>>, also: number = 0)
  */
 const withUnsaved = (
   stored: StoredDecisions,
-  unsaved: { readonly delta: DecisionDelta; readonly author: string }
+  unsaved: { readonly delta: DecisionDelta; readonly author: string; readonly authorId: string }
 ): StoredDecisions => {
   const same = S.toEquivalence(RowDecision)
   const changed = R.filter(unsaved.delta.set, (decision, id) =>
@@ -142,7 +143,11 @@ const withUnsaved = (
   return {
     decisions: R.filter({ ...stored.decisions, ...unsaved.delta.set }, cleared),
     authors: R.filter({ ...stored.authors, ...R.map(changed, () => unsaved.author) }, cleared),
-    savedAt: R.filter(stored.savedAt, cleared)
+    deciders: R.filter({ ...stored.deciders, ...R.map(changed, () => unsaved.authorId) }, cleared),
+    savedAt: R.filter(stored.savedAt, cleared),
+    lastSavedBy: R.filter({ ...stored.lastSavedBy, ...R.map(unsaved.delta.set, () => unsaved.authorId) }, cleared),
+    lastSavedOn: R.filter(stored.lastSavedOn, cleared),
+    saves: stored.saves
   }
 }
 
@@ -297,9 +302,9 @@ export const importsEndpoints = Effect.gen(function* () {
     waited: {
       readonly over: Over
       readonly clear: ReadonlyArray<string>
-      readonly stored: SavedDecisions
+      readonly stored: StoredDecisions
       readonly takenBack: ReadonlyArray<MatchTakeBack>
-    } = { over: {}, clear: [], stored: {}, takenBack: [] }
+    } = { over: {}, clear: [], stored: noStoredDecisions, takenBack: [] }
   ) {
     const choices = yield* imports.choices(draft)
     const moves = yield* imports.moves(draft)
@@ -319,7 +324,12 @@ export const importsEndpoints = Effect.gen(function* () {
       moves,
       madeOn,
       over: waited.over,
-      stored: waited.stored,
+      stored: waited.stored.decisions,
+      savedAt: waited.stored.savedAt,
+      deciders: waited.stored.deciders,
+      lastSavedBy: waited.stored.lastSavedBy,
+      lastSavedOn: waited.stored.lastSavedOn,
+      sender: actor.id,
       takenBack: waited.takenBack,
       takenBackFrom: draft.takenBackFrom,
       left: (row) => (HashSet.has(cleared, row) ? O.none() : R.get(applied, row))
@@ -341,7 +351,8 @@ export const importsEndpoints = Effect.gen(function* () {
     const table = known ?? (yield* imports.table(actor.organizationId, draft))
     const choices = yield* imports.choices(draft)
     const held = yield* imports.decisions(actor.organizationId, draft.id)
-    const stored = unsaved === undefined ? held : withUnsaved(held, { delta: unsaved, author: actor.name })
+    const stored =
+      unsaved === undefined ? held : withUnsaved(held, { delta: unsaved, author: actor.name, authorId: actor.id })
     const storedItems = yield* storedFor(actor, table, choices, stored.decisions)
     const created = yield* imports.createdRows(actor.organizationId, draft.id)
     const createdIds = A.map(created, rowId)
@@ -465,7 +476,10 @@ export const importsEndpoints = Effect.gen(function* () {
     const draft = yield* find(actor, id)
     if (latest > draft.revision) return yield* ahead(draft)
     const waiting = !R.isEmptyRecord(payload.over)
-    const stored = waiting ? (yield* imports.decisions(actor.organizationId, draft.id)).decisions : {}
+    // With who decided each row, who last saved it and the revisions: a row that waited is judged by whose it is.
+    const stored: StoredDecisions = waiting
+      ? yield* imports.decisions(actor.organizationId, draft.id)
+      : noStoredDecisions
     // What the matches recorded they took back, as stored with the draft read: the rows that waited are judged by it.
     const takenBack = waiting ? yield* imports.takenBack(draft) : []
     // A decision made before a column it rests on was matched again is not applied; the rest of the row's decision is.
@@ -485,7 +499,8 @@ export const importsEndpoints = Effect.gen(function* () {
         clear: A.filter(payload.clear, (row) => !HashSet.has(notWritten, row))
       },
       read,
-      waiting ? O.some(draft.revision) : O.none()
+      // Written only while no save has come since what was compared, even one that moved no revision.
+      waiting ? O.some({ revision: draft.revision, saves: stored.saves }) : O.none()
     )
     const again = (overtaken: Overtaken) =>
       tries.left <= 1

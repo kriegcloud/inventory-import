@@ -122,7 +122,9 @@ describe("what a match took back from the stored decisions", () => {
               reads: true,
               kind: "stored",
               count: 2,
-              rows: ["row-2", "row-3"]
+              rows: ["row-2", "row-3"],
+              // Which decision each part was taken from: Marcus's save, at the revision it moved the draft to.
+              saved: { "row-2": view.revision + 1, "row-3": view.revision + 1 }
             },
             {
               revision: matched.revision,
@@ -132,7 +134,8 @@ describe("what a match took back from the stored decisions", () => {
               reads: true,
               kind: "twin",
               count: 2,
-              rows: ["row-4", "row-5"]
+              rows: ["row-4", "row-5"],
+              saved: { "row-4": view.revision + 1, "row-5": view.revision + 1 }
             }
           ]
           // The match's own answer names them, and so does every later view, whoever reads it.
@@ -524,6 +527,7 @@ describe("what a draft keeps of its matches' take-backs", () => {
       by: "Dana Whitfield",
       matched: "sku",
       reads: () => true,
+      savedAt: { "row-9": 11, "row-4": 6 },
       notApplied: [
         { rowId: "row-9", field: "sku", kind: "stored" },
         { rowId: "not-a-row", field: "sku", kind: "stored" },
@@ -532,8 +536,8 @@ describe("what a draft keeps of its matches' take-backs", () => {
         { rowId: "row-0", field: "uom", kind: "accept" }
       ]
     })
-    expect(A.map(entries, (taken) => [taken.field, taken.kind, taken.count, taken.rows])).toEqual([
-      ["sku", "stored", 2, ["row-4", "row-9"]]
+    expect(A.map(entries, (taken) => [taken.field, taken.kind, taken.count, taken.rows, taken.saved])).toEqual([
+      ["sku", "stored", 2, ["row-4", "row-9"], { "row-4": 6, "row-9": 11 }]
     ])
   })
 })

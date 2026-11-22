@@ -357,12 +357,14 @@ layer(TypedApp)("what a match took back from the stored decisions", (it) => {
           "row-5": { out: true, kept: true },
           "row-6": { edits: { name: "Hemp Rope 10m" } }
         })
-        yield* client.imports
+        const decided = yield* client.imports
           .decide({ params, payload: { madeOn: R.map(set, () => matching.revision), set, clear: [] } })
           .pipe(marcus)
         const matched = yield* client.imports
           .match({ params, payload: { field: "sku", column: O.some(column("Alt code")) } })
           .pipe(dana)
+        // Which decision each part was taken from: Marcus's save, at the revision it moved the draft to.
+        const at = decided.revision
         const by = {
           revision: matched.revision,
           by: "Dana Whitfield",
@@ -371,8 +373,8 @@ layer(TypedApp)("what a match took back from the stored decisions", (it) => {
           reads: true
         }
         const named = [
-          { ...by, kind: "stored", count: 2, rows: ["row-2", "row-3"] },
-          { ...by, kind: "twin", count: 2, rows: ["row-4", "row-5"] }
+          { ...by, kind: "stored", count: 2, rows: ["row-2", "row-3"], saved: { "row-2": at, "row-3": at } },
+          { ...by, kind: "twin", count: 2, rows: ["row-4", "row-5"], saved: { "row-4": at, "row-5": at } }
         ]
         expect(matched.takenBack).toEqual(named)
         const read = yield* client.imports.get({ params }).pipe(marcus)

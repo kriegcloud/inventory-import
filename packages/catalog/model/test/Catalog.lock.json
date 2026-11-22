@@ -62,10 +62,6 @@
         "kind": "transition",
         "source": "({ before, after, command }) =>\n        !isImported(after) || isImported(before) || isConfirm(command)"
       },
-      "Import.AConfirmOfAClosedImportWritesNothing": {
-        "kind": "transition",
-        "source": "({ before, after, command }) =>\n        !isConfirm(command) || isOpen(before) || after.status === before.status"
-      },
       "Import.AConfirmNamesEveryChange": {
         "kind": "transition",
         "source": "({ before, after, command }) =>\n        !isConfirm(command) || !isOpen(before) || !isImported(after) || command.seen === before.changes"
@@ -122,10 +118,6 @@
         "kind": "transition",
         "source": "({ before, after, command }) =>\n        !isMatch(command) || !isOpen(before) || !isOpen(after) || after.matching === before.matching + 1"
       },
-      "Import.OnlyAnOpenImportIsReviewed": {
-        "kind": "transition",
-        "source": "({ before, after }) =>\n        isOpen(before) ||\n        isUnstaged(before) ||\n        isRemoved(before) ||\n        isRemoved(after) ||\n        isUnstaged(after) ||\n        after.matching === before.matching"
-      },
       "Import.AnImportIsOpenedAgainOnlyByReopen": {
         "kind": "transition",
         "source": "({ before, after, command }) =>\n        !isOpen(after) ||\n        isOpen(before) ||\n        isUnstaged(before) ||\n        (isReopen(command) && (isImported(before) || isTakenBack(before)))"
@@ -173,10 +165,6 @@
       "Row.ARowNeverChangesImportOrOrganization": {
         "kind": "transition",
         "source": "({ before, after }) =>\n        isUntouched(before) ||\n        isUntouched(after) ||\n        (before.organizationId === after.organizationId && before.importId === after.importId)"
-      },
-      "Group.AGroupHasRows": {
-        "kind": "invariant",
-        "source": "(s) => !isDecidedGroup(s) || s.count >= 1"
       },
       "Group.AGroupKeepsItsRows": {
         "kind": "transition",
@@ -301,10 +289,6 @@
       "DecideRow.AndWhatWasBelowStaysBelow": {
         "kind": "transition",
         "source": "({ before, after, command }) =>\n        !isDecided(before.row) ||\n        changesNothing({ row: before.row, command }) ||\n        !isDecided(after.row) ||\n        after.row.below ===\n          (before.row.under.change === 0\n            ? \"\"\n            : before.row.below.length > MOST_BELOW\n              ? CUT\n              : seal({ level: before.row.under, below: before.row.below }))"
-      },
-      "DecideRow.NobodyClearsAnotherPersonsDecision": {
-        "kind": "transition",
-        "source": "Effect.fn(\"Deciding.NobodyClearsAnotherPersonsDecision\")(function* ({\n        before,\n        after\n      }) {\n        if (!isDecided(before.row) || isDecided(after.row)) return true\n        const actor = yield* CurrentActor\n        return actor.memberId === before.row.by\n      })"
       },
       "DecideRow.OnlyItsOwnOrganizationChangesTheRow": {
         "kind": "transition",
@@ -470,10 +454,6 @@
         "kind": "transition",
         "source": "({ command, events }) =>\n        A.every(events, (e) => !isGroupCounted(e) || e.rows === command.count)"
       },
-      "DecideGroup.NobodyUndoesAnotherPersonsGroup": {
-        "kind": "transition",
-        "source": "Effect.fn(\"DecidingGroup.NobodyUndoesAnotherPersonsGroup\")(function* ({\n        before,\n        after\n      }) {\n        if (\n          !isDecidedGroup(before.group) ||\n          !isDecidedGroup(after.group) ||\n          after.group.undoneAt === before.group.undoneAt\n        ) {\n          return true\n        }\n        const actor = yield* CurrentActor\n        return actor.memberId === before.group.by\n      })"
-      },
       "DecideGroup.OnlyItsOwnOrganizationChangesTheGroup": {
         "kind": "transition",
         "source": "Effect.fn(\"DecidingGroup.OnlyItsOwnOrganizationChangesTheGroup\")(\n        function* ({ before }) {\n          if (isUntouchedGroup(before.group)) return true\n          const actor = yield* CurrentActor\n          return actor.organizationId === before.group.organizationId\n        }\n      )"
@@ -548,7 +528,7 @@
       },
       "Catalog.AGroupsChangeIsOneItsImportGave": {
         "kind": "model invariant",
-        "source": "(all) =>\n        A.every(all.Group, (group) =>\n          A.every(\n            all.Import,\n            (life) =>\n              !isDecidedGroup(group.state) ||\n              group.state.importId !== life.id ||\n              isRemoved(life.state) ||\n              (!isUnstaged(life.state) && group.state.change >= 1 && group.state.undoneAt <= life.state.changes)\n          )\n        )"
+        "source": "(all) =>\n        A.every(all.Group, (group) =>\n          A.every(\n            all.Import,\n            (life) =>\n              !isDecidedGroup(group.state) ||\n              group.state.importId !== life.id ||\n              isRemoved(life.state) ||\n              (!isUnstaged(life.state) &&\n                group.state.change >= 1 &&\n                group.state.change <= life.state.changes &&\n                group.state.undoneAt <= life.state.changes)\n          )\n        )"
       },
       "Catalog.AGroupsUndoComesAfterIt": {
         "kind": "model invariant",
@@ -614,10 +594,6 @@
         "kind": "relation",
         "source": "({ life, group }) =>\n          isUntouchedGroup(group.state) ||\n          group.state.importId !== life.id ||\n          (!isUnstaged(life.state) && group.state.organizationId === life.state.organizationId)"
       },
-      "UndoRowStep.ARowsUndoIsNotFromUnderALaterGroup": {
-        "kind": "transition",
-        "source": "({ command }) => !command.covered"
-      },
       "UndoRowStep.TheRowKeepsWhichChangeWasTakenBack": {
         "kind": "transition",
         "source": "({ after, command }) =>\n        !isUntouched(after.row) && after.row.undone.change === command.undo"
@@ -629,6 +605,50 @@
       "UndoRowStep.AndWhoPressed": {
         "kind": "transition",
         "source": "Effect.fn(\"Undoing.AndWhoPressed\")(function* ({ after }) {\n        if (isUntouched(after.row)) return false\n        const actor = yield* CurrentActor\n        return after.row.undone.by === actor.memberId\n      })"
+      },
+      "Import.AConfirmLeavesAClosedImportsStatusAsItWas": {
+        "kind": "transition",
+        "source": "({ before, after, command }) =>\n        !isConfirm(command) || isOpen(before) || after.status === before.status"
+      },
+      "Import.TheMatchingMovesOnlyOnAnOpenImport": {
+        "kind": "transition",
+        "source": "({ before, after }) =>\n        isOpen(before) ||\n        isUnstaged(before) ||\n        isRemoved(before) ||\n        isRemoved(after) ||\n        isUnstaged(after) ||\n        after.matching === before.matching"
+      },
+      "Group.AGroupSaysAtLeastOneRow": {
+        "kind": "invariant",
+        "source": "(s) => !isDecidedGroup(s) || s.count >= 1"
+      },
+      "Group.AGroupKeepsItsCount": {
+        "kind": "transition",
+        "source": "({ before, after }) =>\n        !isDecidedGroup(before) || !isDecidedGroup(after) || after.count === before.count"
+      },
+      "DecideRow.ADecisionIsMadeOnAScreenThatHasTheRowsLastUndo": {
+        "kind": "transition",
+        "source": "({ before, command }) =>\n        command.sawUndone === before.row.undone.change"
+      },
+      "UndoRowStep.AnUndoIsMadeOnTheMatchingNow": {
+        "kind": "transition",
+        "source": "({ before, command }) =>\n        isOpen(before.life) && command.madeOn === before.life.matching"
+      },
+      "UndoRowStep.ARowsUndoSaysNoLaterGroupCoversIt": {
+        "kind": "transition",
+        "source": "({ command }) => !command.covered"
+      },
+      "UndoRowStep.AnUndoIsOfARowOfTheImportItNames": {
+        "kind": "transition",
+        "source": "({ before, command }) =>\n        isUntouched(before.row) || before.row.importId === command.importId"
+      },
+      "UndoRowStep.AnUndoStopsWhereTheHistoryWasLetGo": {
+        "kind": "transition",
+        "source": "({ before }) => !isDecided(before.row) || before.row.under.change !== -1"
+      },
+      "UndoGroup.AGroupsUndoIsOfAGroupOfTheImportItNames": {
+        "kind": "transition",
+        "source": "({ before, command }) =>\n        isDecidedGroup(before.group) && before.group.importId === command.importId"
+      },
+      "Catalog.NoGroupInForceIsLaterThanTheLastInForce": {
+        "kind": "model invariant",
+        "source": "(all) =>\n        A.every(all.Group, (group) =>\n          A.every(\n            all.Import,\n            (life) =>\n              !isDecidedGroup(group.state) ||\n              group.state.importId !== life.id ||\n              isRemoved(life.state) ||\n              isUnstaged(life.state) ||\n              group.state.undoneAt !== 0 ||\n              group.state.change <= life.state.topGroup\n          )\n        )"
       }
     }
   }

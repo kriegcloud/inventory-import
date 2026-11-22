@@ -1,5 +1,5 @@
 // Proves `UndoingGroup`, the decision behind the undo of one act on a group, for every state of the import and the
-// group and every input: its own 13 rules, and every rule of the two aggregates it records on. A rule that is no
+// group and every input: its own 14 rules, and every rule of the two aggregates it records on. A rule that is no
 // longer proved fails here by name. Its counterexamples need a group that was decided, under a key built from two
 // fields of the command (`importId/step`). The library as published does not tie an instance's id to such a key, and
 // a broken rule here then comes back "not proved", with the sentence "the real code rejects it". The repository
@@ -25,7 +25,7 @@ layer(NodeServices.layer)("UndoingGroup", (it) => {
       expect(notProved(standings(report)), said).toEqual([])
       // Ours too, because the library does not ask whose act a decision records: the rules of every aggregate it reads
       // are there, and the ones about who may change a row or a group it states itself.
-      expect(missingRules(report), said).toEqual([])
+      expect(missingRules({ report, records: ["GroupUndone", "GroupCounted"] }), said).toEqual([])
       // Every state it leaves is one its aggregate's schema allows.
       expect(standingOf(report.schema), said).toBe("proved")
       // Some state lets it record: it is not proved only because it never does anything.

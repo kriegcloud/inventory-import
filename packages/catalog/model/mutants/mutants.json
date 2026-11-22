@@ -30,7 +30,7 @@
         "AnImportIsOpenedAgainOnlyByReopen",
         "AnImportNeverChangesOrganization",
         "EveryChangeHasItsOwnNumber",
-        "OnlyAnOpenImportIsReviewed",
+        "TheMatchingMovesOnlyOnAnOpenImport",
         "OnlyItsOwnOrganizationChangesAnImport"
       ],
       "trialStories": [
@@ -344,46 +344,8 @@
       "old": "        if (!isImported(s) && !isOpen(s)) return yield* new NotImported({})\n",
       "new": "",
       "proof": "test/Import.prove.test.ts",
-      "expect": "rule",
-      "trialRules": [
-        "AConfirmNamesEveryChange",
-        "AConfirmOfAClosedImportWritesNothing",
-        "AMatchHoldsTheColumnsItSays",
-        "AMatchIsMadeOnTheLastOne",
-        "AMatchIsOfThisOpening",
-        "AMatchIsTheNextOne",
-        "APlanDoesWhatWasShown",
-        "APlanIsOfEveryChange",
-        "ARemovedImportStaysRemoved",
-        "ASuggestionWritesNothing",
-        "ATakeBackIsOfEverythingInForce",
-        "AViewerChangesNothing",
-        "AlreadyIsNotNegative",
-        "AnImportIsOpenedAgainOnlyByReopen",
-        "AnImportNeverChangesOrganization",
-        "AndOfEverythingReplaced",
-        "CreatedIsNotNegative",
-        "EveryChangeHasItsOwnNumber",
-        "EveryEventSaysWhose",
-        "InForceIsNotNegative",
-        "KeptIsNotNegative",
-        "NoMoreInForceThanRows",
-        "NotImportedIsNotNegative",
-        "NothingIsWrittenBeforeConfirm",
-        "NothingStandsThatWasTakenBack",
-        "OnlyAnImportWithAConfirmStandingIsTakenBack",
-        "OnlyAnImportWithNothingInForceIsRemoved",
-        "OnlyAnOpenImportIsReviewed",
-        "OnlyItsOwnOrganizationChangesAnImport",
-        "OutcomesAddUpToTheRows",
-        "RemovedIsNotNegative",
-        "ReplacedIsNotNegative",
-        "RowsAreNotNegative",
-        "StandingIsNotNegative",
-        "TheRestNameEveryChangeToo",
-        "UpdatedIsNotNegative",
-        "WhatIsInForceThenIsWhatWasKept"
-      ],
+      "expect": "story",
+      "trialRules": [],
       "trialStories": [
         "Review: a removed import takes nothing more: no suggestion, no match, no take-back, no reopen, no second staging"
       ]
@@ -1393,7 +1355,7 @@
       "file": "src/Review/Deciding.decision.ts",
       "anchors": ["Effect.fn(\"Deciding.decide\")", "        // No group covers the row"],
       "until": "      const change = life.state.changes + 1",
-      "old": "        if (cmd.madeOn !== life.state.matching) return yield* new MatchedSince({ matching: life.state.matching })\n",
+      "old": "        if (cmd.madeOn !== life.state.matching) {\n          // The same press sent again after a match landed: the row holds this very act already (this step, from\n          // this person, with this text on the matching it was made on). It is answered as the first time, with\n          // nothing new, not told it was made on an older matching.\n          if (\n            isDecided(row.state) &&\n            row.state.step === cmd.step &&\n            row.state.by === actor.memberId &&\n            onItsMatching(row.state) === onItsMatching(cmd)\n          ) {\n            return []\n          }\n          return yield* new MatchedSince({ matching: life.state.matching })\n        }\n",
       "new": "",
       "proof": "test/Deciding.prove.test.ts",
       "expect": "rule",
@@ -1424,11 +1386,8 @@
       "old": "          if (onItsMatching(row.state) === onItsMatching(cmd)) return []\n",
       "new": "          if (row.state.flags === cmd.flags) return []\n",
       "proof": "test/Deciding.prove.test.ts",
-      "expect": "rule",
-      "trialRules": [
-        "Unconfirmed AnActThatChangesNothingLeavesTheImport",
-        "Unconfirmed AnActThatChangesNothingLeavesTheRow"
-      ],
+      "expect": "story",
+      "trialRules": [],
       "trialStories": [
         "Review: the same decision made again on a newer matching is a change, and made on the older one it is refused: Ana keeps row 12, Dana matches a column, and Ana keeps it again"
       ]
@@ -1496,6 +1455,119 @@
       "trialRules": [],
       "trialStories": [
         "Group: a covered press sent twice is written once and answered the same: Ana's group leaves row 14 out, Dana types 8 on it, and her screen sends the press again"
+      ]
+    },
+    {
+      "key": "row-resend-covered-step",
+      "target": "DecideRow",
+      "kind": "check",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")"],
+      "until": "    transitions: {",
+      "old": "if (row.state.step === cmd.step && row.state.by === actor.memberId && row.state.flags === cmd.flags) {",
+      "new": "if (row.state.by === actor.memberId && row.state.flags === cmd.flags) {",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Group: a covered press sent twice is written once and answered the same: Ana's group leaves row 14 out, Dana types 8 on it, and her screen sends the press again"
+      ]
+    },
+    {
+      "key": "row-resend-covered-by",
+      "target": "DecideRow",
+      "kind": "check",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")"],
+      "until": "    transitions: {",
+      "old": "if (row.state.step === cmd.step && row.state.by === actor.memberId && row.state.flags === cmd.flags) {",
+      "new": "if (row.state.step === cmd.step && row.state.flags === cmd.flags) {",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Group: a covered press sent twice is written once and answered the same: Ana's group leaves row 14 out, Dana types 8 on it, and her screen sends the press again"
+      ]
+    },
+    {
+      "key": "row-resend-covered-text",
+      "target": "DecideRow",
+      "kind": "check",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")"],
+      "until": "    transitions: {",
+      "old": "if (row.state.step === cmd.step && row.state.by === actor.memberId && row.state.flags === cmd.flags) {",
+      "new": "if (row.state.step === cmd.step && row.state.by === actor.memberId) {",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Group: a covered press sent twice is written once and answered the same: Ana's group leaves row 14 out, Dana types 8 on it, and her screen sends the press again"
+      ]
+    },
+    {
+      "key": "row-resend-matched",
+      "target": "DecideRow",
+      "kind": "check",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")"],
+      "until": "    transitions: {",
+      "old": "          // The same press sent again after a match landed: the row holds this very act already (this step, from\n          // this person, with this text on the matching it was made on). It is answered as the first time, with\n          // nothing new, not told it was made on an older matching.\n          if (\n            isDecided(row.state) &&\n            row.state.step === cmd.step &&\n            row.state.by === actor.memberId &&\n            onItsMatching(row.state) === onItsMatching(cmd)\n          ) {\n            return []\n          }\n",
+      "new": "",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Review: a press sent twice with a match landing between is answered as the first time: Dana keeps row 12, the admin matches a column, and her screen sends the keep again"
+      ]
+    },
+    {
+      "key": "row-resend-matched-step",
+      "target": "DecideRow",
+      "kind": "check",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")"],
+      "until": "    transitions: {",
+      "old": "            row.state.step === cmd.step &&\n            row.state.by === actor.memberId &&\n            onItsMatching",
+      "new": "            row.state.by === actor.memberId &&\n            onItsMatching",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Review: a press sent twice with a match landing between is answered as the first time: Dana keeps row 12, the admin matches a column, and her screen sends the keep again"
+      ]
+    },
+    {
+      "key": "row-resend-matched-by",
+      "target": "DecideRow",
+      "kind": "check",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")"],
+      "until": "    transitions: {",
+      "old": "            row.state.step === cmd.step &&\n            row.state.by === actor.memberId &&\n            onItsMatching",
+      "new": "            row.state.step === cmd.step &&\n            onItsMatching",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Review: a press sent twice with a match landing between is answered as the first time: Dana keeps row 12, the admin matches a column, and her screen sends the keep again"
+      ]
+    },
+    {
+      "key": "row-undone",
+      "target": "DecideRow",
+      "kind": "check",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")"],
+      "until": "    transitions: {",
+      "old": "      // An undo landed on the row that the sender's screen has not received. After an undo the row holds exactly what\n      // it held before the decision taken back, so a press drawn before it (a late copy of the very press that was\n      // taken back, too) names what the row holds and would be written again. It is refused and held.\n      if (cmd.sawUndone !== row.state.undone.change) {\n        return yield* new UndoneSince({ by: row.state.undone.by, change: row.state.undone.change })\n      }\n",
+      "new": "",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated ADecisionIsMadeOnAScreenThatHasTheRowsLastUndo"],
+      "trialStories": [
+        "Group: a press sent again after its sender took it back is not written a second time: Ana's group leaves row 14 out, Dana types 8 on it and takes that back, and the first sending of her 8 arrives late",
+        "Review: a press drawn before an undo is not written over what the undo put back: Ana leaves row 12 out, Dana keeps it and takes that back, and presses that name Ana's decision from screens without the undo are refused"
       ]
     },
     {
@@ -1580,13 +1652,27 @@
       ]
     },
     {
+      "key": "undo-rowowner-import",
+      "target": "UndoRowStep",
+      "kind": "check",
+      "file": "src/Review/Undoing.decision.ts",
+      "anchors": ["Effect.fn(\"Undoing.decide\")"],
+      "until": "    transitions: {",
+      "old": "(row.state.importId !== cmd.importId || row.state.organizationId !== life.state.organizationId)",
+      "new": "(row.state.organizationId !== life.state.organizationId)",
+      "proof": "test/Undoing.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated AnUndoIsOfARowOfTheImportItNames"],
+      "trialStories": []
+    },
+    {
       "key": "undo-opening",
       "target": "UndoRowStep",
       "kind": "check",
       "file": "src/Review/Undoing.decision.ts",
       "anchors": ["Effect.fn(\"Undoing.decide\")"],
       "until": "    transitions: {",
-      "old": "      if (cmd.opening !== life.state.confirms) return yield* new ConfirmedSince({})\n",
+      "old": "      if (cmd.opening !== life.state.confirms) {\n        if (tookThisUndo({ row: row.state, undo: cmd.undo, step: cmd.step, by: actor.memberId })) return []\n        return yield* new ConfirmedSince({})\n      }\n",
       "new": "",
       "proof": "test/Undoing.prove.test.ts",
       "expect": "rule",
@@ -1602,7 +1688,7 @@
       "file": "src/Review/Undoing.decision.ts",
       "anchors": ["Effect.fn(\"Undoing.decide\")"],
       "until": "    transitions: {",
-      "old": "      if (cmd.sawGroup !== life.state.lastGroup) return yield* new GroupedSince({})\n",
+      "old": "      if (cmd.sawGroup !== life.state.lastGroup) {\n        if (tookThisUndo({ row: row.state, undo: cmd.undo, step: cmd.step, by: actor.memberId })) return []\n        return yield* new GroupedSince({})\n      }\n",
       "new": "",
       "proof": "test/Undoing.prove.test.ts",
       "expect": "rule",
@@ -1618,7 +1704,7 @@
       "file": "src/Review/Undoing.decision.ts",
       "anchors": ["Effect.fn(\"Undoing.decide\")"],
       "until": "    transitions: {",
-      "old": "      if (!isDecided(row.state) || row.state.by !== actor.memberId || row.state.change !== cmd.undo) {\n        // The same undo sent again: the row took this very act already (this change, in this step, from this person),\n        // and it is written once. Its sender is answered as the first time, with nothing new, whatever was decided\n        // there since (2026-11-22, by the rule on a press from a screen that is behind).\n        if (\n          row.state.undone.change === cmd.undo &&\n          row.state.undone.step === cmd.step &&\n          row.state.undone.by === actor.memberId\n        ) {\n          return []\n        }\n        return yield* new NotYourStep({})\n      }\n",
+      "old": "      if (!isDecided(row.state) || row.state.by !== actor.memberId || row.state.change !== cmd.undo) {\n        if (tookThisUndo({ row: row.state, undo: cmd.undo, step: cmd.step, by: actor.memberId })) return []\n        return yield* new NotYourStep({})\n      }\n",
       "new": "",
       "proof": "test/Undoing.prove.test.ts",
       "expect": "rule",
@@ -1636,10 +1722,90 @@
       "target": "UndoRowStep",
       "kind": "check",
       "file": "src/Review/Undoing.decision.ts",
-      "anchors": ["Effect.fn(\"Undoing.decide\")"],
-      "until": "    transitions: {",
-      "old": "        // The same undo sent again: the row took this very act already (this change, in this step, from this person),\n        // and it is written once. Its sender is answered as the first time, with nothing new, whatever was decided\n        // there since (2026-11-22, by the rule on a press from a screen that is behind).\n        if (\n          row.state.undone.change === cmd.undo &&\n          row.state.undone.step === cmd.step &&\n          row.state.undone.by === actor.memberId\n        ) {\n          return []\n        }\n",
+      "anchors": ["Effect.fn(\"Undoing.decide\")", "row.state.change !== cmd.undo) {\n"],
+      "until": "NotYourStep",
+      "old": "        if (tookThisUndo({ row: row.state, undo: cmd.undo, step: cmd.step, by: actor.memberId })) return []\n",
       "new": "",
+      "proof": "test/Undoing.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Review: an undo sent twice is written once and answered the same, whatever was decided there since: Ana leaves row 12 out, Dana keeps it and takes that back, and her screen sends the undo again"
+      ]
+    },
+    {
+      "key": "undo-resend-grouped",
+      "target": "UndoRowStep",
+      "kind": "check",
+      "file": "src/Review/Undoing.decision.ts",
+      "anchors": ["Effect.fn(\"Undoing.decide\")", "if (cmd.sawGroup !== life.state.lastGroup) {\n"],
+      "until": "GroupedSince",
+      "old": "        if (tookThisUndo({ row: row.state, undo: cmd.undo, step: cmd.step, by: actor.memberId })) return []\n",
+      "new": "",
+      "proof": "test/Undoing.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Group: an undo sent twice is answered as the first time when a group act landed between: Dana types 8 on row 14 and takes it back, Ana accepts a group, and Dana's screen sends the undo again"
+      ]
+    },
+    {
+      "key": "undo-resend-reopened",
+      "target": "UndoRowStep",
+      "kind": "check",
+      "file": "src/Review/Undoing.decision.ts",
+      "anchors": ["Effect.fn(\"Undoing.decide\")", "if (cmd.opening !== life.state.confirms) {\n"],
+      "until": "ConfirmedSince",
+      "old": "        if (tookThisUndo({ row: row.state, undo: cmd.undo, step: cmd.step, by: actor.memberId })) return []\n",
+      "new": "",
+      "proof": "test/Undoing.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Review: an undo sent twice is answered as the first time when the import was confirmed and opened again between: Dana's undo of her keep on row 12, sent again from the first opening"
+      ]
+    },
+    {
+      "key": "undo-resend-step",
+      "target": "UndoRowStep",
+      "kind": "check",
+      "file": "src/Review/Undoing.decision.ts",
+      "anchors": ["const tookThisUndo"],
+      "until": "type UndoingEvent",
+      "old": "act.row.undone.change === act.undo && act.row.undone.step === act.step && act.row.undone.by === act.by",
+      "new": "act.row.undone.change === act.undo && act.row.undone.by === act.by",
+      "proof": "test/Undoing.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Review: an undo sent twice is written once and answered the same, whatever was decided there since: Ana leaves row 12 out, Dana keeps it and takes that back, and her screen sends the undo again"
+      ]
+    },
+    {
+      "key": "undo-resend-by",
+      "target": "UndoRowStep",
+      "kind": "check",
+      "file": "src/Review/Undoing.decision.ts",
+      "anchors": ["const tookThisUndo"],
+      "until": "type UndoingEvent",
+      "old": "act.row.undone.change === act.undo && act.row.undone.step === act.step && act.row.undone.by === act.by",
+      "new": "act.row.undone.change === act.undo && act.row.undone.step === act.step",
+      "proof": "test/Undoing.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Review: an undo sent twice is written once and answered the same, whatever was decided there since: Ana leaves row 12 out, Dana keeps it and takes that back, and her screen sends the undo again"
+      ]
+    },
+    {
+      "key": "undo-resend-change",
+      "target": "UndoRowStep",
+      "kind": "check",
+      "file": "src/Review/Undoing.decision.ts",
+      "anchors": ["const tookThisUndo"],
+      "until": "type UndoingEvent",
+      "old": "act.row.undone.change === act.undo && act.row.undone.step === act.step && act.row.undone.by === act.by",
+      "new": "act.row.undone.step === act.step && act.row.undone.by === act.by",
       "proof": "test/Undoing.prove.test.ts",
       "expect": "story",
       "trialRules": [],
@@ -1658,9 +1824,25 @@
       "new": "",
       "proof": "test/Undoing.prove.test.ts",
       "expect": "rule",
-      "trialRules": ["Unconfirmed ARowsUndoIsNotFromUnderALaterGroup"],
+      "trialRules": ["Violated ARowsUndoSaysNoLaterGroupCoversIt"],
       "trialStories": [
         "Group: a decision a later group covers is not taken back from under it: Dana types 8 on row 14, Ana's group covers the row, Dana's undo is refused naming the group, and is taken once Ana has taken the group back"
+      ]
+    },
+    {
+      "key": "undo-madeon",
+      "target": "UndoRowStep",
+      "kind": "check",
+      "file": "src/Review/Undoing.decision.ts",
+      "anchors": ["Effect.fn(\"Undoing.decide\")"],
+      "until": "    transitions: {",
+      "old": "      // An undo puts back the decision under the one taken back, another person's included, on the matching that one\n      // was made on. Pressed on a screen that has not received a match, it is refused and held as a row's act is.\n      if (cmd.madeOn !== life.state.matching) return yield* new MatchedSince({ matching: life.state.matching })\n",
+      "new": "",
+      "proof": "test/Undoing.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated AnUndoIsMadeOnTheMatchingNow"],
+      "trialStories": [
+        "Review: a row's undo pressed on a screen that has not received a match is refused and held, and taken once it has: Ana leaves row 12 out, Dana keeps it, the admin matches a column, and Dana presses undo"
       ]
     },
     {
@@ -1687,8 +1869,8 @@
       "old": "      if (row.state.under.change === -1) return yield* new HistoryEnds({})\n",
       "new": "",
       "proof": "test/Undoing.prove.test.ts",
-      "expect": "story",
-      "trialRules": [],
+      "expect": "rule",
+      "trialRules": ["Violated AnUndoStopsWhereTheHistoryWasLetGo"],
       "trialStories": [
         "Review: a full history never refuses a decision: the oldest levels are let go, and an undo stops there and says so"
       ]
@@ -1955,6 +2137,20 @@
       "trialStories": [
         "Review: a row or a group kept under another organization's name is not changed, even by its maker"
       ]
+    },
+    {
+      "key": "gundo-groupowner-import",
+      "target": "UndoGroup",
+      "kind": "check",
+      "file": "src/Review/UndoingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"UndoingGroup.decide\")"],
+      "until": "    transitions: {",
+      "old": "if (group.state.importId !== cmd.importId || group.state.organizationId !== life.state.organizationId) {",
+      "new": "if (group.state.organizationId !== life.state.organizationId) {",
+      "proof": "test/UndoingGroup.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated AGroupsUndoIsOfAGroupOfTheImportItNames"],
+      "trialStories": []
     },
     {
       "key": "gundo-own",

@@ -115,7 +115,10 @@ export class Catalog extends Domain.Model(
               !isDecidedGroup(group.state) ||
               group.state.importId !== life.id ||
               isRemoved(life.state) ||
-              (!isUnstaged(life.state) && group.state.change >= 1 && group.state.undoneAt <= life.state.changes)
+              (!isUnstaged(life.state) &&
+                group.state.change >= 1 &&
+                group.state.change <= life.state.changes &&
+                group.state.undoneAt <= life.state.changes)
           )
         ),
       AGroupsUndoComesAfterIt: (all) =>
@@ -136,6 +139,20 @@ export class Catalog extends Domain.Model(
               isUnstaged(life.state) ||
               group.state.change !== life.state.topGroup ||
               group.state.undoneAt === 0
+          )
+        ),
+      // And no group in force is later than it: the one an import holds as its last in force is the last.
+      NoGroupInForceIsLaterThanTheLastInForce: (all) =>
+        A.every(all.Group, (group) =>
+          A.every(
+            all.Import,
+            (life) =>
+              !isDecidedGroup(group.state) ||
+              group.state.importId !== life.id ||
+              isRemoved(life.state) ||
+              isUnstaged(life.state) ||
+              group.state.undoneAt !== 0 ||
+              group.state.change <= life.state.topGroup
           )
         ),
       // No act on a group of an import is later than the one the import holds as its last.

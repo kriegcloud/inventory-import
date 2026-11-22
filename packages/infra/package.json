@@ -20,11 +20,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@alchemy.run/cloudflare": "2.0.0-beta.87",
-    "@alchemy.run/github": "2.0.0-beta.87",
+    "@alchemy.run/cloudflare": "2.0.0-beta.87-734c27a",
+    "@alchemy.run/github": "2.0.0-beta.87-734c27a",
     "@beep/identity": "workspace:*",
     "@beep/schema": "workspace:*",
-    "alchemy": "2.0.0-beta.87",
+    "alchemy": "2.0.0-beta.87-734c27a",
     "effect": "4.1.5"
   },
   "devDependencies": {

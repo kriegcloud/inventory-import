@@ -52,6 +52,25 @@
     "turbo": "2.11.11",
     "typescript": "~7.0.2"
   },
+  "overrides": {
+    "@alchemy.run/acme": "file:vendor/alchemy/alchemy.run-acme-734c27a.tgz",
+    "@alchemy.run/cloudflare": "file:vendor/alchemy/alchemy.run-cloudflare-734c27a.tgz",
+    "@alchemy.run/cloudflare-runtime": "file:vendor/alchemy/alchemy.run-cloudflare-runtime-734c27a.tgz",
+    "@alchemy.run/docker": "file:vendor/alchemy/alchemy.run-docker-734c27a.tgz",
+    "@alchemy.run/domain": "file:vendor/alchemy/alchemy.run-domain-734c27a.tgz",
+    "@alchemy.run/github": "file:vendor/alchemy/alchemy.run-github-734c27a.tgz",
+    "@alchemy.run/node-utils": "file:vendor/alchemy/alchemy.run-node-utils-734c27a.tgz",
+    "@alchemy.run/sql": "file:vendor/alchemy/alchemy.run-sql-734c27a.tgz",
+    "@distilled.cloud/acme": "file:vendor/alchemy/distilled.cloud-acme-734c27a.tgz",
+    "@distilled.cloud/aws": "file:vendor/alchemy/distilled.cloud-aws-734c27a.tgz",
+    "@distilled.cloud/aws4signer": "file:vendor/alchemy/distilled.cloud-aws4signer-734c27a.tgz",
+    "@distilled.cloud/cloudflare": "file:vendor/alchemy/distilled.cloud-cloudflare-734c27a.tgz",
+    "@distilled.cloud/core": "file:vendor/alchemy/distilled.cloud-core-734c27a.tgz",
+    "@distilled.cloud/github": "file:vendor/alchemy/distilled.cloud-github-734c27a.tgz",
+    "@distilled.cloud/iceberg": "file:vendor/alchemy/distilled.cloud-iceberg-734c27a.tgz",
+    "@distilled.cloud/s3": "file:vendor/alchemy/distilled.cloud-s3-734c27a.tgz",
+    "alchemy": "file:vendor/alchemy/alchemy-734c27a.tgz"
+  },
   "engines": {
     "node": ">=22"
   },

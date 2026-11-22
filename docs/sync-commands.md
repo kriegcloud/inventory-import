@@ -27,8 +27,8 @@ packages at different versions of `effect`, a package no `workspaces` pattern co
 ## Moving dependencies: `deps:update`
 
 - **Every package.** The root's `package.json` and every workspace's under `apps` and `packages`, 25 files today.
-  The scratchpad's is not one of them: what it shares with the packages follows through `version-sync`, and a
-  library an experiment added is the experiment's. A dependency keeps the way it is
+  The scratchpad's is not one of them: it is no workspace, and its libraries and its own lockfile are the
+  experiments'. A dependency keeps the way it is
   written: an exact version stays exact, `^1.2.3` stays a caret range.
 - **Effect moves together.** `effect` and every `@effect/*` package released with it are at one exact version. When
   the registry's newest version is the same for all of them, all move; when one was published later than the rest,
@@ -38,14 +38,14 @@ packages at different versions of `effect`, a package no `workspaces` pattern co
   with why it is held and what moves it by hand. So one run says everything an update needs: what moved, and for
   what did not, the command or the steps. The list is `updateGroups` in `.syncpackrc.json`: a group's `label` is its
   reason, and what follows ` To move: ` in it is how it moves. `deps:outdated` leaves the same ones out.
-- **After the move** `version-sync --write` brings along every place a moved version is repeated (the scratchpad,
-  the documents, the pins in code), and only then `bun install` runs, once, so `bun.lock` is made from what the files
+- **After the move** `version-sync --write` brings along every place a moved version is repeated (the documents,
+  the pins in code), and only then `bun install` runs, once, so `bun.lock` is made from what the files
   finally say. The command says what moved from which version to which. Run `bun run check:full` before committing: a
   new formatter or type-checker can find new things.
 - **If the install fails**, every file the command wrote is put back as it was, `bun.lock` included, and it says so.
   `node_modules` may be half installed: `bun install` puts it back. Fix what bun said and run `bun run deps:update`
   again: it finds the same moves.
-- **`config-sync` installs too** when it writes a package.json (the scratchpad's dependencies, a package's scripts),
+- **`config-sync` installs too** when it writes a package.json (a package's scripts),
   so `bun.lock` follows at once. `bun run lockfile:check`, in `bun run check`, refuses a package.json that asks for a
   version `bun.lock` does not hold, which is what CI's frozen install refuses.
 
@@ -76,7 +76,6 @@ what moves it; to release one, remove the group.
 | A GitHub action's version | `.github/workflows/ci.yml` | the same action in every other workflow |
 | The CLI's version | its `package.json` | `version` in its `src/bin.ts` |
 | The Effect language service's schema | the installed `@effect/tsgo` | a tsconfig's `$schema` that names the library's repository instead |
-| What the scratchpad runs on | the version the `package.json` files state for each dependency | the same dependency in `scratchpad/package.json`; a library only an experiment uses is left alone |
 
 The standing documents are `CLAUDE.md`, `AGENTS.md`, `README.md`, `docs/` and `.claude/agents`. A version is read in
 a sentence only after its own name ("Effect 4.1", "`effect` 4.1.5's source"), and as precisely as the sentence
@@ -117,9 +116,8 @@ depends on where it is and what it holds is written from that.
 | scripts | `check` type-checks each of the package's projects and counts against its ceiling file; `test` exists beside a `vitest.config.ts`; `lint` exists unless the package is vendored | what the package holds |
 | tasks | `check` and `check:full` run every root task `turbo.json` defines and no other; each has a root script (a problem when it has none) | the `//#name` tasks of `turbo.json` |
 | vendored | the formatter's `ignorePatterns` name every vendored package, and no package of the repository's own | the packages with a `vendor.json` |
-| scratchpad | the scratchpad's `dependencies` name every package under `packages/`, as `workspace:*` ([the scratchpad](scratchpad.md)); a link an experiment added to another workspace stays as written; syncpack's sources leave the scratchpad out | the packages under `packages/` |
 
-A reference a person added by hand to a solution file is kept while it names something. A list or object that holds
+A reference a person added by hand to a solution file is kept while it names something. The scratchpad is no workspace, and no rule reads it. A list or object that holds
 a comment is never rewritten whole: the command names what differs and leaves the change to a person, so the comment
 stays. A `./` path that names nothing beside its file is a problem, never a repoint at the root's file of that name.
 

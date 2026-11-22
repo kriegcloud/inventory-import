@@ -1,14 +1,16 @@
 /**
- * The scratchpad: a workspace package (`scratchpad/`) that can import every package of the repository, where an idea
- * is tried in a folder of its own (`scratchpad/experiments/<name>/`) and no check, build or deploy reads it
- * (decision "the scratchpad", 2026-11-22, in explorations/ideal-architecture/DECISIONS.md).
+ * The scratchpad: a folder beside the workspaces, not one of them (`scratchpad/`), whose experiments import every
+ * package of the repository from the root's install. An idea is tried in a folder of its own
+ * (`scratchpad/experiments/<name>/`); the root's install, the build and a deploy never read it, and `bun run check`
+ * only for an import of it, a key and a home path (decision "the scratchpad", 2026-11-22, and its install, in
+ * explorations/ideal-architecture/DECISIONS.md).
  *
  * - `scratch new <name> --template <template>` writes an experiment whose test already passes, and its `NOTE.md`.
  * - `scratch list` says what is open and how old, warns past 30 days or 200 files, and reads back the log.
  * - `scratch check` holds what keeps the scratchpad small: no install inside an experiment (a `package.json`, a
- *   lockfile, a `node_modules`), a note that says what the experiment is, and every dependency of the scratchpad
- *   accounted for: a workspace package, one the repository's packages also use, or a library an experiment's note
- *   names.
+ *   lockfile, a `node_modules`), a note that says what the experiment is, every library of the scratchpad named by an
+ *   experiment's note and none the root's install already has, the scratchpad's own lockfile beside its libraries, its
+ *   configuration as the CLI writes it; then the type-checker with the Effect diagnostics.
  * - `scratch graduate` and `scratch drop` end an experiment: its folder is deleted, the libraries only it named are
  *   removed, and one line of what was learned is appended to `scratchpad/LOG.md`. Moving code into a package is the
  *   person's, before graduating; there the repository's laws apply to it.
@@ -30,6 +32,7 @@ import { Repo } from "../../Repo.service.ts"
 import { scratchpadFolder } from "../../Repo.schema.ts"
 import { err, type Line, out } from "../../Report.schema.ts"
 import { decodeJsonc, entriesOf, objectOf, renderObject } from "../../Sync.rules.ts"
+import { scratchpadFiles } from "./Scratch.config.ts"
 import { filesOf, Template, templates } from "./Scratch.templates.ts"
 
 const $I = $RepoCliId.create("commands/Scratch/Scratch.rules")
@@ -116,7 +119,7 @@ export class ScratchPackage extends S.Class<ScratchPackage, { readonly brand: un
     name: S.String.pipe(S.annotateKey({ description: "The scratchpad's package name" })),
     dependencies: S.Record(S.String, S.String).pipe(
       S.optionalKey,
-      S.annotateKey({ description: "Every workspace package, and what experiments run on" })
+      S.annotateKey({ description: "The libraries experiments added, and nothing the root's install has" })
     ),
     devDependencies: S.Record(S.String, S.String).pipe(
       S.optionalKey,
@@ -124,21 +127,6 @@ export class ScratchPackage extends S.Class<ScratchPackage, { readonly brand: un
     )
   },
   $I.annote("ScratchPackage", { description: "The scratchpad's name and what it depends on" })
-) {}
-
-/**
- * The record of the packages kept as files: read only for whether the prover's package is among them.
- *
- * @category schemas
- */
-export class KeptFiles extends S.Class<KeptFiles, { readonly brand: unique symbol }>($I`KeptFiles`)(
-  {
-    commit: S.String.pipe(S.annotateKey({ description: "The commit the files were built from" })),
-    packages: S.Array(S.Struct({ package: S.String, version: S.String })).pipe(
-      S.annotateKey({ description: "The packages kept as files" })
-    )
-  },
-  $I.annote("KeptFiles", { description: "The commit and versions of the packages kept as files" })
 ) {}
 
 const name = S.String.pipe(S.annotateKey({ description: "The experiment's name" }))
@@ -399,10 +387,10 @@ export const scratchTest = Effect.fn("Scratch.scratchTest")(function* (name: O.O
   )
 })
 
-/** `bun install`, at the repository's root. */
+/** `bun install` in the scratchpad, which has its own lockfile: the root's install is never touched. */
 export const bunInstall: Install = Effect.gen(function* () {
   const repo = yield* Repo
-  const answer = yield* repo.run("bun", ["install"])
+  const answer = yield* repo.run("bun", ["install"], { cwd: repo.join(repo.root, scratchpad) })
   return { code: answer.code, output: Str.trim(`${answer.stdout}\n${answer.stderr}`) }
 })
 
@@ -463,10 +451,11 @@ const withBlock = (
  *
  * @category rules
  */
-export const scratchNew = Effect.fn("Scratch.scratchNew")(function* (
-  options: { readonly name: string; readonly template: Template; readonly question: string },
-  install: Install
-) {
+export const scratchNew = Effect.fn("Scratch.scratchNew")(function* (options: {
+  readonly name: string
+  readonly template: Template
+  readonly question: string
+}) {
   const repo = yield* Repo
   const slug = options.name
   if (!validName.test(slug) || slug.length > 40) {
@@ -482,35 +471,27 @@ export const scratchNew = Effect.fn("Scratch.scratchNew")(function* (
     return yield* refuse(folder, `${where} is already there: choose another name, or end that experiment first`)
   }
 
-  // The prover's package is a library of the experiment, and only once the repository pins it.
-  const kept = repo.join(repo.root, "vendor", "alchemy", "sources.json")
-  const needsProver = options.template === "verify"
-  const hasKept = yield* repo.exists(kept)
-  const keptText = needsProver && hasKept ? yield* repo.text(kept) : '{"commit":"","packages":[]}'
-  const record = yield* decodeJsonc(KeptFiles)("vendor/alchemy/sources.json", keptText)
-  const prover = A.findFirst(record.packages, (one) => one.package === "@alchemy.run/domain")
-  if (needsProver && O.isNone(prover)) {
-    return yield* refuse(
-      kept,
-      `the verify template needs @alchemy.run/domain, and this repository does not pin it yet (vendor/alchemy/sources.json ${
-        hasKept ? "does not list it" : "is not there"
-      }). Until it does, start from ${A.join(
-        A.filter(templates, (template) => template !== "verify"),
-        ", "
-      )}`
-    )
+  // The prover comes from the root's install, as every package of the repository does: it is there once a package
+  // asks for it. A second copy in the scratchpad would be a second Effect beside the packages'.
+  if (options.template === "verify") {
+    const prover = repo.join(repo.root, "node_modules", "@alchemy.run", "domain", "package.json")
+    if (!(yield* repo.exists(prover))) {
+      return yield* refuse(
+        prover,
+        `the verify template needs @alchemy.run/domain, and the root's install does not have it (no package asks for it yet, or \`bun install\` has not run). Until it does, start from ${A.join(
+          A.filter(templates, (template) => template !== "verify"),
+          ", "
+        )}`
+      )
+    }
   }
-  const libraries = O.match(prover, {
-    onNone: () => A.empty<readonly [string, string]>(),
-    onSome: (one) => (needsProver ? [["@alchemy.run/domain", `${one.version}-${record.commit}`] as const] : [])
-  })
 
   const started = yield* today
   const note = Note.make({
     status: "open",
     started,
     template: options.template,
-    libraries: A.map(libraries, ([library]) => library)
+    libraries: []
   })
   const files = A.prepend(filesOf(options.template)(slug), {
     name: "NOTE.md",
@@ -520,25 +501,15 @@ export const scratchNew = Effect.fn("Scratch.scratchNew")(function* (
     concurrency: 1,
     discard: true
   })
-  if (libraries.length > 0) {
-    const added = withBlock(state.manifestText, "dependencies", (entries) =>
-      A.appendAll(
-        A.filter(entries, ([key]) => !A.some(libraries, ([library]) => library === key)),
-        libraries
-      )
-    )
-    yield* repo.write(state.manifestFile, added)
-    const installed = yield* install
-    if (installed.code !== 0) {
-      return yield* refuse(
-        "bun install",
-        `${where} is written and ${A.join(
-          A.map(libraries, ([library]) => library),
-          ", "
-        )} is in the scratchpad's package.json, but \`bun install\` did not finish:\n${installed.output}`
-      )
-    }
-  }
+  // The scratchpad's own configuration, written where it is missing: the CLI is where it is kept.
+  yield* Effect.forEach(
+    scratchpadFiles,
+    Effect.fnUntraced(function* (file) {
+      const absolute = repo.join(state.dir, file.name)
+      if (!(yield* repo.exists(absolute))) yield* repo.write(absolute, file.text)
+    }),
+    { concurrency: 1, discard: true }
+  )
   const next: ReadonlyArray<string> = A.flatten([
     [`bun run scratch:test ${slug}    its test, which passes as written`],
     options.template === "screen"
@@ -653,26 +624,9 @@ export const scratchCheck = Effect.fn("Scratch.scratchCheck")(function* (types: 
     )
   })
 
-  // Every dependency is a workspace package, one the repository's packages also use, or a library a note names.
-  const workspaces = yield* repo.workspaces
-  const rootManifest = yield* repo.json(
-    S.Struct({
-      dependencies: S.optionalKey(S.Record(S.String, S.Unknown)),
-      devDependencies: S.optionalKey(S.Record(S.String, S.Unknown))
-    })
-  )(repo.join(repo.root, "package.json"))
-  const used = A.dedupe(
-    A.appendAll(
-      A.flatMap(workspaces, (workspace) =>
-        R.keys({
-          ...workspace.manifest.dependencies,
-          ...workspace.manifest.devDependencies,
-          ...workspace.manifest.peerDependencies
-        })
-      ),
-      R.keys({ ...rootManifest.dependencies, ...rootManifest.devDependencies })
-    )
-  )
+  // A library of the scratchpad is an experiment's own: one the root's install already has (effect, react, a package
+  // of the repository) comes from the root, as it is, and a second copy would be a second of it beside the packages'.
+  const fromRoot = (name: string) => repo.exists(repo.join(repo.root, "node_modules", name, "package.json"))
   const named = A.flatMap(state.experiments, (experiment) =>
     O.match(experiment.note, {
       onNone: () => A.empty<{ readonly library: string; readonly slug: string }>(),
@@ -680,19 +634,67 @@ export const scratchCheck = Effect.fn("Scratch.scratchCheck")(function* (types: 
     })
   )
   const declared = R.toEntries({ ...state.manifest.dependencies, ...state.manifest.devDependencies })
+  const shared = yield* Effect.filter(
+    A.map(declared, ([dependency]) => dependency),
+    (dependency) =>
+      Effect.map(
+        fromRoot(dependency),
+        (installed) =>
+          installed ||
+          dependency === "effect" ||
+          Str.startsWith("@effect/")(dependency) ||
+          Str.startsWith("react")(dependency)
+      ),
+    { concurrency: 1 }
+  )
+  const sharedProblems = A.map(shared, (dependency) =>
+    problem(
+      `${scratchpad}/package.json`,
+      `\`${dependency}\` comes from the root's install: an experiment imports it as the packages do. Remove it here (\`bun remove --cwd ${scratchpad} ${dependency}\`), so there is one copy`
+    )
+  )
   const unaccounted = A.map(
     A.filter(
       declared,
-      ([dependency, spec]) =>
-        !Str.startsWith("workspace:")(spec) &&
-        !A.contains(used, dependency) &&
-        !A.some(named, (one) => one.library === dependency)
+      ([dependency]) => !A.contains(shared, dependency) && !A.some(named, (one) => one.library === dependency)
     ),
     ([dependency]) =>
       problem(
         `${scratchpad}/package.json`,
-        `\`${dependency}\` is a dependency no experiment's NOTE.md names (\`libraries:\`) and no package of the repository uses: name the experiment that needs it, or remove it`
+        `\`${dependency}\` is a library no experiment's NOTE.md names (\`libraries:\`): name the experiment that needs it, or remove it`
       )
+  )
+  // The scratchpad's own lockfile is committed: bun writes it with the first library.
+  const lockfile = repo.join(state.dir, "bun.lock")
+  const hasLockfile = yield* repo.exists(lockfile)
+  const unlocked =
+    declared.length > 0 && !hasLockfile
+      ? [
+          problem(
+            `${scratchpad}/package.json`,
+            `lists libraries and ${scratchpad}/bun.lock is not there: run \`bun install --cwd ${scratchpad}\` and commit ${scratchpad}/bun.lock`
+          )
+        ]
+      : []
+  // Its configuration is the CLI's (scratch new writes it): a file that differs would be read by nothing that checks it.
+  const configs = yield* Effect.forEach(
+    A.filter(scratchpadFiles, (file) => file.name !== "package.json"),
+    Effect.fnUntraced(function* (file) {
+      const absolute = repo.join(state.dir, file.name)
+      const there = yield* repo.exists(absolute)
+      const text = there ? yield* repo.text(absolute) : ""
+      return text === file.text
+        ? A.empty<ScratchFinding>()
+        : [
+            problem(
+              `${scratchpad}/${file.name}`,
+              there
+                ? "differs from what the CLI writes (packages/tooling/tool/cli/src/commands/Scratch/Scratch.config.ts): change both together"
+                : "is missing: `bun run scratch:new` writes it"
+            )
+          ]
+    }),
+    { concurrency: 1 }
   )
   const undeclared = A.map(
     A.filter(named, (one) => !A.some(declared, ([dependency]) => dependency === one.library)),
@@ -702,7 +704,7 @@ export const scratchCheck = Effect.fn("Scratch.scratchCheck")(function* (types: 
         `names the library \`${one.library}\`, which is not in the scratchpad's package.json: add it there (\`bun add --cwd ${scratchpad} ${one.library}\`), or take it out of the note`
       )
   )
-  const problems = A.flatten([perExperiment, unaccounted, undeclared])
+  const problems = A.flatten([perExperiment, sharedProblems, unaccounted, undeclared, unlocked, A.flatten(configs)])
   const structure = A.isArrayNonEmpty(problems)
     ? A.prepend<ScratchFinding, ScratchFinding>(
         problems,

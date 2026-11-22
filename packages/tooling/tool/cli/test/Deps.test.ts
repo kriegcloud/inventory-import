@@ -19,19 +19,16 @@ import { render } from "../src/Report.schema.ts"
 import { lines } from "./support/sync.ts"
 import { inTree, json, printed, type Tree } from "./support/tree.ts"
 
-// A registry that answers from a table, and an install that writes a lockfile from every package.json as it is when
-// the install runs, the scratchpad's included, as bun does: no network, nothing installed. A test then sees in
+// A registry that answers from a table, and an install that writes a lockfile from every package.json of the
+// workspaces as it is when the install runs, as bun does: no network, nothing installed. A test then sees in
 // bun.lock what the install was given. A failing install still writes its lockfile first, as a half-finished one can.
 const lockOf = Effect.gen(function* () {
   const repo = yield* Repo
   const workspaces = yield* repo.workspaces
-  const scratch = repo.join(repo.root, "scratchpad", "package.json")
-  const hasScratch = yield* repo.exists(scratch)
-  const files = A.flatten([
-    [repo.join(repo.root, "package.json")],
+  const files = A.prepend(
     A.map(workspaces, (workspace) => repo.join(workspace.dir, "package.json")),
-    hasScratch ? [scratch] : []
-  ])
+    repo.join(repo.root, "package.json")
+  )
   const texts = yield* Effect.forEach(
     files,
     (file) => Effect.map(repo.text(file), (text) => `${repo.relative(repo.root, file)} ${text}`),
@@ -233,24 +230,25 @@ describe("deps update", () => {
     })
   )
 
-  it.effect("the scratchpad is not read: a library an experiment added is the experiment's to move", () =>
+  it.effect("the scratchpad is not read: its package.json and its own lockfile are the experiments'", () =>
     Effect.gen(function* () {
-      const scratch = json({ name: "@x/scratchpad", dependencies: { effect: "4.1.4", zod: "^3.0.0" } })
+      const scratch = json({ name: "@x/scratchpad", dependencies: { "left-pad": "^1.0.0" } })
       const result = yield* run(
-        { ...tree(), "scratchpad/package.json": scratch },
-        registry({ ...newest, zod: "4.0.0" }),
+        { ...tree(), "scratchpad/package.json": scratch, "scratchpad/bun.lock": "the scratchpad's own\n" },
+        registry({ ...newest, "left-pad": "1.3.0" }),
         "write",
-        ["scratchpad/package.json"]
+        ["scratchpad/package.json", "scratchpad/bun.lock"]
       )
-      expect(A.filter(printed(result.first), Str.includes("zod"))).toEqual([])
+      expect(A.filter(printed(result.first), Str.includes("left-pad"))).toEqual([])
       expect(printed(result.first)[0]).toBe(
         "out: deps:update  3 package.json files, 6 dependencies: 3 moved, 2 held, 1 not compared"
       )
-      // `effect` follows through version-sync; `zod` stays where the experiment put it.
-      const followed = json({ name: "@x/scratchpad", dependencies: { effect: "4.1.5", zod: "^3.0.0" } })
-      expect(result.files["scratchpad/package.json"]).toBe(followed)
-      // And the install ran after version-sync: the lockfile was made from the scratchpad as it now is.
-      expect(result.lock).toContain(`scratchpad/package.json ${followed}`)
+      expect(result.files).toEqual({
+        "scratchpad/package.json": scratch,
+        "scratchpad/bun.lock": "the scratchpad's own\n"
+      })
+      // The root's install was made from the workspaces only.
+      expect(result.lock).not.toContain("scratchpad")
     })
   )
 

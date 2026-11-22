@@ -7,7 +7,9 @@ tags: [tooling, experiments, scratchpad]
 
 # Trying an idea in the scratchpad
 
-`scratchpad/` is a workspace package that can import every package of the repository. An idea is tried there in a
+`scratchpad/` is a folder beside the workspaces, not one of them, that can import every package of the repository:
+bun keeps one `node_modules` at the root, which holds every package and every library, and an experiment imports
+them from there. An idea is tried there in a
 folder of its own, with a test. The build never reads an experiment, `bun run check` reads one only for what must
 never be committed (a key, a home path) and for an import of it, and a broken experiment fails no check. What does
 read the scratchpad today is listed at the end of this page. The price of that freedom is that an experiment ends: its code graduates into a
@@ -76,10 +78,15 @@ the test's name says it was not run, and it was checked by hand.
   and where to, or was dropped.
 - **No install of its own.** A `package.json`, a lockfile or a `node_modules` inside an experiment fails
   `scratch:check`. That is how a scratchpad becomes a second repository.
-- **A library only an experiment needs** goes in the scratchpad's `package.json`
-  (`bun add --cwd scratchpad <name>`) and in the experiment's note (`libraries: <name>`). It never goes in the app or
-  a package. `bun run deps:update` leaves it alone, and ending the experiment removes it unless another experiment
-  names it too.
+- **A library only an experiment needs** goes in the scratchpad's own `package.json`
+  (`bun add --cwd scratchpad <name>`), installed in `scratchpad/node_modules` with the scratchpad's own lockfile,
+  `scratchpad/bun.lock`, which is committed (bun writes it with the first library), and in the experiment's note
+  (`libraries: <name>`). It never goes in the app or a package, and the root's install, CI and a deploy never install
+  it. `bun run deps:update` leaves both files alone, and ending the experiment removes the library unless another
+  experiment names it too.
+- **Never a library the root already has.** `effect`, `@effect/*`, React and every package of the repository come
+  from the root's install, as they are: `scratch:check` refuses one in the scratchpad's `package.json`, since a second
+  copy of `effect` beside the packages' breaks them. So an experiment cannot try another version of a shared library.
 - **Graduate or delete.** Graduating does not move code: move it into a package first, make `bun run check` pass
   there, then graduate, in the same change.
 - **A warning, not a failure:** `scratch:list` names an experiment older than 30 days or larger than 200 files.
@@ -93,14 +100,12 @@ import the packages, and `scratch:list` shows that it is still there.
 
 ## What the rest of the repository does with it
 
-- **It is a workspace of the root**, so the root's `bun install` (on CI and in a deploy too) installs what its
-  package.json asks for, a library an experiment added included, and `bun run check` reads that package.json
-  (`version-sync`, `config-sync:check`, `lockfile:check`). Whether it should stay a workspace is not decided.
-- The scratchpad depends on every package under `packages/`; `bun run config-sync` writes that list, so a new
-  package is importable without anyone remembering, and `config-sync:check` fails when it is missing.
-- What it shares with the packages (`effect`, the test runner, React) is held at the packages' versions by
-  `bun run version-sync`. syncpack does not read it.
-- Turbo runs no task in it: it has no `check`, `lint`, `test` or `build` script. An edit inside an experiment changes
-  the cache key of two root tasks only, `keys:check` and `private-paths:check`, which read it for what must never be
-  committed. The CLI's slow test of the templates copies the scratchpad's three configuration files. The formatter skips
-  `scratchpad/experiments`.
+- **It is no workspace** (decision "the scratchpad", its install): the root's `bun install`, on CI and in a deploy,
+  never installs anything of it, and a new package is importable from it as soon as `bun install` has run at the root.
+- **`bun run check` reads it for three things only:** an import of it from anywhere else (`boundaries:check`), a key
+  (`keys:check`) and a home path or a private folder (`private-paths:check`). No other check, the formatter included,
+  reads it, and an edit inside an experiment changes the cache key of those three tasks only.
+- **Its configuration is the CLI's** (`packages/tooling/tool/cli/src/commands/Scratch/Scratch.config.ts`):
+  `scratch:new` writes a file that is missing, `scratch:check` names one that differs, and the CLI's slow test of the
+  templates builds its scratchpad from those texts, so CI reads nothing of this folder.
+- Turbo runs no task in it: it has no `check`, `lint`, `test` or `build` script.

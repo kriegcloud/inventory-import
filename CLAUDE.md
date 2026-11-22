@@ -268,8 +268,9 @@ Hosting is not a script: `bunx alchemy deploy --stage <name>` from the root runs
 only Benjamin runs it (`goals/infra/PLAN.md`, "What Benjamin does by hand").
 
 If you add or remove a dependency, do it with `bun add` or `bun remove` in the workspace that uses it
-(`bun add --cwd apps/inventory <name>`); `bun.lock` at the root is the only lockfile, and `bunfig.toml` keeps one
-hoisted `node_modules`.
+(`bun add --cwd apps/inventory <name>`); `bun.lock` at the root is the only lockfile of the workspaces, and `bunfig.toml` keeps one
+hoisted `node_modules`. The one other lockfile is the scratchpad's (`scratchpad/bun.lock`, committed), for the
+libraries an experiment added: the scratchpad is no workspace, and a library the root already has never goes there.
 
 **A second dev server.** Benjamin usually runs the dev server in his own terminal on port 5173; ask before starting
 another. Start one with `bun run dev -- --port 5174 --strictPort & echo $! > .dev.pid`, stop it with
@@ -344,11 +345,12 @@ packages/tooling/tool/cli/  @beep/repo-cli: the repository's own rules as comman
                         `config-sync`, which move dependencies and keep repeated versions and derived configuration in
                         step (`docs/sync-commands.md`); and `scratch` (new, list, check, graduate, drop). Nothing
                         imports it.
-scratchpad/             @inventory/scratchpad: a private workspace package that depends on every package, where an idea
-                        is tried in a folder of its own (experiments/<name>/: a NOTE.md, code and a test). No check,
-                        build or deploy reads it, and nothing may import from it (`bun run beep laws boundaries`). The
-                        laws on how code is written apply when an experiment's code graduates into a package; only the
-                        law on secrets reads it. LOG.md keeps one line for each experiment that ended
+scratchpad/             A folder beside the workspaces, not one of them, where an idea is tried in a folder of its own
+                        (experiments/<name>/: a NOTE.md, code and a test), importing every package from the root's
+                        install. Its package.json and its own bun.lock hold only libraries experiments added; its
+                        configuration is the CLI's. The root's install, the build and a deploy never read it; `bun run
+                        check` reads it only for an import of it (`laws boundaries`), a key and a home path. The laws on
+                        how code is written apply when an experiment's code graduates into a package. LOG.md keeps one line for each experiment that ended
                         (`docs/scratchpad.md`).
 tsconfig.json           References every package's tsconfig.test.json and tsconfig.config.json, so a linter that reads
                         types and an editor find a test's project. Nothing compiles it. `bun run config-sync` writes

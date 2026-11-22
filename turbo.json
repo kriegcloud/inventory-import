@@ -34,9 +34,9 @@
     "build": { "dependsOn": ["transit"], "outputs": ["dist/**"] },
     "dev": { "cache": false, "persistent": true },
     // Repository checks: root scripts that do not call turbo.
-    // Every file but an experiment of the scratchpad: the formatter leaves those alone (.oxfmtrc.json), and an
-    // experiment that is not formatted, or does not parse, fails nothing here.
-    "//#format:check": { "inputs": ["$TURBO_DEFAULT$", "!scratchpad/experiments/**"], "outputs": [] },
+    // Every file but the scratchpad's: the formatter leaves it alone (.oxfmtrc.json), and an experiment that is not
+    // formatted, or does not parse, fails nothing here.
+    "//#format:check": { "inputs": ["$TURBO_DEFAULT$", "!scratchpad/**"], "outputs": [] },
     // Vendored kit packages still match the beep-effect files they were copied from (`beep vendor check`).
     "//#vendor:check": {
       "inputs": [
@@ -156,7 +156,6 @@
         "packages/**/wrangler*.jsonc",
         "packages/**/src/**/*.ts",
         "vendor/alchemy/sources.json",
-        "scratchpad/package.json",
         "bun.lock",
         "!**/node_modules/**"
       ],
@@ -172,8 +171,6 @@
         "packages/foundation/modeling/schema/src/**",
         "packages/foundation/modeling/utils/src/**",
         "*.{json,jsonc}",
-        "scratchpad/package.json",
-        "scratchpad/tsconfig*.json",
         ".oxlintrc*.json",
         ".oxfmtrc.json",
         ".syncpackrc.json",
@@ -258,7 +255,6 @@
         "package.json",
         "apps/**/package.json",
         "packages/**/package.json",
-        "scratchpad/package.json",
         "bun.lock",
         "bunfig.toml",
         "!**/node_modules/**"

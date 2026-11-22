@@ -36,7 +36,7 @@ const question = Flag.String("question").pipe(
 
 /** `scratch new <name> [--template probe|service|screen|verify]`: an experiment whose test already passes. */
 export const scratchNewCommand = Command.make("new", { name, template, question }, (flags) =>
-  Effect.flatMap(scratchNew(flags, bunInstall), emit(scratchSentence))
+  Effect.flatMap(scratchNew(flags), emit(scratchSentence))
 ).pipe(Command.withDescription("Start an experiment in its own folder of the scratchpad, from a template that runs"))
 
 const testedName = Argument.String("name").pipe(

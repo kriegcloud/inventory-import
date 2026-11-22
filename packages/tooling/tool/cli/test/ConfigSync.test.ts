@@ -350,48 +350,28 @@ describe("config-sync", () => {
     })
   )
 
-  it.effect(
-    "the formatter reads again a package that stopped being vendored; the scratchpad keeps a link to the app",
-    () =>
-      Effect.gen(function* () {
-        const result = yield* run(
-          {
-            "package.json": json({ name: "root", workspaces: ["apps/*", "packages/*", "scratchpad"] }),
-            ".oxfmtrc.json": lines(["{", '  "ignorePatterns": ["**/dist/**", "packages/once-kit/**"]', "}"]),
-            "apps/shop/package.json": json({ name: "@x/shop", scripts }),
-            "apps/shop/tsconfig.json": "{}",
-            // No vendor.json any more: the repository's own code.
-            "packages/once-kit/package.json": json({ name: "@x/once-kit", scripts }),
-            "packages/once-kit/tsconfig.json": "{}",
-            "scratchpad/package.json": lines([
-              "{",
-              '  "name": "@x/scratchpad",',
-              '  "dependencies": {',
-              '    "@x/shop": "workspace:*",',
-              '    "@x/once-kit": "workspace:^"',
-              "  }",
-              "}"
-            ])
-          },
-          [".oxfmtrc.json", "scratchpad/package.json"]
-        )
-        expect(result.before).toEqual([
-          "err: config-sync FAIL  1 place differs from what it is derived from (`bun run config-sync` writes it)",
-          "err:   .oxfmtrc.json:2  `ignorePatterns`, from the packages with a vendor.json: found with packages/once-kit/**, which is no vendored package, expected every vendored package, and no package of the repository's own"
-        ])
-        expect(result.files).toEqual({
-          ".oxfmtrc.json": lines(["{", '  "ignorePatterns": ["**/dist/**"]', "}"]),
-          "scratchpad/package.json": lines([
-            "{",
-            '  "name": "@x/scratchpad",',
-            '  "dependencies": {',
-            '    "@x/shop": "workspace:*",',
-            '    "@x/once-kit": "workspace:^"',
-            "  }",
-            "}"
-          ])
-        })
+  it.effect("the formatter reads again a package that stopped being vendored", () =>
+    Effect.gen(function* () {
+      const result = yield* run(
+        {
+          "package.json": json({ name: "root", workspaces: ["apps/*", "packages/*"] }),
+          ".oxfmtrc.json": lines(["{", '  "ignorePatterns": ["**/dist/**", "packages/once-kit/**"]', "}"]),
+          "apps/shop/package.json": json({ name: "@x/shop", scripts }),
+          "apps/shop/tsconfig.json": "{}",
+          // No vendor.json any more: the repository's own code.
+          "packages/once-kit/package.json": json({ name: "@x/once-kit", scripts }),
+          "packages/once-kit/tsconfig.json": "{}"
+        },
+        [".oxfmtrc.json"]
+      )
+      expect(result.before).toEqual([
+        "err: config-sync FAIL  1 place differs from what it is derived from (`bun run config-sync` writes it)",
+        "err:   .oxfmtrc.json:2  `ignorePatterns`, from the packages with a vendor.json: found with packages/once-kit/**, which is no vendored package, expected every vendored package, and no package of the repository's own"
+      ])
+      expect(result.files).toEqual({
+        ".oxfmtrc.json": lines(["{", '  "ignorePatterns": ["**/dist/**"]', "}"])
       })
+    })
   )
 
   it.effect("gives a package the scripts turbo runs for what it holds", () =>
@@ -526,59 +506,25 @@ describe("config-sync", () => {
     })
   )
 
-  it.effect("the scratchpad depends on every package, and syncpack does not read it", () =>
+  it.effect("the scratchpad is no workspace and is not read: its manifest and configuration are the CLI's", () =>
     Effect.gen(function* () {
+      const scratch = lines(["{", '  "name": "@x/scratchpad",', '  "dependencies": { "left-pad": "^1.0.0" }', "}"])
       const result = yield* run(
         {
-          "package.json": json({ name: "root", workspaces: ["packages/*", "scratchpad"] }),
+          "package.json": json({ name: "root", workspaces: ["packages/*"] }),
           ".syncpackrc.json": lines(["{", '  "source": ["package.json", "packages/*/package.json"]', "}"]),
           "packages/kernel/package.json": json({ name: "@x/kernel", scripts }),
           "packages/kernel/tsconfig.json": "{}",
-          "packages/ui/package.json": json({ name: "@x/ui", scripts }),
-          "packages/ui/tsconfig.json": "{}",
-          // One package is missing, one that is gone is still there, and a library an experiment added stays.
-          "scratchpad/package.json": lines([
-            "{",
-            '  "name": "@x/scratchpad",',
-            '  "dependencies": {',
-            '    "@x/gone": "workspace:*",',
-            '    "@x/kernel": "workspace:*",',
-            '    "zod": "^4.0.0"',
-            "  }",
-            "}"
-          ]),
-          "scratchpad/tsconfig.json": lines(["{", '  "extends": "../../tsconfig.base.json"', "}"]),
-          "tsconfig.base.json": "{}"
+          "scratchpad/package.json": scratch,
+          "scratchpad/tsconfig.json": lines(["{", '  "extends": "../../tsconfig.base.json"', "}"])
         },
-        ["scratchpad/package.json", "scratchpad/tsconfig.json", ".syncpackrc.json", "bun.lock"]
+        ["scratchpad/package.json", "scratchpad/tsconfig.json"]
       )
-      // The write changed a package.json, so it installed: the lockfile follows the scratchpad as it now is.
-      expect(result.written.at(-1)).toBe(
-        "out: config-sync  a package.json changed, so bun install ran: bun.lock follows what the package.json files say"
-      )
-      expect(result.files["bun.lock"]).toBe(`locked from: ${result.files["scratchpad/package.json"]}`)
-      expect(result.before).toEqual([
-        "err: config-sync FAIL  2 places differ from what they are derived from (`bun run config-sync` writes them)",
-        "err:   scratchpad/package.json:3  the scratchpad's `dependencies`, from the packages under packages/: found without @x/ui, with @x/gone, which is no workspace, expected every package under packages/, as workspace:*",
-        "err:   scratchpad/tsconfig.json:2  `extends`, from the folder's depth: found ../../tsconfig.base.json, expected ../tsconfig.base.json"
-      ])
+      expect(result.before[0]).toMatch(/^out: config-sync OK /)
       expect(result.files).toEqual({
-        "scratchpad/package.json": lines([
-          "{",
-          '  "name": "@x/scratchpad",',
-          '  "dependencies": {',
-          '    "@x/kernel": "workspace:*",',
-          '    "@x/ui": "workspace:*",',
-          '    "zod": "^4.0.0"',
-          "  }",
-          "}"
-        ]),
-        "scratchpad/tsconfig.json": lines(["{", '  "extends": "../tsconfig.base.json"', "}"]),
-        ".syncpackrc.json": lines(["{", '  "source": ["package.json", "packages/*/package.json"]', "}"]),
-        "bun.lock": `locked from: ${result.files["scratchpad/package.json"]}`
+        "scratchpad/package.json": scratch,
+        "scratchpad/tsconfig.json": lines(["{", '  "extends": "../../tsconfig.base.json"', "}"])
       })
-      expect(result.after[0]).toMatch(/^out: config-sync OK /)
-      expect(result.again).toEqual(result.after)
     })
   )
 

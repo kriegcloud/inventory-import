@@ -10,8 +10,7 @@
     "packages/access/*",
     "packages/drivers/*",
     "packages/foundation/*/*",
-    "packages/tooling/*/*",
-    "scratchpad"
+    "packages/tooling/*/*"
   ],
   "type": "module",
   "scripts": {

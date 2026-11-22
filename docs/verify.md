@@ -21,7 +21,8 @@ Nothing a person sees uses the model yet, and nothing is stored through it.
 ## What is proved, and what tests hold
 
 Three kinds of rule, and one thing no rule says. Which rules there are is kept by the lock file (below); the counts
-in this table are the lock's, by whose rule it is, and a test holds them (`test/Proving.test.ts`).
+in this table are the lock's, by whose rule it is, and a test reads this table and fails on a row that differs from
+the lock (`test/Proving.test.ts`).
 
 | | Rules | How far each is known to hold |
 | --- | --- | --- |
@@ -41,7 +42,7 @@ schemas and the invariants allow and every input, not sampled by a test.
 
 **No rule says that a valid act is taken.** A `decide` that refused everything would keep all 143. That an act is
 recorded, with the events it should record, is held by tests: the stories (`test/Review.story.test.ts` and
-`test/Group.story.test.ts`, 65 of them, one at least for each of the eleven commands), and the property that drives
+`test/Group.story.test.ts`, 66 of them, one at least for each of the eleven commands), and the property that drives
 the model with the review region's own presses (`packages/catalog/web/test/ReviewModelFold.fold.test.ts`). The eleven
 "can be taken" rules close part of the gap inside Verify: a command no sequence reaches fails the search. They are a
 search three commands deep.
@@ -114,10 +115,15 @@ group is refused naming the group, and taken once the group is taken back" shows
   and from a screen that has not received a match it is refused `MatchedSince` and held.
 - `GroupedAfter` carries the import's last group in force, the one to take back first. For a row's undo that is the
   group over the row or one made after it: the model keeps no reading of a group's rows and cannot say which.
-- `UndoGroup` names nothing its sender has seen, and is the one decision that takes a press from a screen that is
-  behind: it takes back its sender's own act and replaces nothing of anyone else's. A row decided since keeps that
-  person's whole decision ("Row 14 stays whole"), and the screen names such rows from the rows it holds; the answer
-  carries the group's undo and its number, not the rows.
+- `UndoGroup` names nothing its sender has seen, and takes a press from a screen that is behind on the rows: it takes
+  back its sender's own act and replaces nothing of anyone else's. A row decided since keeps that person's whole
+  decision ("Row 14 stays whole"), and the screen names such rows from the rows it holds; the answer carries the
+  group's undo and its number, not the rows.
+- A row's undo is taken from a screen that is behind in one case, and no other press on a row is. `UndoRowStep` names
+  the decision it takes back and not the last undo its screen has of the row (`DecideRow` does: `sawUndone`). Dana
+  keeps row 12, Ana leaves it out and takes that back; Dana's screen has neither, and her undo of her keep is taken:
+  the row holds her decision again, as her screen shows it, and the undo replaces nothing of anyone else's. A story
+  holds it.
 
 **Nothing evaluates a rule while the app runs.** What refuses a state is the code of `decide`. A proved rule means
 that code cannot break it.
@@ -164,13 +170,17 @@ Two more tasks hold the model, both in `bun run check:full`:
 - `bun run --cwd packages/catalog/model mutants:sample`: a few of the model's mutants. A mutant is one change to a
   `decide` (a check removed, an event's field given a wrong value, an act made to record nothing), which a proof or a
   story must notice; `packages/catalog/model/mutants/README.md` has them all, what each class means and what they
-  cost. All of them run every night (`mutants`).
+  cost. All of them run every night: all but the slowest in one job, and that one (`row-open`) alone in a job of its
+  own, where its proof is given 100 minutes.
 
 In CI these four have a job of their own (`proofs` in `.github/workflows/ci.yml`, which runs the tasks of
 `bun run proofs` through turbo itself), which restores turbo's results from the last run on `main` and so runs
 nothing unless one of those changed. They run again every night with nothing replayed and every mutant
-(`.github/workflows/proofs-nightly.yml`, which also calls turbo itself; `bun run proofs:nightly` is the same four
-tasks by hand, with `--force`, so it replays nothing either). `bun run check:ci` is `check:full` without them, for
+(`.github/workflows/proofs-nightly.yml`, which also calls turbo itself). `bun run proofs:nightly` is the same four
+tasks by hand, with `--force`, so it replays nothing either, with one difference: by hand every mutant runs in the
+one task, two at a time, and `row-open` keeps the proof's own 50 minutes beside another mutant, where the nightly
+runs it alone with 100. It took 1,544 s on the workstation; on a slower machine run it as the nightly does
+(`packages/catalog/model/mutants/README.md`). `bun run check:ci` is `check:full` without them, for
 CI's main job. The rule on `main` names both jobs as required (`packages/infra/src/GitHub.stack.ts`); it holds once
 the repository's stack is deployed again (`goals/infra/PLAN.md`, step 14), and until then a red proofs job stops no
 merge.

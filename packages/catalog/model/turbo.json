@@ -2,6 +2,16 @@
   "$schema": "../../../node_modules/turbo/schema.json",
   "extends": ["//"],
   "tasks": {
+    // The fast tests read one file outside the package: the table of rules in docs/verify.md, which a test holds
+    // against the lock (`test/Proving.test.ts`). Named here, or an edit to the page replays an old pass.
+    "test": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/vitest.shared.ts",
+        "$TURBO_ROOT$/vitest.retries.ts",
+        "$TURBO_ROOT$/docs/verify.md"
+      ]
+    },
     // The proofs of the review's model. A proof reads the model's own blocks (the aggregates, the decisions, who is
     // asking and the values they share), the kernel those blocks import from, how the code is compiled, and the
     // pinned library; turbo adds the versions the lockfile resolves for this package (Effect, the solver, the

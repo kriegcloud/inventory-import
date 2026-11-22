@@ -189,6 +189,7 @@ const undone = (input: {
   readonly by: string
   readonly flags: string
   readonly madeOn?: number
+  readonly actor?: string
 }) =>
   ActCounted.make({
     change: input.change,
@@ -197,7 +198,7 @@ const undone = (input: {
     label: "undo",
     holds: input.holds,
     by: input.by,
-    actor: "ana",
+    actor: input.actor ?? "ana",
     flags: input.flags,
     madeOn: input.madeOn ?? 0
   })
@@ -1253,6 +1254,31 @@ it.effect("an undo that puts back another person's decision stops there", () =>
     Story.when(undo({ row: "row-12", undo: 1, step: "u2" })),
     Story.rejected(NotYourStep.make({}))
   )
+)
+it.effect(
+  "a row's undo of its sender's own decision is taken from a screen that has neither another person's decision over it nor its undo: Dana keeps row 12, Ana leaves it out and takes that back, and Dana, whose screen has neither, takes her keep back",
+  () =>
+    story(
+      Story.given(life, staged),
+      Story.provide(CurrentActor, dana),
+      Story.when(act({ row: "row-12", step: "d1", saw: 0, flags: kept })),
+      ...recorded(row12, "row-12", { change: 1, by: "dana", step: "d1", flags: kept }),
+      Story.provide(CurrentActor, ana),
+      Story.when(act({ row: "row-12", step: "a1", saw: 1, flags: leftOut })),
+      ...recorded(row12, "row-12", { change: 2, by: "ana", step: "a1", flags: leftOut }),
+      Story.when(undo({ row: "row-12", undo: 2, step: "u1" })),
+      Story.then(row12, StepUndone.make({ next: noLevel, below: "", undo: 2, step: "u1", by: "ana" })),
+      Story.then(life, undone({ change: 3, row: "row-12", step: "u1", holds: 1, by: "dana", flags: kept })),
+      // The row holds Dana's keep again, as her screen shows it: the undo names nothing of the row it has seen but
+      // the decision it takes back, which is hers and is there.
+      Story.provide(CurrentActor, dana),
+      Story.when(undo({ row: "row-12", undo: 1, step: "u2" })),
+      Story.then(row12, StepUndone.make({ next: noLevel, below: "", undo: 1, step: "u2", by: "dana" })),
+      Story.then(
+        life,
+        undone({ change: 4, row: "row-12", step: "u2", holds: 0, by: "", flags: "", madeOn: -1, actor: "dana" })
+      )
+    )
 )
 it.effect(
   "a full history never refuses a decision: the oldest levels are let go, and an undo stops there and says so",

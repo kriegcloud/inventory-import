@@ -19,15 +19,23 @@ import { retriedReporters } from "./vitest.retries.ts"
  * folder for the whole repository by default and empties it after a change to `bun.lock`; the first package's tests
  * to start then emptied it while other packages' tests were reading it, and those failed with ENOENT (seen here after
  * a merge, and in beep-effect, whose `vitest.shared.ts` gives each package its own folder for the same reason).
+ * The path is relative, so vitest reads it from the package's own root however it was started.
  */
 export const limits = {
   testTimeout: 30_000,
   hookTimeout: 60_000,
-  fsModuleCachePath: `${process.cwd()}/node_modules/.vitest-cache`
+  fsModuleCachePath: "node_modules/.vitest-cache/fast"
 } as const
 
-/** The limits of a slow test (`*.slow.test.ts`: a real database, sign-in, or 50,000 rows). */
-export const slowLimits = { testTimeout: 120_000, hookTimeout: 120_000 } as const
+/**
+ * The limits of a slow test (`*.slow.test.ts`: a real database, sign-in, or 50,000 rows), and its own module cache:
+ * turbo starts a package's fast and slow tests side by side, and each would empty the other's folder.
+ */
+export const slowLimits = {
+  testTimeout: 120_000,
+  hookTimeout: 120_000,
+  fsModuleCachePath: "node_modules/.vitest-cache/slow"
+} as const
 
 /**
  * For a package whose tests wait in real time (`Effect.sleep("20 millis")`, then look): a wait that runs long on a

@@ -9,6 +9,7 @@ import { depsCommand } from "./commands/Deps/Deps.command.ts"
 import { docsCommand } from "./commands/Docs/Docs.command.ts"
 import { lawsCommand } from "./commands/Laws/Laws.command.ts"
 import { qualityCommand } from "./commands/Quality/Quality.command.ts"
+import { scratchCommand } from "./commands/Scratch/Scratch.command.ts"
 import { vendorCommand } from "./commands/Vendor/Vendor.command.ts"
 import { versionSyncCommand } from "./commands/VersionSync/VersionSync.command.ts"
 
@@ -25,6 +26,7 @@ export const rootCommand = Command.make("beep").pipe(
     docsCommand,
     lawsCommand,
     qualityCommand,
+    scratchCommand,
     vendorCommand,
     versionSyncCommand
   ])

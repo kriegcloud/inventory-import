@@ -10,7 +10,8 @@
     "packages/access/*",
     "packages/drivers/*",
     "packages/foundation/*/*",
-    "packages/tooling/*/*"
+    "packages/tooling/*/*",
+    "scratchpad"
   ],
   "type": "module",
   "scripts": {
@@ -36,6 +37,13 @@
     "version-sync": "bun packages/tooling/tool/cli/src/bin.ts version-sync",
     "config-sync": "bun packages/tooling/tool/cli/src/bin.ts config-sync",
     "config-sync:check": "bun packages/tooling/tool/cli/src/bin.ts config-sync --check",
+    "scratch:new": "bun packages/tooling/tool/cli/src/bin.ts scratch new",
+    "scratch:list": "bun packages/tooling/tool/cli/src/bin.ts scratch list",
+    "scratch:check": "bun packages/tooling/tool/cli/src/bin.ts scratch check",
+    "scratch:test": "bun run --cwd scratchpad tests",
+    "scratch:serve": "bun run --cwd scratchpad serve",
+    "scratch:graduate": "bun packages/tooling/tool/cli/src/bin.ts scratch graduate",
+    "scratch:drop": "bun packages/tooling/tool/cli/src/bin.ts scratch drop",
     "prepare": "effect-tsgo patch --typescript --oxlint --tsrs",
     "keys:check": "bun packages/tooling/tool/cli/src/bin.ts laws keys",
     "vendor:check": "bun packages/tooling/tool/cli/src/bin.ts vendor check",

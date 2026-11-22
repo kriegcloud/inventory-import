@@ -38,6 +38,8 @@ worker-configuration.d.ts
 .claude/settings.local.json
 .dev.pid
 .scratch/
+# What an experiment keeps while it runs (a database, a dev server's cache): never committed
+scratchpad/**/.state/
 .taste-skill/
 .turbo
 # Written by the activity-log hook of checkouts made before it was removed; never committed

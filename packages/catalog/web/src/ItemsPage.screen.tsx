@@ -600,9 +600,9 @@ const itemsCatalogAtom = Atom.readable((get) => itemsCatalog(get(itemFacetValues
 /** The columns shown when the page opens: the ones it has room for; on a phone, all of them (cards). Once per visit. */
 const firstFits = Atom.readable((get) => (get.once(isNarrow) ? {} : fitting(get.once(contentWidth))))
 
-/** Columns the assistant hid or showed, kept for the person: read once per visit. */
-const keptColumns = Atom.readable((get) => {
-  const who = O.getOrUndefined(get.once(member))
+/** Columns the assistant hid or showed, kept for the person in this organization: read once per visit. */
+export const keptColumns = Atom.readable((get) => {
+  const who = O.getOrUndefined(get(member))
   return keptVisibility("Items", who?.organizationId, who?.id)
 })
 

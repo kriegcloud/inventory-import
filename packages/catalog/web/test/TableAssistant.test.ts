@@ -11,11 +11,23 @@ import { provideMember } from "@inventory/client/MemberAtoms"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
 import { DisplayName } from "@inventory/kernel/Text"
+import { conversationKey, emptyConversation, writeConversation } from "../src/Conversation.machine.ts"
+import { keptColumns } from "../src/ItemsPage.screen.tsx"
 import { askingFrom, assistantPresent, assistantScreen, stillAsked } from "../src/TableAssistant.screen.tsx"
 
 // The page's module asks how wide the window is when it is first read: a desk-wide page with no sidebar cookie.
 vi.hoisted(() => {
+  const kept: Record<string, string> = {}
   Object.assign(globalThis, {
+    localStorage: {
+      getItem: (key: string) => kept[key] ?? null,
+      setItem: (key: string, value: string) => {
+        kept[key] = value
+      },
+      removeItem: (key: string) => {
+        delete kept[key]
+      }
+    },
     document: { cookie: "" },
     window: { innerWidth: 1440, addEventListener: () => undefined, removeEventListener: () => undefined }
   })
@@ -92,6 +104,20 @@ describe("an assistant's answer", () => {
     const asked = askingFrom(t.registry, table)
     t.registry.set(t.signedIn, memberOf("org_lakeside"))
     expect(t.applies(asked)).toBe(false)
+  })
+
+  it("hides and shows columns for the person in the organization it was asked in, and for nobody else", () => {
+    const t = world()
+    const hidden = { vendors: false }
+    writeConversation(conversationKey({ organizationId: "org_prairie", memberId: "mem_dana" }, table), {
+      ...emptyConversation,
+      visibility: hidden
+    })
+    // The Items table stays drawn through a switch of organization answered at once.
+    t.registry.mount(keptColumns)
+    expect(t.registry.get(keptColumns)).toEqual(hidden)
+    t.registry.set(t.signedIn, memberOf("org_lakeside"))
+    expect(t.registry.get(keptColumns)).toEqual({})
   })
 
   it("is not applied when it was asked with no assistant drawn", () => {

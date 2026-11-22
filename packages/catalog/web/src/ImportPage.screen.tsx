@@ -1,5 +1,6 @@
-import { useAtomMount, useAtomValue } from "@effect/atom-react"
+import { useAtomMount, useAtomSet, useAtomValue } from "@effect/atom-react"
 import * as O from "effect/Option"
+import * as S from "effect/Schema"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as Atom from "effect/reactivity/Atom"
 import { lazy, Suspense } from "react"
@@ -18,16 +19,20 @@ import {
   StepperTitle,
   StepperTrigger
 } from "@inventory/ui/components/stepper"
+import type { ImportId } from "@inventory/catalog-contract/Ids"
+import { ImportNotFound } from "@inventory/catalog-contract/ImportRejection"
+import { perKey } from "@inventory/client/Api"
+import { askedAgainWhenBack } from "@inventory/client/ConnectionAtoms"
 import { member } from "@inventory/client/MemberAtoms"
-import { followRemoval, importTable, importViewShown } from "./Imports.atoms.ts"
+import { followRemoval, importTable, importView, importViewShown } from "./Imports.atoms.ts"
 import { isNarrow } from "@inventory/ui/ContentWidth"
 import { location, navigate } from "@inventory/ui/Route"
-import { resultOf } from "./internal/result.ts"
+import { openedOf } from "./internal/result.ts"
 import { importAddress, importInAddress } from "./internal/route.ts"
 import { hasRole } from "@inventory/kernel/Role"
 import { SheetButton } from "./internal/SheetButton.tsx"
 import { UploadStep } from "./UploadStep.screen.tsx"
-import { sayError } from "@inventory/client/SayError"
+import { isTransient, sayError } from "@inventory/client/SayError"
 
 // The steps after Upload are separate chunks: the first screen does not wait for the review table's code. While one
 // is on its way the person sees a skeleton of that step, in its own boxes.
@@ -46,6 +51,51 @@ type Step = (typeof steps)[number]["value"]
 /** What the page follows while the address names no import: nothing. */
 const nothingToFollow = Atom.readable((): void => undefined)
 
+/**
+ * Mounted by the page while the address names an import: a read of it that could not be made (the network, the server's
+ * own failure) is made again by itself once the connection is back.
+ */
+export const readAgainWhenBack = perKey((id: ImportId) =>
+  Atom.readable((get): void => {
+    get.mount(
+      askedAgainWhenBack({ read: importViewShown(id), askAgain: (registry) => importView(id).askAgain(registry) })
+    )
+    get.mount(askedAgainWhenBack({ read: importTable(id), askAgain: (registry) => importTable(id).askAgain(registry) }))
+  })
+)
+
+/** The person asked for an import to be read again: its view and its rows, whichever could not be. */
+const readAgain = Atom.fnSync((id: ImportId, get) => {
+  if (AsyncResult.isFailure(get.registry.get(importView(id)))) importView(id).askAgain(get.registry)
+  if (AsyncResult.isFailure(get.registry.get(importTable(id)))) importTable(id).askAgain(get.registry)
+})
+
+/** The server says there is no such import where the person is: removed, or another organization's. */
+const isGone = S.is(ImportNotFound)
+
+/** Above a step that stays drawn: the import could not be read again, and when it will be. */
+function NotReadAgain(props: { importId: ImportId; error: unknown }) {
+  const again = useAtomSet(readAgain)
+  return (
+    <div className="max-h-1/3 flex-none overflow-y-auto">
+      <Alert className="mx-4 my-3 w-auto sm:mx-9">
+        <AlertTitle>This import could not be read again</AlertTitle>
+        <AlertDescription>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <p className="min-w-0">
+              {sayError(props.error).sentence} What you see is how it was when it was last read.
+              {isTransient(props.error) ? " It is read again by itself when the connection is back." : ""}
+            </p>
+            <Button variant="outline" size="xs" onClick={() => again(props.importId)}>
+              Read it now
+            </Button>
+          </div>
+        </AlertDescription>
+      </Alert>
+    </div>
+  )
+}
+
 /** What the steps read while the address names no import: nothing, and never asked for. */
 const noImport = Atom.make(AsyncResult.initial<never, never>())
 
@@ -62,10 +112,12 @@ export function ImportPage() {
   const canImport = actor !== undefined && hasRole(actor.role, "editor")
   // Found removed: what the person's tabs kept for it is let go and named, above the page.
   useAtomMount(importId === undefined ? nothingToFollow : followRemoval(importId))
+  // Could not be read: read again by itself once the connection is back.
+  useAtomMount(importId === undefined ? nothingToFollow : readAgainWhenBack(importId))
   const viewRead = useAtomValue(importId === undefined ? noImport : importViewShown(importId))
   const tableRead = useAtomValue(importId === undefined ? noImport : importTable(importId))
-  const view = resultOf(viewRead)
-  const table = resultOf(tableRead)
+  const view = openedOf({ read: viewRead, isGone })
+  const table = openedOf({ read: tableRead, isGone })
   const wanted = params.get("step")
   // Confirmed, or confirmed and taken back: either way the result screen is where it stands.
   const imported = view.data !== undefined && view.data.status !== "open"
@@ -96,7 +148,7 @@ export function ImportPage() {
     else if (importId !== undefined) navigate(importAddress(importId, value))
   }
 
-  const waiting = importId !== undefined && (AsyncResult.isInitial(viewRead) || AsyncResult.isInitial(tableRead))
+  const waiting = importId !== undefined && (view.data === undefined || table.data === undefined)
   const skeleton =
     step === "review" ? (
       <ReviewSkeleton {...(view.data === undefined ? {} : { title: `Review ${view.data.fileName}` })} />
@@ -105,18 +157,23 @@ export function ImportPage() {
     ) : (
       <TablePageSkeleton line action views={4} caption="What happened to each row" columns={someColumns(7)} />
     )
-  const failed = view.error ?? table.error
+  const refused = O.orElse(view.refused, () => table.refused)
+  const gone = view.gone || table.gone
+  const behind = O.orElse(view.behind, () => table.behind)
   const body = (render: () => React.ReactNode) =>
-    failed !== null || malformed ? (
+    O.isSome(refused) || malformed ? (
       <div className="mx-auto max-w-2xl px-4 pt-6 sm:px-9">
         <Alert variant="destructive">
-          <AlertTitle>This import could not be opened</AlertTitle>
+          <AlertTitle>{gone ? "This import is not here any more" : "This import could not be opened"}</AlertTitle>
           <AlertDescription>
-            {failed === null
-              ? "The address does not name an import. Check the link, or choose a file."
-              : sayError(failed).sentence}
+            {gone
+              ? "Somebody removed it, or it belongs to another organization. The first screen lists the imports there are: continue one of them, or choose a file."
+              : O.match(refused, {
+                  onNone: () => "The address does not name an import. Check the link, or choose a file.",
+                  onSome: (error) => sayError(error).sentence
+                })}
             <Button variant="outline" size="sm" onClick={() => navigate("/")}>
-              Choose a file
+              {gone ? "Go to the first screen" : "Choose a file"}
             </Button>
           </AlertDescription>
         </Alert>
@@ -124,7 +181,14 @@ export function ImportPage() {
     ) : waiting ? (
       skeleton
     ) : (
-      <Suspense fallback={skeleton}>{render()}</Suspense>
+      // The same boxes with the line above the step and without it: the step stays the one that is drawn, with whatever
+      // is being typed in it, when the line comes and goes.
+      <div className="flex h-full flex-col">
+        {importId !== undefined && O.isSome(behind) ? <NotReadAgain importId={importId} error={behind.value} /> : null}
+        <div className="min-h-0 flex-1">
+          <Suspense fallback={skeleton}>{render()}</Suspense>
+        </div>
+      </div>
     )
 
   const stepNav = (

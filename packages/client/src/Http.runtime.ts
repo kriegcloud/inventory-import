@@ -7,6 +7,7 @@ import * as FetchHttpClient from "effect/http/FetchHttpClient"
 import * as HttpClient from "effect/http/HttpClient"
 import * as HttpClientRequest from "effect/http/HttpClientRequest"
 import * as HttpClientResponse from "effect/http/HttpClientResponse"
+import { serverAnswered } from "@inventory/client/ConnectionAtoms"
 
 const runtime = ManagedRuntime.make(FetchHttpClient.layer)
 
@@ -16,6 +17,7 @@ export const request: typeof globalThis.fetch = (input, init) => {
   return runtime
     .runPromiseExit(
       HttpClient.execute(HttpClientRequest.fromWeb(native)).pipe(
+        Effect.tap((response) => Effect.sync(() => serverAnswered(response.status))),
         Effect.map((response) => response.pipe(HttpClientResponse.toWeb, O.getOrThrow)),
         Effect.provideService(FetchHttpClient.RequestInit, init ?? {}),
         // These requests previously used plain fetch and did not send trace context.

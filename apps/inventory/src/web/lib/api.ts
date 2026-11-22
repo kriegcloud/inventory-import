@@ -14,6 +14,7 @@ import { AccessClient } from "@inventory/access-web/Access"
 import { CatalogClient, configureCatalog } from "@inventory/catalog-web/Catalog"
 import { apiPrefix } from "../../api/v1/Version.ts"
 import { makeApi } from "@inventory/client/ApiRuntime"
+import { ofThisPage } from "./ofThisPage.ts"
 import { browserTelemetry } from "./telemetry.ts"
 
 /** A client derived from the API contract. Methods, payloads and errors are all typed from src/api/v1/Api.ts. */
@@ -42,7 +43,7 @@ class ApiClient extends Context.Service<ApiClient, Client>()("@inventory/app/web
   static readonly layer = Layer.effect(
     ApiClient,
     // Same origin: the browser sends the session cookie with every call, so nothing names the actor here.
-    HttpApiClient.make(Api, { transformClient: withEarly })
+    HttpApiClient.make(Api, { transformClient: (client) => client.pipe(withEarly, ofThisPage) })
   ).pipe(Layer.provide(FetchHttpClient.layer))
 }
 

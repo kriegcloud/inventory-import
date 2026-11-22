@@ -32,7 +32,7 @@ import { NativeSelect, NativeSelectOption } from "@inventory/ui/components/nativ
 import { Switch } from "@inventory/ui/components/switch"
 import { Textarea } from "@inventory/ui/components/textarea"
 import { invalidate } from "@inventory/client/Api"
-import { memberKey } from "@inventory/client/MemberAtoms"
+import { keptOfMember, memberKey } from "@inventory/client/MemberAtoms"
 import { optimisticChange, optimisticWrite } from "@inventory/client/OptimisticAtoms"
 import { catalogApi } from "./Catalog.runtime.ts"
 import { itemsPage } from "./ItemsPage.screen.tsx"
@@ -147,25 +147,20 @@ const closedEditor: EditorState = { open: false, base: O.none(), form: O.none(),
 /**
  * The editors that are open, by item. Kept for the page's life, and small: an editor is in it only while its dialog
  * is open. A save outlives the row that pressed it (the person pages on, or opens another screen), so "Edit again"
- * on a save that failed must find its editor whether or not the row is drawn; held with the row, it was gone.
+ * on a save that failed must find its editor whether or not the row is drawn; held with the row, it was gone. What is
+ * typed in one is one member's: another member, or another organization, has none open.
  */
-const openEditors = Atom.make(HashMap.empty<string, EditorState>()).pipe(Atom.keepAlive)
+const openEditors = keptOfMember(() => HashMap.empty<string, EditorState>())
 
 /**
  * What the server answered to the last save of each item: the item as stored, at its new revision. Kept while the same
- * member is signed in, and let go the moment that changes (a sign-out, another member, another organization), as every
- * read of the previous person's is. A save is counted out until it answers, but the item's row is read again only after
+ * member is signed in, also while that is asked again, and shown to nobody else: a page left for another person's, or a
+ * sign-in page, is loaded anew, and another organization the person switches to starts with none. A save is counted out until it answers, but the item's row is read again only after
  * that item's last write in flight has answered (each item's editor counts its own), and until then it shows the saved
  * values on the old revision; an editor opened in between takes its revision from here, or its save goes out on the old
  * one and is refused as someone else's.
  */
-const savedItems = Atom.writable(
-  (get): HashMap.HashMap<string, StoredItem> => {
-    get(memberKey)
-    return HashMap.empty()
-  },
-  (ctx, next: HashMap.HashMap<string, StoredItem>) => ctx.setSelf(next)
-).pipe(Atom.keepAlive)
+const savedItems = keptOfMember(() => HashMap.empty<string, StoredItem>())
 
 /** The newer of the item an editor was opened on and the server's answer to its last save: the base of the next. */
 const newerOf = (base: StoredItem, saved: O.Option<StoredItem>): StoredItem =>
@@ -213,17 +208,24 @@ const itemsAddress = "/items"
 /**
  * "Edit again" on a save that was not kept: the editor opens with what the person typed, on the item as it stands
  * (`base`). When the item's row is not on screen (they paged on, or opened another screen meanwhile) they are taken
- * to it: the Items table, searched for its SKU.
+ * to it: the Items table, searched for its SKU. Only where it was saved: after a switch of organization the item is not
+ * this one's, and the press says so.
  */
-const editAgain =
-  (input: {
-    readonly registry: AtomRegistry.AtomRegistry
-    readonly save: ItemSave
-    readonly base: StoredItem
-    readonly notice: string | null
-  }) =>
-  (): void => {
-    const { base, notice, registry, save } = input
+const editAgain = (input: {
+  readonly registry: AtomRegistry.AtomRegistry
+  readonly save: ItemSave
+  readonly base: StoredItem
+  readonly notice: string | null
+}): (() => void) => {
+  const { base, notice, registry, save } = input
+  const savedAs = registry.get(memberKey)
+  return () => {
+    if (registry.get(memberKey) !== savedAs) {
+      toast.error(`${base.name} is not in this organization`, {
+        description: "It belongs to the one you were in when you saved it. Switch back to it, and edit it there."
+      })
+      return
+    }
     registry.set(itemEditor(base.id), {
       open: true,
       base: O.some(base),
@@ -234,6 +236,7 @@ const editAgain =
     const drawn = document.querySelector(`[data-edit-item="${CSS.escape(base.id)}"]`) !== null
     if (!drawn) navigate(`${itemsAddress}?search=${encodeURIComponent(base.sku)}`)
   }
+}
 
 /** The request that saves one item, counted as out from when it is sent until it has answered or failed. */
 const sendEdit = (id: StoredItem["id"]) =>

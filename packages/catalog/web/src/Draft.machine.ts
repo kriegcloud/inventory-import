@@ -190,7 +190,15 @@ export interface Draft {
    * What an answer said the server holds of some rows at `at`, kept over `held` until a picture of that revision or
    * later is read: somebody else saved in between, so `held` is behind and cannot be moved on by guessing.
    */
-  readonly landed: O.Option<{ readonly rows: RowChanges; readonly at: number }>
+  readonly landed: O.Option<{
+    readonly rows: RowChanges
+    readonly at: number
+    /**
+     * The revision each row was said at. A row an earlier answer said is known as of that answer, not a later one's: a
+     * match may have come between the two, and a decision made after it is not judged against the older word.
+     */
+    readonly said: Readonly<Record<string, number>>
+  }>
   /** The save or the confirm that is out. One at a time: the next waits and then carries whatever changed since. */
   readonly flight: O.Option<Flight>
   /** The id of the last save or confirm sent: never used twice in a page, whatever ended or was let go since. */
@@ -267,6 +275,12 @@ export interface Draft {
    */
   readonly endedOn: SavedDecisions
   /**
+   * The person's decisions alive when the draft ended that the picture it ended on already said, so none was named. If
+   * the import is opened again and says otherwise of one, it is named then (`arriving`), as it would have been had that
+   * picture never come: a closed picture that arrives late must not let go a decision the reopened import lacks.
+   */
+  readonly saidByClose: O.Option<Named>
+  /**
    * Decisions of a row this tab or a closed tab of the person's sent, whose fate is not known, kept from a line she
    * let go (a refused decision dismissed, what is saved kept): the next decision of the row stands over them too, so
    * what the server holds of them is never said as somebody else's.
@@ -302,6 +316,7 @@ export const emptyDraft: Draft = {
   closedSeen: O.none(),
   ended: false,
   endedOn: {},
+  saidByClose: O.none(),
   sentBefore: {}
 }
 
@@ -679,13 +694,16 @@ const known = (draft: Draft): SavedDecisions => over(heldDecisions(draft), lande
 const knownOf = (draft: Draft, rowId: string): O.Option<RowDecision> =>
   O.getOrElse(R.get(landedRows(draft), rowId), () => R.get(heldDecisions(draft), rowId))
 
-/** True when what is known of a row is no older than the picture the decision was made on. */
-const knows = (draft: Draft, rowId: string, side: Side): boolean =>
-  side.madeOn <=
+/** The revision what is known of a row was said at: by an answer since the picture held, or by that picture. */
+const rowSaidAt = (draft: Draft, rowId: string): number =>
   O.match(draft.landed, {
     onNone: () => heldAt(draft),
-    onSome: (landed) => (R.has(landed.rows, rowId) ? landed.at : heldAt(draft))
+    onSome: (landed) =>
+      R.has(landed.rows, rowId) ? O.getOrElse(R.get(landed.said, rowId), () => landed.at) : heldAt(draft)
   })
+
+/** True when what is known of a row is no older than the picture the decision was made on. */
+const knows = (draft: Draft, rowId: string, side: Side): boolean => side.madeOn <= rowSaidAt(draft, rowId)
 
 /** A decision the server did not refuse: it can be sent. */
 const isGood = (side: Side): boolean => O.isNone(side.refused)
@@ -827,11 +845,13 @@ export const linesShown = (draft: Draft): Readonly<Record<string, LineShown>> =>
     going: O.map(R.get(flying(draft), rowId), (side) => side.decision),
     // Said as somebody else's or another tab's only against a decision of this tab's that does not stand over it, over
     // a picture that says what the matches took back: with none, this tab may have written it itself, and the line
-    // says what is saved.
+    // says what is saved. An answer newer than the picture held says what is stored, not what a match in between took
+    // back of hers: until a picture of that revision is read, the line says what is saved too.
     since: O.exists(line.theirs, (theirs) => {
       const own = A.filter(line.sides, (side) => side.here && isGood(side))
       return (
         O.isSome(draft.held) &&
+        rowSaidAt(draft, rowId) <= heldAt(draft) &&
         A.isReadonlyArrayNonEmpty(own) &&
         !A.some(own, (side) => ownEarlier(draft, rowId, side, theirs)) &&
         !hasDecision(
@@ -962,8 +982,22 @@ const linedRow = (draft: Draft, book: Book, rowId: string): void => {
   // left to save: it was on the line while she decided, and her decision is on the server.
   const pendingHere = O.isSome(waits) || out || A.some(before, ownSide)
   const settledHere = (side: Side): boolean => !side.here && !isGood(side) && side.overtaken && !pendingHere
+  const goesAsHeld = (side: Side): boolean => isHeld(draft, rowId, side) && !asksBeside(side)
+  // This tab's own the server holds leaves the line as one that waits does above: what it was sent as may still be on
+  // the server (the picture may be older than a save of it whose answer was lost), so the next decision of the row
+  // stands over that too, and what the server holds of it is never said as somebody else's.
+  const heldHere = A.filter(all, (side) => side.here && isGood(side) && goesAsHeld(side))
+  if (A.isReadonlyArrayNonEmpty(heldHere)) {
+    book.sentBefore[rowId] = A.takeRight(
+      eachDecision([
+        ...O.getOrElse(R.get(book.sentBefore, rowId), () => []),
+        ...A.flatMap(heldHere, (side) => side.seen)
+      ]),
+      overBound
+    )
+  }
   const sides = A.map(
-    A.filter(all, (side) => (!isHeld(draft, rowId, side) || asksBeside(side)) && !settledHere(side)),
+    A.filter(all, (side) => !goesAsHeld(side) && !settledHere(side)),
     (side) => (isGood(side) && overtaken(side) ? { ...side, overtaken: true } : side)
   )
   const good = A.filter(sides, isGood)
@@ -1077,6 +1111,21 @@ const againstImport = (named: Named, decisions: SavedDecisions): O.Option<Named>
     R.map(named.theirs, (_then, rowId) => R.get(decisions, rowId))
   )
   return R.isEmptyReadonlyRecord(left.rows) ? O.none() : O.some(left)
+}
+
+/** The decisions of a naming the import already holds: the rest of `againstImport`. */
+const saidByImport = (named: Named, decisions: SavedDecisions): O.Option<Named> => {
+  const said = naming(
+    A.filter(eachNamed(named), ([rowId, decision]) => sameDecision(R.get(decisions, rowId), decision)),
+    noRows
+  )
+  return R.isEmptyReadonlyRecord(said.rows) ? O.none() : O.some(said)
+}
+
+/** Several namings of which there may be none, as one. */
+const joined = (several: ReadonlyArray<O.Option<Named>>): O.Option<Named> => {
+  const some = A.getSomes(several)
+  return A.isReadonlyArrayNonEmpty(some) ? O.some(eachOnce(some)) : O.none()
 }
 
 /** What was left over so far, with more of it. */
@@ -1229,7 +1278,11 @@ const landing = (draft: Draft, rows: RowChanges, at: number): Draft => ({
   ...noneLive(draft),
   landed: O.some({
     rows: { ...landedRows(draft), ...rows },
-    at: Math.max(at, O.match(draft.landed, { onNone: () => 0, onSome: (landed) => landed.at }))
+    at: Math.max(at, O.match(draft.landed, { onNone: () => 0, onSome: (landed) => landed.at })),
+    said: {
+      ...O.match(draft.landed, { onNone: () => ({}), onSome: (landed) => landed.said }),
+      ...R.map(rows, () => at)
+    }
   })
 })
 
@@ -1579,6 +1632,7 @@ const closing = (draft: Draft, picture: Picture): Stepped => {
         draft,
         O.flatMap(alive, (named) => againstImport(named, picture.decisions))
       ),
+      saidByClose: joined([draft.saidByClose, O.flatMap(alive, (named) => saidByImport(named, picture.decisions))]),
       ended: true,
       endedOn: picture.decisions
     },
@@ -1647,8 +1701,15 @@ const arriving = (draft: Draft, event: Data.TaggedEnum.Value<DraftEvent, "ViewAr
   }
   // Open again after it had ended (reopened to review again): what was left over is said now, unless the result has
   // named it already, and is not sent into the reopened import.
-  const reopened: Draft = draft.ended ? { ...draft, ended: false, endedOn: {}, leftOver: O.none() } : draft
-  const unnamed = draft.ended ? draft.leftOver : O.none<Named>()
+  const reopened: Draft = draft.ended
+    ? { ...draft, ended: false, endedOn: {}, leftOver: O.none(), saidByClose: O.none() }
+    : draft
+  // What the closed picture already said of hers, and the reopened import says otherwise, is named with it: had that
+  // picture not come first, it would be named as outlived below. A closed picture that arrives late then decides
+  // nothing of what is said to her.
+  const unnamed = draft.ended
+    ? joined([draft.leftOver, O.flatMap(draft.saidByClose, (named) => againstImport(named, decisions))])
+    : O.none<Named>()
   // The import was confirmed since the person's decisions were made, and opened again: they were not part of that
   // confirm, and are not sent into the reopened import. They are named, each line whole, and let go.
   const confirmedSince = O.exists(reopened.confirms, (before) => confirms > before)
@@ -1830,7 +1891,13 @@ const takingUp = (
 const takingUpAll = (draft: Draft, kept: Waiting, here: boolean): Stepped => {
   const theirs = decisionsIn(kept)
   // Into a draft that ended, the rows its closed picture does not hold are left over, named by the result.
-  if (draft.ended) return only({ ...draft, leftOver: leaving(draft, againstImport(theirs, draft.endedOn)) })
+  if (draft.ended) {
+    return only({
+      ...draft,
+      leftOver: leaving(draft, againstImport(theirs, draft.endedOn)),
+      saidByClose: joined([draft.saidByClose, saidByImport(theirs, draft.endedOn)])
+    })
+  }
   // Rows a closed import left over, or of an import confirmed since, are named and let go: never sent.
   const outlived =
     O.isSome(kept.leftOver) || O.exists(kept.confirms, (before) => O.exists(draft.confirms, (now) => now > before))
@@ -1973,9 +2040,7 @@ const transition = (draft: Draft, event: DraftEvent): Stepped =>
                   book,
                   rowId,
                   A.map(withSides([refused], sidesOf(book, rowId)), (side) =>
-                    side.here === refused.here && sameDecision(side.decision, refused.decision)
-                      ? { ...side, refused: refused.refused }
-                      : side
+                    sameDecision(side.decision, refused.decision) ? { ...side, refused: refused.refused } : side
                   )
                 )
               }

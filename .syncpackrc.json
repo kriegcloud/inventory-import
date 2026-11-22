@@ -32,7 +32,7 @@
       "isIgnored": true
     },
     {
-      "label": "Its tables are a migration written by hand (docs/auth.md). After a move `bun run auth:schema` must print nothing, so it moves by hand. To move: write the new version in the package.json files that name it, `bun install`, then `bun run auth:schema` and add the migration it prints, if any",
+      "label": "Its tables are a migration written by hand (docs/auth.md), and a new version can want a table or a column they do not make: `bun run check` fails then (test/server/AuthSchema.test.ts). To move: write the new version in the package.json files that name it, `bun install`, `bun run auth:schema`, save what it prints as the next migration (nothing printed, nothing to save), then `bun run check`",
       "dependencies": ["better-auth"],
       "isIgnored": true
     },

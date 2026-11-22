@@ -25,7 +25,9 @@ packages at different versions of `effect`, a package no `workspaces` pattern co
 
 ## Moving dependencies: `deps:update`
 
-- **Every package.** The root's `package.json` and every workspace's, 25 files today. A dependency keeps the way it is
+- **Every package.** The root's `package.json` and every workspace's under `apps` and `packages`, 25 files today.
+  The scratchpad's is not one of them: what it shares with the packages follows through `version-sync`, and a
+  library an experiment added is the experiment's. A dependency keeps the way it is
   written: an exact version stays exact, `^1.2.3` stays a caret range.
 - **Effect moves together.** `effect` and every `@effect/*` package released with it are at one exact version. When
   the registry's newest version is the same for all of them, all move; when one was published later than the rest,
@@ -60,6 +62,7 @@ To hold another dependency, add a group with its reason to `updateGroups`; to re
 | A GitHub action's version | `.github/workflows/ci.yml` | the same action in every other workflow |
 | The CLI's version | its `package.json` | `version` in its `src/bin.ts` |
 | The Effect language service's schema | the installed `@effect/tsgo` | a tsconfig's `$schema` that names the library's repository instead |
+| What the scratchpad runs on | the version the `package.json` files state for each dependency | the same dependency in `scratchpad/package.json`; a library only an experiment uses is left alone |
 
 The standing documents are `CLAUDE.md`, `AGENTS.md`, `README.md`, `docs/` and `.claude/agents`. A version is read in
 a sentence only after its own name ("Effect 4.1", "`effect` 4.1.4's source"), and as precisely as the sentence
@@ -100,6 +103,7 @@ depends on where it is and what it holds is written from that.
 | scripts | `check` type-checks each of the package's projects and counts against its ceiling file; `test` exists beside a `vitest.config.ts`; `lint` exists unless the package is vendored | what the package holds |
 | tasks | `check` and `check:full` run every root task `turbo.json` defines and no other; each has a root script (a problem when it has none) | the `//#name` tasks of `turbo.json` |
 | vendored | the formatter's `ignorePatterns` name every vendored package | the packages with a `vendor.json` |
+| scratchpad | the scratchpad's `dependencies` name every package, as `workspace:*` ([the scratchpad](scratchpad.md)); syncpack's sources leave the scratchpad out | the packages under `packages/` |
 
 A reference a person added by hand to a solution file is kept while it names something. No package has project
 references today (each is type-checked from source by `tsrs -p`); the rule for them is there for the day one does.

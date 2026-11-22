@@ -30,7 +30,9 @@
     "build": { "dependsOn": ["transit"], "outputs": ["dist/**"] },
     "dev": { "cache": false, "persistent": true },
     // Repository checks: root scripts that do not call turbo.
-    "//#format:check": { "outputs": [] },
+    // Every file but an experiment of the scratchpad: the formatter leaves those alone (.oxfmtrc.json), and an
+    // experiment that is not formatted, or does not parse, fails nothing here.
+    "//#format:check": { "inputs": ["$TURBO_DEFAULT$", "!scratchpad/experiments/**"], "outputs": [] },
     // Vendored kit packages still match the beep-effect files they were copied from (`beep vendor check`).
     "//#vendor:check": {
       "inputs": [
@@ -73,7 +75,8 @@
       "outputs": []
     },
     // Every ref is a DOM ref or a callback that stays the same across draws (`beep laws ref-callbacks`).
-    // Its inputs are the law's own pathspec: every .tsx git would commit, the vendored kit and the skills left out; and
+    // Its inputs are the law's own pathspec: every .tsx git would commit, the vendored kit, the skills and the
+    // scratchpad left out; and
     // every package.json, whose exports name the modules of hooks.
     "//#refs:check": {
       "inputs": [
@@ -82,6 +85,7 @@
         "!packages/ui/src/components/**",
         "!packages/ui/src/hooks/**",
         "!.agents/**",
+        "!scratchpad/**",
         "apps/**/package.json",
         "packages/**/package.json",
         "packages/tooling/tool/cli/src/**"
@@ -139,6 +143,7 @@
         "packages/**/wrangler*.jsonc",
         "packages/**/src/**/*.ts",
         "vendor/alchemy/sources.json",
+        "scratchpad/package.json",
         "bun.lock",
         "!**/node_modules/**"
       ],
@@ -151,6 +156,8 @@
     "//#config-sync:check": {
       "inputs": [
         "*.{json,jsonc}",
+        "scratchpad/package.json",
+        "scratchpad/tsconfig*.json",
         ".oxlintrc*.json",
         ".oxfmtrc.json",
         ".syncpackrc.json",
@@ -169,7 +176,8 @@
       ],
       "outputs": []
     },
-    // Every file git would commit, so its hash is the whole repository's.
+    // Every file git would commit, so its hash is the whole repository's, the scratchpad's experiments included: a
+    // key in an experiment is refused like any other, and this is the one root task an edit there re-runs.
     "//#keys:check": { "outputs": [] },
     "//#docs:check": {
       "inputs": [

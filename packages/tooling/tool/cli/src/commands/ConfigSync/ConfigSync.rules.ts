@@ -16,7 +16,10 @@
  *   counts against its ceiling file, `test` exists beside a `vitest.config.ts`, `lint` unless it is vendored;
  * - `tasks`: every root task `turbo.json` defines (`//#name`) has a root script and is run by `check` and
  *   `check:full`;
- * - `vendored`: the formatter leaves every vendored package alone.
+ * - `vendored`: the formatter leaves every vendored package alone;
+ * - `scratchpad`: the scratchpad (`scratchpad/`) depends on every package under `packages`, so an experiment can
+ *   import any of them and a new package is there without anyone remembering. syncpack does not read the scratchpad:
+ *   what an experiment adds there is the experiment's, and `version-sync` holds the rest to the packages' versions.
  *
  * @packageDocumentation
  */
@@ -30,10 +33,12 @@ import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import { Repo, type Workspace } from "../../Repo.service.ts"
+import { scratchpadFolder } from "../../Repo.schema.ts"
 import {
   anchorless,
   arrayOf,
   decodeJsonc,
+  entriesOf,
   fits,
   type Found,
   type FoundBlock,
@@ -41,6 +46,7 @@ import {
   lineAt,
   objectOf,
   renderArray,
+  renderObject,
   stringsIn,
   stringValues
 } from "../../Sync.rules.ts"
@@ -159,7 +165,10 @@ export const configSyncPlan = Effect.fn("ConfigSync.plan")(function* () {
     const config = yield* readIfThere(repo.join(repo.root, ".syncpackrc.json"))
     if (O.isNone(config)) return nothing
     const expected = A.prepend(
-      A.map(patterns, (pattern) => `${pattern}/package.json`),
+      A.map(
+        A.filter(patterns, (pattern) => pattern !== scratchpadFolder),
+        (pattern) => `${pattern}/package.json`
+      ),
       "package.json"
     )
     const block = arrayOf("source")(config.value.text)
@@ -188,7 +197,8 @@ export const configSyncPlan = Effect.fn("ConfigSync.plan")(function* () {
   })
 
   // coverage: every package fits a workspace pattern, and every pattern names a package.
-  const folders = A.map(workspaces, folderOf)
+  const scratchPackage = yield* readIfThere(repo.join(repo.root, scratchpadFolder, "package.json"))
+  const folders = A.appendAll(A.map(workspaces, folderOf), O.isSome(scratchPackage) ? [scratchpadFolder] : [])
   const coverage = Plan.make({
     checked: folders.length + patterns.length,
     drifts: [],
@@ -290,7 +300,8 @@ export const configSyncPlan = Effect.fn("ConfigSync.plan")(function* () {
     A.map(workspaces, (workspace) => workspace.dir),
     repo.root
   )
-  const inConfigs = yield* Effect.forEach(dirs, configPaths, { concurrency: 1 })
+  const withScratchpad = A.appendAll(dirs, O.isSome(scratchPackage) ? [repo.join(repo.root, scratchpadFolder)] : [])
+  const inConfigs = yield* Effect.forEach(withScratchpad, configPaths, { concurrency: 1 })
   const inScripts = yield* Effect.forEach(workspaces, scriptPaths, { concurrency: 1 })
   const paths = mergePlans(A.appendAll(inConfigs, inScripts))
 
@@ -642,6 +653,64 @@ export const configSyncPlan = Effect.fn("ConfigSync.plan")(function* () {
     })
   })
 
+  // scratchpad: it depends on every package, so an experiment can import any of them.
+  const scratch = O.match(scratchPackage, {
+    onNone: () => nothing,
+    onSome: (at) => {
+      const wanted = A.map(
+        A.filter(workspaces, (workspace) => Str.startsWith("packages/")(folderOf(workspace))),
+        (workspace) => String(workspace.manifest.name)
+      )
+      const block = objectOf("dependencies")(at.text)
+      if (O.isNone(block)) {
+        return one({
+          problems: [
+            Problem.make({
+              file: at.file,
+              message: `has no "dependencies", and the scratchpad depends on every package: add "dependencies": {} and run \`bun run config-sync\``
+            })
+          ]
+        })
+      }
+      const written = A.map(entriesOf(block.value)(at.text), ([key, value]) => [key.value, value.value] as const)
+      const others = A.filter(written, ([, spec]) => !Str.startsWith("workspace:")(spec))
+      const byName = Order.mapInput(Order.String, (entry: readonly [string, string]) => entry[0])
+      const expected = A.sort(
+        A.appendAll(
+          others,
+          A.map(wanted, (name) => [name, "workspace:*"] as const)
+        ),
+        byName
+      )
+      const linked = A.map(
+        A.filter(written, ([, spec]) => Str.startsWith("workspace:")(spec)),
+        ([name]) => name
+      )
+      const missing = A.filter(wanted, (name) => !A.contains(linked, name))
+      const stale = A.filter(linked, (name) => !A.contains(wanted, name))
+      if (missing.length === 0 && stale.length === 0)
+        return Plan.make({ checked: wanted.length, drifts: [], problems: [] })
+      return Plan.make({
+        checked: wanted.length,
+        problems: [],
+        drifts: [
+          drift(at, block.value, {
+            what: "the scratchpad's `dependencies`, from the packages under packages/",
+            found: A.join(
+              A.appendAll(
+                missing.length === 0 ? [] : [`without ${listed(missing)}`],
+                stale.length === 0 ? [] : [`with ${listed(stale)}, which is no package`]
+              ),
+              ", "
+            ),
+            expected: "every package, as workspace:*",
+            text: renderObject(block.value.indent)(expected)
+          })
+        ]
+      })
+    }
+  })
+
   const sources = yield* sourcesPlan()
   const tasks = yield* tasksPlan()
   const vendored = yield* vendoredPlan()
@@ -651,7 +720,7 @@ export const configSyncPlan = Effect.fn("ConfigSync.plan")(function* () {
       solutions,
       projects,
       scripts,
-      [tasks, vendored]
+      [tasks, vendored, scratch]
     ])
   )
 })

@@ -352,6 +352,45 @@ describe("version-sync", () => {
     })
   )
 
+  it.effect("the scratchpad runs on the packages' versions, and an experiment's own library is left alone", () =>
+    Effect.gen(function* () {
+      const scratch = (effect: string, vitest: string) =>
+        lines([
+          "{",
+          '  "name": "@x/scratchpad",',
+          '  "dependencies": {',
+          '    "@x/kernel": "workspace:*",',
+          `    "effect": "${effect}",`,
+          '    "zod": "^3.0.0"',
+          "  },",
+          '  "devDependencies": {',
+          `    "vitest": "${vitest}"`,
+          "  }",
+          "}"
+        ])
+      const result = yield* run(
+        {
+          "package.json": json({ name: "root", workspaces: ["packages/*", "scratchpad"] }),
+          "packages/kernel/package.json": json({
+            name: "@x/kernel",
+            dependencies: { effect: "4.1.5" },
+            devDependencies: { vitest: "^5.1.1" }
+          }),
+          "scratchpad/package.json": scratch("4.1.4", "^5.1.0")
+        },
+        ["scratchpad/package.json"]
+      )
+      expect(result.before).toEqual([
+        "err: version-sync FAIL  2 places differ from what they are derived from (`bun run version-sync -- --write` writes them)",
+        "err:   scratchpad/package.json:5  the scratchpad's `effect`, from the package.json files: found 4.1.4, expected 4.1.5",
+        "err:   scratchpad/package.json:9  the scratchpad's `vitest`, from the package.json files: found ^5.1.0, expected ^5.1.1"
+      ])
+      expect(result.files).toEqual({ "scratchpad/package.json": scratch("4.1.5", "^5.1.1") })
+      expect(result.after).toEqual(["out: version-sync OK  2 places agree with what they are derived from"])
+      expect(result.again).toEqual(result.after)
+    })
+  )
+
   it("reads a version as precisely as a sentence states it, and only after its own name", () => {
     expect(asWritten("4.2.0")("4.1")).toBe("4.2")
     expect(asWritten("4.2.0")("4.1.4")).toBe("4.2.0")

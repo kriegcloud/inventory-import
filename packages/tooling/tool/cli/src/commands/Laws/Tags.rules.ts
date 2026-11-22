@@ -29,7 +29,9 @@
  * Where: every file of our own code and every test, the screens' and the server's, the model's, the host's and the
  * repository's own commands alike. The vendored kit (its components and hooks, and each package a `vendor.json`
  * copies from beep-effect) keeps its own. No file is excepted, and none is held to a count: a count lets one
- * hand-written tag be swapped for another and pass.
+ * hand-written tag be swapped for another and pass. One folder is left out by name, the scratchpad (`scratchpad/`):
+ * an experiment is tried there under the type-checker only, and this law applies to it when its code graduates into
+ * a package (decision "the scratchpad", 2026-11-22).
  *
  * "Every file git would commit" is git's answer to give, so this asks git, and fails when git does not answer.
  *
@@ -43,13 +45,16 @@ import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import { Repo } from "../../Repo.service.ts"
+import { scratchpadFolder } from "../../Repo.schema.ts"
 import { err, type Line, out } from "../../Report.schema.ts"
 import { readTags } from "./internal/tagsCode.ts"
 
 const $I = $RepoCliId.create("commands/Laws/Tags.rules")
 
 /**
- * Our own code and every test; the vendored components and the agents' skills left out. Each is a glob pathspec:
+ * Our own code and every test; the vendored components and the agents' skills left out, and the scratchpad, which
+ * the patterns below never reach and which is named here so that it stays out if they widen: an experiment is held
+ * to this when it graduates into a package. Each is a glob pathspec:
  * without the magic git reads `**` as `*`, so a pattern missed every file straight under its folder
  * (`apps/inventory/src/web/App.tsx`).
  */
@@ -73,7 +78,7 @@ const ownCode = A.appendAll(
     ],
     (pattern) => `:(glob)${pattern}`
   ),
-  [":!packages/ui/src/components", ":!packages/ui/src/hooks", ":!.agents"]
+  [":!packages/ui/src/components", ":!packages/ui/src/hooks", ":!.agents", `:!${scratchpadFolder}`]
 )
 
 /**

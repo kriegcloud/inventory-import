@@ -224,3 +224,33 @@ export const anchorless = (path: string): string => Str.replace(/^(?:\.{1,2}\/)+
 /** Whether a value is a path on this disk, and not an address or a package's name. */
 export const isLocalPath = (value: string): boolean =>
   !/^[a-z][a-z0-9+.-]*:/i.test(value) && (Str.startsWith(".")(value) || Str.startsWith("node_modules/")(value))
+
+/**
+ * The names and values of an object of strings (a `dependencies` block, a `scripts` block), in the order written:
+ * inside such a block the strings alternate, a name and then its value.
+ *
+ * @category rules
+ */
+export const entriesOf =
+  (block: { readonly start: number; readonly end: number }) =>
+  (text: string): ReadonlyArray<readonly [Found, Found]> =>
+    A.flatMap(A.chunksOf(stringsIn(block)(text), 2), (pair) => {
+      const name = pair[0]
+      const value = pair[1]
+      return name === undefined || value === undefined ? [] : [[name, value] as const]
+    })
+
+/**
+ * An object of strings as the formatter leaves it in a `package.json`: one entry a line, no trailing comma.
+ *
+ * @category rules
+ */
+export const renderObject =
+  (indent: string) =>
+  (entries: ReadonlyArray<readonly [string, string]>): string =>
+    entries.length === 0
+      ? "{}"
+      : `{\n${A.join(
+          A.map(entries, ([name, value]) => `${indent}  "${name}": "${value}"`),
+          ",\n"
+        )}\n${indent}}`

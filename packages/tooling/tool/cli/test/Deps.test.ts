@@ -3,6 +3,7 @@ import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
+import * as Str from "effect/String"
 import {
   asksIn,
   depsSentence,
@@ -194,6 +195,26 @@ describe("deps update", () => {
       const error = yield* inTree(tree(), Effect.flip(depsUpdate("write", registry({}))))
       expect(error.message).toBe(
         "deps:update could not learn the newest version of any of the 5 dependencies it asked about: `bun info <name> version` answered for none. Is the registry reachable? Nothing was written"
+      )
+    })
+  )
+
+  it.effect("the scratchpad is not read: a library an experiment added is the experiment's to move", () =>
+    Effect.gen(function* () {
+      const scratch = json({ name: "@x/scratchpad", dependencies: { effect: "4.1.4", zod: "^3.0.0" } })
+      const result = yield* run(
+        { ...tree(), "scratchpad/package.json": scratch },
+        registry({ ...newest, zod: "4.0.0" }),
+        "write",
+        ["scratchpad/package.json"]
+      )
+      expect(A.filter(printed(result.first), Str.includes("zod"))).toEqual([])
+      expect(printed(result.first)[0]).toBe(
+        "out: deps:update  3 package.json files, 6 dependencies: 3 moved, 2 held, 1 not compared"
+      )
+      // `effect` follows through version-sync, which runs after the move; `zod` stays where the experiment put it.
+      expect(result.files["scratchpad/package.json"]).toBe(
+        json({ name: "@x/scratchpad", dependencies: { effect: "4.1.5", zod: "^3.0.0" } })
       )
     })
   )

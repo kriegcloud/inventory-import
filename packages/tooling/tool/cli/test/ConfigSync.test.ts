@@ -449,4 +449,68 @@ describe("config-sync", () => {
       expect(result.again).toEqual(left)
     })
   )
+
+  it.effect("the scratchpad depends on every package, and syncpack does not read it", () =>
+    Effect.gen(function* () {
+      const result = yield* run(
+        {
+          "package.json": json({ name: "root", workspaces: ["packages/*", "scratchpad"] }),
+          ".syncpackrc.json": lines(["{", '  "source": ["package.json", "packages/*/package.json"]', "}"]),
+          "packages/kernel/package.json": json({ name: "@x/kernel", scripts }),
+          "packages/kernel/tsconfig.json": "{}",
+          "packages/ui/package.json": json({ name: "@x/ui", scripts }),
+          "packages/ui/tsconfig.json": "{}",
+          // One package is missing, one that is gone is still there, and a library an experiment added stays.
+          "scratchpad/package.json": lines([
+            "{",
+            '  "name": "@x/scratchpad",',
+            '  "dependencies": {',
+            '    "@x/gone": "workspace:*",',
+            '    "@x/kernel": "workspace:*",',
+            '    "zod": "^4.0.0"',
+            "  }",
+            "}"
+          ]),
+          "scratchpad/tsconfig.json": lines(["{", '  "extends": "../../tsconfig.base.json"', "}"]),
+          "tsconfig.base.json": "{}"
+        },
+        ["scratchpad/package.json", "scratchpad/tsconfig.json", ".syncpackrc.json"]
+      )
+      expect(result.before).toEqual([
+        "err: config-sync FAIL  2 places differ from what they are derived from (`bun run config-sync` writes them)",
+        "err:   scratchpad/package.json:3  the scratchpad's `dependencies`, from the packages under packages/: found without @x/ui, with @x/gone, which is no package, expected every package, as workspace:*",
+        "err:   scratchpad/tsconfig.json:2  `extends`, from the folder's depth: found ../../tsconfig.base.json, expected ../tsconfig.base.json"
+      ])
+      expect(result.files).toEqual({
+        "scratchpad/package.json": lines([
+          "{",
+          '  "name": "@x/scratchpad",',
+          '  "dependencies": {',
+          '    "@x/kernel": "workspace:*",',
+          '    "@x/ui": "workspace:*",',
+          '    "zod": "^4.0.0"',
+          "  }",
+          "}"
+        ]),
+        "scratchpad/tsconfig.json": lines(["{", '  "extends": "../tsconfig.base.json"', "}"]),
+        ".syncpackrc.json": lines(["{", '  "source": ["package.json", "packages/*/package.json"]', "}"])
+      })
+      expect(result.after[0]).toMatch(/^out: config-sync OK /)
+      expect(result.again).toEqual(result.after)
+    })
+  )
+
+  it.effect("a `scratchpad` pattern with no scratchpad behind it is a problem", () =>
+    Effect.gen(function* () {
+      const result = yield* run({
+        "package.json": json({ name: "root", workspaces: ["packages/*", "scratchpad"] }),
+        "packages/kernel/package.json": json({ name: "@x/kernel", scripts }),
+        "packages/kernel/tsconfig.json": "{}"
+      })
+      expect(result.before).toEqual([
+        "err: config-sync FAIL  1 problem needs a person, and no command repairs it",
+        'err:   package.json: the `workspaces` pattern "scratchpad" names no package: remove it, or the package it was written for has moved'
+      ])
+    })
+  )
 })

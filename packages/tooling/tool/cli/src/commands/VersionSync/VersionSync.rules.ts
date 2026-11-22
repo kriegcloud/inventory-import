@@ -13,6 +13,7 @@
  * | a GitHub action's version | `.github/workflows/ci.yml` | the same action in every other workflow |
  * | the CLI's version | its package.json | `version` in its `src/bin.ts` |
  * | the Effect language service's schema | the installed `@effect/tsgo` | a `$schema` that names the library's repository instead |
+ * | what the scratchpad runs on | the version the package.json files state for each dependency | the same dependency in `scratchpad/package.json` (a library only an experiment uses is left alone) |
  *
  * The standing documents are `CLAUDE.md`, `AGENTS.md`, `README.md`, `docs/` (its evidence folders `docs/qa` and
  * `docs/session` left out) and `.claude/agents`. A version is read only after its own name, and after a name written
@@ -33,8 +34,10 @@ import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import { Repo, type Workspace } from "../../Repo.service.ts"
+import { scratchpadFolder } from "../../Repo.schema.ts"
 import {
   decodeJsonc,
+  entriesOf,
   type Found,
   type FoundBlock,
   lineAt,
@@ -571,7 +574,52 @@ export const versionSyncPlan = Effect.fn("VersionSync.plan")(function* () {
     )
   })
 
+  // The scratchpad: what it shares with the packages is at the packages' version; the rest is an experiment's.
+  const scratchPlan = Effect.fn("VersionSync.scratchpad")(function* () {
+    const at = yield* readIfThere(repo.join(repo.root, scratchpadFolder, "package.json"))
+    if (O.isNone(at)) return nothing
+    const own = A.flatMap(["dependencies", "devDependencies"], (block) =>
+      O.match(objectOf(block)(at.value.text), {
+        onNone: () => A.empty<readonly [Found, Found]>(),
+        onSome: (found) => entriesOf(found)(at.value.text)
+      })
+    )
+    return mergePlans(
+      A.map(
+        A.filter(own, ([, spec]) => isRegistryVersion(spec.value)),
+        ([name, spec]) => {
+          const source = stated(name.value)
+          return O.match(source.spec, {
+            // Two packages that disagree are named once already, where the dependency is the packages' own.
+            onNone: () => nothing,
+            onSome: (wanted) =>
+              Plan.make({
+                checked: 1,
+                problems: [],
+                drifts:
+                  spec.value === wanted
+                    ? []
+                    : [
+                        Drift.make({
+                          file: at.value.file,
+                          line: lineAt(at.value.text)(spec.start),
+                          what: `the scratchpad's \`${name.value}\`, from the package.json files`,
+                          found: spec.value,
+                          expected: wanted,
+                          start: spec.start,
+                          end: spec.end,
+                          text: wanted
+                        })
+                      ]
+              })
+          })
+        }
+      )
+    )
+  })
+
   const bun = yield* bunPlan()
+  const scratch = yield* scratchPlan()
   const effect = yield* effectPlan()
   const alchemy = yield* alchemyPlan()
   const date = yield* datePlan()
@@ -588,7 +636,8 @@ export const versionSyncPlan = Effect.fn("VersionSync.plan")(function* () {
     date,
     actionsPlan(),
     cli,
-    schema
+    schema,
+    scratch
   ])
 })
 

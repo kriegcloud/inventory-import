@@ -9,6 +9,16 @@ import * as S from "effect/Schema"
 
 const $I = $RepoCliId.create("Repo.schema")
 
+/**
+ * The scratchpad's folder, from the root: a workspace package where an idea is tried against the repository's
+ * packages. The check, the build and a deploy never read it, and the laws on how code is written (tags, the form of
+ * an import, a steady ref) leave it out by this name: they apply when code graduates into a package. Only the law
+ * on secrets reads it, since the repository is public (decision "the scratchpad", 2026-11-22).
+ *
+ * @category models
+ */
+export const scratchpadFolder = "scratchpad"
+
 const names = S.Record(S.String, S.Unknown)
 
 /**

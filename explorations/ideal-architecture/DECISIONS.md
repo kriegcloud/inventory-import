@@ -1312,6 +1312,17 @@ The agent chose these, and I was not asked:
 - **No law refuses private names** on this branch: only key-shaped strings are read for (`laws keys`), in the
   scratchpad as everywhere. Answer 3's "private names" has nothing to hold it yet.
 
+### 2026-11-22 — the scratchpad: a comment that hides a type error
+
+`scratch:check` refuses `@ts-nocheck` and any Effect diagnostic turned off outside the one line decision 33 of the
+Alchemy brief allows. I was asked: "In scratchpad experiments, `scratch:check` now refuses `@ts-nocheck` and any
+switched-off Effect diagnostic. Should it also refuse `@ts-ignore` and `@ts-expect-error`, which each hide one type
+error on the next line?" Options: "Refuse ignore, allow expect-error (Recommended)"; "Allow both"; "Refuse both".
+Answer: "Refuse ignore, allow expect-error". I chose; the agent recommended the same. `@ts-ignore` hides an error
+silently and keeps hiding it after the code is fixed, so `scratch:check` refuses it, in any capitals, in every file
+the scratchpad's type-check reads. `@ts-expect-error` stays: it is how an experiment shows that a wrong call does not
+compile, and it fails by itself once the error is gone.
+
 ### 2026-11-22 — dependencies: the catalog, Node's types, Better Auth, and sentences that record a check
 
 Four questions left open when `deps:update`, `version-sync` and `config-sync` were built, answered by dialog.

@@ -4,8 +4,11 @@ import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
+import * as Str from "effect/String"
 import * as TestClock from "effect/testing/TestClock"
 import {
+  diagnosticLines,
+  noCheck,
   type Install,
   logLine,
   readLogLine,
@@ -14,9 +17,12 @@ import {
   scratchEnd,
   scratchList,
   scratchNew,
-  scratchSentence
+  scratchSentence,
+  scratchTest,
+  uncheckedLines
 } from "../src/commands/Scratch/Scratch.rules.ts"
-import { typeName } from "../src/commands/Scratch/Scratch.templates.ts"
+import { scratchpadFiles } from "../src/commands/Scratch/Scratch.config.ts"
+import { decideFileLine, diagnosticDirective, typeName } from "../src/commands/Scratch/Scratch.templates.ts"
 import { Repo } from "../src/Repo.service.ts"
 import { render } from "../src/Report.schema.ts"
 import { lines } from "./support/sync.ts"
@@ -45,28 +51,33 @@ const note = (started: string, template = "probe", libraries = "") =>
     "# an idea"
   ])
 
+// The scratchpad's package.json: only the libraries experiments added, everything else from the root's install.
 const manifest = (dependencies: ReadonlyArray<string>) =>
   lines([
     "{",
     '  "name": "@x/scratchpad",',
-    '  "dependencies": {',
+    dependencies.length === 0 ? '  "dependencies": {}' : '  "dependencies": {',
     ...A.map(dependencies, (line, index) => `    ${line}${index === dependencies.length - 1 ? "" : ","}`),
-    "  },",
-    '  "devDependencies": {',
-    '    "vitest": "^5.1.0"',
-    "  }",
+    ...(dependencies.length === 0 ? [] : ["  }"]),
     "}"
   ])
 
-const repository = (extra: Tree = {}, dependencies = ['"@x/kernel": "workspace:*"', '"effect": "4.1.4"']): Tree => ({
-  "package.json": json({
-    name: "root",
-    workspaces: ["packages/*", "scratchpad"],
-    devDependencies: { vitest: "^5.1.0" }
-  }),
+// The scratchpad as the CLI writes its configuration, outside the root's workspaces, and a root install that has
+// effect and the repository's packages (what an experiment imports from the root).
+const repository = (extra: Tree = {}, dependencies: ReadonlyArray<string> = []): Tree => ({
+  "package.json": json({ name: "root", workspaces: ["packages/*"], devDependencies: { vitest: "^5.1.0" } }),
   "packages/kernel/package.json": json({ name: "@x/kernel", dependencies: { effect: "4.1.4" } }),
+  "node_modules/effect/package.json": "{}",
+  "node_modules/@x/kernel/package.json": "{}",
+  ...R.fromEntries(
+    A.map(
+      A.filter(scratchpadFiles, (file) => file.name !== "package.json"),
+      (file) => [`scratchpad/${file.name}`, file.text] as const
+    )
+  ),
   "scratchpad/package.json": manifest(dependencies),
   "scratchpad/LOG.md": "# What the experiments taught\n\n",
+  ...(dependencies.length === 0 ? {} : { "scratchpad/bun.lock": "the scratchpad's lockfile\n" }),
   ...extra
 })
 
@@ -88,14 +99,12 @@ describe("scratch", () => {
       const result = yield* inTree(
         repository(),
         Effect.gen(function* () {
-          const lines = yield* said(scratchNew({ name: "stock-count", template: "service", question: "" }, install))
+          const lines = yield* said(scratchNew({ name: "stock-count", template: "service", question: "" }))
           const text = yield* read("scratchpad/experiments/stock-count/NOTE.md")
           const code = yield* read("scratchpad/experiments/stock-count/StockCount.ts")
           const test = yield* there("scratchpad/experiments/stock-count/StockCount.test.ts")
           const installed = yield* there("installed")
-          const again = yield* Effect.flip(
-            scratchNew({ name: "stock-count", template: "probe", question: "" }, install)
-          )
+          const again = yield* Effect.flip(scratchNew({ name: "stock-count", template: "probe", question: "" }))
           return { lines, text, code, test, installed, again: again.message }
         })
       )
@@ -123,8 +132,8 @@ describe("scratch", () => {
       const result = yield* inTree(
         repository(),
         Effect.gen(function* () {
-          const name = yield* Effect.flip(scratchNew({ name: "Stock_Count", template: "probe", question: "" }, install))
-          const verify = yield* Effect.flip(scratchNew({ name: "shelf", template: "verify", question: "" }, install))
+          const name = yield* Effect.flip(scratchNew({ name: "Stock_Count", template: "probe", question: "" }))
+          const verify = yield* Effect.flip(scratchNew({ name: "shelf", template: "verify", question: "" }))
           const made = yield* there("scratchpad/experiments/shelf")
           return { name: name.message, verify: verify.message, made }
         })
@@ -133,50 +142,79 @@ describe("scratch", () => {
         '"Stock_Count" cannot name an experiment: use small letters, digits and single hyphens, starting with a letter, at most 40 characters (stock-count, xlsx-dates-2)'
       )
       expect(result.verify).toBe(
-        "the verify template needs @alchemy.run/domain, and this repository does not pin it yet (vendor/alchemy/sources.json is not there). Until it does, start from probe, service, screen"
+        "the verify template needs @alchemy.run/domain, and the root's install does not have it (no package asks for it yet, or `bun install` has not run). Until it does, start from probe, service, screen"
       )
       expect(result.made).toBe(false)
     })
   )
 
-  it.effect("new makes the verify template once its package is pinned, as the experiment's own library", () =>
+  it.effect("new makes the verify template once the root's install has the prover, with no library of its own", () =>
     Effect.gen(function* () {
       yield* at("2026-11-22T12:00:00Z")
       const result = yield* inTree(
-        repository({
-          "vendor/alchemy/sources.json": json({
-            commit: "abc1234",
-            packages: [
-              { package: "@alchemy.run/domain", version: "2.0.0-beta.88", file: "alchemy.run-domain-abc1234.tgz" }
-            ]
-          })
-        }),
+        repository({ "node_modules/@alchemy.run/domain/package.json": "{}" }),
         Effect.gen(function* () {
           const lines = yield* said(
-            scratchNew({ name: "shelf", template: "verify", question: "Can a shelf overfill?" }, install)
+            scratchNew({ name: "shelf", template: "verify", question: "Can a shelf overfill?" })
           )
           const text = yield* read("scratchpad/experiments/shelf/NOTE.md")
           const pkg = yield* read("scratchpad/package.json")
-          const installed = yield* there("installed")
           const model = yield* there("scratchpad/experiments/shelf/Shelf.aggregate.ts")
           const checked = yield* scratchCheck(types).pipe(said)
-          return { first: lines[0], text, pkg, installed, model, checked }
+          return { first: lines[0], text, pkg, model, checked }
         })
       )
       expect(result.first).toBe(
         "out: scratch:new  shelf, from the verify template: 3 files in scratchpad/experiments/shelf"
       )
-      expect(result.text).toContain("libraries: @alchemy.run/domain\n")
+      expect(result.text).toContain("libraries: \n")
       expect(result.text).toContain("Can a shelf overfill?")
-      expect(result.pkg).toBe(
-        manifest(['"@alchemy.run/domain": "2.0.0-beta.88-abc1234"', '"@x/kernel": "workspace:*"', '"effect": "4.1.4"'])
-      )
-      expect(result.installed).toBe(true)
+      // The prover comes from the root, as the packages' effect does: the scratchpad's package.json is unchanged.
+      expect(result.pkg).toBe(manifest([]))
       expect(result.model).toBe(true)
-      // The library is accounted for: the experiment's note names it.
       expect(result.checked).toEqual([
-        "out: scratch:check OK  1 experiment, none with an install of its own; 4 dependencies accounted for",
-        "out: scratch:check OK  1 experiment passes the type-checker and the Effect diagnostics"
+        "out: scratch:check OK  1 experiment, none with an install of its own; 0 dependencies accounted for",
+        "out: scratch:check OK  the scratchpad's configuration and 1 experiment pass the type-checker and the Effect diagnostics"
+      ])
+    })
+  )
+
+  it.effect("new writes the scratchpad's configuration where it is missing; check names one that differs", () =>
+    Effect.gen(function* () {
+      const result = yield* inTree(
+        {
+          ...repository(),
+          "scratchpad/tsconfig.json": "{}\n",
+          "scratchpad/vite.config.ts": ""
+        },
+        Effect.gen(function* () {
+          const repo = yield* Repo
+          yield* repo.remove(repo.join(repo.root, "scratchpad", "vitest.config.ts"))
+          const before = yield* Effect.map(scratchCheck(types), render(scratchSentence))
+          yield* scratchNew({ name: "idea", template: "probe", question: "" })
+          const written = yield* read("scratchpad/vitest.config.ts")
+          const after = yield* scratchCheck(types).pipe(said)
+          return { before, written, after }
+        })
+      )
+      const differs =
+        "differs from what the CLI writes (packages/tooling/tool/cli/src/commands/Scratch/Scratch.config.ts): change both together"
+      expect(result.before.failed).toBe(true)
+      expect(A.filter(printed(result.before), Str.includes("scratchpad/"))).toEqual([
+        `err:   scratchpad/tsconfig.json: ${differs}`,
+        "err:   scratchpad/vitest.config.ts: is missing: `bun run scratch:new` writes it",
+        `err:   scratchpad/vite.config.ts: ${differs}`
+      ])
+      // The missing file is written; one that differs is a person's to settle, and stays.
+      expect(result.written).toBe(
+        A.findFirst(scratchpadFiles, (file) => file.name === "vitest.config.ts").pipe(
+          O.map((file) => file.text),
+          O.getOrElse(() => "")
+        )
+      )
+      expect(A.filter(result.after, Str.includes("scratchpad/"))).toEqual([
+        `err:   scratchpad/tsconfig.json: ${differs}`,
+        `err:   scratchpad/vite.config.ts: ${differs}`
       ])
     })
   )
@@ -223,7 +261,7 @@ describe("scratch", () => {
     })
   )
 
-  it.effect("an empty scratchpad lists nothing, passes its check, and is not type-checked", () =>
+  it.effect("an empty scratchpad lists nothing, and its check type-checks its own configuration", () =>
     Effect.gen(function* () {
       const result = yield* inTree(
         repository(),
@@ -236,9 +274,10 @@ describe("scratch", () => {
       )
       expect(result.listed).toEqual(["out: scratch:list  no experiment is open"])
       expect(result.checked).toEqual([
-        "out: scratch:check OK  0 experiments, none with an install of its own; 3 dependencies accounted for"
+        "out: scratch:check OK  0 experiments, none with an install of its own; 0 dependencies accounted for",
+        "out: scratch:check OK  the scratchpad's configuration and 0 experiments pass the type-checker and the Effect diagnostics"
       ])
-      expect(result.typed).toBe(false)
+      expect(result.typed).toBe(true)
     })
   )
 
@@ -254,7 +293,13 @@ describe("scratch", () => {
             "scratchpad/experiments/no-note/Idea.ts": "",
             "scratchpad/experiments/bad-note/NOTE.md": "---\nstatus: graduated\n---\n"
           },
-          ['"@x/kernel": "workspace:*"', '"effect": "4.1.4"', '"left-pad": "^1.3.0"', '"zod": "^4.0.0"']
+          [
+            '"@x/kernel": "workspace:*"',
+            '"effect": "4.1.4"',
+            '"left-pad": "^1.3.0"',
+            '"react": "^19.0.0"',
+            '"zod": "^4.0.0"'
+          ]
         ),
         Effect.map(
           scratchCheck(marked("typed", 2, "experiments/no-note/Idea.ts(1,1): error TS1: wrong")),
@@ -267,15 +312,131 @@ describe("scratch", () => {
         "is missing or does not read as a note: it starts with status: open, started: a day, template: one of probe, service, screen, verify, and libraries: (empty, or names separated by commas), between two lines of ---"
       expect(report.failed).toBe(true)
       expect(printed(report)).toEqual([
-        "err: scratch:check FAIL  7 problems",
+        "err: scratch:check FAIL  10 problems",
         `err:   scratchpad/experiments/bad-note/NOTE.md: ${noNote}`,
         `err:   scratchpad/experiments/no-note/NOTE.md: ${noNote}`,
         `err:   scratchpad/experiments/own-install/node_modules: ${install}`,
         `err:   scratchpad/experiments/own-install/package.json: ${install}`,
         `err:   scratchpad/experiments/own-install/sub/bun.lock: ${install}`,
-        "err:   scratchpad/package.json: `left-pad` is a dependency no experiment's NOTE.md names (`libraries:`) and no package of the repository uses: name the experiment that needs it, or remove it",
+        "err:   scratchpad/package.json: `@x/kernel` comes from the root's install: an experiment imports it as the packages do. Remove it here (`bun remove --cwd scratchpad @x/kernel`), so there is one copy",
+        "err:   scratchpad/package.json: `effect` comes from the root's install: an experiment imports it as the packages do. Remove it here (`bun remove --cwd scratchpad effect`), so there is one copy",
+        "err:   scratchpad/package.json: `react` comes from the root's install: an experiment imports it as the packages do. Remove it here (`bun remove --cwd scratchpad react`), so there is one copy",
+        "err:   scratchpad/package.json: `left-pad` is a library no experiment's NOTE.md names (`libraries:`): name the experiment that needs it, or remove it",
         "err:   scratchpad/experiments/own-install/NOTE.md: names the library `date-fns`, which is not in the scratchpad's package.json: add it there (`bun add --cwd scratchpad date-fns`), or take it out of the note",
         "err: scratch:check FAIL  the type-checker, with the Effect diagnostics, over the experiments:\nexperiments/no-note/Idea.ts(1,1): error TS1: wrong"
+      ])
+    })
+  )
+
+  it("a diagnostic may be turned off only by the one line, first in a decide file", () => {
+    const line = decideFileLine
+    expect(diagnosticLines("Shelf.aggregate.ts")(`${line}\nexport const x = 1\n`)).toEqual([])
+    expect(diagnosticLines("Count.decision.ts")(`${line}\r\n`)).toEqual([])
+    expect(diagnosticLines("Shelf.ts")(`${line}\n`)).toEqual([1])
+    expect(diagnosticLines("Shelf.test.ts")(`${line}\n`)).toEqual([1])
+    expect(diagnosticLines("Shelf.aggregate.ts")(`// a comment\n${line}\n`)).toEqual([2])
+    expect(diagnosticLines("Shelf.aggregate.ts")(`// ${diagnosticDirective} strictEffectProvide:off\n`)).toEqual([1])
+    expect(
+      diagnosticLines("Shelf.aggregate.ts")(`${line}\n// ${diagnosticDirective}-next-line floatingEffect:off\n`)
+    ).toEqual([2])
+  })
+
+  it.effect("check refuses a diagnostic turned off anywhere but the first line of a decide file", () =>
+    Effect.gen(function* () {
+      const line = decideFileLine
+      const result = yield* inTree(
+        repository({
+          "scratchpad/experiments/shelf/NOTE.md": note("2026-11-22", "verify", ""),
+          "scratchpad/experiments/shelf/Shelf.aggregate.ts": `${line}\nexport const decide = 1\n`,
+          "scratchpad/experiments/shelf/Shelf.decision.ts": `// first\n${line}\n`,
+          "scratchpad/experiments/shelf/Shelf.ts": `${line}\n`,
+          "scratchpad/experiments/shelf/Shelf.test.ts": `// ${diagnosticDirective} floatingEffect:off\n`
+        }),
+        scratchCheck(types).pipe(said)
+      )
+      const refused = `turns an Effect diagnostic off. Only a decide file (\`*.aggregate.ts\`, \`*.decision.ts\`) may, and only \`${decideFileLine}\` as its first line (decision 33 of the Alchemy brief): build with \`.make\` here`
+      expect(result).toEqual([
+        "err: scratch:check FAIL  3 problems",
+        `err:   scratchpad/experiments/shelf/Shelf.decision.ts:2: ${refused}`,
+        `err:   scratchpad/experiments/shelf/Shelf.test.ts:1: ${refused}`,
+        `err:   scratchpad/experiments/shelf/Shelf.ts:1: ${refused}`,
+        "out: scratch:check OK  the scratchpad's configuration and 1 experiment pass the type-checker and the Effect diagnostics"
+      ])
+    })
+  )
+
+  it.effect("check reads every file the type-checker reads, not only an experiment's own", () =>
+    Effect.gen(function* () {
+      const off = `// ${diagnosticDirective} floatingEffect:off\n`
+      const result = yield* inTree(
+        repository({
+          "scratchpad/experiments/shelf/NOTE.md": note("2026-11-22", "probe", ""),
+          "scratchpad/experiments/Loose.ts": off,
+          "scratchpad/experiments/shelf/dist/Shelf.ts": off,
+          "scratchpad/shared/Helper.ts": off,
+          "scratchpad/extra.config.ts": off,
+          "scratchpad/experiments/shelf/.state/cache.ts": off,
+          "scratchpad/node_modules/left-pad/index.ts": off
+        }),
+        scratchCheck(types).pipe(said)
+      )
+      const refused = `turns an Effect diagnostic off. Only a decide file (\`*.aggregate.ts\`, \`*.decision.ts\`) may, and only \`${decideFileLine}\` as its first line (decision 33 of the Alchemy brief): build with \`.make\` here`
+      expect(result).toEqual([
+        "err: scratch:check FAIL  4 problems",
+        `err:   scratchpad/experiments/Loose.ts:1: ${refused}`,
+        `err:   scratchpad/experiments/shelf/dist/Shelf.ts:1: ${refused}`,
+        `err:   scratchpad/extra.config.ts:1: ${refused}`,
+        `err:   scratchpad/shared/Helper.ts:1: ${refused}`,
+        "out: scratch:check OK  the scratchpad's configuration and 1 experiment pass the type-checker and the Effect diagnostics"
+      ])
+    })
+  )
+
+  it("the comment that turns a whole file's checks off is found on any line", () => {
+    expect(uncheckedLines(`// ${noCheck}\nexport const count = 1\n`)).toEqual([1])
+    expect(uncheckedLines(`/* a note */\r\n/// ${noCheck}\r\n`)).toEqual([2])
+    expect(uncheckedLines("// @ts-check\nexport const count = 1\n")).toEqual([])
+  })
+
+  it.effect("check refuses a file that turns the type-checker off whole, a decide file too", () =>
+    Effect.gen(function* () {
+      const result = yield* inTree(
+        repository({
+          "scratchpad/experiments/shelf/NOTE.md": note("2026-11-22", "verify", ""),
+          "scratchpad/experiments/shelf/Shelf.ts": `// ${noCheck}\nexport const count = 1\n`,
+          "scratchpad/experiments/shelf/Shelf.aggregate.ts": `${decideFileLine}\n// ${noCheck}\n`
+        }),
+        scratchCheck(types).pipe(said)
+      )
+      const refused = `names \`${noCheck}\`, which turns the type-checker and every Effect diagnostic off for a whole file. No file of the scratchpad may hold it: remove the line and fix what the type-checker then says`
+      expect(result).toEqual([
+        "err: scratch:check FAIL  2 problems",
+        `err:   scratchpad/experiments/shelf/Shelf.aggregate.ts:2: ${refused}`,
+        `err:   scratchpad/experiments/shelf/Shelf.ts:1: ${refused}`,
+        "out: scratch:check OK  the scratchpad's configuration and 1 experiment pass the type-checker and the Effect diagnostics"
+      ])
+    })
+  )
+
+  it.effect("check asks for the scratchpad's own lockfile once it lists a library", () =>
+    Effect.gen(function* () {
+      const result = yield* inTree(
+        {
+          ...repository({ "scratchpad/experiments/idea/NOTE.md": note("2026-11-22", "probe", "zod") }, [
+            '"zod": "^4.0.0"'
+          ]),
+          "scratchpad/bun.lock": ""
+        },
+        Effect.gen(function* () {
+          const repo = yield* Repo
+          yield* repo.remove(repo.join(repo.root, "scratchpad", "bun.lock"))
+          return yield* scratchCheck(types).pipe(said)
+        })
+      )
+      expect(result).toEqual([
+        "err: scratch:check FAIL  1 problem",
+        "err:   scratchpad/package.json: lists libraries and scratchpad/bun.lock is not there: run `bun install --cwd scratchpad` and commit scratchpad/bun.lock",
+        "out: scratch:check OK  the scratchpad's configuration and 1 experiment pass the type-checker and the Effect diagnostics"
       ])
     })
   )
@@ -365,6 +526,49 @@ describe("scratch", () => {
       })
     })
   )
+
+  it.effect(
+    "test runs one experiment's folder, never another whose name starts the same, and refuses one that is not there",
+    () =>
+      Effect.gen(function* () {
+        const asked: Array<string> = []
+        const run = (folder: string) =>
+          Effect.sync(() => {
+            asked.push(folder)
+            return {
+              code: 0,
+              output:
+                folder === "experiments/empty" ? "No test files found, exiting with code 0" : "Test Files  1 passed (1)"
+            }
+          })
+        const result = yield* inTree(
+          repository({
+            "scratchpad/experiments/xlsx-dates/NOTE.md": note("2026-11-22"),
+            "scratchpad/experiments/xlsx-dates-2/NOTE.md": note("2026-11-22"),
+            "scratchpad/experiments/empty/NOTE.md": note("2026-11-22")
+          }),
+          Effect.gen(function* () {
+            const one = yield* said(scratchTest(O.some("xlsx-dates"), run))
+            const every = yield* said(scratchTest(O.none(), run))
+            const empty = yield* Effect.map(scratchTest(O.some("empty"), run), render(scratchSentence))
+            const missing = yield* Effect.flip(scratchTest(O.some("xlsx"), run))
+            return { one, every, empty, missing: missing.message }
+          })
+        )
+        expect(asked).toEqual(["experiments/xlsx-dates", "experiments", "experiments/empty"])
+        expect(result.one).toEqual(["out: scratch:test OK  xlsx-dates\nTest Files  1 passed (1)"])
+        expect(result.every).toEqual(["out: scratch:test OK  every experiment\nTest Files  1 passed (1)"])
+        expect(result.empty.failed).toBe(true)
+        expect(result.missing).toBe("scratchpad/experiments/xlsx is not there. Open: empty, xlsx-dates, xlsx-dates-2")
+      })
+  )
+
+  it("reads a note saved on Windows or with a byte-order mark as the same note", () => {
+    const unix = note("2026-11-22", "service", "zod")
+    const windows = `\uFEFF${A.join(Str.split("\n")(unix), "\r\n")}`
+    expect(readNote(windows)).toEqual(readNote(unix))
+    expect(O.isSome(readNote(windows))).toBe(true)
+  })
 
   it("a line of the log reads back as what was written, and a name becomes a type's", () => {
     const lines = [

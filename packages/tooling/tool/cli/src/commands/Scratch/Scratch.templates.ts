@@ -290,15 +290,29 @@ const screen = (slug: string): ReadonlyArray<TemplateFile> => {
   ]
 }
 
+/**
+ * The word that starts an Effect diagnostic's directive, written in two pieces: the language service reads the whole
+ * word wherever it stands in a file, a string included, and would turn the diagnostic off in this file.
+ */
+const diagnosticsWord = "diagnostics"
+export const diagnosticDirective = `@effect-${diagnosticsWord}`
+
+/**
+ * The one diagnostic line a decide file may hold, as its first line (decision 33 of the Alchemy brief, 2026-11-22: "`new`
+ * only in decide files"): the prover knows an event or a rejection only by `new`, which the profile refuses elsewhere.
+ */
+export const decideFileLine = `// ${diagnosticDirective} newSchemaClass:off`
+
 const verify = (slug: string): ReadonlyArray<TemplateFile> => {
   const name = typeName(slug)
   return [
     {
       name: `${name}.aggregate.ts`,
       text: lines([
-        "// The prover reads this file's source, and knows an event or a rejection by `new`: `X.make(...)` is not read.",
-        "// So `new` is used in an aggregate's file, and only there, with the diagnostic that refuses it turned off.",
-        "// @effect-diagnostics newSchemaClass:off",
+        decideFileLine,
+        "// The prover reads this file's source and knows an event or a rejection by `new`, not by `X.make(...)`. So a",
+        "// decide file (`*.aggregate.ts`, `*.decision.ts`) builds them with `new`, with that one diagnostic off on its",
+        "// first line, and every other file uses `.make` (decision 33 of the Alchemy brief, 2026-11-22).",
         "/**",
         ` * ${slug}: a domain model the prover can read. Commands are decided against a state, events change it, and the`,
         " * rules (`invariants` of a state, `transitions` between two) are what the prover holds every path to.",

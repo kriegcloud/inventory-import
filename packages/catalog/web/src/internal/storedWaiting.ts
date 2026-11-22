@@ -1,6 +1,6 @@
-// One import's waiting rows as this browser keeps them: the stored form of the draft's `Waiting`, with the rows on hold
-// and the values the server may hold of each row. The one thing not to break: what a reload reads back is what the
-// draft kept, holds and values seen included; a G2 hold after a reload and a refused row across one rest on it.
+// One import's waiting rows as this browser keeps them: the stored form of the draft's `Waiting`. The one thing not to
+// break: what a reload reads back is what the draft kept, every side of every line and what each may be written over
+// included; and what an older page of the app kept still reads, so nothing it kept is lost.
 import * as A from "effect/Array"
 import { dual } from "effect/Function"
 import * as O from "effect/Option"
@@ -8,53 +8,70 @@ import * as P from "effect/Predicate"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import { RowDecision } from "@inventory/catalog-contract/Decision"
-import { type ClosedTab, Hold, type HeldRow, type Waiting } from "../Draft.machine.ts"
+import type { Line, Side, Waiting } from "../Draft.machine.ts"
 
-/** The values the server may have of a row, as this browser keeps them. */
-const StoredSeen = RowDecision.pipe(S.OptionFromNullOr, S.Array)
+const StoredDecision = S.OptionFromNullOr(RowDecision)
 
-/** A decision of a row made in a tab that is gone, as this browser keeps it on the row's line. */
-const StoredClosed = S.Struct({
-  decision: S.OptionFromNullOr(RowDecision),
+/** Several decisions of a row, as this browser keeps them. */
+const StoredSeveral = StoredDecision.pipe(S.Array)
+
+/** One decision of one row, as this browser keeps it. */
+const StoredSide = S.Struct({
+  decision: StoredDecision,
   madeOn: S.Int,
-  seen: S.OptionFromNullOr(StoredSeen),
+  dates: S.Record(S.String, S.Int).pipe(S.optionalKey),
+  seen: StoredSeveral,
+  here: S.Boolean,
+  overtaken: S.Boolean,
   refused: S.OptionFromNullOr(S.String)
-}).annotate({ description: "A decision of a row made in a closed tab of the person's, as this browser keeps it" })
+}).annotate({ description: "One decision of a row of the person's the server has not taken, as this browser keeps it" })
 
-/**
- * Why a row is held, as this browser keeps it: refused, decided elsewhere since, or decided otherwise by a gone tab. An
- * older page kept, for the last, the gone tab's decision as the row's own and this tab's beside it (`thisTab`).
- */
-const StoredHold = S.Union([
-  S.Struct({ kind: S.tag("refused"), reason: S.String }),
-  S.Struct({ kind: S.tag("elsewhere"), theirs: S.OptionFromNullOr(RowDecision) }),
-  S.Struct({ kind: S.tag("othertab"), thisTab: RowDecision.pipe(S.OptionFromNullOr, S.optionalKey) })
-])
-  .annotate({ description: "Why one of the person's rows is held, as this browser keeps it" })
-  .pipe(S.toTaggedUnion("kind"))
-
-/** One row on hold as this browser keeps it: an older page kept no closed tabs' decisions with it. */
-const StoredHeld = S.Struct({
-  mine: S.OptionFromNullOr(RowDecision),
-  madeOn: S.Int,
-  why: StoredHold,
-  closed: StoredClosed.pipe(S.Array, S.optionalKey)
-}).annotate({
-  description: "One of the person's rows on hold, as this browser keeps it"
+/** One row's line as this browser keeps it: `theirs` left out where nobody decided the row since. */
+const StoredLine = S.Struct({ sides: S.Array(StoredSide), theirs: StoredDecision.pipe(S.optionalKey) }).annotate({
+  description: "One row's line above the review, as this browser keeps it"
 })
 
+/** A closed tab's decision on a row's line, as an older page kept it. */
+const OlderClosed = S.Struct({
+  decision: StoredDecision,
+  madeOn: S.Int,
+  seen: S.OptionFromNullOr(StoredSeveral),
+  refused: S.OptionFromNullOr(S.String)
+}).annotate({ description: "A closed tab's decision on a row's line, as an older page kept it" })
+
+/** Why a row was held, as an older page kept it. */
+const OlderHold = S.Union([
+  S.Struct({ kind: S.tag("refused"), reason: S.String }),
+  S.Struct({ kind: S.tag("elsewhere"), theirs: StoredDecision }),
+  S.Struct({ kind: S.tag("othertab"), thisTab: StoredDecision.pipe(S.optionalKey) })
+])
+  .annotate({ description: "Why one of the person's rows was held, as an older page kept it" })
+  .pipe(S.toTaggedUnion("kind"))
+
+/** One row on hold, as an older page kept it. */
+const OlderHeld = S.Struct({
+  mine: StoredDecision,
+  madeOn: S.Int,
+  why: OlderHold,
+  closed: OlderClosed.pipe(S.Array, S.optionalKey)
+}).annotate({ description: "One of the person's rows on hold, as an older page kept it" })
+
 /**
- * One import's waiting rows as this browser keeps them. Read too as an older page of the app kept them: one revision
- * for all the rows (`madeOn` a number), no count of confirms, no values seen, no rows on hold and no file name.
+ * One import's waiting rows as this browser keeps them: what waits (`waits`), the lines, and what was left over
+ * (`rows`, `beside`, `theirs`). Read too as an older page of the app kept them: what waited in `rows`, with one revision
+ * for all of them or one each (`madeOn`), the values seen apart, and the rows on hold (`held`).
  */
 export const StoredWaiting = S.Struct({
-  madeOn: S.Union([S.Int, S.Record(S.String, S.Int)]),
+  waits: S.Record(S.String, StoredSide).pipe(S.optionalKey),
+  lines: S.Record(S.String, StoredLine).pipe(S.optionalKey),
   confirms: S.Int.pipe(S.NullOr, S.optionalKey),
   leftOver: S.Boolean,
-  rows: S.Record(S.String, S.OptionFromNullOr(RowDecision)),
-  beside: S.Record(S.String, StoredSeen).pipe(S.optionalKey),
-  seen: S.Record(S.String, StoredSeen).pipe(S.optionalKey),
-  held: S.Record(S.String, StoredHeld).pipe(S.optionalKey),
+  rows: S.Record(S.String, StoredDecision),
+  beside: S.Record(S.String, StoredSeveral).pipe(S.optionalKey),
+  theirs: S.Record(S.String, StoredDecision).pipe(S.optionalKey),
+  madeOn: S.Union([S.Int, S.Record(S.String, S.Int)]),
+  seen: S.Record(S.String, StoredSeveral).pipe(S.optionalKey),
+  held: S.Record(S.String, OlderHeld).pipe(S.optionalKey),
   fileName: S.optionalKey(S.String)
 })
   .pipe(S.OptionFromNullOr)
@@ -62,56 +79,107 @@ export const StoredWaiting = S.Struct({
 /** The decoded value of `StoredWaiting`. */
 export type StoredWaiting = typeof StoredWaiting.Type
 
+const sideFrom = (stored: typeof StoredSide.Type): Side => ({
+  ...stored,
+  dates: stored.dates ?? {},
+  // Kept between visits, it waited.
+  live: false
+})
+
+const sideTo = ({ dates, decision, here, madeOn, overtaken, refused, seen }: Side): typeof StoredSide.Type => ({
+  decision,
+  madeOn,
+  ...(R.isEmptyReadonlyRecord(dates) ? {} : { dates }),
+  seen,
+  here,
+  overtaken,
+  refused
+})
+
+/** A decision an older page kept; where it kept no values seen, the server may hold nothing of the row. */
+const olderSide = (parts: {
+  readonly decision: Side["decision"]
+  readonly madeOn: number
+  readonly seen: O.Option<Side["seen"]>
+  readonly here: boolean
+  readonly overtaken?: boolean
+  readonly refused?: O.Option<string>
+}): Side => ({
+  decision: parts.decision,
+  madeOn: parts.madeOn,
+  dates: {},
+  seen: O.getOrElse(parts.seen, (): Side["seen"] => [O.none()]),
+  live: false,
+  here: parts.here,
+  overtaken: parts.overtaken ?? false,
+  refused: parts.refused ?? O.none()
+})
+
 /**
- * One row on hold from what this browser kept. What an older page kept of a gone tab's decision beside this tab's own
- * reads as the same line: this tab's decision is the row's, and the gone tab's is on it, refused where it was.
+ * One row on hold as an older page kept it, as its line. A gone tab's decision held beside this tab's own is told by
+ * what is not there: kept as the row's own, with this tab's in `thisTab` or (older still) only among the rows that
+ * waited, it has no closed tabs' decisions beside it.
  */
-const toHeld = (input: {
-  readonly held: typeof StoredHeld.Type
-  /** This tab's own decision of the row, kept waiting beside the line. */
-  readonly own: O.Option<{ readonly decision: O.Option<RowDecision>; readonly madeOn: O.Option<number> }>
-}): HeldRow => {
-  const { held, own } = input
-  const closed: ReadonlyArray<ClosedTab> = held.closed ?? []
-  const beside = (mine: O.Option<RowDecision>, refused: O.Option<string>): HeldRow => ({
-    mine,
-    madeOn: O.getOrElse(
-      O.flatMap(own, (waits) => waits.madeOn),
-      () => held.madeOn
-    ),
-    why: Hold.OtherTab(),
-    closed: [...closed, { decision: held.mine, madeOn: held.madeOn, seen: O.none(), refused }]
-  })
-  const as = (why: Hold): HeldRow => ({ mine: held.mine, madeOn: held.madeOn, why, closed })
-  return StoredHold.match(held.why, {
-    refused: ({ reason }) =>
-      O.match(own, {
-        onNone: () => as(Hold.Refused({ reason })),
-        onSome: (waits) => beside(waits.decision, O.some(reason))
-      }),
-    elsewhere: ({ theirs }) => as(Hold.Elsewhere({ theirs })),
-    othertab: ({ thisTab }) => (thisTab === undefined ? as(Hold.OtherTab()) : beside(thisTab, O.none()))
+const olderLine = (input: {
+  readonly held: typeof OlderHeld.Type
+  readonly seen: O.Option<Side["seen"]>
+  /** This tab's own decision of the row waited beside it. */
+  readonly waits: boolean
+}): Line => {
+  const { held, seen, waits } = input
+  const closed = A.map(held.closed ?? [], (one) => olderSide({ ...one, here: false }))
+  const own = (parts: { readonly overtaken?: boolean; readonly refused?: O.Option<string> }): ReadonlyArray<Side> => [
+    olderSide({ decision: held.mine, madeOn: held.madeOn, seen, here: true, ...parts }),
+    ...closed
+  ]
+  const gone = (refused: O.Option<string>): ReadonlyArray<Side> => [
+    olderSide({ decision: held.mine, madeOn: held.madeOn, seen: O.none(), here: false, refused }),
+    ...closed
+  ]
+  return OlderHold.match(held.why, {
+    refused: ({ reason }): Line => ({
+      sides: waits ? gone(O.some(reason)) : own({ refused: O.some(reason) }),
+      theirs: O.none()
+    }),
+    elsewhere: ({ theirs }) => ({ sides: own({ overtaken: true }), theirs: O.some(theirs) }),
+    // This tab's own waits beside the line, or is saved: what is asked about is the others'.
+    othertab: ({ thisTab }) => ({
+      sides: thisTab === undefined && A.isReadonlyArrayNonEmpty(closed) ? closed : gone(O.none()),
+      theirs: O.none()
+    })
   })
 }
 
 /** The draft's waiting rows from what this browser kept. */
 export const toWaiting = (stored: StoredWaiting): O.Option<Waiting> =>
-  O.map(stored, (entry) => {
+  O.map(stored, (entry): Waiting => {
+    const confirms = O.fromNullishOr(entry.confirms)
+    if (entry.leftOver) {
+      const named = { rows: entry.rows, beside: entry.beside ?? {}, theirs: entry.theirs ?? {} }
+      return { rows: {}, lines: {}, confirms, leftOver: O.some(named) }
+    }
     const made = entry.madeOn
-    const madeOn = P.isNumber(made) ? R.map(entry.rows, () => made) : made
+    const seenOf = (rowId: string): O.Option<Side["seen"]> => R.get(entry.seen ?? {}, rowId)
+    const older = R.map(entry.rows, (decision, rowId) =>
+      olderSide({
+        decision,
+        madeOn: P.isNumber(made) ? made : O.getOrElse(R.get(made, rowId), () => 0),
+        seen: seenOf(rowId),
+        here: true
+      })
+    )
+    const olderLines = R.map(entry.held ?? {}, (held, rowId) =>
+      olderLine({ held, seen: seenOf(rowId), waits: R.has(older, rowId) })
+    )
+    const lines = R.map(entry.lines ?? {}, (line): Line => ({
+      sides: A.map(line.sides, sideFrom),
+      theirs: line.theirs === undefined ? O.none() : O.some(line.theirs)
+    }))
     return {
-      rows: entry.rows,
-      madeOn,
-      confirms: O.fromNullishOr(entry.confirms),
-      leftOver: entry.leftOver,
-      beside: entry.beside ?? {},
-      seen: entry.seen ?? {},
-      held: R.map(entry.held ?? {}, (held, rowId) =>
-        toHeld({
-          held,
-          own: O.map(R.get(entry.rows, rowId), (decision) => ({ decision, madeOn: R.get(madeOn, rowId) }))
-        })
-      )
+      rows: { ...older, ...R.map(entry.waits ?? {}, sideFrom) },
+      lines: { ...olderLines, ...lines },
+      confirms,
+      leftOver: O.none()
     }
   })
 
@@ -126,26 +194,20 @@ export const toStored: {
 } = dual(2, (waits: O.Option<Waiting>, fileName: O.Option<string>): StoredWaiting =>
   O.map(waits, (entry) => ({
     ...O.match(fileName, { onNone: () => ({}), onSome: (name) => ({ fileName: name }) }),
-    madeOn: entry.madeOn,
     confirms: O.getOrNull(entry.confirms),
-    leftOver: entry.leftOver,
-    rows: entry.rows,
-    ...(R.isEmptyReadonlyRecord(entry.beside) ? {} : { beside: entry.beside }),
-    ...(R.isEmptyReadonlyRecord(entry.seen) ? {} : { seen: entry.seen }),
-    ...(R.isEmptyReadonlyRecord(entry.held)
-      ? {}
-      : {
-          held: R.map(entry.held, (held) => ({
-            mine: held.mine,
-            madeOn: held.madeOn,
-            why: Hold.$match(held.why, {
-              Refused: ({ reason }) => ({ kind: "refused" as const, reason }),
-              Elsewhere: ({ theirs }) => ({ kind: "elsewhere" as const, theirs }),
-              OtherTab: () => ({ kind: "othertab" as const })
-            }),
-            ...(A.isReadonlyArrayNonEmpty(held.closed) ? { closed: held.closed } : {})
-          }))
-        })
+    madeOn: {},
+    ...O.match(entry.leftOver, {
+      onSome: (named) => ({ leftOver: true, ...named }),
+      onNone: () => ({
+        leftOver: false,
+        rows: {},
+        waits: R.map(entry.rows, sideTo),
+        lines: R.map(entry.lines, (line) => ({
+          sides: A.map(line.sides, sideTo),
+          ...O.match(line.theirs, { onNone: () => ({}), onSome: (theirs) => ({ theirs }) })
+        }))
+      })
+    })
   }))
 )
 

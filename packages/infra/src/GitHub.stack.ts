@@ -1,15 +1,17 @@
 /**
- * The repository's stack: what GitHub must hold so the deploy workflow can run. Two environments (`preview` and
- * `production`), a Cloudflare token for each, minted in its own account (decision I4), production's model key and
- * sign-up list (I5, I8), and the rule that `main` takes a change only through a pull request whose check passed,
- * with an admin bypass (I7).
+ * The repository's stack: what GitHub must hold so the deploy workflow can run. Three environments (`preview`,
+ * `staging` and `production`), a Cloudflare token for production's account and one for the previews' (staging runs
+ * there too, decision I4), production's model key and sign-up list (I5, I8), the rule that `main` takes a change only
+ * through a pull request whose check passed, with an admin bypass (I7), and the release rules (decision "releases and
+ * deploys"): only an admin creates, moves or deletes a `v*` tag, and a `release/*` branch is never rewritten.
  *
  * Deployed from a workstation only, by the repository's owner, under `op run` so the model key is filled for that
  * one process: `op run --env-file packages/infra/env/op.env -- bunx alchemy deploy packages/infra/src/GitHub.stack.ts
  * --stage prod`. No workflow deploys it: a job that could rewrite its own approval rule would have none.
  *
- * Must not break: a preview job holds no model key, no sign-up list and no token for production's account; the
- * previews' password is written as a secret and never printed.
+ * Must not break: a preview or staging job holds no model key, no sign-up list and no token for production's
+ * account; the previews' password is written as a secret and never printed; production deploys only from a release
+ * tag, which only an admin can make, after the environment's reviewer approves.
  *
  * @packageDocumentation
  */
@@ -106,13 +108,23 @@ export default Alchemy.Stack(
       { onFailure: Effect.die, onSuccess: Effect.succeed }
     )
 
+    // Production deploys from a release tag (decision "releases and deploys"). No branch rule: Alchemy's provider
+    // writes only branch rules and deletes any other, so a `v*` tag rule could not be kept here, and a branch rule
+    // would refuse every tag. What holds it instead: the workflow starts production only on a `v*` tag, its first step
+    // refuses a tag that is not annotated, not on its release branch or on main (`bun run beep release verify`), only an
+    // admin may make a `v*` tag (the ruleset below), and the reviewer approves each deploy.
     const production = yield* GitHub.Environment("Production", {
       ...repository,
       name: "production",
-      reviewers: { users: [approver] },
-      deploymentBranchPolicy: { customBranchPolicies: ["main"] }
+      reviewers: { users: [approver] }
     })
     const preview = yield* GitHub.Environment("Preview", { ...repository, name: "preview" })
+    // What `main` holds, deployed after every green push. Only main deploys it.
+    const staging = yield* GitHub.Environment("Staging", {
+      ...repository,
+      name: "staging",
+      deploymentBranchPolicy: { customBranchPolicies: ["main"] }
+    })
 
     const productionToken = yield* Cloudflare.ApiToken.AccountApiToken("ProductionDeployToken", {
       accountId: productionAccount,
@@ -175,6 +187,26 @@ export default Alchemy.Stack(
       value: previewAccount
     })
 
+    // Staging runs on the previews' account with the previews' token, and its test accounts take their password.
+    yield* GitHub.Secret("StagingCloudflareToken", {
+      ...repository,
+      environment: staging,
+      name: "CLOUDFLARE_API_TOKEN",
+      value: previewToken.value
+    })
+    yield* GitHub.Secret("StagingTestAccountPassword", {
+      ...repository,
+      environment: staging,
+      name: previewPasswordVariable,
+      value: previewPassword
+    })
+    yield* GitHub.Variable("StagingCloudflareAccount", {
+      ...repository,
+      environment: staging,
+      name: "CLOUDFLARE_ACCOUNT_ID",
+      value: previewAccount
+    })
+
     // Decision I7: the rule on main, as code, with the admin bypass that is the way out of a check that never ran.
     yield* GitHub.Ruleset("Main", {
       ...repository,
@@ -189,8 +221,32 @@ export default Alchemy.Stack(
       nonFastForward: true
     })
 
+    // Decision "releases and deploys": a release tag is what deploys production, so only an admin may make, move
+    // or delete one; a release branch keeps its history, since its tags point into it.
+    yield* GitHub.Ruleset("ReleaseTags", {
+      ...repository,
+      name: "release tags",
+      target: "tag",
+      enforcement: "active",
+      conditions: { include: ["refs/tags/v*"] },
+      bypassActors: [{ actorType: "RepositoryRole", actorId: adminRole, bypassMode: "always" }],
+      creation: true,
+      update: true,
+      deletion: true
+    })
+    yield* GitHub.Ruleset("ReleaseBranches", {
+      ...repository,
+      name: "release branches",
+      target: "branch",
+      enforcement: "active",
+      conditions: { include: ["refs/heads/release/*"] },
+      bypassActors: [{ actorType: "RepositoryRole", actorId: adminRole, bypassMode: "always" }],
+      deletion: true,
+      nonFastForward: true
+    })
+
     return {
-      environments: ["preview", "production"],
+      environments: ["preview", "staging", "production"],
       modelKey: O.isSome(modelKey) ? "written to production" : "none, on purpose: production's rules answer",
       signUp
     }

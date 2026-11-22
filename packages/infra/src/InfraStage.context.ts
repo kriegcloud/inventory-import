@@ -34,7 +34,7 @@ export class StageNotDeployed extends S.TaggedError<StageNotDeployed, { readonly
 ) {
   /** What to do about it. */
   override get message(): string {
-    return `"${this.stage}" is a personal stage: it runs with \`bun run dev\` and is never deployed. Deploy prod, pr-<number> or test_<user>.`
+    return `"${this.stage}" is a personal stage: it runs with \`bun run dev\` and is never deployed. Deploy prod, staging, pr-<number> or test_<user>.`
   }
 }
 

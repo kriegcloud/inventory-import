@@ -317,7 +317,9 @@ describe("a row that waited, over any order of saves, lost answers, matches, ite
       "a row not named was last pressed by its sender or before her screen read it, and stored as a decision she named",
       [S.Array(Step).check(S.isMinLength(12), S.isMaxLength(30))],
       ([steps]) => played(steps),
-      { timeout: 600_000, arbitrary: { runs: 2000 } }
+      // 2,000 runs took 24 s alone on two pinned cores, the stand-in for CI's runner: 180 s leaves room for the rest of
+      // the check running beside it, and a hang still fails within the job's 15 minutes.
+      { timeout: 180_000, arbitrary: { runs: 2000 } }
     )
   })
 })

@@ -55,7 +55,6 @@ vi.mock("../src/ReviewStep.screen.tsx", () => ({ ReviewStep: () => "THE REVIEW" 
 vi.mock("../src/UploadStep.screen.tsx", () => ({ UploadStep: () => "THE UPLOAD" }))
 
 // A cold start of the page's modules, on a busy machine.
-vi.setConfig({ testTimeout: 20_000 })
 
 const settle = Effect.sleep("30 millis")
 

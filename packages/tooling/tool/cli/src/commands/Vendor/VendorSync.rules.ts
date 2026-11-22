@@ -298,9 +298,12 @@ export const vendorSync = Effect.fn("VendorSync.vendorSync")(function* (from: st
     const testConfig = yield* tsconfig(["src", "test"])
     yield* repo.write(repo.join(target, "tsconfig.json"), srcConfig)
     yield* repo.write(repo.join(target, "tsconfig.test.json"), testConfig)
+    // The repository's test limits (vitest.shared.ts), as every package of its own has them: a kit package's
+    // property tests are what timed out on CI's runner under vitest's 5 s.
+    const shared = repo.relative(pkg.dir, "vitest.shared.ts")
     yield* repo.write(
       repo.join(target, "vitest.config.ts"),
-      `import { defineConfig } from "vitest/config"\n\nexport default defineConfig({ test: { include: ["test/**/*.test.ts"] } })\n`
+      `import { defineConfig } from "vitest/config"\nimport { limits } from "${shared}"\n\nexport default defineConfig({ test: { include: ["test/**/*.test.ts"], ...limits } })\n`
     )
     const needsRuns = A.some(testTexts, Str.includes("support/fcRuns.ts"))
     if (needsRuns) yield* repo.write(repo.join(target, "test/support/fcRuns.ts"), fcRuns)

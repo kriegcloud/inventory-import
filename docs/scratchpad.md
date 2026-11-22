@@ -7,9 +7,12 @@ tags: [tooling, experiments, scratchpad]
 
 # Trying an idea in the scratchpad
 
-`scratchpad/` is a workspace package that can import every package of the repository. An idea is tried there in a
-folder of its own, with a test, and nothing else reads it: not `bun run check`, not the build, not a deploy, not CI.
-A broken experiment breaks nothing. The price of that freedom is that an experiment ends: its code graduates into a
+`scratchpad/` is a folder beside the workspaces, not one of them, that can import every package of the repository:
+bun keeps one `node_modules` at the root, which holds every package and every library, and an experiment imports
+them from there. An idea is tried there in a
+folder of its own, with a test. The build never reads an experiment, `bun run check` reads one only for what must
+never be committed (a key, a home path) and for an import of it, and a broken experiment fails no check. What does
+read the scratchpad today is listed at the end of this page. The price of that freedom is that an experiment ends: its code graduates into a
 package, where every rule applies, or it is dropped, and one line of what it taught stays.
 
 ## From an idea to its end
@@ -26,39 +29,52 @@ bun run scratch:drop stock-count --learned "The table library already does this.
 | Command | What it does |
 | --- | --- |
 | `bun run scratch:new <name> --template <template>` | Writes `scratchpad/experiments/<name>/` from a template, with a `NOTE.md`. The name is small letters, digits and hyphens. `--question` puts the question in the note |
-| `bun run scratch:test [name]` | The experiments' tests, on Node as the repository's tests run (Vitest with `@effect/vitest`); with a name, only that experiment's |
+| `bun run scratch:test [name]` | The experiments' tests, on Node as the repository's tests run (Vitest with `@effect/vitest`); with a name, only that experiment's folder (`xlsx-dates` never runs `xlsx-dates-2`), and a named experiment with no test fails |
 | `bun run scratch:check` | No install inside an experiment, a note for each, every dependency accounted for; then the type-checker with the Effect diagnostics over all of them |
 | `bun run scratch:list` | The open experiments with their age and size, the ones past a limit, and the log of the ended ones |
-| `bun run scratch:serve experiments/<name>` | A screen experiment's page on http://localhost:5273 |
+| `bun run scratch:serve experiments/<name>` | A screen experiment's page, on the first free port from 5273 (so two can be served at once), with its cache in that experiment's `.state` |
 | `bun run scratch:graduate <name> --to <path> --learned "<one line>"` | The code has moved into a package: deletes the folder, removes the libraries only it named, appends the line to `scratchpad/LOG.md` |
 | `bun run scratch:drop <name> --learned "<one line>"` | The idea is not pursued: the same, without a place |
 
 ## The four starting points
 
 Each is a few files and a test that passes as written. A test in the repository's CLI makes each one and runs the
-real test runner and type-checker over it, so a template that stops working fails `bun run check:full`.
+real test runner and type-checker over it, so a template that stops working fails `bun run check:full`. The `verify`
+template is in that test only once `@alchemy.run/domain` is installed at the root (a package asks for it); until then
+the test's name says it was not run, and it was checked by hand.
 
 | Template | What it gives |
 | --- | --- |
 | `probe` | A plain function, the same as an Effect, and a test of both. It imports `@inventory/kernel/Role`, to show that any package is imported by its name |
 | `service` | A `Context.Service`, its twin for tests with everything in memory, something that uses it, and a test through the twin |
 | `screen` | A page of its own (`index.html`, `main.tsx`), a screen from the design system's components over atoms, and a test of the atoms. Served by `scratch:serve`; the app never loads it |
-| `verify` | An aggregate the prover reads (`<Name>.aggregate.ts`), a story that runs its model and a proof of its rules. It needs `@alchemy.run/domain`: until `vendor/alchemy/sources.json` lists that package, `scratch:new` refuses this template and says so; once it does, the package is added as the experiment's own library. The aggregate's file builds events with `new` and turns the one diagnostic that refuses it off on its first lines, because the prover does not read `X.make(...)` |
+| `verify` | An aggregate the prover reads (`<Name>.aggregate.ts`), a story that runs its model and a proof of its rules. It takes `@alchemy.run/domain` from the root's install: until a package asks for it, `scratch:new` refuses this template and says so. The prover knows an event or a rejection only by `new`, not by `X.make(...)`, so, as decision 33 of the Alchemy brief (2026-11-22, "`new` only in decide files") has it, a decide file (`*.aggregate.ts`, `*.decision.ts`) builds them with `new` and turns that one diagnostic off on its first line (`// @effect-diagnostics newSchemaClass:off`); every other file, the template's model and test included, builds with `.make` |
 
 ## What is and is not enforced inside it
 
 - **On, in `scratch:check`:** the type-checker with the repository's whole Effect profile (`tsconfig.base.json`, nothing
-  turned off). What it says of an experiment is what it would say of a package.
+  turned off). What it says of an experiment is what it would say of a package. A file may turn one diagnostic off
+  only as decision 33 of the Alchemy brief allows: `// @effect-diagnostics newSchemaClass:off` as the first line of a
+  `*.aggregate.ts` or `*.decision.ts`. `scratch:check` refuses any other `@effect-diagnostics` line, and any
+  `@ts-nocheck`, with its file and line, in every code file of the scratchpad the type-checker can read: the
+  experiments, a file loose beside them or in a `dist` folder, and the scratchpad's own configuration (all but
+  `node_modules` and a folder whose name starts with a dot, such as `.state`).
 - **Not enforced inside:** the laws on how code is written (no `_tag` told apart by hand, the form of an Effect
   import, a ref that stays the same across draws) and the linter. Each of those laws names the scratchpad as left
   out. They apply the moment code graduates into a package, so write an experiment the way a package is written when
   you mean to keep it.
-- **Still refused:** a secret. `bun run check` reads every file git would commit for key-shaped strings, the
-  experiments too, because the repository is public. Use no real customer data and no private name in an experiment
+- **Still refused:** a secret, and a path that names a person's machine. `bun run check` reads every file git would
+  commit for key-shaped strings, the experiments too (`keys:check`), and every file of the scratchpad for an absolute
+  home path (`/home/<name>/`, `/Users/<name>/`, `C:\Users\<name>`) or a folder kept outside the repository
+  (`~/.claude`, `.config/Claude`) (`private-paths:check`). Each names the file and line, never what it found, because
+  the repository and its CI logs are public. Use no real customer data and no private name in an experiment
   for the same reason.
-- **Never the other way:** nothing imports from the scratchpad. `bun run check` refuses a package that declares it or
-  a file that imports it, by name or by path (`bun run beep laws boundaries`). That is the one thing the check
-  enforces about it.
+- **Never the other way:** nothing imports from the scratchpad. `bun run check` refuses a package.json (a
+  workspace's or the root's) that declares it or maps a `#` import into it, and any file that reaches it: by its
+  name, by a path, by an alias that climbs into it (`@/../../scratchpad/...`), through `import.meta.glob`, or a
+  stylesheet's `@import` or `@source`. It reads each workspace's code, scripts, root files and stylesheets, and the
+  files at the repository's root (`alchemy.run.ts`, what a deploy runs). A path built at run time is not seen
+  (`bun run beep laws boundaries`). That is the one thing the check enforces about it.
 
 ## Staying small
 
@@ -67,25 +83,34 @@ real test runner and type-checker over it, so a template that stops working fail
   and where to, or was dropped.
 - **No install of its own.** A `package.json`, a lockfile or a `node_modules` inside an experiment fails
   `scratch:check`. That is how a scratchpad becomes a second repository.
-- **A library only an experiment needs** goes in the scratchpad's `package.json`
-  (`bun add --cwd scratchpad <name>`) and in the experiment's note (`libraries: <name>`). It never goes in the app or
-  a package. `bun run deps:update` leaves it alone, and ending the experiment removes it unless another experiment
-  names it too.
+- **A library only an experiment needs** goes in the scratchpad's own `package.json`
+  (`bun add --cwd scratchpad <name>`), installed in `scratchpad/node_modules` with the scratchpad's own lockfile,
+  `scratchpad/bun.lock`, which is committed (bun writes it with the first library), and in the experiment's note
+  (`libraries: <name>`). It never goes in the app or a package, and the root's install, CI and a deploy never install
+  it. `bun run deps:update` leaves both files alone, and ending the experiment removes the library unless another
+  experiment names it too.
+- **Never a library the root already has.** `effect`, `@effect/*`, React and every package of the repository come
+  from the root's install, as they are: `scratch:check` refuses one in the scratchpad's `package.json`, since a second
+  copy of `effect` beside the packages' breaks them. So an experiment cannot try another version of a shared library.
 - **Graduate or delete.** Graduating does not move code: move it into a package first, make `bun run check` pass
   there, then graduate, in the same change.
 - **A warning, not a failure:** `scratch:list` names an experiment older than 30 days or larger than 200 files.
-- **State stays out of git and off the app's port.** A database or a dev server's cache goes in a `.state` folder
-  (ignored), and a server takes its own port (5273 for a screen), never the app's 5173.
+- **State stays out of git and off the app's port.** A screen's dev server keeps its cache in its experiment's own
+  `.state` folder (ignored) and takes the first free port from 5273, never the app's 5173. A database is the
+  experiment's to put under its own `.state` too: no template or helper gives it a path, and nothing stops an
+  experiment from using the app's local database.
 
 Trial code written while building something belongs here too, not in a cache folder: it is type-checked, it can
 import the packages, and `scratch:list` shows that it is still there.
 
 ## What the rest of the repository does with it
 
-- The scratchpad depends on every package under `packages/`; `bun run config-sync` writes that list, so a new
-  package is importable without anyone remembering, and `config-sync:check` fails when it is missing.
-- What it shares with the packages (`effect`, the test runner, React) is held at the packages' versions by
-  `bun run version-sync`. syncpack does not read it.
-- Turbo runs no task in it: it has no `check`, `lint`, `test` or `build` script. An edit inside an experiment changes
-  the cache key of one task only, `keys:check`, which reads it for secrets. The formatter skips
-  `scratchpad/experiments`.
+- **It is no workspace** (decision "the scratchpad", its install): the root's `bun install`, on CI and in a deploy,
+  never installs anything of it, and a new package is importable from it as soon as `bun install` has run at the root.
+- **`bun run check` reads it for three things only:** an import of it from anywhere else (`boundaries:check`), a key
+  (`keys:check`) and a home path or a private folder (`private-paths:check`). No other check, the formatter included,
+  reads it, and an edit inside an experiment changes the cache key of those three tasks only.
+- **Its configuration is the CLI's** (`packages/tooling/tool/cli/src/commands/Scratch/Scratch.config.ts`):
+  `scratch:new` writes a file that is missing, `scratch:check` names one that differs, and the CLI's slow test of the
+  templates builds its scratchpad from those texts, so CI reads nothing of this folder.
+- Turbo runs no task in it: it has no `check`, `lint`, `test` or `build` script.

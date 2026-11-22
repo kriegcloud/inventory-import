@@ -5,6 +5,7 @@
 // the view changed meanwhile, does not find the region as it was.
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
+import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as HttpApiError from "effect/http-api/HttpApiError"
 import { vi } from "vitest"
@@ -18,6 +19,7 @@ import {
 } from "@inventory/catalog-contract/Decision"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import type { ImportView } from "@inventory/catalog-contract/Import"
+import { draftOf } from "../src/Draft.atoms.ts"
 import { DraftEvent } from "../src/Draft.machine.ts"
 import { importView, importViewShown } from "../src/Imports.atoms.ts"
 import {
@@ -77,7 +79,7 @@ const world = (id: ImportId, network: { down: boolean } = { down: false }, reads
             revision.now += 1
             Object.assign(stored, delta.set)
             for (const rowId of delta.clear) delete stored[rowId]
-            return Effect.succeed({ revision: revision.now, changed: true, notApplied: [] })
+            return Effect.succeed({ revision: revision.now, changed: true, notApplied: [], decidedSince: [] })
           })
       }
     },
@@ -185,7 +187,7 @@ describe("the region beside the draft", () => {
         const id = importNo(43)
         const network = { down: true }
         const t = world(id, network, true)
-        t.open()
+        const leave = t.open()
         yield* settle
         page.said.length = 0
         page.actions.length = 0
@@ -198,16 +200,19 @@ describe("the region beside the draft", () => {
           ["Not saved yet"]
         ])
         expect(t.registry.get(rowsNotSaved(id))).toBe(1)
-        // It says when the row goes by itself: back on this import's review, never "when the server answers" (nothing
-        // sends it while the step is away).
-        expect(page.descriptions.at(-1)).toContain("when you are back on this import's review")
-        // The network is back, and the person presses Save again on what was said.
+        // The button says what it does: it sends the row now, wherever the person is.
+        expect(page.descriptions.at(-1)).toContain("Save again sends it now")
+        // The network is back, the person has gone to another page, and presses Save again on what was said: the row
+        // goes, as one that waited, over what the server may hold of it (nothing, when it was decided, or itself).
+        leave()
+        yield* Effect.sleep("300 millis")
+        expect(t.registry.get(draftOf(id)).onScreen).toBe(false)
         network.down = false
         page.actions[0]?.()
         yield* settle
         expect(t.saves).toEqual([
           { set: { "row-2": out }, clear: [] },
-          { set: { "row-2": out }, clear: [] }
+          { over: { "row-2": [O.none(), O.some(out)] }, set: { "row-2": out }, clear: [] }
         ])
         expect([t.registry.get(rowsNotSaved(id)), page.said]).toEqual([0, ["Not saved yet"]])
       })

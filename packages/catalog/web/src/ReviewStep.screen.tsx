@@ -4,7 +4,7 @@ import * as Cause from "effect/Cause"
 import * as Exit from "effect/Exit"
 import * as O from "effect/Option"
 import * as Atom from "effect/reactivity/Atom"
-import { useDeferredValue } from "react"
+import { type ReactNode, useDeferredValue } from "react"
 import { TriangleAlertIcon } from "lucide-react"
 import { toast } from "sonner"
 import { ReviewSkeleton } from "@inventory/ui/Skeletons"
@@ -20,12 +20,12 @@ import { hasRole } from "@inventory/kernel/Role"
 import { perKey } from "@inventory/client/Api"
 import {
   confirmHeldBack,
-  confirmHeldForLines,
   confirmingImport,
   dismissTakeBack,
+  importStopped,
+  reviewLines,
   rowsNotSaved,
-  rowsOnHold,
-  takeBacksNamed,
+  takeBackLines,
   draftEvents,
   followDraft,
   regionEpoch,
@@ -36,8 +36,8 @@ import {
   whileCurrent
 } from "./ReviewDraft.atoms.ts"
 import { acceptsWords } from "./ReviewDraft.atoms.ts"
-import { DraftEvent, type HeldBack, type HeldRows, type Keep } from "./Draft.machine.ts"
-import { holdLine, inFileOrder, takeBackWords } from "./internal/leftOver.ts"
+import { DraftEvent, type HeldBack, type LinePick } from "./Draft.machine.ts"
+import { type LineGroup, lineGroups, linesAsk, linesAtOnce, linesDrawn, linesTitle } from "./internal/leftOver.ts"
 import { matchColumn, suggestFixes } from "./Imports.atoms.ts"
 import { navigate } from "@inventory/ui/Route"
 import { importAddress } from "./internal/route.ts"
@@ -189,10 +189,8 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
   // written; the screen then takes the newer picture and says so above the review, until the person confirms again.
   const committing = useAtomValue(confirmingImport(view.id))
   const heldBack = useAtomValue(confirmHeldBack(view.id))
-  const heldForLines = useAtomValue(confirmHeldForLines(view.id))
   const notSaved = useAtomValue(rowsNotSaved(view.id))
-  const onHold = useAtomValue(rowsOnHold(view.id))
-  const takenBack = useAtomValue(takeBacksNamed(view.id))
+  const takenBack = useAtomValue(takeBackLines(view.id))
   const dismiss = useAtomSet(dismissTakeBack(view.id))
   const commit = () => happened(DraftEvent.ConfirmPressed())
 
@@ -285,17 +283,21 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
   })
 
   return (
-    <>
-      <ReaderWarnings table={table} />
-      <NotImportedYet why={heldBack} />
-      <NotSavedYet rows={notSaved} onSaveAgain={() => happened(DraftEvent.SaveAgain())} />
-      <OnHold
-        rows={onHold}
-        onSettle={(rowId, keep) => happened(DraftEvent.HoldSettled({ rowId, keep }))}
-        canDecide={props.canImport}
-      />
-      <NotImportedForLines held={heldForLines} />
-      <MatchTakeBacks taken={takenBack} onDismiss={dismiss} />
+    <AboveReview
+      lines={
+        <>
+          <LinesAsking
+            id={view.id}
+            canDecide={props.canImport}
+            onSettle={(picks) => happened(DraftEvent.Settled({ picks }))}
+          />
+          <NotImportedYet why={heldBack} />
+          <NotSavedYet rows={notSaved} onSaveAgain={() => happened(DraftEvent.SaveAgain())} />
+          <MatchTakeBacks taken={takenBack} onDismiss={dismiss} />
+          <ReaderWarnings table={table} />
+        </>
+      }
+    >
       <ReviewRegion
         key={`${view.id}:${epoch}`}
         title={`Review ${view.fileName}`}
@@ -343,7 +345,20 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
         }
         onImport={commit}
       />
-    </>
+    </AboveReview>
+  )
+}
+
+/**
+ * The review with the lines that stand above it, in the step's fixed height: however many lines there are, they scroll
+ * in their own part of it and the review takes the rest, so Import never leaves the screen.
+ */
+export function AboveReview(props: { lines: ReactNode; children: ReactNode }) {
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="max-h-2/5 flex-none overflow-y-auto">{props.lines}</div>
+      <div className="min-h-0 flex-1">{props.children}</div>
+    </div>
   )
 }
 
@@ -354,17 +369,16 @@ function ReviewBody(props: { view: ImportView; table: StagedTable; canImport: bo
 function NotSavedYet(props: { rows: number; onSaveAgain: () => void }) {
   const narrow = useAtomValue(isNarrow)
   if (props.rows === 0) return null
+  const one = props.rows === 1
   return (
     <Alert role="status" className={narrow ? "mx-4 mt-3 w-auto" : "mx-6 mt-4 w-auto"}>
       <TriangleAlertIcon aria-hidden />
-      <AlertTitle>
-        {props.rows === 1 ? "1 decision is not saved yet" : `${props.rows} decisions are not saved yet`}
-      </AlertTitle>
+      <AlertTitle>{one ? "1 decision is not saved yet" : `${props.rows} decisions are not saved yet`}</AlertTitle>
       <AlertDescription>
         <p>
-          The server did not take {props.rows === 1 ? "it" : "them"}. {props.rows === 1 ? "It is" : "They are"} kept in
-          this browser and sent again once this screen has read the import again and nobody decided{" "}
-          {props.rows === 1 ? "that row" : "those rows"} otherwise meanwhile.
+          The server did not take {one ? "it" : "them"}. {one ? "It is" : "They are"} kept in this browser and sent with
+          your next decision, or now. Where someone decided {one ? "that row" : "one of those rows"} otherwise
+          meanwhile, you are asked which stands.
         </p>
         <Button variant="outline" size="xs" onClick={props.onSaveAgain}>
           Save again
@@ -374,77 +388,156 @@ function NotSavedYet(props: { rows: number; onSaveAgain: () => void }) {
   )
 }
 
+/** How many lines of one kind are shown on one import's review, until it is left. */
+const linesShownOf = Atom.family((_key: string) => Atom.make(linesAtOnce))
+
+/** Takes the person to a line: where a press of Import stopped, or the next one once that is settled. */
+const goThere = (line: HTMLElement | null): void => {
+  if (line === null) return
+  const go = () => {
+    line.focus({ preventScroll: true })
+    line.scrollIntoView({ block: "nearest" })
+  }
+  go()
+  // Pressed in the import's own confirm step, which gives the Import button its focus back once it has closed (after
+  // this is drawn): that one move is taken back, so the person lands on the line.
+  const back = (event: FocusEvent): void => {
+    document.removeEventListener("focusin", back)
+    if (event.target instanceof HTMLElement && event.target.hasAttribute("data-import-button")) go()
+  }
+  document.addEventListener("focusin", back)
+  window.setTimeout(() => document.removeEventListener("focusin", back), 1000)
+}
+
 /**
- * The person's decisions held instead of sent, one line a row, above the review: refused by the server (with its
- * sentence; dismissed, or settled by deciding the row again), decided otherwise since by someone else or another tab
- * while they waited, or decided otherwise by tabs of theirs that are gone (every one said; the person picks which
- * stands).
- * Nothing here is sent until the person says so.
+ * The rows that wait for the person, above the review, by what they ask (decided since by someone else or another tab,
+ * otherwise in a closed tab of theirs, or not saved): every answer of a row said, and the person picks, row by row or
+ * many at once. Nothing is sent, and nothing is imported, until they do; a press of Import says so and goes to the first
+ * line. Only how many there are is read out as it changes.
  */
-function OnHold(props: { rows: HeldRows; onSettle: (rowId: string, keep: Keep) => void; canDecide: boolean }) {
+function LinesAsking(props: { id: ImportId; canDecide: boolean; onSettle: (picks: ReadonlyArray<LinePick>) => void }) {
   const narrow = useAtomValue(isNarrow)
-  // In the file's order: row 9 before row 10.
-  const lines = inFileOrder(props.rows)
-  if (!A.isReadonlyArrayNonEmpty(lines)) return null
+  const lines = useAtomValue(reviewLines(props.id))
+  const stopped = useAtomValue(importStopped(props.id))
+  const groups = lineGroups({ lines, canDecide: props.canDecide })
+  if (!A.isReadonlyArrayNonEmpty(groups)) return null
   return (
-    <Alert role="status" className={narrow ? "mx-4 mt-3 w-auto" : "mx-6 mt-4 w-auto"}>
+    <Alert
+      role="group"
+      aria-label="Rows that wait for you"
+      className={narrow ? "mx-4 mt-3 w-auto" : "mx-6 mt-4 w-auto"}
+    >
       <TriangleAlertIcon aria-hidden />
-      <AlertTitle>
-        {A.length(lines) === 1
-          ? "1 row has a decision of yours that is not saved"
-          : `${A.length(lines)} rows have decisions of yours that are not saved`}
-      </AlertTitle>
+      <AlertTitle role="status">{linesTitle(groups)}</AlertTitle>
       <AlertDescription>
-        <ul className="flex flex-col gap-2">
-          {A.map(lines, ([rowId, held]) => {
-            // A pick that sends nothing is anyone's, so anyone may settle a line with it; only an editor can send.
-            const line = holdLine({ rowId, held, canDecide: props.canDecide })
-            return (
-              <li key={rowId} className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <span className="min-w-0">{line.text}</span>
-                <span className="flex gap-2">
-                  {A.map(line.actions, (action) => (
-                    <Button
-                      key={action.label}
-                      variant="outline"
-                      size="xs"
-                      onClick={() => props.onSettle(rowId, action.keep)}
-                    >
-                      {action.label}
-                    </Button>
-                  ))}
-                </span>
-              </li>
-            )
-          })}
-        </ul>
+        {stopped === 0 ? null : (
+          <p key={stopped} className="text-foreground">
+            Nothing was imported: {linesTitle(groups)} first.
+          </p>
+        )}
+        <p>{linesAsk(groups)}</p>
+        {A.map(groups, (group, at) => (
+          <LinesOf
+            key={group.asked}
+            id={props.id}
+            group={group}
+            stopped={at === 0 ? stopped : 0}
+            onSettle={props.onSettle}
+          />
+        ))}
       </AlertDescription>
     </Alert>
   )
 }
 
+/** The lines of one kind, the first few of them, with the presses that settle many. */
+function LinesOf(props: {
+  id: ImportId
+  group: LineGroup
+  stopped: number
+  onSettle: (picks: ReadonlyArray<LinePick>) => void
+}) {
+  const { group, stopped } = props
+  const [drawn, draw] = useAtom(linesShownOf(`${props.id}:${group.asked}`))
+  const { more, shown } = linesDrawn({ lines: group.lines, drawn })
+  return (
+    <>
+      {group.all.length === 0 ? null : (
+        <div className="flex flex-wrap gap-2 pt-1">
+          {A.map(group.all, (all) => (
+            <Button key={all.label} variant="outline" size="xs" onClick={() => props.onSettle(all.picks)}>
+              {all.label}
+            </Button>
+          ))}
+        </div>
+      )}
+      <ul className="flex flex-col gap-2 pt-1">
+        {A.map(shown, (line, at) => (
+          <li
+            // Stopped here: the first line takes the focus at each press of Import, and the next one once it is settled.
+            key={at === 0 && stopped > 0 ? `${line.rowId}:${stopped}` : line.rowId}
+            {...(at === 0 && stopped > 0 ? { ref: goThere } : {})}
+            tabIndex={-1}
+            className="flex flex-wrap items-center gap-x-3 gap-y-1"
+          >
+            <span className="min-w-0">{line.text}</span>
+            <span className="flex flex-wrap gap-2">
+              {A.map(line.actions, (action) => (
+                <Button
+                  key={action.label}
+                  variant="outline"
+                  size="xs"
+                  onClick={() => props.onSettle([{ rowId: line.rowId, keep: action.keep }])}
+                >
+                  {action.label}
+                </Button>
+              ))}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {O.match(more, {
+        onNone: () => null,
+        onSome: (press) => (
+          <Button variant="outline" size="xs" onClick={() => draw(press.drawn)}>
+            {press.label}
+          </Button>
+        )
+      })}
+    </>
+  )
+}
+
 /**
- * What matches took back from decisions already saved, one line each, above the review: who matched which field again,
- * how many decisions of which kind, on which rows. The review below already shows each row as it reads now; the line
- * stays until the person dismisses it.
+ * What matches took back from decisions already saved, one line each, above the review: who did what to which field's
+ * column, how many decisions of which kind, on which rows. The review below already shows each row as it reads now; the
+ * line stays until the person dismisses it, or every row of it was decided again.
  */
-function MatchTakeBacks(props: { taken: ReadonlyArray<MatchTakeBack>; onDismiss: (taken: MatchTakeBack) => void }) {
+function MatchTakeBacks(props: {
+  taken: ReadonlyArray<{ readonly taken: MatchTakeBack; readonly text: string }>
+  onDismiss: (taken: MatchTakeBack) => void
+}) {
   const narrow = useAtomValue(isNarrow)
   if (!A.isReadonlyArrayNonEmpty(props.taken)) return null
   return (
-    <Alert role="status" className={narrow ? "mx-4 mt-3 w-auto" : "mx-6 mt-4 w-auto"}>
+    // Not read out as it changes: it stands until dismissed, and the review below already shows each row as it reads.
+    <Alert
+      role="group"
+      aria-label="Decisions a match took back"
+      className={narrow ? "mx-4 mt-3 w-auto" : "mx-6 mt-4 w-auto"}
+    >
       <TriangleAlertIcon aria-hidden />
       <AlertTitle>
         {A.length(props.taken) === 1 ? "A match took decisions back" : "Matches took decisions back"}
       </AlertTitle>
       <AlertDescription>
         <ul className="flex flex-col gap-2">
-          {A.map(props.taken, (taken) => (
+          {A.map(props.taken, ({ taken, text }) => (
             <li
               key={`${taken.revision}:${taken.field}:${taken.kind}`}
               className="flex flex-wrap items-center gap-x-3 gap-y-1"
             >
-              <span className="min-w-0">{takeBackWords(taken)} Each row shows what it reads now, to decide again.</span>
+              <span className="min-w-0">{text}</span>
               <Button variant="outline" size="xs" onClick={() => props.onDismiss(taken)}>
                 Dismiss
               </Button>
@@ -469,28 +562,6 @@ function NotImportedYet(props: { why: O.Option<HeldBack> }) {
       <AlertTitle>Nothing was imported</AlertTitle>
       <AlertDescription>
         <p>{heldBackSentence({ why: props.why.value, accepts: acceptsWords(props.why.value.accepts) })}</p>
-      </AlertDescription>
-    </Alert>
-  )
-}
-
-/**
- * Said above the review when a confirm was not made because a line above it asks which of two decisions of a row
- * stands (one from a tab of the person's that is gone): nothing was imported; the person settles those lines, then
- * imports. It goes once they are settled.
- */
-function NotImportedForLines(props: { held: boolean }) {
-  const narrow = useAtomValue(isNarrow)
-  if (!props.held) return null
-  return (
-    <Alert role="alert" className={narrow ? "mx-4 mt-3 w-auto" : "mx-6 mt-4 w-auto"}>
-      <TriangleAlertIcon aria-hidden />
-      <AlertTitle>Nothing was imported</AlertTitle>
-      <AlertDescription>
-        <p>
-          A row is listed above with a decision from your other tab beside this tab's own. Pick which one stands on each
-          of those lines, then import.
-        </p>
       </AlertDescription>
     </Alert>
   )

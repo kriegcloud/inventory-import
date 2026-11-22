@@ -24,7 +24,7 @@ import { type ImportView, MatchTakeBack } from "@inventory/catalog-contract/Impo
 import { DraftBusy, ImportNotFound } from "@inventory/catalog-contract/ImportRejection"
 import * as S from "effect/Schema"
 import { NotSignedIn } from "@inventory/kernel/AccessError"
-import { DraftEvent, Hold } from "../src/Draft.machine.ts"
+import { DraftEvent } from "../src/Draft.machine.ts"
 import { askBeforeLeaving, importView, importViewShown, removeImport } from "../src/Imports.atoms.ts"
 import {
   dismissTakeBack,
@@ -35,12 +35,13 @@ import {
   reviewLocal,
   rowsLeftOver,
   rowsNotSaved,
-  rowsOnHold,
+  reviewLines,
   shownDecisions
 } from "../src/ReviewDraft.atoms.ts"
 import { noticeWords } from "../src/internal/notices.ts"
 import { dismissNotice, notices } from "../src/Notices.atoms.ts"
 import { importNo, registryFor, viewAt } from "./support/catalog.ts"
+import { memberOf, sessionStandIn } from "./support/session.ts"
 
 // The browser: its storage, which outlives a page, the tab's own storage (every page here is one tab, loaded again),
 // and the listeners a page adds to its window. It has no locks: a page loaded again is one whose old page is gone.
@@ -147,7 +148,8 @@ const keyOf = (id: ImportId, memberId: string, organizationId = "org_prairie") =
  * One page of the app, on the shared storage: the server answers each save only when the test says, and refuses it as
  * nobody signed in while `server.signedOut`; a read of the import never answers, unless the import was removed. Asking
  * who is signed in again is counted (`asked`); the test says who is. With `server.askHangs`, the question stays out
- * (`asking` true) until the test answers it.
+ * (`asking` true) until the test answers it. With `session`, who is signed in is the app's own session stand-in
+ * (`support/session.ts`), asked and answered by its rules.
  */
 const page = (
   id: ImportId,
@@ -162,7 +164,8 @@ const page = (
   } = {
     signedOut: false,
     removed: false
-  }
+  },
+  session?: ReturnType<typeof sessionStandIn>
 ) => {
   const saves: Array<{ readonly payload: SaveRequest; readonly answer: Deferred.Deferred<unknown, SaveFailure> }> = []
   // The confirms sent; the server never answers one.
@@ -201,14 +204,17 @@ const page = (
         remove: () => Effect.void
       }
     },
-    signedIn: Atom.readable(
-      (get) => get(who),
-      () => {
-        asked.times += 1
-        if (server.askHangs === true) held.registry?.set(asking, true)
-      }
-    ),
-    asked: asking
+    signedIn:
+      session === undefined
+        ? Atom.readable(
+            (get) => get(who),
+            () => {
+              asked.times += 1
+              if (server.askHangs === true) held.registry?.set(asking, true)
+            }
+          )
+        : session.signedIn,
+    asked: session === undefined ? asking : session.asked
   })
   held.registry = registry
   return {
@@ -227,7 +233,7 @@ const page = (
     },
     decide: (rowId: string) => registry.set(draftEvents(id), DraftEvent.Decided({ changes: { [rowId]: O.some(out) } })),
     answer: (n: number, revision: number) =>
-      Deferred.succeed(saves[n]!.answer, { revision, changed: true, notApplied: [] })
+      Deferred.succeed(saves[n]!.answer, { revision, changed: true, notApplied: [], decidedSince: [] })
   }
 }
 
@@ -303,7 +309,9 @@ describe("the waiting rows this browser keeps", () => {
       t.registry.set(importView(id), viewAt({ id, revision: 6, status: "imported", decisions: { "row-2": out } }))
       yield* settle
       expect(t.saves.length).toBe(2)
-      expect(t.registry.get(rowsLeftOver(id))).toEqual(O.some({ rows: { "row-3": O.some(out) }, beside: {} }))
+      expect(t.registry.get(rowsLeftOver(id))).toEqual(
+        O.some({ rows: { "row-3": O.some(out) }, beside: {}, theirs: {} })
+      )
       expect(R.has(browser.kept, keyOf(id, "mem_dana"))).toBe(true)
       // The result names them; when it is left, nothing of them is kept.
       const naming = t.registry.mount(namingLeftOver(id))
@@ -356,25 +364,23 @@ describe("the question before the page is left", () => {
     })
   )
 
-  it.live(
-    "is not asked for rows of an import removed meanwhile: they are erased at page start (copied-tab-and-removed-import-leave-question)",
-    () =>
-      Effect.gen(function* () {
-        emptyStorage()
-        const id = importNo(67)
-        const first = page(id)
-        first.open(viewAt({ id, revision: 4 }))
-        yield* settle
-        first.decide("row-2")
-        yield* settle
-        expect(R.has(browser.kept, keyOf(id, "mem_dana"))).toBe(true)
-        // A colleague removes the import; the page is loaded again.
-        browser.listeners["beforeunload"] = []
-        const again = page(id, dana, { signedOut: false, removed: true })
-        again.registry.mount(askBeforeLeaving)
-        yield* settle
-        expect([leaving(), R.has(browser.kept, keyOf(id, "mem_dana"))]).toEqual([false, false])
-      })
+  it.live("is not asked for rows of an import removed meanwhile: they are erased at page start", () =>
+    Effect.gen(function* () {
+      emptyStorage()
+      const id = importNo(67)
+      const first = page(id)
+      first.open(viewAt({ id, revision: 4 }))
+      yield* settle
+      first.decide("row-2")
+      yield* settle
+      expect(R.has(browser.kept, keyOf(id, "mem_dana"))).toBe(true)
+      // A colleague removes the import; the page is loaded again.
+      browser.listeners["beforeunload"] = []
+      const again = page(id, dana, { signedOut: false, removed: true })
+      again.registry.mount(askBeforeLeaving)
+      yield* settle
+      expect([leaving(), R.has(browser.kept, keyOf(id, "mem_dana"))]).toEqual([false, false])
+    })
   )
 })
 
@@ -399,7 +405,7 @@ describe("rows that wait after a save refused for nobody signed in (G3)", () => 
         // under Dana's key, and who is signed in is asked again (the tab then shows the sign-in page).
         expect([
           A.length(t.saves),
-          t.registry.get(rowsOnHold(id)),
+          t.registry.get(reviewLines(id)),
           t.registry.get(rowsNotSaved(id)),
           R.has(browser.kept, keyOf(id, "mem_dana")),
           t.asked.times
@@ -439,7 +445,7 @@ const taken = S.decodeSync(S.Array(MatchTakeBack))([
 
 describe("what a match took back from saved decisions", () => {
   it.live(
-    "is named from the view until the person dismisses it; the dismissal is kept per person and import in this browser (match-taken-back-not-named)",
+    "is named from the view until the person dismisses it; the dismissal is kept per person and import in this browser",
     () =>
       Effect.gen(function* () {
         emptyStorage()
@@ -470,7 +476,7 @@ describe("what a match took back from saved decisions", () => {
 
 describe("rows on hold and the values seen, through the browser's storage", () => {
   it.live(
-    "come back after a reload: a waiting row decided elsewhere meanwhile is held, a refused row keeps its reason, and nothing is sent (kept-codec-untested)",
+    "come back after a reload: a waiting row the picture shows decided elsewhere meanwhile is on a line with theirs, a refused row keeps its reason, and nothing is sent while they ask",
     () =>
       Effect.gen(function* () {
         emptyStorage()
@@ -490,7 +496,7 @@ describe("rows on hold and the values seen, through the browser's storage", () =
         yield* settle
         yield* Deferred.fail(first.saves[1]!.answer, HttpApiError.InternalServerErrorProblem.make({}))
         yield* settle
-        const refused = R.get(first.registry.get(rowsOnHold(id)), "row-3")
+        const refused = R.get(first.registry.get(reviewLines(id)), "row-3")
         expect(O.isSome(refused)).toBe(true)
         // The page is loaded again; Lee has kept row 2 meanwhile (revision 5).
         const kept = decisionFromFlags({ kept: true })
@@ -498,10 +504,10 @@ describe("rows on hold and the values seen, through the browser's storage", () =
         const again = page(id, dana, { signedOut: false, removed: false, view: later })
         again.open(later)
         yield* settle
-        const held = again.registry.get(rowsOnHold(id))
-        expect([R.get(held, "row-3"), O.map(R.get(held, "row-2"), (one) => one.why)]).toEqual([
+        const lines = again.registry.get(reviewLines(id))
+        expect([R.get(lines, "row-3"), O.map(R.get(lines, "row-2"), (one) => one.theirs)]).toEqual([
           refused,
-          O.some(Hold.Elsewhere({ theirs: O.some(kept) }))
+          O.some(kept).pipe(O.some, O.some)
         ])
         expect(again.saves).toEqual([])
       })
@@ -513,7 +519,7 @@ const keptDecision = decisionFromFlags({ kept: true })
 
 describe("a waiting row, whose it is and when it may go, through the runner", () => {
   it.live(
-    "a row that waits is not checked by the view the step finds when drawn again: the import is asked, and its answer holds a decision made since (redraw-skips-g2)",
+    "a row that waits is sent with what it may be written over when the step is drawn again, and the server's word that somebody decided it since puts it on a line with theirs",
     () =>
       Effect.gen(function* () {
         emptyStorage()
@@ -536,18 +542,28 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
         yield* settle
         // Lee keeps row 2 meanwhile (revision 5).
         server.view = viewAt({ id, revision: 5, decisions: { "row-2": keptDecision } })
-        // Back to Review: the step is drawn again over the view the tab held, through `importViewShown`.
+        // Back to Review: the step is drawn again over the view the tab held. Nothing is judged before it goes: the row
+        // goes, written only over what the server may hold of it (nothing, when it was decided, or the save that failed).
         t.registry.mount(followDraft(id))
         yield* settle
-        expect(A.length(t.saves)).toBe(1)
-        expect(O.map(R.get(t.registry.get(rowsOnHold(id)), "row-2"), (one) => one.why)).toEqual(
-          O.some(Hold.Elsewhere({ theirs: O.some(keptDecision) }))
+        expect(A.map(t.saves, (save) => save.payload.over)).toEqual([undefined, { "row-2": [O.none(), O.some(out)] }])
+        // The server holds Lee's decision, which is none of those: it writes nothing, and says so.
+        yield* Deferred.succeed(t.saves[1]!.answer, {
+          revision: 5,
+          changed: false,
+          notApplied: [],
+          decidedSince: [{ rowId: "row-2", theirs: O.some(keptDecision) }]
+        })
+        yield* settle
+        expect(O.map(R.get(t.registry.get(reviewLines(id)), "row-2"), (one) => one.theirs)).toEqual(
+          O.some(keptDecision).pipe(O.some, O.some)
         )
+        expect(A.length(t.saves)).toBe(2)
       })
   )
 
   it.live(
-    "a confirm pressed by someone else signed in on this page never carries the rows of the member who decided them (confirm-sends-anothers-rows)",
+    "a confirm pressed by someone else signed in on this page never carries the rows of the member who decided them",
     () =>
       Effect.gen(function* () {
         emptyStorage()
@@ -583,7 +599,7 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
   )
 
   it.live(
-    "a decision by someone else signed in on this page is made on the picture the screen shows, never on none (decided-after-let-go)",
+    "a decision by someone else signed in on this page is made on the picture the screen shows, never on none",
     () =>
       Effect.gen(function* () {
         emptyStorage()
@@ -605,7 +621,7 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
   )
 
   it.live(
-    "a read of the import that answers not found erases nothing kept: the import may be another organization's now (notfound-erases-rows)",
+    "a read of the import that answers not found erases nothing kept: the import may be another organization's now",
     () =>
       Effect.gen(function* () {
         emptyStorage()
@@ -632,25 +648,23 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
       })
   )
 
-  it.live(
-    "a save answered that the import was too busy waits to be sent again: it is never held as refused (draft-busy)",
-    () =>
-      Effect.gen(function* () {
-        emptyStorage()
-        const id = importNo(75)
-        const t = page(id)
-        t.open(viewAt({ id, revision: 4 }))
-        yield* settle
-        t.decide("row-2")
-        yield* settle
-        yield* Deferred.fail(t.saves[0]!.answer, DraftBusy.make({ reason: "The import kept changing." }))
-        yield* settle
-        expect([t.registry.get(rowsOnHold(id)), t.registry.get(rowsNotSaved(id))]).toEqual([{}, 1])
-      })
+  it.live("a save answered that the import was too busy waits to be sent again: it is never held as refused", () =>
+    Effect.gen(function* () {
+      emptyStorage()
+      const id = importNo(75)
+      const t = page(id)
+      t.open(viewAt({ id, revision: 4 }))
+      yield* settle
+      t.decide("row-2")
+      yield* settle
+      yield* Deferred.fail(t.saves[0]!.answer, DraftBusy.make({ reason: "The import kept changing." }))
+      yield* settle
+      expect([t.registry.get(reviewLines(id)), t.registry.get(rowsNotSaved(id))]).toEqual([{}, 1])
+    })
   )
 
   it.live(
-    "rows that wait for their member are said as not sent because someone else is signed in, when someone else is (signedout-words)",
+    "rows that wait for their member are said as not sent because someone else is signed in, when someone else is",
     () =>
       Effect.gen(function* () {
         emptyStorage()
@@ -676,7 +690,7 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
       })
   )
 
-  it.live("the take-backs a person dismissed go with the import when it is removed (dismissals-outlive-import)", () =>
+  it.live("the take-backs a person dismissed go with the import when it is removed", () =>
     Effect.gen(function* () {
       emptyStorage()
       const id = importNo(77)
@@ -698,7 +712,7 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
   )
 
   it.live(
-    "a new owner's rows are kept under their key from the first one, and their own entry this page had not read is taken in, never erased (keysread-new-owner)",
+    "a new owner's rows are kept under their key from the first one, and their own entry this page had not read is taken in, never erased",
     () =>
       Effect.gen(function* () {
         emptyStorage()
@@ -740,7 +754,7 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
   )
 
   it.live(
-    "a confirm that waited on a save goes as the member who pressed it or not at all, when someone else signed in meanwhile (confirm-owner-gate)",
+    "a confirm that waited on a save goes as the member who pressed it or not at all, when someone else signed in meanwhile",
     () =>
       Effect.gen(function* () {
         emptyStorage()
@@ -764,35 +778,37 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
   )
 
   it.live(
-    "while who is signed in is asked again after a save refused for nobody signed in, nothing of the draft is sent: the answer decides (send-on-stale-member)",
+    "while who is signed in is asked again after a save refused for nobody signed in, nothing of the draft is sent: the answer decides",
     () =>
       Effect.gen(function* () {
         emptyStorage()
         const id = importNo(80)
-        const server: { signedOut: boolean; removed: boolean; view?: ImportView; askHangs?: boolean } = {
+        const server: { signedOut: boolean; removed: boolean; view?: ImportView } = {
           signedOut: true,
           removed: false,
-          view: viewAt({ id, revision: 4 }),
-          askHangs: true
+          view: viewAt({ id, revision: 4 })
         }
-        const t = page(id, dana, server)
+        const session = sessionStandIn(memberOf({ id: "mem_dana" }))
+        const t = page(id, dana, server, session)
         t.open(viewAt({ id, revision: 4 }))
         yield* settle
         t.decide("row-2")
         yield* settle
         // Refused for nobody signed in: who is signed in is asked again, and has not answered.
-        expect([A.length(t.saves), t.asked.times, t.registry.get(t.asking)]).toEqual([1, 1, true])
-        // The cookie is Marcus's now; the page still says Dana. She presses Save again: the picture is read, the row
-        // is checked, and the save waits for the answer.
+        expect([A.length(t.saves), session.times(), t.registry.get(session.asked)]).toEqual([1, 1, true])
+        // The cookie is Marcus's now; the page still says Dana. She presses Save again: the save waits for the answer.
         server.signedOut = false
         t.registry.set(draftEvents(id), DraftEvent.SaveAgain())
         yield* settle
         expect(A.length(t.saves)).toBe(1)
-        // The answer: Marcus. Nothing of Dana's goes as him; her row stays kept for her.
-        t.registry.set(t.who, marcus)
-        t.registry.set(t.asking, false)
+        // The answer: Marcus. The page is left, never his; nothing of Dana's goes as him, and her row stays kept for her.
+        yield* session.answer(memberOf({ id: "mem_marcus" }))
         yield* settle
-        expect([A.length(t.saves), R.has(browser.kept, keyOf(id, "mem_dana"))]).toEqual([1, true])
+        expect([A.length(t.saves), session.left.times, R.has(browser.kept, keyOf(id, "mem_dana"))]).toEqual([
+          1,
+          1,
+          true
+        ])
       })
   )
 
@@ -800,13 +816,13 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
     Effect.gen(function* () {
       emptyStorage()
       const id = importNo(81)
-      const server: { signedOut: boolean; removed: boolean; view?: ImportView; askHangs?: boolean } = {
+      const server: { signedOut: boolean; removed: boolean; view?: ImportView } = {
         signedOut: true,
         removed: false,
-        view: viewAt({ id, revision: 4 }),
-        askHangs: true
+        view: viewAt({ id, revision: 4 })
       }
-      const t = page(id, dana, server)
+      const session = sessionStandIn(memberOf({ id: "mem_dana" }))
+      const t = page(id, dana, server, session)
       t.open(viewAt({ id, revision: 4 }))
       yield* settle
       t.decide("row-2")
@@ -816,7 +832,7 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
       yield* settle
       expect(A.length(t.saves)).toBe(1)
       // The answer: Dana is still signed in. The held save goes.
-      t.registry.set(t.asking, false)
+      yield* session.answer(memberOf({ id: "mem_dana" }))
       yield* settle
       expect(A.map(t.saves, (save) => R.keys(save.payload.set))).toEqual([["row-2"], ["row-2"]])
     })
@@ -828,13 +844,13 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
       Effect.gen(function* () {
         emptyStorage()
         const id = importNo(82)
-        const server: { signedOut: boolean; removed: boolean; view?: ImportView; askHangs?: boolean } = {
+        const server: { signedOut: boolean; removed: boolean; view?: ImportView } = {
           signedOut: true,
           removed: false,
-          view: viewAt({ id, revision: 4 }),
-          askHangs: true
+          view: viewAt({ id, revision: 4 })
         }
-        const t = page(id, dana, server)
+        const session = sessionStandIn(memberOf({ id: "mem_dana" }))
+        const t = page(id, dana, server, session)
         t.open(viewAt({ id, revision: 4 }))
         yield* settle
         t.decide("row-2")
@@ -843,8 +859,7 @@ describe("a waiting row, whose it is and when it may go, through the runner", ()
         t.registry.set(draftEvents(id), DraftEvent.ConfirmPressed())
         yield* settle
         expect(t.commits).toEqual([])
-        t.registry.set(t.who, marcus)
-        t.registry.set(t.asking, false)
+        yield* session.answer(memberOf({ id: "mem_marcus" }))
         yield* settle
         expect([t.commits, R.has(browser.kept, keyOf(id, "mem_dana"))]).toEqual([[], true])
       })
@@ -856,7 +871,7 @@ describe("an import removed meanwhile (the rows kept for it, named; Benjamin, 20
   const says = (t: ReturnType<typeof page>) => A.map(t.registry.get(notices), noticeWords)
 
   it.live(
-    "page start: its kept rows are let go and named, row by row, to the member they belong to, until dismissed (forget-erases-unnamed)",
+    "page start: its kept rows are let go and named, row by row, to the member they belong to, until dismissed",
     () =>
       Effect.gen(function* () {
         emptyStorage()
@@ -897,7 +912,7 @@ describe("an import removed meanwhile (the rows kept for it, named; Benjamin, 20
   )
 
   it.live(
-    "page start: not found in another organization than the rows' erases nothing, and the question before leaving stays (forget-after-org-switch)",
+    "page start: not found in another organization than the rows' erases nothing, and the question before leaving stays",
     () =>
       Effect.gen(function* () {
         emptyStorage()
@@ -918,7 +933,7 @@ describe("an import removed meanwhile (the rows kept for it, named; Benjamin, 20
   )
 
   it.live(
-    "while its page is open: what waits and what is on hold is named and let go, and nothing asks before the page is left (removed-while-open)",
+    "while its page is open: what waits and what is on hold is named and let go, and nothing asks before the page is left",
     () =>
       Effect.gen(function* () {
         emptyStorage()
@@ -963,5 +978,74 @@ describe("an import removed meanwhile (the rows kept for it, named; Benjamin, 20
           ]
         ])
       })
+  )
+})
+
+describe("what the runner asks for while nobody looks", () => {
+  it.live("Save again pressed off the review with no picture held reads the import, then sends what waits on it", () =>
+    Effect.gen(function* () {
+      emptyStorage()
+      const id = importNo(91)
+      // The import is not read yet: the step is drawn, and the person's row waits with no picture under it.
+      const server: { signedOut: boolean; removed: boolean; view?: ImportView } = { signedOut: false, removed: false }
+      const t = page(id, dana, server)
+      t.registry.mount(importViewShown(id))
+      const leave = t.registry.mount(followDraft(id))
+      yield* settle
+      t.decide("row-2")
+      yield* settle
+      expect(A.length(t.saves)).toBe(0)
+      // She goes to another page; the server can be read now; she presses Save again on what was said.
+      leave()
+      yield* settle
+      server.view = viewAt({ id, revision: 4 })
+      t.registry.set(draftEvents(id), DraftEvent.SaveAgain())
+      yield* settle
+      expect(A.map(t.saves, (save) => save.payload.set)).toEqual([{ "row-2": out }])
+    })
+  )
+
+  it.live("not found in another organization than the rows': who is signed in is asked once per answer", () =>
+    Effect.gen(function* () {
+      emptyStorage()
+      const id = importNo(92)
+      const server: { signedOut: boolean; removed: boolean; in?: string } = {
+        signedOut: false,
+        removed: true,
+        in: "org_switched"
+      }
+      const t = page(id, dana, server)
+      t.registry.mount(importViewShown(id))
+      t.registry.mount(followDraft(id))
+      yield* settle
+      expect(t.asked.times).toBe(1)
+      // The same answer again (a refresh, the step drawn again): not asked again.
+      t.registry.refresh(importView(id))
+      yield* settle
+      expect(t.asked.times).toBe(1)
+      // Not found where the session now looks, another organization again: asked once more.
+      server.in = "org_another"
+      t.registry.refresh(importView(id))
+      yield* settle
+      expect(t.asked.times).toBe(2)
+    })
+  )
+
+  it.live("the question before the page is left counts the rows of every organization this tab kept", () =>
+    Effect.gen(function* () {
+      emptyStorage()
+      const id = importNo(93)
+      const first = page(id)
+      first.open(viewAt({ id, revision: 4 }))
+      yield* settle
+      first.decide("row-2")
+      yield* settle
+      // The page is loaded again for her in her other organization: the rows kept for Example Works still wait.
+      browser.listeners["beforeunload"] = []
+      const again = page(id, person("mem_dana_north", "org_northline"))
+      again.registry.mount(askBeforeLeaving)
+      yield* settle
+      expect(leaving()).toBe(true)
+    })
   )
 })

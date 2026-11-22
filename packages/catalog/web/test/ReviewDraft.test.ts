@@ -18,7 +18,8 @@ import {
   type DecisionDelta,
   type SaveRequest,
   decisionFromFlags,
-  type SavedDecisions
+  type SavedDecisions,
+  type DecidedSince
 } from "@inventory/catalog-contract/Decision"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import type { ImportView } from "@inventory/catalog-contract/Import"
@@ -56,6 +57,7 @@ type Saved = {
   readonly revision: number
   readonly changed: boolean
   readonly notApplied: ReadonlyArray<{ readonly rowId: string; readonly field: string }>
+  readonly decidedSince: ReadonlyArray<DecidedSince>
 }
 
 const settle = Effect.sleep("15 millis")
@@ -118,7 +120,7 @@ const world = (id: ImportId) => {
     answerGet: (n: number, view: ImportView) => Deferred.succeed(gets[n]!, view),
     /** The server answers a save: at this revision, and (unless the test says otherwise) as the save that moved it. */
     answerSave: (n: number, revision: number, changed = true) =>
-      Deferred.succeed(saves[n]!.answer, { revision, changed, notApplied: [] }),
+      Deferred.succeed(saves[n]!.answer, { revision, changed, notApplied: [], decidedSince: [] }),
     refuseSave: (n: number) =>
       Deferred.fail(saves[n]!.answer, AlreadyImported.make({ reason: "This import was confirmed already." })),
     /** The server fails the save itself: the client sends it again, later. */

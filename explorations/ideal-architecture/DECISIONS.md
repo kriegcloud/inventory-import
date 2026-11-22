@@ -1580,8 +1580,8 @@ answered before, and not asked. I can overrule any of them.
    refused with the sender's own decision. The library gives a decision no number of the command to know a resend by.
 5. **A group's undo is taken from a screen that is behind on the rows.** This stands by my answer "Row 14 stays
    whole": the undo takes back its sender's own act and touches no row, so a row decided since keeps that person's
-   whole decision, and the screen then names it. It is the one decision that takes a press from a screen that is
-   behind, because it replaces nothing of anyone else's. The answer is the group's undo and its number; which rows
+   whole decision, and the screen then names it. It takes a press from a screen that is behind because it replaces
+   nothing of anyone else's (a row's undo does too, in the one case 15 names). The answer is the group's undo and its number; which rows
    were decided since and stay is read from the rows, not carried in the answer: the model keeps no reading of a
    group's rows.
 6. From the entry above: a row left with no decision is guarded as a decided one is (a "clear" from a screen that
@@ -1606,7 +1606,7 @@ answered before, and not asked. I can overrule any of them.
    this person, with this text on the matching it was made on.
 10. **A row's undo is made on the matching now.** It puts another person's decision back on the row; from a screen
     that has not received a match it is refused `MatchedSince` and held, as a row's act is. `UndoRowStep` gains
-    `madeOn`. With this, a group's undo is again the one decision that takes a press from a screen that is behind.
+    `madeOn`. With this, no undo from a screen that has not received a match is taken.
 11. **What `GroupedAfter` names for a row's undo is the import's last group in force**, the one to take back first,
     and its words say so. It is the group over the row or one made after it: the model keeps no reading of a
     group's rows. The rule that held it was named for more than it reads and is renamed: a row's undo that is taken
@@ -1624,6 +1624,13 @@ answered before, and not asked. I can overrule any of them.
     the two sendings** (a fourth review, the same day; 12 said it of an undo only). Before, the copy was refused
     `GroupedSince` or `ConfirmedSince` though the row held that very press: this step, from this person, with this
     text on the matching it was made on.
+15. **Not decided by the rule, and said as it stands: a row's undo of its sender's own decision is taken from a screen
+    that has neither another person's decision over it nor that person's undo.** Dana keeps row 12, Ana leaves it
+    out and takes that back, and Dana, whose screen shows only her keep, takes it back: taken. The row holds her
+    decision again, as her screen shows it, and the undo replaces nothing of anyone else's, as a group's undo does
+    not. `UndoRowStep` has no `sawUndone` as `DecideRow` has; to hold this press instead, add it and refuse
+    `UndoneSince`. A story holds what happens now (66 stories). Items 5 and 10 said a group's undo was the one
+    decision that takes a press from a screen that is behind, which this case made untrue.
 
 With 1, the two rules "a decision is replaced only by an act that saw it" and "an act is made on the matching now"
 excuse nothing any more: every act that records saw the row's decision and was made on the matching now. On a row no
@@ -1662,7 +1669,8 @@ Rules that said less than their names, each either made to say it or renamed (th
   items; a group's rows are bounded at a million characters, which takes 50,000 ids at their longest.
 
 143 rules of the kinds a proof covers under `CI=true`; the lock written again on purpose for these. With 14:
-`DecideRow` at 234 paths, the relation still proved across it, no rule changed; 65 stories, 190 mutants.
+`DecideRow` at 234 paths, the relation still proved across it, no rule changed; 65 stories, 190 mutants. With 15:
+nothing in the model changed, one story more, 66.
 
 ### 2026-11-22 — the review's model, rows already stored: start empty
 

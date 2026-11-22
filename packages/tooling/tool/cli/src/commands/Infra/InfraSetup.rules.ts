@@ -1489,8 +1489,11 @@ const perform = (
  * Runs the setup: a dry run prints its steps and starts nothing; a real run refuses anything but a person at a
  * terminal, then does each step in order and stops at the first one that cannot go on.
  */
-export const setup = Effect.fn("InfraSetup.setup")(function* (options: SetupOptions) {
+export const setup = Effect.fn("InfraSetup.setup")(function* (given: SetupOptions) {
   const workstation = yield* Workstation
+  // A dry run with no size prints the steps of all three, so the command the agents' rule names prints steps.
+  const unsized = !A.isReadonlyArrayNonEmpty(given.sizes)
+  const options: SetupOptions = unsized && given.dryRun ? { ...given, sizes: SetupSize.literals } : given
   if (!A.isReadonlyArrayNonEmpty(options.sizes)) {
     return yield* stop(
       "Say how much to set up: `--test-stage` (a test stage and its address), `--staging` (the repository's stack) or `--production`. `--dry-run` prints the steps and starts nothing."
@@ -1504,11 +1507,18 @@ export const setup = Effect.fn("InfraSetup.setup")(function* (options: SetupOpti
   const repo = yield* Repo
   const local = repo.join(repo.root, localEnvFile)
   const own = (yield* repo.exists(local)) ? yield* repo.text(local) : ""
-  const token = referenceState({ text: own, name: previewTokenName })
-  const accountId = referenceState({ text: own, name: previewAccountIdName })
-  const previewByToken = token === "reference" && accountId === "reference"
+  const committed = yield* repo.text(repo.join(repo.root, opEnvFile))
+  // Read as the repository's stack reads them: the last line of a name across op.env and then op.env.local.
+  const token = referenceGiven({ committed, own, name: previewTokenName })
+  const accountId = referenceGiven({ committed, own, name: previewAccountIdName })
+  const previewByToken =
+    token.state === "reference" &&
+    accountId.state === "reference" &&
+    token.file === localEnvFile &&
+    accountId.file === localEnvFile
   if (options.dryRun) {
-    return yield* Effect.forEach(dryRun({ options, previewByToken }), workstation.say, {
+    const said = unsized ? ["No size was given, so these are the steps of all three sizes at once."] : []
+    return yield* Effect.forEach([...said, ...dryRun({ options, previewByToken })], workstation.say, {
       concurrency: 1,
       discard: true
     })
@@ -1517,20 +1527,30 @@ export const setup = Effect.fn("InfraSetup.setup")(function* (options: SetupOpti
   yield* outside(options)
   // The tracked file holds comments and references and nothing else: a value typed there in any form would be
   // committed with the reference this command writes, so any other line stops the run before it writes or says so.
-  const committed = yield* repo.text(repo.join(repo.root, opEnvFile))
   const stray = strayLines(committed)
   if (A.isReadonlyArrayNonEmpty(stray)) {
     return yield* stop(
       `${opEnvFile} is tracked by git and holds only comments and lines NAME=op://vault/item/field. Line ${A.join(A.map(stray, String), ", ")} is neither. If a value was typed there, take it out (and change it wherever it came from if the file was ever committed), then run this again. Nothing was started; no line was printed.`
     )
   }
+  // His token's references are his own: the commands that use them read op.env.local alone, and op.env is public.
+  if (token.file === opEnvFile && token.state !== "missing") {
+    return yield* stop(
+      `${opEnvFile} names ${previewTokenName}, and the repository's stack would take it from there. Your own token's references go in ${localEnvFile} (git ignores it): move both lines there, then run this again. Nothing was started.`
+    )
+  }
+  if (accountId.file === opEnvFile && accountId.state !== "missing") {
+    return yield* stop(
+      `${opEnvFile} names ${previewAccountIdName}, and the repository's stack would take it from there. Your own token's references go in ${localEnvFile} (git ignores it): move both lines there, then run this again. Nothing was started.`
+    )
+  }
   if (
-    (token === "missing") !== (accountId === "missing") ||
-    token === "not-a-reference" ||
-    accountId === "not-a-reference"
+    (token.state === "missing") !== (accountId.state === "missing") ||
+    token.state === "not-a-reference" ||
+    accountId.state === "not-a-reference"
   ) {
     return yield* stop(
-      `${localEnvFile} must name both ${previewTokenName} and ${previewAccountIdName} as op:// references (a name with a space in quotes), or neither. Nothing was started; no line was printed.`
+      `${localEnvFile} must name both ${previewTokenName} and ${previewAccountIdName} as op:// references (a name with a space in quotes), or neither; the last line of each name is the one taken. Nothing was started; no line was printed.`
     )
   }
   if (!previewByToken && has(options.sizes, "staging")) {

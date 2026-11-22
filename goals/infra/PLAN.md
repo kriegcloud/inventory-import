@@ -210,12 +210,12 @@ Nothing below was started. Every command names its stage.
 
 ### One command for steps 2 to 6, 8, 9 and the first part of 12
 
-`bun run beep infra setup` does those steps in order, on Benjamin's workstation. It is his to run, and no agent
-runs it. What enforces that is narrow: with no terminal, or with `CI` set, it stops before its first tool, which
+`bun run beep infra setup` does those steps in order, on Benjamin's workstation. It is his to run; an agent runs it
+only with `--dry-run`, which starts no tool (Benjamin's rule, written in CLAUDE.md). What enforces the rest is narrow: with no terminal, or with `CI` set, it stops before its first tool, which
 keeps a workflow and a plain agent shell out. A program that is given a terminal passes that test, so the rule for
 agents is a rule, and the command is built for the case where it is broken: it shows nothing secret itself, and
 everything it makes waits for a yes. `--dry-run` starts no tool and writes nothing; it prints the steps and the
-commands of a run, with the token's commands when his own file names one, and says when a run as things are would
+commands of a run (of all three sizes when none is given), with the token's commands when his own file names one, and says when a run as things are would
 stop before step 1. What a run finds on the way (an item already there, a profile already connected) only a run
 shows. Run again, it leaves alone what it can see is done: a reference already written, an item already there, a
 profile already connected to the right account. The state store is the exception: nothing reads whether it exists,
@@ -259,7 +259,11 @@ What each step does, and with which tool:
   password's references the same way (`referenceGiven`: the last line of the name, a reference or not, as the stacks'
   `referencesIn` takes it; tooling may not import `@beep/infra`, so the rule is written twice and the CLI's tests
   hold its cases), and says which file it read: what it says, and the
-  `DEPLOY_WITHOUT_MODEL_KEY` it gives, come from the file the stack will take the reference from.
+  `DEPLOY_WITHOUT_MODEL_KEY` it gives, come from the file the stack will take the reference from. The previews'
+  token and account id are read by the same rule, so a template line left above his real one is passed over as
+  the stack passes it over. A run stops when the line taken is in `op.env`: those two are his own, the commands
+  that use them read `op.env.local` alone, and `op.env` is public. Not checked: whether `op-human run --env-file`
+  accepts a file that still holds a template line above the real one (it is never run here).
 - **1Password**, through `op-human` (the 1Password CLI as its owner runs it): if neither
   `packages/infra/env/op.env` nor `op.env.local` names a `PREVIEW_TEST_ACCOUNT_PASSWORD`, it looks for the item "inventory-import
   PREVIEW_TEST_ACCOUNT_PASSWORD" in the vault (`--vault`, or asked when there are several), has 1Password make it with

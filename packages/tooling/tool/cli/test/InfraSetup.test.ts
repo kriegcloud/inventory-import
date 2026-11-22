@@ -1373,6 +1373,46 @@ describe("infra setup: the second account by its token", () => {
       })
   )
 
+  it.effect("the token's names are read as the stack reads them: the last line, across op.env and op.env.local", () =>
+    Effect.gen(function* () {
+      // The template line he copied is left above his real one; the stack takes the last, and so does a run.
+      const template = 'PREVIEW_CLOUDFLARE_API_TOKEN="op://<vault>/<item>/<field>"\n'
+      const honest = world()
+      const first = yield* run(
+        honest,
+        options(),
+        untouched,
+        O.map(own, (text) => `${template}${text}`)
+      )
+      expect(O.getOrElse(first.stopped, () => "")).not.toContain("must name both")
+      expect(A.some(started(honest), Str.includes("cf accounts tokens verify"))).toBe(true)
+      // A real line above the template one: the stack takes the template, so the run stops.
+      const below = world()
+      const second = yield* run(
+        below,
+        options(),
+        untouched,
+        O.map(own, (text) => `${text}${template}`)
+      )
+      expect(O.getOrElse(second.stopped, () => "")).toContain("must name both")
+      // Named only in the public op.env: the stack would take them there, and the run says to move them.
+      const committedOnly = world()
+      const third = yield* run(committedOnly, options(), `${untouched}${O.getOrElse(own, () => "")}`, O.none())
+      expect(O.getOrElse(third.stopped, () => "")).toContain(
+        `${opEnvFile} names PREVIEW_CLOUDFLARE_API_TOKEN, and the repository's stack would take it from there`
+      )
+      const idOnly = world()
+      const fourth = yield* run(
+        idOnly,
+        options(),
+        `${untouched}PREVIEW_CLOUDFLARE_ACCOUNT_ID=op://v/i/f\n`,
+        O.some("PREVIEW_CLOUDFLARE_API_TOKEN=op://v/i/g\n")
+      )
+      expect(O.getOrElse(fourth.stopped, () => "")).toContain(`${opEnvFile} names PREVIEW_CLOUDFLARE_ACCOUNT_ID`)
+      expect([...started(below), ...started(committedOnly), ...started(idOnly)]).toEqual([])
+    })
+  )
+
   it.effect("without his own file the repository's stack is not set up: it stops at once and names the two lines", () =>
     Effect.gen(function* () {
       const w = world({ accounts: productionOnly, profiles: connected })
@@ -1400,6 +1440,24 @@ describe("infra setup: the dry run", () => {
       yield* run(without, options({ sizes: ["staging"], dryRun: true }), untouched, O.none())
       expect(A.join(without.log, "\n")).toContain("As things are, a run stops before step 1")
       expect([...started(withFile), ...checks(withFile), ...started(without)]).toEqual([])
+    })
+  )
+
+  it.effect("with no size, it prints the steps of all three sizes and starts nothing", () =>
+    Effect.gen(function* () {
+      const w = world({ terminal: false })
+      const result = yield* run(w, options({ sizes: [], dryRun: true }))
+      expect(result.stopped).toEqual(O.none())
+      const said = A.join(w.log, "\n")
+      expect(said).toContain("No size was given, so these are the steps of all three sizes at once.")
+      expect(said).toContain("bunx alchemy plan --stage test_ben --profile inventory-preview")
+      expect(said).toContain(
+        "bunx alchemy deploy packages/infra/src/GitHub.stack.ts --stage prod --profile inventory-production --yes"
+      )
+      expect([...started(w), ...checks(w)]).toEqual([])
+      // A real run with no size still stops and says how much to set up.
+      const real = yield* run(world(), options({ sizes: [] }))
+      expect(O.getOrElse(real.stopped, () => "")).toContain("Say how much to set up")
     })
   )
 })

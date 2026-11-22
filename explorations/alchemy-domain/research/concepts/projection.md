@@ -168,14 +168,14 @@ the package root (`index.ts` 171-180).
 ## In this app
 
 Today a confirm is one atomic D1 batch in `ImportStore.commit`
-(`packages/catalog/host/src/ImportStore.adapter.ts` 867-1099): the confirm's own `importBatch` row (only while the
+(`packages/catalog/host/src/ImportStore.adapter.ts` 1106-1382): the confirm's own `importBatch` row (only while the
 import is open), the import closed, the new items (`ON CONFLICT (organizationId, skuKey) DO NOTHING`), a kept copy of
 each replaced item, the replacements, one `importOutcome` per row, the `importChange` rows, the counts and the
 activity line. Every statement after the first checks that this confirm's row exists, so a second press, which comes
-with a new confirm id, writes nothing. A take-back is one batch too (1101-1254). The FTS5 index `itemSearch` follows
+with a new confirm id, writes nothing. A take-back is one batch too (1384-1537). The FTS5 index `itemSearch` follows
 `item` through triggers, so it moves with whatever writes `item`. The confirm id, the id of every new item and the
 activity line's id are made in the request handler with `random.uuidV4()`
-(`packages/catalog/model/src/Import/Imports.handler.ts` 65-66, 420-427).
+(`packages/catalog/model/src/Import/Imports.handler.ts` 164-165, 543-550).
 
 With an `Import` [aggregate](./aggregate.md), the decision "this import is confirmed" becomes the aggregate's commit
 (`ImportConfirmed`, refused once the import is not open), and the writes become a projection keyed by the import
@@ -244,7 +244,7 @@ What each event does, and why each is safe twice:
   finds nothing written and does it all.
 - **`ImportTakenBack`** needs its own marker too. Today's `markConfirms` marks only confirms with `takeBackId IS NULL`,
   but every later statement selects the confirms by `takeBackId = <this take-back>`, which the first run already set
-  (`ofTakeBack`, `ImportStore.adapter.ts` 1110-1111). So a second run with the same take-back id would run
+  (`ofTakeBack`, `ImportStore.adapter.ts` 1393-1394). So a second run with the same take-back id would run
   `countTakeBack` again and reset `removed` to 0 (the items are gone by then), insert the activity line again, and
   raise the import's `revision` again in `settleDraft`. A second press is safe today only because it comes with a new
   take-back id. Guard the batch the same way: a table `importTakeBack (organizationId, id, applied)` keyed by
@@ -258,13 +258,13 @@ What each event does, and why each is safe twice:
 
 **Where the rows come from.** One event cannot carry a large confirm's rows. `maxStagedRows` is 50,000
 (`packages/catalog/contract/src/Staging/Staged.read.ts` 149); the adapter already splits a confirm into statements of
-at most 500 rows (`chunkRows`, `packages/catalog/contract/src/Staging/Upload.command.ts` 10) and about 600,000
-characters each, to stay under D1's 2 MB limit on one value (`ImportStore.adapter.ts` 70-89), and counts at least 600
-characters per item (`textOf`, 61-68). Each statement passes its rows as one JSON value, so it stays under D1's 100
-bound parameters per statement. A single 50,000-row event would be at least 30 MB, over the 8 MB a Durable Object
-stores in one value. In chunks of several commands the rows do fit, at a cost. The options, under the labels
-[host-cloudflare.md](./host-cloudflare.md) also uses (that page counts the objects, requests, rows written and stored
-bytes of each; which to build is the app owner's decision):
+at most 500 rows (`chunkRows`, `packages/catalog/contract/src/Staging/Upload.command.ts` 10) and at most 1,000,000
+bytes of UTF-8 each, half of D1's 2 MB limit on one value (`pieceBytes` and `pieced`,
+`packages/catalog/host/src/internal/pieces.ts`). Each statement passes its rows as one JSON value, so it stays under
+D1's 100 bound parameters per statement. A single 50,000-row event, at 600 characters an item, would be at least
+30 MB, over the 8 MB a Durable Object stores in one value. In chunks of several commands the rows do fit, at a cost.
+The options, under the labels [host-cloudflare.md](./host-cloudflare.md) also uses (that page counts the objects,
+requests, rows written and stored bytes of each; which to build is the app owner's decision):
 
 - **(a1) The event names a plan staged in D1.** The confirm handler runs `review` on the stored rows, as it does now,
   writes the planned rows, with their item ids and the audit line's id, to a new table `importPlan` keyed by
@@ -326,7 +326,7 @@ Until edits are events of an `Item` aggregate and part of `on`, never bump this 
 `item` as a table the projection writes into rather than one it owns.
 
 - **Used today:** no. `ImportStore.commit` and `ImportStore.takeBack`
-  (`packages/catalog/host/src/ImportStore.adapter.ts` 1024-1099, 1226-1254) write in the same request as the guard.
+  (`packages/catalog/host/src/ImportStore.adapter.ts` 1297-1382, 1509-1537) write in the same request as the guard.
 - **Where it goes:** the writes of `commit` and `takeBack` move behind a new port `ImportWrites` in
   `packages/catalog/model/src/Import/`, with its D1 adapter in `packages/catalog/host/src/`; an `applied` column on
   `importBatch`, an `importTakeBack` table and, under (a1), an `importPlan` table (under (a2) holding the chunks, a

@@ -198,7 +198,7 @@ same file but for its retry options); `packages/domain/src/InMemoryWorkflows.ts`
 
 The best fit is a model pass over an import that outlives one request. Today Suggest is one request: it takes one call
 from the allowance, asks once with a digest of what is open, and stores what passes the guard
-(`packages/catalog/model/src/Suggestion/Suggestions.handler.ts` 75-169). For a file of tens of thousands of rows, one
+(`packages/catalog/model/src/Suggestion/Suggestions.handler.ts` 75-176). For a file of tens of thousands of rows, one
 question is too large and one request too short. A saga asks in pieces, waits between them, stores proposals as it
 goes, and never writes an item.
 
@@ -289,7 +289,7 @@ The other two the brief names, honestly weighed:
   `TakeBackImport` does the same with less; the saga earns its place only if more steps join (a mail to the
   requester, a second approval for a large take-back).
 
-- **Used today:** no. The Suggest request asks once and returns (`Suggestions.handler.ts` 135-169); uploads and
+- **Used today:** no. The Suggest request asks once and returns (`Suggestions.handler.ts` 139-176); uploads and
   take-backs are single requests (`ImportStore.adapter.ts`, `beginUpload` to `discardUpload`, and `takeBack`).
 - **Where it goes:** `packages/catalog/model/src/Suggestion/SuggestionPass.saga.ts`, listed in the catalog model's
   `sagas`, started by `SuggestOnStaging`; the Review step's suggestions panel reads the import's view.

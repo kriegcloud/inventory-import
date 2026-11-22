@@ -135,7 +135,7 @@ Three timed rules, and what fits each:
 
 1. **An upload left unfinished for an hour is discarded.** Today nothing fires at the hour: the *next* upload of the
    organization deletes every upload and its chunks older than 60 minutes, in the same batch that inserts itself
-   (`beginUpload`, `packages/catalog/host/src/ImportStore.adapter.ts` lines 375-400; `abandonedAfterMinutes = 60` in
+   (`beginUpload`, `packages/catalog/host/src/ImportStore.adapter.ts` lines 381-404; `abandonedAfterMinutes = 60` in
    `packages/catalog/model/src/Staging/Upload.rules.ts` line 20). An organization that never uploads again keeps the
    rows. As a deadline: `BeginUpload` records `UploadBegun`, a policy schedules `ExpireUpload` after 1 hour under
    `expire:<uploadId>`, `FinishUpload` and `DiscardUpload` move the upload out of `Uploading`, and the expiry records

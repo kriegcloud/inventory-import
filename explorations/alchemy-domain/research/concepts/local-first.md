@@ -115,13 +115,17 @@ and `optimistic-updates.mdx`, and `examples/cloudflare-domain/packages/web/src/B
 ## In this app
 
 The review already is an intent queue in all but name. Each change to the decisions becomes a delta (`deltaOf`:
-rows set and rows cleared), sent one request at a time by `useDecisionSaver`, which keeps `onServer` and `wanted`
-and sends the difference; the confirm carries whatever is still `pending()`; a transient failure keeps the decision
-on screen with "Save again"; a refusal (the import was confirmed or removed meanwhile, the role was taken away) puts
-the screen back to what the server holds. Undo and redo are local: `ReviewState` holds `undo` and `redo` steps beside
-the decisions, `toDraft` and `fromDraft` keep them through a refresh, and `useSavedProgress` writes the draft to
-`localStorage` and the chosen file to IndexedDB per member and organization. An undo is therefore just another
-delta, never a server-side undo.
+rows set and rows cleared), sent one save at a time by the review's draft (`step` in
+`packages/catalog/web/src/Draft.machine.ts`, its effects run by `packages/catalog/web/src/ReviewDraft.atoms.ts`),
+which keeps the server's picture (`held`) and the person's rows not saved yet (`flight`, `unsent`) and sends the
+difference; rows that wait are kept in this browser through a reload (`keepWaiting`,
+`packages/catalog/web/src/Draft.atoms.ts`); the confirm carries whatever is still `unconfirmed`; a transient failure
+keeps the decision on screen with "Save again"; a refused save puts its rows on hold (`onHold`) until the person
+decides the row again or dismisses it, and rows an import closed on are named on the Result step (`leftOver`). Undo
+and redo are local: `ReviewState` holds `undo` and `redo` steps beside the decisions, `toDraft` and `fromDraft` keep
+them through a refresh, and the saved progress keeps the draft in `localStorage` per member and organization
+(`progressOf`, an `Atom.kvs`, `packages/review/src/SavedProgress.hook.ts`) and the upload's chosen file in IndexedDB.
+An undo is therefore just another delta, never a server-side undo.
 
 With a domain model, each act of the review is the intent, decided across the import's lifecycle instance and the
 row it names. An intent is what the
@@ -166,9 +170,11 @@ review run over the stored rows, the SKU key uniqueness per organization, the ta
 since" check, the 40-calls-a-day allowance, and every count on the result screen. The screen's own preview of the
 counts already runs the same pure `review` locally; that stays as it is.
 
-- **Used today:** no. In its place: `useDecisionSaver` (`packages/catalog/web/src/Draft.controller.ts`),
-  `ReviewState` with undo and redo (`packages/review/src/ReviewDraft.rules.ts`), `useSavedProgress`
-  (`packages/review/src/SavedProgress.hook.ts`), and the optimistic write atoms (`packages/client/src/Optimistic.atoms.ts`).
+- **Used today:** no. In its place: the review's draft (`packages/catalog/web/src/Draft.machine.ts`,
+  `packages/catalog/web/src/ReviewDraft.atoms.ts`, `packages/catalog/web/src/Draft.atoms.ts`), `ReviewState` with undo
+  and redo (`packages/review/src/ReviewDraft.rules.ts`), the saved progress (`progressOf`, `useSavedProgress`,
+  `packages/review/src/SavedProgress.hook.ts`), and the optimistic write atoms
+  (`packages/client/src/Optimistic.atoms.ts`).
 - **Where it goes:** each act of the review becomes a `DecideRow` or `UndoRowStep` command with a stable `commandId` kept in
   the saved progress (`packages/review/src/SavedProgress.schema.ts`); `predict` is called by the confirm button in
   `packages/catalog/web/src/ReviewStep.screen.tsx`.

@@ -197,7 +197,7 @@ The choices, none picked here (the owner decides):
      name would not be read either.
 2. **The blocks live with the aggregate in `model`, and `contract` re-exports them** for the wire and the browser.
    Touches `packages/<context>/contract`, `packages/<context>/model` and the boundary law: `contextMay` lets
-   `contract` import only `kernel`, and `model` imports `contract` today (`packages/catalog/model/package.json:46`),
+   `contract` import only `kernel`, and `model` imports `contract` today (`packages/catalog/model/package.json:47`),
    so a re-export from `model` would also be a package cycle until `model` stops importing `contract`.
 3. **Upstream changes the prover to follow package imports** (`Prove/internal/Source.ts:228-230` on main). Touches no
    package of the app: blocks could stay in `contract` and the aggregate in `model`. It is not on main today.

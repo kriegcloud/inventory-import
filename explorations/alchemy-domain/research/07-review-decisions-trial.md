@@ -10443,6 +10443,7 @@ with other work; the load average stands beside each time, and no timeout was ra
 | 15 | A decision that records nothing for every act | **Proved all the same**, on this model and on trial 13's: no rule holds that an act is taken | 7.65 s, 24.08 39.95 47.17 to 27.64 40.21 47.17; 26.92 s, 27.92 39.85 46.98 to 28.63 38.96 46.46 |
 | 15 | Six stories of a group as one unit | **All pass**; the one about a row decided over a group fails on a model without that check | under 1 s |
 | 15 | Only the import's last group act may be taken back (`review12last`) | **Proved**, 84 paths | 3.62 s, 17.03 28.12 40.88 to 17.03 28.12 40.88 |
+| 15 | The whole model with that check, as he then answered decisions 7 and 8 (`review13`) | **Verified. 124 rules proved**; the decisions 42, 84, 152 and 292 paths; the six rules across instances checked 3 commands deep; seven stories pass; the check removed breaks `OnlyTheLastGroupActIsTakenBack` | 128.98 s, 43.01 27.81 28.50 to 42.30 33.49 30.52 |
 | 15 | Both ways at once: trial 13's group sent row by row, with the unit beside it (`review12mix`) | **Proved**: 44, 86, 476 and 2652 paths | 36.35 s, 17.03 28.12 40.88 to 18.35 27.36 40.10; 285.84 s, 45.46 52.15 53.45 to 40.63 44.66 49.83 |
 | 16 | The fold over units against today's `act`, a property over generated sequences | **Equal after every action of 50,000 sequences**, when a group's rows are split by what each got; unequal with one patch a group | 14 s for 25,000 |
 | 17 | The one-unit model on the Durable Object host in local workerd | One act for a group of 9, 600, 6,000 and 50,000 rows: a median of 95 to 214 ms, its undo 64 to 191 ms; no size refused | below, at loads of 36 to 60 |
@@ -11791,6 +11792,8 @@ A ninth, the `covered` check, breaks no rule: see above.
 - **`review12last`: only the import's last group act is taken back as a unit.** `UndoingGroup` refuses with `GroupedAfter`
   when another act on a group came after it, and `OnlyTheLastGroupActIsTakenBack` is proved. Under it the undo of a group
   is exact (trial 16); without it an undo of an earlier group is the fold's, with the cases trial 16 names.
+  `review13` is `review12` with that check, run whole after decisions 7 and 8 were answered: the model those answers
+  describe. Its `Group.decision.ts` differs from the one above by the check, its rule and the `GroupedAfter` rejection.
 - **`review12mix`: both ways at once.** Trial 13's model whole, a group sent row by row and counted by the import, with
   `GroupUnit`, `DecideGroup` and `UndoGroup` beside it; a unit is refused while a group is being sent. All four decisions
   prove, `Undoing` with trial 13's 2,652 paths. A group under some size sent row by row and a larger one as a unit is
@@ -13163,9 +13166,13 @@ Exited.
 - What a match does to a group in force: the reader of what a match put out of force, as for a row.
 - A redo of a group as its own act (a redo is a new group, from a screen that has every change).
 - A keep of one of two rows as one act, which a unit of two parts could carry; a saga; anything deployed.
-- The trial's files under a type-check. A type-check of trial 17's copy reports that an aggregate's rule may not read
-  the request context (`Effect<boolean, never, CurrentActor>` is not assignable to `boolean | Effect<boolean, never,
-  never>`), on `RowUnit` and `GroupUnit`; Vitest strips types, and Verify ran and proved those rules. Not looked into.
+- The trial's files under a type-check, until after the round. A type-check then reported six errors, all on the rules
+  of `RowUnit` and `GroupUnit` that read who is acting (`Effect<boolean, never, CurrentActor>` is not assignable to
+  `boolean | Effect<boolean, never, never>`). The library types an aggregate's rule with the context its own commands'
+  middleware provides, and these two aggregates have no commands: their events are recorded by decisions. Vitest strips
+  types, and Verify and Prove gave the rules the context of the decision that records on them, and proved them. The
+  import's rules and every decision's rule that reads the actor type-check. Wrapping the six rules in one cast, in a
+  copy, leaves no error, and `DecidingGroup` and `Deciding` prove on it as before.
 
 ## Running the fifth round again
 

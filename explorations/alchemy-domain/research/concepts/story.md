@@ -310,9 +310,9 @@ Where each story would sit next to today's tests:
 | Story | Today's test | Beside or replace |
 | --- | --- | --- |
 | Confirm recorded once | `packages/catalog/model/test/Endpoints.test.ts` "a confirm writes the ready rows and says so; a second confirm is AlreadyImported and writes nothing" (over the in-memory twins) | Replaces the decision half; the twin test keeps the counts read back through `items.list` |
-| Stale review refused | None. Today the confirm carries the unsaved decisions (`DecisionDelta`) and the server re-runs `review` on what is saved (`packages/catalog/contract/src/Catalog.contract.ts` 175-185) | New rule: a product decision for the owner before it is built |
+| Stale review refused | `apps/inventory/test/server/ConfirmRevision.slow.test.ts` "a confirm names the revision its screen showed". Today the confirm names that revision with its unsaved decisions (`ConfirmRequest`) and is refused with `DraftMoved` when the draft has moved on (`commit` in `packages/catalog/contract/src/Catalog.contract.ts`) | Beside it: the rule is built (his answer of 2026-11-19, "Refuse, show, confirm again"), and the slow test stays for D1 |
 | Second confirm refused | Same `Endpoints.test.ts` case; `AlreadyImported` in `packages/catalog/contract/src/Import/Import.rejection.ts` | Replaces the twin assertion; `apps/inventory/test/server/Imports.slow.test.ts` stays for D1 |
-| Take-back keeps a changed item | `Endpoints.test.ts` "a take-back removes the untouched items, keeps and names the edited one, and a second press writes nothing"; `apps/inventory/test/server/TakeBack.slow.test.ts` | Replaces the twin case; the slow test stays, since the revision checks live in SQL today (`packages/catalog/host/src/ImportStore.adapter.ts` 1124-1196) |
+| Take-back keeps a changed item | `Endpoints.test.ts` "a take-back removes the untouched items, keeps and names the edited one, and a second press writes nothing"; `apps/inventory/test/server/TakeBack.slow.test.ts` | Replaces the twin case; the slow test stays, since the revision checks live in SQL today (`packages/catalog/host/src/ImportStore.adapter.ts` 1407-1479) |
 | Second take-back does nothing | Same twin case | Replaces it |
 
 `packages/catalog/model/test/Confirm.test.ts` (the plan's statuses add up to the review's, an `it.prop`) is a test of

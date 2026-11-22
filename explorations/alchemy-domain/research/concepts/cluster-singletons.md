@@ -242,10 +242,10 @@ On the Durable Object pool, from the source (identical at both refs):
 
 **The hourly sweep of unfinished uploads.** Today nothing runs on a schedule. `beginUpload` deletes the
 organization's uploads begun more than `abandonedAfterMinutes` (60) ago, and their chunks, in the same D1 batch that
-stores the new upload (`packages/catalog/host/src/ImportStore.adapter.ts:344-355`, 374-397;
+stores the new upload (`packages/catalog/host/src/ImportStore.adapter.ts:351-361`, 381-404;
 `packages/catalog/model/src/Staging/Upload.rules.ts:20`). So an organization nobody uploads to again keeps its last
 unfinished upload's rows indefinitely, and the person who comes back later sees "This upload is no longer on the
-server" only if someone else uploaded in between (`Imports.handler.ts:207-210`).
+server" only if someone else uploaded in between (`Imports.handler.ts:576-579`).
 
 As a Cron Trigger on the app's Worker as it is:
 
@@ -292,7 +292,7 @@ the count cheap regardless, so pruning is housekeeping, not correctness. Turning
 calendar-day reset (at midnight UTC, say) would change what the person is told ("They come back over the next day",
 `Allowance.rules.ts:23`), and is the app's owner's decision, not a default.
 
-- **Used today:** no. The sweep runs inside `beginUpload` (`ImportStore.adapter.ts:374-397`); the allowance has no
+- **Used today:** no. The sweep runs inside `beginUpload` (`ImportStore.adapter.ts:381-404`); the allowance has no
   scheduled part.
 - **Where it goes:** `crons` on the `Website.Vite` props in `packages/infra/src/Inventory.stack.ts`, a `scheduled`
   export in `apps/inventory/src/server/worker.ts`, a `sweepAbandoned` method on the import store port

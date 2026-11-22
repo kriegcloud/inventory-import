@@ -100,10 +100,10 @@ Each line is argued on the page it links to. These are findings, not decisions.
 
 **How review decisions are saved**
 
-- On the atoms branch a save names the draft revision it was made on, and a confirm names the revision the screen
-  shows; but a save's rows to set and to clear are not checked against that revision, so the later save wins over a
-  newer decision by someone else, and any caller of the contract can send a stale clear
-  ([07](research/07-review-decisions-trial.md); the brief, "Problem").
+- A save names, for each row, the draft revision it was decided on, and a row that waited is written only over a
+  decision its sender knew (`over`); a confirm names the revision the screen shows. A row that did not wait is not
+  checked, so the later save wins over a newer decision by someone else, and any caller of the contract can send a
+  stale clear ([07](research/07-review-decisions-trial.md); the brief, "Problem").
 - An aggregate's state is one stored value, written again at every accepted command. In local workerd, through the
   domain host, 8.3 MB was stored and 8.5 MB was refused. The 2 MiB in the library's source is a guard of its cluster
   package. One instance per import passes 8 MiB at about 42,800 decided rows; one instance per row is a few hundred

@@ -335,7 +335,7 @@ it in the model's terms, what happens with no key, what a preview must never do,
 
 What the stack declares (`packages/infra/src/Inventory.stack.ts`): a `mailKey` setting in the stage plan beside
 `modelKey` (`packages/infra/src/Stage.schema.ts:200-205`), `FromEnvironment({ variable: "RESEND_API_KEY" })` for
-production and `NotGiven` for test and preview stages (as `StagePlan.rules.ts:86-116` does for the model key); the
+production and `NotGiven` for test and preview stages (as `StagePlan.rules.ts:77-105` does for the model key); the
 stack reads it with `secretOf` and adds `RESEND_API_KEY` to the Worker's `env` only when present (the pattern at
 `Inventory.stack.ts:74-79`, `:119`), plus a plain `MAIL_FROM`. The production key reaches the deploy job as a GitHub
 environment secret written by `GitHub.stack.ts` (the `ProductionModelKey` pattern), filled under `op run` from an

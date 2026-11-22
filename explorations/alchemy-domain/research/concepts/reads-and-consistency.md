@@ -199,9 +199,10 @@ measured only in local Docker (2 to 7 ms eventual, 5 to 40 ms strong). The run d
 ## In this app
 
 Today the confirm is one D1 batch that writes the items, the outcomes and the counts, and answers with the import as
-stored; the Result step renders that answer at once (`packages/catalog/web/src/ReviewStep.screen.tsx` 248-263), and
-while the request runs the Confirm button is disabled with a spinner (`importing={commit.isPending}`, line 391;
-`packages/review/src/ReviewRegion.component.tsx` 1099-1128).
+stored; the Result step renders that answer at once (the confirm's effect, `putConfirmed` and then the result's
+address, `packages/catalog/web/src/ReviewDraft.atoms.ts` 336-366), and while the request runs the Confirm button is
+disabled with a spinner (`importing={committing}` from `confirmingImport`,
+`packages/catalog/web/src/ReviewStep.screen.tsx` line 328; `packages/review/src/ReviewRegion.component.tsx` 627-661).
 
 With Domain on beta.87, `ConfirmImport` answers as soon as its events commit. The Result step then reads
 `ImportResult.get(importId, { atLeast: receipt })` (or `snapshot` with `atLeast`, then follows `ImportHistory.events`

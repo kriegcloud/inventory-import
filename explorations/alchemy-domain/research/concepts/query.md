@@ -178,7 +178,7 @@ The Items page today asks `items.page` and `items.facets` (`packages/catalog/con
 by `ItemStore.page` and `ItemStore.facets` (`packages/catalog/model/src/Item/ItemStore.store.ts`) on D1
 (`packages/catalog/host/src/ItemStore.adapter.ts`). What it does there:
 
-- Input `ItemQuery` (`packages/catalog/contract/src/Item/ItemQuery.command.ts` 126-146): `page` (from 1),
+- Input `ItemQuery` (`packages/catalog/contract/src/Item/ItemQuery.command.ts` 134-154): `page` (from 1),
   `perPage` (1 to 50; the table offers 10 to 50), up to 5 `sorting` entries, up to 20 `filters` of a closed schema
   (column, operator, value), `joinOperator` and `search`.
 - SQL: the organization AND the search AND the filters' group; the filters joined by `and` or `or`; search through the
@@ -186,10 +186,10 @@ by `ItemStore.page` and `ItemStore.facets` (`packages/catalog/model/src/Item/Ite
   ranked by how many words hit the name, then the SKU; then the chosen sort (text `COLLATE NOCASE`, unit cost as a
   number, empty reorder point and date last), then `id` in the last column's direction.
 - Paging: `LIMIT perPage OFFSET (page - 1) * perPage`, and `COUNT(*)` in the same D1 batch, so the answer is
-  `ItemPage`, `{ data, total, pageCount }` (`ItemQuery.command.ts` 147-158; `ItemStore.adapter.ts` `page`).
+  `ItemPage`, `{ data, total, pageCount }` (`ItemQuery.command.ts` 155-166; `ItemStore.adapter.ts` `page`).
   `ItemsPage.screen.tsx` shows the total and the page count, and moves an address past the last page to the last.
 - With no sort chosen and no search, rows come by SKU (`bySku`).
-- Facets (`ItemFacets`, `ItemQuery.command.ts` 168-193): the organization's item count, counts per category, unit,
+- Facets (`ItemFacets`, `ItemQuery.command.ts` 176-201): the organization's item count, counts per category, unit,
   active and lot-tracked, and the lowest and highest quantity and cost, over all the organization's items (not the
   filtered ones), in one batch (`ItemStore.adapter.ts` `facets`).
 

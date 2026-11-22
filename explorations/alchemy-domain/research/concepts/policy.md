@@ -164,7 +164,7 @@ partition), 1424-1479 (`policyKit`: history skipped, command ids, context, telem
 ## In this app
 
 Today these reactions are inline in requests or do not exist. Suggestions are asked for when the person presses
-Suggest (`packages/catalog/model/src/Suggestion/Suggestions.handler.ts` 75-169), which takes one call from the
+Suggest (`packages/catalog/model/src/Suggestion/Suggestions.handler.ts` 75-176), which takes one call from the
 allowance, asks the model through `Answerer`, guards the answer and stores it with an activity line in one batch. The
 confirm writes its activity line inside its own D1 batch. The app sends no mail at all: an admin adds a person by the
 email of an account that already exists (`PeopleStore`), and I found no mail sender in `packages/` or `apps/`.
@@ -240,8 +240,8 @@ The other two, in outline:
   declares `error: [AddressRejected]`; the policy catches it and sends `MarkInvitationBounced` so the People page can
   say so. See [resend](./resend.md) for one provider.
 
-- **Used today:** no. Suggestions run inside the Suggest request (`Suggestions.handler.ts` 135-169); the confirm's
-  activity line is a statement in its batch (`ImportStore.adapter.ts` 1010-1022); there is no mail.
+- **Used today:** no. Suggestions run inside the Suggest request (`Suggestions.handler.ts` 139-176); the confirm's
+  activity line is a statement in its batch (`ImportStore.adapter.ts` 1283-1295); there is no mail.
 - **Where it goes:** policies beside the `Import` and people aggregates in `packages/catalog/model/src/Import/` and
   `packages/access/model/src/People/`; the allowance's `take` adapter in `packages/access/host/src/` learns to answer
   "taken" for an id it already holds.

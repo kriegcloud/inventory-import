@@ -270,7 +270,7 @@ What none of the upstream tools can prove, because the in-memory host runs no SQ
   depends on;
 - the tenancy keys `(organizationId, id)` that refuse a cross-organization row
   (`apps/inventory/test/server/Tenancy.slow.test.ts`);
-- the take-back's revision checks written in SQL today (`packages/catalog/host/src/ImportStore.adapter.ts` 1124-1196);
+- the take-back's revision checks written in SQL today (`packages/catalog/host/src/ImportStore.adapter.ts` 1407-1479);
 - query plans (`apps/inventory/test/server/QueryPlans.test.ts`) and D1's limits (100 bound parameters, no
   interactive transactions).
 

@@ -61,7 +61,7 @@ a new decision by him.
 
 ### 2026-11-19 — a save that changes nothing
 
-Asked on today's contract, by dialog; built on the atoms branch (`7b09ee4`). Question: how does the screen tell that a
+Asked on today's contract, by dialog; built in commit `7b09ee4`. Question: how does the screen tell that a
 save changed nothing? Answer: "Answer says 'no change'". It was the recommended option. The save's answer
 says whether it changed anything, and the screen asks for the picture when it did not. Rejected: "Leave it until the
 domain model"; "Always re-read after a save".
@@ -73,7 +73,7 @@ Reverse: a new decision by him.
 
 ### 2026-11-19 — a confirm made on a draft somebody else has changed
 
-Asked on today's contract, by dialog; built on the atoms branch (`42c8303`). Question: what does Confirm do when the
+Asked on today's contract, by dialog; built in commit `42c8303`. Question: what does Confirm do when the
 other person has decided a row this screen has not shown yet? Answer: "Refuse, show, confirm again". It was the
 recommended option. If the draft has moved on nothing is written, the screen shows what changed with its new totals, and
 the person confirms again. His rule: nothing is confirmed that was not on screen, and nobody's decision is overwritten
@@ -89,7 +89,7 @@ that change, are tests to write: not run. Reverse: a new decision by him.
 
 ### 2026-11-20 — rows that wait unsaved when the page is reloaded
 
-Asked on today's review saving, by dialog; built on the atoms branch (`fa83274`). Question: a save failed, rows wait
+Asked on today's review saving, by dialog; built in commit `fa83274`. Question: a save failed, rows wait
 unsaved, and the person reloads: what becomes of them? Answer: "Keep them and send them". It was the recommended option.
 The waiting rows come back after a reload marked not saved yet and are sent again; the browser asks before the page is
 left while rows wait. His rule: a decision the person made is either on the server or still waiting, never neither.
@@ -100,7 +100,7 @@ its step and command id, so a resend answers the first receipt. Reverse: a new d
 
 ### 2026-11-20 — rows that wait unsaved when somebody else confirms the import
 
-Asked on today's review saving, by dialog; built on the atoms branch (`fa83274`). Question: rows wait unsaved and
+Asked on today's review saving, by dialog; built in commit `fa83274`. Question: rows wait unsaved and
 someone else confirms the import: what becomes of them? Answer: "Name the rows, then drop them". It was the recommended
 option. Nothing is sent to the closed import; the result says which rows the person had decided that were not part of
 the confirm, with what they had decided. Rejected: "Drop them without a word".
@@ -110,7 +110,7 @@ In the model: the queue sends nothing once the import is confirmed, and an act a
 
 ### 2026-11-20 — an accept that waits while its field's column is matched again
 
-Asked on today's review saving, by dialog; built on the atoms branch (`fa83274`). Question: what happens to that
+Asked on today's review saving, by dialog; built in commit `fa83274`. Question: what happens to that
 accept? Answer: "Server refuses, screen says so". It was the recommended option. An accept made on an older
 matching is not applied, the row shows the new proposal as open, and the screen says which accepts were taken back.
 Rejected: "Screen drops it only"; "As today".
@@ -123,8 +123,8 @@ Reverse: a new decision by him.
 
 ### 2026-11-20 and 2026-11-21 — his later answers on saving the review
 
-Asked by dialog on today's contract and built on the atoms branch after `d7594bd`, where each is recorded in full
-(`explorations/ideal-architecture/DECISIONS.md` on that branch, the entries that begin "atoms,"). Each was the recommended
+Asked by dialog on today's contract and built in today's code, after commit `d7594bd`. Each is recorded in full in
+`explorations/ideal-architecture/DECISIONS.md`, the entries that begin "atoms,". Each was the recommended
 option. What each asks of the model is in the brief, "His answers, carried into the model". Reverse each: a new decision by
 him.
 

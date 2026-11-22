@@ -175,7 +175,7 @@ On main each of these lines is 5 lower (the `ConsistencyTimeout` doc grew); noth
 ## In this app
 
 The Result step today gets its counts back from the confirm itself (`commit` answers with the import's view,
-`packages/catalog/web/src/ReviewStep.screen.tsx` lines 248-263). With Domain, `ConfirmImport` would be a command on an
+`packages/catalog/web/src/ReviewDraft.atoms.ts` lines 336-366). With Domain, `ConfirmImport` would be a command on an
 `Import` aggregate, and the Result step would read the `ImportResult` view above with the confirm's receipt:
 
 The sketch is in beta.87's shape (a command takes its target first) and was not run: the trials on 2026-11-19 ran no

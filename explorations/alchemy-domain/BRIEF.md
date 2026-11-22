@@ -21,20 +21,23 @@ Three rules shape every recommendation here:
 - **An option that goes against a dated answer of his says so**, with the answer and its date.
 
 Nothing here is built. **The build starts after Benjamin says the brief matches, and after the atoms goal is merged
-into main.** "Today" in this brief is the atoms branch at `d7594bd`, the commit the build starts from; its final
-commit is named when the atoms goal lands.
+into main.** That goal's work is in main now ([its plan](../../goals/atoms/PLAN.md)), and "today" in this brief is the
+code on main.
 
 ## Problem
 
 No file in the repository imports `@alchemy.run/domain`. Each rule that matters is held by a guarded D1 batch behind a
 port, and checked by tests that sample it.
 
-- **A save can still overwrite a decision its sender never saw.** Today a save names the draft revision it was made
-  on (`madeOn`) and answers whether it changed anything and which accepts it did not apply; a confirm names the
-  revision the screen shows, carries the person's unsent rows, and is refused with `DraftMoved` or
-  `AcceptsTakenBack`. What is still open there: a save's rows to set and to clear are not checked against `madeOn`,
-  so the last save wins over a newer decision by someone else, and any caller of the contract can send a stale clear
-  (the atoms head, `Imports.handler.ts` and `ImportStore.adapter.ts`; the screen avoids the orderings it knows).
+- **A save can still overwrite a decision its sender never saw.** Today a save names, for each row, the draft revision
+  it was decided on (`madeOn`), and for a row that waited the decisions it may be written over (`over`); it answers
+  whether it changed anything, which parts it did not apply, and which rows that waited were decided otherwise since
+  and not written (`decidedSince`); a confirm names the revision the screen shows, carries the person's unsent rows,
+  and is refused with `DraftMoved` or `AcceptsTakenBack`. What is still open there: a row not named in `over` is a live
+  press and is not checked, so the last save wins over a newer decision by someone else, and any caller of the contract
+  can send a stale clear by leaving `over` out (`packages/catalog/contract/src/Import/Decision.command.ts`,
+  `packages/catalog/model/src/Import/Waited.rules.ts`, `Imports.handler.ts` and `ImportStore.adapter.ts`; the screen
+  avoids the orderings it knows).
 - **The rules are sampled, never proved.** "An organization always keeps an admin", "a decision is replaced only by
   someone who saw it", "nothing is confirmed that was not on screen" each rest on code and the cases its test thought
   of. Under the model the review's rules, the item's, the allowance's and the organization's become rules Verify
@@ -272,19 +275,18 @@ is on the import for everyone to see.
 
 ### What becomes of `Draft.machine.ts` and the atoms
 
-`packages/catalog/web/src/Draft.machine.ts` at the atoms head is one pure transition, `step(draft, event) -> { draft,
-effects }`, with a property test over random orderings. It stays, smaller. The parts that hold his five answers move
-as follows.
+`packages/catalog/web/src/Draft.machine.ts` is one pure transition, `step(draft, event) -> { draft, effects }`, with
+a property test over random orderings. It stays, smaller. The parts that hold his five answers move as follows.
 
-| Part today (atoms head) | Holds | Under the model |
+| Part today | Holds | Under the model |
 | --- | --- | --- |
 | `held`, `shown(draft)`, `epoch`, `Restart`, `onScreen` | The server's picture and what is drawn | Stay: the rows as last read and the acts received since; `shown` is the fold the property test checks |
 | `flight`, `unsent`, `stalled`, `landed` | Saves on their way | One ordered queue of the person's acts, each with step and command id |
-| `Opened { kept }`, `waitingKept` in `ReviewDraft.atoms.ts` | "Keep them and send them", "Each tab keeps its own" | Stay: the queue is what is kept, one per tab, and it is sent again after a reload |
+| `Opened { kept }`, `keptWaiting` in `Draft.atoms.ts` | "Keep them and send them", "Each tab keeps its own" | Stay: the queue is what is kept, one per tab, and it is sent again after a reload |
 | `ViewArrived { open }`, `closing`, `leftOver`, `LeftOverNamed` | "Name the rows, then drop them" | Stay: the stream says the import is confirmed; the queue sends nothing more; the Result step names the left-over acts |
 | `ConfirmPressed`, `ConfirmMoved`, `ConfirmStale` | "Refuse, show, confirm again" | Stay, on new causes: Confirm waits for the queue to empty; `ReviewMovedOn`, `PlanBehind` and `NotWhatWasShown` are `ConfirmMoved`, and the screen draws again from the stream |
-| `madeOn`, `notApplied`, `withoutStaleAccepts`, `MappingChoice.at` | "Server refuses, screen says so" | `madeOn` becomes the matching an act was made on; `MappingChoice.at` becomes the columns at each match, on the import's events; `notApplied` becomes the screen's reading of `MatchedSince` and of the parts the match put out of force |
-| The held and the refused rows (built after `d7594bd`) | "Hold it, show both, ask"; "Keep them, say why"; "Wait until she picks" | Stay, on new causes: `DecidedSince` and `NoLongerThere` hold the act with both decisions; any other rejection marks it not saved; Confirm waits for both |
+| `madeOn`, `notApplied`, `withoutStaleDecisions` (server), `MappingChoice.at` | "Server refuses, screen says so" | `madeOn` becomes the matching an act was made on; `MappingChoice.at` becomes the columns at each match, on the import's events; `notApplied` becomes the screen's reading of `MatchedSince` and of the parts the match put out of force |
+| The held and the refused rows, `onHold` and `seen` | "Hold it, show both, ask"; "Keep them, say why"; "Wait until she picks" | Stay, on new causes: `DecidedSince` and `NoLongerThere` hold the act with both decisions; any other rejection marks it not saved; Confirm waits for both |
 | `changed` in `SaveAnswered` | "Answer says 'no change'" | A receipt with no events |
 | `Send { delta }`, `deltaOf`, `over` with a clear, `SaveAnswered`'s revision cases, `Put`, `Ask`, `matching`, `MatchStarted`, `MatchEnded` | The difference between two pictures | Go: an act is sent, and the stream brings the rest |
 | The test's hand-written server | | Goes: the test drives the real model on `Domain.InMemory` |
@@ -292,8 +294,9 @@ as follows.
 **The review region changes too.** `packages/review` keeps its own undo and redo stacks and hands its whole state to
 its caller after every action. Under the model each action carries a step and names its rows; Undo and Redo are
 handed to the caller as acts; the stacks are filled from the person's steps on the server. His answer A6 (2026-11-19)
-keeps `Action` a `Data.TaggedEnum` until an action is stored or sent; under the model an act is sent as a command
-whose text is the row's decision and whose label is stored, so `Action` itself is neither, and A6 stands.
+made `Action` a `Data.TaggedEnum` until an action is stored or sent; main's rule against `switch` has since made it a
+literal kit's tagged union on `type` (`packages/review/src/ReviewDraft.rules.ts`). Under the model an act is sent as a
+command whose text is the row's decision and whose label is stored, so `Action` itself is neither, and A6 stands.
 
 ### The undo history
 
@@ -308,7 +311,7 @@ whose text is the row's decision and whose label is stored, so `Action` itself i
 
 ### His answers, carried into the model
 
-His answers given by dialog on saving the review, built on the atoms branch, each with what the model holds and what
+His answers given by dialog on saving the review, built in today's code, each with what the model holds and what
 stays tested. The options he rejected are in [DECISIONS.md](DECISIONS.md).
 
 | Answer (date) | In the model | Proved | Tested |
@@ -394,7 +397,7 @@ ran in a trial named on the trial page.
 | --- | --- | --- |
 | The decisions the Review step shows | `GET /imports/:id`, from `importDecision` | `ImportReview`, a query over the same rows, which `DraftRows` writes |
 | "N of M rows need a decision" in the list of open imports | `review` over the saved decisions | The same, over the same rows |
-| Whether an accept, an undone fix, a keep or an answer about the stored item is in force | `withoutStaleAccepts` against `MappingChoice.at` | A reader over the columns at each match, each part against the fields it rests on |
+| Whether an accept, an undone fix, a keep or an answer about the stored item is in force | `withoutStaleDecisions` (`Rematch.rules.ts`) against `MappingChoice.at` and the import's column moves | A reader over the columns at each match, each part against the fields it rests on |
 | The numbers on the Result step | Read back in the confirm's own batch | `ImportResultCounts`, a query that waits for the projection |
 | What a take-back would do now | D1 | D1: the handler reads which items changed, then sends `TakeBackImport` with how many of the created and of the replaced are kept |
 | Remove refused while an item is in force | D1 | The import refuses on its own counts; the handler asks D1 first |
@@ -402,10 +405,10 @@ ran in a trial named on the trial page.
 
 ### The contract and the ports
 
-| Today, at the atoms head (`Catalog.contract.ts`) | Under the model |
+| Today (`packages/catalog/contract/src/Catalog.contract.ts`) | Under the model |
 | --- | --- |
-| `PUT /imports/:id/decisions`: `SaveRequest { madeOn, set, clear }`, answers `{ revision, changed, notApplied }` | Gone. `DecideRow` and `UndoRowStep`; `madeOn` becomes the matching the act was made on, `changed` an empty receipt, `notApplied` the screen's reading of `MatchedSince` |
-| `POST /imports/:id/commit`: `ConfirmRequest { revision, madeOn, set, clear }`, refused with `DraftMoved` or `AcceptsTakenBack` | Names the last change the screen received and what it shows; carries no rows. Its handler builds the plan and sends `ConfirmImport` through `ServerApi`. `DraftMoved` becomes `ReviewMovedOn`, `PlanBehind` and `NotWhatWasShown`; `AcceptsTakenBack` cannot happen at Confirm, since the match that took an accept back is a numbered change, which the confirm must have received |
+| `PUT /imports/:id/decisions`: `SaveRequest { madeOn, over, set, clear }`, answers `{ revision, changed, notApplied, decidedSince }` | Gone. `DecideRow` and `UndoRowStep`; `madeOn` becomes the matching the act was made on, `changed` an empty receipt, `notApplied` the screen's reading of `MatchedSince` |
+| `POST /imports/:id/commit`: `ConfirmRequest { revision, madeOn, set, clear }`, refused with `DraftMoved`, `AcceptsTakenBack`, `RevisionAhead` or `DraftBusy` | Names the last change the screen received and what it shows; carries no rows. Its handler builds the plan and sends `ConfirmImport` through `ServerApi`. `DraftMoved` becomes `ReviewMovedOn`, `PlanBehind` and `NotWhatWasShown`; `AcceptsTakenBack` cannot happen at Confirm, since the match that took an accept back is a numbered change, which the confirm must have received |
 | `GET /imports/:id` | `ImportReview`, then `ImportActs`. `GET /imports/:id/table` stays HTTP |
 | `POST /imports/:id/mapping`, `/take-back`, `/reopen`, `DELETE /imports/:id` | `MatchColumn`, `TakeBackImport`, `ReopenImport`, `RemoveImport` |
 | The four upload endpoints | Stay HTTP for the pieces; `Upload` records begun, finished and expired |
@@ -513,7 +516,7 @@ others are kept below as what was rejected.
 
 *The same options under every answer to decision 4.* His answer of 2026-11-20, "Hold it, show both, ask", is for a row
 that waited, after a failed save or a reload. This asks it for a row that did not: today such a save lets the later one
-win, over a decision its sender never saw (the atoms head).
+win, over a decision its sender never saw (a row not named in a save's `over` is not checked, `Waited.rules.ts`).
 
 - **The same: theirs is held, the row shows both with whose is whose, they pick one, and Confirm waits until they do
   (Recommended).** *Rests on:* that answer, "never change a value silently", and his rule of 2026-11-19 that nobody's

@@ -230,7 +230,7 @@ called it `ImportDraft`) adds `keyOf: (cmd) => cmd.importId`, and every command 
 
 The item edit is the same shape: `EditItem` with `input: { revision: S.Int, ...fields }`, rejecting when the revision
 is not the current one (the trial on main called that rejection `EditedSince`). The app's existing `ItemChanged`
-(`packages/catalog/contract/src/Catalog.contract.ts` line 286) is already an `S.TaggedError` with `httpApiStatus: 409`,
+(`packages/catalog/contract/src/Catalog.contract.ts` line 307) is already an `S.TaggedError` with `httpApiStatus: 409`,
 so on beta.87 it can go in `rejects` as it is; on main, the prover reads it only when it is imported by a relative path,
 so a proved `Item` aggregate declares its own rejection beside it.
 
@@ -300,4 +300,4 @@ list-order fix.
 - `packages/domain/test/types/Story.ts`, `Model.ts`, `Decision.ts` on `main@dbfd0ddb`: new (no type tests at beta.87)
 - Effect 4.1.4 (tag `effect@4.1.4`): `packages/effect/src/rpc/Rpc.ts` lines 893-901, `rpc/RpcServer.ts` lines 610-626,
   `rpc/RpcMiddleware.ts` lines 51-62
-- The app: `tsconfig.base.json` line 190, `packages/catalog/contract/src/Catalog.contract.ts` line 286
+- The app: `tsconfig.base.json` line 190, `packages/catalog/contract/src/Catalog.contract.ts` line 307

@@ -191,7 +191,7 @@ const confirm = Effect.fn("confirm")(function* (
 
 - **Used today:** yes, in its own form: `S.TaggedError` classes with `httpApiStatus`, for example `AlreadyImported`,
   `ImportKept`, `ImportNotFound` (`packages/catalog/contract/src/Import/Import.rejection.ts`) and `ItemChanged`
-  (`packages/catalog/contract/src/Catalog.contract.ts` line 286). On beta.87 they can be listed in `rejects` as they
+  (`packages/catalog/contract/src/Catalog.contract.ts` line 307). On beta.87 they can be listed in `rejects` as they
   are; on main a proved aggregate needs them by relative import, so they move beside the commands or are declared
   again there.
 - **Where it goes:** beside each command in its `*.command.ts` file; shared ones in `*.rejection.ts`
@@ -230,4 +230,4 @@ tag at every sender.
 - `packages/domain/test/types/Decision.ts`, `Story.ts` on `main@dbfd0ddb`: new
 - Effect 4.1.4 (tag `effect@4.1.4`): `packages/effect/src/Schema.ts` lines 240, 17408-17436
 - The app: `tsconfig.base.json` line 190, `packages/catalog/contract/src/Import/Import.rejection.ts`,
-  `packages/catalog/contract/src/Catalog.contract.ts` line 286
+  `packages/catalog/contract/src/Catalog.contract.ts` line 307

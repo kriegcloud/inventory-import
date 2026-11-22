@@ -184,9 +184,10 @@ The route a confirm has, each way (beta.87 shapes):
 ```text
 Hand-written (today, and after the change):
   POST /api/v1/imports/<importId>/commit
-  body   DecisionDelta (only the decisions not saved yet)
+  body   ConfirmRequest (the revision the screen shows; the decisions not saved yet, with their madeOn)
   200    ImportView
-  401 NotSignedIn · 403 Forbidden · 404 ImportNotFound · 409 AlreadyImported · 400 problem document
+  401 NotSignedIn · 403 Forbidden · 404 ImportNotFound · 409 AlreadyImported, DraftMoved, AcceptsTakenBack or
+  DraftBusy · 400 RevisionAhead or a problem document
 
 toHttpApi(MemberApi, { expose: ["ConfirmImport"] }):
   POST /ConfirmImport                   in toHttpApi's own api
@@ -224,7 +225,7 @@ const commit = Effect.fn("imports.commit")(function* ({ params, payload, request
 
 `toImportView` stands for the mapping from the domain's view to the contract's `ImportView`. `NotOpen` is the
 rejection of the trial model; `AlreadyImported` carries one field, `reason`
-(`packages/catalog/contract/src/Import/Import.rejection.ts` lines 22-27).
+(`packages/catalog/contract/src/Import/Import.rejection.ts` lines 31-36).
 
 - **Used today:** no. The app's own `HttpApi` (`apps/inventory/src/api/v1/Api.ts`) is served at `/api/v1` with its
   OpenAPI document at `/api/v1/openapi.json`; its handlers call ports, not a domain Api.

@@ -344,12 +344,12 @@ engines on one Worker conflict was not checked.
 
 ## In this app
 
-Today the model pass is one request: `POST /imports/:id/suggest` (`packages/catalog/model/src/Import/Imports.handler.ts:373-389`)
-calls `suggest` (`packages/catalog/model/src/Suggestion/Suggestions.handler.ts:135-175`), which digests every open
-row into one question, takes one call from the allowance only when a model is on (`propose`, 75-128), asks once
-through `Answerer` (`packages/catalog/host/src/Answerer.adapter.ts:40-59`, 65-85), runs the guard and stores the
+Today the model pass is one request: `POST /imports/:id/suggest` (`packages/catalog/model/src/Import/Imports.handler.ts:771-787`)
+calls `suggest` (`packages/catalog/model/src/Suggestion/Suggestions.handler.ts:139-182`), which digests every open
+row into one question, takes one call from the allowance only when a model is on (`propose`, 75-132), asks once
+through `Answerer` (`packages/catalog/host/src/Answerer.adapter.ts:36-55`, 61-81), runs the guard and stores the
 suggestions and one audit line in one batch. A provider's rate limit arrives as `AiUnavailable` with trouble `busy`
-and `retryable: true` (`packages/drivers/openrouter/src/OpenRouter.schema.ts:185-209`), and the rules answer at once.
+and `retryable: true` (`packages/drivers/openrouter/src/OpenRouter.schema.ts:171-193`), and the rules answer at once.
 
 As a workflow, the pass asks in pieces. Each piece is an activity that checks the import is still open, then takes
 one call from the allowance, then asks, then stores what passed the guard. A `busy` answer is recorded as data, the
@@ -427,7 +427,7 @@ What `pass.piece` does, in order, so the app's rules hold:
    (`packages/access/host/src/AllowanceStore.adapter.ts:36-40`).
 3. Asks through `Answerer`; a `busy` answer becomes `Busy`, any other failure falls to the rules for that piece.
 4. Runs the guard (`Suggest.rules.ts`) and stores with `SuggestionStore.store`, which keeps a row's first suggestion
-   (`Suggestions.handler.ts:131-134`), so a re-run stores nothing twice; one audit line per piece. No item, no
+   (`Suggestions.handler.ts:135-138`), so a re-run stores nothing twice; one audit line per piece. No item, no
    decision (rule 8).
 
 Compensation is not needed: nothing the pass writes has to be undone when it fails. A confirm or a remove of the
@@ -442,8 +442,8 @@ reads the allowance's own sentence and "the rules answered the rest". When the r
 who answered and how many were stored. This changes what the Suggest endpoint answers (a run, not the suggestions),
 which is a decision for the app's owner.
 
-- **Used today:** no. The pass is one model call inside one request (`Suggestions.handler.ts:135-175`), started by
-  `imports.suggest` (`Imports.handler.ts:373-389`).
+- **Used today:** no. The pass is one model call inside one request (`Suggestions.handler.ts:139-182`), started by
+  `imports.suggest` (`Imports.handler.ts:771-787`).
 - **Where it goes:** a `SuggestForImport` workflow and a `SuggestPass` port in `packages/catalog/model/src/Suggestion/`,
   its D1 implementation in `packages/catalog/host/src/`, the engine Layer and `SuggestForImportLive` on the second,
   Effect-native Worker declared in `packages/infra/src/Inventory.stack.ts` (see "What it needs"), a changed `suggest`

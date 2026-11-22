@@ -13,8 +13,10 @@
  * - asks `tsgolint` (the linter `tsrs-lint` is a port of, and the one that says it) which project each file has, and
  *   fails on a file that has none, JavaScript included.
  *
- * One folder is left out, by name and by Benjamin's decision: `.agents/`, the agent skills, vendored as they were
- * published, most from other people and some from his own beep-effect (`leftOut`).
+ * Two folders are left out, each by name and by Benjamin's decision (`leftOut`): `.agents/`, the agent skills,
+ * vendored as they were published, most from other people and some from his own beep-effect; and `scratchpad/`,
+ * where an idea is tried under the type-checker only and this law applies when its code graduates into a package
+ * (decision "the scratchpad", 2026-11-22).
  *
  * "Every file git would commit" is git's answer to give, so this asks git, and fails when git does not answer.
  *
@@ -28,6 +30,7 @@ import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import { RepoError } from "../../Cli.errors.ts"
 import { Repo } from "../../Repo.service.ts"
+import { scratchpadFolder } from "../../Repo.schema.ts"
 import { err, type Line, out } from "../../Report.schema.ts"
 
 const $I = $RepoCliId.create("commands/Laws/DeprecatedApis.rules")
@@ -43,10 +46,11 @@ const isCode = (file: string) => Str.match(/\.[cm]?[jt]sx?$/)(file).pipe(O.isSom
  * as they were published and never run by the app or its checks: 16 of its 18 code files are other people's, and two
  * (the ontology auditor's script and its test) are from Benjamin's own beep-effect. One of the others reads deprecated
  * CSS properties on purpose, to report a page that uses them. Leaving the folder out is his decision
- * (explorations/ideal-architecture/DECISIONS.md, 2026-11-22). Anything else git would commit is read, a new folder
- * included.
+ * (explorations/ideal-architecture/DECISIONS.md, 2026-11-22). The scratchpad is left out by the decision of the same
+ * day that made it: the laws on how code is written apply to an experiment when it graduates into a package.
+ * Anything else git would commit is read, a new folder included.
  */
-const leftOut: ReadonlyArray<string> = [".agents/"]
+const leftOut: ReadonlyArray<string> = [".agents/", `${scratchpadFolder}/`]
 
 /** The profile as it must be: the one rule, an error, and nothing that turns it off or leaves a file out. */
 const Profile = S.Struct({
@@ -137,7 +141,7 @@ const fail = (message: string): Line => err(`deprecated:check FAIL  ${message}`)
  * @category rendering
  */
 export const deprecatedApisSentence: (finding: DeprecatedApisFinding) => Line = DeprecatedApisFinding.match({
-  Clean: () => out("deprecated:check OK  no deprecated API is used (.agents/ is not read)"),
+  Clean: () => out("deprecated:check OK  no deprecated API is used (.agents/ and scratchpad/ are not read)"),
   Refused: () => fail("a deprecated API is used. Move to what its note names:"),
   At: ({ note, place }) => err(`${place}  ${note}`),
   Unlisted: ({ why }) => fail(`git could not list the files, so none was checked: ${why}`),

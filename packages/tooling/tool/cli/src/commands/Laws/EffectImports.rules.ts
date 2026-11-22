@@ -15,7 +15,8 @@
  *
  * It reads code under `apps`, `packages`, `scripts` and `test`, the examples in their comments, and the standing
  * documents. The vendored kit packages (a `vendor.json` at their root) are not this repository's to change and are
- * skipped. With `write`, code that can be repaired mechanically is repaired first; documents are checked, never
+ * skipped. The scratchpad (`scratchpad/`) is left out by name: an experiment is tried there under the type-checker
+ * only, and this law applies to its code when it graduates into a package (decision "the scratchpad", 2026-11-22). With `write`, code that can be repaired mechanically is repaired first; documents are checked, never
  * rewritten: a sentence around an import has to be reworded by a person.
  *
  * @packageDocumentation
@@ -28,6 +29,7 @@ import * as R from "effect/Record"
 import * as Str from "effect/String"
 import type { RepoError } from "../../Cli.errors.ts"
 import { Repo } from "../../Repo.service.ts"
+import { scratchpadFolder } from "../../Repo.schema.ts"
 import { EffectImportsFinding } from "./EffectImports.schema.ts"
 import { judgeCode, repairCode } from "./internal/effectImportsCode.ts"
 import { type Installed, judgeText, lineOf } from "./internal/effectImportsJudge.ts"
@@ -106,7 +108,9 @@ export const effectImports = Effect.fn("EffectImports.effectImports")(function* 
   const vendorRecords = yield* tracked(["*vendor.json"])
   const vendored = A.map(vendorRecords, (file) => `${repo.dirname(file)}/`)
   const isVendored = (file: string) =>
-    A.some(vendored, (dir) => Str.startsWith(dir)(file)) || Str.includes("/dist/")(file)
+    A.some(vendored, (dir) => Str.startsWith(dir)(file)) ||
+    Str.includes("/dist/")(file) ||
+    Str.startsWith(`${scratchpadFolder}/`)(file)
   const inRoots = yield* tracked(
     A.flatMap(codeRoots, (root) => A.map(extensions, (extension) => `${root}/**/*.${extension}`))
   )

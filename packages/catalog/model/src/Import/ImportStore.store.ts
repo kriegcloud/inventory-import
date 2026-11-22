@@ -253,12 +253,43 @@ export const decisionsItemsChanged: Decided = DecisionsItemsChanged.make({})
 /**
  * The saved draft of a review, who last decided each row, and the revision that decision was saved at: a row decided
  * again, even to the same decision by way of another, has a later one (0 for a row saved before this was kept).
+ * `authors` holds names, for the screen and the confirm's words; `deciders` holds the members' ids, which tell people
+ * apart: a row that waited is judged by whose decision is stored, and a name is not unique.
  */
 export type StoredDecisions = {
   readonly decisions: SavedDecisions
   readonly authors: Readonly<Record<string, string>>
+  readonly deciders: Readonly<Record<string, string>>
   readonly savedAt: Readonly<Record<string, number>>
+  /**
+   * Who last saved each row (a member id), whether or not that save changed it: a person who sends exactly what is
+   * stored decided the row too, though who decided it and its revision stay. A row with no entry cannot say (stored
+   * before this was kept): never the sender's.
+   */
+  readonly lastSavedBy: Readonly<Record<string, string>>
+  /** The draft's revision each row's last save was made on, before that save moved it: a screen at a later one is from after it. */
+  readonly lastSavedOn: Readonly<Record<string, number>>
+  /** How many saves have named a row of the draft, changed or not, read before the rows: what a save that waited expects. */
+  readonly saves: number
 }
+
+/** Nothing stored: a draft with no decision, read by nobody. */
+export const noStoredDecisions: StoredDecisions = {
+  decisions: {},
+  authors: {},
+  deciders: {},
+  savedAt: {},
+  lastSavedBy: {},
+  lastSavedOn: {},
+  saves: 0
+}
+
+/**
+ * What a save whose rows waited was compared at: the draft's revision and how many saves had named a row of it. Its
+ * write lands only while both are still so: a save between that changed nothing moved no revision, and may still be
+ * somebody's decision of a row that waited.
+ */
+export type ComparedAt = { readonly revision: number; readonly saves: number }
 
 /**
  * What saving the column choices did: saved them, found them already so (nothing written), found the import closed,
@@ -363,9 +394,10 @@ export class ImportStore extends Context.Service<
      * (`rematched`): each of the delta's decisions that rests on a column (an accept, an undone fix, a Replace or
      * Keep-stored, a keep of one of two) was judged against those choices, and a match since may have made it stale;
      * or when the stored items, created rows or suggestions `read` names are no longer as it read them
-     * (`itemsChanged`): a Replace or Keep-stored across a re-match was judged against them. `expected` is the revision the
-     * rows that waited were compared at, when the save has any: nothing is saved, and no revision answered, once the
-     * draft is at another (`moved`), an empty delta included. Every check is part of the save's own write, so no match,
+     * (`itemsChanged`): a Replace or Keep-stored across a re-match was judged against them. `expected` is what the rows
+     * that waited were compared at, when the save has any: nothing is saved, and no revision answered, once the draft is
+     * at another revision or another save has named a row since (`moved`), an empty delta included. Every row the save
+     * names records who saved it and the revision the save was made on, changed or not. Every check is part of the save's own write, so no match,
      * no save and no item change can fall between the judgement and the write. `read` defaults to none (`noItemsRead`),
      * and `expected` to any revision.
      */
@@ -374,7 +406,7 @@ export class ImportStore extends Context.Service<
       draft: Draft,
       delta: DecisionDelta,
       read?: ItemsAsRead,
-      expected?: O.Option<number>
+      expected?: O.Option<ComparedAt>
     ): Effect.Effect<Decided>
     /** The columns people chose for fields, as stored with the draft. */
     choices(draft: Draft): Effect.Effect<ReadonlyArray<MappingChoice>>

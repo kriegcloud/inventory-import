@@ -195,4 +195,52 @@ describe("laws boundaries", () => {
       ])
     })
   )
+
+  it.effect("lets nothing reach the scratchpad: not declared, not imported by name or by path, from any file", () =>
+    Effect.gen(function* () {
+      // Put together here, so the rule does not read this file as reaching into the scratchpad itself.
+      const byPath = (up: string) => `import ${`"${up}scratchpad/experiments/idea/Idea.ts"`}`
+      const report = yield* inTree(
+        {
+          ...base,
+          // The scratchpad may import anything, and is never read as a workspace.
+          "scratchpad/package.json": pkg("@x/scratchpad", { family: "scratchpad" }, { "@x/kernel": "workspace:*" }),
+          "scratchpad/experiments/idea/Idea.ts": 'import "@x/ui/button"\nimport "left-pad"\n',
+          "apps/shop/package.json": pkg("@x/shop", { family: "app" }, { "@x/scratchpad": "workspace:*" }),
+          "apps/shop/src/main.ts": `import "@x/scratchpad/experiments/idea/Idea"\n${byPath("../../../")}\n`,
+          "apps/shop/vite.config.ts": `${byPath("../../")}\n`,
+          "apps/shop/scripts/seed.mjs": `${byPath("../../../")}\n`,
+          "packages/kernel/test/a.test.ts": `${byPath("../../../")}\n`
+        },
+        Effect.map(boundaries(), render(boundariesSentence))
+      )
+      const refused = (where: string, specifier: string) =>
+        `err:   ${where} imports "${specifier}": nothing imports from the scratchpad. An experiment's code graduates into a package first`
+      expect(printed(report)).toEqual([
+        "err: check-boundaries FAIL",
+        "err:   @x/shop declares @x/scratchpad: nothing depends on the scratchpad. Move what it needs into a package",
+        refused("apps/shop/src/main.ts", "@x/scratchpad/experiments/idea/Idea"),
+        refused("apps/shop/src/main.ts", "../../../scratchpad/experiments/idea/Idea.ts"),
+        refused("apps/shop/scripts/seed.mjs", "../../../scratchpad/experiments/idea/Idea.ts"),
+        refused("apps/shop/vite.config.ts", "../../scratchpad/experiments/idea/Idea.ts"),
+        refused("packages/kernel/test/a.test.ts", "../../../scratchpad/experiments/idea/Idea.ts")
+      ])
+    })
+  )
+
+  it.effect(
+    "a repository with a scratchpad nothing reaches passes, and the scratchpad is not counted as a workspace",
+    () =>
+      Effect.gen(function* () {
+        const report = yield* inTree(
+          {
+            ...base,
+            "scratchpad/package.json": pkg("@x/scratchpad", { family: "scratchpad" }, { "@x/kernel": "workspace:*" }),
+            "scratchpad/experiments/idea/Idea.ts": 'import "@x/ui/button"\nimport "left-pad"\n'
+          },
+          Effect.map(boundaries(), render(boundariesSentence))
+        )
+        expect(printed(report)).toEqual(["out: check-boundaries OK  3 workspaces"])
+      })
+  )
 })

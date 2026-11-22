@@ -56,7 +56,25 @@ My engineering rules are in `CLAUDE.md` and [patterns](../patterns.md). This pag
 - **Property tests from Schemas** (`it.prop` or `it.effect.prop`, which take Schemas as arbitraries) for rules that
   hold for every input: cents read from digits, a key normalised twice equals once, outcome counts add up to the
   rows. Check: at least one property test for the import's main rule.
-- **Anything timed is tested on `TestClock`**, never with a real wait. Check: no `sleep` or timer in a test.
+- **Anything timed is tested on `TestClock`**, never with a real wait. Check: no `sleep` or timer in a test. Not held
+  today: 28 test files wait in real time (`Effect.sleep("20 millis")`, then look), most in `packages/client/test` and
+  `packages/catalog/web/test`. A wait that runs long on a busy machine lets the code's next timer fire first, so they
+  fail now and then on code that is right: on two pinned cores the client package's tests failed in 1 run of 8. Until
+  they run on `TestClock`, those four test runs try a failed test again, three times at most (`realTime` in
+  `vitest.shared.ts`), and never a property that was falsified; without it the check pinned to four cores was red in
+  two runs of three.
+- **A test's limit is a guard against a hang, sized for the slowest machine that runs the check**, and is one
+  decision: `vitest.shared.ts` at the root (30 s for a test, 60 s for a hook, 120 s for a `*.slow.test.ts`), which
+  every package's `vitest.config.ts` spreads in. A test never asserts how long something took on the clock; a budget
+  is held in processor time (`packages/tooling/tool/cli/test/Startup.test.ts`).
+- **The check on CI runs two tasks at a time, with one test worker each** (`--concurrency=2`,
+  `VITEST_MAX_WORKERS=1` in `.github/workflows/ci.yml`), and `--continue`, so a red run lists everything that is
+  wrong. The runner has four cores; turbo's own ten tasks at once, each test run with a worker per core, made tests
+  several times slower than they are (ten at once on four pinned cores: 117 s, and red on three tests' limits).
+  To see what the runner sees:
+  `VITEST_MAX_WORKERS=1 taskset -c 0-3 bun run check:full -- --force --continue --concurrency=2` (green three times
+  in a row on four pinned cores, 168 to 192 s, and once on two, 342 s; the table is in the exploration's
+  `DECISIONS.md`, 2026-11-22).
 - **No test re-asserts what the types or another test already prove.** Check: each test names the rule it protects.
 
 ## Documentation

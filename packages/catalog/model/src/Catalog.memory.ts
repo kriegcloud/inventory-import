@@ -67,6 +67,7 @@ import {
   type Confirmed,
   confirmItemsChanged,
   confirmMoved,
+  type ComparedAt,
   confirmWritten,
   type ConfirmWrite,
   type Decided,
@@ -121,14 +122,24 @@ type MemDecision = {
   readonly json: string
   readonly decision: RowDecision
   readonly author: string
+  /** The member who made it: who it is, where a name is not unique. */
+  readonly authorId: string
   readonly savedAt: number
+  /** The member who last saved it, changed or not, and the draft's revision that save was made on. */
+  readonly lastSavedBy: string
+  readonly lastSavedOn: number
 }
+
+/** What a save leaves for the store to fill in of each decision it names. */
+type MemSet = Omit<MemDecision, "author" | "authorId" | "savedAt" | "lastSavedBy" | "lastSavedOn">
 
 type MemDraft = {
   readonly organizationId: OrganizationId
   readonly draft: Draft
   readonly rows: ReadonlyArray<StagedRow>
   readonly decisions: ReadonlyArray<MemDecision>
+  /** How many saves have named a row of it, changed or not. */
+  readonly saves: number
 }
 
 type MemItem = {
@@ -334,7 +345,7 @@ const commitStep = (
   state: CatalogState,
   write: ConfirmWrite,
   /** The confirming person's unsaved decisions, encoded as they are stored. */
-  unsaved: ReadonlyArray<Omit<MemDecision, "author" | "savedAt">>
+  unsaved: ReadonlyArray<MemSet>
 ): readonly [Confirmed, CatalogState] => {
   const audit = write.audit
   const org = audit.organizationId
@@ -528,7 +539,9 @@ const commitStep = (
         sets: unsaved,
         clear: write.unsaved.clear,
         author: audit.actorName,
-        savedAt: entry.draft.revision + 1
+        authorId: audit.actorId,
+        savedAt: entry.draft.revision + 1,
+        savedOn: entry.draft.revision
       }),
       draft: {
         ...entry.draft,
@@ -549,28 +562,35 @@ const commitStep = (
 /**
  * A draft's stored decisions after one person's save: the same decision sent again leaves the row, who made it and the
  * revision it was saved at as they are; a new or changed one is theirs, saved at `savedAt`; a cleared row has none.
+ * Every row the save names, changed or not, was last saved by them, on the revision the draft was at (`savedOn`).
  */
 const withSaved = (
   stored: ReadonlyArray<MemDecision>,
   save: {
-    readonly sets: ReadonlyArray<Omit<MemDecision, "author" | "savedAt">>
+    readonly sets: ReadonlyArray<MemSet>
     readonly clear: ReadonlyArray<string>
     readonly author: string
+    readonly authorId: string
     readonly savedAt: number
+    readonly savedOn: number
   }
 ): ReadonlyArray<MemDecision> => {
+  const last = { lastSavedBy: save.authorId, lastSavedOn: save.savedOn }
   const kept = A.map(stored, (old) =>
     O.match(
       A.findFirst(save.sets, (set) => set.rowId === old.rowId),
       {
         onNone: () => old,
-        onSome: (set) => (set.json === old.json ? old : { ...set, author: save.author, savedAt: save.savedAt })
+        onSome: (set) =>
+          set.json === old.json
+            ? { ...old, ...last }
+            : { ...set, author: save.author, authorId: save.authorId, savedAt: save.savedAt, ...last }
       }
     )
   )
   const added = A.map(
     A.filter(save.sets, (set) => !A.some(stored, (old) => old.rowId === set.rowId)),
-    (set) => ({ ...set, author: save.author, savedAt: save.savedAt })
+    (set) => ({ ...set, author: save.author, authorId: save.authorId, savedAt: save.savedAt, ...last })
   )
   return A.filter([...kept, ...added], (entry) => !A.contains(save.clear, entry.rowId))
 }
@@ -1016,7 +1036,8 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
             ),
             (chunk: { readonly rows: ReadonlyArray<StagedRow> }) => chunk.rows
           ),
-          decisions: []
+          decisions: [],
+          saves: 0
         }
         return [
           true,
@@ -1046,7 +1067,7 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
       draft: Draft,
       delta: DecisionDelta,
       read: ItemsAsRead = noItemsRead,
-      expected: O.Option<number> = O.none()
+      expected: O.Option<ComparedAt> = O.none()
     ) {
       const sets = yield* Effect.forEach(
         R.toEntries(delta.set),
@@ -1060,9 +1081,12 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
         if (O.isNone(found) || found.value.draft.status !== "open") return [decisionsClosed, state]
         // Checked against other choices than the draft has now: a match came between, and nothing is saved.
         if (found.value.draft.choicesJson !== draft.choicesJson) return [decisionsRematched, state]
-        // Its rows that waited were compared at another revision than the draft is at: nothing is saved.
-        const revisionNow = found.value.draft.revision
-        if (O.exists(expected, (revision) => revision !== revisionNow)) return [decisionsMoved, state]
+        // Its rows that waited were compared at another revision than the draft is at, or another save has named a row
+        // since (one that changed nothing moves no revision): nothing is saved.
+        const now = { revision: found.value.draft.revision, saves: found.value.saves }
+        if (O.exists(expected, (at) => at.revision !== now.revision || at.saves !== now.saves)) {
+          return [decisionsMoved, state]
+        }
         // Judged against stored items, created rows or suggestions that changed since (a Replace or Keep-stored across a
         // re-match): nothing is saved.
         if (!stillAsRead(read)(readNow(state, org, draft.id))) return [decisionsItemsChanged, state]
@@ -1077,13 +1101,17 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
           sets,
           clear: delta.clear,
           author: actor.name,
-          savedAt: revision
+          authorId: actor.id,
+          savedAt: revision,
+          savedOn: stored.draft.revision
         })
+        const named = sets.length + delta.clear.length > 0
         return [
           decisionsSaved({ revision, changed: differs || clears }),
           mapDraft(state, org, draft.id, (entry) => ({
             ...entry,
             decisions,
+            saves: entry.saves + (named ? 1 : 0),
             draft: { ...entry.draft, revision }
           }))
         ]
@@ -1132,6 +1160,7 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
           by: actor.name,
           matched: choice.field,
           reads: plan.reads,
+          savedAt: R.fromEntries(A.map(entry.decisions, (old) => [old.rowId, old.savedAt] as const)),
           notApplied: plan.notApplied
         })
         const kept = yield* S.decodeEffect(TakenBackJson)(entry.draft.takenBackJson)
@@ -1458,14 +1487,19 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
       remove,
       decisions: Effect.fnUntraced(function* (organizationId: OrganizationId, importId: string) {
         const state = yield* Ref.get(ref)
-        const stored = O.match(A.findFirst(state.drafts, sameDraft(organizationId, importId)), {
+        const found = A.findFirst(state.drafts, sameDraft(organizationId, importId))
+        const stored = O.match(found, {
           onNone: (): ReadonlyArray<MemDecision> => [],
           onSome: (entry) => entry.decisions
         })
         return {
           decisions: R.fromEntries(A.map(stored, (entry) => [entry.rowId, entry.decision] as const)),
           authors: R.fromEntries(A.map(stored, (entry) => [entry.rowId, entry.author] as const)),
-          savedAt: R.fromEntries(A.map(stored, (entry) => [entry.rowId, entry.savedAt] as const))
+          deciders: R.fromEntries(A.map(stored, (entry) => [entry.rowId, entry.authorId] as const)),
+          savedAt: R.fromEntries(A.map(stored, (entry) => [entry.rowId, entry.savedAt] as const)),
+          lastSavedBy: R.fromEntries(A.map(stored, (entry) => [entry.rowId, entry.lastSavedBy] as const)),
+          lastSavedOn: R.fromEntries(A.map(stored, (entry) => [entry.rowId, entry.lastSavedOn] as const)),
+          saves: O.match(found, { onNone: () => 0, onSome: (entry) => entry.saves })
         }
       }),
       decide,

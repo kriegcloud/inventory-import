@@ -13,7 +13,7 @@ import { Repo } from "../src/Repo.service.ts"
 import { render } from "../src/Report.schema.ts"
 import { inTree, json, printed, type Tree } from "./support/tree.ts"
 
-const clean = "out: deprecated:check OK  no deprecated API is used (.agents/ is not read)"
+const clean = "out: deprecated:check OK  no deprecated API is used (.agents/ and scratchpad/ are not read)"
 const refused = "err: deprecated:check FAIL  a deprecated API is used. Move to what its note names:"
 const profile = ".oxlintrc.deprecated-apis.json"
 
@@ -289,7 +289,10 @@ export const framed = <iframe title="Frame" frameBorder={0} />
             "tools/tsconfig.json": project(["."], ["node"]),
             "tools/seed.ts": node,
             "packages/use/dist/built.js": use,
-            ".agents/skills/one/skill.ts": use
+            ".agents/skills/one/skill.ts": use,
+            // An experiment, in no project and using what is deprecated: left out, so neither is said.
+            "scratchpad/experiments/idea/Idea.ts": use,
+            "scratchpad/vite.config.ts": node
           },
           { "packages/use/src/New.ts": use }
         )

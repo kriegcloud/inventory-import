@@ -1139,3 +1139,154 @@ nightly workflow runs everything with nothing replayed and opens or comments on 
 GitHub turns a schedule off after 60 days without a commit on a public repository, and turning it on again is done
 by hand. No secret, no remote cache. Not built yet: it goes in with the model. Reverse: put `prove` and the search
 back in the main job's command and delete the second job and the nightly workflow.
+
+### 2026-11-22 — the check on GitHub's runner (agent, not asked)
+
+CI failed twice on code that had not changed: the CLI's start-up test, then two property tests of `@beep/xlsx`, each
+"timed out in 5000ms". Reproduced with the whole check pinned to four cores (`taskset`): turbo starts ten tasks at
+once and each test run a worker per core, so tests ran several times slower than they are, and a different one hit
+its limit each time (the xlsx property, the review's parity test, a slow test's 10 s hook). What was changed, none
+of it a test's own number or what a test asserts:
+
+- CI runs two tasks at a time with one test worker each, and `--continue`, so a red run lists every failure.
+- One file, `vitest.shared.ts`, holds every test's limit (30 s, hooks 60 s, slow tests 120 s) in place of vitest's 5 s
+  and 10 s. Sized from the slowest tests on two pinned cores: 4.4 s and 31 s.
+- In the four places whose tests wait in real time (`packages/client`, `packages/catalog/web`, `packages/review` and
+  the app's fast tests), a test that fails is tried again, three times at most and half a second apart; a property that was falsified
+  never is.
+- No property test's run count was lowered and nothing is skipped.
+
+Measured, cold, pinned (`taskset`), the whole check each time, 80 tasks:
+
+| Cores | Tasks at once | Test workers | Second try | Runs | Green | Seconds |
+| --- | --- | --- | --- | --- | --- | --- |
+| 4 | 10 (as before) | one per core | no | 1 | 0 | 117 |
+| 4 | 2 | 2 | no | 3 | 1 | 106 to 118 |
+| 2 | 2 | 2 | no | 3 | 2 | 144 to 236 |
+| 4 | 2 | 2 | twice | 6 | 5 | 102 to 145 |
+| 2 | 2 | 2 | twice | 3 | 3 | 152 to 160 |
+| 4 | 2 | 1 | three times, 0.5 s apart | 3 | 3 | 168 to 192 |
+| 2 | 2 | 1 | three times, 0.5 s apart | 1 | 1 | 342 |
+
+The last two rows are what CI runs. Every red run after the first row was a test that waits in real time, never a
+limit. One test worker costs about a minute on four cores; the job's limit is 15 minutes and the two-core run, which
+stands in for the runner's slower cores, took under six. The runner itself has not run this yet: nothing is pushed.
+
+The second try is the part to look at twice: it makes a test that fails now and then pass in silence (the reporter
+names a try only on a test that still failed), and it is not a cure: with two tries one session test failed all
+three times in one run. It stands only because those tests break the standard's own rule that
+anything timed runs on `TestClock`. Rejected: a longer limit for the xlsx tests alone (the next heavy test would be
+next); a second try for every package (only these four wait in real time); trying a falsified property again.
+Reverse: the three lines in `.github/workflows/ci.yml`, and `limits` and `realTime` in each `vitest.config.ts`.
+
+Two things this does not end, both found while measuring and neither in files of this change:
+
+- The tests that wait in real time (28 files) still fail now and then under load on any machine, and only the second
+  try keeps that out of sight.
+- One property test of the review's draft found a real counterexample: "with the person confirming: a confirm the
+  server makes writes what its screen showed, and nothing is sent beside it" is falsified by seed 369148268449177
+  after 651 runs ("after everything landed, a row of the person's still waits"), every time, on an idle machine too.
+  A second seed, -2416120108841983, falsified it after 762 runs in an unpinned run of the full check. Seeds are drawn
+  at random and it was met twice in about twenty runs here, so CI will meet it.
+
+### 2026-11-22 — dependencies, versions and derived configuration kept in step
+
+I asked "do we have a `deps:update` script like beep-effect?" (there was none: only `deps:lint` and `deps:outdated`,
+and syncpack read 7 of the 25 `package.json` files), and then: "Actually I would like a version-sync & config-sync
+command as well that keeps hard coded values & configs up to date & in sync along with the update:deps". Built as
+three commands of the repository's CLI, in beep-effect's shapes and without its packages: `deps update`,
+`version-sync` (check, `--write`, `--dry-run`) and `config-sync` (writes; `--check`, `--dry-run`). `version-sync`
+and `config-sync --check` are part of `bun run check`. What each covers and leaves alone is in
+`docs/sync-commands.md`. `version-sync --write` may change a version number in `CLAUDE.md`, and nothing else there.
+
+The agent chose these, and I was not asked. Each is small to reverse:
+
+- **The held list is `updateGroups` in `.syncpackrc.json`**, a group's `label` being its reason, where beep-effect
+  keeps a ledger of holds with a probe for each. One list, read by syncpack (`deps:outdated`) and by `deps update`.
+  Rejected: a ledger with probes (a goal of its own); a second file beside syncpack's. Reverse: move the groups.
+- **What is held**: `@effect/tsgo` and the four tools it patches (`typescript`, `tsrs`, `oxlint`,
+  `oxlint-tsgolint`); `alchemy`, `@alchemy.run/*` and `@distilled.cloud/*`, pinned as one set to one commit;
+  `better-auth`, whose tables are a migration written by hand; `xlsx`, which is an address. Not held, and it would
+  move: `@types/node`, from ^24 to ^26, while the workflows run Node 22. Reverse: one group each.
+- **`deps update` asks the registry itself** (`bun info <name> version`) and does not call `syncpack update`, so its
+  plan is tested with no network, and `effect` and the `@effect/*` packages released with it move to one version or
+  not at all. Rejected: reading what syncpack prints.
+- **Records are never rewritten**: `explorations/`, `goals/`, the root's `DECISIONS.md`, `docs/qa`. The
+  standing documents are `CLAUDE.md`, `AGENTS.md`, `README.md`, `docs/` and `.claude/agents`.
+- **A sentence that records a check is moved with the rest** ("checked in effect's source at this version"): the
+  command prints each line it changes, and a person re-checks or rewords. Rejected: guessing which sentences are
+  records.
+- **Three places were wrong and are written**: syncpack's sources (now one pattern for each workspace pattern), the
+  app's `wrangler.jsonc` `$schema` (it named a file that does not exist from that folder), and `tsconfig.base.json`'s
+  `$schema` (the library's repository instead of the installed `@effect/tsgo`).
+- **No package gets project references.** Each is type-checked from source by `tsrs -p`; references would need
+  `composite` and a build order, which is a change to how the repository type-checks. `config-sync` keeps the
+  solution files (the app's, and the root's when there is one) and holds a project's references to its declared
+  packages only where a project already has them.
+
+Not decided, and mine: **one catalog at the root** (versions written once, each package saying `catalog:`). The
+commands already read a root `catalog` first, and a test holds that. It would take: a top-level `"catalog"` in the
+root's `package.json` (not `workspaces.catalog`: every rule reads `workspaces` as a list); `catalog:` in the 24
+workspace `package.json` files; a new `bun.lock`; `customTypes.catalog` and a version group in `.syncpackrc.json`,
+as beep-effect has; and `vendor sync` writing `catalog:` into a vendored package. One commit touching all 25 files,
+for a day when no other branch is open.
+
+### 2026-11-22 — the scratchpad
+
+I asked: "So beep-effect has this `scratchpad` folder modeled after effects. It has grown a little out of hand
+overtime but I'd like a similar thing in this repository. Could you look at how effect does it? Id like to be able to
+import any package from the repo into it as well has have a structured way for us to write tests when I want to try
+experiments or explore ideas I have in a non destructive & isolated way." What was found: Effect's `scratchpad/` is a
+private workspace package that depends on every package, three files committed and everything else ignored, no tests
+and no structure; beep-effect's holds 1,126 tracked files and 135 MB, whole projects with their own lockfile, read by
+the main build, and nothing in it ever ends. Built as `scratchpad/`, the `scratch:*` commands and
+`docs/scratchpad.md`. Eight questions, answered by dialog, and the whole confirmed with "Yes, build it". For each: I
+chose; the agent recommended the same.
+
+1. **Kept or thrown away?** Answer: "Committed, one folder each". Rejected: "Ignored, like Effect"; "Ignored by
+   default, kept on request". An experiment is `scratchpad/experiments/<name>/`, in git.
+2. **In the check?** Answer: "Its own commands only". `scratch:check` and `scratch:test` type-check and test it on
+   request; `bun run check`, the build and CI never read it; the one thing `bun run check` enforces is that nothing
+   outside the scratchpad imports from it. Rejected: "Type-checked in check"; "Fully in check and CI".
+3. **Rules inside?** Answer: "Types on, bans at graduation". The type-checker with the Effect diagnostics runs in
+   `scratch:check`; the laws on how code is written and my bans (no try/catch, no switch, the import form, tags) are
+   not enforced inside it and apply when code graduates into a package; secrets and private names are still refused,
+   since the repository is public. Rejected: "Your bans always"; "Everything applies". This gives the laws on tags,
+   Effect imports and refs a named exemption, the scratchpad, where they had the vendored kit or none: each law's
+   doc says so.
+4. **Staying small** (all four chosen): every experiment has a status (open; graduated, and where to; dropped) and
+   `scratch:list` shows them with their age; no nested installs (a `package.json` or a lockfile inside an experiment
+   is refused); graduate or delete (the folder goes in the same change and one line of what was learned stays in a
+   log); a size and age limit as a warning in `scratch:list`, not a failed check.
+5. **Starting points** (all four chosen), each a small template with a test that already runs, made by one command:
+   a plain probe and its test; a service with a test layer; a Verify model with stories, refused with a sentence
+   until `@alchemy.run/domain` is pinned in the repository and available after; a screen in the browser on a page of
+   its own with the design system and atoms.
+6. **Extra libraries?** Answer: "In the scratchpad's package.json". Only there, never in the app or a package, each
+   named with the experiment that needs it; `deps:update` leaves them alone; deleting or graduating the experiment
+   removes the library in the same change. Rejected: "Not at all".
+7. **First contents?** Answer: "No, start empty". The Alchemy trial models stay where they are; the log points to
+   the brief's trial page once that page is in `main`. Rejected: "Yes, the final model only"; "Yes, all rounds".
+8. **When?** Answer: "After the sync commands".
+
+Three defaults I was shown and accepted with the whole: the warning is at 30 days old or 200 files; an experiment
+that needs a database or a dev server keeps its state in its own ignored folder (`.state`) and on its own port,
+never the app's; a build session may use the scratchpad for trial code instead of a cache folder.
+
+The agent chose these, and I was not asked:
+
+- **Status is not kept twice.** A note only ever says `open`: an experiment that graduated or was dropped has no
+  folder, and its line in `scratchpad/LOG.md` says which. `scratch:list` reads both.
+- **A library is named in its experiment's note** (`libraries:`), and `scratch:check` fails on a dependency of the
+  scratchpad that is not a workspace package, not one the packages also use, and not named by a note.
+- **The checks that keep it small run in `scratch:check`**, not in `bun run check` (answer 2).
+- **The scratchpad's profile is the root's, with nothing turned off**: no third exception to the type-check.
+- **The screen template is its own Vite entry** inside the experiment, served on port 5273 (`scratch:serve`). The app
+  has no route to it, so its production bundle cannot change; the boundaries law holds that.
+- **`config-sync` writes the scratchpad's dependencies** (every package under `packages/`, not the app), and
+  **`version-sync` holds what it shares with the packages** to their versions. syncpack and `deps:update` do not
+  read it.
+- **Graduating does not move code.** The person moves it into a package and makes the check pass there;
+  `scratch:graduate` deletes the folder and logs it.
+- **No law refuses private names** on this branch: only key-shaped strings are read for (`laws keys`), in the
+  scratchpad as everywhere. Answer 3's "private names" has nothing to hold it yet.

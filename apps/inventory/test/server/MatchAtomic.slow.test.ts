@@ -26,7 +26,7 @@ import { storedSuggestion, suggestedByRule } from "@inventory/catalog-contract/S
 import { AlreadyImported, DraftBusy } from "@inventory/catalog-contract/ImportRejection"
 import type { StagedTable } from "@inventory/catalog-contract/Staged"
 import { ImportStoreD1 } from "@inventory/catalog-host/ImportStoreD1"
-import { draftTries, ImportStore } from "@inventory/catalog-model/ImportStore"
+import { decisionsSaved, draftTries, ImportStore } from "@inventory/catalog-model/ImportStore"
 import { StoreSuggestions, SuggestionStore } from "@inventory/catalog-model/SuggestionStore"
 import { Activity } from "@inventory/kernel/Activity"
 import { ActivityId, MemberId, OrganizationId } from "@inventory/kernel/Ids"
@@ -1016,6 +1016,25 @@ layer(App)("a match and another person's write that fall into each other", (it) 
         const { over: _over, ...live } = waited(view)
         const saved = yield* client.imports.decide({ params, payload: live }).pipe(as("mem_dana"))
         expect([saved.changed, MutableRef.get(sent)]).toEqual([true, 1])
+      })
+  )
+
+  it.effect(
+    "a colleague's save of exactly what is stored between a save's comparison of a row that waited and its batch: it moves no revision, and the save is compared again",
+    () =>
+      Effect.gen(function* () {
+        const { client, view, params, store } = yield* staged
+        const first = yield* marcusSaves(store, view.id, { "row-5": { out: true } })
+        const again = marcusSaves(store, view.id, { "row-5": { out: true } })
+        yield* around([{ before: Effect.orDie(again) }, {}])
+        const saved = yield* client.imports.decide({ params, payload: waited(view) }).pipe(as("mem_dana"))
+        // Two batches: the first found another save since its comparison, though the draft's revision had not moved.
+        expect([first, MutableRef.get(sent), saved.decidedSince, saved.changed]).toEqual([
+          decisionsSaved({ revision: view.revision + 1, changed: true }),
+          2,
+          [],
+          true
+        ])
       })
   )
 

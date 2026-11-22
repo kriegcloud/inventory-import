@@ -1,0 +1,15 @@
+{
+  // One project for every experiment: the repository's profile with nothing turned off, so the type-checker and the
+  // Effect diagnostics say of an experiment what they would say of a package. Nothing but `bun run scratch:check`
+  // reads it. An experiment may draw a screen, so the browser's types and JSX are on.
+  "extends": "../tsconfig.base.json",
+  "$schema": "../node_modules/@effect/tsgo/schema.json",
+  "compilerOptions": {
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "types": ["node", "vite/client"],
+    "jsx": "react-jsx"
+  },
+  "include": ["experiments"]
+}

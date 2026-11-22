@@ -19,6 +19,8 @@ Paths here that start `src/`, `test/`, `migrations/`, `public/` or `scripts/` ar
 * [Inventory glossary](glossary.md) - The trade words in stock, purchasing and production files, each with the mistake an import makes with it.
 * [Break a rule and watch Verify catch it](verify.md) - The review as a model whose rules Verify proves from the code that decides: what is proved, the command, and three rules to break with a one-line edit, each with what it prints.
 * [Sign-in](auth.md) - How sign-in, sessions, organizations and roles are wired (Better Auth on D1), how development opens signed in, the People page, its settings, how it stays fast, how to change the schema, and what is not done.
+* [Versions and configuration kept in step](sync-commands.md) - The three commands that move dependencies, hold every repeated version to its one source and write the configuration that follows from the workspaces; what each covers, what it leaves alone, and the dependencies held back with their reasons.
+* [Trying an idea in the scratchpad](scratchpad.md) - How to try an idea against the repository's own packages without touching them: one folder for each experiment, from a template whose test already runs, apart from the check, the build and a deploy, and ended by graduating its code into a package or dropping it.
 
 # Evidence written while building
 

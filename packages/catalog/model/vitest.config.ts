@@ -1,4 +1,5 @@
 import { configDefaults, defineConfig } from "vitest/config"
+import { limits } from "../../../vitest.shared.ts"
 
 // Three projects. "fast" is what `test` runs: the rules' tests and the model's stories. "prove" holds the files named
 // `*.prove.test.ts`: the proofs of the import and of the four decisions, about half a minute together, run by `prove` as part of
@@ -10,6 +11,7 @@ const verify = ["test/**/*.verify.test.ts"]
 
 export default defineConfig({
   test: {
+    ...limits,
     projects: [
       {
         extends: true,

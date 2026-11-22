@@ -44,6 +44,7 @@ import {
   draftTries,
   Upload,
   ConfirmWrite,
+  type ComparedAt,
   confirmWritten,
   confirmClosed,
   confirmMoved,
@@ -253,10 +254,24 @@ export const ImportStoreD1 = Layer.effect(
     })
     const findDecisions = SqlSchema.findAll({
       Request: Scope,
-      Result: S.Struct({ rowId: S.String, decisionJson: S.String, decidedByName: S.String, savedRevision: S.Int }),
+      Result: S.Struct({
+        rowId: S.String,
+        decisionJson: S.String,
+        decidedById: S.String,
+        decidedByName: S.String,
+        savedRevision: S.Int,
+        lastSavedById: S.NullOr(S.String),
+        lastSavedRevision: S.Int
+      }),
       execute: ({ org, id }) =>
-        sql`SELECT rowId, decisionJson, decidedByName, savedRevision FROM importDecision
-          WHERE organizationId = ${org} AND importId = ${id}`
+        sql`SELECT rowId, decisionJson, decidedById, decidedByName, savedRevision, lastSavedById, lastSavedRevision
+          FROM importDecision WHERE organizationId = ${org} AND importId = ${id}`
+    })
+    // How many saves have named a row of the draft: read before its rows, so a save that lands in between is seen.
+    const findSaves = SqlSchema.findAll({
+      Request: Scope,
+      Result: S.Struct({ saves: S.Int }),
+      execute: ({ org, id }) => sql`SELECT saves FROM importDraft WHERE organizationId = ${org} AND id = ${id}`
     })
     // A value counts as taken back when its confirm was taken back and the item it went into is gone with it, or,
     // for a replace, was put back as it was; an item that was kept because someone had changed it still holds it.
@@ -530,6 +545,7 @@ export const ImportStoreD1 = Layer.effect(
     }, Effect.orDie)
 
     const decisions = Effect.fn("Imports.decisions")(function* (organizationId: OrganizationId, importId: string) {
+      const saves = yield* findSaves({ org: organizationId, id: importId })
       const rows = yield* findDecisions({ org: organizationId, id: importId })
       const decoded = yield* Effect.forEach(
         rows,
@@ -540,7 +556,14 @@ export const ImportStoreD1 = Layer.effect(
       return {
         decisions: R.fromEntries(decoded),
         authors: R.fromEntries(A.map(rows, (row) => [row.rowId, row.decidedByName] as const)),
-        savedAt: R.fromEntries(A.map(rows, (row) => [row.rowId, row.savedRevision] as const))
+        deciders: R.fromEntries(A.map(rows, (row) => [row.rowId, row.decidedById] as const)),
+        savedAt: R.fromEntries(A.map(rows, (row) => [row.rowId, row.savedRevision] as const)),
+        // A row stored before who last saved it was kept has no name: it cannot say, and is never the sender's.
+        lastSavedBy: R.fromEntries(
+          A.flatMap(rows, (row) => (row.lastSavedById === null ? [] : [[row.rowId, row.lastSavedById] as const]))
+        ),
+        lastSavedOn: R.fromEntries(A.map(rows, (row) => [row.rowId, row.lastSavedRevision] as const)),
+        saves: O.match(A.head(saves), { onNone: () => 0, onSome: (row) => row.saves })
       }
     }, Effect.orDie)
 
@@ -581,7 +604,8 @@ export const ImportStoreD1 = Layer.effect(
       write: S.String,
       seq: S.Int,
       piece: JsonPiece,
-      expected: S.NullOr(S.Int)
+      expected: S.NullOr(S.Int),
+      expectedSaves: S.NullOr(S.Int)
     })
     const putList = (list: ListName) =>
       D1.statement({
@@ -589,7 +613,7 @@ export const ImportStoreD1 = Layer.effect(
         Result: NoRows,
         execute: (r) => sql`INSERT INTO importWriteList (organizationId, importId, writeId, list, seq, piece)
           SELECT organizationId, id, ${r.write}, ${list}, ${r.seq}, ${r.piece} FROM importDraft
-          WHERE organizationId = ${r.org} AND id = ${r.id}${r.expected === null ? sql`` : sql` AND revision = ${r.expected}`}`
+          WHERE organizationId = ${r.org} AND id = ${r.id}${r.expected === null ? sql`` : sql` AND revision = ${r.expected}`}${r.expectedSaves === null ? sql`` : sql` AND saves = ${r.expectedSaves}`}`
       })
     const putSets = putList("sets")
     const putClears = putList("clears")
@@ -641,10 +665,12 @@ export const ImportStoreD1 = Layer.effect(
       const created = yield* createdReadPieces(read.created)
       const suggestions = yield* textPieces(read.suggestions)
       return [
-        ...A.map(keys, (piece, seq) => putKeys({ ...scope, seq, piece, expected: null })),
-        ...A.map(items, (piece, seq) => putItems({ ...scope, seq, piece, expected: null })),
-        ...A.map(created, (piece, seq) => putCreated({ ...scope, seq, piece, expected: null })),
-        ...A.map(suggestions, (piece, seq) => putSuggestions({ ...scope, seq, piece, expected: null }))
+        ...A.map(keys, (piece, seq) => putKeys({ ...scope, seq, piece, expected: null, expectedSaves: null })),
+        ...A.map(items, (piece, seq) => putItems({ ...scope, seq, piece, expected: null, expectedSaves: null })),
+        ...A.map(created, (piece, seq) => putCreated({ ...scope, seq, piece, expected: null, expectedSaves: null })),
+        ...A.map(suggestions, (piece, seq) =>
+          putSuggestions({ ...scope, seq, piece, expected: null, expectedSaves: null })
+        )
       ]
     })
     // What the judgement read of import `id` is still so: the organization's items under those keys exactly the ones
@@ -706,20 +732,47 @@ export const ImportStoreD1 = Layer.effect(
         WHERE organizationId = ${r.org} AND id = ${r.id} AND status = 'open' AND choicesJson = ${r.choices}
           AND ${itemsAsRead(r.org, r.id, r)} AND (${differs(r.org, r.write)} OR ${clears(r.org, r.id, r.write)})`
     })
+    // Every stored row the save names was last saved by its sender, on the revision the draft is at before the save
+    // moves it, whether or not the save changes it: a person who sends exactly what is stored decided the row too.
+    // Before the revision is moved, so it reads the revision the save was made on.
+    const touchDecisions = D1.statement({
+      Request: S.Struct({ ...SaveWrite.fields, ...Acting }),
+      Result: NoRows,
+      execute: (r) => sql`UPDATE importDecision SET lastSavedById = ${r.actor},
+          lastSavedRevision = (SELECT d.revision FROM importDraft d
+            WHERE d.organizationId = ${r.org} AND d.id = ${r.id})
+        WHERE organizationId = ${r.org} AND importId = ${r.id}
+          AND rowId IN (SELECT json_extract(j.value, '$.rowId') FROM ${inList(r.org, r.write, "sets")})
+          AND ${sameChoices(r.org, r.id, r.choices, r)}`
+    })
+    // One more save has named a row of the draft: what a save whose rows waited checks it was compared at.
+    const countSave = D1.statement({
+      Request: SaveWrite,
+      Result: NoRows,
+      execute: (r) => sql`UPDATE importDraft SET saves = saves + 1
+        WHERE organizationId = ${r.org} AND id = ${r.id} AND status = 'open' AND choicesJson = ${r.choices}
+          AND ${itemsAsRead(r.org, r.id, r)}
+          AND (EXISTS (SELECT 1 FROM ${inList(r.org, r.write, "sets")})
+            OR EXISTS (SELECT 1 FROM ${inList(r.org, r.write, "clears")}))`
+    })
     const upsertDecisions = D1.statement({
       Request: S.Struct({ ...SaveWrite.fields, ...Acting, at: S.String }),
       Result: NoRows,
       // The same decision sent again leaves the row (who made it, and the revision it was saved at) as it is. Saved at
-      // the revision this save moved the draft to, the statement before.
+      // the revision this save moved the draft to, the statement before; a row new or changed moved it by one, so the
+      // revision it was made on is one less.
       execute: (r) => sql`INSERT INTO importDecision (importId, organizationId, rowId, decisionJson, decidedById,
-          decidedByName, updatedAt, savedRevision)
-        SELECT ${r.id}, ${r.org}, json_extract(j.value, '$.rowId'), json_extract(j.value, '$.json'), ${r.actor},
+          decidedByName, updatedAt, savedRevision, lastSavedById, lastSavedRevision)
+        SELECT ${r.id}, ${r.org}, json_extract(j.value, '$.rowId'), json_extract(j.value, '$.json'), a.actor,
           ${r.name}, ${r.at}, (SELECT d.revision FROM importDraft d
-            WHERE d.organizationId = w.organizationId AND d.id = w.importId)
-        FROM ${inList(r.org, r.write, "sets")} AND ${sameChoices(r.org, r.id, r.choices, r)}
+            WHERE d.organizationId = w.organizationId AND d.id = w.importId), a.actor,
+          (SELECT d.revision - 1 FROM importDraft d WHERE d.organizationId = w.organizationId AND d.id = w.importId)
+        FROM (SELECT ${r.actor} AS actor) AS a, ${inList(r.org, r.write, "sets")}
+          AND ${sameChoices(r.org, r.id, r.choices, r)}
         ON CONFLICT (organizationId, importId, rowId) DO UPDATE SET decisionJson = excluded.decisionJson,
           decidedById = excluded.decidedById, decidedByName = excluded.decidedByName, updatedAt = excluded.updatedAt,
-          savedRevision = excluded.savedRevision
+          savedRevision = excluded.savedRevision, lastSavedById = excluded.lastSavedById,
+          lastSavedRevision = excluded.lastSavedRevision
         WHERE importDecision.decisionJson IS NOT excluded.decisionJson`
     })
     const clearDecisions = D1.statement({
@@ -731,19 +784,18 @@ export const ImportStoreD1 = Layer.effect(
     })
     const openRevision = D1.statement({
       Request: Scope,
-      Result: S.Array(S.Struct({ revision: S.Int })),
-      execute: (r) => sql`SELECT revision FROM importDraft
+      Result: S.Array(S.Struct({ revision: S.Int, saves: S.Int })),
+      execute: (r) => sql`SELECT revision, saves FROM importDraft
         WHERE organizationId = ${r.org} AND id = ${r.id} AND status = 'open'`
     })
 
     // The open draft's revision and choices, and whether the stored items the save's judgement read are still so.
-    const OpenChoices = S.Array(S.Struct({ revision: S.Int, choicesJson: S.String, itemsSame: S.Int }))
+    const OpenChoices = S.Array(S.Struct({ revision: S.Int, saves: S.Int, choicesJson: S.String, itemsSame: S.Int }))
     const openChoices = D1.statement({
       Request: S.Struct({ ...Scope.fields, ...ItemsGuard.fields }),
       Result: OpenChoices,
-      execute: (
-        r
-      ) => sql`SELECT revision, choicesJson, CASE WHEN ${itemsAsRead(r.org, r.id, r)} THEN 1 ELSE 0 END AS itemsSame
+      execute: (r) => sql`SELECT revision, saves, choicesJson,
+          CASE WHEN ${itemsAsRead(r.org, r.id, r)} THEN 1 ELSE 0 END AS itemsSame
         FROM importDraft WHERE organizationId = ${r.org} AND id = ${r.id} AND status = 'open'`
     })
 
@@ -752,41 +804,49 @@ export const ImportStoreD1 = Layer.effect(
       draft: Draft,
       delta: DecisionDelta,
       read: ItemsAsRead = noItemsRead,
-      expected: O.Option<number> = O.none()
+      expected: O.Option<ComparedAt> = O.none()
     ) {
       const at = yield* now
       const org = actor.organizationId
       const choices = draft.choicesJson
       const sets = yield* decisionPieces(delta.set)
       const cleared = yield* textPieces(delta.clear)
-      const movedOn = (revision: number): boolean => O.exists(expected, (compared) => compared !== revision)
+      const movedOn = (draftNow: { readonly revision: number; readonly saves: number }): boolean =>
+        O.exists(expected, (compared) => compared.revision !== draftNow.revision || compared.saves !== draftNow.saves)
       if (sets.length + cleared.length === 0) {
         const open = yield* run(openRevision({ org, id: draft.id }))
         return O.match(A.head(open), {
           onNone: () => decisionsClosed,
-          onSome: (row) =>
-            movedOn(row.revision) ? decisionsMoved : decisionsSaved({ revision: row.revision, changed: false })
+          onSome: (row) => (movedOn(row) ? decisionsMoved : decisionsSaved({ revision: row.revision, changed: false }))
         })
       }
       const write = yield* random.uuidV4()
       const scope = { org, id: draft.id, write }
       const save = { ...scope, choices, ...guardOf(write, read) }
-      const put = { ...scope, expected: O.getOrNull(expected) }
+      const put = {
+        ...scope,
+        expected: O.getOrNull(O.map(expected, (at) => at.revision)),
+        expectedSaves: O.getOrNull(O.map(expected, (at) => at.saves))
+      }
       const reads = yield* putRead(scope, read)
       // The revision is read, then moved, and only for a delta that changes something; read again right after, it is
       // the revision these decisions are saved under, and a higher one than before says this save is what moved it.
       // The writes after it change no revision. One batch: nobody else's save can fall between the two reads, and
       // every write in it holds only while the choices and the stored items are those the save was judged against, and
-      // writes from lists put only while the draft is at the revision its rows that waited were compared at.
+      // writes from lists put only while the draft is at the revision its rows that waited were compared at, with no
+      // other save since. Who last saved each row is written before the revision moves, so it reads the one the save
+      // was made on; the count of saves after the first read, so that read is what the save was compared with.
       const answers = yield* batch([
         ...A.map(sets, (piece, seq) => putSets({ ...put, seq, piece })),
         ...A.map(cleared, (piece, seq) => putClears({ ...put, seq, piece })),
         ...reads,
         openChoices(save),
+        touchDecisions({ ...save, ...acting(actor) }),
         bumpRevision(save),
         openChoices({ ...save, asked: 0 }),
         upsertDecisions({ ...save, ...acting(actor), at }),
         clearDecisions(save),
+        countSave(save),
         dropLists({ org, write })
       ])
       // Only the two reads answer rows: the open draft's, before the revision was moved and after.
@@ -795,7 +855,7 @@ export const ImportStoreD1 = Layer.effect(
         ? decisionsClosed
         : before.choicesJson !== choices
           ? decisionsRematched
-          : movedOn(before.revision)
+          : movedOn(before)
             ? decisionsMoved
             : before.itemsSame !== 1
               ? decisionsItemsChanged
@@ -1040,6 +1100,7 @@ export const ImportStoreD1 = Layer.effect(
             by: actor.name,
             matched: choice.field,
             reads: plan.reads,
+            savedAt: stored.savedAt,
             notApplied: plan.notApplied
           })
           const at = yield* now
@@ -1140,15 +1201,25 @@ export const ImportStoreD1 = Layer.effect(
       Request: S.Struct({ ...CommitScope.fields, entries: JsonPiece }),
       Result: NoRows,
       // Saved at the revision the confirm moves the draft to when it closes it, after this.
+      // Each row it names was last saved by the confirming person, on the revision the draft is at before the close,
+      // changed or not; a changed one is theirs too.
       execute: (r) => sql`INSERT INTO importDecision (importId, organizationId, rowId, decisionJson, decidedById,
-          decidedByName, updatedAt, savedRevision)
+          decidedByName, updatedAt, savedRevision, lastSavedById, lastSavedRevision)
         SELECT ${r.id}, ${r.org}, json_extract(value, '$.rowId'), json_extract(value, '$.json'), ${r.actor}, ${r.name},
-          ${r.at}, (SELECT d.revision + 1 FROM importDraft d WHERE d.organizationId = ${r.org} AND d.id = ${r.id})
+          ${r.at}, (SELECT d.revision + 1 FROM importDraft d WHERE d.organizationId = ${r.org} AND d.id = ${r.id}),
+          ${r.actor}, (SELECT d.revision FROM importDraft d WHERE d.organizationId = ${r.org} AND d.id = ${r.id})
         FROM json_each(${r.entries}) WHERE ${thisConfirm(r.org, r.batch)}
-        ON CONFLICT (organizationId, importId, rowId) DO UPDATE SET decisionJson = excluded.decisionJson,
-          decidedById = excluded.decidedById, decidedByName = excluded.decidedByName, updatedAt = excluded.updatedAt,
-          savedRevision = excluded.savedRevision
-        WHERE importDecision.decisionJson IS NOT excluded.decisionJson`
+        ON CONFLICT (organizationId, importId, rowId) DO UPDATE SET
+          decidedById = CASE WHEN importDecision.decisionJson IS NOT excluded.decisionJson THEN excluded.decidedById
+            ELSE importDecision.decidedById END,
+          decidedByName = CASE WHEN importDecision.decisionJson IS NOT excluded.decisionJson THEN excluded.decidedByName
+            ELSE importDecision.decidedByName END,
+          updatedAt = CASE WHEN importDecision.decisionJson IS NOT excluded.decisionJson THEN excluded.updatedAt
+            ELSE importDecision.updatedAt END,
+          savedRevision = CASE WHEN importDecision.decisionJson IS NOT excluded.decisionJson THEN excluded.savedRevision
+            ELSE importDecision.savedRevision END,
+          decisionJson = excluded.decisionJson, lastSavedById = excluded.lastSavedById,
+          lastSavedRevision = excluded.lastSavedRevision`
     })
     const clearAtConfirm = D1.statement({
       Request: S.Struct({ ...CommitScope.fields, rowIds: JsonPiece }),

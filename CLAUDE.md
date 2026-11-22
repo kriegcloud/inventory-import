@@ -239,7 +239,7 @@ package's task and replays it when nothing it reads has changed. The app's own s
 | `bun run check` | The loop check through turbo: type-check with Effect diagnostics, lint (with the two design lints), the fast tests, the proofs of the review's model (`prove`: half a minute when they run, replayed by turbo until the model's own files or the pinned library change), the format check, `docs:check`, the key scan (`keys:check`), the vendored-kit hash check (`vendor:check`), the Alchemy packages kept as files against their recorded hashes (`alchemy:check`; needs python3), which package may import which (`boundaries:check`), the two stylesheet lists (`screens:check`), every `ref` a DOM ref or a callback that stays the same across draws (`refs:check`), no `_tag` compared or built by hand in any src or test folder (`tags:check`), no deprecated API used, read from every file's types (`deprecated:check`; `docs/standards/deprecated-apis.md`), the root's own configuration files type-check (`configs:check`) and the Effect imports (`imports:check`; `imports:fix` repairs code), every version written in more than one place equal to its one source (`version-sync`) and the configuration that follows from the workspaces (`config-sync:check`), `bun.lock` holding what every package.json asks for (`lockfile:check`), no home path or private folder in the scratchpad (`private-paths:check`), and every patch to a dependency with its header and a test of its own, for what is installed, and needed: its test fails with that one patch left out (`patches:check`, `patches:prove`), with every task that runs code waiting until what is installed holds the patches (`patches:installed`; `docs/patches.md`). Before every commit |
 | `bun run beep <group> <command>` | One of the repository's own rules by hand: `bun run beep laws boundaries`, `bun run beep quality ceilings`, `bun run beep vendor check`; `--help` on any of them lists its flags. `bun run check` runs them all under their root script names (`boundaries:check`, `vendor:check` and the rest) |
 | `bun run check:full` | `check` plus Verify's search of the whole model (`verify`: two minutes when it runs), the property that holds the model against the review region (`fold`: a minute and a half), a sample of the model's mutants (`mutants:sample`: under a minute), the slow tests (`*.slow.test.ts`: workerd, D1, sign-in) and the production build. The model's tasks are replayed by turbo until what they read changes |
-| `bun run check:ci` | What CI's main job runs: `check:full` without the model's proofs, search, fold and mutants. CI runs those in a job of their own (`proofs` in `ci.yml`, the tasks of `bun run proofs`, turbo's results restored from the last run on `main`), and every night with nothing replayed and every mutant (`.github/workflows/proofs-nightly.yml`; `bun run proofs:nightly` is the same by hand) |
+| `bun run check:ci` | What CI's main job runs: `check:full` without the model's proofs, search, fold and mutants. CI runs those in a job of their own (`proofs` in `ci.yml`, the tasks of `bun run proofs`, turbo's results restored from the last run on `main`), and every night with nothing replayed and every mutant (`.github/workflows/proofs-nightly.yml`; `bun run proofs:nightly` runs the same four tasks by hand with nothing replayed, but every mutant in one task, two at a time, with `row-open` given 50 minutes beside another mutant where the nightly runs it alone with 100: `docs/verify.md`) |
 | `bun run build` | The production build through turbo |
 | `bun run test` | Every test: fast, the proofs, the search and slow (Vitest, Node). Not the fold or the mutants: `bun run proofs` |
 | `bun run format` | oxfmt, writes files: `bun run format -- <files>` for only yours, since a bare run rewrites every file. `format:check` only reports |
@@ -268,8 +268,9 @@ package's task and replays it when nothing it reads has changed. The app's own s
 | `grid:keys` | Types on every data grid editor in Chromium and reads what is stored (needs `CHROME_PATH`); by hand, after a change to the grid |
 
 Hosting is Benjamin's alone. `bunx alchemy deploy --stage <name>` from the root runs the stack in `packages/infra`, and
-`bun run beep infra setup` does what comes before a first deploy and then deploys on his yes. No agent runs either,
-whatever it was asked to get done, and none runs `bun run release` unless he asks for a release in that message
+`bun run beep infra setup` does what comes before a first deploy and then deploys on his yes. No agent runs either
+for real, whatever it was asked to get done; an agent may run `bun run beep infra setup --dry-run`, which prints the
+steps and starts no tool. None runs `bun run release` unless he asks for a release in that message
 (`goals/infra/PLAN.md`, "What Benjamin does by hand"; `docs/releasing.md`).
 
 If you add or remove a dependency, do it with `bun add` or `bun remove` in the workspace that uses it
@@ -335,7 +336,8 @@ packages/infra/          @beep/infra: what is deployed, per stage. The stage pla
                         the deploy environments, their secrets, the rule on main). Nothing in the app imports it.
 alchemy.run.ts          The app's stack, re-exported for `bunx alchemy deploy --stage <name>`. A deploy is Benjamin's:
                         no agent runs `alchemy deploy`, `plan`, `destroy`, `login` or `state`, nor
-                        `bun run beep infra setup`, which runs them for him (goals/infra/PLAN.md).
+                        `bun run beep infra setup`, which runs them for him, except with `--dry-run`, which
+                        starts nothing (goals/infra/PLAN.md).
 vendor/alchemy/         The Alchemy packages as files, one commit of the library's main, with every sibling address
                         inside them rewritten so an install needs the library's registry for nothing. Its README says
                         why, and how the pin moves. Never edit a file there: `bun run alchemy:check`, part of `bun run check`, fails on a change.

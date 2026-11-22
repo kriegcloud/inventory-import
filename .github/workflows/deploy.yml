@@ -134,14 +134,14 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha }}
       # Staging never goes backwards: a CI run that is run again for an older commit, or one that finishes after a
       # newer commit's, deploys nothing. Only the commit main is at now deploys; an older one's turn has passed, and
-      # main's own CI run deploys main. When git cannot say where main is, the job fails.
+      # main's own CI run deploys main. When git cannot say where main is, the job fails. `git ls-remote` lists every
+      # ref whose name ends as the one asked for, so only the line whose name is exactly main's is read.
       - name: Deploy only the commit main is at
         id: head
         env:
           CHECKED: ${{ github.event.workflow_run.head_sha }}
         run: |
-          listed="$(git ls-remote origin refs/heads/main)"
-          main="${listed%%[[:space:]]*}"
+          main="$(git ls-remote origin refs/heads/main | awk '$2 == "refs/heads/main" { print $1 }')"
           if [ -z "$main" ]; then
             echo "git could not say where main is, so nothing is deployed." >&2
             exit 1
@@ -234,17 +234,17 @@ jobs:
       # Asked again after the approval, which may come days after the guard ran, and on every re-run of this job (a
       # re-run takes the guard's old answer): the commit is still the head of its release branch and still carries
       # the tag. A release that a later one on its line has replaced fails here, so approving an old run cannot put
-      # production back. When git cannot say, the job fails.
+      # production back. When git cannot say, the job fails. `git ls-remote` lists every ref whose name ends as the
+      # one asked for, so only the line whose name is exactly the branch's, or the tag's commit's, is read: a branch
+      # named `a/refs/heads/release/1.0` answers for nothing.
       - name: Deploy only a release that is still its branch's head
         env:
           BRANCH: ${{ github.event.workflow_run.head_branch }}
           CHECKED: ${{ github.event.workflow_run.head_sha }}
           TAG: ${{ needs.release-tag.outputs.tag }}
         run: |
-          listed="$(git ls-remote origin "refs/heads/$BRANCH")"
-          head="${listed%%[[:space:]]*}"
-          listed="$(git ls-remote origin "refs/tags/$TAG^{}")"
-          tagged="${listed%%[[:space:]]*}"
+          head="$(git ls-remote origin "refs/heads/$BRANCH" | awk '$2 == "refs/heads/" ENVIRON["BRANCH"] { print $1 }')"
+          tagged="$(git ls-remote origin "refs/tags/$TAG^{}" | awk '$2 == "refs/tags/" ENVIRON["TAG"] "^{}" { print $1 }')"
           if [ -z "$head" ] || [ -z "$tagged" ]; then
             echo "git could not say where $BRANCH and $TAG are, so nothing is deployed." >&2
             exit 1

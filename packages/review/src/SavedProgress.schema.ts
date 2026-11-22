@@ -1,9 +1,10 @@
 // What the person has done so far on a screen, kept in this browser so a hard refresh or a closed tab never makes
 // them repeat it: the step they were on, the file they chose, and their decisions with the undo history behind them.
 // The rules this file protects: progress belongs to one person in one organization (another member, or the same person
-// in another organization, never sees it); what is read back is decoded, so a draft from an older version is dropped,
-// never shown half; and Confirm clears it. The decisions are small and go to localStorage, written before the next
-// frame; the file itself is a Blob in IndexedDB, written once when it is chosen and read again by the worker on return.
+// in another organization, never sees it); what is read back is decoded, so a draft from an older version is never
+// shown half (it reads as none, and the next write replaces it); and Confirm clears it. The decisions are small and
+// go to localStorage through an atom per key (`SavedProgress.hook.ts`); the file itself is a Blob in IndexedDB,
+// written once when it is chosen and read again by the worker on return.
 import * as S from "effect/Schema"
 import type * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
@@ -11,7 +12,7 @@ import * as O from "effect/Option"
 import { ReviewDecisionFromFlags, RowKey } from "@inventory/review/ReviewDecision"
 import { fromDraft, toDraft } from "@inventory/review/ReviewDraft"
 import { DraftStep, ReviewDraft } from "@inventory/review/ReviewTypes"
-import type { SavedDecisions } from "@inventory/review/ReviewTypes"
+import type { ReviewState } from "@inventory/review/ReviewTypes"
 import { $ReviewId } from "./internal/identity.ts"
 
 /** Who the progress belongs to, and which screen. Every part comes from the session, never from the page's address. */
@@ -124,53 +125,6 @@ export class SavedProgress extends S.Opaque<SavedProgress, { readonly brand: uni
     })
 }
 
-const decode = S.decodeUnknownOption(S.fromJsonString(SavedProgress))
-const encode = S.encodeOption(S.fromJsonString(SavedProgress))
-
-/** The part of the Web Storage interface (localStorage) the progress needs, so a test can hand in its own. */
-export interface ProgressStorage {
-  getItem(key: string): string | null
-  setItem(key: string, value: string): void
-  removeItem(key: string): void
-}
-
-/** Reads the progress stored under `key`, dropping it when it no longer decodes. */
-export const readAt = (storage: ProgressStorage, key: string): SavedProgress | undefined => {
-  const text = storage.getItem(key)
-  if (text === null) return undefined
-  const found = decode(text)
-  if (found._tag === "Some") return found.value
-  storage.removeItem(key)
-  return undefined
-}
-
-/** Writes the progress under `key`. False when the browser refused (a private window, a full disk). */
-export const writeAt = (storage: ProgressStorage, key: string, progress: SavedProgress): boolean => {
-  const text = encode(progress)
-  if (text._tag === "None") return false
-  try {
-    storage.setItem(key, text.value)
-    return true
-  } catch {
-    return false
-  }
-}
-
-/**
- * Reads the progress of one scope. Absent, unreadable or from an older version: undefined, and the stored text is
- * removed, so a broken draft never comes back.
- */
-export const readProgress = (storage: ProgressStorage, scope: ProgressScope): SavedProgress | undefined =>
-  readAt(storage, progressKey(scope))
-
-/** Writes the progress of one scope. False when the browser refused (a private window, a full disk). */
-export const writeProgress = (storage: ProgressStorage, scope: ProgressScope, progress: SavedProgress): boolean =>
-  writeAt(storage, progressKey(scope), progress)
-
-/** Removes the progress of one scope. */
-export const clearProgress = (storage: ProgressStorage, scope: ProgressScope): void =>
-  storage.removeItem(progressKey(scope))
-
 const toStoredStep = (step: DraftStep): StoredStep =>
   StoredStep.make({
     label: step.label,
@@ -185,9 +139,9 @@ const fromStoredStep = (step: StoredStep): DraftStep =>
     focus: O.getOrNull(step.focus)
   })
 
-/** The decisions handed out by the review region, as stored, undo history included. */
-export const storedReview = (decisions: SavedDecisions): StoredReview => {
-  const draft = toDraft(decisions)
+/** The review region's decisions with their undo and redo history, as stored. */
+export const storedReview = (state: ReviewState): StoredReview => {
+  const draft = toDraft(state)
   return StoredReview.make({
     decisions: draft.decisions,
     undo: draft.undo.map(toStoredStep),
@@ -195,8 +149,8 @@ export const storedReview = (decisions: SavedDecisions): StoredReview => {
   })
 }
 
-/** Stored decisions, ready to hand back to the review region as `savedDecisions`, undo history included. */
-export const restoredDecisions = (review: StoredReview): SavedDecisions =>
+/** A stored review as the region's decisions hold it: where the region starts again, its history with it. */
+export const restoredReview = (review: StoredReview): ReviewState =>
   fromDraft(
     ReviewDraft.make({
       decisions: review.decisions,

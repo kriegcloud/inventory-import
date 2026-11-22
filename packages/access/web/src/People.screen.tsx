@@ -1,4 +1,4 @@
-import { useAtom, useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
+import { useAtom, useAtomMount, useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
 import * as Cause from "effect/Cause"
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
@@ -41,6 +41,7 @@ import {
 import { Field, FieldGroup, FieldLabel } from "@inventory/ui/components/field"
 import { Input } from "@inventory/ui/components/input"
 import { NativeSelect, NativeSelectOption } from "@inventory/ui/components/native-select"
+import { ofMember } from "@inventory/client/MemberAtoms"
 import { optimisticChange, optimisticWrite, shown } from "@inventory/client/OptimisticAtoms"
 import { AddPerson as AddPersonCommand, ChangeRole } from "@inventory/access-contract/PeopleCommand"
 import { Person } from "@inventory/access-contract/Person"
@@ -113,10 +114,10 @@ const remove = optimisticWrite({
   settled: accessKeys.activity
 })
 
-/** The add form: whether it is open, and what is typed in it. */
-const addOpen = Atom.make(false)
-const addEmail = Atom.make("")
-const addRole = Atom.make<Role>("editor")
+/** The add form: whether it is open, and what the person signed in has typed in it. */
+export const addOpen = ofMember(() => false)
+export const addEmail = ofMember(() => "")
+export const addRole = ofMember((): Role => "editor")
 
 /**
  * Adding a person. Not optimistic: only the server knows whose email it is. Through the command's schema, which trims
@@ -145,7 +146,7 @@ function AddPerson() {
   const pending = result.waiting
   const outcome = result.pipe(AsyncResult.value, O.getOrUndefined)
   const problem = !pending && outcome !== undefined && Result.isFailure(outcome) ? outcome.failure : undefined
-  const failed = !pending && result._tag === "Failure" ? Cause.squash(result.cause) : null
+  const failed = !pending && AsyncResult.isFailure(result) ? Cause.squash(result.cause) : null
   return (
     <Dialog
       open={open}
@@ -222,26 +223,32 @@ function AddPerson() {
   )
 }
 
-/** Who is in the organization and with what role. An admin adds people, changes roles and removes members here. */
-export function PeoplePage() {
-  const who = useAtomValue(signedIn)
-  const actor = O.getOrUndefined(who)
-  const admin = actor !== undefined && hasRole(actor.role, "admin")
-  const list = useAtomValue(people)
-  const askAgain = useAtomRefresh(people)
-  const saving = useAtomValue(savingRoles)
-  const changeRole = useAtomSet(setRole)
-  const removePerson = useAtomSet(remove)
-  const data = list.pipe(AsyncResult.value, O.getOrUndefined)
-  const error = list._tag === "Failure" && !list.waiting ? Cause.squash(list.cause) : null
-  // Each row says whether its role is on its way to the server. Carried in the row itself: the table redraws a row
-  // when its data changes, and the list the server sends back after a change can be the very object shown before.
-  const rows: ReadonlyArray<PersonRow> = (data ?? []).map((person) => ({
+const noPeople: ReadonlyArray<Person> = []
+
+/**
+ * The list's rows: each says whether its role is on its way to the server. Carried in the row itself: the table
+ * redraws a row when its data changes, and the list the server sends back after a change can be the very object shown
+ * before.
+ */
+const peopleRows = Atom.readable((get): ReadonlyArray<PersonRow> => {
+  const saving = get(savingRoles)
+  return (get(people).pipe(AsyncResult.value, O.getOrUndefined) ?? noPeople).map((person) => ({
     ...person,
     saving: HashSet.has(saving, person.memberId)
   }))
+})
 
-  const columns: ReadonlyArray<ListColumn<PersonRow>> = [
+/**
+ * The list's columns, for the person signed in: an admin's Role is a choice and their rows have Remove. The cells
+ * write through the registry they are read in, so the columns are made again only when the person signed in changes.
+ */
+const peopleColumns = Atom.readable((get): ReadonlyArray<ListColumn<PersonRow>> => {
+  const actor = O.getOrUndefined(get(signedIn))
+  const admin = actor !== undefined && hasRole(actor.role, "admin")
+  const registry = get.registry
+  const changeRole = (change: { readonly person: Person; readonly role: Role }) => registry.set(setRole, change)
+  const removePerson = (person: Person) => registry.set(remove, person)
+  return [
     {
       id: "name",
       label: "Name",
@@ -335,7 +342,21 @@ export function PeoplePage() {
         ]
       : [])
   ]
+})
 
+/** Who is in the organization and with what role. An admin adds people, changes roles and removes members here. */
+export function PeoplePage() {
+  const who = useAtomValue(signedIn)
+  const actor = O.getOrUndefined(who)
+  const admin = actor !== undefined && hasRole(actor.role, "admin")
+  const list = useAtomValue(people)
+  const askAgain = useAtomRefresh(people)
+  // The two writes the list's cells make are mounted while the page is, so one under way is not let go.
+  useAtomMount(setRole)
+  useAtomMount(remove)
+  const columns = useAtomValue(peopleColumns)
+  const data = list.pipe(AsyncResult.value, O.getOrUndefined)
+  const error = AsyncResult.isFailure(list) && !list.waiting ? Cause.squash(list.cause) : null
   const count = data?.length ?? 0
   return (
     <div className="flex h-full flex-col">
@@ -368,8 +389,8 @@ export function PeoplePage() {
         <ListTable
           caption="People in the organization"
           searchLabel="Search people"
-          columns={columns}
-          rows={rows}
+          columns={peopleColumns}
+          rows={peopleRows}
           rowKey={(person) => person.memberId}
           empty="Nobody is here yet."
           updating={list.waiting}

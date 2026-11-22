@@ -99,3 +99,24 @@ export const progressOf = (input: { readonly state: UploadState }): { done: numb
     },
     () => ({ done: 0, total: null })
   )
+
+/**
+ * The file an upload is of, as its state names it; none while nothing is chosen.
+ *
+ * @example fileNameOf({ _tag: "Preparing", fileName: "items_messy.csv", uploadId, rows: 200 }) // "items_messy.csv"
+ */
+export const fileNameOf: (state: UploadState) => string = UploadState.match({
+  Idle: () => "",
+  Refused: (state) => state.problem.fileName,
+  Reading: (state) => state.fileName,
+  Saving: (state) => state.fileName,
+  Preparing: (state) => state.fileName,
+  Cancelling: (state) => state.fileName,
+  Failed: (state) => state.fileName
+})
+
+/** True while Cancel still stops something: the file is being read or its rows saved. */
+export const isStoppable = UploadState.isAnyOf(["Reading", "Saving"])
+
+/** True from the moment a file is chosen until its upload has ended: arrived, cancelled, failed or refused. */
+export const isBusy = (state: UploadState): boolean => !UploadState.isAnyOf(["Idle", "Failed", "Refused"])(state)

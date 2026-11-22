@@ -6,7 +6,7 @@ import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint"
 import * as HttpApiGroup from "effect/http-api/HttpApiGroup"
 import * as HttpApiSchema from "effect/http-api/HttpApiSchema"
 import * as OpenApi from "effect/http-api/OpenApi"
-import { DecisionDelta } from "./Import/Decision.command.ts"
+import { ConfirmRequest, DecidedSince, SaveRequest, StaleAccept } from "./Import/Decision.command.ts"
 import { reasonForPerson } from "./internal/Described.ts"
 import { StagingOutcome } from "./Staging/FileProblem.read.ts"
 import { ConfirmId, ImportId, ItemId } from "./Catalog.id.ts"
@@ -14,8 +14,12 @@ import { ChangeRecord, ImportView, OpenImports, PastImports, SuggestOutcome } fr
 import {
   AlreadyImported,
   ColumnNotFound,
+  AcceptsTakenBack,
+  DraftBusy,
+  DraftMoved,
   ImportKept,
   ImportNotFound,
+  RevisionAhead,
   UploadNotFound
 } from "./Import/Import.rejection.ts"
 import { ItemEdit, StoredItem } from "./Item/Item.read.ts"
@@ -142,12 +146,12 @@ export class ImportsApi extends HttpApiGroup.make("imports")
         )
       }),
       success: ImportView,
-      error: [Forbidden, ImportNotFound, AlreadyImported, ColumnNotFound]
+      error: [Forbidden, ImportNotFound, AlreadyImported, ColumnNotFound, DraftBusy]
     })
       .annotate(OpenApi.Summary, "Point a field at a file column, or at none")
       .annotate(
         OpenApi.Description,
-        "Points a field at a file column, or at none (`column: null`). `column` is the column's position in the file, from 0. An accepted proposal about that field is taken back, since the value behind it can change. Refused with 409 once the import is confirmed. Needs the editor role."
+        "Points a field at a file column, or at none (`column: null`). `column` is the column's position in the file, from 0. In the same write, every stored decision that rests on a column the match moved is taken back, whoever made it: an accept or an undone fix of a moved field, every Replace, Keep-stored and keep-one-of-two when the SKU moved, and a Replace or Keep-stored when another field's move changed how its row compares with the stored item. What it took back is kept with the import by field and kind (`ImportView.takenBack`), so every screen of the import names it, and the audit line counts it. The answer is the import as it now is. Refused with 409 once the import is confirmed, and with 409 `DraftBusy` when the import (a save, another match), or what the judgement of a Replace or Keep-stored read beside it (the stored items, the rows earlier confirms created, the stored suggestions), kept changing under every try (nothing written). Needs the editor role."
       ),
     HttpApiEndpoint.post("suggest", "/:id/suggest", {
       params: importId,
@@ -161,27 +165,44 @@ export class ImportsApi extends HttpApiGroup.make("imports")
       ),
     HttpApiEndpoint.put("decide", "/:id/decisions", {
       params: importId,
-      payload: DecisionDelta,
+      payload: SaveRequest,
       success: S.Struct({
-        revision: S.Int.annotateKey({ description: "The draft's revision after this save" })
-      }).annotate({ description: "The decisions are saved; the draft's new revision" }),
-      error: [Forbidden, ImportNotFound, AlreadyImported]
+        revision: S.Int.annotateKey({ description: "The draft's revision after this save" }),
+        changed: S.Boolean.annotateKey({
+          description:
+            "True when this save changed a decision: the draft moved one revision, from whatever it was at just before this save. That is the sender's own next revision only when it is exactly one more than the revision the sender held; otherwise somebody else saved in between, and the sender reads the import again before counting on it. False when every row it names already stood as sent (the same save again, or somebody else decided the same): nothing was written, and the revision is whatever the draft had reached, which may hold other people's decisions the sender has not read"
+        }),
+        notApplied: S.Array(StaleAccept).annotateKey({
+          description:
+            "The parts of this save's decisions that were not applied, each by row, field and kind: a part that rests on a column matched again after the revision its row names in `madeOn` (an accept or an undone fix of that field; a Replace, Keep-stored or keep-one-of-two after the SKU's column; a Replace or Keep-stored after another column, where that changed how the row compares with the stored item). The rest of each row's decision is saved. Nothing is named of a row in `decidedSince`, none of which was written. Empty when everything was applied"
+        }),
+        decidedSince: S.Array(DecidedSince)
+          .pipe(S.withDecodingDefaultKey(Effect.succeed([])))
+          .annotateKey({
+            description:
+              "The rows named in `over` that were not written, because what is stored of them is none of the decisions named: decided otherwise since, each with what is stored of it. The other rows are saved"
+          })
+      }).annotate({
+        description:
+          "The decisions are saved: the draft's revision, whether this save is what moved it, the parts of decisions it did not apply, and the rows that waited and were decided otherwise since"
+      }),
+      error: [Forbidden, ImportNotFound, AlreadyImported, RevisionAhead, DraftBusy]
     })
       .annotate(OpenApi.Summary, "Save the decisions made since the last save")
       .annotate(
         OpenApi.Description,
-        "Saves decisions as they are made. Only the difference travels (the rows whose decision is new, and the rows whose decision was taken back), so two screens deciding different rows do not collide. Returns the draft's new revision. Needs the editor role."
+        "Saves decisions as they are made. Only the difference travels (the rows whose decision is new, and the rows whose decision was taken back), so two screens deciding different rows do not collide. Answers the draft's revision and whether this save changed anything: a save that changed nothing (the same one sent again, or rows somebody else had already decided the same way) writes nothing and moves no revision, and its `revision` is then not the sender's own next one, so a screen that reads `changed: false` asks for the import again instead of counting on. Safe to send twice. Refused with 409 once the import is confirmed. Needs the editor role. The save names, for each row it sets, the revision of the draft that row was last decided on (`madeOn`; a key naming no row of `set`, and no row of `over`, is not read): a part of a decision that rests on a column matched again since (an accept or an undone fix of that field, a Replace, Keep-stored or keep-one-of-two after the SKU's column, a Replace or Keep-stored whose row now compares otherwise after another column) is not applied, and the answer names it in `notApplied` with its kind; the screen then shows that row open again and says what was taken back. A row that waited (its first save failed, it was kept across a reload, a closed tab kept it) is named in `over` with the decisions the sender knows the server may hold of it: it is written only while what is stored of it is one of them (none and a decision that says nothing are the same), or one of them with the parts a match took back since removed, or already what the save leaves. Otherwise the row is not written and `decidedSince` names it with what is stored; the other rows are saved. A save with such rows is compared and written as one: nothing can be saved, matched or confirmed in between. Refused with 409 `DraftBusy` when the import's columns kept being matched, when the import kept being saved by others while rows that waited were compared, or when what a Replace or Keep-stored was judged against (the stored items, the rows earlier confirms created, the stored suggestions) kept changing, under every try (nothing written)."
       ),
     HttpApiEndpoint.post("commit", "/:id/commit", {
       params: importId,
-      payload: DecisionDelta,
+      payload: ConfirmRequest,
       success: ImportView,
-      error: [Forbidden, ImportNotFound, AlreadyImported]
+      error: [Forbidden, ImportNotFound, AlreadyImported, DraftMoved, AcceptsTakenBack, RevisionAhead, DraftBusy]
     })
       .annotate(OpenApi.Summary, "Confirm: write the items the review says are ready")
       .annotate(
         OpenApi.Description,
-        "The confirm carries only the decisions not saved yet; the rows never travel. The server applies the saved draft to the staged file with the same review the screen ran and writes what that says is ready. A confirm of an import already confirmed is refused with 409 instead of running again. Needs the editor role."
+        "The confirm names the revision of the draft its screen shows and carries only that screen's own decisions not saved yet; the rows never travel. The server applies the saved draft and those decisions to the staged file with the same review the screen ran and writes what that says is ready, in one write with the decisions themselves and the close of the import, and only while the stored draft is still at the revision named. If the draft has moved on (somebody else decided a row or matched a column; storing a suggestion does not move it), nothing is written and the answer is 409 `DraftMoved` with the draft's revision now: read the import again, show what changed, and confirm again. Two confirms can never both pass, and a confirm never writes a decision its screen did not show. A confirm of an import already confirmed is refused with 409 `AlreadyImported` instead of running again. The answer is the import as it now is, one revision on. Needs the editor role. The decisions the confirm carries name the revision each row was decided on (`madeOn`), as a save does: if a part of one of them rests on a column matched again since (any of the kinds a save leaves out), nothing is written and the answer is 409 `AcceptsTakenBack` naming each by row, field and kind. A Replace or Keep-stored judged across a re-match of another column is judged against the stored items, the rows earlier confirms created and the stored suggestions as read, and the confirm is written only while they are still so: an item edited, replaced, created or taken back, or a suggestion stored, in between makes the confirm be judged again, and an import whose items kept changing under every try is refused with 409 `DraftBusy` (nothing written)."
       ),
     HttpApiEndpoint.post("takeBack", "/:id/take-back", {
       params: importId,

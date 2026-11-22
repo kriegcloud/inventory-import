@@ -2,7 +2,6 @@ import { useAtom, useAtomRefresh, useAtomValue } from "@effect/atom-react"
 import * as Cause from "effect/Cause"
 import * as O from "effect/Option"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
-import * as Atom from "effect/reactivity/Atom"
 import { PageHeader, Views } from "@inventory/ui/PageHeader"
 import { Alert, AlertDescription, AlertTitle } from "@inventory/ui/components/alert"
 import { TableSkeleton } from "@inventory/ui/Skeletons"
@@ -12,14 +11,15 @@ import {
   importDecisionColumns,
   ImportDecisions,
   importDecisionsCaption,
-  useImportDecisions
+  importDecisions
 } from "@inventory/catalog-web/ImportDecisions"
+import { ofMember } from "@inventory/client/MemberAtoms"
 import { sayError } from "@inventory/client/SayError"
-import { usePastImports } from "@inventory/catalog-web/Imports"
+import { pastImports } from "@inventory/catalog-web/Imports"
 import { pastImportColumns, pastImportsCaption, PastImportsList } from "@inventory/catalog-web/PastImports"
 
 /** The list the person chose; none until they choose, and the page opens on the one with something in it. */
-const chosenView = Atom.make<O.Option<"decisions" | "events" | "imports">>(O.none())
+export const chosenView = ofMember((): O.Option<"decisions" | "events" | "imports"> => O.none())
 
 /**
  * Who decided what: the shell over three lists. "Decisions" is the catalog screens' list of every value an import
@@ -29,20 +29,25 @@ const chosenView = Atom.make<O.Option<"decisions" | "events" | "imports">>(O.non
 export function ActivityPage() {
   const [chosen, choose] = useAtom(chosenView)
   const setView = (view: "decisions" | "events" | "imports") => choose(O.some(view))
-  const changes = useImportDecisions()
-  const eventsRead = useAtomValue(auditEvents)
-  const askEventsAgain = useAtomRefresh(auditEvents)
-  // The audit trail in the shape of the two lists still read through the catalog screens' cache (goals/atoms, step 6).
-  const events = {
-    data: eventsRead.pipe(AsyncResult.value, O.getOrUndefined),
-    error: eventsRead._tag === "Failure" && !eventsRead.waiting ? Cause.squash(eventsRead.cause) : null,
-    updating: eventsRead.waiting,
+  const changesRead = useAtomValue(importDecisions)
+  const askChangesAgain = useAtomRefresh(importDecisions)
+  const pastRead = useAtomValue(pastImports)
+  const askPastAgain = useAtomRefresh(pastImports)
+  // Each list in the same shape, for the one error and skeleton below.
+  const shapeOf = <A,>(read: AsyncResult.AsyncResult<A, unknown>, refetch: () => void) => ({
+    data: read.pipe(AsyncResult.value, O.getOrUndefined),
+    error: AsyncResult.isFailure(read) && !read.waiting ? read.cause.pipe(Cause.squash) : null,
+    updating: read.waiting,
     refetch: () => {
-      askEventsAgain()
+      refetch()
       return Promise.resolve()
     }
-  }
-  const past = usePastImports()
+  })
+  const changes = shapeOf(changesRead, askChangesAgain)
+  const eventsRead = useAtomValue(auditEvents)
+  const askEventsAgain = useAtomRefresh(auditEvents)
+  const events = shapeOf(eventsRead, askEventsAgain)
+  const past = shapeOf(pastRead, askPastAgain)
   // Until the person chooses, the page opens on the list that has something in it: an empty "Decisions" beside
   // nine events read as "nothing has happened here".
   const view =
@@ -87,11 +92,11 @@ export function ActivityPage() {
           />
         )
       ) : view === "imports" ? (
-        <PastImportsList rows={past.data?.imports ?? []} older={older} />
+        <PastImportsList older={older} />
       ) : view === "decisions" ? (
-        <ImportDecisions rows={changes.data ?? []} />
+        <ImportDecisions />
       ) : (
-        <AuditEvents rows={events.data ?? []} updating={events.updating} />
+        <AuditEvents updating={events.updating} />
       )}
     </div>
   )

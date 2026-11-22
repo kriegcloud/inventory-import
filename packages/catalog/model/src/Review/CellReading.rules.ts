@@ -11,6 +11,7 @@
  */
 import * as A from "effect/Array"
 import * as BigDecimal from "effect/BigDecimal"
+import * as Match from "effect/Match"
 import * as O from "effect/Option"
 import * as Str from "effect/String"
 import {
@@ -135,9 +136,20 @@ const VendorsCell = VendorCell.pipe(S.Array, S.fromJsonString)
 const decodeVendors = S.decodeUnknownOption(VendorsCell)
 const encodeVendors = S.encodeOption(VendorsCell)
 
+/** A value of a cell that holds JSON, read. */
+export type ReadOk<A> = { readonly _tag: "ok"; readonly value: A }
 /** A value of a cell that holds JSON: read, or the sentence that says what is wrong with it. */
-type Read<A> = { readonly _tag: "ok"; readonly value: A } | { readonly _tag: "bad"; readonly message: string }
+export type Read<A> = ReadOk<A> | { readonly _tag: "bad"; readonly message: string }
 const ok = <A>(value: A): Read<A> => ({ _tag: "ok", value })
+
+/**
+ * True when a cell was read: its value is there, and no sentence. Read by its case, so the review and the forms tell
+ * a reading apart the one way.
+ *
+ * @example wasRead(readDimensions('{"length":31.2,"width":41.4,"height":2,"unit":"cm"}')) // true
+ */
+export const wasRead = <A>(read: Read<A>): read is ReadOk<A> =>
+  Match.valueTags(read, { ok: () => true, bad: () => false })
 const bad = <A>(message: string): Read<A> => ({ _tag: "bad", message })
 
 /**
@@ -197,9 +209,12 @@ export const readVendors = (text: string): Read<ReadonlyArray<Vendor>> => {
       isPreferred: vendor.is_preferred === true
     })
   })
-  const wrong = A.findFirst(read, (entry) => entry._tag === "bad")
-  if (O.isSome(wrong) && wrong.value._tag === "bad") return bad(wrong.value.message)
-  return ok(A.flatMap(read, (entry) => (entry._tag === "ok" ? [entry.value] : [])))
+  const wrong = A.findFirst(
+    read,
+    Match.valueTags({ ok: () => O.none<string>(), bad: ({ message }) => O.some(message) })
+  )
+  if (O.isSome(wrong)) return bad(wrong.value)
+  return ok(A.flatMap(read, Match.valueTags({ ok: ({ value }) => [value], bad: () => [] })))
 }
 
 /** The vendors cell again with only the vendor at `keep` preferred: one reading of a cell that marks several. */

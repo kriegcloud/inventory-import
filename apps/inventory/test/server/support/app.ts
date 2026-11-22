@@ -4,7 +4,7 @@
 // the handlers and middleware (fast). Settings come from a ConfigProvider, the same way the Worker gets them. Sign-in
 // is real on the D1 database (`TestAuth`, Better Auth on the same binding); in memory nobody is signed in to it
 // (`SignedOutAuth`), and the header identity names the actor.
-import { D1Binding } from "@beep/d1/D1"
+import { type D1, D1Binding } from "@beep/d1/D1"
 import { D1Test, D1TestOptions } from "@beep/d1/D1Test"
 import * as A from "effect/Array"
 import * as Config from "effect/Config"
@@ -45,6 +45,11 @@ import {
   SuggestionStoreMemory
 } from "@inventory/catalog-model/Memory"
 import { ModelAllowanceViaAccess } from "@inventory/catalog-host/ModelAllowance"
+import type { ImportStore } from "@inventory/catalog-model/ImportStore"
+import type * as SqlClient from "effect/sql/SqlClient"
+
+/** What a stand-in store may build on: the real store, or the test database itself (a store of its own on it). */
+type StoreNeeds = ImportStore | D1 | SqlClient.SqlClient
 import * as Observability from "../../../src/server/Observability.ts"
 import { SameOriginLive } from "../../../src/server/SameOrigin.ts"
 import { testAccountPassword } from "@inventory/access-host/TestAccounts"
@@ -212,27 +217,48 @@ export const as =
       () => effect
     )
 
-/**
- * The handlers on a fresh test database with the real services and the given model (none, unless the test scripts
- * one), for the typed client (`HttpApiTest.groups`). Use `as(memberId)` on each call. Slow: name the file
- * `*.slow.test.ts`.
- */
-export const testAppWith = <E, R>(ai: Layer.Layer<OpenRouter, E, R>) =>
-  Handlers.pipe(
+/** The handlers on a fresh test database, with the real services, the given model and any stand-in around the store. */
+const handlersOn = <E, R>(
+  ai: Layer.Layer<OpenRouter, E, R>,
+  /**
+   * A stand-in around the real import store, or a store of its own on the test database (a test that puts another
+   * request between two steps): none by default.
+   */
+  around?: Layer.Layer<ImportStore, never, StoreNeeds>
+) => {
+  const services = servicesWith({ ai, production: false })
+  return Handlers.pipe(
     Layer.provideMerge(HeaderIdentity),
     Layer.provideMerge(SameOriginLive),
     Layer.provideMerge(HttpApiMiddleware.layerProblemDetails({ includeDetails: true })),
     // The header identity looks up whoever `as` named last, in the real `member` table.
     Layer.provide(directoryFollowing(() => MutableRef.get(acting))),
-    Layer.provideMerge(servicesWith({ ai, production: false })),
+    Layer.provideMerge(around === undefined ? services : around.pipe(Layer.provideMerge(services))),
     Layer.provide(SignedOutAuth),
     Layer.provideMerge(TestDatabase),
     Layer.provideMerge(HttpServer.layerServices),
     Layer.provide(settingsLayer())
   )
+}
+
+/**
+ * The handlers on a fresh test database with the real services and the given model (none, unless the test scripts
+ * one), for the typed client (`HttpApiTest.groups`). Use `as(memberId)` on each call. Slow: name the file
+ * `*.slow.test.ts`.
+ */
+export const testAppWith = <E, R>(ai: Layer.Layer<OpenRouter, E, R>) => handlersOn(ai)
 
 /** The typed-client app with no AI key: the state the app must be complete in. */
 export const TypedApp = testAppWith(OpenRouterTest.off("noKey", ModelId.make(testSettings.AI_MODEL)))
+
+/**
+ * `TypedApp` with a stand-in around the real import store, or a store of its own built on the test database (the real
+ * D1 store over a D1 whose batches a test can step into): a test that puts another person's request between the
+ * moment a handler or a store has read an import and the moment the store writes. Slow: name the file
+ * `*.slow.test.ts`.
+ */
+export const testAppAround = (around: Layer.Layer<ImportStore, never, StoreNeeds>) =>
+  handlersOn(OpenRouterTest.off("noKey", ModelId.make(testSettings.AI_MODEL)), around)
 
 /** The app's `fetch`, as the Worker exports it: security headers included. `dispose` runs when the test block ends. */
 export class TestFetch extends Context.Service<

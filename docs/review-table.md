@@ -27,9 +27,9 @@ month its own row of the region, labelled "3 · Feb").
 | `title`, `noun` | Required. The `h1` ("Review items_messy.csv") and what a row is called, `["record", "records"]`, for the button |
 | `columns` | Our fields in order. The first is the record's own column, pinned when the table scrolls sideways. `size`: `"fit"` (the default: as wide as its longest value and its header, measured from the rows in view, never cut; a code, a unit, a price, a short choice) or `"fill"` (shares what is left and ends in an ellipsis, the whole text in a hover card; a name, a description). `width` is the least width (a `fill` column's default is 160). `priority`: short of room the lowest `fit` column moves into the row's detail first (higher stays longer; `core` counts as 1, others 0; ties go from the right). `unit` is a second header line ("$", "days"). `align: "right"` for numbers, `under` to show it under the name when it gives way, `hidden` to start it hidden (the Columns menu shows it), `facet` for a filter by its values, `search` to search it with the name, `context` for the phone card's one line, `code` for an identifier compared character by character (a SKU, part number, barcode, lot or serial: set in the monospace face), `match` to say which file column fed it, `display` for how a value is shown when not as the file has it (money: "1.2" as "$1.20"; only what is drawn changes, the edit, the checks and the result keep the file's text) |
 | `rows` | One per file line, or one per record when a line holds several (`id` its own, `line` shared, `label` "8 · Feb" for the region's sentences: [patterns](patterns.md) section 16): `{ id, line, label?, cells: { [columnId]: text }, problem?, applied?, stored? }`. `label` names the row in "Leave row 8 · Feb out", "Keep row 8 · Feb", the "row 8 · Feb" link and the download; the Row column keeps `line`. Cells are already formatted text. A row with no `problem` is ready. `stored: true` is a record already in the system: it counts apart (Already there), shows under All with its tag, and offers nothing, not even "Leave out" |
-| `problemKinds` | `{ id, label, tone, help?, fixable? }`: the tag in the Problem column, three words at most. `decision` is amber, `blocker` is red. `help` is one line under the kind's heading. `fixable: false` is a kind nothing on this screen can settle (the item it names is not in the system yet): its rows are counted under Can't fix here, offer no answer and never hold the import back |
+| `problemKinds` | An atom of `{ id, label, tone, help?, fixable? }`, in the order the work list shows them: the tag in the Problem column, three words at most. `decision` is amber, `blocker` is red. `help` is one line under the kind's heading. `fixable: false` is a kind nothing on this screen can settle (the item it names is not in the system yet): its rows are counted under Can't fix here, offer no answer and never hold the import back |
 | `problem` | `{ kind, reason?, column?, ask?, note?, fix?, rivals?, choices? }`: `kind` is a `problemKinds` id; `reason` is the row's sentence, naming the column and the value ("Code is empty."), shown on every row whatever its kind, a fix or none, and in `result.held` and the download (without it the kind's `help`, then its label, stand in); `column` the cell it is in, `note` a few words beside the tag ("row 31") |
-| `problem.fix` | A proposal: `{ column, to, by?: "rule" \| "model", kind, group?, label?, reason?, confidence?, why: { basis, detail?, alternatives? } }`. Shown struck-old, green new value, button "Use pcs". `by` names who prepared it ("Rule", a sparkle for a model); left out, the change is called a suggestion and names nobody. `reason` is what is wrong with the value, the row's sentence while the fix waits (a rule's lossless fix has no `problem` of its own). Same `group` on identical changes gives a heading above those rows with "Use pcs for 9". `confidence: "low"` makes it a question: the person picks `to` or one of `why.alternatives`, and there is no accept for the group |
+| `problem.fix` | A proposal: `{ column, to, by?: "rule" \| "model", kind, group?, label?, reason?, confidence, why: { basis, detail?, alternatives? } }` (`confidence` is an `Option` the caller always gives: `O.some("high")`, or `O.none()` when nothing rated it). Shown struck-old, green new value, button "Use pcs". `by` names who prepared it ("Rule", a sparkle for a model); left out, the change is called a suggestion and names nobody. `reason` is what is wrong with the value, the row's sentence while the fix waits (a rule's lossless fix has no `problem` of its own). Same `group` on identical changes gives a heading above those rows with "Use pcs for 9". `confidence: "low"` makes it a question: the person picks `to` or one of `why.alternatives`, and there is no accept for the group |
 | `fix.label` | What a group's heading and button call the change when its rows end in different values: one reading of a column, `label: "a decimal point"` for 1,5 → 1.5 and 2,25 → 2.25. The heading reads "1,5 (1) · 2,25 (1) → a decimal point" and the button "Use a decimal point for the 2 ticked"; each row still shows its own old and new value, and an accept gives each row its own `to` |
 | `problem.choices` | A pick with no default: `[{ value, label, note?, suggested? }]`, with a `column` and no `fix`. Equal outline buttons, nothing proposed in the cell; one choice is its own button, several open from one (`problem.ask`, or "Choose"). A pick is the person's own value for `column` (your `recheck` sees it) and the row then says "Chosen". `suggested: true` with the reason in `note` reads "40 L, as 6 of 7 lines say (suggested)": said in words only, never picked for the person, never the filled button |
 | `problem.rivals` | Ids of rows that cannot all go in (the same code). The row gets "Keep row 5", which leaves the rivals out, and a "row 56" link that shows the two side by side |
@@ -37,12 +37,14 @@ month its own row of the region, labelled "3 · Feb").
 | `recheck` | Your pure check of one row, run after the person types a value. Return a `Problem` or `undefined` |
 | `onImport(result)` | `result.ready` (id, line, final cells) is what to write; `result.held` has a reason per row |
 | `summary`, `activity` | Extra past-tense chips, and the Activity drawer: steps tagged Read, Rule or Model, what it was allowed, facts |
-| `state`, `readOnly`, `onMatchColumn`, `emptyAction`, `importing` | `"loading" \| "error" \| "ready"`; view only; a column the file did not answer |
+| `state`, `onMatchColumn`, `emptyAction`, `importing` | `"loading" \| "error" \| "ready"`; a column the file did not answer |
+| `readOnly` | An atom of a boolean: true while the person may look but not decide. The region's buttons, its keys and the width of its answers follow it |
+| `ruleFixes` | An atom of `"propose"` (the default) or `"apply"`: see "Asking first" below |
 | `embedded` | Inside a page with its own heading, counts and import button: the title is an `h2`, the toolbar keeps Undo and Redo, and the region shows neither its own tally nor its import button, so `onImport` is never called. See "When records have a parent" |
-| `words` | The task's own words for the tabs and the statuses, each set once and used on every tab, tag, count, sentence and downloaded file; what is left out keeps its default (`defaultReviewWords` in `words.ts`). The tabs: `needs` (Needs you), `cannot` (Can't fix here), `ready`, `out` (Left out), `all`; a row's tag: `stored` (Already there), `auto` (Auto-fixed), `accepted`, `kept`, `edited`, `chosen`; and `nothingNew` ("Nothing new: this file is already in") and `nothingToImport` ("Nothing here can be imported") in place of the import button. `{ needs: "Waiting on you" }`. The table's caption follows them |
+| `words` | An atom of the task's own words for the tabs and the statuses, each set once and used on every tab, tag, count, sentence and downloaded file; what is left out keeps its default (`defaultReviewWords` in `words.ts`). The tabs: `needs` (Needs you), `cannot` (Can't fix here), `ready`, `out` (Left out), `all`; a row's tag: `stored` (Already there), `auto` (Auto-fixed), `accepted`, `kept`, `edited`, `chosen`; and `nothingNew` ("Nothing new: this file is already in") and `nothingToImport` ("Nothing here can be imported") in place of the import button. `{ needs: "Waiting on you" }`. The table's caption follows them |
 | `totals` | `[{ label, value }]`: the sums that matter, worked out by you from the rows you will import ("Purchase $3,771.18"), shown in the footer. Never add different units or currencies in one |
-| `rowAction` | `(row) => ({ label, onSelect }) \| undefined`: one more answer on a row that needs the person, for rows with a parent ("Leave job J-2044 out"). Each such row keeps its own answers, under a group heading too (no ticks there; the heading's button then says "for all 3"): its fix, pick or typing, then "Other answers" with typing a value beside a fix, "Leave row 8 out" and yours, each in full; a phone card lists them as buttons. Return `undefined` for a row it does not fit. Keep it stable (`useCallback`) |
-| `savedDecisions`, `onDecisionsChange` | The decisions as plain data, for the caller to keep (below). Hand back the very object `onDecisionsChange` gave and Undo and Redo come back with them. The region reads the callback from a ref, so a new function on every render (`(next) => setDraft(next)`) is called once per change, not again on each render |
+| `rowAction` | An atom of `Option<(row) => ({ label, onSelect }) \| undefined>` (none while there is no such answer): one more answer on a row that needs the person, for rows with a parent ("Leave job J-2044 out"). Each such row keeps its own answers, under a group heading too (no ticks there; the heading's button then says "for all 3"): its fix, pick or typing, then "Other answers" with typing a value beside a fix, "Leave row 8 out" and yours, each in full; a phone card lists them as buttons. Return `undefined` for a row it does not fit. The widths of the table's answers are worked out from it, so it is an atom like the rows: `Atom.make(O.some(fn))` at module level, or a derived atom when it reads the page's state |
+| `decisions` | The person's decisions with their undo and redo, as the caller's own atom (`Atom.Writable<ReviewState>`). The region writes it with every action; whoever keeps the decisions reads it there (`saved(state)` is the plain data). Start it with `proposing(rows)` (the rules' fixes as proposals), `emptyState`, `restored(saved)` for decisions kept as plain data (a new history), or `fromDraft(draft)` for a review kept with its Undo and Redo (`toDraft(state)`) |
 
 ## From the spreadsheet reader to the review
 
@@ -95,6 +97,8 @@ file does not have is a `match: { state: "unmatched", candidates }` on that colu
 import { AppShell } from "@/components/app/AppShell"
 import { ReviewRegion } from "@inventory/review/ReviewRegion"
 import { Problem, ProblemKind, ReviewColumn, ReviewRow } from "@inventory/review/ReviewTypes"
+import * as O from "effect/Option"
+import * as Atom from "effect/reactivity/Atom"
 
 const columns: ReadonlyArray<ReviewColumn> = [
   ReviewColumn.make({ id: "name", label: "Name", width: 220, core: true }),
@@ -105,6 +109,7 @@ const kinds: ReadonlyArray<ProblemKind> = [
   ProblemKind.make({ id: "unit", label: "Unknown unit", tone: "decision" }),
   ProblemKind.make({ id: "qty", label: "Below zero", tone: "blocker" })
 ]
+const kindsAtom = Atom.make(kinds) // what the region works from is an atom of the caller's
 const spellings: Record<string, string> = { ea: "pcs", each: "pcs" } // your rule table; Record.get in the model package
 
 // The same pure function the server runs. One problem per row: the first rule that fails.
@@ -113,7 +118,7 @@ const check = (cells: Readonly<Record<string, string>>): Problem | undefined => 
   const to = Object.hasOwn(spellings, unit) ? spellings[unit] : undefined
   if (to !== undefined) {
     const why = { basis: `Fixed rule: "${unit}" means ${to}.` }
-    const fix = { column: "unit", to, by: "rule" as const, kind: "unit", group: `unit:${to}`, why }
+    const fix = { column: "unit", to, by: "rule" as const, kind: "unit", group: `unit:${to}`, confidence: O.none(), why }
     return Problem.make({ kind: "unit", column: "unit", fix })
   }
   if (!["pcs", "kg", "m"].includes(unit)) return Problem.make({ kind: "unit", column: "unit" })
@@ -127,11 +132,11 @@ const review = (file: ReadonlyArray<Record<string, string>>): ReadonlyArray<Revi
   })
 
 export function ReviewStep(props: { file: ReadonlyArray<Record<string, string>>; onImport: (cells: unknown) => void }) {
-  const rows = useMemo(() => review(props.file), [props.file])
   return (
     <AppShell fill title="Import records">
-      <ReviewRegion title="Review items_messy.csv" noun={["record", "records"]} columns={columns} rows={rows} problemKinds={kinds}
-        summary={[`${rows.length} rows read`]} recheck={({ cells }) => check(cells)}
+      <ReviewRegion title="Review items_messy.csv" noun={["record", "records"]} columns={columnsAtom} rows={rowsAtom}
+        decisions={decisionsAtom} problemKinds={kindsAtom} summary={[`${useAtomValue(rowsAtom).length} rows read`]}
+        recheck={recheckAtom}
         onImport={(result) => props.onImport(result.ready.map((row) => row.cells))} />
     </AppShell>
   )
@@ -139,7 +144,10 @@ export function ReviewStep(props: { file: ReadonlyArray<Record<string, string>>;
 ```
 
 - `AppShell fill` gives the region the screen below the header. Inside another frame, give its parent a height.
-- Keep `rows`, `columns` and `recheck` stable (`useMemo`, module level): the region re-derives everything from them.
+- `rows`, `columns`, `recheck` and `decisions` are atoms, made at module level beside the file's own atom
+  (`const rowsAtom = Atom.map(fileAtom, review)`, `const columnsAtom = Atom.make(columns)`,
+  `const recheckAtom = Atom.make(O.some(({ cells }) => check(cells)))`,
+  `const decisionsAtom = Atom.make(emptyState)`): the region derives everything from them, once per change.
 - A model's proposals are the same `fix` with `by: "model"`; they get a sparkle. Merge them into `rows` when they
   arrive. A row the person already decided keeps the person's decision. Give the region a new `key` for a new file.
 - The server still decides: send `result.ready` to an endpoint that runs the same `check` and refuses what it refuses.
@@ -158,21 +166,23 @@ holds several records, is [patterns](patterns.md) section 16):
   `problem` and `fix` as above, and a column for the parent's number (`code: true`, and `context: true` for the
   phone card), so every row says which order it belongs to. Pass `embedded`: the title becomes an `h2` under the
   page's heading, and the region shows neither its own tally nor its import button.
-- **The page counts, not the region.** Keep the decisions with `onDecisionsChange` (`savedDecisions` brings them
-  back), turn them into the project's answers, and run the project's own pure review of the parents with them. That
+- **The page counts, not the region.** Read the decisions from the atom the region writes
+  (`Atom.map(decisionsAtom, saved)`), turn them into the project's answers, and run the project's own pure review of the parents with them. That
   one function gives every count on the page and what its button imports: the region counts rows, and an order is
   ready only when every one of its lines is.
 - **The filter words follow the task's own names.** Where the task calls the waiting ones "Waiting on you", pass
-  `words={{ needs: "Waiting on you" }}` and give the parent table's tabs the same words, so the page and the
+  `words={Atom.make({ needs: "Waiting on you" })}` (made once, at module level) and give the parent table's tabs the same words, so the page and the
   region say one thing.
 - **A line's own answers, and its parent's.** `rowAction` adds the parent's answer to every line that needs the
   person ("Leave job J-2044 out"), beside "Leave row 8 out"; the page leaves the parent out and drops its lines from
   `rows`. A question with no default is `problem.choices`, one of them `suggested` with its reason in `note`.
 - **Two views, one history.** A page that shows the parent table and the questions as two views unmounts the region
-  when it switches. Keep the decisions in the page (`onDecisionsChange={setDecisions}`,
-  `savedDecisions={decisions}`), as they are: the region comes back with its answers and with "Undo last step". A
-  copy of the object (`{ ...saved }`), JSON or a refresh brings the decisions back and starts a new history. A page
-  that keeps no decisions loses both on every switch: keep the region mounted and hide it instead.
+  when it switches. The decisions are the page's atom, and they outlive the region only while something still
+  holds that atom: the app's registry lets an atom nobody reads go after 400 ms, and an `Atom.make` read again
+  starts from its first value, with no answers and no history. So the page reads or mounts the atom in both views
+  (`useAtomMount(decisions)`), or makes it `Atom.keepAlive`; the region then comes back with its answers and with
+  "Undo last step". After a refresh, `fromDraft(draft)` brings the decisions and their history back; the plain
+  decisions alone (`restored(saved)`) bring them back and start a new history.
 - **Twelve parent rows at 1440 by 900.** The parent table is the data table (`RecordsTable`), one line a row with
   the reason cut to one line and the whole sentence in its `title`, one status pill, the totals on one line beside
   the import button and the filters on the same row as the view tabs.
@@ -251,17 +261,27 @@ choice suggested), a decimal comma under one labelled group, a SKU not in stock,
 
 - **Nothing changes until the person accepts** (`ruleFixes`, default `"propose"`): the rules' lossless fixes
   (`row.applied`) wait as proposals under Needs you, with "Accept 17 safe fixes" on their kind's heading and one
-  heading per spelling. `ruleFixes="apply"` puts them in force on arrival with a tick, "17 auto-fixed" and Undo.
+  heading per spelling. `ruleFixes={Atom.make("apply")}` puts them in force on arrival with a tick, "17 auto-fixed" and Undo.
 - **Who decided each thing** is in `onImport`'s result, ready for an Activity row per change:
   `result.ready[i].changes` is `{ column, from, to, source: "rule" | "model" | "person", decidedBy: "person" | "rule",
-  how, basis?, confidence? }` (`basis` and `confidence` are the fix's `why.basis` and `confidence`), `kept` marks a row
+  how, basis?, confidence }` (`basis` and `confidence` are the fix's `why.basis` and `confidence`, the latter an `Option`), `kept` marks a row
   kept over another, and `result.held[i].decidedBy` is `"person"` for a row left out, `"nobody"` for one still open.
-- **A refresh does not lose work**: decisions are plain data. Keep them and hand them back (the same object, kept as
-  it is, also keeps "Undo last step" when the region is drawn again in the same page: "Two views, one history"):
+- **A refresh does not lose work**: decisions are plain data. Keep them with their history (`toDraft(state)`) and
+  start again from them (`fromDraft(draft)`); kept as `saved(state)` alone they come back with a new history:
 
 ```tsx
-const [draft, setDraft] = useState<SavedDecisions | undefined>(() => readDraft(fileId)) // your server draft or localStorage
-<ReviewRegion key={fileId} savedDecisions={draft} onDecisionsChange={(next) => { setDraft(next); writeDraft(fileId, next) }} … />
+// One atom per file. Read: what is held, or what was kept, with its Undo and Redo. A write holds it and keeps it
+// (your server draft or localStorage; `readDraft` gives an Option of what `toDraft` made). `held` is kept alive: the
+// registry lets an atom nobody reads go after 400 ms, and without it a region that comes back after the other view
+// would read the kept draft again in place of what the person did since the last write landed.
+const decisionsOf = perKey((fileId: string) => {
+  const held = Atom.keepAlive(Atom.make<O.Option<ReviewState>>(O.none()))
+  return Atom.writable(
+    (get) => O.getOrElse(get(held), () => O.match(readDraft(fileId), { onNone: () => emptyState, onSome: fromDraft })),
+    (ctx, next: ReviewState) => { ctx.set(held, O.some(next)); writeDraft(fileId, toDraft(next)) }
+  )
+})
+<ReviewRegion key={fileId} decisions={decisionsOf(fileId)} … />
 ```
 
 ## Not included
@@ -277,11 +297,13 @@ const [draft, setDraft] = useState<SavedDecisions | undefined>(() => readDraft(f
 - Editing is one field, the one that is wrong. For editing many cells use the data grid ([the kit](kit.md)).
 - No sums of its own: it cannot know which columns add up or in what units. Pass yours in `totals`, and a check
   against the file in `summary` ("Totals match file").
-- Decisions live in the region until Import unless the caller saves them: pass `savedDecisions` and `onDecisionsChange`
-  (see "A refresh does not lose work"). Without them a reload, or a view switch that unmounts the region, starts the
-  review again. The undo and redo history lives in the decisions object the region handed out; to keep it across a
-  refresh, store `toDraft(decisions)` and hand back `fromDraft(draft)` as `savedDecisions` (`useSavedProgress` does
-  this; a draft saved before redo existed opens with nothing to redo).
+- It keeps no decisions of its own: they live in the caller's `decisions` atom, for as long as the caller keeps that
+  atom (read or mounted somewhere, or `Atom.keepAlive`: an atom nobody reads is let go after 400 ms and starts again
+  from its first value), and across a reload only if the caller's atom writes them somewhere (see "A refresh does
+  not lose work"). The
+  undo and redo history lives in the state the atom holds; to keep it across a refresh, store `toDraft(state)`
+  and start again from `fromDraft(draft)` (the Review step does this with the saved progress; a draft saved
+  before redo existed opens with nothing to redo).
 
 ## Wired to the example Record
 

@@ -5,6 +5,7 @@
  * a unit to pick with no default (`choices`, one suggested), a quantity with a decimal comma (one `label`ed group
  * whose rows end in different values), and a SKU that is not on the item list (type one, or leave the job out).
  */
+import * as O from "effect/Option"
 import { Choice, Problem, ProblemKind, ReviewColumn, ReviewRow } from "@inventory/review/ReviewTypes"
 import type { RowDecision, SavedDecisions } from "@inventory/review/ReviewTypes"
 
@@ -175,7 +176,7 @@ export function makeJobs(): ReadonlyArray<Job> {
             to,
             label: "a decimal point",
             by: "rule",
-            confidence: "high",
+            confidence: O.some("high"),
             kind: "comma",
             group: "qty:comma",
             why: {

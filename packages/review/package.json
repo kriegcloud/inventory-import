@@ -14,7 +14,8 @@
     "./ReviewDecision": "./src/ReviewDecision.schema.ts",
     "./ReviewDraft": "./src/ReviewDraft.rules.ts",
     "./SavedProgress": "./src/SavedProgress.schema.ts",
-    "./SavedProgressHook": "./src/SavedProgress.hook.ts"
+    "./SavedProgressHook": "./src/SavedProgress.hook.ts",
+    "./Kept": "./src/Kept.atoms.ts"
   },
   "scripts": {
     "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json && beep-cli quality strict strict-ceiling.json",
@@ -24,6 +25,7 @@
   "dependencies": {
     "@beep/identity": "workspace:*",
     "@beep/schema": "workspace:*",
+    "@effect/atom-react": "4.1.4",
     "@inventory/ui": "workspace:*",
     "@tanstack/react-table": "^9.3.1",
     "@tanstack/react-virtual": "^3.14.26",
@@ -35,6 +37,8 @@
   },
   "devDependencies": {
     "@effect/vitest": "4.1.4",
+    "@tanstack/store": "0.11.2",
+    "@tanstack/table-core": "9.3.1",
     "@types/node": "^24.19.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",

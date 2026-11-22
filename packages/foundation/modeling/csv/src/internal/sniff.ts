@@ -7,7 +7,7 @@ import * as A from "effect/Array"
 import * as O from "effect/Option"
 import * as Str from "effect/String"
 import type { CsvDelimiter, CsvReadOptions } from "../CsvOptions.schema.ts"
-import { end, MachineState, push, type MachineConfig } from "./machine.ts"
+import { end, MachineConfig, MachineState, push } from "./machine.ts"
 
 /** Characters of text the delimiter is detected from, as the app's old reader's first piece. */
 export const SNIFF_WINDOW = 256 * 1024
@@ -20,14 +20,14 @@ const widthsWith = (
   delimiter: CsvDelimiter,
   limits: CsvReadOptions["limits"]
 ): ReadonlyArray<number> => {
-  const config: MachineConfig = {
+  const config = MachineConfig.make({
     delimiter,
     quotes: "lenient",
     ragged: "keep",
     blankLines: "keep",
     trim: "none",
     limits
-  }
+  })
   let state = MachineState.initial
   const widths: Array<number> = []
   let at = 0

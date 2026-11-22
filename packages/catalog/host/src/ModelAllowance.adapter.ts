@@ -2,7 +2,13 @@
 // contract; this is the one place the two unions meet.
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import { ModelAllowance, taken, usedUp, type CatalogModelPurpose } from "@inventory/catalog-model/ModelAllowance"
+import {
+  AllowanceAnswer,
+  ModelAllowance,
+  taken,
+  usedUp,
+  type CatalogModelPurpose
+} from "@inventory/catalog-model/ModelAllowance"
 import { ModelAllowanceGateway, usedUpWords } from "@inventory/access-contract/ModelAllowance"
 
 /**
@@ -16,7 +22,7 @@ export const ModelAllowanceViaAccess = Layer.effect(
     return ModelAllowance.of({
       take: Effect.fnUntraced(function* (purpose: CatalogModelPurpose) {
         const call = yield* gateway.take(purpose)
-        return call.kind === "taken" ? taken : usedUp(usedUpWords)
+        return AllowanceAnswer.guards.taken(call) ? taken : usedUp(usedUpWords)
       })
     })
   })

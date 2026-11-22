@@ -3,7 +3,7 @@
 // binds them once, at start (`configureCatalog`), because an upload and a prefetch run outside any component.
 import type { AssistantApi, ImportsApi, ItemsApi } from "@inventory/catalog-contract/Catalog"
 import type { Api, Call, Fork } from "@inventory/client/ApiRuntime"
-import { makeOptimisticWrite } from "@inventory/client/Optimistic"
+import { makeApiAtoms } from "@inventory/client/Api"
 import type { SameOrigin } from "@inventory/kernel/SameOrigin"
 import * as Context from "effect/Context"
 import type * as Effect from "effect/Effect"
@@ -52,22 +52,23 @@ const binding = (): CatalogBinding => {
 }
 
 /**
- * Run one API call as a Promise, for TanStack Query.
- * A typed API error rejects with that error object, so the UI can switch on `_tag`.
- */
-export const call: Call<CatalogApiClient> = (use) => binding().call(use)
-
-/**
- * Runs one write as a Promise, for a mutation. A failure that may pass is sent again, twice at most; a refusal is
- * not. A write names what it acts on, so a retry after a lost answer adds nothing.
+ * Runs one write as a Promise, for a write that is not an atom's (the review's draft sends its saves itself). A
+ * failure that may pass is sent again, twice at most; a refusal is not. A write names what it acts on, so a retry
+ * after a lost answer adds nothing.
  */
 export const callWrite: Call<CatalogApiClient> = (use) => binding().callWrite(use)
+
+/**
+ * Runs one request as a Promise, sent once whatever its answer: the confirm of an import, whose outcome only the
+ * server knows, so a lost answer is asked about and never sent again.
+ */
+export const call: Call<CatalogApiClient> = (use) => binding().call(use)
 
 /** Runs a longer program against the API in the background; interrupting its fiber aborts its requests. */
 export const fork: Fork<CatalogApiClient> = (use) => binding().fork(use)
 
-/** One optimistic write against the catalog groups (`@inventory/client/Optimistic` says the rule it keeps). */
-export const useOptimisticWrite = makeOptimisticWrite(callWrite)
+/** Reads, writes and the write retries against the catalog groups, as atoms on the app's one runtime. */
+export const catalogApi = makeApiAtoms(CatalogClient)
 
 /** Runs an Effect on the app's runtime, as a Promise of its exit. */
 export const runExit = <A, E>(effect: Effect.Effect<A, E>): Promise<Exit.Exit<A, E>> =>

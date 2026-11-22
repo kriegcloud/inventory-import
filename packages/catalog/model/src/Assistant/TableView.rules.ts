@@ -38,11 +38,11 @@ export const checkCommand = (input: {
 }): Result.Result<ReadonlyArray<ViewChange>, string> => {
   const checked: Array<ViewChange> = []
   for (const change of input.changes) {
-    if (change.kind === "clear") {
+    if (ViewChange.guards.clear(change)) {
       checked.push(change)
       continue
     }
-    if (change.kind === "search") {
+    if (ViewChange.guards.search(change)) {
       if (!input.searchable)
         return Result.fail(`This table has no search box; ask for a filter on a column instead, ${nothing}`)
       const text = Str.trim(change.text)
@@ -57,13 +57,15 @@ export const checkCommand = (input: {
       return Result.fail(`The answer named a column this table does not have (${quoted(change.column)}), ${nothing}`)
     }
     const column = found.value
-    if (change.kind === "sort") {
+    if (ViewChange.guards.sort(change)) {
       if (!column.sortable) return Result.fail(`The table cannot be ordered by ${column.label}, ${nothing}`)
       checked.push(change)
       continue
     }
-    if (change.kind !== "filter") {
-      if (change.kind === "hide" && !column.hideable) return Result.fail(`${column.label} is always shown, ${nothing}`)
+    if (!ViewChange.guards.filter(change)) {
+      if (ViewChange.guards.hide(change) && !column.hideable) {
+        return Result.fail(`${column.label} is always shown, ${nothing}`)
+      }
       checked.push(change)
       continue
     }

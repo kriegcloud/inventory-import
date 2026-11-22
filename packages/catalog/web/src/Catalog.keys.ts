@@ -1,6 +1,6 @@
-// The query keys of the catalog screens. The rule this file protects: every key a catalog write makes stale is named
-// here, so a write invalidates exactly what it changed.
-import { ItemQuery } from "@inventory/catalog-contract/ItemQuery"
+// The reactivity keys of the catalog screens' reads (`@inventory/client/Api`). The rule this file protects: every key
+// a catalog write makes stale is named here, so a write asks again exactly what it changed. A read asks again when any
+// one of its keys is said to have changed, so two reads share a key only where one change makes both stale.
 
 /**
  * The keys the catalog screens cache under. A confirm changes the items, the changed values, the activity and the
@@ -20,10 +20,8 @@ export const catalogKeys = {
   importTable: (id: string | undefined) => ["import-table", id] as const,
   /** Everything about items: the prefix a confirm, a take-back or an edit invalidates. */
   items: ["items"],
-  /** Every page of items the table has fetched: the prefix an item edit changes at once. */
-  itemsPages: ["items", "page"],
-  itemsPage: (query: ItemQuery) => ["items", "page", query] as const,
-  itemFacets: ["items", "facets"],
+  /** Its own key, not under "items": an item edit asks for the facets again without asking for its page twice. */
+  itemFacets: ["item-facets"],
   /** The values imports wrote that differ from their files. */
   changes: ["changes"],
   /**
@@ -32,6 +30,3 @@ export const catalogKeys = {
    */
   activity: ["activity"]
 } as const
-
-/** The keys under the name the screens that moved here call them by. */
-export const queryKeys = catalogKeys

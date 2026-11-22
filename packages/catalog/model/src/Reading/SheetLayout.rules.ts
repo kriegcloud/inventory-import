@@ -10,13 +10,15 @@ import * as Str from "effect/String"
 import {
   type Cell,
   type Column,
+  CsvFormat,
   type ExtraCell,
   type Note,
   type NoteKind,
   type Row,
   type SheetChoice,
   type SheetSummary,
-  type SpreadsheetTable
+  type SpreadsheetTable,
+  WorkbookFormat
 } from "./Spreadsheet.rules.ts"
 import { fileProblem } from "@inventory/catalog-contract/FileProblem"
 /** One row of the grid as read, before the header is known. `cells[i]` is spreadsheet column `i` (0 = A). */
@@ -564,7 +566,7 @@ export const describeCsv = Effect.fn("SheetLayout.describeCsv")(function* (input
   return {
     fileName: input.fileName,
     kind: "csv",
-    format: { _tag: "csv", delimiter: input.delimiter, encoding: input.encoding },
+    format: CsvFormat.make({ delimiter: input.delimiter, encoding: input.encoding }),
     headerRowNumber: layout.headerRowNumber,
     columns: layout.columns,
     rows: layout.rows,
@@ -656,8 +658,7 @@ export const describeSheets = Effect.fn("SheetLayout.describeSheets")(function* 
   return {
     fileName: input.fileName,
     kind: "xlsx",
-    format: {
-      _tag: "xlsx",
+    format: WorkbookFormat.make({
       sheets: summaries,
       chosen: {
         name: sheet.name,
@@ -666,7 +667,7 @@ export const describeSheets = Effect.fn("SheetLayout.describeSheets")(function* 
         reason,
         explanation
       }
-    },
+    }),
     headerRowNumber: layout.headerRowNumber,
     columns: layout.columns,
     rows: layout.rows,

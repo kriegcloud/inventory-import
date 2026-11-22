@@ -11,6 +11,7 @@ import {
 } from "@inventory/catalog-contract/Item"
 import * as A from "effect/Array"
 import * as BigDecimal from "effect/BigDecimal"
+import * as Data from "effect/Data"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as Result from "effect/Result"
@@ -45,6 +46,18 @@ export type ItemFormProblems = Partial<
   >
 >
 
+/**
+ * What reading the edit form gives: the edit to send, or every problem in it. A tagged enum, so the screen and the
+ * tests tell the two apart with its own `$match` and `$is`, and build either with its constructor.
+ */
+export type ItemFormReading = Data.TaggedEnum<{
+  Edit: { readonly edit: ItemEdit }
+  Problems: { readonly problems: ItemFormProblems }
+}>
+
+/** The constructors, guards and matcher of `ItemFormReading`. */
+export const ItemFormReading = Data.taggedEnum<ItemFormReading>()
+
 const count = new Intl.NumberFormat("en-US")
 
 /**
@@ -52,14 +65,9 @@ const count = new Intl.NumberFormat("en-US")
  * says what to change. A cost is read from the digits, as an import reads it; empty optional boxes are none.
  *
  * @example readItemForm({ form: { ...form, unitCost: "3.65555" }, revision: 1 })
- * // { _tag: "Problems", problems: { unitCost: "Unit cost is not an amount ..." } }
+ * // ItemFormReading.Problems({ problems: { unitCost: "Unit cost is not an amount ..." } })
  */
-export const readItemForm = (input: {
-  readonly form: ItemForm
-  readonly revision: number
-}):
-  | { readonly _tag: "Edit"; readonly edit: ItemEdit }
-  | { readonly _tag: "Problems"; readonly problems: ItemFormProblems } => {
+export const readItemForm = (input: { readonly form: ItemForm; readonly revision: number }): ItemFormReading => {
   const { form } = input
   const name = Str.trim(form.name)
   const description = Str.trim(form.description)
@@ -119,9 +127,8 @@ export const readItemForm = (input: {
   const problems = A.filterMap(found, ([field, message]) =>
     message === undefined ? Result.failVoid : Result.succeed([field, message] as const)
   )
-  if (A.isReadonlyArrayNonEmpty(problems)) return { _tag: "Problems", problems: R.fromEntries(problems) }
-  return {
-    _tag: "Edit",
+  if (A.isReadonlyArrayNonEmpty(problems)) return ItemFormReading.Problems({ problems: R.fromEntries(problems) })
+  return ItemFormReading.Edit({
     edit: {
       revision: input.revision,
       name,
@@ -135,5 +142,5 @@ export const readItemForm = (input: {
       lotTracked: form.lotTracked,
       firstReceivedOn: O.flatten(received)
     }
-  }
+  })
 }

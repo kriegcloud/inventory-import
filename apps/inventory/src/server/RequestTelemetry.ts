@@ -5,6 +5,7 @@ import * as Duration from "effect/Duration"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Layer from "effect/Layer"
+import * as Match from "effect/Match"
 import * as O from "effect/Option"
 import * as Scope from "effect/Scope"
 import * as Tracer from "effect/Tracer"
@@ -66,10 +67,15 @@ const countingOpenSpans = (tracer: Tracer.Tracer) => {
       started = true
       const end = span.end
       span.end = function (endTime, exit) {
-        if (span.status._tag === "Ended") return
-        end.call(this, endTime, exit)
-        open -= 1
-        if (open === 0) Deferred.doneUnsafe(allEnded, Exit.void)
+        // A span ended once is not counted again: told by its status's case.
+        Match.valueTags(span.status, {
+          Ended: () => undefined,
+          Started: () => {
+            end.call(this, endTime, exit)
+            open -= 1
+            if (open === 0) Deferred.doneUnsafe(allEnded, Exit.void)
+          }
+        })
       }
       return span
     },

@@ -15,7 +15,6 @@ import * as ByteSize from "effect/ByteSize"
 import * as Channel from "effect/Channel"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
-import * as P from "effect/Predicate"
 import * as R from "effect/Record"
 import * as Result from "effect/Result"
 import * as S from "effect/Schema"
@@ -279,14 +278,16 @@ export const Pending = PendingTag.mapMembers(
   Tuple.evolve([
     () => S.Struct({ phase: S.tag(PendingTag.Enum.buffering), buffer: S.String, first: S.Boolean }),
     () => S.Struct({ phase: S.tag(PendingTag.Enum.running), state: MachineState, config: MachineConfig })
-  ]),
-
+  ])
 )
 type Pending =
   | { readonly phase: "buffering"; readonly buffer: string; readonly first: boolean }
   | { readonly phase: "running"; readonly state: MachineState; readonly config: MachineConfig }
 
 type Emitted = A.NonEmptyReadonlyArray<CsvRecordSlice> | CsvParseError
+
+/** True for the reader's failure among what it emits, told by its own class. */
+const isParseError = S.is(CsvParseError)
 
 const slicesOf = (step: Step): ReadonlyArray<Emitted> => {
   const fatals = fatalsOf(step.diagnostics)
@@ -329,9 +330,7 @@ const haltText = (pending: Pending, options: ReadOptions): ReadonlyArray<Emitted
 }
 
 const failOnError = (emitted: Emitted): Effect.Effect<A.NonEmptyReadonlyArray<CsvRecordSlice>, CsvParseError> =>
-  P.isTagged(emitted, "CsvParseError")
-    ? Effect.fail(emitted as CsvParseError)
-    : Effect.succeed(emitted as A.NonEmptyReadonlyArray<CsvRecordSlice>)
+  isParseError(emitted) ? Effect.fail(emitted) : Effect.succeed(emitted)
 
 const decodeStringChannel = <IE, Done>(
   options: ReadOptions
@@ -352,36 +351,29 @@ const decodeStringChannel = <IE, Done>(
     ),
     Channel.mapEffect(failOnError)
   )
-const BytesPendingTag = LiteralKit(
-  [
-    "window",
-    "utf8",
-    "fixed"
-  ]
-)
-export type BytesPendingTag = typeof BytesPendingTag.Type;
+const BytesPendingTag = LiteralKit(["window", "utf8", "fixed"])
+export type BytesPendingTag = typeof BytesPendingTag.Type
 
 export const BytesPending = BytesPendingTag.mapMembers(
-  Tuple.evolve(
-    [
-      () => S.Struct({
+  Tuple.evolve([
+    () =>
+      S.Struct({
         phase: S.tag(BytesPendingTag.Enum.window),
         bytes: S.Uint8Array
       }),
-      () => S.Struct({
+    () =>
+      S.Struct({
         phase: S.tag(BytesPendingTag.Enum.utf8),
         carry: S.Uint8Array,
         at: S.Finite
       }),
-      () => S.Struct({
+    () =>
+      S.Struct({
         phase: S.tag(BytesPendingTag.Enum.fixed),
         decoder: S.instanceOf(TextDecoder)
       })
-    ]
-  )
-).pipe(
-  S.toTaggedUnion("phase")
-)
+  ])
+).pipe(S.toTaggedUnion("phase"))
 export type BytesPending = typeof BytesPending.Type
 
 type Text = string | CsvParseError
@@ -504,11 +496,7 @@ const bytesToText = <IE, Done>(
         ),
       { onHalt: (pending) => [...haltBytes(pending, options)] }
     ),
-    Channel.mapEffect((text) =>
-      P.isTagged(text, "CsvParseError")
-        ? Effect.fail(text as CsvParseError)
-        : Effect.succeed(A.of(text as string) as A.NonEmptyReadonlyArray<string>)
-    )
+    Channel.mapEffect((text) => (isParseError(text) ? Effect.fail(text) : Effect.succeed(A.of(text))))
   )
 
 const encodeStringChannel = <IE, Done>(

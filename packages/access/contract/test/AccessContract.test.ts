@@ -16,6 +16,7 @@ import {
   TestAccount
 } from "@inventory/access-contract/SessionState"
 import * as Effect from "effect/Effect"
+import * as Exit from "effect/Exit"
 import * as Arbitrary from "effect/Arbitrary"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
@@ -80,7 +81,7 @@ describe("the wire", () => {
       const key = yield* S.decodeEffect(EmailToFind)("  Sam.Okafor@Example.TEST ")
       const blank = yield* Effect.exit(S.decodeEffect(EmailToFind)("   "))
       const noEmail = yield* Effect.exit(S.decodeEffect(EmailToFind)("sam"))
-      expect([key, blank._tag, noEmail._tag]).toEqual(["sam.okafor@example.test", "Failure", "Failure"])
+      expect([key, Exit.isFailure(blank), Exit.isFailure(noEmail)]).toEqual(["sam.okafor@example.test", true, true])
     })
   )
 

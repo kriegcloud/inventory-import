@@ -10,13 +10,18 @@ import {
   BreadcrumbSeparator
 } from "@inventory/ui/components/breadcrumb"
 import { ReviewSkeleton, someColumns, StepsSkeleton, TablePageSkeleton, UploadSkeleton } from "@inventory/ui/Skeletons"
-import { useAtomValue } from "@effect/atom-react"
-import { sessionView } from "@inventory/access-web/Session"
-import { CurrentMember } from "@inventory/client/CurrentMember"
+import { useAtomMount, useAtomRefresh, useAtomValue } from "@effect/atom-react"
+import { Alert, AlertDescription, AlertTitle } from "@inventory/ui/components/alert"
+import { Button } from "@inventory/ui/components/button"
+import { isNarrow } from "@inventory/ui/ContentWidth"
+import { sayError } from "@inventory/client/SayError"
+import { session, sessionView } from "@inventory/access-web/Session"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import { importInAddress } from "@inventory/catalog-web/Route"
-import { importTableQuery, importViewQuery, useImportView } from "@inventory/catalog-web/Imports"
-import { queryClient } from "@/lib/queries"
+import { KeptNotices } from "@inventory/catalog-web/KeptNotices"
+import { askBeforeLeaving, importViewShown } from "@inventory/catalog-web/Imports"
+import * as AsyncResult from "effect/reactivity/AsyncResult"
+import * as Atom from "effect/reactivity/Atom"
 import { contentBelow } from "@inventory/ui/ContentWidth"
 import { linkTo, location } from "@inventory/ui/Route"
 
@@ -24,16 +29,9 @@ import { linkTo, location } from "@inventory/ui/Route"
 // spreadsheet reader or the other pages.
 const importPage = () => import("@inventory/catalog-web/ImportPage")
 const ImportPage = lazy(() => importPage().then((module) => ({ default: module.ImportPage })))
-// A signed-in person most likely lands on the import page: its code is fetched with this chunk, not after it. When
-// the address names an import, its view and rows are asked for now too, beside the page's code instead of after it.
-if (window.location.pathname === "/") {
-  void importPage()
-  const opened = importInAddress(new URLSearchParams(window.location.search)).id
-  if (opened !== undefined) {
-    void queryClient.prefetchQuery(importViewQuery(opened))
-    void queryClient.prefetchQuery(importTableQuery(opened))
-  }
-}
+// A signed-in person most likely lands on the import page: its code is fetched with this chunk, not after it. An
+// import the address names is already on its way (`preload.ts` asks for its view and rows early).
+if (window.location.pathname === "/") void importPage()
 const ItemsPage = lazy(() =>
   import("@inventory/catalog-web/ItemsPage").then((module) => ({ default: module.ItemsPage }))
 )
@@ -74,14 +72,18 @@ function PageSkeleton(props: { path: string; params: URLSearchParams }) {
   )
 }
 
+/** What the crumbs read while no import is open: nothing, never asked for. */
+const noImport = Atom.make(AsyncResult.initial<never, never>())
+
 /**
  * Where the person is, in the bar beside the sidebar's button: the organization, the page, and the file when an
  * import is open. The organization gives way first on a narrow screen; the sidebar already names it.
  */
 function Crumbs(props: { page: AppPage; importId: ImportId | undefined }) {
   const { actor } = useAtomValue(sessionView)
-  // The same cached answer the import page reads: no second request.
-  const fileName = useImportView(props.importId).data?.fileName
+  // The same read the import page shows: no second request.
+  const opened = useAtomValue(props.importId === undefined ? noImport : importViewShown(props.importId))
+  const fileName = AsyncResult.isSuccess(opened) ? opened.value.fileName : undefined
   const inImport = props.page.path === "/" && props.importId !== undefined
   // The organization is already named at the top of the sidebar: beside a narrow page the bar keeps its room.
   const short = useAtomValue(contentBelow(1024))
@@ -126,15 +128,38 @@ function Crumbs(props: { page: AppPage; importId: ImportId | undefined }) {
  */
 export default function Workspace() {
   const { path, params } = useAtomValue(location)
-  // The catalog screens mirror the role rule from the member the app provides here, never from a request.
-  const { actor } = useAtomValue(sessionView)
+  // The browser asks before the page is left while an import has rows still to be sent, whatever page is shown.
+  useAtomMount(askBeforeLeaving)
   // An address that names no page shows the first one, as before.
   const current = appPages.find((page) => page.path === path) ?? appPages[0]
   if (current === undefined) return null
+  return <WorkspaceFrame current={current} path={path} params={params} />
+}
+
+/**
+ * Who is signed in could not be read again: the page stays as it is, with what is typed in it, and nothing is sent
+ * until it is known. It is asked again by itself; the button asks now.
+ */
+function SessionNotice() {
+  const { error } = useAtomValue(sessionView)
+  const ask = useAtomRefresh(session)
+  const narrow = useAtomValue(isNarrow)
+  if (error === null) return null
   return (
-    <CurrentMember value={actor}>
-      <WorkspaceFrame current={current} path={path} params={params} />
-    </CurrentMember>
+    <Alert className={narrow ? "mx-4 my-3 w-auto flex-none" : "mx-6 my-4 w-auto flex-none"}>
+      <AlertTitle>We could not check that you are still signed in</AlertTitle>
+      <AlertDescription>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <p className="min-w-0">
+            {sayError(error).sentence} Nothing you decide or save is sent until we can, and it is checked again by
+            itself when the connection is back.
+          </p>
+          <Button variant="outline" size="xs" onClick={ask}>
+            Check now
+          </Button>
+        </div>
+      </AlertDescription>
+    </Alert>
   )
 }
 
@@ -147,17 +172,24 @@ function WorkspaceFrame(props: { current: AppPage; path: string; params: URLSear
       sidebar={<AppSidebar current={current.path} />}
       crumbs={<Crumbs page={current} importId={importInAddress(params).id} />}
     >
-      <Suspense fallback={<PageSkeleton path={path} params={params} />}>
-        {current.path === peoplePath ? (
-          <PeoplePage />
-        ) : current.path === "/items" ? (
-          <ItemsPage />
-        ) : current.path === "/activity" ? (
-          <ActivityPage />
-        ) : (
-          <ImportPage />
-        )}
-      </Suspense>
+      <div className="flex h-full flex-col">
+        {/* Whatever page is shown: what became of the person's unsaved decisions while this tab was away. */}
+        <KeptNotices />
+        <SessionNotice />
+        <div className="min-h-0 flex-1">
+          <Suspense fallback={<PageSkeleton path={path} params={params} />}>
+            {current.path === peoplePath ? (
+              <PeoplePage />
+            ) : current.path === "/items" ? (
+              <ItemsPage />
+            ) : current.path === "/activity" ? (
+              <ActivityPage />
+            ) : (
+              <ImportPage />
+            )}
+          </Suspense>
+        </div>
+      </div>
     </AppShell>
   )
 }

@@ -12,6 +12,7 @@ import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as MutableRef from "effect/MutableRef"
+import * as O from "effect/Option"
 import * as Stream from "effect/Stream"
 import * as HttpClient from "effect/http/HttpClient"
 import type * as HttpClientRequest from "effect/http/HttpClientRequest"
@@ -76,7 +77,7 @@ export class OpenRouterTest {
             const index = MutableRef.getAndIncrement(count)
             // Past the end of the script, the last reply plays again: a test that asks many times scripts it once.
             const reply = A.get(replies, Math.min(index, replies.length - 1))
-            if (reply._tag === "None") return yield* Effect.die("The script has no replies")
+            if (O.isNone(reply)) return yield* Effect.die("The script has no replies")
             if ("hang" in reply.value) return yield* Effect.never
             if ("text" in reply.value) {
               return [

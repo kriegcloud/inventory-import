@@ -12,6 +12,7 @@ import * as Tracer from "effect/Tracer"
 import * as SecureRandom from "effect/crypto/SecureRandom"
 import * as FetchHttpClient from "effect/http/FetchHttpClient"
 import * as HttpClient from "effect/http/HttpClient"
+import * as HttpClientError from "effect/http/HttpClientError"
 import * as HttpMiddleware from "effect/http/HttpMiddleware"
 import * as HttpRouter from "effect/http/HttpRouter"
 import * as HttpServerRequest from "effect/http/HttpServerRequest"
@@ -85,7 +86,7 @@ const collectorClient = Layer.effect(
   Effect.map(
     HttpClient.HttpClient,
     HttpClient.tapError((error) =>
-      error.reason._tag === "TransportError"
+      error.reason instanceof HttpClientError.TransportError
         ? Effect.map(Clock.currentTimeMillis, (now) => {
             collectorMissedAt = Number(now)
           })

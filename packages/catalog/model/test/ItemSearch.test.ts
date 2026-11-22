@@ -4,6 +4,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
+import * as Match from "effect/Match"
 import * as Str from "effect/String"
 import * as S from "effect/Schema"
 import { ItemQueryParams } from "@inventory/catalog-contract/Catalog"
@@ -15,6 +16,7 @@ import {
   phrase,
   plan,
   searchWords,
+  type WordMatch,
   wordsLeftOut,
   wordsToCheck
 } from "@inventory/catalog-model/ItemSearch"
@@ -82,11 +84,13 @@ describe("the words of a search", () => {
 
   it("are read by length and by whether the items hold them as typed", () => {
     expect(wordsToCheck(["m8", "nut", "washr", "lock"])).toEqual(["washr", "lock"])
-    expect(A.map(plan({ words: ["m8", "nut", "washr", "lock"], found: ["lock"] }), (word) => word._tag)).toEqual([
-      "Contains",
-      "Indexed",
-      "Close",
-      "Indexed"
+    const how = (word: WordMatch) =>
+      Match.valueTags(word, { Contains: () => "contains", Indexed: () => "indexed", Close: () => "close" })
+    expect(A.map(plan({ words: ["m8", "nut", "washr", "lock"], found: ["lock"] }), how)).toEqual([
+      "contains",
+      "indexed",
+      "close",
+      "indexed"
     ])
   })
 })

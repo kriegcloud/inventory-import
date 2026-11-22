@@ -1,3 +1,5 @@
+import { CellMark } from "@inventory/review/ReviewTypes"
+import * as O from "effect/Option"
 import {
   ArrowRightIcon,
   CheckIcon,
@@ -7,17 +9,10 @@ import {
   WandSparklesIcon,
   XIcon
 } from "lucide-react"
-import {
-  createContext,
-  lazy,
-  type ReactNode,
-  Suspense,
-  useContext,
-  useId,
-  useLayoutEffect,
-  useRef,
-  useState
-} from "react"
+import { useAtom, useAtomValue } from "@effect/atom-react"
+import * as ScopedAtom from "@effect/atom-react/ScopedAtom"
+import * as Atom from "effect/reactivity/Atom"
+import { lazy, type ReactNode, Suspense, useId, useRef } from "react"
 import { cn } from "cn"
 import { Slot } from "radix-ui"
 import { ProposedChip, SourceMark } from "@inventory/ui/ProposedValue"
@@ -27,7 +22,7 @@ import { Button } from "@inventory/ui/components/button"
 import { Field, FieldLabel } from "@inventory/ui/components/field"
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@inventory/ui/components/hover-card"
 import { Input } from "@inventory/ui/components/input"
-import { narrowBelow, useContentBelow } from "@inventory/ui/ContentWidth"
+import { contentBelow, narrowBelow } from "@inventory/ui/ContentWidth"
 import {
   Popover,
   PopoverArrow,
@@ -39,7 +34,6 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@inventory/ui/components/tooltip"
 import { choicesOf, pickedChoice, spellingOf, valueWords, variantsText } from "@inventory/review/ReviewDraft"
 import type {
-  CellMark,
   Fix,
   FixGroup,
   MarkSource,
@@ -50,27 +44,27 @@ import type {
 } from "@inventory/review/ReviewTypes"
 import { defaultReviewWords } from "@inventory/review/ReviewWords"
 
+// Each enum's own guard, made once: these run for every row and every cell.
+const isCellMarkApplied = CellMark.guards.applied
+const isCellMarkProposed = CellMark.guards.proposed
+
 // ---------------------------------------------------------------------------------------------------------------
 // Layout: a table when the page has 1101px, a shorter table on a tablet, one decision at a time on a phone
 // ---------------------------------------------------------------------------------------------------------------
 
 export type Layout = "wide" | "medium" | "narrow"
 
-// Widths of the page's own area (the window less the sidebar), from `lib/content-width.ts`.
+// Widths of the page's own area (the window less the sidebar), from `@inventory/ui/ContentWidth`.
 const narrowUnder = narrowBelow
 const mediumUnder = 1101
 
 /**
  * The layout for the room the page has. Worked out from the window and the sidebar's width, never from an element,
- * so nothing measures layout.
+ * so nothing measures layout. Every part of the region reads it here.
  */
-export function useLayout(): Layout {
-  const narrow = useContentBelow(narrowUnder)
-  const medium = useContentBelow(mediumUnder)
-  return narrow ? "narrow" : medium ? "medium" : "wide"
-}
-
-export const LayoutContext = createContext<Layout>("wide")
+export const regionLayout: Atom.Atom<Layout> = Atom.readable((get) =>
+  get(contentBelow(narrowUnder)) ? "narrow" : get(contentBelow(mediumUnder)) ? "medium" : "wide"
+)
 
 // ---------------------------------------------------------------------------------------------------------------
 // A popover on a desk, a bottom sheet on a phone
@@ -80,8 +74,21 @@ export const LayoutContext = createContext<Layout>("wide")
 // ReviewRegion), never on a desk.
 const PhoneDrawer = lazy(() => import("./PhoneDrawer.tsx").then((module) => ({ default: module.PhoneDrawer })))
 
-/** One-click-away detail. The same content points at its trigger on a wide screen and rises from the bottom on a phone. */
-export function Overlay(props: {
+/**
+ * What one overlay holds: open when nobody controls it, mounted once opened (so closing slides it away), whether a
+ * resting mouse opened it, and the timer that will open or close it.
+ */
+type OverlayHeld = {
+  readonly open: boolean
+  readonly opened: boolean
+  readonly byHover: boolean
+  readonly timer: number
+}
+const OverlayScope = ScopedAtom.make(() =>
+  Atom.make<OverlayHeld>({ open: false, opened: false, byHover: false, timer: 0 })
+)
+
+type OverlayProps = {
   trigger: ReactNode
   title: string
   /** For the bottom sheet's hidden description. */
@@ -104,19 +111,32 @@ export function Overlay(props: {
    * or the pointer leaving closes it). For a card that explains; a panel that holds a form keeps its close button.
    */
   card?: boolean
-}) {
-  const layout = useContext(LayoutContext)
-  const hovered = useRef(false)
-  const timer = useRef(0)
-  const [inner, setInner] = useState(false)
-  const open = props.open ?? inner
+}
+
+/** One-click-away detail. The same content points at its trigger on a wide screen and rises from the bottom on a phone. */
+export function Overlay(props: OverlayProps) {
+  return (
+    <OverlayScope.Provider>
+      <OverlayBody {...props} />
+    </OverlayScope.Provider>
+  )
+}
+
+function OverlayBody(props: OverlayProps) {
+  const layout = useAtomValue(regionLayout)
+  const [held, setHeld] = useAtom(OverlayScope.use())
+  const open = props.open ?? held.open
   const setOpen = (next: boolean) => {
-    setInner(next)
+    setHeld((before) => ({ ...before, open: next }))
     props.onOpenChange?.(next)
   }
   const body = typeof props.children === "function" ? props.children(() => setOpen(false)) : props.children
-  // Mounted from its first opening on, so closing it slides it away instead of cutting it off.
-  const [opened, setOpened] = useState(false)
+  const opened = held.opened
+  const setOpened = (next: boolean) => setHeld((before) => ({ ...before, opened: next }))
+  const byHover = held.byHover
+  const setByHover = (next: boolean) =>
+    setHeld((before) => (before.byHover === next ? before : { ...before, byHover: next }))
+  const stopTimer = () => window.clearTimeout(held.timer)
   const trigger = useRef<HTMLElement>(null)
   if (layout === "narrow") {
     return (
@@ -153,19 +173,20 @@ export function Overlay(props: {
     )
   }
   const later = (next: boolean, wait: number) => {
-    window.clearTimeout(timer.current)
-    timer.current = window.setTimeout(() => {
-      hovered.current = next
+    stopTimer()
+    const timer = window.setTimeout(() => {
+      setByHover(next)
       setOpen(next)
     }, wait)
+    setHeld((before) => ({ ...before, timer }))
   }
   const mouse = (event: React.PointerEvent) => props.hover === true && event.pointerType === "mouse"
   return (
     <Popover
       open={open}
       onOpenChange={(next) => {
-        window.clearTimeout(timer.current)
-        hovered.current = false
+        stopTimer()
+        setByHover(false)
         setOpen(next)
       }}
     >
@@ -176,15 +197,15 @@ export function Overlay(props: {
         }}
         onPointerLeave={(event) => {
           if (!mouse(event)) return
-          if (open && hovered.current) later(false, 200)
-          else window.clearTimeout(timer.current)
+          if (open && byHover) later(false, 200)
+          else stopTimer()
         }}
         onClick={(event) => {
           // Pressed while open from a hover: it stays open, now as if pressed, instead of closing under the click.
-          if (open && hovered.current) {
+          if (open && byHover) {
             event.preventDefault()
-            window.clearTimeout(timer.current)
-            hovered.current = false
+            stopTimer()
+            setByHover(false)
           }
         }}
       >
@@ -195,13 +216,13 @@ export function Overlay(props: {
         side={props.side ?? "bottom"}
         sideOffset={props.card === true ? 4 : 6}
         onOpenAutoFocus={(event) => {
-          if (hovered.current) event.preventDefault()
+          if (byHover) event.preventDefault()
         }}
         onPointerEnter={(event) => {
-          if (mouse(event) && hovered.current) window.clearTimeout(timer.current)
+          if (mouse(event) && byHover) stopTimer()
         }}
         onPointerLeave={(event) => {
-          if (mouse(event) && hovered.current) later(false, 200)
+          if (mouse(event) && byHover) later(false, 200)
         }}
         {...(props.className === undefined ? {} : { className: props.className })}
       >
@@ -329,7 +350,7 @@ export function CellValue(props: {
   if (raw === undefined) return props.value === "" ? (props.empty ?? null) : <>{shown(props.value)}</>
   const mark = { ...raw, from: shown(raw.from), to: shown(raw.to) }
   if (mark.from === mark.to) return <>{mark.to}</>
-  if (mark.state === "proposed" && choicesOf(mark.fix) !== undefined) {
+  if (isCellMarkProposed(mark) && choicesOf(mark.fix) !== undefined) {
     // A question, marked with who asks it: a sparkle only when the caller says a model made it.
     return (
       <span className="inline-flex items-center gap-1.5">
@@ -342,7 +363,7 @@ export function CellValue(props: {
     )
   }
   // A value typed into an empty cell has nothing to strike through: the value and a check say it changed.
-  if (mark.from === "" && mark.state === "applied") {
+  if (mark.from === "" && isCellMarkApplied(mark)) {
     return (
       <span className="inline-flex items-center gap-1">
         {mark.to}
@@ -357,7 +378,7 @@ export function CellValue(props: {
   // change can be seen; a long one (a name) would not fit twice and stands alone.
   const spacesOnly = mark.from !== "" && mark.from.trim() === mark.to
   const alone = spacesOnly && mark.to.length > longValue
-  if (mark.state === "proposed" && ((mark.from === "" && props.stated === true) || alone)) {
+  if (isCellMarkProposed(mark) && ((mark.from === "" && props.stated === true) || alone)) {
     return (
       <Tooltip>
         <TooltipTrigger asChild>
@@ -375,7 +396,11 @@ export function CellValue(props: {
       </Tooltip>
     )
   }
-  const state = mark.state === "applied" && props.accepted === true && mark.by !== "you" ? "accepted" : mark.state
+  const state = isCellMarkApplied(mark)
+    ? props.accepted === true && mark.by !== "you"
+      ? "accepted"
+      : "applied"
+    : "proposed"
   const source = mark.by === "you" ? null : <FixMark by={mark.by} />
   // The file's value struck through and the value that would be imported beside it, as real `<del>` and `<ins>` with
   // hidden "was" and "now". Short of room the old value is the part that is cut; its whole spelling is then one hover
@@ -412,11 +437,29 @@ export function CellValue(props: {
 }
 
 /**
- * Text in one line that may be cut short. Once it is cut (measured after it is drawn, again when its cell changes
- * width), the whole text is in a hover card: on hover, on keyboard focus (the cut text joins the tab order) and on a
- * tap, for a touch screen has no hover. Text that fits is plain, and not a tab stop.
+ * One cut text's own: whether it is cut and its card open, and the ref callback for its span, the same for as long as
+ * the text is drawn: it measures the span when it appears and again whenever its box changes size.
  */
-export function CutText(props: {
+const CutScope = ScopedAtom.make(() =>
+  Atom.readable((get) => {
+    const registry = get.registry
+    const held = Atom.make({ cut: false, open: false })
+    const measured = (element: HTMLSpanElement | null) => {
+      if (element === null) return undefined
+      const measure = () => {
+        const now = element.scrollWidth > element.clientWidth + 1
+        registry.update(held, (before) => (before.cut === now ? before : { ...before, cut: now }))
+      }
+      measure()
+      const observer = new ResizeObserver(measure)
+      observer.observe(element)
+      return () => observer.disconnect()
+    }
+    return { held, measured }
+  })
+)
+
+type CutTextProps = {
   /** The whole text, for the card. */
   text: string
   /** What is drawn, when it is more than the text (a code in its face, hidden words for a screen reader). */
@@ -424,24 +467,31 @@ export function CutText(props: {
   /** What the card shows, when it is more than the text (an old and a new value). */
   card?: ReactNode
   className?: string
-}) {
-  const ref = useRef<HTMLSpanElement>(null)
-  const [cut, setCut] = useState(false)
-  const [open, setOpen] = useState(false)
-  useLayoutEffect(() => {
-    const element = ref.current
-    if (element === null) return
-    const measure = () => setCut(element.scrollWidth > element.clientWidth + 1)
-    measure()
-    const observer = new ResizeObserver(measure)
-    observer.observe(element)
-    return () => observer.disconnect()
-  }, [props.text])
+}
+
+/**
+ * Text in one line that may be cut short. Once it is cut (measured after it is drawn, again when its cell changes
+ * width), the whole text is in a hover card: on hover, on keyboard focus (the cut text joins the tab order) and on a
+ * tap, for a touch screen has no hover. Text that fits is plain, and not a tab stop.
+ */
+export function CutText(props: CutTextProps) {
+  return (
+    <CutScope.Provider>
+      <CutBody {...props} />
+    </CutScope.Provider>
+  )
+}
+
+function CutBody(props: CutTextProps) {
+  const scope = useAtomValue(CutScope.use())
+  const [{ cut, open }, setHeld] = useAtom(scope.held)
+  const setOpen = (next: boolean | ((before: boolean) => boolean)) =>
+    setHeld((before) => ({ ...before, open: typeof next === "function" ? next(before.open) : next }))
   return (
     <HoverCard openDelay={350} closeDelay={100} open={open && cut} onOpenChange={setOpen}>
       <HoverCardTrigger asChild>
         <span
-          ref={ref}
+          ref={scope.measured}
           className={cn(
             "block truncate",
             cut && "cursor-default rounded-xs focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
@@ -507,7 +557,7 @@ export function GroupChange(props: {
  * `brief` keeps it to one line: who is behind it and the reason, without the evidence.
  */
 export function Reason(props: {
-  fix: { by?: MarkSource | undefined; confidence?: Fix["confidence"]; why: Fix["why"] }
+  fix: { by?: MarkSource | undefined; confidence: Fix["confidence"]; why: Fix["why"] }
   brief?: boolean
   className?: string
 }) {
@@ -517,7 +567,7 @@ export function Reason(props: {
     // The whole reason on hover: in a heading of one line it is the part that is cut.
     <span className={cn("text-muted-foreground", props.className)}>
       <span className="font-medium text-foreground">
-        {sourceAndConfidence({ by, confidence: props.fix.confidence })}.
+        {sourceAndConfidence({ by, confidence: O.getOrUndefined(props.fix.confidence) })}.
       </span>{" "}
       {why.basis}
       {why.detail === undefined || props.brief === true ? null : ` ${why.detail}`}
@@ -587,15 +637,28 @@ export function WhyBody(props: {
   )
 }
 
-/** One field for the value that is wrong. Enter saves; the row is checked again by the caller's rule. */
-export function EditForm(props: {
+/** What one edit form holds: the value it opened with, then what was typed. A later value from outside does not move it. */
+const EditScope = ScopedAtom.make((opened: string) => Atom.make(opened))
+
+type EditFormProps = {
   label: string
   value: string
   size: "sm" | "touch"
   onSave: (value: string) => void
-}) {
+}
+
+/** One field for the value that is wrong. Enter saves; the row is checked again by the caller's rule. */
+export function EditForm(props: EditFormProps) {
+  return (
+    <EditScope.Provider value={props.value}>
+      <EditBody {...props} />
+    </EditScope.Provider>
+  )
+}
+
+function EditBody(props: EditFormProps) {
   const id = useId()
-  const [value, setValue] = useState(props.value)
+  const [value, setValue] = useAtom(EditScope.use())
   return (
     <form
       className="flex flex-col gap-3"

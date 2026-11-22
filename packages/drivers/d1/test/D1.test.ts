@@ -7,6 +7,7 @@ import * as S from "effect/Schema"
 import * as SqlClient from "effect/sql/SqlClient"
 import * as SqlSchema from "effect/sql/SqlSchema"
 import { D1, NoRows } from "@beep/d1/D1"
+import { D1Error } from "@beep/d1/D1Error"
 import { D1Test, D1TestOptions } from "@beep/d1/D1Test"
 
 const fixtures = new URL("./fixtures/", import.meta.url)
@@ -69,7 +70,8 @@ layer(Database)("D1", (it) => {
         const d1 = yield* D1
         const make = yield* insertReturning
         const error = yield* Effect.flip(d1.run(make({ id: NoteId.make("two"), body: "Second" })))
-        expect(error).toMatchObject({ _tag: "D1Error", stage: "decode", statement: 0 })
+        expect(S.is(D1Error)(error)).toBe(true)
+        expect(error).toMatchObject({ stage: "decode", statement: 0 })
       })
     )
 
@@ -81,7 +83,8 @@ layer(Database)("D1", (it) => {
         const error = yield* Effect.flip(
           d1.batch([make({ id: NoteId.make("three"), body: "Third" }), make({ id: NoteId.make("four"), body: "" })])
         )
-        expect(error).toMatchObject({ _tag: "D1Error", stage: "execute" })
+        expect(S.is(D1Error)(error)).toBe(true)
+        expect(error).toMatchObject({ stage: "execute" })
         const after = yield* (yield* all)(undefined)
         expect(after.length).toBe(before)
         expect(A.some(after, (row) => row.id === "three")).toBe(false)
@@ -98,7 +101,8 @@ layer(Database)("D1", (it) => {
             make({ id: "" as typeof NoteId.Type, body: "x" })
           ])
         )
-        expect(error).toMatchObject({ _tag: "D1Error", stage: "encode", statement: 1 })
+        expect(S.is(D1Error)(error)).toBe(true)
+        expect(error).toMatchObject({ stage: "encode", statement: 1 })
         const after = yield* (yield* all)(undefined)
         expect(A.some(after, (row) => row.id === "five")).toBe(false)
       })

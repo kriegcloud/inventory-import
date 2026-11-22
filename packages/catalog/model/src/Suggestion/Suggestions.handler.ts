@@ -82,7 +82,7 @@ export const propose = Effect.fn("Suggestions.propose")(function* <R>(input: {
   if (questions(asked) === 0) {
     const none: Proposed = {
       suggestions: [],
-      answeredBy: { _tag: "Rules", reason: nothingToAsk },
+      answeredBy: AnsweredBy.cases.Rules.make({ reason: nothingToAsk }),
       lines: ["Suggested nothing: every row the rules cannot fix has a suggestion already, or has nothing to go on"]
     }
     return none
@@ -93,11 +93,11 @@ export const propose = Effect.fn("Suggestions.propose")(function* <R>(input: {
     const checked = guard({ source: input.source, answer: answerByRules(asked), by: suggestedByRule })
     return {
       suggestions: checked.suggestions,
-      answeredBy: { _tag: "Rules", reason },
+      answeredBy: AnsweredBy.cases.Rules.make({ reason }),
       lines: suggestLines({ made: checked.suggestions, refused: checked.refused.length, asked, by: "rule" })
     }
   }
-  if (call.kind === "usedUp") return byRules(usedUpSentence(call.reason))
+  if (AllowanceAnswer.guards.usedUp(call)) return byRules(usedUpSentence(call.reason))
   const sent = yield* toJson(asked).pipe(Effect.orDie)
   const answer = yield* answerer
     .ask(
@@ -114,11 +114,15 @@ export const propose = Effect.fn("Suggestions.propose")(function* <R>(input: {
       answeredByRules(() => null)
     )
   // No model could answer (no key, busy, down, an answer that did not fit): the rules do, and the reason is said.
-  if (answer.value === null || answer.answeredBy._tag === "Rules") {
-    const why = answer.answeredBy._tag === "Rules" ? answer.answeredBy.reason : "No model answered."
+  const model = O.liftPredicate(answer.answeredBy, AnsweredBy.guards.Model)
+  if (answer.value === null || O.isNone(model)) {
+    const why = AnsweredBy.match(answer.answeredBy, {
+      Rules: (rules) => rules.reason,
+      Model: () => "No model answered."
+    })
     return byRules(`${why} The rules answered instead.`)
   }
-  const checked = guard({ source: input.source, answer: answer.value, by: suggestedByModel(answer.answeredBy.model) })
+  const checked = guard({ source: input.source, answer: answer.value, by: suggestedByModel(model.value.model) })
   const proposed: Proposed = {
     suggestions: checked.suggestions,
     answeredBy: answer.answeredBy,
@@ -154,7 +158,10 @@ export const suggest = Effect.fn("Suggestions.suggest")(function* (input: {
   const id = yield* random.uuidV4()
   const createdAt = yield* DateTime.now
   const n = suggestions.length
-  const who = proposed.answeredBy._tag === "Model" ? proposed.answeredBy.model : "the rules, with no model"
+  const who = AnsweredBy.match(proposed.answeredBy, {
+    Model: (by) => by.model,
+    Rules: () => "the rules, with no model"
+  })
   const made = yield* store.store(
     StoreSuggestions.make({
       draft: input.importId,

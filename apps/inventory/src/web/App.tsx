@@ -6,7 +6,7 @@ import { useAtomValue } from "@effect/atom-react"
 import { location } from "@inventory/ui/Route"
 import { workspace } from "./preload.ts"
 
-// The first download is the sign-in screen and what it needs: React, the query cache, the session request and the
+// The first download is the sign-in screen and what it needs: React, the atoms, the session request and the
 // sign-in page. Everything a signed-in member sees (the shell's sidebar, the API client and every page) is the
 // workspace's chunk, fetched once someone is signed in (preload.ts, started by @/lib/actor on a hint or the answer).
 const Workspace = lazy(workspace)

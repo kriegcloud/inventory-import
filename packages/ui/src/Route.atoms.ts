@@ -38,6 +38,18 @@ export const navigate = (to: string, options?: { replace?: boolean }) => {
   for (const follow of followers) follow()
 }
 
+/**
+ * The event the page sends just before the app itself leaves it (a sign-out, a sign-in as somebody else): whatever
+ * would ask the person before the page is left stands down, since the app chose to leave.
+ */
+export const leavingApp = "inventory:leaving-app"
+
+/** Leaves the app for `to` with a page load, on purpose: nothing asks before the page goes. */
+export const leaveApp = (to: string): void => {
+  window.dispatchEvent(new Event(leavingApp))
+  window.location.assign(to)
+}
+
 /** `location`, read: for the screens that have not moved to reading the atom themselves (goals/atoms). */
 export const useLocation = (): { readonly path: string; readonly params: URLSearchParams } => useAtomValue(location)
 

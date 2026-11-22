@@ -2,6 +2,7 @@ import { describe, expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
+import * as S from "effect/Schema"
 import {
   columnLetter,
   dateText,
@@ -12,7 +13,7 @@ import {
   type GridRow,
   type SheetGrid
 } from "../src/Reading/SheetLayout.rules.ts"
-import type { Cell } from "../src/Reading/Spreadsheet.rules.ts"
+import { type Cell, WorkbookFormat } from "../src/Reading/Spreadsheet.rules.ts"
 
 const t = (text: string): Cell => (text === "" ? emptyCell : { type: "text", text })
 const n = (value: number): Cell => ({ type: "number", text: numberText(value) })
@@ -68,7 +69,7 @@ describe("describeWorkbook", () => {
         sheet: O.none(),
         notes: []
       })
-      if (table.format._tag !== "xlsx") throw new Error("expected a workbook")
+      if (!S.is(WorkbookFormat)(table.format)) throw new Error("expected a workbook")
       expect(table.format.chosen).toMatchObject({
         name: "Items",
         position: 2,
@@ -88,7 +89,7 @@ describe("describeWorkbook", () => {
         sheet: O.none(),
         notes: []
       })
-      if (table.format._tag !== "xlsx") throw new Error("expected a workbook")
+      if (!S.is(WorkbookFormat)(table.format)) throw new Error("expected a workbook")
       expect(table.format.chosen).toMatchObject({
         name: "Items",
         reason: "mostData",

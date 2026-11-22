@@ -58,9 +58,14 @@ import {
   decimalComma,
   tagsOf,
   categoryStem,
+  wasRead,
   withPreferred
 } from "./CellReading.rules.ts"
-import { Suggestion, suggestionFits } from "@inventory/catalog-contract/Suggestion"
+import {
+  Suggestion,
+  suggestionField as suggestionFieldOf,
+  suggestionFits
+} from "@inventory/catalog-contract/Suggestion"
 import { matchColumns, shownText, totalRowNumbers } from "./Mapping.rules.ts"
 import {
   rowId,
@@ -68,7 +73,8 @@ import {
   decisionOf,
   SavedDecisions,
   isLeftOut,
-  hasKeep
+  hasKeep,
+  StoredChoice
 } from "@inventory/catalog-contract/Decision"
 
 /** Fields read from a cell's stored text, not from what Excel shows: a cost from the digits, a date cell as ISO. */
@@ -595,15 +601,15 @@ const proposeStored = (ctx: Context, row: FileRow, field: Field): O.Option<Propo
       ctx.suggestions,
       // A row's suggestion for this very cell: a column's is offered beside the review, not on a row.
       (s): s is Exclude<Suggestion, { readonly kind: "column" }> =>
-        s.kind !== "column" &&
-        s.kind === field &&
+        Suggestion.isAnyOf(["name", "category"])(s) &&
+        suggestionFieldOf(s) === field &&
         s.rowId === row.id &&
         s.from === row.file[field] &&
         suggestionFits({ kind: s.kind, to: s.to, file: row.file })
     ),
     (s): Proposal => ({
       field,
-      kind: s.kind === "name" ? "missing" : "category",
+      kind: Suggestion.guards.name(s) ? "missing" : "category",
       to: s.to,
       by: s.by.kind,
       suggestionId: s.id,
@@ -830,7 +836,7 @@ const proposeByRule = (ctx: Context, row: FileRow, field: Field): O.Option<Propo
   }
   if (field === "vendors") {
     const read = readVendors(text)
-    if (read._tag === "ok") {
+    if (wasRead(read)) {
       const preferred = preferredOf(read.value)
       if (preferred.length > 1) {
         const picks = keepSome(read.value, (vendor, index) =>
@@ -994,13 +1000,13 @@ const fault = (ctx: Context, field: Field, values: Readonly<Record<Field, string
   }
   if (field === "dimensions") {
     const read = readDimensions(text)
-    return read._tag === "ok"
+    return wasRead(read)
       ? undefined
       : { kind: "dimensions", message: read.message, ask: "Correct the dimensions, or clear them" }
   }
   if (field === "vendors") {
     const read = readVendors(text)
-    if (read._tag === "bad") {
+    if (!wasRead(read)) {
       return { kind: "vendors", message: read.message, ask: "Correct the vendors, or clear them" }
     }
     const preferred = preferredOf(read.value)
@@ -1124,6 +1130,14 @@ const problemsOf = (
 }
 
 /**
+ * Whether a row's values make an item: only such a row is compared with a stored item with its SKU. A re-match that
+ * makes the row stop reading (or start) changes how it compares, whatever its differences said.
+ *
+ * @example readsAsItem(reviewedRow.values) // false when Unit cost reads "call for price"
+ */
+export const readsAsItem = (values: Readonly<Record<Field, string>>): boolean => toItem(values) !== null
+
+/**
  * The item a row's values make, or null when one of them does not read. Empty optional cells take the brief's
  * defaults: quantity on hand 0, active true, lot tracked false.
  */
@@ -1163,8 +1177,8 @@ const toItem = (values: Readonly<Record<Field, string>>): ItemFields | null => {
     O.isNone(lot) ||
     O.isNone(received) ||
     O.isNone(discontinued) ||
-    dimensions._tag === "bad" ||
-    vendors._tag === "bad" ||
+    !wasRead(dimensions) ||
+    !wasRead(vendors) ||
     preferredOf(vendors.value).length > 1 ||
     (canonicalTags(values.tags) !== values.tags && canonicalTags(values.tags) !== "") ||
     (discontinued.value !== null && active.value)
@@ -1276,8 +1290,9 @@ export const review = (input: {
     // reads it is skipped (it says what is stored) or asks (it says something else).
     const stored = O.isSome(storedItem) && item !== null ? differences(storedItem.value, item) : []
     const differs = stored.length > 0
-    const replace = differs && decision.stored.kind === "replace"
-    const already = mine || (O.isSome(storedItem) && item !== null && (!differs || decision.stored.kind === "keep"))
+    const replace = differs && StoredChoice.guards.replace(decision.stored)
+    const already =
+      mine || (O.isSome(storedItem) && item !== null && (!differs || StoredChoice.guards.keep(decision.stored)))
     return {
       row,
       decision,
@@ -1291,7 +1306,7 @@ export const review = (input: {
       replace,
       already,
       mine,
-      keptStored: differs && decision.stored.kind === "keep",
+      keptStored: differs && StoredChoice.guards.keep(decision.stored),
       out: isLeftOut(decision)
     }
   })
@@ -1312,7 +1327,7 @@ export const review = (input: {
       hasKeep(entry.decision) && !A.some(live, (other) => hasKeep(other.decision) && other.row.order < entry.row.order)
     const sku = Str.trim(entry.values.sku)
     const changed: Problem | null =
-      entry.differs && entry.decision.stored.kind === "undecided"
+      entry.differs && StoredChoice.guards.undecided(entry.decision.stored)
         ? {
             kind: "changed",
             tone: "decision",
@@ -1406,7 +1421,7 @@ export const review = (input: {
   })
   const byRule = A.map(
     A.filter(rows, (row) => row.status === "ready" || row.status === "needs"),
-    (row) => A.filter(row.changes, (change) => change.how === "appliedByRule").length
+    (row) => A.filter(row.changes, Change.guards.appliedByRule).length
   )
 
   return {
@@ -1527,31 +1542,3 @@ export const carryDecisions = (input: {
   })
   return R.fromEntries(merged)
 }
-
-/**
- * Takes back acceptances that no longer mean what the person agreed to. An accept is stored as the field's name,
- * so when the proposal behind a field can change (its column was matched again) the accept must go, or a different
- * value would arrive as "accepted". Returns only the rows whose decision changed.
- *
- * @example
- * // Row 24's unit proposal came from a column that was just matched again: the accept of it goes.
- * dropAccepted({ decisions: { "row-24": decisionOf({ accepted: ["uom"] }) }, rows, drop: (p) => p.field === "uom" })
- * // { "row-24": decisionOf() }
- */
-export const dropAccepted = (input: {
-  readonly decisions: SavedDecisions
-  readonly rows: ReadonlyArray<ReviewedRow>
-  readonly drop: (proposal: Proposal) => boolean
-}): SavedDecisions =>
-  R.fromEntries(
-    keepSome(input.rows, (row) => {
-      const decision = R.get(input.decisions, row.id)
-      if (O.isNone(decision)) return O.none()
-      const accepted = decision.value.accepted
-      const kept = A.filter(accepted, (field) =>
-        A.some(row.proposals, (proposal) => proposal.field === field && !input.drop(proposal))
-      )
-      if (kept.length === accepted.length) return O.none()
-      return O.some([row.id, { ...decision.value, accepted: kept }] as const)
-    })
-  )

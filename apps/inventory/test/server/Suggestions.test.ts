@@ -8,6 +8,7 @@ import * as Layer from "effect/Layer"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as Ref from "effect/Ref"
+import { AnsweredBy } from "@inventory/catalog-contract/Answer"
 import { SuggestionId } from "@inventory/catalog-contract/Ids"
 import messy from "../../public/samples/items_messy.csv?raw"
 import { review } from "@inventory/catalog-model/Review"
@@ -134,7 +135,7 @@ layer(AnswererOpenRouter.pipe(Layer.provide(OpenRouterTest.off("noKey", ModelId.
             callTaken
           )
         })
-        expect(proposed.answeredBy._tag).toBe("Rules")
+        expect(AnsweredBy.guards.Rules(proposed.answeredBy)).toBe(true)
         const calls = yield* Ref.get(taken)
         expect(calls).toBe(0)
         expect(
@@ -169,7 +170,7 @@ layer(AnswererOpenRouter.pipe(Layer.provide(scripted.layer)))("with a model", (i
           callTaken
         )
       })
-      expect([proposed.answeredBy._tag, yield* Ref.get(taken)]).toEqual(["Model", 1])
+      expect([AnsweredBy.guards.Model(proposed.answeredBy), yield* Ref.get(taken)]).toEqual([true, 1])
       expect(
         A.map(proposed.suggestions, (s) => (s.kind === "column" ? [] : [s.rowNumber, s.to, s.by.kind, s.confidence]))
       ).toEqual([
@@ -186,7 +187,9 @@ layer(AnswererOpenRouter.pipe(Layer.provide(scripted.layer)))("with a model", (i
         fileName: "items_messy.csv",
         take: Effect.succeed(callsUsedUp(usedUpWords))
       })
-      expect(usedUp.answeredBy).toMatchObject({ _tag: "Rules", reason: expect.stringContaining("AI calls are used") })
+      expect(AnsweredBy.guards.Rules(usedUp.answeredBy) ? usedUp.answeredBy.reason : usedUp.answeredBy).toContain(
+        "AI calls are used"
+      )
       expect(A.every(usedUp.suggestions, (s) => s.by.kind === "rule")).toBe(true)
     })
   )

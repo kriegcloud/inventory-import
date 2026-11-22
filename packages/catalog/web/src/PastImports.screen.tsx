@@ -1,4 +1,7 @@
 // The imports that were confirmed, as the columns of a list: the way back to a past import's result, from the first
+import * as Atom from "effect/reactivity/Atom"
+import { answerOf } from "@inventory/client/Api"
+import { pastImports } from "./Imports.atoms.ts"
 // screen and from Activity. Every confirmed import is listed, whatever it changed: a clean file's has a line too.
 // The one thing not to break: the count of items is the server's, read from the stored items, never the confirm's.
 import * as DateTime from "effect/DateTime"
@@ -111,8 +114,16 @@ export const pastImportColumnsShort: ReadonlyArray<ListColumn<PastImport>> = [
 /** What the imports list is, for its caption and its skeleton. */
 export const pastImportsCaption = "Imports that were confirmed"
 
+const noImports: ReadonlyArray<PastImport> = []
+const pastImportsAnswer = answerOf(pastImports)
+/** The confirmed imports as a list follows them: empty until they have been read. */
+export const pastImportRows = Atom.map(pastImportsAnswer, (answer) => answer?.imports ?? noImports)
+const pastImportColumnsAtom = Atom.make(pastImportColumns)
+/** The few columns that fit the first screen, as its list follows them. */
+export const pastImportColumnsShortAtom = Atom.make(pastImportColumnsShort)
+
 /** The Activity page's "Imports" list: every confirmed import, each a link back to its result. */
-export function PastImportsList(props: { rows: ReadonlyArray<PastImport>; older: number }) {
+export function PastImportsList(props: { older: number }) {
   const { older } = props
   return (
     <>
@@ -120,8 +131,8 @@ export function PastImportsList(props: { rows: ReadonlyArray<PastImport>; older:
         key="imports"
         caption={pastImportsCaption}
         searchLabel="Search imports"
-        columns={pastImportColumns}
-        rows={props.rows}
+        columns={pastImportColumnsAtom}
+        rows={pastImportRows}
         rowKey={(entry) => entry.id}
         empty="No import has been confirmed yet. Each one confirmed appears here, with a link to its result."
       />

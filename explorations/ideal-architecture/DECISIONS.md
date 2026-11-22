@@ -709,6 +709,237 @@ What this touches in this file:
 Rejected: keeping "core" and moving one aggregate later. Reverse: a new decision by him; the app as it stands on main
 is the D1 core, and nothing of the reversal is built yet.
 
+### 2026-11-19 — atoms, the table's own store in the review package
+
+The review region held the facets the person ticked as the table's column filters, in an atom of TanStack's own
+store (`createAtom` from `@tanstack/store`, imported by the review package's code), kept in step with the region's
+derived facets. The brief says "No new state library beside atoms". A second reason came from the review: the review
+package pinned the store exactly beside react-table's own range, so a lockfile refresh could leave two copies, and a
+ticked facet would stop filtering. Question: may the review package's own code use the table's store? Options:
+"Effect atoms only (Recommended)"; "Keep it for this one slice". Answer: "Effect atoms only". I chose; the agent
+recommended the same. Built in `packages/review/src/ReviewRegion.atoms.ts`: the ticked facets filter the rows in a
+derived Effect atom (`shown`) before the table is given them, and the table keeps only its sort, its search and its
+hidden columns. `@tanstack/store` is no dependency of the package any more; it stays a development dependency, with
+`@tanstack/table-core`, for the one test that makes a table as the screen's hook does. Reverse: `shown` and the
+column definitions' `enableColumnFilter`.
+
+### 2026-11-19 — atoms, a save that changes nothing
+
+A save of decisions answered only the draft's revision. A save that changed nothing (the same one sent again after a
+lost answer, a decision taken back while its save was out, rows somebody else had just decided the same way) moved no
+revision, so its answer named wherever the draft had got to, and the screen took that for its own next revision: it
+then held a picture without the other person's rows under a revision that has them. Question: how does the screen
+tell? Options: "Answer says 'no change' (Recommended)"; "Leave it until the domain model"; "Always re-read after a
+save". Answer: "Answer says 'no change'". I chose; the agent recommended the same. Built: `PUT
+/api/v1/imports/:id/decisions` answers `{ revision, changed }` (`Catalog.contract.ts`; read in one batch on D1,
+`ImportStore.adapter.ts`, and in the in-memory twin); the draft's transition (`Draft.machine.ts`) moves its picture on
+by the person's own rows only when `changed` is true and the revision is the next one, and otherwise keeps the rows
+on screen and asks for the import at once. The property test no longer waives "what is held is what the server held
+at that revision" after such a save. Reverse: the field, and the one condition in `SaveAnswered`.
+
+### 2026-11-19 — atoms, a confirm made on a draft somebody else has changed
+
+The confirm sent the decisions the screen showed, all of them, and the server saved them over what it held before it
+confirmed: a row another person had decided since this screen last read the import went back to what this screen
+showed, and the import was confirmed with totals nobody had looked at. Question: what does Confirm do when the other
+person has decided a row this screen has not shown yet? Options: "Refuse, show, confirm again (Recommended)"; "Their
+decision stands"; "As today: your screen wins". Answer: "Refuse, show, confirm again". I chose; the agent recommended
+the same. Built: `POST /api/v1/imports/:id/commit` takes `ConfirmRequest`, the revision of the draft the screen shows
+and the person's own decisions not saved yet (set and clear); on another revision the server writes nothing, not an
+item and not a decision, and answers `DraftMoved` (409) with the revision the draft is at. The check is the first
+statement of the confirm's own batch on D1 (`insertBatch` in `ImportStore.adapter.ts`: the confirm's row is written
+only while the import is open at that revision, and every later statement checks for that row), so two confirms
+cannot both pass; the handler checks the same before it works the review out. A confirm moves the draft on by one, so
+a confirmed import is never taken for the open one of the same revision. On the screen the confirm is an event of the
+draft (`Draft.machine.ts`): it waits for the person's save that is out, goes only on a picture with nothing of
+theirs on its way over it, and is held back by any newer picture that arrives meanwhile; refused, the newer picture
+is asked for, the review is drawn again from it with its totals, and a line above it says nothing was imported and
+how many rows were decided elsewhere, until the person confirms again. Reverse: the `revision` field and the
+`DraftMoved` error in the contract, the `revision = expected` condition in `insertBatch`, and `ConfirmPressed` in
+the machine.
+
+### 2026-11-20 — atoms, rows that wait unsaved when the page is reloaded
+
+A save that failed left its rows on the screen and in memory only; a reload dropped them, and the browser's kept
+copy of the review was thrown away because it differed from the server's. Question: a save failed, rows wait
+unsaved, and the person reloads: what becomes of them? Options: "Keep them and send them (Recommended)"; "Warn before
+leaving only"; "Drop them and say which". Answer: "Keep them and send them". I chose; the agent recommended the same.
+Built: the rows the server has not taken (the save that is out, and what waits behind it) are kept in the browser per
+person and import, through `Atom.kvs` like the saved progress (`waitingKept` in `ReviewDraft.atoms.ts`, written after
+every event of the draft). When the step is drawn they come back as the person's waiting rows (`Opened { kept }` in
+`Draft.machine.ts`), over whatever the server holds, are said as not saved yet above the review, and are sent again
+when the import's picture arrives, made on the revision they were made on. The browser asks before the page is left
+while rows wait. This replaces the rule that the kept copy is used only while it ends at the server's decisions: the
+server's picture is followed, and the waiting rows go over it. Reverse: the `kept` of `Opened`, and `waitingKept`.
+Superseded in part (2026-11-20): the rows are kept per person, import and tab by `keepWaiting` and `keptWaiting` in
+`Draft.atoms.ts` (`waitingKept` is gone), per "Each tab keeps its own" below; and a waiting row decided otherwise
+elsewhere since is held for the person, not sent over it, per "Hold it, show both, ask" below.
+
+### 2026-11-20 — atoms, rows that wait unsaved when somebody else confirms the import
+
+Rows that waited after a failed save outlived a confirm made by somebody else: the result said nothing of them, and
+they were sent with the next decision when the import was opened again. Question: rows wait unsaved and someone else
+confirms the import: what becomes of them? Options: "Name the rows, then drop them (Recommended)"; "Drop them without
+a word". Answer: "Name the rows, then drop them". I chose; the agent recommended the same. Built: the import's status
+reaches the machine with every picture (`ViewArrived { open }`); a picture of an import that can no longer be decided
+ends the draft, nothing more is sent to it, and the person's rows the confirmed import does not already say are kept
+aside (`leftOver`). The result names each, with what the person had decided ("Row 55: you left out"), and they are
+kept in the browser only until that screen has been left. A row the server refused while the import was still open
+is set aside the same way and let go when the person decides again. Reverse: `closing` in the machine and the alert
+on the Result step.
+
+### 2026-11-20 — atoms, an accept that waits while its field's column is matched again
+
+An accept that was unsent or on its way when its field's column was matched again stayed over the match's view and
+was sent afterwards, for a proposal the person had not seen; the server takes stored accepts back at a match for
+exactly this reason. Question: what happens to that accept? Options: "Server refuses, screen says so (Recommended)";
+"Screen drops it only"; "As today". Answer: "Server refuses, screen says so". I chose; the agent recommended the
+same. Built, with the revision at Confirm and the no-change answer as one shape: a save names the revision of the
+draft its decisions were made on (`madeOn`, one field in) and its answer names the accepts it did not apply
+(`notApplied`, one list out); a confirm names the revision it confirms and, for the rows it carries, the same
+`madeOn`, and is refused whole with `AcceptsTakenBack` when one of them is such an accept. Each column choice records
+the first revision that has it (`MappingChoice.at`), so the server can tell without a history of matches. The screen
+takes the accepts out of the rows, draws the review again with their proposals open, and says which were taken back;
+a match made on this screen is not announced as a change on another screen. Reverse: `madeOn`, `notApplied`, `at`,
+and `withoutStaleDecisions` (which took the place of `withoutStaleAccepts`).
+
+### 2026-11-20 — atoms, a Replace or a Keep-stored across a re-match of the SKU column
+
+A decision to replace a stored item, or keep it, was made against the item the row's SKU found; matching the SKU field
+to another column can make the row find another item, or none. Question ("SKU rematch"): what happens to such a
+decision made before the re-match? Options: "Server refuses, says so (Recommended)"; "Keep it as made". Answer:
+"Server refuses, says so". I chose; the agent recommended the same. The server does not apply it, in the same atomic
+batch as the accept rule; the row shows as undecided against what it now reads, and the screen names it as taken
+back. Built: `withoutStaleDecisions` (`Rematch.rules.ts`) at the save and the confirm, and the match's own batch dropping
+the stored ones (host and twin); a taken-back decision names its kind (`StaleAccept.kind`, `stored`, field `sku`),
+and the screen leaves it out of the row and says "the keep-or-replace on row 20 (SKU matched again)". Seen on screen.
+
+### 2026-11-20 — atoms, a kept row that was decided elsewhere since
+
+Rows that wait (after a failed save, or kept across a reload) were sent over whatever anybody decided on those rows
+since. Question ("Kept vs newer"): such a row was decided differently since, by somebody else or another tab: what
+happens? Options: "Hold it, show both, ask (Recommended)"; "Send it, last press wins"; "Drop hers, name it". Answer:
+"Hold it, show both, ask". I chose; the agent recommended the same. The row shows "Decided elsewhere since: <theirs>.
+Yours: <yours>" with a choice of which one stands; nothing is sent for that row until the person picks, and the other
+waiting rows go as usual. Built: each waiting row keeps the values it is known to have had (`Draft.seen`: what the server was known to hold
+when the person began deciding it, then each value sent, any of which a failed save may have written; a value that never
+left the browser is not in it). A waiting row is never sent before it is checked against a fresh picture at least as
+new as the one held (never the picture a redraw gives again): a picture that holds none of its values puts it on hold
+(`Hold.Elsewhere`), said "Row N: decided since by someone else or another tab: <theirs>. Yours: <yours>." with Use
+mine and Keep theirs (Keep theirs offered to a view-only member too); the hold's theirs follows later pictures and the
+hold lets go when the server holds the person's decision. A
+decision of the person's own gone tab beside this tab's is held the same way ("Row N: from your other tab: … This
+tab: …", `Hold.OtherTab`), with Use the other tab's and Keep this tab's. Use mine keeps the revision the decision was
+made on. Seen on screen (the Elsewhere line).
+
+What such a row does to the confirm is decided in "a held row, a refused row and the confirm" below. Not decided, built
+as follows: a press on Import by another member than the one whose unsaved rows the screen shows confirms nothing and
+draws the screen again for them; a save answered that the import kept changing waits and is sent again.
+
+### 2026-11-20 — atoms, what a refused save does to waiting rows
+
+A refused save set every waiting row aside, the ones never sent included, and kept none of them. Question ("Refused
+save"): what becomes of them? Options: "Keep them, say why (Recommended)"; "Name them once, drop"; "As built". Answer:
+"Keep them, say why". I chose; the agent recommended the same. A refusal because the person is not signed in counts as
+waiting: the rows are sent after sign-in. A refused row stays kept, marked "not saved" with the reason, until the
+person decides it again or dismisses it; rows behind it that were never sent stay waiting. The rule: a decision is on
+the server or still waiting, never neither. Built: `SaveSignedOut` waits like a failure; a refusal holds the rows it carried (`Hold.Refused`, kept in the
+browser with the waiting rows) and leaves the rows behind waiting, sent once the picture asked for says the import is
+open; a closed import's result names the held rows with the rest. Seen on screen.
+
+### 2026-11-20 — atoms, two tabs of one person
+
+Two tabs of one person wrote one kept entry per import: each replaced or erased the other's waiting rows, and a tab that
+opened took the other's rows and sent them. Question ("Two tabs"): how are they kept? Options: "Each tab keeps its own
+(Recommended)"; "One list, merged by row". Answer: "Each tab keeps its own". I chose; the agent recommended the same.
+Each tab keeps and sends only its own waiting rows. A tab opened later takes up rows only from a tab that is gone
+(closed or crashed), never from one still open, and no tab writes over or erases another tab's entry. Built: the kept key ends in the tab's id (kept in the tab's own storage, so a reload keeps it); each tab holds a Web
+Lock for its life, and a tab that opens an import takes up the entries of tabs whose lock nobody holds (`takeUpGoneTabs`,
+`TakenUp`), keeping them under its own key. Seen on screen with two tabs and a closed one.
+
+### 2026-11-20 — atoms, a keep-one-of-two across a re-match of the SKU column
+
+Question ("Twin rematch"): a keep-one-of-two made before the SKU field's column was matched again: what happens?
+Options: "Server refuses, says so (Recommended)"; "Keep it as made". Answer: "Server refuses, says so". I chose; the
+agent recommended the same. It is not applied; the new pair shows as undecided, and the screen names the keep as taken
+back. Built: kind `twin` in the same rule; a row left out stays left out. Not seen on screen (tested on the twin and D1).
+
+### 2026-11-20 — atoms, a Replace or a Keep-stored across a re-match of another column
+
+Question ("Other rematch"): a column other than SKU is matched again: what happens to a Replace or a Keep-stored made
+before it? Options: "Refuse if it changes the row (Recommended)"; "Refuse every one"; "Keep it as made". Answer:
+"Refuse if it changes the row". I chose; the agent recommended the same. It is taken back only on rows whose comparison
+with the stored item changed because of that column; those rows show as undecided and are named on the screen.
+Replaces on rows the re-match did not change stand. Built: the column each field read at every revision is kept as moves (`ColumnMove`, `importDraft.movesJson`, migration
+0002), and the review runs once with the field on each column to compare the row with the stored item. Not seen on
+screen (tested on the twin and D1, two re-matches in a row included).
+
+### 2026-11-20 — atoms, an undone fix across a re-match
+
+Question ("Undone fix"): a fix the person undid, made before its field's column was matched again: what happens?
+Options: "Server refuses, says so (Recommended)"; "Keep it as made". Answer: "Server refuses, says so". I chose; the
+agent recommended the same. It is not applied to the new value; the row shows the new suggested fix as open, and the
+screen names it as taken back. Built: kind `undo` in the same rule. Not seen on screen (tested on the twin and D1). A field moved off its column
+because the person took the column for another field is stamped too, so its decisions go stale the same way.
+
+### 2026-11-21 — atoms, a refused row beside a closed tab's decision of the same row
+
+A row of this tab's was refused, and a closed tab of the same person had decided it otherwise. As built, this tab's row
+became its own refused line and the closed tab's decision was named once in a toast, then dropped. Question: what
+becomes of the two? Options: "Keep both, she picks (Recommended)"; "Name once, then drop". Answer: "Keep both, she
+picks". I chose; the agent recommended the same. Both stay on the row's line ("This tab: kept (not saved: the reason).
+Your closed tab: left out"), and the person picks one.
+
+### 2026-11-21 — atoms, a field matched by hand to the column it already reads
+
+As built, any pick by hand counted as a re-match, so picking the column a field already read took its accepts and
+undone fixes back, and what rests on the SKU. Question: what does such a pick take back? Options: "Only when it
+changes (Recommended)"; "Any pick by hand". Answer: "Only when it changes". I chose; the agent recommended the same.
+Picking the column a field already reads takes nothing back: accepts, undone fixes, Replace, Keep-stored and
+keep-one-of-two alike. A field displaced by another field's match still counts as moved.
+
+### 2026-11-21 — atoms, a tab the browser discarded or has not loaded yet
+
+Such a tab holds no lock, so it counts as gone although it is still in the tab strip. Question: does it count as gone?
+Options: "Yes, and it says so (Recommended)"; "Only after a while". Answer: "Yes, and it says so". I chose; the agent
+recommended the same. Its rows are taken up, with the hold where someone decided since; when that tab loads again, it
+says its waiting decisions were taken up by another tab.
+
+### 2026-11-21 — atoms, a Replace or Keep-stored on an import matched before moves were kept
+
+An import matched before migration 0002 has no record of the column a field read earlier, so whether a re-match changed
+how a row compares cannot be known for a Replace or Keep-stored made before it. Question: what becomes of it? Options:
+"Take it back, say so (Recommended)"; "Keep it as made". Answer: "Take it back, say so". I chose; the agent
+recommended the same. The server takes it back, as it did; the screen names it. The answer is about a decision that
+arrives after the re-match.
+
+### 2026-11-22 — atoms, a Replace or Keep-stored already saved on an import matched before moves were kept
+
+Such a decision is saved, and nobody matches that field again. The server cannot tell whether it was made before or
+after the old match. Question: what becomes of it? Options: "Leave as made (Recommended)"; "Take them all back once"
+(when this ships, every such saved decision taken back once and named). Answer: "Leave as made". I chose; the agent
+recommended the same. A confirm does not judge saved decisions, so it is applied as made; the next match of that same
+field takes it back and names it, whether or not the row's comparison changed; a match of another field leaves it.
+Case: Replace saved on row 2, Unit cost matched before moves were kept, Reorder point matched since: the confirm
+overwrites row 2's stored item.
+
+### 2026-11-21 — atoms, a held row, a refused row and the confirm
+
+As built, a row held because it was decided elsewhere since stopped the whole confirm, and a refused row did not (it was
+imported without the person's decision and named on the result). Question ("Held row and Confirm"): what does Import do
+while a row is held? Options: "Wait until she picks (Recommended)"; "Import, theirs stands". Answer: "Wait until she
+picks". I chose; the agent recommended the same. Import does nothing while a row is held; the screen says how many rows
+wait for the person and takes them there; one press settles many ("Keep theirs for all", "Use mine for all").
+Question ("Refused row and Confirm"): what does Import do while a row is refused ("not saved")? Options: "Wait, like a
+held row (Recommended)"; "Import and name it". Answer: "Wait, like a held row". I chose; the agent recommended the same.
+Nothing is imported until the person decides the row again or dismisses the line; held and refused rows behave the same.
+
+### 2026-11-21 — atoms, the take-backs of earlier matches and a person who comes later
+
+Question ("Earlier take-backs"): who is shown the line that names what a match took back? Options: "Yes, everyone
+(Recommended)"; "Only who was there". Answer: "Yes, everyone". I chose; the agent recommended the same. The line is
+shown to everyone working on the import, newcomers included, until each dismisses it.
+
 ### 2026-11-20 — no `switch`, the vendored components included
 
 Every `switch` in the repository was to be replaced, in this order of preference: a struct union becomes an

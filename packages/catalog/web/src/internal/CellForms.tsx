@@ -1,9 +1,14 @@
-import { stringify } from "@inventory/ui/Json"
 // The two cells of an item that hold JSON, fixed in a small form instead of as raw text. The form writes the cell back
 // as the brief's own JSON; the one thing not to break: nothing is saved that the domain's readers (`readDimensions`,
 // `readVendors`) would refuse, and their sentence is what the person reads under the fields.
+import * as Match from "effect/Match"
 import { PlusIcon, Trash2Icon } from "lucide-react"
-import { useId, useState } from "react"
+import { useAtom } from "@effect/atom-react"
+import * as ScopedAtom from "@effect/atom-react/ScopedAtom"
+import * as O from "effect/Option"
+import * as Atom from "effect/reactivity/Atom"
+import { useId } from "react"
+import { stringify } from "@inventory/ui/Json"
 import { Button } from "@inventory/ui/components/button"
 import { Field, FieldError, FieldLabel, FieldLegend, FieldSet } from "@inventory/ui/components/field"
 import { Input } from "@inventory/ui/components/input"
@@ -29,15 +34,36 @@ const dimensionsCell = (draft: DimensionsDraft): string =>
     unit: draft.unit
   })
 
+/**
+ * What one open form holds: what was typed (none until something is, the cell's value showing meanwhile) and why
+ * the last save was refused. One per form on screen, made in the form's own provider and let go with it.
+ */
+const FormScope = ScopedAtom.make(() =>
+  Atom.make<{ readonly typed: O.Option<unknown>; readonly error: string | undefined }>({
+    typed: O.none(),
+    error: undefined
+  })
+)
+
+type CellFormProps = { value: string; onSave: (cell: string) => void }
+
 /** Length, width, height and their unit, saved as the cell's JSON once the three read; or no dimensions at all. */
-export function DimensionsForm(props: { value: string; onSave: (cell: string) => void }) {
+export function DimensionsForm(props: CellFormProps) {
+  return (
+    <FormScope.Provider>
+      <DimensionsFields {...props} />
+    </FormScope.Provider>
+  )
+}
+
+function DimensionsFields(props: CellFormProps) {
   const id = useId()
-  const [draft, setDraft] = useState(() => dimensionsDraft(props.value))
-  const [error, setError] = useState<string | undefined>(undefined)
-  const set = (key: keyof DimensionsDraft, value: string) => {
-    setDraft((before) => ({ ...before, [key]: value }))
-    setError(undefined)
-  }
+  const [held, setHeld] = useAtom(FormScope.use())
+  const draft = O.getOrElse(held.typed as O.Option<DimensionsDraft>, () => dimensionsDraft(props.value))
+  const { error } = held
+  const setError = (message: string) => setHeld((now) => ({ ...now, error: message }))
+  const set = (key: keyof DimensionsDraft, value: string) =>
+    setHeld({ typed: O.some({ ...draft, [key]: value }), error: undefined })
   return (
     <form
       className="flex flex-col gap-3"
@@ -45,8 +71,7 @@ export function DimensionsForm(props: { value: string; onSave: (cell: string) =>
         event.preventDefault()
         const cell = dimensionsCell(draft)
         const read = readDimensions(cell)
-        if (read._tag === "bad") setError(read.message)
-        else props.onSave(cell)
+        Match.valueTags(read, { bad: (bad) => setError(bad.message), ok: () => props.onSave(cell) })
       }}
     >
       <div className="grid grid-cols-2 gap-3">
@@ -103,17 +128,24 @@ const vendorsCell = (vendors: ReadonlyArray<VendorDraft>): string =>
   )
 
 /** Up to three vendors, each with a name, its SKU, a unit cost and a lead time, one of them preferred; or none. */
-export function VendorsForm(props: { value: string; onSave: (cell: string) => void }) {
+export function VendorsForm(props: CellFormProps) {
+  return (
+    <FormScope.Provider>
+      <VendorsFields {...props} />
+    </FormScope.Provider>
+  )
+}
+
+function VendorsFields(props: CellFormProps) {
   const id = useId()
-  const [vendors, setVendors] = useState<ReadonlyArray<VendorDraft>>(() => {
+  const [held, setHeld] = useAtom(FormScope.use())
+  const vendors = O.getOrElse(held.typed as O.Option<ReadonlyArray<VendorDraft>>, () => {
     const found = vendorsDraft(props.value)
     return found.length === 0 ? [emptyVendor] : found
   })
-  const [error, setError] = useState<string | undefined>(undefined)
-  const change = (next: ReadonlyArray<VendorDraft>) => {
-    setVendors(next)
-    setError(undefined)
-  }
+  const { error } = held
+  const setError = (message: string) => setHeld((now) => ({ ...now, error: message }))
+  const change = (next: ReadonlyArray<VendorDraft>) => setHeld({ typed: O.some(next), error: undefined })
   const set = (at: number, key: "name" | "sku" | "cost" | "lead", value: string) =>
     change(vendors.map((vendor, index) => (index === at ? { ...vendor, [key]: value } : vendor)))
   const preferred = vendors.findIndex((vendor) => vendor.preferred)
@@ -130,8 +162,7 @@ export function VendorsForm(props: { value: string; onSave: (cell: string) => vo
         event.preventDefault()
         const cell = vendorsCell(vendors)
         const read = readVendors(cell)
-        if (read._tag === "bad") setError(read.message)
-        else props.onSave(cell)
+        Match.valueTags(read, { bad: (bad) => setError(bad.message), ok: () => props.onSave(cell) })
       }}
     >
       <RadioGroup

@@ -7,9 +7,11 @@ import * as O from "effect/Option"
 import * as Str from "effect/String"
 import * as S from "effect/Schema"
 import { describe, expect, it } from "vitest"
+import { CellMark, Entry } from "@inventory/review/ReviewTypes"
 import {
   act,
-  type Action,
+  Action,
+  OtherAnswer,
   appliedGroups,
   choicesOf,
   choiceText,
@@ -24,6 +26,7 @@ import {
   nextProblem,
   otherAnswers,
   pickedChoice,
+  Primary,
   primary,
   proposing,
   restored,
@@ -32,6 +35,8 @@ import {
   result,
   saved,
   shownWith,
+  toDraft,
+  fromDraft,
   viewRows,
   visible,
   waitingGroups,
@@ -53,12 +58,12 @@ const after = (...actions: ReadonlyArray<Action>): ReviewState =>
   A.reduce(actions, emptyState, (state, action) => run(state, action).state)
 const firstOf = (kind: string): ReviewRow => {
   const row = A.findFirst(rows, (candidate) => candidate.problem?.kind === kind)
-  if (row._tag === "None") throw new Error(`no ${kind} row in the gallery file`)
+  if (O.isNone(row)) throw new Error(`no ${kind} row in the gallery file`)
   return row.value
 }
 const viewOf = (state: ReviewState, rowId: string) => {
   const view = A.findFirst(views(state), (candidate) => candidate.row.id === rowId)
-  if (view._tag === "None") throw new Error(`no row ${rowId}`)
+  if (O.isNone(view)) throw new Error(`no row ${rowId}`)
   return view.value
 }
 
@@ -74,10 +79,13 @@ describe("counts", () => {
     const cost = firstOf("cost")
     const states = [
       emptyState,
-      after({ type: "accept", rowIds: [unit.id] }),
-      after({ type: "acceptGroup", groupId: "unit:each" }, { type: "leaveOut", rowIds: [cost.id] }),
-      after({ type: "keep", rowId: copy.id }, { type: "revertGroup", groupId: "unit:case:kg" }),
-      after({ type: "edit", rowId: cost.id, column: "cost", value: "$4.10" }, { type: "undo" })
+      after({ type: "accept" as const, rowIds: [unit.id] }),
+      after(
+        { type: "acceptGroup" as const, groupId: "unit:each", except: [] },
+        { type: "leaveOut" as const, rowIds: [cost.id] }
+      ),
+      after({ type: "keep" as const, rowId: copy.id }, { type: "revertGroup" as const, groupId: "unit:case:kg" }),
+      after({ type: "edit" as const, rowId: cost.id, column: "cost", value: "$4.10" }, { type: "undo" as const })
     ]
     for (const state of states) {
       const counts = count(views(state))
@@ -88,11 +96,11 @@ describe("counts", () => {
 
   it("the button's number is the Ready count, and the held line is everything else", () => {
     const state = after(
-      { type: "acceptGroup", groupId: "unit:each" },
-      { type: "leaveOut", rowIds: [firstOf("cost").id] }
+      { type: "acceptGroup" as const, groupId: "unit:each", except: [] },
+      { type: "leaveOut" as const, rowIds: [firstOf("cost").id] }
     )
     const counts = count(views(state))
-    expect(primary({ columns, counts, noun })).toEqual({ label: `Import ${counts.ready} items`, blocked: false })
+    expect(primary({ columns, counts, noun })).toEqual(Primary.Import({ label: `Import ${counts.ready} items` }))
     expect(counts.ready).toBe(145)
     // Each count under the word its tab says, so the line and the tabs never disagree.
     expect(heldLine(counts)).toBe("33 won't be imported: Needs a decision 32, Left out 1")
@@ -112,16 +120,18 @@ describe("counts", () => {
 describe("a proposal never overwrites the person's decision", () => {
   it("a group accept skips a row the person typed a value into, and a row they left out", () => {
     const group = A.findFirst(waitingGroups({ views: views(emptyState) }), (candidate) => candidate.id === "unit:each")
-    if (group._tag === "None") throw new Error("no group")
+    if (O.isNone(group)) throw new Error("no group")
     const [typed, left] = group.value.rowIds
     if (typed === undefined || left === undefined) throw new Error("group too small")
     const state = after(
-      { type: "edit", rowId: typed, column: "unit", value: "kg" },
-      { type: "leaveOut", rowIds: [left] },
-      { type: "acceptGroup", groupId: "unit:each" }
+      { type: "edit" as const, rowId: typed, column: "unit", value: "kg" },
+      { type: "leaveOut" as const, rowIds: [left] },
+      { type: "acceptGroup" as const, groupId: "unit:each", except: [] }
     )
     expect(viewOf(state, typed).cells.unit).toBe("kg")
-    expect(viewOf(state, typed).marks.unit).toMatchObject({ state: "applied", by: "you", to: "kg" })
+    const typedMark = viewOf(state, typed).marks.unit
+    expect(CellMark.guards.applied(typedMark)).toBe(true)
+    expect(typedMark).toMatchObject({ by: "you", to: "kg" })
     expect(viewOf(state, left).status).toBe("out")
     expect(O.getOrUndefined(HashMap.get(state.decisions, left))?.accepted ?? []).toEqual([])
     expect(state.undo[state.undo.length - 1]?.label).toBe("7 fixes accepted")
@@ -130,13 +140,13 @@ describe("a proposal never overwrites the person's decision", () => {
   it("keeping one copy leaves its twin out, but not a twin the person already gave a new SKU", () => {
     const copy = firstOf("copy")
     const twin = copy.problem?.rivals?.[0] ?? ""
-    const kept = after({ type: "keep", rowId: copy.id })
+    const kept = after({ type: "keep" as const, rowId: copy.id })
     expect(viewOf(kept, copy.id).status).toBe("ready")
     expect(viewOf(kept, twin).status).toBe("out")
 
     const renamed = after(
-      { type: "edit", rowId: twin, column: "sku", value: "NEW-1" },
-      { type: "keep", rowId: copy.id }
+      { type: "edit" as const, rowId: twin, column: "sku", value: "NEW-1" },
+      { type: "keep" as const, rowId: copy.id }
     )
     expect(viewOf(renamed, twin).status).toBe("ready")
     expect(viewOf(renamed, twin).cells.sku).toBe("NEW-1")
@@ -145,26 +155,28 @@ describe("a proposal never overwrites the person's decision", () => {
   it("leaving one copy out settles the other without asking again", () => {
     const copy = firstOf("copy")
     const twin = copy.problem?.rivals?.[0] ?? ""
-    const state = after({ type: "leaveOut", rowIds: [twin] })
+    const state = after({ type: "leaveOut" as const, rowIds: [twin] })
     expect(viewOf(state, copy.id).status).toBe("ready")
   })
 
   it("a typed value is checked again by the caller's rule", () => {
     const cost = firstOf("cost")
-    expect(viewOf(after({ type: "edit", rowId: cost.id, column: "cost", value: "soon" }), cost.id).status).toBe("needs")
-    expect(viewOf(after({ type: "edit", rowId: cost.id, column: "cost", value: "$4.10" }), cost.id).status).toBe(
-      "ready"
-    )
+    expect(
+      viewOf(after({ type: "edit" as const, rowId: cost.id, column: "cost", value: "soon" }), cost.id).status
+    ).toBe("needs")
+    expect(
+      viewOf(after({ type: "edit" as const, rowId: cost.id, column: "cost", value: "$4.10" }), cost.id).status
+    ).toBe("ready")
   })
 })
 
 describe("one undo step per accept", () => {
   it("a group accept is one step, and undo restores every row it touched", () => {
-    const accepted = run(emptyState, { type: "acceptGroup", groupId: "unit:each" })
+    const accepted = run(emptyState, { type: "acceptGroup" as const, groupId: "unit:each", except: [] })
     expect(accepted.label).toBe("9 fixes accepted")
     expect(accepted.state.undo).toHaveLength(1)
     expect(count(views(accepted.state)).needs).toBe(33)
-    const undone = run(accepted.state, { type: "undo" })
+    const undone = run(accepted.state, { type: "undo" as const })
     expect(undone.state.undo).toHaveLength(0)
     expect(HashMap.size(undone.state.decisions)).toBe(0)
     expect(undone.changed).toHaveLength(9)
@@ -173,16 +185,16 @@ describe("one undo step per accept", () => {
 
   it("undo after keep puts the twin back as well", () => {
     const copy = firstOf("copy")
-    const state = after({ type: "keep", rowId: copy.id }, { type: "undo" })
+    const state = after({ type: "keep" as const, rowId: copy.id }, { type: "undo" as const })
     expect(count(views(state)).needs).toBe(42)
     expect(count(views(state)).out).toBe(0)
   })
 
   it("an action that fits no row adds no step", () => {
     const ready = A.findFirst(rows, (row) => row.problem === undefined)
-    if (ready._tag === "None") throw new Error("no ready row")
-    expect(run(emptyState, { type: "accept", rowIds: [ready.value.id] }).state).toBe(emptyState)
-    expect(run(emptyState, { type: "undo" }).label).toBe("")
+    if (O.isNone(ready)) throw new Error("no ready row")
+    expect(run(emptyState, { type: "accept" as const, rowIds: [ready.value.id] }).state).toBe(emptyState)
+    expect(run(emptyState, { type: "undo" as const }).label).toBe("")
   })
 })
 
@@ -201,7 +213,7 @@ describe("groups", () => {
 
   it("accepting a group touches only its rows", () => {
     const before = views(emptyState)
-    const outcome = run(emptyState, { type: "acceptGroup", groupId: "unit:length" })
+    const outcome = run(emptyState, { type: "acceptGroup" as const, groupId: "unit:length", except: [] })
     const now = views(outcome.state)
     const moved = A.filter(now, (view, index) => view.status !== before[index]?.status)
     expect(A.map(moved, (view) => view.row.problem?.fix?.group)).toEqual(["unit:length", "unit:length", "unit:length"])
@@ -209,11 +221,11 @@ describe("groups", () => {
   })
 
   it("undoing a group of rule fixes turns its rows back into proposals, and accepting restores them", () => {
-    const reverted = run(emptyState, { type: "revertGroup", groupId: "unit:case:kg" })
+    const reverted = run(emptyState, { type: "revertGroup" as const, groupId: "unit:case:kg" })
     expect(reverted.label).toBe("8 fixes undone")
     const counts = count(views(reverted.state))
     expect([counts.needs, counts.ready, counts.applied]).toEqual([50, 128, 9])
-    const again = run(reverted.state, { type: "acceptGroup", groupId: "unit:case:kg" })
+    const again = run(reverted.state, { type: "acceptGroup" as const, groupId: "unit:case:kg", except: [] })
     // Taken back by the person, they count as the person's decisions, not as the rule's.
     expect(count(views(again.state)).applied).toBe(9)
     expect(A.filter(views(again.state), (view) => view.decided === "accepted")).toHaveLength(8)
@@ -225,11 +237,9 @@ describe("groups", () => {
 describe("the import button and the queue", () => {
   it("names the blocker when a column has no match", () => {
     const counts = count(viewRows({ rows: makeRows({ size: 178, withoutUnit: true }), state: emptyState }))
-    expect(primary({ columns: columnsUnmatched, counts, noun })).toEqual({
-      label: "Match Unit to import",
-      blocked: true,
-      columnId: "unit"
-    })
+    expect(primary({ columns: columnsUnmatched, counts, noun })).toEqual(
+      Primary.Blocked({ label: "Match Unit to import", columnId: "unit" })
+    )
   })
 
   it("moves to the next undecided row and wraps round", () => {
@@ -272,9 +282,9 @@ describe("what the table and the phone show", () => {
     const copy = firstOf("copy")
     const cost = firstOf("cost")
     const state = after(
-      { type: "accept", rowIds: [unit.id] },
-      { type: "keep", rowId: copy.id },
-      { type: "edit", rowId: cost.id, column: "cost", value: "$4.10" }
+      { type: "accept" as const, rowIds: [unit.id] },
+      { type: "keep" as const, rowId: copy.id },
+      { type: "edit" as const, rowId: cost.id, column: "cost", value: "$4.10" }
     )
     expect(viewOf(state, unit.id).decided).toBe("accepted")
     expect(viewOf(state, copy.id).decided).toBe("kept")
@@ -289,7 +299,7 @@ describe("what the table and the phone show", () => {
     const lines = entries({ list, groups: waitingGroups({ views: all, kind: "unit" }) })
     expect(
       A.join(
-        A.map(lines, (line) => (line.type === "group" ? line.group.id : "row")),
+        A.map(lines, (line) => (Entry.guards.group(line) ? line.group.id : "row")),
         " "
       )
     ).toBe(A.join(["unit:each", ...A.makeBy(9, () => "row"), "unit:length", "row", "row", "row"], " "))
@@ -301,18 +311,18 @@ describe("what the table and the phone show", () => {
       waitingGroups({ views: views(emptyState) }),
       (candidate) => candidate.id === "unit:length"
     )
-    if (group._tag === "None") throw new Error("no group")
+    if (O.isNone(group)) throw new Error("no group")
     expect(choicesOf(group.value)).toEqual(["m", "pcs"])
     expect(group.value.why.basis).toMatch(/^\d+ other Bar rows in this file use m; 0 use pcs\.$/)
     const each = A.findFirst(waitingGroups({ views: views(emptyState) }), (candidate) => candidate.id === "unit:each")
-    expect(each._tag === "Some" ? choicesOf(each.value) : "missing").toBeUndefined()
+    expect(O.isSome(each) ? choicesOf(each.value) : "missing").toBeUndefined()
 
-    const chosen = run(emptyState, { type: "chooseGroup", groupId: "unit:length", value: "pcs" })
+    const chosen = run(emptyState, { type: "chooseGroup" as const, groupId: "unit:length", value: "pcs", except: [] })
     expect(chosen.label).toBe("3 rows set to pcs")
     expect(chosen.state.undo).toHaveLength(1)
     const row = viewOf(chosen.state, group.value.rowIds[0] ?? "")
     expect([row.status, row.cells.unit, row.decided]).toEqual(["ready", "pcs", "edited"])
-    const proposed = run(emptyState, { type: "chooseGroup", groupId: "unit:length", value: "m" })
+    const proposed = run(emptyState, { type: "chooseGroup" as const, groupId: "unit:length", value: "m", except: [] })
     expect(viewOf(proposed.state, group.value.rowIds[0] ?? "").decided).toBe("accepted")
   })
 
@@ -336,32 +346,31 @@ describe("the first screen and the confirm step", () => {
       collapsed: (_kind, hasGroups) => !hasGroups
     })
     expect(
-      A.map(
-        A.filter(lines, (line) => line.type === "kind"),
-        (line) => (line.type === "kind" ? `${line.kind.id} ${line.rowIds.length} ${line.collapsed}` : "")
+      A.map(A.filter(lines, Entry.guards.kind), (line) =>
+        Entry.guards.kind(line) ? `${line.kind.id} ${line.rowIds.length} ${line.collapsed}` : ""
       )
     ).toEqual(["unit 12 false", "cost 9 true", "copy 8 true", "below 7 true", "name 6 true"])
-    expect(A.filter(lines, (line) => line.type === "row")).toHaveLength(12)
-    expect(A.filter(lines, (line) => line.type === "group")).toHaveLength(2)
+    expect(A.filter(lines, Entry.guards.row)).toHaveLength(12)
+    expect(A.filter(lines, Entry.guards.group)).toHaveLength(2)
   })
 
   it("a group accept leaves out the rows the person unticked", () => {
     const group = A.findFirst(waitingGroups({ views: views(emptyState) }), (candidate) => candidate.id === "unit:each")
-    if (group._tag === "None") throw new Error("no group")
+    if (O.isNone(group)) throw new Error("no group")
     const unticked = group.value.rowIds[0] ?? ""
-    const outcome = run(emptyState, { type: "acceptGroup", groupId: "unit:each", except: [unticked] })
+    const outcome = run(emptyState, { type: "acceptGroup" as const, groupId: "unit:each", except: [unticked] })
     expect(outcome.label).toBe("8 fixes accepted")
     expect(viewOf(outcome.state, unticked).status).toBe("needs")
   })
 
   it("the confirm step counts what the import carries, and the file of held rows has a reason on every line", () => {
     const state = after(
-      { type: "acceptGroup", groupId: "unit:each" },
-      { type: "leaveOut", rowIds: [firstOf("cost").id] }
+      { type: "acceptGroup" as const, groupId: "unit:each", except: [] },
+      { type: "leaveOut" as const, rowIds: [firstOf("cost").id] }
     )
     const summary = importSummary(views(state))
     expect(A.reduce(summary, 0, (sum, line) => sum + line.count)).toBe(145)
-    expect(A.findFirst(summary, (line) => line.label === "Fixed by a rule")._tag).toBe("Some")
+    expect(O.isSome(A.findFirst(summary, (line) => line.label === "Fixed by a rule"))).toBe(true)
     const csv = Str.split(heldCsv({ views: views(state), columns, problemKinds }), "\n")
     expect(csv).toHaveLength(1 + 33)
     expect(csv[0]).toBe("Row,Reason,Item,SKU,Category,Unit,On hand,Reorder at,Cost,Supplier,Bin,Lead time")
@@ -380,9 +389,9 @@ describe("the approved standards", () => {
       problemKinds,
       collapsed: () => false
     })
-    const safe = A.flatMap(lines, (line) => (line.type === "kind" ? line.safe : []))
+    const safe = A.flatMap(lines, (line) => (Entry.guards.kind(line) ? line.safe : []))
     expect(safe).toHaveLength(17)
-    const taken = act({ rows, state: start, action: { type: "accept", rowIds: safe }, recheck })
+    const taken = act({ rows, state: start, action: { type: "accept" as const, rowIds: safe }, recheck })
     expect(taken.label).toBe("17 fixes accepted")
     expect(taken.state.undo).toHaveLength(1)
     const now = count(views(taken.state))
@@ -397,9 +406,9 @@ describe("the approved standards", () => {
     const cost = firstOf("cost")
     const out = firstOf("below")
     const state = after(
-      { type: "accept", rowIds: [unit.id] },
-      { type: "edit", rowId: cost.id, column: "cost", value: "$4.10" },
-      { type: "leaveOut", rowIds: [out.id] }
+      { type: "accept" as const, rowIds: [unit.id] },
+      { type: "edit" as const, rowId: cost.id, column: "cost", value: "$4.10" },
+      { type: "leaveOut" as const, rowIds: [out.id] }
     )
     const outcome = result({ views: views(state), problemKinds })
     const changesOf = (rowId: string) => A.flatMap(outcome.ready, (row) => (row.id === rowId ? row.changes : []))
@@ -412,11 +421,19 @@ describe("the approved standards", () => {
         decidedBy: "person",
         how: "accepted a proposal",
         basis: unit.problem?.fix?.why.basis,
-        confidence: "high"
+        confidence: O.some("high")
       }
     ])
     expect(changesOf(cost.id)).toEqual([
-      { column: "cost", from: "", to: "$4.10", source: "person", decidedBy: "person", how: "typed or chose a value" }
+      {
+        column: "cost",
+        from: "",
+        to: "$4.10",
+        source: "person",
+        decidedBy: "person",
+        how: "typed or chose a value",
+        confidence: O.none()
+      }
     ])
     const byRule = A.filter(
       A.flatMap(outcome.ready, (row) => row.changes),
@@ -433,10 +450,10 @@ describe("the approved standards", () => {
       const copy = firstOf("copy")
       const state = A.reduce(
         [
-          { type: "acceptGroup", groupId: "unit:each" },
-          { type: "keep", rowId: copy.id },
-          { type: "edit", rowId: firstOf("cost").id, column: "cost", value: "$4.10" },
-          { type: "leaveOut", rowIds: [firstOf("below").id] }
+          { type: "acceptGroup" as const, groupId: "unit:each", except: [] },
+          { type: "keep" as const, rowId: copy.id },
+          { type: "edit" as const, rowId: firstOf("cost").id, column: "cost", value: "$4.10" },
+          { type: "leaveOut" as const, rowIds: [firstOf("below").id] }
         ] satisfies ReadonlyArray<Action>,
         proposing(rows),
         (before, action) => act({ rows, state: before, action, recheck }).state
@@ -468,12 +485,12 @@ describe("records with a parent: label, choices, rowAction, and undo across view
   const lineRun = (state: ReviewState, action: Action) => act({ rows: lines, state, action, recheck: recheckLine })
   const lineOf = (kind: string): ReviewRow => {
     const row = A.findFirst(lines, (candidate) => candidate.problem?.kind === kind)
-    if (row._tag === "None") throw new Error(`no ${kind} line in the gallery's jobs`)
+    if (O.isNone(row)) throw new Error(`no ${kind} line in the gallery's jobs`)
     return row.value
   }
   const lineView = (state: ReviewState, rowId: string) => {
     const view = A.findFirst(lineViews(state), (candidate) => candidate.row.id === rowId)
-    if (view._tag === "None") throw new Error(`no line ${rowId}`)
+    if (O.isNone(view)) throw new Error(`no line ${rowId}`)
     return view.value
   }
   const extra = { label: "Leave job J-2045 out", onSelect: () => undefined }
@@ -487,16 +504,16 @@ describe("records with a parent: label, choices, rowAction, and undo across view
 
   it("label: a group whose rows end in different values is named by its label, and each row takes its own value", () => {
     const group = A.findFirst(waitingGroups({ views: lineViews(emptyState) }), (found) => found.id === "qty:comma")
-    if (group._tag === "None") throw new Error("no comma group")
+    if (O.isNone(group)) throw new Error("no comma group")
     expect([group.value.label, group.value.rowIds.length]).toEqual(["a decimal point", 3])
     expect(groupUse({ group: group.value, n: 3, ticks: true })).toBe("Use a decimal point for the 3 ticked")
     // Where each row keeps its own answers (`rowAction`) there is no tick: the button acts on all of them.
     expect(groupUse({ group: group.value, n: 3, ticks: false })).toBe("Use a decimal point for all 3")
     const unit = A.findFirst(waitingGroups({ views: views(emptyState) }), (found) => found.id === "unit:each")
-    if (unit._tag === "None") throw new Error("no unit group")
+    if (O.isNone(unit)) throw new Error("no unit group")
     expect(groupUse({ group: unit.value, n: 9, ticks: true })).toBe("Use pcs for the 9 ticked")
 
-    const taken = lineRun(emptyState, { type: "acceptGroup", groupId: "qty:comma" })
+    const taken = lineRun(emptyState, { type: "acceptGroup" as const, groupId: "qty:comma", except: [] })
     expect(taken.state.undo).toHaveLength(1)
     expect(A.map(group.value.rowIds, (rowId) => lineView(taken.state, rowId).cells.qty)).toEqual([
       "1.5",
@@ -504,7 +521,7 @@ describe("records with a parent: label, choices, rowAction, and undo across view
       "0.75"
     ])
     // One value typed for the whole group is that value on every row: accepted where it is the row's own proposal.
-    const chosen = lineRun(emptyState, { type: "chooseGroup", groupId: "qty:comma", value: "1.5" })
+    const chosen = lineRun(emptyState, { type: "chooseGroup" as const, groupId: "qty:comma", value: "1.5", except: [] })
     expect(
       A.map(group.value.rowIds, (rowId) => {
         const view = lineView(chosen.state, rowId)
@@ -522,7 +539,7 @@ describe("records with a parent: label, choices, rowAction, and undo across view
     expect(A.some(waitingGroups({ views: lineViews(emptyState) }), (group) => group.rowIds.includes(unit.id))).toBe(
       false
     )
-    const picked = lineRun(emptyState, { type: "edit", rowId: unit.id, column: "unit", value: "pcs" })
+    const picked = lineRun(emptyState, { type: "edit" as const, rowId: unit.id, column: "unit", value: "pcs" })
     const after = lineView(picked.state, unit.id)
     expect([after.status, after.cells.unit, after.decided, pickedChoice(after)?.value]).toEqual([
       "ready",
@@ -534,18 +551,19 @@ describe("records with a parent: label, choices, rowAction, and undo across view
       result({ views: lineViews(picked.state), problemKinds: lineKinds }).ready,
       (row) => row.id === unit.id
     )
-    expect(change._tag === "Some" ? change.value.changes : []).toEqual([
+    expect(O.isSome(change) ? change.value.changes : []).toEqual([
       {
         column: "unit",
         from: "length",
         to: "pcs",
         source: "person",
         decidedBy: "person",
-        how: "typed or chose a value"
+        how: "typed or chose a value",
+        confidence: O.none()
       }
     ])
     // A typed value that is not one of the choices is an edit, not a pick.
-    const typed = lineRun(emptyState, { type: "edit", rowId: unit.id, column: "unit", value: "kg" })
+    const typed = lineRun(emptyState, { type: "edit" as const, rowId: unit.id, column: "unit", value: "kg" })
     expect(pickedChoice(lineView(typed.state, unit.id))).toBeUndefined()
   })
 
@@ -562,44 +580,43 @@ describe("records with a parent: label, choices, rowAction, and undo across view
   it("rowAction: a row keeps its own answer, then typing (beside a fix), leaving the row out and the page's answer", () => {
     const at = (kind: string) => lineView(emptyState, lineOf(kind).id)
     expect(otherAnswers({ view: at("comma"), extra })).toEqual([
-      { type: "type" },
-      { type: "leaveOut", label: `Leave row ${lineOf("comma").line} out` },
-      { type: "action", label: "Leave job J-2045 out" }
+      OtherAnswer.Type(),
+      OtherAnswer.LeaveOut({ label: `Leave row ${lineOf("comma").line} out` }),
+      OtherAnswer.Extra({ label: "Leave job J-2045 out" })
     ])
     // A pick and a row with nothing proposed have no typing among the others: the first is chosen, the second typed.
-    expect(A.map(otherAnswers({ view: at("unit"), extra }) ?? [], (answer) => answer.type)).toEqual([
-      "leaveOut",
-      "action"
+    expect(otherAnswers({ view: at("unit"), extra })).toEqual([
+      OtherAnswer.LeaveOut({ label: `Leave row ${lineOf("unit").line} out` }),
+      OtherAnswer.Extra({ label: "Leave job J-2045 out" })
     ])
-    expect(A.map(otherAnswers({ view: at("stock"), extra }) ?? [], (answer) => answer.type)).toEqual([
-      "leaveOut",
-      "action"
+    expect(otherAnswers({ view: at("stock"), extra })).toEqual([
+      OtherAnswer.LeaveOut({ label: `Leave row ${lineOf("stock").line} out` }),
+      OtherAnswer.Extra({ label: "Leave job J-2045 out" })
     ])
     // Without the page's answer, and on a row that is ready, there is nothing more: "Leave out" as before.
     expect(otherAnswers({ view: at("comma"), extra: undefined })).toBeUndefined()
-    const done = lineRun(emptyState, { type: "acceptGroup", groupId: "qty:comma" }).state
+    const done = lineRun(emptyState, { type: "acceptGroup" as const, groupId: "qty:comma", except: [] }).state
     expect(otherAnswers({ view: lineView(done, lineOf("comma").id), extra })).toBeUndefined()
   })
 
-  it("undo survives the region being drawn again from the object onDecisionsChange gave", () => {
+  it("undo survives the decisions being kept as a draft and started from again", () => {
     const state = A.reduce(
       [
-        { type: "acceptGroup", groupId: "qty:comma" },
-        { type: "edit", rowId: lineOf("unit").id, column: "unit", value: "m" }
+        { type: "acceptGroup" as const, groupId: "qty:comma", except: [] },
+        { type: "edit" as const, rowId: lineOf("unit").id, column: "unit", value: "m" }
       ] satisfies ReadonlyArray<Action>,
       emptyState,
       (before, action) => lineRun(before, action).state
     )
-    const kept: SavedDecisions = saved(state)
-    // The page switched views and back: the region starts again from what the page kept.
-    const again = restored(kept)
+    // The page kept the review as plain data (a refresh, a closed tab) and starts the region from it again.
+    const again = fromDraft(toDraft(state))
     expect(again.undo).toHaveLength(2)
-    const undone = lineRun(again, { type: "undo" })
+    const undone = lineRun(again, { type: "undo" as const })
     expect(undone.label).toBe("Undone: Value changed")
     expect(lineView(undone.state, lineOf("unit").id).status).toBe("needs")
     expect(lineView(undone.state, lineOf("comma").id).cells.qty).toBe("1.5")
-    // A copy is new data: the same decisions, and a new history.
-    const copy = restored({ ...kept })
+    // The decisions alone are plain data: the same decisions, and a new history.
+    const copy = restored(saved(state))
     expect([HashMap.size(copy.decisions), copy.undo.length]).toEqual([HashMap.size(state.decisions), 0])
   })
 
@@ -611,7 +628,7 @@ describe("records with a parent: label, choices, rowAction, and undo across view
       A.filter(list, (status) => status === "waiting").length
     ]
     expect(statuses(tally(emptyState, []))).toEqual([16, 8])
-    const comma = lineRun(emptyState, { type: "acceptGroup", groupId: "qty:comma" }).state
+    const comma = lineRun(emptyState, { type: "acceptGroup" as const, groupId: "qty:comma", except: [] }).state
     expect(statuses(tally(comma, []))).toEqual([19, 5])
     const out = tally(emptyState, ["J-2045"])
     expect([...statuses(out), A.filter(out, (status) => status === "out").length]).toEqual([16, 7, 1])
@@ -621,10 +638,10 @@ describe("records with a parent: label, choices, rowAction, and undo across view
 
 describe("a model's weak guess", () => {
   it("is never a row's one-press answer: only a model's low guess is held back for typing", () => {
-    expect(weakGuess({ by: "model", confidence: "low" })).toBe(true)
-    expect(weakGuess({ by: "model", confidence: "medium" })).toBe(false)
+    expect(weakGuess({ by: "model", confidence: O.some("low") })).toBe(true)
+    expect(weakGuess({ by: "model", confidence: O.some("medium") })).toBe(false)
     // A rule's low proposal is a question with two readings, answered by a press: it stays one.
-    expect(weakGuess({ by: "rule", confidence: "low" })).toBe(false)
+    expect(weakGuess({ by: "rule", confidence: O.some("low") })).toBe(false)
   })
 })
 

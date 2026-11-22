@@ -212,13 +212,15 @@ export const strict = Effect.fn("Strict.strict")(function* (ceilingFile: O.Optio
   const own = yield* pluginOf(repo.join(repo.cwd, "tsconfig.base.json"))
   const root = yield* pluginOf(repo.join(repo.root, "tsconfig.base.json"))
   if (O.isNone(own) || O.isNone(root)) {
-    return A.of<StrictFinding>({ _tag: "NoPlugin" })
+    return A.of<StrictFinding>(StrictFinding.cases.NoPlugin.make({}))
   }
   const ownText = yield* asJson({ ...own.value, overrides: [] }).pipe(Effect.orDie)
   const rootText = yield* asJson({ ...root.value, overrides: [] }).pipe(Effect.orDie)
-  const drift = ownText === rootText ? A.empty<StrictFinding>() : A.of<StrictFinding>({ _tag: "Drift" })
+  const drift =
+    ownText === rootText ? A.empty<StrictFinding>() : A.of<StrictFinding>(StrictFinding.cases.Drift.make({}))
 
-  if (O.isNone(ceilingFile)) return A.append<StrictFinding, StrictFinding>(drift, { _tag: "NoCeilingFile" })
+  if (O.isNone(ceilingFile))
+    return A.append<StrictFinding, StrictFinding>(drift, StrictFinding.cases.NoCeilingFile.make({}))
   const ledger = yield* repo.json(StrictCeiling)(repo.join(repo.cwd, ceilingFile.value))
   const tsgo = repo.join(repo.root, "node_modules", "@effect/tsgo/dist/effect-tsgo.cjs")
   if (!(yield* repo.exists(tsgo))) {
@@ -260,24 +262,25 @@ export const strict = Effect.fn("Strict.strict")(function* (ceilingFile: O.Optio
   const perRule = A.flatMap(rules, ([rule, found]): ReadonlyArray<StrictFinding> => {
     const shown = all ? found : A.take(found, 3)
     return A.flatten<ReadonlyArray<ReadonlyArray<StrictFinding>>>([
-      [{ _tag: "RuleCount", rule, count: found.length }],
-      A.map(shown, (finding) => ({
-        _tag: "At",
-        file: repo.relative(repo.cwd, finding.file),
-        line: finding.line,
-        column: finding.column
-      })),
-      found.length > shown.length ? [{ _tag: "More", count: found.length - shown.length }] : []
+      [StrictFinding.cases.RuleCount.make({ rule, count: found.length })],
+      A.map(shown, (finding) =>
+        StrictFinding.cases.At.make({
+          file: repo.relative(repo.cwd, finding.file),
+          line: finding.line,
+          column: finding.column
+        })
+      ),
+      found.length > shown.length ? [StrictFinding.cases.More.make({ count: found.length - shown.length })] : []
     ])
   })
   const finished = yield* Clock.currentTimeMillis
   const seconds = Num.round((finished - started) / 1000, 1).toFixed(1)
   return A.flatten<ReadonlyArray<ReadonlyArray<StrictFinding>>>([
     drift,
-    [{ _tag: "Ledger", rules: ledger.rules, own: ledger.own }],
+    [StrictFinding.cases.Ledger.make({ rules: ledger.rules, own: ledger.own })],
     perRule,
-    [{ _tag: "Total", total, ceiling: ledger.ceiling, seconds }],
-    total > ledger.ceiling ? [{ _tag: "Above", by: total - ledger.ceiling }] : [],
-    total < ledger.ceiling ? [{ _tag: "Below", total, ceilingFile: ceilingFile.value }] : []
+    [StrictFinding.cases.Total.make({ total, ceiling: ledger.ceiling, seconds })],
+    total > ledger.ceiling ? [StrictFinding.cases.Above.make({ by: total - ledger.ceiling })] : [],
+    total < ledger.ceiling ? [StrictFinding.cases.Below.make({ total, ceilingFile: ceilingFile.value })] : []
   ])
 })

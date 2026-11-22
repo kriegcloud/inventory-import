@@ -62,8 +62,8 @@ export const keys = Effect.fn("Keys.keys")(function* () {
   )
   return A.isArrayNonEmpty(found)
     ? A.prepend<KeysFinding, KeysFinding>(
-        A.map(found, (place) => ({ _tag: "At", place })),
-        { _tag: "Refused" }
+        A.map(found, (place) => KeysFinding.cases.At.make({ place })),
+        KeysFinding.cases.Refused.make({})
       )
-    : A.of<KeysFinding>({ _tag: "Clean" })
+    : A.of<KeysFinding>(KeysFinding.cases.Clean.make({}))
 })

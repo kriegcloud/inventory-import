@@ -12,12 +12,20 @@ import * as O from "effect/Option"
 import * as Result from "effect/Result"
 import * as Tuple from "effect/Tuple"
 import { Member } from "@inventory/kernel/Member"
-import { StagedHead, StagedRow, StagedTable } from "@inventory/catalog-contract/Staged"
+import { type Field, StagedHead, StagedRow, StagedTable } from "@inventory/catalog-contract/Staged"
 import { FileProblem } from "@inventory/catalog-contract/FileProblem"
 import { OrganizationId } from "@inventory/kernel/Ids"
-import { PastImport, ChangeRecord, ImportEvent, TakeBackState, RowOutcome } from "@inventory/catalog-contract/Import"
-import { MappingChoice } from "@inventory/catalog-contract/Mapping"
+import {
+  PastImport,
+  ChangeRecord,
+  ImportEvent,
+  type MatchTakeBack,
+  TakeBackState,
+  RowOutcome
+} from "@inventory/catalog-contract/Import"
+import { ColumnMove, MappingChoice } from "@inventory/catalog-contract/Mapping"
 import { ConfirmPlan } from "../Confirm/Confirm.rules.ts"
+import { type CompareAtMatch, ItemsAsRead } from "./Rematch.rules.ts"
 import { Activity } from "@inventory/kernel/Activity"
 import { LiteralKit } from "@beep/schema/LiteralKit"
 
@@ -34,7 +42,14 @@ export const Draft = S.Struct({
   importedAt: S.OptionFromNullOr(Instant),
   revision: S.Int,
   needsAtStart: S.Int,
-  choicesJson: S.String
+  choicesJson: S.String,
+  movesJson: S.String.annotateKey({
+    description: "Every field that began to read another column at a match, oldest first: `ColumnMove`s as JSON"
+  }),
+  takenBackJson: S.String.annotateKey({
+    description:
+      "What each match of the open import took back from the stored decisions, oldest first: `MatchTakeBack`s as JSON; '[]' once it is confirmed"
+  })
 }).annotate({ description: "An import as stored, without its rows" })
 /** The decoded value of `Draft`: an import as stored, without its rows. */
 export type Draft = typeof Draft.Type
@@ -45,6 +60,22 @@ export class ConfirmWrite extends S.Opaque<ConfirmWrite, { readonly brand: uniqu
     draft: ImportId,
     fileName: S.String.pipe(S.annotateKey({ description: "The import's file, for the audit line" })),
     confirm: ConfirmId,
+    expected: S.Int.pipe(
+      S.annotateKey({
+        description:
+          "The draft's revision the plan was worked out from: the confirm is written only while the draft is still at it"
+      })
+    ),
+    unsaved: DecisionDelta.pipe(
+      S.annotateKey({
+        description:
+          "The confirming person's own decisions not saved yet, already in the plan: saved under their name in the same write"
+      })
+    ),
+    // The stored items, created rows and suggestions the confirm's judgement of its decisions across a re-match read:
+    // the confirm is written only while they are still so. Given as the class itself, which an annotation would
+    // rebuild into a plain struct.
+    read: ItemsAsRead,
     plan: ConfirmPlan,
     itemIds: S.Array(ItemId).pipe(
       S.annotateKey({ description: "One id per row the plan creates, in the plan's order, made by the handler" })
@@ -56,9 +87,10 @@ export class ConfirmWrite extends S.Opaque<ConfirmWrite, { readonly brand: uniqu
 ) {}
 
 /** What a confirm's write did. */
-export const ConfirmedKind = LiteralKit(["confirmed", "closed"]).annotate({
+export const ConfirmedKind = LiteralKit(["confirmed", "closed", "moved", "itemsChanged"]).annotate({
   identifier: "ConfirmedKind",
-  description: "The confirm was written, or the import was no longer open and nothing was"
+  description:
+    "The confirm was written; or nothing was, because the import was no longer open, because its draft had moved on from the revision the confirm was made on, or because a stored item its judgement read changed since"
 })
 class ConfirmWritten extends S.Opaque<ConfirmWritten, { readonly brand: unique symbol }>()(
   S.Struct({ kind: S.tag("confirmed") }).annotate({
@@ -72,10 +104,31 @@ class ConfirmClosed extends S.Opaque<ConfirmClosed, { readonly brand: unique sym
     description: "Another confirm won, or the import was not open: nothing was written"
   })
 ) {}
-/** Whether a confirm's write was the one that confirmed the import. */
-export const Confirmed = ConfirmedKind.mapMembers(() => Tuple.make(ConfirmWritten, ConfirmClosed)).pipe(
-  S.toTaggedUnion("kind"),
-  S.annotate({ identifier: "Confirmed", description: "Whether a confirm's write confirmed the import" })
+class ConfirmMoved extends S.Opaque<ConfirmMoved, { readonly brand: unique symbol }>()(
+  S.Struct({
+    kind: S.tag("moved"),
+    revision: S.Int.pipe(S.annotateKey({ description: "The draft's revision now" }))
+  }).annotate({
+    identifier: "ConfirmMoved",
+    description: "The draft is open at another revision than the confirm was made on: nothing was written"
+  })
+) {}
+class ConfirmItemsChanged extends S.Opaque<ConfirmItemsChanged, { readonly brand: unique symbol }>()(
+  S.Struct({ kind: S.tag("itemsChanged") }).annotate({
+    identifier: "ConfirmItemsChanged",
+    description:
+      "A stored item the confirm's judgement read was edited, replaced, created or taken back since, or the import's created rows or suggestions changed: nothing was written, and the confirm is judged again"
+  })
+) {}
+/**
+ * Whether a confirm's write was the one that confirmed the import. Told apart with `Confirmed.match` or its `guards`:
+ * the description is given before `S.toTaggedUnion`, since annotating after it rebuilds the union without them.
+ */
+export const Confirmed = ConfirmedKind.mapMembers(() =>
+  Tuple.make(ConfirmWritten, ConfirmClosed, ConfirmMoved, ConfirmItemsChanged)
+).pipe(
+  S.annotate({ identifier: "Confirmed", description: "Whether a confirm's write confirmed the import" }),
+  S.toTaggedUnion("kind")
 )
 /** The decoded value of `Confirmed`. */
 export type Confirmed = typeof Confirmed.Type
@@ -83,6 +136,10 @@ export type Confirmed = typeof Confirmed.Type
 export const confirmWritten: Confirmed = ConfirmWritten.make({})
 /** The import was no longer open: nothing was written. */
 export const confirmClosed: Confirmed = ConfirmClosed.make({})
+/** The draft had moved on to `revision`: nothing was written. */
+export const confirmMoved = (revision: number): Confirmed => ConfirmMoved.make({ revision })
+/** A stored item, created row or suggestion the confirm's judgement read changed since: nothing was written. */
+export const confirmItemsChanged: Confirmed = ConfirmItemsChanged.make({})
 
 /** One take-back, as it is written: the confirms it reverses and its audit line, in one atomic batch. */
 export class TakeBackWrite extends S.Opaque<TakeBackWrite, { readonly brand: unique symbol }>()(
@@ -118,8 +175,8 @@ class NothingInForce extends S.Opaque<NothingInForce, { readonly brand: unique s
 ) {}
 /** Whether a take-back's write reversed anything. */
 export const TookBack = TookBackKind.mapMembers(() => Tuple.make(TakenBack, NothingInForce)).pipe(
-  S.toTaggedUnion("kind"),
-  S.annotate({ identifier: "TookBack", description: "Whether a take-back's write reversed anything" })
+  S.annotate({ identifier: "TookBack", description: "Whether a take-back's write reversed anything" }),
+  S.toTaggedUnion("kind")
 )
 /** The decoded value of `TookBack`. */
 export type TookBack = typeof TookBack.Type
@@ -128,14 +185,93 @@ export const tookBack: TookBack = TakenBack.make({})
 /** None of the confirms was in force any more. */
 export const nothingInForce: TookBack = NothingInForce.make({})
 
-/** The saved draft of a review, and who last decided each row. */
+/** What a save of decisions did. */
+export const DecidedKind = LiteralKit(["saved", "closed", "rematched", "moved", "itemsChanged"]).annotate({
+  identifier: "DecidedKind",
+  description:
+    "The save was written; or nothing was, because the import was no longer open, because a column was matched again since the choices its decisions were judged against, because the draft moved on from the revision its rows that waited were compared at, or because a stored item that judgement read changed since"
+})
+class DecisionsSaved extends S.Opaque<DecisionsSaved, { readonly brand: unique symbol }>()(
+  S.Struct({
+    kind: S.tag("saved"),
+    revision: S.Int.pipe(S.annotateKey({ description: "The draft's revision after the save" })),
+    changed: S.Boolean.pipe(S.annotateKey({ description: "Whether this save is what moved the draft there" }))
+  }).annotate({ identifier: "DecisionsSaved", description: "The save was written, or changed nothing" })
+) {}
+class DecisionsClosed extends S.Opaque<DecisionsClosed, { readonly brand: unique symbol }>()(
+  S.Struct({ kind: S.tag("closed") }).annotate({
+    identifier: "DecisionsClosed",
+    description: "The import was no longer open: nothing was saved"
+  })
+) {}
+class DecisionsRematched extends S.Opaque<DecisionsRematched, { readonly brand: unique symbol }>()(
+  S.Struct({ kind: S.tag("rematched") }).annotate({
+    identifier: "DecisionsRematched",
+    description:
+      "A column was matched again since the draft was read: its decisions were judged against choices it no longer has, and nothing was saved"
+  })
+) {}
+class DecisionsMoved extends S.Opaque<DecisionsMoved, { readonly brand: unique symbol }>()(
+  S.Struct({ kind: S.tag("moved") }).annotate({
+    identifier: "DecisionsMoved",
+    description:
+      "The draft moved on from the revision the save's rows that waited were compared at (somebody saved, matched or confirmed in between): nothing was saved"
+  })
+) {}
+class DecisionsItemsChanged extends S.Opaque<DecisionsItemsChanged, { readonly brand: unique symbol }>()(
+  S.Struct({ kind: S.tag("itemsChanged") }).annotate({
+    identifier: "DecisionsItemsChanged",
+    description:
+      "A stored item the save's judgement of a Replace or Keep-stored read was edited, replaced, created or taken back since, or the import's created rows or suggestions changed: nothing was saved"
+  })
+) {}
+/**
+ * What a save of decisions did: written (at which revision, and whether it moved the draft), or why not. Told apart
+ * with `Decided.match` or its `guards`.
+ */
+export const Decided = DecidedKind.mapMembers(() =>
+  Tuple.make(DecisionsSaved, DecisionsClosed, DecisionsRematched, DecisionsMoved, DecisionsItemsChanged)
+).pipe(S.annotate({ identifier: "Decided", description: "What a save of decisions did" }), S.toTaggedUnion("kind"))
+/** The decoded value of `Decided`. */
+export type Decided = typeof Decided.Type
+/** The save was written at `revision`; `changed` says whether it is what moved the draft there. */
+export const decisionsSaved = (saved: { readonly revision: number; readonly changed: boolean }): Decided =>
+  DecisionsSaved.make(saved)
+/** The import was no longer open: nothing was saved. */
+export const decisionsClosed: Decided = DecisionsClosed.make({})
+/** A column was matched again since the draft was read: nothing was saved. */
+export const decisionsRematched: Decided = DecisionsRematched.make({})
+/** The draft moved on from the revision the save's rows that waited were compared at: nothing was saved. */
+export const decisionsMoved: Decided = DecisionsMoved.make({})
+/** A stored item, created row or suggestion the save's judgement read changed since: nothing was saved. */
+export const decisionsItemsChanged: Decided = DecisionsItemsChanged.make({})
+
+/**
+ * The saved draft of a review, who last decided each row, and the revision that decision was saved at: a row decided
+ * again, even to the same decision by way of another, has a later one (0 for a row saved before this was kept).
+ */
 export type StoredDecisions = {
   readonly decisions: SavedDecisions
   readonly authors: Readonly<Record<string, string>>
+  readonly savedAt: Readonly<Record<string, number>>
 }
 
-/** What saving the column choices did: saved them, found them already so (nothing written), or found the import closed. */
-export type ChoicesSaved = "saved" | "same" | "closed"
+/**
+ * What saving the column choices did: saved them, found them already so (nothing written), found the import closed,
+ * or found it changing under every one of its `draftTries` tries (`busy`: nothing written).
+ */
+export type ChoicesSaved = "saved" | "same" | "closed" | "busy"
+
+/**
+ * How many times a request worked out against a draft as read is tried before it gives up with nothing written: a
+ * match, in either store; a save, checked against the draft's column choices, what its judgement read, and when it has
+ * rows that waited the draft's revision; and a confirm, checked against what its judgement read. Each try that is
+ * overtaken (somebody saved or matched in between, or an item, a created row or a suggestion the judgement read changed)
+ * reads the draft again; a request overtaken
+ * this many times running is answered as busy (`DraftBusy`, saying which kept changing), never retried without end and
+ * never a server error.
+ */
+export const draftTries = 6
 
 /** An upload that has not finished: who started it, what file, and how many rows in how many pieces will follow. */
 export const Upload = S.Struct({
@@ -213,25 +349,61 @@ export class ImportStore extends Context.Service<
      * written nothing, when the import is gone, is not open, or still has items: those must stay.
      */
     remove(actor: Member, draft: Draft): Effect.Effect<boolean>
-    /** The saved draft: each row's decision, and who made it. */
+    /** The saved draft: each row's decision, who made it, and the revision it was saved at. */
     decisions(organizationId: OrganizationId, importId: string): Effect.Effect<StoredDecisions>
     /**
-     * Saves what changed in the draft, row by row, under the member's name, and answers the draft's revision. A
-     * delta that changes nothing (the same save sent again) writes nothing and leaves the revision as it is. None when
-     * the import is no longer open (nothing is saved then).
+     * Saves what changed in the draft, row by row, under the member's name, and answers the draft's revision and
+     * whether this save moved it. A delta that changes nothing (the same save sent again, or rows somebody else
+     * decided the same way) writes nothing, leaves the revision as it is and answers `changed: false`. Nothing is
+     * saved when the import is no longer open (`closed`); when its column choices are no longer `draft`'s
+     * (`rematched`): each of the delta's decisions that rests on a column (an accept, an undone fix, a Replace or
+     * Keep-stored, a keep of one of two) was judged against those choices, and a match since may have made it stale;
+     * or when the stored items, created rows or suggestions `read` names are no longer as it read them
+     * (`itemsChanged`): a Replace or Keep-stored across a re-match was judged against them. `expected` is the revision the
+     * rows that waited were compared at, when the save has any: nothing is saved, and no revision answered, once the
+     * draft is at another (`moved`), an empty delta included. Every check is part of the save's own write, so no match,
+     * no save and no item change can fall between the judgement and the write. `read` defaults to none (`noItemsRead`),
+     * and `expected` to any revision.
      */
-    decide(actor: Member, draft: Draft, delta: DecisionDelta): Effect.Effect<O.Option<number>>
-    /** The columns people chose for fields, as stored with the draft. */
-    choices(draft: Draft): Effect.Effect<ReadonlyArray<MappingChoice>>
-    /**
-     * Points fields at file columns (or at none), with its audit line. Choices that are already so write nothing,
-     * and an import that is no longer open writes nothing either.
-     */
-    setChoices(
+    decide(
       actor: Member,
       draft: Draft,
-      choices: ReadonlyArray<MappingChoice>,
-      detail: string
+      delta: DecisionDelta,
+      read?: ItemsAsRead,
+      expected?: O.Option<number>
+    ): Effect.Effect<Decided>
+    /** The columns people chose for fields, as stored with the draft. */
+    choices(draft: Draft): Effect.Effect<ReadonlyArray<MappingChoice>>
+    /** Every field that began to read another column at a match, oldest first, as stored with the draft. */
+    moves(draft: Draft): Effect.Effect<ReadonlyArray<ColumnMove>>
+    /**
+     * What the matches of the open import took back from the stored decisions, oldest first, as stored with the draft:
+     * empty once it is confirmed.
+     */
+    takenBack(draft: Draft): Effect.Effect<ReadonlyArray<MatchTakeBack>>
+    /**
+     * Points one field at a file column (or at none, `column` null), in one atomic write with five parts: the choice,
+     * stamped with the revision this write moves the draft to when the field reads another column by it (a decision
+     * made on an earlier one was made before the field read this column; a pick of the column it already reads keeps
+     * the stamp it had, moves nothing and takes nothing back); a move for every field that reads another column after
+     * the match, the field itself or one moved off its column (`movesOfMatch`), stamped the same; every stored decision
+     * the match takes back (`withoutStaleDecisions`, as if
+     * each was made on the revision before the match), whoever made it: accepts and undone fixes of a moved field,
+     * and when the SKU moved every Replace, Keep-stored and keep-one-of-two, and the Replaces and Keep-storeds whose
+     * comparison `compare` says the match changed; what it took back, kept with the draft by field and kind
+     * (`takenBackOfMatch`); and the audit line, which counts what it took back by kind. It is worked out from the
+     * draft, its decisions and what `compare` read (stored items, created rows, suggestions) as they are when it writes,
+     * not as `draft` read them: a save, a match or a change to what `compare` read that lands first makes it be worked
+     * out again, at most `draftTries` times
+     * (`busy`, nothing written). The same choice again writes nothing (`same`); an import no longer open writes
+     * nothing (`closed`).
+     */
+    matchColumn(
+      actor: Member,
+      draft: Draft,
+      choice: { readonly field: Field; readonly column: number | null },
+      detail: string,
+      compare?: CompareAtMatch
     ): Effect.Effect<ChoicesSaved>
     /**
      * The items of the file an earlier confirm of this import created and still has, by row and part (0 when the
@@ -241,11 +413,6 @@ export class ImportStore extends Context.Service<
       organizationId: OrganizationId,
       importId: string
     ): Effect.Effect<ReadonlyArray<{ readonly rowNumber: number; readonly part: number }>>
-    /**
-     * Replaces the stored decision of rows that already have one, keeping who made them. Used when the app itself
-     * has to take back an acceptance (the proposal behind it changed), which is not a decision by the person acting.
-     */
-    rewriteDecisions(actor: Member, draft: Draft, set: SavedDecisions): Effect.Effect<void>
     /**
      * Opens a confirmed or taken-back import again for its rows to be decided. Items it created and still has are
      * untouched. Opening one that is open already writes nothing.
@@ -266,9 +433,12 @@ export class ImportStore extends Context.Service<
       importId: string
     ): Effect.Effect<{ readonly rows: number; readonly cells: number }>
     /**
-     * Writes a confirm: its new items, the stored items it replaces (each with a kept copy), every row's outcome,
-     * the changed values and the audit line, in one atomic batch. `closed` when the import was no longer open, in
-     * which case nothing was written.
+     * Writes a confirm: the confirming person's unsaved decisions, the close of the import (one revision on, with what
+     * its matches took back let go: there is nothing left to name), its new items, the stored items it replaces (each with a kept copy), every row's outcome, the changed values and the
+     * audit line, in one atomic batch, and only while the draft is open at `expected` and the stored items, created
+     * rows and suggestions `read` names are as the confirm's judgement read them. `closed` when the import was no longer open, `moved` when its
+     * draft is at another revision, `itemsChanged` when one of those items changed (the confirm is judged again): in
+     * each nothing was written.
      */
     commit(write: ConfirmWrite): Effect.Effect<Confirmed>
     /**

@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url"
 import { configDefaults, defineConfig } from "vitest/config"
 
 // Unit tests run in Node, without the Cloudflare plugin: they cover the domain and
@@ -8,6 +9,8 @@ import { configDefaults, defineConfig } from "vitest/config"
 const slow = ["test/**/*.slow.test.ts"]
 
 export default defineConfig({
+  // The app's own address of its web code, as vite.config.ts has it.
+  resolve: { alias: { "@": fileURLToPath(new URL("./src/web", import.meta.url)) } },
   test: {
     environment: "node",
     projects: [

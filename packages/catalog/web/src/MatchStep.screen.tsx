@@ -1,13 +1,14 @@
+import { useAtomSet, useAtomValue } from "@effect/atom-react"
+import * as Cause from "effect/Cause"
+import * as Exit from "effect/Exit"
 import * as O from "effect/Option"
-import { useMutation } from "@tanstack/react-query"
 import { PageHeader } from "@inventory/ui/PageHeader"
 import { NotSet } from "@inventory/ui/NotSet"
 import { type RecordColumn, RecordsTable } from "@inventory/ui/components/data-table/data-table-records"
 import { StatusPill } from "@inventory/ui/StatusPill"
 import { Button } from "@inventory/ui/components/button"
 import { NativeSelect, NativeSelectOption } from "@inventory/ui/components/native-select"
-import { call } from "./Catalog.runtime.ts"
-import { useImportCache } from "./Imports.controller.ts"
+import { matchColumn } from "./Imports.atoms.ts"
 import { navigate } from "@inventory/ui/Route"
 import { importAddress } from "./internal/route.ts"
 import type { ImportView } from "@inventory/catalog-contract/Import"
@@ -31,18 +32,12 @@ type Row = { match: ColumnMatch }
  */
 export function MatchStep(props: { view: ImportView; table: StagedTable; canImport: boolean }) {
   const { view, table } = props
-  const cache = useImportCache()
-  const match = useMutation({
-    mutationFn: (input: { field: Field; column: number | null }) =>
-      call((api) =>
-        api.imports.match({
-          params: { id: view.id },
-          payload: { field: input.field, column: O.fromNullOr(input.column) }
-        })
-      ),
-    onSuccess: cache.setView,
-    onError: (error) => toastError(error)
-  })
+  const matching = useAtomValue(matchColumn).waiting
+  const matchOne = useAtomSet(matchColumn, { mode: "promiseExit" })
+  const match = (input: { field: Field; column: number | null }) =>
+    void matchOne({ id: view.id, field: input.field, column: O.fromNullOr(input.column) }).then((exit) => {
+      if (Exit.isFailure(exit)) toastError(exit.cause.pipe(Cause.squash))
+    })
 
   const rows: ReadonlyArray<Row> = view.mapping.map((entry) => ({ match: entry }))
   const columns: ReadonlyArray<RecordColumn<Row>> = [
@@ -66,9 +61,9 @@ export function MatchStep(props: { view: ImportView; table: StagedTable; canImpo
           size="sm"
           aria-label={`File column for ${fieldLabels[entry.field]}`}
           value={O.match(matchedColumn(entry), { onNone: () => "", onSome: (column) => `${column.index}` })}
-          disabled={!props.canImport || match.isPending}
+          disabled={!props.canImport || matching}
           onChange={(event) =>
-            match.mutate({ field: entry.field, column: event.target.value === "" ? null : Number(event.target.value) })
+            match({ field: entry.field, column: event.target.value === "" ? null : Number(event.target.value) })
           }
         >
           <NativeSelectOption value="">None</NativeSelectOption>

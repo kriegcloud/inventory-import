@@ -13,7 +13,9 @@ import { effectImports } from "./EffectImports.rules.ts"
 import { effectImportsSentence } from "./EffectImports.schema.ts"
 import { exactExports, exportsSentence } from "./Exports.rules.ts"
 import { keys, keysSentence } from "./Keys.rules.ts"
+import { refCallbacks, refCallbacksSentence } from "./RefCallbacks.rules.ts"
 import { screens, screensSentence } from "./Screens.rules.ts"
+import { tags, tagsSentence } from "./Tags.rules.ts"
 
 /** `laws exports`: the package in the current folder has exact exports, one per component and hook. */
 export const exportsCommand = Command.make("exports", {}, () =>
@@ -33,6 +35,18 @@ export const screensCommand = Command.make("screens", {}, () => Effect.flatMap(s
 /** `laws keys`: no key-shaped string in any file git would commit. */
 export const keysCommand = Command.make("keys", {}, () => Effect.flatMap(keys(), emit(keysSentence))).pipe(
   Command.withDescription("No key-shaped string is in any file git would commit")
+)
+
+/** `laws ref-callbacks`: every ref is a DOM ref or a callback that stays the same across draws. */
+export const refCallbacksCommand = Command.make("ref-callbacks", {}, () =>
+  Effect.flatMap(refCallbacks(), emit(refCallbacksSentence))
+).pipe(Command.withDescription("Every ref is a DOM ref or a callback that stays the same across draws"))
+
+/** `laws tags`: no `_tag` is told apart or built by hand in our own code and every test, with no file excepted. */
+export const tagsCommand = Command.make("tags", {}, () => Effect.flatMap(tags(), emit(tagsSentence))).pipe(
+  Command.withDescription(
+    "No _tag is told apart or built by hand in our own code and every test, with no file excepted"
+  )
 )
 
 const write = Flag.Boolean("write").pipe(
@@ -56,5 +70,13 @@ export const effectImportsCommand = Command.make("effect-imports", { write, chec
 /** The `laws` group. */
 export const lawsCommand = Command.make("laws").pipe(
   Command.withDescription("The repository's rules over its own source"),
-  Command.withSubcommands([boundariesCommand, effectImportsCommand, exportsCommand, keysCommand, screensCommand])
+  Command.withSubcommands([
+    boundariesCommand,
+    effectImportsCommand,
+    exportsCommand,
+    keysCommand,
+    refCallbacksCommand,
+    screensCommand,
+    tagsCommand
+  ])
 )

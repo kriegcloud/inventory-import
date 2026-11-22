@@ -1,3 +1,4 @@
+import * as Match from "effect/Match"
 import { stringify } from "@inventory/ui/Json"
 // The spreadsheet reader, off the page's thread. A module worker that the build emits as its own file on our origin,
 // so the content security policy's `script-src 'self'` covers it; never a blob: worker, which the policy blocks (a
@@ -9,23 +10,18 @@ import * as Result from "effect/Result"
 import { type FileProblem, fileProblem } from "@inventory/catalog-contract/FileProblem"
 import { maxChunkChars, uploadChunks } from "@inventory/catalog-model/Upload"
 import { readSpreadsheet } from "./spreadsheet/read.ts"
-import type { ReadMessage, ReadRequest } from "./protocol.ts"
+import { ReadMessage, type ReadRequest } from "./protocol.ts"
 import { stageTable, stagingProblem } from "@inventory/catalog-model/Staging"
 
 const post = (message: ReadMessage) => self.postMessage(message)
 
 /** The file cannot be staged: its problem goes to the page as plain fields. */
 const refuse = (problem: FileProblem) =>
-  post({
-    _tag: "Refused",
-    problem: {
-      _tag: "FileProblem",
-      kind: problem.kind,
-      fileName: problem.fileName,
-      problem: problem.problem,
-      todo: problem.todo
-    }
-  })
+  post(
+    ReadMessage.Refused({
+      problem: { kind: problem.kind, fileName: problem.fileName, problem: problem.problem, todo: problem.todo }
+    })
+  )
 
 /** At most one progress message every 50 ms: the page redraws on each. */
 const throttle = (send: (message: ReadMessage) => void) => {
@@ -34,7 +30,7 @@ const throttle = (send: (message: ReadMessage) => void) => {
     const now = performance.now()
     if (now - last < 50 && !progress.exact) return
     last = now
-    send({ _tag: "Progress", ...progress })
+    send(ReadMessage.Progress(progress))
   }
 }
 
@@ -61,22 +57,27 @@ const read = ({ file, sheet }: ReadRequest) =>
       if (chunks.some((chunk) => stringify(chunk).length > maxChunkChars)) {
         return refuse(fileProblem.tooLong({ fileName: head.fileName, part: "cells" }))
       }
-      post({
-        _tag: "Head",
-        head,
-        chunkSizes: chunks.map((chunk) => chunk.length),
-        workbook: table.format._tag === "xlsx" ? { sheets: table.format.sheets, chosen: table.format.chosen } : null
-      })
-      chunks.forEach((chunk, seq) => post({ _tag: "Chunk", seq, rows: chunk }))
-      post({ _tag: "Done" })
+      post(
+        ReadMessage.Head({
+          head,
+          chunkSizes: chunks.map((chunk) => chunk.length),
+          workbook: Match.valueTags(table.format, {
+            xlsx: (format) => ({ sheets: format.sheets, chosen: format.chosen }),
+            csv: () => null
+          })
+        })
+      )
+      chunks.forEach((chunk, seq) => post(ReadMessage.Chunk({ seq, rows: chunk })))
+      post(ReadMessage.Done())
     })
 
 self.onmessage = (event: MessageEvent<ReadRequest>) => {
   // The reader itself broke (not the file): a sentence about the page, not a problem with the file.
   read(event.data).catch(() =>
-    post({
-      _tag: "Crashed",
-      message: `"${event.data.file.name}" could not be read. Try again, and reload the page if it keeps happening.`
-    })
+    post(
+      ReadMessage.Crashed({
+        message: `"${event.data.file.name}" could not be read. Try again, and reload the page if it keeps happening.`
+      })
+    )
   )
 }

@@ -71,30 +71,34 @@ class TypedValue extends S.Opaque<TypedValue, { readonly brand: unique symbol }>
  * `changeDecidedBy` answer who was behind it in each case.
  */
 export const Change = ChangeHow.mapMembers(() => Tuple.make(AppliedByRule, AcceptedProposal, TypedValue)).pipe(
-  S.toTaggedUnion("how"),
   S.annotate({
     identifier: "Change",
     description: "One value that differs from the file, and how it came to stand"
-  })
+  }),
+  S.toTaggedUnion("how")
 )
 /** The decoded value of `Change`: one value that differs from the file, and how it came to stand. */
 export type Change = typeof Change.Type
 
 /** Where the new value came from: a rule, a model's suggestion, or the person. */
 export const changeSource = (change: Change): ChangeSource =>
-  change.how === "appliedByRule" ? "rule" : change.how === "acceptedProposal" ? change.source : "person"
+  Change.match(change, {
+    appliedByRule: (): ChangeSource => "rule",
+    acceptedProposal: (accepted): ChangeSource => accepted.source,
+    typed: (): ChangeSource => "person"
+  })
 
 /** Who put the value in force: the rule that applied it, or the person who accepted or typed it. */
 export const changeDecidedBy = (change: Change): "rule" | "person" =>
-  change.how === "appliedByRule" ? "rule" : "person"
+  Change.guards.appliedByRule(change) ? "rule" : "person"
 
 /** What a proposal rested on; none for a value the person typed. */
 export const changeBasis = (change: Change): O.Option<string> =>
-  change.how === "typed" ? O.none() : O.some(change.basis)
+  Change.guards.typed(change) ? O.none() : O.some(change.basis)
 
 /** How sure a proposal's source was; none for a value the person typed. */
 export const changeConfidence = (change: Change): O.Option<Confidence> =>
-  change.how === "typed" ? O.none() : O.some(change.confidence)
+  Change.guards.typed(change) ? O.none() : O.some(change.confidence)
 
 /** The words `importChange.how` has always held for each case, and the activity view shows where there is no basis. */
 export const changeHowWords = {

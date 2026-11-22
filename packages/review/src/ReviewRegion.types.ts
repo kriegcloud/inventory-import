@@ -27,6 +27,8 @@ import { ColumnKey, ReviewDecision, RowKey } from "@inventory/review/ReviewDecis
 import * as P from "effect/Predicate"
 import * as S from "effect/Schema"
 import * as Tuple from "effect/Tuple"
+import type * as O from "effect/Option"
+import type * as Atom from "effect/reactivity/Atom"
 import type { ReactNode } from "react"
 import { $ReviewId } from "./internal/identity.ts"
 
@@ -325,8 +327,7 @@ export class Fix extends S.Opaque<Fix, { readonly brand: unique symbol }>()(
           "calls the change a suggestion and names nobody."
       })
     ),
-    confidence: Confidence.pipe(
-      S.optionalKey,
+    confidence: S.Option(Confidence).pipe(
       S.annotateKey({
         description:
           "How sure the source is, in a word, never a percentage. A `low` fix is a question: the person picks " +
@@ -504,12 +505,10 @@ export type RowDecision = ReviewDecision
 /** One thing the person did, as undo holds it: the decisions its rows had before, and where focus returns. */
 export const UndoStep = S.Struct({
   label: S.String.pipe(S.annotateKey({ description: "What the step did, in the words its undo button says" })),
-  before: S.HashMap(RowKey, S.UndefinedOr(ReviewDecision)).pipe(
-    S.annotateKey({ description: "The decisions these rows had before the step." })
+  before: S.HashMap(RowKey, S.Option(ReviewDecision)).pipe(
+    S.annotateKey({ description: "The decisions these rows had before the step; none for a row that had none." })
   ),
-  focus: S.UndefinedOr(RowKey).pipe(
-    S.annotateKey({ description: "The row to return focus to when the step is undone." })
-  )
+  focus: S.Option(RowKey).pipe(S.annotateKey({ description: "The row to return focus to when the step is undone." }))
 }).pipe($I.annoteSchema("UndoStep", { description: "One step of the undo or redo history, as the region holds it" }))
 
 /** The decoded value of `UndoStep`. */
@@ -520,7 +519,6 @@ export const ReviewState = S.Struct({
   decisions: S.HashMap(RowKey, ReviewDecision).pipe(S.annotateKey({ description: "Each decided row's decision" })),
   undo: S.Array(UndoStep).pipe(S.annotateKey({ description: "The steps an undo takes back, the latest last" })),
   redo: S.Array(UndoStep).pipe(
-    S.optionalKey,
     S.annotateKey({
       description:
         "Steps taken back, the latest last: a redo puts the last one in force again. Any new decision empties it. " +
@@ -571,11 +569,10 @@ const AppliedMark = S.Struct({
   from: S.String.pipe(S.annotateKey({ description: "The file's value" })),
   to: S.String.pipe(S.annotateKey({ description: "The value in force" })),
   by: MarkAuthor.pipe(S.annotateKey({ description: "Who put it in force" })),
-  fix: Fix.pipe(S.optionalKey, S.annotateKey({ description: "The fix this value came from, when it came from one." })),
+  fix: S.Option(Fix).pipe(S.annotateKey({ description: "The fix this value came from; none when it came from none." })),
   accepted: S.Boolean.pipe(
-    S.optionalKey,
     S.annotateKey({
-      description: "True when the person took the fix; absent when a rule applied it by itself."
+      description: "True when the person took the fix; false when a rule applied it by itself."
     })
   )
 }).pipe($I.annoteSchema("AppliedMark", { description: "A change in force" }))
@@ -656,7 +653,9 @@ export const FixGroup = S.Struct({
     })
   ),
   by: MarkSource.pipe(S.annotateKey({ description: "Who prepared its fixes" })),
-  confidence: Confidence.pipe(S.optionalKey, S.annotateKey({ description: "How sure the source is" })),
+  confidence: S.Option(Confidence).pipe(
+    S.annotateKey({ description: "How sure the source is; none when it did not say" })
+  ),
   variants: S.Array(Variant).pipe(
     S.annotateKey({ description: "The file's spellings and how many rows have each, most common first." })
   ),
@@ -855,7 +854,7 @@ export class ImportChange extends S.Opaque<ImportChange, { readonly brand: uniqu
     decidedBy: ChangeDecider.pipe(S.annotateKey({ description: "Who put it in force" })),
     how: ChangeHow.pipe(S.annotateKey({ description: "How it came into force" })),
     basis: S.String.pipe(S.optionalKey, S.annotateKey({ description: "The fix's `why.basis`" })),
-    confidence: Confidence.pipe(S.optionalKey, S.annotateKey({ description: "The fix's `confidence`" }))
+    confidence: S.Option(Confidence).pipe(S.annotateKey({ description: "The fix's `confidence`" }))
   }).pipe(
     $I.annoteSchema("ImportChange", {
       description: "One changed value of an imported row, with who is behind it"
@@ -987,17 +986,33 @@ export type ReviewRegionProps = {
   title: string
   /** What a row is called, singular and plural. */
   noun: readonly [string, string]
-  columns: ReadonlyArray<ReviewColumn>
-  rows: ReadonlyArray<ReviewRow>
-  problemKinds: ReadonlyArray<ProblemKind>
+  /**
+   * The columns and the rows, as atoms: the region and everything it works out from them (the counts, the list on
+   * screen, the facets, the widths) follow them, and a caller whose rows change hands over no new props.
+   */
+  columns: Atom.Atom<ReadonlyArray<ReviewColumn>>
+  rows: Atom.Atom<ReadonlyArray<ReviewRow>>
+  /**
+   * The person's decisions with their undo history: the caller's atom. The region writes it with every action and
+   * every undo, and whoever keeps the decisions (a server draft, the browser) reads it there: `saved(state)` is the
+   * plain data to keep. Start it with `restored(saved)` for kept decisions (handed back as the very object `saved`
+   * gave, or as `fromDraft` rebuilt it after a refresh, they bring "Undo last step" back with them), with
+   * `proposing(rows)` where the rules' fixes are proposals, or with `emptyState`. A new atom, with a new `key` on the
+   * region, starts the review again.
+   */
+  decisions: Atom.Writable<ReviewState>
+  /** The kinds of problem the rows can have, in the order the work list shows them, as an atom the region follows. */
+  problemKinds: Atom.Atom<ReadonlyArray<ProblemKind>>
   /** Past-tense facts about the run, a few words each ("178 rows read"). Columns and fixes are added for you. */
   summary: ReadonlyArray<string>
   activity?: Activity
   /**
-   * The caller's own check, run on a row after the person typed a value. Without it an edit to the problem's cell
-   * settles the problem.
+   * The caller's own check, run on a row after the person typed a value, as an atom (none while there is no rule).
+   * Without it an edit to the problem's cell settles the problem.
    */
-  recheck?: (input: { row: ReviewRow; cells: Readonly<Record<string, string>> }) => Problem | undefined
+  recheck?: Atom.Atom<
+    O.Option<(input: { row: ReviewRow; cells: Readonly<Record<string, string>> }) => Problem | undefined>
+  >
   onImport: (result: ImportResult) => void
   /** The person picked a file column for a field. Re-run the review and pass new `columns` and `rows`. */
   onMatchColumn?: (columnId: string, source: string) => void
@@ -1010,8 +1025,11 @@ export type ReviewRegionProps = {
   /** One sentence for the error state, and what to try. */
   error?: string
   onRetry?: () => void
-  /** The person may look but not decide. `readOnlyNote` says who can, in the caller's words. */
-  readOnly?: boolean
+  /**
+   * True while the person may look but not decide, as an atom: the region's widths, its keys and its buttons follow
+   * it. `readOnlyNote` says who can decide, in the caller's words.
+   */
+  readOnly?: Atom.Atom<boolean>
   readOnlyNote?: string
   /**
    * The one action when the file has no rows, or when nothing in it can be imported (every row already there, left
@@ -1027,21 +1045,9 @@ export type ReviewRegionProps = {
   /**
    * What happens to the rules' own lossless fixes (`row.applied`). "propose" (the default) asks first: they are
    * proposals the person takes in one click, counted under Needs you until then. "apply" puts them in force on
-   * arrival, shown with a tick and an Undo per group.
+   * arrival, shown with a tick and an Undo per group. An atom, as everything the region works from is.
    */
-  ruleFixes?: "propose" | "apply"
-  /**
-   * Decisions to start from: a draft restored after a refresh, or the region drawn again after the page showed
-   * another view. Read once; give the region a new `key` to reset. Handed back as the very object
-   * `onDecisionsChange` gave, or as `fromDraft` rebuilt it after a refresh, it brings "Undo last step" back with it;
-   * a plain copy starts a new history.
-   */
-  savedDecisions?: SavedDecisions
-  /**
-   * Called after every decision and undo with the decisions as plain data, for the caller to keep as it is. Read
-   * through a ref: a new function on each render is fine, and is called once per change.
-   */
-  onDecisionsChange?: (saved: SavedDecisions) => void
+  ruleFixes?: Atom.Atom<"propose" | "apply">
   /** One sentence for the confirm step: what the import does to what is already there ("Each row becomes a new item."). */
   importNote?: string
   /**
@@ -1060,9 +1066,9 @@ export type ReviewRegionProps = {
   /**
    * The caller's words for the tabs and the statuses, when the task has its own ("Waiting on you" for Needs you,
    * "Will be created" for Ready). Each word is set once here and used on every tab, tag, count and file that says it;
-   * what is not given keeps its default (`defaultReviewWords`).
+   * what is not given keeps its default (`defaultReviewWords`). An atom the region follows.
    */
-  words?: Partial<typeof ReviewWords.Encoded>
+  words?: Atom.Atom<Partial<typeof ReviewWords.Encoded>>
   /**
    * The sums that matter, worked out by the caller from the rows it will import, each with its unit or currency
    * ("Purchase $12,480.20"). Shown in the table's footer beside the counts. Never add different units in one.
@@ -1072,9 +1078,10 @@ export type ReviewRegionProps = {
    * One more answer on a row that needs the person, for rows that belong to a parent record ("Leave job J-2044
    * out"). With it each such row keeps its own answers, under a group heading too: its fix or its choices, then
    * "Other answers" with typing a value, leaving the row out and this action, each named in full. Return
-   * `undefined` for a row it does not fit. Keep the function stable (`useCallback`).
+   * `undefined` for a row it does not fit. An atom (none while there is no such answer): the widths of the table's
+   * answers are worked out from it.
    */
-  rowAction?: (row: ReviewRow) => RowAction | undefined
+  rowAction?: Atom.Atom<O.Option<(row: ReviewRow) => RowAction | undefined>>
   /**
    * "Why flagged?": the caller's own account of the flagged rows on screen (what the view, the problem kind, the
    * search and the filters narrow it to), each row named with every reason it has. Shown in a side panel from the
@@ -1085,7 +1092,7 @@ export type ReviewRegionProps = {
    * The caller's own form for a value the person has to give, where one box of text would not do (a cell that holds
    * several values). It stands where the region's one field would, behind the same button, and what it saves is the
    * cell's text: one undo step, checked again by `recheck`, as a typed value is. `undefined` for a cell it does not
-   * fit. Keep the function stable.
+   * fit. Read when a row is drawn, and kept nowhere.
    */
   cellEditor?: (input: { row: ReviewRow; column: string; value: string }) => CellEditor | undefined
 }

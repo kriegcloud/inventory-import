@@ -1,10 +1,13 @@
 import { LayoutGridIcon } from "lucide-react"
 import { useAtom, useAtomValue } from "@effect/atom-react"
+import * as O from "effect/Option"
 import * as Atom from "effect/reactivity/Atom"
 import { toast } from "sonner"
 import { AppShell } from "@/components/app/AppShell"
 import { ReviewRegion } from "@inventory/review/ReviewRegion"
+import { proposing } from "@inventory/review/ReviewDraft"
 import { Problem, ProblemKind, ReviewColumn, ReviewRow } from "@inventory/review/ReviewTypes"
+import type { ReviewState } from "@inventory/review/ReviewTypes"
 import { Button } from "@inventory/ui/components/button"
 import {
   DropdownMenu,
@@ -138,11 +141,13 @@ const monthRows: ReadonlyArray<ReviewRow> = monthItems.flatMap((item, index) =>
   })
 )
 
-/** The item's own answer on each of its months: every record of its line goes. Module level, so it is stable. */
-const leaveItemOut = (row: ReviewRow) => ({
-  label: `Leave ${row.cells.name ?? "the item"} out, every month`,
-  onSelect: () => toast(`Would leave every month of line ${row.line} out`)
-})
+/** The item's own answer on each of its months: every record of its line goes. An atom, as the region takes it. */
+const leaveItemOut = Atom.make(
+  O.some((row: ReviewRow) => ({
+    label: `Leave ${row.cells.name ?? "the item"} out, every month`,
+    onSelect: () => toast(`Would leave every month of line ${row.line} out`)
+  }))
+)
 
 /** Which state the gallery shows, first from the address (`?state=`). */
 const galleryState = Atom.make<GalleryState>(readState())
@@ -162,6 +167,35 @@ const galleryRows = Atom.map(galleryState, (state): ReadonlyArray<ReviewRow> =>
           ...(state === "stored" ? storedRows : []),
           ...(state === "elsewhere" ? elsewhereRows : [])
         ]
+)
+
+// What the regions are given, as the atoms they follow.
+const galleryColumns = Atom.map(galleryState, (state) => (state === "unmatched" ? columnsUnmatched : columns))
+const galleryRecheck = Atom.make(O.some(recheck))
+const galleryKinds = Atom.map(galleryState, (state): ReadonlyArray<ProblemKind> =>
+  state === "elsewhere" ? elsewhereKinds : problemKinds
+)
+const monthKinds = Atom.make<ReadonlyArray<ProblemKind>>(problemKinds)
+const galleryLooking = Atom.map(galleryState, (state) => state === "readonly")
+const monthColumnsAtom = Atom.make(monthColumns)
+const monthRowsAtom = Atom.make(monthRows)
+const monthRecheck = Atom.make(
+  O.some((asked: { row: ReviewRow; cells: Readonly<Record<string, string>> }) =>
+    belowZero(asked.cells.month ?? "", asked.cells.onHand ?? asked.row.cells.onHand ?? "")
+  )
+)
+const monthDecisions = Atom.make(proposing(monthRows))
+
+/** The decisions of the state shown: each state starts from its own rows' proposals, and keeps what was decided. */
+const galleryHeld = Atom.make<O.Option<{ readonly of: GalleryState; readonly state: ReviewState }>>(O.none())
+const galleryStart = Atom.map(galleryRows, proposing)
+const galleryDecisions = Atom.writable(
+  (get): ReviewState => {
+    const of = get(galleryState)
+    const held = get(galleryHeld)
+    return O.isSome(held) && held.value.of === of ? held.value.state : get(galleryStart)
+  },
+  (ctx, next: ReviewState) => ctx.set(galleryHeld, O.some({ of: ctx.get(galleryState), state: next }))
 )
 
 /**
@@ -205,11 +239,12 @@ export default function ReviewGallery() {
         <ReviewRegion
           title="Review stock by month.csv"
           noun={["record", "records"]}
-          columns={monthColumns}
-          rows={monthRows}
-          problemKinds={problemKinds}
+          columns={monthColumnsAtom}
+          rows={monthRowsAtom}
+          decisions={monthDecisions}
+          problemKinds={monthKinds}
           summary={[`${monthItems.length} rows in the file, ${monthRows.length} records`]}
-          recheck={({ row, cells }) => belowZero(cells.month ?? "", cells.onHand ?? row.cells.onHand ?? "")}
+          recheck={monthRecheck}
           rowAction={leaveItemOut}
           onImport={(result) => toast(`Would import ${result.ready.length} records and hold ${result.held.length}`)}
         />
@@ -218,16 +253,17 @@ export default function ReviewGallery() {
           key={state}
           title="Review items.csv"
           noun={["item", "items"]}
-          columns={state === "unmatched" ? columnsUnmatched : columns}
-          rows={rows}
-          problemKinds={state === "elsewhere" ? elsewhereKinds : problemKinds}
+          columns={galleryColumns}
+          rows={galleryRows}
+          decisions={galleryDecisions}
+          problemKinds={galleryKinds}
           summary={[]}
           activity={activity(rows.length)}
-          recheck={recheck}
+          recheck={galleryRecheck}
           state={state === "loading" ? "loading" : state === "error" ? "error" : "ready"}
           error="The file could not be read: the first sheet has no header row. Check the file and upload it again."
           onRetry={() => choose("default")}
-          readOnly={state === "readonly"}
+          readOnly={galleryLooking}
           importNote="Each row becomes a new item; nothing already in stock is updated."
           readOnlyNote="View only. An editor can import."
           emptyAction={

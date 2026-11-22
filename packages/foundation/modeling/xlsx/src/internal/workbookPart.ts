@@ -3,6 +3,7 @@
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as HashMap from "effect/HashMap"
+import * as Match from "effect/Match"
 import * as MutableHashMap from "effect/MutableHashMap"
 import * as MutableHashSet from "effect/MutableHashSet"
 import * as O from "effect/Option"
@@ -135,8 +136,9 @@ const stringsOf = Effect.fnUntraced(function* (input: {
   let textAt = -1
   let text = ""
   let failed: O.Option<"sharedStrings" | "cellChars"> = O.none()
-  const step = (event: XmlEvent): void => {
-    if (event._tag === "StartElement") {
+  // Each kind of event, told by its case (built once for the table: one is sent per tag and per text).
+  const step = Match.typeTags<XmlEvent>()({
+    StartElement: (event): void => {
       depth += 1
       const name = localName(event.name)
       if (entryAt === -1) {
@@ -148,7 +150,8 @@ const stringsOf = Effect.fnUntraced(function* (input: {
         if (name === "rPh") phoneticAt = depth
         else if (name === "t") textAt = depth
       }
-    } else if (event._tag === "EndElement") {
+    },
+    EndElement: (): void => {
       if (depth === textAt) textAt = -1
       else if (depth === phoneticAt) phoneticAt = -1
       else if (depth === entryAt) {
@@ -158,8 +161,15 @@ const stringsOf = Effect.fnUntraced(function* (input: {
         else strings.push(detached(unescaped(text)))
       }
       depth -= 1
-    } else if (event._tag === "Text" && textAt !== -1) text += event.text
-  }
+    },
+    Text: (event): void => {
+      if (textAt !== -1) text += event.text
+    },
+    Declaration: (): void => undefined,
+    Doctype: (): void => undefined,
+    Comment: (): void => undefined,
+    ProcessingInstruction: (): void => undefined
+  })
   yield* eventsOf({ path: input.path, body: Stream.make(input.bytes), cellChars: input.caps.cellChars }).pipe(
     Stream.takeWhile(() => O.isNone(failed)),
     Stream.runForEachArray((events) =>

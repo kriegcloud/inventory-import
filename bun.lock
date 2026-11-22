@@ -46,7 +46,6 @@
         "@inventory/review": "workspace:*",
         "@inventory/ui": "workspace:*",
         "@shadcn/react": "^0.3.1",
-        "@tanstack/react-query": "^5.107.1",
         "@tanstack/react-table": "^9.3.1",
         "@tanstack/react-virtual": "^3.14.26",
         "better-auth": "1.7.22",
@@ -62,6 +61,7 @@
         "react": "^19.3.1",
         "react-day-picker": "^10.0.2",
         "react-dom": "^19.3.1",
+        "react-grab": "^0.2.0",
         "react-hook-form": "^7.92.0",
         "react-resizable-panels": "^4.22.0",
         "recharts": "^3.8.0",
@@ -84,7 +84,6 @@
         "compression": "1.8.2",
         "oxlint": "1.93.0",
         "oxlint-tsgolint": "7.0.2006",
-        "react-grab": "^0.2.0",
         "rollup-plugin-visualizer": "7.0.1",
         "tailwindcss": "^4.3.5",
         "tsrs": "0.25.0-ts7.1.0-beta",
@@ -116,6 +115,7 @@
         "@beep/better-auth": "workspace:*",
         "@beep/d1": "workspace:*",
         "@beep/identity": "workspace:*",
+        "@cloudflare/workers-types": "^5.20261113.1",
         "@inventory/access-contract": "workspace:*",
         "@inventory/access-model": "workspace:*",
         "@inventory/kernel": "workspace:*",
@@ -123,7 +123,6 @@
         "effect": "4.1.4",
       },
       "devDependencies": {
-        "@cloudflare/workers-types": "^5.20261113.1",
         "@effect/vitest": "4.1.4",
         "@types/node": "^24.19.2",
         "vitest": "^5.1.0",
@@ -233,7 +232,6 @@
         "@inventory/kernel": "workspace:*",
         "@inventory/review": "workspace:*",
         "@inventory/ui": "workspace:*",
-        "@tanstack/react-query": "^5.107.1",
         "@tanstack/react-table": "^9.3.1",
         "effect": "4.1.4",
         "lucide-react": "^1.72.0",
@@ -260,7 +258,6 @@
       "dependencies": {
         "@effect/atom-react": "4.1.4",
         "@inventory/kernel": "workspace:*",
-        "@tanstack/react-query": "^5.107.1",
         "effect": "4.1.4",
         "sonner": "^2.0.8",
       },
@@ -295,11 +292,11 @@
       "dependencies": {
         "@beep/identity": "workspace:*",
         "@beep/schema": "workspace:*",
+        "@cloudflare/workers-types": "^5.20261113.1",
         "@effect/sql-d1": "4.1.4",
         "effect": "4.1.4",
       },
       "devDependencies": {
-        "@cloudflare/workers-types": "^5.20261113.1",
         "@effect/platform-node": "4.1.4",
         "@effect/vitest": "4.1.4",
         "@types/node": "^24.19.2",
@@ -454,6 +451,7 @@
       "dependencies": {
         "@beep/identity": "workspace:*",
         "@beep/schema": "workspace:*",
+        "@effect/atom-react": "4.1.4",
         "@inventory/ui": "workspace:*",
         "@tanstack/react-table": "^9.3.1",
         "@tanstack/react-virtual": "^3.14.26",
@@ -465,6 +463,8 @@
       },
       "devDependencies": {
         "@effect/vitest": "4.1.4",
+        "@tanstack/store": "0.11.2",
+        "@tanstack/table-core": "9.3.1",
         "@types/node": "^24.19.2",
         "@types/react": "^19.3.0",
         "@types/react-dom": "^19.3.0",
@@ -1207,10 +1207,6 @@
     "@tailwindcss/oxide-win32-x64-msvc": ["@tailwindcss/oxide-win32-x64-msvc@4.3.5", "", { "os": "win32", "cpu": "x64" }, "sha512-XiKFfIy1RWe7qK4WqByxNW7Oz1/nkOy8o/BWhHminyV1PmpUd8Eedj5v2A8h2kpqeVlz6xRnwk9Fr/ZXNLcZfg=="],
 
     "@tailwindcss/vite": ["@tailwindcss/vite@4.3.5", "", { "dependencies": { "@tailwindcss/node": "4.3.5", "@tailwindcss/oxide": "4.3.5", "tailwindcss": "4.3.5" }, "peerDependencies": { "vite": "^5.2.0 || ^6 || ^7 || ^8" } }, "sha512-BCNiY0a1ZjdOHVqw7kyb7U72BwfMF3dfUuN+tQsLWky/J5JOI/r7abibglXfygrZhVO/3u3V+E25kkKTeMkXaQ=="],
-
-    "@tanstack/query-core": ["@tanstack/query-core@5.107.1", "", {}, "sha512-PSyAik11oQBEVOiVy5hjZWHmoUqOXqK1WYy4v55mcxozEfKaQgpUMsgnXhWjuESzSht8JfzqMS1m6M/9CpNgvg=="],
-
-    "@tanstack/react-query": ["@tanstack/react-query@5.107.1", "", { "dependencies": { "@tanstack/query-core": "5.107.1" }, "peerDependencies": { "@types/react": "^18 || ^19", "react": "^18 || ^19" }, "optionalPeers": ["@types/react"] }, "sha512-udCOOLp3ZAheUrIHLCe+ZZge6nr2ZUrGMSWcCuXsjY1Bf2JeeE09oxst97PILiCY6N8xo/7bIo3Hvz13zh06FA=="],
 
     "@tanstack/react-store": ["@tanstack/react-store@0.11.2", "", { "dependencies": { "@tanstack/store": "0.11.2", "use-sync-external-store": "^1.6.0" }, "peerDependencies": { "react": "^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0", "react-dom": "^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0" } }, "sha512-oj5O5DmiMWE+ih+SioX2ayC1kbK7d3fpLx0B75fPJr9nY3zU+hoW010yr64qXsY/9fyiLVE2bn5mGNV3owm8RQ=="],
 

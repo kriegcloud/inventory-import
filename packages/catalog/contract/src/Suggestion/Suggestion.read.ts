@@ -37,8 +37,8 @@ class SuggestedByRule extends S.Opaque<SuggestedByRule, { readonly brand: unique
 
 /** Who made a suggestion: a model, named, or a rule. */
 export const SuggestionBy = SuggestionByKind.mapMembers(() => Tuple.make(SuggestedByModel, SuggestedByRule)).pipe(
-  S.toTaggedUnion("kind"),
-  S.annotate({ identifier: "SuggestionBy", description: "Who suggested it: a model, named, or a rule" })
+  S.annotate({ identifier: "SuggestionBy", description: "Who suggested it: a model, named, or a rule" }),
+  S.toTaggedUnion("kind")
 )
 /** The decoded value of `SuggestionBy`. */
 export type SuggestionBy = typeof SuggestionBy.Type
@@ -119,11 +119,11 @@ class ColumnSuggestion extends S.Opaque<ColumnSuggestion, { readonly brand: uniq
 export const Suggestion = SuggestionKind.mapMembers(() =>
   Tuple.make(NameSuggestion, CategorySuggestion, ColumnSuggestion)
 ).pipe(
-  S.toTaggedUnion("kind"),
   S.annotate({
     identifier: "Suggestion",
     description: "A stored suggestion for something the fixed rules cannot settle; the person accepts or rejects it"
-  })
+  }),
+  S.toTaggedUnion("kind")
 )
 /** The decoded value of `Suggestion`. */
 export type Suggestion = typeof Suggestion.Type
@@ -188,11 +188,11 @@ export const suggestionToStored = (suggestion: Suggestion): StoredSuggestionRow 
     kind: suggestion.kind,
     field: suggestionField(suggestion),
     by: suggestion.by.kind,
-    model: suggestion.by.kind === "model" ? suggestion.by.model : null,
+    model: SuggestionBy.guards.model(suggestion.by) ? suggestion.by.model : null,
     confidence: suggestion.confidence,
     basis: suggestion.basis
   }
-  return suggestion.kind === "column"
+  return Suggestion.guards.column(suggestion)
     ? { ...shared, rowId: "", rowNumber: null, from: "", to: suggestion.heading, column: suggestion.column }
     : {
         ...shared,

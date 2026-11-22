@@ -72,6 +72,38 @@
       ],
       "outputs": []
     },
+    // Every ref is a DOM ref or a callback that stays the same across draws (`beep laws ref-callbacks`).
+    // Its inputs are the law's own pathspec: every .tsx git would commit, the vendored kit and the skills left out; and
+    // every package.json, whose exports name the modules of hooks.
+    "//#refs:check": {
+      "inputs": [
+        "**/*.tsx",
+        "!**/node_modules/**",
+        "!packages/ui/src/components/**",
+        "!packages/ui/src/hooks/**",
+        "!.agents/**",
+        "apps/**/package.json",
+        "packages/**/package.json",
+        "packages/tooling/tool/cli/src/**"
+      ],
+      "outputs": []
+    },
+    // No `_tag` is told apart or built by hand in our own code and every test (`beep laws tags`), with no file
+    // excepted: a count per file would let one hand-written tag be swapped for another.
+    "//#tags:check": {
+      "inputs": [
+        "apps/*/src/**/*.{ts,tsx}",
+        "apps/*/test/**/*.{ts,tsx}",
+        "packages/**/src/**/*.{ts,tsx}",
+        "packages/**/test/**/*.{ts,tsx}",
+        "packages/client/**/*.{ts,tsx}",
+        "packages/review/**/*.{ts,tsx}",
+        "packages/ui/**/*.{ts,tsx}",
+        "packages/**/vendor.json",
+        "packages/tooling/tool/cli/src/**"
+      ],
+      "outputs": []
+    },
     // Every Effect import from its own path under its own name (`beep laws effect-imports`,
     // docs/standards/effect-imports.md): code, the examples in its comments, and the standing documents.
     "//#imports:check": {

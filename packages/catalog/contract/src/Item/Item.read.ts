@@ -199,8 +199,8 @@ class Discontinued extends S.Opaque<Discontinued, { readonly brand: unique symbo
  * discontinued date is not active. Stored as the two columns it replaces; `stockingOf` reads them.
  */
 export const Stocking = StockingKind.mapMembers(() => Tuple.make(Active, Inactive, Discontinued)).pipe(
-  S.toTaggedUnion("kind"),
-  S.annotate({ identifier: "Stocking", description: "Whether the item is in use, and since when it is not stocked" })
+  S.annotate({ identifier: "Stocking", description: "Whether the item is in use, and since when it is not stocked" }),
+  S.toTaggedUnion("kind")
 )
 /** The decoded value of `Stocking`. */
 export type Stocking = typeof Stocking.Type
@@ -227,11 +227,11 @@ export const stockingOf = (stored: {
   })
 
 /** True when the item is in use. */
-export const isActive = (stocking: Stocking): boolean => stocking.kind === "active"
+export const isActive = (stocking: Stocking): boolean => Stocking.guards.active(stocking)
 
 /** The day the item stopped being stocked, when it did. */
 export const discontinuedOn = (stocking: Stocking): O.Option<string> =>
-  stocking.kind === "discontinued" ? O.some(stocking.on) : O.none()
+  Stocking.guards.discontinued(stocking) ? O.some(stocking.on) : O.none()
 
 /**
  * What one item needs before it can be stored. A row of the file becomes this only when every value was read without

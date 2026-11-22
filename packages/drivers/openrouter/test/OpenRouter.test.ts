@@ -11,7 +11,9 @@ import * as O from "effect/Option"
 import * as Redacted from "effect/Redacted"
 import * as S from "effect/Schema"
 import * as TestClock from "effect/testing/TestClock"
+import * as HttpBody from "effect/http/HttpBody"
 import { OpenRouter } from "@beep/openrouter/OpenRouter"
+import { ModelUnavailable } from "@beep/openrouter/OpenRouterError"
 import { ModelPolicy, OpenRouterSettings } from "@beep/openrouter/OpenRouterConfig"
 import { ModelId, ModelPrompt } from "@beep/openrouter/OpenRouterModel"
 import { OpenRouterTest, type ScriptedReply } from "@beep/openrouter/OpenRouterTest"
@@ -85,7 +87,8 @@ describe("a scripted model", () => {
       it.effect("gives up after the policy's retries, as busy", () =>
         Effect.gen(function* () {
           const error = yield* failure
-          expect(error).toMatchObject({ _tag: "ModelUnavailable", trouble: "busy", retryable: true })
+          expect(S.is(ModelUnavailable)(error)).toBe(true)
+          expect(error).toMatchObject({ trouble: "busy", retryable: true })
           expect(calls()).toBe(3)
         })
       )
@@ -205,7 +208,7 @@ describe("over OpenRouter's real client", () => {
 
   layer(
     OpenRouterTest.overHttp(settings, (request) => {
-      if (request.body._tag === "Uint8Array") {
+      if (request.body instanceof HttpBody.Uint8Array) {
         const text = new TextDecoder().decode(request.body.body)
         MutableRef.update(bodies, (all) => [...all, text])
       }

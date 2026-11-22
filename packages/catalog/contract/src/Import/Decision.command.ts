@@ -1,5 +1,6 @@
 // What the person decided for one row of a file, as code holds it and as it is stored and sent (its flags), the
 // id of one item of a file, and the change to the saved decisions a screen sends.
+import * as Effect from "effect/Effect"
 import * as R from "effect/Record"
 import * as Tuple from "effect/Tuple"
 import * as S from "effect/Schema"
@@ -7,6 +8,7 @@ import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as SchemaTransformation from "effect/SchemaTransformation"
 import { RowId } from "../Catalog.id.ts"
 import { fields } from "../Staging/Staged.read.ts"
+import { nullAsNone } from "@inventory/kernel/Wire"
 
 const bounded = (max: number) => S.String.check(S.isMaxLength(max))
 
@@ -86,8 +88,8 @@ class PlaceLeftOut extends S.Opaque<PlaceLeftOut, { readonly brand: unique symbo
  * import.
  */
 export const RowPlace = RowPlaceKind.mapMembers(() => Tuple.make(PlaceOpen, PlaceKept, PlaceLeftOut)).pipe(
-  S.toTaggedUnion("kind"),
-  S.annotate({ identifier: "RowPlace", description: "Where a row stands by the person's own word" })
+  S.annotate({ identifier: "RowPlace", description: "Where a row stands by the person's own word" }),
+  S.toTaggedUnion("kind")
 )
 /** The decoded value of `RowPlace`. */
 export type RowPlace = typeof RowPlace.Type
@@ -100,11 +102,11 @@ export const placeKept: RowPlace = PlaceKept.make({})
 export const placeLeftOut = (wasKept: boolean): RowPlace => PlaceLeftOut.make({ wasKept })
 
 /** True when the row is left out. */
-export const isLeftOut = (decision: { readonly place: RowPlace }): boolean => decision.place.kind === "leftOut"
+export const isLeftOut = (decision: { readonly place: RowPlace }): boolean => RowPlace.guards.leftOut(decision.place)
 
 /** True when the person kept the row over its rivals, whether or not they then left it out (the stored `kept` flag). */
 export const hasKeep = (decision: { readonly place: RowPlace }): boolean =>
-  decision.place.kind === "kept" || (decision.place.kind === "leftOut" && decision.place.wasKept)
+  RowPlace.guards.kept(decision.place) || (RowPlace.guards.leftOut(decision.place) && decision.place.wasKept)
 
 /** What to do with a row whose SKU is stored with other values. */
 export const StoredChoiceKind = LiteralKit(["undecided", "keep", "replace"]).annotate({
@@ -138,8 +140,11 @@ class StoredReplace extends S.Opaque<StoredReplace, { readonly brand: unique sym
 export const StoredChoice = StoredChoiceKind.mapMembers(() =>
   Tuple.make(StoredUndecided, StoredKeep, StoredReplace)
 ).pipe(
-  S.toTaggedUnion("kind"),
-  S.annotate({ identifier: "StoredChoice", description: "What to do with a row whose SKU is stored with other values" })
+  S.annotate({
+    identifier: "StoredChoice",
+    description: "What to do with a row whose SKU is stored with other values"
+  }),
+  S.toTaggedUnion("kind")
 )
 /** The decoded value of `StoredChoice`. */
 export type StoredChoice = typeof StoredChoice.Type
@@ -160,7 +165,10 @@ type DecisionShape = {
   readonly edits: { readonly [field: string]: string }
 }
 
-/** The flags of a decision: the stored form, every part that says nothing left out. */
+/**
+ * The flags of a decision: the stored form, every part that says nothing left out. It reads the parts' `kind` as the
+ * data the encoding turns into flags (either side of the schema), not a decoded value's case: so by its field.
+ */
 const flagsOf = (parts: DecisionShape): RowDecisionFlags => ({
   ...(parts.place.kind === "leftOut" ? { out: true } : {}),
   ...(parts.place.kind === "kept" || (parts.place.kind === "leftOut" && parts.place.wasKept) ? { kept: true } : {}),
@@ -296,3 +304,120 @@ export const DecisionDelta = S.Struct({
 })
 /** The decoded value of `DecisionDelta`: what changed in the draft since the last save. */
 export type DecisionDelta = typeof DecisionDelta.Type
+
+/** A draft's revision: 0 for a draft nobody has changed, one more for every change. Never negative. */
+const Revision = S.Int.check(S.isGreaterThanOrEqualTo(0))
+
+// As bounded as the rows it speaks of: one key per row of `set` (or cleared row of a save's `over`), each a row id.
+const madeOn = S.Record(bounded(40), Revision)
+  .check(S.isMaxProperties(50000))
+  .annotate({
+    description:
+      "For each row in `set`, and each row in `over`, the draft's revision the screen held when that row was last decided (`ImportView.revision` as it was read then)",
+    examples: [{ "row-55": 11, "row-9": 12 }]
+  })
+  .annotateKey({
+    description:
+      "The revision each row's decision was made on. A part of it that rests on a column matched again after that revision is not applied, and the answer names it: an accept or an undone fix of that field, a Replace, Keep-stored or keep-one-of-two after the SKU's column, and a Replace or Keep-stored after another field's column when that changed how the row compares with the stored item. A row of `set` left out counts as made on revision 0, and so does a cleared row named in a save's `over`. A revision later than the draft's is refused",
+    messageMissingKey:
+      "Send `madeOn`: for each row in `set`, the import's revision as the screen held it when that row was decided."
+  })
+
+/**
+ * What kind of decision a re-match took back. accept: an accept of a field's proposal. stored: a Replace or a
+ * Keep-stored. twin: a keep-one-of-two over the rows that share a SKU. undo: an undone fix of a field.
+ */
+export const TakenBackKind = LiteralKit(["accept", "stored", "twin", "undo"]).annotate({
+  identifier: "TakenBackKind",
+  description:
+    "accept: an accepted proposal. stored: a Replace or Keep-stored. twin: a keep-one-of-two. undo: an undone fix"
+})
+/** The decoded value of `TakenBackKind`. */
+export type TakenBackKind = typeof TakenBackKind.Type
+
+/**
+ * A decision the server did not apply because a column it rests on was matched again after it was made (Benjamin,
+ * 2026-11-20, group 3: "Server refuses, says so"). An accept or an undone fix rests on its field's column; a Replace,
+ * a Keep-stored and a keep-one-of-two rest on the SKU's column, and a Replace or Keep-stored also on another field's
+ * column when the re-match changed how the row compares with the stored item. `field` is the field whose column was
+ * matched again. Stored answers from before `kind` existed decode as accepts.
+ */
+export const StaleAccept = S.Struct({
+  rowId: S.String.annotateKey({ description: "The row (`row-7`)" }),
+  field: S.String.annotateKey({
+    description: "The field whose column was matched again (`unitCost`); for an accept, the field accepted"
+  }),
+  kind: TakenBackKind.pipe(S.withDecodingDefaultKey(Effect.succeed("accept" as const))).annotateKey({
+    description: "What was taken back: an accept, a Replace or Keep-stored, a keep-one-of-two, or an undone fix"
+  })
+}).annotate({
+  identifier: "StaleAccept",
+  description: "A decision made before a column it rests on was matched again: not applied"
+})
+/** The decoded value of `StaleAccept`. */
+export type StaleAccept = typeof StaleAccept.Type
+
+/**
+ * For each row of a save that waited (its first save failed, it was kept across a reload, or a closed tab kept it),
+ * the decisions this tab knows the server may hold of it: what the server held when the person began deciding the
+ * row, and each decision this tab sent whose fate it does not know; null for no decision, the same as a decision that
+ * says nothing. Such a row is written only while what is stored is one of them, or one of them with the parts a match
+ * took back since removed, so a decision made elsewhere since is never overwritten unasked (Benjamin, 2026-11-20: "Hold
+ * it, show both, ask"). A row not named here is a live press: the last one stands. A key naming no row of `set` or
+ * `clear` is not read.
+ */
+const over = S.Record(bounded(40), RowDecision.pipe(S.OptionFromNullOr, S.Array, S.check(S.isMaxLength(50))))
+  .check(S.isMaxProperties(50000))
+  .annotate({
+    description:
+      "For each row of the save that waited, the decisions the sender knows the server may hold of it (null for none): the row is written only while one of them is stored"
+  })
+
+/** A row of a save that was not written: it waited, and what is stored of it is none of the decisions named in `over`. */
+export const DecidedSince = S.Struct({
+  rowId: S.String.annotateKey({ description: "The row (`row-7`)" }),
+  theirs: RowDecision.pipe(nullAsNone({ description: "The decision stored of it now; null for none" }))
+}).annotate({
+  identifier: "DecidedSince",
+  description: "A row that waited and was decided otherwise since: not written, with what is stored of it"
+})
+/** The decoded value of `DecidedSince`. */
+export type DecidedSince = typeof DecidedSince.Type
+
+/**
+ * What a save sends: the decisions made since the last save, and the revision of the draft they were made on. The
+ * difference only, so two screens deciding different rows do not collide; what they were made on, so a decision made
+ * before a column it rests on was matched again is not applied; and for rows that waited, what they may be written over.
+ */
+export const SaveRequest = S.Struct({ madeOn, over: over.pipe(S.optionalKey), ...DecisionDelta.fields }).annotate({
+  identifier: "SaveRequest",
+  description:
+    "A save of decisions: the revision of the draft they were made on, the rows whose decision is new or different, and the rows whose decision was taken back"
+})
+/** The decoded value of `SaveRequest`. */
+export type SaveRequest = typeof SaveRequest.Type
+
+/**
+ * What a confirm sends: the revision of the draft its screen shows, and the person's own decisions that screen
+ * holds and the server has not been sent yet, with the revision those were made on. Never anybody else's decision,
+ * and never one the screen did not show.
+ */
+export const ConfirmRequest = S.Struct({
+  revision: Revision.annotate({
+    description:
+      "The draft's revision as the confirming screen last read it: `ImportView.revision`, or the `revision` a save of this screen's answered with, but only when that save answered `changed: true` with exactly one more than the revision the screen held. Otherwise somebody else's decision may be in it, and the screen reads the import again before it confirms",
+    examples: [12]
+  }).annotateKey({
+    description:
+      "The revision of the draft the screen shows. The confirm is written only while the stored draft is still at this revision",
+    messageMissingKey: "Send `revision`: the import's revision as this screen last read it."
+  }),
+  madeOn,
+  ...DecisionDelta.fields
+}).annotate({
+  identifier: "ConfirmRequest",
+  description:
+    "A confirm: the draft's revision as the screen shows it, and the decisions made on that screen that are not saved yet (new or different in `set`, taken back in `clear`)"
+})
+/** The decoded value of `ConfirmRequest`. */
+export type ConfirmRequest = typeof ConfirmRequest.Type

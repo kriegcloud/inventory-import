@@ -49,6 +49,7 @@ layer(TestDatabase)("tenancy in the database", (it) => {
         "importSuggestion",
         "importUpload",
         "importUploadChunk",
+        "importWriteList",
         "item",
         "member",
         "modelCall"

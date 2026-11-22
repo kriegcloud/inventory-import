@@ -1,5 +1,7 @@
 // The messy sample through the catalog's in-memory twins, held to the numbers the D1 adapter gives for the same
-// steps (Imports.slow.test.ts and TakeBack.slow.test.ts): a twin that drifted from the adapter fails here, fast.
+// steps (Imports.slow.test.ts and TakeBack.slow.test.ts): one save, a confirm, a second load of the same file and a
+// take-back. A twin whose counts drifted from the adapter's fails here, fast. The twin's refusals (a stale accept, a
+// confirm overtaken by a save, a revision ahead of the draft) are held in the model package's Endpoints.test.ts.
 import { expect, layer } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
@@ -9,6 +11,7 @@ import * as HttpApiTest from "effect/http-api/HttpApiTest"
 import messy from "../../public/samples/items_messy.csv?raw"
 import { Api } from "../../src/api/v1/Api.ts"
 import { decisionFromFlags } from "@inventory/catalog-contract/Decision"
+import { ImportEvent } from "@inventory/catalog-contract/Import"
 import { ModelId } from "@beep/openrouter/OpenRouterModel"
 import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
 import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
@@ -45,9 +48,10 @@ layer(inMemoryHandlers({ member: marcus, ai: OpenRouterTest.off("noKey", ModelId
           rows: 200
         })
         const params = { id: staged.id }
-        yield* client.imports.decide({
+        const saved = yield* client.imports.decide({
           params,
           payload: {
+            madeOn: { "row-55": staged.revision, "row-18": staged.revision },
             set: {
               "row-55": decisionFromFlags({ accepted: ["unitCost"] }),
               "row-18": decisionFromFlags({ reverted: ["uom"] })
@@ -55,7 +59,10 @@ layer(inMemoryHandlers({ member: marcus, ai: OpenRouterTest.off("noKey", ModelId
             clear: []
           }
         })
-        const confirmed = yield* client.imports.commit({ params, payload: { set: {}, clear: [] } })
+        const confirmed = yield* client.imports.commit({
+          params,
+          payload: { revision: saved.revision, madeOn: {}, set: {}, clear: [] }
+        })
         const result = O.getOrThrow(confirmed.result)
         expect([result.created, result.updated, result.already, result.notImported]).toEqual([155, 0, 0, 45])
         expect(result.fixed).toEqual({ rows: 16, cells: 19 })
@@ -96,16 +103,17 @@ layer(inMemoryHandlers({ member: marcus, ai: OpenRouterTest.off("noKey", ModelId
         // The same file again: 154 already there, row 55 waits with its proposal, row 18 is the one new item.
         const again = yield* upload({ client, table })
         expect(again.progress).toMatchObject({ ready: 1, needs: 45 })
-        const second = yield* client.imports.commit({ params: { id: again.id }, payload: { set: {}, clear: [] } })
+        const second = yield* client.imports.commit({
+          params: { id: again.id },
+          payload: { revision: again.revision, madeOn: {}, set: {}, clear: [] }
+        })
         const secondResult = O.getOrThrow(second.result)
         expect([secondResult.created, secondResult.already, secondResult.notImported]).toEqual([1, 154, 45])
 
         // Taking the first import back removes its 155 and keeps the second's one.
         const back = yield* client.imports.takeBack({ params, payload: { confirms: confirmed.takeBack.confirms } })
-        const taken = A.filter(back.history, (event) => event._tag === "TakenBack")
-        expect(A.map(taken, (event) => (event._tag === "TakenBack" ? [event.removed, event.kept] : []))).toEqual([
-          [155, 0]
-        ])
+        const taken = A.filter(back.history, ImportEvent.guards.TakenBack)
+        expect(A.map(taken, (event) => [event.removed, event.kept])).toEqual([[155, 0]])
         const left = yield* client.items.list()
         expect([back.status, left.length]).toEqual(["takenBack", 1])
       })

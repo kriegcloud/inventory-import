@@ -31,6 +31,7 @@
     "@beep/better-auth": "workspace:*",
     "@beep/d1": "workspace:*",
     "@beep/identity": "workspace:*",
+    "@cloudflare/workers-types": "^5.20261113.1",
     "@inventory/access-contract": "workspace:*",
     "@inventory/access-model": "workspace:*",
     "@inventory/kernel": "workspace:*",
@@ -38,7 +39,6 @@
     "effect": "4.1.4"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20261113.1",
     "@effect/vitest": "4.1.4",
     "@types/node": "^24.19.2",
     "vitest": "^5.1.0"

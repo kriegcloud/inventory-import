@@ -71,9 +71,9 @@ export const exactExports = Effect.fn("Exports.exactExports")(function* () {
     entries,
     Effect.fnUntraced(function* ([key, target]) {
       if (Str.includes("*")(key) || Str.includes("*")(String(target)))
-        return A.of<ExportsFinding>({ _tag: "Wildcard", key })
+        return A.of<ExportsFinding>(ExportsFinding.cases.Wildcard.make({ key }))
       if (!P.isString(target) || !(yield* repo.exists(repo.join(root, target))))
-        return A.of<ExportsFinding>({ _tag: "NamesNoFile", key })
+        return A.of<ExportsFinding>(ExportsFinding.cases.NamesNoFile.make({ key }))
       return A.empty<ExportsFinding>()
     }),
     { concurrency: 1 }
@@ -89,7 +89,7 @@ export const exactExports = Effect.fn("Exports.exactExports")(function* () {
             A.flatMap(files, (file) =>
               A.contains(targets, file)
                 ? A.empty<ExportsFinding>()
-                : A.of<ExportsFinding>({ _tag: "Unlisted", file: repo.relative(root, file) })
+                : A.of<ExportsFinding>(ExportsFinding.cases.Unlisted.make({ file: repo.relative(root, file) }))
             )
           )
         ),
@@ -98,6 +98,6 @@ export const exactExports = Effect.fn("Exports.exactExports")(function* () {
   const problems = A.appendAll(A.flatten(wrong), A.flatten(unlisted))
   const name = String(manifest.name)
   return A.isArrayNonEmpty(problems)
-    ? A.prepend<ExportsFinding, ExportsFinding>(problems, { _tag: "Refused", name })
-    : A.of<ExportsFinding>({ _tag: "Exact", name, entries: entries.length })
+    ? A.prepend<ExportsFinding, ExportsFinding>(problems, ExportsFinding.cases.Refused.make({ name }))
+    : A.of<ExportsFinding>(ExportsFinding.cases.Exact.make({ name, entries: entries.length }))
 })

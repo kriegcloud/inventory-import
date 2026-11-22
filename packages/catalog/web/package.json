@@ -23,8 +23,7 @@
     "./ItemsPage": "./src/ItemsPage.screen.tsx",
     "./ItemEditor": "./src/ItemEditor.screen.tsx",
     "./TableAssistant": "./src/TableAssistant.screen.tsx",
-    "./Imports": "./src/Imports.controller.ts",
-    "./Draft": "./src/Draft.controller.ts",
+    "./Imports": "./src/Imports.atoms.ts",
     "./Upload": "./src/Upload.controller.ts",
     "./Spreadsheet": "./src/internal/spreadsheet/index.ts",
     "./SpreadsheetCsv": "./src/internal/spreadsheet/csv.ts",
@@ -33,7 +32,8 @@
     "./Route": "./src/internal/route.ts",
     "./AnsweredByWords": "./src/internal/answeredBy.ts",
     "./UploadMachine": "./src/Upload.machine.ts",
-    "./ImportDecisions": "./src/ImportDecisions.screen.tsx"
+    "./ImportDecisions": "./src/ImportDecisions.screen.tsx",
+    "./KeptNotices": "./src/KeptNotices.screen.tsx"
   },
   "scripts": {
     "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json && beep-cli quality strict strict-ceiling.json",
@@ -51,7 +51,6 @@
     "@inventory/kernel": "workspace:*",
     "@inventory/review": "workspace:*",
     "@inventory/ui": "workspace:*",
-    "@tanstack/react-query": "^5.107.1",
     "@tanstack/react-table": "^9.3.1",
     "effect": "4.1.4",
     "lucide-react": "^1.72.0",

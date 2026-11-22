@@ -14,7 +14,7 @@ import * as O from "effect/Option"
 import * as Redacted from "effect/Redacted"
 import * as HttpServerRequest from "effect/http/HttpServerRequest"
 import * as HttpServerResponse from "effect/http/HttpServerResponse"
-import type { CrossSiteRequest } from "@inventory/kernel/AccessError"
+import { CrossSiteRequest } from "@inventory/kernel/AccessError"
 import { mayCreateAccount } from "@inventory/access-model/SignUp"
 import { passwordToVerify } from "@inventory/access-model/StagePassword"
 import { authSettings } from "./Config.ts"
@@ -70,14 +70,16 @@ export const signIn = (options: {
     })
   )
 
-/** The answer the app's own API gives a cross-site write (`CrossSiteRequest`), so the browser reads both alike. */
-const refused = HttpServerResponse.jsonUnsafe(
-  {
-    _tag: "CrossSiteRequest",
+/**
+ * The answer the app's own API gives a cross-site write (`CrossSiteRequest`), so the browser reads both alike: built
+ * with the error's own constructor and encoded by its schema, never typed out by hand.
+ */
+const refused = HttpServerResponse.schemaJson(CrossSiteRequest)(
+  CrossSiteRequest.make({
     reason: "This request came from another site, so it was refused. Open the app itself and try again there."
-  } satisfies typeof CrossSiteRequest.Encoded,
+  }),
   { status: 403 }
-)
+).pipe(Effect.orDie)
 
 /** Better Auth's endpoints at /api/auth/*, served by the same router as the HttpApi, behind the cross-site rule. */
 export const SignInRoute = BetterAuth.route({
@@ -96,6 +98,7 @@ export const SignInRoute = BetterAuth.route({
         "http.sec_fetch_site": O.getOrElse(source.fetchSite, () => "")
       })
     )
-    return O.some(refused)
+    const answer = yield* refused
+    return O.some(answer)
   })
 })

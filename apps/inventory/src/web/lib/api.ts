@@ -1,6 +1,5 @@
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
-import type * as Exit from "effect/Exit"
 import * as Layer from "effect/Layer"
 import * as ManagedRuntime from "effect/ManagedRuntime"
 import * as FetchHttpClient from "effect/http/FetchHttpClient"
@@ -15,7 +14,7 @@ import { AccessClient } from "@inventory/access-web/Access"
 import { CatalogClient, configureCatalog } from "@inventory/catalog-web/Catalog"
 import { apiPrefix } from "../../api/v1/Version.ts"
 import { makeApi } from "@inventory/client/ApiRuntime"
-import { makeOptimisticWrite } from "@inventory/client/Optimistic"
+import { ofThisPage } from "./ofThisPage.ts"
 import { browserTelemetry } from "./telemetry.ts"
 
 /** A client derived from the API contract. Methods, payloads and errors are all typed from src/api/v1/Api.ts. */
@@ -44,7 +43,7 @@ class ApiClient extends Context.Service<ApiClient, Client>()("@inventory/app/web
   static readonly layer = Layer.effect(
     ApiClient,
     // Same origin: the browser sends the session cookie with every call, so nothing names the actor here.
-    HttpApiClient.make(Api, { transformClient: withEarly })
+    HttpApiClient.make(Api, { transformClient: (client) => client.pipe(withEarly, ofThisPage) })
   ).pipe(Layer.provide(FetchHttpClient.layer))
 }
 
@@ -64,41 +63,12 @@ export const appRuntime = ManagedRuntime.make(
   ).pipe(Layer.provideMerge(browserTelemetry))
 )
 
-const api = makeApi(appRuntime, ApiClient)
-
 /**
  * The same runtime's services as a layer, for the atom registry (`provideApi` from `@inventory/client/Api`): the atoms
- * call the API through this one client, so there is one connection to DevTools and one set of traces, whichever way a
- * screen reaches the API while the screens move from TanStack Query to atoms.
+ * call the API through this one client, so there is one connection to DevTools and one set of traces.
  */
 export const appLayer = Layer.effectContext(appRuntime.contextEffect)
 
 // The catalog screens start uploads and prefetch outside any component, so they are bound to this runtime here, once,
 // before anything of theirs runs.
 configureCatalog({ ...makeApi(appRuntime, CatalogClient), runtime: appRuntime, apiPrefix })
-
-/**
- * Run one API call as a Promise, for TanStack Query.
- * A typed API error (for example `AiUnavailable`) rejects with that error object, so the UI can switch on `_tag`.
- */
-export const call = api.call
-
-/**
- * Runs one write as a Promise, for a mutation. A failure that may pass (the network, a server error, "too many
- * requests") is sent again, twice at most, waiting longer each time; a refusal is not. A write names what it acts on
- * (an upload's key, an edit's revision, an import that is still open), so a retry after a lost answer adds nothing.
- */
-export const callWrite = api.callWrite
-
-/**
- * Runs a longer program against the API in the background and returns its fiber. Interrupting the fiber aborts every
- * request it has in flight (the fetch is cancelled) and runs its finalizers: all a Cancel button needs.
- */
-export const fork = api.fork
-
-/** One optimistic write against this app's API (`@inventory/client/Optimistic` says the rule it keeps). */
-export const useOptimisticWrite = makeOptimisticWrite(callWrite)
-
-/** Runs an Effect on the API's runtime, as a Promise of its exit. */
-export const runExit = <A, E>(effect: Effect.Effect<A, E>): Promise<Exit.Exit<A, E>> =>
-  appRuntime.runPromiseExit(effect)

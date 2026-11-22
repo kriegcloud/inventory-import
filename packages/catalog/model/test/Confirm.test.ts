@@ -3,7 +3,8 @@
 import { describe, expect, it } from "@effect/vitest"
 import { decisionFromFlags, type SavedDecisions } from "@inventory/catalog-contract/Decision"
 import { ImportId } from "@inventory/catalog-contract/Ids"
-import { confirmPlan } from "@inventory/catalog-model/Confirm"
+import { DecidedBy } from "@inventory/catalog-contract/Import"
+import { confirmPlan, PlannedRow } from "@inventory/catalog-model/Confirm"
 import { review } from "@inventory/catalog-model/Review"
 import * as A from "effect/Array"
 import * as R from "effect/Record"
@@ -34,22 +35,17 @@ describe("confirmPlan", () => {
       )
       const current = review({ table, choices: [], decisions, storedItems: [] })
       const plan = confirmPlan({ draft, review: current, authors: {}, actor: marcus })
-      const count = (status: string) => A.filter(plan.rows, (row) => row.status === status).length
+      const count = (status: PlannedRow["status"]) => A.filter(plan.rows, PlannedRow.isAnyOf([status])).length
       const reviewed = (status: string) => A.filter(current.rows, (row) => row.status === status).length
       expect(A.map(plan.rows, (row) => row.rowNumber)).toEqual(A.map(current.rows, (row) => row.rowNumber))
       expect(count("ready") + count("update")).toBe(reviewed("ready"))
       expect(count("already")).toBe(reviewed("already"))
       expect(count("notImported")).toBe(reviewed("needs") + reviewed("out"))
       // A row the person left out says who; a row nobody settled says nobody.
-      const deciders = A.map(
-        A.filter(plan.rows, (row) => row.status === "notImported"),
-        (row) => (row.status === "notImported" ? row.decidedBy.kind : "")
-      )
-      expect(A.filter(deciders, (kind) => kind === "person").length).toBe(reviewed("out"))
+      const deciders = A.map(A.filter(plan.rows, PlannedRow.guards.notImported), (row) => row.decidedBy)
+      expect(A.filter(deciders, DecidedBy.guards.person).length).toBe(reviewed("out"))
       // A row that is written carries an item; nothing else does.
-      expect(A.every(plan.rows, (row) => (row.status === "ready" || row.status === "update") === "item" in row)).toBe(
-        true
-      )
+      expect(A.every(plan.rows, (row) => PlannedRow.isAnyOf(["ready", "update"])(row) === "item" in row)).toBe(true)
     },
     { arbitrary: { runs: 60 } }
   )

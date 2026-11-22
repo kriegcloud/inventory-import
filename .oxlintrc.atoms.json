@@ -10,6 +10,44 @@
     "no-restricted-imports": [
       "error",
       {
+        // The same hooks reached by a relative path from inside the design system's own pieces.
+        "patterns": [
+          {
+            "group": [
+              "**/hooks/use-isomorphic-layout-effect*",
+              "**/hooks/use-ref-with-init*",
+              "**/hooks/use-value-as-ref*"
+            ],
+            "message": "The kit's effect and ref hooks are for the vendored kit alone: an effect is banned with no exception, and a ref holds a DOM node only (goals/atoms)."
+          },
+          {
+            // A pause in typing is an atom's (Atom.debounce): the kit's hook keeps its function in a ref that a
+            // layout effect points anew after every draw.
+            "group": ["**/hooks/use-debounced-callback*"],
+            "message": "The kit's debounce hook is an effect after every draw, and is for the vendored kit alone: a pause is Atom.debounce on the atom that holds what is typed (goals/atoms)."
+          },
+          {
+            // The same hooks under the packages they are hoisted as: radix-ui/internal re-exports these, and React's
+            // useSyncExternalStore has a shim of its own. TanStack Query is gone (goals/atoms, step 8): its packages
+            // are refused so a read cannot come back as a query.
+            "group": [
+              "@radix-ui/react-use-*",
+              "@radix-ui/react-compose-refs",
+              "use-sync-external-store",
+              "use-sync-external-store/*",
+              "@tanstack/query-core",
+              "@tanstack/query-core/*",
+              "@tanstack/react-query/*"
+            ],
+            "message": "Effects, state and a query cache by another package's name: use an atom, a ref callback, or the component's own controlled props (goals/atoms)."
+          },
+          {
+            // TanStack's own store, and its React binding: state outside atoms by another package's name. The review
+            // package's test drives the table's store as the table does, and says so on its one import.
+            "group": ["@tanstack/store", "@tanstack/store/*", "@tanstack/react-store", "@tanstack/react-store/*"],
+            "message": "TanStack's store is state outside atoms: hold the value in an atom (Atom.make), and read it with useAtomValue (goals/atoms)."
+          }
+        ],
         "paths": [
           {
             "name": "react",
@@ -28,6 +66,32 @@
               "useImperativeHandle"
             ],
             "message": "State lives in atoms: Atom.make for a value, Atom.readable or Atom.map for a derived one, the registry for what a provider held; read it with useAtomValue (goals/atoms)."
+          },
+          {
+            "name": "react",
+            "importNames": ["use", "useOptimistic", "useActionState"],
+            "message": "React 19's own state hooks are state outside atoms too: a promise or a context is read through an atom (useAtomValue), an optimistic value through optimisticWrite, a form's action through an atom's write (goals/atoms)."
+          },
+          {
+            "name": "react-dom",
+            "importNames": ["useFormStatus", "useFormState", "default"],
+            "message": "A form's pending state is the write atom's own (useAtomValue(write).waiting), not react-dom's (goals/atoms)."
+          },
+          {
+            "name": "@inventory/ui/hooks/use-isomorphic-layout-effect",
+            "message": "The kit's layout effect is an effect all the same, and effects are banned with no exception: use a ref callback or an atom's subscription (goals/atoms)."
+          },
+          {
+            "name": "@inventory/ui/hooks/use-ref-with-init",
+            "message": "A ref that holds a value is state outside atoms: hold it in an atom; useRef is for a DOM node only (goals/atoms)."
+          },
+          {
+            "name": "@inventory/ui/hooks/use-value-as-ref",
+            "message": "A ref that follows a value is state outside atoms (and a layout effect underneath): read the atom where the value is needed (goals/atoms)."
+          },
+          {
+            "name": "radix-ui/internal",
+            "message": "Radix's internal hooks (useLayoutEffect, useControllableState, useCallbackRef and the rest) are effects and state by another name: use an atom, a ref callback, or the component's own controlled props (goals/atoms)."
           },
           {
             "name": "react",

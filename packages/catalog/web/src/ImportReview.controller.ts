@@ -58,7 +58,7 @@ const toFix = (proposal: Proposal, reason?: string): Fix =>
     column: proposal.field,
     to: proposal.to,
     by: proposal.by,
-    confidence: proposal.confidence,
+    confidence: O.some(proposal.confidence),
     kind: proposal.kind,
     ...(proposal.kind === "spaces" ? { group: `${proposal.field}:trim`, label: trimLabel } : { group: proposal.group }),
     why: {
@@ -325,7 +325,7 @@ const itemColumns = (
             match: {
               state: "matched" as const,
               source: column.value.header,
-              by: "name" as const,
+              by: "name",
               samples: column.value.examples
             }
           })

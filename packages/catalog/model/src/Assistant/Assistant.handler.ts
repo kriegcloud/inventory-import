@@ -16,7 +16,7 @@ import { AgentRun } from "@inventory/kernel/AgentRun"
 import * as S from "effect/Schema"
 import { CurrentActor } from "@inventory/kernel/Actor"
 import { Answerer, modelIsOn, ModelQuestion } from "../Answer/Answerer.external.ts"
-import { ModelAllowance } from "../Answer/ModelAllowance.external.ts"
+import { AllowanceAnswer, ModelAllowance } from "../Answer/ModelAllowance.external.ts"
 import { AssistantLog } from "./AssistantLog.store.ts"
 import * as SecureRandom from "effect/crypto/SecureRandom"
 import { asAgent } from "@inventory/kernel/Agent"
@@ -32,7 +32,7 @@ export const usedUpSentence = (words: string): string => `${words}, so the rules
  * the rules answered. Pure: it needs no key and touches no table.
  */
 /** The rules answered, and why no model did. */
-const answeredByRules = (reason: string): AnsweredBy => ({ _tag: "Rules", reason })
+const answeredByRules = (reason: string): AnsweredBy => AnsweredBy.cases.Rules.make({ reason })
 
 export const answerByRules = (input: { readonly request: ViewRequest; readonly why: string }): ViewOutcome => {
   const { request, why } = input
@@ -78,7 +78,7 @@ export const view = Effect.fn("TableAssistant.view")(function* (request: ViewReq
   }
   // One call from the day's allowance, taken before the call is made, so a call that fails still counts.
   const call = yield* allowance.take("view")
-  if (call.kind === "usedUp") {
+  if (AllowanceAnswer.guards.usedUp(call)) {
     return answerByRules({ request, why: usedUpSentence(call.reason) })
   }
   const catalog = yield* toJson({

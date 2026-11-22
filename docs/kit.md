@@ -16,7 +16,7 @@ and the decisions behind them in `DECISIONS.md`.
 | Need | Use | File |
 | --- | --- | --- |
 | Upload, Match, Review, Result | `Stepper`, its value in `?step=`, each screen in a `StepperContent`; the import page draws its steps into the shell's top bar (`BarSlotContext`) | `components/ui/stepper.tsx`, `pages/ImportPage.tsx` |
-| Choose the file | `FileUpload` (Dice UI): a labelled file input, drag and drop on its box, Enter opens the picker; a file dropped anywhere else on the page goes to the same input (`UploadStep.screen.tsx`); then `useUpload().start(file)`, which reads in a worker and stages in chunks, with progress and Cancel | `components/ui/file-upload.tsx`, `lib/upload/`, `pages/import/UploadStep.tsx` |
+| Choose the file | `FileUpload` (Dice UI): a labelled file input, drag and drop on its box, Enter opens the picker; a file dropped anywhere else on the page goes to the same input (`UploadStep.screen.tsx`); then the `startUpload` atom is set to the file, which reads in a worker and stages in chunks, with progress and Cancel | `components/ui/file-upload.tsx`, `lib/upload/`, `pages/import/UploadStep.tsx` |
 | Which sheet of a workbook | `SheetChooser`: "Sheet 3 of 6: Records", why, and a select; nothing when one sheet has data | `packages/catalog/web/src/internal/SheetChooser.tsx` |
 | A refresh loses nothing | `useSavedProgress(scope, browserRuntime)`: the chosen file until the server has it, and the review's undo history beside the decisions the server keeps, for one person in one organization; cleared on Confirm | `lib/saved-progress/` |
 | A table of rows to decide on | `ReviewRegion`: one card with one toolbar (search, views, Undo and Redo, column, filter, row height, download and activity icons, the counted Import button), a work list of the problem kinds beside the table, columns sized to their values (`fit`) or sharing the rest (`fill`), cut text in a hover card, one decision per group, one decision at a time on a phone. Read [the review region](review-table.md) | `components/review/` |
@@ -26,7 +26,7 @@ and the decisions behind them in `DECISIONS.md`.
 | Something on its way | `PageHeaderSkeleton`, `TableSkeleton`, `TablePageSkeleton`, `ReviewSkeleton`, `UploadSkeleton`, `StepsSkeleton` in the real boxes | `@inventory/ui/Skeletons` (`packages/ui/src/Skeletons.component.tsx`) |
 | A failure, in words | `sayError(error)`: title, sentence and every problem; `toastError`; `answeredByLine` for which path answered | `@inventory/client/SayError`; `answeredByLine` in `lib/answeredBy.ts` |
 | Every problem of a form at once | `formProblems` and `problemOf`, shown with `FieldError` under each field (the record editor reads its form with `readRecordForm` from the domain instead) | `lib/form.ts`, `pages/ItemEditor.tsx` |
-| Cache keys and fetch rules | `queryKeys`, `freshFor`, `sessionQuery`; the one `queryClient` | `lib/queries.ts` |
+| Reading and writing the API | `makeApiAtoms(tag)`: `query` (a read as an atom), `write`, `ask`, `send`; `invalidate(keys)`; `optimisticWrite`; each package's keys | `@inventory/client/Api`, `@inventory/client/OptimisticAtoms`; `packages/catalog/web/src/Catalog.keys.ts`, `packages/access/web/src/Access.keys.ts` |
 | Act on selected rows or cells | `ActionBar`, passed to `DataGrid` as `actionBar` | `packages/ui/src/components/action-bar.tsx` |
 | A change before it happens | `ProposedValue`: `<del>` and `<ins>` with hidden "was" and "now" | `packages/ui/src/ProposedValue.component.tsx` |
 | What a run did | `AgentRun`: past-tense steps that open to show what each read and returned | `packages/ui/src/AgentRun.component.tsx` |
@@ -59,8 +59,8 @@ and the decisions behind them in `DECISIONS.md`.
   trigger has `aria-current="step"`. Arrow keys move between steps; disable steps the person cannot reach yet with
   `<StepperItem disabled>`.
 - Take the chosen file from `onAccept`, not `onValueChange`: with a controlled `value` the component calls
-  `onValueChange` twice for one choice, which staged every file twice here. Hand it to `useUpload().start(file)` from
-  `@inventory/catalog-web/Upload`, which reads it in a worker with `readSpreadsheet` (.csv and .xlsx, [patterns](patterns.md) section 7),
+  `onValueChange` twice for one choice, which staged every file twice here. Hand it to `startUpload` from
+  `@inventory/catalog-web/Upload` (an atom: `useAtomSet(startUpload)({ file })`), which reads it in a worker with `readSpreadsheet` (.csv and .xlsx, [patterns](patterns.md) section 7),
   stages it in chunks and shows progress with a Cancel. A "Use the sample file" ghost button beside "Choose file" is
   the demo path.
 
@@ -133,7 +133,7 @@ decision at a time by itself.
 The grid scrolls sideways on a phone; `RowCards` (below) is the narrow layout for it. Cost when used: about 117 kB
 gzip, so load the screen that holds it with `lazy(() => import(...))`. Unused, it adds nothing to the bundle.
 
-Keep `columns` stable (module level or `useMemo`).
+Keep `columns` stable: made at module level, or a derived atom when they follow the page's state.
 
 ```tsx
 const col = createColumnHelper<DataGridFeatures, Row>() // from "@tanstack/react-table"
@@ -181,19 +181,24 @@ const recordsTable = createDataTableConfig({
   columns: { name: { variant: "text" }, unit: { variant: "select" }, price: { variant: "number" }, date: {} },
   defaultSorting: [{ id: "code", desc: false }], enableGlobalFilter: true
 })
-// 2. The question for the server is read from the address, the same address the table writes its state to.
-const query = useMemo(() => recordsTable.parse(params.toString()), [params])
-const page = useQuery({ queryKey: queryKeys.recordsPage(query), placeholderData: keepPreviousData,
-  queryFn: () => call((api) => api.items.page({ query: { page: query.page, perPage: query.perPage,
-    sort: query.sorting, filters: query.filters, joinOperator: query.joinOperator, search: query.globalFilter } })) })
-// 3. The table, told how many pages there are. `urlState` keeps page, order and filters in the address.
+// 2. The question for the server is an atom read from the address (`location` from `@inventory/ui/Route`), the same
+//    address the table writes its state to; the page is a read whose question comes from it. Both at module level.
+const recordsQuestion = Atom.map(location, ({ params }) => recordsTable.parse(params.toString()))
+const recordsPage = catalogApi.query((api, get) => {
+  const query = get(recordsQuestion)
+  return api.items.page({ query: { page: query.page, perPage: query.perPage,
+    sort: query.sorting, filters: query.filters, joinOperator: query.joinOperator, search: query.globalFilter } })
+}, { reactivityKeys: catalogKeys.items })
+// 3. In the screen: the read, and the table, told how many pages there are. `urlState` keeps page, order and filters
+//    in the address. While the next page is fetched the read keeps the last one, marked waiting.
+const page = resultOf(useAtomValue(recordsPage))
 const { table } = useDataTable({ data: page.data?.data ?? [], columns, config: recordsTable,
   pageCount: page.data?.pageCount ?? 0, urlState: true, getRowId: (record) => record.id })
 return (
   <DataTable table={table} stickyHeader>
     <DataTableToolbar table={table} quick={["unit"]} search={
-        <TableSearch value={query.globalFilter} onSearch={(text) => table.setGlobalFilter(text)}
-          placeholder="Search records" working={page.isFetching && page.isPlaceholderData} maxLength={200} shortcutHint />}>
+        <TableSearch table={table}
+          placeholder="Search records" working={page.updating} maxLength={200} shortcutHint />}>
       <DataTableSortMenu table={table} align="end" />
       <DataTableFilterMenu table={table} align="end" />
     </DataTableToolbar>
@@ -202,7 +207,8 @@ return (
 ```
 
 - A table has one search box, at the left of its toolbar (`search`, a local addition; `TableSearch` in
-  `components/app` waits 300 ms, says it is working and empties with Escape). With it, the quick filters move to the
+  `@inventory/ui` is given the table: it shows the search the table holds, asks the table for the typed one after a
+  300 ms pause, says it is working and empties with Escape). With it, the quick filters move to the
   right beside the menus. A search in one column is a text filter in the Filter menu, not a second box.
 - The toolbar holds the few filters used all day (`quick`, a local addition: left out, every filterable column gets
   a control). `DataTableFilterMenu` reaches every filterable column with every comparison ("contains", "is not",
@@ -267,7 +273,7 @@ come from rules and say `rule`; the model's say `AI`.
 ### Cards from the same table, for a phone
 
 ```tsx
-{useIsNarrow() ? <RowCards table={table} titleColumnId="name" /> : <DataGrid {...grid} table={table} />}
+{useAtomValue(isNarrow) ? <RowCards table={table} titleColumnId="name" /> : <DataGrid {...grid} table={table} />}
 ```
 
 - `RowCards` is for the data grid only; a review built on `ReviewRegion` needs nothing extra on a phone.
@@ -297,23 +303,32 @@ The Records page and its editor (`packages/catalog/web/src/ItemsPage.screen.tsx`
 screen that reads and writes; the People page's role change is a second one.
 
 ```tsx
-const page = useQuery({ queryKey: queryKeys.recordsPage(query), queryFn: () => call((api) => api.items.page(...)) })
-// An edit is optimistic: the row shows the new values at once; a refusal puts it back and offers "Edit again".
-const save = useOptimisticWrite({ write: (api, edit) => api.items.edit(edit), changes: ..., failed: "Not saved" })
-<Button type="submit" disabled={save.isPending}>{save.isPending ? "Saving" : "Save"}</Button>
+// At module level: the read shown through an item's edit, and the edit itself.
+const recordsShown = shown(recordsPage)
+const saveRecord = optimisticWrite({
+  send: (edit: RecordEdit) => catalogApi.send((api) => api.items.edit({ params: { id: edit.id }, payload: edit })),
+  // The row shows the new values at once; a refusal takes them back and offers "Edit again".
+  changes: [optimisticChange(recordsShown, (page, edit: RecordEdit) => withEdit(page, edit))],
+  failed: () => "Not saved."
+})
+// In the screen:
+const page = resultOf(useAtomValue(recordsShown))
+const saving = useAtomValue(saveRecord).waiting
+const save = useAtomSet(saveRecord)
+<Button type="submit" disabled={saving}>{saving ? "Saving" : "Save"}</Button>
 ```
 
-- **The cache** (`lib/queries.ts`): queries are fresh for 30 s (`freshFor`), so a screen change or a remount shows
-  what was fetched without asking again; no refetch when the window regains focus; one more try only for a failure
-  that may pass (`isTransient`: the network, a server error, "too many requests"), never for a refusal. The session
-  (`queryKeys.session`) takes `sessionQuery`: fetched once, never again on its own; switching who you are resets every
-  cached query, so nothing of the last organization shows even for a moment.
-- **A write** invalidates exactly the keys of what it changed, named in `queryKeys`, never everything (a confirm,
-  a take-back or an edit: `queryKeys.items`, the import's view, and `queryKeys.activity` for its audit line). Its
-  button is disabled while the request is pending. A write whose outcome the screen can show before the server
-  answers is optimistic (`useOptimisticWrite` from `lib/api.ts`, built by `@inventory/client/Optimistic`); one only the server knows (a confirm, a
-  take-back, adding a person by email) shows its progress instead. Mutations are retried only through `callWrite`,
-  and only for a failure that may pass.
+- **A read** (`makeApiAtoms(tag).query` in `@inventory/client/Api`) is an atom made once at module level. What it
+  answered is kept for five minutes after the last screen stops reading it (`keepUnwatched`), so a screen change or a
+  remount shows it at once and asks again behind it; one more try only for a failure that may pass (`isTransient`: the
+  network, a server error, "too many requests"), never for a refusal. A read is kept per member and organization, so
+  nothing of the last organization shows even for a moment; the session is asked once, never again on its own.
+- **A write** says exactly what it changed, with the keys named in the package's `*.keys.ts` (`catalogKeys.items`, the
+  import's view, `catalogKeys.activity` for its audit line), never everything: `reactivityKeys` on the write, or
+  `invalidate(keys)`. Its button is disabled while the request is out. A write whose outcome the screen can show
+  before the server answers is optimistic (`optimisticWrite` from `@inventory/client/OptimisticAtoms`); one only the
+  server knows (a confirm, a take-back, adding a person by email) is `ask` and shows its progress instead. A write is
+  sent again only by `send` and `write`, and only for a failure that may pass.
 - **Every problem of a form at once**: run every field's check (`readRecordForm` in `packages/catalog/contract/src/Item/Item.read.ts`, or
   `formProblems` from `lib/form.ts`), show each under its field with `FieldError`, and send nothing while one is
   open. In the record editor an empty Name and a price with three decimals are both named after one press.

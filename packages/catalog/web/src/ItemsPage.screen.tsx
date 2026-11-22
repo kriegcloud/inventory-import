@@ -1,8 +1,8 @@
+import * as A from "effect/Array"
 import * as O from "effect/Option"
-import { keepPreviousData, useQuery } from "@tanstack/react-query"
-import { createColumnHelper, type ReactTable } from "@tanstack/react-table"
+import { type Column, createColumnHelper, type ReactTable } from "@tanstack/react-table"
 import { ArrowDownUp, ListFilter } from "lucide-react"
-import { type ComponentType, lazy, Suspense, useEffect, useMemo, useState } from "react"
+import { type ComponentType, lazy, Suspense } from "react"
 import { Code } from "@inventory/ui/Code"
 import { PageHeader } from "@inventory/ui/PageHeader"
 import { NotSet } from "@inventory/ui/NotSet"
@@ -12,17 +12,23 @@ import { Button } from "@inventory/ui/components/button"
 import { DataTable } from "@inventory/ui/components/data-table/data-table"
 import { DataTableCards } from "@inventory/ui/components/data-table/data-table-cards"
 import { DataTableColumnHeader } from "@inventory/ui/components/data-table/data-table-column-header"
+import { DataTableFacetedFilter } from "@inventory/ui/components/data-table/data-table-faceted-filter"
 import { createDataTableConfig } from "@inventory/ui/components/data-table/data-table-config"
 import type { DataTableFeatures } from "@inventory/ui/components/data-table/data-table-features"
 import { DataTablePagination } from "@inventory/ui/components/data-table/data-table-pagination"
 import { DataTableToolbar } from "@inventory/ui/components/data-table/data-table-toolbar"
 import { useDataTable } from "@inventory/ui/hooks/use-data-table"
-import { useMember } from "@inventory/client/CurrentMember"
-import { call } from "./Catalog.runtime.ts"
-import { useAtomValue } from "@effect/atom-react"
-import { contentWidth, useIsNarrow } from "@inventory/ui/ContentWidth"
-import { navigate, useLocation } from "@inventory/ui/Route"
+import { member } from "@inventory/client/MemberAtoms"
+import { shown } from "@inventory/client/OptimisticAtoms"
+import { catalogApi } from "./Catalog.runtime.ts"
+import { useAtomRefresh, useAtomValue } from "@effect/atom-react"
+import * as Effect from "effect/Effect"
+import * as Atom from "effect/reactivity/Atom"
+import { contentWidth, isNarrow } from "@inventory/ui/ContentWidth"
+import { location, navigate } from "@inventory/ui/Route"
+import { resultOf } from "./internal/result.ts"
 import { hasRole } from "@inventory/kernel/Role"
+import { answerOf, perKey } from "@inventory/client/Api"
 import { discontinuedOn, isActive, type StoredItem } from "@inventory/catalog-contract/Item"
 import { itemPageSizes } from "@inventory/catalog-contract/ItemQuery"
 import { day, when } from "./internal/format.tsx"
@@ -31,7 +37,7 @@ import { costOf, dimensionsText, vendorsText } from "./internal/itemText.ts"
 import { sayError } from "@inventory/client/SayError"
 import { keptVisibility, TableAssistant } from "./TableAssistant.screen.tsx"
 import { TableSearch } from "@inventory/ui/TableSearch"
-import { queryKeys } from "./Catalog.keys.ts"
+import { catalogKeys } from "./Catalog.keys.ts"
 import { maxSearch, maxSearchWords } from "@inventory/catalog-contract/ItemSearch"
 import { type CatalogColumn, type ColumnCatalog, operatorsFor } from "@inventory/catalog-contract/TableView"
 import { wordsLeftOut } from "@inventory/catalog-model/ItemSearch"
@@ -155,9 +161,9 @@ const itemsTable = createDataTableConfig({ ...tableOptions, defaultSorting: [{ i
 // While searching, no order chosen means best matches first: no heading claims an order the rows do not have.
 const searchedTable = createDataTableConfig({ ...tableOptions, defaultSorting: [] })
 
-// The list filters used all day sit in the toolbar, after the search box. Every column that can be filtered, with
-// every comparison and "all of" or "any of", is in the Filter menu beside it: a search in one column (only the name,
-// only the SKU) is a text filter there.
+// The list filters used all day sit in the toolbar, after the search box (`QuickFilters`). Every column that can be
+// filtered, with every comparison and "all of" or "any of", is in the Filter menu beside it: a search in one column
+// (only the name, only the SKU) is a text filter there.
 const quickFilters = ["category", "uom"] as const
 
 const col = createColumnHelper<DataTableFeatures, StoredItem>()
@@ -234,252 +240,401 @@ const range = (
         onSome: (min) => ({ min: Math.floor(min), max: Math.ceil(O.getOrElse(found.max, () => min)) })
       })
 
+// Every cell and heading of the table is a component made once, here: the table hands each the row or the column it
+// draws, so an answer that changes what the filters offer gives React the very same components, and it keeps what they
+// drew (an open row editor stays open when a save changes a category, a unit or a count).
+type CellProps = { readonly row: { readonly original: StoredItem } }
+
+/** A heading that sorts, and hides its column from the View menu. */
+function SortHeader<TValue>(props: { readonly column: Column<DataTableFeatures, StoredItem, TValue> }) {
+  return <DataTableColumnHeader column={props.column} />
+}
+/** The same, at the end of a column of numbers, so the label lines up with its values. */
+function SortHeaderEnd<TValue>(props: { readonly column: Column<DataTableFeatures, StoredItem, TValue> }) {
+  return <DataTableColumnHeader column={props.column} className="justify-end" />
+}
+const EditHeader = () => <span className="sr-only">Edit</span>
+
+/** The pencil at the end of an item's row. */
+const EditCell = (props: CellProps) => <ItemEditor item={props.row.original} trigger="icon" />
+// A long name ends in an ellipsis, with the whole name on hover, instead of being cut by the next column.
+const NameCell = ({ row }: CellProps) => (
+  <span className="block truncate font-semibold" title={row.original.name}>
+    {row.original.name}
+  </span>
+)
+const SkuCell = ({ row }: CellProps) => <Code>{row.original.sku}</Code>
+const UnitCostCell = ({ row }: CellProps) => (
+  <div className="text-right tabular-nums">{costOf(row.original.unitCost)}</div>
+)
+// The quantity carries its unit of measure: "3,911 BX".
+const QuantityCell = ({ row }: CellProps) => (
+  <div className="text-right tabular-nums">
+    {whole.format(row.original.quantityOnHand)} {row.original.uom}
+  </div>
+)
+const ReorderPointCell = ({ row }: CellProps) => (
+  <div className="text-right tabular-nums">
+    {O.match(row.original.reorderPoint, {
+      onNone: () => <NotSet />,
+      onSome: (point) => <>{`${whole.format(point)} ${row.original.uom}`}</>
+    })}
+  </div>
+)
+const ActiveCell = ({ row }: CellProps) => yesNo(isActive(row.original.stocking))
+const LotTrackedCell = ({ row }: CellProps) => yesNo(row.original.lotTracked)
+const TagsCell = ({ row }: CellProps) =>
+  row.original.tags.length === 0 ? (
+    <NotSet />
+  ) : (
+    <span className="block truncate" title={row.original.tags.join(", ")}>
+      {row.original.tags.join(", ")}
+    </span>
+  )
+const FirstReceivedCell = ({ row }: CellProps) =>
+  O.match(row.original.firstReceivedOn, {
+    onNone: () => <NotSet />,
+    onSome: (day) => <span className="tabular-nums">{day}</span>
+  })
+const DiscontinuedCell = ({ row }: CellProps) =>
+  O.match(discontinuedOn(row.original.stocking), {
+    onNone: () => <NotSet />,
+    onSome: (day) => <span className="tabular-nums">{day}</span>
+  })
+const DimensionsCell = ({ row }: CellProps) =>
+  O.match(row.original.dimensions, {
+    onNone: () => <NotSet />,
+    onSome: (size) => <span className="tabular-nums">{dimensionsText(size)}</span>
+  })
+// How many, and the preferred one by name; every vendor with its cost and lead time is in the editor.
+const VendorsCell = ({ row }: CellProps) => {
+  const vendors = row.original.vendors.map((vendor) => ({ name: vendor.vendorName, preferred: vendor.isPreferred }))
+  if (vendors.length === 0) return <NotSet />
+  return (
+    <span className="block truncate" title={vendors.map((vendor) => vendor.name).join(", ")}>
+      {vendorsText(vendors)}
+    </span>
+  )
+}
+const AddedCell = ({ row }: CellProps) => (
+  <span title={`${when(row.original.createdAt)} · ${row.original.createdBy}`}>
+    {day(row.original.createdAt)} · {row.original.createdBy}
+  </span>
+)
+
+/**
+ * The columns of the Items table for an editor or a viewer, made once when the page's code loads. What the Filter
+ * menu offers is not in them (`withFilterValues`); the two toolbar filters read theirs from an atom (`QuickFilters`).
+ */
+const buildColumns = (canImport: boolean) => {
+  // An editor can change an item, from the pencil at the end of its row. A changed item stays if the import
+  // that created it is taken back.
+  const edit = canImport
+    ? [
+        col.display({
+          id: "edit",
+          header: EditHeader,
+          cell: EditCell,
+          meta: { label: "Edit" },
+          enableHiding: false,
+          size: editWidth
+        })
+      ]
+    : []
+  return col.columns([
+    col.accessor("name", {
+      id: "name",
+      header: SortHeader,
+      cell: NameCell,
+      meta: { label: labels.name },
+      enableHiding: false,
+      size: widths.name[0]
+    }),
+    col.accessor("sku", {
+      id: "sku",
+      header: SortHeader,
+      cell: SkuCell,
+      meta: { label: labels.sku },
+      size: widths.sku[0]
+    }),
+    col.accessor("category", {
+      id: "category",
+      header: SortHeader,
+      meta: { label: labels.category },
+      size: widths.category[0]
+    }),
+    col.accessor("uom", { id: "uom", header: SortHeader, meta: { label: labels.uom }, size: widths.uom[0] }),
+    col.accessor("unitCost", {
+      id: "unitCost",
+      header: SortHeaderEnd,
+      cell: UnitCostCell,
+      meta: { label: labels.unitCost },
+      size: widths.unitCost[0]
+    }),
+    col.accessor("quantityOnHand", {
+      id: "quantityOnHand",
+      header: SortHeaderEnd,
+      cell: QuantityCell,
+      meta: { label: labels.quantityOnHand },
+      size: widths.quantityOnHand[0]
+    }),
+    col.accessor("reorderPoint", {
+      id: "reorderPoint",
+      header: SortHeaderEnd,
+      cell: ReorderPointCell,
+      meta: { label: labels.reorderPoint },
+      size: widths.reorderPoint[0]
+    }),
+    col.accessor((item) => isActive(item.stocking), {
+      id: "isActive",
+      header: labels.isActive,
+      cell: ActiveCell,
+      meta: { label: labels.isActive },
+      size: widths.isActive[0]
+    }),
+    col.accessor("lotTracked", {
+      id: "lotTracked",
+      header: labels.lotTracked,
+      cell: LotTrackedCell,
+      meta: { label: labels.lotTracked },
+      size: widths.lotTracked[0]
+    }),
+    col.accessor((item) => item.tags.join(", "), {
+      id: "tags",
+      header: labels.tags,
+      cell: TagsCell,
+      meta: { label: labels.tags },
+      size: widths.tags[0]
+    }),
+    col.accessor("firstReceivedOn", {
+      id: "firstReceivedOn",
+      header: SortHeader,
+      cell: FirstReceivedCell,
+      meta: { label: labels.firstReceivedOn },
+      size: widths.firstReceivedOn[0]
+    }),
+    col.accessor((item) => O.getOrElse(discontinuedOn(item.stocking), () => ""), {
+      id: "discontinuedOn",
+      header: labels.discontinuedOn,
+      cell: DiscontinuedCell,
+      meta: { label: labels.discontinuedOn },
+      size: widths.discontinuedOn[0]
+    }),
+    col.accessor((item) => O.match(item.dimensions, { onNone: () => "", onSome: dimensionsText }), {
+      id: "dimensions",
+      header: labels.dimensions,
+      cell: DimensionsCell,
+      meta: { label: labels.dimensions },
+      size: widths.dimensions[0]
+    }),
+    col.accessor((item) => item.vendors.length, {
+      id: "vendors",
+      header: labels.vendors,
+      cell: VendorsCell,
+      meta: { label: labels.vendors },
+      size: widths.vendors[0]
+    }),
+    col.accessor("createdAt", {
+      id: "createdAt",
+      header: SortHeader,
+      cell: AddedCell,
+      meta: { label: labels.createdAt },
+      size: widths.createdAt[0]
+    }),
+    ...edit
+  ])
+}
+
+/** The columns for an editor and for a viewer, made once: nothing in them comes from an answer. */
+const editorColumns = buildColumns(true)
+const viewerColumns = buildColumns(false)
+
+/**
+ * The question the address asks the server: the page, its size, the order, the filters and the search, read the way
+ * the table writes them. Away from the Items page it keeps the last one, so a read kept while the person is elsewhere
+ * is not asked again at every step of another page.
+ */
+const itemsQuestion = Atom.readable((get) => {
+  const { path, params } = get(location)
+  const held = get.self<ItemsQuestion>()
+  if (path !== "/items" && O.isSome(held)) return held.value
+  const searching = (params.get(itemsTable.urlKeys.search) ?? "").trim() !== ""
+  const config = searching ? searchedTable : itemsTable
+  return { searching, config, query: config.parse(params.toString()) }
+})
+type ItemsQuestion = {
+  readonly searching: boolean
+  readonly config: typeof itemsTable
+  readonly query: ReturnType<typeof itemsTable.parse>
+}
+
+/**
+ * An address somebody typed or kept from before: a page size that is not offered goes back to the usual one, and a
+ * page past the last goes to the last, instead of "Page 999 of 8" over an empty table. Said in the address, so the
+ * table and the question agree; done where the answer is read, never after a render.
+ */
+const correctAddress = (asked: ItemsQuestion["query"], pageCount: number | undefined) => {
+  if (window.location.pathname !== "/items") return
+  const next = new URLSearchParams(window.location.search)
+  const before = next.toString()
+  if (!itemPageSizes.some((size) => size === asked.perPage)) next.delete("perPage")
+  if (pageCount !== undefined && asked.page > Math.max(1, pageCount)) {
+    if (pageCount <= 1) next.delete("page")
+    else next.set("page", `${pageCount}`)
+  }
+  const after = next.toString()
+  if (after !== before) navigate(`${window.location.pathname}${after === "" ? "" : `?${after}`}`, { replace: true })
+}
+
+/**
+ * The page of items the address asks for. One read whose question comes from the address: when the question changes
+ * the rows on screen stay, marked waiting, while the next page or the next filter is fetched, so nothing blinks or
+ * jumps. Shown through an item's edit (`ItemEditor`).
+ */
+export const itemsPage = shown(
+  catalogApi.query(
+    (api, get) => {
+      const asked = get(itemsQuestion).query
+      return Effect.sync(() => correctAddress(asked, undefined)).pipe(
+        Effect.andThen(
+          api.items.page({
+            query: {
+              page: asked.page,
+              perPage: asked.perPage,
+              sort: asked.sorting,
+              filters: asked.filters,
+              joinOperator: asked.joinOperator,
+              search: asked.globalFilter
+            }
+          })
+        ),
+        Effect.tap((answer) => Effect.sync(() => correctAddress(asked, answer.pageCount)))
+      )
+    },
+    { reactivityKeys: catalogKeys.items }
+  )
+)
+
+/** What the filters offer (each column's values, the range of numbers) and how many items there are in all. */
+export const itemFacets = catalogApi.query((api) => api.items.facets(), { reactivityKeys: catalogKeys.itemFacets })
+
+type Found = Atom.Success<typeof itemFacets> | undefined
+
+/**
+ * The filters' values alone: the same object while the server answers the same, however often it is asked. The
+ * columns are built from this and not from the read, which changes twice every time it is asked again.
+ */
+const itemFacetValues = answerOf(itemFacets)
+
+type Counted = ReadonlyArray<{ readonly value: string; readonly count: number }> | undefined
+const options = (listed: Counted) =>
+  (listed ?? []).map((entry) => ({ label: entry.value, value: entry.value, count: entry.count }))
+// A flag is stored as "true" or "false" and read as Yes or No, as its cells say.
+const flagOptions = (listed: Counted) =>
+  (listed ?? []).map((entry) => ({
+    label: entry.value === "true" ? "Yes" : "No",
+    value: entry.value,
+    count: entry.count
+  }))
+
+/**
+ * The columns with what the Filter menu offers now: the values a list filter lists and the ends of a range. The data
+ * table copies a column's meta when it takes the columns (`applyColumnConfig`), so the Filter menu can read them only
+ * from the column it is given; the two toolbar filters read theirs from `quickFilterOptions` instead. Each column here
+ * is the column made once with another meta: its cell, its heading and its pencil are the same components.
+ */
+const withFilterValues = (columns: typeof editorColumns, found: Found): typeof editorColumns => {
+  const values: Partial<Record<string, object>> = {
+    category: { options: options(found?.category) },
+    uom: { options: options(found?.uom) },
+    isActive: { options: flagOptions(found?.isActive) },
+    lotTracked: { options: flagOptions(found?.lotTracked) },
+    // A range in whole numbers, wide enough to hold the lowest and the highest value there is.
+    unitCost: range(found?.unitCost),
+    quantityOnHand: range(found?.quantityOnHand)
+  }
+  return A.map(columns, (column) => {
+    const extra = column.id === undefined ? undefined : values[column.id]
+    return extra === undefined ? column : { ...column, meta: { ...column.meta, ...extra } }
+  }) as typeof editorColumns
+}
+
+/**
+ * The table's columns for an editor or a viewer, with the Filter menu's values of the answer held: the same array
+ * while the answer is, and the same cells whatever it says.
+ */
+export const itemColumns = perKey((canImport: boolean) =>
+  Atom.readable((get) => withFilterValues(canImport ? editorColumns : viewerColumns, get(itemFacetValues)))
+)
+
+/** What the two toolbar filters offer, Category and UoM: the organization's values with how many items have each. */
+export const quickFilterOptions = Atom.readable((get) => {
+  const found = get(itemFacetValues)
+  return { category: options(found?.category), uom: options(found?.uom) }
+})
+
+/** The page's sorting and filtering as the table reads it, for a test to put the columns through as the table does. */
+export const itemsTableConfig = itemsTable
+
+/**
+ * The list filters used all day, in the toolbar beside the menus: Category and UoM, each offering what
+ * `quickFilterOptions` holds, so a new answer reaches them without a new column.
+ */
+function QuickFilters(props: { readonly table: ReactTable<DataTableFeatures, StoredItem, unknown> }) {
+  const offered = useAtomValue(quickFilterOptions)
+  return (
+    <>
+      {A.map(quickFilters, (id) => {
+        const column = props.table.getColumn(id)
+        return column === undefined ? null : (
+          <DataTableFacetedFilter key={id} column={column} title={labels[id]} options={offered[id]} multiple />
+        )
+      })}
+    </>
+  )
+}
+
+/** What the assistant knows of the columns, built from the filters' values. */
+const itemsCatalogAtom = Atom.readable((get) => itemsCatalog(get(itemFacetValues)))
+
+/** The columns shown when the page opens: the ones it has room for; on a phone, all of them (cards). Once per visit. */
+const firstFits = Atom.readable((get) => (get.once(isNarrow) ? {} : fitting(get.once(contentWidth))))
+
+/** Columns the assistant hid or showed, kept for the person in this organization: read once per visit. */
+export const keptColumns = Atom.readable((get) => {
+  const who = O.getOrUndefined(get(member))
+  return keptVisibility("Items", who?.organizationId, who?.id)
+})
+
 /**
  * The items the organization has now, a page at a time. The server sorts and filters them (one question in the
  * address, one answer with a page of rows and the page count), so a long list is never sent whole to be sorted
  * here. Items are created by confirming an import.
  */
 export function ItemsPage() {
-  const narrow = useIsNarrow()
-  const actor = useMember()
+  const narrow = useAtomValue(isNarrow)
+  const signedIn = useAtomValue(member)
+  const actor = O.getOrUndefined(signedIn)
   const canImport = actor !== undefined && hasRole(actor.role, "editor")
-  const { params } = useLocation()
   // The table writes its state into the address and the question for the server is read from the same address,
   // so the two cannot disagree.
-  const address = params.toString()
-  const searching = (params.get(itemsTable.urlKeys.search) ?? "").trim() !== ""
-  const config = searching ? searchedTable : itemsTable
-  const query = useMemo(() => config.parse(address), [config, address])
-  const page = useQuery({
-    queryKey: queryKeys.itemsPage({ ...query, search: query.globalFilter }),
-    queryFn: () =>
-      call((api) =>
-        api.items.page({
-          query: {
-            page: query.page,
-            perPage: query.perPage,
-            sort: query.sorting,
-            filters: query.filters,
-            joinOperator: query.joinOperator,
-            search: query.globalFilter
-          }
-        })
-      ),
-    // The rows on screen stay while the next page or the next filter is fetched: nothing blinks or jumps.
-    placeholderData: keepPreviousData
-  })
-  const facets = useQuery({ queryKey: queryKeys.itemFacets, queryFn: () => call((api) => api.items.facets()) })
-
-  // An address somebody typed or kept from before: a page size that is not offered goes back to the usual one,
-  // and a page past the last goes to the last, instead of "Page 999 of 8" over an empty table.
-  const pageCount = page.isPlaceholderData ? undefined : page.data?.pageCount
-  useEffect(() => {
-    const next = new URLSearchParams(window.location.search)
-    const before = next.toString()
-    if (!itemPageSizes.some((size) => size === query.perPage)) next.delete("perPage")
-    if (pageCount !== undefined && query.page > Math.max(1, pageCount)) {
-      if (pageCount <= 1) next.delete("page")
-      else next.set("page", `${pageCount}`)
-    }
-    const after = next.toString()
-    if (after !== before) navigate(`${window.location.pathname}${after === "" ? "" : `?${after}`}`, { replace: true })
-  }, [query.perPage, query.page, pageCount])
+  const { searching, config, query } = useAtomValue(itemsQuestion)
+  const pageRead = useAtomValue(itemsPage)
+  const page = resultOf(pageRead)
+  const askPageAgain = useAtomRefresh(itemsPage)
+  const facetsRead = useAtomValue(itemFacets)
+  const facets = resultOf(facetsRead)
 
   const found = facets.data
-  const columns = useMemo(() => {
-    // An editor can change an item, from the pencil at the end of its row. A changed item stays if the import
-    // that created it is taken back.
-    const edit = canImport
-      ? [
-          col.display({
-            id: "edit",
-            header: () => <span className="sr-only">Edit</span>,
-            cell: ({ row }) => <ItemEditor item={row.original} trigger="icon" />,
-            meta: { label: "Edit" },
-            enableHiding: false,
-            size: editWidth
-          })
-        ]
-      : []
-    const options = (listed: ReadonlyArray<{ readonly value: string; readonly count: number }> | undefined) =>
-      (listed ?? []).map((entry) => ({ label: entry.value, value: entry.value, count: entry.count }))
-    // A flag is stored as "true" or "false" and read as Yes or No, as its cells say.
-    const flagOptions = (listed: ReadonlyArray<{ readonly value: string; readonly count: number }> | undefined) =>
-      (listed ?? []).map((entry) => ({
-        label: entry.value === "true" ? "Yes" : "No",
-        value: entry.value,
-        count: entry.count
-      }))
-    return col.columns([
-      col.accessor("name", {
-        id: "name",
-        header: ({ column }) => <DataTableColumnHeader column={column} />,
-        // A long name ends in an ellipsis, with the whole name on hover, instead of being cut by the next column.
-        cell: ({ row }) => (
-          <span className="block truncate font-semibold" title={row.original.name}>
-            {row.original.name}
-          </span>
-        ),
-        meta: { label: labels.name },
-        enableHiding: false,
-        size: widths.name[0]
-      }),
-      col.accessor("sku", {
-        id: "sku",
-        header: ({ column }) => <DataTableColumnHeader column={column} />,
-        cell: ({ row }) => <Code>{row.original.sku}</Code>,
-        meta: { label: labels.sku },
-        size: widths.sku[0]
-      }),
-      col.accessor("category", {
-        id: "category",
-        header: ({ column }) => <DataTableColumnHeader column={column} />,
-        meta: { label: labels.category, options: options(found?.category) },
-        size: widths.category[0]
-      }),
-      col.accessor("uom", {
-        id: "uom",
-        header: ({ column }) => <DataTableColumnHeader column={column} />,
-        meta: { label: labels.uom, options: options(found?.uom) },
-        size: widths.uom[0]
-      }),
-      col.accessor("unitCost", {
-        id: "unitCost",
-        header: ({ column }) => <DataTableColumnHeader column={column} className="justify-end" />,
-        cell: ({ row }) => <div className="text-right tabular-nums">{costOf(row.original.unitCost)}</div>,
-        // A range in whole dollars, wide enough to hold the lowest and the highest cost there is.
-        meta: { label: labels.unitCost, ...range(found?.unitCost) },
-        size: widths.unitCost[0]
-      }),
-      col.accessor("quantityOnHand", {
-        id: "quantityOnHand",
-        header: ({ column }) => <DataTableColumnHeader column={column} className="justify-end" />,
-        // The quantity carries its unit of measure: "3,911 BX".
-        cell: ({ row }) => (
-          <div className="text-right tabular-nums">
-            {whole.format(row.original.quantityOnHand)} {row.original.uom}
-          </div>
-        ),
-        meta: { label: labels.quantityOnHand, ...range(found?.quantityOnHand) },
-        size: widths.quantityOnHand[0]
-      }),
-      col.accessor("reorderPoint", {
-        id: "reorderPoint",
-        header: ({ column }) => <DataTableColumnHeader column={column} className="justify-end" />,
-        cell: ({ row }) => (
-          <div className="text-right tabular-nums">
-            {O.match(row.original.reorderPoint, {
-              onNone: () => <NotSet />,
-              onSome: (point) => <>{`${whole.format(point)} ${row.original.uom}`}</>
-            })}
-          </div>
-        ),
-        meta: { label: labels.reorderPoint },
-        size: widths.reorderPoint[0]
-      }),
-      col.accessor((item) => isActive(item.stocking), {
-        id: "isActive",
-        header: labels.isActive,
-        cell: ({ row }) => yesNo(isActive(row.original.stocking)),
-        meta: { label: labels.isActive, options: flagOptions(found?.isActive) },
-        size: widths.isActive[0]
-      }),
-      col.accessor("lotTracked", {
-        id: "lotTracked",
-        header: labels.lotTracked,
-        cell: ({ row }) => yesNo(row.original.lotTracked),
-        meta: { label: labels.lotTracked, options: flagOptions(found?.lotTracked) },
-        size: widths.lotTracked[0]
-      }),
-      col.accessor((item) => item.tags.join(", "), {
-        id: "tags",
-        header: labels.tags,
-        cell: ({ row }) =>
-          row.original.tags.length === 0 ? (
-            <NotSet />
-          ) : (
-            <span className="block truncate" title={row.original.tags.join(", ")}>
-              {row.original.tags.join(", ")}
-            </span>
-          ),
-        meta: { label: labels.tags },
-        size: widths.tags[0]
-      }),
-      col.accessor("firstReceivedOn", {
-        id: "firstReceivedOn",
-        header: ({ column }) => <DataTableColumnHeader column={column} />,
-        cell: ({ row }) =>
-          O.match(row.original.firstReceivedOn, {
-            onNone: () => <NotSet />,
-            onSome: (day) => <span className="tabular-nums">{day}</span>
-          }),
-        meta: { label: labels.firstReceivedOn },
-        size: widths.firstReceivedOn[0]
-      }),
-      col.accessor((item) => O.getOrElse(discontinuedOn(item.stocking), () => ""), {
-        id: "discontinuedOn",
-        header: labels.discontinuedOn,
-        cell: ({ row }) =>
-          O.match(discontinuedOn(row.original.stocking), {
-            onNone: () => <NotSet />,
-            onSome: (day) => <span className="tabular-nums">{day}</span>
-          }),
-        meta: { label: labels.discontinuedOn },
-        size: widths.discontinuedOn[0]
-      }),
-      col.accessor((item) => O.match(item.dimensions, { onNone: () => "", onSome: dimensionsText }), {
-        id: "dimensions",
-        header: labels.dimensions,
-        cell: ({ row }) =>
-          O.match(row.original.dimensions, {
-            onNone: () => <NotSet />,
-            onSome: (size) => <span className="tabular-nums">{dimensionsText(size)}</span>
-          }),
-        meta: { label: labels.dimensions },
-        size: widths.dimensions[0]
-      }),
-      col.accessor((item) => item.vendors.length, {
-        id: "vendors",
-        header: labels.vendors,
-        // How many, and the preferred one by name; every vendor with its cost and lead time is in the editor.
-        cell: ({ row }) => {
-          const vendors = row.original.vendors.map((vendor) => ({
-            name: vendor.vendorName,
-            preferred: vendor.isPreferred
-          }))
-          if (vendors.length === 0) return <NotSet />
-          return (
-            <span className="block truncate" title={vendors.map((vendor) => vendor.name).join(", ")}>
-              {vendorsText(vendors)}
-            </span>
-          )
-        },
-        meta: { label: labels.vendors },
-        size: widths.vendors[0]
-      }),
-      col.accessor("createdAt", {
-        id: "createdAt",
-        header: ({ column }) => <DataTableColumnHeader column={column} />,
-        cell: ({ row }) => (
-          <span title={`${when(row.original.createdAt)} · ${row.original.createdBy}`}>
-            {day(row.original.createdAt)} · {row.original.createdBy}
-          </span>
-        ),
-        meta: { label: labels.createdAt },
-        size: widths.createdAt[0]
-      }),
-      ...edit
-    ])
-  }, [found, canImport])
+  const columns = useAtomValue(itemColumns(canImport))
 
   const rows = page.data?.data ?? none
   // The columns shown at first are the ones the page has room for (`fitting`). On a phone the rows are cards, one
   // line a value: there is room for all of them.
-  const room = useAtomValue(contentWidth)
-  const [fits] = useState(() => (narrow ? {} : fitting(room)))
+  const fits = useAtomValue(firstFits)
   // Columns the assistant hid or showed come back after a refresh; the address keeps the sort and the filters.
-  const [kept] = useState(() => keptVisibility("Items", actor?.organizationId, actor?.id))
-  const catalog = useMemo(() => itemsCatalog(found), [found])
+  const kept = useAtomValue(keptColumns)
+  const catalog = useAtomValue(itemsCatalogAtom)
   const { table } = useDataTable({
     data: rows as Array<StoredItem>,
     columns,
@@ -525,19 +680,19 @@ export function ItemsPage() {
   const toolbar = (
     <DataTableToolbar
       table={table}
-      quick={quickFilters}
+      quick={[]}
       search={
         <TableSearch
-          value={searched}
-          onSearch={(text) => table.setGlobalFilter(text)}
+          table={table}
           placeholder="Search items"
-          working={page.isFetching && page.isPlaceholderData}
+          working={page.updating}
           maxLength={maxSearch}
           shortcutHint={!narrow}
           className={narrow ? "w-auto min-w-0 flex-1" : "w-80"}
         />
       }
     >
+      <QuickFilters table={table} />
       <TableMenus table={table} />
       <TableAssistant
         table={table}
@@ -571,7 +726,7 @@ export function ItemsPage() {
             <AlertTitle>The items could not be loaded</AlertTitle>
             <AlertDescription>
               {sayError(page.error).sentence}
-              <Button variant="outline" size="sm" onClick={() => void page.refetch()}>
+              <Button variant="outline" size="sm" onClick={askPageAgain}>
                 Try again
               </Button>
             </AlertDescription>

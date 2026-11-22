@@ -28,7 +28,7 @@ import * as R from "effect/Record"
 import * as Str from "effect/String"
 import type { RepoError } from "../../Cli.errors.ts"
 import { Repo } from "../../Repo.service.ts"
-import type { EffectImportsFinding } from "./EffectImports.schema.ts"
+import { EffectImportsFinding } from "./EffectImports.schema.ts"
 import { judgeCode, repairCode } from "./internal/effectImportsCode.ts"
 import { type Installed, judgeText, lineOf } from "./internal/effectImportsJudge.ts"
 
@@ -139,14 +139,15 @@ export const effectImports = Effect.fn("EffectImports.effectImports")(function* 
       const line = lineOf(repaired.text)
       return {
         problems: A.appendAll<EffectImportsFinding, EffectImportsFinding>(
-          A.map(repaired.left, (left) => ({ _tag: "Left", file, left })),
-          A.map(judgeCode(installed)(file, repaired.text), (hit) => ({
-            _tag: "Fault",
-            file,
-            line: line(hit.offset),
-            inComment: hit.inComment,
-            fault: hit.fault
-          }))
+          A.map(repaired.left, (left) => EffectImportsFinding.cases.Left.make({ file, left })),
+          A.map(judgeCode(installed)(file, repaired.text), (hit) =>
+            EffectImportsFinding.cases.Fault.make({
+              file,
+              line: line(hit.offset),
+              inComment: hit.inComment,
+              fault: hit.fault
+            })
+          )
         ),
         changed: repaired.text !== original
       }
@@ -157,13 +158,14 @@ export const effectImports = Effect.fn("EffectImports.effectImports")(function* 
     textFiles,
     (file) =>
       Effect.map(repo.text(repo.join(repo.root, file)), (text) =>
-        A.map(judgeText(installed)(text), (hit): EffectImportsFinding => ({
-          _tag: "Fault",
-          file,
-          line: lineOf(text)(hit.offset),
-          inComment: hit.inComment,
-          fault: hit.fault
-        }))
+        A.map(judgeText(installed)(text), (hit): EffectImportsFinding =>
+          EffectImportsFinding.cases.Fault.make({
+            file,
+            line: lineOf(text)(hit.offset),
+            inComment: hit.inComment,
+            fault: hit.fault
+          })
+        )
       ),
     { concurrency: 1 }
   )
@@ -173,13 +175,13 @@ export const effectImports = Effect.fn("EffectImports.effectImports")(function* 
     A.flatten(perText)
   )
   const wrote: ReadonlyArray<EffectImportsFinding> = write
-    ? [{ _tag: "Wrote", changed: A.filter(perCode, (one) => one.changed).length, files }]
+    ? [EffectImportsFinding.cases.Wrote.make({ changed: A.filter(perCode, (one) => one.changed).length, files })]
     : []
   return A.isReadonlyArrayNonEmpty(problems)
     ? A.flatten<ReadonlyArray<ReadonlyArray<EffectImportsFinding>>>([
         wrote,
-        [{ _tag: "Refused", problems: problems.length, files }],
+        [EffectImportsFinding.cases.Refused.make({ problems: problems.length, files })],
         problems
       ])
-    : A.append<EffectImportsFinding, EffectImportsFinding>(wrote, { _tag: "Held", files })
+    : A.append<EffectImportsFinding, EffectImportsFinding>(wrote, EffectImportsFinding.cases.Held.make({ files }))
 })

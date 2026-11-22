@@ -22,6 +22,7 @@ import {
   heldCsv,
   heldLine,
   kindsOf,
+  Primary,
   primary,
   reasonOf,
   restored,
@@ -75,10 +76,13 @@ describe("who is behind a suggestion", () => {
         ...(row.applied ?? []),
         ...(row.problem?.fix === undefined ? [] : [row.problem.fix])
       ])
-      const questions = A.filter(fixes, (fix) => fix.confidence === "low")
+      const questions = A.filter(fixes, (fix) => O.contains(fix.confidence, "low"))
       expect(questions.length).toBeGreaterThan(0)
       for (const fix of fixes) expect(fix.by).toBe("rule")
-      for (const fix of questions) expect(Str.toLowerCase(sourceLead(fix))).not.toContain("model")
+      for (const fix of questions)
+        expect(Str.toLowerCase(sourceLead({ by: fix.by, confidence: O.getOrUndefined(fix.confidence) }))).not.toContain(
+          "model"
+        )
     })
   )
 })
@@ -134,15 +138,16 @@ describe("rows that cannot be fixed here", () => {
     expect(cannot === undefined ? "" : reasonOf({ view: cannot, kinds: kindsOf(kinds) })).toBe(
       "Item 3 is not in the system yet."
     )
-    expect(act({ rows, state: emptyState, action: { type: "leaveOut", rowIds: ["row-3"] }, fixable }).label).toBe("")
+    expect(
+      act({ rows, state: emptyState, action: { type: "leaveOut" as const, rowIds: ["row-3"] }, fixable }).label
+    ).toBe("")
     expect(heldLine(counts)).toBe("3 won't be imported: Needs a decision 1, Cannot import 2")
   })
 
   it("do not hold the import back", () => {
-    expect(primary({ columns, counts: count(views), noun: ["item", "items"] })).toEqual({
-      label: "Import 1 item",
-      blocked: false
-    })
+    expect(primary({ columns, counts: count(views), noun: ["item", "items"] })).toEqual(
+      Primary.Import({ label: "Import 1 item" })
+    )
   })
 })
 
@@ -151,16 +156,12 @@ describe("a button that could do nothing is never offered", () => {
 
   it("is idle while decisions are open and nothing is ready", () => {
     const counts = count(viewRows({ rows: [row(2, { problem: { kind: "unit", column: "name" } })], state: emptyState }))
-    expect(primary({ columns, counts, noun })).toEqual({ label: "No items ready yet", blocked: true, idle: true })
+    expect(primary({ columns, counts, noun })).toEqual(Primary.Idle({ label: "No items ready yet" }))
   })
 
   it("gives way to words when only rows nothing here can fix are left", () => {
     const counts = count(viewRows({ rows: [unknownItem(2)], state: emptyState, fixable: fixableBy(kinds) }))
-    expect(primary({ columns, counts, noun })).toEqual({
-      label: defaultReviewWords.nothingToImport,
-      blocked: true,
-      done: true
-    })
+    expect(primary({ columns, counts, noun })).toEqual(Primary.Done({ label: defaultReviewWords.nothingToImport }))
   })
 
   it.effect("ends a second load of the same file on 'Nothing new' once every row is already there", () =>
@@ -172,11 +173,9 @@ describe("a button that could do nothing is never offered", () => {
       const { rows } = yield* sampleRows("items_clean.csv", items)
       const counts = count(viewRows({ rows, state: emptyState }))
       expect(counts.stored).toBe(25)
-      expect(primary({ columns, counts, noun })).toEqual({
-        label: "Nothing new: this file is already in",
-        blocked: true,
-        done: true
-      })
+      expect(primary({ columns, counts, noun })).toEqual(
+        Primary.Done({ label: "Nothing new: this file is already in" })
+      )
     })
   )
 })
@@ -185,7 +184,7 @@ describe("status words", () => {
   it("are set once by the caller and said everywhere they show", () => {
     const words = reviewWords({ out: "Skipped", stored: "In stock already", needs: "Waiting on you" })
     const rows = [row(2, { problem: { kind: "unit", column: "name" } }), row(3), row(4, { stored: true })]
-    const left = act({ rows, state: emptyState, action: { type: "leaveOut", rowIds: ["row-3"] } }).state
+    const left = act({ rows, state: emptyState, action: { type: "leaveOut" as const, rowIds: ["row-3"] } }).state
     const views = viewRows({ rows, state: left })
     const csv = heldCsv({ views, columns, problemKinds: kinds, words })
     expect(csv).toContain("3,Skipped,Item 3")

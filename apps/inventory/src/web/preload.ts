@@ -32,7 +32,8 @@ export const preload = () => {
   const params = new URLSearchParams(window.location.search)
   const opened = params.get("import")
   for (const load of pageCode(window.location.pathname, opened === null ? null : params.get("step"))) void load()
-  // The workspace asks for these as its chunk runs (Workspace.tsx); asked for now, they are on their way already.
+  // The import page's and the breadcrumb's atoms (`importViewShown`, `importTable`) take these answers on their first
+  // request (`takeEarly`): asked for now, they are on their way before the page's code has loaded. Nothing else asks.
   if (opened !== null && opened.length <= 64) {
     early(`${apiPrefix}/imports/${encodeURIComponent(opened)}`)
     early(`${apiPrefix}/imports/${encodeURIComponent(opened)}/table`)

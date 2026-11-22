@@ -1,42 +1,53 @@
 import { stringify } from "@inventory/ui/Json"
-import { useMutation } from "@tanstack/react-query"
 import { ArrowUp, ChevronRight, MessageSquarePlus, Sparkles, Undo2, X } from "lucide-react"
-import { type FormEvent, useEffect, useMemo, useRef, useState } from "react"
+import { useAtom, useAtomMount, useAtomSet, useAtomSubscribe } from "@effect/atom-react"
+import * as Cause from "effect/Cause"
+import * as Exit from "effect/Exit"
+import * as O from "effect/Option"
+import * as Atom from "effect/reactivity/Atom"
+import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
+import { type FormEvent, useRef } from "react"
 import * as Clock from "effect/Clock"
 import * as Effect from "effect/Effect"
-import * as O from "effect/Option"
 import * as Result from "effect/Result"
 import { Button } from "@inventory/ui/components/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@inventory/ui/components/collapsible"
 import { Input } from "@inventory/ui/components/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@inventory/ui/components/popover"
 import { Spinner } from "@inventory/ui/components/spinner"
-import { useMember } from "@inventory/client/CurrentMember"
-import { call } from "./Catalog.runtime.ts"
+import { member, memberKey, ofMember } from "@inventory/client/MemberAtoms"
+import { apiRuntime, perKey } from "@inventory/client/Api"
+import { useAtomValue } from "@effect/atom-react"
+import { catalogApi } from "./Catalog.runtime.ts"
 import { sayError } from "@inventory/client/SayError"
 import {
+  answererName,
   type Conversation,
   conversationKey,
   emptyConversation,
   type Entry,
+  lastAnsweredByRules,
   readConversation,
   writeConversation
 } from "./Conversation.machine.ts"
 import { applyAll, describe, overtaken, takeBack, type ViewFilter, type ViewState } from "./internal/view.ts"
-import type { AnsweredBy } from "@inventory/catalog-contract/Answer"
+import { AnsweredBy } from "@inventory/catalog-contract/Answer"
 import { rulesRead } from "@inventory/catalog-model/TableViewRules"
 import { type ColumnCatalog, maxPrompt } from "@inventory/catalog-contract/TableView"
 /**
- * Who answered and the line under it, as the conversation keeps them: "Rules" with the reason no model answered, or
- * the model's name with what it said it could not do.
+ * Who answered and the line under it, as the conversation keeps them: who answered as its case, with the reason no
+ * model answered, or with what the model said it could not do.
  */
 const whoAnswered = (answer: {
   readonly answeredBy: AnsweredBy
   readonly note: O.Option<string>
-}): { readonly answeredBy: string; readonly note: string | null } =>
-  answer.answeredBy._tag === "Rules"
-    ? { answeredBy: "Rules", note: answer.answeredBy.reason }
-    : { answeredBy: answer.answeredBy.model, note: O.getOrNull(answer.note) }
+}): { readonly answeredBy: AnsweredBy; readonly note: string | null } => ({
+  answeredBy: answer.answeredBy,
+  note: AnsweredBy.match(answer.answeredBy, {
+    Rules: (by) => by.reason,
+    Model: () => O.getOrNull(answer.note)
+  })
+})
 
 /** The parts of a TanStack table the assistant reads and writes: the table's own state, never a copy of it. */
 export type AssistedTable = {
@@ -95,6 +106,139 @@ const suggestionsFor = (columns: ColumnCatalog): ReadonlyArray<string> => {
   ]
 }
 
+/** One person's conversation with the assistant about one table, kept in this browser (`writeConversation`). */
+const conversationOf = perKey((key: string) =>
+  Atom.writable(
+    () => readConversation(key),
+    (ctx, next: Conversation) => {
+      writeConversation(key, next)
+      ctx.setSelf(next)
+    }
+  )
+)
+
+/** The conversation while nobody is known yet: nothing to keep. */
+const noConversation = Atom.make<Conversation>(emptyConversation)
+
+/** One table's assistant on screen: open or not, and what the person signed in has typed. */
+interface AssistantUi {
+  readonly open: boolean
+  readonly prompt: string
+}
+export const assistantOf = perKey((_table: string) => ofMember((): AssistantUi => ({ open: false, prompt: "" })))
+
+/**
+ * The request on its way for one person's conversation about one table: what they asked. Kept while it is out, since
+ * the request outlives the screen: a person who leaves the table and comes back before the answer still reads
+ * "Working", and cannot ask a second time.
+ */
+const assistantPending = perKey((_conversation: string) => Atom.make<O.Option<string>>(O.none()).pipe(Atom.keepAlive))
+const noPending = Atom.make<O.Option<string>>(O.none())
+
+/** A drawing of one table's assistant: another number each time the assistant comes on screen. */
+export type AssistantScreen = { readonly table: string; readonly drawing: number }
+
+/** Counts the drawings of every assistant, so no two are the same. */
+const drawings = Atom.make(0).pipe(Atom.keepAlive)
+
+/** Which drawing of a table's assistant is on screen now; none while it is not drawn. */
+export const assistantScreen = perKey((_table: string) =>
+  Atom.make<O.Option<AssistantScreen>>(O.none()).pipe(Atom.keepAlive)
+)
+
+/**
+ * Mounted while a table's assistant is drawn: names this drawing as the one on screen, and takes that back the moment
+ * it leaves (no idle time: an answer that lands just after must not find the screen it left).
+ */
+export const assistantPresent = perKey((table: string) =>
+  Atom.setIdleTTL(
+    Atom.readable((get) => {
+      const registry = get.registry
+      registry.update(drawings, (n) => n + 1)
+      const drawing = registry.get(drawings)
+      registry.set(assistantScreen(table), O.some({ table, drawing }))
+      get.addFinalizer(() =>
+        registry.update(assistantScreen(table), (now) =>
+          O.exists(now, (drawn) => drawn.drawing === drawing) ? O.none() : now
+        )
+      )
+    }),
+    0
+  )
+)
+
+/** Where a request was asked from: who was signed in to which organization, and which drawing of the assistant. */
+export interface AskedFrom {
+  readonly member: string
+  readonly screen: O.Option<AssistantScreen>
+}
+
+/** Where a request asked now would be asked from. */
+export const askingFrom = (registry: AtomRegistry.AtomRegistry, table: string): AskedFrom => ({
+  member: registry.get(memberKey),
+  screen: registry.get(assistantScreen(table))
+})
+
+/**
+ * True when an answer may still change the table: the same person is signed in to the same organization, and the
+ * drawing of the assistant that asked is still the one on screen. The path alone does not say so: the person may have
+ * left the table and come back to a fresh view of it, or switched organization without leaving the address.
+ */
+export const stillAsked = (input: {
+  readonly registry: AtomRegistry.AtomRegistry
+  readonly table: string
+  readonly asked: AskedFrom
+}): boolean => {
+  const now = askingFrom(input.registry, input.table)
+  return (
+    now.member === input.asked.member &&
+    O.exists(now.screen, (here) => O.exists(input.asked.screen, (asked) => asked.drawing === here.drawing))
+  )
+}
+
+/** The registry these atoms live in, for what answers after the draw that asked. */
+const registryOf = Atom.readable((get) => get.registry)
+
+/** What the assistant is asked: the words, the table, its columns, and whether it can be searched. */
+interface Asked {
+  readonly prompt: string
+  readonly table: string
+  readonly columns: ColumnCatalog
+  readonly searchable: boolean
+}
+
+/** One request to the assistant, sent once: a model's answer is not asked for twice. */
+const askAssistant = apiRuntime.fn<Asked>()((asked: Asked) =>
+  catalogApi.ask((api) => api.assistant.view({ payload: asked }))
+)
+
+/** Where one table's conversation ends now: a new value when it has a new last line. */
+type LastLine = { readonly table: string; readonly line: string }
+
+/**
+ * What says the conversation about one table has a new last line: a line was added, a request started or ended, or
+ * the panel opened. One atom per table and conversation.
+ */
+const lastLine = perKey((table: string) =>
+  perKey((conversation: string) =>
+    Atom.withEquality(
+      Atom.readable((get): LastLine => ({
+        table,
+        line: `${get(conversationOf(conversation)).entries.length}:${O.getOrElse(get(assistantPending(conversation)), () => "")}:${get(assistantOf(table)).open}`
+      })),
+      (before, next) => before.line === next.line
+    )
+  )
+)
+const noLine: Atom.Atom<LastLine> = Atom.make<LastLine>({ table: "", line: "" })
+
+/** For `lastLine`: brings the newest line of that table's conversation into view, a frame later, when it is drawn. */
+const bringNewest = (now: LastLine): void => {
+  requestAnimationFrame(() =>
+    document.querySelector(`[data-assistant-end="${CSS.escape(now.table)}"]`)?.scrollIntoView({ block: "nearest" })
+  )
+}
+
 /**
  * The person types what they want to see in a table; the assistant changes the table's sort, filters and columns, and
  * lists what it changed so each change can be taken back.
@@ -108,75 +252,77 @@ export function TableAssistant(props: {
   /** The view as the table opens, which "clear" returns to. */
   readonly opened: ViewState
 }) {
-  const actor = useMember()
+  const signedIn = useAtomValue(member)
+  const actor = O.getOrUndefined(signedIn)
   const key =
     actor === undefined
       ? undefined
       : conversationKey({ organizationId: actor.organizationId, memberId: actor.id }, props.name)
-  const [conversation, setConversation] = useState<Conversation>(() =>
-    key === undefined ? emptyConversation : readConversation(key)
-  )
-  const [open, setOpen] = useState(false)
-  const [prompt, setPrompt] = useState("")
-  const [pending, setPending] = useState<string | null>(null)
+  const conversationAtom = key === undefined ? noConversation : conversationOf(key)
+  const [conversation, save] = useAtom(conversationAtom)
+  const [ui, setUi] = useAtom(assistantOf(props.name))
+  const { open, prompt } = ui
+  const [out, setOut] = useAtom(key === undefined ? noPending : assistantPending(key))
+  const pending = O.getOrNull(out)
+  const registry = useAtomValue(registryOf)
+  // This drawing of the assistant is the one on screen for as long as it is mounted.
+  useAtomMount(assistantPresent(props.name))
+  // The newest line is brought into view when it arrives.
+  useAtomSubscribe(key === undefined ? noLine : lastLine(props.name)(key), bringNewest)
+  const setOpen = (next: boolean) => setUi((now) => ({ ...now, open: next }))
+  const setPrompt = (next: string) => setUi((now) => ({ ...now, prompt: next }))
   const view = useTableView(props.table, props.searchable)
-  const end = useRef<HTMLDivElement>(null)
   const promptField = useRef<HTMLInputElement>(null)
+  const ask = useAtomSet(askAssistant, { mode: "promiseExit" })
 
-  const save = (next: Conversation) => {
-    setConversation(next)
-    if (key !== undefined) writeConversation(key, next)
+  // Added to the conversation as it stands when the answer lands, not as it stood when the question was asked.
+  const record = (entry: Entry, visibility?: Readonly<Record<string, boolean>>) => {
+    const now = registry.get(conversationAtom)
+    registry.set(conversationAtom, {
+      ...now,
+      entries: [...now.entries, entry],
+      visibility: { ...(visibility ?? now.visibility) }
+    })
   }
-
-  useEffect(() => {
-    end.current?.scrollIntoView({ block: "nearest" })
-  }, [conversation.entries.length, pending, open])
-
-  const ask = useMutation({
-    mutationFn: (words: string) =>
-      call((api) =>
-        api.assistant.view({
-          payload: { prompt: words, table: props.name, columns: props.columns, searchable: props.searchable }
-        })
-      )
-  })
-
-  const record = (entry: Entry, visibility: Readonly<Record<string, boolean>>) =>
-    save({ ...conversation, entries: [...conversation.entries, entry], visibility: { ...visibility } })
 
   const send = (words: string) => {
     const typed = words.trim()
     if (typed === "" || pending !== null) return
-    setPrompt("")
-    setPending(typed)
+    setUi((now) => ({ ...now, prompt: "" }))
+    setOut(O.some(typed))
     const id = `${Effect.runSync(Clock.currentTimeMillis)}`
-    ask.mutate(typed, {
-      onSettled: () => setPending(null),
-      onError: (error) => {
-        record(
-          {
+    // Who asked, and from which drawing of this table's assistant: an answer that arrives after the person has left
+    // it (another screen, the same table opened again, another organization) changes nothing.
+    const asked = askingFrom(registry, props.name)
+    void ask({ prompt: typed, table: props.name, columns: props.columns, searchable: props.searchable }).then(
+      (exit) => {
+        setOut(O.none())
+        if (!stillAsked({ registry, table: props.name, asked })) {
+          // The request outlives the screen. Applied now, the view would be written through the table the person
+          // left into the address of whatever they are on, and the conversation would list changes the table never
+          // showed.
+          record({
             id,
             prompt: typed,
             outcome: "failed",
             answeredBy: null,
             note: null,
-            reason: sayError(error).sentence,
+            reason: `The answer came after you left ${props.name}, so nothing was changed. Ask again.`,
             applied: [],
             undone: false
-          },
-          view.read().visibility
-        )
-      },
-      onSuccess: (outcome) => {
-        if (Result.isFailure(outcome)) {
-          const failure = outcome.failure
+          })
+          return
+        }
+        if (Exit.isFailure(exit)) {
+          const error = exit.cause.pipe(Cause.squash)
           record(
             {
               id,
               prompt: typed,
-              outcome: "refused",
-              ...whoAnswered(failure),
-              reason: failure.reason,
+              outcome: "failed",
+              answeredBy: null,
+              note: null,
+              reason: sayError(error).sentence,
               applied: [],
               undone: false
             },
@@ -184,29 +330,53 @@ export function TableAssistant(props: {
           )
           return
         }
-        const answer = outcome.success
-        const before = view.read()
-        const after = applyAll({ state: before, changes: answer.changes, columns: props.columns, opened: props.opened })
-        view.write(before, after.state)
-        record(
-          {
-            id,
-            prompt: typed,
-            outcome: "applied",
-            ...whoAnswered(answer),
-            reason: null,
-            applied: answer.changes.map((change, index) => ({
-              change,
-              label: describe(props.columns, change),
-              patch: after.patches[index] ?? {},
-              removed: false
-            })),
-            undone: false
-          },
-          after.state.visibility
-        )
+        const outcome = exit.value
+        {
+          if (Result.isFailure(outcome)) {
+            const failure = outcome.failure
+            record(
+              {
+                id,
+                prompt: typed,
+                outcome: "refused",
+                ...whoAnswered(failure),
+                reason: failure.reason,
+                applied: [],
+                undone: false
+              },
+              view.read().visibility
+            )
+            return
+          }
+          const answer = outcome.success
+          const before = view.read()
+          const after = applyAll({
+            state: before,
+            changes: answer.changes,
+            columns: props.columns,
+            opened: props.opened
+          })
+          view.write(before, after.state)
+          record(
+            {
+              id,
+              prompt: typed,
+              outcome: "applied",
+              ...whoAnswered(answer),
+              reason: null,
+              applied: answer.changes.map((change, index) => ({
+                change,
+                label: describe(props.columns, change),
+                patch: after.patches[index] ?? {},
+                removed: false
+              })),
+              undone: false
+            },
+            after.state.visibility
+          )
+        }
       }
-    })
+    )
   }
 
   const update = (id: string, change: (entry: Entry, now: ViewState) => { entry: Entry; next: ViewState }) => {
@@ -266,7 +436,7 @@ export function TableAssistant(props: {
       return { entry: { ...entry, undone: true, applied }, next }
     })
 
-  const suggestions = useMemo(() => suggestionsFor(props.columns), [props.columns])
+  const suggestions = suggestionsFor(props.columns)
   const latest = pending ?? conversation.entries[conversation.entries.length - 1]?.prompt
 
   const submit = (event: FormEvent) => {
@@ -326,7 +496,7 @@ export function TableAssistant(props: {
               <li key={entry.id} className="flex flex-col gap-1">
                 <p className="text-sm font-medium">{entry.prompt}</p>
                 {entry.answeredBy === null ? null : (
-                  <p className="text-xs text-muted-foreground">Answered by {entry.answeredBy}</p>
+                  <p className="text-xs text-muted-foreground">Answered by {answererName(entry.answeredBy)}</p>
                 )}
                 {entry.reason === null ? null : <p className="text-sm text-destructive">{entry.reason}</p>}
                 {entry.note === null || entry.note === conversation.entries[index - 1]?.note ? null : (
@@ -390,7 +560,8 @@ export function TableAssistant(props: {
               </li>
             )}
           </ol>
-          <div ref={end} />
+          {/* Where the conversation ends: brought into view when a line arrives (`lastLine`). */}
+          <div data-assistant-end={props.name} />
         </div>
         <div className="flex flex-col gap-2 border-t pt-2">
           <form className="flex gap-2" onSubmit={submit}>
@@ -408,7 +579,7 @@ export function TableAssistant(props: {
               <ArrowUp />
             </Button>
           </form>
-          {conversation.entries[conversation.entries.length - 1]?.answeredBy === "Rules" ? (
+          {lastAnsweredByRules(conversation.entries) ? (
             <p className="text-xs text-muted-foreground">{rulesRead}</p>
           ) : null}
           <div className="flex flex-wrap gap-1.5">

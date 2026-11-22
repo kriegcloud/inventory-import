@@ -1,6 +1,7 @@
 // Decides what a chosen file really is from its bytes, not its name, then hands it to the CSV or workbook reader.
 // Each reader is its own lazily loaded chunk, so choosing a CSV never downloads the workbook reader.
 import * as A from "effect/Array"
+import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import { type FileProblem, fileProblem } from "@inventory/catalog-contract/FileProblem"
@@ -27,11 +28,17 @@ export interface ReadSpreadsheetInput {
   readonly onProgress?: (progress: ReadProgress) => void
 }
 
-type Sniffed =
-  | { readonly kind: "csv" }
-  | { readonly kind: "xlsx" }
-  | { readonly kind: "archive" }
-  | { readonly kind: "refuse"; readonly error: FileProblem }
+/**
+ * What a chosen file is, from its bytes: CSV text, a workbook, an archive the workbook reader still has to look inside,
+ * or a file refused with the sentence that says what it is instead.
+ */
+type Sniffed = Data.TaggedEnum<{
+  Csv: {}
+  Xlsx: {}
+  Archive: {}
+  Refuse: { readonly error: FileProblem }
+}>
+const Sniffed = Data.taggedEnum<Sniffed>()
 
 const startsWith = (bytes: Uint8Array, prefix: ReadonlyArray<number>): boolean =>
   prefix.every((byte, i) => bytes[i] === byte)
@@ -61,17 +68,17 @@ const others: ReadonlyArray<readonly [ReadonlyArray<number>, string]> = [
   [[0x50, 0x4b, 0x05, 0x06], "an empty zip archive"]
 ]
 
-const refuse = (fileName: string, what: string, how?: string): Sniffed => ({
-  kind: "refuse",
-  error: fileProblem.notASpreadsheet({ fileName, is: what, ...(how === undefined ? {} : { todo: how }) })
-})
+const refuse = (fileName: string, what: string, how?: string): Sniffed =>
+  Sniffed.Refuse({
+    error: fileProblem.notASpreadsheet({ fileName, is: what, ...(how === undefined ? {} : { todo: how }) })
+  })
 
 /**
  * The file's real format from its first bytes: text to read as CSV, a file that is plainly something else, or an
  * archive (a zip file or an older Office file), which the workbook reader looks inside.
  */
 export const sniff = (fileName: string, bytes: Uint8Array): Sniffed => {
-  if (startsWith(bytes, zip) || startsWith(bytes, ole)) return { kind: "archive" }
+  if (startsWith(bytes, zip) || startsWith(bytes, ole)) return Sniffed.Archive()
   for (const [magic, what] of others) if (startsWith(bytes, magic)) return refuse(fileName, what)
   const head = new TextDecoder("utf-8").decode(bytes.subarray(0, 512)).trimStart().toLowerCase()
   if (head.startsWith("<!doctype html") || head.startsWith("<html") || head.startsWith("<table"))
@@ -81,12 +88,12 @@ export const sniff = (fileName: string, bytes: Uint8Array): Sniffed => {
       "Open it in Excel and save it as .xlsx or CSV UTF-8."
     )
   if (bytes.subarray(0, 4096).includes(0)) return refuse(fileName, "a binary file")
-  return { kind: "csv" }
+  return Sniffed.Csv()
 }
 
 /** What an archive is to the person: a workbook to read, or the sentence that says what it is instead. */
 const archiveKind = (fileName: string, bytes: Uint8Array, container: XlsxContainer): Sniffed => {
-  const workbook = (): Sniffed => ({ kind: "xlsx" })
+  const workbook = (): Sniffed => Sniffed.Xlsx()
   const olderOffice = (): Sniffed => refuse(fileName, "an older Office document")
   return XlsxContainer.match(container, {
     workbook,
@@ -99,14 +106,27 @@ const archiveKind = (fileName: string, bytes: Uint8Array, container: XlsxContain
     // An Office file cut short (a failed download, a full disk) loses the list of its parts at the end.
     otherZip: (): Sniffed =>
       contains(bytes, "[Content_Types].xml") || /\.xls[xm]$/i.test(fileName)
-        ? { kind: "refuse", error: fileProblem.unreadable({ fileName, why: ": it looks damaged or incomplete" }) }
+        ? Sniffed.Refuse({ error: fileProblem.unreadable({ fileName, why: ": it looks damaged or incomplete" }) })
         : refuse(fileName, "a zip archive"),
-    encrypted: (): Sniffed => ({ kind: "refuse", error: fileProblem.protectedWorkbook({ fileName }) }),
-    legacyXls: (): Sniffed => ({ kind: "refuse", error: fileProblem.oldExcel({ fileName }) }),
+    encrypted: (): Sniffed => Sniffed.Refuse({ error: fileProblem.protectedWorkbook({ fileName }) }),
+    legacyXls: (): Sniffed => Sniffed.Refuse({ error: fileProblem.oldExcel({ fileName }) }),
     otherOle: olderOffice,
     notAnArchive: olderOffice
   })
 }
+
+/**
+ * The reader a sniffed file goes to, or the problem that says why it goes to none. Every case is named: a new kind
+ * of file is a compile error here, never a file read by the wrong reader.
+ */
+const formatOf = (fileName: string, sniffed: Sniffed): Effect.Effect<"csv" | "xlsx", FileProblem> =>
+  Sniffed.$match(sniffed, {
+    Csv: (): Effect.Effect<"csv" | "xlsx", FileProblem> => Effect.succeed("csv"),
+    Xlsx: (): Effect.Effect<"csv" | "xlsx", FileProblem> => Effect.succeed("xlsx"),
+    // Still an archive after the workbook reader looked inside: it could not tell what it is.
+    Archive: () => Effect.fail(fileProblem.unreadable({ fileName, why: ": it looks damaged or incomplete" })),
+    Refuse: ({ error }) => Effect.fail(error)
+  })
 
 const extensionOf = (fileName: string): string => /\.([^.]+)$/.exec(fileName)?.[1]?.toLowerCase() ?? ""
 
@@ -146,38 +166,29 @@ export const readSpreadsheet = Effect.fn("readSpreadsheet")(function* (
   const bytes = new Uint8Array(buffer)
   const first = sniff(fileName, bytes)
   // An archive is looked inside by the workbook reader, which is fetched only now: a CSV never downloads it.
-  const sniffed =
-    first.kind === "archive"
-      ? archiveKind(fileName, bytes, (yield* Effect.promise(() => import("./xlsx.ts"))).containerOf(bytes))
-      : first
-  if (sniffed.kind === "refuse" || sniffed.kind === "archive") {
-    return yield* Effect.fail(
-      sniffed.kind === "refuse"
-        ? sniffed.error
-        : fileProblem.unreadable({ fileName, why: ": it looks damaged or incomplete" })
-    )
-  }
-  const limit = maxFileBytes[sniffed.kind]
+  const sniffed = Sniffed.$is("Archive")(first)
+    ? archiveKind(fileName, bytes, (yield* Effect.promise(() => import("./xlsx.ts"))).containerOf(bytes))
+    : first
+  const format = yield* formatOf(fileName, sniffed)
+  const limit = maxFileBytes[format]
   if (file.size > limit) {
-    const what = sniffed.kind === "csv" ? "CSV files" : "workbooks"
+    const what = format === "csv" ? "CSV files" : "workbooks"
     return yield* Effect.fail(fileProblem.tooManyBytes({ fileName, bytes: file.size, limitBytes: limit, what }))
   }
   const extension = extensionOf(fileName)
   const notes: Array<Note> =
-    extension === sniffed.kind ||
-    (sniffed.kind === "xlsx" && extension === "xlsm") ||
-    (sniffed.kind === "csv" && extension === "txt")
+    extension === format || (format === "xlsx" && extension === "xlsm") || (format === "csv" && extension === "txt")
       ? []
       : [
           {
             kind: "wrongExtension",
             level: "warning",
-            message: `The file is named ".${extension}" but holds ${sniffed.kind === "csv" ? "CSV text" : "an Excel workbook"}; it was read as ${sniffed.kind === "csv" ? "CSV" : ".xlsx"}.`,
+            message: `The file is named ".${extension}" but holds ${format === "csv" ? "CSV text" : "an Excel workbook"}; it was read as ${format === "csv" ? "CSV" : ".xlsx"}.`,
             rows: []
           }
         ]
   const onProgress = input.onProgress ?? (() => {})
-  if (sniffed.kind === "csv") {
+  if (format === "csv") {
     const { readCsv } = yield* Effect.promise(() => import("./csv.ts"))
     const table = yield* readCsv({ fileName, bytes, notes, onProgress })
     // A .txt is read as CSV only when it holds a table: short column names over rows of as many cells. Notes or a

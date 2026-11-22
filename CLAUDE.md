@@ -48,7 +48,7 @@ sign-in secret into `.dev.vars` the first time).
   and service if nothing else uses them, and its tests. Ask Benjamin before deleting one.
 - **Sign-in** (Better Auth: accounts, organizations, roles, sessions; [docs/auth.md](docs/auth.md)). In development
   the app opens already signed in as the first test account, Dana Whitfield, admin of Example Works (test),
-  through a real session (`useDevelopmentSignIn` in `src/web/components/app/SignedIn.tsx`); the other test accounts are
+  through a real session (the `developmentSignIn` atom in `src/web/components/app/SignedIn.tsx`); the other test accounts are
   one click away in the user menu ("Sign in as a test account"). After a sign-out that tab shows the sign-in page. A
   production build always shows the sign-in page, and offers no test accounts.
 - **The import of a file of items**, in four steps, each its own file in `@inventory/catalog-web` (`packages/catalog/web/src/`), on the page
@@ -56,7 +56,7 @@ sign-in secret into `.dev.vars` the first time).
 
   | Step | File | What it does |
   | --- | --- | --- |
-  | Upload | `UploadStep.screen.tsx` | A .csv or .xlsx read in a worker and sent up in pieces, with progress and Cancel (`useUpload`, `@inventory/catalog-web/Upload`); "Use items_messy.csv" (each sample its own button) and a download link; the open imports with Continue and Remove |
+  | Upload | `UploadStep.screen.tsx` | A .csv or .xlsx read in a worker and sent up in pieces, with progress and Cancel (the upload's atoms, `@inventory/catalog-web/Upload`); "Use items_messy.csv" (each sample its own button) and a download link; the open imports with Continue and Remove |
   | Match | `MatchStep.screen.tsx` | Which file column fills which field, by heading, changed by hand; shown when a required field found no column. Review waits until every required field has a column and names the ones left |
   | Review | `ReviewStep.screen.tsx`, `ImportReview.controller.ts` | The review region (`@inventory/review`, `packages/review`) on the rows: accept a proposal for a row or a group, pick one of two readings, type a value, keep one of two rows, leave a row out, undo and redo; the confirm button says what it will import |
   | Result | `ResultStep.screen.tsx` | What the confirm did, counted from what is stored, the rows not imported downloadable with their reasons, and the take-back (a changed record is kept and named) |
@@ -90,8 +90,9 @@ table and the stored rows agree.
   commits.
 - **Use what exists before building.** Before writing a reader, a table, a review screen, an upload or a service,
   look for one in this project (`docs/kit.md`, `docs/index.md`). For a screen behaviour, use the template's own
-  helper first: `useUpload` (a file read in a worker and sent up in pieces, with progress and Cancel),
-  `useSavedProgress` (a refresh loses nothing), the review region's undo, `sayError` (words for any failure).
+  helper first: the upload's atoms (`startUpload`, `uploadState`, `cancelUpload`: a file read in a worker and sent up
+  in pieces, with progress and Cancel), `useSavedProgress` (a refresh loses nothing), the review region's undo,
+  `sayError` (words for any failure).
   Building a second one is a decision for Benjamin, with the reason the first does not fit.
 - **Commit at each working step** with a conventional message (`feat:`, `fix:`, `test:`, `docs:`, `chore:`,
   `refactor:`) that describes the change to the app. Run `bun run check` before every commit, and
@@ -235,7 +236,7 @@ package's task and replays it when nothing it reads has changed. The app's own s
 | Root command | What it does |
 | --- | --- |
 | `bun run dev` | Applies local migrations and the test accounts, then serves the app and API on http://localhost:5173, signed in by itself as the first test account |
-| `bun run check` | The loop check through turbo: type-check with Effect diagnostics, lint (with the two design lints), the fast tests, the format check, `docs:check`, the key scan (`keys:check`), the vendored-kit hash check (`vendor:check`), which package may import which (`boundaries:check`), the two stylesheet lists (`screens:check`) and the Effect imports (`imports:check`; `imports:fix` repairs code). Before every commit |
+| `bun run check` | The loop check through turbo: type-check with Effect diagnostics, lint (with the two design lints), the fast tests, the format check, `docs:check`, the key scan (`keys:check`), the vendored-kit hash check (`vendor:check`), which package may import which (`boundaries:check`), the two stylesheet lists (`screens:check`), every `ref` a DOM ref or a callback that stays the same across draws (`refs:check`), no `_tag` compared or built by hand in any src or test folder (`tags:check`) and the Effect imports (`imports:check`; `imports:fix` repairs code). Before every commit |
 | `bun run beep <group> <command>` | One of the repository's own rules by hand: `bun run beep laws boundaries`, `bun run beep quality ceilings`, `bun run beep vendor check`; `--help` on any of them lists its flags. `bun run check` runs them all under their root script names (`boundaries:check`, `vendor:check` and the rest) |
 | `bun run check:full` | `check` plus the slow tests (`*.slow.test.ts`) and the production build. CI runs it |
 | `bun run build` | The production build through turbo |
@@ -296,8 +297,9 @@ apps/inventory/         The app: the Worker and the SPA, one Vite build. Its own
 packages/ui/             @inventory/ui: the vendored shadcn, Dice UI and tablecn components and hooks (as published, one
                         exact export each), the theme (`theme.css`, the Tailwind entry) and the shared screen pieces.
 packages/review/         @inventory/review: the review region and its saved progress.
-packages/client/         @inventory/client: the browser's seam to the API with no contract in it (calls bound to a client,
-                        the runtime context, the query client, optimistic writes, `sayError`, the early requests).
+packages/client/         @inventory/client: the browser's seam to the API with no contract in it (the API's atoms: reads,
+                        writes and optimistic writes bound to a client; who is signed in, as an atom; `sayError`; the
+                        early requests).
 packages/access/         The access context (who may do what), as four packages: contract/ (the session, people and
                         audit-trail schemas, their API groups, the model allowance's gateway), model/ (rules, ports,
                         in-memory twins, handlers: no SQL, no HTTP), host/ (the D1 adapters, sign-in, the session
@@ -327,10 +329,10 @@ explorations/           Questions being shaped: research, decisions, briefs.
 goals/                  Work with a definition of done: SPEC.md and PLAN.md.
 packages/tooling/tool/cli/  @beep/repo-cli: the repository's own rules as commands (`bun run beep <group> <command>`):
                         `laws` (boundaries: which package may import which; screens: every package with screens in
-                        both stylesheet lists; exports; keys; effect-imports: every Effect import from its own path
+                        both stylesheet lists; ref-callbacks: no ref callback made on each draw; tags: no `_tag` compared or built by hand in any src or test folder; exports; keys; effect-imports: every Effect import from its own path
                         under its one name), `quality` (strict, ceilings), `docs check` and `vendor` (check; sync,
                         which copies the kit from a beep-effect checkout). Nothing imports it.
-turbo.json              The task graph: seven package tasks and three root tasks.
+turbo.json              The task graph: seven package tasks and the root tasks (the repository's own rules, one each).
 .agents/                Skills (see above). Not application code; the check ignores it.
 ```
 
@@ -363,11 +365,14 @@ Design in this order. Do not start from the UI.
 4. **Handler** in the model package (`Item/Items.handler.ts`: what each endpoint does, the ports resolved once);
    the group Layer is built in `src/server/handlers.ts`, and the adapter added to `servicesWith` in
    `src/server/App.ts`.
-5. **UI** in the web package (`ItemsPage.screen.tsx`): `call((api) => api.group.endpoint(...))` inside TanStack Query, with
-   loading, empty and error states. A write of a value the person chose is optimistic through `useOptimisticWrite`
-   (the package's `Catalog.runtime.ts`, bound from `@inventory/client/Optimistic`; copy `ItemEditor.screen.tsx` or the People page's role change); a write whose outcome only the
-   server knows (a confirm, a take-back) shows its progress instead. A new page is one line in `appPages` and one
-   branch in `Workspace.tsx`.
+5. **UI** in the web package (`ItemsPage.screen.tsx`). A read is an atom, made once at module level:
+   `catalogApi.query((api) => api.group.endpoint(...), { reactivityKeys })` (the package's `Catalog.runtime.ts`, from
+   `makeApiAtoms` in `@inventory/client/Api`), read with `useAtomValue`, with loading, empty and error states; what a
+   write changed is said with `invalidate(keys)`. A write of a value the person chose is optimistic through
+   `optimisticWrite` (`@inventory/client/OptimisticAtoms`; copy `ItemEditor.screen.tsx` or the People page's role
+   change); a write whose outcome only the server knows (a confirm, a take-back) is `catalogApi.ask` and shows its
+   progress instead. A screen's own state is an atom too ("UI" below, "State is atoms"). A new page is one line in
+   `appPages` and one branch in `Workspace.tsx`.
 6. **Test** the rule that would hurt most if it were wrong ("Tests" below).
 
 ## Effect (version 4)
@@ -385,6 +390,10 @@ this repo, check it in `node_modules/effect/src/` or the guides in `node_modules
 - Modules live under `effect/http/`, `effect/http-api/`, `effect/sql/`, `effect/schema/`, `effect/ai/`, each imported
   from its own path (`effect/sql/SqlClient`; `docs/standards/effect-imports.md`). Not `@effect/platform`.
 - Literal unions are `Schema.Literals([...])`. Classes are `Schema.Class`, `Model.Class`, `Schema.TaggedError`.
+- A tagged value's case is told by what its type gives: `O.isSome` and `O.match`, `AsyncResult.isFailure`, a
+  `Data.taggedEnum`'s `$is` and `$match`, a `Schema.TaggedUnion`'s `guards`, `isAnyOf` and `match`, `Match.valueTags`
+  for plain data, `Schema.is` of one error class. Never `x._tag === "A"` or `switch (x._tag)`:
+  `bun run check` refuses both, in every src and test folder (`tags:check`).
 - `bun run typecheck` catches wiring mistakes (a missing Layer shows as a type error in `worker.ts`). Run it early.
 - A route beside the HttpApi (a frame document, a stream) has its own shape: pattern 6 in `docs/patterns.md`.
 
@@ -477,7 +486,8 @@ The API runs in workerd, locally and deployed. Measured in this repo:
   nothing, and you can tell the person how many rows were already there. Pattern 1 in `docs/patterns.md` has the code.
 - **No filesystem.** Read uploaded files in the browser, or send their text in a JSON payload. Do not use multipart
   persistence.
-- **Spreadsheets (.csv, .xlsx)**: the reader is installed; do not write another. `useUpload` from `@inventory/catalog-web/Upload`
+- **Spreadsheets (.csv, .xlsx)**: the reader is installed; do not write another. `startUpload` from
+  `@inventory/catalog-web/Upload` (an atom: set it to the chosen file; `uploadState` is its progress, `cancelUpload` its Cancel)
   reads a chosen .csv or .xlsx in a worker into one table with typed cells and Notes, then sends its rows to the
   server in pieces (`POST /api/v1/imports/uploads`, then the chunks, then finish), with its progress and Cancel;
   `SheetChooser` picks the sheet. Pattern 7 in `docs/patterns.md` has the shape, the limits and the samples.
@@ -501,8 +511,10 @@ The API runs in workerd, locally and deployed. Measured in this repo:
 Sign-in is Better Auth: `@inventory/access-host/SessionIdentity` turns the session cookie into the actor
 ([docs/auth.md](docs/auth.md)). `HeaderIdentity` in `@inventory/access-host/AccessTest` (a header names the member) is
 for tests only. The browser
-asks who is signed in once (`useActor`, `GET /api/v1/identity/session`); sign-in, a switch of organization and
-sign-out drop every cached query. What must stay real in every new endpoint:
+asks who is signed in once (the `session` atom of `@inventory/access-web/Session`, `GET /api/v1/identity/session`; a
+screen reads `member` from `@inventory/client/MemberAtoms`). Every read is kept per member and organization, so
+another account or another organization starts from nothing, and a sign-out lets every read go. What must stay real
+in every new endpoint:
 
 - Attach `.middleware(Identity)` to the group. Read the actor with `yield* CurrentActor`. Never accept an
   organization or member id from a payload.
@@ -591,9 +603,17 @@ only where it means something.
   rule go in the grey line under it.
 - **Title row**: `PageHeader` (`flex flex-wrap justify-between gap-4`, title block `min-w-0 flex-1 basis-60`, actions
   `flex flex-wrap gap-2`).
-- **Decide a layout from the room the page has**, not the window: `useIsNarrow()` and `useContentBelow(px)` from
-  `@inventory/ui/ContentWidth` already subtract the sidebar. A `md:` class or `useIsMobile()` in a page is wrong on a tablet
-  with the sidebar open.
+- **Decide a layout from the room the page has**, not the window: the atoms `isNarrow` and `contentBelow(px)` from
+  `@inventory/ui/ContentWidth` (read with `useAtomValue`) already subtract the sidebar. A `md:` class or
+  `useIsMobile()` in a page is wrong on a tablet with the sidebar open.
+- **State is atoms** (`effect/reactivity`, read with `@effect/atom-react`; goals/atoms). A value a screen holds is
+  `Atom.make`; one worked out from others is `Atom.readable` or `Atom.map`; state that belongs to one component on
+  screen is a `ScopedAtom`; something outside (the window, a table's own store) is followed by an atom that
+  subscribes and cleans up with `get.addFinalizer`; a value followed after the draw is `useAtomSubscribe` with one
+  function for the component's life. `bun run check` refuses `useState`, `useReducer`, `useMemo`, `useCallback`,
+  `useContext` and every effect hook in our own code, with no exception for effects, and refuses a `ref` that is not
+  a DOM ref or a callback that stays the same across draws (`refs:check`). `useRef` is for a DOM node only. The
+  vendored kit (`packages/ui/src/components`, `packages/ui/src/hooks`) keeps its own.
 - **Saved views** ("All 30", "Needs attention 7") are ghost `Button size="sm"` with `aria-pressed`; the button draws the
   selected one (`bg-muted`), so pass no class for it.
 - **Columns**: name, Status, Reason, then the file's columns, then Line. Reason text is ink; grey is for "Not set".

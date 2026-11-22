@@ -42,8 +42,8 @@ class UsedUp extends S.Opaque<UsedUp, { readonly brand: unique symbol }>()(
 
 /** Whether a call was taken: the catalog's own union of the access context's two cases. */
 export const AllowanceAnswer = AllowanceAnswerKind.mapMembers(() => Tuple.make(Taken, UsedUp)).pipe(
-  S.toTaggedUnion("kind"),
-  S.annotate({ identifier: "CatalogAllowanceAnswer", description: "Whether a model call was taken" })
+  S.annotate({ identifier: "CatalogAllowanceAnswer", description: "Whether a model call was taken" }),
+  S.toTaggedUnion("kind")
 )
 /** The decoded value of `AllowanceAnswer`. */
 export type AllowanceAnswer = typeof AllowanceAnswer.Type

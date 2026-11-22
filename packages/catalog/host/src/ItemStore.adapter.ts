@@ -21,6 +21,7 @@ import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as Eq from "effect/Equal"
 import * as Layer from "effect/Layer"
+import * as Match from "effect/Match"
 import * as O from "effect/Option"
 import * as Str from "effect/String"
 import type * as Statement from "effect/sql/Statement"
@@ -28,8 +29,11 @@ import * as SqlClient from "effect/sql/SqlClient"
 import * as SqlSchema from "effect/sql/SqlSchema"
 import * as S from "effect/Schema"
 import { OrganizationId, MemberId } from "@inventory/kernel/Ids"
-import { ItemEdit, StoredItem, discontinuedOn } from "@inventory/catalog-contract/Item"
-import { ItemStore } from "@inventory/catalog-model/ItemStore"
+import { ItemEdit, Stocking, StoredItem, discontinuedOn } from "@inventory/catalog-contract/Item"
+
+// Whether two stockings say the same: the same case, and the same day for a discontinued one.
+const sameStocking = S.toEquivalence(Stocking)
+import { EditOutcome, ItemStore } from "@inventory/catalog-model/ItemStore"
 import { D1, NoRows } from "@beep/d1/D1"
 import * as SecureRandom from "effect/crypto/SecureRandom"
 import { Member } from "@inventory/kernel/Member"
@@ -192,10 +196,15 @@ export const ItemStoreD1 = Layer.effect(
       org: string,
       words: ReadonlyArray<WordMatch>
     ) {
-      const indexed = A.flatMap(words, (word) => (word._tag === "Indexed" ? [word.phrase] : []))
+      const indexed = A.flatMap(
+        words,
+        Match.valueTags({ Indexed: (word) => [word.phrase], Contains: () => [], Close: () => [] })
+      )
+      const asText = (word: { readonly patterns: ReadonlyArray<string> }) =>
+        Effect.asSome(anyLike(word.patterns, everywhere))
       const texts = yield* Effect.forEach(
         words,
-        (word) => (word._tag === "Indexed" ? Effect.succeedNone : Effect.asSome(anyLike(word.patterns, everywhere))),
+        Match.valueTags({ Indexed: () => Effect.succeedNone, Contains: asText, Close: asText }),
         { concurrency: 1 }
       )
       const all = [
@@ -211,12 +220,14 @@ export const ItemStoreD1 = Layer.effect(
       words: ReadonlyArray<WordMatch>,
       column: "name" | "sku"
     ) {
+      const asText = (word: { readonly patterns: ReadonlyArray<string> }) => anyLike(word.patterns, [column])
       const hits = yield* Effect.forEach(
         words,
-        (word) =>
-          word._tag === "Indexed"
-            ? Effect.succeed(inIndex(org, `${column} : ${word.phrase}`))
-            : anyLike(word.patterns, [column]),
+        Match.valueTags({
+          Indexed: (word) => Effect.succeed(inIndex(org, `${column} : ${word.phrase}`)),
+          Contains: asText,
+          Close: asText
+        }),
         { concurrency: 1 }
       )
       return sql.join(" + ", true, "0")(hits)
@@ -469,9 +480,9 @@ export const ItemStoreD1 = Layer.effect(
       execute: ({ org, id }) => sql`SELECT ${itemColumns(sql)} FROM item WHERE organizationId = ${org} AND id = ${id}`
     })
     // The edit's stocking as the two columns that store it: the active bit, and the discontinued day or NULL.
-    const activeBit = (edit: (typeof ItemEdit)["Encoded"]): number => (edit.stocking.kind === "active" ? 1 : 0)
+    const activeBit = (edit: (typeof ItemEdit)["Encoded"]): number => (Stocking.guards.active(edit.stocking) ? 1 : 0)
     const discontinuedDay = (edit: (typeof ItemEdit)["Encoded"]): string | null =>
-      edit.stocking.kind === "discontinued" ? edit.stocking.on : null
+      Stocking.guards.discontinued(edit.stocking) ? edit.stocking.on : null
     // True while the item is at the revision the edit was made on and holds something other than the edit says.
     const editable = (r: typeof EditRequest.Encoded) => sql`EXISTS (SELECT 1 FROM item
       WHERE organizationId = ${r.org} AND id = ${r.id} AND revision = ${r.edit.revision}
@@ -510,7 +521,7 @@ export const ItemStoreD1 = Layer.effect(
       BigDecimal.equals(item.unitCost, edit.unitCost) &&
       item.quantityOnHand === edit.quantityOnHand &&
       Eq.equals(item.reorderPoint, edit.reorderPoint) &&
-      item.stocking.kind === edit.stocking.kind &&
+      sameStocking(item.stocking, edit.stocking) &&
       Eq.equals(discontinuedOn(item.stocking), discontinuedOn(edit.stocking)) &&
       item.lotTracked === edit.lotTracked &&
       Eq.equals(item.firstReceivedOn, edit.firstReceivedOn)
@@ -521,12 +532,14 @@ export const ItemStoreD1 = Layer.effect(
       const request = { org: actor.organizationId, actor: actor.id, name: actor.name, id, activity, at, edit: change }
       const [, edited] = yield* batch([editedLine(request), editItem(request)])
       const written = A.head(edited)
-      if (O.isSome(written)) return { _tag: "Edited" as const, item: storedItem(written.value) }
+      if (O.isSome(written)) return EditOutcome.cases.Edited.make({ item: storedItem(written.value) })
       // Nothing was written: the item is gone, already says what the edit says, or was changed by someone else.
       const now = yield* findItem({ org: actor.organizationId, id })
-      if (O.isNone(now)) return { _tag: "Missing" as const }
+      if (O.isNone(now)) return EditOutcome.cases.Missing.make({})
       const stored = storedItem(now.value)
-      return same(stored, change) ? { _tag: "Same" as const, item: stored } : { _tag: "Changed" as const, item: stored }
+      return same(stored, change)
+        ? EditOutcome.cases.Same.make({ item: stored })
+        : EditOutcome.cases.Changed.make({ item: stored })
     }, Effect.orDie)
 
     return ItemStore.of({ page, facets, edit })

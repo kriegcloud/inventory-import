@@ -7,7 +7,8 @@ import * as S from "effect/Schema"
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import { AnsweredBy } from "../Answer/AnsweredBy.read.ts"
 import { Change } from "./Change.read.ts"
-import { SavedDecisions } from "./Decision.command.ts"
+import { SavedDecisions, TakenBackKind } from "./Decision.command.ts"
+import { Field } from "../Staging/Staged.read.ts"
 import { personName } from "../internal/Described.ts"
 import { ConfirmId, ImportId, RowId } from "../Catalog.id.ts"
 import { ItemFields } from "../Item/Item.read.ts"
@@ -42,8 +43,8 @@ class DecidedByNobody extends S.Opaque<DecidedByNobody, { readonly brand: unique
 
 /** For a row that was not imported: the person who left it out, or that nobody had settled it yet. */
 export const DecidedBy = DecidedByKind.mapMembers(() => Tuple.make(DecidedByPerson, DecidedByNobody)).pipe(
-  S.toTaggedUnion("kind"),
-  S.annotate({ identifier: "DecidedBy", description: "Who left a row out, or that nobody had settled it" })
+  S.annotate({ identifier: "DecidedBy", description: "Who left a row out, or that nobody had settled it" }),
+  S.toTaggedUnion("kind")
 )
 /** The decoded value of `DecidedBy`. */
 export type DecidedBy = typeof DecidedBy.Type
@@ -126,15 +127,15 @@ class RowTakenBack extends S.Opaque<RowTakenBack, { readonly brand: unique symbo
 export const RowOutcome = OutcomeKind.mapMembers(() =>
   Tuple.make(RowCreated, RowUpdated, RowAlready, RowNotImported, RowTakenBack)
 ).pipe(
-  S.toTaggedUnion("outcome"),
-  S.annotate({ identifier: "RowOutcome", description: "What the confirms did with one row of the file" })
+  S.annotate({ identifier: "RowOutcome", description: "What the confirms did with one row of the file" }),
+  S.toTaggedUnion("outcome")
 )
 /** The decoded value of `RowOutcome`: what the confirms did with one row of the file. */
 export type RowOutcome = typeof RowOutcome.Type
 
 /** The row's reason, for the two outcomes that have one. */
 export const outcomeReasonOf = (row: RowOutcome): O.Option<string> =>
-  row.outcome === "already" || row.outcome === "notImported" ? O.some(row.reason) : O.none()
+  RowOutcome.guards.already(row) || RowOutcome.guards.notImported(row) ? O.some(row.reason) : O.none()
 
 /**
  * The outcome a stored row says, from the columns `importOutcome` keeps: every outcome has every column there, so
@@ -232,6 +233,43 @@ export const ImportEvent = S.TaggedUnion({
 }).annotate({ identifier: "ImportEvent", description: "A confirm of an import, or the take-back of one" })
 /** The decoded value of `ImportEvent`: one thing that happened to a confirmed import, for its history. */
 export type ImportEvent = typeof ImportEvent.Type
+
+/** How many rows of one match's take-backs are named by row; the rest are counted. */
+export const takenBackRowsNamed = 200
+
+/**
+ * Decisions a match took back from what was stored, of one kind on one re-matched field (Benjamin, 2026-11-20, group
+ * 3: "the screen names it as taken back"). Every screen of the import names them from its picture, the matcher's
+ * included, until the person dismisses them: a decision already saved is the usual case, and the match rewrites it
+ * where nobody's save or confirm would say so. `rows` names up to `takenBackRowsNamed` of them; `count` is all.
+ */
+export const MatchTakeBack = S.Struct({
+  revision: S.Int.check(S.isGreaterThanOrEqualTo(0)).annotateKey({
+    description: "The draft's revision the match wrote: a screen holding an earlier one has not been told"
+  }),
+  by: personName("Who matched the column"),
+  field: Field.annotateKey({ description: "The field that reads another column, or none, since this match" }),
+  matched: Field.pipe(S.optionalKey).annotateKey({
+    description:
+      "The field the person matched by hand: another than `field` when that one lost its column to it. Left out on an entry stored before this was kept"
+  }),
+  reads: S.Boolean.pipe(S.optionalKey).annotateKey({
+    description:
+      "Whether `field` reads a column since this match; false when it was cleared, or lost its only one. Left out on an entry stored before this was kept"
+  }),
+  kind: TakenBackKind.annotateKey({
+    description: "What was taken back: accepts, Replaces or Keep-stored, keeps of one of two, undone fixes"
+  }),
+  count: S.Int.check(S.isGreaterThanOrEqualTo(1)).annotateKey({ description: "How many rows had one taken back" }),
+  rows: S.Array(RowId)
+    .check(S.isMaxLength(takenBackRowsNamed))
+    .annotateKey({ description: "The first rows, in the file's order; `count` says how many there are in all" })
+}).annotate({
+  identifier: "MatchTakeBack",
+  description: "Decisions of one kind a match of one field took back from what was stored, with the rows"
+})
+/** The decoded value of `MatchTakeBack`. */
+export type MatchTakeBack = typeof MatchTakeBack.Type
 
 /** An item an import created that someone changed afterwards: what it is, who changed it last and when. */
 export const ChangedItem = S.Struct({
@@ -335,7 +373,12 @@ export class ImportView extends S.Class<ImportView, { readonly brand: unique sym
     history: S.Array(ImportEvent).annotateKey({
       description: "Every confirm and take-back of this import, oldest first"
     }),
-    takeBack: TakeBackState
+    takeBack: TakeBackState,
+    takenBack: S.Array(MatchTakeBack).annotateKey({
+      description:
+        "What each match of this open import took back from the stored decisions, oldest first: what a screen names as taken back. Empty once the import is confirmed",
+      default: []
+    })
   },
   {
     description:

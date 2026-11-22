@@ -5,6 +5,7 @@
 // written and reported.
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as A from "effect/Array"
+import * as Match from "effect/Match"
 import * as MutableHashMap from "effect/MutableHashMap"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
@@ -204,21 +205,39 @@ export class SheetReader {
     this.caps = input.caps
   }
 
+  /**
+   * What each kind of event does, told by its case (built once: a sheet sends one per tag and per text): text goes into
+   * the value being read, an element opened or closed moves the depth, and the rest of the XML says nothing of cells.
+   */
+  private readonly step = Match.typeTags<XmlEvent>()({
+    Text: (event): ReadonlyArray<ReadRow> => this.text(event.text),
+    StartElement: (event): ReadonlyArray<ReadRow> => this.opened(event.name, event.attributes),
+    EndElement: (): ReadonlyArray<ReadRow> => this.closed(),
+    Declaration: () => none,
+    Doctype: () => none,
+    Comment: () => none,
+    ProcessingInstruction: () => none
+  })
+
   /** Takes one event of the part and returns the rows that ended with it. */
   push(event: XmlEvent): ReadonlyArray<ReadRow> {
-    if (O.isSome(this.failed)) return none
-    if (event._tag === "Text") {
-      if (this.target === "v") this.valueText += event.text
-      else if (this.target === "t") this.inlineText += event.text
-      else if (this.target === "f") this.formulaText += event.text
-      return none
-    }
-    if (event._tag === "StartElement") {
-      this.depth += 1
-      this.start(localName(event.name), event.attributes)
-      return none
-    }
-    if (event._tag !== "EndElement") return none
+    return O.isSome(this.failed) ? none : this.step(event)
+  }
+
+  private text(text: string): ReadonlyArray<ReadRow> {
+    if (this.target === "v") this.valueText += text
+    else if (this.target === "t") this.inlineText += text
+    else if (this.target === "f") this.formulaText += text
+    return none
+  }
+
+  private opened(name: string, attributes: Readonly<Record<string, string>>): ReadonlyArray<ReadRow> {
+    this.depth += 1
+    this.start(localName(name), attributes)
+    return none
+  }
+
+  private closed(): ReadonlyArray<ReadRow> {
     const depth = this.depth
     this.depth -= 1
     if (depth === this.targetDepth) {

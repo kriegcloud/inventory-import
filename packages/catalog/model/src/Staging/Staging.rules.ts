@@ -7,6 +7,7 @@
 import { SpreadsheetTable } from "../Reading/Spreadsheet.rules.ts"
 import { StagedTable, maxStagedRows } from "@inventory/catalog-contract/Staged"
 import * as A from "effect/Array"
+import * as Match from "effect/Match"
 import * as O from "effect/Option"
 import { FileProblem, fileProblem } from "@inventory/catalog-contract/FileProblem"
 export const stageTable = (input: { readonly table: SpreadsheetTable }): StagedTable => {
@@ -14,7 +15,10 @@ export const stageTable = (input: { readonly table: SpreadsheetTable }): StagedT
   return {
     fileName: table.fileName,
     kind: table.kind,
-    sheet: table.format._tag === "xlsx" ? O.some(table.format.chosen.name) : O.none(),
+    sheet: Match.valueTags(table.format, {
+      xlsx: (format) => O.some(format.chosen.name),
+      csv: () => O.none<string>()
+    }),
     headerRowNumber: table.headerRowNumber,
     columns: A.map(table.columns, (column) => ({ index: column.index, letter: column.letter, label: column.label })),
     rows: A.map(table.rows, (row) => ({

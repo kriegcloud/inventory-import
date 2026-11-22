@@ -1,19 +1,15 @@
-// The browser half of saved progress: the chosen file in IndexedDB and the hook a screen uses. The rules and the
-// stored shape are in `SavedProgress.schema.ts` (tested without a browser).
+// The browser half of saved progress: the chosen file in IndexedDB, the progress as an atom per key that is the
+// browser's own record of it (`Atom.kvs` over `localStorage`), and the hook a screen reads it with. The stored shape
+// and its keys are in `SavedProgress.schema.ts`.
 import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import type * as ManagedRuntime from "effect/ManagedRuntime"
 import * as O from "effect/Option"
 import * as S from "effect/Schema"
-import { useCallback, useMemo, useRef, useState } from "react"
-import {
-  progressKey,
-  type ProgressScope,
-  type ProgressStorage,
-  readAt,
-  SavedProgress,
-  writeAt
-} from "@inventory/review/SavedProgress"
+import { useAtomSet, useAtomValue } from "@effect/atom-react"
+import * as Atom from "effect/reactivity/Atom"
+import { progressKey, type ProgressScope, SavedProgress } from "@inventory/review/SavedProgress"
+import { keptRuntime } from "./internal/keptStore.ts"
 
 // The chosen file, kept as a Blob in IndexedDB: a whole spreadsheet does not fit localStorage, and a Blob is stored
 // without being copied through the page's thread.
@@ -62,84 +58,89 @@ export const dropFile = Effect.fn("savedProgress.dropFile")(function* (scope: Pr
   yield* inFiles("readwrite", (store) => store.delete(progressKey(scope)))
 })
 
-const browserStorage = (): ProgressStorage | undefined => {
-  try {
-    return window.localStorage
-  } catch {
-    return undefined
-  }
+// None is kept as no entry at all (`keptStore.ts`), so Confirm leaves nothing behind.
+const Kept = S.OptionFromNullOr(SavedProgress)
+
+/**
+ * The progress kept under one key, as the browser's own record of it (`Atom.kvs`): read from storage when first
+ * read, written there with every write, so an atom let go and read again finds the same. A stored text that no
+ * longer decodes (an older version) reads as none and is replaced by the next write.
+ */
+const progressAt = Atom.family((key: string) =>
+  Atom.kvs({ runtime: keptRuntime, key, schema: Kept, defaultValue: () => O.none<SavedProgress>() })
+)
+
+/** No scope yet (the actor still loading): nothing is read or written. */
+const noProgress: Atom.Writable<O.Option<SavedProgress>, O.Option<SavedProgress>> = Atom.writable(
+  () => O.none(),
+  () => undefined
+)
+
+/**
+ * The progress kept for one scope, as the atom a screen's own atoms read and write (the Review step keeps the undo
+ * history there with every decision). With no scope yet nothing is read or written.
+ */
+export const progressOf = (
+  scope: ProgressScope | undefined
+): Atom.Writable<O.Option<SavedProgress>, O.Option<SavedProgress>> =>
+  scope === undefined ? noProgress : progressAt(progressKey(scope))
+
+/** The progress to keep after a change: what was kept (or a first record), the change over it, and the time now. */
+export const progressWith = (input: {
+  readonly before: O.Option<SavedProgress>
+  readonly change: Partial<Omit<SavedProgress, "version" | "savedAt">>
+}): O.Option<SavedProgress> => {
+  const now = DateTime.nowUnsafe()
+  return O.some(
+    SavedProgress.make({ ...O.getOrElse(input.before, () => SavedProgress.first(now)), ...input.change, savedAt: now })
+  )
 }
 
 /**
- * One screen's saved progress for the person signed in. `saved` is what was there when the screen opened (or after
- * the last `clear`); `save` merges a change and writes it at once; `keepFile` stores the chosen file; `file` reads
- * it back; `clear` removes all of it (on Confirm, or "Start again"). `refused` turns true when the browser would not
- * keep it, so the screen can say so once. With no scope yet (the actor still loading) nothing is read or written.
- * `browserRuntime` is the page's one runtime: the file is read and written on it, so a Cancel anywhere interrupts it.
+ * One screen's saved progress for the person signed in. `saved` is what is kept now; `save` merges a change and
+ * writes it at once; `keepFile` stores the chosen file; `file` reads it back; `clear` removes all of it (on Confirm,
+ * or "Start again"). Where the browser keeps nothing (a private window, a full disk) the progress lasts for the
+ * visit and the file is not kept: nothing is said, and the upload goes on. With no
+ * scope yet (the actor still loading) nothing is read or written; another person or organization reads their own,
+ * never the last one's. `browserRuntime` is the page's one runtime: the file is read and written on it, so a Cancel
+ * anywhere interrupts it.
  */
 export function useSavedProgress(
   scope: ProgressScope | undefined,
   browserRuntime: ManagedRuntime.ManagedRuntime<never, never>
 ) {
-  const key = scope === undefined ? undefined : progressKey(scope)
-  const storage = useMemo(browserStorage, [])
-  const [refused, setRefused] = useState(false)
-  const read = (at: string | undefined) => (at === undefined || storage === undefined ? undefined : readAt(storage, at))
-  const [state, setState] = useState<{ key: string | undefined; saved: SavedProgress | undefined }>(() => ({
-    key,
-    saved: read(key)
-  }))
-  // Another person or organization: read theirs, never show the last one's.
-  const current = state.key === key ? state : { key, saved: read(key) }
-  if (current !== state) setState(current)
+  const at = progressOf(scope)
+  const kept = useAtomValue(at)
+  const saved = O.getOrUndefined(kept)
+  // Given a function, the setter works the change out from the progress as it stands when written, so two changes in
+  // one tick both land.
+  const update = useAtomSet(at)
 
-  // The latest progress, read by `save` so two changes in one tick both land.
-  const latest = useRef(current.saved)
-  latest.current = current.saved
+  const save = (change: Partial<Omit<SavedProgress, "version" | "savedAt">>) => {
+    if (scope === undefined) return
+    update((before) => progressWith({ before, change }))
+  }
 
-  const save = useCallback(
-    (change: Partial<Omit<SavedProgress, "version" | "savedAt">>) => {
-      if (key === undefined) return
-      const now = DateTime.nowUnsafe()
-      const next = SavedProgress.make({ ...(latest.current ?? SavedProgress.first(now)), ...change, savedAt: now })
-      latest.current = next
-      if (storage === undefined || !writeAt(storage, key, next)) setRefused(true)
-      setState({ key, saved: next })
-    },
-    [key, storage]
-  )
+  const keepFile = (file: File) => {
+    if (scope === undefined) return
+    browserRuntime.runFork(saveFile(scope, file).pipe(Effect.ignore))
+  }
 
-  // The scope's ids, kept with the key they make: a new object with the same ids is the same scope.
-  const scoped = useMemo(() => scope, [key])
+  const file = (): Promise<File | undefined> =>
+    scope === undefined
+      ? Promise.resolve(undefined)
+      : browserRuntime.runPromise(
+          loadFile(scope).pipe(
+            Effect.map(O.getOrUndefined),
+            Effect.orElseSucceed(() => undefined)
+          )
+        )
 
-  const keepFile = useCallback(
-    (file: File) => {
-      if (scoped === undefined) return
-      browserRuntime.runFork(saveFile(scoped, file).pipe(Effect.tapError(() => Effect.sync(() => setRefused(true)))))
-    },
-    [scoped, browserRuntime]
-  )
+  const clear = () => {
+    if (scope === undefined) return
+    update(() => O.none())
+    browserRuntime.runFork(dropFile(scope).pipe(Effect.ignore))
+  }
 
-  const file = useCallback(
-    (): Promise<File | undefined> =>
-      scoped === undefined
-        ? Promise.resolve(undefined)
-        : browserRuntime.runPromise(
-            loadFile(scoped).pipe(
-              Effect.map(O.getOrUndefined),
-              Effect.orElseSucceed(() => undefined)
-            )
-          ),
-    [scoped, browserRuntime]
-  )
-
-  const clear = useCallback(() => {
-    if (scoped === undefined) return
-    storage?.removeItem(progressKey(scoped))
-    latest.current = undefined
-    browserRuntime.runFork(dropFile(scoped).pipe(Effect.ignore))
-    setState({ key: progressKey(scoped), saved: undefined })
-  }, [scoped, storage])
-
-  return { saved: current.saved, save, keepFile, file, clear, refused }
+  return { saved, save, keepFile, file, clear }
 }

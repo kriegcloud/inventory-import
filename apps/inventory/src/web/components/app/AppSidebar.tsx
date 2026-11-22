@@ -76,6 +76,16 @@ const themes: ReadonlyArray<{ value: Theme; label: string; icon: LucideIcon }> =
 ]
 
 /**
+ * Where the page goes as the person switches organization. An import belongs to the organization being left: its address
+ * would open on "not found", so the page goes back to the first screen. A search, a filter or a page of a table is of
+ * that organization's too: the address keeps its page alone.
+ *
+ * @example addressInAnother({ pathname: "/items", search: "?search=oak" }) // "/items"
+ */
+export const addressInAnother = (at: { readonly pathname: string; readonly search: string }): string =>
+  new URLSearchParams(at.search).has("import") ? "/" : at.pathname
+
+/**
  * Which organization the person is working in, and their role there. With more than one they switch here: the
  * server changes the session's organization after checking membership, and everything on screen is asked for again.
  */
@@ -117,11 +127,9 @@ function OrganizationPicker() {
                   key={organization.id}
                   onSelect={() => {
                     if (organization.id !== actor.organizationId) {
-                      // An import belongs to the organization being left: its address would open on "not found",
-                      // so the page goes back to the first screen before everything is asked for again.
-                      if (new URLSearchParams(window.location.search).has("import")) navigate("/")
+                      navigate(addressInAnother(window.location))
                       // The server checks the membership, so the switch is not shown before it answers: it says
-                      // what it is doing, and the pages show their skeletons while everything is asked for again.
+                      // what it is doing, and the pages show their skeletons once it has.
                       const switching = toast.loading(`Switching to ${organization.name}`)
                       void switchTo(organization.id).then((exit) => {
                         toast.dismiss(switching)

@@ -1,8 +1,14 @@
+import { CellMark, Entry } from "@inventory/review/ReviewTypes"
+import { OtherAnswer } from "@inventory/review/ReviewDraft"
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
 import * as HashMap from "effect/HashMap"
 import * as HashSet from "effect/HashSet"
 import * as O from "effect/Option"
-import { Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from "react"
+import { useAtom, useAtomSubscribe, useAtomValue } from "@effect/atom-react"
+import * as ScopedAtom from "@effect/atom-react/ScopedAtom"
+import * as Atom from "effect/reactivity/Atom"
+import { Fragment, type ReactNode } from "react"
+import { type Region, RegionScope, TableScope } from "../ReviewRegion.atoms.ts"
 import { Button } from "@inventory/ui/components/button"
 import { Checkbox } from "@inventory/ui/components/checkbox"
 import { ButtonGroup } from "@inventory/ui/components/button-group"
@@ -34,16 +40,76 @@ import {
 } from "@inventory/review/ReviewDraft"
 import { CellValue, ColumnText, DecisionTag, EditForm, GroupChange, Overlay, Reason, ReasonTag } from "./parts.tsx"
 import type { GroupActions, RowActions } from "./ReviewGrid.tsx"
+import type { RowActionFor } from "../ReviewRegion.atoms.ts"
 import type {
+  FixGroup,
   ProblemKind,
   QueueEntry,
   ReviewColumn,
   ReviewRegionProps,
-  ReviewWords,
   RowView
 } from "@inventory/review/ReviewTypes"
 
+// Each enum's own guard, made once: these run for every row and every cell.
+const isCellMarkProposed = CellMark.guards.proposed
+
 const page = 30
+
+/** Where one queue is: the card shown, and how many rows of a plain list are drawn. */
+type Place = { readonly at: number; readonly shown: number }
+
+/** The card on screen: what names its decision, and whether it has just taken another card's place. */
+type Card = { readonly key: string; readonly moved: boolean }
+
+/** What one queue holds and works out from the region it is in. */
+interface Queue {
+  readonly place: Atom.Writable<Place>
+  /** The decisions the queue goes through: every one, or the rows that cannot be imported as written. */
+  readonly decisions: Atom.Atom<ReturnType<typeof queue>>
+  /** The column labels by id. */
+  readonly labels: Atom.Atom<HashMap.HashMap<string, string>>
+  /** The card on screen. `moved` is true when it took another card's place: after a decision, or a step along. */
+  readonly card: Atom.Atom<Card>
+  /**
+   * For `card`: once a card that took another's place is drawn, focus goes to its first button. Not for the first
+   * card the queue shows, nor for a card that is still the one on screen.
+   */
+  readonly focusCard: (now: Card) => void
+}
+
+const makeQueue = (region: Region): Queue => {
+  const place = Atom.make<Place>({ at: 0, shown: page })
+  const split = Atom.map(region.ui, (now) => now.split)
+  const decisions = Atom.readable((get) =>
+    queue({ views: get(region.views), split: get(split), blocked: get(region.filter) === "cannot" })
+  )
+  return {
+    place,
+    decisions,
+    labels: Atom.map(region.input.columns, (columns) =>
+      HashMap.fromIterable(columns.map((column) => [column.id, column.label] as const))
+    ),
+    card: Atom.readable((get): Card => {
+      const list = get(decisions)
+      const shown = list[Math.min(get(place).at, Math.max(0, list.length - 1))]
+      const now = shown === undefined ? "" : cardKey(shown)
+      const before = get.self<Card>()
+      return { key: now, moved: now !== "" && O.exists(before, (was) => was.key !== "" && was.key !== now) }
+    }),
+    // The atoms change before the card is drawn: the focus is put there a frame later, when it is on screen.
+    focusCard: (now) => {
+      if (!now.moved) return
+      requestAnimationFrame(() =>
+        document
+          .querySelector<HTMLElement>(`[data-review-region="${CSS.escape(region.id)}"] [data-card] [data-first-action]`)
+          ?.focus()
+      )
+    }
+  }
+}
+
+/** One queue's atoms, made when it is first drawn from the region it is in. */
+const QueueScope = ScopedAtom.make((region: Region) => Atom.make(makeQueue(region)))
 
 /**
  * How far through the decisions the person is: how many are done and how many there are in all. More can need the
@@ -95,124 +161,140 @@ function WhySheet(props: { title: string; about: string; children: ReactNode }) 
   )
 }
 
-/** The one decision on screen: a group of identical fixes, or a row. Everything needed to decide is on the card. */
-function Decision(props: {
-  entry: QueueEntry
+type CardProps = {
   columns: ReadonlyArray<ReviewColumn>
+  labels: HashMap.HashMap<string, string>
   kinds: HashMap.HashMap<string, ProblemKind>
   actions: RowActions
   groupActions: GroupActions
   onSplit: (groupId: string) => void
   excluded: HashSet.HashSet<string>
-  rowAction: ReviewRegionProps["rowAction"]
+  rowAction: RowActionFor | undefined
   cellEditor: ReviewRegionProps["cellEditor"]
-}) {
-  const { entry, actions, groupActions } = props
-  const labels = useMemo(
-    () => HashMap.fromIterable(props.columns.map((column) => [column.id, column.label] as const)),
-    [props.columns]
-  )
+}
+
+/** The one decision on screen: a group of identical fixes, or a row. Everything needed to decide is on the card. */
+function Decision(props: CardProps & { entry: QueueEntry }) {
+  const { entry, ...card } = props
+  return Entry.match(entry, {
+    group: ({ group }) => <GroupCard {...card} group={group} />,
+    row: ({ view }) => <RowCard {...card} view={view} />,
+    // A heading is never a decision.
+    kind: () => null,
+    rest: () => null
+  })
+}
+
+/** What names one decision's card: its group, or its row. */
+const cardKey = Entry.match({
+  group: ({ group }) => `g:${group.id}`,
+  row: ({ view }) => view.row.id,
+  kind: () => "",
+  rest: () => ""
+})
+
+function GroupCard(props: CardProps & { group: FixGroup }) {
+  const { group, actions, groupActions } = props
   const columnOf = (id: string | undefined) => props.columns.find((column) => column.id === id)
+  const n = group.rowIds.filter((rowId) => !HashSet.has(props.excluded, rowId)).length
+  const choices = choicesOf(group)
+  return (
+    <Item variant="outline" className="w-full min-w-0">
+      <ItemHeader>
+        <ReasonTag kind={O.getOrUndefined(HashMap.get(props.kinds, group.kind))} fallback={group.kind} />
+        <span className="text-muted-foreground">{rowsWord(n)}</span>
+      </ItemHeader>
+      <ItemContent className="min-w-0">
+        <ItemTitle>
+          <GroupChange group={group} display={columnOf(group.column)?.display} />
+        </ItemTitle>
+        <WhySheet title="Why this change?" about="What the proposal is based on">
+          <p>
+            <Reason fix={group} />
+          </p>
+        </WhySheet>
+      </ItemContent>
+      <ItemFooter className="min-w-0">
+        <div className="flex w-full min-w-0 flex-col gap-2">
+          {choices !== undefined ? (
+            <ButtonGroup aria-label={`Choose for ${n === 1 ? "the row" : `all ${n} rows`}`} className="w-full">
+              {choices.map((choice, at) => (
+                <Button
+                  key={choice}
+                  variant="outline"
+                  size="touch"
+                  className="flex-1"
+                  {...(at === 0 ? first : {})}
+                  onClick={() => groupActions.choose(group.id, choice)}
+                >
+                  {valueWords(group, choice)} for {n}
+                </Button>
+              ))}
+            </ButtonGroup>
+          ) : (
+            <Button size="touch" {...first} onClick={() => groupActions.accept(group.id)}>
+              {group.mixed === true ? `Accept for ${n}` : `Use ${group.label ?? group.to} for ${n}`}
+            </Button>
+          )}
+          <div className="flex flex-col gap-2">
+            <Button variant="outline" size="touch" onClick={() => props.onSplit(group.id)}>
+              Review {n} one by one
+            </Button>
+            <Button
+              variant="outline"
+              size="touch"
 
-  if (entry.type === "group") {
-    const { group } = entry
-    const n = group.rowIds.filter((rowId) => !HashSet.has(props.excluded, rowId)).length
-    const choices = choicesOf(group)
-    return (
-      <Item variant="outline" className="w-full min-w-0">
-        <ItemHeader>
-          <ReasonTag kind={O.getOrUndefined(HashMap.get(props.kinds, group.kind))} fallback={group.kind} />
-          <span className="text-muted-foreground">{rowsWord(n)}</span>
-        </ItemHeader>
-        <ItemContent className="min-w-0">
-          <ItemTitle>
-            <GroupChange group={group} display={columnOf(group.column)?.display} />
-          </ItemTitle>
-          <WhySheet title="Why this change?" about="What the proposal is based on">
-            <p>
-              <Reason fix={group} />
-            </p>
-          </WhySheet>
-        </ItemContent>
-        <ItemFooter className="min-w-0">
-          <div className="flex w-full min-w-0 flex-col gap-2">
-            {choices !== undefined ? (
-              <ButtonGroup aria-label={`Choose for ${n === 1 ? "the row" : `all ${n} rows`}`} className="w-full">
-                {choices.map((choice, at) => (
-                  <Button
-                    key={choice}
-                    variant="outline"
-                    size="touch"
-                    className="flex-1"
-                    {...(at === 0 ? first : {})}
-                    onClick={() => groupActions.choose(group.id, choice)}
-                  >
-                    {valueWords(group, choice)} for {n}
-                  </Button>
-                ))}
-              </ButtonGroup>
-            ) : (
-              <Button size="touch" {...first} onClick={() => groupActions.accept(group.id)}>
-                {group.mixed === true ? `Accept for ${n}` : `Use ${group.label ?? group.to} for ${n}`}
-              </Button>
-            )}
-            <div className="flex flex-col gap-2">
-              <Button variant="outline" size="touch" onClick={() => props.onSplit(group.id)}>
-                Review {n} one by one
-              </Button>
-              <Button
-                variant="outline"
-                size="touch"
-
-                onClick={() => groupActions.leaveOut(group.rowIds)}
-              >
-                Leave out {n}
-              </Button>
-            </div>
-            <ul className="flex min-w-0 flex-col border-t pt-1">
-              {group.rowIds.map((rowId) => {
-                const view = actions.peek(rowId)
-                if (view === undefined) return null
-                const name = nameOf(view, props.columns[0])
-                return (
-                  <li key={rowId} className="min-w-0 text-sm">
-                    {/* The whole line is the tick box's label: a 20px box alone is too small to tap. */}
-                    <Label className="min-h-11 min-w-0 overflow-hidden">
-                      <Checkbox
-                        checked={!HashSet.has(props.excluded, rowId)}
-                        aria-label={`In this fix: ${name}`}
-                        className="size-5"
-                        onCheckedChange={() => groupActions.toggle(rowId)}
-                      />
-                      <span className="min-w-0 flex-1 leading-5">
-                        <span className="block truncate font-medium">{name}</span>
-                        <span className="block truncate font-normal text-muted-foreground">
-                          {contextOf(view, props.columns, group.column)}
-                        </span>
-                      </span>
-                      <span className="flex-none font-normal text-muted-foreground">
-                        <ColumnText column={columnOf(group.column)}>{view.row.cells[group.column]}</ColumnText> →{" "}
-                        {/* Each row's own new value: under a `label` the rows of one group end in different values. */}
-                        {choices === undefined ? (view.problem?.fix?.to ?? group.to) : "?"}
-                      </span>
-                    </Label>
-                  </li>
-                )
-              })}
-            </ul>
+              onClick={() => groupActions.leaveOut(group.rowIds)}
+            >
+              Leave out {n}
+            </Button>
           </div>
-        </ItemFooter>
-      </Item>
-    )
-  }
+          <ul className="flex min-w-0 flex-col border-t pt-1">
+            {group.rowIds.map((rowId) => {
+              const view = actions.peek(rowId)
+              if (view === undefined) return null
+              const name = nameOf(view, props.columns[0])
+              return (
+                <li key={rowId} className="min-w-0 text-sm">
+                  {/* The whole line is the tick box's label: a 20px box alone is too small to tap. */}
+                  <Label className="min-h-11 min-w-0 overflow-hidden">
+                    <Checkbox
+                      checked={!HashSet.has(props.excluded, rowId)}
+                      aria-label={`In this fix: ${name}`}
+                      className="size-5"
+                      onCheckedChange={() => groupActions.toggle(rowId)}
+                    />
+                    <span className="min-w-0 flex-1 leading-5">
+                      <span className="block truncate font-medium">{name}</span>
+                      <span className="block truncate font-normal text-muted-foreground">
+                        {contextOf(view, props.columns, group.column)}
+                      </span>
+                    </span>
+                    <span className="flex-none font-normal text-muted-foreground">
+                      <ColumnText column={columnOf(group.column)}>{view.row.cells[group.column]}</ColumnText> →{" "}
+                      {/* Each row's own new value: under a `label` the rows of one group end in different values. */}
+                      {choices === undefined ? (view.problem?.fix?.to ?? group.to) : "?"}
+                    </span>
+                  </Label>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      </ItemFooter>
+    </Item>
+  )
+}
 
-  const { view } = entry
+function RowCard(props: CardProps & { view: RowView }) {
+  const { view, actions, labels } = props
+  const columnOf = (id: string | undefined) => props.columns.find((column) => column.id === id)
   const nameColumn = props.columns[0]
   const name = nameOf(view, nameColumn)
   const problem = view.problem
   const subject = problem?.column
   const mark = subject === undefined ? undefined : view.marks[subject]
-  const fix = mark !== undefined && mark.state === "proposed" ? mark.fix : undefined
+  const fix = mark !== undefined && isCellMarkProposed(mark) ? mark.fix : undefined
   const choices = fix === undefined ? undefined : choicesOf(fix)
   const rival = problem?.rivals?.[0] === undefined ? undefined : actions.peek(problem.rivals[0])
   const label = subject === undefined ? "" : O.getOrElse(HashMap.get(labels, subject), () => subject)
@@ -376,42 +458,49 @@ function Decision(props: {
           ) : (
             // The caller's own answer for the row: each answer in full words, as on a desk.
             others.map((answer) =>
-              answer.type === "type" ? (
-                subject === undefined ? null : (
-                  <Overlay
-                    key="type"
-                    title={`${label} for ${name}`}
-                    about={`Type the ${label} for ${name}`}
-                    trigger={
-                      <Button variant="outline" size="touch">
-                        {askFor(label)}
-                      </Button>
-                    }
+              OtherAnswer.$match(answer, {
+                Type: () =>
+                  subject === undefined ? null : (
+                    <Overlay
+                      key="type"
+                      title={`${label} for ${name}`}
+                      about={`Type the ${label} for ${name}`}
+                      trigger={
+                        <Button variant="outline" size="touch">
+                          {askFor(label)}
+                        </Button>
+                      }
+                    >
+                      {(close) => (
+                        <EditForm
+                          label={label}
+                          size="touch"
+                          value=""
+                          onSave={(next) => {
+                            close()
+                            actions.edit(view.row.id, subject, next)
+                          }}
+                        />
+                      )}
+                    </Overlay>
+                  ),
+                LeaveOut: ({ label: words }) => (
+                  <Button
+                    key="leave-out"
+                    variant="outline"
+                    size="touch"
+                    {...(main === null ? first : {})}
+                    onClick={() => actions.leaveOut(view.row.id)}
                   >
-                    {(close) => (
-                      <EditForm
-                        label={label}
-                        size="touch"
-                        value=""
-                        onSave={(next) => {
-                          close()
-                          actions.edit(view.row.id, subject, next)
-                        }}
-                      />
-                    )}
-                  </Overlay>
+                    {words}
+                  </Button>
+                ),
+                Extra: ({ label: words }) => (
+                  <Button key="extra" variant="outline" size="touch" onClick={extra.onSelect}>
+                    {words}
+                  </Button>
                 )
-              ) : (
-                <Button
-                  key={answer.type}
-                  variant="outline"
-                  size="touch"
-                  {...(main === null && answer.type === "leaveOut" ? first : {})}
-                  onClick={() => (answer.type === "leaveOut" ? actions.leaveOut(view.row.id) : extra.onSelect())}
-                >
-                  {answer.label}
-                </Button>
-              )
+              })
             )
           )}
         </div>
@@ -420,60 +509,60 @@ function Decision(props: {
   )
 }
 
-/**
- * The phone's review: an approval flow, one decision at a time. A group of identical fixes is one decision; then
- * each row that needs the person, with its reason, the change and what each button will do. The other views are a
- * plain two-line list. Nothing scrolls sideways.
- */
-export function ReviewQueue(props: {
-  /** Every row as it stands, for the decisions. */
-  views: ReadonlyArray<RowView>
-  /** The rows of the current view, for the list. */
-  list: ReadonlyArray<RowView>
+type QueueProps = {
   deciding: boolean
   /** The cards are the rows that cannot be imported as written, one by one, instead of the decisions. */
   blocked?: boolean
-  /** Rows the person took out of their group's action. */
-  excluded: HashSet.HashSet<string>
-  columns: ReadonlyArray<ReviewColumn>
-  kinds: HashMap.HashMap<string, ProblemKind>
-  actions: RowActions
-  groupActions: GroupActions
   /** Decisions there were when the review opened, and how many are left (`decisionsLeft`). */
   progress: { total: number; left: number }
-  /** Groups the person chose to go through row by row. Kept by the region, so its count of decisions agrees. */
-  split: HashSet.HashSet<string>
+  /** A group to go through row by row. Kept by the region, so its count of decisions agrees. */
   onSplit: (groupId: string) => void
-  words: ReviewWords
   undo: ReactNode
-  readOnly: boolean
   loading: boolean
   caption: string
   empty: ReactNode
-  /** The caller's own answer per row (`rowAction` on the region). */
-  rowAction: ReviewRegionProps["rowAction"]
   cellEditor: ReviewRegionProps["cellEditor"]
-}) {
-  const { split } = props
-  const [at, setAt] = useState(0)
-  const [shown, setShown] = useState(page)
-  const decisions = useMemo(
-    () => queue({ views: props.views, split, blocked: props.blocked === true }),
-    [props.views, split, props.blocked]
+}
+
+/**
+ * The phone's review: an approval flow, one decision at a time. A group of identical fixes is one decision; then
+ * each row that needs the person, with its reason, the change and what each button will do. The other views are a
+ * plain two-line list. Nothing scrolls sideways. It reads the region it is in (`RegionScope`, `TableScope`).
+ */
+export function ReviewQueue(props: QueueProps) {
+  const region = useAtomValue(RegionScope.use())
+  return (
+    <QueueScope.Provider value={region}>
+      <QueueBody {...props} region={region} />
+    </QueueScope.Provider>
   )
+}
+
+function QueueBody(props: QueueProps & { region: Region }) {
+  const { region } = props
+  const table = useAtomValue(TableScope.use())
+  const queueOf = useAtomValue(QueueScope.use())
+  const [{ at, shown }, setPlace] = useAtom(queueOf.place)
+  const setAt = (next: number) => setPlace((before) => ({ ...before, at: next }))
+  const setShown = (next: number) => setPlace((before) => ({ ...before, shown: next }))
+  const decisions = useAtomValue(queueOf.decisions)
+  const labels = useAtomValue(queueOf.labels)
+  const list = useAtomValue(region.list)
+  const columns = useAtomValue(region.input.columns)
+  const excluded = useAtomValue(region.ui).excluded
+  const kinds = useAtomValue(region.kinds)
+  const words = useAtomValue(region.words)
+  const readOnly = useAtomValue(region.input.readOnly)
+  const ownAnswer = useAtomValue(region.input.rowAction)
+  const rowAction = O.getOrUndefined(ownAnswer)
+  const actions = useAtomValue(region.rejects) ? table.actions : table.plainActions
+  const groupActions = table.groupActions
   const index = Math.min(at, Math.max(0, decisions.length - 1))
   const entry = decisions[index]
-  const key = entry === undefined ? "" : entry.type === "group" ? `g:${entry.group.id}` : entry.view.row.id
-  const nameColumn = props.columns[0]
-
-  // After a decision the next card takes its place, and focus goes to its first button.
-  const region = useRef<HTMLDivElement>(null)
-  const before = useRef(key)
-  useEffect(() => {
-    if (before.current === key) return
-    before.current = key
-    region.current?.querySelector<HTMLElement>("[data-first-action]")?.focus()
-  }, [key])
+  const key = useAtomValue(queueOf.card).key
+  // After a decision the next card takes the decided one's place, and focus goes to its first button.
+  useAtomSubscribe(queueOf.card, queueOf.focusCard)
+  const nameColumn = columns[0]
 
   if (props.loading) {
     return (
@@ -484,17 +573,16 @@ export function ReviewQueue(props: {
     )
   }
 
-  if (!props.deciding || props.readOnly) {
-    const rows = props.list.slice(0, shown)
+  if (!props.deciding || readOnly) {
+    const rows = list.slice(0, shown)
     return (
       <div
-        ref={region}
         role="region"
         aria-label={props.caption}
         data-queue=""
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-y"
       >
-        {props.list.length === 0 ? (
+        {list.length === 0 ? (
           <div className="py-10 text-center text-sm text-muted-foreground">{props.empty}</div>
         ) : (
           <ItemGroup>
@@ -504,29 +592,26 @@ export function ReviewQueue(props: {
                   <ItemTitle>{nameOf(view, nameColumn)}</ItemTitle>
                   <ItemDescription>
                     {view.status === "needs" || view.status === "cannot"
-                      ? reasonOf({ view, kinds: props.kinds, words: props.words })
-                      : contextOf(view, props.columns, undefined)}
+                      ? reasonOf({ view, kinds: kinds, words: words })
+                      : contextOf(view, columns, undefined)}
                   </ItemDescription>
                 </ItemContent>
                 {view.status === "needs" || view.status === "cannot" ? (
                   <ReasonTag
-                    kind={O.getOrUndefined(HashMap.get(props.kinds, view.problem?.kind ?? ""))}
+                    kind={O.getOrUndefined(HashMap.get(kinds, view.problem?.kind ?? ""))}
                     tone={view.problem?.tone}
                     fallback={view.problem?.kind ?? ""}
                   />
                 ) : (
-                  <DecisionTag view={view} words={props.words} />
+                  <DecisionTag view={view} words={words} />
                 )}
-                {props.readOnly ||
-                view.status === "needs" ||
-                view.status === "stored" ||
-                view.status === "cannot" ? null : (
+                {readOnly || view.status === "needs" || view.status === "stored" || view.status === "cannot" ? null : (
                   <Button
                     variant="quiet"
                     size="touch"
                     data-first-action=""
                     onClick={() =>
-                      view.status === "out" ? props.actions.putBack(view.row.id) : props.actions.leaveOut(view.row.id)
+                      view.status === "out" ? actions.putBack(view.row.id) : actions.leaveOut(view.row.id)
                     }
                   >
                     {view.status === "out" ? "Put back" : "Leave out"}
@@ -537,9 +622,9 @@ export function ReviewQueue(props: {
             ))}
           </ItemGroup>
         )}
-        {props.list.length > shown ? (
+        {list.length > shown ? (
           <Button variant="outline" size="touch" className="my-3 w-full" onClick={() => setShown(shown + page)}>
-            Show {Math.min(page, props.list.length - shown)} more
+            Show {Math.min(page, list.length - shown)} more
           </Button>
         ) : null}
       </div>
@@ -548,7 +633,6 @@ export function ReviewQueue(props: {
 
   return (
     <div
-      ref={region}
       role="region"
       aria-label={props.caption}
       data-queue=""
@@ -591,18 +675,21 @@ export function ReviewQueue(props: {
             }
             className="h-1"
           />
-          <Decision
-            key={key}
-            entry={entry}
-            columns={props.columns}
-            kinds={props.kinds}
-            actions={props.actions}
-            groupActions={props.groupActions}
-            excluded={props.excluded}
-            rowAction={props.rowAction}
-            cellEditor={props.cellEditor}
-            onSplit={props.onSplit}
-          />
+          {/* Keyed by the decision, so the card that takes a decided one's place is a new node. */}
+          <div key={key} data-card={key} className="contents">
+            <Decision
+              entry={entry}
+              columns={columns}
+              labels={labels}
+              kinds={kinds}
+              actions={actions}
+              groupActions={groupActions}
+              excluded={excluded}
+              rowAction={rowAction}
+              cellEditor={props.cellEditor}
+              onSplit={props.onSplit}
+            />
+          </div>
         </>
       )}
     </div>

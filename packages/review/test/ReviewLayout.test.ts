@@ -172,12 +172,12 @@ describe("undo and redo", () => {
     const row = ready[0]!
     const left = act({ rows, state: emptyState, action: { type: "leaveOut", rowIds: [row.id] } })
     const undone = act({ rows, state: left.state, action: { type: "undo" } })
-    expect([undone.state.undo.length, undone.state.redo?.length]).toEqual([0, 1])
+    expect([undone.state.undo.length, undone.state.redo.length]).toEqual([0, 1])
     expect(undone.label).toBe("Undone: 1 row left out")
     const redone = act({ rows, state: undone.state, action: { type: "redo" } })
-    expect([redone.state.undo.length, redone.state.redo?.length]).toEqual([1, 0])
+    expect([redone.state.undo.length, redone.state.redo.length]).toEqual([1, 0])
     expect(redone.label).toBe("Redone: 1 row left out")
-    expect(redone.focus).toBe(row.id)
+    expect(redone.focus).toEqual(O.some(row.id))
     // Nothing to redo: nothing happens.
     expect(act({ rows, state: redone.state, action: { type: "redo" } }).label).toBe("")
   })
@@ -261,8 +261,11 @@ describe("a row already in the system", () => {
   it("cannot be left out or edited: there is nothing to decide", () => {
     expect(act({ rows: all, state: emptyState, action: { type: "leaveOut", rowIds: [stored.id] } }).label).toBe("")
     expect(
-      act({ rows: all, state: emptyState, action: { type: "edit", rowId: stored.id, column: "name", value: "X" } })
-        .label
+      act({
+        rows: all,
+        state: emptyState,
+        action: { type: "edit", rowId: stored.id, column: "name", value: "X" }
+      }).label
     ).toBe("")
   })
 })

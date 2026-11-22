@@ -28,6 +28,17 @@ confirm (`commit` in `packages/catalog/host/src/ImportStore.adapter.ts`), tested
 statement `ON CONFLICT (organizationId, codeKey) DO NOTHING`, and a row counts as created only when its record is
 there afterwards. The smaller shape, one statement per row, is below.
 
+A statement that needs a whole list at once (does any of these 50,000 rows differ, are all these items still as read)
+cannot bind one value per piece of it: 100 values are soon passed, and one value holds at most 2 MB. Its batch first
+puts the list into `importWriteList`, a piece to a statement, the statement reads it back with `json_each` (three bound
+values however long it is), and the batch's last statement deletes it (`putPiece` and `inList` in the same adapter;
+tested at 50,000 rows in `test/server/WriteLimits.slow.test.ts`, which counts what every statement binds). A piece is
+cut by the bytes of UTF-8 of the text bound, as D1 counts them, never by characters: a "木" is three bytes, and a quote
+typed into a decision, JSON inside JSON, is escaped twice (`pieced` in `packages/catalog/host/src/internal/pieces.ts`).
+A statement that writes rows found by a key in such a piece finds them first, in a subquery that drives from the piece
+(`CROSS JOIN`, kept whole with `LIMIT -1`), and writes them by `rowid`: left to choose, SQLite reads every row of the
+organization and scans the piece for each.
+
 In the Layer: `const sql = yield* D1Client.D1Client`. In the migration, the natural key is
 `TEXT NOT NULL COLLATE NOCASE` with `UNIQUE (organizationId, code)`, so case variants are one key. Rows go in and come
 out through the model's Schema (pattern 12 for the table).
@@ -72,8 +83,9 @@ record: Effect.fn("records.record")(function* ({ params }) {
   return found.value
 })
 
-// web
-useQuery({ queryKey: ["record", code], queryFn: () => call((api) => api.items.record({ params: { code } })) })
+// web: one read per code, each an atom made once and kept by its key (`perKey` from `@inventory/client/Api`)
+const record = perKey((code: string) => catalogApi.query((api) => api.items.record({ params: { code } })))
+// in the screen: useAtomValue(record(code)), an AsyncResult with the endpoint's own failures
 ```
 
 ## 3. Calling a model
@@ -172,7 +184,7 @@ A route beside the HttpApi (a frame document, a stream):
 
 ## 7. Reading a spreadsheet (.csv and .xlsx)
 
-The reader exists; do not write another. A file the person chooses is read with `useUpload().start(file, sheet?)`
+The reader exists; do not write another. A file the person chooses is read by setting the `startUpload` atom to it
 (`@inventory/catalog-web/Upload`, [the kit](kit.md) "Steps and upload"): a module worker runs the reader, so the page never freezes, and
 the screen shows its progress and Cancel. Inside the worker and in tests, `readSpreadsheet({ file, sheet?,
 onProgress? })` from `@inventory/catalog-web/Spreadsheet` returns an `Effect<SpreadsheetTable, FileProblem>` (shapes in
@@ -185,12 +197,14 @@ look, as sentences to show. A file that cannot be read is a `FileProblem`, data 
 and tests: `packages/catalog/web/test/readSpreadsheet.test.ts`.
 
 ```tsx
-const upload = useUpload()
-upload.start(file)                       // returns at once; upload.state: Reading -> Arriving -> Read, or Refused
-// upload.state._tag === "Read": upload.state.table, and upload.state.workbook for a workbook ->
-// <SheetChooser sheets={workbook.sheets} chosen={workbook.chosen} onChoose={(sheet) => upload.start(file, sheet)} />
-// upload.state._tag === "Refused": upload.state.problem is the file's FileProblem (what is wrong, what to do)
-// upload.state._tag === "Failed": the reader itself broke; upload.state.message says so
+const state = useAtomValue(uploadState)   // Idle -> Reading -> Saving -> Preparing, or Cancelling, Refused, Failed
+const start = useAtomSet(startUpload)
+const cancel = useAtomSet(cancelUpload)
+start({ file, onEnd })                    // returns at once; `onEnd` hears how it ended (an `UploadEnd`: Arrived,
+                                          // Cancelled, Refused or Failed, told apart with `UploadEnd.$match`).
+                                          // Another sheet of a workbook: `start({ file, sheet })`
+// "Refused": state.problem is the file's FileProblem (what is wrong, what to do)
+// "Failed": the reader or the sending broke; the state says so in words
 ```
 
 - **Cell text.** Numbers are plain decimals at Excel's 15 digits (`0.1+0.2` is `"0.3"`, money stays `"12.5"`, so read
@@ -379,6 +393,35 @@ step (`packages/catalog/web/src/ResultStep.screen.tsx`) says what it will do and
 - **Each Confirm is a recorded batch.** One `importBatch` row per Confirm; each record it creates names it
   (`batchId`) and starts at `revision` 1. Records, outcomes, changes, the audit line and the import's status are one
   atomic batch, and every statement checks that the import is still open, so a second Confirm writes nothing.
+- **A save names what its decisions were made on.** `PUT /api/v1/imports/:id/decisions` takes `SaveRequest`: the
+  rows whose decision is new or taken back, and `madeOn`, for each row of `set`, the draft's revision the screen held
+  when that row was last decided (a key that names no row of `set` is not read). Each column choice records the first
+  revision that has it (`MappingChoice.at`) and each match the fields it moved (`ColumnMove`); every row is judged on
+  its own revision by `withoutStaleDecisions` (`packages/catalog/model/src/Import/Rematch.rules.ts`), and a part of
+  its decision that rests on a column matched again since is not applied, of four kinds: an accept or an undone fix
+  of that field (`accept`, `undo`), a Replace, Keep-stored or keep-one-of-two after the SKU's column (`stored`,
+  `twin`), a Replace or Keep-stored after another column where the row now compares otherwise with its stored item
+  (`stored`). The rest of the row's decision is applied, and the answer names each part in `notApplied` by row, field
+  and kind. A confirm carries the same `madeOn` for the rows it carries, and is refused whole (`AcceptsTakenBack`,
+  409) when any part of one of them would not be applied.
+- **A row that waited is written only over what its sender knew.** A save's `over` names, for each row that waited (a
+  failed save, a reload, a closed tab), the decisions the sender knows the server may hold of it. Such a row is
+  written only while what is stored is one of them, or one of them with what a match took back since removed (the same
+  `withoutStaleDecisions`, on the row's `madeOn`), or already what the save leaves (the same save sent again); otherwise
+  it is not written and the answer names it in `decidedSince` with what is stored. The comparison and the write are
+  one: the save's lists are put only while the draft is at the revision the comparison read, so a save, a match or a
+  confirm in between makes it be compared again (`Waited.rules.ts`, `test/server/WaitedRows.slow.test.ts`).
+- **A match takes back what rests on the columns it moves, and keeps what it took.** The same rule, on the stored
+  decisions as if each was made on the revision before the match, in the match's own atomic write; what it took back
+  is kept with the draft by field and kind (`ImportView.takenBack`, the first 200 rows named and all counted) so every
+  screen names it, the audit line counts it by kind, and it is let go when the import is confirmed. A request
+  overtaken on every try (`draftTries`) is refused with `DraftBusy` (409), nothing written.
+- **A Confirm names the draft it was made on.** Its payload is the revision of the draft the screen shows and the
+  person's own decisions not saved yet (`ConfirmRequest`), never the screen's whole picture. The batch's first
+  statement writes the confirm's row only while the import is open at that revision, and everything after it,
+  the unsaved decisions included, checks for that row: on a draft somebody has changed since, nothing is written and
+  the answer is `DraftMoved` (409) with the revision the draft is at. The screen then reads the import again, says
+  what changed above the review, and the person confirms again (`Draft.machine.ts`, `ConfirmPressed`).
 - **A change to a record moves its revision** (`Records.edit`, made on the revision the person saw; the same edit
   again writes nothing). Changed is "saved since", even if the person changed it back: the revision says a person
   touched it.

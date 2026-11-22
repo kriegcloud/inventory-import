@@ -67,25 +67,18 @@ const send = (body: unknown) =>
 describe("a file that cannot be staged", () => {
   it.effect("is answered with 200 and its problem as data, and a file that can with what was made", () =>
     Effect.gen(function* () {
+      // The body is the outcome as the wire carries it: each value built with its constructor, then encoded as JSON.
+      const wire = S.encodeEffect(S.toCodecJson(StagingOutcome(Staged)))
       const empty = yield* send({ fileName: "items.csv", rows: 0 })
-      expect(empty).toEqual({
-        status: 200,
-        json: {
-          _tag: "Failure",
-          failure: {
-            _tag: "FileProblem",
-            kind: "empty",
-            fileName: "items.csv",
-            problem: '"items.csv" has column names but no rows under them.',
-            todo: "Choose the file that holds the rows to import."
-          }
-        }
+      const problem = FileProblem.make({
+        kind: "empty",
+        fileName: "items.csv",
+        problem: '"items.csv" has column names but no rows under them.',
+        todo: "Choose the file that holds the rows to import."
       })
+      expect(empty).toEqual({ status: 200, json: yield* wire(Result.fail(problem)) })
       const made = yield* send({ fileName: "items.csv", rows: 12 })
-      expect(made).toEqual({
-        status: 200,
-        json: { _tag: "Success", success: { rows: 12 } }
-      })
+      expect(made).toEqual({ status: 200, json: yield* wire(Result.succeed({ rows: 12 })) })
     })
   )
 

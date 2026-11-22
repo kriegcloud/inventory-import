@@ -17,7 +17,7 @@ type AnswerSchema = S.Codec<unknown, Record<string, unknown>, never, never>
 /** A structured answer, and which model gave it (the screen says which one answered). */
 export interface AiAnswer<A> {
   readonly value: A
-  readonly answeredBy: Extract<AnsweredBy, { readonly _tag: "Model" }>
+  readonly answeredBy: typeof AnsweredBy.cases.Model.Type
 }
 
 /** True when a model can be asked; with none, a feature goes straight to its rules and takes no call. */
@@ -25,12 +25,8 @@ export const modelIsOn = (status: ModelStatus): boolean =>
   ModelStatus.match(status, { on: () => true, off: () => false })
 
 /** Who answered, in the contract's words. */
-export const answeredByModel = (answered: ModelAnswered): AiAnswer<unknown>["answeredBy"] => ({
-  _tag: "Model",
-  provider: "openrouter",
-  model: answered.model,
-  fallback: answered.fallback
-})
+export const answeredByModel = (answered: ModelAnswered): AiAnswer<unknown>["answeredBy"] =>
+  AnsweredBy.cases.Model.make({ provider: "openrouter", model: answered.model, fallback: answered.fallback })
 
 /** A failure as the contract words it: the trouble, its sentence (`modelSentences`), and whether trying again helps. */
 export const aiUnavailableOf = (error: ModelUnavailable): AiUnavailable =>

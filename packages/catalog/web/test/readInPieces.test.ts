@@ -6,7 +6,7 @@ import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import { describe, expect, it } from "vitest"
 import { readSpreadsheet, type ReadProgress } from "@inventory/catalog-web/Spreadsheet"
-import { progressOf, rowsOf } from "@inventory/catalog-web/UploadMachine"
+import { progressOf, rowsOf, UploadState } from "@inventory/catalog-web/UploadMachine"
 
 describe("reading CSV text in pieces", () => {
   it("reports progress that rises, ends exact, and never passes its total", () =>
@@ -28,7 +28,11 @@ describe("reading CSV text in pieces", () => {
         }
         for (const report of reports) {
           const { done, total } = progressOf({
-            state: { _tag: "Reading", fileName: "big.csv", rowsRead: report.rowsRead, rows: rowsOf(report) }
+            state: UploadState.cases.Reading.make({
+              fileName: "big.csv",
+              rowsRead: report.rowsRead,
+              rows: rowsOf(report)
+            })
           })
           expect(done).toBeLessThanOrEqual(total ?? Infinity)
         }

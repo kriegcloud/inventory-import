@@ -67,10 +67,9 @@ export class AfterQuoteSpaces extends S.Opaque<AfterQuoteSpaces, { readonly bran
 
 /** Where the machine is inside a record. */
 const Mode = LiteralKit(["fieldStart", "unquoted", "quoted", "quoteInQuoted", "afterQuoteSpaces"])
-export const MachineMode = Mode.mapMembers(() => Tuple.make(FieldStart, Unquoted, Quoted, QuoteInQuoted, AfterQuoteSpaces)).pipe(
-  S.toTaggedUnion("mode"),
-  $I.annoteSchema("MachineMode", { description: "Where the machine is in a record" })
-)
+export const MachineMode = Mode.mapMembers(() =>
+  Tuple.make(FieldStart, Unquoted, Quoted, QuoteInQuoted, AfterQuoteSpaces)
+).pipe(S.toTaggedUnion("mode"), $I.annoteSchema("MachineMode", { description: "Where the machine is in a record" }))
 export type MachineMode = typeof MachineMode.Type
 
 const point = CsvIndex
@@ -178,9 +177,12 @@ export class RawRecord extends S.Opaque<RawRecord, { readonly brand: unique symb
 ) {}
 
 /** The rules the machine reads by. */
-export class MachineConfig extends S.Opaque<MachineConfig, {
-  readonly brand: unique symbol
-}>()(
+export class MachineConfig extends S.Opaque<
+  MachineConfig,
+  {
+    readonly brand: unique symbol
+  }
+>()(
   S.Struct({
     delimiter: S.String,
     quotes: CsvQuoteRule,

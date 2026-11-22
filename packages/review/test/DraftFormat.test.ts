@@ -10,9 +10,9 @@ import * as A from "effect/Array"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import { putBack, ReviewDecision, ReviewDecisionFromFlags } from "@inventory/review/ReviewDecision"
-import { act, restored } from "@inventory/review/ReviewDraft"
+import { act } from "@inventory/review/ReviewDraft"
 import { ReviewRow } from "@inventory/review/ReviewTypes"
-import { restoredDecisions, SavedProgress } from "@inventory/review/SavedProgress"
+import { restoredReview, SavedProgress } from "@inventory/review/SavedProgress"
 import before from "./fixtures/draft-before-the-move.txt?raw"
 
 const asText = S.fromJsonString(SavedProgress)
@@ -31,14 +31,16 @@ describe("a draft saved by the build before the move", () => {
     Effect.gen(function* () {
       const progress = yield* S.decodeEffect(asText)(before)
       const review = O.getOrThrow(progress.review)
-      const state = restored(restoredDecisions(review))
+      const state = restoredReview(review)
       expect(A.sort([...HashMap.keys(state.decisions)], Order.String)).toEqual(["row-148", "row-195"])
       expect(O.map(HashMap.get(state.decisions, "row-148"), (d) => d.accepted)).toEqual(O.some(["sku"]))
       expect(A.map(state.undo, (step) => step.label)).toEqual(["2 fixes accepted"])
-      expect(A.map(state.redo ?? [], (step) => step.label)).toEqual(["2 rows left out"])
+      expect(A.map(state.redo, (step) => step.label)).toEqual(["2 rows left out"])
       // The redo step holds the two rows as they were when it was undone: left out, not kept before.
-      const redone = state.redo?.[0]?.before ?? HashMap.empty()
-      expect(O.map(HashMap.get(redone, "row-55"), (d) => d?.place)).toEqual(O.some({ kind: "leftOut", wasKept: false }))
+      const redone = state.redo[0]?.before ?? HashMap.empty()
+      expect(O.map(O.flatten(HashMap.get(redone, "row-55")), (d) => d.place)).toEqual(
+        O.some({ kind: "leftOut", wasKept: false })
+      )
       // Redo after the restore puts the two rows back out.
       const rows: ReadonlyArray<ReviewRow> = A.map(["row-55", "row-191", "row-148", "row-195"], (id, i) =>
         ReviewRow.make({

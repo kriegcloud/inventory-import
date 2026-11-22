@@ -31,6 +31,47 @@ didn't": a messy file in, what is wrong fixed in the app, a clear account of the
   - On a phone the grey line under the result's heading is cut to one line.
   - A take-back restores at most ten replaces of one item in turn. No test covers two rows of one file replacing the
     same SKU.
+  - **A review that saves as you decide, open in two tabs or by two people.** Each of these needs two tabs, two people
+    or a lost connection; one person in one tab with a connection meets none of them.
+    - On a phone, a line above the review (a confirm held back, rows not saved, a take-back) pushes Import below the
+      edge of a page that does not scroll. The person dismisses the lines to reach it; a held confirm cannot be sent
+      again from there.
+    - A row waiting to be saved again can be sent over a colleague's newer decision of that row without asking, in
+      three cases: it was decided twice while its first save was on its way and the second save failed; it was
+      compared with the server while another save was on its way; "Suggest fixes" was pressed while it waited.
+    - A "from your other tab" line does not follow what the server holds. Picking a side can replace a colleague's
+      newer decision the line never showed, and Import goes through while the line still asks.
+    - A decision from a tab since closed, held beside this tab's own, is not named when someone else confirms the
+      import or it is closed; when the row already has a line, it is named once in a toast and then gone.
+    - An Undo or "Put row back" pressed while a save was on its way is lost when that save's answer takes back the
+      rest of the row: the server keeps what the person took back.
+    - A sign-in as somebody else in another tab of the same browser is not noticed in this tab until a request is
+      refused: until then what is pressed here is written as the other person, and what is read here is theirs.
+    - A switch of organization pressed while the page is asking who is signed in loads the whole page again, and an
+      upload under way is dropped.
+    - After a switch of organization the browser no longer asks before the page is left, though rows of the other
+      organization still wait in this tab. They are kept in this browser.
+    - After an import is closed and opened again in the same page, a late answer to an earlier save can be taken for
+      the answer to a newer one.
+    - A waiting row is held as "decided since by someone else or another tab" when nobody decided it (a column matched
+      again took part of it back, or a colleague put the row back), and it holds Import until the person picks.
+    - A confirm held because a colleague decided a row says the row has "a decision from your other tab beside this
+      tab's own".
+    - Each held row is one line and one press, with no press for all of them, and Import waits for every one. A
+      screen reader is read the whole list again after each press.
+    - This tab's waiting decision can be held by a closed tab's "Not saved" line whose only button is Dismiss; the
+      screen says it will be sent again, and Import asks for a pick that is not offered.
+    - The toast's "Save again" does nothing unless the person is on that import's Review or Result step.
+    - An accept made just after a column was matched again, on a row still being saved, can be taken back with a toast
+      saying the column was matched again after the accept. Accepting again works.
+    - The take-back line says a field "was matched again" and "to decide again" also when its column was cleared or
+      went to another field, after the rows were decided again, and to people who cannot decide.
+  - **For whoever changes the code.** `tags:check` takes 38 s on a chain of 20 calls, and `refs:check` does not
+    return on seven module variables assigned to each other; no file here is of either shape. `WordMatch`, `Read`
+    and the kept form of a held row are tagged unions whose cases are still built by hand. The property test of the
+    draft generates no take-back, empty decision, settled line, taken-up row or sign-out. Nothing fails when the
+    held-confirm line is removed, and three tests of a save while the session is asked again keep a person signed
+    in, which the app does not.
 - **Not verified:** how good the model help is on other files, and what it costs; the dark theme on the new screens;
   a restore after several confirms of one import replaced the same item in turn.
 - **Where my agent was wrong:** its profile missed rows 92 and 103 ("2024-13-01"), caught by the rules on the real
@@ -84,6 +125,10 @@ means I chose and the agent recommended the same.
 | A model's name guess the guard rates low | Typed by the person, the guess offered beside the box; one press | the agent's default after the hour | "the app never invents a value" |
 | What "Why flagged?" asks about | The rows on screen (view, kind, search); rows ticked one by one | the agent's default after the hour: it needs no new control | the standard's "the answer names them" |
 | A .txt file | A table only when most rows have as many cells as the heading; any text with commas | the agent's default after the hour | a letter read as two columns |
+| A save failed, rows wait unsaved, and the person reloads | Keep them and send them; warn before leaving only; drop them and say which | same, 2026-11-20 | row 130 left out with the network down: the browser asked before the reload, the row came back "not saved yet", and was sent when the network returned |
+| Rows wait unsaved and someone else confirms the import | Name the rows, then drop them; drop them without a word | same, 2026-11-20 | rows 55 and 191 left out and waiting, the import confirmed in another browser: the result says "Row 55: you left out", "Row 191: you left out" |
+| An accept waits while its field's column is matched again | Server refuses, screen says so; screen drops it only; as today | same, 2026-11-20 | Unit cost matched again from another screen, then rows 55 and 191 accepted: "2 accepts were taken back", both rows still open |
+| Confirm, when someone else decided a row this screen has not shown | Refuse, show, confirm again; their decision stands; your screen wins | same, 2026-11-19 | two tabs on items_clean.csv: row 3 left out in one, "Import 25 items" in the other imports nothing, shows 24 and asks again |
 
 **Reference ledger.** My own app stockroom (MIT): `src/domain/Prep.ts`, functions taken and rewritten (`inspect`,
 the guard); `src/domain/ItemImport.ts`, the stored-suggestion shape and its proposal branch; `src/server/Prep.ts`,

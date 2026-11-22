@@ -25,10 +25,11 @@ describe("stored JSON", () => {
     Effect.gen(function* () {
       yield* sameBytes(S.fromJsonString(RowDecision), '{"accepted":["quantityOnHand"]}')
       yield* sameBytes(S.fromJsonString(RowDecision), '{"out":true}')
-      yield* sameBytes(
-        MappingChoice.pipe(S.Array, S.fromJsonString),
-        '[{"field":"reorderPoint","column":1,"by":"person"}]'
-      )
+      const Choices = MappingChoice.pipe(S.Array, S.fromJsonString)
+      yield* sameBytes(Choices, '[{"field":"reorderPoint","column":1,"by":"person","at":12}]')
+      // A choice stored before a match named its revision is read as made before every decision.
+      const older = yield* S.decodeEffect(Choices)('[{"field":"reorderPoint","column":1,"by":"person"}]')
+      expect(older).toEqual([{ field: "reorderPoint", column: 1, by: "person", at: 0 }])
       yield* sameBytes(S.fromJsonString(StagedHead), headJson)
       yield* sameBytes(S.fromJsonString(StagedRow), rowJson)
     })

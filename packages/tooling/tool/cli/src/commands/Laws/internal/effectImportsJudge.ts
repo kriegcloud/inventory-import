@@ -5,7 +5,7 @@ import * as HashSet from "effect/HashSet"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
 import * as Str from "effect/String"
-import type { ImportFault } from "../EffectImports.schema.ts"
+import { ImportFault } from "../EffectImports.schema.ts"
 
 /** The modules whose namespace name is not the module's own. beep-effect: effect-laws-v1 law 1, EF-4. */
 const aliases: Readonly<Record<string, ReadonlyArray<string>>> = {
@@ -102,22 +102,22 @@ export const judge =
     taken: (name: string) => boolean
   ): ReadonlyArray<ImportFault> => {
     const shape = shapeOf(installed)(source)
-    if (shape === "missing") return [{ _tag: "UnknownPath", source, package: packageOf(source) }]
+    if (shape === "missing") return [ImportFault.cases.UnknownPath.make({ source, package: packageOf(source) })]
     if (shape === "barrel") {
       if (A.contains(namedRoots, source)) return []
       const kind = source === "effect" ? "root-barrel" : "nested-barrel"
-      if (specifiers.length === 0) return [{ _tag: "BarrelBare", kind, source }]
+      if (specifiers.length === 0) return [ImportFault.cases.BarrelBare.make({ kind, source })]
       return A.map(specifiers, (specifier): ImportFault => {
-        if (specifier.kind !== "named") return { _tag: "BarrelWhole", kind, source }
+        if (specifier.kind !== "named") return ImportFault.cases.BarrelWhole.make({ kind, source })
         const imported = specifier.imported
         const leaf = `${source}/${imported}`
         if (shapeOf(installed)(leaf) === "leaf") {
           const write = importLine({ local: canonicalOf(leaf)[0], source: leaf, type: specifier.type })
-          return { _tag: "BarrelModule", kind, imported, source, write }
+          return ImportFault.cases.BarrelModule.make({ kind, imported, source, write })
         }
         if (source === "effect" && isFunctionExport(installed)(imported))
-          return { _tag: "BarrelFunction", kind, imported }
-        return { _tag: "BarrelNoModule", kind, imported, source, leaf }
+          return ImportFault.cases.BarrelFunction.make({ kind, imported })
+        return ImportFault.cases.BarrelNoModule.make({ kind, imported, source, leaf })
       })
     }
     return A.flatMap(specifiers, (specifier): ReadonlyArray<ImportFault> => {
@@ -125,24 +125,22 @@ export const judge =
       if (specifier.kind === "namespace") {
         if (A.contains(names, specifier.local) || A.every(names, taken)) return []
         return [
-          {
-            _tag: "Alias",
+          ImportFault.cases.Alias.make({
             source,
             local: specifier.local,
             write: importLine({ local: names[0], source, type: specifier.type }),
             others: A.drop(names, 1)
-          }
+          })
         ]
       }
       if (specifier.type || A.contains(namedLeaves, source) || !Str.startsWith("effect/")(source)) return []
       return [
-        {
-          _tag: "NamedImport",
+        ImportFault.cases.NamedImport.make({
           imported: specifier.imported,
           source,
           write: importLine({ local: names[0], source, type: false }),
           name: names[0]
-        }
+        })
       ]
     })
   }

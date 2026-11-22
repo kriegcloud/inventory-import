@@ -106,7 +106,7 @@ export const okf = Effect.fn("Okf.okf")(function* (verbose: boolean) {
   const repo = yield* Repo
   const validator = repo.join(repo.root, ".agents/skills/okf-open-knowledge-format/scripts/validate.sh")
   if (!(yield* repo.exists(validator))) {
-    return A.of<OkfFinding>({ _tag: "ValidatorMissing", validator })
+    return A.of<OkfFinding>(OkfFinding.cases.ValidatorMissing.make({ validator }))
   }
   const present = yield* Effect.forEach(
     tools,
@@ -115,17 +115,17 @@ export const okf = Effect.fn("Okf.okf")(function* (verbose: boolean) {
   )
   const missing = A.findFirst(A.zip(tools, present), ([, found]) => !found)
   if (O.isSome(missing)) {
-    return A.of<OkfFinding>({ _tag: "ToolMissing", tool: missing.value[0] })
+    return A.of<OkfFinding>(OkfFinding.cases.ToolMissing.make({ tool: missing.value[0] }))
   }
   const sortZ = yield* repo.run("bash", ["-c", "printf 'a\\0' | sort -z"])
   if (sortZ.code !== 0) {
-    return A.of<OkfFinding>({ _tag: "SortWithoutZ" })
+    return A.of<OkfFinding>(OkfFinding.cases.SortWithoutZ.make({}))
   }
 
   const checkBundle = Effect.fn("Okf.checkBundle")(function* (bundle: string): Effect.fn.Return<Step, RepoError> {
     const files = yield* repo.files(repo.join(repo.root, bundle))
     const expected = A.filter(files, Str.endsWith(".md")).length
-    if (expected === 0) return { found: [{ _tag: "NoMarkdown", bundle }], stop: true }
+    if (expected === 0) return { found: [OkfFinding.cases.NoMarkdown.make({ bundle })], stop: true }
     // Both of the validator's streams as one, in the order it wrote them.
     const answer = yield* repo.run("bash", ["-c", 'bash "$0" "$1" 2>&1', validator, bundle])
     const report = Str.replace(/\n+$/, "")(answer.stdout)
@@ -139,29 +139,26 @@ export const okf = Effect.fn("Okf.okf")(function* (verbose: boolean) {
     )
     if (answer.code !== 0 || !Str.includes("Bundle is OKF v0.2 conformant")(report)) {
       return {
-        found: [
-          { _tag: "Printed", text: report },
-          { _tag: "NotConformant", bundle }
-        ],
+        found: [OkfFinding.cases.Printed.make({ text: report }), OkfFinding.cases.NotConformant.make({ bundle })],
         stop: true
       }
     }
     if (scanned !== String(expected)) {
       return {
         found: [
-          { _tag: "Printed", text: report },
-          { _tag: "ScannedWrong", bundle, scanned, expected }
+          OkfFinding.cases.Printed.make({ text: report }),
+          OkfFinding.cases.ScannedWrong.make({ bundle, scanned, expected })
         ],
         stop: true
       }
     }
     const shown: ReadonlyArray<OkfFinding> = verbose
-      ? [{ _tag: "Printed", text: report }]
+      ? [OkfFinding.cases.Printed.make({ text: report })]
       : A.map(
           A.filter(reportLines, (line) => /W[0-9]*: /.test(line)),
-          (text) => ({ _tag: "Printed", text })
+          (text) => OkfFinding.cases.Printed.make({ text })
         )
-    return { found: A.append(shown, { _tag: "Conformant", bundle, files: expected }), stop: false }
+    return { found: A.append(shown, OkfFinding.cases.Conformant.make({ bundle, files: expected })), stop: false }
   })
 
   const first = yield* checkBundle(bundles[0])

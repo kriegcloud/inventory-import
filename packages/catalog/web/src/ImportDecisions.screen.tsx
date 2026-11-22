@@ -1,6 +1,7 @@
 // The Activity page's "Decisions" list: every value an import wrote that differs from its file, what it was, what it
+import * as Atom from "effect/reactivity/Atom"
+import { answerOf } from "@inventory/client/Api"
 // became, who proposed it and who accepted or typed it. The app's Activity page shows it beside the audit trail.
-import { useQuery } from "@tanstack/react-query"
 import * as DateTime from "effect/DateTime"
 import * as O from "effect/Option"
 import { Code } from "@inventory/ui/Code"
@@ -16,7 +17,7 @@ import {
   changeSource
 } from "@inventory/catalog-contract/Change"
 import { fieldLabels } from "@inventory/catalog-contract/Staged"
-import { call } from "./Catalog.runtime.ts"
+import { catalogApi } from "./Catalog.runtime.ts"
 import { catalogKeys } from "./Catalog.keys.ts"
 import { importAddress } from "./internal/route.ts"
 import { when } from "./internal/format.tsx"
@@ -138,19 +139,26 @@ export const importDecisionColumns: ReadonlyArray<ListColumn<ChangeRecord>> = [
 /** What the decisions list is, for its caption and its skeleton. */
 export const importDecisionsCaption = "Values that imports changed, and who decided each"
 
-/** Every changed value the organization's imports wrote, newest first. */
-export const useImportDecisions = () =>
-  useQuery({ queryKey: catalogKeys.changes, queryFn: () => call((api) => api.imports.changes()) })
+/** Every changed value the organization's imports wrote, newest first: a confirm or a take-back changes it. */
+export const importDecisions = catalogApi.query((api) => api.imports.changes(), {
+  reactivityKeys: catalogKeys.changes
+})
+
+const noChanges: ReadonlyArray<ChangeRecord> = []
+const importDecisionAnswer = answerOf(importDecisions)
+/** The decisions' rows and columns as the list follows them: empty until the decisions have been read. */
+const importDecisionRows = Atom.map(importDecisionAnswer, (answer) => answer ?? noChanges)
+const importDecisionColumnsAtom = Atom.make(importDecisionColumns)
 
 /** The decisions list. The person searches it, sorts it and narrows it by field, by who proposed and by file. */
-export function ImportDecisions(props: { rows: ReadonlyArray<ChangeRecord> }) {
+export function ImportDecisions() {
   return (
     <ListTable
       key="decisions"
       caption={importDecisionsCaption}
       searchLabel="Search decisions"
-      columns={importDecisionColumns}
-      rows={props.rows}
+      columns={importDecisionColumnsAtom}
+      rows={importDecisionRows}
       rowKey={(change) =>
         `${change.importId}:${change.rowNumber}.${O.getOrElse(change.part, () => 0)}:${change.change.field}:${DateTime.formatIso(change.createdAt)}`
       }

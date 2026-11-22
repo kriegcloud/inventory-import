@@ -1,13 +1,17 @@
 // Who is signed in, as atoms, read through the browser HTTP boundary: this module is in the sign-in screen's first
 // download, without the API client or contract. The answer is decoded by a module of its own
 // (./internal/Session.decode.ts), asked for as this module loads, beside the first session request. The rule this file
-// protects: the session is asked for once per page load and shared; it is asked again only after signing in, creating
-// an organization or switching organization, and every read of the API then belongs to the new member
-// (`@inventory/client/Api` keys its reads by `member`). Signing out reloads the page.
+// protects: the session is asked for once per page load and shared; it is asked again after signing in, creating an
+// organization, switching organization, and when the server says this page's idea of who is signed in is out of date.
+// One page is one member's: asked again, the page keeps the member it had, and an answer that is somebody else, another
+// organization or nobody leaves the page (a full page load, as signing out is), so nothing a person typed, chose or
+// read is there for whoever is next. Only the person's own switch of organization goes on without one, as Benjamin
+// decided (2026-11-19, "atoms, the reads after a sign-out or a switch"): a switch back shows the rows at once.
 import { forgetReads } from "@inventory/client/Api"
 import { forgetEarly } from "@inventory/client/Early"
 import { request } from "@inventory/client/Http"
-import { queryClient } from "@inventory/client/QueryClient"
+import { answeredFor, askedOfAnswer, keyOfMember, memberOfAnswer } from "@inventory/client/MemberAtoms"
+import { leaveApp, navigate } from "@inventory/ui/Route"
 import {
   actorOfSession,
   type OrganizationChoice,
@@ -19,9 +23,11 @@ import * as Cause from "effect/Cause"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as S from "effect/Schema"
+import * as Str from "effect/String"
 import * as HttpClientError from "effect/http/HttpClientError"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as Atom from "effect/reactivity/Atom"
+import * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import { $AccessWebId } from "./internal/identity.ts"
 
 const $I = $AccessWebId.create("Session")
@@ -99,6 +105,55 @@ const rememberSignedOut = (signedOut: boolean) => {
   }
 }
 
+const endedKey = "session-ended"
+
+/**
+ * A member's session was found ended on this page: kept for the sign-in page of this tab, which says so, with where
+ * they were, for them alone. Two lines: the member, and the address.
+ */
+const rememberEnded = (who: O.Option<Member>) => {
+  try {
+    const { pathname, search } = window.location
+    window.sessionStorage.setItem(endedKey, `${keyOfMember(who)}\n${pathname}${search}`)
+  } catch {
+    // Without storage the sign-in page says nothing, and signing in again lands on the first screen.
+  }
+}
+
+/** Whether this tab's last page was left because its member's session had ended. */
+export const sessionEnded = (): boolean => {
+  try {
+    return window.sessionStorage.getItem(endedKey) !== null
+  } catch {
+    return false
+  }
+}
+
+/** Where `who` was when their session ended in this tab, taken once; none for anybody else, who lands on the first screen. */
+const takeEnded = (who: O.Option<Member>): O.Option<string> => {
+  try {
+    const kept = window.sessionStorage.getItem(endedKey)
+    window.sessionStorage.removeItem(endedKey)
+    const [of = "", at = ""] = Str.split(kept ?? "", "\n")
+    const here = Str.startsWith("/")(at) && !Str.startsWith("//")(at)
+    return of !== "" && of === keyOfMember(who) && here ? O.some(at) : O.none()
+  } catch {
+    return O.none()
+  }
+}
+
+/**
+ * Leaves this page for a fresh one, on purpose: nothing asks first, the previous person's reads leave memory, and a
+ * browser that brings the page back as it was (its back button) loads it again instead.
+ */
+const leavePage = (): void => {
+  forgetReads()
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted) window.location.reload()
+  })
+  leaveApp("/")
+}
+
 /**
  * The session answer could not be read (not a 200, or not a session). Said as "Something went wrong" with what to
  * do; a network failure stays the HTTP client's own error, said as "could not be reached".
@@ -112,7 +167,7 @@ export class SessionUnreadable extends S.TaggedError<SessionUnreadable, { readon
 /** Why the session is not known: the network, or an answer that is not a session. */
 export type SessionFailure = HttpClientError.HttpClientError | SessionUnreadable
 
-/** One GET of the session, decoded; remembers whether someone is signed in, and starts or drops the first screen. */
+/** One GET of the session, decoded; remembers whether someone is signed in. */
 const askSession: Effect.Effect<SessionState, SessionFailure> = Effect.tryPromise({
   // index.html preloads this address, so the answer is usually on its way before this code runs.
   try: () =>
@@ -121,34 +176,86 @@ const askSession: Effect.Effect<SessionState, SessionFailure> = Effect.tryPromis
       return response.json().then((body: unknown) => decoder.then(({ decodeSession }) => decodeSession(body)))
     }),
   catch: (cause): SessionFailure => (HttpClientError.isHttpClientError(cause) ? cause : SessionUnreadable.make({}))
-}).pipe(
-  Effect.tap((answer) =>
-    Effect.sync(() => {
-      rememberSignedIn(answer.status !== "signed-out")
-      // Signed in: the workspace's code and the first screen's data, if the hint did not start them. Not signed in:
-      // whatever the hint asked for was asked for the wrong person, and no screen may take it.
-      if (answer.status === "ready") setup.onSignedIn()
-      else forgetEarly()
-      // Nobody is signed in: whatever was read for the previous person leaves memory now (a sign-out reloads the page,
-      // which does the same; this holds when the session is found signed out without one).
-      if (answer.status === "signed-out") forgetReads()
-    })
+}).pipe(Effect.tap((answer) => Effect.sync(() => rememberSignedIn(answer.status !== "signed-out"))))
+
+/**
+ * The organization the person is switching to in this tab, from their press until the session has answered; none
+ * otherwise. What tells their own switch from another organization found (switched in another tab).
+ */
+const switchingTo = Atom.make<O.Option<string>>(O.none()).pipe(Atom.keepAlive)
+
+/** The email of the account signed in, whatever it acts as; none while nobody is. */
+const emailOf = (state: SessionState): O.Option<string> =>
+  state.status === "signed-out" ? O.none() : O.some(state.email)
+
+/** True when `answer` is the switch the person asked for: the same account, in the organization they chose. */
+const isChosen = (input: {
+  readonly before: O.Option<SessionState>
+  readonly answer: SessionState
+  readonly to: O.Option<string>
+}): boolean =>
+  O.exists(input.to, (to) => O.exists(actorOfSession(input.answer), (actor) => actor.organizationId === to)) &&
+  O.exists(O.flatMap(input.before, emailOf), (email) => O.contains(emailOf(input.answer), email))
+
+/** The answer is this page's: starts or drops the first screen, and takes the person back to where their session ended. */
+const settled = (answer: SessionState): void => {
+  // Not signed in: whatever the hint asked for was asked for the wrong person, and no screen may take it.
+  if (answer.status !== "ready") return forgetEarly()
+  O.map(takeEnded(actorOfSession(answer)), (at) => navigate(at, { replace: true }))
+  // Signed in: the workspace's code and the first screen's data, if the hint did not start them.
+  setup.onSignedIn()
+}
+
+/**
+ * Who is signed in, and as whom they act: one request (`GET /api/v1/identity/session`, always a 200), kept all tab.
+ * Asked again while the page is a member's, it goes on being asked when the answer is anybody else: the page is on its
+ * way out (`answeredFor`).
+ */
+export const session: Atom.Atom<AsyncResult.AsyncResult<SessionState, SessionFailure>> = Atom.make((get) => {
+  const before = O.flatMap(get.self<AsyncResult.AsyncResult<SessionState, SessionFailure>>(), AsyncResult.value)
+  const to = get.once(switchingTo)
+  const had = O.flatMap(before, actorOfSession)
+  return askSession.pipe(
+    Effect.flatMap((answer) =>
+      answeredFor({
+        answer,
+        before: had,
+        after: actorOfSession(answer),
+        chosen: isChosen({ before, answer, to }),
+        leave: () => {
+          if (answer.status === "signed-out") rememberEnded(had)
+          leavePage()
+        }
+      })
+    ),
+    Effect.tap((answer) =>
+      Effect.sync(() => {
+        get.set(switchingTo, O.none())
+        settled(answer)
+      })
+    )
   )
-)
+}).pipe(Atom.keepAlive)
 
-/** Who is signed in, and as whom they act: one request (`GET /api/v1/identity/session`, always a 200), kept all tab. */
-export const session: Atom.Atom<AsyncResult.AsyncResult<SessionState, SessionFailure>> = Atom.make(askSession).pipe(
-  Atom.keepAlive
-)
-
-/** The member the session acts as, once it is ready; none while loading, signed out or with no organization. */
+/**
+ * The member this page is for: the session's, kept while the session is asked again and when it could not be read;
+ * none before the first answer, while nobody is signed in, and with no organization.
+ */
 export const actor: Atom.Atom<O.Option<Member>> = Atom.map(session, (result) =>
-  result.waiting ? O.none() : O.flatMap(AsyncResult.value(result), actorOfSession)
+  memberOfAnswer({ session: result, memberOf: actorOfSession })
+)
+
+/**
+ * True while who is signed in is not known for certain: asked (again), not read, or the person is switching
+ * organization. Nothing is written until it is.
+ */
+export const signedInAsked: Atom.Atom<boolean> = Atom.readable(
+  (get) => askedOfAnswer(get(session)) || O.isSome(get(switchingTo))
 )
 
 /** Who is signed in, as the shell draws it: the answer's fields, with "loading" while it is asked (again). */
 export interface SessionView {
-  /** loading, then signed-out, no-organization or ready (`actor` is set only when ready). */
+  /** loading, then signed-out, no-organization or ready (`actor` is set only when ready; once ready, it stays so). */
   readonly status: "loading" | SessionState["status"]
   readonly actor: Member | undefined
   readonly email: string | undefined
@@ -156,16 +263,18 @@ export interface SessionView {
   readonly features: SignInFeatures | undefined
   /** No answer yet, and this browser was not signed in last time: draw the sign-in page without waiting. */
   readonly probablySignedOut: boolean
-  /** Why the session could not be read, while it is not being asked again. */
+  /** Why the session could not be read, while it is not being asked again; with a member known, they stay. */
   readonly error: unknown
 }
 
 /**
- * The session as the shell reads it. While it is asked again (after a switch) it reads as loading, as it did when the
- * cache was emptied for the new member.
+ * The session as the shell reads it. The first time it is asked, and after the sign-in page has signed somebody in, it
+ * reads as loading until it answers. Asked again while a member is known, it reads as that member: the workspace stays
+ * drawn, with whatever is being typed in it.
  */
 export const sessionView: Atom.Atom<SessionView> = Atom.map(session, (result): SessionView => {
-  const state = result.waiting ? undefined : result.pipe(AsyncResult.value, O.getOrUndefined)
+  const known = result.pipe(AsyncResult.value, O.getOrUndefined)
+  const state = result.waiting && known?.status !== "ready" ? undefined : known
   return {
     status: state?.status ?? "loading",
     actor: state?.status === "ready" ? state.actor : undefined,
@@ -173,16 +282,15 @@ export const sessionView: Atom.Atom<SessionView> = Atom.map(session, (result): S
     organizations: state === undefined || state.status === "signed-out" ? [] : state.organizations,
     features: state?.features,
     probablySignedOut: state === undefined && !wasSignedIn(),
-    error: result._tag === "Failure" && !result.waiting ? Cause.squash(result.cause) : null
+    error: AsyncResult.isFailure(result) && !result.waiting ? Cause.squash(result.cause) : null
   }
 })
 
 /**
  * Asks who is signed in again, for a new member (after signing in or creating an organization): every read of the
- * API follows the member, and the catalog screens' cache, until they move to atoms, is emptied as before.
+ * API follows the member, so nothing else has to be emptied.
  */
 export const refreshSession = Atom.fnSync((_: void, get) => {
-  void queryClient.resetQueries()
   get.refresh(session)
 })
 
@@ -198,23 +306,29 @@ export class SwitchRefused extends S.TaggedError<SwitchRefused, { readonly brand
 
 /**
  * Switches the session to another organization the person belongs to: the server checks the membership, then the
- * session is asked again and every read follows the new member.
+ * session is asked again and every read follows the new member. From the press until it has answered nothing else is
+ * written (`signedInAsked`). Ends when the session has answered.
  */
 export const switchOrganization = Atom.fn((organizationId: string, get) =>
-  Effect.tryPromise({
-    try: () =>
-      loadAuthClient().then(({ authClient, orThrow }) =>
-        authClient.organization.setActive({ organizationId }).then(orThrow)
-      ),
-    catch: (cause) =>
-      SwitchRefused.make({ message: cause instanceof Error ? cause.message : "The organization was not opened." })
-  }).pipe(
+  Effect.sync(() => get.set(switchingTo, O.some(organizationId))).pipe(
     Effect.andThen(
-      Effect.sync(() => {
-        void queryClient.resetQueries()
-        get.refresh(session)
+      Effect.tryPromise({
+        try: () =>
+          loadAuthClient().then(({ authClient, orThrow }) =>
+            authClient.organization.setActive({ organizationId }).then(orThrow)
+          ),
+        catch: (cause) =>
+          SwitchRefused.make({ message: cause instanceof Error ? cause.message : "The organization was not opened." })
       })
-    )
+    ),
+    Effect.tapError(() => Effect.sync(() => get.set(switchingTo, O.none()))),
+    Effect.andThen(() => {
+      // Said again: an answer that came meanwhile (the session asked again for another reason) ended it.
+      get.set(switchingTo, O.some(organizationId))
+      get.refresh(session)
+      // A session that cannot be read now is asked again by itself, and the switch is taken up then.
+      return AtomRegistry.getResult(get.registry, session, { suspendOnWaiting: true }).pipe(Effect.ignore)
+    })
   )
 )
 
@@ -229,9 +343,8 @@ export const signInAs = (account: { readonly email: string; readonly password: s
       .then(() => authClient.signIn.email(account))
       .then(orThrow)
       .then(() => {
-        forgetReads()
         rememberSignedOut(false)
-        window.location.assign("/")
+        leavePage()
       })
   )
 
@@ -242,10 +355,9 @@ export const signOut = (): Promise<void> =>
       .signOut()
       .then(orThrow)
       .then(() => {
-        forgetReads()
         rememberSignedIn(false)
         rememberSignedOut(true)
-        window.location.assign("/")
+        leavePage()
       })
   )
 

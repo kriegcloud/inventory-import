@@ -10,8 +10,13 @@ import * as Layer from "effect/Layer"
 import * as O from "effect/Option"
 import * as S from "effect/Schema"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
+import * as Atom from "effect/reactivity/Atom"
 import * as AtomRegistry from "effect/reactivity/AtomRegistry"
+import { MemberId, OrganizationId } from "@inventory/kernel/Ids"
+import { Member } from "@inventory/kernel/Member"
+import { DisplayName } from "@inventory/kernel/Text"
 import { makeApiAtoms, provideApi } from "@inventory/client/Api"
+import { provideMember } from "@inventory/client/MemberAtoms"
 import { optimisticChange, optimisticWrite, shown } from "@inventory/client/OptimisticAtoms"
 
 type Item = { readonly name: string; readonly unit: string }
@@ -26,12 +31,24 @@ interface FakeServer {
 }
 class Server extends Context.Service<Server, FakeServer>()("@inventory/client/test/Optimistic.atoms.test/Server") {}
 
+const memberOf = (organization: string) =>
+  O.some(
+    Member.make({
+      id: MemberId.make("mem_dana"),
+      name: DisplayName.make("Dana Whitfield"),
+      role: "admin",
+      organizationId: OrganizationId.make(organization),
+      organizationName: DisplayName.make(organization)
+    })
+  )
+
 /** Long enough for the registry to run what a write started. */
 const settle = Effect.sleep("10 millis")
 
-const world = () => {
+const world = (options: { readonly idleTTL?: number; readonly readAgainAfterRefusal?: boolean } = {}) => {
   let item: Item = { name: "Bolt", unit: "each" }
   let reads = 0
+  const signedIn = Atom.make(memberOf("org_prairie"))
   const answers: Array<Deferred.Deferred<void, Refused>> = []
   const layer = Layer.succeed(Server, {
     read: Effect.sync(() => {
@@ -52,11 +69,16 @@ const world = () => {
     send: (input: Edit) => api.send((server) => server.edit(input)),
     changes: [optimisticChange(itemShown, (now: Item, input: Edit) => ({ ...now, ...input }))],
     failed: () => "The item was not saved.",
-    onRefused: () => true
+    onRefused: () => true,
+    ...(options.readAgainAfterRefusal === undefined ? {} : { readAgainAfterRefusal: options.readAgainAfterRefusal })
   })
-  const registry = AtomRegistry.make({ initialValues: [provideApi(layer)] })
+  const registry = AtomRegistry.make({
+    initialValues: [provideApi(layer), provideMember(signedIn)],
+    ...(options.idleTTL === undefined ? {} : { defaultIdleTTL: options.idleTTL })
+  })
   registry.mount(itemShown)
-  registry.mount(edit)
+  // The row that holds the write: let go when the row leaves the screen.
+  const leave = registry.mount(edit)
   const seen = () => {
     const result = registry.get(itemShown)
     return { item: result.pipe(AsyncResult.value, O.getOrUndefined), waiting: result.waiting }
@@ -64,7 +86,14 @@ const world = () => {
   const press = (input: Edit) => registry.set(edit, input)
   const answer = (n: number) => Deferred.succeed(answers[n]!, undefined)
   const refuse = (n: number) => Deferred.fail(answers[n]!, Refused.make({}))
-  return { seen, press, answer, refuse, reads: () => reads, stored: () => item }
+  /** The write's own result, as the row's Save button reads it: busy while a press is out, then the answer. */
+  const write = () => {
+    const result = registry.get(edit)
+    return { waiting: result.waiting, tag: result._tag }
+  }
+  /** The person switches to another organization: the session now acts for it. */
+  const switchTo = (organization: string) => registry.set(signedIn, memberOf(organization))
+  return { seen, press, answer, refuse, leave, write, switchTo, reads: () => reads, stored: () => item }
 }
 
 describe("two optimistic edits in flight", () => {
@@ -85,6 +114,8 @@ describe("two optimistic edits in flight", () => {
       expect(t.stored()).toEqual({ name: "Hex bolt", unit: "box" })
       // The first read, and one read after the last answer.
       expect(t.reads()).toBe(2)
+      // The write itself has settled: the button that pressed it is free again.
+      expect(t.write()).toEqual({ waiting: false, tag: "Success" })
     })
   )
 
@@ -121,6 +152,96 @@ describe("two optimistic edits in flight", () => {
       yield* settle
       expect(t.seen()).toEqual({ item: { name: "Bolt", unit: "each" }, waiting: false })
       expect(t.reads()).toBe(1)
+    })
+  )
+})
+
+describe("an optimistic edit whose row leaves the screen", () => {
+  it.live("runs to its end: saved, nothing left on its way, read again once", () =>
+    Effect.gen(function* () {
+      // The registry lets an atom nobody reads go after 20 ms, as the app's does after 400.
+      const t = world({ idleTTL: 20 })
+      yield* settle
+      t.press({ name: "Hex bolt" })
+      yield* settle
+      expect(t.seen()).toEqual({ item: { name: "Hex bolt", unit: "each" }, waiting: true })
+      // The row unmounts (another page, another screen) while the save is still out, and its atom is let go.
+      t.leave()
+      yield* Effect.sleep("80 millis")
+      yield* t.answer(0)
+      yield* Effect.sleep("40 millis")
+      expect(t.stored()).toEqual({ name: "Hex bolt", unit: "each" })
+      expect(t.seen()).toEqual({ item: { name: "Hex bolt", unit: "each" }, waiting: false })
+      expect(t.reads()).toBe(2)
+      // A later edit of the same item still settles: the first left nothing counted in flight.
+      t.press({ unit: "box" })
+      yield* settle
+      yield* t.answer(1)
+      yield* Effect.sleep("40 millis")
+      expect(t.seen()).toEqual({ item: { name: "Hex bolt", unit: "box" }, waiting: false })
+      expect(t.reads()).toBe(3)
+    })
+  )
+})
+
+describe("an optimistic edit that answers after the person switched organization", () => {
+  it.live("takes its change off and reads nothing again: the reads on screen are the other organization's", () =>
+    Effect.gen(function* () {
+      const t = world()
+      yield* settle
+      expect(t.reads()).toBe(1)
+      t.press({ name: "Hex bolt" })
+      yield* settle
+      // The save is still out when the person switches. The new organization reads its own item, once.
+      t.switchTo("org_lakeside")
+      yield* settle
+      expect(t.reads()).toBe(2)
+      yield* t.answer(0)
+      yield* Effect.sleep("40 millis")
+      // The save landed, for the organization it was pressed in.
+      expect(t.stored()).toEqual({ name: "Hex bolt", unit: "each" })
+      // Nothing was asked again with the new session, for either organization, and nothing is left on its way.
+      expect(t.reads()).toBe(2)
+      expect(t.seen().waiting).toBe(false)
+    })
+  )
+
+  it.live("still reads again what the person signed in now saved, when an older save for another answers last", () =>
+    Effect.gen(function* () {
+      const t = world()
+      yield* settle
+      t.press({ name: "Hex bolt" })
+      yield* settle
+      t.switchTo("org_lakeside")
+      yield* settle
+      expect(t.reads()).toBe(2)
+      // Their own save in the new organization answers first; the older one, pressed in the other, last.
+      t.press({ unit: "box" })
+      yield* settle
+      yield* t.answer(1)
+      yield* settle
+      expect(t.reads()).toBe(2)
+      yield* t.answer(0)
+      yield* Effect.sleep("40 millis")
+      expect(t.reads()).toBe(3)
+      expect(t.seen().waiting).toBe(false)
+    })
+  )
+})
+
+describe("a refused write that asks for its reads again", () => {
+  it.live("takes the change back at once, then shows what the server holds now", () =>
+    Effect.gen(function* () {
+      // A remove refused because someone else already removed it: the list must not keep showing what is gone.
+      const t = world({ readAgainAfterRefusal: true })
+      yield* settle
+      t.press({ name: "Hex bolt" })
+      yield* settle
+      yield* t.refuse(0)
+      yield* Effect.sleep("40 millis")
+      expect(t.seen()).toEqual({ item: { name: "Bolt", unit: "each" }, waiting: false })
+      // The first read, and one more after the refusal.
+      expect(t.reads()).toBe(2)
     })
   )
 })

@@ -1300,3 +1300,45 @@ untouched.
 The agent chose, and I was not asked: the Verify template takes the prover from the root's install (a library of the
 scratchpad would be a second Effect), so it works once a package asks for `@alchemy.run/domain`, and until then
 `scratch:new` says so.
+
+### 2026-11-22 — releases and deploys: trunk, release branches, tags
+
+He asked, in his words: "We should also setup deploys only on release branches with tags for releases. I'm thinking
+we follow some kind of trunk based strategy". Four questions by dialog; each answer was the recommended option.
+
+1. What deploys production? Answer: "A tag on a release branch". Work lands on `main`; a release is cut as
+   `release/<major>.<minor>` from `main`; pushing a tag `v<major>.<minor>.<patch>` on that branch deploys production;
+   a fix to a released version lands on `main` first and is cherry-picked onto its release branch, then tagged with
+   the next patch. `main` never deploys production. Rejected: "A tag on main, no branches". I chose; the agent
+   recommended the same.
+2. What does `main` deploy? Answer: "A staging stage". Every green push to `main` deploys one staging stage.
+   Rejected: "Nothing"; "Pull-request previews only". I chose; the agent recommended the same.
+3. Does each production deploy wait for my approval? Answer: "Yes, I approve each one": the production job waits on
+   the `production` environment's required reviewer. I chose; the agent recommended the same.
+4. How is a release cut? First answer: "One repo command", in his words "maybe changsets too for our packages. I
+   recommend you look up the turbo documentation on this". Turborepo's guide recommends Changesets only for packages
+   published to npm and calls the others Internal Packages; every package here is private. Second answer: "App
+   version only, for now": one version for the app, set by the release command and tagged on the release branch; the
+   packages stay Internal Packages; Changesets is added only if a package is ever published. Rejected: "Trial
+   Changesets first"; "Changesets now". I chose; the agent recommended the same.
+
+Built as: `bun run release` in the repository's CLI (`docs/releasing.md`); `.github/workflows/deploy.yml` deploys
+staging after CI passes on `main`, and production only from a `v*` tag whose commit is on a `release/*` branch,
+behind the `production` environment; the previews are unchanged. Reverse: production on a push to `main` again in
+`deploy.yml`, and the `staging` stage out of the stage plan.
+
+The agent chose these, and I was not asked:
+
+- The approval stays as code. The `production` environment and its reviewer are already made by the repository's
+  stack (`packages/infra/src/GitHub.stack.ts`, decision I7), so nothing is clicked in GitHub's settings: the stack
+  now leaves the environment open to any ref (Alchemy's GitHub provider writes only branch rules, and deletes any rule
+  it did not write, so a `v*` tag rule could not be kept there), and a tag ruleset lets only an admin create, move or
+  delete a `v*` tag. The deploy job checks the tag and its branch itself, and the reviewer approves each one. Until
+  he deploys that stack again, GitHub still allows only `main` to deploy to production, so a tag deploy waits there.
+- The staging stage is named `staging`, answers on `workers.dev`, and is a rehearsal like a preview: the test
+  organizations and accounts, sign-up closed (decision I8: no real email outside production), and no model key:
+  decision I5 gives one to production only, so the missing-model-key guard has nothing to guard and the rules answer.
+  Its test accounts take the one password the previews share. It runs on the previews' Cloudflare account.
+- The release notes are the conventional commits since the last tag, grouped by type, written to `CHANGELOG.md` and
+  into the annotated tag's message. The app's version is `apps/inventory/package.json`; the "(v0.6.1)" in
+  `README.md` names the version that was submitted and is never moved.

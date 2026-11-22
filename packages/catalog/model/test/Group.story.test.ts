@@ -131,8 +131,20 @@ const groupCounted = (input: {
     by: input.by ?? "ana",
     top: input.top ?? input.change
   })
-const undoGroup = (input: { readonly undo: number; readonly step?: string; readonly opening?: number }) =>
-  UndoGroup.make({ importId: id, step: input.step ?? "g1", undo: input.undo, opening: input.opening ?? 0 })
+// `seen`: every change up to this number is on the sender's screen; the group's own change, where no story says more.
+const undoGroup = (input: {
+  readonly undo: number
+  readonly step?: string
+  readonly opening?: number
+  readonly seen?: number
+}) =>
+  UndoGroup.make({
+    importId: id,
+    step: input.step ?? "g1",
+    undo: input.undo,
+    opening: input.opening ?? 0,
+    seen: input.seen ?? input.undo
+  })
 const act = (input: {
   readonly step: string
   readonly saw: number
@@ -349,7 +361,7 @@ it.effect(
       Story.given(g1, groupDecided({ change: 1 })),
       Story.given(row12, decided({ change: 2, by: "dana", step: "d1", flags: accepted })),
       Story.provide(CurrentActor, ana),
-      Story.when(undoGroup({ undo: 1 })),
+      Story.when(undoGroup({ undo: 1, seen: 2 })),
       Story.then(g1, GroupUndone.make({ change: 3 })),
       Story.then(life, groupCounted({ change: 3, label: "undo", top: 0 })),
       Story.then(row12),
@@ -393,7 +405,7 @@ it.effect(
       Story.then(life, counted({ change: 2, step: "d1", by: "dana", flags: typed, row: "row-14" })),
       // Ana takes her group back: one act, and row 14's own instance is not touched.
       Story.provide(CurrentActor, ana),
-      Story.when(undoGroup({ undo: 1 })),
+      Story.when(undoGroup({ undo: 1, seen: 2 })),
       Story.then(g1, GroupUndone.make({ change: 3 })),
       Story.then(life, groupCounted({ change: 3, rows: 12, label: "undo", top: 0 })),
       Story.then(row14),
@@ -791,7 +803,7 @@ it.effect(
     )
 )
 it.effect(
-  "a group's undo is taken from a screen that is behind on the rows, and touches none: Ana's group covers row 14, Dana types 8 on it, and Ana, who has not received the 8, takes her group back",
+  "a group's undo from a screen that is behind on the rows is held, and taken once the screen has them, touching none: Ana's group covers row 14, Dana types 8 on it, and Ana, who has not received the 8, takes her group back",
   () =>
     story(
       Story.given(life, staged),
@@ -803,11 +815,17 @@ it.effect(
       Story.when(act({ row: "row-14", step: "d1", saw: 0, sawGroup: 1, covered: true, flags: typedEight })),
       Story.then(row14, decided({ change: 2, by: "dana", step: "d1", flags: typedEight })),
       Story.then(life, counted({ change: 2, step: "d1", by: "dana", flags: typedEight, row: "row-14" })),
-      // Ana's undo names nothing her screen has seen of the rows, and is taken: it takes back her own act and no
-      // one else's. The answer is the group's undo with its number; row 14 keeps Dana's whole decision, made since
-      // the group, which is what Ana's screen then names as changed since and staying.
+      // Ana's screen has her group and not Dana's 8. Her undo is refused with the import's last change, and nothing
+      // is recorded on the group, the import or row 14: she is shown the 8 before her group goes from under it.
       Story.provide(CurrentActor, ana),
-      Story.when(undoGroup({ undo: 1 })),
+      Story.when(undoGroup({ undo: 1, seen: 1 })),
+      Story.rejected(ReviewMovedOn.make({ last: 2 })),
+      Story.then(g1),
+      Story.then(life),
+      Story.then(row14),
+      // Once her screen has it, the same undo is taken. It takes back her own act and no one else's: row 14 keeps
+      // Dana's whole decision, made since the group, which Ana's screen names as changed since and staying.
+      Story.when(undoGroup({ undo: 1, seen: 2 })),
       Story.then(g1, GroupUndone.make({ change: 3 })),
       Story.then(life, groupCounted({ change: 3, rows: 2, label: "undo", top: 0 })),
       Story.then(row14),
@@ -843,7 +861,7 @@ it.effect(
       Story.then(life, groupCounted({ change: 3, step: "g2", rows: 900, label: "undo", by: "dana", top: 1 })),
       // Ana's is the last in force again.
       Story.provide(CurrentActor, ana),
-      Story.when(undoGroup({ undo: 1 })),
+      Story.when(undoGroup({ undo: 1, seen: 3 })),
       Story.then(g1, GroupUndone.make({ change: 4 })),
       Story.then(life, groupCounted({ change: 4, label: "undo", top: 0 }))
     )

@@ -303,27 +303,39 @@ and the four decisions with `Effect.fn`, and its counts above are of that form o
   fits: the screen computes them, not run.
 - **A group is taken back only by its maker, once, and only while it is the last group still in force** (decision 8, as
   answered); then the group under it is the last in force, so undo walks back. Otherwise `NotOpen`, `NotPermitted`,
-  `NotYourStep`, `GroupedAfter { last }`, `DecidedBeforeTheConfirm` or `ConfirmedSince`. A group its maker took back is out of force: the reading lays
+  `NotYourStep`, `GroupedAfter { last }`, `ReviewMovedOn { last }`, `DecidedBeforeTheConfirm` or `ConfirmedSince`. A group its maker took back is out of force: the reading lays
   its patch on no row (the recommended option, picked on 2026-11-22 and standing under his rule (DECISIONS.md)). A row someone changed over the group is the exception: that decision
   was written whole, with what the group gave it, so the row keeps the group's effect until that decision is undone
   (under "The reading of a row through its groups"). That is the recommended "Row 14 stays whole", picked on 2026-11-22 and standing under his rule (DECISIONS.md): the screen names
   the row ("Row 14 was changed by Dana and stays"). A press over the group that left the row reading as it read changed
   nothing and is recorded as nobody's, so the group's undo leaves that row undecided like the group's other rows (the
   recommended "No change, Ana's undo applies", picked on 2026-11-22 and standing under his rule (DECISIONS.md)). Today's `act` strips the group's part from such a row, and
-  changes at the move that puts the review on the model. A group's undo names no `seen` and no `sawGroup`: only a later
-  group in force refuses it, not a row's act made since. So Ana's undo is taken from a screen that may not have received
-  Dana's act on row 14, and the screen can say "Row 14 was changed by Dana and stays" only once the undo has landed and
-  the act is received, counting the rows that changed; the import's event for the undo (`GroupCounted`) counts the
-  group's rows, row 14 among them. The screen says it after only, with no warning before, even when it already holds a
+  changes at the move that puts the review on the model. A group's undo names every change its screen has received
+  (`seen`), as a group's act does, and is refused `ReviewMovedOn { last }` from a screen that has not received every
+  change of the import: it is held and shown, and taken once the screen has every change
+  (`UndoGroup.AGroupsUndoIsMadeOnEveryChange`; the story "a group's undo from a screen that is behind on the rows is
+  held, and taken once the screen has them, touching none"; the mutant `gundo-seen`). That is by the rule "a press
+  from a screen that is behind is never silently dropped or applied, it is held and shown" (DECISIONS.md, "Decided by
+  the rule, for him to overrule"). The check is coarse on purpose: the model keeps no reading of a group's rows, so any
+  change of the import the screen lacks holds the undo, on a row of the group or not. So Ana's undo from a screen that
+  has not received Dana's act on row 14 is held, and she is shown that act first; once taken, the undo still touches no
+  row, row 14 keeps Dana's whole decision, and the screen says "Row 14 was changed by Dana and stays", counting the rows
+  that changed; the import's event for the undo (`GroupCounted`) counts the group's rows, row 14 among them. From a
+  screen that has every change, the screen says it after only, with no warning before, even when it already holds a
   later decision on one of the group's rows (the recommended "Say it after only", picked on 2026-11-22, settled under the rule for
   several people at once). Not run.
 - **A take-back is of everything in force**, from the result or while the import is open again, as today: the items its
   confirms created, removed or kept, and the items they replaced, put back or kept.
 - **A row's undo names the change it takes back, the import's last group act (`sawGroup`), the matching it was pressed
-  on (`madeOn`), and brings what goes under the decision it puts back**; the row takes it only when it seals to exactly
+  on (`madeOn`), the change the row's last undo took back as its screen has it (`sawUndone`, 0 for none), and brings
+  what goes under the decision it puts back**; the row takes it only when it seals to exactly
   the text the row holds. It does not reach past a confirm that stands. Otherwise `NotOpen`, `NotPermitted`, `NotYourStep`,
-  `GroupedAfter { last }`, `NotWhatWasUnder`, `GroupedSince`, `MatchedSince`, `ConfirmedSince`, `DecidedBeforeTheConfirm` or, where a very
-  long history was let go, `HistoryEnds`. An undo puts back the decision under the one taken back, on the matching that
+  `UndoneSince { by, change }`, `GroupedAfter { last }`, `NotWhatWasUnder`, `GroupedSince`, `MatchedSince`, `ConfirmedSince`, `DecidedBeforeTheConfirm` or, where a very
+  long history was let go, `HistoryEnds`. `UndoneSince` says the row holds the sender's decision again after an undo
+  the screen has not received: another person decided over it and took that back. The undo is held, and taken once the
+  screen has that undo (`UndoRowStep.AnUndoIsMadeOnAScreenThatHasTheRowsLastUndo`; the story "a row's undo from a screen
+  that has neither another person's decision over its sender's nor that person's undo is held, not applied"; the mutant
+  `undo-undone`). An undo puts back the decision under the one taken back, on the matching that
   one was made on, so one pressed on a screen that has not received a match is refused `MatchedSince` and held, as a
   row's act is, and taken once the screen has the match (`UndoRowStep.AnUndoIsMadeOnTheMatchingNow`; the story "a
   row's undo pressed on a screen that has not received a match is refused and held, and taken once it has"; the mutant
@@ -416,12 +428,14 @@ cell:
 | A row's undo is taken only when its sender says no later group in force covers the row | `UndoRowStep.ARowsUndoSaysNoLaterGroupCoversIt` | in the lock at `53654e6`, proved by the build's own report; not in `review15` | The `covered` the undo states | That the screen sets `covered` truly: the screen, not run. The story "a decision a later group covers is not taken back from under it" |
 | A row's act is made on a screen that has the row's last undo | `DecideRow.ADecisionIsMadeOnAScreenThatHasTheRowsLastUndo` | in the lock at `53654e6`, proved by the build's own report; not in `review15` | The change `sawUndone` states and the one the row's last undo took back | That the screen names the last undo it received: the screen, not run. The story "a press drawn before an undo is not written over what the undo put back" |
 | A row's undo is made on the import's matching now | `UndoRowStep.AnUndoIsMadeOnTheMatchingNow` | in the lock at `53654e6`, proved by the build's own report; not in `review15` | The number `madeOn` states | The story "a row's undo pressed on a screen that has not received a match is refused and held, and taken once it has" |
+| A row's undo is made on a screen that has the row's last undo | `UndoRowStep.AnUndoIsMadeOnAScreenThatHasTheRowsLastUndo` | in the lock, proved by the build's own report; not in `review15` | The change `sawUndone` states and the one the row's last undo took back | That the screen names the last undo it received: the screen, not run. The story "a row's undo from a screen that has neither another person's decision over its sender's nor that person's undo is held, not applied" |
 | A row keeps which undo it took: the change taken back, the step it was pressed in, and who pressed | `UndoRowStep.TheRowKeepsWhichChangeWasTakenBack`, `.AndTheStepItWasPressedIn`, `.AndWhoPressed` | in the lock at `53654e6`, proved by the build's own report; not in `review15` | The row after the undo | The row keeps its last undo only, so the same undo sent again is known by these three until another undo lands on the row |
 | An undo stops where the history was let go | `UndoRowStep.AnUndoStopsWhereTheHistoryWasLetGo` | in the lock at `53654e6`, proved by the build's own report; not in `review15` | The level under the row's decision | The story "a full history never refuses a decision: the oldest levels are let go, and an undo stops there and says so" |
 | A row's undo is of a row, and a group's undo of a group, of the import it names | `UndoRowStep.AnUndoIsOfARowOfTheImportItNames`; `UndoGroup.AGroupsUndoIsOfAGroupOfTheImportItNames` | in the lock at `53654e6`, proved by the build's own report; not in `review15` | The import the command names and the one the row or group holds | A key is built from the import's id and the row's or the step, and two pairs can build the same key |
 | Neither undo reaches past a confirm that stands | `UndoRowStep.AnUndoDoesNotReachPastAConfirm`; `UndoGroup.AGroupsUndoDoesNotReachPastAConfirm` | proved | The confirm's number | |
 | A row and a group are decided only on an open import | `DecideRow.ARowIsDecidedOnlyOnAnOpenImport`; `DecideGroup.AGroupIsDecidedOnlyOnAnOpenImport` | proved | The import | |
 | A group is taken only from a screen that has every change, and a step decides one group | `DecideGroup.AGroupIsMadeOnEveryChange`, `.AStepDecidesOneGroup` | proved | The number `seen` states and the group's instance | That the rows it names are the ones the fix fits: the screen, not run |
+| A group's undo is taken only from a screen that has every change | `UndoGroup.AGroupsUndoIsMadeOnEveryChange` | in the lock, proved by the build's own report; not in `review15` | The number `seen` states | Any change the screen lacks holds it, on a row of the group or not: the model keeps no reading of a group's rows. The story "a group's undo from a screen that is behind on the rows is held, and taken once the screen has them, touching none" |
 | A group decided is the import's last group act and the last in force, and keeps which one was before it; only the last in force is taken back, and then the one under it is | `DecideGroup.TheImportHoldsItAsItsLastGroupAct`, `.AGroupDecidedIsTheLastInForce`, `.AndKeepsWhichOneWasBeforeIt`; `UndoGroup.OnlyTheLastGroupInForceIsTakenBack`, `.ThenTheOneUnderItIsTheLastInForce`, `.TheImportHoldsItAsItsLastGroupAct` | proved | `lastGroup`, `topGroup` and the group's `under` | That the group the import holds as last in force is in force: checked, below |
 | Only its maker takes a group back, once; only its organization changes a group; a viewer changes none | `UndoGroup.AGroupsUndoTakesBackOnlyItsSendersOwn`, `.AGroupIsTakenBackOnce`, `.NobodyUndoesAnotherPersonsGroup`, `.OnlyItsOwnOrganizationChangesTheGroup`, `.AViewerChangesNoGroup`; `DecideGroup.OnlyItsOwnOrganizationChangesTheGroup`, `.AViewerChangesNoGroup` | proved | The group's maker and the actor | `review15` states `NobodyUndoesAnotherPersonsGroup` on `DecideGroup` too; the lock does not, since a group's act takes nothing back |
 | A group says at least one row, and never changes once decided (its rows, its count, what it does, its number, what was under it, its maker), except to be taken back once | `Group.AGroupSaysAtLeastOneRow`, `.AGroupKeepsItsRows`, `.AGroupKeepsItsCount`, `.AGroupKeepsItsPatch`, `.AGroupKeepsItsNumber`, `.AGroupKeepsWhatWasUnderIt`, `.AGroupKeepsItsMaker`, `.ADecidedGroupStaysDecided`, `.AGroupTakenBackStaysTakenBack` | proved; `.AGroupKeepsItsCount` in the lock at `53654e6`, proved by the build's own report; not in `review15` | The group's state | A redo of a group is a new group. The count is its sender's word: the model reads no row out of a group's rows, so nothing ties the count to them |
@@ -499,11 +513,12 @@ made at the press.** A resend with the same command id answers the first receipt
 | Act | Command | What it names |
 | --- | --- | --- |
 | A row's act | `DecideRow` | The row, the step, the decision it saw there (`saw`), the import's last group act as the screen has it (`sawGroup`), whether a group in force covers the row (`covered`), whether the act leaves the row reading as it reads now through its groups (`asItReads`, the recommended option picked on 2026-11-22 and standing under his rule; in the trial model `review15`), the change the row's last undo took back as the screen has it (`sawUndone`), the opening, the matching, the decision's text and its label |
-| A row's undo | `UndoRowStep` | The row, the change it takes back, its step, `sawGroup`, whether a group in force decided after the decision it takes back covers the row (`covered`), the matching it was pressed on (`madeOn`), the opening, and the level that goes under the decision it puts back, with the sealed text below that |
+| A row's undo | `UndoRowStep` | The row, the change it takes back, its step, `sawGroup`, whether a group in force decided after the decision it takes back covers the row (`covered`), the matching it was pressed on (`madeOn`), the change the row's last undo took back as the screen has it (`sawUndone`), the opening, and the level that goes under the decision it puts back, with the sealed text below that |
 | A group's act | `DecideGroup` | The step, the opening, every change the screen has received (`seen`), the matching, the rows and what the act does to them as two texts, and how many rows |
-| A group's undo | `UndoGroup` | The step and the change it takes back, and the opening |
+| A group's undo | `UndoGroup` | The step and the change it takes back, every change the screen has received (`seen`), and the opening |
 
-A group act names every change, so it is sent once every earlier act in the person's queue has come back.
+A group act and a group's undo name every change, so each is sent once every earlier act in the person's queue has
+come back.
 
 **A rejection ends nothing by itself** (his answers of 2026-11-20 and 2026-11-21). What each one means for the queue of
 waiting acts:
@@ -519,7 +534,9 @@ waiting acts:
   DECISIONS.md, "Decided by the rule"). Not run.
 - `UndoneSince`, an undo landed on the row that the screen had not received: the act is held the same way, with what
   the row holds now and who took back which change, and Confirm waits. Once the screen has the undo, a press naming it
-  in `sawUndone` is taken; a late copy of a press its sender took back is never written again. Nothing is
+  in `sawUndone` is taken; a late copy of a press its sender took back is never written again. On a row's undo it
+  means another person decided over the sender's decision and took that back: the queue holds the undo, shows whose
+  undo landed, and sends it again with that undo in `sawUndone`. Nothing is
   dropped and nothing applied over what the undo put back (by the rule "a press from a screen that is behind is never
   silently dropped or applied, it is held and shown"; DECISIONS.md, "Decided by the rule"). Not run.
 - `GroupedSince`, a group landed that the screen had not received (not run). When a colleague's group act lands, a
@@ -541,7 +558,8 @@ waiting acts:
   again by itself", picked on 2026-11-22 and standing under his rule (DECISIONS.md)); only one on a row the group touched is held and shown: the screen shows the group, and they press
   undo again if they still mean it.
 - `ReviewMovedOn` on a group act, its screen one change behind: the screen draws the change, and the person presses
-  again.
+  again. On a group's undo, its screen behind by any change of the import: the undo is held and shown, and taken once
+  the screen has every change (by the rule; DECISIONS.md, "Decided by the rule"). Not run.
 - `GroupedAfter { last }` on a group's undo: a later group is still in force; the screen names it, and the undo stays in
   the person's history until that group is taken back. On a row's undo (`covered` set) it means a group in force,
   decided after the decision, covers the row: the same, the screen names the group and the undo stays until that group
@@ -635,11 +653,15 @@ command whose text is the row's decision and whose label is stored, so `Action` 
   touch the waiting undo is sent again by itself; on one it touched, the screen shows the group, and they press undo
   again if they still mean it (the recommended "Sent again by itself", picked on 2026-11-22 and standing under his rule (DECISIONS.md)). Not run.
   It names the matching it was pressed on too, and is refused `MatchedSince` when a match landed that its screen has
-  not received (`UndoRowStep.AnUndoIsMadeOnTheMatchingNow`).
+  not received (`UndoRowStep.AnUndoIsMadeOnTheMatchingNow`). It names the row's last undo as its screen has it too, and
+  is refused `UndoneSince` when another person decided over the sender's decision and took that back unseen
+  (`UndoRowStep.AnUndoIsMadeOnAScreenThatHasTheRowsLastUndo`).
 - **A group is taken back only while it is the last group still in force** (decision 8). An earlier one is refused with
   `GroupedAfter`, which names the later one; once that one is taken back, the earlier is the last again, so undo walks
   back. A row's undo of a decision that a later group in force covers is refused `GroupedAfter` the same way, and is
-  taken once that group is taken back (`UndoRowStep`'s `covered`, at `53654e6`). A group its maker took back is out of force, and its patch is laid on no row (the recommended option, picked on 2026-11-22 and standing under his rule (DECISIONS.md)); a row
+  taken once that group is taken back (`UndoRowStep`'s `covered`, at `53654e6`). A group's undo from a screen that has
+  not received every change is refused `ReviewMovedOn`, held and shown, and taken once the screen has every change
+  (`UndoGroup.AGroupsUndoIsMadeOnEveryChange`). A group its maker took back is out of force, and its patch is laid on no row (the recommended option, picked on 2026-11-22 and standing under his rule (DECISIONS.md)); a row
   someone changed over the group keeps that decision whole, with what the group had done to it when it was made, so the
   group's effect stays on that row until its decision is undone (the property under "The reading of a row through its
   groups"). That is the recommended "Row 14 stays whole", picked on 2026-11-22 and standing under his rule (DECISIONS.md), and the screen names the row ("Row 14 was changed by Dana
@@ -673,7 +695,7 @@ rejected are in [DECISIONS.md](DECISIONS.md).
 | "SKU rematch", "Twin rematch", "Undone fix" (2026-11-20): server refuses, says so | A Replace, a Keep-stored, a keep of one of two and an undone fix are parts of the text with their own number; the reader puts them out of force as an accept | | The reader's test, each kind; not run |
 | "Other rematch" (2026-11-20): refuse if it changes the row | The reader compares the row with the stored item on the columns at the part's match and now, with `review` | | The same |
 | "Only when it changes" (2026-11-21); a field displaced by another's match counts as moved | The same columns again are no match (no rule: removing that check breaks none, and a story catches it); the columns are of every field, so a displaced one is moved | `Import.AMatchHoldsTheColumnsItSays`, of the columns a match holds | A story on `review15` (the same columns, by heading or by hand, are no match) |
-| "Hold it, show both, ask" (2026-11-20), for a row that waited | `DecidedSince`, `PutBackSince` and `NoLongerThere` refuse the act; the queue holds it with both. `UndoneSince` (an undo the screen had not received) refuses it too and is held the same way. An act made before a colleague's group reached the screen is refused with `GroupedSince`, held on a row the group names and sent again on one it does not. A row that did not wait is decision 2 | `DecideRow.ADecisionIsReplacedOnlyByAnActThatSawIt`, `.ADecisionIsMadeOnAScreenThatHasTheRowsLastUndo`, `.ARowsActSawTheLastGroupAct`; `UndoRowStep.ARowsUndoSawTheLastGroupAct` | That the queue holds it and Confirm waits; not run |
+| "Hold it, show both, ask" (2026-11-20), for a row that waited | `DecidedSince`, `PutBackSince` and `NoLongerThere` refuse the act; the queue holds it with both. `UndoneSince` (an undo the screen had not received) refuses it too, and a row's undo, and each is held the same way. An act made before a colleague's group reached the screen is refused with `GroupedSince`, held on a row the group names and sent again on one it does not. A row that did not wait is decision 2 | `DecideRow.ADecisionIsReplacedOnlyByAnActThatSawIt`, `.ADecisionIsMadeOnAScreenThatHasTheRowsLastUndo`, `.ARowsActSawTheLastGroupAct`; `UndoRowStep.ARowsUndoSawTheLastGroupAct`, `.AnUndoIsMadeOnAScreenThatHasTheRowsLastUndo` | That the queue holds it and Confirm waits; not run |
 | "Keep them, say why" (2026-11-20) | A refused act stays in the queue with its reason; signed out counts as waiting | | The queue's test |
 | "Each tab keeps its own" (2026-11-20); a discarded tab counts as gone and says so; "Keep both, she picks" for a refused row beside a closed tab's (2026-11-21) | One queue a tab, taken up only from a tab that is gone; a command id answers its first receipt whichever tab sends it | | The queue's test with two tabs |
 | "Wait until she picks", "Wait, like a held row" (2026-11-21) | Confirm is sent only when no act is held or marked not saved | | The screen's half of the confirm |
@@ -849,7 +871,8 @@ paths (checked 2 commands deep, 9,434 sequences). Nine other shapes of the same 
 paths. The margin is thin: how a check is written can cost a proved rule. Where the checks stand is not in the paths
 either: with the covered exit ahead of the check of `saw`, or between that check and the matching's, the act still has
 284 paths and every rule is still proved; only the two stories of the order see it. In this repository at `53654e6`,
-as its prove tests write them, a row's act has 222 paths and a row's undo 362, a group's act 42 and a group's undo 84.
+as its prove tests write them, a row's act has 222 paths and a row's undo 362, a group's act 42 and a group's undo 84;
+since then, 234, 364, 42 and 86 (the group's undo names `seen`).
 
 ## Decisions for Benjamin
 
@@ -2040,7 +2063,7 @@ taken.
 | 40: review in memory, then host | The order of moves itself |
 | "Undecided: Ana took it back" | The story "a group taken back gives no row anything again: Ana's group of twelve rows, Dana types on row 14, both are taken back, and row 14 holds nothing" |
 | "Yes, refuse and show" (an undo behind a group) | `UndoRowStep.ARowsUndoSawTheLastGroupAct`; the story "refuse and show: a row's undo or act sent before the last group act reached its screen is refused and records nothing, and is taken sent again with it" |
-| "Row 14 stays whole" | The story "a group's undo touches no row: a row another person decided since keeps its decision, and a row's act made before the undo reached its screen is refused"; the sentence on screen: to write (Proof 6) |
+| "Row 14 stays whole" | The story "a group's undo touches no row: a row another person decided since keeps its decision, and a row's act made before the undo reached its screen is refused", and "a group's undo from a screen that is behind on the rows is held, and taken once the screen has them, touching none" (the mutant `gundo-seen`); the sentence on screen: to write (Proof 6) |
 | "No change, Ana's undo applies" | The story "a press that leaves a row reading as it reads is no change: Ana's group of twelve rows, Dana's press on row 14 changes nothing, Ana takes the group back, and row 14 holds nothing"; and, at `53654e6`, the stories "a press from a screen that is behind is held, not lost as no change" and "a covered press made on an older matching is held too" (the trial model `review15` has them as "a press over a group from a screen that missed a later decision on the row is refused and held, not answered no change" and "a press over a group made on an older matching is refused and held, not answered no change"), with the mutants `row-covered-early` and `row-covered-before-matching` |
 | "Yes: resend untouched, hold touched"; "Sent again by itself" | To write: the queue's test (Proof 3) |
 | "Yes, tests hold it, said plainly" | The 63 stories; each of the 184 mutants (both at `53654e6`), run in `check:full` by a sample and nightly in full (what they find by the build's own report) |
@@ -2096,7 +2119,10 @@ proof. It is written for his answers; decision 40's answer is this order.
    (`sawUndone`, mutant `row-undone`); a row's undo refused `MatchedSince` when pressed on an older matching
    (`madeOn`, mutant `undo-madeon`); a press sent twice answered as the first time when a match landed between (still refused
    `GroupedSince` after a group act); and an undo sent twice answered as the first time when a group act, or a confirm
-   and a reopening, landed between, each with its story and mutants.
+   and a reopening, landed between, each with its story and mutants. After `53654e6`: a row's undo refused
+   `UndoneSince` from a screen that has not received the row's last undo (`sawUndone`, mutant `undo-undone`), and a
+   group's undo refused `ReviewMovedOn` from a screen that has not received every change (`seen`, mutant
+   `gundo-seen`), each with its story.
 2. **The host and the first slice.** The model's Worker, `bun run dev` as decision 30 says, the session, the two
    guards, the Api tests in process, the harness test, telemetry. The first slice is the allowance: its aggregate, its
    view, and each model call's take going through it, starting empty: no count the current app stored is carried over, the

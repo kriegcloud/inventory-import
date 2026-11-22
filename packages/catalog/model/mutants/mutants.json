@@ -2312,6 +2312,22 @@
       ]
     },
     {
+      "key": "gundo-seen",
+      "target": "UndoGroup",
+      "kind": "check",
+      "file": "src/Review/UndoingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"UndoingGroup.decide\")"],
+      "until": "    transitions: {",
+      "old": "      // The sender's screen has not received every change. The model keeps no reading of a group's rows, so it cannot\n      // say whether what landed since is on one of them: a row another person decided since keeps that whole decision\n      // when the group goes, and the sender would learn it only after. Refused with the import's last change and\n      // held, as a group's act is; taken once the screen has it.\n      if (cmd.seen !== life.state.changes) return yield* new ReviewMovedOn({ last: life.state.changes })\n",
+      "new": "",
+      "proof": "test/UndoingGroup.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated AGroupsUndoIsMadeOnEveryChange"],
+      "trialStories": [
+        "Group: a group's undo from a screen that is behind on the rows is held, and taken once the screen has them, touching none: Ana's group covers row 14, Dana types 8 on it, and Ana, who has not received the 8, takes her group back"
+      ]
+    },
+    {
       "key": "gundo-nothing",
       "target": "UndoGroup",
       "kind": "nothing",

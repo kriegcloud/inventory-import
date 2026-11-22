@@ -344,7 +344,7 @@ it.effect("an admin of another organization changes nothing in this one's import
     Story.rejected(NotPermitted.make({})),
     Story.when(group({ step: "g2", seen: 2 })),
     Story.rejected(NotPermitted.make({})),
-    Story.when(UndoGroup.make({ importId: id, step: "g1", undo: 2, opening: 0 })),
+    Story.when(UndoGroup.make({ importId: id, step: "g1", undo: 2, opening: 0, seen: 2 })),
     Story.rejected(NotPermitted.make({}))
   )
 )
@@ -383,7 +383,7 @@ it.effect("a viewer changes nothing: no match, suggestion, confirm, remove, row 
     Story.rejected(NotPermitted.make({})),
     Story.when(group({ step: "g2", seen: 2 })),
     Story.rejected(NotPermitted.make({})),
-    Story.when(UndoGroup.make({ importId: id, step: "g1", undo: 2, opening: 0 })),
+    Story.when(UndoGroup.make({ importId: id, step: "g1", undo: 2, opening: 0, seen: 2 })),
     Story.rejected(NotPermitted.make({}))
   )
 )
@@ -430,9 +430,9 @@ it.effect("a row or a group kept under another organization's or import's name i
     Story.rejected(NotPermitted.make({})),
     Story.when(undo({ row: "row-3", undo: 1, step: "a5", sawGroup: 2 })),
     Story.rejected(NotPermitted.make({})),
-    Story.when(UndoGroup.make({ importId: id, step: "g1", undo: 2, opening: 0 })),
+    Story.when(UndoGroup.make({ importId: id, step: "g1", undo: 2, opening: 0, seen: 2 })),
     Story.rejected(NotPermitted.make({})),
-    Story.when(UndoGroup.make({ importId: id, step: "g2", undo: 2, opening: 0 })),
+    Story.when(UndoGroup.make({ importId: id, step: "g2", undo: 2, opening: 0, seen: 2 })),
     Story.rejected(NotPermitted.make({}))
   )
 )
@@ -466,7 +466,7 @@ it.effect(
       Story.rejected(NotOpen.make({})),
       Story.when(group({ step: "g2", seen: 3, opening: 1 })),
       Story.rejected(NotOpen.make({})),
-      Story.when(UndoGroup.make({ importId: id, step: "g1", undo: 2, opening: 1 })),
+      Story.when(UndoGroup.make({ importId: id, step: "g1", undo: 2, opening: 1, seen: 2 })),
       Story.rejected(NotOpen.make({})),
       Story.when(ReopenImport.make({ importId: id, seen: 3 })),
       Story.then(life, ImportReopened.make({ change: 4, by: "ana" }))

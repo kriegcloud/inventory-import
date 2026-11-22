@@ -725,10 +725,14 @@ Overrule any line by saying so.
   answered as the first time", "an undo sent twice is answered as the first time when a group act landed between" and
   "an undo sent twice is answered as the first time when the import was confirmed and opened again between", and the
   mutants `row-resend-matched`, `undo-resend-grouped` and `undo-resend-reopened`.
-- A group's undo from a screen that is behind on the rows; taken, since it takes back only its sender's own act and
-  replaces nothing of anyone else's, so a row another person decided since keeps that whole decision and the screen
-  names such rows after; built in `UndoingGroup` at `53654e6`, with the story "a group's undo is taken from a screen
-  that is behind on the rows, and touches none".
+- A group's undo from a screen that has not received every change of the import; refused `ReviewMovedOn`, naming the
+  import's last change, and held, as a group's act is, and taken once the screen has every change; taken, it takes
+  back only its sender's own act and touches no row, so a row another person decided since keeps that whole decision
+  ("Row 14 stays whole"). The check is of the whole import, since the model keeps no reading of a group's rows: a
+  change on a row outside the group holds the undo too. Built in `UndoingGroup` (`seen`,
+  `UndoGroup.AGroupsUndoIsMadeOnEveryChange`) after `d075922`, with the story "a group's undo from a screen that is
+  behind on the rows is held, and taken once the screen has them, touching none" and the mutant `gundo-seen`. This
+  line said before that such an undo is taken; that was not the rule's doing and is withdrawn.
 - A group's undo while the undoer's screen holds a later decision on one of its rows; no warning before, the screen
   names the row after the undo lands ("Row 14 was changed by Dana and stays"); the Review step's screen, move 3.
 - A suggested fix accepted on a rival row after a keep; the rival stays out, as an accept made before the keep; only a

@@ -63,7 +63,7 @@ layer(NodeServices.layer)("Catalog", (it) => {
       const proved = yield* lockedProved()
       // The number docs/verify.md states for the rules that must stay proved. It is read from the lock as it stood
       // before this run: a rule added or taken out on purpose changes it here and there, with the lock.
-      expect(proved.length).toBe(144)
+      expect(proved.length).toBe(145)
       const report = yield* Verify.report(Catalog, {
         apis: [CatalogApi],
         story: Story.make(Catalog),

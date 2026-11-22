@@ -33,6 +33,9 @@ packages at different versions of `effect`, a package no `workspaces` pattern co
 - **Effect moves together.** `effect` and every `@effect/*` package released with it are at one exact version. When
   the registry's newest version is the same for all of them, all move; when one was published later than the rest,
   none moves and the command says which is behind.
+- **A patched dependency stops the update.** When a dependency the repository patches
+  ([Patching a dependency](patches.md)) has a newer version, nothing is moved, and the command names the folder of
+  its patches: a patch is made for one version, and bun would install the new one unpatched with one warning line.
 - **Held dependencies stay**, and each is named at every run with the registry's newest version (one written as an
   address, as `xlsx` is, has none: the registry cannot be asked about it), and its group
   with why it is held and what moves it by hand. So one run says everything an update needs: what moved, and for

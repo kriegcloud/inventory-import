@@ -263,6 +263,24 @@
       ],
       "outputs": []
     },
+    // Every patch to a dependency has its header and its test, is for what bun.lock holds, applies to the kept file
+    // it names, and is what is installed (`beep patches check`, docs/patches.md). The last is read from
+    // node_modules, which no input can stand for: bun leaves a patch out with one warning line and exit 0. So this
+    // runs every time; it takes about a second.
+    "//#patches:check": { "cache": false },
+    // Each patch's test fails beside the package without its patches (`beep patches prove`): the patches and their
+    // tests, the kept files they are applied to, and what the tests are run with.
+    "//#patches:prove": {
+      "inputs": [
+        "packages/patches/**",
+        "!packages/patches/node_modules/**",
+        "vendor/alchemy/*.tgz",
+        "package.json",
+        "bun.lock",
+        "packages/tooling/tool/cli/src/**"
+      ],
+      "outputs": []
+    },
     // No home path or private folder is named in the scratchpad (`beep laws private-paths`): every file in it.
     "//#private-paths:check": {
       "inputs": ["scratchpad/**", "!scratchpad/**/node_modules/**", "packages/tooling/tool/cli/src/**"],

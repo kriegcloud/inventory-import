@@ -5,6 +5,8 @@
  *
  * - `sources`: `.syncpackrc.json` reads the root's `package.json` and one pattern for each `workspaces` pattern, so
  *   `deps:lint`, `deps:outdated` and `deps:update` see every package;
+ * - `catalog`: the version group of `.syncpackrc.json` that holds dependencies to `catalog:` lists every name of the
+ *   root's `catalog`, so `deps:lint` refuses one written as a version in a package.json;
  * - `coverage`: every folder with a `package.json` under `apps` and `packages` fits a `workspaces` pattern, and every
  *   pattern names at least one;
  * - `paths`: a `$schema`, an `extends` and a path in a script name a file that exists; one that does not, and would
@@ -44,6 +46,7 @@ import {
   type FoundBlock,
   isLocalPath,
   lineAt,
+  entriesOf,
   objectOf,
   renderArray,
   stringsIn,
@@ -209,6 +212,42 @@ export const configSyncPlan = Effect.fn("ConfigSync.plan")(function* () {
       found: listed(found),
       expected: listed(expected),
       text: renderArray(block.value)(A.map(expected, quoted))
+    })
+  })
+
+  // catalog: syncpack holds every dependency the root's catalog names to `catalog:`, so the group's list is the
+  // catalog's names. A name missing from it could be written as a version in one package.json and nothing would say.
+  const catalogPlan = Effect.fn("ConfigSync.catalog")(function* () {
+    const config = yield* readIfThere(repo.join(repo.root, ".syncpackrc.json"))
+    const catalog = objectOf("catalog")(rootPackage.text)
+    if (O.isNone(config) || O.isNone(catalog)) return nothing
+    const expected = A.sort(
+      A.map(entriesOf(catalog.value)(rootPackage.text), ([name]) => name.value),
+      Order.String
+    )
+    const text = config.value.text
+    const missing = one({
+      problems: [
+        Problem.make({
+          file: config.value.file,
+          message: `has no version group that holds the catalog: add { "label": "...", "policy": "catalog", "dependencies": [], "dependencyTypes": ["prod", "dev", "peer"] } to "versionGroups" and run \`bun run config-sync\`, or a dependency of the root's catalog can be written as a version in one package.json`
+        })
+      ]
+    })
+    const policy = /"policy"\s*:\s*"catalog"/.exec(blankComments(text))
+    if (policy === null) return missing
+    const rest = Str.slice(policy.index)(text)
+    const closes = O.getOrElse(Str.indexOf("}")(blankComments(rest)), () => rest.length)
+    const block = O.filter(arrayOf("dependencies")(rest), (found) => found.start < closes)
+    if (O.isNone(block)) return missing
+    const span = { ...block.value, start: block.value.start + policy.index, end: block.value.end + policy.index }
+    const found = A.map(stringsIn(span)(text), (entry) => entry.value)
+    if (A.join(found, "\n") === A.join(expected, "\n")) return agreed
+    return blockDrift(config.value, span, {
+      what: "the catalog group's `dependencies`, from the `catalog` of package.json",
+      found: listed(found),
+      expected: listed(expected),
+      text: renderArray(span)(A.map(expected, quoted))
     })
   })
 
@@ -635,10 +674,16 @@ export const configSyncPlan = Effect.fn("ConfigSync.plan")(function* () {
   })
 
   const sources = yield* sourcesPlan()
+  const catalogued = yield* catalogPlan()
   const tasks = yield* tasksPlan()
   const vendored = yield* vendoredPlan()
   return mergePlans(
-    A.flatten<ReadonlyArray<ReadonlyArray<Plan>>>([[sources, coverage, paths], solutions, scripts, [tasks, vendored]])
+    A.flatten<ReadonlyArray<ReadonlyArray<Plan>>>([
+      [sources, catalogued, coverage, paths],
+      solutions,
+      scripts,
+      [tasks, vendored]
+    ])
   )
 })
 

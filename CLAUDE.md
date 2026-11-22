@@ -245,7 +245,7 @@ package's task and replays it when nothing it reads has changed. The app's own s
 | `bun run format` | oxfmt, writes files: `bun run format -- <files>` for only yours, since a bare run rewrites every file. `format:check` only reports |
 | `bun run deps:update` | Moves every dependency of every package to its newest version, except the ones `.syncpackrc.json` holds back (each is named with its reason and how to move it), runs `version-sync -- --write`, then `bun install` once, and says what moved from which version to which; a failed install puts every file back. `-- --dry-run` lists the moves and writes nothing. `deps:lint` and `deps:outdated` (syncpack) read the same packages and the same held list |
 | `bun run version-sync` | Names every place where a version or a date differs from its one source (`.bun-version`, `engines.node`, the `effect` the packages state, the app's `wrangler.jsonc` and the rest) and fails. `-- --write` rewrites them, `-- --dry-run` lists what would be written. `docs/sync-commands.md` has every source and what is left alone |
-| `bun run config-sync` | Writes what follows from the workspaces: syncpack's sources, tsconfig references, each package's scripts, the paths that depend on a package's depth, the root tasks the three checks (`check`, `check:full`, `check:ci`) run; installs when it wrote a package.json. `config-sync:check` only compares, `-- --dry-run` lists what would be written |
+| `bun run config-sync` | Writes what follows from the workspaces: syncpack's sources and its list of the catalog's names, tsconfig references, each package's scripts, the paths that depend on a package's depth, the root tasks the three checks (`check`, `check:full`, `check:ci`) run; installs when it wrote a package.json. `config-sync:check` only compares, `-- --dry-run` lists what would be written |
 | `bun run scratch:new <name> --template <probe\|service\|screen\|verify>` | Starts an experiment in `scratchpad/experiments/<name>` from a template whose test already passes. `scratch:test [name]` runs the experiments' tests, or one experiment's folder only (Vitest, Node); `scratch:check` holds the scratchpad's own rules (no install inside an experiment, a note for each) and runs the type-checker with the Effect diagnostics; `scratch:list` shows what is open with its age; `scratch:serve experiments/<name>` serves a screen on the first free port from 5273; `scratch:graduate <name> --to <path> --learned "<line>"` or `scratch:drop <name> --learned "<line>"` ends one. `bun run check`, the build and CI never read the scratchpad (`docs/scratchpad.md`) |
 | `bun run docs:check` | Checks that `docs/`, `explorations/` and `goals/` are Open Knowledge Format bundles (the OKF skill's validator). Needs bash |
 | `bun run db:reset` | Deletes the local database and re-applies migrations. **Restart `bun run dev` afterwards.** |
@@ -270,7 +270,9 @@ only Benjamin runs it (`goals/infra/PLAN.md`, "What Benjamin does by hand").
 
 If you add or remove a dependency, do it with `bun add` or `bun remove` in the workspace that uses it
 (`bun add --cwd apps/inventory <name>`); `bun.lock` at the root is the only lockfile of the workspaces, and `bunfig.toml` keeps one
-hoisted `node_modules`. The one other lockfile is the scratchpad's (`scratchpad/bun.lock`, committed), for the
+hoisted `node_modules`. A dependency more than one package uses has its version once, in the `catalog` of the root's
+package.json, and each package.json says `"catalog:"` (`docs/sync-commands.md`, "One place for a shared version");
+`bun run deps:lint` refuses one written as a version. The one other lockfile is the scratchpad's (`scratchpad/bun.lock`, committed), for the
 libraries an experiment added: the scratchpad is no workspace, and a library the root already has never goes there.
 
 **A second dev server.** Benjamin usually runs the dev server in his own terminal on port 5173; ask before starting

@@ -236,7 +236,7 @@ package's task and replays it when nothing it reads has changed. The app's own s
 | Root command | What it does |
 | --- | --- |
 | `bun run dev` | Applies local migrations and the test accounts, then serves the app and API on http://localhost:5173, signed in by itself as the first test account |
-| `bun run check` | The loop check through turbo: type-check with Effect diagnostics, lint (with the two design lints), the fast tests, the format check, `docs:check`, the key scan (`keys:check`), the vendored-kit hash check (`vendor:check`), which package may import which (`boundaries:check`), the two stylesheet lists (`screens:check`), every `ref` a DOM ref or a callback that stays the same across draws (`refs:check`), no `_tag` compared or built by hand in any src or test folder (`tags:check`) and the Effect imports (`imports:check`; `imports:fix` repairs code). Before every commit |
+| `bun run check` | The loop check through turbo: type-check with Effect diagnostics, lint (with the two design lints), the fast tests, the format check, `docs:check`, the key scan (`keys:check`), the vendored-kit hash check (`vendor:check`), which package may import which (`boundaries:check`), the two stylesheet lists (`screens:check`), every `ref` a DOM ref or a callback that stays the same across draws (`refs:check`), no `_tag` compared or built by hand in any src or test folder (`tags:check`), no deprecated API used, read from every file's types (`deprecated:check`; `docs/standards/deprecated-apis.md`), the root's own configuration files type-check (`configs:check`) and the Effect imports (`imports:check`; `imports:fix` repairs code). Before every commit |
 | `bun run beep <group> <command>` | One of the repository's own rules by hand: `bun run beep laws boundaries`, `bun run beep quality ceilings`, `bun run beep vendor check`; `--help` on any of them lists its flags. `bun run check` runs them all under their root script names (`boundaries:check`, `vendor:check` and the rest) |
 | `bun run check:full` | `check` plus the slow tests (`*.slow.test.ts`) and the production build. CI runs it |
 | `bun run build` | The production build through turbo |
@@ -257,6 +257,7 @@ package's task and replays it when nothing it reads has changed. The app's own s
 | `build:report` | The browser's build, then each chunk's makeup by package, largest first (`-- index` for one chunk); the treemap is `.scratch/bundle/client.html` |
 | `lighthouse` | Lighthouse on the production build, mobile and desktop. `-- /path` for another page. Prints the scores and every audit that scored below 100 |
 | `auth:schema` | After a change to Better Auth's options, prints the migration it still needs |
+| `grid:keys` | Types on every data grid editor in Chromium and reads what is stored (needs `CHROME_PATH`); by hand, after a change to the grid |
 
 Hosting is not a script: `bunx alchemy deploy --stage <name>` from the root runs the stack in `packages/infra`, and
 only Benjamin runs it (`goals/infra/PLAN.md`, "What Benjamin does by hand").
@@ -329,9 +330,11 @@ explorations/           Questions being shaped: research, decisions, briefs.
 goals/                  Work with a definition of done: SPEC.md and PLAN.md.
 packages/tooling/tool/cli/  @beep/repo-cli: the repository's own rules as commands (`bun run beep <group> <command>`):
                         `laws` (boundaries: which package may import which; screens: every package with screens in
-                        both stylesheet lists; ref-callbacks: no ref callback made on each draw; tags: no `_tag` compared or built by hand in any src or test folder; exports; keys; effect-imports: every Effect import from its own path
+                        both stylesheet lists; ref-callbacks: no ref callback made on each draw; tags: no `_tag` compared or built by hand in any src or test folder; exports; keys; deprecated-apis: no deprecated API used, in any code file git would commit outside `.agents`; effect-imports: every Effect import from its own path
                         under its one name), `quality` (strict, ceilings), `docs check` and `vendor` (check; sync,
                         which copies the kit from a beep-effect checkout). Nothing imports it.
+tsconfig.json           References every package's tsconfig.test.json and tsconfig.config.json, so a linter that reads
+                        types and an editor find a test's project. Nothing compiles it. A new package adds its line.
 turbo.json              The task graph: seven package tasks and the root tasks (the repository's own rules, one each).
 .agents/                Skills (see above). Not application code; the check ignores it.
 ```

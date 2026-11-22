@@ -393,6 +393,9 @@ main for `keyOf`, fold-only aggregates, `invariants`, `transitions` and their pr
 organization in the state, events and rejections built with `new`, and a policy to carry a confirm's rows to the
 items; the same model in main's shape (`keyOf`, invariants) proves the app's rules.
 
+The brief's decisions 17 and 18 answer otherwise (2026-11-22): each item is its own aggregate, and a saga creates a
+confirm's items from a plan staged in D1, in place of a policy that carries the confirm's rows.
+
 ## Where this was read
 
 - https://alchemy.run/domain/aggregate (the live site documents beta.87)

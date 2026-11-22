@@ -368,6 +368,9 @@ depend on `@alchemy.run/domain` at `main@dbfd0ddb` or later (no npm release has 
 decision), domain files that import their commands, events and helpers by relative paths, and an exception to
 `newSchemaClass` for domain blocks.
 
+The brief, as answered on 2026-11-22, does not build `EveryConfirmedFileAddsUp`; the import's rules it asserts are those
+of the models its decisions 4, 5 and 7 answer.
+
 ## Where this was read
 
 - `website/src/content/docs/domain/verifying-models.mdx`: not at `v2.0.0-beta.87`; on `main@dbfd0ddb` new

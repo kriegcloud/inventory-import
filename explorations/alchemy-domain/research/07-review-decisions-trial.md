@@ -1,7 +1,7 @@
 ---
 type: Research
 title: "Trial: saving review decisions, under Verify"
-description: Five rounds of models of how a review's decisions are saved, run through Verify on the library's main on 2026-11-19 to 2026-11-21. The first shows that a set-and-clear difference cannot hold the rule "no command clears a decision its sender did not make". The second finds the shape under which the review's rules are proved, measures the largest value an object stores, and runs a decision, a relation, a model invariant and an eventually rule. The third runs that shape as it would be hosted, with the app's fifteen fields (32 rules proved, and two orderings let through), the item with replace and restore, the allowance by day, members as instances, each proof alone, and one decision across two objects in local workerd. The fourth closes those orderings and every other ordering found that a model can hold, and measures that model in local workerd. The sources and Verify's reports, with what is proved, what is only checked, and what was not run; a report cut short says which lines it shows.
+description: Six rounds of models of how a review's decisions are saved, run through Verify on the library's main on 2026-11-19 to 2026-11-22. The first shows that a set-and-clear difference cannot hold the rule "no command clears a decision its sender did not make". The second finds the shape under which the review's rules are proved, measures the largest value an object stores, and runs a decision, a relation, a model invariant and an eventually rule. The third runs that shape as it would be hosted, with the app's fifteen fields (32 rules proved, and two orderings let through), the item with replace and restore, the allowance by day, members as instances, each proof alone, and one decision across two objects in local workerd. The fourth closes those orderings and every other ordering found that a model can hold, and measures that model in local workerd. The sources and Verify's reports, with what is proved, what is only checked, and what was not run; a report cut short says which lines it shows.
 ---
 
 # Trial: saving review decisions, under Verify
@@ -9,10 +9,10 @@ description: Five rounds of models of how a review's decisions are saved, run th
 Everything on this page was run in folders outside this repository, on `@alchemy.run/domain` at `main@dbfd0ddb`.
 Nothing in the repository was changed. This is the case [the brief](../BRIEF.md) models first.
 
-There are five rounds. The first, of 2026-11-19, is below as it was written, with three sentences corrected; it
+There are six rounds. The first, of 2026-11-19, is below as it was written, with three sentences corrected; it
 claimed more than it had shown, and [the second round](#the-second-round), of 2026-11-20, lists the corrections and
 runs what the first did not. [The third round](#the-third-round), the same day, runs the shape the brief recommends as
-it would be hosted. **Read the third round's table first**: the design in the brief rests on it.
+it would be hosted. **Read [the sixth round](#the-sixth-round)'s table first**: the design in the brief rests on its model.
 
 # The first round
 
@@ -13178,3 +13178,3250 @@ Exited.
 
 As the fourth round: `review12` beside `test/Actor.context.ts`, and `node node_modules/vitest/vitest.mjs run <file>`.
 Trial 16 needs `fast-check` and this repository's `packages/review`; trial 17 takes trial 12's manifest.
+
+# The sixth round
+
+Run on 2026-11-22 on the same builds, after decisions 7 and 8 of the brief were answered and with them three further
+points: a group is one unit; only the last group still in force is taken back, so undo walks back through the groups;
+a row's undo, like a row's act, names the import's last group act. `review14` is that model. It is the fifth round's
+`review12` with those rules, written so that it type-checks, with a story for every command and a mutant for every
+check. The load average stands beside each time, and no timeout was raised.
+
+| # | What | Result | Time, load before and after |
+| --- | --- | --- | --- |
+| 18 | `Verify.model(Review)`: three aggregates, four decisions, eleven commands | **Verified. 135 rules proved** | 109.52 s, 27.86 34.29 40.82 to 27.67 30.97 38.79 |
+| 18 | `Prove.decision` of each decision | **Proved**: a row's act 152 paths, a row's undo 298, a group's act 42, a group's undo 84 | 9.44 s, 24.68 34.14 40.97 to 32.97 35.63 41.38; 19.64 s, 32.97 35.63 41.38 to 27.86 34.29 40.82; 856 ms, 25.09 34.38 41.08 to 25.09 34.38 41.08; 3.16 s, 25.09 34.38 41.08 to 24.68 34.14 40.97 |
+| 18 | 7 rules across every import, row and group | **Checked**, every sequence of up to 2 commands (9,401 sequences) and of up to 3 (16,629 sequences, 3,630 states) | 45.42 s, 27.67 30.97 38.79 to 35.73 32.23 38.82; 51.70 s, 35.73 32.23 38.82 to 30.31 31.63 38.29 |
+| 18 | The model under a strict type-check, with no cast | **No error**; no parameter of its functions typed `any` | not timed |
+| 18 | Stories: each of the eleven commands accepted with its events, and each refusal it can give | **43 pass**, and 3 properties of the seal | under 2 s |
+| 18 | 148 mutants: each check removed, each field of an event given a wrong value, each kind of act recording nothing | **111 break a rule; the other 37 fail a story**; none passes both | the slowest 1,392 s; six at a time, load to 97 |
+| 19 | The reading of a row through its groups, against the `act` of today's code, for one person and for two | **Equal** where the reference has an answer; three orderings where it does not, below | 25,000 sequences a run |
+
+"Proved" here is of `review14`, printed below whole, on `main@dbfd0dd`, and of nothing else.
+
+## Trial 18. The model the answers describe
+
+What differs from trial 15's `review12`:
+
+- **Undo walks back.** The import holds `topGroup`, the change of the last group still in force; a group holds `under`,
+  the one that was the last in force when it was decided. Only the group the import holds as `topGroup` is taken back,
+  and then the one under it is the last in force again. A later group still in force refuses the undo with
+  `GroupedAfter` and its number.
+- **A row's undo names the import's last group act**, as a row's act does, and is refused with `GroupedSince` on any
+  other. The refusal hands back no number: a screen learns the last group act only by receiving it.
+- **A group taken back gives no row anything**: the reading of a row skips it. The row keeps no copy of what the group
+  did.
+- **The rules that read who is acting are stated on the decisions.** The library types an aggregate's rule with the
+  context its own commands' middleware provides, and the row and the group have no commands: their events are recorded
+  by decisions. Each of the six rules is one comparison on each decision that records on that aggregate. A decision
+  added later that records on a row or a group has to state them itself.
+- **Every function is written so that its parameters are typed**, and the prover reads each as before.
+
+What no rule holds, here as in every round: that an act is taken. The stories hold it, one for each command accepted,
+and the mutants that record nothing each fail a story and no rule.
+
+`Seen.value.ts`:
+
+```ts
+// Every change to an import's review has a number the import itself gives, one higher each time, so no two changes
+// ever share one and no sender's id has to be trusted to be unique. A step is only the label of an act the person can
+// undo: the rows of one group act share it. The import also counts every match (its matching) and holds which column
+// fills each of the app's fifteen fields as one text, the headings' own choices included, because one match can move
+// more than one field's column.
+import * as S from "effect/Schema"
+
+// The id the screen gives one act at the press: never empty. The rows of a group act share it.
+export const Step = S.String.check(S.isMinLength(1), S.isMaxLength(64))
+// A change named by its number, or 0 for none.
+export const Change = S.Int
+// Which column fills each field, as the one text an encoder writes for it; "none on purpose" is a value in it.
+export const Columns = S.String.check(S.isMaxLength(10_000))
+// The rows of one group act as one text an encoder writes, and what the act does to each of them.
+export const Rows = S.String.check(S.isMinLength(1), S.isMaxLength(600_000))
+export const Patch = S.String.check(S.isMaxLength(10_000))
+```
+
+`ImportLife.aggregate.ts`:
+
+```ts
+// One import's lifecycle as its own instance, with no list in its state: staged, matched, confirmed, taken back,
+// opened again, removed. It numbers every change. A confirm, a take-back, a reopen and a remove each name the last
+// change their sender's screen has received, with none before it missing, and are refused on any other. An act on a
+// group of rows is one change, recorded with the group's own instance; the import holds its number as the last group
+// act. Rows and groups are not here.
+import * as Domain from "@alchemy.run/domain"
+import * as Effect from "effect/Effect"
+import * as S from "effect/Schema"
+import { CurrentActor, Session } from "../test/Actor.context.ts"
+import { Change, Columns, Step } from "./Seen.value.ts"
+
+export const ImportId = S.String.pipe(S.brand("ImportId"))
+const Count = S.Int.check(S.isGreaterThanOrEqualTo(0))
+
+export class ImportStaged extends Domain.Event("ImportStaged", {
+  organizationId: S.String,
+  rows: Count,
+  columns: Columns,
+  by: S.String,
+}) {}
+// Which column fills each field now, every field a match moved included, the number of the match, and who made it: the
+// mapping, and since which match each field reads its column, can be rebuilt from the import's events alone.
+export class ColumnMatched extends Domain.Event("ColumnMatched", {
+  change: Change,
+  matching: S.Int,
+  columns: Columns,
+  by: S.String,
+}) {}
+// One act on one row, numbered by its import and recorded by the decision that also records the row. It says what the
+// row holds after it: the change that recorded the decision (0 when the row has none), whose it is, and its text.
+export class ActCounted extends Domain.Event("ActCounted", {
+  change: Change,
+  step: Step,
+  row: S.String,
+  label: S.String,
+  holds: Change,
+  by: S.String,
+  // Who acted; after an undo the decision the row then holds can be another person's.
+  actor: S.String,
+  flags: S.String,
+  madeOn: S.Int,
+}) {}
+// One act on a group of rows, or its undo, numbered by its import and recorded by the decision that also records the
+// group: how many rows it is of, and who acted.
+export class GroupCounted extends Domain.Event("GroupCounted", {
+  change: Change,
+  step: Step,
+  rows: Count,
+  label: S.String,
+  by: S.String,
+  // The last act on a group still in force after this one: itself when it decides a group, the one that was under it
+  // when it takes one back (0 for none).
+  top: Change,
+}) {}
+export class SuggestionRecorded extends Domain.Event("SuggestionRecorded", { by: S.String }) {}
+export class ImportConfirmed extends Domain.Event("ImportConfirmed", {
+  change: Change,
+  created: Count,
+  updated: Count,
+  already: Count,
+  notImported: Count,
+  by: S.String,
+}) {}
+// Of the items its confirms created: how many were removed, and kept because someone changed them. Of the items they
+// replaced: how many were put back, and kept for the same reason.
+export class ImportTakenBack extends Domain.Event("ImportTakenBack", {
+  change: Change,
+  removed: Count,
+  kept: Count,
+  restored: Count,
+  keptReplaced: Count,
+  by: S.String,
+}) {}
+export class ImportReopened extends Domain.Event("ImportReopened", { change: Change, by: S.String }) {}
+export class ImportRemoved extends Domain.Event("ImportRemoved", { change: Change, by: S.String }) {}
+
+export class NotPermitted extends Domain.Rejection("NotPermitted", {}) {}
+export class AlreadyStaged extends Domain.Rejection("AlreadyStaged", {}) {}
+export class NotOpen extends Domain.Rejection("NotOpen", {}) {}
+// The screen has not received every change: the last one's number.
+export class ReviewMovedOn extends Domain.Rejection("ReviewMovedOn", { last: Change }) {}
+// The plan was built at a change that is no longer the last: the handler builds it again.
+export class PlanBehind extends Domain.Rejection("PlanBehind", { last: Change }) {}
+// What the plan would do is not what the button said: the stored items changed, with no change of this import between.
+export class NotWhatWasShown extends Domain.Rejection("NotWhatWasShown", {}) {}
+// The import was confirmed after the act was made: the screen names it.
+export class ConfirmedSince extends Domain.Rejection("ConfirmedSince", {}) {}
+// A column was matched again: the matching now.
+export class MatchedSince extends Domain.Rejection("MatchedSince", { matching: S.Int }) {}
+export class CountsDoNotAddUp extends Domain.Rejection("CountsDoNotAddUp", {}) {}
+export class NotImported extends Domain.Rejection("NotImported", {}) {}
+export class MoreKeptThanInForce extends Domain.Rejection("MoreKeptThanInForce", {}) {}
+export class NotClosed extends Domain.Rejection("NotClosed", {}) {}
+// Items it created are in force, or a confirm of it was not taken back: it stays with them.
+export class HasItemsInForce extends Domain.Rejection("HasItemsInForce", {}) {}
+
+export class StageImport extends Domain.Command("StageImport", {
+  middleware: [Session],
+  input: { importId: ImportId, rows: Count, columns: Columns },
+  events: [ImportStaged],
+  rejects: [NotPermitted, AlreadyStaged],
+}) {}
+export class MatchColumn extends Domain.Command("MatchColumn", {
+  middleware: [Session],
+  // `columns`: every field's column after the match. `saw`: the import's matching as the sender's screen has it.
+  input: { importId: ImportId, columns: Columns, saw: S.Int, opening: S.Int },
+  events: [ColumnMatched],
+  rejects: [NotPermitted, NotOpen, ConfirmedSince, MatchedSince],
+}) {}
+export class RecordSuggestion extends Domain.Command("RecordSuggestion", {
+  middleware: [Session],
+  input: { importId: ImportId },
+  events: [SuggestionRecorded],
+  rejects: [NotPermitted, NotOpen],
+}) {}
+export class ConfirmImport extends Domain.Command("ConfirmImport", {
+  middleware: [Session],
+  // `seen`: the screen has received every change up to this number, its own acts' included. `planAt`: the handler built
+  // the plan from rows written up to this number. `shown` and `plan`: what every row becomes, as one digest, as the
+  // screen had it and as the plan has it.
+  input: {
+    importId: ImportId,
+    seen: Change,
+    planAt: Change,
+    shown: S.String,
+    plan: S.String,
+    created: Count,
+    updated: Count,
+    already: Count,
+    notImported: Count,
+  },
+  events: [ImportConfirmed],
+  rejects: [NotPermitted, NotOpen, ReviewMovedOn, PlanBehind, NotWhatWasShown, CountsDoNotAddUp],
+}) {}
+export class TakeBackImport extends Domain.Command("TakeBackImport", {
+  middleware: [Session],
+  input: { importId: ImportId, seen: Change, kept: Count, keptReplaced: Count },
+  events: [ImportTakenBack],
+  rejects: [NotPermitted, NotImported, ReviewMovedOn, MoreKeptThanInForce],
+}) {}
+export class ReopenImport extends Domain.Command("ReopenImport", {
+  middleware: [Session],
+  input: { importId: ImportId, seen: Change },
+  events: [ImportReopened],
+  rejects: [NotPermitted, NotClosed, ReviewMovedOn],
+}) {}
+export class RemoveImport extends Domain.Command("RemoveImport", {
+  middleware: [Session],
+  input: { importId: ImportId, seen: Change },
+  events: [ImportRemoved],
+  rejects: [NotPermitted, NotOpen, ReviewMovedOn, HasItemsInForce],
+}) {}
+
+const kept = {
+  organizationId: S.String,
+  rows: S.Int,
+  // How many times it was confirmed: an act names it, so one made before a confirm is not taken after a reopen.
+  confirms: S.Int,
+  matching: S.Int,
+  columns: Columns,
+  // The number of the last change, and of the last confirm that stands (0 when none does).
+  changes: S.Int,
+  confirmedAt: S.Int,
+  // Items its confirms created that are in force, items they replaced and that were not put back, and its confirms not
+  // taken back.
+  inForce: S.Int,
+  replaced: S.Int,
+  standing: S.Int,
+  // The number of the last act on a group, its undo included (0 when there was none): a row's act names it.
+  lastGroup: S.Int,
+  // The change of the last group still in force (0 when there is none): only that one is taken back.
+  topGroup: S.Int,
+}
+export const ImportState = S.Union([
+  S.TaggedStruct("Unstaged", {}),
+  S.TaggedStruct("Open", {
+    ...kept,
+    suggestions: S.Int,
+  }),
+  S.TaggedStruct("Imported", { ...kept, created: S.Int, updated: S.Int, already: S.Int, notImported: S.Int }),
+  S.TaggedStruct("TakenBack", { ...kept, removed: S.Int, kept: S.Int }),
+  S.TaggedStruct("Removed", { organizationId: S.String }),
+])
+
+export class ImportLife extends Domain.Aggregate("ImportLife", {
+  id: ImportId,
+  state: ImportState,
+  initial: { _tag: "Unstaged" },
+  invariants: {
+    // A confirm's four outcomes add up to the rows in the file: of the counts its command states.
+    OutcomesAddUpToTheRows: (s) =>
+      s._tag !== "Imported" || s.created + s.updated + s.already + s.notImported === s.rows,
+    // No count is negative. One comparison a rule: the prover takes both sides of every `&&` it cannot settle, so a
+    // chain of them multiplies the paths of each decision that reads the import.
+    RowsAreNotNegative: (s) => s._tag === "Unstaged" || s._tag === "Removed" || s.rows >= 0,
+    InForceIsNotNegative: (s) => s._tag === "Unstaged" || s._tag === "Removed" || s.inForce >= 0,
+    ReplacedIsNotNegative: (s) => s._tag === "Unstaged" || s._tag === "Removed" || s.replaced >= 0,
+    StandingIsNotNegative: (s) => s._tag === "Unstaged" || s._tag === "Removed" || s.standing >= 0,
+    CreatedIsNotNegative: (s) => s._tag !== "Imported" || s.created >= 0,
+    UpdatedIsNotNegative: (s) => s._tag !== "Imported" || s.updated >= 0,
+    AlreadyIsNotNegative: (s) => s._tag !== "Imported" || s.already >= 0,
+    NotImportedIsNotNegative: (s) => s._tag !== "Imported" || s.notImported >= 0,
+    RemovedIsNotNegative: (s) => s._tag !== "TakenBack" || s.removed >= 0,
+    KeptIsNotNegative: (s) => s._tag !== "TakenBack" || s.kept >= 0,
+    // An import never has more items in force than the file has rows.
+    NoMoreInForceThanRows: (s) => s._tag === "Unstaged" || s._tag === "Removed" || s.inForce <= s.rows,
+    // What says "taken back" has no confirm standing.
+    NothingStandsThatWasTakenBack: (s) => s._tag !== "TakenBack" || s.standing === 0,
+    WhatIsInForceThenIsWhatWasKept: (s) => s._tag !== "TakenBack" || s.inForce === s.kept,
+    // No group has fewer than no rows left to answer.
+  },
+  transitions: {
+    // The status becomes Imported only by a confirm.
+    NothingIsWrittenBeforeConfirm: ({ before, after, command }) =>
+      after._tag !== "Imported" || before._tag === "Imported" || command._tag === "ConfirmImport",
+    AConfirmOfAClosedImportWritesNothing: ({ before, after, command }) =>
+      command._tag !== "ConfirmImport" || before._tag === "Open" || after._tag === before._tag,
+    // Nothing is confirmed that was not on screen: the confirm names the last change, as the last of every one its
+    // screen received; its plan is of that change; and the plan does what the screen said it would.
+    AConfirmNamesEveryChange: ({ before, after, command }) =>
+      command._tag !== "ConfirmImport" ||
+      before._tag !== "Open" ||
+      after._tag !== "Imported" ||
+      command.seen === before.changes,
+    APlanIsOfEveryChange: ({ before, after, command }) =>
+      command._tag !== "ConfirmImport" ||
+      before._tag !== "Open" ||
+      after._tag !== "Imported" ||
+      command.planAt === before.changes,
+    APlanDoesWhatWasShown: ({ before, after, command }) =>
+      command._tag !== "ConfirmImport" ||
+      before._tag !== "Open" ||
+      after._tag !== "Imported" ||
+      command.plan === command.shown,
+    // Nor is an import taken back, opened again or removed by someone who has not received its last change.
+    TheRestNameEveryChangeToo: ({ before, after, command }) =>
+      (command._tag !== "TakeBackImport" && command._tag !== "ReopenImport" && command._tag !== "RemoveImport") ||
+      before._tag === "Unstaged" ||
+      before._tag === "Removed" ||
+      after._tag === "Unstaged" ||
+      command.seen === before.changes,
+    // Every change has a number of its own: each raises the import's number by exactly one, and nothing else moves it.
+    EveryChangeHasItsOwnNumber: ({ before, after, command }) =>
+      before._tag === "Unstaged" ||
+      before._tag === "Removed" ||
+      after._tag === "Unstaged" ||
+      after._tag === "Removed" ||
+      after.changes === before.changes + (command._tag === "RecordSuggestion" ? 0 : 1),
+    // No confirm and no remove is taken while a group act is being sent.
+    OnlyAnImportWithAConfirmStandingIsTakenBack: ({ before, after, command }) =>
+      command._tag !== "TakeBackImport" ||
+      before._tag === "Unstaged" ||
+      before._tag === "Removed" ||
+      after._tag === "Unstaged" ||
+      before.standing >= 1,
+    // A take-back is of everything in force: what was removed and what was kept add up to it, and nothing stands after.
+    ATakeBackIsOfEverythingInForce: ({ before, after, command, events }) =>
+      command._tag !== "TakeBackImport" ||
+      before._tag === "Unstaged" ||
+      before._tag === "Removed" ||
+      after._tag === "Unstaged" ||
+      after._tag === "Removed" ||
+      (after.standing === 0 &&
+        after.replaced === 0 &&
+        after.inForce === command.kept &&
+        events.every((e) => e._tag !== "ImportTakenBack" || e.removed + e.kept === before.inForce)),
+    // What its confirms replaced is put back or kept, and nothing is left out of the two counts.
+    AndOfEverythingReplaced: ({ before, command, events }) =>
+      command._tag !== "TakeBackImport" ||
+      before._tag === "Unstaged" ||
+      before._tag === "Removed" ||
+      events.every((e) => e._tag !== "ImportTakenBack" || e.restored + e.keptReplaced === before.replaced),
+    // Every event of the import says whose it is.
+    EveryEventSaysWhose: ({ events }) => Effect.gen(function* () {
+      const actor = yield* CurrentActor
+      return events.every((e) => (e._tag === "ActCounted" ? e.actor === actor.memberId : e.by === actor.memberId))
+    }),
+    // A match and a group are made in this opening of the import.
+    AMatchIsOfThisOpening: ({ before, after, command }) =>
+      command._tag !== "MatchColumn" ||
+      before._tag !== "Open" ||
+      after._tag !== "Open" ||
+      command.opening === before.confirms,
+    ASuggestionWritesNothing: ({ before, after, command }) =>
+      command._tag !== "RecordSuggestion" ||
+      before._tag !== "Open" ||
+      (after._tag === "Open" && after.matching === before.matching && after.changes === before.changes),
+    // A match is made by someone who saw the last one, whatever field it moved; it raises the matching by one and holds
+    // the columns it says. The same columns again are no match.
+    AMatchIsMadeOnTheLastOne: ({ before, after, command }) =>
+      command._tag !== "MatchColumn" || before._tag !== "Open" || after._tag !== "Open" || command.saw === before.matching,
+    AMatchHoldsTheColumnsItSays: ({ before, after, command }) =>
+      command._tag !== "MatchColumn" || before._tag !== "Open" || after._tag !== "Open" || after.columns === command.columns,
+    AMatchIsTheNextOne: ({ before, after, command }) =>
+      command._tag !== "MatchColumn" ||
+      before._tag !== "Open" ||
+      after._tag !== "Open" ||
+      after.matching === before.matching + 1,
+    OnlyAnOpenImportIsReviewed: ({ before, after }) =>
+      before._tag === "Open" ||
+      before._tag === "Unstaged" ||
+      before._tag === "Removed" ||
+      after._tag === "Removed" ||
+      after._tag === "Unstaged" ||
+      after.matching === before.matching,
+    AnImportIsOpenedAgainOnlyByReopen: ({ before, after, command }) =>
+      after._tag !== "Open" ||
+      before._tag === "Open" ||
+      before._tag === "Unstaged" ||
+      (command._tag === "ReopenImport" && (before._tag === "Imported" || before._tag === "TakenBack")),
+    ARemovedImportStaysRemoved: ({ before, after }) => before._tag !== "Removed" || after._tag === "Removed",
+    OnlyAnImportWithNothingInForceIsRemoved: ({ before, after }) =>
+      after._tag !== "Removed" ||
+      before._tag === "Removed" ||
+      (before._tag === "Open" && before.inForce === 0 && before.standing === 0),
+    AnImportNeverChangesOrganization: ({ before, after }) =>
+      before._tag === "Unstaged" || after._tag === "Unstaged" || before.organizationId === after.organizationId,
+    OnlyItsOwnOrganizationChangesAnImport: ({ before }) => Effect.gen(function* () {
+      if (before._tag === "Unstaged") return true
+      return (yield* CurrentActor).organizationId === before.organizationId
+    }),
+    AViewerChangesNothing: () => Effect.gen(function* () {
+      return (yield* CurrentActor).role !== "viewer"
+    }),
+  },
+  commands: [
+    StageImport,
+    MatchColumn,
+    RecordSuggestion,
+    ConfirmImport,
+    TakeBackImport,
+    ReopenImport,
+    RemoveImport,
+  ],
+  events: [ActCounted, GroupCounted],
+  keyOf: (cmd) => cmd.importId,
+  decide: {
+    StageImport: (s, cmd) => Effect.gen(function* () {
+      const actor = yield* CurrentActor
+      if (actor.role === "viewer") return yield* new NotPermitted({})
+      if (s._tag !== "Unstaged") return yield* new AlreadyStaged({})
+      return [
+        new ImportStaged({
+          organizationId: actor.organizationId,
+          rows: cmd.rows,
+          columns: cmd.columns,
+          by: actor.memberId,
+        }),
+      ]
+    }),
+    MatchColumn: (s, cmd) => Effect.gen(function* () {
+      const actor = yield* CurrentActor
+      if (s._tag !== "Open") return yield* new NotOpen({})
+      if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* new NotPermitted({})
+      if (cmd.opening !== s.confirms) return yield* new ConfirmedSince({})
+      if (cmd.saw !== s.matching) return yield* new MatchedSince({ matching: s.matching })
+      // Every field reads this already, by its heading or by hand: nothing is recorded, and nothing is taken back.
+      if (s.columns === cmd.columns) return []
+      return [
+        new ColumnMatched({
+          change: s.changes + 1,
+          matching: s.matching + 1,
+          columns: cmd.columns,
+          by: actor.memberId,
+        }),
+      ]
+    }),
+    RecordSuggestion: (s) => Effect.gen(function* () {
+      const actor = yield* CurrentActor
+      if (s._tag !== "Open") return yield* new NotOpen({})
+      if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* new NotPermitted({})
+      return [new SuggestionRecorded({ by: actor.memberId })]
+    }),
+    ConfirmImport: (s, cmd) => Effect.gen(function* () {
+      const actor = yield* CurrentActor
+      if (s._tag !== "Open") return yield* new NotOpen({})
+      if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* new NotPermitted({})
+      if (cmd.seen !== s.changes) return yield* new ReviewMovedOn({ last: s.changes })
+      if (cmd.planAt !== s.changes) return yield* new PlanBehind({ last: s.changes })
+      if (cmd.plan !== cmd.shown) return yield* new NotWhatWasShown({})
+      if (cmd.created + cmd.updated + cmd.already + cmd.notImported !== s.rows) return yield* new CountsDoNotAddUp({})
+      // No more is ever in force than the file has rows.
+      if (s.inForce + cmd.created > s.rows) return yield* new CountsDoNotAddUp({})
+      return [
+        new ImportConfirmed({
+          change: s.changes + 1,
+          created: cmd.created,
+          updated: cmd.updated,
+          already: cmd.already,
+          notImported: cmd.notImported,
+          by: actor.memberId,
+        }),
+      ]
+    }),
+    TakeBackImport: (s, cmd) => Effect.gen(function* () {
+      const actor = yield* CurrentActor
+      if (s._tag !== "Imported" && s._tag !== "Open") return yield* new NotImported({})
+      if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* new NotPermitted({})
+      if (s.standing < 1) return yield* new NotImported({})
+      if (cmd.seen !== s.changes) return yield* new ReviewMovedOn({ last: s.changes })
+      if (cmd.kept > s.inForce || cmd.keptReplaced > s.replaced) return yield* new MoreKeptThanInForce({})
+      return [
+        new ImportTakenBack({
+          change: s.changes + 1,
+          removed: s.inForce - cmd.kept,
+          kept: cmd.kept,
+          restored: s.replaced - cmd.keptReplaced,
+          keptReplaced: cmd.keptReplaced,
+          by: actor.memberId,
+        }),
+      ]
+    }),
+    ReopenImport: (s, cmd) => Effect.gen(function* () {
+      const actor = yield* CurrentActor
+      if (s._tag !== "Imported" && s._tag !== "TakenBack") return yield* new NotClosed({})
+      if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* new NotPermitted({})
+      if (cmd.seen !== s.changes) return yield* new ReviewMovedOn({ last: s.changes })
+      return [new ImportReopened({ change: s.changes + 1, by: actor.memberId })]
+    }),
+    RemoveImport: (s, cmd) => Effect.gen(function* () {
+      const actor = yield* CurrentActor
+      if (s._tag !== "Open") return yield* new NotOpen({})
+      if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* new NotPermitted({})
+      if (cmd.seen !== s.changes) return yield* new ReviewMovedOn({ last: s.changes })
+      if (s.inForce !== 0 || s.standing !== 0) return yield* new HasItemsInForce({})
+      return [new ImportRemoved({ change: s.changes + 1, by: actor.memberId })]
+    }),
+  },
+  evolve: {
+    ImportStaged: (_, e) => ({
+      _tag: "Open" as const,
+      organizationId: e.organizationId,
+      rows: e.rows,
+      confirms: 0,
+      matching: 0,
+      columns: e.columns,
+      changes: 0,
+      confirmedAt: 0,
+      inForce: 0,
+      replaced: 0,
+      standing: 0,
+      lastGroup: 0,
+      topGroup: 0,
+      suggestions: 0,
+    }),
+    ColumnMatched: (s, e) =>
+      s._tag === "Open"
+        ? {
+            ...s,
+            changes: e.change,
+            matching: e.matching,
+            columns: e.columns,
+          }
+        : s,
+    ActCounted: (s, e) => (s._tag === "Open" ? { ...s, changes: e.change } : s),
+    GroupCounted: (s, e) => (s._tag === "Open" ? { ...s, changes: e.change, lastGroup: e.change, topGroup: e.top } : s),
+    SuggestionRecorded: (s) => (s._tag === "Open" ? { ...s, suggestions: s.suggestions + 1 } : s),
+    ImportConfirmed: (s, e) =>
+      s._tag === "Open"
+        ? {
+            _tag: "Imported" as const,
+            organizationId: s.organizationId,
+            rows: s.rows,
+            confirms: s.confirms + 1,
+            matching: s.matching,
+            columns: s.columns,
+            changes: e.change,
+            confirmedAt: e.change,
+            inForce: s.inForce + e.created,
+            replaced: s.replaced + e.updated,
+            standing: s.standing + 1,
+            lastGroup: s.lastGroup,
+            topGroup: s.topGroup,
+            created: e.created,
+            updated: e.updated,
+            already: e.already,
+            notImported: e.notImported,
+          }
+        : s,
+    // Taken back from its result it says so; taken back while it is open again it stays open.
+    ImportTakenBack: (s, e) =>
+      s._tag === "Open"
+        ? { ...s, changes: e.change, confirmedAt: 0, inForce: e.kept, replaced: 0, standing: 0 }
+        : s._tag === "Imported"
+          ? {
+              _tag: "TakenBack" as const,
+              organizationId: s.organizationId,
+              rows: s.rows,
+              confirms: s.confirms,
+              matching: s.matching,
+                columns: s.columns,
+              changes: e.change,
+              confirmedAt: 0,
+              inForce: e.kept,
+              replaced: 0,
+              standing: 0,
+              lastGroup: s.lastGroup,
+              topGroup: s.topGroup,
+              removed: e.removed,
+              kept: e.kept,
+            }
+          : s,
+    ImportReopened: (s, e) =>
+      s._tag === "Imported" || s._tag === "TakenBack"
+        ? {
+            _tag: "Open" as const,
+            organizationId: s.organizationId,
+            rows: s.rows,
+            confirms: s.confirms,
+            matching: s.matching,
+            columns: s.columns,
+            changes: e.change,
+            confirmedAt: s.confirmedAt,
+            inForce: s.inForce,
+            replaced: s.replaced,
+            standing: s.standing,
+            lastGroup: s.lastGroup,
+            topGroup: s.topGroup,
+            suggestions: 0,
+          }
+        : s,
+    ImportRemoved: (s) => (s._tag === "Open" ? { _tag: "Removed" as const, organizationId: s.organizationId } : s),
+  },
+}) {}
+```
+
+`RowUnit.aggregate.ts`:
+
+```ts
+// One row of one import's review as its own instance. The row decides nothing alone: `Deciding` and `Undoing` record
+// its events. It holds its decision with the number of the change that recorded it, the decision under it in full, and
+// every decision below that one sealed into one text, which the row compares and never reads. An undo at any depth has
+// to bring the level it uncovers, and the row takes it only when it seals to exactly the text it holds.
+import * as Domain from "@alchemy.run/domain"
+import * as S from "effect/Schema"
+import { Change, Step } from "./Seen.value.ts"
+
+// One decision as a row keeps it: the change that recorded it (0 when there is none), who made it, in which step, its
+// text, the import's matching it was made on, and its label. Change -1 stands for a level no longer kept.
+export const Level = S.Struct({
+  change: Change,
+  by: S.String,
+  step: S.String,
+  flags: S.String,
+  madeOn: S.Int,
+  label: S.String,
+  // How long each text is: the seal needs it as a number the prover can hold.
+  bySize: S.Int,
+  stepSize: S.Int,
+  flagsSize: S.Int,
+  labelSize: S.Int,
+})
+export type Level = typeof Level.Type
+export const noLevel: Level = {
+  change: 0,
+  by: "",
+  step: "",
+  flags: "",
+  madeOn: -1,
+  label: "",
+  bySize: 0,
+  stepSize: 0,
+  flagsSize: 0,
+  labelSize: 0,
+}
+
+/** A level that was let go: an undo stops here. */
+export const letGo: Level = { ...noLevel, change: -1 }
+
+/** The sizes a level names are its texts' own. */
+export const sizesAreTrue = (level: Level): boolean =>
+  level.bySize === level.by.length &&
+  level.stepSize === level.step.length &&
+  level.flagsSize === level.flags.length &&
+  level.labelSize === level.label.length
+
+/**
+ * A decision and everything below it as one text. Its numbers and the sizes of its texts come first, so two different
+ * levels whose sizes are true never seal to the same text (`unseal`, in the test, reads one back).
+ */
+export const seal = (level: Level, below: string): string =>
+  `${level.change}:${level.madeOn}:${level.bySize}:${level.stepSize}:${level.labelSize}:${level.flagsSize}:${level.by}${level.step}${level.label}${level.flags}${below}`
+
+// A decision's text, bounded as the contract bounds what a person may type into one row's fifteen fields.
+export const Flags = S.String.check(S.isMaxLength(600_000))
+// The text of a row with nothing decided: an act that says it on such a row changes nothing.
+export const NO_DECISION = "{}"
+
+// What a row may keep below its decisions, in characters: past it the oldest are let go and an undo stops there, so
+// nobody is ever refused a decision because of the history and the state stays far from the largest value an object
+// stores. `CUT` can never be a seal: a seal starts with a number.
+export const MOST_BELOW = 1_000_000
+export const CUT = "cut"
+
+export class RowDecided extends Domain.Event("RowDecided", {
+  importId: S.String,
+  organizationId: S.String,
+  change: Change,
+  by: S.String,
+  step: Step,
+  flags: Flags,
+  madeOn: S.Int,
+  label: S.String,
+}) {}
+// The current decision is taken back; `next` goes under the one put back, with `below` under it.
+export class StepUndone extends Domain.Event("StepUndone", { next: Level, below: S.String }) {}
+
+export const RowState = S.Union([
+  S.TaggedStruct("Untouched", {}),
+  S.TaggedStruct("Undecided", { importId: S.String, organizationId: S.String }),
+  S.TaggedStruct("Decided", {
+    importId: S.String,
+    organizationId: S.String,
+    change: Change,
+    by: S.String,
+    step: S.String,
+    flags: S.String,
+    madeOn: S.Int,
+    label: S.String,
+    under: Level,
+    below: S.String,
+  }),
+])
+
+export class RowUnit extends Domain.Aggregate("RowUnit", {
+  id: S.String,
+  state: RowState,
+  initial: { _tag: "Untouched" },
+  invariants: {
+    // The sizes kept beside the decision under the current one are its texts' own: one comparison a rule.
+    TheSizeOfByIsTrue: (s) => s._tag !== "Decided" || s.under.bySize === s.under.by.length,
+    TheSizeOfStepIsTrue: (s) => s._tag !== "Decided" || s.under.stepSize === s.under.step.length,
+    TheSizeOfFlagsIsTrue: (s) => s._tag !== "Decided" || s.under.flagsSize === s.under.flags.length,
+    TheSizeOfLabelIsTrue: (s) => s._tag !== "Decided" || s.under.labelSize === s.under.label.length,
+  },
+  transitions: {
+    // A row has no decision again only when nothing was under the one taken back.
+    ARowIsUndecidedOnlyWhenNothingWasUnder: ({ before, after }) =>
+      before._tag !== "Decided" || after._tag !== "Undecided" || before.under.change === 0,
+    ARowNeverChangesImportOrOrganization: ({ before, after }) =>
+      before._tag === "Untouched" ||
+      after._tag === "Untouched" ||
+      (before.organizationId === after.organizationId && before.importId === after.importId),
+    // Who may change a row (only its decision's sender clears it, only its own organization changes it, a viewer
+    // changes nothing) reads who sent the act, which only a decision's command carries: those rules are stated on
+    // `Deciding` and `Undoing`, the decisions that record on a row, and a new one must state them too.
+  },
+  events: [RowDecided, StepUndone],
+  evolve: {
+    RowDecided: (s, e) => ({
+      _tag: "Decided" as const,
+      importId: e.importId,
+      organizationId: e.organizationId,
+      change: e.change,
+      by: e.by,
+      step: e.step,
+      flags: e.flags,
+      madeOn: e.madeOn,
+      label: e.label,
+      under:
+        s._tag === "Decided"
+          ? {
+              change: s.change,
+              by: s.by,
+              step: s.step,
+              flags: s.flags,
+              madeOn: s.madeOn,
+              label: s.label,
+              bySize: s.by.length,
+              stepSize: s.step.length,
+              flagsSize: s.flags.length,
+              labelSize: s.label.length,
+            }
+          : noLevel,
+      below:
+        s._tag !== "Decided" || s.under.change === 0
+          ? ""
+          : s.below.length > MOST_BELOW
+            ? CUT
+            : seal(s.under, s.below),
+    }),
+    StepUndone: (s, e) =>
+      s._tag !== "Decided"
+        ? s
+        : s.under.change !== 0
+          ? {
+              _tag: "Decided" as const,
+              importId: s.importId,
+              organizationId: s.organizationId,
+              change: s.under.change,
+              by: s.under.by,
+              step: s.under.step,
+              flags: s.under.flags,
+              madeOn: s.under.madeOn,
+              label: s.under.label,
+              under: e.next,
+              below: e.below,
+            }
+          : { _tag: "Undecided" as const, importId: s.importId, organizationId: s.organizationId },
+  },
+}) {}
+```
+
+`GroupUnit.aggregate.ts`:
+
+```ts
+// One act on a group of rows as its own instance: which rows, what it does to each, who made it and the number of the
+// change that recorded it. It is recorded whole or not at all, and never changes after; its undo records only when.
+// The group decides nothing alone: `DecidingGroup` and `UndoingGroup` record its events. A row's decision is read from
+// the row's own instance and the groups that name it; no instance holds that reading.
+import * as Domain from "@alchemy.run/domain"
+import * as S from "effect/Schema"
+import { Change, Patch, Rows, Step } from "./Seen.value.ts"
+
+export class GroupDecided extends Domain.Event("GroupDecided", {
+  importId: S.String,
+  organizationId: S.String,
+  change: Change,
+  by: S.String,
+  step: Step,
+  patch: Patch,
+  rows: Rows,
+  count: S.Int,
+  madeOn: S.Int,
+  label: S.String,
+  // The last group in force on the import when this one was decided (0 for none).
+  under: Change,
+}) {}
+export class GroupUndone extends Domain.Event("GroupUndone", { change: Change }) {}
+
+export const GroupState = S.Union([
+  S.TaggedStruct("Untouched", {}),
+  S.TaggedStruct("Decided", {
+    importId: S.String,
+    organizationId: S.String,
+    change: Change,
+    by: S.String,
+    step: S.String,
+    patch: S.String,
+    rows: S.String,
+    count: S.Int,
+    madeOn: S.Int,
+    label: S.String,
+    // The change that took it back, or 0 while it is in force.
+    undoneAt: Change,
+    under: Change,
+  }),
+])
+
+export class GroupUnit extends Domain.Aggregate("GroupUnit", {
+  id: S.String,
+  state: GroupState,
+  initial: { _tag: "Untouched" },
+  invariants: {
+    AGroupHasRows: (s) => s._tag !== "Decided" || s.count >= 1,
+    // That its number is one its import gave, and that its undo comes after it, need the import: they are rules over
+    // every import and group in the model, searched and not proved.
+  },
+  transitions: {
+    // What a group decided never changes: its rows, what it does to them, its number, whose it is.
+    AGroupKeepsItsRows: ({ before, after }) =>
+      before._tag !== "Decided" || after._tag !== "Decided" || after.rows === before.rows,
+    AGroupKeepsItsPatch: ({ before, after }) =>
+      before._tag !== "Decided" || after._tag !== "Decided" || after.patch === before.patch,
+    AGroupKeepsItsNumber: ({ before, after }) =>
+      before._tag !== "Decided" || after._tag !== "Decided" || after.change === before.change,
+    AGroupKeepsWhatWasUnderIt: ({ before, after }) =>
+      before._tag !== "Decided" || after._tag !== "Decided" || after.under === before.under,
+    AGroupKeepsItsMaker: ({ before, after }) =>
+      before._tag !== "Decided" || after._tag !== "Decided" || after.by === before.by,
+    ADecidedGroupStaysDecided: ({ before, after }) => before._tag !== "Decided" || after._tag === "Decided",
+    // A group taken back stays so.
+    AGroupTakenBackStaysTakenBack: ({ before, after }) =>
+      before._tag !== "Decided" || after._tag !== "Decided" || before.undoneAt === 0 || after.undoneAt === before.undoneAt,
+    AGroupNeverChangesImportOrOrganization: ({ before, after }) =>
+      before._tag === "Untouched" ||
+      after._tag === "Untouched" ||
+      (before.organizationId === after.organizationId && before.importId === after.importId),
+    // Who may change a group (only its maker takes it back, only its own organization changes it, a viewer changes
+    // nothing) reads who sent the act, which only a decision's command carries: those rules are stated on
+    // `DecidingGroup` and `UndoingGroup`, the decisions that record on a group, and a new one must state them too.
+  },
+  events: [GroupDecided, GroupUndone],
+  evolve: {
+    GroupDecided: (s, e) =>
+      s._tag === "Untouched"
+        ? {
+            _tag: "Decided" as const,
+            importId: e.importId,
+            organizationId: e.organizationId,
+            change: e.change,
+            by: e.by,
+            step: e.step,
+            patch: e.patch,
+            rows: e.rows,
+            count: e.count,
+            madeOn: e.madeOn,
+            label: e.label,
+            undoneAt: 0,
+            under: e.under,
+          }
+        : s,
+    GroupUndone: (s, e) => (s._tag === "Decided" ? { ...s, undoneAt: e.change } : s),
+  },
+}) {}
+```
+
+`Review.decision.ts`:
+
+```ts
+// One act of the review, decided across the import and the row it names, and recorded on both or on neither. The
+// import says whether it is open, what its matching is, whether the act's group is being sent and what number the act
+// gets; the row says what decision it holds. An act that would leave the row as it is records nothing: "no change".
+import * as Domain from "@alchemy.run/domain"
+import * as Effect from "effect/Effect"
+import * as S from "effect/Schema"
+import { CurrentActor, Session } from "../test/Actor.context.ts"
+import {
+  ActCounted,
+  ConfirmedSince,
+  ImportId,
+  ImportLife,
+  MatchedSince,
+  NotOpen,
+  NotPermitted,
+} from "./ImportLife.aggregate.ts"
+import {
+  CUT,
+  Flags,
+  Level,
+  MOST_BELOW,
+  NO_DECISION,
+  RowDecided,
+  RowUnit,
+  StepUndone,
+  letGo,
+  noLevel,
+  seal,
+  sizesAreTrue,
+} from "./RowUnit.aggregate.ts"
+import { Change, Step } from "./Seen.value.ts"
+
+// The row holds a decision its sender did not see: whose it is and the change that recorded it.
+export class DecidedSince extends Domain.Rejection("DecidedSince", { by: S.String, change: Change }) {}
+// The decision its sender saw is no longer there, and the row has none.
+export class NoLongerThere extends Domain.Rejection("NoLongerThere", {}) {}
+// An act on a group of rows was recorded that the sender has not seen: its number.
+// It hands back no number: the screen learns the last group act only by receiving it.
+export class GroupedSince extends Domain.Rejection("GroupedSince", {}) {}
+export class NotYourStep extends Domain.Rejection("NotYourStep", {}) {}
+// A confirm that stands was made after it: the row is decided again, the item edited, or the import taken back.
+export class DecidedBeforeTheConfirm extends Domain.Rejection("DecidedBeforeTheConfirm", {}) {}
+// What was brought to go under the decision put back is not what was under it.
+export class NotWhatWasUnder extends Domain.Rejection("NotWhatWasUnder", {}) {}
+// The decisions below it are no longer kept.
+export class HistoryEnds extends Domain.Rejection("HistoryEnds", {}) {}
+
+const RowName = S.String.check(S.isMaxLength(64))
+const Label = S.String.check(S.isMaxLength(200))
+
+export class DecideRow extends Domain.Command("DecideRow", {
+  middleware: [Session],
+  input: {
+    importId: ImportId,
+    row: RowName,
+    step: Step,
+    // The import's last group act as the sender's screen has it, and whether a group in force on this row was decided
+    // after the row's own decision: then the row is not as its own instance has it, and the same text is a change.
+    sawGroup: Change,
+    covered: S.Boolean,
+    // How many times the import had been confirmed when the act was made.
+    opening: S.Int,
+    // The change that recorded the decision the sender saw on the row, or 0 for none.
+    saw: Change,
+    flags: Flags,
+    // The import's matching the act was made on, whatever it decides.
+    madeOn: S.Int,
+    label: Label,
+  },
+  events: [RowDecided, ActCounted],
+  rejects: [NotOpen, NotPermitted, ConfirmedSince, GroupedSince, DecidedSince, NoLongerThere, MatchedSince],
+}) {}
+
+export class UndoRowStep extends Domain.Command("UndoRowStep", {
+  middleware: [Session],
+  // `undo` is the change taken back; `step` is this act's own, a group's when it is one of several; `next`, with `below`
+  // under it, goes under the decision put back.
+  input: {
+    importId: ImportId,
+    row: RowName,
+    undo: Change,
+    step: Step,
+    // The import's last group act as the sender's screen has it.
+    sawGroup: Change,
+    opening: S.Int,
+    next: Level,
+    below: S.String,
+  },
+  events: [StepUndone, ActCounted],
+  rejects: [
+    NotOpen,
+    NotPermitted,
+    ConfirmedSince,
+    GroupedSince,
+    NotYourStep,
+    DecidedBeforeTheConfirm,
+    HistoryEnds,
+    NotWhatWasUnder,
+  ],
+}) {}
+
+/** Taking this decision would leave the row as it is: it holds this text already, or nothing and nothing is decided. */
+const leavesAsItIs = (
+  row: { readonly _tag: "Untouched" } | { readonly _tag: "Undecided" } | { readonly _tag: "Decided"; readonly flags: string },
+  flags: string,
+): boolean => (row._tag === "Decided" ? row.flags === flags : flags === NO_DECISION)
+
+export class Deciding extends Domain.Decision(DecideRow, {
+  reads: { life: ImportLife, row: RowUnit },
+  keyOf: (cmd) => ({ life: cmd.importId, row: `${cmd.importId}/${cmd.row}` }),
+  decide: ({ life, row }, cmd) => Effect.gen(function* () {
+    const actor = yield* CurrentActor
+    if (life.state._tag !== "Open") return yield* new NotOpen({})
+    if (actor.organizationId !== life.state.organizationId || actor.role === "viewer") {
+      return yield* new NotPermitted({})
+    }
+    // A row instance belongs to one import of one organization, for good.
+    if (
+      row.state._tag !== "Untouched" &&
+      (row.state.importId !== cmd.importId || row.state.organizationId !== life.state.organizationId)
+    ) {
+      return yield* new NotPermitted({})
+    }
+    if (cmd.opening !== life.state.confirms) return yield* new ConfirmedSince({})
+    if (cmd.sawGroup !== life.state.lastGroup) return yield* new GroupedSince({})
+    // The row says this already, whoever decided it and whether or not the sender has seen it.
+    if (!cmd.covered && leavesAsItIs(row.state, cmd.flags)) return []
+    if (row.state._tag === "Decided") {
+      if (cmd.saw !== row.state.change) return yield* new DecidedSince({ by: row.state.by, change: row.state.change })
+    } else if (cmd.saw !== 0) {
+      return yield* new NoLongerThere({})
+    }
+    if (cmd.madeOn !== life.state.matching) return yield* new MatchedSince({ matching: life.state.matching })
+    const change = life.state.changes + 1
+    return [
+      row.record(
+        new RowDecided({
+          importId: cmd.importId,
+          organizationId: life.state.organizationId,
+          change,
+          by: actor.memberId,
+          step: cmd.step,
+          flags: cmd.flags,
+          madeOn: cmd.madeOn,
+          label: cmd.label,
+        }),
+      ),
+      life.record(
+        new ActCounted({
+          change,
+          step: cmd.step,
+          row: cmd.row,
+          label: cmd.label,
+          holds: change,
+          by: actor.memberId,
+          actor: actor.memberId,
+          flags: cmd.flags,
+          madeOn: cmd.madeOn,
+        }),
+      ),
+    ]
+  }),
+  transitions: {
+    ARowIsDecidedOnlyOnAnOpenImport: ({ before }) => before.life._tag === "Open",
+    // An act is taken only in the opening it was made in: one made before a confirm is not taken after a reopen.
+    AnActIsOfThisOpening: ({ before, command }) =>
+      before.life._tag === "Open" && command.opening === before.life.confirms,
+    // A row's act is made on a screen that has the import's last group act.
+    ARowsActSawTheLastGroupAct: ({ before, command }) =>
+      before.life._tag === "Open" && command.sawGroup === before.life.lastGroup,
+    // A decision is replaced only by an act whose sender saw it, by the number of the change that recorded it.
+    ADecisionIsReplacedOnlyByAnActThatSawIt: ({ before, command }) =>
+      (!command.covered && leavesAsItIs(before.row, command.flags)) ||
+      (before.row._tag === "Decided" ? command.saw === before.row.change : command.saw === 0),
+    // Whatever it decides, an act is made on the import's matching now; one made on an older matching is not applied.
+    AnActIsMadeOnTheMatchingNow: ({ before, command }) =>
+      (!command.covered && leavesAsItIs(before.row, command.flags)) ||
+      (before.life._tag === "Open" && command.madeOn === before.life.matching),
+    // An act that would leave the row's decision as it is records nothing: the row and the import are unchanged.
+    AnActThatChangesNothingLeavesTheImport: ({ before, after, command }) =>
+      !(!command.covered && leavesAsItIs(before.row, command.flags)) ||
+      before.life._tag !== "Open" ||
+      after.life._tag !== "Open" ||
+      after.life.changes === before.life.changes,
+    AnActThatChangesNothingLeavesTheRow: ({ before, after, command }) =>
+      !(!command.covered && leavesAsItIs(before.row, command.flags)) ||
+      before.row._tag !== "Decided" ||
+      after.row._tag !== "Decided" ||
+      after.row.change === before.row.change,
+    // Any other act is recorded as its sender said, and gets the import's next number on the row and on the import.
+    AnyOtherActIsRecorded: ({ before, after, command }) =>
+      (!command.covered && leavesAsItIs(before.row, command.flags)) || after.row._tag === "Decided",
+    WithItsText: ({ before, after, command }) =>
+      (!command.covered && leavesAsItIs(before.row, command.flags)) || after.row._tag !== "Decided" || after.row.flags === command.flags,
+    OnItsMatching: ({ before, after, command }) =>
+      (!command.covered && leavesAsItIs(before.row, command.flags)) || after.row._tag !== "Decided" || after.row.madeOn === command.madeOn,
+    UnderItsStep: ({ before, after, command }) =>
+      (!command.covered && leavesAsItIs(before.row, command.flags)) || after.row._tag !== "Decided" || after.row.step === command.step,
+    AsItsSenders: ({ before, after, command }) => Effect.gen(function* () {
+      if ((!command.covered && leavesAsItIs(before.row, command.flags)) || after.row._tag !== "Decided") return true
+      return after.row.by === (yield* CurrentActor).memberId
+    }),
+    AndGetsTheNextNumber: ({ before, after, command }) =>
+      (!command.covered && leavesAsItIs(before.row, command.flags)) ||
+      before.life._tag !== "Open" ||
+      after.life._tag !== "Open" ||
+      after.life.changes === before.life.changes + 1,
+    OnTheRowToo: ({ before, after, command }) =>
+      (!command.covered && leavesAsItIs(before.row, command.flags)) ||
+      after.life._tag !== "Open" ||
+      after.row._tag !== "Decided" ||
+      after.row.change === after.life.changes,
+    // The import's event says what the row now holds, and whose it is.
+    TheImportsEventSaysWhichDecisionTheRowHolds: ({ after, events }) =>
+      events.every((e) => e._tag !== "ActCounted" || after.row._tag !== "Decided" || e.holds === after.row.change),
+    TheImportsEventSaysWhose: ({ after, events }) =>
+      events.every((e) => e._tag !== "ActCounted" || after.row._tag !== "Decided" || e.by === after.row.by),
+    TheImportsEventSaysItsText: ({ after, events }) =>
+      events.every((e) => e._tag !== "ActCounted" || after.row._tag !== "Decided" || e.flags === after.row.flags),
+    // And who acted.
+    TheImportsEventSaysWhoActed: ({ events }) => Effect.gen(function* () {
+      const actor = yield* CurrentActor
+      return events.every((e) => e._tag !== "ActCounted" || e.actor === actor.memberId)
+    }),
+    // The decision an act replaces is kept under it.
+    AnActKeepsWhichDecisionItReplaces: ({ before, after, command }) =>
+      before.row._tag !== "Decided" ||
+      (!command.covered && leavesAsItIs(before.row, command.flags)) ||
+      after.row._tag !== "Decided" ||
+      after.row.under.change === before.row.change,
+    AndWhose: ({ before, after, command }) =>
+      before.row._tag !== "Decided" ||
+      (!command.covered && leavesAsItIs(before.row, command.flags)) ||
+      after.row._tag !== "Decided" ||
+      after.row.under.by === before.row.by,
+    AndItsText: ({ before, after, command }) =>
+      before.row._tag !== "Decided" ||
+      (!command.covered && leavesAsItIs(before.row, command.flags)) ||
+      after.row._tag !== "Decided" ||
+      after.row.under.flags === before.row.flags,
+    AndItsMatching: ({ before, after, command }) =>
+      before.row._tag !== "Decided" ||
+      (!command.covered && leavesAsItIs(before.row, command.flags)) ||
+      after.row._tag !== "Decided" ||
+      after.row.under.madeOn === before.row.madeOn,
+    // What was below that stays below it, sealed, unless the history is let go.
+    AndWhatWasBelowStaysBelow: ({ before, after, command }) =>
+      before.row._tag !== "Decided" ||
+      (!command.covered && leavesAsItIs(before.row, command.flags)) ||
+      after.row._tag !== "Decided" ||
+      after.row.below ===
+        (before.row.under.change === 0
+          ? ""
+          : before.row.below.length > MOST_BELOW
+            ? CUT
+            : seal(before.row.under, before.row.below)),
+    // The row's own rules on who may change it, stated here because only the command says who sent it: no act
+    // clears a decision its sender did not make, only the row's own organization changes it, and a viewer changes none.
+    NobodyClearsAnotherPersonsDecision: ({ before, after }) =>
+      Effect.gen(function* () {
+        if (before.row._tag !== "Decided" || after.row._tag === "Decided") return true
+        return (yield* CurrentActor).memberId === before.row.by
+      }),
+    OnlyItsOwnOrganizationChangesTheRow: ({ before }) =>
+      Effect.gen(function* () {
+        if (before.row._tag === "Untouched") return true
+        return (yield* CurrentActor).organizationId === before.row.organizationId
+      }),
+    AViewerChangesNoRow: () =>
+      Effect.gen(function* () {
+        return (yield* CurrentActor).role !== "viewer"
+      }),
+  },
+}) {}
+
+export class Undoing extends Domain.Decision(UndoRowStep, {
+  reads: { life: ImportLife, row: RowUnit },
+  keyOf: (cmd) => ({ life: cmd.importId, row: `${cmd.importId}/${cmd.row}` }),
+  decide: ({ life, row }, cmd) => Effect.gen(function* () {
+    const actor = yield* CurrentActor
+    if (life.state._tag !== "Open") return yield* new NotOpen({})
+    if (actor.organizationId !== life.state.organizationId || actor.role === "viewer") {
+      return yield* new NotPermitted({})
+    }
+    if (
+      row.state._tag !== "Untouched" &&
+      (row.state.importId !== cmd.importId || row.state.organizationId !== life.state.organizationId)
+    ) {
+      return yield* new NotPermitted({})
+    }
+    if (cmd.opening !== life.state.confirms) return yield* new ConfirmedSince({})
+    if (cmd.sawGroup !== life.state.lastGroup) return yield* new GroupedSince({})
+    if (row.state._tag !== "Decided" || row.state.by !== actor.memberId || row.state.change !== cmd.undo) {
+      return yield* new NotYourStep({})
+    }
+    // What a standing confirm wrote is taken back with the import, not here.
+    if (row.state.change <= life.state.confirmedAt) return yield* new DecidedBeforeTheConfirm({})
+    if (row.state.under.change === -1) return yield* new HistoryEnds({})
+    // What goes under the decision put back must be what was under it, to the letter; nothing, when nothing was, and a
+    // level let go when the rest was let go.
+    const kept = row.state.below !== "" && row.state.below !== CUT
+    if (kept && (!sizesAreTrue(cmd.next) || seal(cmd.next, cmd.below) !== row.state.below)) {
+      return yield* new NotWhatWasUnder({})
+    }
+    const next = kept ? cmd.next : row.state.below === CUT ? letGo : noLevel
+    const under = row.state.under
+    return [
+      row.record(new StepUndone({ next, below: kept ? cmd.below : "" })),
+      life.record(
+        new ActCounted({
+          change: life.state.changes + 1,
+          step: cmd.step,
+          row: cmd.row,
+          label: "undo",
+          holds: under.change,
+          by: under.by,
+          actor: actor.memberId,
+          flags: under.flags,
+          madeOn: under.madeOn,
+        }),
+      ),
+    ]
+  }),
+  transitions: {
+    // An undo is taken only on an open import, for its sender's own change, while it is the row's decision.
+    AnUndoTakesBackOnlyItsSendersOwnStep: ({ before, command }) => Effect.gen(function* () {
+      if (before.life._tag !== "Open" || before.row._tag !== "Decided") return false
+      return before.row.change === command.undo && (yield* CurrentActor).memberId === before.row.by
+    }),
+    AnUndoIsOfThisOpening: ({ before, command }) =>
+      before.life._tag === "Open" && command.opening === before.life.confirms,
+    // A row's undo is made on a screen that has the import's last group act.
+    ARowsUndoSawTheLastGroupAct: ({ before, command }) =>
+      before.life._tag === "Open" && command.sawGroup === before.life.lastGroup,
+    // It does not reach past a confirm that stands.
+    AnUndoDoesNotReachPastAConfirm: ({ before }) =>
+      before.life._tag === "Open" && before.row._tag === "Decided" && before.row.change > before.life.confirmedAt,
+    // An undo puts back exactly the decision under the one taken back, another person's included.
+    AnUndoLeavesADecisionWhenOneWasUnder: ({ before, after }) =>
+      before.row._tag !== "Decided" || before.row.under.change === 0 || after.row._tag === "Decided",
+    AndNoneWhenNoneWas: ({ before, after }) =>
+      before.row._tag !== "Decided" || before.row.under.change !== 0 || after.row._tag === "Undecided",
+    AnUndoPutsBackTheDecisionThatWasThere: ({ before, after }) =>
+      before.row._tag !== "Decided" ||
+      before.row.under.change === 0 ||
+      after.row._tag !== "Decided" ||
+      after.row.change === before.row.under.change,
+    AsTheirsWhoMadeIt: ({ before, after }) =>
+      before.row._tag !== "Decided" ||
+      before.row.under.change === 0 ||
+      after.row._tag !== "Decided" ||
+      after.row.by === before.row.under.by,
+    WithItsTextAsItWas: ({ before, after }) =>
+      before.row._tag !== "Decided" ||
+      before.row.under.change === 0 ||
+      after.row._tag !== "Decided" ||
+      after.row.flags === before.row.under.flags,
+    OnItsMatchingAsItWas: ({ before, after }) =>
+      before.row._tag !== "Decided" ||
+      before.row.under.change === 0 ||
+      after.row._tag !== "Decided" ||
+      after.row.madeOn === before.row.under.madeOn,
+    UnderItsStepAsItWas: ({ before, after }) =>
+      before.row._tag !== "Decided" ||
+      before.row.under.change === 0 ||
+      after.row._tag !== "Decided" ||
+      after.row.step === before.row.under.step,
+    // Nothing lies below a decision that had nothing more kept under it.
+    NothingIsBelowWhatWasTheLastKept: ({ before, after }) =>
+      before.row._tag !== "Decided" ||
+      after.row._tag !== "Decided" ||
+      (before.row.below !== "" && before.row.below !== CUT) ||
+      after.row.below === "",
+    // What lies under it afterwards seals to exactly the text the row held: nothing its sender wrote can stand there.
+    WhatLiesUnderIsWhatWasRecorded: ({ before, after }) =>
+      before.row._tag !== "Decided" ||
+      before.row.under.change === 0 ||
+      after.row._tag !== "Decided" ||
+      (before.row.below === ""
+        ? after.row.under.change === 0
+        : before.row.below === CUT
+          ? after.row.under.change === -1
+          : seal(after.row.under, after.row.below) === before.row.below),
+    // The import's event says what the row now holds, and whose it is.
+    TheImportsEventSaysWhichDecisionTheRowHolds: ({ after, events }) =>
+      events.every((e) => e._tag !== "ActCounted" || e.holds === (after.row._tag === "Decided" ? after.row.change : 0)),
+    TheImportsEventSaysWhose: ({ after, events }) =>
+      events.every((e) => e._tag !== "ActCounted" || after.row._tag !== "Decided" || e.by === after.row.by),
+    TheImportsEventSaysItsText: ({ after, events }) =>
+      events.every((e) => e._tag !== "ActCounted" || after.row._tag !== "Decided" || e.flags === after.row.flags),
+    TheImportsEventSaysWhoActed: ({ events }) => Effect.gen(function* () {
+      const actor = yield* CurrentActor
+      return events.every((e) => e._tag !== "ActCounted" || e.actor === actor.memberId)
+    }),
+    AnUndoIsNumbered: ({ before, after }) =>
+      before.life._tag === "Open" && after.life._tag === "Open" && after.life.changes === before.life.changes + 1,
+    // The row's own rules on who may change it, stated here because only the command says who sent it: no act
+    // clears a decision its sender did not make, only the row's own organization changes it, and a viewer changes none.
+    NobodyClearsAnotherPersonsDecision: ({ before, after }) =>
+      Effect.gen(function* () {
+        if (before.row._tag !== "Decided" || after.row._tag === "Decided") return true
+        return (yield* CurrentActor).memberId === before.row.by
+      }),
+    OnlyItsOwnOrganizationChangesTheRow: ({ before }) =>
+      Effect.gen(function* () {
+        if (before.row._tag === "Untouched") return true
+        return (yield* CurrentActor).organizationId === before.row.organizationId
+      }),
+    AViewerChangesNoRow: () =>
+      Effect.gen(function* () {
+        return (yield* CurrentActor).role !== "viewer"
+      }),
+  },
+}) {}
+```
+
+`Group.decision.ts`:
+
+```ts
+// One act on a group of rows, decided across the import and the group it names, and recorded on both or on neither:
+// one command, whatever the number of rows. It is taken only from a screen that has every change of the import, so the
+// rows it names are the ones the act fits now. Its undo is one act too.
+import * as Domain from "@alchemy.run/domain"
+import * as Effect from "effect/Effect"
+import * as S from "effect/Schema"
+import { CurrentActor, Session } from "../test/Actor.context.ts"
+import { GroupDecided, GroupUndone, GroupUnit } from "./GroupUnit.aggregate.ts"
+import {
+  ConfirmedSince,
+  GroupCounted,
+  ImportId,
+  ImportLife,
+  MatchedSince,
+  NotOpen,
+  NotPermitted,
+  ReviewMovedOn,
+} from "./ImportLife.aggregate.ts"
+import { DecidedBeforeTheConfirm, NotYourStep } from "./Review.decision.ts"
+import { Change, Patch, Rows, Step } from "./Seen.value.ts"
+
+// A group was already decided under this step.
+// A later group is still in force over this one: its number.
+export class GroupedAfter extends Domain.Rejection("GroupedAfter", { last: Change }) {}
+export class StepTaken extends Domain.Rejection("StepTaken", {}) {}
+
+export class DecideGroup extends Domain.Command("DecideGroup", {
+  middleware: [Session],
+  input: {
+    importId: ImportId,
+    step: Step,
+    opening: S.Int,
+    // The screen has received every change up to this number.
+    seen: Change,
+    madeOn: S.Int,
+    patch: Patch,
+    rows: Rows,
+    count: S.Int.check(S.isGreaterThanOrEqualTo(1)),
+    label: S.String.check(S.isMaxLength(200)),
+  },
+  events: [GroupDecided, GroupCounted],
+  rejects: [NotOpen, NotPermitted, StepTaken, ConfirmedSince, ReviewMovedOn, MatchedSince],
+}) {}
+
+export class UndoGroup extends Domain.Command("UndoGroup", {
+  middleware: [Session],
+  input: { importId: ImportId, step: Step, undo: Change, opening: S.Int },
+  events: [GroupUndone, GroupCounted],
+  rejects: [NotOpen, NotPermitted, ConfirmedSince, NotYourStep, DecidedBeforeTheConfirm, GroupedAfter],
+}) {}
+
+export class DecidingGroup extends Domain.Decision(DecideGroup, {
+  reads: { life: ImportLife, group: GroupUnit },
+  keyOf: (cmd) => ({ life: cmd.importId, group: `${cmd.importId}/${cmd.step}` }),
+  decide: ({ life, group }, cmd) => Effect.gen(function* () {
+    const actor = yield* CurrentActor
+    if (life.state._tag !== "Open") return yield* new NotOpen({})
+    if (actor.organizationId !== life.state.organizationId || actor.role === "viewer") {
+      return yield* new NotPermitted({})
+    }
+    if (group.state._tag !== "Untouched") return yield* new StepTaken({})
+    if (cmd.opening !== life.state.confirms) return yield* new ConfirmedSince({})
+    if (cmd.seen !== life.state.changes) return yield* new ReviewMovedOn({ last: life.state.changes })
+    if (cmd.madeOn !== life.state.matching) return yield* new MatchedSince({ matching: life.state.matching })
+    const change = life.state.changes + 1
+    return [
+      group.record(
+        new GroupDecided({
+          importId: cmd.importId,
+          organizationId: life.state.organizationId,
+          change,
+          by: actor.memberId,
+          step: cmd.step,
+          patch: cmd.patch,
+          rows: cmd.rows,
+          count: cmd.count,
+          madeOn: cmd.madeOn,
+          label: cmd.label,
+          under: life.state.topGroup,
+        }),
+      ),
+      life.record(
+        new GroupCounted({ change, step: cmd.step, rows: cmd.count, label: cmd.label, by: actor.memberId, top: change }),
+      ),
+    ]
+  }),
+  transitions: {
+    AGroupIsDecidedOnlyOnAnOpenImport: ({ before }) => before.life._tag === "Open",
+    AGroupIsOfThisOpening: ({ before, command }) =>
+      before.life._tag === "Open" && command.opening === before.life.confirms,
+    // Its screen had every change: the rows it names are the ones the act fits.
+    AGroupIsMadeOnEveryChange: ({ before, command }) =>
+      before.life._tag === "Open" && command.seen === before.life.changes,
+    AGroupIsMadeOnTheMatchingNow: ({ before, command }) =>
+      before.life._tag === "Open" && command.madeOn === before.life.matching,
+    AStepDecidesOneGroup: ({ before }) => before.group._tag === "Untouched",
+    // It is recorded whole: every row it names, what it does to them, as its sender's, in force.
+    AGroupIsRecorded: ({ after }) => after.group._tag === "Decided",
+    WithEveryRowItNames: ({ after, command }) => after.group._tag !== "Decided" || after.group.rows === command.rows,
+    WithWhatItDoes: ({ after, command }) => after.group._tag !== "Decided" || after.group.patch === command.patch,
+    WithItsCount: ({ after, command }) => after.group._tag !== "Decided" || after.group.count === command.count,
+    OnItsMatching: ({ after, command }) => after.group._tag !== "Decided" || after.group.madeOn === command.madeOn,
+    InForce: ({ after }) => after.group._tag !== "Decided" || after.group.undoneAt === 0,
+    AsItsSenders: ({ after }) => Effect.gen(function* () {
+      if (after.group._tag !== "Decided") return true
+      return after.group.by === (yield* CurrentActor).memberId
+    }),
+    // It is one change of the import, whatever the number of its rows, with the same number on the group.
+    AGroupIsOneChange: ({ before, after }) =>
+      before.life._tag !== "Open" || after.life._tag !== "Open" || after.life.changes === before.life.changes + 1,
+    OnTheGroupToo: ({ after }) =>
+      after.life._tag !== "Open" || after.group._tag !== "Decided" || after.group.change === after.life.changes,
+    TheImportHoldsItAsItsLastGroupAct: ({ after }) =>
+      after.life._tag !== "Open" || after.life.lastGroup === after.life.changes,
+    // It is now the last group in force, and keeps which one was before it.
+    AGroupDecidedIsTheLastInForce: ({ after }) =>
+      after.life._tag !== "Open" || after.life.topGroup === after.life.changes,
+    AndKeepsWhichOneWasBeforeIt: ({ before, after }) =>
+      before.life._tag !== "Open" || after.group._tag !== "Decided" || after.group.under === before.life.topGroup,
+    TheImportsEventSaysHowManyRows: ({ command, events }) =>
+      events.every((e) => e._tag !== "GroupCounted" || e.rows === command.count),
+    // The group's own rules on who may change it, stated here because only the command says who sent it: only its
+    // maker takes it back, only the group's own organization changes it, and a viewer changes none.
+    NobodyUndoesAnotherPersonsGroup: ({ before, after }) =>
+      Effect.gen(function* () {
+        if (before.group._tag !== "Decided" || after.group._tag !== "Decided" || after.group.undoneAt === before.group.undoneAt) return true
+        return (yield* CurrentActor).memberId === before.group.by
+      }),
+    OnlyItsOwnOrganizationChangesTheGroup: ({ before }) =>
+      Effect.gen(function* () {
+        if (before.group._tag === "Untouched") return true
+        return (yield* CurrentActor).organizationId === before.group.organizationId
+      }),
+    AViewerChangesNoGroup: () =>
+      Effect.gen(function* () {
+        return (yield* CurrentActor).role !== "viewer"
+      }),
+  },
+}) {}
+
+export class UndoingGroup extends Domain.Decision(UndoGroup, {
+  reads: { life: ImportLife, group: GroupUnit },
+  keyOf: (cmd) => ({ life: cmd.importId, group: `${cmd.importId}/${cmd.step}` }),
+  decide: ({ life, group }, cmd) => Effect.gen(function* () {
+    const actor = yield* CurrentActor
+    if (life.state._tag !== "Open") return yield* new NotOpen({})
+    if (actor.organizationId !== life.state.organizationId || actor.role === "viewer") {
+      return yield* new NotPermitted({})
+    }
+    if (cmd.opening !== life.state.confirms) return yield* new ConfirmedSince({})
+    if (group.state._tag !== "Decided") return yield* new NotYourStep({})
+    if (group.state.importId !== cmd.importId || group.state.organizationId !== life.state.organizationId) {
+      return yield* new NotPermitted({})
+    }
+    if (group.state.by !== actor.memberId || group.state.change !== cmd.undo || group.state.undoneAt !== 0) {
+      return yield* new NotYourStep({})
+    }
+    if (group.state.change <= life.state.confirmedAt) return yield* new DecidedBeforeTheConfirm({})
+    // A later group is still in force: what that one did was drawn on a screen that had this one. Once it is taken
+    // back, this one is the last in force again.
+    if (group.state.change !== life.state.topGroup) return yield* new GroupedAfter({ last: life.state.topGroup })
+    const change = life.state.changes + 1
+    return [
+      group.record(new GroupUndone({ change })),
+      life.record(
+        new GroupCounted({
+          change,
+          step: cmd.step,
+          rows: group.state.count,
+          label: "undo",
+          by: actor.memberId,
+          top: group.state.under,
+        }),
+      ),
+    ]
+  }),
+  transitions: {
+    AGroupsUndoTakesBackOnlyItsSendersOwn: ({ before, command }) => Effect.gen(function* () {
+      if (before.life._tag !== "Open" || before.group._tag !== "Decided") return false
+      return before.group.change === command.undo && (yield* CurrentActor).memberId === before.group.by
+    }),
+    AGroupsUndoIsOfThisOpening: ({ before, command }) =>
+      before.life._tag === "Open" && command.opening === before.life.confirms,
+    // Only the last group still in force is taken back; then the one that was under it is the last in force.
+    OnlyTheLastGroupInForceIsTakenBack: ({ before }) =>
+      before.life._tag === "Open" && before.group._tag === "Decided" && before.group.change === before.life.topGroup,
+    ThenTheOneUnderItIsTheLastInForce: ({ before, after }) =>
+      before.group._tag !== "Decided" || after.life._tag !== "Open" || after.life.topGroup === before.group.under,
+    AGroupIsTakenBackOnce: ({ before }) => before.group._tag === "Decided" && before.group.undoneAt === 0,
+    AGroupsUndoDoesNotReachPastAConfirm: ({ before }) =>
+      before.life._tag === "Open" && before.group._tag === "Decided" && before.group.change > before.life.confirmedAt,
+    // It is one change, whatever the number of rows, and the group says when.
+    AGroupsUndoIsOneChange: ({ before, after }) =>
+      before.life._tag === "Open" && after.life._tag === "Open" && after.life.changes === before.life.changes + 1,
+    AndTheGroupSaysWhen: ({ after }) =>
+      after.life._tag !== "Open" || after.group._tag !== "Decided" || after.group.undoneAt === after.life.changes,
+    TheImportHoldsItAsItsLastGroupAct: ({ after }) =>
+      after.life._tag !== "Open" || after.life.lastGroup === after.life.changes,
+    TheImportsEventSaysHowManyRows: ({ before, events }) =>
+      events.every((e) => e._tag !== "GroupCounted" || before.group._tag !== "Decided" || e.rows === before.group.count),
+    // The group's own rules on who may change it, stated here because only the command says who sent it: only its
+    // maker takes it back, only the group's own organization changes it, and a viewer changes none.
+    NobodyUndoesAnotherPersonsGroup: ({ before, after }) =>
+      Effect.gen(function* () {
+        if (before.group._tag !== "Decided" || after.group._tag !== "Decided" || after.group.undoneAt === before.group.undoneAt) return true
+        return (yield* CurrentActor).memberId === before.group.by
+      }),
+    OnlyItsOwnOrganizationChangesTheGroup: ({ before }) =>
+      Effect.gen(function* () {
+        if (before.group._tag === "Untouched") return true
+        return (yield* CurrentActor).organizationId === before.group.organizationId
+      }),
+    AViewerChangesNoGroup: () =>
+      Effect.gen(function* () {
+        return (yield* CurrentActor).role !== "viewer"
+      }),
+  },
+}) {}
+```
+
+`Review.model.ts`:
+
+```ts
+// The review of one import as a model, with a group decided as one unit: the lifecycle, the rows, the groups, the four
+// decisions, and the rules across an import and its rows and groups.
+import * as Domain from "@alchemy.run/domain"
+import { DecidingGroup, UndoingGroup } from "./Group.decision.ts"
+import { GroupUnit } from "./GroupUnit.aggregate.ts"
+import { ImportLife } from "./ImportLife.aggregate.ts"
+import { Deciding, Undoing } from "./Review.decision.ts"
+import { RowUnit } from "./RowUnit.aggregate.ts"
+
+export class Review extends Domain.Model("Review", {
+  aggregates: [ImportLife, RowUnit, GroupUnit],
+  decisions: [Deciding, Undoing, DecidingGroup, UndoingGroup],
+  relations: {
+    ARowBelongsToItsImportsOrganization: Domain.Relation({
+      over: { life: ImportLife, row: RowUnit },
+      holds: ({ life, row }) =>
+        row.state._tag === "Untouched" ||
+        row.state.importId !== life.id ||
+        (life.state._tag !== "Unstaged" && row.state.organizationId === life.state.organizationId),
+    }),
+    AGroupBelongsToItsImportsOrganization: Domain.Relation({
+      over: { life: ImportLife, group: GroupUnit },
+      holds: ({ life, group }) =>
+        group.state._tag === "Untouched" ||
+        group.state.importId !== life.id ||
+        (life.state._tag !== "Unstaged" && group.state.organizationId === life.state.organizationId),
+    }),
+  },
+}) {}
+export class ReviewApi extends Domain.Api("ReviewApi", { model: Review }) {}
+
+// The same model with rules over every import, row and group at once: searched, never proved.
+export class ReviewInvariants extends Domain.Model("ReviewInvariants", {
+  aggregates: [ImportLife, RowUnit, GroupUnit],
+  decisions: [Deciding, Undoing, DecidingGroup, UndoingGroup],
+  invariants: {
+    NoTwoRowsHoldTheSameChange: (all) =>
+      all.RowUnit.every((a) =>
+        all.RowUnit.every(
+          (b) =>
+            a.id === b.id ||
+            a.state._tag !== "Decided" ||
+            b.state._tag !== "Decided" ||
+            a.state.importId !== b.state.importId ||
+            a.state.change !== b.state.change,
+        ),
+      ),
+    NoRowAndGroupHoldTheSameChange: (all) =>
+      all.RowUnit.every((row) =>
+        all.GroupUnit.every(
+          (group) =>
+            row.state._tag !== "Decided" ||
+            group.state._tag !== "Decided" ||
+            row.state.importId !== group.state.importId ||
+            (row.state.change !== group.state.change && row.state.change !== group.state.undoneAt),
+        ),
+      ),
+    NoTwoGroupsHoldTheSameChange: (all) =>
+      all.GroupUnit.every((a) =>
+        all.GroupUnit.every(
+          (b) =>
+            a.id === b.id ||
+            a.state._tag !== "Decided" ||
+            b.state._tag !== "Decided" ||
+            a.state.importId !== b.state.importId ||
+            a.state.change !== b.state.change,
+        ),
+      ),
+    AGroupsChangeIsOneItsImportGave: (all) =>
+      all.GroupUnit.every((group) =>
+        all.ImportLife.every(
+          (life) =>
+            group.state._tag !== "Decided" ||
+            group.state.importId !== life.id ||
+            life.state._tag === "Removed" ||
+            (life.state._tag !== "Unstaged" && group.state.change >= 1 && group.state.undoneAt <= life.state.changes),
+        ),
+      ),
+    AGroupsUndoComesAfterIt: (all) =>
+      all.GroupUnit.every(
+        (group) => group.state._tag !== "Decided" || group.state.undoneAt === 0 || group.state.undoneAt > group.state.change,
+      ),
+    // The group an import holds as its last in force is in force.
+    TheLastGroupInForceIsInForce: (all) =>
+      all.GroupUnit.every((group) =>
+        all.ImportLife.every(
+          (life) =>
+            group.state._tag !== "Decided" ||
+            group.state.importId !== life.id ||
+            life.state._tag === "Removed" ||
+            life.state._tag === "Unstaged" ||
+            group.state.change !== life.state.topGroup ||
+            group.state.undoneAt === 0,
+        ),
+      ),
+    // While an import is open, no act on a group of it is later than the one it holds as its last.
+    NoGroupActIsLaterThanTheImportsLast: (all) =>
+      all.GroupUnit.every((group) =>
+        all.ImportLife.every(
+          (life) =>
+            group.state._tag !== "Decided" ||
+            group.state.importId !== life.id ||
+            life.state._tag === "Removed" ||
+            life.state._tag === "Unstaged" ||
+            (group.state.change <= life.state.lastGroup && group.state.undoneAt <= life.state.lastGroup),
+        ),
+      ),
+  },
+}) {}
+export class ReviewInvariantsApi extends Domain.Api("ReviewInvariantsApi", { model: ReviewInvariants }) {}
+```
+
+`Review.story.test.ts`:
+
+```ts
+// The orderings that decide whether the review holds Benjamin's answers, as stories on the model: review11's, ported to
+// a group decided as one unit (a row's act names the last group act it saw and whether a group covers it), and one
+// story at least for every command accepted, with what it records event by event, and for every refusal it can give.
+import { Story } from "@alchemy.run/domain/Story"
+import { it } from "@effect/vitest"
+import { CurrentActor } from "../test/Actor.context.ts"
+import { DecideGroup, UndoGroup } from "./Group.decision.ts"
+import { GroupDecided, GroupUnit } from "./GroupUnit.aggregate.ts"
+import {
+  ActCounted,
+  AlreadyStaged,
+  ColumnMatched,
+  ConfirmImport,
+  ConfirmedSince,
+  CountsDoNotAddUp,
+  GroupCounted,
+  HasItemsInForce,
+  ImportConfirmed,
+  ImportId,
+  ImportLife,
+  ImportRemoved,
+  ImportReopened,
+  ImportStaged,
+  ImportTakenBack,
+  MatchColumn,
+  MatchedSince,
+  MoreKeptThanInForce,
+  NotClosed,
+  NotImported,
+  NotOpen,
+  NotPermitted,
+  NotWhatWasShown,
+  PlanBehind,
+  RecordSuggestion,
+  RemoveImport,
+  ReopenImport,
+  ReviewMovedOn,
+  StageImport,
+  SuggestionRecorded,
+  TakeBackImport,
+} from "./ImportLife.aggregate.ts"
+import {
+  DecideRow,
+  DecidedBeforeTheConfirm,
+  DecidedSince,
+  GroupedSince,
+  HistoryEnds,
+  NoLongerThere,
+  NotWhatWasUnder,
+  NotYourStep,
+  UndoRowStep,
+} from "./Review.decision.ts"
+import { Review } from "./Review.model.ts"
+import { type Level, RowDecided, RowUnit, StepUndone, letGo, noLevel, seal } from "./RowUnit.aggregate.ts"
+
+const story = Story.make(Review)
+const id = ImportId.make("imp_1")
+const life = ImportLife.ref(id)
+const row3 = RowUnit.ref("imp_1/row-3")
+const row7 = RowUnit.ref("imp_1/row-7")
+const row12 = RowUnit.ref("imp_1/row-12")
+const g1 = GroupUnit.ref("imp_1/g1")
+
+const ana = { organizationId: "org_prairie", memberId: "ana", role: "editor" as const }
+const dana = { organizationId: "org_prairie", memberId: "dana", role: "editor" as const }
+const admin = { organizationId: "org_prairie", memberId: "ada", role: "admin" as const }
+const anaViewer = { ...ana, role: "viewer" as const }
+// An admin of another organization: a role is no key to an organization's imports.
+const oli = { organizationId: "org_other", memberId: "oli", role: "admin" as const }
+const staged = new ImportStaged({ organizationId: "org_prairie", rows: 200, columns: "by heading", by: "ana" })
+const leftOut = '{"out":true}'
+const kept = '{"kept":true}'
+const typed = '{"set":{"name":"Hex bolt M8"}}'
+const patch = '{"accept":"unit"}'
+
+const act = (input: {
+  row: string
+  step: string
+  saw: number
+  flags: string
+  madeOn?: number
+  opening?: number
+  sawGroup?: number
+  covered?: boolean
+}) => new DecideRow({ importId: id, madeOn: 0, opening: 0, sawGroup: 0, covered: false, label: "Decide", ...input })
+const undo = (input: { row: string; undo: number; step: string; opening?: number; sawGroup?: number; next?: Level; below?: string }) =>
+  new UndoRowStep({ importId: id, opening: 0, sawGroup: 0, next: noLevel, below: "", ...input })
+const decided = (input: { change: number; by: string; step: string; flags: string; madeOn?: number; organizationId?: string }) =>
+  new RowDecided({ importId: id, organizationId: "org_prairie", madeOn: 0, label: "Decide", ...input })
+const counted = (input: { change: number; step: string; row: string; by: string; flags: string; madeOn?: number }) =>
+  new ActCounted({ label: "Decide", holds: input.change, madeOn: 0, actor: input.by, ...input })
+const undone = (input: { change: number; row: string; step: string; holds: number; by: string; flags: string; madeOn?: number; actor?: string }) =>
+  new ActCounted({ label: "undo", madeOn: 0, actor: "ana", ...input })
+const counts = { created: 155, updated: 0, already: 0, notImported: 45 }
+const confirm = (input: { seen: number; planAt: number }) =>
+  new ConfirmImport({ importId: id, shown: "155", plan: "155", ...counts, ...input })
+const confirmed = (change: number, more: Partial<typeof counts & { by: string }> = {}) =>
+  new ImportConfirmed({ change, ...counts, by: "ana", ...more })
+const level = (input: { change: number; by: string; step: string; flags: string }): Level => ({
+  madeOn: 0,
+  label: "Decide",
+  ...input,
+  bySize: input.by.length,
+  stepSize: input.step.length,
+  flagsSize: input.flags.length,
+  labelSize: "Decide".length,
+})
+// One recorded act, as the events it leaves on the row and on the import.
+const recorded = (ref: typeof row3, row: string, input: { change: number; by: string; step: string; flags: string; madeOn?: number }) =>
+  [Story.then(ref, decided(input)), Story.then(life, counted({ row, ...input }))] as const
+const group = (input: { step: string; seen: number; opening?: number }) =>
+  new DecideGroup({ importId: id, opening: 0, madeOn: 0, patch, rows: "row-3,row-12", count: 2, label: "2 fixes accepted", ...input })
+const groupDecided = (change: number, more: { by?: string; organizationId?: string } = {}) =>
+  new GroupDecided({ importId: id, organizationId: "org_prairie", change, by: "ana", step: "g1", patch, rows: "row-3,row-12", count: 2, madeOn: 0, label: "2 fixes accepted", under: 0, ...more })
+const groupCounted = (change: number, by = "ana") =>
+  new GroupCounted({ change, step: "g1", rows: 2, label: "2 fixes accepted", by, top: change })
+
+// ---- a file staged, a suggestion
+it.effect("a viewer may not stage a file; an editor stages it, once", () =>
+  story(
+    Story.provide(CurrentActor, anaViewer),
+    Story.when(new StageImport({ importId: id, rows: 200, columns: "by heading" })),
+    Story.rejected(new NotPermitted({})),
+    Story.provide(CurrentActor, ana),
+    Story.when(new StageImport({ importId: id, rows: 200, columns: "by heading" })),
+    Story.then(life, staged),
+    Story.provide(CurrentActor, dana),
+    Story.when(new StageImport({ importId: id, rows: 12, columns: "sku: A" })),
+    Story.rejected(new AlreadyStaged({})),
+  ),
+)
+it.effect("a suggestion is recorded as its asker's and changes no number; a viewer's is refused", () =>
+  story(
+    Story.given(life, staged),
+    Story.provide(CurrentActor, dana),
+    Story.when(new RecordSuggestion({ importId: id })),
+    Story.then(life, new SuggestionRecorded({ by: "dana" })),
+    // The next change is still number 1.
+    Story.when(new MatchColumn({ importId: id, columns: "tags: none", saw: 0, opening: 0 })),
+    Story.then(life, new ColumnMatched({ change: 1, matching: 1, columns: "tags: none", by: "dana" })),
+    Story.provide(CurrentActor, anaViewer),
+    Story.when(new RecordSuggestion({ importId: id })),
+    Story.rejected(new NotPermitted({})),
+  ),
+)
+it.effect("a removed import takes nothing more: no suggestion, no match, no take-back, no reopen, no second staging", () =>
+  story(
+    Story.given(life, staged),
+    Story.provide(CurrentActor, ana),
+    Story.when(new RemoveImport({ importId: id, seen: 0 })),
+    Story.then(life, new ImportRemoved({ change: 1, by: "ana" })),
+    Story.when(new RecordSuggestion({ importId: id })),
+    Story.rejected(new NotOpen({})),
+    Story.when(new MatchColumn({ importId: id, columns: "tags: none", saw: 0, opening: 0 })),
+    Story.rejected(new NotOpen({})),
+    Story.when(new TakeBackImport({ importId: id, seen: 1, kept: 0, keptReplaced: 0 })),
+    Story.rejected(new NotImported({})),
+    Story.when(new ReopenImport({ importId: id, seen: 1 })),
+    Story.rejected(new NotClosed({})),
+    Story.when(new StageImport({ importId: id, rows: 200, columns: "by heading" })),
+    Story.rejected(new AlreadyStaged({})),
+  ),
+)
+
+// ---- who may act
+it.effect("an admin of another organization changes nothing in this one's import, its rows or its groups", () =>
+  story(
+    Story.given(life, staged, counted({ change: 1, step: "a1", row: "row-12", by: "ana", flags: leftOut }), groupCounted(2)),
+    Story.given(row12, decided({ change: 1, by: "ana", step: "a1", flags: leftOut })),
+    Story.given(g1, groupDecided(2)),
+    Story.provide(CurrentActor, oli),
+    Story.when(new MatchColumn({ importId: id, columns: "tags: none", saw: 0, opening: 0 })),
+    Story.rejected(new NotPermitted({})),
+    Story.when(new RecordSuggestion({ importId: id })),
+    Story.rejected(new NotPermitted({})),
+    Story.when(confirm({ seen: 2, planAt: 2 })),
+    Story.rejected(new NotPermitted({})),
+    Story.when(new RemoveImport({ importId: id, seen: 2 })),
+    Story.rejected(new NotPermitted({})),
+    Story.when(act({ row: "row-12", step: "o1", saw: 1, sawGroup: 2, covered: true, flags: kept })),
+    Story.rejected(new NotPermitted({})),
+    Story.when(undo({ row: "row-12", undo: 1, step: "o2", sawGroup: 2 })),
+    Story.rejected(new NotPermitted({})),
+    Story.when(group({ step: "g2", seen: 2 })),
+    Story.rejected(new NotPermitted({})),
+    Story.when(new UndoGroup({ importId: id, step: "g1", undo: 2, opening: 0 })),
+    Story.rejected(new NotPermitted({})),
+  ),
+)
+it.effect("an admin of another organization neither takes back nor reopens this one's confirmed import", () =>
+  story(
+    Story.given(life, staged, confirmed(1)),
+    Story.provide(CurrentActor, oli),
+    Story.when(new TakeBackImport({ importId: id, seen: 1, kept: 0, keptReplaced: 0 })),
+    Story.rejected(new NotPermitted({})),
+    Story.when(new ReopenImport({ importId: id, seen: 1 })),
+    Story.rejected(new NotPermitted({})),
+  ),
+)
+it.effect("a viewer changes nothing: no match, suggestion, confirm, remove, row act, undo, group or group undo", () =>
+  story(
+    Story.given(life, staged, counted({ change: 1, step: "a1", row: "row-12", by: "ana", flags: leftOut }), groupCounted(2)),
+    Story.given(row12, decided({ change: 1, by: "ana", step: "a1", flags: leftOut })),
+    Story.given(g1, groupDecided(2)),
+    Story.provide(CurrentActor, anaViewer),
+    Story.when(new MatchColumn({ importId: id, columns: "tags: none", saw: 0, opening: 0 })),
+    Story.rejected(new NotPermitted({})),
+    Story.when(confirm({ seen: 2, planAt: 2 })),
+    Story.rejected(new NotPermitted({})),
+    Story.when(new RemoveImport({ importId: id, seen: 2 })),
+    Story.rejected(new NotPermitted({})),
+    Story.when(act({ row: "row-12", step: "v1", saw: 1, sawGroup: 2, covered: true, flags: kept })),
+    Story.rejected(new NotPermitted({})),
+    Story.when(undo({ row: "row-12", undo: 1, step: "v2", sawGroup: 2 })),
+    Story.rejected(new NotPermitted({})),
+    Story.when(group({ step: "g2", seen: 2 })),
+    Story.rejected(new NotPermitted({})),
+    Story.when(new UndoGroup({ importId: id, step: "g1", undo: 2, opening: 0 })),
+    Story.rejected(new NotPermitted({})),
+  ),
+)
+it.effect("a viewer neither takes back nor reopens a confirmed import", () =>
+  story(
+    Story.given(life, staged, confirmed(1)),
+    Story.provide(CurrentActor, anaViewer),
+    Story.when(new TakeBackImport({ importId: id, seen: 1, kept: 0, keptReplaced: 0 })),
+    Story.rejected(new NotPermitted({})),
+    Story.when(new ReopenImport({ importId: id, seen: 1 })),
+    Story.rejected(new NotPermitted({})),
+  ),
+)
+it.effect("when a person is made a viewer, their next act on a row is refused, and an admin's confirm is taken", () =>
+  story(
+    Story.given(life, staged, counted({ change: 1, step: "a1", row: "row-3", by: "ana", flags: leftOut })),
+    Story.given(row3, decided({ change: 1, by: "ana", step: "a1", flags: leftOut })),
+    Story.provide(CurrentActor, anaViewer),
+    Story.when(act({ row: "row-12", step: "a2", saw: 0, flags: leftOut })),
+    Story.rejected(new NotPermitted({})),
+    Story.provide(CurrentActor, admin),
+    Story.when(confirm({ seen: 1, planAt: 1 })),
+    Story.then(life, confirmed(2, { by: "ada" })),
+  ),
+)
+it.effect("a row or a group kept under another organization's name is not changed, even by its maker", () =>
+  story(
+    Story.given(life, staged, counted({ change: 1, step: "a1", row: "row-12", by: "ana", flags: leftOut }), groupCounted(2)),
+    Story.given(row12, decided({ change: 1, by: "ana", step: "a1", flags: leftOut, organizationId: "org_other" })),
+    Story.given(row3, new RowDecided({ importId: ImportId.make("imp_2"), organizationId: "org_prairie", change: 1, by: "ana", step: "a1", flags: leftOut, madeOn: 0, label: "Decide" })),
+    Story.given(g1, groupDecided(2, { organizationId: "org_other" })),
+    Story.provide(CurrentActor, ana),
+    Story.when(act({ row: "row-12", step: "a2", saw: 1, sawGroup: 2, covered: true, flags: kept })),
+    Story.rejected(new NotPermitted({})),
+    Story.when(undo({ row: "row-12", undo: 1, step: "a3", sawGroup: 2 })),
+    Story.rejected(new NotPermitted({})),
+    Story.when(act({ row: "row-3", step: "a4", saw: 1, sawGroup: 2, covered: true, flags: kept })),
+    Story.rejected(new NotPermitted({})),
+    Story.when(new UndoGroup({ importId: id, step: "g1", undo: 2, opening: 0 })),
+    Story.rejected(new NotPermitted({})),
+  ),
+)
+
+// ---- an import that is not open
+it.effect("on a confirmed import nothing is reviewed, matched, suggested, confirmed again or removed until it is reopened", () =>
+  story(
+    Story.given(life, staged, counted({ change: 1, step: "a1", row: "row-12", by: "ana", flags: leftOut }), groupCounted(2), confirmed(3)),
+    Story.given(row12, decided({ change: 1, by: "ana", step: "a1", flags: leftOut })),
+    Story.given(g1, groupDecided(2)),
+    Story.provide(CurrentActor, ana),
+    Story.when(new MatchColumn({ importId: id, columns: "tags: none", saw: 0, opening: 1 })),
+    Story.rejected(new NotOpen({})),
+    Story.when(new RecordSuggestion({ importId: id })),
+    Story.rejected(new NotOpen({})),
+    Story.when(confirm({ seen: 3, planAt: 3 })),
+    Story.rejected(new NotOpen({})),
+    Story.when(new RemoveImport({ importId: id, seen: 3 })),
+    Story.rejected(new NotOpen({})),
+    Story.when(act({ row: "row-12", step: "a2", saw: 1, sawGroup: 2, covered: true, flags: kept, opening: 1 })),
+    Story.rejected(new NotOpen({})),
+    Story.when(undo({ row: "row-12", undo: 1, step: "a3", sawGroup: 2, opening: 1 })),
+    Story.rejected(new NotOpen({})),
+    Story.when(group({ step: "g2", seen: 3, opening: 1 })),
+    Story.rejected(new NotOpen({})),
+    Story.when(new UndoGroup({ importId: id, step: "g1", undo: 2, opening: 1 })),
+    Story.rejected(new NotOpen({})),
+    Story.when(new ReopenImport({ importId: id, seen: 3 })),
+    Story.then(life, new ImportReopened({ change: 4, by: "ana" })),
+  ),
+)
+it.effect("an import never confirmed is not taken back, and an open one is not opened again", () =>
+  story(
+    Story.given(life, staged),
+    Story.provide(CurrentActor, ana),
+    Story.when(new TakeBackImport({ importId: id, seen: 0, kept: 0, keptReplaced: 0 })),
+    Story.rejected(new NotImported({})),
+    Story.when(new ReopenImport({ importId: id, seen: 0 })),
+    Story.rejected(new NotClosed({})),
+  ),
+)
+it.effect("an import whose confirm stands is not removed, even when it created nothing, until it is taken back", () =>
+  story(
+    Story.given(life, staged, confirmed(1, { created: 0, already: 155 }), new ImportReopened({ change: 2, by: "ana" })),
+    Story.provide(CurrentActor, ana),
+    Story.when(new RemoveImport({ importId: id, seen: 2 })),
+    Story.rejected(new HasItemsInForce({})),
+    Story.when(new TakeBackImport({ importId: id, seen: 2, kept: 0, keptReplaced: 0 })),
+    Story.then(life, new ImportTakenBack({ change: 3, removed: 0, kept: 0, restored: 0, keptReplaced: 0, by: "ana" })),
+    Story.when(new RemoveImport({ importId: id, seen: 3 })),
+    Story.then(life, new ImportRemoved({ change: 4, by: "ana" })),
+  ),
+)
+it.effect("an import with items in force is not removed: a take-back that keeps some leaves them in force", () =>
+  story(
+    Story.given(life, staged, confirmed(1), new ImportReopened({ change: 2, by: "ana" })),
+    Story.provide(CurrentActor, ana),
+    Story.when(new RemoveImport({ importId: id, seen: 2 })),
+    Story.rejected(new HasItemsInForce({})),
+    Story.when(new TakeBackImport({ importId: id, seen: 2, kept: 3, keptReplaced: 0 })),
+    Story.then(life, new ImportTakenBack({ change: 3, removed: 152, kept: 3, restored: 0, keptReplaced: 0, by: "ana" })),
+    Story.when(new RemoveImport({ importId: id, seen: 3 })),
+    Story.rejected(new HasItemsInForce({})),
+  ),
+)
+
+// ---- the confirm
+it.effect("a plan built before the last act may not be confirmed after it", () =>
+  story(
+    Story.given(
+      life,
+      staged,
+      counted({ change: 1, step: "a1", row: "row-3", by: "ana", flags: leftOut }),
+      counted({ change: 2, step: "a2", row: "row-12", by: "ana", flags: leftOut }),
+    ),
+    Story.provide(CurrentActor, ana),
+    Story.when(confirm({ seen: 2, planAt: 1 })),
+    Story.rejected(new PlanBehind({ last: 2 })),
+    Story.when(confirm({ seen: 2, planAt: 2 })),
+    Story.then(life, confirmed(3)),
+  ),
+)
+it.effect("a plan that would do something else than the button said is refused: the stored items changed", () =>
+  story(
+    Story.given(life, staged),
+    Story.provide(CurrentActor, ana),
+    Story.when(
+      new ConfirmImport({ importId: id, seen: 0, planAt: 0, shown: "155 new", plan: "155 there", created: 0, updated: 0, already: 155, notImported: 45 }),
+    ),
+    Story.rejected(new NotWhatWasShown({})),
+  ),
+)
+it.effect("another person's act lands before the screen's own waiting act: the confirm is refused", () =>
+  story(
+    Story.given(life, staged),
+    Story.provide(CurrentActor, dana),
+    Story.when(act({ row: "row-7", step: "d1", saw: 0, flags: kept })),
+    ...recorded(row7, "row-7", { change: 1, by: "dana", step: "d1", flags: kept }),
+    // Ana's screen has not received change 1. Her own act is change 2: she has 2 and not 1, so every change up to 0.
+    Story.provide(CurrentActor, ana),
+    Story.when(act({ row: "row-3", step: "a1", saw: 0, flags: leftOut })),
+    ...recorded(row3, "row-3", { change: 2, by: "ana", step: "a1", flags: leftOut }),
+    Story.when(confirm({ seen: 0, planAt: 2 })),
+    Story.rejected(new ReviewMovedOn({ last: 2 })),
+    Story.when(confirm({ seen: 2, planAt: 2 })),
+    Story.then(life, confirmed(3)),
+  ),
+)
+it.effect("counts that do not add up to the file's rows are refused, and so is more in force than the file has rows", () =>
+  story(
+    Story.given(life, staged, confirmed(1), new ImportReopened({ change: 2, by: "ana" })),
+    Story.provide(CurrentActor, ana),
+    Story.when(
+      new ConfirmImport({ importId: id, seen: 2, planAt: 2, shown: "x", plan: "x", created: 0, updated: 0, already: 10, notImported: 0 }),
+    ),
+    Story.rejected(new CountsDoNotAddUp({})),
+    // An item of the first confirm was changed: its row is no longer already there.
+    Story.when(
+      new ConfirmImport({ importId: id, seen: 2, planAt: 2, shown: "x", plan: "x", created: 0, updated: 0, already: 154, notImported: 46 }),
+    ),
+    Story.then(life, new ImportConfirmed({ change: 3, created: 0, updated: 0, already: 154, notImported: 46, by: "ana" })),
+    Story.when(new ReopenImport({ importId: id, seen: 3 })),
+    Story.then(life, new ImportReopened({ change: 4, by: "ana" })),
+    Story.when(
+      new ConfirmImport({ importId: id, seen: 4, planAt: 4, shown: "x", plan: "x", created: 46, updated: 0, already: 154, notImported: 0 }),
+    ),
+    Story.rejected(new CountsDoNotAddUp({})),
+  ),
+)
+
+// ---- take-back, reopen, remove
+it.effect("a take-back, a reopen and a remove each name the last change, so a press on an old screen is refused", () =>
+  story(
+    Story.given(
+      life,
+      staged,
+      confirmed(1),
+      new ImportTakenBack({ change: 2, removed: 155, kept: 0, restored: 0, keptReplaced: 0, by: "ana" }),
+      new ImportReopened({ change: 3, by: "ana" }),
+      confirmed(4),
+    ),
+    Story.provide(CurrentActor, ana),
+    Story.when(new TakeBackImport({ importId: id, seen: 1, kept: 0, keptReplaced: 0 })),
+    Story.rejected(new ReviewMovedOn({ last: 4 })),
+    Story.when(new ReopenImport({ importId: id, seen: 2 })),
+    Story.rejected(new ReviewMovedOn({ last: 4 })),
+    Story.when(new TakeBackImport({ importId: id, seen: 4, kept: 0, keptReplaced: 0 })),
+    Story.then(life, new ImportTakenBack({ change: 5, removed: 155, kept: 0, restored: 0, keptReplaced: 0, by: "ana" })),
+    Story.when(new ReopenImport({ importId: id, seen: 5 })),
+    Story.then(life, new ImportReopened({ change: 6, by: "ana" })),
+    Story.when(new RemoveImport({ importId: id, seen: 5 })),
+    Story.rejected(new ReviewMovedOn({ last: 6 })),
+    Story.when(new RemoveImport({ importId: id, seen: 6 })),
+    Story.then(life, new ImportRemoved({ change: 7, by: "ana" })),
+  ),
+)
+it.effect("a take-back takes back everything in force: the second round's items and the first's", () =>
+  story(
+    Story.given(life, staged, confirmed(1), new ImportReopened({ change: 2, by: "ana" })),
+    Story.provide(CurrentActor, ana),
+    Story.when(new ConfirmImport({ importId: id, seen: 2, planAt: 2, shown: "10", plan: "10", created: 10, updated: 0, already: 155, notImported: 35 })),
+    Story.then(life, new ImportConfirmed({ change: 3, created: 10, updated: 0, already: 155, notImported: 35, by: "ana" })),
+    Story.when(new TakeBackImport({ importId: id, seen: 3, kept: 0, keptReplaced: 0 })),
+    Story.then(life, new ImportTakenBack({ change: 4, removed: 165, kept: 0, restored: 0, keptReplaced: 0, by: "ana" })),
+    Story.when(new TakeBackImport({ importId: id, seen: 4, kept: 0, keptReplaced: 0 })),
+    Story.rejected(new NotImported({})),
+    Story.when(new ReopenImport({ importId: id, seen: 4 })),
+    Story.then(life, new ImportReopened({ change: 5, by: "ana" })),
+    Story.when(new RemoveImport({ importId: id, seen: 5 })),
+    Story.then(life, new ImportRemoved({ change: 6, by: "ana" })),
+  ),
+)
+it.effect("an import opened again is taken back without confirming it again", () =>
+  story(
+    Story.given(life, staged, confirmed(1), new ImportReopened({ change: 2, by: "ana" })),
+    Story.provide(CurrentActor, ana),
+    Story.when(new TakeBackImport({ importId: id, seen: 2, kept: 5, keptReplaced: 0 })),
+    Story.then(life, new ImportTakenBack({ change: 3, removed: 150, kept: 5, restored: 0, keptReplaced: 0, by: "ana" })),
+  ),
+)
+it.effect("a take-back counts the items that were replaced too, put back and kept, and never keeps more than there is", () =>
+  story(
+    Story.given(life, staged, confirmed(1, { created: 100, updated: 50, notImported: 50 }), new ImportReopened({ change: 2, by: "ana" })),
+    Story.provide(CurrentActor, ana),
+    Story.when(new TakeBackImport({ importId: id, seen: 2, kept: 101, keptReplaced: 3 })),
+    Story.rejected(new MoreKeptThanInForce({})),
+    Story.when(new TakeBackImport({ importId: id, seen: 2, kept: 2, keptReplaced: 51 })),
+    Story.rejected(new MoreKeptThanInForce({})),
+    Story.when(new TakeBackImport({ importId: id, seen: 2, kept: 2, keptReplaced: 3 })),
+    Story.then(life, new ImportTakenBack({ change: 3, removed: 98, kept: 2, restored: 47, keptReplaced: 3, by: "ana" })),
+  ),
+)
+
+// ---- a match, an opening
+it.effect("a match made over one its sender never saw is refused, and the columns as they are, by heading or by hand, are no match", () =>
+  story(
+    Story.given(life, staged),
+    Story.provide(CurrentActor, ana),
+    // By hand, what the headings gave already: nothing is taken back.
+    Story.when(new MatchColumn({ importId: id, columns: "by heading", saw: 0, opening: 0 })),
+    Story.then(life),
+    // None, on purpose, for a column its heading gave: that is a match.
+    Story.when(new MatchColumn({ importId: id, columns: "tags: none", saw: 0, opening: 0 })),
+    Story.then(life, new ColumnMatched({ change: 1, matching: 1, columns: "tags: none", by: "ana" })),
+    Story.provide(CurrentActor, dana),
+    Story.when(new MatchColumn({ importId: id, columns: "uom: Unit", saw: 0, opening: 0 })),
+    Story.rejected(new MatchedSince({ matching: 1 })),
+  ),
+)
+it.effect("an act made on an older matching is refused, whatever it decides", () =>
+  story(
+    Story.given(life, staged, new ColumnMatched({ change: 1, matching: 1, columns: "sku: B", by: "dana" })),
+    Story.provide(CurrentActor, ana),
+    Story.when(act({ row: "row-12", step: "a1", saw: 0, flags: '{"stored":"replace"}', madeOn: 0 })),
+    Story.rejected(new MatchedSince({ matching: 1 })),
+    Story.when(act({ row: "row-12", step: "a2", saw: 0, flags: '{"stored":"replace"}', madeOn: 1 })),
+    ...recorded(row12, "row-12", { change: 2, by: "ana", step: "a2", flags: '{"stored":"replace"}', madeOn: 1 }),
+  ),
+)
+it.effect("an act made before a confirm is not taken after the import is opened again", () =>
+  story(
+    Story.given(life, staged, confirmed(1), new ImportReopened({ change: 2, by: "ana" })),
+    Story.provide(CurrentActor, ana),
+    Story.when(act({ row: "row-3", step: "a1", saw: 0, flags: leftOut, opening: 0 })),
+    Story.rejected(new ConfirmedSince({})),
+    Story.when(act({ row: "row-3", step: "a2", saw: 0, flags: leftOut, opening: 1 })),
+    ...recorded(row3, "row-3", { change: 3, by: "ana", step: "a2", flags: leftOut }),
+  ),
+)
+it.effect("a match, a group and an undo made before a confirm are not taken after the import is opened again either", () =>
+  story(
+    Story.given(
+      life,
+      staged,
+      counted({ change: 1, step: "a1", row: "row-12", by: "ana", flags: leftOut }),
+      confirmed(2),
+      new ImportTakenBack({ change: 3, removed: 155, kept: 0, restored: 0, keptReplaced: 0, by: "dana" }),
+      new ImportReopened({ change: 4, by: "dana" }),
+    ),
+    Story.given(row12, decided({ change: 1, by: "ana", step: "a1", flags: leftOut })),
+    Story.provide(CurrentActor, ana),
+    Story.when(undo({ row: "row-12", undo: 1, step: "u1", opening: 0 })),
+    Story.rejected(new ConfirmedSince({})),
+    Story.when(new MatchColumn({ importId: id, columns: "unitCost: List price", saw: 0, opening: 0 })),
+    Story.rejected(new ConfirmedSince({})),
+    Story.when(group({ step: "g1", seen: 4, opening: 0 })),
+    Story.rejected(new ConfirmedSince({})),
+    // Made in this opening, the match is taken.
+    Story.when(new MatchColumn({ importId: id, columns: "unitCost: List price", saw: 0, opening: 1 })),
+    Story.then(life, new ColumnMatched({ change: 5, matching: 1, columns: "unitCost: List price", by: "ana" })),
+  ),
+)
+it.effect("an undo does not reach past a confirm that stands", () =>
+  story(
+    Story.given(life, staged, counted({ change: 1, step: "a1", row: "row-12", by: "ana", flags: typed }), confirmed(2), new ImportReopened({ change: 3, by: "ana" })),
+    Story.given(row12, decided({ change: 1, by: "ana", step: "a1", flags: typed })),
+    Story.provide(CurrentActor, ana),
+    Story.when(undo({ row: "row-12", undo: 1, step: "u1", opening: 1 })),
+    Story.rejected(new DecidedBeforeTheConfirm({})),
+  ),
+)
+
+// ---- rows and undo
+it.effect("when someone else decided the row first, the act is refused with whose decision is there", () =>
+  story(
+    Story.given(life, staged, counted({ change: 1, step: "d1", row: "row-12", by: "dana", flags: kept })),
+    Story.given(row12, decided({ change: 1, by: "dana", step: "d1", flags: kept })),
+    Story.provide(CurrentActor, ana),
+    Story.when(act({ row: "row-12", step: "a1", saw: 0, flags: leftOut })),
+    Story.rejected(new DecidedSince({ by: "dana", change: 1 })),
+  ),
+)
+it.effect("a decision its sender saw that was taken back since is no longer there, and the act is refused", () =>
+  story(
+    Story.given(life, staged, counted({ change: 1, step: "a1", row: "row-12", by: "ana", flags: leftOut })),
+    Story.given(row12, decided({ change: 1, by: "ana", step: "a1", flags: leftOut })),
+    Story.provide(CurrentActor, ana),
+    Story.when(undo({ row: "row-12", undo: 1, step: "u1" })),
+    Story.then(row12, new StepUndone({ next: noLevel, below: "" })),
+    Story.then(life, undone({ change: 2, row: "row-12", step: "u1", holds: 0, by: "", flags: "", madeOn: -1 })),
+    // Dana's screen still shows Ana's decision on row 12.
+    Story.provide(CurrentActor, dana),
+    Story.when(act({ row: "row-12", step: "d1", saw: 1, flags: kept })),
+    Story.rejected(new NoLongerThere({})),
+    Story.when(act({ row: "row-12", step: "d2", saw: 0, flags: kept })),
+    ...recorded(row12, "row-12", { change: 3, by: "dana", step: "d2", flags: kept }),
+  ),
+)
+it.effect("a save that leaves the row as it is records nothing, seen or not: the answer says no change", () =>
+  story(
+    Story.given(life, staged, counted({ change: 1, step: "a1", row: "row-12", by: "ana", flags: kept })),
+    Story.given(row12, decided({ change: 1, by: "ana", step: "a1", flags: kept })),
+    Story.provide(CurrentActor, ana),
+    Story.when(act({ row: "row-12", step: "a2", saw: 1, flags: kept })),
+    Story.then(row12),
+    Story.then(life),
+    // Nor does an empty decision on a row with none.
+    Story.when(act({ row: "row-3", step: "a3", saw: 0, flags: "{}" })),
+    Story.then(row3),
+    Story.then(life),
+    // Somebody else had just decided it the same way, and the screen had not received that.
+    Story.provide(CurrentActor, dana),
+    Story.when(act({ row: "row-12", step: "d1", saw: 0, flags: kept })),
+    Story.then(row12),
+    Story.then(life),
+  ),
+)
+it.effect("a row's undo pressed before a group reached its sender's screen is refused, and taken once it has", () =>
+  story(
+    Story.given(life, staged, counted({ change: 1, step: "d1", row: "row-12", by: "dana", flags: kept })),
+    Story.given(row12, decided({ change: 1, by: "dana", step: "d1", flags: kept })),
+    Story.provide(CurrentActor, ana),
+    Story.when(group({ step: "g1", seen: 1 })),
+    Story.then(g1, groupDecided(2)),
+    Story.then(life, groupCounted(2)),
+    // Dana presses undo on her own decision; Ana's group has not reached her screen.
+    Story.provide(CurrentActor, dana),
+    Story.when(undo({ row: "row-12", undo: 1, step: "u1", sawGroup: 0 })),
+    Story.rejected(new GroupedSince({})),
+    Story.when(undo({ row: "row-12", undo: 1, step: "u2", sawGroup: 2 })),
+    Story.then(row12, new StepUndone({ next: noLevel, below: "" })),
+    Story.then(life, undone({ change: 3, row: "row-12", step: "u2", holds: 0, by: "", flags: "", madeOn: -1, actor: "dana" })),
+  ),
+)
+it.effect("an undo may not bring a text of its sender's as another person's decision", () =>
+  story(
+    Story.given(life, staged),
+    Story.given(
+      row12,
+      decided({ change: 1, by: "dana", step: "d1", flags: kept }),
+      decided({ change: 2, by: "ana", step: "a1", flags: leftOut }),
+      decided({ change: 3, by: "ana", step: "a2", flags: typed }),
+    ),
+    Story.provide(CurrentActor, ana),
+    Story.when(undo({ row: "row-12", undo: 3, step: "u1", next: level({ change: 1, by: "dana", step: "d1", flags: "FORGED" }) })),
+    Story.rejected(new NotWhatWasUnder({})),
+    // Nor with sizes that let the forged text share the true one's seal.
+    Story.when(undo({ row: "row-12", undo: 3, step: "u2", next: { ...level({ change: 1, by: "dana", step: "d1", flags: kept }), by: "dan", step: "ad1" } })),
+    Story.rejected(new NotWhatWasUnder({})),
+  ),
+)
+it.effect("undos go down every level exactly as it was, and end at none", () =>
+  story(
+    Story.given(life, staged, counted({ change: 4, step: "a4", row: "row-12", by: "ana", flags: "4" })),
+    Story.given(
+      row12,
+      decided({ change: 1, by: "ana", step: "a1", flags: "1" }),
+      decided({ change: 2, by: "ana", step: "a2", flags: "2" }),
+      decided({ change: 3, by: "ana", step: "a3", flags: "3" }),
+      decided({ change: 4, by: "ana", step: "a4", flags: "4" }),
+    ),
+    Story.provide(CurrentActor, ana),
+    Story.when(
+      undo({
+        row: "row-12",
+        undo: 4,
+        step: "u1",
+        next: level({ change: 2, by: "ana", step: "a2", flags: "2" }),
+        below: seal(level({ change: 1, by: "ana", step: "a1", flags: "1" }), ""),
+      }),
+    ),
+    Story.then(
+      row12,
+      new StepUndone({
+        next: level({ change: 2, by: "ana", step: "a2", flags: "2" }),
+        below: seal(level({ change: 1, by: "ana", step: "a1", flags: "1" }), ""),
+      }),
+    ),
+    Story.then(life, undone({ change: 5, row: "row-12", step: "u1", holds: 3, by: "ana", flags: "3" })),
+    Story.when(undo({ row: "row-12", undo: 3, step: "u2", next: level({ change: 1, by: "ana", step: "a1", flags: "1" }) })),
+    Story.then(row12, new StepUndone({ next: level({ change: 1, by: "ana", step: "a1", flags: "1" }), below: "" })),
+    Story.then(life, undone({ change: 6, row: "row-12", step: "u2", holds: 2, by: "ana", flags: "2" })),
+    Story.when(undo({ row: "row-12", undo: 2, step: "u3" })),
+    Story.then(row12, new StepUndone({ next: noLevel, below: "" })),
+    Story.then(life, undone({ change: 7, row: "row-12", step: "u3", holds: 1, by: "ana", flags: "1" })),
+    Story.when(undo({ row: "row-12", undo: 1, step: "u4" })),
+    Story.then(row12, new StepUndone({ next: noLevel, below: "" })),
+    Story.then(life, undone({ change: 8, row: "row-12", step: "u4", holds: 0, by: "", flags: "", madeOn: -1 })),
+    // A row with no decision has no step to undo.
+    Story.when(undo({ row: "row-12", undo: 1, step: "u5" })),
+    Story.rejected(new NotYourStep({})),
+  ),
+)
+it.effect("an undo that puts back another person's decision stops there", () =>
+  story(
+    Story.given(life, staged, counted({ change: 2, step: "a1", row: "row-12", by: "ana", flags: leftOut })),
+    Story.given(row12, decided({ change: 1, by: "dana", step: "d1", flags: kept }), decided({ change: 2, by: "ana", step: "a1", flags: leftOut })),
+    Story.provide(CurrentActor, ana),
+    Story.when(undo({ row: "row-12", undo: 2, step: "u1" })),
+    Story.then(row12, new StepUndone({ next: noLevel, below: "" })),
+    Story.then(life, undone({ change: 3, row: "row-12", step: "u1", holds: 1, by: "dana", flags: kept })),
+    Story.when(undo({ row: "row-12", undo: 1, step: "u2" })),
+    Story.rejected(new NotYourStep({})),
+  ),
+)
+it.effect("a full history never refuses a decision: the oldest levels are let go, and an undo stops there and says so", () =>
+  story(
+    Story.given(life, staged, counted({ change: 6, step: "a6", row: "row-12", by: "ana", flags: "6" })),
+    Story.given(
+      row12,
+      ...[1, 2, 3, 4].map((n) => decided({ change: n, by: "ana", step: `a${n}`, flags: "x".repeat(400_000 + n) })),
+      decided({ change: 5, by: "ana", step: "a5", flags: "5" }),
+      decided({ change: 6, by: "ana", step: "a6", flags: "6" }),
+    ),
+    Story.provide(CurrentActor, ana),
+    Story.when(undo({ row: "row-12", undo: 6, step: "u1" })),
+    Story.then(row12, new StepUndone({ next: letGo, below: "" })),
+    Story.then(life, undone({ change: 7, row: "row-12", step: "u1", holds: 5, by: "ana", flags: "5" })),
+    Story.when(undo({ row: "row-12", undo: 5, step: "u2" })),
+    Story.rejected(new HistoryEnds({})),
+  ),
+)
+it.effect("an undo of a group step that decided no group is refused as not the sender's step", () =>
+  story(
+    Story.given(life, staged, groupCounted(1)),
+    Story.given(g1, groupDecided(1)),
+    Story.provide(CurrentActor, ana),
+    Story.when(new UndoGroup({ importId: id, step: "g2", undo: 1, opening: 0 })),
+    Story.rejected(new NotYourStep({})),
+  ),
+)
+```
+
+`Group.story.test.ts`:
+
+```ts
+// A group decided as one unit, as stories on the model: what one act records, what it refuses, and what a row's act
+// and a confirm have to have seen of it.
+import { Story } from "@alchemy.run/domain/Story"
+import { it } from "@effect/vitest"
+import { CurrentActor } from "../test/Actor.context.ts"
+import { DecideGroup, GroupedAfter, StepTaken, UndoGroup } from "./Group.decision.ts"
+import { GroupDecided, GroupUndone, GroupUnit } from "./GroupUnit.aggregate.ts"
+import {
+  ActCounted,
+  ColumnMatched,
+  ConfirmImport,
+  ConfirmedSince,
+  GroupCounted,
+  ImportConfirmed,
+  ImportId,
+  ImportLife,
+  ImportReopened,
+  ImportStaged,
+  MatchColumn,
+  MatchedSince,
+  ReopenImport,
+  ReviewMovedOn,
+} from "./ImportLife.aggregate.ts"
+import { DecideRow, DecidedBeforeTheConfirm, GroupedSince, NotYourStep } from "./Review.decision.ts"
+import { Review } from "./Review.model.ts"
+import { RowDecided, RowUnit } from "./RowUnit.aggregate.ts"
+
+const story = Story.make(Review)
+const id = ImportId.make("imp_1")
+const life = ImportLife.ref(id)
+const g1 = GroupUnit.ref("imp_1/g1")
+const row12 = RowUnit.ref("imp_1/row-12")
+const ana = { organizationId: "org_prairie", memberId: "ana", role: "editor" as const }
+const dana = { organizationId: "org_prairie", memberId: "dana", role: "editor" as const }
+const staged = new ImportStaged({ organizationId: "org_prairie", rows: 50_000, columns: "by heading", by: "ana" })
+// 6,000 rows named in one text.
+const rows = Array.from({ length: 6_000 }, (_, n) => `row-${n + 1}`).join(",")
+const patch = '{"accept":"unit"}'
+const accepted = '{"accepted":["unit"]}'
+const leftOut = '{"out":true}'
+const group = (input: { step?: string; seen: number; opening?: number; madeOn?: number }) =>
+  new DecideGroup({ importId: id, step: "g1", opening: 0, madeOn: 0, patch, rows, count: 6_000, label: "6,000 fixes accepted", ...input })
+const groupDecided = (change: number) =>
+  new GroupDecided({ importId: id, organizationId: "org_prairie", change, by: "ana", step: "g1", patch, rows, count: 6_000, madeOn: 0, label: "6,000 fixes accepted", under: 0 })
+const groupCounted = (change: number, label = "6,000 fixes accepted", top = change) =>
+  new GroupCounted({ change, step: "g1", rows: 6_000, label, by: "ana", top })
+const act = (input: { step: string; saw: number; sawGroup: number; covered: boolean; flags: string }) =>
+  new DecideRow({ importId: id, row: "row-12", madeOn: 0, opening: 0, label: "Decide", ...input })
+const counts = { created: 155, updated: 0, already: 0, notImported: 49_845 }
+const confirm = (seen: number) => new ConfirmImport({ importId: id, shown: "155", plan: "155", seen, planAt: seen, ...counts })
+
+it.effect("a group of 6,000 rows is one act and one change, and a confirm has to have received it", () =>
+  story(
+    Story.given(life, staged),
+    Story.provide(CurrentActor, ana),
+    Story.when(group({ seen: 0 })),
+    Story.then(g1, groupDecided(1)),
+    Story.then(life, groupCounted(1)),
+    Story.provide(CurrentActor, dana),
+    Story.when(confirm(0)),
+    Story.rejected(new ReviewMovedOn({ last: 1 })),
+    Story.when(confirm(1)),
+    Story.then(life, new ImportConfirmed({ change: 2, ...counts, by: "dana" })),
+  ),
+)
+it.effect("a group is taken only from a screen that has every change, and a step decides one group", () =>
+  story(
+    Story.given(life, staged, new ActCounted({ change: 1, step: "d1", row: "row-12", label: "Decide", holds: 1, by: "dana", actor: "dana", flags: leftOut, madeOn: 0 })),
+    Story.given(row12, new RowDecided({ importId: id, organizationId: "org_prairie", change: 1, by: "dana", step: "d1", flags: leftOut, madeOn: 0, label: "Decide" })),
+    Story.provide(CurrentActor, ana),
+    // Ana's screen drew the group before Dana left row 12 out.
+    Story.when(group({ seen: 0 })),
+    Story.rejected(new ReviewMovedOn({ last: 1 })),
+    Story.when(group({ seen: 1 })),
+    Story.then(g1, groupDecided(2)),
+    Story.then(life, groupCounted(2)),
+    Story.when(group({ seen: 2 })),
+    Story.rejected(new StepTaken({})),
+  ),
+)
+it.effect("a row's act names the last group act, and the same text over a group in force is a change", () =>
+  story(
+    Story.given(life, staged, groupCounted(1)),
+    Story.given(g1, groupDecided(1)),
+    Story.provide(CurrentActor, dana),
+    // Dana typed on row 12 before the group reached her screen.
+    Story.when(act({ step: "d1", saw: 0, sawGroup: 0, covered: false, flags: leftOut })),
+    Story.rejected(new GroupedSince({})),
+    // Having seen it, she leaves the row with nothing decided of its own: over the group, that is a decision.
+    Story.when(act({ step: "d2", saw: 0, sawGroup: 1, covered: true, flags: "{}" })),
+    Story.then(row12, new RowDecided({ importId: id, organizationId: "org_prairie", change: 2, by: "dana", step: "d2", flags: "{}", madeOn: 0, label: "Decide" })),
+    Story.then(life, new ActCounted({ change: 2, step: "d2", row: "row-12", label: "Decide", holds: 2, by: "dana", actor: "dana", flags: "{}", madeOn: 0 })),
+  ),
+)
+it.effect("only its maker takes a group back, in one act, once; a row another person decided since is not touched", () =>
+  story(
+    Story.given(life, staged, groupCounted(1), new ActCounted({ change: 2, step: "d1", row: "row-12", label: "Decide", holds: 2, by: "dana", actor: "dana", flags: accepted, madeOn: 0 })),
+    Story.given(g1, groupDecided(1)),
+    Story.given(row12, new RowDecided({ importId: id, organizationId: "org_prairie", change: 2, by: "dana", step: "d1", flags: accepted, madeOn: 0, label: "Decide" })),
+    Story.provide(CurrentActor, dana),
+    Story.when(new UndoGroup({ importId: id, step: "g1", undo: 1, opening: 0 })),
+    Story.rejected(new NotYourStep({})),
+    Story.provide(CurrentActor, ana),
+    Story.when(new UndoGroup({ importId: id, step: "g1", undo: 1, opening: 0 })),
+    Story.then(g1, new GroupUndone({ change: 3 })),
+    Story.then(life, groupCounted(3, "undo", 0)),
+    Story.then(row12),
+    Story.when(new UndoGroup({ importId: id, step: "g1", undo: 1, opening: 0 })),
+    Story.rejected(new NotYourStep({})),
+    // A row's act made before the undo reached its screen is refused.
+    Story.provide(CurrentActor, dana),
+    Story.when(act({ step: "d2", saw: 2, sawGroup: 1, covered: false, flags: leftOut })),
+    Story.rejected(new GroupedSince({})),
+  ),
+)
+it.effect("a group made on an older matching is refused", () =>
+  story(
+    Story.given(life, staged, new ColumnMatched({ change: 1, matching: 1, columns: "unit: Unit of measure", by: "dana" })),
+    Story.provide(CurrentActor, ana),
+    Story.when(group({ seen: 1, madeOn: 0 })),
+    Story.rejected(new MatchedSince({ matching: 1 })),
+    Story.when(new MatchColumn({ importId: id, columns: "unit: UoM", saw: 1, opening: 0 })),
+    Story.then(life, new ColumnMatched({ change: 2, matching: 2, columns: "unit: UoM", by: "ana" })),
+  ),
+)
+it.effect("a group's undo does not reach past a confirm that stands, and a group made before it is not taken after a reopen", () =>
+  story(
+    Story.given(life, staged, groupCounted(1), new ImportConfirmed({ change: 2, ...counts, by: "ana" })),
+    Story.given(g1, groupDecided(1)),
+    Story.provide(CurrentActor, ana),
+    Story.when(new ReopenImport({ importId: id, seen: 2 })),
+    Story.then(life, new ImportReopened({ change: 3, by: "ana" })),
+    Story.when(new UndoGroup({ importId: id, step: "g1", undo: 1, opening: 0 })),
+    Story.rejected(new ConfirmedSince({})),
+    Story.when(new UndoGroup({ importId: id, step: "g1", undo: 1, opening: 1 })),
+    Story.rejected(new DecidedBeforeTheConfirm({})),
+    Story.when(group({ step: "g2", seen: 3, opening: 0 })),
+    Story.rejected(new ConfirmedSince({})),
+  ),
+)
+it.effect("only the last group still in force is taken back, so undo walks back: Dana takes hers back, then Ana hers", () =>
+  story(
+    Story.given(
+      life,
+      staged,
+      groupCounted(1),
+      new GroupCounted({ change: 2, step: "g2", rows: 900, label: "900 fixes accepted", by: "dana", top: 2 }),
+    ),
+    Story.given(g1, groupDecided(1)),
+    Story.given(
+      GroupUnit.ref("imp_1/g2"),
+      new GroupDecided({ importId: id, organizationId: "org_prairie", change: 2, by: "dana", step: "g2", patch, rows: "row-1,row-2", count: 900, madeOn: 0, label: "900 fixes accepted", under: 1 }),
+    ),
+    Story.provide(CurrentActor, ana),
+    // Dana's group came after Ana's and is in force: Ana's undo is refused and says which.
+    Story.when(new UndoGroup({ importId: id, step: "g1", undo: 1, opening: 0 })),
+    Story.rejected(new GroupedAfter({ last: 2 })),
+    Story.provide(CurrentActor, dana),
+    Story.when(new UndoGroup({ importId: id, step: "g2", undo: 2, opening: 0 })),
+    Story.then(GroupUnit.ref("imp_1/g2"), new GroupUndone({ change: 3 })),
+    Story.then(life, new GroupCounted({ change: 3, step: "g2", rows: 900, label: "undo", by: "dana", top: 1 })),
+    // Ana's is the last in force again.
+    Story.provide(CurrentActor, ana),
+    Story.when(new UndoGroup({ importId: id, step: "g1", undo: 1, opening: 0 })),
+    Story.then(g1, new GroupUndone({ change: 4 })),
+    Story.then(life, groupCounted(4, "undo", 0)),
+  ),
+)
+it.effect("a group decided after another was taken back goes over the one still in force, on the matching now", () =>
+  story(
+    Story.given(
+      life,
+      staged,
+      new ColumnMatched({ change: 1, matching: 1, columns: "unit: UoM", by: "dana" }),
+      new GroupCounted({ change: 2, step: "g1", rows: 6_000, label: "6,000 fixes accepted", by: "ana", top: 2 }),
+      new GroupCounted({ change: 3, step: "g2", rows: 900, label: "900 fixes accepted", by: "dana", top: 3 }),
+      new GroupCounted({ change: 4, step: "g2", rows: 900, label: "undo", by: "dana", top: 2 }),
+    ),
+    Story.given(g1, new GroupDecided({ importId: id, organizationId: "org_prairie", change: 2, by: "ana", step: "g1", patch, rows, count: 6_000, madeOn: 1, label: "6,000 fixes accepted", under: 0 })),
+    Story.given(
+      GroupUnit.ref("imp_1/g2"),
+      new GroupDecided({ importId: id, organizationId: "org_prairie", change: 3, by: "dana", step: "g2", patch, rows: "row-1,row-2", count: 900, madeOn: 1, label: "900 fixes accepted", under: 2 }),
+      new GroupUndone({ change: 4 }),
+    ),
+    Story.provide(CurrentActor, ana),
+    // Dana's group is taken back: Ana's new one goes over Ana's first, not over the undo.
+    Story.when(group({ step: "g3", seen: 4, madeOn: 1 })),
+    Story.then(
+      GroupUnit.ref("imp_1/g3"),
+      new GroupDecided({ importId: id, organizationId: "org_prairie", change: 5, by: "ana", step: "g3", patch, rows, count: 6_000, madeOn: 1, label: "6,000 fixes accepted", under: 2 }),
+    ),
+    Story.then(life, new GroupCounted({ change: 5, step: "g3", rows: 6_000, label: "6,000 fixes accepted", by: "ana", top: 5 })),
+  ),
+)
+```
+
+`Seal.test.ts` is trial 13's.
+
+### Reports
+
+`Verify.model(Review)`, the standing of each rule:
+
+```text
+VERIFIED
+proved  ImportLife.OutcomesAddUpToTheRows
+proved  ImportLife.RowsAreNotNegative
+proved  ImportLife.InForceIsNotNegative
+proved  ImportLife.ReplacedIsNotNegative
+proved  ImportLife.StandingIsNotNegative
+proved  ImportLife.CreatedIsNotNegative
+proved  ImportLife.UpdatedIsNotNegative
+proved  ImportLife.AlreadyIsNotNegative
+proved  ImportLife.NotImportedIsNotNegative
+proved  ImportLife.RemovedIsNotNegative
+proved  ImportLife.KeptIsNotNegative
+proved  ImportLife.NoMoreInForceThanRows
+proved  ImportLife.NothingStandsThatWasTakenBack
+proved  ImportLife.WhatIsInForceThenIsWhatWasKept
+proved  ImportLife.NothingIsWrittenBeforeConfirm
+proved  ImportLife.AConfirmOfAClosedImportWritesNothing
+proved  ImportLife.AConfirmNamesEveryChange
+proved  ImportLife.APlanIsOfEveryChange
+proved  ImportLife.APlanDoesWhatWasShown
+proved  ImportLife.TheRestNameEveryChangeToo
+proved  ImportLife.EveryChangeHasItsOwnNumber
+proved  ImportLife.OnlyAnImportWithAConfirmStandingIsTakenBack
+proved  ImportLife.ATakeBackIsOfEverythingInForce
+proved  ImportLife.AndOfEverythingReplaced
+proved  ImportLife.EveryEventSaysWhose
+proved  ImportLife.AMatchIsOfThisOpening
+proved  ImportLife.ASuggestionWritesNothing
+proved  ImportLife.AMatchIsMadeOnTheLastOne
+proved  ImportLife.AMatchHoldsTheColumnsItSays
+proved  ImportLife.AMatchIsTheNextOne
+proved  ImportLife.OnlyAnOpenImportIsReviewed
+proved  ImportLife.AnImportIsOpenedAgainOnlyByReopen
+proved  ImportLife.ARemovedImportStaysRemoved
+proved  ImportLife.OnlyAnImportWithNothingInForceIsRemoved
+proved  ImportLife.AnImportNeverChangesOrganization
+proved  ImportLife.OnlyItsOwnOrganizationChangesAnImport
+proved  ImportLife.AViewerChangesNothing
+proved  RowUnit.TheSizeOfByIsTrue
+proved  RowUnit.TheSizeOfStepIsTrue
+proved  RowUnit.TheSizeOfFlagsIsTrue
+proved  RowUnit.TheSizeOfLabelIsTrue
+proved  RowUnit.ARowIsUndecidedOnlyWhenNothingWasUnder
+proved  RowUnit.ARowNeverChangesImportOrOrganization
+proved  GroupUnit.AGroupHasRows
+proved  GroupUnit.AGroupKeepsItsRows
+proved  GroupUnit.AGroupKeepsItsPatch
+proved  GroupUnit.AGroupKeepsItsNumber
+proved  GroupUnit.AGroupKeepsWhatWasUnderIt
+proved  GroupUnit.AGroupKeepsItsMaker
+proved  GroupUnit.ADecidedGroupStaysDecided
+proved  GroupUnit.AGroupTakenBackStaysTakenBack
+proved  GroupUnit.AGroupNeverChangesImportOrOrganization
+proved  DecideRow.ARowIsDecidedOnlyOnAnOpenImport
+proved  DecideRow.AnActIsOfThisOpening
+proved  DecideRow.ARowsActSawTheLastGroupAct
+proved  DecideRow.ADecisionIsReplacedOnlyByAnActThatSawIt
+proved  DecideRow.AnActIsMadeOnTheMatchingNow
+proved  DecideRow.AnActThatChangesNothingLeavesTheImport
+proved  DecideRow.AnActThatChangesNothingLeavesTheRow
+proved  DecideRow.AnyOtherActIsRecorded
+proved  DecideRow.WithItsText
+proved  DecideRow.OnItsMatching
+proved  DecideRow.UnderItsStep
+proved  DecideRow.AsItsSenders
+proved  DecideRow.AndGetsTheNextNumber
+proved  DecideRow.OnTheRowToo
+proved  DecideRow.TheImportsEventSaysWhichDecisionTheRowHolds
+proved  DecideRow.TheImportsEventSaysWhose
+proved  DecideRow.TheImportsEventSaysItsText
+proved  DecideRow.TheImportsEventSaysWhoActed
+proved  DecideRow.AnActKeepsWhichDecisionItReplaces
+proved  DecideRow.AndWhose
+proved  DecideRow.AndItsText
+proved  DecideRow.AndItsMatching
+proved  DecideRow.AndWhatWasBelowStaysBelow
+proved  DecideRow.NobodyClearsAnotherPersonsDecision
+proved  DecideRow.OnlyItsOwnOrganizationChangesTheRow
+proved  DecideRow.AViewerChangesNoRow
+proved  UndoRowStep.AnUndoTakesBackOnlyItsSendersOwnStep
+proved  UndoRowStep.AnUndoIsOfThisOpening
+proved  UndoRowStep.ARowsUndoSawTheLastGroupAct
+proved  UndoRowStep.AnUndoDoesNotReachPastAConfirm
+proved  UndoRowStep.AnUndoLeavesADecisionWhenOneWasUnder
+proved  UndoRowStep.AndNoneWhenNoneWas
+proved  UndoRowStep.AnUndoPutsBackTheDecisionThatWasThere
+proved  UndoRowStep.AsTheirsWhoMadeIt
+proved  UndoRowStep.WithItsTextAsItWas
+proved  UndoRowStep.OnItsMatchingAsItWas
+proved  UndoRowStep.UnderItsStepAsItWas
+proved  UndoRowStep.NothingIsBelowWhatWasTheLastKept
+proved  UndoRowStep.WhatLiesUnderIsWhatWasRecorded
+proved  UndoRowStep.TheImportsEventSaysWhichDecisionTheRowHolds
+proved  UndoRowStep.TheImportsEventSaysWhose
+proved  UndoRowStep.TheImportsEventSaysItsText
+proved  UndoRowStep.TheImportsEventSaysWhoActed
+proved  UndoRowStep.AnUndoIsNumbered
+proved  UndoRowStep.NobodyClearsAnotherPersonsDecision
+proved  UndoRowStep.OnlyItsOwnOrganizationChangesTheRow
+proved  UndoRowStep.AViewerChangesNoRow
+proved  DecideGroup.AGroupIsDecidedOnlyOnAnOpenImport
+proved  DecideGroup.AGroupIsOfThisOpening
+proved  DecideGroup.AGroupIsMadeOnEveryChange
+proved  DecideGroup.AGroupIsMadeOnTheMatchingNow
+proved  DecideGroup.AStepDecidesOneGroup
+proved  DecideGroup.AGroupIsRecorded
+proved  DecideGroup.WithEveryRowItNames
+proved  DecideGroup.WithWhatItDoes
+proved  DecideGroup.WithItsCount
+proved  DecideGroup.OnItsMatching
+proved  DecideGroup.InForce
+proved  DecideGroup.AsItsSenders
+proved  DecideGroup.AGroupIsOneChange
+proved  DecideGroup.OnTheGroupToo
+proved  DecideGroup.TheImportHoldsItAsItsLastGroupAct
+proved  DecideGroup.AGroupDecidedIsTheLastInForce
+proved  DecideGroup.AndKeepsWhichOneWasBeforeIt
+proved  DecideGroup.TheImportsEventSaysHowManyRows
+proved  DecideGroup.NobodyUndoesAnotherPersonsGroup
+proved  DecideGroup.OnlyItsOwnOrganizationChangesTheGroup
+proved  DecideGroup.AViewerChangesNoGroup
+proved  UndoGroup.AGroupsUndoTakesBackOnlyItsSendersOwn
+proved  UndoGroup.AGroupsUndoIsOfThisOpening
+proved  UndoGroup.OnlyTheLastGroupInForceIsTakenBack
+proved  UndoGroup.ThenTheOneUnderItIsTheLastInForce
+proved  UndoGroup.AGroupIsTakenBackOnce
+proved  UndoGroup.AGroupsUndoDoesNotReachPastAConfirm
+proved  UndoGroup.AGroupsUndoIsOneChange
+proved  UndoGroup.AndTheGroupSaysWhen
+proved  UndoGroup.TheImportHoldsItAsItsLastGroupAct
+proved  UndoGroup.TheImportsEventSaysHowManyRows
+proved  UndoGroup.NobodyUndoesAnotherPersonsGroup
+proved  UndoGroup.OnlyItsOwnOrganizationChangesTheGroup
+proved  UndoGroup.AViewerChangesNoGroup
+proved  Review.ARowBelongsToItsImportsOrganization
+proved  Review.AGroupBelongsToItsImportsOrganization
+```
+
+`Prove.decision`, the first three lines of each:
+
+```text
+PROVED
+elapsed 9141 ms
+schema Proved; accepted true; paths 152
+```
+
+```text
+PROVED
+elapsed 19366 ms
+schema Proved; accepted true; paths 298
+```
+
+```text
+PROVED
+elapsed 479 ms
+schema Proved; accepted true; paths 42
+```
+
+```text
+PROVED
+elapsed 2892 ms
+schema Proved; accepted true; paths 84
+```
+
+The rules across instances, every sequence of up to 3 commands:
+
+```text
+VERIFIED
+checked  ReviewInvariants.NoTwoRowsHoldTheSameChange
+checked  ReviewInvariants.NoRowAndGroupHoldTheSameChange
+checked  ReviewInvariants.NoTwoGroupsHoldTheSameChange
+checked  ReviewInvariants.AGroupsChangeIsOneItsImportGave
+checked  ReviewInvariants.AGroupsUndoComesAfterIt
+checked  ReviewInvariants.TheLastGroupInForceIsInForce
+checked  ReviewInvariants.NoGroupActIsLaterThanTheImportsLast
+16,629 sequences, 3,630 states
+Sampled: 200 longer sequences, of up to 8 commands picked at random (seed 1)
+Run on the real model: 57 sequences the explorer found and 111 walks of commands picked at random, as stories
+```
+
+The stories:
+
+```text
+ ✓ review14/Review.story.test.ts > a viewer may not stage a file; an editor stages it, once 22ms
+ ✓ review14/Review.story.test.ts > a suggestion is recorded as its asker's and changes no number; a viewer's is refused 6ms
+ ✓ review14/Review.story.test.ts > a removed import takes nothing more: no suggestion, no match, no take-back, no reopen, no second staging 5ms
+ ✓ review14/Review.story.test.ts > an admin of another organization changes nothing in this one's import, its rows or its groups 8ms
+ ✓ review14/Review.story.test.ts > an admin of another organization neither takes back nor reopens this one's confirmed import 4ms
+ ✓ review14/Review.story.test.ts > a viewer changes nothing: no match, suggestion, confirm, remove, row act, undo, group or group undo 6ms
+ ✓ review14/Review.story.test.ts > a viewer neither takes back nor reopens a confirmed import 2ms
+ ✓ review14/Review.story.test.ts > when a person is made a viewer, their next act on a row is refused, and an admin's confirm is taken 2ms
+ ✓ review14/Review.story.test.ts > a row or a group kept under another organization's name is not changed, even by its maker 3ms
+ ✓ review14/Review.story.test.ts > on a confirmed import nothing is reviewed, matched, suggested, confirmed again or removed until it is reopened 4ms
+ ✓ review14/Review.story.test.ts > an import never confirmed is not taken back, and an open one is not opened again 1ms
+ ✓ review14/Review.story.test.ts > an import whose confirm stands is not removed, even when it created nothing, until it is taken back 2ms
+ ✓ review14/Review.story.test.ts > an import with items in force is not removed: a take-back that keeps some leaves them in force 2ms
+ ✓ review14/Review.story.test.ts > a plan built before the last act may not be confirmed after it 3ms
+ ✓ review14/Review.story.test.ts > a plan that would do something else than the button said is refused: the stored items changed 2ms
+ ✓ review14/Review.story.test.ts > another person's act lands before the screen's own waiting act: the confirm is refused 5ms
+ ✓ review14/Review.story.test.ts > counts that do not add up to the file's rows are refused, and so is more in force than the file has rows 2ms
+ ✓ review14/Review.story.test.ts > a take-back, a reopen and a remove each name the last change, so a press on an old screen is refused 3ms
+ ✓ review14/Review.story.test.ts > a take-back takes back everything in force: the second round's items and the first's 3ms
+ ✓ review14/Review.story.test.ts > an import opened again is taken back without confirming it again 1ms
+ ✓ review14/Review.story.test.ts > a take-back counts the items that were replaced too, put back and kept, and never keeps more than there is 2ms
+ ✓ review14/Review.story.test.ts > a match made over one its sender never saw is refused, and the columns as they are, by heading or by hand, are no match 2ms
+ ✓ review14/Review.story.test.ts > an act made on an older matching is refused, whatever it decides 3ms
+ ✓ review14/Review.story.test.ts > an act made before a confirm is not taken after the import is opened again 4ms
+ ✓ review14/Review.story.test.ts > a match, a group and an undo made before a confirm are not taken after the import is opened again either 4ms
+ ✓ review14/Review.story.test.ts > an undo does not reach past a confirm that stands 2ms
+ ✓ review14/Review.story.test.ts > when someone else decided the row first, the act is refused with whose decision is there 1ms
+ ✓ review14/Review.story.test.ts > a decision its sender saw that was taken back since is no longer there, and the act is refused 8ms
+ ✓ review14/Review.story.test.ts > a save that leaves the row as it is records nothing, seen or not: the answer says no change 3ms
+ ✓ review14/Review.story.test.ts > a row's undo pressed before a group reached its sender's screen is refused, and taken once it has 3ms
+ ✓ review14/Review.story.test.ts > an undo may not bring a text of its sender's as another person's decision 2ms
+ ✓ review14/Review.story.test.ts > undos go down every level exactly as it was, and end at none 2ms
+ ✓ review14/Review.story.test.ts > an undo that puts back another person's decision stops there 1ms
+ ✓ review14/Review.story.test.ts > a full history never refuses a decision: the oldest levels are let go, and an undo stops there and says so 1ms
+ ✓ review14/Review.story.test.ts > an undo of a group step that decided no group is refused as not the sender's step 1ms
+      Tests  35 passed (35)
+```
+
+```text
+ ✓ review14/Group.story.test.ts > a group of 6,000 rows is one act and one change, and a confirm has to have received it 23ms
+ ✓ review14/Group.story.test.ts > a group is taken only from a screen that has every change, and a step decides one group 5ms
+ ✓ review14/Group.story.test.ts > a row's act names the last group act, and the same text over a group in force is a change 4ms
+ ✓ review14/Group.story.test.ts > only its maker takes a group back, in one act, once; a row another person decided since is not touched 4ms
+ ✓ review14/Group.story.test.ts > a group made on an older matching is refused 4ms
+ ✓ review14/Group.story.test.ts > a group's undo does not reach past a confirm that stands, and a group made before it is not taken after a reopen 3ms
+ ✓ review14/Group.story.test.ts > only the last group still in force is taken back, so undo walks back: Dana takes hers back, then Ana hers 3ms
+ ✓ review14/Group.story.test.ts > a group decided after another was taken back goes over the one still in force, on the matching now 2ms
+      Tests  8 passed (8)
+```
+
+```text
+ ✓ review14/Seal.test.ts > a seal is read back as what was sealed 72ms
+ ✓ review14/Seal.test.ts > a screen that is missing any change never names the last one 5ms
+ ✓ review14/Seal.test.ts > the first property ran 2,000 times 0ms
+      Tests  3 passed (3)
+```
+
+### Where the six rules went
+
+Each keeps its one comparison and reads the same fields, now as `before.row`/`after.row` or `before.group`/`after.group`. The comment on the aggregate says where they went, and that a new decision recording on that aggregate must state them too, because the check no longer comes for free. Each is written in the gen form `(params) => Effect.gen(function* () { ... })`.
+
+| Old place and name | New place (decision, its command in reports) and name |
+| --- | --- |
+| RowUnit.NobodyClearsAnotherPersonsDecision | Deciding (DecideRow).NobodyClearsAnotherPersonsDecision; Undoing (UndoRowStep).NobodyClearsAnotherPersonsDecision |
+| RowUnit.OnlyItsOwnOrganizationChangesARow | Deciding.OnlyItsOwnOrganizationChangesTheRow; Undoing.OnlyItsOwnOrganizationChangesTheRow |
+| RowUnit.AViewerChangesNothing | Deciding.AViewerChangesNoRow; Undoing.AViewerChangesNoRow |
+| GroupUnit.NobodyUndoesAnotherPersonsGroup | DecidingGroup (DecideGroup).NobodyUndoesAnotherPersonsGroup; UndoingGroup (UndoGroup).NobodyUndoesAnotherPersonsGroup |
+| GroupUnit.OnlyItsOwnOrganizationChangesAGroup | DecidingGroup.OnlyItsOwnOrganizationChangesTheGroup; UndoingGroup.OnlyItsOwnOrganizationChangesTheGroup |
+| GroupUnit.AViewerChangesNothing | DecidingGroup.AViewerChangesNoGroup; UndoingGroup.AViewerChangesNoGroup |
+
+As written now (Deciding and Undoing state the row's three; DecidingGroup and UndoingGroup the group's):
+```ts
+NobodyClearsAnotherPersonsDecision: ({ before, after }) => Effect.gen(function* () {
+  if (before.row._tag !== "Decided" || after.row._tag === "Decided") return true
+  return (yield* CurrentActor).memberId === before.row.by }),
+OnlyItsOwnOrganizationChangesTheRow: ({ before }) => Effect.gen(function* () {
+  if (before.row._tag === "Untouched") return true
+  return (yield* CurrentActor).organizationId === before.row.organizationId }),
+AViewerChangesNoRow: () => Effect.gen(function* () { return (yield* CurrentActor).role !== "viewer" }),
+NobodyUndoesAnotherPersonsGroup: ({ before, after }) => Effect.gen(function* () {
+  if (before.group._tag !== "Decided" || after.group._tag !== "Decided" || after.group.undoneAt === before.group.undoneAt) return true
+  return (yield* CurrentActor).memberId === before.group.by }),
+OnlyItsOwnOrganizationChangesTheGroup / AViewerChangesNoGroup: the same over before.group.
+```
+Whether they say the same thing: on the aggregate a rule was checked on every step that recorded on that aggregate. In these four decisions every accepted act records on both the import and the row (or the group), and an act that records nothing is checked by neither. So the steps checked are the same. RowUnit keeps ARowIsUndecidedOnlyWhenNothingWasUnder and ARowNeverChangesImportOrOrganization. GroupUnit keeps its six rules on what a group keeps, plus AGroupTakenBackStaysTakenBack.
+
+### Each command against its stories
+
+Stories are named by what a person sees. R = `review14/Review.story.test.ts` (35), G = `review14/Group.story.test.ts` (8). Final run: 35 + 8 passed, Seal 3 passed (`out/Stories14-Review.run.log`, `out/Stories14-Group.run.log`, `out/Seal14.run.log`).
+
+R1 a viewer may not stage a file; an editor stages it, once · R2 a suggestion is recorded as its asker's and changes no number; a viewer's is refused · R3 a removed import takes nothing more · R4 an admin of another organization changes nothing in this one's import, its rows or its groups · R5 an admin of another organization neither takes back nor reopens · R6 a viewer changes nothing (match, confirm, remove, row act, undo, group, group undo) · R7 a viewer neither takes back nor reopens · R8 when a person is made a viewer, their next act on a row is refused, and an admin's confirm is taken · R9 a row or a group kept under another organization's name is not changed, even by its maker · R10 on a confirmed import nothing is reviewed, matched, suggested, confirmed again or removed until it is reopened · R11 an import never confirmed is not taken back, and an open one is not opened again · R12 an import whose confirm stands is not removed, even when it created nothing, until it is taken back · R13 an import with items in force is not removed · R14 a plan built before the last act may not be confirmed after it · R15 a plan that would do something else than the button said is refused · R16 another person's act lands before the screen's own waiting act: the confirm is refused · R17 counts that do not add up to the file's rows are refused, and so is more in force than the file has rows · R18 a take-back, a reopen and a remove each name the last change · R19 a take-back takes back everything in force · R20 an import opened again is taken back without confirming it again · R21 a take-back counts the items that were replaced too, and never keeps more than there is · R22 a match made over one its sender never saw is refused, and the columns as they are are no match · R23 an act made on an older matching is refused, whatever it decides · R24 an act made before a confirm is not taken after the import is opened again · R25 a match, a group and an undo made before a confirm are not taken after the import is opened again either · R26 an undo does not reach past a confirm that stands · R27 when someone else decided the row first, the act is refused with whose decision is there · R28 a decision its sender saw that was taken back since is no longer there · R29 a save that leaves the row as it is records nothing · R30 a row's undo pressed before a group reached its sender's screen is refused, and taken once it has · R31 an undo may not bring a text of its sender's as another person's decision · R32 undos go down every level exactly as it was, and end at none · R33 an undo that puts back another person's decision stops there · R34 a full history never refuses a decision: the oldest levels are let go · R35 an undo of a group step that decided no group is refused.
+G1 a group of 6,000 rows is one act and one change, and a confirm has to have received it · G2 a group is taken only from a screen that has every change, and a step decides one group · G3 a row's act names the last group act, and the same text over a group in force is a change · G4 only its maker takes a group back, in one act, once · G5 a group made on an older matching is refused · G6 a group's undo does not reach past a confirm that stands, and a group made before it is not taken after a reopen · G7 only the last group still in force is taken back, so undo walks back · G8 a group decided after another was taken back goes over the one still in force, on the matching now.
+
+Every accepted act in these stories is followed by `Story.then` on each instance it records on, and the library matches the events exactly, field by field (`matchesOrder` in `Story.ts`). An act that records nothing is asserted with `Story.then(ref)` and no events.
+
+| Command | Accepted, events asserted | Each refusal it can give, and its story |
+| --- | --- | --- |
+| StageImport | R1 | NotPermitted (viewer) R1; AlreadyStaged R1, R3 |
+| MatchColumn | R2, R22, R25, G5 (R22: the same columns record nothing) | NotPermitted R4 (other organization), R6 (viewer); NotOpen R3, R10; ConfirmedSince R25; MatchedSince R22 |
+| RecordSuggestion | R2 | NotPermitted R2 (viewer), R4 (other organization); NotOpen R3, R10 |
+| ConfirmImport | R8, R14, R16, R17, R19, G1 | NotPermitted R4, R6; NotOpen R10; ReviewMovedOn R16, G1; PlanBehind R14; NotWhatWasShown R15; CountsDoNotAddUp R17 (sum, and more in force than rows) |
+| TakeBackImport | R12, R13, R18, R19, R20, R21 | NotPermitted R5, R7; NotImported R3 (removed), R11 (open, never confirmed), R19 (taken back); ReviewMovedOn R18; MoreKeptThanInForce R21 (both halves) |
+| ReopenImport | R10, R17, R18, R19, G6 | NotPermitted R5, R7; NotClosed R3 (removed), R11 (open); ReviewMovedOn R18 |
+| RemoveImport | R3, R12, R18, R19 | NotPermitted R4, R6; NotOpen R10; ReviewMovedOn R18; HasItemsInForce R12 (a confirm stands), R13 (items in force) |
+| DecideRow | R16, R23, R24, R28, G3 (covered); R29 records nothing (3 ways) | NotOpen R10; NotPermitted R4, R6, R8, R9 (row under another organization, row of another import); ConfirmedSince R24; GroupedSince G3, G4; DecidedSince R27; NoLongerThere R28; MatchedSince R23 |
+| UndoRowStep | R28, R30, R32, R33, R34 | NotOpen R10; NotPermitted R4, R6, R9; ConfirmedSince R25; GroupedSince R30; NotYourStep R32 (no decision), R33 (another person's); DecidedBeforeTheConfirm R26; HistoryEnds R34; NotWhatWasUnder R31 (forged text, forged sizes) |
+| DecideGroup | R30, G1, G2, G8 | NotOpen R10; NotPermitted R4, R6; StepTaken G2; ConfirmedSince R25, G6; ReviewMovedOn G2; MatchedSince G5 |
+| UndoGroup | G4, G7 (twice) | NotOpen R10; NotPermitted R4, R6, R9 (group under another organization); ConfirmedSince G6; NotYourStep G4 (not its maker; taken back already), R35 (no group); DecidedBeforeTheConfirm G6; GroupedAfter G7 |
+
+Dropped from review11, being only about sending a group row by row: "a screen that received only the first row of an ended group may not confirm", "no confirm and no remove is taken while a group act is being sent", "a row of a group that is refused is recorded as skipped", "an undo of a step whose rows are still being sent waits for them", "the undo of a group is a group". Kept by their ordering, without the group: "when its sender is no longer an editor, an admin stops the group" became R8, and "a take-back ... waits for a group" became R21. "a plan built after the first row of a group" became R14, and "a match, a group and an undo made before a confirm" (R25) now sends DecideGroup. The other 15 are ported one for one (R15, R16, R17, R18, R19, R20, R22 to R24, R26, R27, R29, R31 to R34). The rest (R1 to R7, R9 to R13, R28, R30, R35, G8) are new, written for the refusals and records that were missing.
+
+### The mutants
+
+148 mutants, each in `review14m-<key>/`, built by `$S/tools/mutants14.py` (run from `consumer-main`; it writes `mutants14.tsv`), run by `run-mutants14.sh` / `run-mutant14-one.sh` (proof plus both story files, load in `out/m14/<key>.run.log`), stories re-run with the final story files into `out/m14s/<key>.log`, read by `$S/tools/mutants14_read.py` into `out/Mutants14.tsv`.
+
+The proof run per mutant: `Prove.decisionReport` of the decision for the four decisions; for an ImportLife handler `Verify.aggregate(ImportLife)`, as review11's mutants used, reading its proof section (Prove.invariants over ImportLife's seven commands): its exploration part is always "not done" (the aggregate folds events only a decision records), so only the per-rule proof counts, plus the stories. A rule listed is one the mutant's report gives as `Violated`/`Unconfirmed` (decisions) or `✗` (ImportLife). Stories: the stories (of `Review.story.test.ts` R and `Group.story.test.ts` G) that fail on the mutant.
+
+| Key | On | What | Rules that break | Stories that fail | Proof run |
+| --- | --- | --- | --- | --- | --- |
+| stage-viewer | I | check removed: if (actor.role === "viewer") return yield* new NotPermitted({}) | AViewerChangesNothing | 1: a viewer may not stage a file; an editor stages it, once | 140 sequences NotVerified |
+| stage-staged | I | check removed: if (s._tag !== "Unstaged") return yield* new AlreadyStaged({}) | ARemovedImportStaysRemoved; AnImportIsOpenedAgainOnlyByReopen; AnImportNeverChangesOrganization; EveryChangeHasItsOwnNumber; OnlyAnOpenImportIsReviewed; OnlyItsOwnOrganizationChangesAnImport | 2: a removed import takes nothing more: no suggestion, no match, no take- / a viewer may not stage a file; an editor stages it, once | 979 sequences NotVerified |
+| stage-nothing | I | records nothing | - | 1: a viewer may not stage a file; an editor stages it, once | 21 sequences NotVerified |
+| match-open | I | check removed: if (s._tag !== "Open") return yield* new NotOpen({}) | EveryChangeHasItsOwnNumber | 2: a removed import takes nothing more: no suggestion, no match, no take- / on a confirmed import nothing is reviewed, matched, suggested, confirm | 815 sequences NotVerified |
+| match-permitted | I | check removed: if (actor.organizationId !== s.organizationId \|\| actor.role === "viewer") return yield* new NotPermitted({}) | AViewerChangesNothing; OnlyItsOwnOrganizationChangesAnImport | 2: a viewer changes nothing: no match, suggestion, confirm, remove, row a / an admin of another organization changes nothing in this one's import, | 873 sequences NotVerified |
+| match-opening | I | check removed: if (cmd.opening !== s.confirms) return yield* new ConfirmedSince({}) | AMatchIsOfThisOpening | 1: a match, a group and an undo made before a confirm are not taken after | 747 sequences NotVerified |
+| match-saw | I | check removed: if (cmd.saw !== s.matching) return yield* new MatchedSince({ matching: s.matching }) | AMatchIsMadeOnTheLastOne | 1: a match made over one its sender never saw is refused, and the columns | 747 sequences NotVerified |
+| match-same | I | check removed: if (s.columns === cmd.columns) return [] | - | 1: a match made over one its sender never saw is refused, and the columns | 747 sequences NotVerified |
+| match-nothing | I | records nothing | - | 4: a group made on an older matching is refused / a match made over one its sender never saw is refused, and the columns … | 555 sequences NotVerified |
+| suggestion-open | I | check removed: if (s._tag !== "Open") return yield* new NotOpen({}) | - | 2: a removed import takes nothing more: no suggestion, no match, no take- / on a confirmed import nothing is reviewed, matched, suggested, confirm | 791 sequences NotVerified |
+| suggestion-permitted | I | check removed: if (actor.organizationId !== s.organizationId \|\| actor.role === "viewer") return yield* new NotPermitted({}) | AViewerChangesNothing; OnlyItsOwnOrganizationChangesAnImport | 2: a suggestion is recorded as its asker's and changes no number; a viewe / an admin of another organization changes nothing in this one's import, | 837 sequences NotVerified |
+| suggestion-nothing | I | records nothing | - | 1: a suggestion is recorded as its asker's and changes no number; a viewe | 555 sequences NotVerified |
+| confirm-open | I | check removed: if (s._tag !== "Open") return yield* new NotOpen({}) | EveryChangeHasItsOwnNumber | 1: on a confirmed import nothing is reviewed, matched, suggested, confirm | 831 sequences NotVerified |
+| confirm-permitted | I | check removed: if (actor.organizationId !== s.organizationId \|\| actor.role === "viewer") return yield* new NotPermitted({}) | AViewerChangesNothing; OnlyItsOwnOrganizationChangesAnImport | 2: a viewer changes nothing: no match, suggestion, confirm, remove, row a / an admin of another organization changes nothing in this one's import, | 855 sequences NotVerified |
+| confirm-seen | I | check removed: if (cmd.seen !== s.changes) return yield* new ReviewMovedOn({ last: s.changes }) | AConfirmNamesEveryChange | 2: a group of 6,000 rows is one act and one change, and a confirm has to  / another person's act lands before the screen's own waiting act: the co | 747 sequences NotVerified |
+| confirm-plan | I | check removed: if (cmd.planAt !== s.changes) return yield* new PlanBehind({ last: s.changes }) | APlanIsOfEveryChange | 1: a plan built before the last act may not be confirmed after it | 747 sequences NotVerified |
+| confirm-shown | I | check removed: if (cmd.plan !== cmd.shown) return yield* new NotWhatWasShown({}) | APlanDoesWhatWasShown | 1: a plan that would do something else than the button said is refused: t | 747 sequences NotVerified |
+| confirm-sum | I | check removed: if (cmd.created + cmd.updated + cmd.already + cmd.notImported !== s.rows) return yield* new CountsDoNotAddUp({}) | OutcomesAddUpToTheRows | 1: counts that do not add up to the file's rows are refused, and so is mo | 747 sequences NotVerified |
+| confirm-bound | I | check removed: if (s.inForce + cmd.created > s.rows) return yield* new CountsDoNotAddUp({}) | NoMoreInForceThanRows | 1: counts that do not add up to the file's rows are refused, and so is mo | 747 sequences NotVerified |
+| confirm-nothing | I | records nothing | - | 6: a group of 6,000 rows is one act and one change, and a confirm has to  / a plan built before the last act may not be confirmed after it … | 631 sequences NotVerified |
+| takeback-imported | I | check removed: if (s._tag !== "Imported" && s._tag !== "Open") return yield* new NotImported({}) | AConfirmNamesEveryChange; AConfirmOfAClosedImportWritesNothing; AMatchHoldsTheColumnsItSays; AMatchIsMadeOnTheLastOne; AMatchIsOfThisOpening; AMatchIsTheNextOne; APlanDoesWhatWasShown; APlanIsOfEveryC … (37 rules) | 1: a removed import takes nothing more: no suggestion, no match, no take- | 779 sequences NotVerified |
+| takeback-permitted | I | check removed: if (actor.organizationId !== s.organizationId \|\| actor.role === "viewer") return yield* new NotPermitted({}) | AViewerChangesNothing; OnlyItsOwnOrganizationChangesAnImport | 2: a viewer neither takes back nor reopens a confirmed import / an admin of another organization neither takes back nor reopens this o | 737 sequences NotVerified |
+| takeback-standing | I | check removed: if (s.standing < 1) return yield* new NotImported({}) | OnlyAnImportWithAConfirmStandingIsTakenBack | 1: an import never confirmed is not taken back, and an open one is not op | 071 sequences NotVerified |
+| takeback-seen | I | check removed: if (cmd.seen !== s.changes) return yield* new ReviewMovedOn({ last: s.changes }) | TheRestNameEveryChangeToo | 1: a take-back, a reopen and a remove each name the last change, so a pre | 759 sequences NotVerified |
+| takeback-kept | I | check removed: if (cmd.kept > s.inForce \|\| cmd.keptReplaced > s.replaced) return yield* new MoreKeptThanInForce({}) | - | 1: a take-back counts the items that were replaced too, put back and kept | 751 sequences NotVerified |
+| takeback-nothing | I | records nothing | - | 6: a take-back counts the items that were replaced too, put back and kept / a take-back takes back everything in force: the second round's items a … | 767 sequences NotVerified |
+| reopen-closed | I | check removed: if (s._tag !== "Imported" && s._tag !== "TakenBack") return yield* new NotClosed({}) | EveryChangeHasItsOwnNumber | 2: a removed import takes nothing more: no suggestion, no match, no take- / an import never confirmed is not taken back, and an open one is not op | 061 sequences NotVerified |
+| reopen-permitted | I | check removed: if (actor.organizationId !== s.organizationId \|\| actor.role === "viewer") return yield* new NotPermitted({}) | AViewerChangesNothing; OnlyItsOwnOrganizationChangesAnImport | 2: a viewer neither takes back nor reopens a confirmed import / an admin of another organization neither takes back nor reopens this o | 759 sequences NotVerified |
+| reopen-seen | I | check removed: if (cmd.seen !== s.changes) return yield* new ReviewMovedOn({ last: s.changes }) | TheRestNameEveryChangeToo | 1: a take-back, a reopen and a remove each name the last change, so a pre | 759 sequences NotVerified |
+| reopen-nothing | I | records nothing | - | 5: a group's undo does not reach past a confirm that stands, and a group  / a take-back takes back everything in force: the second round's items a … | 767 sequences NotVerified |
+| remove-open | I | check removed: if (s._tag !== "Open") return yield* new NotOpen({}) | EveryChangeHasItsOwnNumber | 1: on a confirmed import nothing is reviewed, matched, suggested, confirm | 807 sequences NotVerified |
+| remove-permitted | I | check removed: if (actor.organizationId !== s.organizationId \|\| actor.role === "viewer") return yield* new NotPermitted({}) | AViewerChangesNothing; OnlyItsOwnOrganizationChangesAnImport | 2: a viewer changes nothing: no match, suggestion, confirm, remove, row a / an admin of another organization changes nothing in this one's import, | 787 sequences NotVerified |
+| remove-seen | I | check removed: if (cmd.seen !== s.changes) return yield* new ReviewMovedOn({ last: s.changes }) | TheRestNameEveryChangeToo | 1: a take-back, a reopen and a remove each name the last change, so a pre | 747 sequences NotVerified |
+| remove-inforce | I | check removed: if (s.inForce !== 0 \|\| s.standing !== 0) return yield* new HasItemsInForce({}) | OnlyAnImportWithNothingInForceIsRemoved | 2: an import whose confirm stands is not removed, even when it created no / an import with items in force is not removed: a take-back that keeps s | 767 sequences NotVerified |
+| remove-nothing | I | records nothing | - | 4: a removed import takes nothing more: no suggestion, no match, no take- / a take-back takes back everything in force: the second round's items a … | 687 sequences NotVerified |
+| stage-f-organizationId | I | field wrong: organizationId: actor.organizationId, -> organizationId: actor.memberId, | - | 1: a viewer may not stage a file; an editor stages it, once | 767 sequences NotVerified |
+| stage-f-rows | I | field wrong: rows: cmd.rows, -> rows: cmd.rows + 1, | - | 1: a viewer may not stage a file; an editor stages it, once | 767 sequences NotVerified |
+| stage-f-columns | I | field wrong: columns: cmd.columns, -> columns: "", | - | 1: a viewer may not stage a file; an editor stages it, once | 767 sequences NotVerified |
+| stage-f-by | I | field wrong: by: actor.memberId, -> by: actor.organizationId, | EveryEventSaysWhose | 1: a viewer may not stage a file; an editor stages it, once | 767 sequences NotVerified |
+| match-f-change | I | field wrong: change: s.changes + 1, -> change: s.changes, | EveryChangeHasItsOwnNumber | 4: a group made on an older matching is refused / a match made over one its sender never saw is refused, and the columns … | 767 sequences NotVerified |
+| match-f-matching | I | field wrong: matching: s.matching + 1, -> matching: s.matching, | AMatchIsTheNextOne | 4: a group made on an older matching is refused / a match made over one its sender never saw is refused, and the columns … | 767 sequences NotVerified |
+| match-f-columns | I | field wrong: columns: cmd.columns, -> columns: s.columns, | AMatchHoldsTheColumnsItSays | 4: a group made on an older matching is refused / a match made over one its sender never saw is refused, and the columns … | 767 sequences NotVerified |
+| match-f-by | I | field wrong: by: actor.memberId, -> by: actor.organizationId, | EveryEventSaysWhose | 4: a group made on an older matching is refused / a match made over one its sender never saw is refused, and the columns … | 767 sequences NotVerified |
+| suggestion-f-by | I | field wrong: by: actor.memberId -> by: actor.organizationId | EveryEventSaysWhose | 1: a suggestion is recorded as its asker's and changes no number; a viewe | 767 sequences NotVerified |
+| confirm-f-change | I | field wrong: change: s.changes + 1, -> change: s.changes + 2, | EveryChangeHasItsOwnNumber | 6: a group of 6,000 rows is one act and one change, and a confirm has to  / a plan built before the last act may not be confirmed after it … | 767 sequences NotVerified |
+| confirm-f-created | I | field wrong: created: cmd.created, -> created: cmd.updated, | NoMoreInForceThanRows; OutcomesAddUpToTheRows | 5: a group of 6,000 rows is one act and one change, and a confirm has to  / a plan built before the last act may not be confirmed after it … | 767 sequences NotVerified |
+| confirm-f-updated | I | field wrong: updated: cmd.updated, -> updated: cmd.created, | OutcomesAddUpToTheRows | 5: a group of 6,000 rows is one act and one change, and a confirm has to  / a plan built before the last act may not be confirmed after it … | 767 sequences NotVerified |
+| confirm-f-already | I | field wrong: already: cmd.already, -> already: cmd.notImported, | OutcomesAddUpToTheRows | 6: a group of 6,000 rows is one act and one change, and a confirm has to  / a plan built before the last act may not be confirmed after it … | 767 sequences NotVerified |
+| confirm-f-notImported | I | field wrong: notImported: cmd.notImported, -> notImported: cmd.already, | OutcomesAddUpToTheRows | 6: a group of 6,000 rows is one act and one change, and a confirm has to  / a plan built before the last act may not be confirmed after it … | 767 sequences NotVerified |
+| confirm-f-by | I | field wrong: by: actor.memberId, -> by: actor.organizationId, | EveryEventSaysWhose | 6: a group of 6,000 rows is one act and one change, and a confirm has to  / a plan built before the last act may not be confirmed after it … | 767 sequences NotVerified |
+| takeback-f-change | I | field wrong: change: s.changes + 1, -> change: s.changes, | EveryChangeHasItsOwnNumber | 6: a take-back counts the items that were replaced too, put back and kept / a take-back takes back everything in force: the second round's items a … | 767 sequences NotVerified |
+| takeback-f-removed | I | field wrong: removed: s.inForce - cmd.kept, -> removed: s.inForce, | ATakeBackIsOfEverythingInForce | 3: a take-back counts the items that were replaced too, put back and kept / an import opened again is taken back without confirming it again … | 767 sequences NotVerified |
+| takeback-f-kept | I | field wrong: kept: cmd.kept, -> kept: 0, | ATakeBackIsOfEverythingInForce | 3: a take-back counts the items that were replaced too, put back and kept / an import opened again is taken back without confirming it again … | 775 sequences NotVerified |
+| takeback-f-restored | I | field wrong: restored: s.replaced - cmd.keptReplaced, -> restored: s.replaced, | AndOfEverythingReplaced | 1: a take-back counts the items that were replaced too, put back and kept | 767 sequences NotVerified |
+| takeback-f-keptReplaced | I | field wrong: keptReplaced: cmd.keptReplaced, -> keptReplaced: 0, | AndOfEverythingReplaced | 1: a take-back counts the items that were replaced too, put back and kept | 767 sequences NotVerified |
+| takeback-f-by | I | field wrong: by: actor.memberId, -> by: actor.organizationId, | EveryEventSaysWhose | 6: a take-back counts the items that were replaced too, put back and kept / a take-back takes back everything in force: the second round's items a … | 767 sequences NotVerified |
+| reopen-f-change | I | field wrong: change: s.changes + 1, -> change: s.changes, | EveryChangeHasItsOwnNumber | 5: a group's undo does not reach past a confirm that stands, and a group  / a take-back takes back everything in force: the second round's items a … | 767 sequences NotVerified |
+| reopen-f-by | I | field wrong: by: actor.memberId -> by: actor.organizationId | EveryEventSaysWhose | 5: a group's undo does not reach past a confirm that stands, and a group  / a take-back takes back everything in force: the second round's items a … | 767 sequences NotVerified |
+| remove-f-change | I | field wrong: change: s.changes + 1, -> change: s.changes, | - | 4: a removed import takes nothing more: no suggestion, no match, no take- / a take-back takes back everything in force: the second round's items a … | 767 sequences NotVerified |
+| remove-f-by | I | field wrong: by: actor.memberId -> by: actor.organizationId | EveryEventSaysWhose | 4: a removed import takes nothing more: no suggestion, no match, no take- / a take-back takes back everything in force: the second round's items a … | 767 sequences NotVerified |
+| row-open | D | check removed: if (life.state._tag !== "Open") return yield* new NotOpen({}) | Violated ImportLife.EveryChangeHasItsOwnNumber; Violated ARowIsDecidedOnlyOnAnOpenImport; Violated AnActIsOfThisOpening; Violated ARowsActSawTheLastGroupAct; Violated AnActIsMadeOnTheMatchingNow | 1: on a confirmed import nothing is reviewed, matched, suggested, confirm | NotProved; schema Proved; accepted true; paths 383; elapsed 1391862 ms |
+| row-permitted | D | check removed: if (actor.organizationId !== life.state.organizationId \|\| actor.role === "viewer") { | Violated ImportLife.OnlyItsOwnOrganizationChangesAnImport; Violated ImportLife.AViewerChangesNothing; Unconfirmed OnlyItsOwnOrganizationChangesTheRow; Violated AViewerChangesNoRow | 3: a viewer changes nothing: no match, suggestion, confirm, remove, row a / an admin of another organization changes nothing in this one's import, … | NotProved; schema Proved; accepted true; paths 192; elapsed 564769 ms |
+| row-rowowner | D | check removed: if ( | Unconfirmed RowUnit.ARowNeverChangesImportOrOrganization; Unconfirmed OnlyItsOwnOrganizationChangesTheRow | 1: a row or a group kept under another organization's name is not changed | NotProved; schema Proved; accepted true; paths 144; elapsed 426296 ms |
+| row-opening | D | check removed: if (cmd.opening !== life.state.confirms) return yield* new ConfirmedSince({}) | Violated AnActIsOfThisOpening | 1: an act made before a confirm is not taken after the import is opened a | NotProved; schema Proved; accepted true; paths 146; elapsed 178134 ms |
+| row-sawgroup | D | check removed: if (cmd.sawGroup !== life.state.lastGroup) return yield* new GroupedSince({}) | Violated ARowsActSawTheLastGroupAct | 2: a row's act names the last group act, and the same text over a group i / only its maker takes a group back, in one act, once; a row another per | NotProved; schema Proved; accepted true; paths 146; elapsed 135146 ms |
+| row-same | D | check removed: if (!cmd.covered && leavesAsItIs(row.state, cmd.flags)) return [] | Violated AnActThatChangesNothingLeavesTheImport; Unconfirmed AnActThatChangesNothingLeavesTheRow | 1: a save that leaves the row as it is records nothing, seen or not: the  | NotProved; schema Proved; accepted true; paths 170; elapsed 177643 ms |
+| row-saw | D | check removed: if (cmd.saw !== row.state.change) return yield* new DecidedSince({ by: row.state.by, change: row.state.change }) | Unconfirmed ADecisionIsReplacedOnlyByAnActThatSawIt | 1: when someone else decided the row first, the act is refused with whose | NotProved; schema Proved; accepted true; paths 148; elapsed 153343 ms |
+| row-nolonger | D | check removed: } else if (cmd.saw !== 0) { | Violated ADecisionIsReplacedOnlyByAnActThatSawIt | 1: a decision its sender saw that was taken back since is no longer there | NotProved; schema Proved; accepted true; paths 144; elapsed 5837 ms |
+| row-madeon | D | check removed: if (cmd.madeOn !== life.state.matching) return yield* new MatchedSince({ matching: life.state.matching }) | Violated AnActIsMadeOnTheMatchingNow | 1: an act made on an older matching is refused, whatever it decides | NotProved; schema Proved; accepted true; paths 140; elapsed 170149 ms |
+| row-nothing | D | records nothing | - | 5: a row's act names the last group act, and the same text over a group i / a decision its sender saw that was taken back since is no longer there … | NotProved; schema Proved; accepted false; paths 110; elapsed 290 ms |
+| undo-open | U | check removed: if (life.state._tag !== "Open") return yield* new NotOpen({}) | Unconfirmed ImportLife.EveryChangeHasItsOwnNumber; Unconfirmed AnUndoTakesBackOnlyItsSendersOwnStep; Unconfirmed AnUndoIsOfThisOpening; Unconfirmed ARowsUndoSawTheLastGroupAct; Unconfirmed AnUndoDoesN … (6 rules) | 1: on a confirmed import nothing is reviewed, matched, suggested, confirm | NotProved; schema Proved; accepted true; paths 613; elapsed 87060 ms |
+| undo-permitted | U | check removed: if (actor.organizationId !== life.state.organizationId \|\| actor.role === "viewer") { | Unconfirmed ImportLife.OnlyItsOwnOrganizationChangesAnImport; Unconfirmed ImportLife.AViewerChangesNothing; Unconfirmed OnlyItsOwnOrganizationChangesTheRow; Unconfirmed AViewerChangesNoRow | 2: a viewer changes nothing: no match, suggestion, confirm, remove, row a / an admin of another organization changes nothing in this one's import, | NotProved; schema Proved; accepted true; paths 411; elapsed 55203 ms |
+| undo-rowowner | U | check removed: if ( | Unconfirmed OnlyItsOwnOrganizationChangesTheRow | 1: a row or a group kept under another organization's name is not changed | NotProved; schema Proved; accepted true; paths 290; elapsed 32382 ms |
+| undo-opening | U | check removed: if (cmd.opening !== life.state.confirms) return yield* new ConfirmedSince({}) | Unconfirmed AnUndoIsOfThisOpening | 1: a match, a group and an undo made before a confirm are not taken after | NotProved; schema Proved; accepted true; paths 292; elapsed 29955 ms |
+| undo-sawgroup | U | check removed: if (cmd.sawGroup !== life.state.lastGroup) return yield* new GroupedSince({}) | Unconfirmed ARowsUndoSawTheLastGroupAct | 1: a row's undo pressed before a group reached its sender's screen is ref | NotProved; schema Proved; accepted true; paths 292; elapsed 19096 ms |
+| undo-own | U | check removed: if (row.state._tag !== "Decided" \|\| row.state.by !== actor.memberId \|\| row.state.change !== cmd.undo) { | Unconfirmed AnUndoTakesBackOnlyItsSendersOwnStep; Unconfirmed NobodyClearsAnotherPersonsDecision | 2: an undo that puts back another person's decision stops there / undos go down every level exactly as it was, and end at none | the prover could not read this mutant (NotTranslated): no rule verdict; NotProved; schema NotTranslated; accepted true; paths 294; elapsed 29383 ms |
+| undo-confirmed | U | check removed: if (row.state.change <= life.state.confirmedAt) return yield* new DecidedBeforeTheConfirm({}) | Unconfirmed AnUndoDoesNotReachPastAConfirm | 1: an undo does not reach past a confirm that stands | NotProved; schema Proved; accepted true; paths 296; elapsed 25492 ms |
+| undo-history | U | check removed: if (row.state.under.change === -1) return yield* new HistoryEnds({}) | - | 1: a full history never refuses a decision: the oldest levels are let go, | PROVED; schema Proved; accepted true; paths 296; elapsed 25694 ms |
+| undo-seal | U | check removed: if (kept && (!sizesAreTrue(cmd.next) \|\| seal(cmd.next, cmd.below) !== row.state.below)) { | Unconfirmed RowUnit.TheSizeOfByIsTrue; Unconfirmed RowUnit.TheSizeOfStepIsTrue; Unconfirmed RowUnit.TheSizeOfFlagsIsTrue; Unconfirmed RowUnit.TheSizeOfLabelIsTrue; Unconfirmed WhatLiesUnderIsWhatWasRecorded | 1: an undo may not bring a text of its sender's as another person's decis | NotProved; schema Proved; accepted true; paths 288; elapsed 27518 ms |
+| undo-nothing | U | records nothing | - | 5: a decision its sender saw that was taken back since is no longer there / a full history never refuses a decision: the oldest levels are let go, … | NotProved; schema Proved; accepted false; paths 100; elapsed 340 ms |
+| group-open | DG | check removed: if (life.state._tag !== "Open") return yield* new NotOpen({}) | Violated ImportLife.EveryChangeHasItsOwnNumber; Violated AGroupIsDecidedOnlyOnAnOpenImport; Violated AGroupIsOfThisOpening; Violated AGroupIsMadeOnEveryChange; Violated AGroupIsMadeOnTheMatchingNow | 1: on a confirmed import nothing is reviewed, matched, suggested, confirm | NotProved; schema Proved; accepted true; paths 72; elapsed 2029 ms |
+| group-permitted | DG | check removed: if (actor.organizationId !== life.state.organizationId \|\| actor.role === "viewer") { | Violated ImportLife.OnlyItsOwnOrganizationChangesAnImport; Violated ImportLife.AViewerChangesNothing; Violated AViewerChangesNoGroup | 2: a viewer changes nothing: no match, suggestion, confirm, remove, row a / an admin of another organization changes nothing in this one's import, | NotProved; schema Proved; accepted true; paths 39; elapsed 700 ms |
+| group-step | DG | check removed: if (group.state._tag !== "Untouched") return yield* new StepTaken({}) | Unconfirmed AStepDecidesOneGroup; Unconfirmed WithEveryRowItNames; Unconfirmed WithWhatItDoes; Unconfirmed WithItsCount; Unconfirmed OnItsMatching; Unconfirmed InForce; Unconfirmed AsItsSenders; Uncon … (10 rules) | 1: a group is taken only from a screen that has every change, and a step  | NotProved; schema Proved; accepted true; paths 54; elapsed 1942 ms |
+| group-opening | DG | check removed: if (cmd.opening !== life.state.confirms) return yield* new ConfirmedSince({}) | Violated AGroupIsOfThisOpening | 2: a group's undo does not reach past a confirm that stands, and a group  / a match, a group and an undo made before a confirm are not taken after | NotProved; schema Proved; accepted true; paths 40; elapsed 487 ms |
+| group-seen | DG | check removed: if (cmd.seen !== life.state.changes) return yield* new ReviewMovedOn({ last: life.state.changes }) | Violated AGroupIsMadeOnEveryChange | 1: a group is taken only from a screen that has every change, and a step  | NotProved; schema Proved; accepted true; paths 40; elapsed 488 ms |
+| group-madeon | DG | check removed: if (cmd.madeOn !== life.state.matching) return yield* new MatchedSince({ matching: life.state.matching }) | Violated AGroupIsMadeOnTheMatchingNow | 1: a group made on an older matching is refused | NotProved; schema Proved; accepted true; paths 40; elapsed 502 ms |
+| group-nothing | DG | records nothing | - | 4: a group decided after another was taken back goes over the one still i / a group is taken only from a screen that has every change, and a step  … | NotProved; schema Proved; accepted false; paths 42; elapsed 154 ms |
+| gundo-open | UG | check removed: if (life.state._tag !== "Open") return yield* new NotOpen({}) | Unconfirmed ImportLife.EveryChangeHasItsOwnNumber; Unconfirmed AGroupsUndoTakesBackOnlyItsSendersOwn; Unconfirmed AGroupsUndoIsOfThisOpening; Unconfirmed OnlyTheLastGroupInForceIsTakenBack; Unconfirme … (6 rules) | 1: on a confirmed import nothing is reviewed, matched, suggested, confirm | NotProved; schema Proved; accepted true; paths 166; elapsed 6903 ms |
+| gundo-permitted | UG | check removed: if (actor.organizationId !== life.state.organizationId \|\| actor.role === "viewer") { | Unconfirmed ImportLife.OnlyItsOwnOrganizationChangesAnImport; Unconfirmed ImportLife.AViewerChangesNothing; Unconfirmed OnlyItsOwnOrganizationChangesTheGroup; Unconfirmed AViewerChangesNoGroup | 2: a viewer changes nothing: no match, suggestion, confirm, remove, row a / an admin of another organization changes nothing in this one's import, | NotProved; schema Proved; accepted true; paths 102; elapsed 4383 ms |
+| gundo-opening | UG | check removed: if (cmd.opening !== life.state.confirms) return yield* new ConfirmedSince({}) | Unconfirmed AGroupsUndoIsOfThisOpening | 1: a group's undo does not reach past a confirm that stands, and a group  | NotProved; schema Proved; accepted true; paths 80; elapsed 2861 ms |
+| gundo-decided | UG | check removed: if (group.state._tag !== "Decided") return yield* new NotYourStep({}) | - | 1: an undo of a group step that decided no group is refused as not the se | PROVED; schema Proved; accepted true; paths 84; elapsed 2827 ms |
+| gundo-groupowner | UG | check removed: if (group.state.importId !== cmd.importId \|\| group.state.organizationId !== life.state.organizationId) { | Unconfirmed OnlyItsOwnOrganizationChangesTheGroup | 1: a row or a group kept under another organization's name is not changed | NotProved; schema Proved; accepted true; paths 80; elapsed 2688 ms |
+| gundo-own | UG | check removed: if (group.state.by !== actor.memberId \|\| group.state.change !== cmd.undo \|\| group.state.undoneAt !== 0) { | Unconfirmed GroupUnit.AGroupTakenBackStaysTakenBack; Unconfirmed AGroupsUndoTakesBackOnlyItsSendersOwn; Unconfirmed AGroupIsTakenBackOnce; Unconfirmed NobodyUndoesAnotherPersonsGroup | 1: only its maker takes a group back, in one act, once; a row another per | NotProved; schema Proved; accepted true; paths 78; elapsed 3093 ms |
+| gundo-confirmed | UG | check removed: if (group.state.change <= life.state.confirmedAt) return yield* new DecidedBeforeTheConfirm({}) | Unconfirmed AGroupsUndoDoesNotReachPastAConfirm | 1: a group's undo does not reach past a confirm that stands, and a group  | NotProved; schema Proved; accepted true; paths 82; elapsed 2944 ms |
+| gundo-top | UG | check removed: if (group.state.change !== life.state.topGroup) return yield* new GroupedAfter({ last: life.state.topGroup }) | Unconfirmed OnlyTheLastGroupInForceIsTakenBack | 1: only the last group still in force is taken back, so undo walks back:  | NotProved; schema Proved; accepted true; paths 82; elapsed 2731 ms |
+| gundo-nothing | UG | records nothing | - | 2: only its maker takes a group back, in one act, once; a row another per / only the last group still in force is taken back, so undo walks back:  | NotProved; schema Proved; accepted false; paths 54; elapsed 144 ms |
+| row-rowdecided-importId | D | field wrong: importId: cmd.importId, -> importId: cmd.row, | Unconfirmed RowUnit.ARowNeverChangesImportOrOrganization | 5: a row's act names the last group act, and the same text over a group i / a decision its sender saw that was taken back since is no longer there … | NotProved; schema Proved; accepted true; paths 152; elapsed 133724 ms |
+| row-rowdecided-organizationId | D | field wrong: organizationId: life.state.organizationId, -> organizationId: cmd.row, | Unconfirmed RowUnit.ARowNeverChangesImportOrOrganization | 5: a row's act names the last group act, and the same text over a group i / a decision its sender saw that was taken back since is no longer there … | NotProved; schema Proved; accepted true; paths 152; elapsed 121091 ms |
+| row-rowdecided-change | D | field wrong: change, -> change: life.state.changes, | Violated OnTheRowToo; Violated TheImportsEventSaysWhichDecisionTheRowHolds | 5: a row's act names the last group act, and the same text over a group i / a decision its sender saw that was taken back since is no longer there … | NotProved; schema Proved; accepted true; paths 152; elapsed 208622 ms |
+| row-rowdecided-by | D | field wrong: by: actor.memberId, -> by: life.state.organizationId, | Violated AsItsSenders; Violated TheImportsEventSaysWhose | 5: a row's act names the last group act, and the same text over a group i / a decision its sender saw that was taken back since is no longer there … | NotProved; schema Proved; accepted true; paths 152; elapsed 192719 ms |
+| row-rowdecided-step | D | field wrong: step: cmd.step, -> step: cmd.label, | Violated UnderItsStep | 5: a row's act names the last group act, and the same text over a group i / a decision its sender saw that was taken back since is no longer there … | NotProved; schema Proved; accepted true; paths 152; elapsed 86094 ms |
+| row-rowdecided-flags | D | field wrong: flags: cmd.flags, -> flags: cmd.label, | Violated WithItsText; Violated TheImportsEventSaysItsText | 5: a row's act names the last group act, and the same text over a group i / a decision its sender saw that was taken back since is no longer there … | NotProved; schema Proved; accepted true; paths 152; elapsed 210407 ms |
+| row-rowdecided-madeOn | D | field wrong: madeOn: cmd.madeOn, -> madeOn: cmd.opening, | Violated OnItsMatching | 2: an act made before a confirm is not taken after the import is opened a / an act made on an older matching is refused, whatever it decides | NotProved; schema Proved; accepted true; paths 152; elapsed 110058 ms |
+| row-rowdecided-label | D | field wrong: label: cmd.label, -> label: cmd.step, | - | 5: a row's act names the last group act, and the same text over a group i / a decision its sender saw that was taken back since is no longer there … | PROVED; schema Proved; accepted true; paths 152; elapsed 5790 ms |
+| row-actcounted-change | D | field wrong: change, -> change: life.state.changes, | Violated ImportLife.EveryChangeHasItsOwnNumber; Violated AndGetsTheNextNumber; Violated OnTheRowToo | 5: a row's act names the last group act, and the same text over a group i / a decision its sender saw that was taken back since is no longer there … | NotProved; schema Proved; accepted true; paths 152; elapsed 352491 ms |
+| row-actcounted-step | D | field wrong: step: cmd.step, -> step: cmd.label, | - | 5: a row's act names the last group act, and the same text over a group i / a decision its sender saw that was taken back since is no longer there … | PROVED; schema Proved; accepted true; paths 152; elapsed 5632 ms |
+| row-actcounted-row | D | field wrong: row: cmd.row, -> row: cmd.step, | - | 5: a row's act names the last group act, and the same text over a group i / a decision its sender saw that was taken back since is no longer there … | PROVED; schema Proved; accepted true; paths 152; elapsed 5639 ms |
+| row-actcounted-label | D | field wrong: label: cmd.label, -> label: cmd.step, | - | 5: a row's act names the last group act, and the same text over a group i / a decision its sender saw that was taken back since is no longer there … | PROVED; schema Proved; accepted true; paths 152; elapsed 5770 ms |
+| row-actcounted-holds | D | field wrong: holds: change, -> holds: life.state.changes, | Violated TheImportsEventSaysWhichDecisionTheRowHolds | 5: a row's act names the last group act, and the same text over a group i / a decision its sender saw that was taken back since is no longer there … | NotProved; schema Proved; accepted true; paths 152; elapsed 105970 ms |
+| row-actcounted-by | D | field wrong: by: actor.memberId, -> by: cmd.row, | Violated TheImportsEventSaysWhose | 5: a row's act names the last group act, and the same text over a group i / a decision its sender saw that was taken back since is no longer there … | NotProved; schema Proved; accepted true; paths 152; elapsed 106629 ms |
+| row-actcounted-actor | D | field wrong: actor: actor.memberId, -> actor: cmd.row, | Violated ImportLife.EveryEventSaysWhose; Violated TheImportsEventSaysWhoActed | 5: a row's act names the last group act, and the same text over a group i / a decision its sender saw that was taken back since is no longer there … | NotProved; schema Proved; accepted true; paths 152; elapsed 221954 ms |
+| row-actcounted-flags | D | field wrong: flags: cmd.flags, -> flags: cmd.label, | Violated TheImportsEventSaysItsText | 5: a row's act names the last group act, and the same text over a group i / a decision its sender saw that was taken back since is no longer there … | NotProved; schema Proved; accepted true; paths 152; elapsed 126442 ms |
+| row-actcounted-madeOn | D | field wrong: madeOn: cmd.madeOn, -> madeOn: cmd.opening, | - | 2: an act made before a confirm is not taken after the import is opened a / an act made on an older matching is refused, whatever it decides | PROVED; schema Proved; accepted true; paths 152; elapsed 5687 ms |
+| undo-stepundone-next | U | field wrong: next, below -> next: noLevel, below | Unconfirmed WhatLiesUnderIsWhatWasRecorded | 2: a full history never refuses a decision: the oldest levels are let go, / undos go down every level exactly as it was, and end at none | NotProved; schema Proved; accepted true; paths 298; elapsed 19560 ms |
+| undo-stepundone-below | U | field wrong: below: kept ? cmd.below : "" -> below: "" | Unconfirmed WhatLiesUnderIsWhatWasRecorded | 1: undos go down every level exactly as it was, and end at none | NotProved; schema Proved; accepted true; paths 298; elapsed 20492 ms |
+| undo-actcounted-change | U | field wrong: change: life.state.changes + 1, -> change: life.state.changes, | Unconfirmed ImportLife.EveryChangeHasItsOwnNumber; Unconfirmed AnUndoIsNumbered | 5: a decision its sender saw that was taken back since is no longer there / a full history never refuses a decision: the oldest levels are let go, … | NotProved; schema Proved; accepted true; paths 298; elapsed 23146 ms |
+| undo-actcounted-step | U | field wrong: step: cmd.step, -> step: cmd.row, | - | 5: a decision its sender saw that was taken back since is no longer there / a full history never refuses a decision: the oldest levels are let go, … | PROVED; schema Proved; accepted true; paths 298; elapsed 21411 ms |
+| undo-actcounted-row | U | field wrong: row: cmd.row, -> row: cmd.step, | - | 5: a decision its sender saw that was taken back since is no longer there / a full history never refuses a decision: the oldest levels are let go, … | PROVED; schema Proved; accepted true; paths 298; elapsed 21488 ms |
+| undo-actcounted-label | U | field wrong: label: "undo", -> label: cmd.step, | - | 5: a decision its sender saw that was taken back since is no longer there / a full history never refuses a decision: the oldest levels are let go, … | PROVED; schema Proved; accepted true; paths 298; elapsed 23513 ms |
+| undo-actcounted-holds | U | field wrong: holds: under.change, -> holds: row.state.change, | Unconfirmed TheImportsEventSaysWhichDecisionTheRowHolds | 5: a decision its sender saw that was taken back since is no longer there / a full history never refuses a decision: the oldest levels are let go, … | NotProved; schema Proved; accepted true; paths 298; elapsed 24118 ms |
+| undo-actcounted-by | U | field wrong: by: under.by, -> by: actor.memberId, | Unconfirmed TheImportsEventSaysWhose | 4: a decision its sender saw that was taken back since is no longer there / a row's undo pressed before a group reached its sender's screen is ref … | NotProved; schema Proved; accepted true; paths 298; elapsed 20106 ms |
+| undo-actcounted-actor | U | field wrong: actor: actor.memberId, -> actor: under.by, | Unconfirmed ImportLife.EveryEventSaysWhose; Unconfirmed TheImportsEventSaysWhoActed | 4: a decision its sender saw that was taken back since is no longer there / a row's undo pressed before a group reached its sender's screen is ref … | NotProved; schema Proved; accepted true; paths 298; elapsed 20933 ms |
+| undo-actcounted-flags | U | field wrong: flags: under.flags, -> flags: row.state.flags, | Unconfirmed TheImportsEventSaysItsText | 5: a decision its sender saw that was taken back since is no longer there / a full history never refuses a decision: the oldest levels are let go, … | NotProved; schema Proved; accepted true; paths 298; elapsed 19829 ms |
+| undo-actcounted-madeOn | U | field wrong: madeOn: under.madeOn, -> madeOn: row.state.madeOn, | - | 3: a decision its sender saw that was taken back since is no longer there / a row's undo pressed before a group reached its sender's screen is ref … | PROVED; schema Proved; accepted true; paths 298; elapsed 19156 ms |
+| group-groupdecided-importId | DG | field wrong: importId: cmd.importId, -> importId: cmd.step, | - | 4: a group decided after another was taken back goes over the one still i / a group is taken only from a screen that has every change, and a step  … | PROVED; schema Proved; accepted true; paths 42; elapsed 417 ms |
+| group-groupdecided-organizationId | DG | field wrong: organizationId: life.state.organizationId, -> organizationId: actor.memberId, | - | 4: a group decided after another was taken back goes over the one still i / a group is taken only from a screen that has every change, and a step  … | PROVED; schema Proved; accepted true; paths 42; elapsed 428 ms |
+| group-groupdecided-change | DG | field wrong: change, -> change: life.state.changes, | Violated OnTheGroupToo | 4: a group decided after another was taken back goes over the one still i / a group is taken only from a screen that has every change, and a step  … | NotProved; schema Proved; accepted true; paths 42; elapsed 467 ms |
+| group-groupdecided-by | DG | field wrong: by: actor.memberId, -> by: cmd.step, | Violated AsItsSenders | 4: a group decided after another was taken back goes over the one still i / a group is taken only from a screen that has every change, and a step  … | NotProved; schema Proved; accepted true; paths 42; elapsed 459 ms |
+| group-groupdecided-step | DG | field wrong: step: cmd.step, -> step: cmd.label, | - | 4: a group decided after another was taken back goes over the one still i / a group is taken only from a screen that has every change, and a step  … | PROVED; schema Proved; accepted true; paths 42; elapsed 442 ms |
+| group-groupdecided-patch | DG | field wrong: patch: cmd.patch, -> patch: cmd.rows, | Violated WithWhatItDoes | 4: a group decided after another was taken back goes over the one still i / a group is taken only from a screen that has every change, and a step  … | NotProved; schema Proved; accepted true; paths 42; elapsed 474 ms |
+| group-groupdecided-rows | DG | field wrong: rows: cmd.rows, -> rows: cmd.patch, | Violated WithEveryRowItNames | 4: a group decided after another was taken back goes over the one still i / a group is taken only from a screen that has every change, and a step  … | NotProved; schema Proved; accepted true; paths 42; elapsed 520 ms |
+| group-groupdecided-count | DG | field wrong: count: cmd.count, -> count: cmd.count + 1, | Violated WithItsCount | 4: a group decided after another was taken back goes over the one still i / a group is taken only from a screen that has every change, and a step  … | NotProved; schema Proved; accepted true; paths 42; elapsed 601 ms |
+| group-groupdecided-madeOn | DG | field wrong: madeOn: cmd.madeOn, -> madeOn: cmd.opening, | Violated OnItsMatching | 1: a group decided after another was taken back goes over the one still i | NotProved; schema Proved; accepted true; paths 42; elapsed 491 ms |
+| group-groupdecided-label | DG | field wrong: label: cmd.label, -> label: cmd.step, | - | 4: a group decided after another was taken back goes over the one still i / a group is taken only from a screen that has every change, and a step  … | PROVED; schema Proved; accepted true; paths 42; elapsed 480 ms |
+| group-groupdecided-under | DG | field wrong: under: life.state.topGroup, -> under: life.state.lastGroup, | Violated AndKeepsWhichOneWasBeforeIt | 1: a group decided after another was taken back goes over the one still i | NotProved; schema Proved; accepted true; paths 42; elapsed 549 ms |
+| group-groupcounted-change | DG | field wrong: ({ change, step -> ({ change: life.state.changes, step | Violated ImportLife.EveryChangeHasItsOwnNumber; Violated AGroupIsOneChange; Violated OnTheGroupToo; Violated AGroupDecidedIsTheLastInForce | 4: a group decided after another was taken back goes over the one still i / a group is taken only from a screen that has every change, and a step  … | NotProved; schema Proved; accepted true; paths 42; elapsed 567 ms |
+| group-groupcounted-step | DG | field wrong: step: cmd.step, rows -> step: cmd.label, rows | - | 4: a group decided after another was taken back goes over the one still i / a group is taken only from a screen that has every change, and a step  … | PROVED; schema Proved; accepted true; paths 42; elapsed 470 ms |
+| group-groupcounted-rows | DG | field wrong: rows: cmd.count, -> rows: cmd.count + 1, | Violated TheImportsEventSaysHowManyRows | 4: a group decided after another was taken back goes over the one still i / a group is taken only from a screen that has every change, and a step  … | NotProved; schema Proved; accepted true; paths 42; elapsed 565 ms |
+| group-groupcounted-label | DG | field wrong: label: cmd.label, -> label: cmd.step, | - | 4: a group decided after another was taken back goes over the one still i / a group is taken only from a screen that has every change, and a step  … | PROVED; schema Proved; accepted true; paths 42; elapsed 439 ms |
+| group-groupcounted-by | DG | field wrong: by: actor.memberId, -> by: cmd.step, | Violated ImportLife.EveryEventSaysWhose | 4: a group decided after another was taken back goes over the one still i / a group is taken only from a screen that has every change, and a step  … | NotProved; schema Proved; accepted true; paths 42; elapsed 508 ms |
+| group-groupcounted-top | DG | field wrong: top: change -> top: life.state.topGroup | Violated AGroupDecidedIsTheLastInForce | 4: a group decided after another was taken back goes over the one still i / a group is taken only from a screen that has every change, and a step  … | NotProved; schema Proved; accepted true; paths 42; elapsed 422 ms |
+| gundo-groupundone-change | UG | field wrong: ({ change }) -> ({ change: life.state.changes }) | Unconfirmed AndTheGroupSaysWhen | 2: only its maker takes a group back, in one act, once; a row another per / only the last group still in force is taken back, so undo walks back:  | NotProved; schema Proved; accepted true; paths 84; elapsed 2836 ms |
+| gundo-groupcounted-change | UG | field wrong: change, -> change: life.state.changes, | Unconfirmed ImportLife.EveryChangeHasItsOwnNumber; Unconfirmed AGroupsUndoIsOneChange; Unconfirmed AndTheGroupSaysWhen | 2: only its maker takes a group back, in one act, once; a row another per / only the last group still in force is taken back, so undo walks back:  | NotProved; schema Proved; accepted true; paths 84; elapsed 3072 ms |
+| gundo-groupcounted-step | UG | field wrong: step: cmd.step, -> step: "undo", | - | 2: only its maker takes a group back, in one act, once; a row another per / only the last group still in force is taken back, so undo walks back:  | PROVED; schema Proved; accepted true; paths 84; elapsed 2565 ms |
+| gundo-groupcounted-rows | UG | field wrong: rows: group.state.count, -> rows: group.state.count + 1, | Unconfirmed TheImportsEventSaysHowManyRows | 2: only its maker takes a group back, in one act, once; a row another per / only the last group still in force is taken back, so undo walks back:  | NotProved; schema Proved; accepted true; paths 84; elapsed 2651 ms |
+| gundo-groupcounted-label | UG | field wrong: label: "undo", -> label: cmd.step, | - | 2: only its maker takes a group back, in one act, once; a row another per / only the last group still in force is taken back, so undo walks back:  | PROVED; schema Proved; accepted true; paths 84; elapsed 2681 ms |
+| gundo-groupcounted-by | UG | field wrong: by: actor.memberId, -> by: cmd.step, | Unconfirmed ImportLife.EveryEventSaysWhose | 2: only its maker takes a group back, in one act, once; a row another per / only the last group still in force is taken back, so undo walks back:  | NotProved; schema Proved; accepted true; paths 84; elapsed 2745 ms |
+| gundo-groupcounted-top | UG | field wrong: top: group.state.under, -> top: 0, | Unconfirmed ThenTheOneUnderItIsTheLastInForce | 1: only the last group still in force is taken back, so undo walks back:  | NotProved; schema Proved; accepted true; paths 84; elapsed 2678 ms |
+
+Tally (kind, held by): check by rule: 55, check by story: 5, field by rule: 56, field by story: 21, nothing by story: 11
+
+#### Notes on the mutants
+- **Held by neither: none.** Writing stories during this step closed three gaps. `gundo-decided` (UndoGroup's "no group decided under this step") broke no rule, and no story had that refusal, so R35 was written. `group-groupdecided-madeOn` and `group-groupdecided-under` each broke a rule (DecideGroup.OnItsMatching, DecideGroup.AndKeepsWhichOneWasBeforeIt), but no story told them apart, so G8 was written.
+- **Checks no rule notices** (a story holds each): `match-same` (the same columns record nothing: R22), `suggestion-open` (R3: a suggestion on a removed import is no longer refused as NotOpen), `takeback-kept` (more kept than in force: R21; no rule bounds `kept`), `undo-history` (the let-go level: R34; Undoing stays PROVED without the check), `gundo-decided` (R35).
+- **Fields no rule notices** (stories hold each): the event's step, row and label, and ActCounted's madeOn, on DecideRow, UndoRowStep, DecideGroup and UndoGroup; RowDecided.label; GroupDecided's importId, organizationId, step and label; ImportStaged's organizationId, rows and columns; ImportRemoved.change (EveryChangeHasItsOwnNumber skips a step that ends Removed).
+- **Records nothing**: no rule breaks for any of the 11, as the prover's known limit says. The story that fails is named in the table. All 11 fail one or more stories. For the four decisions the prover's report does say `accepted false` and NotProved, with every rule Proved: it notices that nothing can be accepted, but no rule fails.
+- `undo-own` (NotYourStep removed): the prover could not translate the state schema check on the mutant (`schema NotTranslated`), yet still gave AnUndoTakesBackOnlyItsSendersOwnStep and NobodyClearsAnotherPersonsDecision as Unconfirmed. So it counts as held by a rule.
+- `row-nolonger` was first built as invalid code (removing `else if` took the closing brace). It was fixed (only the `else` branch removed), rebuilt and run again. The builder `mutants14.py` now makes it that way.
+- Times: a DecideRow mutant whose rule breaks took 86 s to 23 min in the prover (base 9 s): the time goes into confirming each counterexample. The other mutants took 0.2 to 30 s. 43 DecideRow/UndoRowStep mutants ran six at a time under `nice -n 10` (load up to 97 on the 64-core machine). The rest ran one at a time. No timeout was raised: the proof tests keep their own 1,500,000 ms and Verify.aggregate 600,000 ms, as given, and none was reached (the longest, `row-open`, took 1,391,862 ms, under the 1,500,000).
+
+## Trial 19. The reading of a row through its groups, against today's code
+
+Trial 16 compared a fold over units with `act` as it was before the review's saving was rebuilt, for one person, with a
+redo and an undo the model does not have. This runs it against the code as it is now, for two people, under trial 18's
+rules. What follows is its own account.
+
+### 1. What changed in today's code, and what matters to the fold
+
+I read `git diff 0db4326^1 HEAD` on `packages/review/src`, and on the catalog web package's `Draft.machine.ts`,
+`ReviewDraft.atoms.ts` and `Draft.atoms.ts`.
+
+- **`Action` did not change.** It is the same eleven-member tagged union over the `ActionType` literal kit, with the
+  same fields, and it was already a tagged union before the merge. No action was added or removed. `revert.how` still
+  takes `"undo" | "reject"`; a `RevertHow` literal kit was added beside it, used only for the label.
+- **`act` was restructured, but its behaviour did not change.**
+  - `undo` and `redo` now go through `travel`.
+  - Every other action goes through `decide(input, focus, write)`.
+  - Absence is now an `Option`: `UndoStep.before` is `HashMap<RowKey, Option<ReviewDecision>>`, `focus` is an
+    Option, and `Outcome.focus` is always present.
+  - `redo` is now a required field of `ReviewState`.
+  - The rules per action are line for line the same. That includes the focus rules and "a new decision empties
+    redo".
+  - Evidence: the original property, run on today's `act`, gives the same per-action "effective" tallies as the first
+    trial's logs for both seeds, out of 740,655 and 742,481 actions (`logs/orig-partition-25k.log`).
+- **Schema changes that hit the generator:**
+  - `Fix.confidence` is now a required `S.Option(Confidence)`. `Fix.make` without it throws `MissingKey`, and that was
+    the only reason the old test failed on today's code.
+  - `AppliedMark.fix` is now an Option, and `accepted` is always a boolean.
+  - Nothing in `act`, `viewRows`, `waitingGroups` or `appliedGroups` reads `confidence`. Only `weakGuess` and
+    `choicesOf` do, and the reducer does not call them.
+- **`saved` and `restored` lost their WeakMap of undo histories.**
+  - `restored(x)` always starts a new history now.
+  - `toDraft`/`fromDraft` take and give a `ReviewState`.
+  - This does not touch the fold.
+- **How the catalog drives it for several people (today's app, not the model):**
+  - Each tab runs `act` on its own `ReviewState`.
+  - `reviewState` (`ReviewDraft.atoms.ts` around line 650) sends only the rows that differ between the region's state
+    before and after the press. In the file's words: "what is sent is what the person did", the screen's own result
+    per row.
+  - When what the screen shows changes for any reason other than the person's own decision, `told`
+    (`Draft.machine.ts` around line 1066) bumps `epoch` and the region restarts.
+  - On restart, `startState` (`ReviewDraft.atoms.ts` around line 632) keeps the browser's undo history only if it
+    ends at the decisions now shown. Otherwise it is `restored(...)` with no history.
+  - So in today's app, **another person's change wipes your undo and redo history**. There is no undo across someone
+    else's change at all. That is a third behaviour, beside the reference and the model below.
+
+### 2. The model's rules as translated (`Two.ts`, `Model`)
+
+These come from `consumer-main/review14`.
+
+**What is recorded:**
+- Every recorded change takes the next number, `changes + 1`.
+- A row's own unit is a stack of whole decisions, each with its number and its maker.
+  - Level 0 is the file's starting decision (the `proposing` start). Nobody can undo it.
+- A group unit holds:
+  - its parts: row ids split by the exact patch each row got;
+  - its maker;
+  - `under`, the `topGroup` at the time it was decided;
+  - `undoneAt`.
+- The fold reads a row's own top decision, then applies the patch of every group that is in force, names the row, and
+  has a number above the row's own.
+
+**Which presses become which units:**
+- `acceptGroup`, `chooseGroup` and `revertGroup` are always group acts.
+- `accept`, `leaveOut` and `keep` are group acts when they change more than one row.
+- Every other press is a row act.
+
+**The rules applied:**
+
+| Command | Refused when | Records |
+| --- | --- | --- |
+| DecideGroup | `seen ≠ changes` → ReviewMovedOn | new unit, `under = topGroup`; `topGroup = lastGroup = n` |
+| UndoGroup | not maker, or already undone → NotYourStep; `n ≠ topGroup` → GroupedAfter | `undoneAt`; `topGroup = under`; `lastGroup` = the undo's number |
+| DecideRow | `sawGroup ≠ lastGroup` → GroupedSince; then "no change" when the row is not covered and its own text already equals the press; then `saw ≠ own.n` → DecidedSince, or NoLongerThere | the whole decision the screen worked out, numbered |
+| UndoRowStep | the row's own top decision is not the maker's step `n` → NotYourStep | pops back to the level under it, whoever made that level |
+
+- `covered` means that a group in force named the row after the row's own decision.
+- **There is no redo unit.**
+  - A redo press is a new act.
+  - With `REDO=reissue`, the same Action is pressed again on the screen.
+  - With `REDO=same`, the undone unit's rows and patches are pressed again on the screen. For a group that means a new
+    DecideGroup with the same parts. For a row it means a new DecideRow whose decision is the row's patch applied to
+    its current decision.
+- A refused GroupedAfter stays on the person's stack, so it can be taken back later. A refused NotYourStep is dropped.
+
+**Screens:**
+- With `SCREENS=live`, both screens hold every change after every press.
+- With `SCREENS=stale`, a screen is a snapshot taken at the person's last press or `refresh`. Its `seen`, `sawGroup`
+  and per-row `saw` are those of the snapshot. `refresh` is a generated press.
+
+### 3. The oracle when two people act
+
+**The reference:**
+- There is one shared decisions map `D`.
+- Each person has their own stack of `act` undo steps, plus a redo list.
+- A new press is `act` over `D` with an empty history. Its undo step goes on the presser's stack, and the presser's
+  redo list is emptied. The other person's history is left as it is.
+- An undo is `act` `undo` over `D` with the presser's top step. A redo is `act` `redo` with the presser's last mirror.
+- With `REF=overlay`, a new press is instead the screen's own decisions of the rows it changed, laid over `D`. That is
+  what today's draft sends. On a live screen it is identical to `act` over `D`.
+
+**Where the reference has no answer:**
+- Each row carries a touch: the step that last named it. With `TOUCH=named` (the default), any step whose `before`
+  holds the row counts, whether or not the value changed. With `TOUCH=changed`, only a step that changed the value
+  counts.
+- An undo of step `s` has an answer only while every row of `s` still has the touch `s` left. That means nobody, the
+  presser included, named those rows since. An undo puts the touches back, so one person's LIFO history keeps its
+  answers.
+- A redo has an answer only while every row still has the touch the undo left.
+- Where there is no answer, `act`'s swap would overwrite somebody's later decision, or `act`'s redo would. Examples:
+  - a person's undo of a step that is not their rows' latest change;
+  - an undo after the other person named one of the step's rows.
+- Where there is no answer and the model accepts, the reference adopts the model's map (`D := fold`). Its step for
+  that press becomes what the model did. Those rows get fresh touches, so later presses are judged only against what
+  happened after.
+- Where the model refuses, the reference is not moved.
+
+**What the model does where the reference has no answer.** It accepts and gives a definite result in every such case:
+- **The undo of a group behind later decisions on its rows (N1).** The model takes the group out of force. A row
+  someone decided since keeps that person's whole decision, and that decision still carries the group's effect,
+  because the decision was written whole over the group.
+- **The undo of a row's step after another person's group covered the row.** The row returns to the level under the
+  step, and the group's patch applies over it again.
+- **The undo of a row's step after the other person's own act on the row.** The model refuses (NotYourStep), because
+  the row's decision is no longer the presser's.
+- **A redo after the other person touched the rows (REDO=same).** The patch goes onto the current decision, and the
+  other person's value is kept. Example: q leaves r0 out, undoes it, p types a value into r0, and q's redo gives
+  "left out, with p's value" where `act` gives "left out, p's value lost".
+
+### 4. The property
+
+For generated worlds:
+- 1 to 8 rows, with fixes, groups, applied rule fixes, rivals, stored and blocked flags, and a recheck;
+- the `rejects` option and the `fixable` option;
+- a start that is empty or `proposing`;
+- up to 60 presses by p and q interleaved, covering all eleven `Action` types (undo and redo included), plus
+  `refresh` when screens are stale.
+
+**CHECK=equal.** After every press:
+- if the model accepts and the reference has an answer, `fold(units)` equals the reference's `D`;
+- in live mode, a screen that sends nothing implies that `act` over `D` changes nothing.
+
+Decisions are compared as plain data. A decision that says nothing (open, nothing accepted, undone or typed) equals no
+decision. That is the model's `NO_DECISION`, and `viewRows` draws the two the same way. `PLAIN=strict` turns this off.
+It was needed only for the stale overlay run: there, a no-op put back wrote an empty decision.
+
+**CHECK=harmless.** No refusal is harmless. A refusal counts as harmless when the reference could have taken the press
+without loss:
+- for an undo: the reference has an answer;
+- for a stale press: every row it changes still holds what the screen held ("lossless"), and `act` over `D` gives the
+  same as the screen's act ("agrees").
+
+**`FAIL_ON=<regex>`** chooses which outcome class fails, so each class shrinks on its own. A world stops at the first
+mismatch of any other class, so nothing runs on from a map that has already diverged.
+
+### 5. Runs (`logs/final.log`; load average 30 to 42 on 64 cores)
+
+| Run | Seeds | Sequences | Result |
+| --- | --- | --- | --- |
+| Original partition property, unchanged except for `confidence: O.none()` in `Fix.make` | 20261122, 7 | 25,000 each | **holds** on main's `act`, with tallies identical to the first trial |
+| one person, live, REDO=reissue, equal | 20261122, 7 | 25,000 each | holds (no refusals, no "no answer") |
+| one person, live, REDO=same, equal | 20261122, 7 | 25,000 each | holds |
+| **two people, live, REDO=same, equal** | 20261122, 7, 99 | 25,000 each | **holds**. Seed 20261122: 206,169 comparisons with an answer, 0 differ |
+| **two people, stale, REDO=same, REF=overlay, equal** | 20261122, 7 | 25,000 each | **holds**. 154,416 comparisons |
+| two people, live, **REDO=reissue**, equal | 20261122 | fails at run 111 | C1 |
+| two people, live, REDO=same, **TOUCH=changed**, equal | 20261122 | fails at run 1,875 | C2 |
+| two people, stale, REDO=same, **REF=act**, equal | 20261122 | fails at run 94 | S1 (the reference's fault) |
+| two people, live, harmless | 20261122 | fails at run 9 | H1 |
+| two people, stale, harmless | 20261122 | fails at run 9 | H2 (and H3 with `FAIL_ON=' ReviewMovedOn$'`) |
+
+The tallies at seed 20261122, 25,000 sequences (`CHECK=stats`):
+
+| | live | stale (overlay) |
+| --- | --- | --- |
+| accepted with an answer, all equal | 206,169 | 154,416 |
+| accepted, no answer: undo of a group / undo of a row / no-op undo / redo | 3,746 / 3,662 / 233 / 4,325 | 2,042 / 2,291 / 306 / 1,840 |
+| refused, total | 10,022 | 26,108 |
+| GroupedAfter (harmless) | 4,790 (1,254) | 2,715 (785) |
+| NotYourStep (harmless) | 5,232 (0) | 2,538 (0) |
+| ReviewMovedOn (harmless) | 0 | 11,401 (3,400) |
+| GroupedSince (harmless) | 0 | 6,294 (2,568) |
+| DecidedSince (harmless) | 0 | 2,864 (79) |
+| NoLongerThere (harmless) | 0 | 296 (3) |
+| stale row act accepted where `act` over `D` would differ | | 224 |
+| stale screen sent nothing where `act` over `D` would change rows | | 2,975 |
+
+With REDO=reissue on live screens, 139 of 25,000 worlds stop at a C1 mismatch.
+
+### 6. Counterexamples (smallest forms, in `Two.demo.test.ts`)
+
+**C1. A redo pressed again as the same action reaches other rows (`REDO=reissue`).**
+- Rows r0 and r1, both plain.
+- The presses: q leaves out r0. p leaves out [r0, r1]; that changes only r1. p undoes it. q undoes. p redoes.
+- `act`'s redo leaves out r1. Pressing the action again also leaves out r0, which q had put back in.
+- Shrunk forms exist for accept, acceptGroup, chooseGroup, leaveOut, revertGroup and row redos (`logs/redo-classes.log`).
+  Every one is `[otherRows]`. With 20,000 × 2 seeds there was none with the same rows and a different decision.
+- **What it means:** "doing it again is a new act" must name the undone unit's own rows and patches, not re-run the
+  press over the map. With REDO=same, the property holds (C1′).
+
+**C2. Under `TOUCH=changed`: a press that changes nothing on a covered row bakes the group's effect into the row.**
+- One row r0, with an applied rule fix on c (undone at the start) and a grouped fix on a.
+- The presses: q acceptGroup g. p reverts c, which is undone already. q undoes the group.
+- `act` gives r0 "nothing accepted". The model gives "accepted a".
+- The reason: DecideRow on a covered row counts the same text as a change, and records the folded decision, with the
+  group's accept in it, as the row's own. The group's undo then leaves that accept standing.
+- Under `TOUCH=named` the press named r0, so there is no answer and the case is N1. N1 has the same effect when the
+  later press did change something: the group's undo does not take back its effect on a row decided since.
+- **What it means:** the model's undo of a group is partial on any row anybody pressed on since, even a press that
+  changed nothing. If that is not wanted, the row's unit would have to hold its own patch relative to the
+  groups under it rather than its whole text. Or a covered row's no-change press could record nothing.
+
+**S1. With stale screens, `act` over the shared map is the wrong reference.** This is a counterexample to the
+reference, not to the model.
+- One row r0, with an undone rule fix on c and a proposed fix on b.
+- q accepts r0. p's stale screen accepts r0, which accepts b. The model says the row holds that already: no change.
+- `act` over `D` reads p's press as accepting c.
+- There were 224 accepted stale row acts of this kind in 25,000 sequences, plus 2,975 presses that sent nothing.
+- Today's draft sends the screen's rows, so the stale reference is `REF=overlay`. Under it the property holds.
+
+No counterexample remains for two people, live or stale, with `REDO=same` and `TOUCH=named`.
+
+### 7. Refusals that were harmless (each is the smallest form)
+
+- **H1, GroupedAfter on disjoint rows.** 1,254 of 4,790 group-undo refusals on live screens.
+  - q leaves out [r0, r1], which is a group. p leaves out [r2, r3], which is a group. q undoes, and is refused.
+  - No other refusal on live screens was harmless: NotYourStep was 0 of 5,232.
+- **H2, GroupedSince.** 2,568 of 6,294.
+  - p acceptGroup g over r0 and r1. q's stale screen leaves out r2, and is refused, because a group it had not seen
+    exists, on other rows.
+- **H3, ReviewMovedOn.** 3,400 of 11,401.
+  - q types a value into r0. p's stale screen leaves out [r1, r2], and is refused.
+- **DecidedSince (79 harmless) and NoLongerThere (3).** The row's own unit has moved (a covered no-op record, or an
+  act followed by its undo) while its value is the same.
+- **What it means:** every harmless refusal comes from the model's import-wide conditions: "the last group in force",
+  "every change", "the last group act". Each one blocks presses on rows the blocking change never named. That loses
+  nothing, but it costs the person a refresh. For GroupedAfter it can cost more: the person's undo stays blocked until
+  the other person takes their own group back.
+
+### 8. Not generated or not checked
+
+- Confirm and reopen (`opening`, `confirmedAt`), matching (`madeOn`/MatchedSince), the `HistoryEnds` cut, viewers,
+  roles and organizations.
+- More than two people. Two tabs of one person. Today's draft machine itself: saves in flight, failures, holds,
+  `epoch` restarts. Today's app wipes the history instead (section 1), and that was read, not run.
+- Undoing the `proposing` start. A row with no decision and an empty decision are treated as equal.
+- Steps that `act` records but the model records as nothing ("no change", `undo:none`) are kept in step on both sides.
+  They are not compared beyond the map.
+- Generated values come from small alphabets: 3 columns, 4 values, 3 kinds, 2 groups. Generated rows are at most 8.
+- The shrinker leaves extra rows in its outputs. The smallest forms in section 6 are written by hand, and each one is
+  asserted in `Two.demo.test.ts`.
+- `RESULT.md` makes no claim about the proved model's own proofs. They were read, not run.
+
+## What the sixth round did not run
+
+- A "can happen" rule for each command (the library's `sometimes`), and the library's lock file of standings: both are
+  in a later build of the library than these trials ran on.
+- The model on the Durable Object host: trial 17's times are of `review12`.
+- The screen that computes a group's rows and parts, and the screen and the projection that read a row through its
+  groups; what a match does to a group in force; a keep of one of two rows as one act; adoption of rows already stored.
+- Mutants of a fold or of a rule itself; a type-check of the proof files.
+- A saga, a projection, a view, a stream, a query, or anything deployed.
+
+## Running the sixth round again
+
+As the fifth round, with `review14` beside `test/Actor.context.ts`. The mutants are built by the script the table above
+names and take hours on a busy machine.

@@ -35,15 +35,16 @@ follows infra; Benjamin said it matches too.
 
 The request listed many technologies. The research recommended against using several of them. On 2026-11-19 Benjamin
 reversed that for the Alchemy domain ("Not borrow use."; DECISIONS.md, "core, reversed"), and marked as wanted, on
-his own list of 2026-11-18, the extras the rows below name. Whether and how each is used is not decided: the
-[alchemy-domain](../alchemy-domain/README.md) brief asks him. The recommendation column is kept as it was written,
+his own list of 2026-11-18, the extras the rows below name. How each is used is the
+[alchemy-domain](../alchemy-domain/README.md) brief's: he answered its decisions 1 to 40 on 2026-11-22, and the later
+ones are asked at their move. The recommendation column is kept as it was written,
 for the record.
 
 | Asked for | What the research found | Recommendation |
 | --- | --- | --- |
-| Alchemy domain as the core | It does not build on Effect's `schema/Model`. The documented API (npm `2.0.0-beta.87`) already differs from GitHub `main`. Confirm and take-back would stop being one atomic write. | Model-first package shape now, over D1 state tables behind ports. Move the import lifecycle onto an aggregate later, once a release with `Decision` is published. **Reversed 2026-11-19: to be used, all of it. How is the alchemy-domain brief, whose decisions are open.** |
-| Effect Cluster, workflows, singletons | The SQL storage needs transactions, which the D1 driver cannot do. The only Workers path keeps state in Durable Objects and is experimental. No step of an import needs them today. | Not now. Revisit if a model pass outgrows one request. **Marked as wanted by him. How is decisions 25 to 28 and 56 of the alchemy-domain brief, all open.** |
-| Drizzle v1 in Durable Objects | A second schema language beside Effect Schema, and no help for the hard SQL (full-text search, triggers, composite keys). | Keep D1 with raw SQL and `Model.Class` row schemas. **Marked as wanted by him. How is decision 26 of the alchemy-domain brief, open.** |
+| Alchemy domain as the core | It does not build on Effect's `schema/Model`. The documented API (npm `2.0.0-beta.87`) already differs from GitHub `main`. Confirm and take-back would stop being one atomic write. | Model-first package shape now, over D1 state tables behind ports. Move the import lifecycle onto an aggregate later, once a release with `Decision` is published. **Reversed 2026-11-19: to be used, all of it. How is the alchemy-domain brief, whose decisions 1 to 40 were answered on 2026-11-22.** |
+| Effect Cluster, workflows, singletons | The SQL storage needs transactions, which the D1 driver cannot do. The only Workers path keeps state in Durable Objects and is experimental. No step of an import needs them today. | Not now. Revisit if a model pass outgrows one request. **Marked as wanted by him. How is decisions 25 to 28 and 56 of the alchemy-domain brief: 25 to 28 answered on 2026-11-22, 56 asked at its move.** |
+| Drizzle v1 in Durable Objects | A second schema language beside Effect Schema, and no help for the hard SQL (full-text search, triggers, composite keys). | Keep D1 with raw SQL and `Model.Class` row schemas. **Marked as wanted by him. How is decision 26 of the alchemy-domain brief, answered on 2026-11-22: an aggregate per organization, with Drizzle for one import's suggestions.** |
 | `@effect/atom-react` and reactivity | Works, but undo per change, invalidate-after-last-write and keep-previous-data paging must be rebuilt by hand. | Keep TanStack Query for the first version; atoms as a later, separate change. **Reversed 2026-11-19 by "client state, reversed": the atoms goal.** |
 | `effect/graphql` | A client only. There is no server to call. | Leave out. **Marked as wanted by him. How is decision 54 of the alchemy-domain brief, open.** |
 | `@effect/ai-typesafe` for confidence scores | It does not score another model's answer; a score costs a second call to a second vendor. | No second vendor until a labelled calibration run shows a gain. **Marked as wanted by him. How is decisions 45 to 47 of the alchemy-domain brief, open.** |

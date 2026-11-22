@@ -202,6 +202,9 @@ on a catalog model, make every step that changes both sides a decision, and pin 
 has `Domain.Relation`; how is the brief's decision) and, for a proof rather than a check, `Domain.Decision` from the
 same ref.
 
+The brief, as answered on 2026-11-22, states neither relation: its decision 20 makes members their own instances, with
+the relation of trial 10's model, and its decision 17 makes each item its own aggregate, created by a saga.
+
 ## Where this was read
 
 - `website/src/content/docs/domain/verifying-models.mdx` (155-179, 278, 632, 652-682): not at `v2.0.0-beta.87`; on

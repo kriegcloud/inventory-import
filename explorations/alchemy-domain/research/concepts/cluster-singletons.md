@@ -328,7 +328,7 @@ calendar-day reset (at midnight UTC, say) would change what the person is told (
 
 ## Verdict
 
-**Open: decision 28 of the brief**, which puts two uses on the pool to Benjamin: a cron that closes each
+**Answered: decision 28 of the brief** (2026-11-22, the first option), two uses on the pool: a cron that closes each
 organization's day of model calls into a history, and a singleton that keeps the operator's live total, both over a
 registry entity on the pool. This page's own reading, below, is of the work the app schedules today.
 

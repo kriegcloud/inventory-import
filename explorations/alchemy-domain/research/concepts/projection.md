@@ -367,6 +367,9 @@ the holding table under (a2) when it holds the chunks).
 step wait on it and say when the items are still being written, and alert on its retry log. Do not bump its version
 until item edits are events too.
 
+The brief's decisions 17 and 18 answer otherwise (2026-11-22): each item is its own aggregate, written to D1 by
+`ItemRows`, keyed by the item, and a confirm's items come from a plan staged in D1; neither (a1) nor (a2) is taken.
+
 ## Where this was read
 
 - https://alchemy.run/domain/projection (the live site documents beta.87)

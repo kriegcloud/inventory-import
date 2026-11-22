@@ -13,15 +13,19 @@ it.
 
 ## Open
 
-Decisions 1 to 40 shape the first moves. Decisions 41 to 62 can wait for the move that needs them. "Changes" names
-the earlier answers that remove or change an option. Decisions 1 to 8, 10 to 23, 25 to 40 and 57 to 59 were answered
-on 2026-11-22 and are under "Answered"; 9 and 41 fell away with his answer to 7 and were not asked. Nothing of 1 to 40
-is open; 24 stands on his earlier infra answer, I8, and was not asked again. Decisions 41 to 56 and 60 to 62 are asked each when
-its move opens, as he chose on 2026-11-22. The numbers of the others stay as the brief gives them.
+Decisions 1 to 40 shape the first moves. Decisions 41 to 62 can wait for the move that needs them. "Changes" names the
+earlier answers that remove or change an option. Decisions 1 to 8, 10 to 23, 25 to 40 and 57 to 59 were answered on
+2026-11-22 and are under "Answered"; 9 and 41 fell away with his answer to 7 and were not asked. Of 1 to 40 only three
+points his answers left are open: 14a and 14b, under decision 14, and 34a, under decision 34; 24 stands on his earlier
+infra answer, I8 ("Close sign-up; I add accounts", 2026-11-19), and was not asked again: it is not open. Decisions 42 to
+56 and 60 to 62 are asked each when its move opens, as he chose on 2026-11-22. The numbers of the others stay as the
+brief gives them.
 
 | # | Question | Recommended in the brief | Changes | Where it is argued |
 | --- | --- | --- | --- | --- |
-| 24 | Can a person with no account be invited? | No, as his infra I8 | | [Resend](research/concepts/resend.md) |
+| 14a | A person decides a rival row while a keep stands: does their decision win over the keep? | | 14 | [the brief](BRIEF.md), decision 14 |
+| 14b | Two keeps of one SKU in the same moment: both are taken and both rows are left out. Is that what happens? | | 14 | [the brief](BRIEF.md), decision 14 |
+| 34a | Where in CI does each model's search run? | | 34 | [the brief](BRIEF.md), decision 34 |
 | 42 | What answers the Items page? | A query that answers today's page | | [query](research/concepts/query.md) |
 | 43 | Do suggestions start by the person's press, or by themselves? | By the press, as today | | [policy](research/concepts/policy.md) |
 | 44 | How many calls may one pass take from the 40 a day? | One, as today | | [saga](research/concepts/saga.md) |
@@ -121,7 +125,7 @@ field was matched since. Each part of a decision's text keeps the matching it wa
 every field's column at every match, so every reader can tell whether a stored part still holds (tested, not run).
 Reverse: a new decision by him.
 
-### 2026-11-20 and 2026-11-21 — his later answers on saving the review
+### 2026-11-20 to 2026-11-22 — his later answers on saving the review
 
 Asked by dialog on today's contract and built in today's code, after commit `d7594bd`. Each is recorded in full in
 `explorations/ideal-architecture/DECISIONS.md`, the entries that begin "atoms,". Each was the recommended
@@ -136,6 +140,7 @@ him.
 | A fix the person undid, and its field's column is matched again | Server refuses, says so | Keep it as made |
 | A field matched by hand to the column it already reads: what is taken back? | Only when it changes. A field displaced by another's match counts as moved | Any pick by hand |
 | A Replace or Keep-stored on an import matched before moves were kept | Take it back, say so | Keep it as made |
+| A Replace or Keep-stored already saved on such an import, its field not matched again (2026-11-22) | Leave as made: the next match of that same field takes it back and names it | Take them all back once |
 | A row that waited was decided otherwise since | Hold it, show both, ask | Send it, last press wins; Drop hers, name it |
 | What a refused save does to waiting rows | Keep them, say why, until decided again or dismissed; signed out counts as waiting | Name them once, drop; As built |
 | Two tabs of one person | Each tab keeps its own; a tab takes up only a gone tab's rows | One list, merged by row |
@@ -149,8 +154,8 @@ him.
 
 ### 2026-11-22 — decisions 1, 2, 3 and 6 of the brief
 
-Asked by dialog from the brief as it stood, rewritten and not yet committed or reviewed, which he knew. Each question and
-its options are the brief's. Of each: I chose; the agent recommended the same. Reverse each: a new decision by him.
+Asked by dialog from the brief as it stood. Each question and its options are the brief's. Of each: I chose; the agent
+recommended the same. Reverse each: a new decision by him.
 
 | # | Question | Options, the recommended one first | Answer |
 | --- | --- | --- | --- |
@@ -164,7 +169,8 @@ that the screen says whose the row is; for 6, what the two digests cover.
 
 ### 2026-11-22 — decisions 4, 13, 15 and 16 of the brief
 
-A second round of the same dialog, from the same uncommitted brief. Of each: I chose; the agent recommended the same.
+A second round of the same dialog. From this round on, the question and options in each table are the brief's wording,
+and the answer is the label he picked in the dialog. Of each: I chose; the agent recommended the same.
 Reverse each: a new decision by him.
 
 | # | Question | Options, the recommended one first | Answer |
@@ -179,7 +185,7 @@ between objects and 131 to 151 ms on the mean in local workerd; acts go through 
 of 6,000 rows is 13 to 15 minutes, worked out from that and not measured; one object for each decided row is kept for
 ever.
 
-### 2026-11-22 — decisions 5, 10 and 12 of the brief, and 7 left open
+### 2026-11-22 — decisions 5, 10 and 12 of the brief, and 7 put to a trial first
 
 A third round of the same dialog. Of each of the three: I chose; the agent recommended the same. Reverse each: a new
 decision by him.
@@ -190,14 +196,17 @@ decision by him.
 | 10 | How deep does an undo reach on one row? | Every step, exactly, with everything below the first level sealed into one text; every step, with the undo sent by the server alone; every step, held in the row's state as a list; one level | "Every step, sealed history" |
 | 12 | Can an undo reach past a confirm that stands? | No, for both: it is refused as decided before the last confirm; no for a row the confirm imported, yes for one it did not; yes: the decision is taken back and the item keeps the value | "No, refused for both" |
 
-With decision 5 he was told that it reverses the app's written rule that a confirm and a take-back are each one atomic
-write, and that `docs/standards/undo.md` and `CLAUDE.md` are rewritten in the move that makes it so.
+The label "Yes, fact first, writes after" picks the first option of 5: neither the confirm nor the take-back stays one
+D1 write. With decision 5 he was told that it reverses the app's written rule that a confirm and a take-back are each
+one atomic write, and that `docs/standards/undo.md` and `CLAUDE.md` are rewritten in the move that makes it so.
 
-Decision 7, how an act on a group of rows is carried, was asked in the same round and is not answered. He saw three
-options: "Trial the one-unit design first", "One act per row" (the brief's recommendation) and "One unit, untested", and
-chose the first, against the brief's recommendation. The reason he was given: one act per row is proved and takes 13 to
-15 minutes for 6,000 rows, worked out, with Confirm waiting; the one-unit design has never been run, so its standing
-under Verify is unknown. Decision 7 stays open until that trial reports, and decisions 8, 9 and 41 with it.
+Decision 7, how an act on a group of rows is carried, was asked in the same round and was not answered then. Put to him
+first, and recommended in the dialog, was to run the one-unit design as a trial before deciding; the brief as written
+then recommended one act per row. He saw three options: "Trial the one-unit design first", "One act per row" and "One
+unit, untested", and chose the trial. The reason he was given: one act per row is proved and takes 13 to 15 minutes for
+6,000 rows, worked out, with Confirm waiting; the one-unit design had never been run, so its standing under Verify was
+unknown. Decision 7 stayed open until that trial reported, and decisions 8, 9 and 41 with it; 7 and 8 were answered
+after it (the entry "decisions 7 and 8 of the brief, after the one-unit trial").
 
 ### 2026-11-22 — decisions 11, 14, 17 and 19 of the brief
 
@@ -273,9 +282,10 @@ as the brief states it: for 57 a Rivet control plane the Worker can reach and a 
 the project builds, for 59 a resource over the contents API.
 
 Decisions 41 to 56 and 60 to 62 were put to him together, and his answer was "At their move": he does not want them
-now, and each is asked when its move opens. They stay under "Open".
+now, and each is asked when its move opens. They stay under "Open". Decision 41 was among them and then fell away
+with his answer to 7.
 
-### 2026-11-22 — decisions 7 and 8 of the brief, after the trial he asked for
+### 2026-11-22 — decisions 7 and 8 of the brief, after the one-unit trial
 
 Asked again by dialog once the one-unit design had run (trials 15 to 17 of the trial page). Of each: I chose; the agent
 recommended the same. The recommendation for 7 had been one act per row before the trial and changed with it. Reverse
@@ -293,11 +303,14 @@ a property over 50,000 generated sequences holds the reading of a row through it
 that read through groups are not run. With decision 8 he was told the one case in which taking back an earlier group is
 not exact: an accept pressed because that group had made the proposal stays accepted.
 
+The 214 ms was, each time, the first group act on a fresh import, on the model before the last-group rule (`review12`,
+trial 17).
+
 Decisions 9 (who may stop a group act) and 41 (how long a group act may take before it is decided as one unit) fell away
 with his answer to 7 and were not asked: a group is one act.
 
-He was also given two corrections before these questions: the 93 rules of the final model stand, but none of them says
-that an act is taken; and the 131 to 151 ms an act was measured only on a row's first act.
+Before these questions he was also told that the 93 rules of the final model stand but none of them says that an act is
+taken, and that the 131 to 151 ms an act given with decision 4 was measured only on a row's first act.
 
 ### 2026-11-22 — what the proofs cover, and what the tests cover
 
@@ -305,5 +318,49 @@ Question: "Verify proves what must never happen. It does not prove that a valid 
 recorded nothing would pass every rule. Today that half is held by tests: the stories, and 8 of 8 deliberately broken
 variants each failing their rule. Is that enough?" Answer: "Yes, tests hold it, said plainly". I chose; the agent
 recommended the same. The proofs cover what must never happen; the stories cover that each valid act is taken; the
-documents and the demo page say exactly that split. Rejected: "Trial a rule for it first". Reverse: a new decision by
-him.
+documents and any page that shows the proofs say exactly that split. Rejected: "Trial a rule for it first". Reverse: a
+new decision by him.
+
+### 2026-11-22 — an undo after a group, and an undo behind a group
+
+Asked by dialog after his answers to 7 and 8. Of each: I chose; the agent recommended the same. Reverse each: a new
+decision by him.
+
+Question: his answer to decision 11 used the example of Ana leaving 12 rows out in one act, Dana typing a quantity on
+row 14, Ana undoing, then Dana undoing, and he chose "Row 14 is left out again, as Ana had it", before choosing one unit
+per group. With a group as one unit, Ana's act is a group, and once she has taken it back it gives no row anything, so
+in that example row 14 ends undecided. Which is it? Options: "Undecided: Ana took it back (Recommended)"; "Left out
+again, as Ana had it" (each row keeping its own copy of the group's decision underneath). Answer: "Undecided: Ana took
+it back". A group its maker took back stays taken back for every row; undo stays exact for single-row acts, where it
+puts back exactly what was under, with whose it was.
+
+Question: the model refuses a colleague's decision on any row when a group landed that their screen had not received,
+but not their undo of a row. Should the undo be refused too? Options: "Yes, refuse and show (Recommended)"; "No, let the
+undo through". Answer: "Yes, refuse and show": the undo is refused, the screen shows the group, and they press undo
+again if they still mean it.
+
+### 2026-11-22 — the pin, the names, and what holds the rules' standing
+
+Further answers by dialog on the same day. Reverse each: a new decision by him.
+
+- **The pin.** The library's `main` is pinned at `734c27a`, 67 commits past the `dbfd0dd` every trial on the trial page
+  ran on; the per-row model was proved again there. His words: "All I know is I want the latest version of alchemy. We
+  will likely need to update effect & alchemy again before Wednesday comes." How often it moves, under decision 1:
+  "In the repo, re-pin only when needed"; one pin's builds are 38.7 MB in the repository, measured.
+- **What is kept of what is deployed.** His words: "We can always tear down & redeploy from scratch. The idea is that we
+  get our ideal version built. I don't care about anything we've deployed yet we can start from scratch so that we have
+  the best names & things." So the rule that a model, an aggregate or an event is never renamed, and the adoption of
+  rows already stored (decision 37), bind only from the first deploy he keeps.
+- **Names.** Not his answer: proposed, and open until that deploy. The aggregates are `Import`, `Row` and `Group`, in
+  the model `Catalog` with `CatalogApi`. The trial page's `ImportLife`, `RowUnit`, `GroupUnit`, `Review` and `ReviewApi`
+  are these.
+- **A rule that each command can happen.** Question: the library now has `sometimes` rules, which the search answers
+  "reached" or "unreached"; does each command get one, beside the stories? Answer: "Yes, one per command". Not yet run
+  on the model.
+- **What holds the standing of each rule.** Answer: "The library's lock file": the library's `lock` option records each
+  rule's standing, in place of a list written by hand, once it is shown to catch a rule that slipped. Not yet run.
+- **What is shown on Wednesday 2026-11-25.** Answer: "Chosen design, parked one as fallback": the model with a group as
+  one unit is the one built for `main`; the per-row model stays on a branch as what is shown if the chosen one is not
+  merged by Tuesday evening.
+- **Open:** where decision 34's search runs in CI (34a under "Open").
+

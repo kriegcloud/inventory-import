@@ -387,6 +387,10 @@ claim, and the take-back as a decision over the import and the items it created;
 `@alchemy.run/domain` at `main@dbfd0ddb` or later (no npm release has `Domain.Decision`; how is the brief's
 decision), a host with decisions, and an exception to `newSchemaClass` for domain blocks.
 
+The brief's decisions 5, 17 and 20 answer otherwise (2026-11-22): the take-back is a fact on the import, and a saga
+restores or removes each item, itself an aggregate; a member is added by `AddMember`, a decision across the
+organization, the member and the sender's own member record, with the email claim beside it not run in that shape.
+
 ## Where this was read
 
 - `website/src/content/docs/domain/decision.mdx`: not at `v2.0.0-beta.87`; on `main@dbfd0ddb` new (the live site

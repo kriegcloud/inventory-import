@@ -4,7 +4,7 @@ title: Alchemy domain
 description: Everything @alchemy.run/domain and what plugs into it offers, concept by concept, with how inventory-import would use each. The reference the brief is built on, written so its pages can later become agent skills.
 status: active
 stage: shape
-next: decisions 1 to 40 of the brief are answered (2026-11-22); 42 to 56 and 60 to 62 are asked each when its move opens; moves 0 and 1 are built first, on the atoms work as merged
+next: decisions 1 to 40 of the brief are settled (2026-11-22; 9 fell away, 24 stands on infra I8); 42 to 56 and 60 to 62 are asked each when its move opens; moves 0 and 1 are built first, on the atoms work as merged
 goals: []
 ---
 
@@ -27,12 +27,14 @@ under it:
 
 1. [The map](research/00-map.md): every concept on one page, with its verdict. Fifty-four pages give 59 verdicts:
    46 "use" on the published release, 8 "use, from main", 4 "cannot yet", each with what is in the way, and one
-   (singletons and crons) put to Benjamin as a decision of the brief.
+   (singletons and crons) put to Benjamin as decision 28 of the brief, answered on 2026-11-22.
 2. [The pull request he pointed at](research/01-pr-3260-verify.md): `Verify`, which proves a model's rules.
 3. [This app's rules under Verify](research/03-this-apps-rules-under-verify.md): the app's own rules, declared and
    proved, and [the trial](research/04-trial.md) that ran them. Then
-   [the trial on saving review decisions](research/07-review-decisions-trial.md): five rounds, with their sources
-   and Verify's reports. Read its fourth round's table first, and the fifth's for decision 7.
+   [the trial on saving review decisions](research/07-review-decisions-trial.md): six rounds, with their sources
+   and Verify's reports. Read its sixth round's table first, for the model his answers describe (`review14`); then the
+   fifth's, which decided a group as one unit before the last-group rule, and the fourth's, the row-by-row model kept as
+   the fallback.
 4. [What was merged since the published release](research/02-merged-since-beta-87.md): what `main` has that npm
    does not.
 5. The concept pages, in [research/concepts/](research/concepts/), one file per concept under a stable name.
@@ -65,19 +67,27 @@ A model of this app, outside the repository ([the trial](research/04-trial.md)):
   `Verify`. Nineteen of the app's rules were proved for every state and every input, and one was checked over 5,173
   sequences of commands. A rule broken on purpose came back with the state, the command and the shortest sequence
   that breaks it.
-- On `main`, the saving of review decisions, in five rounds ([07](research/07-review-decisions-trial.md)). The
+- On `main`, the saving of review decisions, in six rounds ([07](research/07-review-decisions-trial.md)). The
   first showed that a command of rows to set and rows to clear cannot hold "no command clears a decision its sender
   did not make". The second found the shape under which the review's rules are proved: the import's lifecycle as its
   own instance, one instance per decided row, and every act a decision across both; one instance per import proves
   nothing, by the prover's design. The third ran that shape with the app's fifteen fields, and its rules were proved
   while two orderings they were named for still went through. The fourth closed those and the other
   orderings found that a model can hold: 93 rules proved, 1 checked, and two rules across every import and row
-  checked.
+  checked. The fifth decided a group of rows as one unit (`review12`, and `review13` with only the import's last group
+  act taken back): 123 and 124 rules proved, six rules across every import, row and group checked 3 commands deep, the
+  reading of a row through its groups equal to today's `act` over 50,000 generated sequences, and one group act in
+  local workerd. The sixth is the model he chose (`review14`): three aggregates, four decisions and eleven commands,
+  with only the last group still in force taken back, so undo walks back; 135 rules proved and seven rules across
+  every import, row and group checked 3 commands deep, on `dbfd0dd`, not hosted; 43 stories and 148 mutants, each
+  mutant breaking a rule or failing a story. The row-by-row model of the fourth round stays on a branch as the
+  fallback.
 - The second round stored values in a local Durable Object through the domain host (about 8 MiB is the limit), and
   ran a decision, a relation, a model invariant, an `eventually` rule and a broken rule kept as a story. The third
   ran one decision across two objects on that host in local workerd (the second round's model), an item with replace and
   restore, the allowance by day, and members as their own instances. The fourth ran its own model there: 4 requests
-  to objects an act (3 of them between objects), 131 to 151 ms an act on the mean, timed on rows' first acts.
+  to objects an act (3 of them between objects), 131 to 151 ms an act on the mean, timed on rows' first acts. The
+  fifth ran the one-unit model there: one group act of 6,000 rows a median of 214 ms, each time an import's first.
 
 ## What the reading found
 
@@ -202,12 +212,13 @@ pages whose "Where this was read" names a file that changed.
 
 ## Trail
 
-- 2026-11-19: packet opened. Every docs page and source file read at both refs; one page per concept written,
-  checked against the source in a second pass, then extended by a third pass over what the first had only
-  outlined; the trial run on the published release and on `main`. Awaiting Benjamin's reading, then the brief.
+- 2026-11-19: packet opened. Every docs page and source file read at both refs; one page per concept written; the
+  trial run on the published release and on `main`. Awaiting Benjamin's reading, then the brief.
 - 2026-11-20: the brief written, with the saving of review decisions modelled first under Verify
   ([07](research/07-review-decisions-trial.md)). Benjamin's reversal of "core" recorded in ideal-architecture.
 - 2026-11-20 and 2026-11-21: a second, a third and a fourth round of trials run and added to
   [07](research/07-review-decisions-trial.md); the brief written again on them, with sixty-two decisions, one decision
-  each, and his answers on today's review saving under "Answered" with the options he rejected. Nothing built; awaiting
-  his answers and "the brief matches".
+  each, and his answers on today's review saving under "Answered" with the options he rejected.
+- 2026-11-22: he answered decisions 1 to 40 by dialog, 7 and 8 after a fifth round of trials, which decided a group of
+  rows as one unit; 9 and 41 fell away, 24 stands on infra I8, and 42 to 56 and 60 to 62 are asked at their move. The
+  brief written on his answers. Nothing built; awaiting "the brief matches".

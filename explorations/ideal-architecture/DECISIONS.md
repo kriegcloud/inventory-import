@@ -1604,6 +1604,57 @@ matching's number and the text as one text, `onItsMatching`) it is one, and the 
 `UndoRowStep` at 300 from 298. 136 rules proved under `CI=true` (one new: a row's undo is not from under a later
 group); the lock written again on purpose for the two rules above. 55 stories, 165 mutants.
 
+8. **A press drawn before an undo on the row is held** (2026-11-22, a second review). After an undo the row holds
+   exactly what it held before the decision taken back, so the number of the row's decision cannot tell a press made
+   after the undo from one drawn before it. Dana types 8 on row 14 and takes it back; the first sending of her 8,
+   stalled on the way, arrives: before, it was written again, on the row she had cleared. Now `DecideRow` says the
+   last undo its screen has of the row (`sawUndone`: the change that undo took back), and a press without it is
+   refused `UndoneSince` with who took the undo and of which change. The same holds for another person whose screen
+   has the older decision and not the undo: before, their press was taken; now it is held and shown. Reverse: remove
+   `sawUndone` and its check.
+9. **A press sent twice is answered as the first time when a match landed between, on a row no group covers too.**
+   Before, the copy was refused `MatchedSince` though the row held that very act. Known as in 4: this step, from
+   this person, with this text on the matching it was made on.
+10. **A row's undo is made on the matching now.** It puts another person's decision back on the row; from a screen
+    that has not received a match it is refused `MatchedSince` and held, as a row's act is. `UndoRowStep` gains
+    `madeOn`. With this, a group's undo is again the one decision that takes a press from a screen that is behind.
+11. **What `GroupedAfter` names for a row's undo is the import's last group in force**, the one to take back first,
+    and its words say so. It is the group over the row or one made after it: the model keeps no reading of a
+    group's rows. The rule that held it was named for more than it reads and is renamed: a row's undo that is taken
+    is one whose sender said no later group covers the row.
+
+12. **An undo's copy is answered as the first time when a group act, or a confirm and a reopening, landed between
+    the two sendings** (a third review, the same day). Before, the copy was refused `GroupedSince` or
+    `ConfirmedSince` though the row had taken that very undo.
+13. **A row keeps its last undo only, and this one cannot be kept by the rule.** A copy of an undo that arrives after
+    another undo on the same row is refused `NotYourStep`, with nothing wrong stored. To know it, the row would have
+    to keep every undo it took. Tried: a text of them looked into with `includes`, which the prover does not read
+    (every rule of the undo comes back "not read"); not tried, read from the library: a list in the state, whose
+    rules are then proved for short lists only and not proved. For me to settle if it matters.
+
+With 8 to 11: `DecideRow` at 222 paths and `UndoRowStep` at 326, the relation of a row to its import's organization
+still proved across both (the first form tried); 61 stories, 179 mutants. With 12: `UndoRowStep` at 362 (the test
+worked out once before the refusals gave 814), 63 stories, 184 mutants.
+
+Rules that said less than their names, each either made to say it or renamed (the same review and the one before):
+
+- Made to say it, each a new rule: an undo stops where the history was let go (the refusal `HistoryEnds` had no
+  rule); an undo is of a row, or a group, of the import it names (only the organization's half of that check had
+  one); a group keeps its count; a group's change is one its import gave, from above as well as from below; no group
+  in force is later than the one its import holds as the last in force (the last two are searched, not proved).
+- Renamed to what they read: `AConfirmLeavesAClosedImportsStatusAsItWas` (was "a confirm of a closed import writes
+  nothing"), `TheMatchingMovesOnlyOnAnOpenImport` (was "only an open import is reviewed"),
+  `AGroupSaysAtLeastOneRow` (was "a group has rows": the count is its sender's word),
+  `ARowsUndoSaysNoLaterGroupCoversIt` (11 above).
+- Taken out, because they could not fail where they stood: "nobody clears another person's decision" on a row's
+  act, which always leaves a decision there, and "nobody undoes another person's group" on a group's act. Both stay
+  on the undos. The check that a decision states who may change a row or a group now asks by the event recorded, so
+  it is never satisfied by a rule that cannot fail.
+- Said as they are, in words only: `replaced` on an import counts replacements as the confirms said them, not
+  items; a group's rows are bounded at a million characters, which takes 50,000 ids at their longest.
+
+143 rules of the kinds a proof covers under `CI=true`; the lock written again on purpose for these.
+
 With 7: `UndoRowStep` at 324 paths, 139 rules proved under `CI=true` (three new, each one comparison: the row keeps
 which change was taken back, the step it was pressed in, and who pressed), 56 stories, 169 mutants.
 

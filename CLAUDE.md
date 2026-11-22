@@ -453,8 +453,9 @@ those files, read [docs/verify.md](docs/verify.md).
   differs, or the matching does") is written as one comparison (`onItsMatching`).
 - **An aggregate's rule reads only what its own commands' middleware provides.** `Row` and `Group` have no command, so
   the rules about who may change a row or a group are rules of each decision that records on it, under the same
-  name in each. A new decision that records on one states them too, and its proof calls the check that it
-  does, as the four do (`missingRules` in `test/proving.ts`, which runs only where a proof calls it): ours, because the lock and the list of rules that must stay proved take its
+  name in each, and only where the rule can fail: who may take a decision or a group back is the undo's rule, not the
+  act's. A new decision that records on one states them too, and its proof calls the check that it
+  does with the events its command records, as the four do (`missingRules` in `test/proving.ts`, which runs only where a proof calls it): ours, because the lock and the list of rules that must stay proved take its
   rules as they are written, and nothing in the library asks whose act a decision records.
 - **Annotate `keyOf`'s parameter** in a decision (`keyOf: (cmd: DecideRow) => ...`): without it the parameters of
   `decide` are `any`, and a typo in one passes the type-check.

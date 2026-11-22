@@ -59,7 +59,7 @@ import {
   SuggestionRecorded,
   TakeBackImport
 } from "../src/Import/Import.aggregate.ts"
-import { DecidedSince, DecideRow, NoLongerThere, PutBackSince } from "../src/Review/Deciding.decision.ts"
+import { DecidedSince, DecideRow, NoLongerThere, PutBackSince, UndoneSince } from "../src/Review/Deciding.decision.ts"
 import { DecideGroup } from "../src/Review/DecidingGroup.decision.ts"
 import {
   DecidedBeforeTheConfirm,
@@ -103,6 +103,7 @@ const act = (input: {
   readonly sawGroup?: number
   readonly covered?: boolean
   readonly asItReads?: boolean
+  readonly sawUndone?: number
 }) =>
   DecideRow.make({
     importId: id,
@@ -113,6 +114,7 @@ const act = (input: {
     asItReads: input.asItReads ?? false,
     opening: input.opening ?? 0,
     saw: input.saw,
+    sawUndone: input.sawUndone ?? 0,
     flags: input.flags,
     madeOn: input.madeOn ?? 0,
     label: "Decide"
@@ -126,6 +128,7 @@ const undo = (input: {
   readonly covered?: boolean
   readonly next?: Level
   readonly below?: string
+  readonly madeOn?: number
 }) =>
   UndoRowStep.make({
     importId: id,
@@ -134,6 +137,7 @@ const undo = (input: {
     step: input.step,
     sawGroup: input.sawGroup ?? 0,
     covered: input.covered ?? false,
+    madeOn: input.madeOn ?? 0,
     opening: input.opening ?? 0,
     next: input.next ?? noLevel,
     below: input.below ?? ""
@@ -815,6 +819,47 @@ it.effect(
       Story.then(life, ColumnMatched.make({ change: 5, matching: 1, columns: "unitCost: List price", by: "ana" }))
     )
 )
+it.effect(
+  "an undo sent twice is answered as the first time when the import was confirmed and opened again between: Dana's undo of her keep on row 12, sent again from the first opening",
+  () =>
+    story(
+      Story.given(
+        life,
+        staged,
+        counted({ change: 1, step: "a1", row: "row-12", by: "ana", flags: leftOut }),
+        counted({ change: 2, step: "d1", row: "row-12", by: "dana", flags: kept }),
+        ActCounted.make({
+          change: 3,
+          step: "u1",
+          row: "row-12",
+          label: "undo",
+          holds: 1,
+          by: "ana",
+          actor: "dana",
+          flags: leftOut,
+          madeOn: 0
+        }),
+        confirmed(4),
+        ImportTakenBack.make({ change: 5, removed: 155, kept: 0, restored: 0, keptReplaced: 0, by: "dana" }),
+        ImportReopened.make({ change: 6, by: "dana" })
+      ),
+      Story.given(
+        row12,
+        decided({ change: 1, by: "ana", step: "a1", flags: leftOut }),
+        decided({ change: 2, by: "dana", step: "d1", flags: kept }),
+        StepUndone.make({ next: noLevel, below: "", undo: 2, step: "u1", by: "dana" })
+      ),
+      // The row took this very undo in the first opening: its copy records nothing, and is not refused.
+      Story.provide(CurrentActor, dana),
+      Story.when(undo({ row: "row-12", undo: 2, step: "u1", opening: 0 })),
+      Story.then(row12),
+      Story.then(life),
+      // Any other undo made in the first opening is refused.
+      Story.provide(CurrentActor, ana),
+      Story.when(undo({ row: "row-12", undo: 1, step: "u2", opening: 0 })),
+      Story.rejected(ConfirmedSince.make({}))
+    )
+)
 it.effect("an undo does not reach past a confirm that stands", () =>
   story(
     Story.given(
@@ -889,7 +934,7 @@ it.effect("a decision its sender saw that was taken back since is no longer ther
     Story.provide(CurrentActor, dana),
     Story.when(act({ row: "row-12", step: "d1", saw: 1, flags: kept })),
     Story.rejected(NoLongerThere.make({})),
-    Story.when(act({ row: "row-12", step: "d2", saw: 0, flags: kept })),
+    Story.when(act({ row: "row-12", step: "d2", saw: 0, sawUndone: 1, flags: kept })),
     ...recorded(row12, "row-12", { change: 3, by: "dana", step: "d2", flags: kept })
   )
 )
@@ -1032,7 +1077,7 @@ it.effect(
       Story.then(life),
       // The admin types a name there, having received the undo. Dana's same undo, sent once more, is still known.
       Story.provide(CurrentActor, admin),
-      Story.when(act({ row: "row-12", step: "x1", saw: 1, flags: typed })),
+      Story.when(act({ row: "row-12", step: "x1", saw: 1, sawUndone: 2, flags: typed })),
       ...recorded(row12, "row-12", { change: 4, by: "ada", step: "x1", flags: typed }),
       Story.provide(CurrentActor, dana),
       Story.when(undo({ row: "row-12", undo: 2, step: "u1" })),
@@ -1041,11 +1086,123 @@ it.effect(
       // Another undo of hers of that change, pressed anew, is refused: the row does not hold it as her decision.
       Story.when(undo({ row: "row-12", undo: 2, step: "u2" })),
       Story.rejected(NotYourStep.make({})),
+      // Nor is the same step naming another change: the admin's decision is not hers to take back.
+      Story.when(undo({ row: "row-12", undo: 4, step: "u1" })),
+      Story.rejected(NotYourStep.make({})),
       // And nobody else is answered for her undo: the same step and change from Ana is refused.
       Story.provide(CurrentActor, ana),
       Story.when(undo({ row: "row-12", undo: 2, step: "u1" })),
       Story.rejected(NotYourStep.make({})),
       Story.state(row12, { status: "Decided", by: "ada", change: 4 })
+    )
+)
+it.effect(
+  "a press drawn before an undo is not written over what the undo put back: Ana leaves row 12 out, Dana keeps it and takes that back, and presses that name Ana's decision from screens without the undo are refused",
+  () =>
+    story(
+      Story.given(life, staged),
+      Story.provide(CurrentActor, ana),
+      Story.when(act({ row: "row-12", step: "a1", saw: 0, flags: leftOut })),
+      ...recorded(row12, "row-12", { change: 1, by: "ana", step: "a1", flags: leftOut }),
+      Story.provide(CurrentActor, dana),
+      Story.when(act({ row: "row-12", step: "d1", saw: 1, flags: kept })),
+      ...recorded(row12, "row-12", { change: 2, by: "dana", step: "d1", flags: kept }),
+      Story.when(undo({ row: "row-12", undo: 2, step: "u1" })),
+      Story.then(row12, StepUndone.make({ next: noLevel, below: "", undo: 2, step: "u1", by: "dana" })),
+      Story.then(
+        life,
+        ActCounted.make({
+          change: 3,
+          step: "u1",
+          row: "row-12",
+          label: "undo",
+          holds: 1,
+          by: "ana",
+          actor: "dana",
+          flags: leftOut,
+          madeOn: 0
+        })
+      ),
+      // The first sending of Dana's keep stalled and arrives now. The row holds Ana's decision again, the very one
+      // the copy says it saw, so the number of the row's decision cannot tell it from a new press: the undo it has
+      // not received does. It is refused naming the undo, and the keep she took back is not written again.
+      Story.when(act({ row: "row-12", step: "d1", saw: 1, flags: kept })),
+      Story.rejected(UndoneSince.make({ by: "dana", change: 2 })),
+      Story.then(row12),
+      Story.then(life),
+      // The admin's screen has Ana's decision and neither Dana's keep nor its undo: held the same way.
+      Story.provide(CurrentActor, admin),
+      Story.when(act({ row: "row-12", step: "x1", saw: 1, flags: typed })),
+      Story.rejected(UndoneSince.make({ by: "dana", change: 2 })),
+      // With the undo received, the same press is taken.
+      Story.when(act({ row: "row-12", step: "x1", saw: 1, sawUndone: 2, flags: typed })),
+      ...recorded(row12, "row-12", { change: 4, by: "ada", step: "x1", flags: typed })
+    )
+)
+it.effect(
+  "a press sent twice with a match landing between is answered as the first time: Dana keeps row 12, the admin matches a column, and her screen sends the keep again",
+  () =>
+    story(
+      Story.given(life, staged),
+      Story.provide(CurrentActor, dana),
+      Story.when(act({ row: "row-12", step: "d1", saw: 0, flags: kept })),
+      ...recorded(row12, "row-12", { change: 1, by: "dana", step: "d1", flags: kept }),
+      Story.provide(CurrentActor, admin),
+      Story.when(MatchColumn.make({ importId: id, columns: "tags: none", saw: 0, opening: 0 })),
+      Story.then(life, ColumnMatched.make({ change: 2, matching: 1, columns: "tags: none", by: "ada" })),
+      // The answer to Dana's keep was lost and her screen sends the very same press: the row holds it already, as
+      // hers, under that step, with that text on the matching it was made on. Nothing more is recorded, and she is
+      // not told it was made on an older matching, which would have her screen hold a press that is on the row.
+      Story.provide(CurrentActor, dana),
+      Story.when(act({ row: "row-12", step: "d1", saw: 0, flags: kept })),
+      Story.then(row12),
+      Story.then(life),
+      // Any other press made on the older matching is refused with the matching now: her own under a new step, and
+      // the same step and text from someone else.
+      Story.when(act({ row: "row-12", step: "d2", saw: 0, flags: kept })),
+      Story.rejected(MatchedSince.make({ matching: 1 })),
+      Story.provide(CurrentActor, ana),
+      Story.when(act({ row: "row-12", step: "d1", saw: 0, flags: kept })),
+      Story.rejected(MatchedSince.make({ matching: 1 }))
+    )
+)
+it.effect(
+  "a row's undo pressed on a screen that has not received a match is refused and held, and taken once it has: Ana leaves row 12 out, Dana keeps it, the admin matches a column, and Dana presses undo",
+  () =>
+    story(
+      Story.given(life, staged),
+      Story.provide(CurrentActor, ana),
+      Story.when(act({ row: "row-12", step: "a1", saw: 0, flags: leftOut })),
+      ...recorded(row12, "row-12", { change: 1, by: "ana", step: "a1", flags: leftOut }),
+      Story.provide(CurrentActor, dana),
+      Story.when(act({ row: "row-12", step: "d1", saw: 1, flags: kept })),
+      ...recorded(row12, "row-12", { change: 2, by: "dana", step: "d1", flags: kept }),
+      Story.provide(CurrentActor, admin),
+      Story.when(MatchColumn.make({ importId: id, columns: "tags: none", saw: 0, opening: 0 })),
+      Story.then(life, ColumnMatched.make({ change: 3, matching: 1, columns: "tags: none", by: "ada" })),
+      // Dana's undo would put Ana's decision back on the row, made on the older matching, from a screen that does
+      // not show the match. It is refused with the matching now, as her act on the row would be.
+      Story.provide(CurrentActor, dana),
+      Story.when(undo({ row: "row-12", undo: 2, step: "u1" })),
+      Story.rejected(MatchedSince.make({ matching: 1 })),
+      Story.then(row12),
+      Story.then(life),
+      Story.when(undo({ row: "row-12", undo: 2, step: "u1", madeOn: 1 })),
+      Story.then(row12, StepUndone.make({ next: noLevel, below: "", undo: 2, step: "u1", by: "dana" })),
+      Story.then(
+        life,
+        ActCounted.make({
+          change: 4,
+          step: "u1",
+          row: "row-12",
+          label: "undo",
+          holds: 1,
+          by: "ana",
+          actor: "dana",
+          flags: leftOut,
+          madeOn: 0
+        })
+      )
     )
 )
 it.effect("an undo that puts back another person's decision stops there", () =>

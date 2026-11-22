@@ -1100,12 +1100,16 @@ const runIn = (world: World, command: Command): void => {
         leftOver: O.none()
       }
       const before = world.draft
-      // Decided the same in this tab, refused in the other: this tab's own stands, and may be sent.
+      // Decided the same in this tab, refused in the other: this tab's own stands, and may be sent. Only this tab's own
+      // decision as it stands now: one on its way that she has decided again since is not what stands.
+      const onItsWay = R.has(before.unsent, row)
+        ? O.none()
+        : O.flatMap(before.flight, (flight) => R.get(flight.rows, row))
       const isOwn = (one: { readonly row: string; readonly value: Value }): boolean =>
         one.row === row &&
         A.some(
           [
-            ...A.fromOption(O.flatMap(before.flight, (flight) => R.get(flight.rows, row))),
+            ...A.fromOption(onItsWay),
             ...A.fromOption(R.get(before.unsent, row)),
             ...A.filter(before.lines[row]?.sides ?? [], (one) => one.here && O.isNone(one.refused))
           ],
@@ -1393,7 +1397,7 @@ export const opened = (decisions: SavedDecisions = {}): World => {
 }
 
 /** The first thing that does not hold when `commands` are played from an opened review, in words; none if all holds. */
-const broken = (commands: ReadonlyArray<Command>): O.Option<string> => {
+export const broken = (commands: ReadonlyArray<Command>): O.Option<string> => {
   const world = opened()
   const one = (command: Command): void => {
     runIn(world, command)

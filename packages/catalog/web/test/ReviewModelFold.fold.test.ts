@@ -461,6 +461,9 @@ const modelSide = (input: { readonly rows: number; readonly first: Actor }) => {
     const stack = stackOf(row)
     const top = A.last(stack)
     const covered = coveredIn(known(), row)
+    // On a covered row the screen says whether the press leaves it reading as it reads through its groups: then it is
+    // no change, and recorded as nobody's (Benjamin, 2026-11-22: "No change, Ana's undo applies").
+    const asItReads = covered && holdsAlready(foldRow(known(), row), decision)
     steps.push(
       Story.when(
         DecideRow.make({
@@ -469,6 +472,7 @@ const modelSide = (input: { readonly rows: number; readonly first: Actor }) => {
           step,
           sawGroup: lastGroup,
           covered,
+          asItReads,
           opening: 0,
           saw: O.match(top, { onNone: () => 0, onSome: (held) => held.level.change }),
           flags,
@@ -478,8 +482,10 @@ const modelSide = (input: { readonly rows: number; readonly first: Actor }) => {
       )
     )
     touchedRows = A.append(touchedRows, row)
-    // The row says this already and no group covers it since: the model records nothing.
-    if (!covered && flags === O.match(top, { onNone: () => NO_DECISION, onSome: (held) => held.level.flags })) {
+    // The row reads as this already, through its groups or by its own instance: the model records nothing.
+    if (
+      covered ? asItReads : flags === O.match(top, { onNone: () => NO_DECISION, onSome: (held) => held.level.flags })
+    ) {
       return Sent.Nothing()
     }
     changes += 1
@@ -801,7 +807,8 @@ const nobody: Person = { undo: [], redo: [], steps: { undo: [], redo: [] } }
 /**
  * How a press is translated. `redo`: "same" sends the undone unit's own rows and patches again; "again" presses the
  * action again on the screen (counterexample C1). `rows`: "changed" sends only the rows whose decision the press
- * changed; "written" every row `act` wrote, a covered row's no-change press included (counterexample C2).
+ * changed; "written" every row `act` wrote, a covered row's no-change press included (counterexample C2, which the
+ * model now answers "no change", so both agree).
  */
 interface How {
   readonly redo: "same" | "again"
@@ -1503,12 +1510,10 @@ it("two people met every case: compared presses, undos with no answer, and both 
  * the translation's one choice (it sends only the rows whose decision a press changed, not every row `act` wrote) is
  * compared on every press that has one.
  *
- * Whether this property tells the two translations apart, measured with the translation switched to "every row `act`
- * wrote": at 25 runs with this seed the two translations are not told apart; the hand-written C2 test is what tells
- * them apart. At 200 runs with this seed the switched translation fails at run 169, shrunk to 60 presses: at press 45
- * row-9 folds to `{"reverted":["isActive"],"edits":{"isActive":"ZZZ-9999"}}` where `act` holds
- * `{"reverted":["isActive"]}`, a group's typed value kept past its undo by a covered row's no-change act, as in C2.
- * 200 runs take about five minutes, so the count stays at 25.
+ * Before the model answered a covered row's no-change press "no change" (`asItReads`, Benjamin, 2026-11-22: "No
+ * change, Ana's undo applies"), the two translations differed: at 200 runs with this seed, "every row `act` wrote"
+ * failed at run 169, a group's typed value kept past its undo by a covered row's no-change act, as in C2. Now the
+ * model records nothing for such a press, and the hand-written C2 test shows both translations agreeing. 25 runs.
  */
 let changedRuns = 0
 let changedTally = nothingYet
@@ -1639,7 +1644,7 @@ it.effect(
 )
 
 it.effect(
-  "C2: only the rows a press changes are sent; a covered row's no-change act would keep a group's effect past its undo",
+  "C2: a covered row's press that changes nothing is no change, so a group's undo takes its effect back, whatever rows are sent",
   () =>
     Effect.gen(function* () {
       const rows = [
@@ -1660,10 +1665,12 @@ it.effect(
         [ana, { type: "undo" }]
       ]
       // As C2 was first found: a step counts as naming a row only when it changed it, so Ana's undo has an answer.
+      // Dana's second press leaves row-1 reading as it reads through Ana's group: the screen says so (`asItReads`),
+      // the model records nothing, and Ana's undo leaves c undone and nothing accepted, as `act` does. Before that
+      // answer the model recorded the press as Dana's whole decision, and the fold kept Ana's accept:
+      // `{"accepted":["a"],"reverted":["c"]}` against `act`'s `{"reverted":["c"]}`.
       const written = yield* twoOn(rows, presses, { ...right, rows: "written" }, "changed")
-      expect(written.last).toEqual([
-        `press 3, row-1: the fold {"accepted":["a"],"reverted":["c"]}, act {"reverted":["c"]}`
-      ])
+      expect(written.last).toEqual([])
       const changed = yield* twoOn(rows, presses, right, "changed")
       expect(changed.last).toEqual([])
       for (const run of [written, changed]) {

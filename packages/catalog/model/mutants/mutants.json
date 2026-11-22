@@ -1200,6 +1200,20 @@
       ]
     },
     {
+      "key": "row-asitreads",
+      "target": "DecideRow",
+      "kind": "check",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["const changesNothing = (act: {"],
+      "until": "/** One act of the review",
+      "old": "(act.command.covered ? act.command.asItReads : leavesAsItIs({ row: act.row, flags: act.command.flags }))",
+      "new": "!act.command.covered && leavesAsItIs({ row: act.row, flags: act.command.flags })",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "rule",
+      "trialRules": [],
+      "trialStories": []
+    },
+    {
       "key": "row-saw",
       "target": "DecideRow",
       "kind": "check",

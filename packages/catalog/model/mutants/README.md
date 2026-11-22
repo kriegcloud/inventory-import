@@ -3,7 +3,7 @@
 What the proofs and the stories of the review are worth is measured by breaking the model on purpose and seeing
 whether anything notices. A **mutant** is one change to the model's source, made in a copy of the package:
 
-- **check**: one check of a `decide` removed (`if (!isOpen(s)) return yield* new NotOpen({})` goes), 60 of them;
+- **check**: one check of a `decide` removed (`if (!isOpen(s)) return yield* new NotOpen({})` goes), 61 of them;
 - **field**: one field of an event given a wrong value (`by: actor.memberId` becomes `by: actor.organizationId`), 77;
 - **nothing**: an accepted act made to record nothing (`return []` before the events), 11.
 
@@ -18,7 +18,9 @@ They cover the import's seven commands (`src/Import/Import.aggregate.ts`) and th
 | `story` | only a story | an example shows the change is wrong, but no rule says so: the next change of the same kind may pass both |
 | `neither` | nothing | the change goes unnoticed: a gap, to be closed by a rule or a story |
 
-An earlier trial of this model ran the same 148 changes and found 111 held by a rule, 37 by a story only and 0 by
+One more was added since, `row-asitreads`: the no-change test of `Deciding` put back as it was before a covered row's
+no-change press was answered "no change"; the story of that answer and the proof's path count notice it. An earlier
+trial of this model ran the other 148 changes and found 111 held by a rule, 37 by a story only and 0 by
 neither. Each mutant in `mutants.json` keeps what that trial found (`expect`, and the rules it saw break in
 `trialRules`), so a run can say when a rule got weaker.
 
@@ -35,7 +37,7 @@ From `packages/catalog/model` (the runner finds its paths from its own place, so
 
 ```sh
 python3 -I mutants/run.py --sample              # nine fast mutants, about 25 s
-python3 -I mutants/run.py --all --jobs 4        # all 148
+python3 -I mutants/run.py --all --jobs 4        # all 149
 python3 -I mutants/run.py --only confirm-sum,group-madeon
 python3 -I mutants/run.py --list                # every mutant, and nothing run
 ```
@@ -58,6 +60,8 @@ It exits 1 when a mutant is held by `neither`, when one the trial found held by 
 A mutant held by a rule where the trial had a story is printed as an `improvement`, and is not a failure.
 
 ## What it costs
+
+The run below is of the first 148, before `row-asitreads` was added (it takes about six seconds more).
 
 Measured on a 64-core workstation with a load average of 20 to 37 from other work, `--nice 10`:
 

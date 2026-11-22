@@ -126,6 +126,7 @@ const act = (input: {
   readonly saw: number
   readonly sawGroup: number
   readonly covered: boolean
+  readonly asItReads?: boolean
   readonly flags: string
   readonly row?: string
 }) =>
@@ -135,6 +136,7 @@ const act = (input: {
     step: input.step,
     sawGroup: input.sawGroup,
     covered: input.covered,
+    asItReads: input.asItReads ?? false,
     opening: 0,
     saw: input.saw,
     flags: input.flags,
@@ -384,6 +386,51 @@ it.effect(
       // patch back onto row 14.
       Story.state(row14, { status: "Undecided" }),
       Story.state(g1, { status: "Decided", undoneAt: 3 })
+    )
+)
+it.effect(
+  "a press that leaves a row reading as it reads is no change: Ana's group of twelve rows, Dana's press on row 14 changes nothing, Ana takes the group back, and row 14 holds nothing",
+  () =>
+    story(
+      Story.given(life, staged),
+      Story.provide(CurrentActor, ana),
+      Story.when(
+        group({
+          seen: 0,
+          rows: A.join(
+            A.makeBy(12, (n) => `row-${n + 3}`),
+            ","
+          ),
+          count: 12,
+          label: "12 fixes accepted"
+        })
+      ),
+      Story.then(
+        g1,
+        groupDecided({
+          change: 1,
+          rows: "row-3,row-4,row-5,row-6,row-7,row-8,row-9,row-10,row-11,row-12,row-13,row-14",
+          count: 12,
+          label: "12 fixes accepted"
+        })
+      ),
+      Story.then(life, groupCounted({ change: 1, rows: 12, label: "12 fixes accepted" })),
+      // Dana's screen has the group: row 14 reads as the group's accepted unit. She accepts the unit on it, which leaves
+      // it reading as it reads (Benjamin, 2026-11-22: "No change, Ana's undo applies"). Nothing is recorded, on the row
+      // or on the import.
+      Story.provide(CurrentActor, dana),
+      Story.when(
+        act({ row: "row-14", step: "d1", saw: 0, sawGroup: 1, covered: true, asItReads: true, flags: accepted })
+      ),
+      Story.then(row14),
+      Story.then(life),
+      // Ana takes her group back, and nothing of it stays on row 14: the row has no decision of its own.
+      Story.provide(CurrentActor, ana),
+      Story.when(undoGroup({ undo: 1 })),
+      Story.then(g1, GroupUndone.make({ change: 2 })),
+      Story.then(life, groupCounted({ change: 2, rows: 12, label: "undo", top: 0 })),
+      Story.state(row14, { status: "Untouched" }),
+      Story.state(g1, { status: "Decided", undoneAt: 2 })
     )
 )
 it.effect(

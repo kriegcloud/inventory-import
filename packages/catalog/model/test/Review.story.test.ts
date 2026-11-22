@@ -102,6 +102,7 @@ const act = (input: {
   readonly opening?: number
   readonly sawGroup?: number
   readonly covered?: boolean
+  readonly asItReads?: boolean
 }) =>
   DecideRow.make({
     importId: id,
@@ -109,6 +110,7 @@ const act = (input: {
     step: input.step,
     sawGroup: input.sawGroup ?? 0,
     covered: input.covered ?? false,
+    asItReads: input.asItReads ?? false,
     opening: input.opening ?? 0,
     saw: input.saw,
     flags: input.flags,

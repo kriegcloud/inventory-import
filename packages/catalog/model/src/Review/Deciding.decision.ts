@@ -2,12 +2,16 @@
 // One act of the review, decided across the import and the row it names, and recorded on both or on neither. The
 // import says whether it is open, what its matching is, which act on a group was its last and what number the act
 // gets; the row says what decision it holds. An act is taken only from a screen that has the import's last group act
-// (2026-11-22: "Yes, refuse and show"): a group that landed since may cover the row, and the screen has not drawn it. An act names the decision its sender saw on the row, by the change that
-// recorded it, and is refused over any other (Benjamin, 2026-11-22: "Same: hold, show both"). An act that would leave
-// the row as it is records nothing, and it stays whose it was (2026-11-19: "Answer says 'no change'"; 2026-11-22: "No,
-// it stays Dana's"), unless its sender says a group in force covers the row since: then the row is not as its own
-// instance has it, and the same text is a change. The one thing not to break: every check here that refuses an act has its rule below, so a check
-// that is removed breaks a named rule under Verify.
+// (2026-11-22: "Yes, refuse and show"): a group that landed since may cover the row, and the screen has not drawn it.
+// An act names the decision its sender saw on the row, by the change that recorded it, and is refused over any other
+// (Benjamin, 2026-11-22: "Same: hold, show both"). An act that would leave the row reading as it reads records nothing,
+// and it stays whose it was (2026-11-19: "Answer says 'no change'"; 2026-11-22: "No, it stays Dana's"). On a row no
+// group in force covers since its own decision, that is the row's own instance holding the act's text; on a row one
+// covers, it is what the row reads as through its groups, which only the screen knows, so the sender says it
+// (`asItReads`), and a group taken back then gives the row nothing (2026-11-22: "No change, Ana's undo applies").
+// `covered` and `asItReads` are the sender's word: the model cannot check them, so the screen must work them out from
+// what it has received, as the fold does. The one thing not to break: every check here that refuses an act has its
+// rule below, so a check that is removed breaks a named rule under Verify.
 import * as Domain from "@alchemy.run/domain"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
@@ -63,9 +67,11 @@ export const Label = S.String.check(S.isMaxLength(200)).annotate({ description: 
 
 /**
  * Decide one row. `sawGroup`: the import's last act on a group as the sender's screen has it. `covered`: a group in
- * force on this row was decided after the row's own decision, so the row is not as its own instance has it and the
- * same text is a change. `opening`: how many times the import had been confirmed when the act was made. `saw`: the change that recorded the decision the sender saw on the row, or 0
- * for none. `madeOn`: the import's matching the act was made on, whatever it decides.
+ * force on this row was decided after the row's own decision, so the row is not as its own instance has it.
+ * `asItReads`: on such a row, the act leaves it reading as it reads now through its groups, so it changes nothing.
+ * Both are the sender's word, worked out by the screen from what it received. `opening`: how many times the import
+ * had been confirmed when the act was made. `saw`: the change that recorded the decision the sender saw on the row,
+ * or 0 for none. `madeOn`: the import's matching the act was made on, whatever it decides.
  */
 export class DecideRow extends Domain.Command(
   "DecideRow",
@@ -77,6 +83,7 @@ export class DecideRow extends Domain.Command(
       step: Step,
       sawGroup: Change,
       covered: S.Boolean,
+      asItReads: S.Boolean,
       opening: S.Int,
       saw: Change,
       flags: Flags,
@@ -96,13 +103,13 @@ const isActCounted = (event: DecidingEvent): event is ActCounted =>
   Match.value(event).pipe(Match.tag("ActCounted", yes), Match.orElse(no))
 
 /**
- * The act would leave the row as it is: it says what the row's own instance holds, and its sender does not say a
- * group in force covers the row since.
+ * The act would leave the row reading as it reads: on a row a group in force covers since its own decision, as its
+ * sender says (`asItReads`); on any other, its text is what the row's own instance holds.
  */
 const changesNothing = (act: {
   readonly row: RowState
-  readonly command: { readonly flags: string; readonly covered: boolean }
-}): boolean => !act.command.covered && leavesAsItIs({ row: act.row, flags: act.command.flags })
+  readonly command: { readonly flags: string; readonly covered: boolean; readonly asItReads: boolean }
+}): boolean => (act.command.covered ? act.command.asItReads : leavesAsItIs({ row: act.row, flags: act.command.flags }))
 
 /** One act of the review: read from the import and the row, recorded on both or on neither. */
 export class Deciding extends Domain.Decision(

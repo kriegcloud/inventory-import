@@ -7,7 +7,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices"
 import { expect, layer } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import { Deciding } from "../src/Review/Deciding.decision.ts"
-import { missingRules, notProved, standingOf, standings, whatBroke } from "./proving.ts"
+import { notProved, standingOf, standings, whatBroke } from "./proving.ts"
 
 layer(NodeServices.layer)("Deciding", (it) => {
   it.effect(
@@ -17,16 +17,15 @@ layer(NodeServices.layer)("Deciding", (it) => {
         source: new URL("../src/Review/Deciding.decision.ts", import.meta.url)
       })
       const said = whatBroke(Prove.renderDecision(report))
-      // What is not proved, by name, with what the solver found. Which rules there are is the lock's, in the search.
+      // Ours, because `Prove` takes no lock and no `require`: what is not proved, by name, with what the solver found.
+      // Which rules there are, and that each stays proved, is the library's, in the search of the whole model.
       expect(notProved(standings(report)), said).toEqual([])
-      // The rules of every aggregate it reads are there, and the ones about who may change a row or a group it states.
-      expect(missingRules(report), said).toEqual([])
       // Every state it leaves is one its aggregate's schema allows.
       expect(standingOf(report.schema), said).toBe("proved")
       // Some state lets it record: it is not proved only because it never does anything.
       expect(report.accepted, said).toBe(true)
       // Past 4,096 paths the prover proves nothing: a rule or a check that adds paths shows here first.
-      expect(report.paths, said).toBe(152)
+      expect(report.paths, said).toBe(176)
       // Every check of every schema is one the prover reads, so a broken rule comes back with its counterexample.
       expect(report.unread).toEqual([])
       expect(report.unkept).toEqual([])

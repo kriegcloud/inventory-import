@@ -43,7 +43,7 @@ real test runner and type-checker over it, so a template that stops working fail
 | `probe` | A plain function, the same as an Effect, and a test of both. It imports `@inventory/kernel/Role`, to show that any package is imported by its name |
 | `service` | A `Context.Service`, its twin for tests with everything in memory, something that uses it, and a test through the twin |
 | `screen` | A page of its own (`index.html`, `main.tsx`), a screen from the design system's components over atoms, and a test of the atoms. Served by `scratch:serve`; the app never loads it |
-| `verify` | A domain model the prover reads, a story that runs it and a proof of its rules. It needs `@alchemy.run/domain`: until `vendor/alchemy/sources.json` lists that package, `scratch:new` refuses this template and says so; once it does, the package is added as the experiment's own library |
+| `verify` | An aggregate the prover reads (`<Name>.aggregate.ts`), a story that runs its model and a proof of its rules. It needs `@alchemy.run/domain`: until `vendor/alchemy/sources.json` lists that package, `scratch:new` refuses this template and says so; once it does, the package is added as the experiment's own library. The aggregate's file builds events with `new` and turns the one diagnostic that refuses it off on its first lines, because the prover does not read `X.make(...)` |
 
 ## What is and is not enforced inside it
 

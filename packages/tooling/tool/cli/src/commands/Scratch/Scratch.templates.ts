@@ -294,8 +294,11 @@ const verify = (slug: string): ReadonlyArray<TemplateFile> => {
   const name = typeName(slug)
   return [
     {
-      name: `${name}.model.ts`,
+      name: `${name}.aggregate.ts`,
       text: lines([
+        "// The prover reads this file's source, and knows an event or a rejection by `new`: `X.make(...)` is not read.",
+        "// So `new` is used in an aggregate's file, and only there, with the diagnostic that refuses it turned off.",
+        "// @effect-diagnostics newSchemaClass:off",
         "/**",
         ` * ${slug}: a domain model the prover can read. Commands are decided against a state, events change it, and the`,
         " * rules (`invariants` of a state, `transitions` between two) are what the prover holds every path to.",
@@ -343,7 +346,7 @@ const verify = (slug: string): ReadonlyArray<TemplateFile> => {
         "}) {}",
         "",
         "/** The model the stories run. */",
-        `export class ${name} extends Domain.Model("${name}", { aggregates: [Shelf] }) {}`
+        `export class ${name}Model extends Domain.Model("${name}Model", { aggregates: [Shelf] }) {}`
       ])
     },
     {
@@ -355,15 +358,15 @@ const verify = (slug: string): ReadonlyArray<TemplateFile> => {
         'import * as NodeServices from "@effect/platform-node/NodeServices"',
         'import { expect, layer } from "@effect/vitest"',
         'import * as Effect from "effect/Effect"',
-        `import { Counted, CountOne, Shelf, ShelfFull, ${name} } from "./${name}.model.ts"`,
+        `import { Counted, CountOne, Shelf, ShelfFull, ${name}Model } from "./${name}.aggregate.ts"`,
         "",
-        `const story = Story.make(${name})`,
+        `const story = Story.make(${name}Model, {})`,
         'const shelf = Shelf.ref("a1")',
-        'const one = [Story.when(new CountOne({ shelf: "a1" })), Story.then(shelf, new Counted({ shelf: "a1" }))]',
+        'const one = [Story.when(CountOne.make({ shelf: "a1" })), Story.then(shelf, Counted.make({ shelf: "a1" }))]',
         "",
         `layer(NodeServices.layer)("${slug}", (it) => {`,
         '  it.effect("three are counted, and the fourth is refused", () =>',
-        '    story(...one, ...one, ...one, Story.when(new CountOne({ shelf: "a1" })), Story.rejected(new ShelfFull({})))',
+        '    story(...one, ...one, ...one, Story.when(CountOne.make({ shelf: "a1" })), Story.rejected(ShelfFull.make({})))',
         "  )",
         "",
         "  it.effect(",

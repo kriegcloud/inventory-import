@@ -158,7 +158,7 @@ describe("scratch", () => {
           const text = yield* read("scratchpad/experiments/shelf/NOTE.md")
           const pkg = yield* read("scratchpad/package.json")
           const installed = yield* there("installed")
-          const model = yield* there("scratchpad/experiments/shelf/Shelf.model.ts")
+          const model = yield* there("scratchpad/experiments/shelf/Shelf.aggregate.ts")
           const checked = yield* scratchCheck(types).pipe(said)
           return { first: lines[0], text, pkg, installed, model, checked }
         })

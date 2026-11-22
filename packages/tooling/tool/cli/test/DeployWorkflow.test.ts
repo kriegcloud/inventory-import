@@ -3,7 +3,7 @@
 // It holds what starts the workflow, which job runs on which event, in which environment, with which secrets, and
 // every command each job runs, word for word: a job that deploys or destroys anything else fails here. The two shell
 // guards in it (the refusal of every stage but a preview, and staging's "only main's head") are run, not only read.
-// No runner is started: `release verify`'s own tests hold the tag guard that the release-tag job runs.
+// No runner is started: `release verify-head`'s own tests hold the guard that the release-tag job runs.
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import { expect, layer } from "@effect/vitest"
 import * as A from "effect/Array"
@@ -37,6 +37,7 @@ const Job = S.Struct({
   "runs-on": S.String,
   "timeout-minutes": S.Int,
   environment: S.optionalKey(S.String),
+  outputs: S.optionalKey(S.Record(S.String, S.String)),
   concurrency: S.optionalKey(S.Struct({ group: S.String, "cancel-in-progress": S.Boolean })),
   env: S.optionalKey(S.Record(S.String, S.String)),
   steps: S.Array(Step)
@@ -70,7 +71,8 @@ const each = <T>(jobs: Readonly<Record<string, typeof Job.Type>>, read: (job: ty
 /** One line: a condition written over several lines reads as one. */
 const flat = (value: string) => Str.trim(Str.replace(/\s+/g, " ")(value))
 
-const onTag = "github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')"
+const greenRelease =
+  "github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && startsWith(github.event.workflow_run.head_branch, 'release/') && github.event.workflow_run.head_repository.full_name == github.repository"
 const ownPullRequest = "github.event.pull_request.head.repo.full_name == github.repository"
 const greenMain =
   "github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == github.repository"
@@ -78,28 +80,35 @@ const install = "bun install --frozen-lockfile"
 
 layer(here)("the deploy workflow", (it) => {
   it.effect(
-    "starts on a v* tag, a pull request and CI's completed run on main, on no push to a branch, and may only read the repository",
+    "starts on a pull request and on CI's completed run on main or a release branch, on no push of a tag or a branch, and may only read the repository",
     () =>
       Effect.gen(function* () {
         const workflow = yield* deploy
         expect(workflow.on).toEqual({
-          push: { tags: ["v*"] },
           pull_request: { types: ["opened", "synchronize", "reopened", "closed"] },
-          workflow_run: { workflows: ["CI"], types: ["completed"], branches: ["main"] }
+          workflow_run: { workflows: ["CI"], types: ["completed"], branches: ["main", "release/**"] }
         })
         expect(workflow.permissions).toEqual({ contents: "read" })
       })
   )
 
-  it.effect("has five jobs, each on its own event, and production only on a tag and after the tag's guard", () =>
+  it.effect("has five jobs, each on its own event, and production only after the release's guard named a tag", () =>
     Effect.gen(function* () {
       const { jobs } = yield* deploy
       expect(each(jobs, (job) => flat(job.if))).toEqual({
         preview: `github.event_name == 'pull_request' && github.event.action != 'closed' && ${ownPullRequest}`,
         cleanup: `github.event_name == 'pull_request' && github.event.action == 'closed' && ${ownPullRequest}`,
         staging: greenMain,
-        "release-tag": onTag,
-        production: onTag
+        "release-tag": greenRelease,
+        production: "needs.release-tag.outputs.tag != ''"
+      })
+      // The tag the guard names is the one its verify step wrote, and nothing else.
+      expect(each(jobs, (job) => job.outputs ?? {})).toEqual({
+        preview: {},
+        cleanup: {},
+        staging: {},
+        "release-tag": { tag: "${{ steps.verify.outputs.tag }}" },
+        production: {}
       })
       expect(each(jobs, (job) => O.getOrElse(O.fromUndefinedOr(job.needs), () => "nothing"))).toEqual({
         preview: "nothing",
@@ -180,7 +189,7 @@ layer(here)("the deploy workflow", (it) => {
           preview: [install, "(Deploy the preview)"],
           cleanup: ["(Refuse any stage but a preview)", install, "(Destroy the preview)"],
           staging: ["(Deploy only the commit main is at)", install, "(Deploy staging)"],
-          "release-tag": ["(Fetch the tag as pushed)", install, "(Refuse a tag that is not a release)"],
+          "release-tag": ["(Fetch the tags as pushed)", install, "(Refuse a release that is not one)"],
           production: [install, "(Deploy production)"]
         })
         const named = (job: string, name: string) =>
@@ -197,15 +206,15 @@ layer(here)("the deploy workflow", (it) => {
           preview: named("preview", "Deploy the preview"),
           cleanup: named("cleanup", "Destroy the preview"),
           staging: named("staging", "Deploy staging"),
-          fetch: named("release-tag", "Fetch the tag as pushed"),
-          guard: named("release-tag", "Refuse a tag that is not a release"),
+          fetch: named("release-tag", "Fetch the tags as pushed"),
+          guard: named("release-tag", "Refuse a release that is not one"),
           production: named("production", "Deploy production")
         }).toEqual({
           preview: 'bunx alchemy deploy --stage "$STAGE" --yes',
           cleanup: 'bunx alchemy destroy --stage "$STAGE" --yes',
           staging: "bunx alchemy deploy --stage staging --yes",
-          fetch: 'git fetch --force origin "refs/tags/${GITHUB_REF_NAME}:refs/tags/${GITHUB_REF_NAME}"',
-          guard: 'bun run beep release verify "$GITHUB_REF_NAME"',
+          fetch: "git fetch --force --tags origin",
+          guard: 'bun run beep release verify-head "$BRANCH" "$CHECKED" --output "$GITHUB_OUTPUT"',
           production: "bunx alchemy deploy --stage prod --yes"
         })
         // The stage a preview's two jobs name is the pull request's, and nothing else sets a stage.
@@ -223,43 +232,58 @@ layer(here)("the deploy workflow", (it) => {
       })
   )
 
-  it.effect("checks out what each job is about: CI's commit for staging, every branch for the tag's guard", () =>
-    Effect.gen(function* () {
-      const { jobs } = yield* deploy
-      const checkout = (job: typeof Job.Type) =>
-        A.flatMap(job.steps, (step) => (step.uses === "actions/checkout@v4" ? [step.with ?? {}] : []))
-      expect(each(jobs, checkout)).toEqual({
-        preview: [{}],
-        cleanup: [{}],
-        staging: [{ ref: "${{ github.event.workflow_run.head_sha }}" }],
-        "release-tag": [{ "fetch-depth": 0 }],
-        production: [{}]
+  it.effect(
+    "checks out what each job is about: CI's commit for staging and for production, and main's code with every branch for the release's guard",
+    () =>
+      Effect.gen(function* () {
+        const { jobs } = yield* deploy
+        const checkout = (job: typeof Job.Type) =>
+          A.flatMap(job.steps, (step) => (step.uses === "actions/checkout@v4" ? [step.with ?? {}] : []))
+        expect(each(jobs, checkout)).toEqual({
+          preview: [{}],
+          cleanup: [{}],
+          staging: [{ ref: "${{ github.event.workflow_run.head_sha }}" }],
+          "release-tag": [{ ref: "main", "fetch-depth": 0 }],
+          production: [{ ref: "${{ github.event.workflow_run.head_sha }}" }]
+        })
+        // The guard is told the branch and the commit as values, and writes the tag as its step's output.
+        const verify = O.getOrThrow(
+          O.flatMap(R.get(jobs, "release-tag"), (job) =>
+            A.findFirst(job.steps, (step) => step.name === "Refuse a release that is not one")
+          )
+        )
+        expect({ id: verify.id, env: verify.env }).toEqual({
+          id: "verify",
+          env: {
+            BRANCH: "${{ github.event.workflow_run.head_branch }}",
+            CHECKED: "${{ github.event.workflow_run.head_sha }}"
+          }
+        })
+        // The refusal is the cleanup's first step, before any code of the pull request is checked out.
+        expect(
+          A.map(R.get(jobs, "cleanup").pipe(O.getOrThrow).steps, (step) => step.name ?? step.uses ?? step.run)
+        ).toEqual([
+          "Refuse any stage but a preview",
+          "actions/checkout@v4",
+          "actions/setup-node@v4",
+          "oven-sh/setup-bun@v2",
+          install,
+          "Destroy the preview"
+        ])
+        // Everything after staging's "only main's head" step waits for its answer.
+        const staging = R.get(jobs, "staging").pipe(O.getOrThrow).steps
+        expect(A.map(staging, (step) => `${step.name ?? step.uses ?? step.run}: ${step.if ?? "always"}`)).toEqual([
+          "actions/checkout@v4: always",
+          "Deploy only the commit main is at: always",
+          "actions/setup-node@v4: steps.head.outputs.deploy == 'true'",
+          "oven-sh/setup-bun@v2: steps.head.outputs.deploy == 'true'",
+          `${install}: steps.head.outputs.deploy == 'true'`,
+          "Deploy staging: steps.head.outputs.deploy == 'true'"
+        ])
+        expect(
+          A.findFirst(staging, (step) => step.name === "Deploy only the commit main is at").pipe(O.getOrThrow).id
+        ).toBe("head")
       })
-      // The refusal is the cleanup's first step, before any code of the pull request is checked out.
-      expect(
-        A.map(R.get(jobs, "cleanup").pipe(O.getOrThrow).steps, (step) => step.name ?? step.uses ?? step.run)
-      ).toEqual([
-        "Refuse any stage but a preview",
-        "actions/checkout@v4",
-        "actions/setup-node@v4",
-        "oven-sh/setup-bun@v2",
-        install,
-        "Destroy the preview"
-      ])
-      // Everything after staging's "only main's head" step waits for its answer.
-      const staging = R.get(jobs, "staging").pipe(O.getOrThrow).steps
-      expect(A.map(staging, (step) => `${step.name ?? step.uses ?? step.run}: ${step.if ?? "always"}`)).toEqual([
-        "actions/checkout@v4: always",
-        "Deploy only the commit main is at: always",
-        "actions/setup-node@v4: steps.head.outputs.deploy == 'true'",
-        "oven-sh/setup-bun@v2: steps.head.outputs.deploy == 'true'",
-        `${install}: steps.head.outputs.deploy == 'true'`,
-        "Deploy staging: steps.head.outputs.deploy == 'true'"
-      ])
-      expect(
-        A.findFirst(staging, (step) => step.name === "Deploy only the commit main is at").pipe(O.getOrThrow).id
-      ).toBe("head")
-    })
   )
 
   it.effect(
@@ -276,7 +300,7 @@ layer(here)("the deploy workflow", (it) => {
           cleanup: "deploy-pr-${{ github.event.pull_request.number }}",
           staging: `\${{ (${greenMain}) && 'deploy-staging' || format('deploy-nothing-{0}', github.run_id) }}`,
           "release-tag": "none",
-          production: "deploy-prod-${{ github.ref_name }}"
+          production: "deploy-prod-${{ needs.release-tag.outputs.tag }}"
         })
       })
   )

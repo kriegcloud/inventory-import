@@ -126,6 +126,12 @@ export const releaseLineOf = (branch: string): O.Option<{ readonly major: number
     minor: Number(found[2])
   }))
 
+/**
+ * The heading over the commits a patch carries that differ from main's (Benjamin's decision of 2026-11-22, "Accept,
+ * and name it"): in the notes, the tag's message and what the command and the deploy guard print.
+ */
+export const pickedTitle = "Picked with changes"
+
 /** The commit kinds the notes name, in the order they are listed. */
 const sections: ReadonlyArray<readonly [string, string]> = [
   ["feat", "Added"],
@@ -148,6 +154,8 @@ export const notesOf = (input: {
   readonly tag: string
   readonly date: string
   readonly subjects: ReadonlyArray<string>
+  /** Each commit that was picked from main with changes, as the release names it. */
+  readonly changed?: ReadonlyArray<string>
 }): string => {
   const kept = A.filter(input.subjects, (subject) => !Str.startsWith("Merge ")(subject))
   const typed = A.map(kept, (subject) =>
@@ -175,7 +183,14 @@ export const notesOf = (input: {
         "\n"
       )
     : "Nothing but the version.\n"
-  return `## ${input.tag} — ${input.date}\n\n${body}`
+  const changed = input.changed ?? []
+  const picked = A.isReadonlyArrayNonEmpty(changed)
+    ? `\n${pickedTitle}\n\n${A.join(
+        A.map(changed, (one) => `- ${one}`),
+        "\n"
+      )}\n`
+    : ""
+  return `## ${input.tag} — ${input.date}\n\n${body}${picked}`
 }
 
 /**
@@ -187,7 +202,10 @@ export const ReleaseFinding = S.TaggedUnion({
   Released: {
     tag: S.String.pipe(S.annotateKey({ description: "The annotated tag made, v<major>.<minor>.<patch>" })),
     branch: S.String.pipe(S.annotateKey({ description: "The release branch it is on" })),
-    cut: S.Boolean.pipe(S.annotateKey({ description: "Whether the branch was made by this run" }))
+    cut: S.Boolean.pipe(S.annotateKey({ description: "Whether the branch was made by this run" })),
+    changed: S.Array(S.String).pipe(
+      S.annotateKey({ description: "Each commit picked from main with changes: the approver reads these" })
+    )
   },
   Dirty: {
     files: S.Array(S.String).pipe(S.annotateKey({ description: "The files with changes not committed" }))
@@ -244,20 +262,29 @@ const refused = (lines: ReadonlyArray<string>): Line =>
     )
   )
 
+/** The lines that name the commits picked with changes, none when there are none. */
+const pickedLines = (changed: ReadonlyArray<string>) =>
+  A.isReadonlyArrayNonEmpty(changed)
+    ? [
+        `  ${pickedTitle}: each differs from the commit on main it names, so read it before approving the deploy:`,
+        ...A.map(changed, (one) => `    ${one}`)
+      ]
+    : []
+
 /**
  * What each finding prints: one line, several for a list.
  *
  * @category rendering
  */
 export const releaseSentence: (finding: ReleaseFinding) => Line = ReleaseFinding.match({
-  Released: ({ branch, cut, tag }) =>
+  Released: ({ branch, changed, cut, tag }) =>
     out(
       A.join(
         [
           `release OK  ${tag} is tagged on ${branch}${cut ? ", a new branch from main" : ""}. Nothing was pushed.`,
-          "  Push the branch, then the tag. The tag deploys production once the production environment's reviewer approves:",
-          `  git push origin ${branch}`,
-          `  git push origin ${tag}`
+          ...pickedLines(changed),
+          "  Push the branch and the tag together. Production deploys once CI passes on the branch and the production environment's reviewer approves:",
+          `  git push --atomic origin ${branch} ${tag}`
         ],
         "\n"
       )
@@ -408,19 +435,31 @@ interface Planned {
   readonly subjects: ReadonlyArray<string>
   /** The notes of the releases before it, from the last release's own file when a new line is cut. */
   readonly older: O.Option<string>
+  /** Each commit picked from main with changes, as the release names it. */
+  readonly changed: ReadonlyArray<string>
 }
 
-/** The lines of `git cherry -v` that main (or another upstream) does not hold, each as its short hash and subject. */
-const notHeld = (cherry: string) =>
+/** The commits `git cherry -v` marks `+`: the upstream holds no commit with the same change. */
+const plusOf = (cherry: string) =>
   A.flatMap(linesOf(cherry), (one) =>
-    Str.startsWith("+ ")(one) ? [Str.replace(/^([0-9a-f]{7})[0-9a-f]* /, "$1 ")(Str.slice(2)(one))] : []
+    O.match(Str.match(/^\+ ([0-9a-f]{7,64}) (.*)$/)(one), {
+      onNone: () => [],
+      onSome: (found) => [{ sha: `${found[1]}`, subject: `${found[2]}` }]
+    })
   )
 
+/** A commit's hash as it is printed: its first seven characters. */
+const short = (sha: string) => Str.slice(0, 7)(sha)
+
 /**
- * What the commits after `base`, up to `head`, carry that `origin/main` does not hold: merges, whose changes `git
- * cherry` never lists (so anything could ride in on one), and commits whose change main has not. `git cherry` compares
- * each commit's change, not its hash, so a cherry-pick that applied as it was counts; one whose conflict was resolved
- * by hand differs from main's and does not.
+ * What the commits after `base`, up to `head`, carry that `origin/main` does not hold.
+ *
+ * - `merges`: `git cherry` never lists a merge, so anything could ride in on one. Always refused.
+ * - `missing`: a commit whose change main does not hold and that names no commit of main. Always refused.
+ * - `changed`: a commit whose change differs from main's (`git cherry` compares each commit's change, so a pick that
+ *   applied as it was is not here) and whose message carries `git cherry-pick -x`'s line naming a commit that is on
+ *   `origin/main`. By Benjamin's decision of 2026-11-22 ("Accept, and name it") it counts, and is named wherever
+ *   the release is: the fix landed on main first, and what differs is shown to the approver, not hidden.
  */
 const beyondMain = Effect.fn("Release.beyondMain")(function* (base: string, head: string) {
   const merges = yield* git("list the merges since the last release", [
@@ -430,7 +469,30 @@ const beyondMain = Effect.fn("Release.beyondMain")(function* (base: string, head
     `${base}..${head}`
   ])
   const cherry = yield* git("compare the commits with origin/main", ["cherry", "-v", originMain, head, base])
-  return { merges: linesOf(merges), missing: notHeld(cherry) }
+  const judged = yield* Effect.forEach(
+    plusOf(cherry),
+    Effect.fnUntraced(function* (one) {
+      const message = yield* git("read a commit's message", ["log", "-1", "--format=%B", one.sha])
+      // The last such line is the pick that made this commit; a commit that cannot be found is not on main.
+      const named = A.last(
+        A.map(
+          A.fromIterable(Str.matchAll(/\(cherry picked from commit ([0-9a-f]{40})\)/g)(message)),
+          (found) => `${found[1]}`
+        )
+      )
+      if (O.isNone(named)) return { ...one, from: O.none<string>() }
+      const onMain = yield* holds(["merge-base", "--is-ancestor", named.value, originMain])
+      return { ...one, from: onMain ? named : O.none<string>() }
+    }),
+    { concurrency: 1 }
+  )
+  return {
+    merges: linesOf(merges),
+    missing: A.flatMap(judged, (one) => (O.isNone(one.from) ? [`${short(one.sha)} ${one.subject}`] : [])),
+    changed: A.flatMap(judged, (one) =>
+      O.isSome(one.from) ? [`${one.subject} (${short(one.sha)} here, ${short(one.from.value)} on main)`] : []
+    )
+  }
 })
 
 /** A major or a minor release, from `main`: the next version after the highest anywhere, on a new branch. */
@@ -465,7 +527,7 @@ const fromMain = Effect.fn("Release.fromMain")(function* (
   const listed = O.isSome(last)
     ? yield* git("list what the last release does not carry", ["cherry", "-v", last.value, "HEAD"])
     : yield* git("read the commits", ["log", "--no-merges", "--format=%s", "HEAD"])
-  const subjects = O.isSome(last) ? A.reverse(A.map(notHeld(listed), Str.replace(/^[0-9a-f]+ /, ""))) : linesOf(listed)
+  const subjects = O.isSome(last) ? A.reverse(A.map(plusOf(listed), (one) => one.subject)) : linesOf(listed)
   const repo = yield* Repo
   const kept = O.isSome(last) ? yield* repo.run("git", ["show", `${last.value}:${notesFile}`]) : undefined
   const planned: Planned = {
@@ -473,14 +535,16 @@ const fromMain = Effect.fn("Release.fromMain")(function* (
     branch: target,
     cut: !exists,
     subjects,
-    older: kept !== undefined && kept.code === 0 ? O.some(kept.stdout) : O.none()
+    older: kept !== undefined && kept.code === 0 ? O.some(kept.stdout) : O.none(),
+    changed: []
   }
   return planned
 })
 
 /**
  * A patch, on the release branch it is run on: the next patch after that branch's last tag, which the branch here
- * must hold, made only of commits whose change `origin/main` already holds, and of no merge.
+ * must hold, made of no merge and only of commits whose change `origin/main` already holds, or that differ from the
+ * commit of main their `cherry-pick -x` line names (those are named in the release).
  */
 const onReleaseBranch = Effect.fn("Release.onReleaseBranch")(function* (branch: string, tags: ReadonlyArray<Tagged>) {
   const line = releaseLineOf(branch)
@@ -513,7 +577,8 @@ const onReleaseBranch = Effect.fn("Release.onReleaseBranch")(function* (branch: 
     branch,
     cut: false,
     subjects: linesOf(subjects),
-    older: O.none()
+    older: O.none(),
+    changed: beyond.changed
   }
   return planned
 })
@@ -580,7 +645,7 @@ export const release = Effect.fn("Release.release")(function* <R>(kind: ReleaseK
       planned.cut ? ["switch", "-c", planned.branch] : ["switch", planned.branch]
     )
     const date = yield* Effect.map(DateTime.now, DateTime.formatIsoDateUtc)
-    const notes = notesOf({ tag, date, subjects: planned.subjects })
+    const notes = notesOf({ tag, date, subjects: planned.subjects, changed: planned.changed })
     yield* repo.write(repo.join(repo.root, versionFile), withVersion(appText, planned.version))
     const lockPath = repo.join(repo.root, lockFile)
     const locked = yield* repo.exists(lockPath)
@@ -597,7 +662,9 @@ export const release = Effect.fn("Release.release")(function* <R>(kind: ReleaseK
     yield* git("stage the version and the notes", ["add", versionFile, notesFile, ...(locked ? [lockFile] : [])])
     yield* git("commit the release", ["commit", "-m", `chore: release ${tag}`])
     yield* git(`make the tag ${tag}`, ["tag", "-a", tag, "-m", `${tag}\n\n${notes}`])
-    return A.of<ReleaseFinding>(ReleaseFinding.cases.Released.make({ tag, branch: planned.branch, cut: planned.cut }))
+    return A.of<ReleaseFinding>(
+      ReleaseFinding.cases.Released.make({ tag, branch: planned.branch, cut: planned.cut, changed: planned.changed })
+    )
   })
   return yield* steps.pipe(Effect.catchTag("ReleaseStopped", (stopped) => Effect.succeed(A.of(stopped.finding))))
 })
@@ -610,7 +677,23 @@ export const release = Effect.fn("Release.release")(function* <R>(kind: ReleaseK
 export const TagFinding = S.TaggedUnion({
   MayDeploy: {
     tag: S.String.pipe(S.annotateKey({ description: "The tag, v<major>.<minor>.<patch>" })),
-    branch: S.String.pipe(S.annotateKey({ description: "The release branch its commit is on" }))
+    branch: S.String.pipe(S.annotateKey({ description: "The release branch its commit is on" })),
+    changed: S.Array(S.String).pipe(
+      S.annotateKey({ description: "Each commit under it picked from main with changes: the approver reads these" })
+    )
+  },
+  NoTag: {
+    branch: S.String.pipe(S.annotateKey({ description: "The release branch CI passed on" })),
+    commit: S.String.pipe(S.annotateKey({ description: "The commit CI checked, short" }))
+  },
+  Moved: {
+    branch: S.String.pipe(S.annotateKey({ description: "The release branch" })),
+    commit: S.String.pipe(S.annotateKey({ description: "The commit CI checked, which is no longer its head, short" }))
+  },
+  NotAReleaseBranch: { branch: S.String.pipe(S.annotateKey({ description: "The branch CI passed on" })) },
+  SeveralTags: {
+    commit: S.String.pipe(S.annotateKey({ description: "The commit, short" })),
+    tags: S.Array(S.String).pipe(S.annotateKey({ description: "The release tags on it" }))
   },
   NotAVersion: { tag: S.String.pipe(S.annotateKey({ description: "The ref the deploy was started from" })) },
   NotAnnotated: { tag: S.String.pipe(S.annotateKey({ description: "A tag that is not one `release` makes" })) },
@@ -648,7 +731,20 @@ export type TagFinding = typeof TagFinding.Type
  * @category rendering
  */
 export const tagSentence: (finding: TagFinding) => Line = TagFinding.match({
-  MayDeploy: ({ branch, tag }) => out(`release verify OK  ${tag} is an annotated release tag on ${branch}`),
+  MayDeploy: ({ branch, changed, tag }) =>
+    out(A.join([`release verify OK  ${tag} is an annotated release tag on ${branch}`, ...pickedLines(changed)], "\n")),
+  NoTag: ({ branch, commit }) =>
+    out(
+      `release verify NONE  ${branch} is at ${commit}, which carries no release tag: nothing deploys. A release is pushed as branch and tag together`
+    ),
+  Moved: ({ branch, commit }) =>
+    out(`release verify NONE  ${commit} is no longer the head of ${branch}: nothing deploys for it`),
+  NotAReleaseBranch: ({ branch }) =>
+    refused([
+      `"${branch}" is not a release branch (release/<major>.<minor>): only a release branch deploys production`
+    ]),
+  SeveralTags: ({ commit, tags }) =>
+    refused([`${commit} carries more than one release tag, and a release commit carries one: ${A.join(tags, ", ")}`]),
   NotAVersion: ({ tag }) =>
     refused([`"${tag}" is not a release tag (v<major>.<minor>.<patch>): only a release tag deploys production`]),
   NotAnnotated: ({ tag }) =>
@@ -687,13 +783,12 @@ const asked = Effect.fn("Release.asked")(function* (args: ReadonlyArray<string>)
  * - its commit is a release commit: one parent, the app's version file there says the tag's version, and it changes
  *   nothing but that file, the lockfile and the notes;
  * - what is under it landed on main: for `<major>.<minor>.0` its parent is a commit of `origin/main`; for a patch the
- *   line's release before it is under it, and the commits between are no merge and each a change `origin/main` holds.
+ *   line's release before it is under it, and the commits between are no merge and each a change `origin/main`
+ *   holds, or a pick with changes that names its commit on main (listed in what this prints).
  *
  * A question git cannot answer (a ref that was not fetched) refuses the tag: it never counts as "no".
  *
- * It cannot hold itself: the deploy job runs this from the tagged commit, so a commit that changes this file or the
- * workflow is judged by its own copy. What stands behind it is the reviewer's approval and the rule that only an
- * admin makes a `v*` tag (docs/releasing.md, "What holds it").
+ * The deploy job runs `main`'s copy of this, never the tagged commit's (`verifyHead` below is what it calls).
  *
  * @category rules
  */
@@ -742,7 +837,7 @@ export const verifyTag = Effect.fn("Release.verifyTag")(function* (tag: string) 
   const rest = Effect.gen(function* () {
     if (version.value.patch === 0) {
       const cut = yield* asked(["merge-base", "--is-ancestor", under, originMain])
-      if (cut.code === 0) return A.of<TagFinding>(TagFinding.cases.MayDeploy.make({ tag, branch }))
+      if (cut.code === 0) return A.of<TagFinding>(TagFinding.cases.MayDeploy.make({ tag, branch, changed: [] }))
       if (cut.code !== 1) return cannotTell("look for the release's parent on origin/main", cut.said)
       const extra = yield* git("list what main does not hold", ["log", "--format=%h %s", `${originMain}..${under}`])
       return A.of<TagFinding>(TagFinding.cases.CarriesMore.make({ tag, commits: linesOf(extra) }))
@@ -766,7 +861,7 @@ export const verifyTag = Effect.fn("Release.verifyTag")(function* (tag: string) 
     const more = A.appendAll(beyond.merges, beyond.missing)
     return A.isReadonlyArrayNonEmpty(more)
       ? A.of<TagFinding>(TagFinding.cases.CarriesMore.make({ tag, commits: more }))
-      : A.of<TagFinding>(TagFinding.cases.MayDeploy.make({ tag, branch }))
+      : A.of<TagFinding>(TagFinding.cases.MayDeploy.make({ tag, branch, changed: beyond.changed }))
   })
   return yield* rest.pipe(
     Effect.catchTag("ReleaseStopped", (stopped) =>
@@ -778,3 +873,49 @@ export const verifyTag = Effect.fn("Release.verifyTag")(function* (tag: string) 
     )
   )
 })
+
+/**
+ * Whether the commit CI just passed on, on a release branch, may deploy production (Benjamin's decision of
+ * 2026-11-22, "After CI on the release branch"). The deploy workflow runs this from `main`'s copy of the code, so a
+ * release branch cannot bring its own guard:
+ *
+ * - the branch is `release/<major>.<minor>` and the commit is still its head as the remote holds it (an older
+ *   commit's turn has passed: nothing deploys for it);
+ * - the commit carries exactly one `v*` tag. None is not a refusal: fixes are
+ *   pushed to a release branch before they are tagged, and nothing deploys until the tag is on the head;
+ * - that tag passes `verifyTag`.
+ *
+ * @category rules
+ */
+export const verifyHead = Effect.fn("Release.verifyHead")(function* (input: {
+  readonly branch: string
+  readonly commit: string
+}) {
+  const { branch } = input
+  if (O.isNone(releaseLineOf(branch))) return A.of<TagFinding>(TagFinding.cases.NotAReleaseBranch.make({ branch }))
+  const commit = short(input.commit)
+  const cannotTell = (step: string, said: string) =>
+    A.of<TagFinding>(TagFinding.cases.CannotTell.make({ tag: commit, said: `git could not ${step}: ${said}` }))
+  if (O.isNone(Str.match(/^[0-9a-f]{40}$/)(input.commit))) {
+    return cannotTell("read the commit", `"${input.commit}" is not a commit's full hash`)
+  }
+  const head = yield* asked(["rev-parse", "--verify", `refs/remotes/origin/${branch}^{commit}`])
+  if (head.code !== 0) return cannotTell(`read where origin/${branch} is`, head.said)
+  if (head.printed !== input.commit) return A.of<TagFinding>(TagFinding.cases.Moved.make({ branch, commit }))
+  const listed = yield* asked(["tag", "--points-at", input.commit, "--list", "v*"])
+  if (listed.code !== 0) return cannotTell("list the tags on the commit", listed.said)
+  const tags = linesOf(listed.printed)
+  const [tag, ...more] = tags
+  if (tag === undefined) return A.of<TagFinding>(TagFinding.cases.NoTag.make({ branch, commit }))
+  if (A.isReadonlyArrayNonEmpty(more)) return A.of<TagFinding>(TagFinding.cases.SeveralTags.make({ commit, tags }))
+  // A tag of another line is refused by `verifyTag`: its commit is not on its own line's branch.
+  return yield* verifyTag(tag)
+})
+
+/**
+ * The tag that may deploy, when the findings say one may.
+ *
+ * @category rules
+ */
+export const deployable = (findings: ReadonlyArray<TagFinding>): O.Option<string> =>
+  O.map(A.findFirst(findings, TagFinding.guards.MayDeploy), (found) => found.tag)

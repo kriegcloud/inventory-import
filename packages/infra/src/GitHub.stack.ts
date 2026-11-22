@@ -10,13 +10,14 @@
  * --stage prod`. No workflow deploys it: a job that could rewrite its own approval rule would have none.
  *
  * Must not break: a preview or staging job holds no model key, no sign-up list and no token for production's
- * account; the previews' password is written as a secret and never printed; nothing reaches production without the
- * environment's reviewer approving that run.
+ * account; the previews' password is written as a secret and never printed; only a run whose ref is `main` may use
+ * the `production` environment, and nothing reaches production without its reviewer approving that run.
  *
- * What this stack does not hold: that production deploys only from a release tag. The `production` environment names
- * no branch or tag (the comment on it says why), so the tag rule is the deploy workflow's and `release verify`'s,
- * both read from the commit being deployed. And staging shares the previews' token, so any pull request's run can
- * reach it. Both are open decisions of Benjamin's (asked 2026-11-22; docs/releasing.md says what holds meanwhile).
+ * Known, and Benjamin's choice of 2026-11-22 ("Keep sharing, say so"): staging shares the previews' Cloudflare
+ * token and account. A token covers a whole account, and a pull request's run uses the pull request's own copy of
+ * the workflow, so anyone who can push a branch to this repository can change or remove staging. The `staging`
+ * environment's rule says which run may use that environment, not who can reach the stage. Staging holds test
+ * accounts only and no model key.
  *
  * @packageDocumentation
  */
@@ -113,15 +114,16 @@ export default Alchemy.Stack(
       { onFailure: Effect.die, onSuccess: Effect.succeed }
     )
 
-    // Production deploys from a release tag (decision "releases and deploys"). No branch rule: Alchemy's provider
-    // writes only branch rules and deletes any other, so a `v*` tag rule could not be kept here, and a branch rule
-    // would refuse every tag. What holds it instead: the workflow starts production only on a `v*` tag, its first step
-    // refuses a tag that is not annotated, not on its release branch or on main (`bun run beep release verify`), only an
-    // admin may make a `v*` tag (the ruleset below), and the reviewer approves each deploy.
+    // Production deploys after CI passed on a release branch whose head carries its tag (decisions "releases and
+    // deploys"). The deploy workflow is started for that by CI's completed run, which GitHub runs from main: this
+    // workflow file as main has it, with main as the run's ref. So only main may deploy to this environment: a pull
+    // request's or a pushed branch's own copy of the workflow is refused here before anyone is asked to approve, and
+    // the release branch brings neither the workflow nor its guard. Then the reviewer approves each deploy.
     const production = yield* GitHub.Environment("Production", {
       ...repository,
       name: "production",
-      reviewers: { users: [approver] }
+      reviewers: { users: [approver] },
+      deploymentBranchPolicy: { customBranchPolicies: ["main"] }
     })
     const preview = yield* GitHub.Environment("Preview", { ...repository, name: "preview" })
     // Main's head, deployed when its check passed. Only a run for main may use this environment; its token is the

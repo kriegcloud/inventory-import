@@ -73,6 +73,9 @@ values in `.dev.vars.example`). After pulling a change to `apps/inventory/migrat
 | `bun run preview` | The production build on http://localhost:4173, with every security header, compressed as Cloudflare compresses it (`PREVIEW_COMPRESSION=off` sends it as it is) |
 | `bun run --cwd apps/inventory build:report` | The production build, and what each of its chunks is made of (`.scratch/bundle/client.html`, a treemap) |
 | `bun run auth:schema` | After a change to Better Auth's options, prints the migration it still needs (Node 22.18 or newer) |
+| `bun run deps:update` | Moves every dependency of every package to its newest version, except the ones held back with a reason in `.syncpackrc.json`, then installs. `-- --dry-run` only says what would move |
+| `bun run version-sync` | Checks that every version written in more than one place equals its one source; `-- --write` rewrites the places that differ |
+| `bun run config-sync` | Writes the configuration that follows from the workspaces (syncpack's sources, tsconfig references, each package's scripts); `config-sync:check` only compares ([docs/sync-commands.md](docs/sync-commands.md)) |
 | `bunx alchemy deploy --stage <name>` | Host it on Cloudflare: the stack in `packages/infra` makes the database and the Worker (needs a Cloudflare login; [goals/infra/PLAN.md](goals/infra/PLAN.md) has the steps, in order) |
 
 ### Signing in

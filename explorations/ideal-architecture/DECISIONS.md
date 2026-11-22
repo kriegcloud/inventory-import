@@ -914,3 +914,45 @@ all 14"; the agent recommended leaving them. Read as: the vendored components ma
 marked "Local change" where it is made; a later `shadcn add` of one of those files is compared by hand. Rejected:
 leaving them as published; converting only the data table. Built with `@beep/schema` added to `@inventory/ui`. Reverse:
 the "Local change" blocks in those eleven files.
+
+### 2026-11-22 — dependencies, versions and derived configuration kept in step
+
+I asked "do we have a `deps:update` script like beep-effect?" (there was none: only `deps:lint` and `deps:outdated`,
+and syncpack read 7 of the 25 `package.json` files), and then: "Actually I would like a version-sync & config-sync
+command as well that keeps hard coded values & configs up to date & in sync along with the update:deps". Built as
+three commands of the repository's CLI, in beep-effect's shapes and without its packages: `deps update`,
+`version-sync` (check, `--write`, `--dry-run`) and `config-sync` (writes; `--check`, `--dry-run`). `version-sync`
+and `config-sync --check` are part of `bun run check`. What each covers and leaves alone is in
+`docs/sync-commands.md`. `version-sync --write` may change a version number in `CLAUDE.md`, and nothing else there.
+
+The agent chose these, and I was not asked. Each is small to reverse:
+
+- **The held list is `updateGroups` in `.syncpackrc.json`**, a group's `label` being its reason, where beep-effect
+  keeps a ledger of holds with a probe for each. One list, read by syncpack (`deps:outdated`) and by `deps update`.
+  Rejected: a ledger with probes (a goal of its own); a second file beside syncpack's. Reverse: move the groups.
+- **What is held**: `@effect/tsgo` and the four tools it patches (`typescript`, `tsrs`, `oxlint`,
+  `oxlint-tsgolint`); `alchemy`, `@alchemy.run/*` and `@distilled.cloud/*`, pinned as one set to one commit;
+  `better-auth`, whose tables are a migration written by hand; `xlsx`, which is an address. Not held, and it would
+  move: `@types/node`, from ^24 to ^26, while the workflows run Node 22. Reverse: one group each.
+- **`deps update` asks the registry itself** (`bun info <name> version`) and does not call `syncpack update`, so its
+  plan is tested with no network, and `effect` and the `@effect/*` packages released with it move to one version or
+  not at all. Rejected: reading what syncpack prints.
+- **Records are never rewritten**: `explorations/`, `goals/`, the root's `DECISIONS.md`, `docs/qa`. The
+  standing documents are `CLAUDE.md`, `AGENTS.md`, `README.md`, `docs/` and `.claude/agents`.
+- **A sentence that records a check is moved with the rest** ("checked in effect's source at this version"): the
+  command prints each line it changes, and a person re-checks or rewords. Rejected: guessing which sentences are
+  records.
+- **Three places were wrong and are written**: syncpack's sources (now one pattern for each workspace pattern), the
+  app's `wrangler.jsonc` `$schema` (it named a file that does not exist from that folder), and `tsconfig.base.json`'s
+  `$schema` (the library's repository instead of the installed `@effect/tsgo`).
+- **No package gets project references.** Each is type-checked from source by `tsrs -p`; references would need
+  `composite` and a build order, which is a change to how the repository type-checks. `config-sync` keeps the
+  solution files (the app's, and the root's when there is one) and holds a project's references to its declared
+  packages only where a project already has them.
+
+Not decided, and mine: **one catalog at the root** (versions written once, each package saying `catalog:`). The
+commands already read a root `catalog` first, and a test holds that. It would take: a top-level `"catalog"` in the
+root's `package.json` (not `workspaces.catalog`: every rule reads `workspaces` as a list); `catalog:` in the 24
+workspace `package.json` files; a new `bun.lock`; `customTypes.catalog` and a version group in `.syncpackrc.json`,
+as beep-effect has; and `vendor sync` writing `catalog:` into a vendored package. One commit touching all 25 files,
+for a day when no other branch is open.

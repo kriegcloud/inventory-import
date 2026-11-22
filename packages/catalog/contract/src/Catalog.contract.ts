@@ -6,7 +6,7 @@ import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint"
 import * as HttpApiGroup from "effect/http-api/HttpApiGroup"
 import * as HttpApiSchema from "effect/http-api/HttpApiSchema"
 import * as OpenApi from "effect/http-api/OpenApi"
-import { ConfirmRequest, SaveRequest, StaleAccept } from "./Import/Decision.command.ts"
+import { ConfirmRequest, DecidedSince, SaveRequest, StaleAccept } from "./Import/Decision.command.ts"
 import { reasonForPerson } from "./internal/Described.ts"
 import { StagingOutcome } from "./Staging/FileProblem.read.ts"
 import { ConfirmId, ImportId, ItemId } from "./Catalog.id.ts"
@@ -175,10 +175,16 @@ export class ImportsApi extends HttpApiGroup.make("imports")
         notApplied: S.Array(StaleAccept).annotateKey({
           description:
             "The parts of this save's decisions that were not applied, each by row, field and kind: a part that rests on a column matched again after the revision its row names in `madeOn` (an accept or an undone fix of that field; a Replace, Keep-stored or keep-one-of-two after the SKU's column; a Replace or Keep-stored after another column, where that changed how the row compares with the stored item). The rest of each row's decision is saved. Empty when everything was applied"
-        })
+        }),
+        decidedSince: S.Array(DecidedSince)
+          .pipe(S.withDecodingDefaultKey(Effect.succeed([])))
+          .annotateKey({
+            description:
+              "The rows named in `over` that were not written, because what is stored of them is none of the decisions named: decided otherwise since, each with what is stored. The other rows are saved"
+          })
       }).annotate({
         description:
-          "The decisions are saved: the draft's revision, whether this save is what moved it, and the parts of decisions it did not apply"
+          "The decisions are saved: the draft's revision, whether this save is what moved it, the parts of decisions it did not apply, and the rows that waited and were decided otherwise since"
       }),
       error: [Forbidden, ImportNotFound, AlreadyImported, RevisionAhead, DraftBusy]
     })

@@ -747,11 +747,11 @@ discriminators" below. Then the groups the draft review's table above left open:
   is asked once more (once, however many saves answered), the given answer staying on screen until then. The
   review's `Ask` calls `askAgain` with the time the last save or confirm was sent: a read that left after it is let
   land with nothing more asked. Test: three saves 2 ms apart behind a read of 30 ms.
-- **Three faults of that build**, found by an independent review and fixed in `d1e31bf`: a given answer hid every
+- **Three faults of that build**, fixed in `d1e31bf`: a given answer hid every
   later failure of the read (a removed import's review went on showing the saved view); a late landing of a read
   already let go released the hold of the read made since for the same member; the once more refreshed over a
   request that had left in the gap, ending it. A test for each, each failing with its fix taken out.
-- **Counted from the answer** (`6b53d73`, the lead's ruling). The rule as first built (a read that left after the
+- **Counted from the answer** (`6b53d73`). The rule as first built (a read that left after the
   save was *sent* includes it) lost an `Ask` in two orderings: a read served before the save's write committed, and
   a save `callWrite` sent again after a failure, counted from its first try. A read must now have left after the
   server *answered* the write; one out before that lands and is asked once more. A test for each ordering, each
@@ -763,7 +763,8 @@ discriminators" below. Then the groups the draft review's table above left open:
   stamped in SQL with the revision that statement writes; the field's accepts taken out in SQL by name from the rows
   as they are; the audit line), and every write of a save holds only while the draft's choices are those it was
   checked against: otherwise `rematched`, and the handler checks it again on the new choices. The twin does the
-  same. Slow tests (`MatchAtomic.slow.test.ts`) put the other person's write at the one place it can fall, through a
+  same. (Since `0bd8bc7` the match works the take-backs of every kind out from a read and writes the rows whole, in
+  the same guarded batch, and tries again when the draft moved meanwhile.) Slow tests (`MatchAtomic.slow.test.ts`) put the other person's write at the one place it can fall, through a
   stand-in around the real D1 store: a save between the match's read and write (fails with the stamp one revision
   earlier), a match between a save's check and write (fails without the guard), and a save just before the match's
   write (its leave-out stands).
@@ -778,10 +779,10 @@ discriminators" below. Then the groups the draft review's table above left open:
   `removeImport`, where a test reaches it.
 - **The twin's own check of the confirm's revision, and the quick return** (`f8ef35e`): above.
 
-## The second review's groups, and group 3 decided (2026-11-20)
+## What a save, a confirm and a reload owe a decision (2026-11-20)
 
-The review of `1171834..cf6ac58` confirmed 49 findings in groups; Benjamin then answered group 3's seven questions
-(the exploration's `DECISIONS.md`, entries of 2026-11-20).
+49 faults of `1171834..cf6ac58`, in groups; Benjamin answered the seven questions of group 3 (the exploration's
+`DECISIONS.md`, entries of 2026-11-20).
 
 - **Groups 1 and 2** (`b784320`): a confirm never sends its rows to a closed import or drops rows decided while it was
   out; each row names its own revision (`madeOn` per row); the kept rows, the leave question and their tests.
@@ -794,16 +795,14 @@ The review of `1171834..cf6ac58` confirmed 49 findings in groups; Benjamin then 
   that rested on the column, in the match's batch, the save and the confirm, each named by kind; a refused save holds
   its rows with the reason; a waiting row decided elsewhere since is held with both decisions; each tab keeps its own
   waiting rows and takes up only a gone tab's.
-- **From the review of `b784320`** (`cb73739`, `1456964`): a held-back confirm records the revision it waits for and
+- **Faults of `b784320`** (`cb73739`, `1456964`): a held-back confirm records the revision it waits for and
   frees its button once the screen holds it; rows apart are counted from what was shown at the press; a closed
   picture outdated by a reopen no longer ends the draft; a refused or lost confirm offers no Save again, and the first
   picture after it that is not the step's own redraw answers it; the leave question is asked after a reload.
 
-## The third review (2026-11-20): group 3 checked, 45 findings
+## A waiting row is checked before it goes (2026-11-20)
 
-The review of `cf6ac58..2fb8dbb` confirmed 45 findings (1 blocker, 14 major, 30 minor). Built in three lanes (server,
-laws, screen), each checked by an independent reader, then three more passes on what each check found, and a last
-read of the whole range by four readers:
+45 faults of `cf6ac58..2fb8dbb`, by what changed:
 
 - **G2 on every path** (`0844c01`, `d390d8d`, `de8ce87`, `8c00d3c`): a waiting row (stalled, sent before, kept across
   a reload, taken up from a gone tab) is never sent before a fresh picture at least as new as the one held has
@@ -819,16 +818,17 @@ read of the whole range by four readers:
 - **Tabs and the session** (`0844c01`, `d390d8d`, `de8ce87`): one tab id for the tab's life (an atom, held from the
   app's start, the sign-in page included); an orphan is taken up under a lock; rows of a confirmed import taken up
   are named; sends and confirms go only for the rows' member, and wait while the session is asked again; another
-  member's press only redraws; thisTab, keptKeys and lastAnswered are atoms; the item editor's saved items go with
+  member's press only redraws; the tab's id, the draft's owner, the kept keys read (`thisTab`, `draftOwner`, `keysRead`) and `lastAnswered` are atoms; the item editor's saved items go with
   the sign-out.
 - **Laws** (`9ca70b5`, `d390d8d`, `de8ce87`, `0636e39`): AnsweredBy and every finding of the laws are constructors read
   with match; the tags law reads every src and test folder, follows a tag through helpers, joins, lists, records and
   reassignment, and refuses P.isTagged with a string; no count-only exemption; the refs and boundaries laws close the
   listed holes, and the refs law's alias walk is bounded.
-- **Departure, the lead's to accept:** the vendored `useDataTable` still sets the table's options in a draw (the
-  comment says so); avoiding it means replacing the kit's hook.
-- **On HOLD (Benjamin):** a Replace on a draft matched before migration 0002, where "changed" cannot be known; whether
-  a tab the browser discarded or has not loaded yet counts as gone.
+- **The table's options:** our own code writes nothing during a draw. The vendored `useDataTable` sets its table's
+  options when it draws, as published; vendored hooks stay as published, so that is not a departure.
+- **Decided since (2026-11-21), to build:** a held row and a refused row both hold the confirm, the screen says how many
+  wait and takes the person there, and one press settles many. The take-backs of earlier matches are shown to everyone
+  until each dismisses them (as built).
 
 ## Step 8: TanStack Query removed, the lint everywhere, the documents
 

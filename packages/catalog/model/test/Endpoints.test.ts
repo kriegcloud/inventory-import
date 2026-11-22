@@ -447,9 +447,9 @@ describe("an accept made before its column was matched again, over the twins", (
           const view = yield* stage(tableOf({ fileName: "five.csv", lines: fiveLines })).pipe(as(marcus))
           const params = { id: view.id }
           const table = yield* imports.table({ params }).pipe(as(dana))
-          const cost = O.getOrThrow(A.findFirst(table.columns, (column) => column.label === "unit_cost"))
+          const other = O.getOrThrow(A.findFirst(table.columns, (column) => column.label === "description"))
           const matched = yield* imports
-            .match({ params, payload: { field: "unitCost", column: O.some(cost.index) } })
+            .match({ params, payload: { field: "unitCost", column: O.some(other.index) } })
             .pipe(as(dana))
           expect(matched.revision).toBe(view.revision + 1)
           const accept = { "row-2": decisionFromFlags({ accepted: ["unitCost"] }) }

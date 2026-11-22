@@ -2,16 +2,20 @@
 // this file protects: what one screen learned (a staged file's view and rows, a draft's new revision) is put in place
 // for the next screen, which then does not wait on a request; and a staged file's rows, which never change, are asked
 // for once and kept for the page.
-import { forgetDraft } from "./Draft.atoms.ts"
+import { forgetDraft, removedHere } from "./Draft.atoms.ts"
 import { optimisticChange, optimisticWrite, shown } from "@inventory/client/OptimisticAtoms"
 import { apiRuntime, invalidate, perKey } from "@inventory/client/Api"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
+import { ImportNotFound } from "@inventory/catalog-contract/ImportRejection"
 import { toast } from "sonner"
 import { navigate } from "@inventory/ui/Route"
 import * as A from "effect/Array"
+import * as Cause from "effect/Cause"
 import * as Effect from "effect/Effect"
 import { dual } from "effect/Function"
 import * as O from "effect/Option"
+import * as S from "effect/Schema"
+import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as Atom from "effect/reactivity/Atom"
 import * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import type { ImportView, OpenImports } from "@inventory/catalog-contract/Import"
@@ -30,6 +34,28 @@ export const importView = perKey((id: ImportId) =>
 
 /** `importView`, asked again when the tab regains focus: what the import's screens read. */
 export const importViewShown = perKey((id: ImportId) => Atom.refreshOnWindowFocus(importView(id)))
+
+/**
+ * Mounted by the import page, whatever it draws: an import opened by its address and found removed has no step to
+ * follow its draft, and what the person's closed tabs kept for it is let go and named here all the same.
+ */
+export const followRemoval = perKey((id: ImportId) =>
+  Atom.setIdleTTL(
+    Atom.readable((get) => {
+      const registry = get.registry
+      get.subscribe(
+        importViewShown(id),
+        (result) => {
+          if (!AsyncResult.isFailure(result) || result.waiting) return
+          const error = result.cause.pipe(Cause.squash)
+          if (S.is(ImportNotFound)(error)) removedHere({ registry, id, error })
+        },
+        { immediate: true }
+      )
+    }),
+    0
+  )
+)
 
 /** One staged file's rows. They never change once staged: asked for once and kept for the page. */
 export const importTable = perKey((id: ImportId) =>

@@ -32,7 +32,8 @@
     "./Route": "./src/internal/route.ts",
     "./AnsweredByWords": "./src/internal/answeredBy.ts",
     "./UploadMachine": "./src/Upload.machine.ts",
-    "./ImportDecisions": "./src/ImportDecisions.screen.tsx"
+    "./ImportDecisions": "./src/ImportDecisions.screen.tsx",
+    "./KeptNotices": "./src/KeptNotices.screen.tsx"
   },
   "scripts": {
     "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json && beep-cli quality strict strict-ceiling.json",

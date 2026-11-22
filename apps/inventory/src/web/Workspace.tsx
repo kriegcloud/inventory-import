@@ -14,6 +14,7 @@ import { useAtomMount, useAtomValue } from "@effect/atom-react"
 import { sessionView } from "@inventory/access-web/Session"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import { importInAddress } from "@inventory/catalog-web/Route"
+import { KeptNotices } from "@inventory/catalog-web/KeptNotices"
 import { askBeforeLeaving, importViewShown } from "@inventory/catalog-web/Imports"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as Atom from "effect/reactivity/Atom"
@@ -140,17 +141,23 @@ function WorkspaceFrame(props: { current: AppPage; path: string; params: URLSear
       sidebar={<AppSidebar current={current.path} />}
       crumbs={<Crumbs page={current} importId={importInAddress(params).id} />}
     >
-      <Suspense fallback={<PageSkeleton path={path} params={params} />}>
-        {current.path === peoplePath ? (
-          <PeoplePage />
-        ) : current.path === "/items" ? (
-          <ItemsPage />
-        ) : current.path === "/activity" ? (
-          <ActivityPage />
-        ) : (
-          <ImportPage />
-        )}
-      </Suspense>
+      <div className="flex h-full flex-col">
+        {/* Whatever page is shown: what became of the person's unsaved decisions while this tab was away. */}
+        <KeptNotices />
+        <div className="min-h-0 flex-1">
+          <Suspense fallback={<PageSkeleton path={path} params={params} />}>
+            {current.path === peoplePath ? (
+              <PeoplePage />
+            ) : current.path === "/items" ? (
+              <ItemsPage />
+            ) : current.path === "/activity" ? (
+              <ActivityPage />
+            ) : (
+              <ImportPage />
+            )}
+          </Suspense>
+        </div>
+      </div>
     </AppShell>
   )
 }

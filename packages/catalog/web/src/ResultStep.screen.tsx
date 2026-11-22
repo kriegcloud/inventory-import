@@ -1,5 +1,4 @@
 import { useAtom, useAtomMount, useAtomSet, useAtomValue } from "@effect/atom-react"
-import * as R from "effect/Record"
 import { followDraft, namingLeftOver, rowsLeftOver } from "./ReviewDraft.atoms.ts"
 import { leftOverLines } from "./internal/leftOver.ts"
 import * as A from "effect/Array"
@@ -333,23 +332,23 @@ export function ResultStep(props: { view: ImportView; result: ImportResult; tabl
           )
         }
       />
-      {O.match(leftOver, {
+      {O.match(O.map(leftOver, leftOverLines), {
         onNone: () => null,
-        onSome: (rows) => (
+        onSome: (lines) => (
           <div className="px-4 pb-3 sm:px-9">
             <Alert role="alert">
               <AlertTitle>
-                {R.keys(rows).length === 1
+                {lines.length === 1
                   ? "1 decision of yours was not part of this import"
-                  : `${R.keys(rows).length} decisions of yours were not part of this import`}
+                  : `${lines.length} decisions of yours were not part of this import`}
               </AlertTitle>
               <AlertDescription>
                 <p>
-                  The import was confirmed before {R.keys(rows).length === 1 ? "it was" : "they were"} saved, so the
-                  rows were imported as the review stood without {R.keys(rows).length === 1 ? "it" : "them"}:
+                  The import was confirmed before {lines.length === 1 ? "it was" : "they were"} saved, so the rows were
+                  imported as the review stood without {lines.length === 1 ? "it" : "them"}:
                 </p>
                 <ul className="list-disc pl-4">
-                  {A.map(leftOverLines(rows), (line) => (
+                  {A.map(lines, (line) => (
                     <li key={line.id}>
                       {line.row}: you {line.decided}
                     </li>

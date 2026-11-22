@@ -8,7 +8,7 @@ import * as Str from "effect/String"
 import { decisionFromFlags, hasKeep, isLeftOut, type TakenBackKind } from "@inventory/catalog-contract/Decision"
 import type { MatchTakeBack } from "@inventory/catalog-contract/Import"
 import { fieldLabels } from "@inventory/catalog-contract/Staged"
-import { type HeldRow, Hold, type RowChanges, type RowDecision } from "../Draft.machine.ts"
+import { type HeldRow, Hold, Keep, type Named, type RowDecision } from "../Draft.machine.ts"
 
 const label = (field: string): string => O.getOrElse(R.get<string, string>(fieldLabels, field), () => field)
 
@@ -58,39 +58,76 @@ export const mineWords = (change: O.Option<RowDecision>): string =>
 /** A row as the person knows it: "Row 12". */
 export const rowLabel = (id: string): string => `Row ${Str.replace(/^row-/, "")(id)}`
 
+/** One press a row's line offers: which decision of it stands, and the words on the button. */
+export interface HoldAction {
+  readonly keep: Keep
+  readonly label: string
+}
+
+/** A decision the server refused, with its sentence in brackets: "left out (not saved: Your role was changed)". */
+const refusedWords = (change: O.Option<RowDecision>, reason: string): string =>
+  `${mineWords(change)} (not saved: ${Str.replace(/\.$/, "")(reason)})`
+
 /**
  * One row on hold as the line above the review says it, with the presses it offers: a refused row is dismissed; a row
- * decided otherwise since, or by a tab of the person's that is gone, is settled by picking. Letting the person's own go
- * sends nothing, so it is offered to anyone (a member made view-only too); sending theirs needs an editor.
+ * decided otherwise since, or in tabs of the person's that are gone, is settled by picking, every decision of it said.
+ * A pick that sends nothing is offered to anyone (a member made view-only too); one that sends the person's decision
+ * needs an editor, and a decision the server refused is never offered to be sent.
  *
- * @example holdLine({ rowId: "row-12", held, canDecide: false }).actions // [{ keep: "theirs", label: "Keep theirs" }]
+ * @example holdLine({ rowId: "row-12", held, canDecide: false }).actions // [{ keep: Keep.Theirs(), label: "Keep theirs" }]
  */
 export const holdLine = (input: {
   readonly rowId: string
   readonly held: HeldRow
   readonly canDecide: boolean
-}): {
-  readonly text: string
-  readonly actions: ReadonlyArray<{ readonly keep: "mine" | "theirs"; readonly label: string }>
-} => {
+}): { readonly text: string; readonly actions: ReadonlyArray<HoldAction> } => {
   const { canDecide, held, rowId } = input
   const row = rowLabel(rowId)
-  const pick = (mine: string, theirs: string) => [
-    ...(canDecide ? [{ keep: "mine" as const, label: mine }] : []),
-    { keep: "theirs" as const, label: theirs }
-  ]
+  const several = held.closed.length > 1
+  const closedWords = A.join(
+    A.map(held.closed, (one, at) => {
+      const words = O.match(one.refused, {
+        onNone: () => mineWords(one.decision),
+        onSome: (reason) => refusedWords(one.decision, reason)
+      })
+      return ` Your closed tab${several ? ` ${at + 1}` : ""}: ${words}.`
+    }),
+    ""
+  )
+  const closedTabs = (one: number): string => (several ? `closed tab ${one + 1}'s` : "the closed tab's")
+  // Beside this tab's refused decision, a closed tab's refused one is kept as that: nothing is sent by it.
+  const closedPicks = A.flatMap(held.closed, (one, at): ReadonlyArray<HoldAction> => {
+    const keep = Keep.Closed({ decision: one.decision })
+    return O.isSome(one.refused)
+      ? Hold.$is("Refused")(held.why)
+        ? [{ keep, label: `Keep ${closedTabs(at)}` }]
+        : []
+      : canDecide
+        ? [{ keep, label: `Use ${closedTabs(at)}` }]
+        : []
+  })
   return Hold.$match(held.why, {
-    Refused: ({ reason }) => ({
-      text: `${row}: you ${mineWords(held.mine)}. Not saved: ${reason}`,
-      actions: [{ keep: "theirs" as const, label: "Dismiss" }]
-    }),
+    Refused: ({ reason }) =>
+      A.isReadonlyArrayNonEmpty(held.closed)
+        ? {
+            text: `${row}: this tab: ${refusedWords(held.mine, reason)}.${closedWords}`,
+            actions: [...closedPicks, { keep: Keep.Mine(), label: "Keep this tab's" }]
+          }
+        : {
+            text: `${row}: you ${mineWords(held.mine)}. Not saved: ${reason}`,
+            actions: [{ keep: Keep.Theirs(), label: "Dismiss" }]
+          },
     Elsewhere: ({ theirs }) => ({
-      text: `${row}: decided since by someone else or another tab: ${decisionWords(theirs)}. Yours: ${mineWords(held.mine)}.`,
-      actions: pick("Use mine", "Keep theirs")
+      text: `${row}: decided since by someone else or another tab: ${decisionWords(theirs)}. Yours: ${mineWords(held.mine)}.${closedWords}`,
+      actions: [
+        ...(canDecide ? [{ keep: Keep.Mine(), label: "Use mine" }] : []),
+        ...closedPicks,
+        { keep: Keep.Theirs(), label: "Keep theirs" }
+      ]
     }),
-    OtherTab: ({ thisTab }) => ({
-      text: `${row}: from your other tab: ${mineWords(held.mine)}. This tab: ${mineWords(thisTab)}.`,
-      actions: pick("Use the other tab's", "Keep this tab's")
+    OtherTab: () => ({
+      text: `${row}: this tab: ${mineWords(held.mine)}.${closedWords}`,
+      actions: [...closedPicks, { keep: Keep.Mine(), label: "Keep this tab's" }]
     })
   })
 }
@@ -125,22 +162,66 @@ export const takeBackWords = (taken: MatchTakeBack): string => {
   return `${taken.by} matched ${label(taken.field)} again: ${taken.count} ${kinds[taken.kind]} taken back${where}.`
 }
 
+/** A row's number in the file: 12 of "row-12". */
+const rowNumber = (id: string): number => Number(Str.replace(/^row-(\d+).*$/, "$1")(id))
+
 /**
- * The rows left over, one line each, in the file's order: the row as the person knows it, and what they had decided.
+ * What is kept by row, in the file's own order: row 9 before row 10.
  *
- * @example leftOverLines({ "row-12": O.some(leftOut) }) // [{ row: "Row 12", decided: "left out" }]
+ * @example inFileOrder({ "row-10": "b", "row-9": "a" }) // [["row-9", "a"], ["row-10", "b"]]
  */
-export const leftOverLines = (
-  rows: RowChanges
-): ReadonlyArray<{ readonly id: string; readonly row: string; readonly decided: string }> =>
-  A.map(
-    A.sort(
-      R.toEntries(rows),
-      Order.mapInput(Order.Number, ([id]: readonly [string, unknown]) => Number(Str.replace(/^row-(\d+).*$/, "$1")(id)))
+export const inFileOrder = <Kept>(byRow: Readonly<Record<string, Kept>>): ReadonlyArray<readonly [string, Kept]> =>
+  A.sort(
+    R.toEntries(byRow),
+    Order.mapInput(Order.Number, ([id]: readonly [string, Kept]) => rowNumber(id))
+  )
+
+/** One decision named: the row as the person knows it, and what they had decided. */
+export interface NamedLine {
+  readonly id: string
+  readonly row: string
+  readonly decided: string
+}
+
+/**
+ * The decisions named, one line each, in the file's order: the row as the person knows it, and what they had decided.
+ * Whatever else of the same row was alive (a closed tab's decision beside this tab's) is a line of its own after it.
+ *
+ * @example leftOverLines({ rows: { "row-12": O.some(leftOut) }, beside: {} }) // [{ row: "Row 12", decided: "left out" }]
+ */
+export const leftOverLines = (named: Named): ReadonlyArray<NamedLine> =>
+  A.flatMap(inFileOrder(named.rows), ([id, change]) => [
+    { id, row: rowLabel(id), decided: mineWords(change) },
+    ...A.map(
+      O.getOrElse(R.get(named.beside, id), (): Named["beside"][string] => []),
+      (other, at) => ({
+        id: `${id}:${at}`,
+        row: rowLabel(id),
+        decided: `${mineWords(other)}, in another tab of yours`
+      })
+    )
+  ])
+
+/**
+ * The decisions named, as one sentence's list: "Row 12: you left out; Row 31: you took your decision back".
+ *
+ * @example namedWords({ rows: { "row-12": O.some(leftOut) }, beside: {} }) // "Row 12: you left out"
+ */
+export const namedWords = (named: Named): string =>
+  A.join(
+    A.map(leftOverLines(named), (line) => `${line.row}: you ${line.decided}`),
+    "; "
+  )
+
+/**
+ * The rows named, by number alone, in the file's order: "Row 12, row 31".
+ *
+ * @example rowsWords(["row-31", "row-12"]) // "Row 12, row 31"
+ */
+export const rowsWords = (rows: ReadonlyArray<string>): string =>
+  A.join(
+    A.map(A.sort(rows, Order.mapInput(Order.Number, rowNumber)), (id, at) =>
+      at === 0 ? rowLabel(id) : Str.replace(/^Row/, "row")(rowLabel(id))
     ),
-    ([id, change]) => ({
-      id,
-      row: rowLabel(id),
-      decided: O.match(change, { onNone: () => "took your decision back", onSome: decided })
-    })
+    ", "
   )

@@ -360,9 +360,11 @@ export class ImportStore extends Context.Service<
     takenBack(draft: Draft): Effect.Effect<ReadonlyArray<MatchTakeBack>>
     /**
      * Points one field at a file column (or at none, `column` null), in one atomic write with five parts: the choice,
-     * stamped with the revision this write moves the draft to (a decision made on an earlier one was made before the
-     * field read this column); a move for that field and for every field the match moved off its column
-     * (`movesOfMatch`), stamped the same; every stored decision the match takes back (`withoutStaleDecisions`, as if
+     * stamped with the revision this write moves the draft to when the field reads another column by it (a decision
+     * made on an earlier one was made before the field read this column; a pick of the column it already reads keeps
+     * the stamp it had, moves nothing and takes nothing back); a move for every field that reads another column after
+     * the match, the field itself or one moved off its column (`movesOfMatch`), stamped the same; every stored decision
+     * the match takes back (`withoutStaleDecisions`, as if
      * each was made on the revision before the match), whoever made it: accepts and undone fixes of a moved field,
      * and when the SKU moved every Replace, Keep-stored and keep-one-of-two, and the Replaces and Keep-storeds whose
      * comparison `compare` says the match changed; what it took back, kept with the draft by field and kind

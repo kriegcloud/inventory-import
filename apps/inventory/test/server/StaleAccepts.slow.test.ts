@@ -27,13 +27,13 @@ layer(TypedApp)("an accept made before its field's column was matched again", (i
         const dana = as("mem_dana")
         const staged = yield* upload({ client, table: yield* stage(new File([messy], "items_messy.csv")) }).pipe(marcus)
         const params = { id: staged.id }
-        // Dana matches the unit cost's column again (the same column, chosen by hand): the draft moves on.
+        // Dana matches the unit cost to another column (the reorder point's): the draft moves on.
         const table = yield* client.imports.table({ params }).pipe(dana)
-        const cost = O.getOrThrow(
-          A.findFirst(table.columns, (column) => Str.includes("cost")(Str.toLowerCase(column.label)))
+        const other = O.getOrThrow(
+          A.findFirst(table.columns, (column) => Str.includes("reorder")(Str.toLowerCase(column.label)))
         )
         const matched = yield* client.imports
-          .match({ params, payload: { field: "unitCost", column: O.some(cost.index) } })
+          .match({ params, payload: { field: "unitCost", column: O.some(other.index) } })
           .pipe(dana)
         expect(matched.revision).toBeGreaterThan(staged.revision)
 

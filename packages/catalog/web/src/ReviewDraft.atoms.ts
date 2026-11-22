@@ -44,6 +44,7 @@ import {
   keepWaiting,
   keptWaiting,
   letAnothersDraftGo,
+  removedHere,
   type Owner,
   ownedByAnother,
   ownerOf,
@@ -53,11 +54,12 @@ import {
   unreadKept
 } from "./Draft.atoms.ts"
 import { thisTab } from "@inventory/client/TabAtoms"
-import { leftOverLines } from "./internal/leftOver.ts"
+import { leftOverLines, namedWords } from "./internal/leftOver.ts"
 import {
   changesBetween,
   DraftEffect,
   DraftEvent,
+  type Named,
   type RowChanges,
   Said,
   shown,
@@ -274,20 +276,6 @@ const perform = (input: {
             action: { label: "Save again", onClick: () => happened(DraftEvent.SaveAgain()) }
           })
         },
-        NotTakenUp: ({ rows }) =>
-          void toast.error(
-            R.keys(rows).length === 1
-              ? "1 decision from your other tab was not used"
-              : `${R.keys(rows).length} decisions from your other tab were not used`,
-            {
-              duration: Number.POSITIVE_INFINITY,
-              closeButton: true,
-              description: `That tab was closed before they were saved, and this tab has its own decision of ${R.keys(rows).length === 1 ? "that row" : "those rows"} listed above the review: ${A.join(
-                A.map(leftOverLines(rows), (line) => `${line.row}: you ${line.decided}`),
-                "; "
-              )}.`
-            }
-          ),
         Refused: ({ reason }) =>
           void toast.error("Your last decision was not saved", {
             description: `${reason} It is listed above the review until you decide that row again or dismiss it; the review shows what was saved.`
@@ -308,20 +296,19 @@ const perform = (input: {
             }
           ),
         // Named once, and let go: the import was confirmed, and opened again, before these rows were sent.
-        Outlived: ({ rows }) =>
+        Outlived: (named) => {
+          const one = leftOverLines(named).length === 1
           void toast.error(
-            R.keys(rows).length === 1
+            one
               ? "1 decision of yours was not part of this import"
-              : `${R.keys(rows).length} decisions of yours were not part of this import`,
+              : `${leftOverLines(named).length} decisions of yours were not part of this import`,
             {
               duration: Number.POSITIVE_INFINITY,
               closeButton: true,
-              description: `The import was confirmed, and opened again, before ${R.keys(rows).length === 1 ? "it was" : "they were"} saved, so ${R.keys(rows).length === 1 ? "it was" : "they were"} not sent: ${A.join(
-                A.map(leftOverLines(rows), (line) => `${line.row}: you ${line.decided}`),
-                "; "
-              )}. The review shows the import as it is now.`
+              description: `The import was confirmed, and opened again, before ${one ? "it was" : "they were"} saved, so ${one ? "it was" : "they were"} not sent: ${namedWords(named)}. The review shows the import as it is now.`
             }
           )
+        }
       }),
     // The import is wanted no older than the last write the server answered this screen. A read already out that
     // left after that answer includes it, and is let land; one that left before is let land too, and asked once more
@@ -392,6 +379,15 @@ const arrivedFrom = (view: ImportView, waiting: boolean): DraftEvent =>
     takenBack: A.map(view.takenBack, (taken) => ({ revision: taken.revision, rows: taken.rows }))
   })
 
+/** Keeps what waits of one import's draft in this browser, as it stands now, with its file's name where it is known. */
+const keeping = ({ id, registry }: { readonly registry: AtomRegistry.AtomRegistry; readonly id: ImportId }): void =>
+  keepWaiting({
+    registry,
+    id,
+    waits: waiting(registry.get(draftOf(id))),
+    fileName: O.flatMap(importView(id).peek(registry), (view) => O.fromNullishOr(view.fileName))
+  })
+
 /**
  * Everything that happens to one import's draft goes in here: the machine says what the draft becomes and what to
  * do, and this does it. Written to, never read.
@@ -452,7 +448,7 @@ export const draftEvents = perKey((id: ImportId) =>
     })
     // What waits is kept in this browser as it changes, so a reload finds it, under the member the rows belong to;
     // nothing waiting is no entry.
-    keepWaiting({ registry, id, waits: waiting(stepped.draft) })
+    keeping({ registry, id })
     for (const effect of stepped.effects) if (!isLocal(effect)) perform({ registry, id, effect, owner })
   })
 )
@@ -528,11 +524,14 @@ export const rowsNotSaved = perKey((id: ImportId) =>
 )
 
 /**
- * The person's rows that were not part of the confirm that closed the import (they were never saved), for the
- * result to name: none while there are none, or while the import can still be decided.
+ * The person's decisions that were not part of the confirm that closed the import (they were never saved), for the
+ * result to name, a closed tab's of the same row with this tab's: none while there are none, or while the import can
+ * still be decided.
  */
 export const rowsLeftOver = perKey((id: ImportId) =>
-  Atom.map(draftOf(id), (draft) => (draft.ended ? draft.leftOver : O.none()))
+  Atom.map(draftOf(id), (draft): O.Option<Named> =>
+    draft.ended ? O.map(draft.leftOver, (rows) => ({ rows, beside: draft.leftOverBeside })) : O.none()
+  )
 )
 
 /**
@@ -586,6 +585,8 @@ export const followDraft = perKey((id: ImportId) =>
           if (read || O.isNone(tab)) return
           read = true
           O.map(keptWaiting({ registry, id }), (kept) => registry.set(draftEvents(id), DraftEvent.TakenUp({ kept })))
+          // Rows decided here meanwhile could not be kept under an id the tab did not have yet: they are now.
+          keeping({ registry, id })
           takeUp()
         })
       }
@@ -594,10 +595,12 @@ export const followDraft = perKey((id: ImportId) =>
       let handed: unknown = undefined
       const hand = (result: AsyncResult.AsyncResult<ImportView, unknown>): void => {
         handed = result
-        // Not found: removed, or the session's organization changed in another tab. Which is not known from here,
-        // so nothing kept is erased (only the removal does that); who is signed in is asked again.
+        // Not found: removed, and its rows are let go and named; or not in the organization the rows belong to (the
+        // session's was switched in another tab), where nothing kept is touched and who is signed in is asked again.
         if (AsyncResult.isFailure(result)) {
-          if (!result.waiting && S.is(ImportNotFound)(result.cause.pipe(Cause.squash))) askWhoIsSignedIn(registry)
+          const error = result.cause.pipe(Cause.squash)
+          if (result.waiting || !S.is(ImportNotFound)(error)) return
+          if (!removedHere({ registry, id, error })) askWhoIsSignedIn(registry)
           return
         }
         if (!AsyncResult.isSuccess(result)) return

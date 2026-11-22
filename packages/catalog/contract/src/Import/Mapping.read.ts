@@ -17,7 +17,7 @@ export const MappingChoice = S.Struct({
   by: S.Literals(["person"]).annotateKey({ description: "Who chose it: always a person" }),
   at: S.Int.pipe(S.withDecodingDefaultKey(Effect.succeed(0))).annotateKey({
     description:
-      "The first revision of the draft that has this choice: a decision made on an earlier revision was made before the field read this column, so a decision that rests on the field's column (an accept, an undone fix, and for the SKU a Replace, a Keep-stored or a keep-one-of-two) is not applied"
+      "The first revision of the draft on which the field read this column by a person's choice: a decision made on an earlier revision was made before the field read this column, so a decision that rests on the field's column (an accept, an undone fix, and for the SKU a Replace, a Keep-stored or a keep-one-of-two) is not applied. Choosing the column the field already reads changes nothing: the choice keeps the revision it had, 0 when the field read the column by its heading"
   })
 }).annotate({
   identifier: "MappingChoice",
@@ -29,9 +29,10 @@ export type MappingChoice = typeof MappingChoice.Type
 const ColumnIndex = S.NullOr(S.Int.check(S.isGreaterThanOrEqualTo(0)))
 
 /**
- * A field that began to read another column at a match: the field matched by hand, and any field the match moved off
- * its column (a field read by its heading moves to its next heading match when a person gives that column to another
- * field). Stored with the draft, oldest first, never sent to a screen. It is how the server knows, exactly and after
+ * A field that began to read another column at a match: the field matched by hand, when its column changed, and any
+ * field the match moved off its column (a field read by its heading moves to its next heading match when a person gives
+ * that column to another field). A pick of the column a field already reads is no move (Benjamin, 2026-11-21, "Only
+ * when it changes"). Stored with the draft, oldest first, never sent to a screen. It is how the server knows, exactly and after
  * any number of matches, which column a field read at a past revision: the `was` of the first move after that
  * revision, or the column it reads now when there is none; and when a field last moved, so a decision made before
  * that is not applied (Benjamin, 2026-11-20: "Server refuses, says so", "Refuse if it changes the row").
@@ -46,7 +47,11 @@ export const ColumnMove = S.Struct({
     description: "The revision the match moved the draft to: the first revision on which the field reads `column`"
   }),
   was: ColumnIndex.annotateKey({ description: "The column the field read before the match; null for none" }),
-  column: ColumnIndex.annotateKey({ description: "The column the field reads from `at` on; null for none" })
+  column: ColumnIndex.annotateKey({ description: "The column the field reads from `at` on; null for none" }),
+  knownFrom: S.optionalKey(S.Int.check(S.isGreaterThanOrEqualTo(1))).annotateKey({
+    description:
+      "Only on the first move of a field matched before moves were kept: the revision of that match, the first one `was` is known for. Absent when `was` is known for every revision since the move before"
+  })
 }).annotate({
   identifier: "ColumnMove",
   description: "A field that began to read another column at a match, and the column it read before"

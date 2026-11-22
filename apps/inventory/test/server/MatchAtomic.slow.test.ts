@@ -165,21 +165,33 @@ const marcusSaves = (store: ImportStore["Service"], id: string, set: Readonly<Re
     store.decide(marcusAsMember, O.getOrThrow(draft), { set: flags(set), clear: [] })
   )
 
-/** The messy sample staged by Marcus, and the file's unit cost column. */
+/** The messy sample staged by Marcus, and the column Dana's matches give the unit cost: the reorder point's. */
 const staged = Effect.gen(function* () {
   const client = yield* HttpApiTest.groups(Api, ["imports", "items"])
   const view = yield* upload({ client, table: yield* stage(new File([messy], "items_messy.csv")) }).pipe(
     as("mem_marcus")
   )
   const table = yield* client.imports.table({ params: { id: view.id } }).pipe(as("mem_dana"))
-  const cost = O.getOrThrow(A.findFirst(table.columns, (column) => Str.includes("cost")(Str.toLowerCase(column.label))))
+  const other = O.getOrThrow(
+    A.findFirst(table.columns, (column) => Str.includes("reorder")(Str.toLowerCase(column.label)))
+  )
   const store = yield* ImportStore
-  return { client, view, params: { id: view.id }, cost, store }
+  return { client, view, params: { id: view.id }, other, store }
 })
 
-const headings = ["sku", "name", "category", "uom", "unit_cost", "quantity_on_hand", "Alt code", "List cost"] as const
+const headings = [
+  "sku",
+  "name",
+  "category",
+  "uom",
+  "unit_cost",
+  "quantity_on_hand",
+  "Alt code",
+  "List cost",
+  "Net cost"
+] as const
 type Line = Partial<Record<(typeof headings)[number], string>>
-const letters = ["A", "B", "C", "D", "E", "F", "G", "H"]
+const letters = ["A", "B", "C", "D", "E", "F", "G", "H", "I"]
 const column = (heading: (typeof headings)[number]): number =>
   O.getOrThrow(A.findFirstIndex(headings, (candidate) => candidate === heading))
 const tableOf = (fileName: string, lines: ReadonlyArray<Line>): StagedTable => ({
@@ -270,11 +282,11 @@ layer(App)("a match and another person's write that fall into each other", (it) 
     "a save between the match's read and its batch: the batch writes nothing, the match is worked out again and stamped with the revision it writes",
     () =>
       Effect.gen(function* () {
-        const { client, view, params, cost, store } = yield* staged
+        const { client, view, params, other, store } = yield* staged
         // Marcus leaves row 3 out once Dana's match has read the import and is about to send its batch.
         yield* around([{ before: Effect.orDie(marcusSaves(store, view.id, { "row-3": { out: true } })) }, {}])
         const matched = yield* client.imports
-          .match({ params, payload: { field: "unitCost", column: O.some(cost.index) } })
+          .match({ params, payload: { field: "unitCost", column: O.some(other.index) } })
           .pipe(as("mem_dana"))
         // Two batches: the first found the draft moved on, the second is the match worked out again.
         expect(MutableRef.get(sent)).toBe(2)
@@ -310,11 +322,16 @@ layer(App)("a match and another person's write that fall into each other", (it) 
     "a match between a save's check and its write: the save is checked again, and its accept is named and not applied",
     () =>
       Effect.gen(function* () {
-        const { client, view, params, cost } = yield* staged
+        const { client, view, params, other } = yield* staged
         // Dana's match lands once Marcus's save has been checked against the choices and is about to be written.
         yield* putBetween("decide", (inner) =>
           Effect.flatMap(inner.find(prairie, view.id), (draft) =>
-            inner.matchColumn(danaAsMember, O.getOrThrow(draft), { field: "unitCost", column: cost.index }, "unit cost")
+            inner.matchColumn(
+              danaAsMember,
+              O.getOrThrow(draft),
+              { field: "unitCost", column: other.index },
+              "unit cost"
+            )
           )
         )
         const saved = yield* client.imports
@@ -338,7 +355,7 @@ layer(App)("a match and another person's write that fall into each other", (it) 
     "a save between the match's read and its batch, on a row the match takes back: the save stands, and the take-back lands with the match's own batch",
     () =>
       Effect.gen(function* () {
-        const { client, view, params, cost, store } = yield* staged
+        const { client, view, params, other, store } = yield* staged
         // Dana had accepted row 55's cost on the staged picture.
         yield* client.imports
           .decide({
@@ -366,7 +383,7 @@ layer(App)("a match and another person's write that fall into each other", (it) 
           { after: look }
         ])
         yield* client.imports
-          .match({ params, payload: { field: "unitCost", column: O.some(cost.index) } })
+          .match({ params, payload: { field: "unitCost", column: O.some(other.index) } })
           .pipe(as("mem_dana"))
         // The first batch wrote nothing over his save; the second took the accept out of the row as he left it.
         expect(MutableRef.get(seen)).toEqual([
@@ -485,9 +502,112 @@ layer(App)("a match and another person's write that fall into each other", (it) 
       })
   )
 
+  it.effect(
+    "a save on another row and an item stocked between the match's read and its batch: what the first try answered stands",
+    () =>
+      Effect.gen(function* () {
+        const client = yield* HttpApiTest.groups(Api, ["imports", "items"])
+        const store = yield* ImportStore
+        const stocking = yield* upload({
+          client,
+          table: tableOf("held-stocking.csv", [{ ...item, sku: "GGG-0001", name: "Brass Hinge", unit_cost: "3" }])
+        }).pipe(as("mem_marcus"))
+        // Nothing is stocked under row 2's SKU; stocked at 3, "unit_cost" would compare otherwise than "List cost".
+        const view = yield* upload({
+          client,
+          table: tableOf("held.csv", [
+            { ...item, sku: "GGG-0001", name: "Brass Hinge", unit_cost: "9.00", "List cost": "3" },
+            { ...item, sku: "GGG-0002", name: "Oak Crate", unit_cost: "4" }
+          ])
+        }).pipe(as("mem_marcus"))
+        const params = { id: view.id }
+        yield* client.imports
+          .decide({ params, payload: { madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
+          .pipe(as("mem_marcus"))
+        // Once Dana's match has asked the review, the item is stocked and Marcus leaves row 3 out.
+        const stock = client.imports
+          .commit({
+            params: { id: stocking.id },
+            payload: { revision: stocking.revision, madeOn: {}, set: {}, clear: [] }
+          })
+          .pipe(as("mem_marcus"))
+        yield* around([
+          { before: Effect.orDie(Effect.andThen(stock, marcusSaves(store, view.id, { "row-3": { out: true } }))) },
+          {}
+        ])
+        const matched = yield* client.imports
+          .match({ params, payload: { field: "unitCost", column: O.some(column("List cost")) } })
+          .pipe(as("mem_dana"))
+        expect(MutableRef.get(sent)).toBe(2)
+        expect([matched.takenBack, R.get(matched.decisions, "row-2"), R.get(matched.decisions, "row-3")]).toEqual([
+          [],
+          R.get(replace, "row-2"),
+          O.some(decisionFromFlags({ out: true }))
+        ])
+      })
+  )
+
+  it.effect(
+    "another person's match between the match's read and its batch: the answers start afresh, and a take-back its column causes is made",
+    () =>
+      Effect.gen(function* () {
+        const client = yield* HttpApiTest.groups(Api, ["imports", "items"])
+        const store = yield* ImportStore
+        const stocking = yield* upload({
+          client,
+          table: tableOf("afresh-stocking.csv", [{ ...item, sku: "HHH-0001", name: "Brass Hinge", unit_cost: "3" }])
+        }).pipe(as("mem_marcus"))
+        yield* client.imports
+          .commit({
+            params: { id: stocking.id },
+            payload: { revision: stocking.revision, madeOn: {}, set: {}, clear: [] }
+          })
+          .pipe(as("mem_marcus"))
+        // Row 2 compares the same under "unit_cost" and "Net cost"; "List cost" says otherwise.
+        const view = yield* upload({
+          client,
+          table: tableOf("afresh.csv", [
+            {
+              ...item,
+              sku: "HHH-0001",
+              name: "Brass Hinge XL",
+              unit_cost: "3",
+              "List cost": "9.00",
+              "Net cost": "3"
+            }
+          ])
+        }).pipe(as("mem_marcus"))
+        const params = { id: view.id }
+        yield* client.imports
+          .decide({ params, payload: { madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
+          .pipe(as("mem_marcus"))
+        // Once Dana's match has asked the review, Marcus matches the cost to "List cost" and decides the Replace again.
+        const theirs = client.imports
+          .match({ params, payload: { field: "unitCost", column: O.some(column("List cost")) } })
+          .pipe(as("mem_marcus"))
+        yield* around([
+          {
+            before: Effect.orDie(
+              Effect.andThen(theirs, marcusSaves(store, view.id, { "row-2": { stored: "replace" } }))
+            )
+          },
+          {}
+        ])
+        const matched = yield* client.imports
+          .match({ params, payload: { field: "unitCost", column: O.some(column("Net cost")) } })
+          .pipe(as("mem_dana"))
+        expect(MutableRef.get(sent)).toBe(2)
+        expect(R.get(matched.decisions, "row-2")).toEqual(O.some(decisionFromFlags({})))
+        expect(A.map(matched.takenBack, (entry) => [entry.by, entry.field, entry.kind, entry.rows])).toEqual([
+          ["Marcus Oyelaran", "unitCost", "stored", ["row-2"]],
+          ["Dana Whitfield", "unitCost", "stored", ["row-2"]]
+        ])
+      })
+  )
+
   it.effect("a match overtaken on every try: refused with DraftBusy after `draftTries` batches, nothing written", () =>
     Effect.gen(function* () {
-      const { client, view, params, cost, store } = yield* staged
+      const { client, view, params, other, store } = yield* staged
       // Before each of the match's batches, Marcus changes row 3 again.
       yield* around(
         A.makeBy(draftTries, (index) => ({
@@ -496,7 +616,7 @@ layer(App)("a match and another person's write that fall into each other", (it) 
       )
       const refused = yield* Effect.flip(
         client.imports
-          .match({ params, payload: { field: "unitCost", column: O.some(cost.index) } })
+          .match({ params, payload: { field: "unitCost", column: O.some(other.index) } })
           .pipe(as("mem_dana"))
       )
       expect([S.is(DraftBusy)(refused), MutableRef.get(sent)]).toEqual([true, draftTries])

@@ -3,9 +3,6 @@ import * as A from "effect/Array"
 import * as Cause from "effect/Cause"
 import * as Exit from "effect/Exit"
 import * as O from "effect/Option"
-import * as Order from "effect/Order"
-import * as R from "effect/Record"
-import * as Str from "effect/String"
 import * as Atom from "effect/reactivity/Atom"
 import { useDeferredValue } from "react"
 import { TriangleAlertIcon } from "lucide-react"
@@ -39,8 +36,8 @@ import {
   whileCurrent
 } from "./ReviewDraft.atoms.ts"
 import { acceptsWords } from "./ReviewDraft.atoms.ts"
-import { DraftEvent, type HeldBack, type HeldRows } from "./Draft.machine.ts"
-import { holdLine, takeBackWords } from "./internal/leftOver.ts"
+import { DraftEvent, type HeldBack, type HeldRows, type Keep } from "./Draft.machine.ts"
+import { holdLine, inFileOrder, takeBackWords } from "./internal/leftOver.ts"
 import { matchColumn, suggestFixes } from "./Imports.atoms.ts"
 import { navigate } from "@inventory/ui/Route"
 import { importAddress } from "./internal/route.ts"
@@ -378,37 +375,29 @@ function NotSavedYet(props: { rows: number; onSaveAgain: () => void }) {
 }
 
 /**
- * The person's decisions held instead of sent, one line each, above the review: refused by the server (with its
+ * The person's decisions held instead of sent, one line a row, above the review: refused by the server (with its
  * sentence; dismissed, or settled by deciding the row again), decided otherwise since by someone else or another tab
- * while they waited, or decided otherwise by a tab of theirs that is gone (both said; the person picks which stands).
+ * while they waited, or decided otherwise by tabs of theirs that are gone (every one said; the person picks which
+ * stands).
  * Nothing here is sent until the person says so.
  */
-function OnHold(props: {
-  rows: HeldRows
-  onSettle: (rowId: string, keep: "mine" | "theirs") => void
-  canDecide: boolean
-}) {
+function OnHold(props: { rows: HeldRows; onSettle: (rowId: string, keep: Keep) => void; canDecide: boolean }) {
   const narrow = useAtomValue(isNarrow)
   // In the file's order: row 9 before row 10.
-  const lines = A.sort(
-    R.toEntries(props.rows),
-    Order.mapInput(Order.Number, ([rowId]: readonly [string, unknown]) =>
-      Number(Str.replace(/^row-(\d+).*$/, "$1")(rowId))
-    )
-  )
+  const lines = inFileOrder(props.rows)
   if (!A.isReadonlyArrayNonEmpty(lines)) return null
   return (
     <Alert role="status" className={narrow ? "mx-4 mt-3 w-auto" : "mx-6 mt-4 w-auto"}>
       <TriangleAlertIcon aria-hidden />
       <AlertTitle>
         {A.length(lines) === 1
-          ? "1 decision of yours is not saved"
-          : `${A.length(lines)} decisions of yours are not saved`}
+          ? "1 row has a decision of yours that is not saved"
+          : `${A.length(lines)} rows have decisions of yours that are not saved`}
       </AlertTitle>
       <AlertDescription>
         <ul className="flex flex-col gap-2">
           {A.map(lines, ([rowId, held]) => {
-            // "Keep theirs" sends nothing, so anyone may settle a line with it; only an editor can send theirs.
+            // A pick that sends nothing is anyone's, so anyone may settle a line with it; only an editor can send.
             const line = holdLine({ rowId, held, canDecide: props.canDecide })
             return (
               <li key={rowId} className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -416,7 +405,7 @@ function OnHold(props: {
                 <span className="flex gap-2">
                   {A.map(line.actions, (action) => (
                     <Button
-                      key={action.keep}
+                      key={action.label}
                       variant="outline"
                       size="xs"
                       onClick={() => props.onSettle(rowId, action.keep)}

@@ -1116,7 +1116,7 @@ describe("the orderings that lost or hid a decision", () => {
     run(world, Command.cases.ComeBack.make({}))
     expect(shown(world.draft)).toEqual({})
     expect(world.draft.onHold).toEqual({
-      a: { mine: O.some(out), madeOn: 1, why: Hold.Refused({ reason: "The import was already imported." }) }
+      a: { mine: O.some(out), madeOn: 1, why: Hold.Refused({ reason: "The import was already imported." }), closed: [] }
     })
     run(world, Command.cases.Decide.make({ row: "b", to: "kept" }))
     expect(O.map(world.save, (save) => save.delta)).toEqual(O.some({ set: { b: kept }, clear: [] }))
@@ -1322,6 +1322,7 @@ describe("rows that wait, kept in the browser", () => {
     madeOn: { a: 4 },
     confirms: O.some(0),
     leftOver: false,
+    beside: {},
     seen: {},
     held: {}
   })
@@ -1374,7 +1375,15 @@ describe("rows that wait, kept in the browser", () => {
       true
     ])
     expect(world.kept).toEqual(
-      O.some({ rows: { a: O.some(out) }, madeOn: {}, confirms: O.none(), leftOver: true, seen: {}, held: {} })
+      O.some({
+        rows: { a: O.some(out) },
+        madeOn: {},
+        confirms: O.none(),
+        leftOver: true,
+        beside: {},
+        seen: {},
+        held: {}
+      })
     )
     // A reload before the result was left: the rows come back as left over, and are named again, not sent.
     run(world, Command.cases.Reload.make({}))
@@ -1464,7 +1473,15 @@ describe("a confirm and the rows around it (his answers 4 and 5)", () => {
     expect([world.draft.ended, world.draft.leftOver, world.kept]).toEqual([
       true,
       O.some({ a: O.some(out) }),
-      O.some({ rows: { a: O.some(out) }, madeOn: {}, confirms: O.none(), leftOver: true, seen: {}, held: {} })
+      O.some({
+        rows: { a: O.some(out) },
+        madeOn: {},
+        confirms: O.none(),
+        leftOver: true,
+        beside: {},
+        seen: {},
+        held: {}
+      })
     ])
   })
 
@@ -1506,6 +1523,7 @@ describe("a confirm and the rows around it (his answers 4 and 5)", () => {
       madeOn: { a: 4 },
       confirms: O.some(0),
       leftOver: false,
+      beside: {},
       seen: {},
       held: {}
     })
@@ -1513,7 +1531,7 @@ describe("a confirm and the rows around it (his answers 4 and 5)", () => {
     const arrived = step(back.draft, DraftEvent.ViewArrived({ revision: 9, decisions: {}, open: true, confirms: 1 }))
     expect(A.some(arrived.effects, DraftEffect.$is("Send"))).toBe(false)
     expect(A.filter(arrived.effects, DraftEffect.$is("Say"))).toEqual([
-      DraftEffect.Say({ what: Said.Outlived({ rows: { a: O.some(out) } }) })
+      DraftEffect.Say({ what: Said.Outlived({ rows: { a: O.some(out) }, beside: {} }) })
     ])
     expect([arrived.draft.unsent, waiting(arrived.draft)]).toEqual([{}, O.none()])
   })

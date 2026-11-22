@@ -28,6 +28,12 @@ confirm (`commit` in `packages/catalog/host/src/ImportStore.adapter.ts`), tested
 statement `ON CONFLICT (organizationId, codeKey) DO NOTHING`, and a row counts as created only when its record is
 there afterwards. The smaller shape, one statement per row, is below.
 
+A statement that needs a whole list at once (does any of these 50,000 rows differ, are all these items still as read)
+cannot bind one value per piece of it: 100 values are soon passed, and one value holds at most 2 MB. Its batch first
+puts the list into `importWriteList`, a piece to a statement, the statement reads it back with `json_each` (three bound
+values however long it is), and the batch's last statement deletes it (`putPiece` and `inList` in the same adapter;
+tested at 50,000 rows in `test/server/WriteLimits.slow.test.ts`, which counts what every statement binds).
+
 In the Layer: `const sql = yield* D1Client.D1Client`. In the migration, the natural key is
 `TEXT NOT NULL COLLATE NOCASE` with `UNIQUE (organizationId, code)`, so case variants are one key. Rows go in and come
 out through the model's Schema (pattern 12 for the table).

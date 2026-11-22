@@ -1,12 +1,15 @@
 // What a re-match of a column takes back besides accepts (Benjamin, 2026-11-20: "Server refuses, says so" for a SKU
 // re-match and an undone fix, "Refuse if it changes the row" for a Replace across another re-match), and a field moved
-// off its column by another field's match, on the real handlers and SQL, a fresh D1 for each rule. Each rule at a save
+// off its column by another field's match; what a match by hand to the column a field already reads takes back: nothing
+// (2026-11-21, "Only when it changes"); and a Replace on an import matched before moves were kept ("Take it back, say
+// so"). On the real handlers and SQL, a fresh D1 for each rule. Each rule at a save
 // (named in `notApplied`), at a confirm (refused whole, nothing imported) and at the match itself (a stored decision
 // dropped in the match's own batch). The same scenarios run over the twins in the catalog model's StaleDecisions test.
 import { expect, layer } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
+import * as Order from "effect/Order"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import * as HttpApiTest from "effect/http-api/HttpApiTest"
@@ -406,6 +409,163 @@ layer(TypedApp)("a Replace whose row stops reading under the column its field is
       expect(A.map(matched.takenBack, (entry) => [entry.field, entry.kind, entry.rows])).toEqual([
         ["unitCost", "stored", ["row-2"]]
       ])
+    })
+  )
+})
+
+layer(TypedApp)("a field matched by hand to the column it already reads", (it) => {
+  it.effect(
+    "takes nothing back, whatever the kind: at the match, at a save and at a confirm of what was made before",
+    () =>
+      Effect.gen(function* () {
+        const { client, saving, matching } = yield* seeded
+        const set = flags({
+          "row-2": { stored: "replace", accepted: ["unitCost"] },
+          "row-3": { stored: "keep" },
+          "row-4": { kept: true },
+          "row-5": { out: true },
+          "row-6": { reverted: ["uom"] }
+        })
+        const rows = R.keys(set)
+        const asMade = A.map(rows, (row) => R.get(set, row))
+        // The SKU, the cost and the unit are read by their headings: Dana picks the very same columns by hand.
+        const picked = (id: typeof saving.id) =>
+          Effect.forEach(
+            [
+              { field: "sku" as const, column: column("sku") },
+              { field: "unitCost" as const, column: column("unit_cost") },
+              { field: "uom" as const, column: column("uom") }
+            ],
+            (pick) =>
+              client.imports
+                .match({ params: { id }, payload: { field: pick.field, column: O.some(pick.column) } })
+                .pipe(dana),
+            { concurrency: 1 }
+          )
+        yield* client.imports
+          .decide({
+            params: { id: matching.id },
+            payload: { madeOn: R.map(set, () => matching.revision), set, clear: [] }
+          })
+          .pipe(marcus)
+        yield* picked(matching.id)
+        const matched = yield* client.imports.get({ params: { id: matching.id } }).pipe(marcus)
+        expect([decided(matched.decisions, rows), matched.takenBack]).toEqual([asMade, []])
+        const trail = yield* client.activity.recent().pipe(marcus)
+        expect(
+          A.sort(
+            A.map(
+              A.filter(trail, (entry) => entry.action === "Matched a column"),
+              (entry) => entry.detail
+            ),
+            Order.String
+          )
+        ).toEqual([
+          `SKU reads column A "sku" in reviewed.csv`,
+          `Unit cost reads column F "unit_cost" in reviewed.csv`,
+          `Unit of measure reads column E "uom" in reviewed.csv`
+        ])
+
+        const params = { id: saving.id }
+        const madeOn = R.map(set, () => saving.revision)
+        yield* picked(saving.id)
+        const saved = yield* client.imports.decide({ params, payload: { madeOn, set, clear: [] } }).pipe(marcus)
+        expect(saved.notApplied).toEqual([])
+        const after = yield* client.imports.get({ params }).pipe(marcus)
+        expect(decided(after.decisions, rows)).toEqual(asMade)
+        const confirmed = yield* client.imports
+          .commit({ params, payload: { revision: after.revision, madeOn, set, clear: [] } })
+          .pipe(marcus)
+        expect(confirmed.status).toBe("imported")
+      })
+  )
+})
+
+layer(TypedApp)("a field matched to another column and back to the one it read", (it) => {
+  it.effect(
+    "moved twice: a decision of each kind made before both picks is named, refuses a confirm, and is dropped",
+    () =>
+      Effect.gen(function* () {
+        const done = yield* scenario({
+          rematch: [
+            { field: "sku", column: column("Alt code") },
+            { field: "sku", column: column("sku") },
+            { field: "uom", column: column("Pack unit") },
+            { field: "uom", column: column("uom") }
+          ],
+          set: {
+            "row-2": { stored: "replace", accepted: ["uom"] },
+            "row-3": { stored: "keep" },
+            "row-4": { kept: true },
+            "row-6": { reverted: ["uom"] }
+          }
+        })
+        const named = [
+          { rowId: "row-2", field: "uom", kind: "accept" },
+          { rowId: "row-2", field: "sku", kind: "stored" },
+          { rowId: "row-3", field: "sku", kind: "stored" },
+          { rowId: "row-4", field: "sku", kind: "twin" },
+          { rowId: "row-6", field: "uom", kind: "undo" }
+        ]
+        expect([done.notApplied, done.refused, done.confirm]).toEqual([named, named, nothingWritten])
+        expect(decided(done.matched, ["row-2", "row-3", "row-4", "row-6"])).toEqual(
+          A.replicate(O.some(decisionFromFlags({})), 4)
+        )
+      })
+  )
+})
+
+/** The import as a match of its cost to "List cost" left it before moves were kept: a choice, and no move. */
+const matchedLongAgo = Effect.fn("matchedLongAgo")(function* (id: string) {
+  const sql = yield* SqlClient.SqlClient
+  yield* sql`UPDATE importDraft SET revision = revision + 1, movesJson = '[]',
+      choicesJson = json_array(json_object('field', 'unitCost', 'column', ${column("List cost")}, 'by', 'person',
+        'at', revision + 1))
+    WHERE id = ${id}`
+}, Effect.orDie)
+
+layer(TypedApp)("a Replace or Keep-stored on an import matched before moves were kept", (it) => {
+  it.effect("is named by a save, refuses a confirm, and is dropped by a further match and named in the view", () =>
+    Effect.gen(function* () {
+      const { client, saving, matching } = yield* seeded
+      // Row 2's cost reads 99.00 in every cost column: only not knowing which one it read takes its Replace back.
+      const set = flags({ "row-2": { stored: "replace" }, "row-3": { stored: "keep" } })
+      const named = [
+        { rowId: "row-2", field: "unitCost", kind: "stored" },
+        { rowId: "row-3", field: "unitCost", kind: "stored" }
+      ]
+      const undecided = A.replicate(O.some(decisionFromFlags({})), 2)
+      const params = { id: saving.id }
+      const madeOn = R.map(set, () => saving.revision)
+      yield* matchedLongAgo(saving.id)
+      // The column it reads since, picked again: an old choice with no moves is not a pick of the same column.
+      yield* client.imports
+        .match({ params, payload: { field: "unitCost", column: O.some(column("List cost")) } })
+        .pipe(dana)
+      const saved = yield* client.imports.decide({ params, payload: { madeOn, set, clear: [] } }).pipe(marcus)
+      expect(saved.notApplied).toEqual(named)
+      const refused = yield* Effect.flip(
+        client.imports.commit({ params, payload: { revision: saved.revision, madeOn, set, clear: [] } }).pipe(marcus)
+      )
+      expect(S.is(AcceptsTakenBack)(refused) ? refused.accepts : refused).toEqual(named)
+
+      const other = { id: matching.id }
+      yield* client.imports
+        .decide({ params: other, payload: { madeOn: R.map(set, () => matching.revision), set, clear: [] } })
+        .pipe(marcus)
+      yield* matchedLongAgo(matching.id)
+      const further = yield* client.imports
+        .match({ params: other, payload: { field: "unitCost", column: O.some(column("Net cost")) } })
+        .pipe(dana)
+      expect(decided(further.decisions, ["row-2", "row-3"])).toEqual(undecided)
+      expect(A.map(further.takenBack, (entry) => [entry.field, entry.kind, entry.rows])).toEqual([
+        ["unitCost", "stored", ["row-2", "row-3"]]
+      ])
+      // Made before the match that kept no move: still not known, though the further match kept its own.
+      const late = yield* client.imports
+        .decide({ params: other, payload: { madeOn: R.map(set, () => matching.revision), set, clear: [] } })
+        .pipe(marcus)
+      expect(late.notApplied).toEqual(named)
     })
   )
 })

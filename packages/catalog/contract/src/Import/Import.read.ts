@@ -248,7 +248,15 @@ export const MatchTakeBack = S.Struct({
     description: "The draft's revision the match wrote: a screen holding an earlier one has not been told"
   }),
   by: personName("Who matched the column"),
-  field: Field.annotateKey({ description: "The field whose column was matched again" }),
+  field: Field.annotateKey({ description: "The field that reads another column, or none, since this match" }),
+  matched: Field.pipe(S.optionalKey).annotateKey({
+    description:
+      "The field the person matched by hand: another than `field` when that one lost its column to it. Left out on an entry stored before this was kept"
+  }),
+  reads: S.Boolean.pipe(S.optionalKey).annotateKey({
+    description:
+      "Whether `field` reads a column since this match; false when it was cleared, or lost its only one. Left out on an entry stored before this was kept"
+  }),
   kind: TakenBackKind.annotateKey({
     description: "What was taken back: accepts, Replaces or Keep-stored, keeps of one of two, undone fixes"
   }),

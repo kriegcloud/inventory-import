@@ -38,6 +38,7 @@ import {
   ConfirmRequest,
   RowDecision,
   SaveRequest,
+  type DecidedSince,
   type StaleAccept
 } from "@inventory/catalog-contract/Decision"
 import { review, carryDecisions, ruleFixes, firstDecisions } from "../Review/Review.rules.ts"
@@ -235,14 +236,16 @@ export const importsEndpoints = Effect.gen(function* () {
 
   // A match's question to the review, held across the store's tries of the one match: an answer a later try gives only
   // because an item, a created row or a suggestion changed in between never adds a take-back (`answeredAcrossTries`).
-  // Held only while the tries are asked with the same columns: another person's match in between starts it afresh
-  // (`heldAtMatch`), so a take-back a column causes is never held down.
-  const heldAcrossTries = Effect.fnUntraced(function* (compare: CompareAtMatch) {
+  // Held while the tries are asked with the same columns, whatever revision each was asked at: a save on another row in
+  // between keeps the earlier answers, and another person's match in between starts them afresh (`heldAtMatch`), so a
+  // take-back a column causes is never held down. `head` is the file's, which never changes.
+  const heldAcrossTries = Effect.fnUntraced(function* (head: StagedHead, compare: CompareAtMatch) {
     const earlier = yield* Ref.make<O.Option<HeldAtMatch>>(O.none())
     const held: CompareAtMatch = Effect.fnUntraced(function* (asked) {
       const answer = yield* compare(asked)
       const kept = heldAtMatch({
         earlier: yield* Ref.get(earlier),
+        head,
         choices: asked.choices,
         moves: asked.moves,
         questions: asked.questions,
@@ -403,7 +406,12 @@ export const importsEndpoints = Effect.gen(function* () {
     latest: number,
     tries: { readonly left: number; readonly overtaken: Overtaken; readonly answered: ReadonlyArray<Answered> }
   ): Effect.fn.Return<
-    { readonly revision: number; readonly changed: boolean; readonly notApplied: ReadonlyArray<StaleAccept> },
+    {
+      readonly revision: number
+      readonly changed: boolean
+      readonly notApplied: ReadonlyArray<StaleAccept>
+      readonly decidedSince: ReadonlyArray<DecidedSince>
+    },
     AlreadyImported | ImportNotFound | RevisionAhead | DraftBusy
   > {
     const draft = yield* find(actor, id)
@@ -416,7 +424,8 @@ export const importsEndpoints = Effect.gen(function* () {
         ? Effect.fail(busy(overtaken))
         : saveChecked(actor, id, payload, latest, { left: tries.left - 1, overtaken, answered: held })
     return yield* Decided.match(done, {
-      saved: (saved) => Effect.succeed({ revision: saved.revision, changed: saved.changed, notApplied }),
+      saved: (saved) =>
+        Effect.succeed({ revision: saved.revision, changed: saved.changed, notApplied, decidedSince: [] }),
       closed: () => Effect.fail(closed(draft)),
       // The columns changed: the next try is a judgement of its own, held to nothing an earlier one answered.
       rematched: () => again({ ...tries.overtaken, draft: true }, []),
@@ -636,13 +645,14 @@ export const importsEndpoints = Effect.gen(function* () {
       if (A.some(before, (choice) => choice.field === payload.field && choice.column === asked)) {
         return yield* viewOf(actor, draft)
       }
-      // One write: the choice, stamped with the revision that write moves the draft to (a decision made on an earlier
-      // one was made before the match), and a move for it and for every field it moved off its column; every stored
-      // decision that rests on a column the match moved taken out (the review is asked which Replaces it changed), and
+      // One write: the choice, stamped with the revision that write moves the draft to when the field reads another
+      // column by it (a decision made on an earlier one was made before the match), and a move for every field that
+      // reads another column (a pick of the column the field already reads moves nothing and takes nothing back); every
+      // stored decision that rests on a column the match moved taken out (the review is asked which Replaces it changed), and
       // kept with the draft by field and kind for every screen to name; and the audit line, with what it took back
       // counted. Nothing can fall between them. The answer is the view, which names what this match took back.
       const label = fieldLabels[payload.field]
-      const compare = yield* heldAcrossTries(compareFor(actor, draft, table))
+      const compare = yield* heldAcrossTries(table, compareFor(actor, draft, table))
       const saved = yield* imports.matchColumn(
         actor,
         draft,

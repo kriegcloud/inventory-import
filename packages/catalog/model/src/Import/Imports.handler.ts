@@ -38,6 +38,7 @@ import {
   ConfirmRequest,
   RowDecision,
   SaveRequest,
+  type DecidedSince,
   type StaleAccept
 } from "@inventory/catalog-contract/Decision"
 import { review, carryDecisions, ruleFixes, firstDecisions } from "../Review/Review.rules.ts"
@@ -405,7 +406,12 @@ export const importsEndpoints = Effect.gen(function* () {
     latest: number,
     tries: { readonly left: number; readonly overtaken: Overtaken; readonly answered: ReadonlyArray<Answered> }
   ): Effect.fn.Return<
-    { readonly revision: number; readonly changed: boolean; readonly notApplied: ReadonlyArray<StaleAccept> },
+    {
+      readonly revision: number
+      readonly changed: boolean
+      readonly notApplied: ReadonlyArray<StaleAccept>
+      readonly decidedSince: ReadonlyArray<DecidedSince>
+    },
     AlreadyImported | ImportNotFound | RevisionAhead | DraftBusy
   > {
     const draft = yield* find(actor, id)
@@ -418,7 +424,8 @@ export const importsEndpoints = Effect.gen(function* () {
         ? Effect.fail(busy(overtaken))
         : saveChecked(actor, id, payload, latest, { left: tries.left - 1, overtaken, answered: held })
     return yield* Decided.match(done, {
-      saved: (saved) => Effect.succeed({ revision: saved.revision, changed: saved.changed, notApplied }),
+      saved: (saved) =>
+        Effect.succeed({ revision: saved.revision, changed: saved.changed, notApplied, decidedSince: [] }),
       closed: () => Effect.fail(closed(draft)),
       // The columns changed: the next try is a judgement of its own, held to nothing an earlier one answered.
       rematched: () => again({ ...tries.overtaken, draft: true }, []),

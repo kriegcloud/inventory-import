@@ -8,6 +8,7 @@ import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as SchemaTransformation from "effect/SchemaTransformation"
 import { RowId } from "../Catalog.id.ts"
 import { fields } from "../Staging/Staged.read.ts"
+import { nullAsNone } from "@inventory/kernel/Wire"
 
 const bounded = (max: number) => S.String.check(S.isMaxLength(max))
 
@@ -357,11 +358,36 @@ export const StaleAccept = S.Struct({
 export type StaleAccept = typeof StaleAccept.Type
 
 /**
- * What a save sends: the decisions made since the last save, and the revision of the draft they were made on. The
- * difference only, so two screens deciding different rows do not collide; and what they were made on, so a decision
- * made before a column it rests on was matched again is not applied.
+ * For each row of a save that waited (its first save failed, it was kept across a reload, or a closed tab kept it),
+ * the decisions this tab knows the server may hold of it: what the server held when the person began deciding the
+ * row, and each decision this tab sent whose fate it does not know; null for no decision. Such a row is written only
+ * while what is stored is one of them, so a decision made elsewhere since is never overwritten unasked (Benjamin,
+ * 2026-11-20: "Hold it, show both, ask"). A row not named here is a live press: the last one stands.
  */
-export const SaveRequest = S.Struct({ madeOn, ...DecisionDelta.fields }).annotate({
+const over = S.Record(bounded(40), RowDecision.pipe(S.OptionFromNullOr, S.Array, S.check(S.isMaxLength(50))))
+  .check(S.isMaxProperties(50000))
+  .annotate({
+    description:
+      "For each row of the save that waited, the decisions the sender knows the server may hold of it (null for none): the row is written only while one of them is stored"
+  })
+
+/** A row of a save that was not written: it waited, and what is stored of it is none of the decisions named in `over`. */
+export const DecidedSince = S.Struct({
+  rowId: S.String.annotateKey({ description: "The row (`row-7`)" }),
+  theirs: RowDecision.pipe(nullAsNone({ description: "The decision stored of it now; null for none" }))
+}).annotate({
+  identifier: "DecidedSince",
+  description: "A row that waited and was decided otherwise since: not written, with what is stored of it"
+})
+/** The decoded value of `DecidedSince`. */
+export type DecidedSince = typeof DecidedSince.Type
+
+/**
+ * What a save sends: the decisions made since the last save, and the revision of the draft they were made on. The
+ * difference only, so two screens deciding different rows do not collide; what they were made on, so a decision made
+ * before a column it rests on was matched again is not applied; and for rows that waited, what they may be written over.
+ */
+export const SaveRequest = S.Struct({ madeOn, over: over.pipe(S.optionalKey), ...DecisionDelta.fields }).annotate({
   identifier: "SaveRequest",
   description:
     "A save of decisions: the revision of the draft they were made on, the rows whose decision is new or different, and the rows whose decision was taken back"

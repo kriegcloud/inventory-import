@@ -1,21 +1,30 @@
 name: Deploy
 
-# A preview for each pull request, destroyed when it closes; production on a push to main, after the approval the
-# `production` environment asks for. The environments, their secrets and variables are made by the repository's
-# stack (packages/infra/src/GitHub.stack.ts), deployed from a workstation. No job here can destroy any stage but
-# `pr-<number>`, and no job deploys the repository's stack.
+# Trunk, with release branches and tags (decision "releases and deploys", docs/releasing.md):
+# - a preview for each pull request, destroyed when it closes;
+# - staging after every push to main whose CI run passed;
+# - production only from a release tag, v<major>.<minor>.<patch>, whose commit is on release/<major>.<minor> and not
+#   on main, after the approval the `production` environment asks for. Nothing deploys production from main.
+# The environments, their secrets and variables are made by the repository's stack (packages/infra/src/GitHub.stack.ts),
+# deployed from a workstation. No job here can destroy any stage but `pr-<number>`, and no job deploys the repository's
+# stack.
 
 on:
   push:
-    branches: [main]
+    tags: ["v*"]
   pull_request:
     types: [opened, synchronize, reopened, closed]
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
 
 permissions:
   contents: read
 
 concurrency:
-  group: deploy-${{ github.event.pull_request.number || 'prod' }}
+  group: >-
+    deploy-${{ github.event.pull_request.number || (github.event_name == 'workflow_run' && 'staging') || 'prod' }}
   cancel-in-progress: false
 
 jobs:
@@ -78,9 +87,60 @@ jobs:
       - name: Destroy the preview
         run: bunx alchemy destroy --stage "$STAGE" --yes
 
+  staging:
+    name: Staging
+    # After CI passed on a push to main: what main holds, deployed as it was checked.
+    if: >-
+      github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: staging
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      # Staging's test accounts take the password every preview's do. A secret: never echoed.
+      PREVIEW_TEST_ACCOUNT_PASSWORD: ${{ secrets.PREVIEW_TEST_ACCOUNT_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The commit CI checked, not whatever main holds by now.
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - name: Deploy staging
+        run: bunx alchemy deploy --stage staging --yes
+
+  release-tag:
+    name: Check the release tag
+    # Before production asks for its approval: the trigger matched `v*`, and this says whether the tag may deploy.
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Every branch, so the tag's commit can be looked for on its release branch and on main.
+          fetch-depth: 0
+      # A checkout of a tag can hold it as a lightweight one; this takes the tag object as it was pushed.
+      - name: Fetch the tag as pushed
+        run: git fetch --force origin "refs/tags/${GITHUB_REF_NAME}:refs/tags/${GITHUB_REF_NAME}"
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - name: Refuse a tag that is not a release
+        run: bun run beep release verify "$GITHUB_REF_NAME"
+
   production:
     name: Production
-    if: github.event_name == 'push'
+    needs: release-tag
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # Waits for the approval the environment asks for.
@@ -93,6 +153,7 @@ jobs:
       DEPLOY_WITHOUT_MODEL_KEY: ${{ vars.DEPLOY_WITHOUT_MODEL_KEY }}
       SIGN_UP: ${{ vars.SIGN_UP }}
     steps:
+      # The tag's own commit: the release commit on its release branch.
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:

@@ -1,4 +1,4 @@
-import { retriedReporters } from "./vitest.retries.ts"
+import { neverTriedAgain, retriedReporters } from "./vitest.retries.ts"
 
 // What every package's vitest.config.ts shares, so a test's limit is one decision and not one per file.
 //
@@ -48,10 +48,14 @@ export const slowLimits = {
  *
  * Never tried again: a property that was falsified (another try draws other values and would hide a counterexample
  * that is real), and a test or hook that ran out of time (a hang tried again would eat the job's time four times
- * over). Both fail at once.
+ * over). Both fail at once when they are the last error of a try, which is the only error vitest shows a retry
+ * condition. When a hook fails after one of them (an `afterEach` that looks at what a hung test never reached), vitest
+ * does try the test again; the reporter reads every error of every try and fails the run for it, whatever a later
+ * try did. So the rule holds for the run's result always, and for the time spent only without such a hook: no test of
+ * the packages that use this has one today.
  */
 export const realTime = {
-  retry: { count: 3, delay: 500, condition: /^(?![\s\S]*(?:Property falsified|(?:Test|Hook) timed out in \d+ms))/ }
+  retry: { count: 3, delay: 500, condition: new RegExp(`^(?![\\s\\S]*(?:${neverTriedAgain.source}))`) }
 }
 
 /**

@@ -29,6 +29,27 @@
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/vitest.shared.ts", "$TURBO_ROOT$/vitest.retries.ts"],
       "outputs": []
     },
+    // The proofs of a model's rules (`*.prove.test.ts`, the "prove" project of a package's Vitest): minutes on a busy
+    // machine, and part of `bun run check`. No `transit` edge: a proof reads the model's own files and the library, so
+    // a package that has proofs names exactly those in its own turbo.json, and a proof is replayed until one changes.
+    "prove": { "outputs": [] },
+    // The search of a whole model under Verify (`*.verify.test.ts`, the "verify" project): every proof again, then
+    // every short sequence of commands and the longer walks. Longer than the proofs, so only `bun run check:full`
+    // runs it. Like `prove` it has no `transit` edge and names its own inputs, and is replayed until one changes.
+    "verify": { "outputs": [] },
+    // The mutants of a model: each one change to its code, which its proofs or its stories must notice. A package that
+    // has them names their inputs in its own turbo.json. The sample is in `bun run check:full`; all of them run in
+    // the nightly workflow.
+    "mutants:sample": { "outputs": [] },
+    "mutants": { "outputs": [] },
+    // A long property beside a package's fast tests (`*.fold.test.ts`, the "fold" project): the review's model held
+    // against the review region, over a minute. Like the fast tests it reads its package and what it depends on, so
+    // it is replayed until one of them changes; it is in `bun run check:full`, not in `bun run check`.
+    "fold": {
+      "dependsOn": ["transit"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/vitest.shared.ts", "$TURBO_ROOT$/vitest.retries.ts"],
+      "outputs": []
+    },
     // The slow tests: workerd, a real D1 database and sign-in. One suite calls a live service, so never cached.
     "test:slow": { "dependsOn": ["transit"], "cache": false },
     // The production build and its identity check.
@@ -234,11 +255,13 @@
       "outputs": []
     },
     // Its tests run that law with the root's own profile and the installed packages, whose deprecation notes they
-    // expect word for word: the same installed manifests are inputs here.
+    // expect word for word: the same installed manifests are inputs here. One of its tests reads the workflows GitHub
+    // runs (test/DeployWorkflow.test.ts), so a change to a workflow alone runs the tests again and is never replayed.
     "@beep/repo-cli#test": {
       "dependsOn": ["transit"],
       "inputs": [
         "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/.github/workflows/**",
         "$TURBO_ROOT$/vitest.shared.ts",
         "$TURBO_ROOT$/vitest.retries.ts",
         "$TURBO_ROOT$/.oxlintrc.deprecated-apis.json",

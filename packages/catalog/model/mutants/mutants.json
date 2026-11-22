@@ -1,0 +1,2823 @@
+{
+  "mutants": [
+    {
+      "key": "stage-viewer",
+      "target": "import",
+      "kind": "check",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.StageImport\")"],
+      "until": "Effect.fn(\"Import.MatchColumn\")",
+      "old": "        if (actor.role === \"viewer\") return yield* new NotPermitted({})\n",
+      "new": "",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["AViewerChangesNothing"],
+      "trialStories": ["Review: a viewer may not stage a file; an editor stages it, once"]
+    },
+    {
+      "key": "stage-staged",
+      "target": "import",
+      "kind": "check",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.StageImport\")"],
+      "until": "Effect.fn(\"Import.MatchColumn\")",
+      "old": "        if (!isUnstaged(s)) return yield* new AlreadyStaged({})\n",
+      "new": "",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": [
+        "ARemovedImportStaysRemoved",
+        "AnImportIsOpenedAgainOnlyByReopen",
+        "AnImportNeverChangesOrganization",
+        "EveryChangeHasItsOwnNumber",
+        "OnlyAnOpenImportIsReviewed",
+        "OnlyItsOwnOrganizationChangesAnImport"
+      ],
+      "trialStories": [
+        "Review: a removed import takes nothing more: no suggestion, no match, no take-back, no reopen, no second staging",
+        "Review: a viewer may not stage a file; an editor stages it, once"
+      ]
+    },
+    {
+      "key": "stage-nothing",
+      "target": "import",
+      "kind": "nothing",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.StageImport\")"],
+      "until": "Effect.fn(\"Import.MatchColumn\")",
+      "old": "        return [",
+      "new": "        return []\n        return [",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": ["Review: a viewer may not stage a file; an editor stages it, once"]
+    },
+    {
+      "key": "match-open",
+      "target": "import",
+      "kind": "check",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.MatchColumn\")"],
+      "until": "Effect.fn(\"Import.RecordSuggestion\")",
+      "old": "        if (!isOpen(s)) return yield* new NotOpen({})\n",
+      "new": "",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["EveryChangeHasItsOwnNumber"],
+      "trialStories": [
+        "Review: a removed import takes nothing more: no suggestion, no match, no take-back, no reopen, no second staging",
+        "Review: on a confirmed import nothing is reviewed, matched, suggested, confirmed again or removed until it is reopened"
+      ]
+    },
+    {
+      "key": "match-permitted",
+      "target": "import",
+      "kind": "check",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.MatchColumn\")"],
+      "until": "Effect.fn(\"Import.RecordSuggestion\")",
+      "old": "        if (actor.organizationId !== s.organizationId || actor.role === \"viewer\") return yield* new NotPermitted({})\n",
+      "new": "",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["AViewerChangesNothing", "OnlyItsOwnOrganizationChangesAnImport"],
+      "trialStories": [
+        "Review: a viewer changes nothing: no match, suggestion, confirm, remove, row act, undo, group or group undo",
+        "Review: an admin of another organization changes nothing in this one's import, its rows or its groups"
+      ]
+    },
+    {
+      "key": "match-opening",
+      "target": "import",
+      "kind": "check",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.MatchColumn\")"],
+      "until": "Effect.fn(\"Import.RecordSuggestion\")",
+      "old": "        if (cmd.opening !== s.confirms) return yield* new ConfirmedSince({})\n",
+      "new": "",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["AMatchIsOfThisOpening"],
+      "trialStories": [
+        "Review: a match, a group and an undo made before a confirm are not taken after the import is opened again either"
+      ]
+    },
+    {
+      "key": "match-saw",
+      "target": "import",
+      "kind": "check",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.MatchColumn\")"],
+      "until": "Effect.fn(\"Import.RecordSuggestion\")",
+      "old": "        if (cmd.saw !== s.matching) return yield* new MatchedSince({ matching: s.matching })\n",
+      "new": "",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["AMatchIsMadeOnTheLastOne"],
+      "trialStories": [
+        "Review: a match made over one its sender never saw is refused, and the columns as they are, by heading or by hand, are no match"
+      ]
+    },
+    {
+      "key": "match-same",
+      "target": "import",
+      "kind": "check",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.MatchColumn\")"],
+      "until": "Effect.fn(\"Import.RecordSuggestion\")",
+      "old": "        if (s.columns === cmd.columns) return []\n",
+      "new": "",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Review: a match made over one its sender never saw is refused, and the columns as they are, by heading or by hand, are no match"
+      ]
+    },
+    {
+      "key": "match-nothing",
+      "target": "import",
+      "kind": "nothing",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.MatchColumn\")"],
+      "until": "Effect.fn(\"Import.RecordSuggestion\")",
+      "old": "        return [",
+      "new": "        return []\n        return [",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Group: a group made on an older matching is refused",
+        "Review: a match made over one its sender never saw is refused, and the columns as they are, by heading or by hand, are no match",
+        "Review: a match, a group and an undo made before a confirm are not taken after the import is opened again either",
+        "Review: a suggestion is recorded as its asker's and changes no number; a viewer's is refused"
+      ]
+    },
+    {
+      "key": "suggestion-open",
+      "target": "import",
+      "kind": "check",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.RecordSuggestion\")"],
+      "until": "Effect.fn(\"Import.ConfirmImport\")",
+      "old": "        if (!isOpen(s)) return yield* new NotOpen({})\n",
+      "new": "",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Review: a removed import takes nothing more: no suggestion, no match, no take-back, no reopen, no second staging",
+        "Review: on a confirmed import nothing is reviewed, matched, suggested, confirmed again or removed until it is reopened"
+      ]
+    },
+    {
+      "key": "suggestion-permitted",
+      "target": "import",
+      "kind": "check",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.RecordSuggestion\")"],
+      "until": "Effect.fn(\"Import.ConfirmImport\")",
+      "old": "        if (actor.organizationId !== s.organizationId || actor.role === \"viewer\") return yield* new NotPermitted({})\n",
+      "new": "",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["AViewerChangesNothing", "OnlyItsOwnOrganizationChangesAnImport"],
+      "trialStories": [
+        "Review: a suggestion is recorded as its asker's and changes no number; a viewer's is refused",
+        "Review: an admin of another organization changes nothing in this one's import, its rows or its groups"
+      ]
+    },
+    {
+      "key": "suggestion-nothing",
+      "target": "import",
+      "kind": "nothing",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.RecordSuggestion\")"],
+      "until": "Effect.fn(\"Import.ConfirmImport\")",
+      "old": "        return [",
+      "new": "        return []\n        return [",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": ["Review: a suggestion is recorded as its asker's and changes no number; a viewer's is refused"]
+    },
+    {
+      "key": "confirm-open",
+      "target": "import",
+      "kind": "check",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.ConfirmImport\")"],
+      "until": "Effect.fn(\"Import.TakeBackImport\")",
+      "old": "        if (!isOpen(s)) return yield* new NotOpen({})\n",
+      "new": "",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["EveryChangeHasItsOwnNumber"],
+      "trialStories": [
+        "Review: on a confirmed import nothing is reviewed, matched, suggested, confirmed again or removed until it is reopened"
+      ]
+    },
+    {
+      "key": "confirm-permitted",
+      "target": "import",
+      "kind": "check",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.ConfirmImport\")"],
+      "until": "Effect.fn(\"Import.TakeBackImport\")",
+      "old": "        if (actor.organizationId !== s.organizationId || actor.role === \"viewer\") return yield* new NotPermitted({})\n",
+      "new": "",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["AViewerChangesNothing", "OnlyItsOwnOrganizationChangesAnImport"],
+      "trialStories": [
+        "Review: a viewer changes nothing: no match, suggestion, confirm, remove, row act, undo, group or group undo",
+        "Review: an admin of another organization changes nothing in this one's import, its rows or its groups"
+      ]
+    },
+    {
+      "key": "confirm-seen",
+      "target": "import",
+      "kind": "check",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.ConfirmImport\")"],
+      "until": "Effect.fn(\"Import.TakeBackImport\")",
+      "old": "        if (cmd.seen !== s.changes) return yield* new ReviewMovedOn({ last: s.changes })\n",
+      "new": "",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["AConfirmNamesEveryChange"],
+      "trialStories": [
+        "Group: a group of 6,000 rows is one act and one change, and a confirm has to have received it",
+        "Review: another person's act lands before the screen's own waiting act: the confirm is refused"
+      ]
+    },
+    {
+      "key": "confirm-plan",
+      "target": "import",
+      "kind": "check",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.ConfirmImport\")"],
+      "until": "Effect.fn(\"Import.TakeBackImport\")",
+      "old": "        if (cmd.planAt !== s.changes) return yield* new PlanBehind({ last: s.changes })\n",
+      "new": "",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["APlanIsOfEveryChange"],
+      "trialStories": ["Review: a plan built before the last act may not be confirmed after it"]
+    },
+    {
+      "key": "confirm-shown",
+      "target": "import",
+      "kind": "check",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.ConfirmImport\")"],
+      "until": "Effect.fn(\"Import.TakeBackImport\")",
+      "old": "        if (cmd.plan !== cmd.shown) return yield* new NotWhatWasShown({})\n",
+      "new": "",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["APlanDoesWhatWasShown"],
+      "trialStories": [
+        "Review: a plan that would do something else than the button said is refused: the stored items changed"
+      ]
+    },
+    {
+      "key": "confirm-sum",
+      "target": "import",
+      "kind": "check",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.ConfirmImport\")"],
+      "until": "Effect.fn(\"Import.TakeBackImport\")",
+      "old": "        if (cmd.created + cmd.updated + cmd.already + cmd.notImported !== s.rows) {\n          return yield* new CountsDoNotAddUp({})\n        }\n",
+      "new": "",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["OutcomesAddUpToTheRows"],
+      "trialStories": [
+        "Review: counts that do not add up to the file's rows are refused, and so is more in force than the file has rows"
+      ]
+    },
+    {
+      "key": "confirm-bound",
+      "target": "import",
+      "kind": "check",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.ConfirmImport\")"],
+      "until": "Effect.fn(\"Import.TakeBackImport\")",
+      "old": "        if (s.inForce + cmd.created > s.rows) return yield* new CountsDoNotAddUp({})\n",
+      "new": "",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["NoMoreInForceThanRows"],
+      "trialStories": [
+        "Review: counts that do not add up to the file's rows are refused, and so is more in force than the file has rows"
+      ]
+    },
+    {
+      "key": "confirm-nothing",
+      "target": "import",
+      "kind": "nothing",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.ConfirmImport\")"],
+      "until": "Effect.fn(\"Import.TakeBackImport\")",
+      "old": "        return [",
+      "new": "        return []\n        return [",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Group: a group of 6,000 rows is one act and one change, and a confirm has to have received it",
+        "Review: a plan built before the last act may not be confirmed after it",
+        "Review: a take-back takes back everything in force: the second round's items and the first's",
+        "Review: another person's act lands before the screen's own waiting act: the confirm is refused",
+        "Review: counts that do not add up to the file's rows are refused, and so is more in force than the file has rows",
+        "Review: when a person is made a viewer, their next act on a row is refused, and an admin's confirm is taken"
+      ]
+    },
+    {
+      "key": "takeback-imported",
+      "target": "import",
+      "kind": "check",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.TakeBackImport\")"],
+      "until": "Effect.fn(\"Import.ReopenImport\")",
+      "old": "        if (!isImported(s) && !isOpen(s)) return yield* new NotImported({})\n",
+      "new": "",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": [
+        "AConfirmNamesEveryChange",
+        "AConfirmOfAClosedImportWritesNothing",
+        "AMatchHoldsTheColumnsItSays",
+        "AMatchIsMadeOnTheLastOne",
+        "AMatchIsOfThisOpening",
+        "AMatchIsTheNextOne",
+        "APlanDoesWhatWasShown",
+        "APlanIsOfEveryChange",
+        "ARemovedImportStaysRemoved",
+        "ASuggestionWritesNothing",
+        "ATakeBackIsOfEverythingInForce",
+        "AViewerChangesNothing",
+        "AlreadyIsNotNegative",
+        "AnImportIsOpenedAgainOnlyByReopen",
+        "AnImportNeverChangesOrganization",
+        "AndOfEverythingReplaced",
+        "CreatedIsNotNegative",
+        "EveryChangeHasItsOwnNumber",
+        "EveryEventSaysWhose",
+        "InForceIsNotNegative",
+        "KeptIsNotNegative",
+        "NoMoreInForceThanRows",
+        "NotImportedIsNotNegative",
+        "NothingIsWrittenBeforeConfirm",
+        "NothingStandsThatWasTakenBack",
+        "OnlyAnImportWithAConfirmStandingIsTakenBack",
+        "OnlyAnImportWithNothingInForceIsRemoved",
+        "OnlyAnOpenImportIsReviewed",
+        "OnlyItsOwnOrganizationChangesAnImport",
+        "OutcomesAddUpToTheRows",
+        "RemovedIsNotNegative",
+        "ReplacedIsNotNegative",
+        "RowsAreNotNegative",
+        "StandingIsNotNegative",
+        "TheRestNameEveryChangeToo",
+        "UpdatedIsNotNegative",
+        "WhatIsInForceThenIsWhatWasKept"
+      ],
+      "trialStories": [
+        "Review: a removed import takes nothing more: no suggestion, no match, no take-back, no reopen, no second staging"
+      ]
+    },
+    {
+      "key": "takeback-permitted",
+      "target": "import",
+      "kind": "check",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.TakeBackImport\")"],
+      "until": "Effect.fn(\"Import.ReopenImport\")",
+      "old": "        if (actor.organizationId !== s.organizationId || actor.role === \"viewer\") return yield* new NotPermitted({})\n",
+      "new": "",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["AViewerChangesNothing", "OnlyItsOwnOrganizationChangesAnImport"],
+      "trialStories": [
+        "Review: a viewer neither takes back nor reopens a confirmed import",
+        "Review: an admin of another organization neither takes back nor reopens this one's confirmed import"
+      ]
+    },
+    {
+      "key": "takeback-standing",
+      "target": "import",
+      "kind": "check",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.TakeBackImport\")"],
+      "until": "Effect.fn(\"Import.ReopenImport\")",
+      "old": "        if (s.standing < 1) return yield* new NotImported({})\n",
+      "new": "",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["OnlyAnImportWithAConfirmStandingIsTakenBack"],
+      "trialStories": ["Review: an import never confirmed is not taken back, and an open one is not opened again"]
+    },
+    {
+      "key": "takeback-seen",
+      "target": "import",
+      "kind": "check",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.TakeBackImport\")"],
+      "until": "Effect.fn(\"Import.ReopenImport\")",
+      "old": "        if (cmd.seen !== s.changes) return yield* new ReviewMovedOn({ last: s.changes })\n",
+      "new": "",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["TheRestNameEveryChangeToo"],
+      "trialStories": [
+        "Review: a take-back, a reopen and a remove each name the last change, so a press on an old screen is refused"
+      ]
+    },
+    {
+      "key": "takeback-kept",
+      "target": "import",
+      "kind": "check",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.TakeBackImport\")"],
+      "until": "Effect.fn(\"Import.ReopenImport\")",
+      "old": "        if (cmd.kept > s.inForce || cmd.keptReplaced > s.replaced) return yield* new MoreKeptThanInForce({})\n",
+      "new": "",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Review: a take-back counts the items that were replaced too, put back and kept, and never keeps more than there is"
+      ]
+    },
+    {
+      "key": "takeback-nothing",
+      "target": "import",
+      "kind": "nothing",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.TakeBackImport\")"],
+      "until": "Effect.fn(\"Import.ReopenImport\")",
+      "old": "        return [",
+      "new": "        return []\n        return [",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Review: a take-back counts the items that were replaced too, put back and kept, and never keeps more than there is",
+        "Review: a take-back takes back everything in force: the second round's items and the first's",
+        "Review: a take-back, a reopen and a remove each name the last change, so a press on an old screen is refused",
+        "Review: an import opened again is taken back without confirming it again",
+        "Review: an import whose confirm stands is not removed, even when it created nothing, until it is taken back",
+        "Review: an import with items in force is not removed: a take-back that keeps some leaves them in force"
+      ]
+    },
+    {
+      "key": "reopen-closed",
+      "target": "import",
+      "kind": "check",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.ReopenImport\")"],
+      "until": "Effect.fn(\"Import.RemoveImport\")",
+      "old": "        if (!isImported(s) && !isTakenBack(s)) return yield* new NotClosed({})\n",
+      "new": "",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["EveryChangeHasItsOwnNumber"],
+      "trialStories": [
+        "Review: a removed import takes nothing more: no suggestion, no match, no take-back, no reopen, no second staging",
+        "Review: an import never confirmed is not taken back, and an open one is not opened again"
+      ]
+    },
+    {
+      "key": "reopen-permitted",
+      "target": "import",
+      "kind": "check",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.ReopenImport\")"],
+      "until": "Effect.fn(\"Import.RemoveImport\")",
+      "old": "        if (actor.organizationId !== s.organizationId || actor.role === \"viewer\") return yield* new NotPermitted({})\n",
+      "new": "",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["AViewerChangesNothing", "OnlyItsOwnOrganizationChangesAnImport"],
+      "trialStories": [
+        "Review: a viewer neither takes back nor reopens a confirmed import",
+        "Review: an admin of another organization neither takes back nor reopens this one's confirmed import"
+      ]
+    },
+    {
+      "key": "reopen-seen",
+      "target": "import",
+      "kind": "check",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.ReopenImport\")"],
+      "until": "Effect.fn(\"Import.RemoveImport\")",
+      "old": "        if (cmd.seen !== s.changes) return yield* new ReviewMovedOn({ last: s.changes })\n",
+      "new": "",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["TheRestNameEveryChangeToo"],
+      "trialStories": [
+        "Review: a take-back, a reopen and a remove each name the last change, so a press on an old screen is refused"
+      ]
+    },
+    {
+      "key": "reopen-nothing",
+      "target": "import",
+      "kind": "nothing",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.ReopenImport\")"],
+      "until": "Effect.fn(\"Import.RemoveImport\")",
+      "old": "        return [",
+      "new": "        return []\n        return [",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Group: a group's undo does not reach past a confirm that stands, and a group made before it is not taken after a reopen",
+        "Review: a take-back takes back everything in force: the second round's items and the first's",
+        "Review: a take-back, a reopen and a remove each name the last change, so a press on an old screen is refused",
+        "Review: counts that do not add up to the file's rows are refused, and so is more in force than the file has rows",
+        "Review: on a confirmed import nothing is reviewed, matched, suggested, confirmed again or removed until it is reopened"
+      ]
+    },
+    {
+      "key": "remove-open",
+      "target": "import",
+      "kind": "check",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.RemoveImport\")"],
+      "until": "    evolve: {",
+      "old": "        if (!isOpen(s)) return yield* new NotOpen({})\n",
+      "new": "",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["EveryChangeHasItsOwnNumber"],
+      "trialStories": [
+        "Review: on a confirmed import nothing is reviewed, matched, suggested, confirmed again or removed until it is reopened"
+      ]
+    },
+    {
+      "key": "remove-permitted",
+      "target": "import",
+      "kind": "check",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.RemoveImport\")"],
+      "until": "    evolve: {",
+      "old": "        if (actor.organizationId !== s.organizationId || actor.role === \"viewer\") return yield* new NotPermitted({})\n",
+      "new": "",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["AViewerChangesNothing", "OnlyItsOwnOrganizationChangesAnImport"],
+      "trialStories": [
+        "Review: a viewer changes nothing: no match, suggestion, confirm, remove, row act, undo, group or group undo",
+        "Review: an admin of another organization changes nothing in this one's import, its rows or its groups"
+      ]
+    },
+    {
+      "key": "remove-seen",
+      "target": "import",
+      "kind": "check",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.RemoveImport\")"],
+      "until": "    evolve: {",
+      "old": "        if (cmd.seen !== s.changes) return yield* new ReviewMovedOn({ last: s.changes })\n",
+      "new": "",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["TheRestNameEveryChangeToo"],
+      "trialStories": [
+        "Review: a take-back, a reopen and a remove each name the last change, so a press on an old screen is refused"
+      ]
+    },
+    {
+      "key": "remove-inforce",
+      "target": "import",
+      "kind": "check",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.RemoveImport\")"],
+      "until": "    evolve: {",
+      "old": "        if (s.inForce !== 0 || s.standing !== 0) return yield* new HasItemsInForce({})\n",
+      "new": "",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["OnlyAnImportWithNothingInForceIsRemoved"],
+      "trialStories": [
+        "Review: an import whose confirm stands is not removed, even when it created nothing, until it is taken back",
+        "Review: an import with items in force is not removed: a take-back that keeps some leaves them in force"
+      ]
+    },
+    {
+      "key": "remove-nothing",
+      "target": "import",
+      "kind": "nothing",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.RemoveImport\")"],
+      "until": "    evolve: {",
+      "old": "        return [",
+      "new": "        return []\n        return [",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Review: a removed import takes nothing more: no suggestion, no match, no take-back, no reopen, no second staging",
+        "Review: a take-back takes back everything in force: the second round's items and the first's",
+        "Review: a take-back, a reopen and a remove each name the last change, so a press on an old screen is refused",
+        "Review: an import whose confirm stands is not removed, even when it created nothing, until it is taken back"
+      ]
+    },
+    {
+      "key": "stage-f-organizationId",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.StageImport\")", "new ImportStaged({"],
+      "until": "})",
+      "old": "organizationId: actor.organizationId,",
+      "new": "organizationId: actor.memberId,",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": ["Review: a viewer may not stage a file; an editor stages it, once"]
+    },
+    {
+      "key": "stage-f-rows",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.StageImport\")", "new ImportStaged({"],
+      "until": "})",
+      "old": "rows: cmd.rows,",
+      "new": "rows: cmd.rows + 1,",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": ["Review: a viewer may not stage a file; an editor stages it, once"]
+    },
+    {
+      "key": "stage-f-columns",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.StageImport\")", "new ImportStaged({"],
+      "until": "})",
+      "old": "columns: cmd.columns,",
+      "new": "columns: \"\",",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": ["Review: a viewer may not stage a file; an editor stages it, once"]
+    },
+    {
+      "key": "stage-f-by",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.StageImport\")", "new ImportStaged({"],
+      "until": "})",
+      "old": "by: actor.memberId",
+      "new": "by: actor.organizationId",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["EveryEventSaysWhose"],
+      "trialStories": ["Review: a viewer may not stage a file; an editor stages it, once"]
+    },
+    {
+      "key": "match-f-change",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.MatchColumn\")", "new ColumnMatched({"],
+      "until": "})",
+      "old": "change: s.changes + 1,",
+      "new": "change: s.changes,",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["EveryChangeHasItsOwnNumber"],
+      "trialStories": [
+        "Group: a group made on an older matching is refused",
+        "Review: a match made over one its sender never saw is refused, and the columns as they are, by heading or by hand, are no match",
+        "Review: a match, a group and an undo made before a confirm are not taken after the import is opened again either",
+        "Review: a suggestion is recorded as its asker's and changes no number; a viewer's is refused"
+      ]
+    },
+    {
+      "key": "match-f-matching",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.MatchColumn\")", "new ColumnMatched({"],
+      "until": "})",
+      "old": "matching: s.matching + 1,",
+      "new": "matching: s.matching,",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["AMatchIsTheNextOne"],
+      "trialStories": [
+        "Group: a group made on an older matching is refused",
+        "Review: a match made over one its sender never saw is refused, and the columns as they are, by heading or by hand, are no match",
+        "Review: a match, a group and an undo made before a confirm are not taken after the import is opened again either",
+        "Review: a suggestion is recorded as its asker's and changes no number; a viewer's is refused"
+      ]
+    },
+    {
+      "key": "match-f-columns",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.MatchColumn\")", "new ColumnMatched({"],
+      "until": "})",
+      "old": "columns: cmd.columns,",
+      "new": "columns: s.columns,",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["AMatchHoldsTheColumnsItSays"],
+      "trialStories": [
+        "Group: a group made on an older matching is refused",
+        "Review: a match made over one its sender never saw is refused, and the columns as they are, by heading or by hand, are no match",
+        "Review: a match, a group and an undo made before a confirm are not taken after the import is opened again either",
+        "Review: a suggestion is recorded as its asker's and changes no number; a viewer's is refused"
+      ]
+    },
+    {
+      "key": "match-f-by",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.MatchColumn\")", "new ColumnMatched({"],
+      "until": "})",
+      "old": "by: actor.memberId",
+      "new": "by: actor.organizationId",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["EveryEventSaysWhose"],
+      "trialStories": [
+        "Group: a group made on an older matching is refused",
+        "Review: a match made over one its sender never saw is refused, and the columns as they are, by heading or by hand, are no match",
+        "Review: a match, a group and an undo made before a confirm are not taken after the import is opened again either",
+        "Review: a suggestion is recorded as its asker's and changes no number; a viewer's is refused"
+      ]
+    },
+    {
+      "key": "suggestion-f-by",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.RecordSuggestion\")", "new SuggestionRecorded({"],
+      "until": "})",
+      "old": "by: actor.memberId",
+      "new": "by: actor.organizationId",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["EveryEventSaysWhose"],
+      "trialStories": ["Review: a suggestion is recorded as its asker's and changes no number; a viewer's is refused"]
+    },
+    {
+      "key": "confirm-f-change",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.ConfirmImport\")", "new ImportConfirmed({"],
+      "until": "})",
+      "old": "change: s.changes + 1,",
+      "new": "change: s.changes + 2,",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["EveryChangeHasItsOwnNumber"],
+      "trialStories": [
+        "Group: a group of 6,000 rows is one act and one change, and a confirm has to have received it",
+        "Review: a plan built before the last act may not be confirmed after it",
+        "Review: a take-back takes back everything in force: the second round's items and the first's",
+        "Review: another person's act lands before the screen's own waiting act: the confirm is refused",
+        "Review: counts that do not add up to the file's rows are refused, and so is more in force than the file has rows",
+        "Review: when a person is made a viewer, their next act on a row is refused, and an admin's confirm is taken"
+      ]
+    },
+    {
+      "key": "confirm-f-created",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.ConfirmImport\")", "new ImportConfirmed({"],
+      "until": "})",
+      "old": "created: cmd.created,",
+      "new": "created: cmd.updated,",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["NoMoreInForceThanRows", "OutcomesAddUpToTheRows"],
+      "trialStories": [
+        "Group: a group of 6,000 rows is one act and one change, and a confirm has to have received it",
+        "Review: a plan built before the last act may not be confirmed after it",
+        "Review: a take-back takes back everything in force: the second round's items and the first's",
+        "Review: another person's act lands before the screen's own waiting act: the confirm is refused",
+        "Review: when a person is made a viewer, their next act on a row is refused, and an admin's confirm is taken"
+      ]
+    },
+    {
+      "key": "confirm-f-updated",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.ConfirmImport\")", "new ImportConfirmed({"],
+      "until": "})",
+      "old": "updated: cmd.updated,",
+      "new": "updated: cmd.created,",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["OutcomesAddUpToTheRows"],
+      "trialStories": [
+        "Group: a group of 6,000 rows is one act and one change, and a confirm has to have received it",
+        "Review: a plan built before the last act may not be confirmed after it",
+        "Review: a take-back takes back everything in force: the second round's items and the first's",
+        "Review: another person's act lands before the screen's own waiting act: the confirm is refused",
+        "Review: when a person is made a viewer, their next act on a row is refused, and an admin's confirm is taken"
+      ]
+    },
+    {
+      "key": "confirm-f-already",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.ConfirmImport\")", "new ImportConfirmed({"],
+      "until": "})",
+      "old": "already: cmd.already,",
+      "new": "already: cmd.notImported,",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["OutcomesAddUpToTheRows"],
+      "trialStories": [
+        "Group: a group of 6,000 rows is one act and one change, and a confirm has to have received it",
+        "Review: a plan built before the last act may not be confirmed after it",
+        "Review: a take-back takes back everything in force: the second round's items and the first's",
+        "Review: another person's act lands before the screen's own waiting act: the confirm is refused",
+        "Review: counts that do not add up to the file's rows are refused, and so is more in force than the file has rows",
+        "Review: when a person is made a viewer, their next act on a row is refused, and an admin's confirm is taken"
+      ]
+    },
+    {
+      "key": "confirm-f-notImported",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.ConfirmImport\")", "new ImportConfirmed({"],
+      "until": "})",
+      "old": "notImported: cmd.notImported,",
+      "new": "notImported: cmd.already,",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["OutcomesAddUpToTheRows"],
+      "trialStories": [
+        "Group: a group of 6,000 rows is one act and one change, and a confirm has to have received it",
+        "Review: a plan built before the last act may not be confirmed after it",
+        "Review: a take-back takes back everything in force: the second round's items and the first's",
+        "Review: another person's act lands before the screen's own waiting act: the confirm is refused",
+        "Review: counts that do not add up to the file's rows are refused, and so is more in force than the file has rows",
+        "Review: when a person is made a viewer, their next act on a row is refused, and an admin's confirm is taken"
+      ]
+    },
+    {
+      "key": "confirm-f-by",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.ConfirmImport\")", "new ImportConfirmed({"],
+      "until": "})",
+      "old": "by: actor.memberId",
+      "new": "by: actor.organizationId",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["EveryEventSaysWhose"],
+      "trialStories": [
+        "Group: a group of 6,000 rows is one act and one change, and a confirm has to have received it",
+        "Review: a plan built before the last act may not be confirmed after it",
+        "Review: a take-back takes back everything in force: the second round's items and the first's",
+        "Review: another person's act lands before the screen's own waiting act: the confirm is refused",
+        "Review: counts that do not add up to the file's rows are refused, and so is more in force than the file has rows",
+        "Review: when a person is made a viewer, their next act on a row is refused, and an admin's confirm is taken"
+      ]
+    },
+    {
+      "key": "takeback-f-change",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.TakeBackImport\")", "new ImportTakenBack({"],
+      "until": "})",
+      "old": "change: s.changes + 1,",
+      "new": "change: s.changes,",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["EveryChangeHasItsOwnNumber"],
+      "trialStories": [
+        "Review: a take-back counts the items that were replaced too, put back and kept, and never keeps more than there is",
+        "Review: a take-back takes back everything in force: the second round's items and the first's",
+        "Review: a take-back, a reopen and a remove each name the last change, so a press on an old screen is refused",
+        "Review: an import opened again is taken back without confirming it again",
+        "Review: an import whose confirm stands is not removed, even when it created nothing, until it is taken back",
+        "Review: an import with items in force is not removed: a take-back that keeps some leaves them in force"
+      ]
+    },
+    {
+      "key": "takeback-f-removed",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.TakeBackImport\")", "new ImportTakenBack({"],
+      "until": "})",
+      "old": "removed: s.inForce - cmd.kept,",
+      "new": "removed: s.inForce,",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["ATakeBackIsOfEverythingInForce"],
+      "trialStories": [
+        "Review: a take-back counts the items that were replaced too, put back and kept, and never keeps more than there is",
+        "Review: an import opened again is taken back without confirming it again",
+        "Review: an import with items in force is not removed: a take-back that keeps some leaves them in force"
+      ]
+    },
+    {
+      "key": "takeback-f-kept",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.TakeBackImport\")", "new ImportTakenBack({"],
+      "until": "})",
+      "old": "kept: cmd.kept,",
+      "new": "kept: 0,",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["ATakeBackIsOfEverythingInForce"],
+      "trialStories": [
+        "Review: a take-back counts the items that were replaced too, put back and kept, and never keeps more than there is",
+        "Review: an import opened again is taken back without confirming it again",
+        "Review: an import with items in force is not removed: a take-back that keeps some leaves them in force"
+      ]
+    },
+    {
+      "key": "takeback-f-restored",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.TakeBackImport\")", "new ImportTakenBack({"],
+      "until": "})",
+      "old": "restored: s.replaced - cmd.keptReplaced,",
+      "new": "restored: s.replaced,",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["AndOfEverythingReplaced"],
+      "trialStories": [
+        "Review: a take-back counts the items that were replaced too, put back and kept, and never keeps more than there is"
+      ]
+    },
+    {
+      "key": "takeback-f-keptReplaced",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.TakeBackImport\")", "new ImportTakenBack({"],
+      "until": "})",
+      "old": "keptReplaced: cmd.keptReplaced,",
+      "new": "keptReplaced: 0,",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["AndOfEverythingReplaced"],
+      "trialStories": [
+        "Review: a take-back counts the items that were replaced too, put back and kept, and never keeps more than there is"
+      ]
+    },
+    {
+      "key": "takeback-f-by",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.TakeBackImport\")", "new ImportTakenBack({"],
+      "until": "})",
+      "old": "by: actor.memberId",
+      "new": "by: actor.organizationId",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["EveryEventSaysWhose"],
+      "trialStories": [
+        "Review: a take-back counts the items that were replaced too, put back and kept, and never keeps more than there is",
+        "Review: a take-back takes back everything in force: the second round's items and the first's",
+        "Review: a take-back, a reopen and a remove each name the last change, so a press on an old screen is refused",
+        "Review: an import opened again is taken back without confirming it again",
+        "Review: an import whose confirm stands is not removed, even when it created nothing, until it is taken back",
+        "Review: an import with items in force is not removed: a take-back that keeps some leaves them in force"
+      ]
+    },
+    {
+      "key": "reopen-f-change",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.ReopenImport\")", "new ImportReopened({"],
+      "until": "})",
+      "old": "change: s.changes + 1,",
+      "new": "change: s.changes,",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["EveryChangeHasItsOwnNumber"],
+      "trialStories": [
+        "Group: a group's undo does not reach past a confirm that stands, and a group made before it is not taken after a reopen",
+        "Review: a take-back takes back everything in force: the second round's items and the first's",
+        "Review: a take-back, a reopen and a remove each name the last change, so a press on an old screen is refused",
+        "Review: counts that do not add up to the file's rows are refused, and so is more in force than the file has rows",
+        "Review: on a confirmed import nothing is reviewed, matched, suggested, confirmed again or removed until it is reopened"
+      ]
+    },
+    {
+      "key": "reopen-f-by",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.ReopenImport\")", "new ImportReopened({"],
+      "until": "})",
+      "old": "by: actor.memberId",
+      "new": "by: actor.organizationId",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["EveryEventSaysWhose"],
+      "trialStories": [
+        "Group: a group's undo does not reach past a confirm that stands, and a group made before it is not taken after a reopen",
+        "Review: a take-back takes back everything in force: the second round's items and the first's",
+        "Review: a take-back, a reopen and a remove each name the last change, so a press on an old screen is refused",
+        "Review: counts that do not add up to the file's rows are refused, and so is more in force than the file has rows",
+        "Review: on a confirmed import nothing is reviewed, matched, suggested, confirmed again or removed until it is reopened"
+      ]
+    },
+    {
+      "key": "remove-f-change",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.RemoveImport\")", "new ImportRemoved({"],
+      "until": "})",
+      "old": "change: s.changes + 1,",
+      "new": "change: s.changes,",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Review: a removed import takes nothing more: no suggestion, no match, no take-back, no reopen, no second staging",
+        "Review: a take-back takes back everything in force: the second round's items and the first's",
+        "Review: a take-back, a reopen and a remove each name the last change, so a press on an old screen is refused",
+        "Review: an import whose confirm stands is not removed, even when it created nothing, until it is taken back"
+      ]
+    },
+    {
+      "key": "remove-f-by",
+      "target": "import",
+      "kind": "field",
+      "file": "src/Import/Import.aggregate.ts",
+      "anchors": ["Effect.fn(\"Import.RemoveImport\")", "new ImportRemoved({"],
+      "until": "})",
+      "old": "by: actor.memberId",
+      "new": "by: actor.organizationId",
+      "proof": "test/Import.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["EveryEventSaysWhose"],
+      "trialStories": [
+        "Review: a removed import takes nothing more: no suggestion, no match, no take-back, no reopen, no second staging",
+        "Review: a take-back takes back everything in force: the second round's items and the first's",
+        "Review: a take-back, a reopen and a remove each name the last change, so a press on an old screen is refused",
+        "Review: an import whose confirm stands is not removed, even when it created nothing, until it is taken back"
+      ]
+    },
+    {
+      "key": "row-open",
+      "target": "DecideRow",
+      "kind": "check",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")"],
+      "until": "    transitions: {",
+      "old": "      if (!isOpen(life.state)) return yield* new NotOpen({})\n",
+      "new": "",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "rule",
+      "trialRules": [
+        "Violated Import.EveryChangeHasItsOwnNumber",
+        "Violated ARowIsDecidedOnlyOnAnOpenImport",
+        "Violated AnActIsOfThisOpening",
+        "Violated ARowsActSawTheLastGroupAct",
+        "Violated AnActIsMadeOnTheMatchingNow"
+      ],
+      "trialStories": [
+        "Review: on a confirmed import nothing is reviewed, matched, suggested, confirmed again or removed until it is reopened"
+      ]
+    },
+    {
+      "key": "row-permitted",
+      "target": "DecideRow",
+      "kind": "check",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")"],
+      "until": "    transitions: {",
+      "old": "      if (actor.organizationId !== life.state.organizationId || actor.role === \"viewer\") {\n        return yield* new NotPermitted({})\n      }\n",
+      "new": "",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "rule",
+      "trialRules": [
+        "Violated Import.OnlyItsOwnOrganizationChangesAnImport",
+        "Violated Import.AViewerChangesNothing",
+        "Unconfirmed OnlyItsOwnOrganizationChangesTheRow",
+        "Violated AViewerChangesNoRow"
+      ],
+      "trialStories": [
+        "Review: a viewer changes nothing: no match, suggestion, confirm, remove, row act, undo, group or group undo",
+        "Review: an admin of another organization changes nothing in this one's import, its rows or its groups",
+        "Review: when a person is made a viewer, their next act on a row is refused, and an admin's confirm is taken"
+      ]
+    },
+    {
+      "key": "row-rowowner",
+      "target": "DecideRow",
+      "kind": "check",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")"],
+      "until": "    transitions: {",
+      "old": "      if (\n        !isUntouched(row.state) &&\n        (row.state.importId !== cmd.importId || row.state.organizationId !== life.state.organizationId)\n      ) {\n        return yield* new NotPermitted({})\n      }\n",
+      "new": "",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "rule",
+      "trialRules": [
+        "Unconfirmed Row.ARowNeverChangesImportOrOrganization",
+        "Unconfirmed OnlyItsOwnOrganizationChangesTheRow"
+      ],
+      "trialStories": [
+        "Review: a row or a group kept under another organization's name is not changed, even by its maker"
+      ]
+    },
+    {
+      "key": "row-opening",
+      "target": "DecideRow",
+      "kind": "check",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")"],
+      "until": "    transitions: {",
+      "old": "      if (cmd.opening !== life.state.confirms) return yield* new ConfirmedSince({})\n",
+      "new": "",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated AnActIsOfThisOpening"],
+      "trialStories": ["Review: an act made before a confirm is not taken after the import is opened again"]
+    },
+    {
+      "key": "row-sawgroup",
+      "target": "DecideRow",
+      "kind": "check",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")"],
+      "until": "    transitions: {",
+      "old": "      if (cmd.sawGroup !== life.state.lastGroup) return yield* new GroupedSince({})\n",
+      "new": "",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated ARowsActSawTheLastGroupAct"],
+      "trialStories": [
+        "Group: a row's act names the last group act, and the same text over a group in force is a change",
+        "Group: only its maker takes a group back, in one act, once; a row another person decided since is not touched"
+      ]
+    },
+    {
+      "key": "row-same",
+      "target": "DecideRow",
+      "kind": "check",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")", "        // No group covers the row"],
+      "until": "      const change = life.state.changes + 1",
+      "old": "          if (row.state.flags === cmd.flags) return []\n",
+      "new": "",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "rule",
+      "trialRules": [
+        "Violated AnActThatChangesNothingLeavesTheImport",
+        "Unconfirmed AnActThatChangesNothingLeavesTheRow"
+      ],
+      "trialStories": [
+        "Review: a save that leaves the row as it is records nothing, seen or not: the answer says no change"
+      ]
+    },
+    {
+      "key": "row-same-untouched",
+      "target": "DecideRow",
+      "kind": "check",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")", "        // No group covers the row"],
+      "until": "      const change = life.state.changes + 1",
+      "old": "          if (cmd.flags === NO_DECISION) return []\n",
+      "new": "",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated AnActThatChangesNothingLeavesTheImport"],
+      "trialStories": []
+    },
+    {
+      "key": "row-covered",
+      "target": "DecideRow",
+      "kind": "check",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")", "        // A group in force covers the row"],
+      "until": "      } else {\n        // No group covers the row",
+      "old": "        if (cmd.asItReads) return []\n",
+      "new": "",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "rule",
+      "trialRules": [
+        "Violated AnActThatChangesNothingLeavesTheImport",
+        "Unconfirmed AnActThatChangesNothingLeavesTheRow"
+      ],
+      "trialStories": []
+    },
+    {
+      "key": "row-covered-early",
+      "target": "DecideRow",
+      "kind": "check",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")", "        // A group in force covers the row"],
+      "until": "      } else {\n        // No group covers the row",
+      "old": "        if (isDecided(row.state)) {\n",
+      "new": "        if (cmd.asItReads) return []\n        if (isDecided(row.state)) {\n",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Group: a press from a screen that is behind is held, not lost as no change: Ana's group leaves row 14 out, Dana types 8 on it, and Carl, who has not received her 8, presses leave out there"
+      ]
+    },
+    {
+      "key": "row-saw",
+      "target": "DecideRow",
+      "kind": "check",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")", "        // No group covers the row"],
+      "until": "      const change = life.state.changes + 1",
+      "old": "          if (cmd.saw !== row.state.change) {\n            return yield* new DecidedSince({ by: row.state.by, change: row.state.change })\n          }\n",
+      "new": "",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Unconfirmed ADecisionIsReplacedOnlyByAnActThatSawIt"],
+      "trialStories": [
+        "Review: when someone else decided the row first, the act is refused with whose decision is there"
+      ]
+    },
+    {
+      "key": "row-saw-covered",
+      "target": "DecideRow",
+      "kind": "check",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")", "        // A group in force covers the row"],
+      "until": "      } else {\n        // No group covers the row",
+      "old": "          if (cmd.saw !== row.state.change) {\n            return yield* new DecidedSince({ by: row.state.by, change: row.state.change })\n          }\n",
+      "new": "",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Unconfirmed ADecisionIsReplacedOnlyByAnActThatSawIt"],
+      "trialStories": []
+    },
+    {
+      "key": "row-nolonger",
+      "target": "DecideRow",
+      "kind": "check",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")", "        // No group covers the row"],
+      "until": "      const change = life.state.changes + 1",
+      "old": "          if (cmd.saw !== 0) return yield* new NoLongerThere({})\n",
+      "new": "",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated ADecisionIsReplacedOnlyByAnActThatSawIt"],
+      "trialStories": [
+        "Review: a decision its sender saw that was taken back since is no longer there, and the act is refused"
+      ]
+    },
+    {
+      "key": "row-nolonger-covered",
+      "target": "DecideRow",
+      "kind": "check",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")", "        // A group in force covers the row"],
+      "until": "      } else {\n        // No group covers the row",
+      "old": "        } else if (cmd.saw !== 0) {\n          return yield* new NoLongerThere({})\n        }\n",
+      "new": "        }\n",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated ADecisionIsReplacedOnlyByAnActThatSawIt"],
+      "trialStories": []
+    },
+    {
+      "key": "row-madeon",
+      "target": "DecideRow",
+      "kind": "check",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")", "        // No group covers the row"],
+      "until": "      const change = life.state.changes + 1",
+      "old": "        if (cmd.madeOn !== life.state.matching) return yield* new MatchedSince({ matching: life.state.matching })\n",
+      "new": "",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated AnActIsMadeOnTheMatchingNow"],
+      "trialStories": ["Review: an act made on an older matching is refused, whatever it decides"]
+    },
+    {
+      "key": "row-madeon-covered",
+      "target": "DecideRow",
+      "kind": "check",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")", "        // A group in force covers the row"],
+      "until": "      } else {\n        // No group covers the row",
+      "old": "        if (cmd.madeOn !== life.state.matching) return yield* new MatchedSince({ matching: life.state.matching })\n",
+      "new": "",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated AnActIsMadeOnTheMatchingNow"],
+      "trialStories": []
+    },
+    {
+      "key": "row-nothing",
+      "target": "DecideRow",
+      "kind": "nothing",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")"],
+      "until": "    transitions: {",
+      "old": "      return [\n",
+      "new": "      return []\n      return [\n",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Group: a row's act names the last group act, and the same text over a group in force is a change",
+        "Review: a decision its sender saw that was taken back since is no longer there, and the act is refused",
+        "Review: an act made before a confirm is not taken after the import is opened again",
+        "Review: an act made on an older matching is refused, whatever it decides",
+        "Review: another person's act lands before the screen's own waiting act: the confirm is refused"
+      ]
+    },
+    {
+      "key": "undo-open",
+      "target": "UndoRowStep",
+      "kind": "check",
+      "file": "src/Review/Undoing.decision.ts",
+      "anchors": ["Effect.fn(\"Undoing.decide\")"],
+      "until": "    transitions: {",
+      "old": "      if (!isOpen(life.state)) return yield* new NotOpen({})\n",
+      "new": "",
+      "proof": "test/Undoing.prove.test.ts",
+      "expect": "rule",
+      "trialRules": [
+        "Unconfirmed Import.EveryChangeHasItsOwnNumber",
+        "Unconfirmed AnUndoTakesBackOnlyItsSendersOwnStep",
+        "Unconfirmed AnUndoIsOfThisOpening",
+        "Unconfirmed ARowsUndoSawTheLastGroupAct",
+        "Unconfirmed AnUndoDoesNotReachPastAConfirm",
+        "Unconfirmed AnUndoIsNumbered"
+      ],
+      "trialStories": [
+        "Review: on a confirmed import nothing is reviewed, matched, suggested, confirmed again or removed until it is reopened"
+      ]
+    },
+    {
+      "key": "undo-permitted",
+      "target": "UndoRowStep",
+      "kind": "check",
+      "file": "src/Review/Undoing.decision.ts",
+      "anchors": ["Effect.fn(\"Undoing.decide\")"],
+      "until": "    transitions: {",
+      "old": "      if (actor.organizationId !== life.state.organizationId || actor.role === \"viewer\") {\n        return yield* new NotPermitted({})\n      }\n",
+      "new": "",
+      "proof": "test/Undoing.prove.test.ts",
+      "expect": "rule",
+      "trialRules": [
+        "Unconfirmed Import.OnlyItsOwnOrganizationChangesAnImport",
+        "Unconfirmed Import.AViewerChangesNothing",
+        "Unconfirmed OnlyItsOwnOrganizationChangesTheRow",
+        "Unconfirmed AViewerChangesNoRow"
+      ],
+      "trialStories": [
+        "Review: a viewer changes nothing: no match, suggestion, confirm, remove, row act, undo, group or group undo",
+        "Review: an admin of another organization changes nothing in this one's import, its rows or its groups"
+      ]
+    },
+    {
+      "key": "undo-rowowner",
+      "target": "UndoRowStep",
+      "kind": "check",
+      "file": "src/Review/Undoing.decision.ts",
+      "anchors": ["Effect.fn(\"Undoing.decide\")"],
+      "until": "    transitions: {",
+      "old": "      if (\n        !isUntouched(row.state) &&\n        (row.state.importId !== cmd.importId || row.state.organizationId !== life.state.organizationId)\n      ) {\n        return yield* new NotPermitted({})\n      }\n",
+      "new": "",
+      "proof": "test/Undoing.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Unconfirmed OnlyItsOwnOrganizationChangesTheRow"],
+      "trialStories": [
+        "Review: a row or a group kept under another organization's name is not changed, even by its maker"
+      ]
+    },
+    {
+      "key": "undo-opening",
+      "target": "UndoRowStep",
+      "kind": "check",
+      "file": "src/Review/Undoing.decision.ts",
+      "anchors": ["Effect.fn(\"Undoing.decide\")"],
+      "until": "    transitions: {",
+      "old": "      if (cmd.opening !== life.state.confirms) return yield* new ConfirmedSince({})\n",
+      "new": "",
+      "proof": "test/Undoing.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Unconfirmed AnUndoIsOfThisOpening"],
+      "trialStories": [
+        "Review: a match, a group and an undo made before a confirm are not taken after the import is opened again either"
+      ]
+    },
+    {
+      "key": "undo-sawgroup",
+      "target": "UndoRowStep",
+      "kind": "check",
+      "file": "src/Review/Undoing.decision.ts",
+      "anchors": ["Effect.fn(\"Undoing.decide\")"],
+      "until": "    transitions: {",
+      "old": "      if (cmd.sawGroup !== life.state.lastGroup) return yield* new GroupedSince({})\n",
+      "new": "",
+      "proof": "test/Undoing.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Unconfirmed ARowsUndoSawTheLastGroupAct"],
+      "trialStories": [
+        "Review: a row's undo pressed before a group reached its sender's screen is refused, and taken once it has"
+      ]
+    },
+    {
+      "key": "undo-own",
+      "target": "UndoRowStep",
+      "kind": "check",
+      "file": "src/Review/Undoing.decision.ts",
+      "anchors": ["Effect.fn(\"Undoing.decide\")"],
+      "until": "    transitions: {",
+      "old": "      if (!isDecided(row.state) || row.state.by !== actor.memberId || row.state.change !== cmd.undo) {\n        return yield* new NotYourStep({})\n      }\n",
+      "new": "",
+      "proof": "test/Undoing.prove.test.ts",
+      "expect": "rule",
+      "trialRules": [
+        "Unconfirmed AnUndoTakesBackOnlyItsSendersOwnStep",
+        "Unconfirmed NobodyClearsAnotherPersonsDecision"
+      ],
+      "trialStories": [
+        "Review: an undo that puts back another person's decision stops there",
+        "Review: undos go down every level exactly as it was, and end at none"
+      ]
+    },
+    {
+      "key": "undo-confirmed",
+      "target": "UndoRowStep",
+      "kind": "check",
+      "file": "src/Review/Undoing.decision.ts",
+      "anchors": ["Effect.fn(\"Undoing.decide\")"],
+      "until": "    transitions: {",
+      "old": "      if (row.state.change <= life.state.confirmedAt) return yield* new DecidedBeforeTheConfirm({})\n",
+      "new": "",
+      "proof": "test/Undoing.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Unconfirmed AnUndoDoesNotReachPastAConfirm"],
+      "trialStories": ["Review: an undo does not reach past a confirm that stands"]
+    },
+    {
+      "key": "undo-history",
+      "target": "UndoRowStep",
+      "kind": "check",
+      "file": "src/Review/Undoing.decision.ts",
+      "anchors": ["Effect.fn(\"Undoing.decide\")"],
+      "until": "    transitions: {",
+      "old": "      if (row.state.under.change === -1) return yield* new HistoryEnds({})\n",
+      "new": "",
+      "proof": "test/Undoing.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Review: a full history never refuses a decision: the oldest levels are let go, and an undo stops there and says so"
+      ]
+    },
+    {
+      "key": "undo-seal",
+      "target": "UndoRowStep",
+      "kind": "check",
+      "file": "src/Review/Undoing.decision.ts",
+      "anchors": ["Effect.fn(\"Undoing.decide\")"],
+      "until": "    transitions: {",
+      "old": "      if (kept && (!sizesAreTrue(cmd.next) || seal({ level: cmd.next, below: cmd.below }) !== row.state.below)) {\n        return yield* new NotWhatWasUnder({})\n      }\n",
+      "new": "",
+      "proof": "test/Undoing.prove.test.ts",
+      "expect": "rule",
+      "trialRules": [
+        "Unconfirmed Row.TheSizeOfByIsTrue",
+        "Unconfirmed Row.TheSizeOfStepIsTrue",
+        "Unconfirmed Row.TheSizeOfFlagsIsTrue",
+        "Unconfirmed Row.TheSizeOfLabelIsTrue",
+        "Unconfirmed WhatLiesUnderIsWhatWasRecorded"
+      ],
+      "trialStories": ["Review: an undo may not bring a text of its sender's as another person's decision"]
+    },
+    {
+      "key": "undo-nothing",
+      "target": "UndoRowStep",
+      "kind": "nothing",
+      "file": "src/Review/Undoing.decision.ts",
+      "anchors": ["Effect.fn(\"Undoing.decide\")"],
+      "until": "    transitions: {",
+      "old": "      return [\n",
+      "new": "      return []\n      return [\n",
+      "proof": "test/Undoing.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Review: a decision its sender saw that was taken back since is no longer there, and the act is refused",
+        "Review: a full history never refuses a decision: the oldest levels are let go, and an undo stops there and says so",
+        "Review: a row's undo pressed before a group reached its sender's screen is refused, and taken once it has",
+        "Review: an undo that puts back another person's decision stops there",
+        "Review: undos go down every level exactly as it was, and end at none"
+      ]
+    },
+    {
+      "key": "group-open",
+      "target": "DecideGroup",
+      "kind": "check",
+      "file": "src/Review/DecidingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"DecidingGroup.decide\")"],
+      "until": "    transitions: {",
+      "old": "      if (!isOpen(life.state)) return yield* new NotOpen({})\n",
+      "new": "",
+      "proof": "test/DecidingGroup.prove.test.ts",
+      "expect": "rule",
+      "trialRules": [
+        "Violated Import.EveryChangeHasItsOwnNumber",
+        "Violated AGroupIsDecidedOnlyOnAnOpenImport",
+        "Violated AGroupIsOfThisOpening",
+        "Violated AGroupIsMadeOnEveryChange",
+        "Violated AGroupIsMadeOnTheMatchingNow"
+      ],
+      "trialStories": [
+        "Review: on a confirmed import nothing is reviewed, matched, suggested, confirmed again or removed until it is reopened"
+      ]
+    },
+    {
+      "key": "group-permitted",
+      "target": "DecideGroup",
+      "kind": "check",
+      "file": "src/Review/DecidingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"DecidingGroup.decide\")"],
+      "until": "    transitions: {",
+      "old": "      if (actor.organizationId !== life.state.organizationId || actor.role === \"viewer\") {\n        return yield* new NotPermitted({})\n      }\n",
+      "new": "",
+      "proof": "test/DecidingGroup.prove.test.ts",
+      "expect": "rule",
+      "trialRules": [
+        "Violated Import.OnlyItsOwnOrganizationChangesAnImport",
+        "Violated Import.AViewerChangesNothing",
+        "Violated AViewerChangesNoGroup"
+      ],
+      "trialStories": [
+        "Review: a viewer changes nothing: no match, suggestion, confirm, remove, row act, undo, group or group undo",
+        "Review: an admin of another organization changes nothing in this one's import, its rows or its groups"
+      ]
+    },
+    {
+      "key": "group-step",
+      "target": "DecideGroup",
+      "kind": "check",
+      "file": "src/Review/DecidingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"DecidingGroup.decide\")"],
+      "until": "    transitions: {",
+      "old": "      if (!isUntouchedGroup(group.state)) return yield* new StepTaken({})\n",
+      "new": "",
+      "proof": "test/DecidingGroup.prove.test.ts",
+      "expect": "rule",
+      "trialRules": [
+        "Unconfirmed AStepDecidesOneGroup",
+        "Unconfirmed WithEveryRowItNames",
+        "Unconfirmed WithWhatItDoes",
+        "Unconfirmed WithItsCount",
+        "Unconfirmed OnItsMatching",
+        "Unconfirmed InForce",
+        "Unconfirmed AsItsSenders",
+        "Unconfirmed OnTheGroupToo",
+        "Unconfirmed AndKeepsWhichOneWasBeforeIt",
+        "Unconfirmed OnlyItsOwnOrganizationChangesTheGroup"
+      ],
+      "trialStories": ["Group: a group is taken only from a screen that has every change, and a step decides one group"]
+    },
+    {
+      "key": "group-opening",
+      "target": "DecideGroup",
+      "kind": "check",
+      "file": "src/Review/DecidingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"DecidingGroup.decide\")"],
+      "until": "    transitions: {",
+      "old": "      if (cmd.opening !== life.state.confirms) return yield* new ConfirmedSince({})\n",
+      "new": "",
+      "proof": "test/DecidingGroup.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated AGroupIsOfThisOpening"],
+      "trialStories": [
+        "Group: a group's undo does not reach past a confirm that stands, and a group made before it is not taken after a reopen",
+        "Review: a match, a group and an undo made before a confirm are not taken after the import is opened again either"
+      ]
+    },
+    {
+      "key": "group-seen",
+      "target": "DecideGroup",
+      "kind": "check",
+      "file": "src/Review/DecidingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"DecidingGroup.decide\")"],
+      "until": "    transitions: {",
+      "old": "      if (cmd.seen !== life.state.changes) return yield* new ReviewMovedOn({ last: life.state.changes })\n",
+      "new": "",
+      "proof": "test/DecidingGroup.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated AGroupIsMadeOnEveryChange"],
+      "trialStories": ["Group: a group is taken only from a screen that has every change, and a step decides one group"]
+    },
+    {
+      "key": "group-madeon",
+      "target": "DecideGroup",
+      "kind": "check",
+      "file": "src/Review/DecidingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"DecidingGroup.decide\")"],
+      "until": "    transitions: {",
+      "old": "      if (cmd.madeOn !== life.state.matching) return yield* new MatchedSince({ matching: life.state.matching })\n",
+      "new": "",
+      "proof": "test/DecidingGroup.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated AGroupIsMadeOnTheMatchingNow"],
+      "trialStories": ["Group: a group made on an older matching is refused"]
+    },
+    {
+      "key": "group-nothing",
+      "target": "DecideGroup",
+      "kind": "nothing",
+      "file": "src/Review/DecidingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"DecidingGroup.decide\")"],
+      "until": "    transitions: {",
+      "old": "      return [\n",
+      "new": "      return []\n      return [\n",
+      "proof": "test/DecidingGroup.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Group: a group decided after another was taken back goes over the one still in force, on the matching now",
+        "Group: a group is taken only from a screen that has every change, and a step decides one group",
+        "Group: a group of 6,000 rows is one act and one change, and a confirm has to have received it",
+        "Review: a row's undo pressed before a group reached its sender's screen is refused, and taken once it has"
+      ]
+    },
+    {
+      "key": "gundo-open",
+      "target": "UndoGroup",
+      "kind": "check",
+      "file": "src/Review/UndoingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"UndoingGroup.decide\")"],
+      "until": "    transitions: {",
+      "old": "      if (!isOpen(life.state)) return yield* new NotOpen({})\n",
+      "new": "",
+      "proof": "test/UndoingGroup.prove.test.ts",
+      "expect": "rule",
+      "trialRules": [
+        "Unconfirmed Import.EveryChangeHasItsOwnNumber",
+        "Unconfirmed AGroupsUndoTakesBackOnlyItsSendersOwn",
+        "Unconfirmed AGroupsUndoIsOfThisOpening",
+        "Unconfirmed OnlyTheLastGroupInForceIsTakenBack",
+        "Unconfirmed AGroupsUndoDoesNotReachPastAConfirm",
+        "Unconfirmed AGroupsUndoIsOneChange"
+      ],
+      "trialStories": [
+        "Review: on a confirmed import nothing is reviewed, matched, suggested, confirmed again or removed until it is reopened"
+      ]
+    },
+    {
+      "key": "gundo-permitted",
+      "target": "UndoGroup",
+      "kind": "check",
+      "file": "src/Review/UndoingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"UndoingGroup.decide\")"],
+      "until": "    transitions: {",
+      "old": "      if (actor.organizationId !== life.state.organizationId || actor.role === \"viewer\") {\n        return yield* new NotPermitted({})\n      }\n",
+      "new": "",
+      "proof": "test/UndoingGroup.prove.test.ts",
+      "expect": "rule",
+      "trialRules": [
+        "Unconfirmed Import.OnlyItsOwnOrganizationChangesAnImport",
+        "Unconfirmed Import.AViewerChangesNothing",
+        "Unconfirmed OnlyItsOwnOrganizationChangesTheGroup",
+        "Unconfirmed AViewerChangesNoGroup"
+      ],
+      "trialStories": [
+        "Review: a viewer changes nothing: no match, suggestion, confirm, remove, row act, undo, group or group undo",
+        "Review: an admin of another organization changes nothing in this one's import, its rows or its groups"
+      ]
+    },
+    {
+      "key": "gundo-opening",
+      "target": "UndoGroup",
+      "kind": "check",
+      "file": "src/Review/UndoingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"UndoingGroup.decide\")"],
+      "until": "    transitions: {",
+      "old": "      if (cmd.opening !== life.state.confirms) return yield* new ConfirmedSince({})\n",
+      "new": "",
+      "proof": "test/UndoingGroup.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Unconfirmed AGroupsUndoIsOfThisOpening"],
+      "trialStories": [
+        "Group: a group's undo does not reach past a confirm that stands, and a group made before it is not taken after a reopen"
+      ]
+    },
+    {
+      "key": "gundo-decided",
+      "target": "UndoGroup",
+      "kind": "check",
+      "file": "src/Review/UndoingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"UndoingGroup.decide\")"],
+      "until": "    transitions: {",
+      "old": "      if (!isDecidedGroup(group.state)) return yield* new NotYourStep({})\n",
+      "new": "",
+      "proof": "test/UndoingGroup.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": ["Review: an undo of a group step that decided no group is refused as not the sender's step"]
+    },
+    {
+      "key": "gundo-groupowner",
+      "target": "UndoGroup",
+      "kind": "check",
+      "file": "src/Review/UndoingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"UndoingGroup.decide\")"],
+      "until": "    transitions: {",
+      "old": "      if (group.state.importId !== cmd.importId || group.state.organizationId !== life.state.organizationId) {\n        return yield* new NotPermitted({})\n      }\n",
+      "new": "",
+      "proof": "test/UndoingGroup.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Unconfirmed OnlyItsOwnOrganizationChangesTheGroup"],
+      "trialStories": [
+        "Review: a row or a group kept under another organization's name is not changed, even by its maker"
+      ]
+    },
+    {
+      "key": "gundo-own",
+      "target": "UndoGroup",
+      "kind": "check",
+      "file": "src/Review/UndoingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"UndoingGroup.decide\")"],
+      "until": "    transitions: {",
+      "old": "      if (group.state.by !== actor.memberId || group.state.change !== cmd.undo || group.state.undoneAt !== 0) {\n        return yield* new NotYourStep({})\n      }\n",
+      "new": "",
+      "proof": "test/UndoingGroup.prove.test.ts",
+      "expect": "rule",
+      "trialRules": [
+        "Unconfirmed Group.AGroupTakenBackStaysTakenBack",
+        "Unconfirmed AGroupsUndoTakesBackOnlyItsSendersOwn",
+        "Unconfirmed AGroupIsTakenBackOnce",
+        "Unconfirmed NobodyUndoesAnotherPersonsGroup"
+      ],
+      "trialStories": [
+        "Group: only its maker takes a group back, in one act, once; a row another person decided since is not touched"
+      ]
+    },
+    {
+      "key": "gundo-confirmed",
+      "target": "UndoGroup",
+      "kind": "check",
+      "file": "src/Review/UndoingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"UndoingGroup.decide\")"],
+      "until": "    transitions: {",
+      "old": "      if (group.state.change <= life.state.confirmedAt) return yield* new DecidedBeforeTheConfirm({})\n",
+      "new": "",
+      "proof": "test/UndoingGroup.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Unconfirmed AGroupsUndoDoesNotReachPastAConfirm"],
+      "trialStories": [
+        "Group: a group's undo does not reach past a confirm that stands, and a group made before it is not taken after a reopen"
+      ]
+    },
+    {
+      "key": "gundo-top",
+      "target": "UndoGroup",
+      "kind": "check",
+      "file": "src/Review/UndoingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"UndoingGroup.decide\")"],
+      "until": "    transitions: {",
+      "old": "      if (group.state.change !== life.state.topGroup) return yield* new GroupedAfter({ last: life.state.topGroup })\n",
+      "new": "",
+      "proof": "test/UndoingGroup.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Unconfirmed OnlyTheLastGroupInForceIsTakenBack"],
+      "trialStories": [
+        "Group: only the last group still in force is taken back, so undo walks back: Dana takes hers back, then Ana hers"
+      ]
+    },
+    {
+      "key": "gundo-nothing",
+      "target": "UndoGroup",
+      "kind": "nothing",
+      "file": "src/Review/UndoingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"UndoingGroup.decide\")"],
+      "until": "    transitions: {",
+      "old": "      return [\n",
+      "new": "      return []\n      return [\n",
+      "proof": "test/UndoingGroup.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Group: only its maker takes a group back, in one act, once; a row another person decided since is not touched",
+        "Group: only the last group still in force is taken back, so undo walks back: Dana takes hers back, then Ana hers"
+      ]
+    },
+    {
+      "key": "row-rowdecided-importId",
+      "target": "DecideRow",
+      "kind": "field",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")", "new RowDecided({"],
+      "until": "})",
+      "old": "importId: cmd.importId,",
+      "new": "importId: cmd.row,",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Unconfirmed Row.ARowNeverChangesImportOrOrganization"],
+      "trialStories": [
+        "Group: a row's act names the last group act, and the same text over a group in force is a change",
+        "Review: a decision its sender saw that was taken back since is no longer there, and the act is refused",
+        "Review: an act made before a confirm is not taken after the import is opened again",
+        "Review: an act made on an older matching is refused, whatever it decides",
+        "Review: another person's act lands before the screen's own waiting act: the confirm is refused"
+      ]
+    },
+    {
+      "key": "row-rowdecided-organizationId",
+      "target": "DecideRow",
+      "kind": "field",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")", "new RowDecided({"],
+      "until": "})",
+      "old": "organizationId: life.state.organizationId,",
+      "new": "organizationId: cmd.row,",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Unconfirmed Row.ARowNeverChangesImportOrOrganization"],
+      "trialStories": [
+        "Group: a row's act names the last group act, and the same text over a group in force is a change",
+        "Review: a decision its sender saw that was taken back since is no longer there, and the act is refused",
+        "Review: an act made before a confirm is not taken after the import is opened again",
+        "Review: an act made on an older matching is refused, whatever it decides",
+        "Review: another person's act lands before the screen's own waiting act: the confirm is refused"
+      ]
+    },
+    {
+      "key": "row-rowdecided-change",
+      "target": "DecideRow",
+      "kind": "field",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")", "new RowDecided({"],
+      "until": "})",
+      "old": "            change,\n",
+      "new": "            change: life.state.changes,\n",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated OnTheRowToo", "Violated TheImportsEventSaysWhichDecisionTheRowHolds"],
+      "trialStories": [
+        "Group: a row's act names the last group act, and the same text over a group in force is a change",
+        "Review: a decision its sender saw that was taken back since is no longer there, and the act is refused",
+        "Review: an act made before a confirm is not taken after the import is opened again",
+        "Review: an act made on an older matching is refused, whatever it decides",
+        "Review: another person's act lands before the screen's own waiting act: the confirm is refused"
+      ]
+    },
+    {
+      "key": "row-rowdecided-by",
+      "target": "DecideRow",
+      "kind": "field",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")", "new RowDecided({"],
+      "until": "})",
+      "old": "by: actor.memberId,",
+      "new": "by: life.state.organizationId,",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated AsItsSenders", "Violated TheImportsEventSaysWhose"],
+      "trialStories": [
+        "Group: a row's act names the last group act, and the same text over a group in force is a change",
+        "Review: a decision its sender saw that was taken back since is no longer there, and the act is refused",
+        "Review: an act made before a confirm is not taken after the import is opened again",
+        "Review: an act made on an older matching is refused, whatever it decides",
+        "Review: another person's act lands before the screen's own waiting act: the confirm is refused"
+      ]
+    },
+    {
+      "key": "row-rowdecided-step",
+      "target": "DecideRow",
+      "kind": "field",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")", "new RowDecided({"],
+      "until": "})",
+      "old": "step: cmd.step,",
+      "new": "step: cmd.label,",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated UnderItsStep"],
+      "trialStories": [
+        "Group: a row's act names the last group act, and the same text over a group in force is a change",
+        "Review: a decision its sender saw that was taken back since is no longer there, and the act is refused",
+        "Review: an act made before a confirm is not taken after the import is opened again",
+        "Review: an act made on an older matching is refused, whatever it decides",
+        "Review: another person's act lands before the screen's own waiting act: the confirm is refused"
+      ]
+    },
+    {
+      "key": "row-rowdecided-flags",
+      "target": "DecideRow",
+      "kind": "field",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")", "new RowDecided({"],
+      "until": "})",
+      "old": "flags: cmd.flags,",
+      "new": "flags: cmd.label,",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated WithItsText", "Violated TheImportsEventSaysItsText"],
+      "trialStories": [
+        "Group: a row's act names the last group act, and the same text over a group in force is a change",
+        "Review: a decision its sender saw that was taken back since is no longer there, and the act is refused",
+        "Review: an act made before a confirm is not taken after the import is opened again",
+        "Review: an act made on an older matching is refused, whatever it decides",
+        "Review: another person's act lands before the screen's own waiting act: the confirm is refused"
+      ]
+    },
+    {
+      "key": "row-rowdecided-madeOn",
+      "target": "DecideRow",
+      "kind": "field",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")", "new RowDecided({"],
+      "until": "})",
+      "old": "madeOn: cmd.madeOn,",
+      "new": "madeOn: cmd.opening,",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated OnItsMatching"],
+      "trialStories": [
+        "Review: an act made before a confirm is not taken after the import is opened again",
+        "Review: an act made on an older matching is refused, whatever it decides"
+      ]
+    },
+    {
+      "key": "row-rowdecided-label",
+      "target": "DecideRow",
+      "kind": "field",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")", "new RowDecided({"],
+      "until": "})",
+      "old": "label: cmd.label",
+      "new": "label: cmd.step",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Group: a row's act names the last group act, and the same text over a group in force is a change",
+        "Review: a decision its sender saw that was taken back since is no longer there, and the act is refused",
+        "Review: an act made before a confirm is not taken after the import is opened again",
+        "Review: an act made on an older matching is refused, whatever it decides",
+        "Review: another person's act lands before the screen's own waiting act: the confirm is refused"
+      ]
+    },
+    {
+      "key": "row-actcounted-change",
+      "target": "DecideRow",
+      "kind": "field",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")", "new ActCounted({"],
+      "until": "})",
+      "old": "            change,\n",
+      "new": "            change: life.state.changes,\n",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "rule",
+      "trialRules": [
+        "Violated Import.EveryChangeHasItsOwnNumber",
+        "Violated AndGetsTheNextNumber",
+        "Violated OnTheRowToo"
+      ],
+      "trialStories": [
+        "Group: a row's act names the last group act, and the same text over a group in force is a change",
+        "Review: a decision its sender saw that was taken back since is no longer there, and the act is refused",
+        "Review: an act made before a confirm is not taken after the import is opened again",
+        "Review: an act made on an older matching is refused, whatever it decides",
+        "Review: another person's act lands before the screen's own waiting act: the confirm is refused"
+      ]
+    },
+    {
+      "key": "row-actcounted-step",
+      "target": "DecideRow",
+      "kind": "field",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")", "new ActCounted({"],
+      "until": "})",
+      "old": "step: cmd.step,",
+      "new": "step: cmd.label,",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Group: a row's act names the last group act, and the same text over a group in force is a change",
+        "Review: a decision its sender saw that was taken back since is no longer there, and the act is refused",
+        "Review: an act made before a confirm is not taken after the import is opened again",
+        "Review: an act made on an older matching is refused, whatever it decides",
+        "Review: another person's act lands before the screen's own waiting act: the confirm is refused"
+      ]
+    },
+    {
+      "key": "row-actcounted-row",
+      "target": "DecideRow",
+      "kind": "field",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")", "new ActCounted({"],
+      "until": "})",
+      "old": "row: cmd.row,",
+      "new": "row: cmd.step,",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Group: a row's act names the last group act, and the same text over a group in force is a change",
+        "Review: a decision its sender saw that was taken back since is no longer there, and the act is refused",
+        "Review: an act made before a confirm is not taken after the import is opened again",
+        "Review: an act made on an older matching is refused, whatever it decides",
+        "Review: another person's act lands before the screen's own waiting act: the confirm is refused"
+      ]
+    },
+    {
+      "key": "row-actcounted-label",
+      "target": "DecideRow",
+      "kind": "field",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")", "new ActCounted({"],
+      "until": "})",
+      "old": "label: cmd.label,",
+      "new": "label: cmd.step,",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Group: a row's act names the last group act, and the same text over a group in force is a change",
+        "Review: a decision its sender saw that was taken back since is no longer there, and the act is refused",
+        "Review: an act made before a confirm is not taken after the import is opened again",
+        "Review: an act made on an older matching is refused, whatever it decides",
+        "Review: another person's act lands before the screen's own waiting act: the confirm is refused"
+      ]
+    },
+    {
+      "key": "row-actcounted-holds",
+      "target": "DecideRow",
+      "kind": "field",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")", "new ActCounted({"],
+      "until": "})",
+      "old": "holds: change,",
+      "new": "holds: life.state.changes,",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated TheImportsEventSaysWhichDecisionTheRowHolds"],
+      "trialStories": [
+        "Group: a row's act names the last group act, and the same text over a group in force is a change",
+        "Review: a decision its sender saw that was taken back since is no longer there, and the act is refused",
+        "Review: an act made before a confirm is not taken after the import is opened again",
+        "Review: an act made on an older matching is refused, whatever it decides",
+        "Review: another person's act lands before the screen's own waiting act: the confirm is refused"
+      ]
+    },
+    {
+      "key": "row-actcounted-by",
+      "target": "DecideRow",
+      "kind": "field",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")", "new ActCounted({"],
+      "until": "})",
+      "old": "by: actor.memberId,",
+      "new": "by: cmd.row,",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated TheImportsEventSaysWhose"],
+      "trialStories": [
+        "Group: a row's act names the last group act, and the same text over a group in force is a change",
+        "Review: a decision its sender saw that was taken back since is no longer there, and the act is refused",
+        "Review: an act made before a confirm is not taken after the import is opened again",
+        "Review: an act made on an older matching is refused, whatever it decides",
+        "Review: another person's act lands before the screen's own waiting act: the confirm is refused"
+      ]
+    },
+    {
+      "key": "row-actcounted-actor",
+      "target": "DecideRow",
+      "kind": "field",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")", "new ActCounted({"],
+      "until": "})",
+      "old": "actor: actor.memberId,",
+      "new": "actor: cmd.row,",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated Import.EveryEventSaysWhose", "Violated TheImportsEventSaysWhoActed"],
+      "trialStories": [
+        "Group: a row's act names the last group act, and the same text over a group in force is a change",
+        "Review: a decision its sender saw that was taken back since is no longer there, and the act is refused",
+        "Review: an act made before a confirm is not taken after the import is opened again",
+        "Review: an act made on an older matching is refused, whatever it decides",
+        "Review: another person's act lands before the screen's own waiting act: the confirm is refused"
+      ]
+    },
+    {
+      "key": "row-actcounted-flags",
+      "target": "DecideRow",
+      "kind": "field",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")", "new ActCounted({"],
+      "until": "})",
+      "old": "flags: cmd.flags,",
+      "new": "flags: cmd.label,",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated TheImportsEventSaysItsText"],
+      "trialStories": [
+        "Group: a row's act names the last group act, and the same text over a group in force is a change",
+        "Review: a decision its sender saw that was taken back since is no longer there, and the act is refused",
+        "Review: an act made before a confirm is not taken after the import is opened again",
+        "Review: an act made on an older matching is refused, whatever it decides",
+        "Review: another person's act lands before the screen's own waiting act: the confirm is refused"
+      ]
+    },
+    {
+      "key": "row-actcounted-madeOn",
+      "target": "DecideRow",
+      "kind": "field",
+      "file": "src/Review/Deciding.decision.ts",
+      "anchors": ["Effect.fn(\"Deciding.decide\")", "new ActCounted({"],
+      "until": "})",
+      "old": "madeOn: cmd.madeOn",
+      "new": "madeOn: cmd.opening",
+      "proof": "test/Deciding.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Review: an act made before a confirm is not taken after the import is opened again",
+        "Review: an act made on an older matching is refused, whatever it decides"
+      ]
+    },
+    {
+      "key": "undo-stepundone-next",
+      "target": "UndoRowStep",
+      "kind": "field",
+      "file": "src/Review/Undoing.decision.ts",
+      "anchors": ["Effect.fn(\"Undoing.decide\")", "new StepUndone({"],
+      "until": "\n",
+      "old": "next, below",
+      "new": "next: noLevel, below",
+      "proof": "test/Undoing.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Unconfirmed WhatLiesUnderIsWhatWasRecorded"],
+      "trialStories": [
+        "Review: a full history never refuses a decision: the oldest levels are let go, and an undo stops there and says so",
+        "Review: undos go down every level exactly as it was, and end at none"
+      ]
+    },
+    {
+      "key": "undo-stepundone-below",
+      "target": "UndoRowStep",
+      "kind": "field",
+      "file": "src/Review/Undoing.decision.ts",
+      "anchors": ["Effect.fn(\"Undoing.decide\")", "new StepUndone({"],
+      "until": "\n",
+      "old": "below: kept ? cmd.below : \"\"",
+      "new": "below: \"\"",
+      "proof": "test/Undoing.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Unconfirmed WhatLiesUnderIsWhatWasRecorded"],
+      "trialStories": ["Review: undos go down every level exactly as it was, and end at none"]
+    },
+    {
+      "key": "undo-actcounted-change",
+      "target": "UndoRowStep",
+      "kind": "field",
+      "file": "src/Review/Undoing.decision.ts",
+      "anchors": ["Effect.fn(\"Undoing.decide\")", "new ActCounted({"],
+      "until": "})",
+      "old": "change: life.state.changes + 1,",
+      "new": "change: life.state.changes,",
+      "proof": "test/Undoing.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Unconfirmed Import.EveryChangeHasItsOwnNumber", "Unconfirmed AnUndoIsNumbered"],
+      "trialStories": [
+        "Review: a decision its sender saw that was taken back since is no longer there, and the act is refused",
+        "Review: a full history never refuses a decision: the oldest levels are let go, and an undo stops there and says so",
+        "Review: a row's undo pressed before a group reached its sender's screen is refused, and taken once it has",
+        "Review: an undo that puts back another person's decision stops there",
+        "Review: undos go down every level exactly as it was, and end at none"
+      ]
+    },
+    {
+      "key": "undo-actcounted-step",
+      "target": "UndoRowStep",
+      "kind": "field",
+      "file": "src/Review/Undoing.decision.ts",
+      "anchors": ["Effect.fn(\"Undoing.decide\")", "new ActCounted({"],
+      "until": "})",
+      "old": "step: cmd.step,",
+      "new": "step: cmd.row,",
+      "proof": "test/Undoing.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Review: a decision its sender saw that was taken back since is no longer there, and the act is refused",
+        "Review: a full history never refuses a decision: the oldest levels are let go, and an undo stops there and says so",
+        "Review: a row's undo pressed before a group reached its sender's screen is refused, and taken once it has",
+        "Review: an undo that puts back another person's decision stops there",
+        "Review: undos go down every level exactly as it was, and end at none"
+      ]
+    },
+    {
+      "key": "undo-actcounted-row",
+      "target": "UndoRowStep",
+      "kind": "field",
+      "file": "src/Review/Undoing.decision.ts",
+      "anchors": ["Effect.fn(\"Undoing.decide\")", "new ActCounted({"],
+      "until": "})",
+      "old": "row: cmd.row,",
+      "new": "row: cmd.step,",
+      "proof": "test/Undoing.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Review: a decision its sender saw that was taken back since is no longer there, and the act is refused",
+        "Review: a full history never refuses a decision: the oldest levels are let go, and an undo stops there and says so",
+        "Review: a row's undo pressed before a group reached its sender's screen is refused, and taken once it has",
+        "Review: an undo that puts back another person's decision stops there",
+        "Review: undos go down every level exactly as it was, and end at none"
+      ]
+    },
+    {
+      "key": "undo-actcounted-label",
+      "target": "UndoRowStep",
+      "kind": "field",
+      "file": "src/Review/Undoing.decision.ts",
+      "anchors": ["Effect.fn(\"Undoing.decide\")", "new ActCounted({"],
+      "until": "})",
+      "old": "label: \"undo\",",
+      "new": "label: cmd.step,",
+      "proof": "test/Undoing.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Review: a decision its sender saw that was taken back since is no longer there, and the act is refused",
+        "Review: a full history never refuses a decision: the oldest levels are let go, and an undo stops there and says so",
+        "Review: a row's undo pressed before a group reached its sender's screen is refused, and taken once it has",
+        "Review: an undo that puts back another person's decision stops there",
+        "Review: undos go down every level exactly as it was, and end at none"
+      ]
+    },
+    {
+      "key": "undo-actcounted-holds",
+      "target": "UndoRowStep",
+      "kind": "field",
+      "file": "src/Review/Undoing.decision.ts",
+      "anchors": ["Effect.fn(\"Undoing.decide\")", "new ActCounted({"],
+      "until": "})",
+      "old": "holds: under.change,",
+      "new": "holds: row.state.change,",
+      "proof": "test/Undoing.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Unconfirmed TheImportsEventSaysWhichDecisionTheRowHolds"],
+      "trialStories": [
+        "Review: a decision its sender saw that was taken back since is no longer there, and the act is refused",
+        "Review: a full history never refuses a decision: the oldest levels are let go, and an undo stops there and says so",
+        "Review: a row's undo pressed before a group reached its sender's screen is refused, and taken once it has",
+        "Review: an undo that puts back another person's decision stops there",
+        "Review: undos go down every level exactly as it was, and end at none"
+      ]
+    },
+    {
+      "key": "undo-actcounted-by",
+      "target": "UndoRowStep",
+      "kind": "field",
+      "file": "src/Review/Undoing.decision.ts",
+      "anchors": ["Effect.fn(\"Undoing.decide\")", "new ActCounted({"],
+      "until": "})",
+      "old": "by: under.by,",
+      "new": "by: actor.memberId,",
+      "proof": "test/Undoing.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Unconfirmed TheImportsEventSaysWhose"],
+      "trialStories": [
+        "Review: a decision its sender saw that was taken back since is no longer there, and the act is refused",
+        "Review: a row's undo pressed before a group reached its sender's screen is refused, and taken once it has",
+        "Review: an undo that puts back another person's decision stops there",
+        "Review: undos go down every level exactly as it was, and end at none"
+      ]
+    },
+    {
+      "key": "undo-actcounted-actor",
+      "target": "UndoRowStep",
+      "kind": "field",
+      "file": "src/Review/Undoing.decision.ts",
+      "anchors": ["Effect.fn(\"Undoing.decide\")", "new ActCounted({"],
+      "until": "})",
+      "old": "actor: actor.memberId,",
+      "new": "actor: under.by,",
+      "proof": "test/Undoing.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Unconfirmed Import.EveryEventSaysWhose", "Unconfirmed TheImportsEventSaysWhoActed"],
+      "trialStories": [
+        "Review: a decision its sender saw that was taken back since is no longer there, and the act is refused",
+        "Review: a row's undo pressed before a group reached its sender's screen is refused, and taken once it has",
+        "Review: an undo that puts back another person's decision stops there",
+        "Review: undos go down every level exactly as it was, and end at none"
+      ]
+    },
+    {
+      "key": "undo-actcounted-flags",
+      "target": "UndoRowStep",
+      "kind": "field",
+      "file": "src/Review/Undoing.decision.ts",
+      "anchors": ["Effect.fn(\"Undoing.decide\")", "new ActCounted({"],
+      "until": "})",
+      "old": "flags: under.flags,",
+      "new": "flags: row.state.flags,",
+      "proof": "test/Undoing.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Unconfirmed TheImportsEventSaysItsText"],
+      "trialStories": [
+        "Review: a decision its sender saw that was taken back since is no longer there, and the act is refused",
+        "Review: a full history never refuses a decision: the oldest levels are let go, and an undo stops there and says so",
+        "Review: a row's undo pressed before a group reached its sender's screen is refused, and taken once it has",
+        "Review: an undo that puts back another person's decision stops there",
+        "Review: undos go down every level exactly as it was, and end at none"
+      ]
+    },
+    {
+      "key": "undo-actcounted-madeOn",
+      "target": "UndoRowStep",
+      "kind": "field",
+      "file": "src/Review/Undoing.decision.ts",
+      "anchors": ["Effect.fn(\"Undoing.decide\")", "new ActCounted({"],
+      "until": "})",
+      "old": "madeOn: under.madeOn",
+      "new": "madeOn: row.state.madeOn",
+      "proof": "test/Undoing.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Review: a decision its sender saw that was taken back since is no longer there, and the act is refused",
+        "Review: a row's undo pressed before a group reached its sender's screen is refused, and taken once it has",
+        "Review: undos go down every level exactly as it was, and end at none"
+      ]
+    },
+    {
+      "key": "group-groupdecided-importId",
+      "target": "DecideGroup",
+      "kind": "field",
+      "file": "src/Review/DecidingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"DecidingGroup.decide\")", "new GroupDecided({"],
+      "until": "})",
+      "old": "importId: cmd.importId,",
+      "new": "importId: cmd.step,",
+      "proof": "test/DecidingGroup.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Group: a group decided after another was taken back goes over the one still in force, on the matching now",
+        "Group: a group is taken only from a screen that has every change, and a step decides one group",
+        "Group: a group of 6,000 rows is one act and one change, and a confirm has to have received it",
+        "Review: a row's undo pressed before a group reached its sender's screen is refused, and taken once it has"
+      ]
+    },
+    {
+      "key": "group-groupdecided-organizationId",
+      "target": "DecideGroup",
+      "kind": "field",
+      "file": "src/Review/DecidingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"DecidingGroup.decide\")", "new GroupDecided({"],
+      "until": "})",
+      "old": "organizationId: life.state.organizationId,",
+      "new": "organizationId: actor.memberId,",
+      "proof": "test/DecidingGroup.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Group: a group decided after another was taken back goes over the one still in force, on the matching now",
+        "Group: a group is taken only from a screen that has every change, and a step decides one group",
+        "Group: a group of 6,000 rows is one act and one change, and a confirm has to have received it",
+        "Review: a row's undo pressed before a group reached its sender's screen is refused, and taken once it has"
+      ]
+    },
+    {
+      "key": "group-groupdecided-change",
+      "target": "DecideGroup",
+      "kind": "field",
+      "file": "src/Review/DecidingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"DecidingGroup.decide\")", "new GroupDecided({"],
+      "until": "})",
+      "old": "            change,\n",
+      "new": "            change: life.state.changes,\n",
+      "proof": "test/DecidingGroup.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated OnTheGroupToo"],
+      "trialStories": [
+        "Group: a group decided after another was taken back goes over the one still in force, on the matching now",
+        "Group: a group is taken only from a screen that has every change, and a step decides one group",
+        "Group: a group of 6,000 rows is one act and one change, and a confirm has to have received it",
+        "Review: a row's undo pressed before a group reached its sender's screen is refused, and taken once it has"
+      ]
+    },
+    {
+      "key": "group-groupdecided-by",
+      "target": "DecideGroup",
+      "kind": "field",
+      "file": "src/Review/DecidingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"DecidingGroup.decide\")", "new GroupDecided({"],
+      "until": "})",
+      "old": "by: actor.memberId,",
+      "new": "by: cmd.step,",
+      "proof": "test/DecidingGroup.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated AsItsSenders"],
+      "trialStories": [
+        "Group: a group decided after another was taken back goes over the one still in force, on the matching now",
+        "Group: a group is taken only from a screen that has every change, and a step decides one group",
+        "Group: a group of 6,000 rows is one act and one change, and a confirm has to have received it",
+        "Review: a row's undo pressed before a group reached its sender's screen is refused, and taken once it has"
+      ]
+    },
+    {
+      "key": "group-groupdecided-step",
+      "target": "DecideGroup",
+      "kind": "field",
+      "file": "src/Review/DecidingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"DecidingGroup.decide\")", "new GroupDecided({"],
+      "until": "})",
+      "old": "step: cmd.step,",
+      "new": "step: cmd.label,",
+      "proof": "test/DecidingGroup.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Group: a group decided after another was taken back goes over the one still in force, on the matching now",
+        "Group: a group is taken only from a screen that has every change, and a step decides one group",
+        "Group: a group of 6,000 rows is one act and one change, and a confirm has to have received it",
+        "Review: a row's undo pressed before a group reached its sender's screen is refused, and taken once it has"
+      ]
+    },
+    {
+      "key": "group-groupdecided-patch",
+      "target": "DecideGroup",
+      "kind": "field",
+      "file": "src/Review/DecidingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"DecidingGroup.decide\")", "new GroupDecided({"],
+      "until": "})",
+      "old": "patch: cmd.patch,",
+      "new": "patch: cmd.rows,",
+      "proof": "test/DecidingGroup.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated WithWhatItDoes"],
+      "trialStories": [
+        "Group: a group decided after another was taken back goes over the one still in force, on the matching now",
+        "Group: a group is taken only from a screen that has every change, and a step decides one group",
+        "Group: a group of 6,000 rows is one act and one change, and a confirm has to have received it",
+        "Review: a row's undo pressed before a group reached its sender's screen is refused, and taken once it has"
+      ]
+    },
+    {
+      "key": "group-groupdecided-rows",
+      "target": "DecideGroup",
+      "kind": "field",
+      "file": "src/Review/DecidingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"DecidingGroup.decide\")", "new GroupDecided({"],
+      "until": "})",
+      "old": "rows: cmd.rows,",
+      "new": "rows: cmd.patch,",
+      "proof": "test/DecidingGroup.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated WithEveryRowItNames"],
+      "trialStories": [
+        "Group: a group decided after another was taken back goes over the one still in force, on the matching now",
+        "Group: a group is taken only from a screen that has every change, and a step decides one group",
+        "Group: a group of 6,000 rows is one act and one change, and a confirm has to have received it",
+        "Review: a row's undo pressed before a group reached its sender's screen is refused, and taken once it has"
+      ]
+    },
+    {
+      "key": "group-groupdecided-count",
+      "target": "DecideGroup",
+      "kind": "field",
+      "file": "src/Review/DecidingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"DecidingGroup.decide\")", "new GroupDecided({"],
+      "until": "})",
+      "old": "count: cmd.count,",
+      "new": "count: cmd.count + 1,",
+      "proof": "test/DecidingGroup.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated WithItsCount"],
+      "trialStories": [
+        "Group: a group decided after another was taken back goes over the one still in force, on the matching now",
+        "Group: a group is taken only from a screen that has every change, and a step decides one group",
+        "Group: a group of 6,000 rows is one act and one change, and a confirm has to have received it",
+        "Review: a row's undo pressed before a group reached its sender's screen is refused, and taken once it has"
+      ]
+    },
+    {
+      "key": "group-groupdecided-madeOn",
+      "target": "DecideGroup",
+      "kind": "field",
+      "file": "src/Review/DecidingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"DecidingGroup.decide\")", "new GroupDecided({"],
+      "until": "})",
+      "old": "madeOn: cmd.madeOn,",
+      "new": "madeOn: cmd.opening,",
+      "proof": "test/DecidingGroup.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated OnItsMatching"],
+      "trialStories": [
+        "Group: a group decided after another was taken back goes over the one still in force, on the matching now"
+      ]
+    },
+    {
+      "key": "group-groupdecided-label",
+      "target": "DecideGroup",
+      "kind": "field",
+      "file": "src/Review/DecidingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"DecidingGroup.decide\")", "new GroupDecided({"],
+      "until": "})",
+      "old": "label: cmd.label,",
+      "new": "label: cmd.step,",
+      "proof": "test/DecidingGroup.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Group: a group decided after another was taken back goes over the one still in force, on the matching now",
+        "Group: a group is taken only from a screen that has every change, and a step decides one group",
+        "Group: a group of 6,000 rows is one act and one change, and a confirm has to have received it",
+        "Review: a row's undo pressed before a group reached its sender's screen is refused, and taken once it has"
+      ]
+    },
+    {
+      "key": "group-groupdecided-under",
+      "target": "DecideGroup",
+      "kind": "field",
+      "file": "src/Review/DecidingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"DecidingGroup.decide\")", "new GroupDecided({"],
+      "until": "})",
+      "old": "under: life.state.topGroup",
+      "new": "under: life.state.lastGroup",
+      "proof": "test/DecidingGroup.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated AndKeepsWhichOneWasBeforeIt"],
+      "trialStories": [
+        "Group: a group decided after another was taken back goes over the one still in force, on the matching now"
+      ]
+    },
+    {
+      "key": "group-groupcounted-change",
+      "target": "DecideGroup",
+      "kind": "field",
+      "file": "src/Review/DecidingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"DecidingGroup.decide\")", "new GroupCounted({"],
+      "until": "})",
+      "old": "            change,\n",
+      "new": "            change: life.state.changes,\n",
+      "proof": "test/DecidingGroup.prove.test.ts",
+      "expect": "rule",
+      "trialRules": [
+        "Violated Import.EveryChangeHasItsOwnNumber",
+        "Violated AGroupIsOneChange",
+        "Violated OnTheGroupToo",
+        "Violated AGroupDecidedIsTheLastInForce"
+      ],
+      "trialStories": [
+        "Group: a group decided after another was taken back goes over the one still in force, on the matching now",
+        "Group: a group is taken only from a screen that has every change, and a step decides one group",
+        "Group: a group of 6,000 rows is one act and one change, and a confirm has to have received it",
+        "Review: a row's undo pressed before a group reached its sender's screen is refused, and taken once it has"
+      ]
+    },
+    {
+      "key": "group-groupcounted-step",
+      "target": "DecideGroup",
+      "kind": "field",
+      "file": "src/Review/DecidingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"DecidingGroup.decide\")", "new GroupCounted({"],
+      "until": "})",
+      "old": "step: cmd.step,",
+      "new": "step: cmd.label,",
+      "proof": "test/DecidingGroup.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Group: a group decided after another was taken back goes over the one still in force, on the matching now",
+        "Group: a group is taken only from a screen that has every change, and a step decides one group",
+        "Group: a group of 6,000 rows is one act and one change, and a confirm has to have received it",
+        "Review: a row's undo pressed before a group reached its sender's screen is refused, and taken once it has"
+      ]
+    },
+    {
+      "key": "group-groupcounted-rows",
+      "target": "DecideGroup",
+      "kind": "field",
+      "file": "src/Review/DecidingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"DecidingGroup.decide\")", "new GroupCounted({"],
+      "until": "})",
+      "old": "rows: cmd.count,",
+      "new": "rows: cmd.count + 1,",
+      "proof": "test/DecidingGroup.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated TheImportsEventSaysHowManyRows"],
+      "trialStories": [
+        "Group: a group decided after another was taken back goes over the one still in force, on the matching now",
+        "Group: a group is taken only from a screen that has every change, and a step decides one group",
+        "Group: a group of 6,000 rows is one act and one change, and a confirm has to have received it",
+        "Review: a row's undo pressed before a group reached its sender's screen is refused, and taken once it has"
+      ]
+    },
+    {
+      "key": "group-groupcounted-label",
+      "target": "DecideGroup",
+      "kind": "field",
+      "file": "src/Review/DecidingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"DecidingGroup.decide\")", "new GroupCounted({"],
+      "until": "})",
+      "old": "label: cmd.label,",
+      "new": "label: cmd.step,",
+      "proof": "test/DecidingGroup.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Group: a group decided after another was taken back goes over the one still in force, on the matching now",
+        "Group: a group is taken only from a screen that has every change, and a step decides one group",
+        "Group: a group of 6,000 rows is one act and one change, and a confirm has to have received it",
+        "Review: a row's undo pressed before a group reached its sender's screen is refused, and taken once it has"
+      ]
+    },
+    {
+      "key": "group-groupcounted-by",
+      "target": "DecideGroup",
+      "kind": "field",
+      "file": "src/Review/DecidingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"DecidingGroup.decide\")", "new GroupCounted({"],
+      "until": "})",
+      "old": "by: actor.memberId,",
+      "new": "by: cmd.step,",
+      "proof": "test/DecidingGroup.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated Import.EveryEventSaysWhose"],
+      "trialStories": [
+        "Group: a group decided after another was taken back goes over the one still in force, on the matching now",
+        "Group: a group is taken only from a screen that has every change, and a step decides one group",
+        "Group: a group of 6,000 rows is one act and one change, and a confirm has to have received it",
+        "Review: a row's undo pressed before a group reached its sender's screen is refused, and taken once it has"
+      ]
+    },
+    {
+      "key": "group-groupcounted-top",
+      "target": "DecideGroup",
+      "kind": "field",
+      "file": "src/Review/DecidingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"DecidingGroup.decide\")", "new GroupCounted({"],
+      "until": "})",
+      "old": "top: change",
+      "new": "top: life.state.topGroup",
+      "proof": "test/DecidingGroup.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated AGroupDecidedIsTheLastInForce"],
+      "trialStories": [
+        "Group: a group decided after another was taken back goes over the one still in force, on the matching now",
+        "Group: a group is taken only from a screen that has every change, and a step decides one group",
+        "Group: a group of 6,000 rows is one act and one change, and a confirm has to have received it",
+        "Review: a row's undo pressed before a group reached its sender's screen is refused, and taken once it has"
+      ]
+    },
+    {
+      "key": "gundo-groupundone-change",
+      "target": "UndoGroup",
+      "kind": "field",
+      "file": "src/Review/UndoingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"UndoingGroup.decide\")", "new GroupUndone"],
+      "until": "\n",
+      "old": "({ change })",
+      "new": "({ change: life.state.changes })",
+      "proof": "test/UndoingGroup.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Unconfirmed AndTheGroupSaysWhen"],
+      "trialStories": [
+        "Group: only its maker takes a group back, in one act, once; a row another person decided since is not touched",
+        "Group: only the last group still in force is taken back, so undo walks back: Dana takes hers back, then Ana hers"
+      ]
+    },
+    {
+      "key": "gundo-groupcounted-change",
+      "target": "UndoGroup",
+      "kind": "field",
+      "file": "src/Review/UndoingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"UndoingGroup.decide\")", "new GroupCounted({"],
+      "until": "})",
+      "old": "            change,\n",
+      "new": "            change: life.state.changes,\n",
+      "proof": "test/UndoingGroup.prove.test.ts",
+      "expect": "rule",
+      "trialRules": [
+        "Unconfirmed Import.EveryChangeHasItsOwnNumber",
+        "Unconfirmed AGroupsUndoIsOneChange",
+        "Unconfirmed AndTheGroupSaysWhen"
+      ],
+      "trialStories": [
+        "Group: only its maker takes a group back, in one act, once; a row another person decided since is not touched",
+        "Group: only the last group still in force is taken back, so undo walks back: Dana takes hers back, then Ana hers"
+      ]
+    },
+    {
+      "key": "gundo-groupcounted-step",
+      "target": "UndoGroup",
+      "kind": "field",
+      "file": "src/Review/UndoingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"UndoingGroup.decide\")", "new GroupCounted({"],
+      "until": "})",
+      "old": "step: cmd.step,",
+      "new": "step: \"undo\",",
+      "proof": "test/UndoingGroup.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Group: only its maker takes a group back, in one act, once; a row another person decided since is not touched",
+        "Group: only the last group still in force is taken back, so undo walks back: Dana takes hers back, then Ana hers"
+      ]
+    },
+    {
+      "key": "gundo-groupcounted-rows",
+      "target": "UndoGroup",
+      "kind": "field",
+      "file": "src/Review/UndoingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"UndoingGroup.decide\")", "new GroupCounted({"],
+      "until": "})",
+      "old": "rows: group.state.count,",
+      "new": "rows: group.state.count + 1,",
+      "proof": "test/UndoingGroup.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Unconfirmed TheImportsEventSaysHowManyRows"],
+      "trialStories": [
+        "Group: only its maker takes a group back, in one act, once; a row another person decided since is not touched",
+        "Group: only the last group still in force is taken back, so undo walks back: Dana takes hers back, then Ana hers"
+      ]
+    },
+    {
+      "key": "gundo-groupcounted-label",
+      "target": "UndoGroup",
+      "kind": "field",
+      "file": "src/Review/UndoingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"UndoingGroup.decide\")", "new GroupCounted({"],
+      "until": "})",
+      "old": "label: \"undo\",",
+      "new": "label: cmd.step,",
+      "proof": "test/UndoingGroup.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Group: only its maker takes a group back, in one act, once; a row another person decided since is not touched",
+        "Group: only the last group still in force is taken back, so undo walks back: Dana takes hers back, then Ana hers"
+      ]
+    },
+    {
+      "key": "gundo-groupcounted-by",
+      "target": "UndoGroup",
+      "kind": "field",
+      "file": "src/Review/UndoingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"UndoingGroup.decide\")", "new GroupCounted({"],
+      "until": "})",
+      "old": "by: actor.memberId,",
+      "new": "by: cmd.step,",
+      "proof": "test/UndoingGroup.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Unconfirmed Import.EveryEventSaysWhose"],
+      "trialStories": [
+        "Group: only its maker takes a group back, in one act, once; a row another person decided since is not touched",
+        "Group: only the last group still in force is taken back, so undo walks back: Dana takes hers back, then Ana hers"
+      ]
+    },
+    {
+      "key": "gundo-groupcounted-top",
+      "target": "UndoGroup",
+      "kind": "field",
+      "file": "src/Review/UndoingGroup.decision.ts",
+      "anchors": ["Effect.fn(\"UndoingGroup.decide\")", "new GroupCounted({"],
+      "until": "})",
+      "old": "top: group.state.under",
+      "new": "top: 0",
+      "proof": "test/UndoingGroup.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Unconfirmed ThenTheOneUnderItIsTheLastInForce"],
+      "trialStories": [
+        "Group: only the last group still in force is taken back, so undo walks back: Dana takes hers back, then Ana hers"
+      ]
+    }
+  ]
+}

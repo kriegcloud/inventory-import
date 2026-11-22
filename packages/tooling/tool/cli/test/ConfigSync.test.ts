@@ -441,7 +441,7 @@ describe("config-sync", () => {
     })
   )
 
-  it.effect("the two checks run every root task turbo.json defines, and the formatter skips a vendored package", () =>
+  it.effect("the three checks run every root task turbo.json defines, and the formatter skips a vendored package", () =>
     Effect.gen(function* () {
       const result = yield* run(
         {
@@ -452,6 +452,7 @@ describe("config-sync", () => {
             '  "scripts": {',
             '    "check": "turbo run check lint //#format:check //#gone:check",',
             '    "check:full": "turbo run check lint build //#format:check //#docs:check",',
+            '    "check:ci": "turbo run check lint //#format:check //#docs:check //#keys:check //#gone:check",',
             '    "format:check": "oxfmt --check",',
             '    "docs:check": "beep docs check"',
             "  }",
@@ -476,10 +477,11 @@ describe("config-sync", () => {
         ["package.json", ".oxfmtrc.json"]
       )
       expect(result.before).toEqual([
-        "err: config-sync FAIL  3 places differ from what they are derived from (`bun run config-sync` writes them); 1 problem needs a person, and no command repairs it",
+        "err: config-sync FAIL  4 places differ from what they are derived from (`bun run config-sync` writes them); 1 problem needs a person, and no command repairs it",
         "err:   .oxfmtrc.json:2  `ignorePatterns`, from the packages with a vendor.json: found without packages/kit/**, expected every vendored package, and no package of the repository's own",
         "err:   package.json:5  the `check` script, from the root tasks of turbo.json: found without //#docs:check, //#keys:check, with //#gone:check, which is no task, expected every root task turbo.json defines, and no other",
         "err:   package.json:6  the `check:full` script, from the root tasks of turbo.json: found without //#keys:check, expected every root task turbo.json defines, and no other",
+        "err:   package.json:7  the `check:ci` script, from the root tasks of turbo.json: found with //#gone:check, which is no task, expected every root task turbo.json defines, and no other",
         'err:   turbo.json: defines the root task //#keys:check and the root\'s package.json has no script "keys:check": add the script, or remove the task'
       ])
       expect(result.files).toEqual({
@@ -490,6 +492,7 @@ describe("config-sync", () => {
           '  "scripts": {',
           '    "check": "turbo run check lint //#format:check //#docs:check //#keys:check",',
           '    "check:full": "turbo run check lint build //#format:check //#docs:check //#keys:check",',
+          '    "check:ci": "turbo run check lint //#format:check //#docs:check //#keys:check",',
           '    "format:check": "oxfmt --check",',
           '    "docs:check": "beep docs check"',
           "  }",

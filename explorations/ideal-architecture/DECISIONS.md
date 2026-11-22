@@ -1580,7 +1580,7 @@ These were not put to me:
   into the annotated tag's message. The app's version is `apps/inventory/package.json`; the "(v0.6.1)" in
   `README.md` names the version that was submitted and is never moved.
 
-Changed later on 2026-11-22, and not put to me:
+After the review of 2026-11-22 the agent changed these, and I was not asked:
 
 - "Main" in every release rule is `origin/main`, fetched by the command itself, never the local `main`; a release is
   cut only from `main` exactly where the remote's is. A fetch that fails stops the release.

@@ -2,7 +2,8 @@ name: CI
 
 on:
   push:
-    # A release branch is checked as main is: a fix cherry-picked onto it is green before its tag is pushed.
+    # A release branch is checked as main is, and this check passing on a tagged head is what starts the release
+    # (deploy.yml).
     branches: [main, "release/**"]
   pull_request:
 
@@ -27,13 +28,14 @@ jobs:
         with:
           bun-version-file: .bun-version
       - run: bun install --frozen-lockfile
-      # Through turbo: type-check, lint, fast and slow tests, the production build, format and docs checks.
+      # Through turbo: type-check, lint, fast and slow tests, the production build, format and docs checks: `check:full`
+      # without the review model's proofs, its search and its other long tests, which the `proofs` job below runs.
       # The runner has four cores. Turbo would start ten tasks at once and each test run a worker per core, which
       # made tests several times slower than they are and failed them on their limits; two tasks at a time with one
       # test worker each is what four cores carry (measured: docs/standards/engineering.md, "The check on CI").
       # `--continue` runs every task even after one fails, so a red run lists everything that is wrong.
       - name: Check, test and build
-        run: bun run check:full -- --summarize --continue --concurrency=2
+        run: bun run check:ci -- --summarize --continue --concurrency=2
         env:
           VITEST_MAX_WORKERS: 1
       # The data grid's typing, in a real browser: what is typed on a cell is what is stored. The runner image has
@@ -49,3 +51,56 @@ jobs:
           bun run --cwd apps/inventory grid:keys
         env:
           CHROME_PATH: /usr/bin/google-chrome
+
+  # The review's model, apart from the job above: its proofs, the search of the whole model, the property that holds it
+  # against the review region (`fold`) and a sample of its mutants. Each is a turbo task that names what it reads: the
+  # proofs, the search and the mutants rerun when the model's files, its stories or proofs, the mutants, the kernel,
+  # the pinned library or a version the lockfile resolves for the package change; the fold reruns on any change to
+  # the web package or what it imports. Turbo's results come back from the last run on main through GitHub's cache
+  # and are saved only on main, so a pull request that leaves those alone replays them in seconds. Every night they
+  # run again with every mutant (proofs-nightly.yml).
+  proofs:
+    name: Proofs and search of the model
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      # The key is made of turbo's own hashes of the tasks, asked for without running them. So an exact hit means
+      # turbo will replay every one, and there is nothing new to keep; any other run starts from the newest results
+      # kept on main and proves what changed.
+      - name: Ask turbo what the results are filed under
+        id: filed
+        run: |
+          bunx turbo run prove verify fold mutants:sample --dry=json > "$RUNNER_TEMP/proofs.json"
+          node -e '
+            const { tasks } = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"))
+            const real = tasks.filter((task) => task.command !== "<NONEXISTENT>")
+            if (real.length === 0) throw new Error("no package has any of these tasks")
+            console.log("key=proofs-" + real.map((task) => task.hash).join("-"))
+          ' "$RUNNER_TEMP/proofs.json" >> "$GITHUB_OUTPUT"
+      - name: Bring back the results kept on main
+        id: results
+        uses: actions/cache/restore@v6
+        with:
+          path: .turbo/cache
+          key: ${{ steps.filed.outputs.key }}
+          restore-keys: |
+            proofs-
+      # Two tasks at a time and no more: the runner has four cores and each proof file starts its own solver.
+      - name: Prove, search, fold and a sample of the mutants
+        run: bunx turbo run prove verify fold mutants:sample --cache-dir=.turbo/cache --concurrency=2 --summarize
+      # Only what passed is kept (a failed step ends the job before this one), only from main, and only when the
+      # results are new.
+      - name: Keep the results for later runs
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.results.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: .turbo/cache
+          key: ${{ steps.filed.outputs.key }}

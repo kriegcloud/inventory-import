@@ -45,6 +45,11 @@ didn't": a messy file in, what is wrong fixed in the app, a clear account of the
       new page, and replace it without a word.
     - Import, while rows wait on lines, first asks "Import 155 items?", and only after that says nothing was imported
       because the rows wait.
+    - When somebody else confirms the import and opens it again while this screen is behind, a decision she picks
+      on a line can be let go without a word, if an older answer then says the import is closed and that confirm
+      wrote the same value; a colleague's decision made after the reopening stands.
+    - A row taken up from a closed tab, beside a save of hers whose answer was lost, can be said as "decided since by
+      someone else or another tab" when only she decided it.
   - **For whoever changes the code.** `tags:check` and `refs:check` read a file within a budget and refuse one past
     it in words; a file built to kill the parser behind text their scan misreads still kills the check, which then
     fails (`goals/atoms/PLAN.md` names the shapes). The kept form of a held row is a tagged union whose cases are

@@ -35,6 +35,7 @@
     "deps:outdated": "syncpack update --check",
     "proofs": "turbo run prove verify fold mutants:sample",
     "proofs:nightly": "turbo run prove verify fold mutants",
+    "release": "bun packages/tooling/tool/cli/src/bin.ts release cut",
     "deps:update": "bun packages/tooling/tool/cli/src/bin.ts deps update",
     "version-sync": "bun packages/tooling/tool/cli/src/bin.ts version-sync",
     "config-sync": "bun packages/tooling/tool/cli/src/bin.ts config-sync",

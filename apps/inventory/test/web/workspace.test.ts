@@ -14,7 +14,6 @@ import { progressKey } from "@inventory/review/SavedProgress"
 import { openPage, signedInAs } from "./support/page.ts"
 
 // A cold start of the app's modules, on a busy machine.
-vi.setConfig({ testTimeout: 20_000 })
 
 // Drawn on a server, where no effect runs: what a component mounts is told as it is drawn.
 const drawing = vi.hoisted(() => ({ mounted: [] as Array<unknown> }))

@@ -36,7 +36,6 @@ vi.mock("../../../../packages/access/web/src/internal/authClient.ts", () => ({
 }))
 
 // A cold start of the app's modules, on a busy machine.
-vi.setConfig({ testTimeout: 20_000 })
 
 const settle = Effect.sleep("30 millis")
 

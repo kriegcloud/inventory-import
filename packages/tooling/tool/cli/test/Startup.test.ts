@@ -25,7 +25,10 @@ import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 const budgetCpuMs = 700
 
 /** One start, timed by bash: what it used of the processor, in milliseconds, and how it ended. */
-const script = 'LC_ALL=C; TIMEFORMAT="cpu %3U %3S"; time bun src/bin.ts --version >/dev/null 2>&1; echo "exit $?"'
+// Each start is stopped after 20 s on the clock (`timeout`, exit 124): a start that hangs is a failed start, not a
+// test that waits out its limit.
+const script =
+  'LC_ALL=C; TIMEFORMAT="cpu %3U %3S"; time timeout 20 bun src/bin.ts --version >/dev/null 2>&1; echo "exit $?"'
 
 const milliseconds = (seconds: string) => Math.round(Number(seconds) * 1000)
 
@@ -55,7 +58,7 @@ const starts = (
       )
 
 layer(NodeServices.layer, { excludeTestServices: true })("the CLI's start-up", (it) => {
-  // The timeout is for a machine that gives the starts no processor at all for minutes; it is not the budget.
+  // The limit is not the budget: five starts of at most 20 s each, so 120 s fails a hung CLI well inside the job.
   it.effect(
     "a command that does nothing starts within the budget, in processor time",
     () =>
@@ -65,6 +68,6 @@ layer(NodeServices.layer, { excludeTestServices: true })("the CLI's start-up", (
         const fastest = A.reduce(runs, Number.POSITIVE_INFINITY, (least, run) => Order.min(Num.Order)(least, run.cpuMs))
         expect(fastest).toBeLessThan(budgetCpuMs)
       }),
-    600_000
+    120_000
   )
 })

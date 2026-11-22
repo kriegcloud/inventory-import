@@ -9,20 +9,27 @@ import { limits } from "../../../vitest.shared.ts"
 const prove = ["test/**/*.prove.test.ts"]
 const verify = ["test/**/*.verify.test.ts"]
 
+// Each project keeps its own module cache: turbo starts the fast tests, the proofs and the search side by side, and
+// each would empty another's folder (../../../vitest.shared.ts says why). The one above them holds only what vitest
+// knows of the lockfile.
+const cache = (name: string) => ({ fsModuleCachePath: `node_modules/.vitest-cache/${name}` })
+
 export default defineConfig({
   test: {
     ...limits,
+    fsModuleCachePath: "node_modules/.vitest-cache",
     projects: [
       {
         extends: true,
         test: {
           name: "fast",
           include: ["test/**/*.test.ts"],
-          exclude: [...configDefaults.exclude, ...prove, ...verify]
+          exclude: [...configDefaults.exclude, ...prove, ...verify],
+          ...cache("fast")
         }
       },
-      { extends: true, test: { name: "prove", include: prove } },
-      { extends: true, test: { name: "verify", include: verify } }
+      { extends: true, test: { name: "prove", include: prove, ...cache("prove") } },
+      { extends: true, test: { name: "verify", include: verify, ...cache("verify") } }
     ]
   }
 })

@@ -236,15 +236,16 @@ package's task and replays it when nothing it reads has changed. The app's own s
 | Root command | What it does |
 | --- | --- |
 | `bun run dev` | Applies local migrations and the test accounts, then serves the app and API on http://localhost:5173, signed in by itself as the first test account |
-| `bun run check` | The loop check through turbo: type-check with Effect diagnostics, lint (with the two design lints), the fast tests, the format check, `docs:check`, the key scan (`keys:check`), the vendored-kit hash check (`vendor:check`), which package may import which (`boundaries:check`), the two stylesheet lists (`screens:check`), every `ref` a DOM ref or a callback that stays the same across draws (`refs:check`), no `_tag` compared or built by hand in any src or test folder (`tags:check`), no deprecated API used, read from every file's types (`deprecated:check`; `docs/standards/deprecated-apis.md`), the root's own configuration files type-check (`configs:check`) and the Effect imports (`imports:check`; `imports:fix` repairs code), every version written in more than one place equal to its one source (`version-sync`) and the configuration that follows from the workspaces (`config-sync:check`), `bun.lock` holding what every package.json asks for (`lockfile:check`), and no home path or private folder in the scratchpad (`private-paths:check`). Before every commit |
+| `bun run check` | The loop check through turbo: type-check with Effect diagnostics, lint (with the two design lints), the fast tests, the proofs of the review's model (`prove`: half a minute when they run, replayed by turbo until the model's own files or the pinned library change), the format check, `docs:check`, the key scan (`keys:check`), the vendored-kit hash check (`vendor:check`), which package may import which (`boundaries:check`), the two stylesheet lists (`screens:check`), every `ref` a DOM ref or a callback that stays the same across draws (`refs:check`), no `_tag` compared or built by hand in any src or test folder (`tags:check`), no deprecated API used, read from every file's types (`deprecated:check`; `docs/standards/deprecated-apis.md`), the root's own configuration files type-check (`configs:check`) and the Effect imports (`imports:check`; `imports:fix` repairs code), every version written in more than one place equal to its one source (`version-sync`) and the configuration that follows from the workspaces (`config-sync:check`), `bun.lock` holding what every package.json asks for (`lockfile:check`), and no home path or private folder in the scratchpad (`private-paths:check`). Before every commit |
 | `bun run beep <group> <command>` | One of the repository's own rules by hand: `bun run beep laws boundaries`, `bun run beep quality ceilings`, `bun run beep vendor check`; `--help` on any of them lists its flags. `bun run check` runs them all under their root script names (`boundaries:check`, `vendor:check` and the rest) |
-| `bun run check:full` | `check` plus the slow tests (`*.slow.test.ts`) and the production build. CI runs it |
+| `bun run check:full` | `check` plus Verify's search of the whole model (`verify`: two minutes when it runs), the property that holds the model against the review region (`fold`: a minute and a half), a sample of the model's mutants (`mutants:sample`: under a minute), the slow tests (`*.slow.test.ts`: workerd, D1, sign-in) and the production build. The model's tasks are replayed by turbo until what they read changes |
+| `bun run check:ci` | What CI's main job runs: `check:full` without the model's proofs, search, fold and mutants. CI runs those in a job of their own (`proofs` in `ci.yml`, `bun run proofs`, turbo's results restored from the last run on `main`), and every night with nothing replayed and every mutant (`bun run proofs:nightly`, `.github/workflows/proofs-nightly.yml`) |
 | `bun run build` | The production build through turbo |
-| `bun run test` | Every test, fast and slow (Vitest, Node) |
+| `bun run test` | Every test: fast, the proofs, the search and slow (Vitest, Node). Not the fold or the mutants: `bun run proofs` |
 | `bun run format` | oxfmt, writes files: `bun run format -- <files>` for only yours, since a bare run rewrites every file. `format:check` only reports |
 | `bun run deps:update` | Moves every dependency of every package to its newest version, except the ones `.syncpackrc.json` holds back (each is named with its reason and how to move it), runs `version-sync -- --write`, then `bun install` once, and says what moved from which version to which; a failed install puts every file back. `-- --dry-run` lists the moves and writes nothing. `deps:lint` and `deps:outdated` (syncpack) read the same packages and the same held list |
 | `bun run version-sync` | Names every place where a version or a date differs from its one source (`.bun-version`, `engines.node`, the `effect` the packages state, the app's `wrangler.jsonc` and the rest) and fails. `-- --write` rewrites them, `-- --dry-run` lists what would be written. `docs/sync-commands.md` has every source and what is left alone |
-| `bun run config-sync` | Writes what follows from the workspaces: syncpack's sources, tsconfig references, each package's scripts, the paths that depend on a package's depth, the root tasks the two checks run; installs when it wrote a package.json. `config-sync:check` only compares, `-- --dry-run` lists what would be written |
+| `bun run config-sync` | Writes what follows from the workspaces: syncpack's sources, tsconfig references, each package's scripts, the paths that depend on a package's depth, the root tasks the three checks (`check`, `check:full`, `check:ci`) run; installs when it wrote a package.json. `config-sync:check` only compares, `-- --dry-run` lists what would be written |
 | `bun run scratch:new <name> --template <probe\|service\|screen\|verify>` | Starts an experiment in `scratchpad/experiments/<name>` from a template whose test already passes. `scratch:test [name]` runs the experiments' tests, or one experiment's folder only (Vitest, Node); `scratch:check` holds the scratchpad's own rules (no install inside an experiment, a note for each) and runs the type-checker with the Effect diagnostics; `scratch:list` shows what is open with its age; `scratch:serve experiments/<name>` serves a screen on the first free port from 5273; `scratch:graduate <name> --to <path> --learned "<line>"` or `scratch:drop <name> --learned "<line>"` ends one. `bun run check`, the build and CI never read the scratchpad (`docs/scratchpad.md`) |
 | `bun run docs:check` | Checks that `docs/`, `explorations/` and `goals/` are Open Knowledge Format bundles (the OKF skill's validator). Needs bash |
 | `bun run db:reset` | Deletes the local database and re-applies migrations. **Restart `bun run dev` afterwards.** |
@@ -316,9 +317,11 @@ packages/catalog/        The catalog context (items and the imports that write t
                         schemas of items, staged files, decisions, changes, suggestions and results, and the imports,
                         items and assistant groups), model/ (the pure rules the screen and the server both run: the
                         review, suggestions, the table view's checks, sheet layout, upload pieces; the six ports, their
-                        in-memory twins and what each endpoint does: no SQL, no HTTP), host/ (the D1 adapters, the model
-                        and the allowance as the catalog asks them) and web/ (the import's steps, the Items page, the
-                        editor, the assistant, the upload).
+                        in-memory twins and what each endpoint does: no SQL, no HTTP; and the review as a model of
+                        `@alchemy.run/domain`, in memory only: the `Import`, `Row` and `Group` aggregates, the four
+                        decisions that record an act on two of them, their stories and their proofs, docs/verify.md), host/ (the D1 adapters, the
+                        model and the allowance as the catalog asks them) and web/ (the import's steps, the Items page,
+                        the editor, the assistant, the upload).
 packages/kernel/, packages/drivers/   @inventory/kernel and the @beep drivers (d1, better-auth, openrouter).
 packages/infra/          @beep/infra: what is deployed, per stage. The stage plan as a schema and a pure function
                         (`StagePlan.rules.ts`: what each stage gets, decided from its name), the app's Alchemy stack
@@ -355,7 +358,7 @@ scratchpad/             A folder beside the workspaces, not one of them, where a
 tsconfig.json           References every package's tsconfig.test.json and tsconfig.config.json, so a linter that reads
                         types and an editor find a test's project. Nothing compiles it. `bun run config-sync` writes
                         its list from the packages' projects.
-turbo.json              The task graph: seven package tasks and the root tasks (the repository's own rules, one each).
+turbo.json              The task graph: twelve package tasks and the root tasks (the repository's own rules, one each).
 .agents/                Skills (see above). Not application code; the check ignores it.
 ```
 
@@ -419,6 +422,47 @@ this repo, check it in `node_modules/effect/src/` or the guides in `node_modules
   `bun run check` refuses both, in every src and test folder (`tags:check`).
 - `bun run typecheck` catches wiring mistakes (a missing Layer shows as a type error in `worker.ts`). Run it early.
 - A route beside the HttpApi (a frame document, a stream) has its own shape: pattern 6 in `docs/patterns.md`.
+
+### The model's blocks: what Verify reads
+
+The review is also a model of `@alchemy.run/domain` (`packages/catalog/model`: `Import/Import.aggregate.ts`,
+`Row/Row.aggregate.ts`, `Group/Group.aggregate.ts`, the four `Review/*.decision.ts`, `Catalog.model.ts`). Verify proves
+its rules from the code of `decide` and `evolve`, so that code is written for two readers. Before changing one of
+those files, read [docs/verify.md](docs/verify.md).
+
+- **`new` only where a `decide` is**: files named `*.aggregate.ts` and `*.decision.ts` build events and rejections with
+  `new`, with `// @effect-diagnostics newSchemaClass:off` as their first line. The prover does not read `X.make(...)`
+  there. Everywhere else, tests included, `.make`.
+- **A case is told with `effect/Match`**, in a guard written once beside the schema (`isOpen`, `isDecided`); the prover
+  does not read a schema's `guards` or `match`. **A state is built by its case's own `make`, with the status written
+  out** (`ImportState.cases.Open.make({ status: "Open", ... })`): the prover sees only what `make` is given. A state's
+  union is keyed by `status`.
+- **A rule is one comparison.** The prover takes both sides of every `&&`, `||` and `?:` it cannot settle, in the code
+  and in every rule a decision reads; past 4,096 paths it proves nothing. The proof tests state each decision's paths.
+  A relation of the model is proved across each decision too, with paths of its own that no proof test states: a
+  `decide` that asks the same thing of its command twice (`cmd.covered`, then `cmd.covered` again after other checks)
+  doubles them, and the relation is then only searched, which fails `verify`. Ask once, and branch.
+- **An aggregate's rule reads only what its own commands' middleware provides.** `Row` and `Group` have no command, so
+  the rules about who may change a row or a group are rules of each decision that records on it, under the same
+  name in each. A new decision that records on one states them too, and its proof calls the check that it
+  does, as the four do (`missingRules` in `test/proving.ts`, which runs only where a proof calls it): ours, because the lock and the list of rules that must stay proved take its
+  rules as they are written, and nothing in the library asks whose act a decision records.
+- **Annotate `keyOf`'s parameter** in a decision (`keyOf: (cmd: DecideRow) => ...`): without it the parameters of
+  `decide` are `any`, and a typo in one passes the type-check.
+- **Which rules there are, and that each stays proved, is the library's**: the lock (below), and Verify's
+  `require: { proved }` in `test/Catalog.verify.test.ts`, given the lock's rules of the kinds a proof covers. A proof
+  file (`Prove.report`, `Prove.decisionReport`) takes neither, so each has a check of ours: every rule its report
+  names is proved. A model's invariant is only searched, and a `sometimes` rule says only that one sequence gets
+  there.
+- **Every check a `decide` makes has a mutant** (`packages/catalog/model/mutants/`): a change that removes it, and one
+  for each field of a new event, which a proof or a story must notice. A new check without one is a gap the nightly
+  cannot see; how to add one is in that folder's README.
+- **The rules as written are locked** (`test/Catalog.lock.json`, written by Verify): a rule taken out or whose text
+  changed fails `bun run --cwd packages/catalog/model verify`, and in CI so does a rule the file does not list. To
+  change a rule on purpose, run that once with `UPDATE_VERIFY_LOCK=1` and commit the file. Never set it to make a
+  failing run pass, and never edit the file by hand.
+- **A model's task names what it reads** (`packages/catalog/model/turbo.json`): a file a block of the model imports
+  from outside those inputs is added there, or its change replays an old proof.
 
 ### What the type-check enforces
 

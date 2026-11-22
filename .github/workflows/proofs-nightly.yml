@@ -1,0 +1,99 @@
+name: Proofs, every night
+
+# Every proof of the review's model, the search of the whole model, the property that holds it against the review
+# region, and every mutant of it, again with nothing replayed, once a night and on request. The job in ci.yml replays
+# each result until what it reads changes, and runs only a sample of the mutants; these jobs do not, so what changed
+# under them (the runner's image, a solver that answers otherwise) shows here. A failure of either job opens one
+# issue, or adds a comment to it while it is open. GitHub turns a schedule off, without a word, after 60 days in which
+# a public repository had no commit: turn it on again from the Actions tab, or with `gh workflow enable`.
+on:
+  schedule:
+    - cron: "23 8 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One at a time, and a run that has started is never cancelled by the next.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  proofs:
+    name: The proofs, the search and the fold, nothing replayed
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      # The step has its own limit, shorter than the job's: a step that runs out of time fails, and the step below
+      # then opens the issue; a job that runs out of time is cancelled, and nothing after it runs.
+      - name: Prove, search and fold, nothing replayed
+        timeout-minutes: 100
+        run: bunx turbo run prove verify fold --force --concurrency=2 --summarize
+      - name: Open the issue, or add to it
+        if: failure()
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const label = "proofs-nightly"
+            const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            const body = `The nightly run of the model's proofs and search failed: ${run}`
+            // The list holds pull requests too: only an issue is commented on.
+            const open = await github.rest.issues.listForRepo({ ...context.repo, labels: label, state: "open", per_page: 100 })
+            const issue = open.data.find((item) => item.pull_request === undefined)
+            if (issue !== undefined) {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: issue.number, body })
+            } else {
+              await github.rest.issues.create({ ...context.repo, title: "The nightly proofs failed", body, labels: [label] })
+            }
+
+  # Every mutant of the model (packages/catalog/model/mutants/README.md): 154 changes, each run against its proof and
+  # the stories. Measured on a busy workstation for the first 148, four at a time: 5,402 s of test time in 24 minutes, one of them
+  # (a check of DecideRow removed) 20 minutes alone. On this runner, four cores each about half as fast, four at a
+  # time: about an hour, and the step's limit leaves room for twice that.
+  mutants:
+    name: Every mutant of the model, nothing replayed
+    runs-on: ubuntu-latest
+    timeout-minutes: 260
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - name: Run every mutant, nothing replayed
+        timeout-minutes: 240
+        run: bunx turbo run mutants --force --summarize -- --jobs 4
+      - name: Open the issue, or add to it
+        if: failure()
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const label = "proofs-nightly"
+            const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            const body = `The nightly run of the model's mutants failed: ${run}`
+            // The list holds pull requests too: only an issue is commented on.
+            const open = await github.rest.issues.listForRepo({ ...context.repo, labels: label, state: "open", per_page: 100 })
+            const issue = open.data.find((item) => item.pull_request === undefined)
+            if (issue !== undefined) {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: issue.number, body })
+            } else {
+              await github.rest.issues.create({ ...context.repo, title: "The nightly proofs failed", body, labels: [label] })
+            }

@@ -1565,10 +1565,16 @@ const twoOn = Effect.fnUntraced(function* (
   const live = liveReview({ side, rows: () => rows, recheck: undefined, touching })
   for (const [actor, action] of presses) yield* live.press(actor, action, how)
   const apart = yield* verdict(side, live.expected)
+  // The instances read back from the model after the last press, once the story has run: not the test's own record.
+  const read = yield* A.last(side.readings).pipe(Effect.fromOption, Effect.orDie)
+  const instances = yield* decoded(read)
   return {
     translation: live.apart,
     answered: O.isSome(O.getOrElse(A.last(live.expected), () => O.none())),
-    last: A.filter(apart, (line) => Str.startsWith(`press ${presses.length - 1},`)(line))
+    last: A.filter(apart, (line) => Str.startsWith(`press ${presses.length - 1},`)(line)),
+    // What each row reads as on the model after the last press, and each group act as the model holds it.
+    folded: flagsOf(fold(instances)),
+    groups: instances.groups
   }
 })
 
@@ -1594,6 +1600,41 @@ it.effect(
         expect(run.answered).toBe(true)
         expect(run.translation).toEqual([])
       }
+    })
+)
+
+// Where the model and today's `act` part on purpose (Benjamin, 2026-11-22: "Row 14 stays whole"). A group is taken
+// back; a row someone decided after it keeps that person's whole decision, the group's effect included, and the
+// screen names it. Today's `act` would instead put back what the row held before the group, and lose the later
+// decision. The model is what was chosen: the review region's `act` is what changes, at the move that puts the
+// review on the model. So the property compares only where one shared history has an answer, and here it has none.
+it.effect(
+  "row 14 stays whole: a group taken back leaves a row decided since as its decider made it, the group's effect included",
+  () =>
+    Effect.gen(function* () {
+      const rows = [
+        ReviewRow.make({
+          id: "row-14",
+          line: 14,
+          cells: { a: "x", b: "x", c: "x" },
+          problem: Problem.make({ kind: "unit", column: "a", fix: unitFix("a", "X", "g") })
+        })
+      ]
+      const presses: ReadonlyArray<readonly [Actor, Action]> = [
+        [ana, { type: "acceptGroup", groupId: "g", except: [] }],
+        [dana, { type: "edit", rowId: "row-14", column: "b", value: "KG" }],
+        [ana, { type: "undo" }]
+      ]
+      const run = yield* twoOn(rows, presses, right)
+      // Ana's undo took the group out of force on the model (change 3), and the group's accept stays on row 14,
+      // inside the decision Dana made over it.
+      expect(A.map(run.groups, (group) => ({ change: group.change, undoneAt: group.undoneAt }))).toEqual([
+        { change: 1, undoneAt: 3 }
+      ])
+      expect(run.folded).toEqual({ "row-14": { accepted: ["a"], edits: { b: "KG" } } })
+      // One shared history has no answer: its undo would write Ana's step over Dana's later decision.
+      expect(run.answered).toBe(false)
+      expect(run.translation).toEqual([])
     })
 )
 

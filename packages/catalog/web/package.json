@@ -38,7 +38,8 @@
   "scripts": {
     "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json && beep-cli quality strict strict-ceiling.json",
     "lint": "oxlint --quiet src; lint=$?; oxlint --disable-nested-config --deny-warnings -c ../../../.oxlintrc.shadcn.json src && exit $lint",
-    "test": "vitest run"
+    "test": "vitest run --project fast",
+    "fold": "vitest run --project fold"
   },
   "dependencies": {
     "@beep/csv": "workspace:*",

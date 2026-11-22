@@ -691,6 +691,36 @@ it.effect(
     )
 )
 it.effect(
+  "a press sent twice is answered as the first time when a group act landed between: Dana types 8 on row 14, Ana accepts a group, and Dana's screen sends the press again",
+  () =>
+    story(
+      Story.given(life, staged),
+      Story.provide(CurrentActor, dana),
+      Story.when(act({ row: "row-14", step: "d1", saw: 0, sawGroup: 0, covered: false, flags: typedEight })),
+      Story.then(row14, decided({ change: 1, by: "dana", step: "d1", flags: typedEight })),
+      Story.then(life, counted({ change: 1, step: "d1", by: "dana", flags: typedEight, row: "row-14" })),
+      Story.provide(CurrentActor, ana),
+      Story.when(group({ seen: 1, rows: "row-3,row-20", count: 2 })),
+      Story.then(g1, groupDecided({ change: 2, rows: "row-3,row-20", count: 2 })),
+      Story.then(life, groupCounted({ change: 2, rows: 2 })),
+      // The answer to Dana's 8 was lost, and the copy cannot have seen Ana's group. The row holds that very press:
+      // nothing more is recorded, and her screen is not told to hold a press that is on the row already.
+      Story.provide(CurrentActor, dana),
+      Story.when(act({ row: "row-14", step: "d1", saw: 0, sawGroup: 0, covered: false, flags: typedEight })),
+      Story.then(row14),
+      Story.then(life),
+      // Any other press from the screen that has not received the group is still refused and held: under a new
+      // step, with another text, or from someone else.
+      Story.when(act({ row: "row-14", step: "d2", saw: 0, sawGroup: 0, covered: false, flags: typedEight })),
+      Story.rejected(GroupedSince.make({})),
+      Story.when(act({ row: "row-14", step: "d1", saw: 0, sawGroup: 0, covered: false, flags: leftOut })),
+      Story.rejected(GroupedSince.make({})),
+      Story.provide(CurrentActor, ana),
+      Story.when(act({ row: "row-14", step: "d1", saw: 0, sawGroup: 0, covered: false, flags: typedEight })),
+      Story.rejected(GroupedSince.make({}))
+    )
+)
+it.effect(
   "a covered press sent twice is written once and answered the same: Ana's group leaves row 14 out, Dana types 8 on it, and her screen sends the press again",
   () =>
     story(

@@ -55,35 +55,70 @@ export const ruleOfWhoMayChange: Readonly<Record<string, ReadonlyArray<string>>>
   GroupUndone: ["NobodyUndoesAnotherPersonsGroup", "OnlyItsOwnOrganizationChangesTheGroup", "AViewerChangesNoGroup"]
 }
 
-/** The rules about who may change an instance that a decision recording this event must state, or none. */
-export const whoMayChange = (event: string): ReadonlyArray<string> =>
-  O.getOrElse(R.get(ruleOfWhoMayChange, event), () => A.empty<string>())
+/**
+ * What the check below reads of a decision: the events its command may record, and each aggregate it reads with the
+ * commands and the events that aggregate has. All of it is the library's own, as the decision's class holds it.
+ */
+export interface RecordingDecision {
+  readonly command: { readonly events: ReadonlyArray<{ readonly tag: string }> }
+  readonly reads: Readonly<
+    Record<
+      string,
+      {
+        readonly definition: {
+          readonly commands: ReadonlyArray<unknown>
+          readonly events: ReadonlyArray<{ readonly tag: string }>
+        }
+      }
+    >
+  >
+}
+
+/**
+ * The events a decision records on an aggregate that has no command of its own: taken from the decision's command and
+ * from the aggregates it reads, never typed where the check is called, so a name cannot be left out or misspelt there.
+ */
+export const recordsWithNoCommand = (decision: RecordingDecision): ReadonlyArray<string> =>
+  A.dedupe(
+    A.flatMap(R.values(decision.reads), (aggregate) =>
+      A.isReadonlyArrayNonEmpty(aggregate.definition.commands)
+        ? []
+        : A.filter(
+            A.map(aggregate.definition.events, (event) => event.tag),
+            (tag) => A.some(decision.command.events, (event) => event.tag === tag)
+          )
+    )
+  )
 
 /**
  * What a decision's report lacks: for each aggregate it reads, at least one rule of that aggregate (so an
- * aggregate whose rules the prover reads no names from shows), and, for each event it records on a row or a group
- * (`records`, the names of its command's events), the rules about who may change it that the decision must state
- * itself. Empty when nothing is missing.
+ * aggregate whose rules the prover reads no names from shows), and, for each event it records on an aggregate with
+ * no command of its own (a row, a group), the rules about who may change it that the decision must state itself. An
+ * event of that kind with no entry in `ruleOfWhoMayChange` is missing too: the list cannot fall behind a new event.
+ * Empty when nothing is missing.
  *
  * Ours, and no rule's standing: the lock and `require.proved` hold the rules a decision has, but only as written, and
  * nothing in the library asks whether a decision that records on a Row or a Group says whose act it records. A Row or
  * a Group has no command, so no middleware of its own: a decision added later that records on one
  * and states none of these would lock and prove, and let anyone change the row.
  */
-export const missingRules = (decision: {
-  readonly report: Prove.DecisionReport
-  readonly records: ReadonlyArray<string>
+export const missingRules = (proof: {
+  readonly report: Pick<Prove.DecisionReport, "reads" | "rules">
+  readonly decision: RecordingDecision
 }): ReadonlyArray<string> => [
-  ...A.flatMap(decision.report.reads, (read) =>
-    A.some(decision.report.rules, (rule) => Str.startsWith(`${read.aggregate}.`)(rule.name))
+  ...A.flatMap(proof.report.reads, (read) =>
+    A.some(proof.report.rules, (rule) => Str.startsWith(`${read.aggregate}.`)(rule.name))
       ? []
       : [`no rule of ${read.aggregate}`]
   ),
-  ...A.map(
-    A.filter(
-      A.dedupe(A.flatMap(decision.records, whoMayChange)),
-      (name) => !A.some(decision.report.rules, (rule) => rule.name === name)
-    ),
-    (name) => `does not state ${name}`
+  ...A.flatMap(recordsWithNoCommand(proof.decision), (event) =>
+    O.match(R.get(ruleOfWhoMayChange, event), {
+      onNone: () => [`no rule of who may change is listed for ${event}`],
+      onSome: (names) =>
+        A.map(
+          A.filter(names, (name) => !A.some(proof.report.rules, (rule) => rule.name === name)),
+          (name) => `does not state ${name}`
+        )
+    })
   )
 ]

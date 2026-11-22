@@ -20,19 +20,20 @@ Nothing a person sees uses the model yet, and nothing is stored through it.
 
 ## What is proved, and what tests hold
 
-Three kinds of rule, and one thing no rule says. Which rules there are is kept by the lock file (below).
+Three kinds of rule, and one thing no rule says. Which rules there are is kept by the lock file (below); the counts
+in this table are the lock's, by whose rule it is, and a test holds them (`test/Proving.test.ts`).
 
 | | Rules | How far each is known to hold |
 | --- | --- | --- |
 | The import's own (`Import`) | 37 | Proved for every state and every input, for each of its seven commands and for all four decisions |
 | The row's own (`Row`) | 6 | Proved, for both decisions that record on a row |
-| An act on a group's own (`Group`) | 9 | Proved, for both decisions that record on a group |
+| An act on a group's own (`Group`) | 10 | Proved, for both decisions that record on a group |
 | An act on a row (`DecideRow`) | 26 | Proved |
-| Its undo (`UndoRowStep`) | 21 | Proved |
-| An act on a group (`DecideGroup`) | 21 | Proved |
-| Its undo (`UndoGroup`) | 13 | Proved |
+| Its undo (`UndoRowStep`) | 28 | Proved |
+| An act on a group (`DecideGroup`) | 20 | Proved |
+| Its undo (`UndoGroup`) | 14 | Proved |
 | Between an import and one row, or one group | 2 | Proved: every decision that records on both keeps it |
-| Over every import, row and group at once | 7 | Searched: every sequence of up to three commands, and 200 longer walks. Never proved |
+| Over every import, row and group at once | 8 | Searched: every sequence of up to three commands, and 200 longer walks. Never proved |
 | That each command can be taken | 11 | Reached: one sequence of commands was found that gets there. Not a proof, and it says nothing of any other sequence |
 
 **A proved rule says what never happens.** It is proved from the code of `decide` and `evolve`, for every state the
@@ -40,7 +41,7 @@ schemas and the invariants allow and every input, not sampled by a test.
 
 **No rule says that a valid act is taken.** A `decide` that refused everything would keep all 143. That an act is
 recorded, with the events it should record, is held by tests: the stories (`test/Review.story.test.ts` and
-`test/Group.story.test.ts`, 63 of them, one at least for each of the eleven commands), and the property that drives
+`test/Group.story.test.ts`, 65 of them, one at least for each of the eleven commands), and the property that drives
 the model with the review region's own presses (`packages/catalog/web/test/ReviewModelFold.fold.test.ts`). The eleven
 "can be taken" rules close part of the gap inside Verify: a command no sequence reaches fails the search. They are a
 search three commands deep.
@@ -106,7 +107,9 @@ group is refused naming the group, and taken once the group is taken back" shows
   holds. `DecideRow` therefore says the last undo its screen has of the row (`sawUndone`), and a press that does not
   have it records nothing.
 - The same press sent again after a match landed is answered as the first time on a row no group covers too: the row
-  holds that very act, and the copy is not told it was made on an older matching.
+  holds that very act, and the copy is not told it was made on an older matching. So is the same press sent again
+  after an act on a group, or a confirm and a reopening, landed between the two sendings, as an undo's copy is: it
+  is known by the row holding it (this step, from this person, with this text on the matching it was made on).
 - A row's undo is made on the matching now, as a row's act is: it puts another person's decision back on the row,
   and from a screen that has not received a match it is refused `MatchedSince` and held.
 - `GroupedAfter` carries the import's last group in force, the one to take back first. For a row's undo that is the
@@ -151,8 +154,11 @@ Two more tasks hold the model, both in `bun run check:full`:
   the rows a press changed. With two people, two numbers in five that press on one row press on a row the other
   person's last press wrote, so presses meet on the same rows; and four in ten are first sent from a screen that has
   not received the other person's last act, or any of their acts since its own: the model refuses them
-  (`GroupedSince`, `DecidedSince`, `PutBackSince`, `NoLongerThere`, `UndoneSince`, `ReviewMovedOn`) or answers "no
-  change", nothing is recorded, and the screen catches up and sends them again. A group's undo from such a screen is
+  (`GroupedSince`, `DecidedSince`, `PutBackSince`, `NoLongerThere`, `UndoneSince`, `ReviewMovedOn`, `NotYourStep`) or
+  answers "no change", nothing is recorded, and the screen catches up and sends them again. Such a press says what
+  that screen saw, and for a row's act whether a group covers the row and whether the press leaves it reading as it
+  reads, from what that screen holds. A row's undo is sent from one only behind a group act, or behind another
+  person's decision made over the sender's on that row; not behind an undo on the row. A group's undo from such a screen is
   taken, as `UndoGroup` names nothing seen. Its tallies say how often the seed reached each case, a covered row's "no
   change" (`asItReads`) and a group taken back behind a later row act on its rows included.
 - `bun run --cwd packages/catalog/model mutants:sample`: a few of the model's mutants. A mutant is one change to a
@@ -342,8 +348,10 @@ and an undo states those two and that nobody takes back another person's ("nobod
 could not fail in a decision that always leaves one there, and is not stated in it). A row and a group have no
 command and so no middleware: without those rules nothing says whose act the decision records, and the lock and
 `require` would take a decision without them as it is written. Whoever adds one writes them, as `CLAUDE.md` says,
-and calls `missingRules` in its proof with the events its command records, as the four do: the check runs only where
-a proof calls it. It stays, named as ours (Benjamin, 2026-11-22: "Keep
+and calls `missingRules` in its proof with the decision itself, as the four do: the check runs only where a proof
+calls it. Which events it asks about is read from the decision's command and from the aggregates it reads (an event
+recorded on an aggregate that has no command), and an event of that kind with no rules listed for it is reported
+too, so nothing is typed where the check is called. It stays, named as ours (Benjamin, 2026-11-22: "Keep
 it, named as ours"): "no hand-written assertions" means no hand-written list of rule names or of how each stands.
 
 - Outside CI, a new rule is added to the file when `verify` runs: commit the file with the rule.

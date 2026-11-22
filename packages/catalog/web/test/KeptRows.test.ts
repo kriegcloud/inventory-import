@@ -38,6 +38,8 @@ import {
   rowsOnHold,
   shownDecisions
 } from "../src/ReviewDraft.atoms.ts"
+import { noticeWords } from "../src/internal/notices.ts"
+import { dismissNotice, notices } from "../src/Notices.atoms.ts"
 import { importNo, registryFor, viewAt } from "./support/catalog.ts"
 
 // The browser: its storage, which outlives a page, the tab's own storage (every page here is one tab, loaded again),
@@ -150,7 +152,14 @@ const keyOf = (id: ImportId, memberId: string, organizationId = "org_prairie") =
 const page = (
   id: ImportId,
   signedIn = dana,
-  server: { signedOut: boolean; removed: boolean; view?: ImportView; askHangs?: boolean } = {
+  server: {
+    signedOut: boolean
+    removed: boolean
+    /** The organization a read that answers not found looked in: the session's, which another tab may have switched. */
+    in?: string
+    view?: ImportView
+    askHangs?: boolean
+  } = {
     signedOut: false,
     removed: false
   }
@@ -168,7 +177,10 @@ const page = (
         get: () =>
           server.removed
             ? Effect.fail(
-                ImportNotFound.make({ reason: "It is gone.", organizationId: OrganizationId.make("org_prairie") })
+                ImportNotFound.make({
+                  reason: "It is gone.",
+                  organizationId: OrganizationId.make(server.in ?? "org_prairie")
+                })
               )
             : server.view === undefined
               ? Deferred.await(Deferred.makeUnsafe<ImportView>())
@@ -291,7 +303,7 @@ describe("the waiting rows this browser keeps", () => {
       t.registry.set(importView(id), viewAt({ id, revision: 6, status: "imported", decisions: { "row-2": out } }))
       yield* settle
       expect(t.saves.length).toBe(2)
-      expect(t.registry.get(rowsLeftOver(id))).toEqual(O.some({ "row-3": O.some(out) }))
+      expect(t.registry.get(rowsLeftOver(id))).toEqual(O.some({ rows: { "row-3": O.some(out) }, beside: {} }))
       expect(R.has(browser.kept, keyOf(id, "mem_dana"))).toBe(true)
       // The result names them; when it is left, nothing of them is kept.
       const naming = t.registry.mount(namingLeftOver(id))
@@ -499,7 +511,7 @@ describe("rows on hold and the values seen, through the browser's storage", () =
 const marcus = person("mem_marcus", "org_prairie")
 const keptDecision = decisionFromFlags({ kept: true })
 
-describe("the third check of round one, through the runner", () => {
+describe("a waiting row, whose it is and when it may go, through the runner", () => {
   it.live(
     "a row that waits is not checked by the view the step finds when drawn again: the import is asked, and its answer holds a decision made since (redraw-skips-g2)",
     () =>
@@ -598,18 +610,25 @@ describe("the third check of round one, through the runner", () => {
       Effect.gen(function* () {
         emptyStorage()
         const id = importNo(74)
-        const server: { signedOut: boolean; removed: boolean; view?: ImportView } = { signedOut: false, removed: false }
+        const server = { signedOut: false, removed: false, in: "org_northline" }
         const t = page(id, dana, server)
         t.open(viewAt({ id, revision: 4 }))
+        t.registry.mount(notices)
         yield* settle
         t.decide("row-2")
         yield* settle
         expect(R.has(browser.kept, keyOf(id, "mem_dana"))).toBe(true)
-        // Another tab switched the session's organization: this one's read of the import answers not found.
+        // Another tab switched the session's organization: this one's read of the import answers not found there.
         server.removed = true
         importView(id).askAgain(t.registry)
         yield* settle
-        expect([R.has(browser.kept, keyOf(id, "mem_dana")), t.asked.times > 0]).toEqual([true, true])
+        // Everything stays, the row and its place on the screen; only who is signed in is asked.
+        expect([
+          R.has(browser.kept, keyOf(id, "mem_dana")),
+          t.asked.times > 0,
+          t.registry.get(shownDecisions(id)),
+          t.registry.get(notices)
+        ]).toEqual([true, true, O.some({ "row-2": out }), []])
       })
   )
 
@@ -828,6 +847,121 @@ describe("the third check of round one, through the runner", () => {
         t.registry.set(t.asking, false)
         yield* settle
         expect([t.commits, R.has(browser.kept, keyOf(id, "mem_dana"))]).toEqual([[], true])
+      })
+  )
+})
+
+describe("an import removed meanwhile (the rows kept for it, named; Benjamin, 2026-11-21)", () => {
+  /** What this page says to whoever is signed in, as they read it. */
+  const says = (t: ReturnType<typeof page>) => A.map(t.registry.get(notices), noticeWords)
+
+  it.live(
+    "page start: its kept rows are let go and named, row by row, to the member they belong to, until dismissed (forget-erases-unnamed)",
+    () =>
+      Effect.gen(function* () {
+        emptyStorage()
+        const id = importNo(83)
+        const first = page(id)
+        first.open(viewAt({ id, revision: 4, fileName: "items_messy.csv" }))
+        yield* settle
+        first.decide("row-31")
+        first.decide("row-12")
+        yield* settle
+        // A colleague removes the import; the page is loaded again.
+        browser.listeners["beforeunload"] = []
+        const gone = { signedOut: false, removed: true }
+        const again = page(id, dana, gone)
+        again.registry.mount(askBeforeLeaving)
+        again.registry.mount(notices)
+        yield* settle
+        const said = [
+          {
+            title: "items_messy.csv was removed",
+            text: "Your decisions on it that were not saved went with it. Row 12: you left out; Row 31: you left out."
+          }
+        ]
+        expect([leaving(), R.has(browser.kept, keyOf(id, "mem_dana")), says(again)]).toEqual([false, false, said])
+        // Not to Marcus, on the same tab; and to Dana again after a reload, until she dismisses it.
+        const other = page(id, marcus, gone)
+        other.registry.mount(notices)
+        const reloaded = page(id, dana, gone)
+        reloaded.registry.mount(notices)
+        yield* settle
+        expect([says(other), says(reloaded)]).toEqual([[], said])
+        reloaded.registry.set(dismissNotice, reloaded.registry.get(notices)[0]!)
+        const after = page(id, dana, gone)
+        after.registry.mount(notices)
+        yield* settle
+        expect([says(reloaded), says(after)]).toEqual([[], []])
+      })
+  )
+
+  it.live(
+    "page start: not found in another organization than the rows' erases nothing, and the question before leaving stays (forget-after-org-switch)",
+    () =>
+      Effect.gen(function* () {
+        emptyStorage()
+        const id = importNo(84)
+        const first = page(id)
+        first.open(viewAt({ id, revision: 4 }))
+        yield* settle
+        first.decide("row-2")
+        yield* settle
+        browser.listeners["beforeunload"] = []
+        // Another tab switched the session to Northline after this page's session had answered Prairie.
+        const again = page(id, dana, { signedOut: false, removed: true, in: "org_northline" })
+        again.registry.mount(askBeforeLeaving)
+        again.registry.mount(notices)
+        yield* settle
+        expect([leaving(), R.has(browser.kept, keyOf(id, "mem_dana")), says(again)]).toEqual([true, true, []])
+      })
+  )
+
+  it.live(
+    "while its page is open: what waits and what is on hold is named and let go, and nothing asks before the page is left (removed-while-open)",
+    () =>
+      Effect.gen(function* () {
+        emptyStorage()
+        browser.listeners["beforeunload"] = []
+        const id = importNo(85)
+        const server = {
+          signedOut: false,
+          removed: false,
+          view: viewAt({ id, revision: 4, fileName: "items_messy.csv" })
+        }
+        const t = page(id, dana, server)
+        t.registry.mount(askBeforeLeaving)
+        t.registry.mount(notices)
+        t.open(viewAt({ id, revision: 4, fileName: "items_messy.csv" }))
+        yield* settle
+        // Row 3 is refused (on hold), row 2 waits after a failed save.
+        t.decide("row-3")
+        yield* settle
+        yield* Deferred.fail(
+          t.saves[0]!.answer,
+          ImportNotFound.make({ reason: "No.", organizationId: OrganizationId.make("org_prairie") })
+        )
+        yield* settle
+        t.decide("row-2")
+        yield* settle
+        yield* Deferred.fail(t.saves[1]!.answer, HttpApiError.InternalServerErrorProblem.make({}))
+        yield* settle
+        expect([leaving(), says(t)]).toEqual([true, []])
+        const asked = t.asked.times
+        server.removed = true
+        importView(id).askAgain(t.registry)
+        yield* settle
+        expect([leaving(), R.has(browser.kept, keyOf(id, "mem_dana")), t.asked.times - asked, says(t)]).toEqual([
+          false,
+          false,
+          0,
+          [
+            {
+              title: "items_messy.csv was removed",
+              text: "Your decisions on it that were not saved went with it. Row 2: you left out; Row 3: you left out."
+            }
+          ]
+        ])
       })
   )
 })

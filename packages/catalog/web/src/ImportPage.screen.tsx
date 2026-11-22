@@ -1,4 +1,4 @@
-import { useAtomValue } from "@effect/atom-react"
+import { useAtomMount, useAtomValue } from "@effect/atom-react"
 import * as O from "effect/Option"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as Atom from "effect/reactivity/Atom"
@@ -19,7 +19,7 @@ import {
   StepperTrigger
 } from "@inventory/ui/components/stepper"
 import { member } from "@inventory/client/MemberAtoms"
-import { importTable, importViewShown } from "./Imports.atoms.ts"
+import { followRemoval, importTable, importViewShown } from "./Imports.atoms.ts"
 import { isNarrow } from "@inventory/ui/ContentWidth"
 import { location, navigate } from "@inventory/ui/Route"
 import { resultOf } from "./internal/result.ts"
@@ -43,6 +43,9 @@ const steps = [
 ] as const
 type Step = (typeof steps)[number]["value"]
 
+/** What the page follows while the address names no import: nothing. */
+const nothingToFollow = Atom.readable((): void => undefined)
+
 /** What the steps read while the address names no import: nothing, and never asked for. */
 const noImport = Atom.make(AsyncResult.initial<never, never>())
 
@@ -57,6 +60,8 @@ export function ImportPage() {
   const actor = O.getOrUndefined(signedIn)
   // The server enforces this. The screen mirrors it so nobody is offered a button that will be refused.
   const canImport = actor !== undefined && hasRole(actor.role, "editor")
+  // Found removed: what the person's tabs kept for it is let go and named, above the page.
+  useAtomMount(importId === undefined ? nothingToFollow : followRemoval(importId))
   const viewRead = useAtomValue(importId === undefined ? noImport : importViewShown(importId))
   const tableRead = useAtomValue(importId === undefined ? noImport : importTable(importId))
   const view = resultOf(viewRead)

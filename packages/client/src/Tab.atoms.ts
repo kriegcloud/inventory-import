@@ -48,6 +48,15 @@ const newId = (): string => {
  */
 export const lockOf = (tab: string): string => `inventory-tab:${tab}`
 
+/**
+ * The lock another tab holds (shared) while it takes up what the tab of this id kept, believing it gone. The tab takes
+ * it whole, once, before its id is its own: a take-up that had begun is over by then, so what it kept is read by one of
+ * the two, never both; and one that begins later finds the tab's own lock held.
+ *
+ * @example takingOf("6f1c…") // "inventory-taking:6f1c…"
+ */
+export const takingOf = (tab: string): string => `inventory-taking:${tab}`
+
 /** The browser's locks, or none where it has none (an old browser, a test). */
 export const browserLocks = (): LockManager | undefined =>
   typeof navigator === "undefined" || navigator.locks === undefined ? undefined : navigator.locks
@@ -55,7 +64,9 @@ export const browserLocks = (): LockManager | undefined =>
 /**
  * This tab's id, once it is the tab's own: none until the tab holds its lock. A tab opened as a copy of another (its
  * storage copied, the id with it) finds the lock held and takes a new id, so two open tabs never share one, and nothing
- * is kept or counted under the copied id. Where the browser has no locks, the kept id (or a new one) at once.
+ * is kept or counted under the copied id. A tab that loads while another is taking up what it kept (it counted as
+ * gone: the browser had discarded it) waits for that to be over first (`takingOf`). Where the browser has no locks, the
+ * kept id (or a new one) at once.
  */
 export const thisTab: Atom.Atom<O.Option<string>> = Atom.readable((get): O.Option<string> => {
   const first = O.getOrElse(keptId(), newId)
@@ -68,10 +79,9 @@ export const thisTab: Atom.Atom<O.Option<string>> = Atom.readable((get): O.Optio
           ? Effect.runPromise(Effect.succeed("taken" as const))
           : // Held for the page's life; the id is the tab's own from now on. Said after this read has returned.
             Effect.runPromise(
-              Effect.yieldNow.pipe(
-                Effect.andThen(Effect.sync(() => get.setSelf(O.some(tab)))),
-                Effect.andThen(Effect.never)
-              )
+              Effect.promise(() =>
+                locks.request(takingOf(tab), { mode: "exclusive" }, () => Effect.runPromise(Effect.void))
+              ).pipe(Effect.andThen(Effect.sync(() => get.setSelf(O.some(tab)))), Effect.andThen(Effect.never))
             )
       )
       .then((answer) => {

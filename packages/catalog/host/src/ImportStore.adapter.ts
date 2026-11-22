@@ -87,16 +87,19 @@ const textOf = (item: ItemFields | null): number =>
       A.reduce(item.vendors, 0, (total, vendor) => total + vendor.vendorName.length + 120)
 
 /**
- * Splits rows into groups for one statement each: at most `chunkRows` rows and about 600,000 characters of text,
- * so the JSON a statement carries stays well under D1's 2 MB limit on a value however long the cells are.
+ * Splits rows into groups, each at most `most` rows and about 600,000 characters of text (`size` says a row's), so the
+ * JSON a group travels as stays well under D1's 2 MB limit on a value however long the cells are.
  */
-const bySize = <A>(rows: ReadonlyArray<A>, size: (row: A) => number): ReadonlyArray<ReadonlyArray<A>> => {
+const grouped = <A>(
+  rows: ReadonlyArray<A>,
+  options: { readonly size: (row: A) => number; readonly most: number }
+): ReadonlyArray<ReadonlyArray<A>> => {
   const groups: Array<Array<A>> = []
   let current: Array<A> = []
   let weight = 0
   for (const row of rows) {
-    const cost = size(row) + 200
-    if (current.length > 0 && (current.length >= chunkRows || weight + cost > 600_000)) {
+    const cost = options.size(row)
+    if (current.length > 0 && (current.length >= options.most || weight + cost > 600_000)) {
       groups.push(current)
       current = []
       weight = 0
@@ -107,6 +110,27 @@ const bySize = <A>(rows: ReadonlyArray<A>, size: (row: A) => number): ReadonlyAr
   if (current.length > 0) groups.push(current)
   return groups
 }
+
+/** Rows grouped for one statement each: at most `chunkRows` of them, counting the JSON around their text. */
+const bySize = <A>(rows: ReadonlyArray<A>, size: (row: A) => number): ReadonlyArray<ReadonlyArray<A>> =>
+  grouped(rows, { size: (row) => size(row) + 200, most: chunkRows })
+
+/** The pieces a list of plain texts (keys, ids) travels in. */
+const textPieces = (texts: ReadonlyArray<string>): ReadonlyArray<ReadonlyArray<string>> =>
+  grouped(texts, { size: (text) => text.length + 3, most: 5000 })
+
+/** Decisions as they travel to SQL, in pieces. */
+const decisionPieces = (set: Readonly<Record<string, RowDecision>>) =>
+  grouped(
+    A.map(R.toEntries(set), ([rowId, json]) => ({ rowId, json })),
+    {
+      size: ({ rowId, json }) =>
+        rowId.length +
+        200 +
+        A.reduce(R.toEntries(json.edits), 0, (sum, [field, text]) => sum + field.length + text.length),
+      most: 2000
+    }
+  )
 
 const HeadJson = S.fromJsonString(StagedHead)
 const RowsJson = StagedRow.pipe(S.Array, S.fromJsonString)
@@ -562,38 +586,123 @@ export const ImportStoreD1 = Layer.effect(
       }
     }, Effect.orDie)
 
+    // -- The lists a write carries --------------------------------------------------------------------------------
+    //
+    // D1 binds at most 100 values to a statement and holds at most 2 MB in one, and a file may have 50,000 rows
+    // (`maxStagedRows`), so no statement binds a value per piece of a list. The lists a save, a match and a confirm
+    // carry are put into `importWriteList` first, a piece to a statement; the statements that need a whole list read
+    // it back (3 values bound, however long it is); the last statement deletes them. It is one batch, so nobody sees
+    // them and a batch that fails leaves none.
+    //
+    // What each statement of those three batches binds, for a file of any length:
+    //
+    //   a piece put (putPiece)        6 = write, list, seq, piece, org, import
+    //   the guard (itemsAsRead)      20 = items under the keys 5 (org, keys 3, found), each item read 3, created rows
+    //                                     counted 3 and each 3, suggestions counted 3 and each 3
+    //   openChoices                  22 = the guard 20, org, import
+    //   bumpRevision                 31 = org, import, choices, the guard 20, sets 3, clears 5 (org, import, 3)
+    //   upsertDecisions              31 = import, org, actor, name, at, sets 3, sameChoices 23 (3 and the guard)
+    //   clearDecisions               28 = org, import, clears 3, sameChoices 23
+    //   matchedLine                  30 = 6 of the line, org, import, revision, choices, the guard 20
+    //   insertBatch                  29 = 6 of the confirm's row, org, import, revision, the guard 20
+    //   saveChoice 9, closeDraft 6, countBatch 10, importedLine 14, openRevision 2, dropLists 2
+    //   one per piece: rewriteDecisions 6, saveAtConfirm 8, clearAtConfirm 5, insertItems 9, keepReplaced 7,
+    //     replaceItems 7, insertOutcomes 13, insertChanges 9; a read of stored items by key (findStored) 2
+    //
+    // What grows with the file is how many statements a batch has, never what one binds: 31 at most, at 50,000 rows as
+    // at one. At 50,000 rows a list is put in 25 statements (decisions set) or 10 (cleared, keys, items found, each
+    // 50,000 created rows); texts long enough to pass 600,000 characters a piece make more of them. Every other
+    // statement here binds a fixed handful, its rows (if any) as one JSON value (a take-back's confirms, at most 10).
+    type ListName = "sets" | "clears" | "keys" | "items" | "created" | "suggestions"
+    const Put = { org: OrganizationId, id: S.String, write: S.String, seq: S.Int }
+    const putPiece = (
+      list: ListName,
+      r: {
+        readonly org: string
+        readonly id: string
+        readonly write: string
+        readonly seq: number
+        readonly piece: string
+      }
+    ) => sql`INSERT INTO importWriteList (organizationId, importId, writeId, list, seq, piece)
+      SELECT organizationId, id, ${r.write}, ${list}, ${r.seq}, ${r.piece} FROM importDraft
+      WHERE organizationId = ${r.org} AND id = ${r.id}`
+    const putSets = D1.statement({
+      Request: S.Struct({ ...Put, piece: DecisionEntries }),
+      Result: NoRows,
+      execute: (r) => putPiece("sets", r)
+    })
+    const putClears = D1.statement({
+      Request: S.Struct({ ...Put, piece: IdList }),
+      Result: NoRows,
+      execute: (r) => putPiece("clears", r)
+    })
+    const putKeys = D1.statement({
+      Request: S.Struct({ ...Put, piece: IdList }),
+      Result: NoRows,
+      execute: (r) => putPiece("keys", r)
+    })
+    const putItems = D1.statement({
+      Request: S.Struct({ ...Put, piece: ItemsRead }),
+      Result: NoRows,
+      execute: (r) => putPiece("items", r)
+    })
+    const putCreated = D1.statement({
+      Request: S.Struct({ ...Put, piece: CreatedRead }),
+      Result: NoRows,
+      execute: (r) => putPiece("created", r)
+    })
+    const putSuggestions = D1.statement({
+      Request: S.Struct({ ...Put, piece: IdList }),
+      Result: NoRows,
+      execute: (r) => putPiece("suggestions", r)
+    })
+    const dropLists = D1.statement({
+      Request: S.Struct({ org: OrganizationId, write: S.String }),
+      Result: NoRows,
+      execute: (r) => sql`DELETE FROM importWriteList WHERE organizationId = ${r.org} AND writeId = ${r.write}`
+    })
+    // One of a write's lists, as a FROM clause and its condition: `j.value` is one value of it, `w` the piece it is in.
+    const inList = (org: string, write: string, list: ListName) => sql`importWriteList AS w, json_each(w.piece) AS j
+      WHERE w.organizationId = ${org} AND w.writeId = ${write} AND w.list = ${list}`
+
     // A decision differs from what is stored when the row has none yet, or a different one.
-    const differs = (org: string, id: string, entries: string) => sql`EXISTS (SELECT 1 FROM json_each(${entries}) j
-      WHERE NOT EXISTS (SELECT 1 FROM importDecision d WHERE d.organizationId = ${org} AND d.importId = ${id}
-        AND d.rowId = json_extract(j.value, '$.rowId') AND d.decisionJson = json_extract(j.value, '$.json')))`
-    const clears = (org: string, id: string, rowIds: string) => sql`EXISTS (SELECT 1 FROM importDecision
-      WHERE organizationId = ${org} AND importId = ${id} AND rowId IN (SELECT value FROM json_each(${rowIds})))`
-    // What a judgement of the decisions read (a match's, a save's, a confirm's), in pieces of 5,000 so no JSON value
-    // nears D1's limit: the keys it looked up and the items it found, each with its revision; the import's created rows;
-    // and its suggestions. `asked` 0 when the file's review was not asked: nothing was read, nothing is checked.
+    const differs = (org: string, write: string) => sql`EXISTS (SELECT 1 FROM ${inList(org, write, "sets")}
+      AND NOT EXISTS (SELECT 1 FROM importDecision d WHERE d.organizationId = w.organizationId
+        AND d.importId = w.importId AND d.rowId = json_extract(j.value, '$.rowId')
+        AND d.decisionJson = json_extract(j.value, '$.json')))`
+    const clears = (org: string, id: string, write: string) => sql`EXISTS (SELECT 1 FROM importDecision
+      WHERE organizationId = ${org} AND importId = ${id} AND rowId IN (SELECT j.value FROM ${inList(org, write, "clears")}))`
+    // What a judgement of the decisions read (a match's, a save's, a confirm's), counted; the keys it looked up, the
+    // items it found (each with its revision), the import's created rows and its suggestions are the write's lists.
+    // `asked` 0 when the file's review was not asked: nothing was read, nothing is checked, no list is put.
     const ItemsGuard = S.Struct({
+      write: S.String,
       asked: S.Int,
-      keys: S.Array(IdList),
-      items: S.Array(ItemsRead),
       found: S.Int,
-      created: S.Array(CreatedRead),
       createdCount: S.Int,
-      suggestions: S.Array(IdList),
       suggestionCount: S.Int
     })
-    const guardOf = (read: ItemsAsRead): typeof ItemsGuard.Type => ({
+    const guardOf = (write: string, read: ItemsAsRead): typeof ItemsGuard.Type => ({
+      write,
       asked: read.asked ? 1 : 0,
-      keys: A.chunksOf(read.keys, 5000),
-      items: A.chunksOf(read.items, 5000),
       found: read.items.length,
-      created: A.chunksOf(read.created, 5000),
       createdCount: read.created.length,
-      suggestions: A.chunksOf(read.suggestions, 5000),
       suggestionCount: read.suggestions.length
     })
-    // Every piece of a list read is still there: `there` says whether one value of the piece (`j.value`) is.
-    const eachThere = (pieces: ReadonlyArray<string>, there: Statement.Fragment): ReadonlyArray<Statement.Fragment> =>
-      A.map(pieces, (piece) => sql`NOT EXISTS (SELECT 1 FROM json_each(${piece}) AS j WHERE NOT ${there})`)
+    // The statements that put what a judgement read where the guard below reads it.
+    const putRead = (
+      scope: { readonly org: OrganizationId; readonly id: string; readonly write: string },
+      read: ItemsAsRead
+    ) =>
+      read.asked
+        ? [
+            ...A.map(textPieces(read.keys), (piece, seq) => putKeys({ ...scope, seq, piece })),
+            ...A.map(A.chunksOf(read.items, 5000), (piece, seq) => putItems({ ...scope, seq, piece })),
+            ...A.map(A.chunksOf(read.created, 5000), (piece, seq) => putCreated({ ...scope, seq, piece })),
+            ...A.map(A.chunksOf(read.suggestions, 5000), (piece, seq) => putSuggestions({ ...scope, seq, piece }))
+          ]
+        : []
     // What the judgement read of import `id` is still so: the organization's items under those keys exactly the ones
     // read, each still at the revision read (one edited, replaced, created or taken back since makes this false); the
     // import's created rows exactly those read (a take-back marks them); its suggestions exactly those read (a request
@@ -601,6 +710,8 @@ export const ImportStoreD1 = Layer.effect(
     // missed.
     const itemsAsRead = (org: string, id: string, guard: typeof ItemsGuard.Encoded) => {
       if (guard.asked === 0) return sql`1=1`
+      const eachThere = (list: ListName, there: Statement.Fragment) =>
+        sql`NOT EXISTS (SELECT 1 FROM ${inList(org, guard.write, list)} AND NOT ${there})`
       const created = sql`(SELECT COUNT(*) FROM importOutcome WHERE organizationId = ${org} AND importId = ${id}
         AND outcome = 'created') = ${guard.createdCount}`
       // Only the rows that read as a whole suggestion (`suggestionFromStored`: a column one with its column, any other
@@ -609,31 +720,27 @@ export const ImportStoreD1 = Layer.effect(
       const suggestions = sql`(SELECT COUNT(*) FROM importSuggestion WHERE organizationId = ${org}
         AND importId = ${id} AND (CASE WHEN kind = 'column' THEN columnIndex IS NOT NULL
           ELSE rowId <> '' AND rowNumber IS NOT NULL END)) = ${guard.suggestionCount}`
-      const items =
-        guard.keys.length === 0
-          ? sql`${guard.found} = 0`
-          : sql`(SELECT COUNT(*) FROM item WHERE organizationId = ${org} AND (${sql.or(
-              A.map(guard.keys, (keys) => sql`skuKey IN (SELECT value FROM json_each(${keys}))`)
-            )})) = ${guard.found}`
+      const items = sql`(SELECT COUNT(*) FROM item WHERE organizationId = ${org}
+        AND skuKey IN (SELECT j.value FROM ${inList(org, guard.write, "keys")})) = ${guard.found}`
       return sql.and([
         items,
-        ...eachThere(
-          guard.items,
-          sql`EXISTS (SELECT 1 FROM item i WHERE i.organizationId = ${org} AND i.id = json_extract(j.value, '$.id')
-            AND i.revision = json_extract(j.value, '$.revision'))`
+        eachThere(
+          "items",
+          sql`EXISTS (SELECT 1 FROM item i WHERE i.organizationId = w.organizationId
+            AND i.id = json_extract(j.value, '$.id') AND i.revision = json_extract(j.value, '$.revision'))`
         ),
         created,
-        ...eachThere(
-          guard.created,
-          sql`EXISTS (SELECT 1 FROM importOutcome o WHERE o.organizationId = ${org} AND o.importId = ${id}
-            AND o.outcome = 'created' AND o.rowNumber = json_extract(j.value, '$.rowNumber')
-            AND o.part = json_extract(j.value, '$.part'))`
+        eachThere(
+          "created",
+          sql`EXISTS (SELECT 1 FROM importOutcome o WHERE o.organizationId = w.organizationId
+            AND o.importId = w.importId AND o.outcome = 'created'
+            AND o.rowNumber = json_extract(j.value, '$.rowNumber') AND o.part = json_extract(j.value, '$.part'))`
         ),
         suggestions,
-        ...eachThere(
-          guard.suggestions,
-          sql`EXISTS (SELECT 1 FROM importSuggestion s WHERE s.organizationId = ${org} AND s.importId = ${id}
-            AND s.id = j.value)`
+        eachThere(
+          "suggestions",
+          sql`EXISTS (SELECT 1 FROM importSuggestion s WHERE s.organizationId = w.organizationId
+            AND s.importId = w.importId AND s.id = j.value)`
         )
       ])
     }
@@ -645,53 +752,35 @@ export const ImportStoreD1 = Layer.effect(
       sql`EXISTS (SELECT 1 FROM importDraft
       WHERE organizationId = ${org} AND id = ${id} AND status = 'open' AND choicesJson = ${choices})
       AND ${itemsAsRead(org, id, guard)}`
-    const DeltaRequest = S.Struct({
-      org: OrganizationId,
-      id: S.String,
-      choices: S.String,
-      sets: S.Array(DecisionEntries),
-      clears: S.Array(IdList),
-      ...ItemsGuard.fields
-    })
-    // Bumps the revision only when the delta changes something, before the writes below make it true.
+    // One save: the rows it sets and clears are its lists.
+    const SaveWrite = S.Struct({ org: OrganizationId, id: S.String, choices: S.String, ...ItemsGuard.fields })
+    // Bumps the revision only when the save changes something, before the writes below make it true.
     const bumpRevision = D1.statement({
-      Request: DeltaRequest,
+      Request: SaveWrite,
       Result: NoRows,
-      execute: (r) => {
-        const changes: ReadonlyArray<Statement.Fragment> = [
-          ...A.map(r.sets, (entries) => differs(r.org, r.id, entries)),
-          ...A.map(r.clears, (rowIds) => clears(r.org, r.id, rowIds))
-        ]
-        return sql`UPDATE importDraft SET revision = revision + 1
-          WHERE organizationId = ${r.org} AND id = ${r.id} AND status = 'open' AND choicesJson = ${r.choices}
-            AND ${itemsAsRead(r.org, r.id, r)} AND (${sql.or(changes)})`
-      }
+      execute: (r) => sql`UPDATE importDraft SET revision = revision + 1
+        WHERE organizationId = ${r.org} AND id = ${r.id} AND status = 'open' AND choicesJson = ${r.choices}
+          AND ${itemsAsRead(r.org, r.id, r)} AND (${differs(r.org, r.write)} OR ${clears(r.org, r.id, r.write)})`
     })
     const upsertDecisions = D1.statement({
-      Request: S.Struct({
-        ...Acting,
-        id: S.String,
-        choices: S.String,
-        entries: DecisionEntries,
-        at: S.String,
-        ...ItemsGuard.fields
-      }),
+      Request: S.Struct({ ...SaveWrite.fields, ...Acting, at: S.String }),
       Result: NoRows,
       // The same decision sent again leaves the row (and who made it) as it is.
       execute: (r) => sql`INSERT INTO importDecision (importId, organizationId, rowId, decisionJson, decidedById,
           decidedByName, updatedAt)
-        SELECT ${r.id}, ${r.org}, json_extract(value, '$.rowId'), json_extract(value, '$.json'), ${r.actor}, ${r.name},
-          ${r.at}
-        FROM json_each(${r.entries}) WHERE ${sameChoices(r.org, r.id, r.choices, r)}
+        SELECT ${r.id}, ${r.org}, json_extract(j.value, '$.rowId'), json_extract(j.value, '$.json'), ${r.actor},
+          ${r.name}, ${r.at}
+        FROM ${inList(r.org, r.write, "sets")} AND ${sameChoices(r.org, r.id, r.choices, r)}
         ON CONFLICT (organizationId, importId, rowId) DO UPDATE SET decisionJson = excluded.decisionJson,
           decidedById = excluded.decidedById, decidedByName = excluded.decidedByName, updatedAt = excluded.updatedAt
         WHERE importDecision.decisionJson IS NOT excluded.decisionJson`
     })
     const clearDecisions = D1.statement({
-      Request: S.Struct({ org: OrganizationId, id: S.String, choices: S.String, rowIds: IdList, ...ItemsGuard.fields }),
+      Request: SaveWrite,
       Result: NoRows,
       execute: (r) => sql`DELETE FROM importDecision WHERE organizationId = ${r.org} AND importId = ${r.id}
-        AND rowId IN (SELECT value FROM json_each(${r.rowIds})) AND ${sameChoices(r.org, r.id, r.choices, r)}`
+        AND rowId IN (SELECT j.value FROM ${inList(r.org, r.write, "clears")})
+        AND ${sameChoices(r.org, r.id, r.choices, r)}`
     })
     const openRevision = D1.statement({
       Request: Scope,
@@ -701,9 +790,10 @@ export const ImportStoreD1 = Layer.effect(
     })
 
     // The open draft's revision and choices, and whether the stored items the save's judgement read are still so.
+    const OpenChoices = S.Array(S.Struct({ revision: S.Int, choicesJson: S.String, itemsSame: S.Int }))
     const openChoices = D1.statement({
       Request: S.Struct({ ...Scope.fields, ...ItemsGuard.fields }),
-      Result: S.Array(S.Struct({ revision: S.Int, choicesJson: S.String, itemsSame: S.Int })),
+      Result: OpenChoices,
       execute: (
         r
       ) => sql`SELECT revision, choicesJson, CASE WHEN ${itemsAsRead(r.org, r.id, r)} THEN 1 ELSE 0 END AS itemsSame
@@ -719,12 +809,8 @@ export const ImportStoreD1 = Layer.effect(
       const at = yield* now
       const org = actor.organizationId
       const choices = draft.choicesJson
-      const guard = guardOf(read)
-      const sets = A.chunksOf(
-        A.map(R.toEntries(delta.set), ([rowId, json]) => ({ rowId, json })),
-        2000
-      )
-      const cleared = A.chunksOf(delta.clear, 5000)
+      const sets = decisionPieces(delta.set)
+      const cleared = textPieces(delta.clear)
       if (sets.length + cleared.length === 0) {
         const open = yield* run(openRevision({ org, id: draft.id }))
         return O.match(A.head(open), {
@@ -732,31 +818,33 @@ export const ImportStoreD1 = Layer.effect(
           onSome: (row) => decisionsSaved({ revision: row.revision, changed: false })
         })
       }
+      const write = yield* random.uuidV4()
+      const scope = { org, id: draft.id, write }
+      const save = { ...scope, choices, ...guardOf(write, read) }
       // The revision is read, then moved, and only for a delta that changes something; read again right after, it is
       // the revision these decisions are saved under, and a higher one than before says this save is what moved it.
       // The writes after it change no revision. One batch: nobody else's save can fall between the two reads, and
       // every write in it holds only while the choices and the stored items are those the save was judged against.
-      const [before, , after] = yield* batch([
-        openChoices({ org, id: draft.id, ...guard }),
-        bumpRevision({ org, id: draft.id, choices, sets, clears: cleared, ...guard }),
-        openRevision({ org, id: draft.id }),
-        ...A.map(sets, (entries) =>
-          upsertDecisions({ ...acting(actor), id: draft.id, choices, entries, at, ...guard })
-        ),
-        ...A.map(cleared, (rowIds) => clearDecisions({ org, id: draft.id, choices, rowIds, ...guard }))
+      const answers = yield* batch([
+        ...A.map(sets, (piece, seq) => putSets({ ...scope, seq, piece })),
+        ...A.map(cleared, (piece, seq) => putClears({ ...scope, seq, piece })),
+        ...putRead(scope, read),
+        openChoices(save),
+        bumpRevision(save),
+        openChoices({ ...save, asked: 0 }),
+        upsertDecisions({ ...save, ...acting(actor), at }),
+        clearDecisions(save),
+        dropLists({ org, write })
       ])
-      return O.match(A.head(before), {
-        onNone: () => decisionsClosed,
-        onSome: (was) =>
-          was.choicesJson !== choices
-            ? decisionsRematched
-            : was.itemsSame !== 1
-              ? decisionsItemsChanged
-              : O.match(A.head(after), {
-                  onNone: () => decisionsClosed,
-                  onSome: (row) => decisionsSaved({ revision: row.revision, changed: row.revision > was.revision })
-                })
-      })
+      // Only the two reads answer rows: the open draft's, before the revision was moved and after.
+      const [before, after] = A.flatten(answers)
+      return before === undefined || after === undefined
+        ? decisionsClosed
+        : before.choicesJson !== choices
+          ? decisionsRematched
+          : before.itemsSame !== 1
+            ? decisionsItemsChanged
+            : decisionsSaved({ revision: after.revision, changed: after.revision > before.revision })
     }, Effect.orDie)
 
     const ReopenRequest = S.Struct({
@@ -968,9 +1056,9 @@ export const ImportStoreD1 = Layer.effect(
       // batch write nothing, and the match is worked out again, at most `draftTries` times (then `busy`).
       const attempt = (triesLeft: number): Effect.Effect<ChoicesSaved> =>
         Effect.gen(function* () {
-          const read = yield* findDraft({ org, id: draft.id })
-          if (O.isNone(read) || read.value.status !== "open") return "closed" as const
-          const current = read.value
+          const found = yield* findDraft({ org, id: draft.id })
+          if (O.isNone(found) || found.value.status !== "open") return "closed" as const
+          const current = found.value
           const before = yield* S.decodeEffect(ChoicesJson)(current.choicesJson)
           // Choices that are already so are not a change: no audit line and no new revision.
           if (A.some(before, (old) => old.field === choice.field && old.column === choice.column)) {
@@ -1000,22 +1088,24 @@ export const ImportStoreD1 = Layer.effect(
             detail: `${detail}${takenBackWords(took)}`,
             at
           }
-          const guard = guardOf(O.getOrElse(plan.read, () => noItemsRead))
-          const rewrites = A.chunksOf(
-            A.map(R.toEntries(plan.rewrites), ([rowId, json]) => ({ rowId, json })),
-            2000
-          )
-          const [, saved] = yield* batch([
-            matchedLine({ ...request, ...guard }),
+          const read = O.getOrElse(plan.read, () => noItemsRead)
+          const scope = { org, id: draft.id, write: activity }
+          const answers = yield* batch([
+            ...putRead(scope, read),
+            matchedLine({ ...request, ...guardOf(activity, read) }),
             saveChoice({
               ...request,
               choices: plan.choices,
               moves: plan.moves,
               takenBack: withTakeBacks({ kept, added: took })
             }),
-            ...A.map(rewrites, (entries) => rewriteDecisions({ org, id: draft.id, activity, entries }))
+            ...A.map(decisionPieces(plan.rewrites), (entries) =>
+              rewriteDecisions({ org, id: draft.id, activity, entries })
+            ),
+            dropLists({ org, write: activity })
           ])
-          if (saved.length > 0) return "saved" as const
+          // Only the draft's own update answers a row, and only when this batch was the match.
+          if (A.flatten(answers).length > 0) return "saved" as const
           if (triesLeft <= 1) return "busy" as const
           return yield* attempt(triesLeft - 1)
         }).pipe(Effect.orDie)
@@ -1030,12 +1120,10 @@ export const ImportStoreD1 = Layer.effect(
       organizationId: OrganizationId,
       keys: ReadonlyArray<string>
     ) {
-      // The keys travel as one JSON value per 5,000, so the statement never nears D1's 100 bound parameters.
-      const found = yield* Effect.forEach(
-        A.chunksOf(keys, 5000),
-        (some) => findStored({ org: organizationId, keys: some }),
-        { concurrency: 1 }
-      )
+      // The keys travel as one JSON value per piece, each piece its own statement of two bound values.
+      const found = yield* Effect.forEach(textPieces(keys), (some) => findStored({ org: organizationId, keys: some }), {
+        concurrency: 1
+      })
       return A.map(A.flatten(found), storedItem)
     }, Effect.orDie)
 
@@ -1297,15 +1385,12 @@ export const ImportStoreD1 = Layer.effect(
         ),
         (change) => change.from.length + change.to.length + (change.basis ?? "").length + change.sku.length
       )
-      const sets = A.chunksOf(
-        A.map(R.toEntries(write.unsaved.set), ([rowId, json]) => ({ rowId, json })),
-        2000
-      )
-      const cleared = A.chunksOf(write.unsaved.clear, 5000)
-      const [confirmed] = yield* batch([
-        insertBatch({ ...scope, expected: write.expected, ...guardOf(write.read) }),
-        ...A.map(sets, (entries) => saveAtConfirm({ ...scope, entries })),
-        ...A.map(cleared, (rowIds) => clearAtConfirm({ ...scope, rowIds })),
+      const lists = { org: audit.org, id: write.draft, write: write.confirm }
+      const answers = yield* batch([
+        ...putRead(lists, write.read),
+        insertBatch({ ...scope, expected: write.expected, ...guardOf(write.confirm, write.read) }),
+        ...A.map(decisionPieces(write.unsaved.set), (entries) => saveAtConfirm({ ...scope, entries })),
+        ...A.map(textPieces(write.unsaved.clear), (rowIds) => clearAtConfirm({ ...scope, rowIds })),
         closeDraft(scope),
         ...A.map(items, (chunk) => insertItems({ ...scope, items: chunk })),
         ...A.map(replacements, (chunk) => keepReplaced({ ...scope, items: chunk })),
@@ -1313,10 +1398,11 @@ export const ImportStoreD1 = Layer.effect(
         ...A.map(outcomes, (chunk) => insertOutcomes({ ...scope, outcomes: chunk })),
         ...A.map(changes, (chunk) => insertChanges({ ...scope, changes: chunk })),
         countBatch(scope),
-        importedLine({ ...scope, activity: audit.id, fileName: write.fileName })
+        importedLine({ ...scope, activity: audit.id, fileName: write.fileName }),
+        dropLists(lists)
       ])
-      // The first statement returns the confirm's id only when this batch was the one that confirmed the import.
-      if (confirmed.length > 0) return confirmWritten
+      // Only the confirm's own row and the close answer one, and only when this batch confirmed the import.
+      if (A.flatten(answers).length > 0) return confirmWritten
       // Nothing was written. Still open at another revision: the draft moved on. Still open at the revision the confirm
       // was made on: a stored item its judgement read changed (revisions only go up, so the draft never came back).
       const open = yield* run(openRevision({ org: audit.org, id: write.draft }))

@@ -45,18 +45,32 @@ export interface StaleAccept {
 }
 
 /**
- * Why one of the person's rows is held, neither sent nor shown as standing (Benjamin, 2026-11-20, group 3): the
- * server refused it, with its sentence; or it waited, and was decided otherwise since by someone else or another tab
- * (`theirs`, what the server holds now, followed picture by picture), and the person picks which stands; or a tab of
- * theirs that is gone had decided it otherwise than this tab (`thisTab`, this tab's decision; `mine` is the gone
- * tab's), and the person picks which stands ("Hold it, show both, ask").
+ * Why one of the person's rows has a line above the review (Benjamin, 2026-11-20, group 3): the server refused this
+ * tab's decision of it, with its sentence; or this tab's decision waited, and was decided otherwise since by someone
+ * else or another tab (`theirs`, what the server holds now, followed picture by picture), and the person picks which
+ * stands; or this tab's decision is as it was (waiting, on its way or saved), and a tab of theirs that is gone had
+ * decided the row otherwise (`HeldRow.closed`), and the person picks which stands ("Hold it, show both, ask").
  */
 export type Hold = Data.TaggedEnum<{
   Refused: { readonly reason: string }
   Elsewhere: { readonly theirs: O.Option<RowDecision> }
-  OtherTab: { readonly thisTab: O.Option<RowDecision> }
+  OtherTab: {}
 }>
 export const Hold = Data.taggedEnum<Hold>()
+
+/**
+ * A decision of a row that a tab of the person's that is gone made and the server has not taken, on the row's line
+ * beside this tab's own until the person picks ("Keep both, she picks", Benjamin, 2026-11-21): never sent, and never
+ * let go, by itself.
+ */
+export interface ClosedTab {
+  readonly decision: O.Option<RowDecision>
+  readonly madeOn: number
+  /** The values the server may have of the row from that tab (`Draft.seen`): none where that is not known. */
+  readonly seen: O.Option<ReadonlyArray<O.Option<RowDecision>>>
+  /** The server's sentence, where it refused this decision in that tab: it is then never sent by a pick. */
+  readonly refused: O.Option<string>
+}
 
 /** One match's take-back as the draft reads it: the revision the match wrote, and the rows it names. */
 export interface TakenBackAt {
@@ -64,11 +78,37 @@ export interface TakenBackAt {
   readonly rows: ReadonlyArray<string>
 }
 
-/** One of the person's rows on hold: their decision, the revision it was made on, and why it is held. */
+/**
+ * One row's line above the review: this tab's decision of it, the revision that was made on, why the line is there,
+ * and every other decision of the row still alive from tabs of the person's that are gone. A line `Hold.OtherTab` has
+ * at least one of those; each differs from this tab's and from the others.
+ */
 export interface HeldRow {
   readonly mine: O.Option<RowDecision>
   readonly madeOn: number
   readonly why: Hold
+  readonly closed: ReadonlyArray<ClosedTab>
+}
+
+/**
+ * Which decision of a row's line the person picked: this tab's (`Mine`); what the server holds, which lets the
+ * person's go (`Theirs`: "Keep theirs", and "Dismiss" of a refused row alone); or a closed tab's, named by the decision
+ * itself, since the decisions on one line all differ.
+ */
+export type Keep = Data.TaggedEnum<{
+  Mine: {}
+  Theirs: {}
+  Closed: { readonly decision: O.Option<RowDecision> }
+}>
+export const Keep = Data.taggedEnum<Keep>()
+
+/**
+ * Decisions of the person's to be named, row by row: one of each row, and beside it whatever else of the same row was
+ * alive (a closed tab's beside this tab's), each once.
+ */
+export interface Named {
+  readonly rows: RowChanges
+  readonly beside: Readonly<Record<string, ReadonlyArray<O.Option<RowDecision>>>>
 }
 
 /** The person's rows on hold, by row. */
@@ -94,6 +134,8 @@ export interface Waiting {
    * sent again.
    */
   readonly leftOver: boolean
+  /** Rows left over: what else of each row was alive beside the decision in `rows`, to be named with it. */
+  readonly beside: Named["beside"]
   /** For each row, the values it is known to have had (`Draft.seen`): absent where that is not known. */
   readonly seen: Seen
   /** The person's rows on hold: kept, never sent, until the person picks or dismisses. */
@@ -200,6 +242,8 @@ export interface Draft {
    * or because the server refused them: kept until the result screen has named them, never sent.
    */
   readonly leftOver: O.Option<RowChanges>
+  /** What else of those rows was alive beside it (a closed tab's decision of the same row): named with it. */
+  readonly leftOverBeside: Named["beside"]
   /**
    * A picture said the import was closed while this screen's own confirm was out: if that confirm turns out not to
    * be the one that closed it, the draft ends on this picture.
@@ -261,6 +305,7 @@ export const emptyDraft: Draft = {
   heldBack: O.none(),
   heldForLines: false,
   leftOver: O.none(),
+  leftOverBeside: {},
   closedSeen: O.none(),
   ended: false,
   endedOn: {},
@@ -283,7 +328,7 @@ export type DraftEvent = Data.TaggedEnum<{
   Left: {}
   /**
    * The waiting rows a tab of the person's that is gone (closed or crashed) kept for this import, taken up by this
-   * tab: added where this tab holds nothing of the row, and sent as this tab's own.
+   * tab: this tab's own where it holds nothing of the row, and on the row's line beside this tab's where it does.
    */
   TakenUp: { readonly kept: Waiting }
   /** The person changed these rows. */
@@ -313,11 +358,8 @@ export type DraftEvent = Data.TaggedEnum<{
    * sentence for the person.
    */
   SaveRefused: { readonly reason: string }
-  /**
-   * The person settled a row on hold: `mine` sends their decision (made now, on the picture held), `theirs` lets it go
-   * (for a refused row, the person dismissed it).
-   */
-  HoldSettled: { readonly rowId: string; readonly keep: "mine" | "theirs" }
+  /** The person settled a row's line: which decision of it stands. A refused decision is never sent by it. */
+  HoldSettled: { readonly rowId: string; readonly keep: Keep }
   /**
    * A picture of the import arrived: a read, a match's answer, a card's Continue. `open`: whether the import can
    * still be decided; a picture of one that cannot ends the draft.
@@ -378,12 +420,7 @@ export type Said = Data.TaggedEnum<{
    * The person's waiting rows outlived a confirm of the import (it was confirmed, and opened again, before they were
    * sent): they were not part of it and are not sent into it.
    */
-  Outlived: { readonly rows: RowChanges }
-  /**
-   * Decisions a tab of the person's that is gone kept for rows this tab holds on hold already: not taken up, and
-   * named, since the line above the review asks about those rows already.
-   */
-  NotTakenUp: { readonly rows: RowChanges }
+  Outlived: Named
 }>
 export const Said = Data.taggedEnum<Said>()
 
@@ -536,7 +573,17 @@ const withoutAccepts = (rows: RowChanges, stale: ReadonlyArray<StaleAccept>): Ro
  * The rows not sent yet without the decisions the server did not apply. A row whose only decision was one of those is
  * a decision the person never made once it is taken out: nothing is sent for it, and its entry goes.
  */
-const strippingUnsent = (draft: Draft, stale: ReadonlyArray<StaleAccept>): Draft => {
+const strippingUnsent = (input: Draft, stale: ReadonlyArray<StaleAccept>): Draft => {
+  // This tab's decision, as a line asking between tabs remembers it, loses them too: "Keep this tab's" never sends one
+  // again.
+  const draft: Draft = {
+    ...input,
+    onHold: R.map(input.onHold, (held, rowId) =>
+      asksBetweenTabs(held)
+        ? { ...held, mine: O.flatten(R.get(withoutAccepts({ [rowId]: held.mine }, stale), rowId)) }
+        : held
+    )
+  }
   const stripped = withoutAccepts(draft.unsent, stale)
   const emptied = R.filter(
     stripped,
@@ -583,12 +630,13 @@ export const waiting = (draft: Draft): O.Option<Waiting> => {
       madeOn: {},
       confirms: draft.confirms,
       leftOver: true,
+      beside: draft.leftOverBeside,
       seen: {},
       held: {}
     }))
   }
-  // A row on hold is kept as that: its copy on its way is an earlier decision, and never comes back as waiting. A gone
-  // tab's decision held beside this tab's own is the exception: this tab's is kept with it, never neither.
+  // A row on hold is kept as that: its copy on its way is an earlier decision, and never comes back as waiting. A line
+  // that asks between this tab's and a closed tab's is the exception: this tab's is kept as it waits, never neither.
   const rows = R.filter(unconfirmed(draft), (_change, rowId) => ownBesideHold(draft, rowId))
   if (R.isEmptyReadonlyRecord(rows) && R.isEmptyReadonlyRecord(draft.onHold)) return O.none()
   // A row waiting again over the one on its way is the person's latest decision of it, made on its own revision.
@@ -597,25 +645,25 @@ export const waiting = (draft: Draft): O.Option<Waiting> => {
     madeOn: madeOnOf(rows, { ...draft.flightOn, ...draft.unsentOn }),
     confirms: draft.confirms,
     leftOver: false,
-    seen: R.filter(draft.seen, (_values, rowId) => R.has(rows, rowId)),
+    beside: {},
+    // The values seen of a row on hold too: what the server may have of it is asked again when the person picks.
+    seen: R.filter(draft.seen, (_values, rowId) => R.has(rows, rowId) || R.has(draft.onHold, rowId)),
     held: draft.onHold
   })
 }
 
-/**
- * True when the row's hold is a gone tab's decision held beside this tab's own decision of the row (taken up, and
- * decided otherwise here): "From your other tab", or a gone tab's refused decision of a row this tab has its own of.
- * This tab's own decision then stays with it (waiting, kept in this browser, back from a failed save), and is never
- * sent, confirmed or checked while the line above the review asks about the row. A refused hold of this tab's own
- * never sits beside a decision of the row on its way or unsent: deciding the row again settles it.
- */
-const besideOwn = (draft: Draft, rowId: string): boolean =>
-  O.exists(
-    R.get(draft.onHold, rowId),
-    (held) => Hold.$is("OtherTab")(held.why) || (Hold.$is("Refused")(held.why) && R.has(unconfirmed(draft), rowId))
-  )
+/** True for a line that asks between this tab's decision, which is as it was, and closed tabs' of the same row. */
+const asksBetweenTabs = (held: HeldRow): boolean => Hold.$is("OtherTab")(held.why)
 
-/** True when this tab's own decision of the row is its own to keep: no hold, or a gone tab's held beside it. */
+/**
+ * True when the row's line asks between this tab's own decision, as it was, and closed tabs'. This tab's own decision
+ * then stays (waiting, kept in this browser, back from a failed save), and is never sent, confirmed or checked while
+ * the line asks. A row of this tab's that was refused, or decided elsewhere since, is held itself instead, and never
+ * sits beside a decision of the row on its way or unsent: deciding the row again settles it.
+ */
+const besideOwn = (draft: Draft, rowId: string): boolean => O.exists(R.get(draft.onHold, rowId), asksBetweenTabs)
+
+/** True when this tab's own decision of the row is its own to keep: no line, or only one asking between tabs. */
 const ownBesideHold = (draft: Draft, rowId: string): boolean => !R.has(draft.onHold, rowId) || besideOwn(draft, rowId)
 
 /** True when the draft holds nothing of the person's that the server has not put in a picture the screen has read. */
@@ -625,8 +673,76 @@ export const settled = (draft: Draft): boolean =>
 /** Settled, and with no row of the person's on hold: nothing of theirs is in this draft but what the server has. */
 const holdsNothing = (draft: Draft): boolean => settled(draft) && R.isEmptyReadonlyRecord(draft.onHold)
 
-/** The decisions of the rows on hold, as the person made them. */
-const heldDecisions = (draft: Draft): RowChanges => R.map(draft.onHold, (held) => held.mine)
+/** One decision of one row. */
+type OfRow = readonly [rowId: string, decision: O.Option<RowDecision>]
+
+/** Decisions as they are named: one of each row, what else there was of it beside, each once. */
+const naming = (decisions: ReadonlyArray<OfRow>): Named => {
+  const rows: Record<string, O.Option<RowDecision>> = {}
+  const beside: Record<string, ReadonlyArray<O.Option<RowDecision>>> = {}
+  for (const [rowId, decision] of decisions) {
+    const first = R.get(rows, rowId)
+    const others = O.getOrElse(R.get(beside, rowId), (): Named["beside"][string] => [])
+    if (O.isNone(first)) rows[rowId] = decision
+    else if (!A.some([first.value, ...others], (one) => Eq.equals(one, decision))) beside[rowId] = [...others, decision]
+  }
+  return { rows, beside }
+}
+
+/** The decisions named, one by one: each row's first before what else there was of it. */
+const eachNamed = (named: Named): ReadonlyArray<OfRow> => [
+  ...R.toEntries(named.rows),
+  ...A.flatMap(R.toEntries(named.beside), ([rowId, others]) => A.map(others, (one): OfRow => [rowId, one]))
+]
+
+/**
+ * The person's decisions the server has not taken, every one: each row that waits (or is on its way), each row on hold
+ * (this tab's decision, unless the line only asks between it and others: it then waits, or is saved), and each closed
+ * tab's on a line.
+ */
+const alive = (input: { readonly rows: RowChanges; readonly held: HeldRows }): ReadonlyArray<OfRow> => [
+  // A row on hold is the person's latest decision of it: a copy on its way is an earlier one.
+  ...A.filter(R.toEntries(input.rows), ([rowId]) =>
+    O.match(R.get(input.held, rowId), { onNone: () => true, onSome: asksBetweenTabs })
+  ),
+  ...A.flatMap(R.toEntries(input.held), ([rowId, held]): ReadonlyArray<OfRow> => [
+    ...(asksBetweenTabs(held) ? [] : [[rowId, held.mine] as const]),
+    ...A.map(held.closed, (one): OfRow => [rowId, one.decision])
+  ])
+]
+
+/**
+ * Several namings as one: each decision of each row once.
+ *
+ * @example eachOnce([decisionsIn(own), decisionsIn(closedTabs)]).rows // { "row-12": some(left out) }
+ */
+export const eachOnce = (several: ReadonlyArray<Named>): Named => naming(A.flatMap(several, eachNamed))
+
+/** The decisions the picture does not hold: what it holds was taken. */
+const notIn = (decisions: ReadonlyArray<OfRow>, picture: SavedDecisions): ReadonlyArray<OfRow> =>
+  A.filter(decisions, ([rowId, decision]) => !Eq.equals(R.get(picture, rowId), decision))
+
+/**
+ * Every decision of the person's in what a browser kept, to be named: waiting, on hold, a closed tab's on a line, or
+ * left over by an import that was closed.
+ *
+ * @example decisionsIn(kept).rows // { "row-12": some(left out) }
+ */
+export const decisionsIn = (kept: Waiting): Named =>
+  naming([...alive(kept), ...eachNamed({ rows: {}, beside: kept.beside })])
+
+/** The rows left over so far, and what else of them, one by one. */
+const leftSoFar = (draft: Draft): ReadonlyArray<OfRow> =>
+  eachNamed({ rows: O.getOrElse(draft.leftOver, (): RowChanges => ({})), beside: draft.leftOverBeside })
+
+/** A draft with these decisions left over, to be named by the result: none where there are none. */
+const leaving = (decisions: ReadonlyArray<OfRow>): Pick<Draft, "leftOver" | "leftOverBeside"> => {
+  const named = naming(decisions)
+  return {
+    leftOver: R.isEmptyReadonlyRecord(named.rows) ? O.none() : O.some(named.rows),
+    leftOverBeside: named.beside
+  }
+}
 
 /**
  * Sends what is unsent when nothing is out: each save carries the rows changed since the last one was sent, each
@@ -702,6 +818,10 @@ const decidedElsewhere = (draft: Draft, rows: RowChanges, decisions: SavedDecisi
     )
   })
 
+/** The closed tabs' decisions on a row's line: none where it has no line. */
+const closedOn = (draft: Draft, rowId: string): ReadonlyArray<ClosedTab> =>
+  O.match(R.get(draft.onHold, rowId), { onNone: (): ReadonlyArray<ClosedTab> => [], onSome: (held) => held.closed })
+
 /**
  * The rows put on hold as decided elsewhere since, with what the picture holds of each: out of what waits, each kept
  * with the revision its decision was made on, until the person picks.
@@ -722,7 +842,8 @@ const holdingElsewhere = (draft: Draft, rows: RowChanges, decisions: SavedDecisi
       ...R.map(rows, (mine, rowId) => ({
         mine,
         madeOn: O.getOrElse(R.get(draft.unsentOn, rowId), () => heldAt(draft)),
-        why: Hold.Elsewhere({ theirs: R.get(decisions, rowId) })
+        why: Hold.Elsewhere({ theirs: R.get(decisions, rowId) }),
+        closed: closedOn(draft, rowId)
       }))
     }
   }
@@ -730,7 +851,8 @@ const holdingElsewhere = (draft: Draft, rows: RowChanges, decisions: SavedDecisi
 
 /**
  * The rows on hold as the picture held now has them: a hold for a decision made elsewhere names what the server
- * holds now, and lets go once the server holds the person's own decision (nothing differs any more).
+ * holds now, and lets go once the server holds the person's own decision (nothing differs any more). A closed tab's
+ * decision on that line is not let go with it: the line then asks between that one and this tab's, which is saved.
  */
 const followingHolds = (draft: Draft): Draft =>
   O.match(draft.held, {
@@ -742,11 +864,13 @@ const followingHolds = (draft: Draft): Draft =>
       const settledThere = (one: HeldRow, rowId: string): boolean =>
         Hold.$is("Elsewhere")(one.why) && Eq.equals(R.get(held.decisions, rowId), one.mine)
       const next = R.map(
-        R.filter(draft.onHold, (one, rowId) => !settledThere(one, rowId)),
+        R.filter(draft.onHold, (one, rowId) => !settledThere(one, rowId) || A.isReadonlyArrayNonEmpty(one.closed)),
         (one, rowId): HeldRow =>
-          Hold.$is("Elsewhere")(one.why)
-            ? { ...one, why: Hold.Elsewhere({ theirs: R.get(held.decisions, rowId) }) }
-            : one
+          settledThere(one, rowId)
+            ? { ...one, why: Hold.OtherTab() }
+            : Hold.$is("Elsewhere")(one.why)
+              ? { ...one, why: Hold.Elsewhere({ theirs: R.get(held.decisions, rowId) }) }
+              : one
       )
       return Eq.equals(next, draft.onHold) ? draft : { ...draft, onHold: next }
     }
@@ -879,12 +1003,11 @@ const confirming = (draft: Draft): Stepped =>
   })
 
 /**
- * True while a line above the review asks which of two decisions of a row stands: a gone tab's beside this tab's
- * waiting row, or a waiting row decided elsewhere since. A confirm would carry one of them unasked.
+ * True while a line above the review asks which decision of a row stands: a closed tab's beside this tab's, or a
+ * waiting row decided elsewhere since. A confirm would carry one of them, or none, unasked.
  */
 const linesAsk = (draft: Draft): boolean =>
-  A.some(R.keys(draft.unsent), (rowId) => besideOwn(draft, rowId)) ||
-  A.some(R.values(draft.onHold), (held) => Hold.$is("Elsewhere")(held.why))
+  A.some(R.values(draft.onHold), (held) => Hold.$is("Elsewhere")(held.why) || A.isReadonlyArrayNonEmpty(held.closed))
 
 /** A confirm held for the lines above the review is free again once no line asks. */
 const linesSettled = (draft: Draft): Draft =>
@@ -968,16 +1091,13 @@ const saysAccepts = (effect: DraftEffect): boolean =>
  * says them: those were part of what was written.
  */
 const closing = (draft: Draft, picture: Picture): Stepped => {
-  const rows = R.filter(
-    { ...O.getOrElse(draft.leftOver, (): RowChanges => ({})), ...heldDecisions(draft), ...unconfirmed(draft) },
-    (change, rowId) => !Eq.equals(R.get(picture.decisions, rowId), change)
-  )
+  const left = [...leftSoFar(draft), ...alive({ rows: unconfirmed(draft), held: draft.onHold })]
   return {
     draft: {
       ...emptyDraft,
       onScreen: draft.onScreen,
       epoch: draft.epoch + 1,
-      leftOver: R.isEmptyReadonlyRecord(rows) ? O.none() : O.some(rows),
+      ...leaving(notIn(left, picture.decisions)),
       ended: true,
       endedOn: picture.decisions
     },
@@ -1056,6 +1176,251 @@ const failing = (draft: Draft, said: Said): Stepped =>
         })
       })
 
+/** True when the two decisions of a row say the same: one with nothing in it says what none at all says. */
+const sameDecision = (one: O.Option<RowDecision>, other: O.Option<RowDecision>): boolean => {
+  const something = (decision: RowDecision): boolean => !Eq.equals(decision, nothingDecided)
+  return Eq.equals(O.filter(one, something), O.filter(other, something))
+}
+
+/** This tab's decision on a row's line, as one of the decisions the line asks between. */
+const ownAsSide = (input: { readonly draft: Draft; readonly held: HeldRow; readonly rowId: string }): ClosedTab => ({
+  decision: input.held.mine,
+  madeOn: input.held.madeOn,
+  seen: R.get(input.draft.seen, input.rowId),
+  refused: Hold.$is("Refused")(input.held.why) ? O.some(input.held.why.reason) : O.none()
+})
+
+/**
+ * A decision the person picked on a line that did not show what the server holds (a closed tab's, or this tab's where
+ * it is neither on its way nor on the server): it waits, under its own revision, and goes once a fresh picture has
+ * checked the row (G2). Decided elsewhere since means by none of the tabs the line named: what any of them may have
+ * written is not somebody else's decision. Where nothing is known of what the tab saw (an older page), it is not held.
+ */
+const picked = (input: {
+  readonly draft: Draft
+  readonly rowId: string
+  readonly one: ClosedTab
+  readonly line: ReadonlyArray<ClosedTab>
+}): Stepped => {
+  const { draft, line, one, rowId } = input
+  const written = A.flatMap(line, (side): Seen[string] => [
+    ...O.getOrElse(side.seen, (): Seen[string] => []),
+    ...(O.isSome(side.refused) ? [] : [side.decision])
+  ])
+  const seen: Seen = O.match(one.seen, {
+    onNone: () => R.remove(draft.seen, rowId),
+    onSome: (values) => ({ ...draft.seen, [rowId]: [...values, ...written] })
+  })
+  return sending(
+    waitingFrom(
+      {
+        ...draft,
+        unsent: { ...draft.unsent, [rowId]: one.decision },
+        unsentOn: { ...draft.unsentOn, [rowId]: one.madeOn },
+        waits: R.remove(draft.waits, rowId),
+        seen,
+        // Sent by the tab that is gone, or not: not known.
+        sentBefore: A.dedupe([...draft.sentBefore, rowId]),
+        stalled: true
+      },
+      [rowId]
+    )
+  )
+}
+
+/**
+ * A row's line settled by the person's pick; the other decisions on it, which the line names, are let go. Theirs: the
+ * screen already shows what the server holds. This tab's refused decision stays as the ordinary refused line, and a
+ * closed tab's refused one becomes that: a value the server refused is never sent by a pick. Any other pick is sent as
+ * the person's decision, under the revision it was made on (never re-dated: a column matched again since still takes
+ * back what it rested on, and the answer names it): at once where the line showed what the server holds, and otherwise
+ * once a fresh picture has checked the row (`picked`). A pick the line does not offer changes nothing.
+ */
+const settling = (input: {
+  readonly draft: Draft
+  readonly held: HeldRow
+  readonly keep: Keep
+  readonly rowId: string
+}): Stepped => {
+  const { draft, held, keep, rowId } = input
+  const unchanged: Stepped = { draft, effects: none }
+  const without: Draft = { ...draft, onHold: R.remove(draft.onHold, rowId) }
+  const alone = !A.isReadonlyArrayNonEmpty(held.closed)
+  const own = ownAsSide(input)
+  const line = (next: HeldRow): Stepped => ({
+    draft: { ...draft, onHold: { ...draft.onHold, [rowId]: next } },
+    effects: none
+  })
+  const sendNow = (one: ClosedTab): Stepped =>
+    transition(
+      { ...without, unsentOn: { ...without.unsentOn, [rowId]: one.madeOn } },
+      DraftEvent.Decided({ changes: { [rowId]: one.decision } })
+    )
+  const sendChecked = (one: ClosedTab): Stepped => picked({ draft: without, rowId, one, line: [own, ...held.closed] })
+  const closedPicked = (one: ClosedTab): Stepped =>
+    O.match(one.refused, {
+      onNone: () => (Hold.$is("Elsewhere")(held.why) ? sendNow(one) : sendChecked(one)),
+      onSome: (reason) =>
+        Hold.$is("Refused")(held.why)
+          ? line({ mine: one.decision, madeOn: one.madeOn, why: Hold.Refused({ reason }), closed: [] })
+          : unchanged
+    })
+  return Keep.$match(keep, {
+    Theirs: () =>
+      Hold.$match(held.why, {
+        Refused: () => (alone ? sending(without) : unchanged),
+        Elsewhere: () => sending(without),
+        OtherTab: () => unchanged
+      }),
+    Mine: () =>
+      Hold.$match(held.why, {
+        Refused: () => (alone ? unchanged : line({ ...held, closed: [] })),
+        Elsewhere: () => sendNow(own),
+        // This tab's decision goes as it waits; where it is neither on its way any more nor on the server, it is
+        // decided again, so it is on the server or waiting, never neither.
+        OtherTab: () =>
+          R.has(mine(without), rowId) || sameDecision(R.get(known(without), rowId), held.mine)
+            ? sending(without)
+            : sendChecked(own)
+      }),
+    Closed: ({ decision }) =>
+      O.match(
+        A.findFirst(held.closed, (one) => Eq.equals(one.decision, decision)),
+        { onNone: () => unchanged, onSome: closedPicked }
+      )
+  })
+}
+
+/**
+ * The decisions of one row that a gone tab's entry holds, each as a closed tab's: its own (waiting, refused with the
+ * sentence, held as decided elsewhere, or saved and not what this screen knows the server to hold), then those it held
+ * of tabs gone before it.
+ */
+const sidesIn = (input: {
+  readonly draft: Draft
+  readonly kept: Waiting
+  readonly rowId: string
+}): ReadonlyArray<ClosedTab> => {
+  const { draft, kept, rowId } = input
+  const seen = R.get(kept.seen, rowId)
+  const waits = O.map(R.get(kept.rows, rowId), (decision): ClosedTab => ({
+    decision,
+    madeOn: O.getOrElse(R.get(kept.madeOn, rowId), () => heldAt(draft)),
+    seen,
+    refused: O.none()
+  }))
+  return O.match(R.get(kept.held, rowId), {
+    onNone: () => A.fromOption(waits),
+    onSome: (held) => {
+      const own = (refused: O.Option<string>): ReadonlyArray<ClosedTab> => [
+        { decision: held.mine, madeOn: held.madeOn, seen, refused }
+      ]
+      const theirs = Hold.$match(held.why, {
+        Refused: ({ reason }) => own(O.some(reason)),
+        Elsewhere: () => own(O.none()),
+        OtherTab: () =>
+          O.match(waits, {
+            onSome: A.of,
+            // Saved by that tab, and held by the server as this screen knows it: it is on the server.
+            onNone: () => (sameDecision(R.get(known(draft), rowId), held.mine) ? [] : own(O.none()))
+          })
+      })
+      return [...theirs, ...held.closed]
+    }
+  })
+}
+
+/**
+ * The closed tabs' decisions on a line with more of them: each decision once, and never the one this tab holds of the
+ * row itself (decided the same in two tabs, nothing is lost). One refused in any of the tabs that made it is refused:
+ * a pick never sends it.
+ */
+const closedWith = (input: {
+  readonly own: O.Option<RowDecision>
+  readonly closed: ReadonlyArray<ClosedTab>
+  readonly more: ReadonlyArray<ClosedTab>
+}): ReadonlyArray<ClosedTab> =>
+  A.reduce(input.more, input.closed, (line, one) => {
+    const same = (side: ClosedTab): boolean => Eq.equals(side.decision, one.decision)
+    if (Eq.equals(one.decision, input.own)) return line
+    if (!A.some(line, same)) return [...line, one]
+    return A.map(line, (side) =>
+      same(side)
+        ? {
+            ...side,
+            madeOn: Math.min(side.madeOn, one.madeOn),
+            seen: O.zipWith(side.seen, one.seen, (here, there) => [...here, ...there]),
+            refused: O.orElse(side.refused, () => one.refused)
+          }
+        : side
+    )
+  })
+
+/**
+ * One row of a gone tab's entry, taken up. What this tab holds of it decides where each decision goes, and none of
+ * them is lost, however many tabs decided the row:
+ *
+ * | This tab holds of the row                      | The entry's own decision                 | What it held of tabs gone before |
+ * | ---------------------------------------------- | ---------------------------------------- | -------------------------------- |
+ * | nothing                                        | this tab's now, as it was there: waiting, refused, held | stays on the row's line |
+ * | its own: waiting, on its way, or saved unread  | on a line beside it, unless the same     | on that line                     |
+ * | a line: its own refused                        | on that line, unless the same            | on that line                     |
+ * | a line: its own decided elsewhere since        | on that line, unless the same            | on that line                     |
+ * | a line: asking between tabs                    | on that line, unless already there       | on that line                     |
+ */
+const takingUp = (input: { readonly draft: Draft; readonly kept: Waiting; readonly rowId: string }): Draft => {
+  const { draft, rowId } = input
+  const own = R.get(mine(draft), rowId)
+  const line = R.get(draft.onHold, rowId)
+  if (O.isNone(own) && O.isNone(line)) return adopting(input)
+  const held: HeldRow = O.getOrElse(line, () => ({
+    mine: O.flatten(own),
+    madeOn: O.getOrElse(
+      O.orElse(R.get(draft.unsentOn, rowId), () => R.get(draft.flightOn, rowId)),
+      () => heldAt(draft)
+    ),
+    why: Hold.OtherTab(),
+    closed: []
+  }))
+  const closed = closedWith({ own: held.mine, closed: held.closed, more: sidesIn(input) })
+  return A.isReadonlyArrayNonEmpty(closed)
+    ? { ...draft, onHold: { ...draft.onHold, [rowId]: { ...held, closed } } }
+    : draft
+}
+
+/** A row this tab holds nothing of: what the gone tab held of it becomes this tab's, its line with it. */
+const adopting = (input: { readonly draft: Draft; readonly kept: Waiting; readonly rowId: string }): Draft => {
+  const { draft, kept, rowId } = input
+  const adopted: Draft = {
+    ...draft,
+    onHold: { ...draft.onHold, ...R.filter(kept.held, (_held, heldRow) => heldRow === rowId) },
+    // A row taken up is checked by what the gone tab may have sent of it, never by what this tab once saw of the row:
+    // that would let a decision made since look like one of the gone tab's own.
+    seen: {
+      ...R.remove(draft.seen, rowId),
+      ...R.filter(kept.seen, (_values, seenRow) => seenRow === rowId)
+    }
+  }
+  return O.match(R.get(kept.rows, rowId), {
+    onNone: () => adopted,
+    onSome: (decision) =>
+      waitingFrom(
+        {
+          ...adopted,
+          unsent: { ...draft.unsent, [rowId]: decision },
+          unsentOn: {
+            ...draft.unsentOn,
+            [rowId]: O.getOrElse(R.get(kept.madeOn, rowId), () => heldAt(draft))
+          },
+          // Sent by the tab that is gone, or not: not known.
+          sentBefore: A.dedupe([...draft.sentBefore, rowId]),
+          stalled: true
+        },
+        [rowId]
+      )
+  })
+}
+
 const transition = (draft: Draft, event: DraftEvent): Stepped =>
   DraftEvent.$match(event, {
     // What this browser kept from before a reload comes back as the person's waiting rows, not saved yet. Nothing
@@ -1066,7 +1431,7 @@ const transition = (draft: Draft, event: DraftEvent): Stepped =>
       return {
         // Rows a closed import left over come back as that, to be named: they are not the person's waiting rows.
         draft: kept.value.leftOver
-          ? { ...opened, leftOver: O.some(kept.value.rows), ended: true }
+          ? { ...opened, leftOver: O.some(kept.value.rows), leftOverBeside: kept.value.beside, ended: true }
           : {
               ...opened,
               unsent: kept.value.rows,
@@ -1083,98 +1448,34 @@ const transition = (draft: Draft, event: DraftEvent): Stepped =>
       }
     },
     Left: () => ({ draft: letGo({ ...draft, onScreen: false, matching: false }), effects: none }),
-    // Rows a gone tab kept: never dropped without a word (Benjamin, 2026-11-20, answers 4 and 5, G2, G4). Into a
-    // draft that ended, the rows its closed picture does not hold are left over, named by the result; rows a closed
-    // import left over are named, never sent; rows of an import confirmed since are named and let go. A row this tab
-    // decided otherwise is held, both said, until the person picks; one this tab holds on hold already is named. The
-    // rest wait as this tab's own, and go once a fresh picture has checked them.
+    // Rows a gone tab kept: never dropped without a word (Benjamin, 2026-11-20, answers 4 and 5, G2, G4; 2026-11-21).
+    // Into a draft that ended, the rows its closed picture does not hold are left over, named by the result; rows a
+    // closed import left over are named, never sent; rows of an import confirmed since are named and let go. The rest
+    // is taken up row by row (`takingUp`), and goes once a fresh picture has checked it.
     TakenUp: ({ kept }) => {
-      const theirs: RowChanges = { ...R.map(kept.held, (held) => held.mine), ...kept.rows }
+      const theirs = decisionsIn(kept)
       if (draft.ended) {
-        const rows = R.filter(theirs, (change, rowId) => !Eq.equals(R.get(draft.endedOn, rowId), change))
-        return R.isEmptyReadonlyRecord(rows)
-          ? { draft, effects: none }
-          : {
-              draft: {
-                ...draft,
-                leftOver: O.some({ ...rows, ...O.getOrElse(draft.leftOver, (): RowChanges => ({})) })
-              },
-              effects: none
-            }
+        return {
+          draft: { ...draft, ...leaving([...leftSoFar(draft), ...notIn(eachNamed(theirs), draft.endedOn)]) },
+          effects: none
+        }
       }
       const outlived =
         kept.leftOver || O.exists(kept.confirms, (before) => O.exists(draft.confirms, (now) => now > before))
       if (outlived) {
-        return R.isEmptyReadonlyRecord(theirs)
+        return R.isEmptyReadonlyRecord(theirs.rows)
           ? { draft, effects: none }
-          : { draft, effects: [DraftEffect.Say({ what: Said.Outlived({ rows: theirs }) })] }
+          : { draft, effects: [DraftEffect.Say({ what: Said.Outlived(theirs) })] }
       }
-      const ours = mine(draft)
-      const madeOnOfTheirs = (rowId: string): number =>
-        O.getOrElse(
-          O.orElse(R.get(kept.madeOn, rowId), () => O.map(R.get(kept.held, rowId), (held) => held.madeOn)),
-          () => heldAt(draft)
-        )
-      // This tab holds the row on hold already: the line above the review asks about it; the other tab's is named.
-      const named = R.filter(
-        theirs,
-        (change, rowId) =>
-          R.has(draft.onHold, rowId) && !O.exists(R.get(draft.onHold, rowId), (held) => Eq.equals(held.mine, change))
-      )
-      // This tab decided it otherwise: held beside this tab's own, both said, until the person picks. A gone tab's row
-      // the server refused stays refused (its reason said), never offered to be sent as "the other tab's". Decided the
-      // same: nothing is lost, nothing to take up.
-      const otherTab = R.filter(
-        theirs,
-        (change, rowId) =>
-          !R.has(draft.onHold, rowId) && O.exists(R.get(ours, rowId), (here) => !Eq.equals(here, change))
-      )
-      const besideHolds = R.map(otherTab, (change, rowId): HeldRow => {
-        const refused = O.filter(
-          R.get(kept.held, rowId),
-          (held) => !R.has(kept.rows, rowId) && Hold.$is("Refused")(held.why)
-        )
-        return O.getOrElse(refused, (): HeldRow => ({
-          mine: change,
-          madeOn: madeOnOfTheirs(rowId),
-          why: Hold.OtherTab({ thisTab: O.flatten(R.get(ours, rowId)) })
-        }))
-      })
-      const free = (_value: unknown, rowId: string): boolean => !R.has(ours, rowId) && !R.has(draft.onHold, rowId)
-      const fresh = R.filter(kept.rows, free)
-      const freshHeld = R.filter(kept.held, (held, rowId) => free(held, rowId) && !R.has(fresh, rowId))
-      const next: Draft = waitingFrom(
-        {
-          ...draft,
-          unsent: { ...fresh, ...draft.unsent },
-          unsentOn: { ...madeOnOf(fresh, kept.madeOn), ...draft.unsentOn },
-          // A row taken up is checked by what the gone tab may have sent of it, never by what this tab once saw of
-          // the row: that would let a decision made since look like one of the gone tab's own.
-          seen: {
-            ...R.filter(draft.seen, (_values, rowId) => !R.has(fresh, rowId)),
-            ...R.filter(kept.seen, (_values, rowId) => R.has(fresh, rowId))
-          },
-          onHold: {
-            ...freshHeld,
-            ...besideHolds,
-            ...draft.onHold
-          },
-          // Sent by the tab that is gone, or not: not known.
-          sentBefore: A.dedupe([...draft.sentBefore, ...R.keys(fresh)]),
-          stalled: draft.stalled || !R.isEmptyReadonlyRecord(fresh)
-        },
-        R.keys(fresh)
-      )
-      const said: ReadonlyArray<DraftEffect> = R.isEmptyReadonlyRecord(named)
-        ? none
-        : [DraftEffect.Say({ what: Said.NotTakenUp({ rows: named }) })]
+      const rows = A.dedupe([...R.keys(kept.rows), ...R.keys(kept.held)])
+      const next = followingHolds(A.reduce(rows, draft, (before, rowId) => takingUp({ draft: before, kept, rowId })))
       // With a picture held, the import is asked for: the fresh picture checks them. Otherwise the first one does.
-      return then(O.isSome(draft.held) ? sending(next) : { draft: next, effects: none }, (after) => ({
-        draft: after,
-        effects: said
-      }))
+      return O.isSome(draft.held) ? sending(next) : { draft: next, effects: none }
     },
-    LeftOverNamed: () => ({ draft: draft.ended ? { ...draft, leftOver: O.none() } : draft, effects: none }),
+    LeftOverNamed: () => ({
+      draft: draft.ended ? { ...draft, leftOver: O.none(), leftOverBeside: {} } : draft,
+      effects: none
+    }),
     // The draft ends on the picture the confirm answered with: rows the person decided while it was out were not part
     // of it, and the result names them; the rows it carried are in that picture, and are not.
     ConfirmDone: ({ decisions, revision }) =>
@@ -1272,6 +1573,7 @@ const transition = (draft: Draft, event: DraftEvent): Stepped =>
       return sending({
         ...draft,
         leftOver: O.none(),
+        leftOverBeside: {},
         unsent,
         unsentOn: madeOnOf(unsent, { ...draft.unsentOn, ...madeOn }),
         // A waiting row decided again still waits (the person decided over their own decision, not over the server's);
@@ -1290,39 +1592,18 @@ const transition = (draft: Draft, event: DraftEvent): Stepped =>
         }
       })
     },
-    // Theirs: the row is let go, and the screen already shows what the server holds (for a gone tab's decision, this
-    // tab's stands). Mine: sent as any decision is, under the revision it was made on (never re-dated: a column matched
-    // again since still takes back what it rested on, and the answer names it); the region is drawn again, without a
-    // word, since the person did it.
-    // For a gone tab's decision held beside this tab's own, theirs is "Keep this tab's": this tab's decision goes as it
-    // waits (checked first), or, where it is no longer on its way (refused, or lost) nor on the server, is decided
-    // again, so it is on the server or waiting, never neither.
+    // The person picked which decision of a row's line stands (`settling`).
     HoldSettled: ({ keep, rowId }) =>
       O.match(R.get(draft.onHold, rowId), {
         onNone: () => ({ draft, effects: none }),
         onSome: (held) => {
-          const without: Draft = { ...draft, onHold: R.remove(draft.onHold, rowId) }
-          const again: O.Option<O.Option<RowDecision>> =
-            keep === "mine"
-              ? O.some(held.mine)
-              : Hold.$match(held.why, {
-                  Refused: () => O.none(),
-                  Elsewhere: () => O.none(),
-                  OtherTab: ({ thisTab }) =>
-                    !R.has(mine(without), rowId) && !Eq.equals(R.get(known(without), rowId), thisTab)
-                      ? O.some(thisTab)
-                      : O.none()
-                })
-          if (O.isNone(again)) return sending(without)
-          const decided = transition(
-            { ...without, unsentOn: { ...without.unsentOn, [rowId]: held.madeOn } },
-            DraftEvent.Decided({ changes: { [rowId]: again.value } })
-          )
-          return Eq.equals(shown(draft), shown(decided.draft))
-            ? decided
+          const by = settling({ draft, held, keep, rowId })
+          // The region is drawn again, without a word, since the person did it.
+          return Eq.equals(shown(draft), shown(by.draft))
+            ? by
             : {
-                draft: { ...decided.draft, epoch: decided.draft.epoch + 1 },
-                effects: [...decided.effects, DraftEffect.Restart({ announce: false })]
+                draft: { ...by.draft, epoch: by.draft.epoch + 1 },
+                effects: [...by.effects, DraftEffect.Restart({ announce: false })]
               }
         }
       }),
@@ -1345,21 +1626,12 @@ const transition = (draft: Draft, event: DraftEvent): Stepped =>
         : O.match(draft.flight, {
             onNone: () => ({ draft, effects: none }),
             onSome: (rows) => {
-              // A gone tab's decision held beside this tab's (refused there, or from the other tab): this tab's own,
-              // refused now, is held in its place as refused, its reason on the screen, and the gone tab's is named,
-              // not dropped unsaid. "Keep this tab's" can then never send again what the server has just refused.
+              // A closed tab's decision on the row's line stays there beside this tab's, refused now with its reason,
+              // and the person picks ("Keep both, she picks", Benjamin, 2026-11-21): neither is let go unsaid.
               const refusedHere = R.filter(
                 rows,
                 (_row, rowId) => !R.has(draft.unsent, rowId) && ownBesideHold(draft, rowId)
               )
-              const replaced = R.filter(
-                heldDecisions(draft),
-                (change, rowId) =>
-                  R.has(refusedHere, rowId) && !O.exists(R.get(rows, rowId), (own) => Eq.equals(own, change))
-              )
-              const named: ReadonlyArray<DraftEffect> = R.isEmptyReadonlyRecord(replaced)
-                ? none
-                : [DraftEffect.Say({ what: Said.NotTakenUp({ rows: replaced }) })]
               return then(
                 restarting({
                   before: draft,
@@ -1374,7 +1646,8 @@ const transition = (draft: Draft, event: DraftEvent): Stepped =>
                         ...R.map(refusedHere, (mine, rowId) => ({
                           mine,
                           madeOn: O.getOrElse(R.get(draft.flightOn, rowId), () => heldAt(draft)),
-                          why: Hold.Refused({ reason })
+                          why: Hold.Refused({ reason }),
+                          closed: closedOn(draft, rowId)
                         }))
                       },
                       // Refused: the server holds none of them.
@@ -1388,7 +1661,7 @@ const transition = (draft: Draft, event: DraftEvent): Stepped =>
                 }),
                 (after) => ({
                   draft: after,
-                  effects: [DraftEffect.Say({ what: Said.Refused({ reason }) }), ...named, DraftEffect.Ask()]
+                  effects: [DraftEffect.Say({ what: Said.Refused({ reason }) }), DraftEffect.Ask()]
                 })
               )
             }
@@ -1483,17 +1756,16 @@ const transition = (draft: Draft, event: DraftEvent): Stepped =>
           : closing(draft, picture)
       }
       // Open again after it had ended (reopened to review again): the rows left over were named on the result.
-      const reopened: Draft = draft.ended ? { ...draft, ended: false, endedOn: {}, leftOver: O.none() } : draft
+      const reopened: Draft = draft.ended
+        ? { ...draft, ended: false, endedOn: {}, leftOver: O.none(), leftOverBeside: {} }
+        : draft
       // The import was confirmed since the person's waiting rows were decided, and opened again: they were not part
       // of that confirm, and are not sent into the reopened import. They are named, and let go.
       // Rows on hold were not part of it either.
       const confirmedSince = O.exists(reopened.confirms, (before) => confirms > before)
-      const outlived = confirmedSince
-        ? R.filter(
-            { ...heldDecisions(reopened), ...reopened.unsent },
-            (change, rowId) => !Eq.equals(R.get(decisions, rowId), change)
-          )
-        : {}
+      const outlived = naming(
+        confirmedSince ? notIn(alive({ rows: reopened.unsent, held: reopened.onHold }), decisions) : []
+      )
       // Only a picture newer than the one held (or the first) is the answer a refused or lost confirm waits for: the
       // view the tab already held, given again when the step is drawn again, says nothing of what that confirm wrote.
       const newer = O.isNone(reopened.held) || revision > heldAt(reopened)
@@ -1503,7 +1775,7 @@ const transition = (draft: Draft, event: DraftEvent): Stepped =>
       const answers = givenAgain !== true && (newer || (!reopened.redrawn && revision >= heldAt(reopened)))
       const followed: Draft = {
         ...reopened,
-        ...(R.isEmptyReadonlyRecord(outlived) ? {} : { unsent: {}, unsentOn: {}, waits: {}, stalled: false }),
+        ...(R.isEmptyReadonlyRecord(outlived.rows) ? {} : { unsent: {}, unsentOn: {}, waits: {}, stalled: false }),
         ...(confirmedSince ? { onHold: {} } : {}),
         confirms: O.some(confirms),
         waitsForPicture: reopened.waitsForPicture && !answers,
@@ -1534,9 +1806,9 @@ const transition = (draft: Draft, event: DraftEvent): Stepped =>
         decidedElsewhere(followed, checked, decisions),
         decisions
       )
-      const named: ReadonlyArray<DraftEffect> = R.isEmptyReadonlyRecord(outlived)
+      const named: ReadonlyArray<DraftEffect> = R.isEmptyReadonlyRecord(outlived.rows)
         ? none
-        : [DraftEffect.Say({ what: Said.Outlived({ rows: outlived }) })]
+        : [DraftEffect.Say({ what: Said.Outlived(outlived) })]
       // A picture arrived, so the server can be reached and the import can be decided: rows that are checked go, and
       // a row still waiting asks for a fresh picture. A hold for a decision made elsewhere follows the picture held.
       // The view given again while it is asked anew asks nothing: the read that is out brings the fresh picture.

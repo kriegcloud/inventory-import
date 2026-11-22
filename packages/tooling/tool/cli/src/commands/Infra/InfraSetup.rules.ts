@@ -46,6 +46,9 @@ export const previewPasswordName = "PREVIEW_TEST_ACCOUNT_PASSWORD"
 /** The variable production's model key comes from. */
 export const modelKeyName = "OPENROUTER_API_KEY"
 
+/** The zone production's address is on: the account that holds it is production's (decision I9). */
+export const productionZone = "beep-effect.com"
+
 /** The title of the 1Password item this command makes for the previews' password. */
 export const previewPasswordItem = "inventory-import PREVIEW_TEST_ACCOUNT_PASSWORD"
 
@@ -293,6 +296,12 @@ const WhoAmI = S.Struct({
   accounts: S.Array(Account)
 }).pipe($I.annoteSchema("WhoAmI", { description: "What `cf auth whoami` answers, as far as the setup reads it" }))
 
+const Zone = S.Struct({ account: S.Struct({ id: S.String }) }).pipe(
+  $I.annoteSchema("Zone", {
+    description: "A zone as `cf zones list` names it: the account that holds it, nothing else"
+  })
+)
+
 const Named = S.Struct({ id: S.String, name: S.String }).pipe(
   $I.annoteSchema("Named", { description: "A 1Password vault: its id and name, nothing it holds" })
 )
@@ -374,7 +383,8 @@ export const described = (options: SetupOptions): ((step: Step) => ReadonlyArray
     Cloudflare: (step) => [
       `Cloudflare: which account is for ${A.join(step.roles, " and for ")}. Logs in only when cf is not logged in; the login is yours, in the browser.`,
       "  cf auth whoami",
-      "  cf auth login   (only when not logged in)"
+      "  cf auth login   (only when not logged in)",
+      `  cf zones list --name ${productionZone}   (the account that holds it is production's; you are shown both roles and asked)`
     ],
     Profile: (step) => {
       const name = profileOf(options, step.role)
@@ -444,12 +454,15 @@ const named = (accounts: ReadonlyArray<Account>) =>
   )
 
 /** The account for one role: the one the flag names, the only one after a yes, or the one he picks. */
-const pick = Effect.fn("InfraSetup.pick")(function* (
-  role: Role,
-  wanted: O.Option<string>,
-  accounts: A.NonEmptyReadonlyArray<Account>
-) {
+const pick = Effect.fn("InfraSetup.pick")(function* (input: {
+  readonly role: Role
+  readonly wanted: O.Option<string>
+  readonly accounts: A.NonEmptyReadonlyArray<Account>
+  /** The account that holds production's zone, when cf could tell. */
+  readonly holder: O.Option<Account>
+}) {
   const workstation = yield* Workstation
+  const { role, wanted, accounts } = input
   if (O.isSome(wanted)) {
     const match = A.findFirst(accounts, (account) => account.id === wanted.value || account.name === wanted.value)
     if (O.isNone(match)) {
@@ -459,15 +472,23 @@ const pick = Effect.fn("InfraSetup.pick")(function* (
     }
     return match.value
   }
+  const holds = (account: Account) => O.exists(input.holder, (holder) => holder.id === account.id)
   const [only, ...others] = accounts
   if (!A.isReadonlyArrayNonEmpty(others)) {
-    const yes = yield* workstation.confirm(`Use the Cloudflare account "${only.name}" for ${role}?`)
+    const note =
+      role === "preview" && holds(only)
+        ? ` It holds the zone ${productionZone}, so it is production's account: a test stage here shares it.`
+        : ""
+    const yes = yield* workstation.confirm(`Use the Cloudflare account "${only.name}" for ${role}?${note}`)
     if (!yes) return yield* stop(`Stopped: no Cloudflare account for ${role}. Nothing was changed.`)
     return only
   }
   const id = yield* workstation.choose(
     `Which Cloudflare account is for ${role}?`,
-    A.map(accounts, (account) => ({ title: account.name, value: account.id }))
+    A.map(accounts, (account) => ({
+      title: holds(account) ? `${account.name} (holds ${productionZone})` : account.name,
+      value: account.id
+    }))
   )
   return O.getOrElse(
     A.findFirst(accounts, (account) => account.id === id),
@@ -501,15 +522,53 @@ const cloudflare = Effect.fn("InfraSetup.cloudflare")(function* (
   yield* workstation.say(
     `Cloudflare: cf is logged in and sees ${accounts.length === 1 ? "one account" : `${accounts.length} accounts`}: ${named(accounts)}.`
   )
+  const zones = yield* read(S.Array(Zone), { command: "cf", args: ["zones", "list", "--name", productionZone] })
+  const holder = O.flatMap(zones, (found) =>
+    found.length === 1
+      ? A.findFirst(accounts, (account) => A.some(found, (zone) => zone.account.id === account.id))
+      : O.none()
+  )
+  yield* workstation.say(
+    O.match(holder, {
+      onSome: (account) =>
+        `Cloudflare: "${account.name}" holds the zone ${productionZone}, so it is production's account.`,
+      onNone: () => `Cloudflare: cf could not tell which account holds the zone ${productionZone}.`
+    })
+  )
   const both = A.contains(roles, "preview") && A.contains(roles, "production")
   const sameAccount =
-    "Production and the previews are two Cloudflare accounts (decision I4): a preview's deploy token covers its whole account, so in one account every pull request's run could change or remove production. The repository's stack takes the two ids and would accept the same one twice; whether to do that for now is Benjamin's decision and is not built. Nothing was changed."
-  if (both && accounts.length === 1) return yield* stop(`cf sees one account. ${sameAccount}`)
+    "Production and the previews are two Cloudflare accounts (decision I4): a preview's deploy token covers its whole account, so in one account every pull request's run could change or remove production. Nothing was changed."
+  if (both && accounts.length === 1) {
+    return yield* stop(
+      `cf sees one account. ${sameAccount} The repository's stack makes both deploy tokens with the one login it is deployed with, so that login must reach both accounts: add it as a member of the second account, then run this again.`
+    )
+  }
+  const unnamed = O.isNone(options.previewAccount) && O.isNone(options.productionAccount)
+  const rest = O.match(holder, {
+    onNone: () => A.empty<Account>(),
+    onSome: (held) => A.filter(accounts, (account) => account.id !== held.id)
+  })
+  // The zone settles production's account; the previews' is the other one, or his pick among the others.
+  if (both && unnamed && O.isSome(holder) && A.isReadonlyArrayNonEmpty(rest)) {
+    const previews = yield* pick({ role: "preview", wanted: O.none(), accounts: rest, holder })
+    yield* workstation.say(
+      `Cloudflare: production is "${holder.value.name}"; previews, test stages and staging are "${previews.name}".`
+    )
+    const yes = yield* workstation.confirm(
+      `Use "${holder.value.name}" for production and "${previews.name}" for previews, test stages and staging?`
+    )
+    if (!yes) {
+      return yield* stop(
+        "Stopped: the accounts were not confirmed. Name them with `--production-account` and `--preview-account`. Nothing was changed."
+      )
+    }
+    return { ...found, preview: O.some(previews), production: holder }
+  }
   const preview = A.contains(roles, "preview")
-    ? yield* pick("preview", options.previewAccount, accounts).pipe(Effect.asSome)
+    ? yield* pick({ role: "preview", wanted: options.previewAccount, accounts, holder }).pipe(Effect.asSome)
     : found.preview
   const production = A.contains(roles, "production")
-    ? yield* pick("production", options.productionAccount, accounts).pipe(Effect.asSome)
+    ? yield* pick({ role: "production", wanted: options.productionAccount, accounts, holder }).pipe(Effect.asSome)
     : found.production
   if (both && O.isSome(preview) && O.isSome(production) && preview.value.id === production.value.id) {
     return yield* stop(`Both roles were given the account "${preview.value.name}". ${sameAccount}`)

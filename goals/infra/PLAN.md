@@ -252,10 +252,22 @@ is his too: `bunx alchemy destroy --stage test_<user> --profile inventory-previe
 not in the command (accounts and Workers Paid, who may sign up, the zone's HTTPS setting, the push), and approving a
 production deploy on GitHub stays as `docs/releasing.md` says.
 
-**One Cloudflare account is not two.** `cf` on his workstation saw one account on 2026-11-22. A test stage needs
-only one. The repository's stack takes two ids and would accept the same one twice, but decision I4 gives previews
-an account of their own because a deploy token covers a whole account; so `--staging` and `--production` stop when
-both roles would be the same account, and whether to share one for now is Benjamin's decision, not made.
+**Two accounts, and which is which.** The command works the roles out from what `cf` can read: the account that
+holds the zone `beep-effect.com` is production's, the other is the previews'. It says both and asks before anything
+is made; when `cf` cannot tell, or there are more than two, he picks. A test stage put into the account that holds
+the zone is told so in the question. `--staging` and `--production` stop when both roles would be one account
+(decision I4).
+
+**The second account must be reachable by the same login** (seen 2026-11-22: `cf`'s login sees one account, the
+one holding the zone; the second account Benjamin added is under another login). The repository's stack makes both
+deploy tokens (`AccountApiToken`, one in each account) with the single credential of the profile it is deployed
+with, so that credential has to reach both accounts. An API key of the second account's own login reaches only
+that account: Alchemy's profile takes one (`alchemy profile edit --add Cloudflare --method stored`, with `apiKey`
+and `email`, or `apiToken`, and the account's id), and it would serve a test stage and the state store there, but
+not the stack. What makes everything above work unchanged: in the second account's dashboard, Manage Account,
+Members, invite the first login as Super Administrator, and accept. `cf` then lists both accounts and one browser
+login serves both profiles. The other way is a change to the stack so each token is made with its own account's
+credential; it is not built. The command does not use the API key's reference, and nothing here resolves it.
 
 **Never run for real.** The command was tested with stand-ins for every tool (`test/InfraSetup.test.ts` in
 `packages/tooling/tool/cli`: what is started, in which order, with which arguments, and that each guard stops it)

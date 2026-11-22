@@ -49,6 +49,8 @@ interface World {
   vaults: ReadonlyArray<{ readonly id: string; readonly name: string }>
   items: Array<{ id: string; title: string; additional_information: string }>
   github: O.Option<string>
+  /** The id of the account that holds production's zone, when cf can tell. */
+  zone: O.Option<string>
   /** His answer to a yes-or-no question. */
   yes: (question: string) => boolean
   /** What a tool handed the terminal exits with. */
@@ -64,6 +66,7 @@ const world = (over: Partial<World> = {}): World => ({
   vaults: [{ id: "vault-1", name: "Deploys" }],
   items: [],
   github: O.some("octo-owner"),
+  zone: O.none(),
   yes: () => true,
   exits: () => 0,
   log: [],
@@ -85,6 +88,10 @@ const standIn = (w: World): Workstation["Service"] => {
           return w.cloudflare
             ? answer(json({ authenticated: true, tokenValid: true, email: "owner@example.test", accounts: w.accounts }))
             : answer(json({ authenticated: false, accounts: [] }))
+        }
+        if (asked === "cf zones list --name beep-effect.com") {
+          const zones = A.map(A.fromOption(w.zone), (id) => ({ name: "beep-effect.com", account: { id } }))
+          return answer(json(zones))
         }
         if (asked === "bunx alchemy profile list") {
           return answer(
@@ -272,6 +279,7 @@ describe("infra setup: a test stage", () => {
       expect(result.stopped).toEqual(O.none())
       expect(started(w)).toEqual([
         "ask: cf auth whoami",
+        "ask: cf zones list --name beep-effect.com",
         "ask: bunx alchemy profile list",
         "ask: bunx alchemy profile create inventory-preview",
         "hand: bunx alchemy profile edit --profile inventory-preview --add Cloudflare",
@@ -327,7 +335,7 @@ describe("infra setup: a test stage", () => {
     Effect.gen(function* () {
       const account = world({ yes: (question) => !Str.startsWith("Use the Cloudflare account")(question) })
       yield* run(account, options())
-      expect(started(account)).toEqual(["ask: cf auth whoami"])
+      expect(started(account)).toEqual(["ask: cf auth whoami", "ask: cf zones list --name beep-effect.com"])
       const store = world({ yes: (question) => !Str.startsWith("Make sure the state store")(question) })
       yield* run(store, options())
       expect(A.some(started(store), Str.includes("state bootstrap"))).toBe(false)
@@ -426,6 +434,7 @@ describe("infra setup: the repository's stack and production", () => {
       const one = world({ profiles: connected })
       const result = yield* run(one, options({ sizes: ["staging"] }))
       expect(O.getOrElse(result.stopped, () => "")).toContain("cf sees one account. Production and the previews")
+      expect(O.getOrElse(result.stopped, () => "")).toContain("add it as a member of the second account")
       expect(A.some(started(one), Str.includes("alchemy"))).toBe(false)
       // It stops on what cf said, before asking him which account is which.
       expect(A.some(one.log, Str.startsWith("confirm: Use the Cloudflare account"))).toBe(false)
@@ -436,6 +445,61 @@ describe("infra setup: the repository's stack and production", () => {
       )
       expect(O.getOrElse(named.stopped, () => "")).toContain("Both roles were given")
       expect(A.some(started(same), Str.includes("alchemy"))).toBe(false)
+    })
+  )
+
+  it.effect("the account that holds the zone is production's: both roles are shown and asked before anything", () =>
+    Effect.gen(function* () {
+      // The zone is in the account listed first, so a pick by position would get the roles the wrong way round.
+      const accounts = [
+        { id: "acc-production", name: "Production" },
+        { id: "acc-preview", name: "Previews" }
+      ]
+      const w = world({ accounts, profiles: connected, zone: O.some("acc-production") })
+      const result = yield* run(w, options({ sizes: ["staging"] }))
+      expect(result.stopped).toEqual(O.none())
+      const asked =
+        'confirm: Use "Production" for production and "Previews" for previews, test stages and staging? -> yes'
+      expect(at(w, asked)).toBeGreaterThan(-1)
+      expect(at(w, asked)).toBeLessThan(at(w, "ask: bunx alchemy profile list"))
+      expect(A.some(w.log, Str.startsWith("choose: Which Cloudflare account"))).toBe(false)
+      expect(A.last(started(w)).pipe(O.getOrElse(() => ""))).toContain(
+        "PRODUCTION_CLOUDFLARE_ACCOUNT_ID=acc-production PREVIEW_CLOUDFLARE_ACCOUNT_ID=acc-preview"
+      )
+      const refused = world({
+        accounts,
+        profiles: connected,
+        zone: O.some("acc-production"),
+        yes: (question) => !Str.startsWith('Use "Production" for production')(question)
+      })
+      const stopped = yield* run(refused, options({ sizes: ["staging"] }))
+      expect(O.getOrElse(stopped.stopped, () => "")).toContain("were not confirmed")
+      expect(A.some(started(refused), Str.includes("alchemy"))).toBe(false)
+    })
+  )
+
+  it.effect("when cf cannot tell who holds the zone, he is asked which account is which", () =>
+    Effect.gen(function* () {
+      const w = world({ accounts: twoAccounts, profiles: connected })
+      const result = yield* run(w, options({ sizes: ["staging"] }))
+      expect(result.stopped).toEqual(O.none())
+      expect(A.filter(w.log, Str.startsWith("choose: Which Cloudflare account"))).toEqual([
+        "choose: Which Cloudflare account is for preview?",
+        "choose: Which Cloudflare account is for production?"
+      ])
+    })
+  )
+
+  it.effect("a test stage in the account that holds the zone says it is production's before he says yes", () =>
+    Effect.gen(function* () {
+      const w = world({ zone: O.some("acc-preview") })
+      yield* run(w, options())
+      expect(
+        at(
+          w,
+          'confirm: Use the Cloudflare account "Previews" for preview? It holds the zone beep-effect.com, so it is production\'s account'
+        )
+      ).toBeGreaterThan(-1)
     })
   )
 

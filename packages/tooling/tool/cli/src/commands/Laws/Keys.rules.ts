@@ -3,7 +3,9 @@
  * files and new files `.gitignore` does not exclude. It names the file and line, never the string. A test that
  * needs a key-shaped value puts it together at run time.
  *
- * "Every file git would commit" is git's answer to give, so this asks git.
+ * "Every file git would commit" is git's answer to give, so this asks git. That includes the scratchpad
+ * (`scratchpad/`), which the laws on how code is written leave out: an experiment is committed to a public
+ * repository like everything else, so a key in one is refused like any other.
  *
  * @packageDocumentation
  */

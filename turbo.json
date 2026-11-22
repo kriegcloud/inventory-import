@@ -34,7 +34,9 @@
     "build": { "dependsOn": ["transit"], "outputs": ["dist/**"] },
     "dev": { "cache": false, "persistent": true },
     // Repository checks: root scripts that do not call turbo.
-    "//#format:check": { "outputs": [] },
+    // Every file but an experiment of the scratchpad: the formatter leaves those alone (.oxfmtrc.json), and an
+    // experiment that is not formatted, or does not parse, fails nothing here.
+    "//#format:check": { "inputs": ["$TURBO_DEFAULT$", "!scratchpad/experiments/**"], "outputs": [] },
     // Vendored kit packages still match the beep-effect files they were copied from (`beep vendor check`).
     "//#vendor:check": {
       "inputs": [
@@ -77,7 +79,8 @@
       "outputs": []
     },
     // Every ref is a DOM ref or a callback that stays the same across draws (`beep laws ref-callbacks`).
-    // Its inputs are the law's own pathspec: every .tsx git would commit, the vendored kit and the skills left out; and
+    // Its inputs are the law's own pathspec: every .tsx git would commit, the vendored kit, the skills and the
+    // scratchpad left out; and
     // every package.json, whose exports name the modules of hooks.
     "//#refs:check": {
       "inputs": [
@@ -86,6 +89,7 @@
         "!packages/ui/src/components/**",
         "!packages/ui/src/hooks/**",
         "!.agents/**",
+        "!scratchpad/**",
         "apps/**/package.json",
         "packages/**/package.json",
         "packages/tooling/tool/cli/src/**"
@@ -122,14 +126,68 @@
       ],
       "outputs": []
     },
+    // Every version and date written in more than one place equals its one source (`beep version-sync`): the
+    // package.json files, the workflows, the standing documents, the wrangler files, the stacks and the CLI's own
+    // source. The installed @effect/tsgo it compares a `$schema` with is hashed through bun.lock.
+    "//#version-sync": {
+      "inputs": [
+        "package.json",
+        "apps/**/package.json",
+        "packages/**/package.json",
+        ".github/workflows/**",
+        "CLAUDE.md",
+        "AGENTS.md",
+        "README.md",
+        "docs/**/*.md",
+        ".claude/agents/*.md",
+        "tsconfig*.json",
+        "apps/**/tsconfig*.json",
+        "packages/**/tsconfig*.json",
+        "apps/**/wrangler*.jsonc",
+        "packages/**/wrangler*.jsonc",
+        "packages/**/src/**/*.ts",
+        "vendor/alchemy/sources.json",
+        "scratchpad/package.json",
+        "bun.lock",
+        "!**/node_modules/**"
+      ],
+      "outputs": []
+    },
+    // The lists and paths that follow from the workspaces are what the workspaces say (`beep config-sync --check`):
+    // every configuration file of the root and of each package, each package's scripts, and what a package holds
+    // (a vitest.config.ts, a vendor.json, a ceiling file). An installed file a `$schema` names is hashed through
+    // bun.lock.
+    "//#config-sync:check": {
+      "inputs": [
+        "*.{json,jsonc}",
+        "scratchpad/package.json",
+        "scratchpad/tsconfig*.json",
+        ".oxlintrc*.json",
+        ".oxfmtrc.json",
+        ".syncpackrc.json",
+        "apps/**/*.{json,jsonc}",
+        "apps/**/.oxlintrc*.json",
+        "apps/**/vitest.config.ts",
+        "packages/**/*.{json,jsonc}",
+        "packages/**/.oxlintrc*.json",
+        "packages/**/vitest.config.ts",
+        "packages/tooling/tool/cli/src/**",
+        "bun.lock",
+        "!**/node_modules/**",
+        "!**/dist/**",
+        "!**/.wrangler/**",
+        "!**/.turbo/**"
+      ],
+      "outputs": []
+    },
     // No deprecated API is used (`beep laws deprecated-apis`), read from every file's types: a new `@deprecated` in one
     // file, in a tsconfig's reach or in an installed package changes the answer for a file that did not change. So every
     // code file and tsconfig is an input, in a folder nobody listed too, with every workspace's manifest and what is
     // installed: the lockfile, and the manifest of every installed package in the root's node_modules, nested ones
     // included, so an install that has fallen behind the lockfile is not answered from one that had not. Turbo applies
     // every `!` to every line above it, so node_modules is not excluded whole: only its code files and tsconfigs are.
-    // Left out by name: what git ignores and the law does not read (`.agents`, and `.claude`, which in the main
-    // checkout holds every other checkout of this repository).
+    // Left out by name: what git ignores and the law does not read (`.agents`, the scratchpad, and `.claude`, which
+    // in the main checkout holds every other checkout of this repository).
     "//#deprecated:check": {
       "inputs": [
         ".oxlintrc.deprecated-apis.json",
@@ -143,7 +201,7 @@
         "!node_modules/**/tsconfig*.json",
         "!apps/**/{node_modules,dist,.wrangler,.turbo}/**",
         "!packages/**/{node_modules,dist,.turbo}/**",
-        "!{.claude,.codex,.agents,.turbo,.scratch,.wrangler,.alchemy,.taste-skill,.session}/**",
+        "!{.claude,.codex,.agents,.turbo,.scratch,.wrangler,.alchemy,.taste-skill,.session,scratchpad}/**",
         "bun.lock",
         "node_modules/*/package.json",
         "node_modules/@*/*/package.json"
@@ -180,7 +238,8 @@
       ],
       "outputs": []
     },
-    // Every file git would commit, so its hash is the whole repository's.
+    // Every file git would commit, so its hash is the whole repository's, the scratchpad's experiments included: a
+    // key in an experiment is refused like any other, and this is the one root task an edit there re-runs.
     "//#keys:check": { "outputs": [] },
     "//#docs:check": {
       "inputs": [

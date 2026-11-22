@@ -22,7 +22,9 @@ it stands there: oxlint's `typescript/no-deprecated`, an error, with every other
 wherever it is: sources, tests, scripts and configuration files, a file in a new folder too. Built files are
 git-ignored.
 
-One folder is left out, by name in the law (`leftOut`): `.agents/`, the 18 code files of the agent skills, copied as
+Two folders are left out, by name in the law (`leftOut`). `scratchpad/` is where an idea is tried under the
+type-checker only: this law, like the others on how code is written, applies to an experiment when its code
+graduates into a package ([the scratchpad](../scratchpad.md)). And `.agents/`, the 18 code files of the agent skills, copied as
 they were published and run by no part of the app or its checks. Sixteen are other people's; two (the ontology
 auditor's script and its test) come from Benjamin's own beep-effect. One of them
 (`design-taste-frontend/scripts/lib/probe.mjs`) reads the deprecated CSS properties `clip` and `webkitBackgroundClip`
@@ -65,8 +67,8 @@ Its answer is kept by Turborepo until a code file or a `tsconfig*.json` anywhere
 profile or `bun.lock` changes, or the manifest of any package installed in the root's `node_modules`. So a new
 `@deprecated` in a dependency is not hidden by an earlier answer, and neither is an install that has fallen behind
 the lockfile (recorded with `turbo run //#deprecated:check --dry=json`: installed effect's manifest at another
-version is a miss, put back a hit). What git ignores and the law does not read is not an input: `.agents`, and
-`.claude`, which in the main checkout holds every other checkout of the repository.
+version is a miss, put back a hit). What git ignores and the law does not read is not an input: `.agents`, the
+scratchpad, and `.claude`, which in the main checkout holds every other checkout of the repository.
 It takes about two seconds when it runs (719 files, 64 threads) and none when nothing changed.
 
 It always reads the whole repository: there is no shorter run for one folder, and running oxlint by hand with the
@@ -89,4 +91,4 @@ one says so.
 | A tag on the line of the brace that opens its block: TypeScript does not read it there, so write it on its own line | `interface Inline { /** @deprecated */ readonly text?: string }` |
 | Everything passed on at once | `export * from "@x/lib/Lib"` |
 
-It does not read prose: an example in a comment or in `docs/`. And it does not read `.agents/` (above).
+It does not read prose: an example in a comment or in `docs/`. And it does not read `.agents/` or `scratchpad/` (above).

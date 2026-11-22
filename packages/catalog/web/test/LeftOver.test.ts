@@ -14,11 +14,18 @@ describe("the rows left over", () => {
           "row-55": O.none(),
           "row-7": O.some(decisionFromFlags({ stored: "replace", reverted: ["uom"] }))
         },
-        beside: { "row-12": [O.some(decisionFromFlags({ stored: "keep" })), O.none()] }
+        beside: { "row-12": [O.some(decisionFromFlags({ stored: "keep" })), O.none()] },
+        // What the import held of a row instead, where somebody decided it since.
+        theirs: { "row-7": O.some(decisionFromFlags({ kept: true })) }
       })
     ).toEqual([
       { id: "row-3", row: "Row 3", decided: "accepted the proposal for Unit cost; typed Name: Steel Tube 1in" },
-      { id: "row-7", row: "Row 7", decided: "replaced the stored item; undid the fix for Unit of measure" },
+      {
+        id: "row-7",
+        row: "Row 7",
+        decided:
+          "replaced the stored item; undid the fix for Unit of measure (saved instead: kept over the other row with its SKU)"
+      },
       { id: "row-12", row: "Row 12", decided: "left out" },
       { id: "row-12:0", row: "Row 12", decided: "kept the stored item, in another tab of yours" },
       { id: "row-12:1", row: "Row 12", decided: "took your decision back, in another tab of yours" },

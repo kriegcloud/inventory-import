@@ -12,6 +12,7 @@ import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import { toast } from "sonner"
 import { perKey } from "@inventory/client/Api"
 import { NotSignedIn } from "@inventory/kernel/AccessError"
+import { hasRole } from "@inventory/kernel/Role"
 import { askWhoIsSignedIn, member, whoIsSignedInAsked } from "@inventory/client/MemberAtoms"
 import { isTransient, sayError, toastError } from "@inventory/client/SayError"
 import type { SavedDecisions, TakenBackKind } from "@inventory/catalog-contract/Decision"
@@ -54,12 +55,14 @@ import {
   unreadKept
 } from "./Draft.atoms.ts"
 import { thisTab } from "@inventory/client/TabAtoms"
-import { leftOverLines, namedWords } from "./internal/leftOver.ts"
+import { leftOverLines, namedWords, rowsWords, takeBackLine } from "./internal/leftOver.ts"
 import {
   changesBetween,
   DraftEffect,
   DraftEvent,
+  linesShown,
   type Named,
+  notSaved,
   type RowChanges,
   Said,
   shown,
@@ -228,13 +231,15 @@ const perform = (input: {
     // Rows go only as the member they belong to: with that member not signed in (signed out, or someone else signed
     // in on this page), nothing is sent and the rows wait as after a save refused for nobody signed in. While who is
     // signed in is being asked again, the save waits for the answer, and that answer decides.
-    Send: ({ delta, madeOn }) =>
+    // A row that waited names what it may be written over (`over`), and the server says which were decided since.
+    Send: ({ delta, id: sent, madeOn, over }) =>
       onceSignedInKnown(registry, () => {
-        if (!signedInAs({ registry, owner })) return happened(DraftEvent.SaveSignedOut())
-        void callWrite((api) => api.imports.decide({ params: { id }, payload: { madeOn, ...delta } })).then(
-          ({ changed, notApplied, revision }) => {
+        if (!signedInAs({ registry, owner })) return happened(DraftEvent.SaveSignedOut({ id: sent }))
+        const payload = { madeOn, ...(R.isEmptyReadonlyRecord(over) ? {} : { over }), ...delta }
+        void callWrite((api) => api.imports.decide({ params: { id }, payload })).then(
+          ({ changed, decidedSince, notApplied, revision }) => {
             answered(registry, id)
-            happened(DraftEvent.SaveAnswered({ revision, changed, notApplied }))
+            happened(DraftEvent.SaveAnswered({ id: sent, revision, changed, notApplied, decidedSince }))
           },
           (error: unknown) => {
             answered(registry, id)
@@ -246,10 +251,10 @@ const perform = (input: {
             if (S.is(NotSignedIn)(error)) askWhoIsSignedIn(registry)
             happened(
               S.is(NotSignedIn)(error)
-                ? DraftEvent.SaveSignedOut()
+                ? DraftEvent.SaveSignedOut({ id: sent })
                 : isTransient(error) || S.is(DraftBusy)(error)
-                  ? DraftEvent.SaveFailed()
-                  : DraftEvent.SaveRefused({ reason: sayError(error).sentence })
+                  ? DraftEvent.SaveFailed({ id: sent })
+                  : DraftEvent.SaveRefused({ id: sent, reason: sayError(error).sentence })
             )
           }
         )
@@ -257,13 +262,13 @@ const perform = (input: {
     // Said only when the machine says so: an answer it no longer waits for is not told to anybody.
     Say: ({ what }) =>
       Said.$match(what, {
-        // The rows stay on screen and are kept in this browser: they are sent once this import's review has read the
-        // server again and found nobody decided them otherwise meanwhile, or when the person presses Save again there.
-        // Never "reload the page": a reload sends them too, but there is nothing to gain by it.
+        // The rows stay on screen and are kept in this browser: they are sent with the next decision, when the import is
+        // read again, or at once when the person presses Save again, wherever they are in the app. The server writes
+        // each only where nobody decided it otherwise meanwhile.
         NotSaved: () =>
           void toast.error("Not saved yet", {
             description:
-              "Your last decision is kept in this browser, and the server did not take it. It is sent again when you are back on this import's review, once it has read the server; nothing is lost.",
+              "Your last decision is kept in this browser, and the server did not take it. Save again sends it now; where someone decided that row meanwhile, the review asks you which stands.",
             action: { label: "Save again", onClick: () => happened(DraftEvent.SaveAgain()) }
           }),
         // Said as it is: nobody is signed in, or somebody else is.
@@ -271,14 +276,24 @@ const perform = (input: {
           const another = ownedByAnother({ registry, id })
           void toast.error(another ? "Not saved: someone else is signed in" : "Not saved: you are signed out", {
             description: another
-              ? "Your last decision is kept in this browser for you, and was not sent as them. It is sent once you sign in again as yourself in this tab; nothing is lost."
-              : "Your last decision is kept in this browser. It is sent once you sign in again as yourself in this tab; nothing is lost.",
+              ? "Your last decision is kept in this browser for you, and was not sent as them. Sign in again as yourself in this tab, then Save again sends it."
+              : "Your last decision is kept in this browser. Sign in again as yourself in this tab, then Save again sends it.",
             action: { label: "Save again", onClick: () => happened(DraftEvent.SaveAgain()) }
           })
         },
         Refused: ({ reason }) =>
           void toast.error("Your last decision was not saved", {
             description: `${reason} It is listed above the review until you decide that row again or dismiss it; the review shows what was saved.`
+          }),
+        DecidedSince: ({ rows }) =>
+          void toast.error(rows.length === 1 ? "1 row was decided since" : `${rows.length} rows were decided since`, {
+            description: `Someone else or another tab decided ${rowsWords(rows)} while your decision waited, so it was not saved over theirs. The import's review asks you which stands.`
+          }),
+        // Not written, and what is saved may be an earlier decision of the person's as a match left it: not said as
+        // somebody else's.
+        SavedOtherwise: ({ rows }) =>
+          void toast.error(rows.length === 1 ? "1 row was not saved" : `${rows.length} rows were not saved`, {
+            description: `What is saved of ${rowsWords(rows)} is not what you last decided, so your decision was not saved over it. The import's review asks you which stands.`
           }),
         AcceptsTakenBack: ({ accepts }) =>
           void toast.error(
@@ -314,7 +329,21 @@ const perform = (input: {
     // left after that answer includes it, and is let land; one that left before is let land too, and asked once more
     // when it does. A read that is out is never ended: a save that answers every few milliseconds would otherwise keep
     // it from landing.
-    Ask: () => importView(id).askAgain(registry, O.getOrUndefined(registry.get(lastAnswered(id)))),
+    // Off the review with no picture held (Save again pressed on another page, before the step had read the import),
+    // nothing hands a view to the draft: it is read here, and handed over, so what waits is judged and sent on it.
+    Ask: () => {
+      importView(id).askAgain(registry, O.getOrUndefined(registry.get(lastAnswered(id))))
+      const now = registry.get(draftOf(id))
+      if (now.onScreen || O.isSome(now.held)) return
+      void call((api) => api.imports.get({ params: { id } })).then(
+        (view) => {
+          const then = registry.get(draftOf(id))
+          if (!then.onScreen && O.isNone(then.held)) registry.set(draftEvents(id), arrivedFrom(view, false))
+        },
+        // Not read (the network, the import gone): what waits stays, and the next press or visit asks again.
+        () => undefined
+      )
+    },
     // Only the decisions and the revision, and never over a later revision already held.
     Put: ({ decisions, revision }) =>
       changeView({
@@ -333,7 +362,7 @@ const perform = (input: {
     // Like a save, only as the member the rows belong to (the owner when the machine asked, even where nothing waits
     // after it): with that member not signed in, nothing is sent, nothing is imported, and the rows wait, kept for
     // them. While who is signed in is being asked again, the confirm waits for the answer, and that answer decides.
-    Confirm: ({ delta, madeOn, revision }) =>
+    Confirm: ({ delta, id: sent, madeOn, revision }) =>
       onceSignedInKnown(registry, () => {
         if (!signedInAs({ registry, owner })) {
           const another = anotherThan({ registry, owner })
@@ -341,7 +370,7 @@ const perform = (input: {
             description:
               "Nothing was confirmed. Your decisions are kept in this browser; confirm again once you are signed in as yourself."
           })
-          return happened(DraftEvent.ConfirmFailed())
+          return happened(DraftEvent.ConfirmFailed({ id: sent }))
         }
         return void call((api) => api.imports.commit({ params: { id }, payload: { revision, madeOn, ...delta } })).then(
           (view) => {
@@ -349,25 +378,27 @@ const perform = (input: {
             const onScreen = registry.get(draftOf(id)).onScreen
             putConfirmed({ registry, view })
             // The picture the confirm answered with: rows decided while it was out are named on the result.
-            happened(DraftEvent.ConfirmDone({ revision: view.revision, decisions: view.decisions }))
+            happened(DraftEvent.ConfirmDone({ id: sent, revision: view.revision, decisions: view.decisions }))
             forget(registry, id)
             if (onScreen) navigate(importAddress(view.id, "result"))
           },
           (error: unknown) => {
             answered(registry, id)
-            if (S.is(DraftMoved)(error)) return happened(DraftEvent.ConfirmMoved())
-            if (S.is(AcceptsTakenBack)(error)) return happened(DraftEvent.ConfirmStale({ accepts: error.accepts }))
+            if (S.is(DraftMoved)(error)) return happened(DraftEvent.ConfirmMoved({ id: sent }))
+            if (S.is(AcceptsTakenBack)(error)) {
+              return happened(DraftEvent.ConfirmStale({ id: sent, accepts: error.accepts }))
+            }
             // Closed already, or the answer was lost: the machine sends nothing and asks for the import, whose picture
             // says what was written.
             toastError(error)
-            happened(DraftEvent.ConfirmFailed())
+            happened(DraftEvent.ConfirmFailed({ id: sent }))
           }
         )
       })
   })
 }
 
-/** A view of the import as the machine reads it: a picture, whether it can be decided, its confirms, its take-backs. */
+/** A view of the import as the machine reads it: a picture, whether it can be decided, its confirms and its matches. */
 const arrivedFrom = (view: ImportView, waiting: boolean): DraftEvent =>
   DraftEvent.ViewArrived({
     revision: view.revision,
@@ -376,6 +407,7 @@ const arrivedFrom = (view: ImportView, waiting: boolean): DraftEvent =>
     // How many times it was confirmed: one more than the person's waiting rows knew means they outlived one.
     confirms: A.filter(view.history, ImportEvent.guards.Confirmed).length,
     waiting,
+    matches: A.map(view.choices, (choice) => choice.at),
     takenBack: A.map(view.takenBack, (taken) => ({ revision: taken.revision, rows: taken.rows }))
   })
 
@@ -395,12 +427,12 @@ const keeping = ({ id, registry }: { readonly registry: AtomRegistry.AtomRegistr
 export const draftEvents = perKey((id: ImportId) =>
   Atom.writable(noValue, (ctx, event: DraftEvent) => {
     const registry = ctx.get(registryOf)
-    // The person's own doing: the step opened, a row decided or a held one settled, rows taken up from a tab of
-    // theirs that is gone. The rows are then theirs, kept under their key.
+    // The person's own doing: the step opened, a row decided or a line settled, rows taken up from a tab of theirs that
+    // is gone. The rows are then theirs, kept under their key.
     const pressed =
       DraftEvent.$is("Opened")(event) ||
       DraftEvent.$is("Decided")(event) ||
-      DraftEvent.$is("HoldSettled")(event) ||
+      DraftEvent.$is("Settled")(event) ||
       DraftEvent.$is("TakenUp")(event) ||
       DraftEvent.$is("ConfirmPressed")(event)
     // The draft in memory is another member's (someone else signed in on this page) and the member signed in now acts
@@ -432,7 +464,9 @@ export const draftEvents = perKey((id: ImportId) =>
       // step here before them): taken in first, so writing their rows never erases what it kept, and their new rows are
       // kept under their key from the first one.
       if (!DraftEvent.$is("Opened")(event)) {
-        O.map(unreadKept({ registry, id }), (kept) => registry.set(draftEvents(id), DraftEvent.TakenUp({ kept })))
+        O.map(unreadKept({ registry, id }), (kept) =>
+          registry.set(draftEvents(id), DraftEvent.TakenUp({ kept, here: true }))
+        )
       }
     }
     // The member the rows belong to when the machine asks for a save or a confirm: whoever the draft was for before
@@ -493,6 +527,25 @@ export const takeBacksNamed = perKey((id: ImportId) =>
   })
 )
 
+/**
+ * The take-backs named, each as the line above the review says it: for the rows not decided again since, and only
+ * somebody who can decide is told to decide. A line with no such row left is gone.
+ */
+export const takeBackLines = perKey((id: ImportId) =>
+  Atom.readable((get): ReadonlyArray<{ readonly taken: MatchTakeBack; readonly text: string }> => {
+    const canDecide = O.exists(get(member), (actor) => hasRole(actor.role, "editor"))
+    const decisions = O.match(viewOf(get, id), {
+      onNone: (): SavedDecisions => ({}),
+      onSome: (view) => view.decisions
+    })
+    return A.getSomes(
+      A.map(get(takeBacksNamed(id)), (taken) =>
+        O.map(takeBackLine({ taken, decisions, canDecide }), (text) => ({ taken, text }))
+      )
+    )
+  })
+)
+
 /** The person dismissed one named take-back: it is named no more to them for this import, in this browser. */
 export const dismissTakeBack = perKey((id: ImportId) =>
   Atom.writable(noValue, (ctx, taken: MatchTakeBack) => {
@@ -515,23 +568,18 @@ export const confirmingImport = perKey((id: ImportId) =>
   Atom.map(draftOf(id), (draft) => draft.confirm !== "idle" || O.exists(draft.heldBack, (why) => !why.read))
 )
 
-/** The person's rows on hold (refused, or decided elsewhere since), for the lines above the review that list them. */
-export const rowsOnHold = perKey((id: ImportId) => Atom.map(draftOf(id), (draft) => draft.onHold))
+/** The lines above the review: the rows that wait for the person to say which decision stands, or let one go. */
+export const reviewLines = perKey((id: ImportId) => Atom.map(draftOf(id), linesShown))
 
 /** How many of the person's rows wait after a save that failed, for the line that says so; 0 while none do. */
-export const rowsNotSaved = perKey((id: ImportId) =>
-  Atom.map(draftOf(id), (draft) => (draft.stalled ? R.keys(draft.unsent).length : 0))
-)
+export const rowsNotSaved = perKey((id: ImportId) => Atom.map(draftOf(id), notSaved))
 
 /**
  * The person's decisions that were not part of the confirm that closed the import (they were never saved), for the
- * result to name, a closed tab's of the same row with this tab's: none while there are none, or while the import can
- * still be decided.
+ * result to name, each line whole: none while there are none, or while the import can still be decided.
  */
 export const rowsLeftOver = perKey((id: ImportId) =>
-  Atom.map(draftOf(id), (draft): O.Option<Named> =>
-    draft.ended ? O.map(draft.leftOver, (rows) => ({ rows, beside: draft.leftOverBeside })) : O.none()
-  )
+  Atom.map(draftOf(id), (draft): O.Option<Named> => (draft.ended ? draft.leftOver : O.none()))
 )
 
 /**
@@ -555,13 +603,19 @@ export const namingLeftOver = perKey((id: ImportId) =>
 export const confirmHeldBack = perKey((id: ImportId) => Atom.map(draftOf(id), (draft) => draft.heldBack))
 
 /**
- * The last confirm was not made because a line above the review asks which of two decisions of a row stands: true
- * until those lines are settled, for the line that says so.
+ * How many presses of Import the lines above the review have stopped: more at each press, so each takes the person to
+ * the lines; 0 once no line is left.
  */
-export const confirmHeldForLines = perKey((id: ImportId) => Atom.map(draftOf(id), (draft) => draft.heldForLines))
+export const importStopped = perKey((id: ImportId) => Atom.map(draftOf(id), (draft) => draft.stopped))
 
 /** Goes up when the region must be drawn again from what is shown: the decisions under it changed elsewhere. */
 export const regionEpoch = perKey((id: ImportId) => Atom.map(draftOf(id), (draft) => draft.epoch))
+
+/**
+ * The organization an import was not found in when who is signed in was last asked because of it: none once the import
+ * has been found again.
+ */
+const askedWhere = perKey((_id: ImportId) => Atom.make<O.Option<string>>(O.none()).pipe(Atom.keepAlive))
 
 /**
  * Follows one import's draft while its Review step is drawn: the step is on screen from when this is mounted until it
@@ -584,7 +638,9 @@ export const followDraft = perKey((id: ImportId) =>
         get.subscribe(thisTab, (tab) => {
           if (read || O.isNone(tab)) return
           read = true
-          O.map(keptWaiting({ registry, id }), (kept) => registry.set(draftEvents(id), DraftEvent.TakenUp({ kept })))
+          O.map(keptWaiting({ registry, id }), (kept) =>
+            registry.set(draftEvents(id), DraftEvent.TakenUp({ kept, here: true }))
+          )
           // Rows decided here meanwhile could not be kept under an id the tab did not have yet: they are now.
           keeping({ registry, id })
           takeUp()
@@ -600,12 +656,19 @@ export const followDraft = perKey((id: ImportId) =>
         if (AsyncResult.isFailure(result)) {
           const error = result.cause.pipe(Cause.squash)
           if (result.waiting || !S.is(ImportNotFound)(error)) return
-          if (!removedHere({ registry, id, error })) askWhoIsSignedIn(registry)
+          if (removedHere({ registry, id, error })) return
+          // Asked once for the organization it was looked for in: asking takes the workspace away until it has answered,
+          // and a step drawn again over the same answer must not ask again, without end.
+          const asked = O.some(error.organizationId)
+          if (Eq.equals(registry.get(askedWhere(id)), asked)) return
+          registry.set(askedWhere(id), asked)
+          askWhoIsSignedIn(registry)
           return
         }
         if (!AsyncResult.isSuccess(result)) return
-        // The view held, given again while it is asked anew: not an answer, and it checks no waiting row. (The first
-        // one, the view the step finds when it is drawn, the machine knows as given again itself.)
+        // Found again, by an answer of the server's: the next not found is another matter.
+        if (!result.waiting) registry.set(askedWhere(id), O.none())
+        // The view held, given again while it is asked anew, is no answer: the machine is told so.
         registry.set(draftEvents(id), arrivedFrom(result.value, result.waiting))
       }
       get.subscribe(importViewShown(id), hand, { immediate: true })

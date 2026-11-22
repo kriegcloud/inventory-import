@@ -272,13 +272,9 @@ describe("a law ends on any file within its budget, judged or refused in words",
     for (const n of isSquare(name) ? [4, 5, 6, 8, 30, 60] : sizes) within("refs", shape(n))
   })
 
-  it.each(R.toEntries(chainRefShapes))(
-    "the refs law: %s, a hundred to ten thousand",
-    (_, shape) => {
-      for (const n of [100, 400, 800, 1000, 4000, 8000, 10_000]) within("refs", shape(n))
-    },
-    60_000
-  )
+  it.each(R.toEntries(chainRefShapes))("the refs law: %s, a hundred to ten thousand", (_, shape) => {
+    for (const n of [100, 400, 800, 1000, 4000, 8000, 10_000]) within("refs", shape(n))
+  })
 
   it.each(chainTagShapes)(
     "the tags law: %s, in a hundred and thirty functions and ten times as many, ten times as deep",
@@ -291,8 +287,7 @@ describe("a law ends on any file within its budget, judged or refused in words",
       ] as const) {
         within("tags", `${handedOn(functions, answer(deep))}if (g0(x) === "A") f()\n`)
       }
-    },
-    60_000
+    }
   )
 
   it("no file is given more than the ceiling, however long", () => {
@@ -301,6 +296,7 @@ describe("a law ends on any file within its budget, judged or refused in words",
   })
 
   // The shapes slowest to read at the ceiling: each ends within it, refused in words.
+  // 8.9 to 9.7 s on two pinned cores alone, near the shared 30 s once the rest of the check runs beside it: 60 s.
   it("the heaviest shapes at a million characters end within the ceiling", () => {
     const heaviest: ReadonlyArray<readonly ["tags" | "refs", Shape | undefined, number]> = [
       ["refs", refShapes["names assigned to each other"], 285],
@@ -339,7 +335,7 @@ describe("the shapes an ordinary file is made of are judged, not refused", () =>
       for (const n of [100, 1000]) expect(shape === undefined || refsRead(shape(n)).unread).toBe(false)
       expect(shape === undefined || refsRead(shape(10_000)).unread).toBe(true)
     }
-  }, 10_000)
+  })
 
   it("the refs law: a record a function writes into at ten thousand keys, read at another", () => {
     const writes = pieces(10_000, (index) => `big.k${index} = f; `)

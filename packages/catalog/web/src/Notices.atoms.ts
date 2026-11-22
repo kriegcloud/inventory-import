@@ -49,17 +49,31 @@ const sharedStorage = (): Storage | undefined => {
 
 const listOf = (stored: NoticesKept): ReadonlyArray<Notice> => O.getOrElse(stored, (): ReadonlyArray<Notice> => [])
 
+/** True for a notice of rows that were only to be named. */
+const isNamed = (one: Notice): boolean => Notice.guards.TakenUp(one) && one.named === true
+
 /** True for two notices about the same import that say the same thing happened to it. */
 const sameNotice = (one: Notice, other: Notice): boolean =>
-  one.importId === other.importId && Notice.guards.TakenUp(one) === Notice.guards.TakenUp(other)
+  one.importId === other.importId &&
+  Notice.guards.TakenUp(one) === Notice.guards.TakenUp(other) &&
+  isNamed(one) === isNamed(other)
 
-/** Two notices of the same thing as one: the rows of both. */
-const together = (before: Notice, now: Notice): Notice =>
-  Notice.guards.TakenUp(before) && Notice.guards.TakenUp(now)
-    ? { ...now, rows: A.dedupe([...before.rows, ...now.rows]) }
+/** A removed import's decisions, as they are named: an older page kept nothing of what the import held. */
+const namedIn = ({ beside, rows, theirs }: Extract<Notice, { readonly rows: Named["rows"] }>): Named => ({
+  rows,
+  beside,
+  theirs: theirs ?? {}
+})
+
+/** Two notices of the same thing as one: the rows of both, and the file's name where either knows it. */
+const together = (before: Notice, now: Notice): Notice => {
+  const fileName = O.orElse(now.fileName, () => before.fileName)
+  return Notice.guards.TakenUp(before) && Notice.guards.TakenUp(now)
+    ? { ...now, fileName, rows: A.dedupe([...before.rows, ...now.rows]) }
     : Notice.guards.Removed(before) && Notice.guards.Removed(now)
-      ? { ...now, ...eachOnce([before, now]) }
+      ? { ...now, fileName, ...eachOnce([namedIn(before), namedIn(now)]) }
       : now
+}
 
 /** The notices with one more: together with the one that says the same of the same import, the newest ones kept. */
 const withNotice = (stored: NoticesKept, notice: Notice): NoticesKept => {
@@ -126,22 +140,30 @@ interface Of {
   readonly fileName: O.Option<string>
 }
 
-/** For a tab another one took the rows of: named there, by import and row, when that tab loads again. */
+/** For a tab another one took the rows of: said there, by import and row, when that tab loads again. */
 export const leaveTakenUp = (input: {
   readonly registry: AtomRegistry.AtomRegistry
   readonly of: Member
   readonly tab: string
   readonly from: Of
   readonly rows: ReadonlyArray<string>
+  /** True for rows that were only to be named. */
+  readonly named: boolean
 }): void => {
-  const { from, of, registry, rows, tab } = input
+  const { from, named, of, registry, rows, tab } = input
   if (!A.isReadonlyArrayNonEmpty(rows)) return
   const at = DateTime.toEpochMillis(DateTime.nowUnsafe())
   leave({
     registry,
     of,
     tab,
-    notice: Notice.cases.TakenUp.make({ importId: from.id, fileName: from.fileName, rows, at })
+    notice: Notice.cases.TakenUp.make({
+      importId: from.id,
+      fileName: from.fileName,
+      rows,
+      ...(named ? { named } : {}),
+      at
+    })
   })
 }
 

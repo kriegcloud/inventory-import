@@ -76,6 +76,7 @@ values in `.dev.vars.example`). After pulling a change to `apps/inventory/migrat
 | `bun run deps:update` | Moves every dependency of every package to its newest version, except the ones held back with a reason in `.syncpackrc.json`, then installs. `-- --dry-run` only says what would move |
 | `bun run version-sync` | Checks that every version written in more than one place equals its one source; `-- --write` rewrites the places that differ |
 | `bun run config-sync` | Writes the configuration that follows from the workspaces (syncpack's sources, tsconfig references, each package's scripts); `config-sync:check` only compares ([docs/sync-commands.md](docs/sync-commands.md)) |
+| `bun run scratch:new <name> --template probe` | Starts an experiment in `scratchpad/experiments/<name>`, from a template whose test already passes (`probe`, `service`, `screen`, `verify`). `scratch:test`, `scratch:check` and `scratch:list` run, type-check and list the experiments; `scratch:graduate` and `scratch:drop` end one ([docs/scratchpad.md](docs/scratchpad.md)). No check, build or deploy reads the scratchpad |
 | `bunx alchemy deploy --stage <name>` | Host it on Cloudflare: the stack in `packages/infra` makes the database and the Worker (needs a Cloudflare login; [goals/infra/PLAN.md](goals/infra/PLAN.md) has the steps, in order) |
 
 ### Signing in

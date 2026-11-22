@@ -126,16 +126,21 @@ const freePort = () =>
 /**
  * This checkout's development server on that port. It is ready when the server itself says it serves the port, so a
  * server left running by another checkout is never mistaken for it; one that stops first is a failure.
+ *
+ * Read without colour: on CI (`CI` is set) Vite colours its address and prints the port in bold, so the text
+ * `localhost:<port>` is never there and the check would wait its whole limit. Colour is turned off for the server, and
+ * any escape code left is taken out before the text is read.
  */
 const serve = (port) =>
   new Promise((resolve, reject) => {
     const server = spawn(process.execPath, [installed("vite/bin/vite.js"), "--port", String(port), "--strictPort"], {
       cwd: join(dirname(fileURLToPath(import.meta.url)), ".."),
-      stdio: ["ignore", "pipe", "pipe"]
+      stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env, NO_COLOR: "1", FORCE_COLOR: "0" }
     })
     let said = ""
     const hear = (chunk) => {
-      said += String(chunk)
+      said += String(chunk).replace(/\x1b\[[0-9;]*m/g, "")
       if (said.includes(`localhost:${port}`)) resolve(server)
     }
     server.stdout.on("data", hear)

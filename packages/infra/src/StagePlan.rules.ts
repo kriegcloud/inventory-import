@@ -154,8 +154,8 @@ export class MissingPreviewPassword extends S.TaggedError<MissingPreviewPassword
     return (
       `Stage "${this.stage}" has no password for its test accounts: ${this.variable} is not set, so nobody could ` +
       `sign in to this ${this.stage === "staging" ? "stage" : "preview"}. Write the reference ` +
-      `${this.variable}=op://<vault>/<item>/<field> in packages/infra/env/op.env and deploy the repository's stack ` +
-      `under \`op run\`, which gives the password to the ${this.stage === "staging" ? "staging" : "preview"} ` +
+      `${this.variable}=op://<vault>/<item>/<field> in packages/infra/env/op.env and deploy the repository's stack, ` +
+      `which asks 1Password for it and gives the password to the ${this.stage === "staging" ? "staging" : "preview"} ` +
       `environment as a secret.`
     )
   }
@@ -205,7 +205,7 @@ export class MissingModelKey extends S.TaggedError<MissingModelKey, { readonly b
     return (
       `Stage "${this.stage}" has no model key: ${this.variable} is not set, so every model feature would be answered ` +
       `by rules. Write the reference ${this.variable}=op://<vault>/<item>/<field> in packages/infra/env/op.env and ` +
-      `deploy the repository's stack under \`op run\`, which gives the key to the production environment. ` +
+      `deploy the repository's stack, which asks 1Password for it and gives the key to the production environment. ` +
       `To deploy without a model on purpose, set ${withoutModelKeyFlag}=true.`
     )
   }

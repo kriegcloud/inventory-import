@@ -12,6 +12,7 @@
  */
 import * as Cloudflare from "@alchemy.run/cloudflare"
 import * as Alchemy from "alchemy"
+import * as Secrets from "alchemy/Secrets"
 import * as Output from "alchemy/Output"
 import * as A from "effect/Array"
 import * as Config from "effect/Config"
@@ -22,12 +23,15 @@ import * as Redacted from "effect/Redacted"
 import * as Result from "effect/Result"
 import * as Str from "effect/String"
 import { InfraStage } from "./InfraStage.context.ts"
+import { secretNamesOf } from "./OpReferences.rules.ts"
+import { opEnvReferences } from "./OpReferences.secrets.ts"
 import type { SettingSource } from "./Stage.schema.ts"
 import {
   givenTestPassword,
   modelKeyFor,
   previewPasswordVariable,
   testPasswordOf,
+  planFor,
   withoutModelKeyFlag
 } from "./StagePlan.rules.ts"
 
@@ -56,7 +60,16 @@ const textFrom = Effect.fnUntraced(function* (source: SettingSource) {
  */
 export default Alchemy.Stack(
   "inventory",
-  { providers: Cloudflare.providers(), state: Cloudflare.state() },
+  {
+    providers: Cloudflare.providers(),
+    state: Cloudflare.state(),
+    // What a stage's plan names as a secret is asked of 1Password from a workstation; a workflow's job is given
+    // its own. A `.env` at the root is still read first, as before this option was set.
+    secrets: [
+      Secrets.DotEnv(),
+      opEnvReferences((stage) => Result.match(planFor(stage), { onFailure: () => [], onSuccess: secretNamesOf }))
+    ]
+  },
   Effect.gen(function* () {
     const plan = yield* InfraStage
     const path = yield* Path.Path

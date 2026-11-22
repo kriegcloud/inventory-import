@@ -17,11 +17,18 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Command from "effect/cli/Command"
 import * as Digest from "effect/crypto/Digest"
+import { Workstation } from "./commands/Infra/Workstation.service.ts"
 import { Repo } from "./Repo.service.ts"
 import { rootCommand } from "./Root.command.ts"
 
 Command.run(rootCommand, { version: "0.0.0" }).pipe(
-  Effect.provide(Repo.layer().pipe(Layer.provideMerge(BunServices.layer), Layer.provide(Digest.layerWebCrypto))),
+  Effect.provide(
+    Workstation.layer.pipe(
+      Layer.provideMerge(Repo.layer()),
+      Layer.provideMerge(BunServices.layer),
+      Layer.provide(Digest.layerWebCrypto)
+    )
+  ),
   Effect.tapErrorTag("RepoError", (error) => Console.error(error.message)),
   Effect.tapDefect((defect) => Console.error(Cause.die(defect).pipe(Cause.pretty))),
   BunRuntime.runMain({ disableErrorReporting: true })

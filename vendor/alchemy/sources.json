@@ -3,6 +3,17 @@
   "pinnedOn": "2026-11-22",
   "packages": [
     {
+      "package": "@alchemy.run/1password",
+      "version": "2.0.0-beta.87",
+      "license": "Apache-2.0",
+      "file": "alchemy.run-1password-734c27a.tgz",
+      "bytes": 22818,
+      "sha256": "c06fe660d42fe20ed20f6473acf62a8408660760b3476b8f78ed0307f4694b21",
+      "registryAddress": "https://pkg.alchemy.run/@alchemy.run/1password/-/b66a8a8e910323f5710494fc9548d03cbfafd9d95fe7379c2ef2162992f63cac.tgz",
+      "registryBytes": 22623,
+      "addressesRewritten": 1
+    },
+    {
       "package": "@alchemy.run/acme",
       "version": "2.0.0-beta.87",
       "license": "Apache-2.0",

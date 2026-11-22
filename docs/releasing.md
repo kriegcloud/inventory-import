@@ -145,9 +145,11 @@ A patch never goes the other way: nothing lands on a release branch first.
   `release/` branch of this repository, after its guard job found a tag that may deploy, and runs that guard from
   `main`. `test/DeployWorkflow.test.ts` in the same package parses the file and holds every job's event,
   environment and secrets, and every step of every job in order: each action by name and version with what it is
-  given, each command word for word, each step's own condition. The three shell guards are held as whole scripts, and run, with a branch and a tag
-  whose names only end as the real ones do on the remote. What an action does
-  inside is not read. The workflow files are inputs of that test in `turbo.json`, so a change to one always runs it.
+  given, each command word for word, each step's own condition, and what each step and each job is told (every variable by
+  name, with what is written for it). The three shell guards are held as whole scripts, and run: main's and the
+  release branch's with a branch on the remote whose name only ends as the real one does, and production's also
+  with the branch's head as the commit checked and only a tag whose name ends as the release's does on it. What an
+  action does inside is not read. The workflow files are inputs of that test in `turbo.json`, so a change to one always runs it.
 - **The repository's stack** (`packages/infra/src/GitHub.stack.ts`): only an admin may create, move or delete a `v*`
   tag, and a `release/*` branch is never force-pushed or deleted (admins may bypass both). The `production`
   environment requires Benjamin's approval and takes only a run whose ref is `main`. A workflow started by another
@@ -176,7 +178,10 @@ for a release branch: no release has been cut.
 accounts, keeps sign-up closed, and has no model key. The rules answer, since decision I5 gives a key to production
 only. Its test accounts take the one password the previews share. It runs on the previews' Cloudflare account, from
 the `staging` environment, which only `main` may deploy to. Nobody deploys it until Benjamin has deployed the
-repository's stack with the `staging` environment in it (`goals/infra/PLAN.md`, "What Benjamin does by hand").
+repository's stack with the `staging` environment in it: `bun run beep infra setup --staging` on his workstation,
+which makes the previews' password in 1Password, finds the two Cloudflare accounts, shows the stack's plan and
+deploys it after his yes (`goals/infra/PLAN.md`, "What Benjamin does by hand"; `--dry-run` prints its steps). The
+browser logins, unlocking 1Password, reading the plan and, later, approving each production deploy stay his.
 
 Until then every push to `main` that passes CI is followed by a failed "Deploy" run: the `staging` job stops with
 `MissingPreviewPassword` ("Stage "staging" has no password for its test accounts"), because the environment that

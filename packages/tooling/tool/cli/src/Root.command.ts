@@ -1,6 +1,6 @@
 /**
  * The root command, `beep`: one group per kind of rule, the three commands that keep what is derived in step,
- * `patches` and `release`.
+ * `patches`, `release`, and `infra`, the owner's setup before a first deploy.
  *
  * @packageDocumentation
  */
@@ -8,6 +8,7 @@ import * as Command from "effect/cli/Command"
 import { configSyncCommand } from "./commands/ConfigSync/ConfigSync.command.ts"
 import { depsCommand } from "./commands/Deps/Deps.command.ts"
 import { docsCommand } from "./commands/Docs/Docs.command.ts"
+import { infraCommand } from "./commands/Infra/Infra.command.ts"
 import { lawsCommand } from "./commands/Laws/Laws.command.ts"
 import { patchesCommand } from "./commands/Patches/Patches.command.ts"
 import { qualityCommand } from "./commands/Quality/Quality.command.ts"
@@ -27,6 +28,7 @@ export const rootCommand = Command.make("beep").pipe(
     configSyncCommand,
     depsCommand,
     docsCommand,
+    infraCommand,
     lawsCommand,
     patchesCommand,
     qualityCommand,

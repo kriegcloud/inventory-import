@@ -17,6 +17,7 @@
     "db:migrate": "node scripts/migrate-local.mjs",
     "db:reset": "node -e \"require('node:fs').rmSync('.wrangler/state',{recursive:true,force:true})\" && node scripts/migrate-local.mjs",
     "lighthouse": "bash scripts/lighthouse.sh",
+    "pregrid:keys": "node scripts/migrate-local.mjs",
     "grid:keys": "node scripts/grid-keys.mjs",
     "dev:portless": "node scripts/migrate-local.mjs && portless inventory vite",
     "dev:https": "node scripts/migrate-local.mjs && node scripts/dev-https.mjs",

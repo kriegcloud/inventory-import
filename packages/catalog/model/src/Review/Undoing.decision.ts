@@ -38,7 +38,7 @@ import {
   StepUndone
 } from "../Row/Row.aggregate.ts"
 import { Change, ImportKey, RowKey, Step } from "./Change.schema.ts"
-import { GroupedAfter, GroupedSince } from "./Deciding.decision.ts"
+import { GroupedAfter, GroupedSince, UndoneSince } from "./Deciding.decision.ts"
 
 /** The row does not hold the change named as its sender's own decision. */
 export class NotYourStep extends Domain.Rejection(
@@ -69,8 +69,8 @@ export class HistoryEnds extends Domain.Rejection(
  * Take back one change on one row. `undo` is the change taken back; `step` is this act's own; `sawGroup` is the
  * import's last act on a group as the sender's screen has it; `covered` says a group in force, decided after the
  * decision taken back, covers the row (the sender's word, from a screen that has every group act: `sawGroup`);
- * `madeOn` is the import's matching the undo was pressed on; `next`, with `below` under it, goes under the decision
- * put back.
+ * `madeOn` is the import's matching the undo was pressed on; `sawUndone` is the change the row's last undo took back,
+ * as the sender's screen has it, or 0 for none; `next`, with `below` under it, goes under the decision put back.
  */
 export class UndoRowStep extends Domain.Command(
   "UndoRowStep",
@@ -84,6 +84,7 @@ export class UndoRowStep extends Domain.Command(
       sawGroup: Change,
       covered: S.Boolean,
       madeOn: S.Int,
+      sawUndone: Change,
       opening: S.Int,
       next: Level,
       // A history is sealed only while it is at most `MOST_BELOW` long, so no true `below` is longer.
@@ -96,6 +97,7 @@ export class UndoRowStep extends Domain.Command(
       ConfirmedSince,
       GroupedSince,
       NotYourStep,
+      UndoneSince,
       MatchedSince,
       GroupedAfter,
       DecidedBeforeTheConfirm,
@@ -143,7 +145,7 @@ export class Undoing extends Domain.Decision(
       // the row since, and whatever landed on the import between the two sendings: a confirm and a reopening, or an
       // act on a group, which the copy cannot have seen (2026-11-22, by the rule on a press from a screen that is
       // behind). It is asked inside each refusal, and worked out there: worked out once before them, its three
-      // comparisons multiply every way through this `decide` for the prover (814 paths, where this form has 362).
+      // comparisons multiply every way through this `decide` for the prover (814 paths then, where this form had 362; 364 now).
       // The row keeps its last undo only: a copy that arrives after another undo on the same row is not known, and
       // is refused as not its sender's step.
       if (cmd.opening !== life.state.confirms) {
@@ -157,6 +159,14 @@ export class Undoing extends Domain.Decision(
       if (!isDecided(row.state) || row.state.by !== actor.memberId || row.state.change !== cmd.undo) {
         if (tookThisUndo({ row: row.state, undo: cmd.undo, step: cmd.step, by: actor.memberId })) return []
         return yield* new NotYourStep({})
+      }
+      // An undo landed on the row that the sender's screen has not received: another person decided over the sender's
+      // decision and took that back, so the row holds the sender's decision again, as the screen that is behind shows
+      // it. The press names what the row holds and would be applied from a screen that has neither act. It is refused
+      // with who took that undo and of which change, and held (2026-11-22, by the rule on a press from a screen that
+      // is behind), as a row's act is.
+      if (cmd.sawUndone !== row.state.undone.change) {
+        return yield* new UndoneSince({ by: row.state.undone.by, change: row.state.undone.change })
       }
       // An undo puts back the decision under the one taken back, another person's included, on the matching that one
       // was made on. Pressed on a screen that has not received a match, it is refused and held as a row's act is.
@@ -209,6 +219,9 @@ export class Undoing extends Domain.Decision(
       // A row's undo is made on a screen that has the import's last act on a group.
       ARowsUndoSawTheLastGroupAct: ({ before, command }) =>
         isOpen(before.life) && command.sawGroup === before.life.lastGroup,
+      // And on one that has the row's last undo: the change it took back names it.
+      AnUndoIsMadeOnAScreenThatHasTheRowsLastUndo: ({ before, command }) =>
+        command.sawUndone === before.row.undone.change,
       // And on the import's matching now.
       AnUndoIsMadeOnTheMatchingNow: ({ before, command }) =>
         isOpen(before.life) && command.madeOn === before.life.matching,

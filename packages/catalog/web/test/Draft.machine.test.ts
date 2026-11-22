@@ -850,8 +850,10 @@ describe("seeds the properties were falsified by, played again", () => {
     }
   ] as const
   for (const { may, name, seed } of seeds) {
+    // The same limit as the four above: a seeded one took 12.8 s at its slowest in three runs of 1,000, measured with
+    // other test runs busy on the same machine.
     it.prop(`${name}, seed ${seed}`, { choices: Choices }, ({ choices }) => play(choices, may), {
-      timeout: 300_000,
+      timeout: limit,
       arbitrary: { runs, size: 60, seed }
     })
   }

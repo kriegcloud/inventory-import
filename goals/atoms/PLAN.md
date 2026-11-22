@@ -913,14 +913,49 @@ organization's rows.
 
 None is left. The client's lint and the app's extend `.oxlintrc.atoms.json` with no exception: the two files the
 client excepted by name (`QueryClient.runtime.ts` and its test) are deleted, and the app's `main.tsx` no longer
-provides a query cache. The only exception to the atoms rule in the repository is the vendored kit
-(`packages/ui/src/components`, `packages/ui/src/hooks`), by decision A1.
+provides a query cache. The vendored kit (`packages/ui/src/components`, `packages/ui/src/hooks`) was the one
+exception to the atoms rule, by decision A1; that exception ended on 2026-11-22, and "The kit on atoms" below is how
+it goes.
 
 | File | What called it | Went at step |
 | --- | --- | --- |
 | `CurrentMember.controller.ts` (`useMember`) | the catalog screens | 6, with `Rollback.rules.ts` |
 | `Optimistic.controller.ts` (`useOptimisticWriteVia`, `makeOptimisticWrite`, `cacheChange`) | the catalog screens | 6, with its test |
 | `QueryClient.runtime.ts` | the app's `main.tsx`, and its own test | 8 |
+
+## The kit on atoms (2026-11-22)
+
+Benjamin, on the `React.useEffect` in `packages/ui/src/hooks/use-data-table.ts`: "I still see react hooks did we
+finish the atom migration?", then "Yeah we will still want to migrate this to atom", and on how far: "Whole kit,
+table first (Recommended)". So A1's exception for the kit is over. The rule is the one our code has: no effect hook,
+and another hook only where no atom can do the job.
+
+What does not change: what a person sees, every count and sentence, the table's tests and the browser step
+`grid:keys`. TanStack Table, TanStack Virtual and react-hook-form stay (A4), so their own hooks stay
+(`useReactTable`, `useVirtualizer`, `useForm` and the like), and so does `useRef` for a DOM node. Each hook left in a
+batch is listed in that batch's entry here with its reason; one that is neither a DOM ref nor a library's own hook is
+a question for Benjamin before the batch is called done.
+
+Counted on 2026-11-22 by name (`useState`, the effect hooks, `useMemo`, `useCallback`, `useRef`, `useReducer`,
+`useContext`, `useImperativeHandle`, `useId`, `useSyncExternalStore`): 44 files in the two folders, 418 calls. An
+earlier count of 38 files and 353 calls left out refs and ids.
+
+| Batch | Files | Hook calls | Proof |
+| --- | --- | --- | --- |
+| 1, the data table (shown Wednesday 2026-11-25) | `hooks/use-data-table.ts`, `hooks/use-debounced-callback.ts`; in `components/data-table/`: `data-table-state.ts`, `data-table.tsx`, `data-table-records.tsx`, `data-table-toolbar.tsx`, `data-table-pagination.tsx`, `data-table-view-options.tsx`, `data-table-sort-menu.tsx`, `data-table-filter-menu.tsx`, `data-table-faceted-filter.tsx`, `data-table-slider-filter.tsx`, `data-table-range-filter.tsx`, `data-table-date-filter.tsx`; what they stand on: `components/faceted.tsx`, `sortable.tsx`, `direction.tsx`, `calendar.tsx`, `slider.tsx` | 80 | The Items page and the review's table on screen: sort, filter, page, hide a column, the address after each; the table's tests |
+| 2, the data grid | `components/data-grid/`: `use-data-grid.ts`, `data-grid.tsx`, `data-grid-cell-variants.tsx`, `data-grid-cell.tsx`, `data-grid-data-cell.tsx`, `data-grid-row.tsx`, `data-grid-column-header.tsx`, `data-grid-select-column.tsx`, `data-grid-search.tsx`, `data-grid-context-menu.tsx`, `data-grid-paste-dialog.tsx`, `use-badge-overflow.ts`; `hooks/use-value-as-ref.ts` | 183 | `grid:keys` in Chromium; the review typed into on screen, 200 rows and the 50,000-row file |
+| 3, the frame and the form pieces | `components/sidebar.tsx`, `hooks/use-mobile.ts`, `sticky-table.tsx`, `form.tsx`, `field.tsx`, `toggle-group.tsx`, `input-otp.tsx`, `chart.tsx`, `carousel.tsx` | 30 | The sidebar open, closed and on a phone's width; the item editor's form |
+| 4, the pieces no screen uses today | `components/tour.tsx`, `stepper.tsx`, `file-upload.tsx`, `action-bar.tsx`, `hooks/use-ref-with-init.ts`, `hooks/use-isomorphic-layout-effect.ts` | 125 | Each drawn once in a throwaway page and used by keyboard; whether an unused one is deleted instead is Benjamin's |
+
+How the lint is turned on. Today `packages/ui/.oxlintrc.json` ignores the two folders whole, because the design
+lints (no raw `button`, no colour outside the theme) cannot hold for the components that are the design system. So
+the atoms rule gets a profile of its own for the kit, `packages/ui/.oxlintrc.kit.json`, which extends only
+`.oxlintrc.atoms.json` and names the files it reads; the package's `lint` runs it beside the first. Each batch adds
+its files to that list in the commit that moves them, so the check is green at every commit and a moved file cannot
+take a hook back. After batch 4 the list is the two folders, and `refs:check` reads them too.
+
+How a changed file is marked. Its first line says it was changed here and no longer matches its registry, and
+`docs/kit.md` lists the changed files, so `shadcn add` over one is a merge by hand and never `--overwrite`.
 
 ## Hand-written discriminators in the web packages
 

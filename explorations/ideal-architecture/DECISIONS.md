@@ -1129,7 +1129,7 @@ trying a falsified property again. Reverse: the three lines in `.github/workflow
 `vitest.config.ts`, and `realTime` and `saidAloud` in the four that wait in real time.
 
 A limit above the shared one is set only with what was measured written beside it: the 2,000-run waited-rows property
-(180 s; 24 s alone on two pinned cores), the draft machine's four properties (120 s; 12 s the slowest seen), Steps'
+(180 s; 24 s alone on two pinned cores), the draft machine's four properties and its three seeded ones (120 s; 13 s the slowest seen), Steps'
 heaviest shapes (60 s; 9.7 s), the scratchpad's nested run (120 s) and the CLI's start-up (120 s: five starts, each
 stopped at 20 s). Limits set below the shared one were taken out, so the shared one applies: six test files had 10 s
 or 20 s, the 50,000-row slow tests 60 s. The vendored kit and the scratchpad use the shared limits too; vendor sync
@@ -1345,3 +1345,17 @@ The agent chose these, and I was not asked:
 - The release notes are the conventional commits since the last tag, grouped by type, written to `CHANGELOG.md` and
   into the annotated tag's message. The app's version is `apps/inventory/package.json`; the "(v0.6.1)" in
   `README.md` names the version that was submitted and is never moved.
+
+### 2026-11-22 — atoms A1, the kit too
+
+Question: A1 left the vendored kit (`packages/ui/src/components`, `packages/ui/src/hooks`) its own React state. I
+saw the `React.useEffect` in `packages/ui/src/hooks/use-data-table.ts` and asked: "I still see react hooks did we
+finish the atom migration?", then said "Yeah we will still want to migrate this to atom". How far, and when?
+Answer: "Whole kit, table first (Recommended)". I chose; the agent recommended the same. Every file of the kit that
+calls a hook moves to atoms under the rule our own code has: no effect hook, another hook only where no atom can do
+the job (a DOM ref, a hook of TanStack Table, TanStack Virtual or react-hook-form, which stay by A4). The data table
+goes first, then the rest in batches, each checked and merged; nothing a person sees changes. The kit stops being
+as published: a changed file is marked as changed here, and a later update of it from its registry is merged by
+hand. This ends the last clause of "atoms A1, what stays a hook" ("the vendored kit is not ours"). Rejected: the
+table only; the kit left as it is. Reverse: take a file again from its registry and add it back to the lint's
+ignore list. The batches are in `goals/atoms/PLAN.md`, "The kit on atoms".

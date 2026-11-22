@@ -55,14 +55,20 @@
     },
     // Which package may import which (`beep laws boundaries`): every package.json and every import under src and test.
     "//#boundaries:check": {
+      // What the law reads: every manifest, every file under src and test, and for the scratchpad's rule also each
+      // workspace's scripts, its root files and stylesheets, and the repository's own root files and manifest.
       "inputs": [
+        "package.json",
+        "*.{ts,tsx,mts,cts,js,mjs,cjs}",
         "apps/**/package.json",
-        "apps/**/src/**",
-        "apps/**/test/**",
+        "apps/**/*.{ts,tsx,mts,cts,js,mjs,cjs,css}",
         "packages/**/package.json",
-        "packages/**/src/**",
-        "packages/**/test/**",
-        "packages/tooling/tool/cli/src/**"
+        "packages/**/*.{ts,tsx,mts,cts,js,mjs,cjs,css}",
+        "scratchpad/package.json",
+        "packages/tooling/tool/cli/src/**",
+        "!**/node_modules/**",
+        "!**/dist/**",
+        "!**/.wrangler/**"
       ],
       "outputs": []
     },

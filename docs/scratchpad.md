@@ -56,9 +56,12 @@ real test runner and type-checker over it, so a template that stops working fail
 - **Still refused:** a secret. `bun run check` reads every file git would commit for key-shaped strings, the
   experiments too, because the repository is public. Use no real customer data and no private name in an experiment
   for the same reason.
-- **Never the other way:** nothing imports from the scratchpad. `bun run check` refuses a package that declares it or
-  a file that imports it, by name or by path (`bun run beep laws boundaries`). That is the one thing the check
-  enforces about it.
+- **Never the other way:** nothing imports from the scratchpad. `bun run check` refuses a package.json (a
+  workspace's or the root's) that declares it or maps a `#` import into it, and any file that reaches it: by its
+  name, by a path, by an alias that climbs into it (`@/../../scratchpad/...`), through `import.meta.glob`, or a
+  stylesheet's `@import` or `@source`. It reads each workspace's code, scripts, root files and stylesheets, and the
+  files at the repository's root (`alchemy.run.ts`, what a deploy runs). A path built at run time is not seen
+  (`bun run beep laws boundaries`). That is the one thing the check enforces about it.
 
 ## Staying small
 

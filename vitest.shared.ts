@@ -12,11 +12,24 @@
 // (`{ timeout }`), as the draft machine's property tests do. The vendored kit's packages keep vitest's defaults:
 // their files are not edited, and their slowest test took under 2.5 s.
 
-/** The limits of a fast test and of a hook. */
-export const limits = { testTimeout: 30_000, hookTimeout: 60_000 } as const
+// Each package keeps vitest's cache of transformed modules in its own folder (a relative path is read from the
+// package's root), and its fast and slow tests in two. Shared by every package at the root, one test run's writes and
+// clean-ups removed files another run, started beside it by turbo, was reading: a whole file of tests failed with
+// ENOENT under `node_modules/.vitest-cache`, a different package each time.
 
-/** The limits of a slow test (`*.slow.test.ts`: a real database, sign-in, or 50,000 rows). */
-export const slowLimits = { testTimeout: 120_000, hookTimeout: 120_000 } as const
+/** The limits of a fast test and of a hook, and the fast tests' own module cache. */
+export const limits = {
+  testTimeout: 30_000,
+  hookTimeout: 60_000,
+  fsModuleCachePath: "node_modules/.vitest-cache/fast"
+} as const
+
+/** The limits of a slow test (`*.slow.test.ts`: a real database, sign-in, or 50,000 rows), and its own module cache. */
+export const slowLimits = {
+  testTimeout: 120_000,
+  hookTimeout: 120_000,
+  fsModuleCachePath: "node_modules/.vitest-cache/slow"
+} as const
 
 /**
  * For a package whose tests wait in real time (`Effect.sleep("20 millis")`, then look): a wait that runs long on a

@@ -300,7 +300,7 @@ export const vendorSync = Effect.fn("VendorSync.vendorSync")(function* (from: st
     yield* repo.write(repo.join(target, "tsconfig.test.json"), testConfig)
     yield* repo.write(
       repo.join(target, "vitest.config.ts"),
-      `import { defineConfig } from "vitest/config"\n\nexport default defineConfig({ test: { include: ["test/**/*.test.ts"] } })\n`
+      `import { defineConfig } from "vitest/config"\n\nexport default defineConfig({ test: { include: ["test/**/*.test.ts"], fsModuleCachePath: "node_modules/.vitest-cache" } })\n`
     )
     const needsRuns = A.some(testTexts, Str.includes("support/fcRuns.ts"))
     if (needsRuns) yield* repo.write(repo.join(target, "test/support/fcRuns.ts"), fcRuns)

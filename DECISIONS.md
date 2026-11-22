@@ -66,11 +66,6 @@ didn't": a messy file in, what is wrong fixed in the app, a clear account of the
       saying the column was matched again after the accept. Accepting again works.
     - The take-back line says a field "was matched again" and "to decide again" also when its column was cleared or
       went to another field, after the rows were decided again, and to people who cannot decide.
-    - A Replace stays when one match swaps the columns of two fields and neither new column reads. A save tried again
-      after an item changed keeps its first answers though somebody's match landed in between, so a Replace that
-      match should have taken back is saved.
-    - A request refused because items kept changing is titled "The import kept changing" above a sentence saying the
-      import did not change.
   - **For whoever changes the code.** `tags:check` takes 38 s on a chain of 20 calls, and `refs:check` does not
     return on seven module variables assigned to each other; no file here is of either shape. `WordMatch`, `Read`
     and the kept form of a held row are tagged unions whose cases are still built by hand. The property test of the

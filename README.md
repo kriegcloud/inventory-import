@@ -134,6 +134,9 @@ What the starter held, now turned to the brief's inventory item:
   key its rules answer.
 - The toolchain: Vite, React, Tailwind, every shadcn/ui component and more from Dice UI's and tablecn's registries
   (MIT; `docs/kit.md` says what was changed), Effect, Wrangler, Vitest, a .csv and .xlsx reader, and syncpack.
+- Alchemy, for hosting: a build of one commit of its `main`, kept as files in `vendor/alchemy` (Apache-2.0, each
+  file with its own licence and notice; [vendor/alchemy/README.md](vendor/alchemy/README.md) says the one change
+  made to them and why they are kept here).
 - Two design lints in `bun run check` that hold every screen to the theme and its components.
 - `CLAUDE.md`, and the skills and agents my coding agent works from. Twenty-one skills come from my monorepo
   beep-effect; the rest are vendored unchanged, and [.agents/skills/README.md](.agents/skills/README.md) credits each

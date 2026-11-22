@@ -246,6 +246,7 @@ package's task and replays it when nothing it reads has changed. The app's own s
 | `bun run db:reset` | Deletes the local database and re-applies migrations. **Restart `bun run dev` afterwards.** |
 | `bun run preview` | Builds and serves the production build on http://localhost:4173, with security headers, compressed (brotli, else gzip) as Cloudflare serves it; `PREVIEW_COMPRESSION=off` for the raw bytes |
 | `bun run telemetry` | Optional, Benjamin's to start (needs Docker): Grafana's LGTM stack, then `OTEL_EXPORTER_OTLP_ENDPOINT` in `apps/inventory/.dev.vars` sends the Worker's and the browser's traces, metrics and logs to it. Never part of `bun run dev`; `telemetry:down` stops it |
+| `bun run alchemy:repin -- <commit>` | Moves the Alchemy packages kept as files in `vendor/alchemy` to another commit of the library's `main`: the files, the root `overrides`, the lockfile's hashes, an install that is refused the library's registry, then `check:full` with nothing replayed from the cache (`vendor/alchemy/README.md`). Benjamin asks for it; it commits nothing. `bun run alchemy:check` checks the pin as it stands. Needs python3 |
 
 | App command (`apps/inventory`) | What it does |
 | --- | --- |
@@ -320,6 +321,9 @@ packages/infra/          @beep/infra: what is deployed, per stage. The stage pla
                         the deploy environments, their secrets, the rule on main). Nothing in the app imports it.
 alchemy.run.ts          The app's stack, re-exported for `bunx alchemy deploy --stage <name>`. A deploy is Benjamin's:
                         no agent runs `alchemy deploy`, `plan`, `destroy`, `login` or `state` (goals/infra/PLAN.md).
+vendor/alchemy/         The Alchemy packages as files, one commit of the library's main, with every sibling address
+                        inside them rewritten so an install needs the library's registry for nothing. Its README says
+                        why, and how the pin moves. Never edit a file there: `bun run alchemy:check` fails on a change.
 packages/foundation/     Product-neutral packages: this repository's own @beep/csv and @beep/xlsx (modeling/), which read
                         and write a CSV and an Excel workbook as Effect Schema codecs, and beep-effect's kit, vendored:
                         @beep/types (primitive/), @beep/identity, @beep/schema and @beep/utils (modeling/). Never edit

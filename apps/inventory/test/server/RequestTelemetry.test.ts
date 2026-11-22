@@ -12,7 +12,7 @@ import { ModelId } from "@beep/openrouter/OpenRouterModel"
 import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
 import { toTracedFetch } from "../../src/server/App.ts"
 import { Collector, RequestTelemetry } from "../../src/server/RequestTelemetry.ts"
-import { inMemoryApp, settingsLayer, testOrigin, testSettings } from "./support/app.ts"
+import { inMemoryApp, settingsLayer, settled, testOrigin, testSettings } from "./support/app.ts"
 
 // Tracing that leaves the Worker is built per request (src/server/RequestTelemetry.ts): each request gets its own
 // exporters, its handler's spans go to them, and they are closed (which sends what they hold) only after the answer,
@@ -106,7 +106,7 @@ it.effect("gives each request its own exporters, and closes them after the answe
       expect(exports[1]?.spans).not.toContain("identity.me")
       // What was handed to `waitUntil` closes each one, and only after every span it was given has ended.
       expect(served.pending.length).toBe(3)
-      yield* Effect.promise(() => Promise.all(served.pending))
+      yield* settled(served.pending)
       for (const one of exports) {
         expect(one.closed).toBe(true)
         expect(one.ended).toBe(one.spans.length)
@@ -122,7 +122,7 @@ it.effect("off, the default: nothing is built, and the request answers as before
       const answer = yield* Effect.promise(() => served.fetch(new Request(`${testOrigin}/api/v1/identity/me`)))
       expect(answer.status).toBe(200)
       expect(answer.headers.get("cache-control")).toBe("no-store")
-      yield* Effect.promise(() => Promise.all(served.pending))
+      yield* settled(served.pending)
     })
   )
 )

@@ -13,7 +13,7 @@ import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
 import { toTracedFetch } from "../../src/server/App.ts"
 import { RequestTelemetry } from "../../src/server/RequestTelemetry.ts"
 import { collector } from "../../src/server/Telemetry.ts"
-import { inMemoryApp, settingsLayer, testOrigin, testSettings } from "./support/app.ts"
+import { inMemoryApp, settingsLayer, settled, testOrigin, testSettings } from "./support/app.ts"
 
 // Telemetry to a collector (src/server/Telemetry.ts). On: every request's traces, logs and metrics are sent once it
 // has answered, and the browser's batches are forwarded from the app's own pages only. A stopped collector costs the
@@ -93,7 +93,7 @@ it.effect("on: each request sends its traces, logs and metrics after it has answ
         const answer = yield* Effect.promise(() => served.fetch(page(path)))
         expect(answer.status).toBe(200)
       }
-      yield* Effect.promise(() => Promise.all(served.pending))
+      yield* settled(served.pending)
       const count = (signal: string) => A.filter(collectorSeen.sent, (path) => path === `/v1/${signal}`).length
       expect([count("traces"), count("metrics")]).toEqual([3, 3])
       expect(count("logs")).toBeLessThanOrEqual(3)
@@ -108,7 +108,7 @@ it.effect("on: every batch names this isolate as one instance, so its counters a
       const served = yield* serving({ ...testSettings, OTEL_EXPORTER_OTLP_ENDPOINT: endpoint })
       for (const path of ["/api/v1/identity/me", "/api/v1/activity"])
         yield* Effect.promise(() => served.fetch(page(path)))
-      yield* Effect.promise(() => Promise.all(served.pending))
+      yield* settled(served.pending)
       const instances = A.dedupe(
         A.flatMap(collectorSeen.bodies, (body) =>
           A.flatMap(
@@ -150,7 +150,7 @@ it.effect(
         collectorSeen.answer = () => Promise.reject(new TypeError("fetch failed"))
         const stopped = yield* Effect.promise(() => served.fetch(batch("same-origin")))
         expect(stopped.status).toBe(204)
-        yield* Effect.promise(() => Promise.all(served.pending))
+        yield* settled(served.pending)
       })
     )
 )
@@ -165,7 +165,7 @@ it.effect("off, the default: nothing is sent, and the page is told so without a 
       const forward = yield* Effect.promise(() =>
         served.fetch(page("/api/otlp/v1/traces", { method: "POST", body: "{}" }))
       )
-      yield* Effect.promise(() => Promise.all(served.pending))
+      yield* settled(served.pending)
       expect({ me: me.status, status, forward: forward.status }).toEqual({
         me: 200,
         status: { on: false },

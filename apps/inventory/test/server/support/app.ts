@@ -285,6 +285,13 @@ const fromJson = S.decodeUnknownEffect(S.fromJsonString(S.Unknown))
 export const testOrigin = "http://localhost:5320"
 
 /**
+ * Waits for everything a request handed to `waitUntil`. Each promise is already running, so nothing is started here:
+ * they are only waited for, all of them at once, and a rejected one fails the test.
+ */
+export const settled = (pending: ReadonlyArray<Promise<unknown>>): Effect.Effect<void> =>
+  Effect.forEach(pending, (promise) => Effect.promise(() => promise), { concurrency: "unbounded", discard: true })
+
+/**
  * Sends one request to the app the way a browser or curl would, as the member named by `actingAs` (the demo
  * identity header), and reads back the status, the headers and the JSON body.
  */

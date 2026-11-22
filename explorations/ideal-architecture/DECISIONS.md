@@ -888,8 +888,8 @@ the "Local change" blocks in those eleven files.
 He asked, in his words: "In beep-effect we have this lint rule or something that errors when deprecated api's are
 used. Can you […] configure and set this up for us?" Built as beep-effect has it, oxlint's
 `typescript/no-deprecated`, as a law and a root task, `deprecated:check` (`docs/standards/deprecated-apis.md`), on
-every code file git would commit but the vendored skills under `.agents/`, which the agent left out and he has not
-been asked about. Reverse: drop the task from `check` and `check:full`.
+every code file git would commit but the vendored skills under `.agents/` (decided below, 2026-11-22). Reverse: drop
+the task from `check` and `check:full`.
 
 ### 2026-11-21 — deprecated APIs, the vendored data grid's `document.execCommand`
 
@@ -902,6 +902,15 @@ What was built first was a different design, not put to him before it was built:
 cell's fallback stored 6 for a typed 56 and 5 for a typed -5, so the agent let the browser type the key that opens an
 editor, through a prop on the vendored cell and a `flushSync` in its key handler. A review found that wrong for a
 column with a variant and its own `cell`, which lost the opening key and stored 6 for a typed 56.
+
+### 2026-11-22 — deprecated APIs, `.agents/` is not read
+
+Question, by dialog: the check reads every code file except `.agents/`, the vendored agent skills; reading it gives 5
+findings in one skill's browser-probe script, which reads two deprecated CSS properties on purpose, plus 18 files with
+no TypeScript project; he had asked for no exemptions. Options: "Leave it out, by name (Recommended)"; "Read it and fix
+it", a local change to the probe script and a project for the 18 files. Answer: "Leave it out, by name". I chose; the
+agent recommended the same. It stays the one folder named as not read, said in the check's output and in its doc
+(`leftOut` in the law). Reverse: empty `leftOut`, give the 18 files a project and change the probe script.
 
 ### 2026-11-22 — the vendored data grid's typing, for every column
 

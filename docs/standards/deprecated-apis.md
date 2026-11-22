@@ -25,7 +25,8 @@ git-ignored.
 One folder is left out, by name in the law (`leftOut`): `.agents/`, 18 code files of other people's skills, vendored as
 they were published and run by no part of the app or its checks. One of them
 (`design-taste-frontend/scripts/lib/probe.mjs`) reads the deprecated CSS properties `clip` and `webkitBackgroundClip`
-on purpose, to report a page that uses them: 5 findings if the folder were read.
+on purpose, to report a page that uses them: 5 findings if the folder were read. Benjamin chose to leave it out by
+name, and the check says so each time it passes.
 
 ```
 packages/use/src/Use.tsx:3:27  `old` is deprecated. use next

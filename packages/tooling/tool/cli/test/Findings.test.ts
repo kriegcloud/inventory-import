@@ -50,7 +50,10 @@ const members = <F extends { readonly _tag: string }>(
   })
 
 members<DeprecatedApisFinding>("laws deprecated-apis", DeprecatedApisFinding, deprecatedApisSentence, {
-  Clean: [DeprecatedApisFinding.cases.Clean.make({}), "out: deprecated:check OK  no deprecated API is used"],
+  Clean: [
+    DeprecatedApisFinding.cases.Clean.make({}),
+    "out: deprecated:check OK  no deprecated API is used (.agents/ is not read)"
+  ],
   Refused: [
     DeprecatedApisFinding.cases.Refused.make({}),
     "err: deprecated:check FAIL  a deprecated API is used. Move to what its note names:"

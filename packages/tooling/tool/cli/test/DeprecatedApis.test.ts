@@ -13,7 +13,7 @@ import { Repo } from "../src/Repo.service.ts"
 import { render } from "../src/Report.schema.ts"
 import { inTree, json, printed, type Tree } from "./support/tree.ts"
 
-const clean = "out: deprecated:check OK  no deprecated API is used"
+const clean = "out: deprecated:check OK  no deprecated API is used (.agents/ is not read)"
 const refused = "err: deprecated:check FAIL  a deprecated API is used. Move to what its note names:"
 const profile = ".oxlintrc.deprecated-apis.json"
 

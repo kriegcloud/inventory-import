@@ -122,7 +122,7 @@ const fail = (message: string): Line => err(`deprecated:check FAIL  ${message}`)
  * @category rendering
  */
 export const deprecatedApisSentence: (finding: DeprecatedApisFinding) => Line = DeprecatedApisFinding.match({
-  Clean: () => out("deprecated:check OK  no deprecated API is used"),
+  Clean: () => out("deprecated:check OK  no deprecated API is used (.agents/ is not read)"),
   Refused: () => fail("a deprecated API is used. Move to what its note names:"),
   At: ({ note, place }) => err(`${place}  ${note}`),
   Unlisted: ({ why }) => fail(`git could not list the files, so none was checked: ${why}`),

@@ -1037,8 +1037,10 @@ batch". I chose; the agent recommended the same. Not built yet.
 
 The Alchemy packages are a build of the library's `main` (`vendor/alchemy`, commit `734c27a`), because
 `@alchemy.run/domain`'s `Decision` and `Verify` are in no release. The update to that build was held on one thing:
-it raises the Cloudflare state store's version from 8 to 9, the first deploy on it upgrades the store without asking
-(`deploy.yml` passes `--yes`), and a checkout on an older build is refused by the store from then on.
+it raises the Cloudflare state store's version from 8 to 9. The first thing on it that reaches a store an older build
+made upgrades that store, one way: `alchemy state bootstrap` and CI's deploys (`deploy.yml` passes `--yes`) without
+asking, a deploy from the workstation only after a confirm. A checkout on an older build is refused by the store from
+then on.
 
 "All I know is I want the latest version of alchemy. We will likely need to update effect & alchemy again before
 Wednesday comes." And on what is deployed: "We can always tear down & redeploy from scratch. The idea is that we get

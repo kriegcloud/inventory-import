@@ -69,8 +69,9 @@ bun run alchemy:repin -- <commit>
 ```
 
 `<commit>` is a commit of the library's `main`, at least its first seven characters, or the word `main` for its head.
-The registry builds commits of `main` only. The command needs python3, git, bun and the network, and does all of
-this, stopping at the first step that fails:
+The registry builds commits of `main` only. The command needs python3, git, bun and the network. It first prints the
+address that compares the pinned commit with the new one, then does all of this, stopping at the first step that
+fails:
 
 1. Downloads that commit's builds, checks each against the hash in its address, rewrites the addresses, replaces the
    files and `sources.json`, and says which packages are new or gone since the last pin.
@@ -85,7 +86,11 @@ this, stopping at the first step that fails:
    if the install asked for it, changed `bun.lock` or put anything else in place than the files here.
 8. Runs `bun run check:full -- --force`: every type-check, test and proof again, nothing replayed from the cache.
    The library's `main` breaks code between releases, so a failure here is the library's change to read and answer
-   in the code, never a reason to keep the old result. The command prints the address that compares the two commits.
+   in the code, never a reason to keep the old result.
+
+A step from 1 to 7 that fails puts every file it changed back as it was and runs `bun install` again, so the old pin
+stands. Step 8 failing leaves the pin moved, and prints the one line that goes back instead. Adding
+`--no-full-check` to the command leaves step 8 out.
 
 It commits nothing. What is left by hand: read the difference and what the library changed, fix what step 8 found,
 and commit.

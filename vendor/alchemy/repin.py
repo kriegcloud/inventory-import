@@ -26,6 +26,8 @@ A move, in order, stopping at the first step that fails:
 8. runs `bun run check:full -- --force`: the library's `main` breaks code between releases, so every type-check,
    test and proof is run again and nothing is replayed from the cache.
 
+A step from 1 to 7 that fails puts every file it changed back as it was. Step 8 failing leaves the pin moved, since
+what it found is the library's change to answer in the code, and says which files to restore to go back instead.
 `--no-full-check` leaves step 8 out. Nothing is committed: read the difference, then commit it.
 """
 import base64, datetime, gzip, hashlib, io, json, os, re, select, shutil, socket, subprocess, sys, tarfile, tempfile
@@ -128,10 +130,9 @@ def fetch(commit: str) -> dict:
         waiting.extend(needs(manifest).items())
 
     before = {source["package"] for source in json.loads(SOURCES.read_text())["packages"]} if SOURCES.exists() else set()
-    for old in HERE.glob("*.tgz"):
-        old.unlink()
     alchemy_version = fetched["alchemy"]["manifest"]["version"]
     sources = []
+    kept_files = {}
     for name in sorted(fetched):
         entry = fetched[name]
         manifest = entry["manifest"]
@@ -146,8 +147,10 @@ def fetch(commit: str) -> dict:
                 changed = raw.replace(json.dumps(spec), json.dumps(f"{version}-{commit}"))
                 rewritten += changed != raw
                 raw = changed
-        if REGISTRY in raw:
-            raise SystemExit(f"{name}: an address is left in its package.json")
+        for key in DEPENDENCY_KEYS:
+            for sibling, spec in (json.loads(raw).get(key) or {}).items():
+                if REGISTRY_HOST in str(spec):
+                    raise SystemExit(f"{name}: its package.json still names {sibling} by the registry's address")
         if rewritten == 0:
             # It names no sibling: the file kept is the registry's, byte for byte.
             kept = entry["data"]
@@ -173,7 +176,7 @@ def fetch(commit: str) -> dict:
                         tar.addfile(member, io.BytesIO(content) if content is not None else None)
             kept = packed.getvalue()
         file = f"{name.lstrip('@').replace('/', '-')}-{commit}.tgz"
-        (HERE / file).write_bytes(kept)
+        kept_files[file] = kept
         sources.append(
             {
                 "package": name,
@@ -188,6 +191,11 @@ def fetch(commit: str) -> dict:
             }
         )
     pin = {"commit": commit, "pinnedOn": datetime.date.today().isoformat(), "packages": sources}
+    # Every package was read and rewritten without a refusal: only now do the files here change.
+    for old in HERE.glob("*.tgz"):
+        old.unlink()
+    for file, kept in kept_files.items():
+        (HERE / file).write_bytes(kept)
     SOURCES.write_text(json.dumps(pin, indent=2) + "\n")
     now = {source["package"] for source in sources}
     for name in sorted(now - before):
@@ -529,38 +537,81 @@ def install_without_registry(pin: dict) -> None:
 
 def run(command: list) -> None:
     if subprocess.run(command, cwd=ROOT).returncode != 0:
-        raise SystemExit(f"`{' '.join(command)}` failed; the pin is half moved. Fix it and run the rest by hand, or "
-                         f"`git checkout -- package.json bun.lock vendor/alchemy packages` to go back.")
+        raise SystemExit(f"`{' '.join(command)}` failed.")
+
+
+def pin_files() -> list:
+    """Every file a move may change: the kept files and their list, the page, the lockfile and the manifests."""
+    return [ROOT / "package.json", LOCK, README, SOURCES, *sorted(HERE.glob("*.tgz")), *workspace_manifests()]
+
+
+def changed_since(before: dict) -> list:
+    now = {file: file.read_bytes() for file in pin_files()}
+    return sorted(str(file.relative_to(ROOT)) for file in {*before, *now} if before.get(file) != now.get(file))
+
+
+def put_back(before: dict) -> None:
+    for file in HERE.glob("*.tgz"):
+        if file not in before:
+            file.unlink()
+    for file, data in before.items():
+        if not file.exists() or file.read_bytes() != data:
+            file.write_bytes(data)
 
 
 def repin(commit: str, full_check: bool) -> None:
-    before = json.loads(SOURCES.read_text())["commit"] if SOURCES.exists() else None
+    pinned = json.loads(SOURCES.read_text())["commit"] if SOURCES.exists() else None
     if commit == "main":
         commit = head_of_main()
     if re.fullmatch(r"[0-9a-f]{7,40}", commit) is None:
         raise SystemExit(f"{commit!r} is not a commit: give at least its first seven characters, or \"main\"")
     commit = commit[:7]
-    say(f"1. The build of commit {commit}, checked against the hashes in its addresses")
-    pin = fetch(commit)
-    say("2. The overrides in the root package.json and the version each workspace asks for")
-    wire(pin)
-    say("3. bun install")
-    run(["bun", "install"])
-    say("4. The hash of each file, written into bun.lock")
-    write_lock_hashes(pin)
-    say("5. The README's part that names the pin")
-    write_readme(pin)
-    say("6. The check")
-    check(pin)
-    say("7. An install of a copy of this tree, with an empty cache, refused the registry")
-    install_without_registry(pin)
+    if pinned is not None and pinned != commit:
+        say(f"From {pinned} to {commit}. What the library changed: {LIBRARY}/compare/{pinned}...{commit}")
+    before = {file: file.read_bytes() for file in pin_files()}
+    installed = False
+    try:
+        say(f"1. The build of commit {commit}, checked against the hashes in its addresses")
+        pin = fetch(commit)
+        say("2. The overrides in the root package.json and the version each workspace asks for")
+        wire(pin)
+        say("3. bun install")
+        installed = True
+        run(["bun", "install"])
+        say("4. The hash of each file, written into bun.lock")
+        write_lock_hashes(pin)
+        say("5. The README's part that names the pin")
+        write_readme(pin)
+        say("6. The check")
+        check(pin)
+        say("7. An install of a copy of this tree, with an empty cache, refused the registry")
+        install_without_registry(pin)
+    except BaseException as stopped:
+        changed = changed_since(before)
+        put_back(before)
+        if not isinstance(stopped, SystemExit):
+            say(f"{type(stopped).__name__}: {stopped}")
+        elif stopped.code not in (None, 0):
+            say(str(stopped.code))
+        if len(changed) > 0:
+            say(f"The move stopped, and the {len(changed)} file(s) it had changed are back as they were.")
+        if installed:
+            say("node_modules may hold the other build: putting it back with `bun install`.")
+            if subprocess.run(["bun", "install"], cwd=ROOT).returncode != 0:
+                say("`bun install` failed: run it again by hand.")
+        raise SystemExit(1) from stopped
     if full_check:
         say("8. bun run check:full -- --force")
-        run(["bun", "run", "check:full", "--", "--force"])
+        if subprocess.run(["bun", "run", "check:full", "--", "--force"], cwd=ROOT).returncode != 0:
+            changed = changed_since(before)
+            tracked = [file for file in changed if not (file.startswith("vendor/alchemy/") and file.endswith(".tgz"))]
+            raise SystemExit(
+                f"The pin has moved to {commit} and passed its own checks; `bun run check:full -- --force` then "
+                f"failed. That is the library's change to answer in the code. To go back instead: "
+                f"`git checkout -- {' '.join(tracked)} vendor/alchemy && git clean -f -- vendor/alchemy && bun install`."
+            )
     else:
         say("8. Left out (--no-full-check): run `bun run check:full -- --force` before committing")
-    if before is not None and before != commit:
-        say(f"Moved from {before} to {commit}. What the library changed: {LIBRARY}/compare/{before}...{commit}")
     say("Nothing is committed. Read `git status` and `git diff`, then commit.")
 
 

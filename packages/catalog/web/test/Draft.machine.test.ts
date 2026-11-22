@@ -12,6 +12,7 @@ import {
   DraftEffect,
   DraftEvent,
   emptyDraft,
+  Keep,
   notSaved,
   Said,
   type Side,
@@ -21,6 +22,7 @@ import {
   waiting
 } from "../src/Draft.machine.ts"
 import {
+  accepted,
   broken,
   Choices,
   Command,
@@ -828,6 +830,142 @@ describe("orderings the properties met, pinned", () => {
         Command.cases.SomeoneElse.make({ row: "b", to: "kept" })
       ])
     ).toEqual(O.none())
+  })
+})
+
+describe("a save's answer that comes after its draft closed", () => {
+  const acceptName = decisionFromFlags({ accepted: ["name"] })
+  /** The events played from nothing: the draft they leave, and everything they asked for, in order. */
+  const played = (events: ReadonlyArray<DraftEvent>) =>
+    A.reduce(events, { draft: emptyDraft, effects: A.empty<DraftEffect>() }, (before, event) => {
+      const next = step(before.draft, event)
+      return { draft: next.draft, effects: [...before.effects, ...next.effects] }
+    })
+  const sends = (effects: ReadonlyArray<DraftEffect>) => A.filter(effects, DraftEffect.$is("Send"))
+  const answer = (
+    id: number,
+    revision: number,
+    decidedSince: ReadonlyArray<{ rowId: string; theirs: O.Option<SavedDecisions[string]> }>
+  ) => DraftEvent.SaveAnswered({ id, revision, changed: false, notApplied: [], decidedSince })
+  /** Row a left out on revision 4, its save failed and sent again (id 2), and the import closed at 6 while it was out. */
+  const closedWithSaveOut = (closedHolds: SavedDecisions): ReadonlyArray<DraftEvent> => [
+    DraftEvent.Opened({ kept: O.none() }),
+    DraftEvent.ViewArrived({ revision: 4, decisions: {}, open: true, confirms: 0 }),
+    DraftEvent.Decided({ changes: { a: O.some(out) } }),
+    DraftEvent.SaveFailed({ id: 1 }),
+    DraftEvent.SaveAgain(),
+    DraftEvent.ViewArrived({ revision: 6, decisions: closedHolds, open: false, confirms: 1 })
+  ]
+
+  it("does not bring her refused pick back against her own newer decision of the row, saved and answered since", () => {
+    // The closed picture named row a (it held another decision): the late answer adds nothing.
+    const named = played([
+      ...closedWithSaveOut({ a: kept }),
+      DraftEvent.ViewArrived({ revision: 7, decisions: {}, open: true, confirms: 1 }),
+      DraftEvent.Decided({ changes: { a: O.some(acceptName) } }),
+      DraftEvent.SaveAnswered({ id: 3, revision: 8, changed: true, notApplied: [], decidedSince: [] }),
+      answer(2, 5, [{ rowId: "a", theirs: O.some(kept) }])
+    ])
+    expect([named.draft.lines, shown(named.draft)]).toEqual([{}, { a: acceptName }])
+    // The closed picture held her decision, so nothing named it; she decided the row again in the reopened import, and
+    // that is saved: what the late answer calls decided since is hers.
+    const held = played([
+      ...closedWithSaveOut({ a: out }),
+      DraftEvent.ViewArrived({ revision: 7, decisions: { a: out }, open: true, confirms: 1 }),
+      DraftEvent.Decided({ changes: { a: O.some(acceptName) } }),
+      DraftEvent.SaveAnswered({ id: 3, revision: 8, changed: true, notApplied: [], decidedSince: [] }),
+      answer(2, 8, [{ rowId: "a", theirs: O.some(acceptName) }])
+    ])
+    expect([held.draft.lines, shown(held.draft)]).toEqual([{}, { a: acceptName }])
+  })
+
+  it("brings her refused pick back on the revision it was made on: a pick of it is sent with that revision", () => {
+    const events = [
+      DraftEvent.Opened({ kept: O.none() }),
+      DraftEvent.ViewArrived({ revision: 4, decisions: {}, open: true, confirms: 0 }),
+      DraftEvent.Decided({ changes: { a: O.some(accepted) } }),
+      // Closed holding her decision, opened again, and somebody decides the row: then her save is judged.
+      DraftEvent.ViewArrived({ revision: 5, decisions: { a: accepted }, open: false, confirms: 1 }),
+      DraftEvent.ViewArrived({ revision: 7, decisions: { a: kept }, open: true, confirms: 1 }),
+      answer(1, 7, [{ rowId: "a", theirs: O.some(kept) }])
+    ]
+    const before = played(events)
+    expect(A.map(before.draft.lines.a?.sides ?? [], (side) => side.madeOn)).toEqual([4])
+    const picked = step(
+      before.draft,
+      DraftEvent.Settled({ picks: [{ rowId: "a", keep: Keep.Side({ decision: O.some(accepted) }) }] })
+    )
+    expect(A.map(sends(picked.effects), (send) => send.madeOn)).toEqual([{ a: 4 }])
+  })
+
+  it("does not name a row a second time, nor put on a line one already said not to be sent, when its draft named it closing", () => {
+    // Named by the result, then the late answer: not named again (whatever revision it says).
+    for (const revision of [5, 7]) {
+      const named = played([
+        ...closedWithSaveOut({ a: kept }),
+        DraftEvent.LeftOverNamed(),
+        answer(2, revision, [{ rowId: "a", theirs: O.some(kept) }])
+      ])
+      expect(named.draft.leftOver).toEqual(O.none())
+    }
+    // Said as outlived when the import opened again, then the late answer: not offered to be sent.
+    const reopened = played([
+      ...closedWithSaveOut({ a: kept }),
+      DraftEvent.ViewArrived({ revision: 7, decisions: { a: kept }, open: true, confirms: 1 })
+    ])
+    expect(
+      A.filter(reopened.effects, (effect) => DraftEffect.$is("Say")(effect) && Said.$is("Outlived")(effect.what))
+    ).toHaveLength(1)
+    const late = step(reopened.draft, answer(2, 8, [{ rowId: "a", theirs: O.some(kept) }]))
+    expect([late.draft.lines, late.draft.unsent]).toEqual([{}, {}])
+  })
+
+  it("keeps the line of a pick refused in the reopened import while the picture the answer names is read", () => {
+    const events = [
+      DraftEvent.Opened({ kept: O.none() }),
+      DraftEvent.ViewArrived({ revision: 4, decisions: {}, open: true, confirms: 0 }),
+      DraftEvent.Decided({ changes: { a: O.some(out) } }),
+      // Closed holding her decision, so nothing named it; opened again and held at 7.
+      DraftEvent.ViewArrived({ revision: 6, decisions: { a: out }, open: false, confirms: 1 }),
+      DraftEvent.ViewArrived({ revision: 7, decisions: { a: out }, open: true, confirms: 1 }),
+      // Her save was judged at 9: somebody had decided the row since.
+      answer(1, 9, [{ rowId: "a", theirs: O.some(kept) }])
+    ]
+    const gap = played(events)
+    expect([R.keys(gap.draft.lines), R.keys(gap.draft.unsent), R.get(shown(gap.draft), "a")]).toEqual([
+      ["a"],
+      [],
+      O.some(kept)
+    ])
+    // A save sent in the gap does not carry her refused pick.
+    const other = step(gap.draft, DraftEvent.Decided({ changes: { b: O.some(kept) } }))
+    expect(A.map(sends(other.effects), (send) => R.keys(send.delta.set))).toEqual([["b"]])
+  })
+
+  it("puts no line over a row the closed picture held as hers when the answer was judged before that picture", () => {
+    // The answer is from revision 5, before the import closed at 6 holding her decision: what it calls decided since
+    // is older than the picture that held hers.
+    const late = played([
+      ...closedWithSaveOut({ a: out }),
+      DraftEvent.ViewArrived({ revision: 7, decisions: { a: out }, open: true, confirms: 1 }),
+      answer(2, 5, [{ rowId: "a", theirs: O.some(kept) }])
+    ])
+    expect([late.draft.lines, late.draft.unsent]).toEqual([{}, {}])
+  })
+
+  it("names once a row whose later decision of hers waited behind the save when its draft closed", () => {
+    // Left out, sent, then kept while that save was out: the closed picture holds the first, and the second was named
+    // closing. The late answer of the first adds neither a line nor a row to send.
+    const waited = played([
+      DraftEvent.Opened({ kept: O.none() }),
+      DraftEvent.ViewArrived({ revision: 4, decisions: {}, open: true, confirms: 0 }),
+      DraftEvent.Decided({ changes: { a: O.some(out) } }),
+      DraftEvent.Decided({ changes: { a: O.some(kept) } }),
+      DraftEvent.ViewArrived({ revision: 6, decisions: { a: out }, open: false, confirms: 1 }),
+      DraftEvent.ViewArrived({ revision: 7, decisions: { a: accepted }, open: true, confirms: 1 }),
+      answer(1, 7, [{ rowId: "a", theirs: O.some(accepted) }])
+    ])
+    expect([waited.draft.lines, waited.draft.unsent]).toEqual([{}, {}])
   })
 })
 

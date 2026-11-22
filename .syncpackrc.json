@@ -10,6 +10,33 @@
     "packages/foundation/*/*/package.json",
     "packages/tooling/*/*/package.json"
   ],
+  "updateGroups": [
+    {
+      "label": "The Effect language service: a new version adds diagnostics the profile in tsconfig.base.json must name, and patches only the typescript, tsrs and oxlint versions it lists. Moved by hand, with them",
+      "dependencies": ["@effect/tsgo"],
+      "isIgnored": true
+    },
+    {
+      "label": "Patched by @effect/tsgo at install (the root's prepare script), which stops on a version it does not list. They move only with @effect/tsgo",
+      "dependencies": ["typescript", "tsrs", "oxlint", "oxlint-tsgolint"],
+      "isIgnored": true
+    },
+    {
+      "label": "A beta pinned as one set to one commit of its library. Re-pinned together by hand, never one package at a time from the registry",
+      "dependencies": ["alchemy", "@alchemy.run/**", "@distilled.cloud/**"],
+      "isIgnored": true
+    },
+    {
+      "label": "Its tables are a migration written by hand (docs/auth.md). After a move `bun run auth:schema` must print nothing, so it moves by hand",
+      "dependencies": ["better-auth"],
+      "isIgnored": true
+    },
+    {
+      "label": "SheetJS publishes at its own address, and the registry's xlsx stopped at 0.18.5. Written as an address and moved by hand",
+      "dependencies": ["xlsx"],
+      "isIgnored": true
+    }
+  ],
   "semverGroups": [
     {
       "label": "Effect packages move together and are pinned to one exact version",

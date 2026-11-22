@@ -6,8 +6,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices"
 import { expect, layer } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import { DecidingGroup } from "../src/Review/DecidingGroup.decision.ts"
-import { allProved, notProved, standingOf, standings, whatBroke } from "./proving.ts"
-import { decidingGroupRules } from "./rules.ts"
+import { missingRules, notProved, standingOf, standings, whatBroke } from "./proving.ts"
 
 layer(NodeServices.layer)("DecidingGroup", (it) => {
   it.effect(
@@ -17,9 +16,10 @@ layer(NodeServices.layer)("DecidingGroup", (it) => {
         source: new URL("../src/Review/DecidingGroup.decision.ts", import.meta.url)
       })
       const said = whatBroke(Prove.renderDecision(report))
-      // What is not proved, by name, with what the solver found; then that every rule is there, by name.
+      // What is not proved, by name, with what the solver found. Which rules there are is the lock's, in the search.
       expect(notProved(standings(report)), said).toEqual([])
-      expect(standings(report)).toEqual(allProved({ recordsOn: "Group", own: decidingGroupRules }))
+      // The rules of every aggregate it reads are there, and the ones about who may change a row or a group it states.
+      expect(missingRules(report), said).toEqual([])
       // Every state it leaves is one its aggregate's schema allows.
       expect(standingOf(report.schema), said).toBe("proved")
       // Some state lets it record: it is not proved only because it never does anything.

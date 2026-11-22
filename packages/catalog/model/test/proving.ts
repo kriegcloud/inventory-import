@@ -1,11 +1,11 @@
-// What the Prove tests share: a decision's report as one line a rule, and the lines a proved decision must give. A
-// test compares the two as lists, so the failure names the rule; the report itself, with the counterexample the solver
-// found, is the message printed beside it.
+// What the Prove tests share: a report as one line a rule, how it stands and its name, so a failure names the rule;
+// the report itself, with the counterexample the solver found, is the message printed beside it.
 import type * as Prove from "@alchemy.run/domain/Prove"
 import * as A from "effect/Array"
 import * as Match from "effect/Match"
+import * as O from "effect/Option"
+import * as R from "effect/Record"
 import * as Str from "effect/String"
-import { groupRules, importRules, rowRules } from "./rules.ts"
 
 /**
  * The parts of a rendered report that say something is wrong: its first line, then each rule that is not proved with
@@ -42,22 +42,30 @@ export const standings = (report: Prove.DecisionReport): ReadonlyArray<string> =
   A.map(report.rules, (rule) => `${standingOf(rule.verdict)}  ${rule.name}`)
 
 /**
- * The lines of a decision that keeps every rule of the import, every rule of the row or the group it also records on,
- * and every rule of its own.
+ * The rules about who may change an instance of an aggregate with no command of its own. Each decision that records
+ * on one of these aggregates states them under these names (`CLAUDE.md`, "The model's blocks: what Verify reads").
  */
-export const allProved = (decision: {
-  readonly recordsOn: "Row" | "Group"
-  readonly own: ReadonlyArray<string>
-}): ReadonlyArray<string> =>
-  A.map(
-    [
-      ...A.map(importRules, (name) => `Import.${name}`),
-      ...Match.value(decision.recordsOn).pipe(
-        Match.when("Row", () => A.map(rowRules, (name) => `Row.${name}`)),
-        Match.when("Group", () => A.map(groupRules, (name) => `Group.${name}`)),
-        Match.exhaustive
-      ),
-      ...decision.own
-    ],
-    (name) => `proved  ${name}`
-  )
+export const ruleOfWhoMayChange: Readonly<Record<string, ReadonlyArray<string>>> = {
+  Row: ["NobodyClearsAnotherPersonsDecision", "OnlyItsOwnOrganizationChangesTheRow", "AViewerChangesNoRow"],
+  Group: ["NobodyUndoesAnotherPersonsGroup", "OnlyItsOwnOrganizationChangesTheGroup", "AViewerChangesNoGroup"]
+}
+
+/** The rules about who may change an instance of this aggregate, or none when it has commands of its own. */
+export const whoMayChange = (aggregate: string): ReadonlyArray<string> =>
+  O.getOrElse(R.get(ruleOfWhoMayChange, aggregate), () => A.empty<string>())
+
+/**
+ * What a decision's report lacks: for each aggregate it reads, at least one rule of that aggregate (so a `reads`
+ * entry the prover no longer sees shows), and the rules about who may change it that the decision must state itself.
+ * Empty when nothing is missing. Which rules there are, one by one, is the lock's, in the search of the whole model.
+ */
+export const missingRules = (report: Prove.DecisionReport): ReadonlyArray<string> =>
+  A.flatMap(report.reads, (read) => [
+    ...(A.some(report.rules, (rule) => Str.startsWith(`${read.aggregate}.`)(rule.name))
+      ? []
+      : [`no rule of ${read.aggregate}`]),
+    ...A.map(
+      A.filter(whoMayChange(read.aggregate), (name) => !A.some(report.rules, (rule) => rule.name === name)),
+      (name) => `does not state ${name}`
+    )
+  ])

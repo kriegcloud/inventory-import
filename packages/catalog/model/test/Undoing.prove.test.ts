@@ -7,8 +7,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices"
 import { expect, layer } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import { Undoing } from "../src/Review/Undoing.decision.ts"
-import { allProved, notProved, standingOf, standings, whatBroke } from "./proving.ts"
-import { undoingRules } from "./rules.ts"
+import { missingRules, notProved, standingOf, standings, whatBroke } from "./proving.ts"
 
 layer(NodeServices.layer)("Undoing", (it) => {
   it.effect(
@@ -18,9 +17,10 @@ layer(NodeServices.layer)("Undoing", (it) => {
         source: new URL("../src/Review/Undoing.decision.ts", import.meta.url)
       })
       const said = whatBroke(Prove.renderDecision(report))
-      // What is not proved, by name, with what the solver found; then that every rule is there, by name.
+      // What is not proved, by name, with what the solver found. Which rules there are is the lock's, in the search.
       expect(notProved(standings(report)), said).toEqual([])
-      expect(standings(report)).toEqual(allProved({ recordsOn: "Row", own: undoingRules }))
+      // The rules of every aggregate it reads are there, and the ones about who may change a row or a group it states.
+      expect(missingRules(report), said).toEqual([])
       // Every state it leaves is one its aggregate's schema allows.
       expect(standingOf(report.schema), said).toBe("proved")
       expect(report.accepted, said).toBe(true)

@@ -9,7 +9,6 @@ import * as Effect from "effect/Effect"
 import * as Str from "effect/String"
 import { Import } from "../src/Import/Import.aggregate.ts"
 import { notProved, standingOf, whatBroke } from "./proving.ts"
-import { importCommands, importRules } from "./rules.ts"
 
 layer(NodeServices.layer)("Import", (it) => {
   it.effect(
@@ -26,20 +25,22 @@ layer(NodeServices.layer)("Import", (it) => {
       const lines = A.flatMap([...report.invariants, ...report.transitions], (rule) =>
         A.map(rule.commands, (proof) => `${standingOf(proof.verdict)}  ${rule.name}  ${proof.command}`)
       )
-      // What is not proved, by name, with what the solver found; then that every rule is there, for every command.
+      // What is not proved, by name, with what the solver found; and every rule is proved for every command. Which
+      // rules there are is the lock's, in the search of the whole model.
       expect(notProved(lines), said).toEqual([])
-      expect(lines).toEqual(
-        A.flatMap(importRules, (rule) => A.map(importCommands, (command) => `proved  ${rule}  ${command}`))
-      )
+      expect(
+        A.map([...report.invariants, ...report.transitions], (rule) => rule.commands.length),
+        said
+      ).toEqual(A.map([...report.invariants, ...report.transitions], () => report.commands.length))
       expect(report.initial, said).toBe(true)
       expect(
         A.map(report.invariants, (rule) => rule.initial),
         said
       ).toEqual(A.map(report.invariants, () => true))
       expect(
-        A.map(report.commands, (command) => `${standingOf(command.schema)}  ${command.command}`),
+        notProved(A.map(report.commands, (command) => `${standingOf(command.schema)}  ${command.command}`)),
         said
-      ).toEqual(A.map(importCommands, (command) => `proved  ${command}`))
+      ).toEqual([])
       // The two events no command of the import records: the four decisions do, and their tests prove it.
       expect(report.outside).toEqual(["ActCounted", "GroupCounted"])
       // Every check of every schema is one the prover reads, so a broken rule comes back with its counterexample.

@@ -65,7 +65,7 @@ members<DeprecatedApisFinding>("laws deprecated-apis", DeprecatedApisFinding, de
   ],
   Unread: [
     DeprecatedApisFinding.cases.Unread.make({ listed: 2, read: 1 }),
-    "err: deprecated:check FAIL  oxlint read 1 of 2 files: .oxlintrc.deprecated-apis.json leaves none out (no ignorePatterns, no overrides)"
+    "err: deprecated:check FAIL  oxlint read 1 of 2 files: .oxlintrc.deprecated-apis.json leaves none out (no ignorePatterns)"
   ],
   Unowned: [
     DeprecatedApisFinding.cases.Unowned.make({ file: "packages/a/test/a.test.ts" }),

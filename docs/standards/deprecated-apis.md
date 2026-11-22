@@ -41,7 +41,7 @@ To read one folder: `bunx oxlint --disable-nested-config -c .oxlintrc.deprecated
 
 ## What it cannot see
 
-Each is held by a test (`packages/tooling/tool/cli/test/DeprecatedApis.test.ts`), so an engine that begins to see one
+Each but the override is held by a test (`packages/tooling/tool/cli/test/DeprecatedApis.test.ts`), so an engine that begins to see one
 says so.
 
 | Form | Example |
@@ -55,7 +55,7 @@ says so.
 | A property handed over inside a whole value (written out in place, it is seen) | `const whole: CardProps = card`, `{ ...card }` |
 | A tag on the line of the brace that opens its block: TypeScript does not read it there, so write it on its own line | `interface Inline { /** @deprecated */ readonly text?: string }` |
 | Everything passed on at once | `export * from "@x/lib/Lib"` |
-| A line that turns the rule off, as oxlint allows: none is written here | `// oxlint-disable-next-line` |
+| A line, or an override in the profile, that turns the rule off, as oxlint allows: none is written here | `// oxlint-disable-next-line` |
 
 It does not read prose: an example in a comment or in `docs/`. A plain `.js` or `.mjs` file that no tsconfig includes
 is read without Node's types (`apps/inventory/public/theme-init.js`, which imports nothing, and

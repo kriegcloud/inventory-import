@@ -81,7 +81,7 @@ export const deprecatedApisSentence: (finding: DeprecatedApisFinding) => Line = 
   At: ({ note, place }) => err(`${place}  ${note}`),
   Unlisted: ({ why }) => fail(`git could not list the files, so none was checked: ${why}`),
   Unread: ({ listed, read }) =>
-    fail(`oxlint read ${read} of ${listed} files: ${profile} leaves none out (no ignorePatterns, no overrides)`),
+    fail(`oxlint read ${read} of ${listed} files: ${profile} leaves none out (no ignorePatterns)`),
   Unowned: ({ file }) =>
     fail(
       `${file} is in no tsconfig, so it is read without its package's types: include it in one the root tsconfig.json references`

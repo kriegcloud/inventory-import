@@ -1,7 +1,8 @@
 {
   // No deprecated API is used (`bun run beep laws deprecated-apis`, `deprecated:check`): the one rule of beep-effect's
-  // profile of the same name, read from each file's types, with every other category off. It has no `ignorePatterns`
-  // and no `overrides`: the law hands oxlint every code file git would commit, and fails when one was left out.
+  // profile of the same name, read from each file's types, with every other category off. The law hands
+  // oxlint every code file git would commit, and fails when an `ignorePatterns` left one out. It does not read
+  // `overrides`: none is here, and one would be an exemption.
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["typescript"],
   "options": { "typeAware": true },

@@ -289,7 +289,7 @@ export const framed = <iframe title="Frame" frameBorder={0} />
           })
         })
         expect(lines).toEqual([
-          "err: deprecated:check FAIL  oxlint read 1 of 2 files: .oxlintrc.deprecated-apis.json leaves none out (no ignorePatterns, no overrides)"
+          "err: deprecated:check FAIL  oxlint read 1 of 2 files: .oxlintrc.deprecated-apis.json leaves none out (no ignorePatterns)"
         ])
       }),
     patience

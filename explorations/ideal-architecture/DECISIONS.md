@@ -841,6 +841,36 @@ agent recommended the same. It is not applied to the new value; the row shows th
 screen names it as taken back. Built: kind `undo` in the same rule. Not seen on screen (tested on the twin and D1). A field moved off its column
 because the person took the column for another field is stamped too, so its decisions go stale the same way.
 
+### 2026-11-21 — atoms, a refused row beside a closed tab's decision of the same row
+
+A row of this tab's was refused, and a closed tab of the same person had decided it otherwise. As built, this tab's row
+became its own refused line and the closed tab's decision was named once in a toast, then dropped. Question: what
+becomes of the two? Options: "Keep both, she picks (Recommended)"; "Name once, then drop". Answer: "Keep both, she
+picks". I chose; the agent recommended the same. Both stay on the row's line ("This tab: kept (not saved: the reason).
+Your closed tab: left out"), and the person picks one.
+
+### 2026-11-21 — atoms, a field matched by hand to the column it already reads
+
+As built, any pick by hand counted as a re-match, so picking the column a field already read took its accepts and
+undone fixes back, and what rests on the SKU. Question: what does such a pick take back? Options: "Only when it
+changes (Recommended)"; "Any pick by hand". Answer: "Only when it changes". I chose; the agent recommended the same.
+Picking the column a field already reads takes nothing back: accepts, undone fixes, Replace, Keep-stored and
+keep-one-of-two alike. A field displaced by another field's match still counts as moved.
+
+### 2026-11-21 — atoms, a tab the browser discarded or has not loaded yet
+
+Such a tab holds no lock, so it counts as gone although it is still in the tab strip. Question: does it count as gone?
+Options: "Yes, and it says so (Recommended)"; "Only after a while". Answer: "Yes, and it says so". I chose; the agent
+recommended the same. Its rows are taken up, with the hold where someone decided since; when that tab loads again, it
+says its waiting decisions were taken up by another tab.
+
+### 2026-11-21 — atoms, a Replace or Keep-stored on an import matched before moves were kept
+
+An import matched before migration 0002 has no record of the column a field read earlier, so whether a re-match changed
+how a row compares cannot be known for a Replace or Keep-stored made before it. Question: what becomes of it? Options:
+"Take it back, say so (Recommended)"; "Keep it as made". Answer: "Take it back, say so". I chose; the agent
+recommended the same. The server takes it back, as it did; the screen names it.
+
 ### 2026-11-20 — no `switch`, the vendored components included
 
 Every `switch` in the repository was to be replaced, in this order of preference: a struct union becomes an

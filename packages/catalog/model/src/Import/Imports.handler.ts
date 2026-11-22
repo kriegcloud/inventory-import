@@ -382,7 +382,10 @@ export const importsEndpoints = Effect.gen(function* () {
   const find = Effect.fn("imports.find")(function* (actor: Member, id: string) {
     const draft = yield* imports.find(actor.organizationId, id)
     if (O.isNone(draft)) {
-      return yield* ImportNotFound.make({ reason: "No import with that id in your organization." })
+      return yield* ImportNotFound.make({
+        reason: "No import with that id in your organization.",
+        organizationId: actor.organizationId
+      })
     }
     return draft.value
   })

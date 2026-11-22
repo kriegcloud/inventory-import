@@ -167,7 +167,9 @@ const page = (
       imports: {
         get: () =>
           server.removed
-            ? Effect.fail(ImportNotFound.make({ reason: "It is gone." }))
+            ? Effect.fail(
+                ImportNotFound.make({ reason: "It is gone.", organizationId: OrganizationId.make("org_prairie") })
+              )
             : server.view === undefined
               ? Deferred.await(Deferred.makeUnsafe<ImportView>())
               : Effect.succeed(server.view),
@@ -467,7 +469,10 @@ describe("rows on hold and the values seen, through the browser's storage", () =
         // Row 3's save is refused; row 2's then fails on the network.
         first.decide("row-3")
         yield* settle
-        yield* Deferred.fail(first.saves[0]!.answer, ImportNotFound.make({ reason: "It is gone." }))
+        yield* Deferred.fail(
+          first.saves[0]!.answer,
+          ImportNotFound.make({ reason: "It is gone.", organizationId: OrganizationId.make("org_prairie") })
+        )
         yield* settle
         first.decide("row-2")
         yield* settle

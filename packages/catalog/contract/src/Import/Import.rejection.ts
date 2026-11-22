@@ -2,11 +2,19 @@
 import * as S from "effect/Schema"
 import { reasonForPerson } from "../internal/Described.ts"
 import { StaleAccept } from "./Decision.command.ts"
+import { OrganizationId } from "@inventory/kernel/Ids"
 
-/** The import id in the address matches nothing in the caller's organization. */
+/**
+ * The import id in the address matches nothing in the caller's organization. `organizationId` is the organization the
+ * server looked in, the caller's own: a tab whose session was switched to another organization elsewhere tells that
+ * from an import that was removed, and erases nothing it keeps for the person on the first.
+ */
 export class ImportNotFound extends S.TaggedError<ImportNotFound, { readonly brand: unique symbol }>()(
   "ImportNotFound",
-  { reason: reasonForPerson },
+  {
+    reason: reasonForPerson,
+    organizationId: OrganizationId.annotateKey({ description: "The organization the server looked in: the caller's" })
+  },
   { description: "The import id in the address matches nothing in the caller's organization", httpApiStatus: 404 }
 ) {}
 

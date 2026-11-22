@@ -1,6 +1,7 @@
 // Removing an open import. The rules that hurt when wrong: a card for an import that no longer exists must not stay
 // on the first screen (after a refusal the list is asked again), an import somebody already removed counts as removed,
 // and nothing of a removed import is kept in the tab, its staged rows least of all.
+import { OrganizationId } from "@inventory/kernel/Ids"
 import { describe, expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
@@ -61,7 +62,9 @@ const world = (remove: () => Effect.Effect<void, ImportNotFound | AlreadyImporte
 describe("removing an open import", () => {
   it.live("that is already gone counts as removed", () =>
     Effect.gen(function* () {
-      const t = world(() => Effect.fail(ImportNotFound.make({ reason: "It is gone." })))
+      const t = world(() =>
+        Effect.fail(ImportNotFound.make({ reason: "It is gone.", organizationId: OrganizationId.make("org_prairie") }))
+      )
       yield* settle
       const exit = yield* t.press(t.first)
       expect(Exit.isSuccess(exit)).toBe(true)

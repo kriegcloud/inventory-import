@@ -898,14 +898,28 @@ Question: what should happen to it? Options: "Local change (Recommended)"; "Exem
 the grid, which no screen uses. Answer: "Local change"; the agent recommended the same. His answer covers the option as
 it was put to him: the fallbacks already in the file, at the cost of the browser's own undo in a cell's editor.
 
-**Built, and not decided.** What is in the code is a different design, and it was not put to him before it was built.
-Measured in Chromium, the number cell's fallback stored 6 for a typed 56 and 5 for a typed -5, so the agent did not use
-it. It added a prop to the vendored cell (`typesInPlace`) and a `flushSync` in its key handler, across three files: the
-text, number and url editors open and select their value while the key is still being handled, and the browser types
-the key itself. Only the long-text editor uses its fallback. It was measured in Chromium only: not in Firefox or
-Safari, not with a touch keyboard or an input method, and no automated test holds it. A review then found it wrong in
-one place: a column with a variant and its own `cell` (the local patch in `docs/kit.md`) draws through a branch that
-does not pass `typesInPlace`, so there the key that opens the editor is lost and a typed 56 stores 6. The grid's code
-is unchanged since, on hold until he answers which design stands. Reverse: the "Local change" marks in
-`packages/ui/src/components/data-grid/` (`data-grid-cell.tsx`, `data-grid-cell-variants.tsx`, `data-grid-utils.ts`),
-one on every changed line.
+What was built first was a different design, not put to him before it was built: measured in Chromium, the number
+cell's fallback stored 6 for a typed 56 and 5 for a typed -5, so the agent let the browser type the key that opens an
+editor, through a prop on the vendored cell and a `flushSync` in its key handler. A review found that wrong for a
+column with a variant and its own `cell`, which lost the opening key and stored 6 for a typed 56.
+
+### 2026-11-22 — the vendored data grid's typing, for every column
+
+Question, by dialog, after he was told that the fallbacks store wrong numbers, that typing in place had been built
+without asking, and that it still lost the first key in a column with its own `cell`: what should happen to the grid?
+Options: "Fix it for every column (Recommended)", keeping the built approach and extending it to those columns, with a
+browser test that types 56, -5 and a space into each editor and reads what is stored; "Remove the grid"; "Exempt the
+grid". Answer: "Fix it for every column". I chose; the agent recommended the same.
+
+Built: the cell's wrapper reads from its column whether the editor that will open takes typing (text, number, url,
+long text), so a column with its own `cell` behaves as a plain one; it opens and focuses that editor before the key
+handler ends, and the browser types the key. The long-text editor is included, which also ends its loss of the first
+key when a second came before the next frame, and no fallback is left. The test is `bun run grid:keys` in
+`apps/inventory`: it types 56, -5 and a space on each of the four editors in a plain column and in a column with its
+own `cell`, on a development-only page (`/gallery/grid`), and reads what the grid stored; with typing in place taken
+out, 24 of 24 fail. It runs by hand, in Chromium only, and is not part of `bun run check`: the repository runs no
+browser tests and the machine that runs the checks has no browser. Not measured: Firefox, Safari, a touch keyboard,
+an input method. A space is stored as the published grid stores it (a no-break space in a text cell; a number or url
+cell emptied), measured with its own mechanism; whether that is wanted was not asked. Reverse: the "Local change"
+marks in `packages/ui/src/components/data-grid/` (`data-grid-cell.tsx`, `data-grid-cell-variants.tsx`,
+`data-grid-utils.ts`), one on every changed line.

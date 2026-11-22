@@ -822,8 +822,37 @@ discriminators" below. Then the groups the draft review's table above left open:
   the sign-out.
 - **Laws** (`9ca70b5`, `d390d8d`, `de8ce87`, `0636e39`): AnsweredBy and every finding of the laws are constructors read
   with match; the tags law reads every src and test folder, follows a tag through helpers, joins, lists, records and
-  reassignment, and refuses P.isTagged with a string; no count-only exemption; the refs and boundaries laws close the
-  listed holes, and the refs law's alias walk is bounded.
+  reassignment, and refuses P.isTagged with a string; no count-only exemption, and none for a case a module types by
+  hand (WordMatch and Read are tagged enums); the refs and boundaries laws close the listed holes, and the refs law's
+  alias walk is bounded. The tags and refs laws read each file within a budget (`internal/budget.ts`). Before
+  parsing, a scan refuses a file longer than 1,000,000 characters (ten times our longest source file, 98,433), brackets nested
+  past 1,000 (ours reach 18), or one expression chaining past 4,000 operators (ours reach 195); the count
+  includes a union of that many members and a template of that many interpolations, which the parser would read.
+  Strings, comments, templates and regular expressions are skipped as far as a scan without a parser can tell them:
+  text inside an element that holds a quote, a backtick, `/*` or `//`, a division after `++`, a regular expression
+  after `}` and a string straight after a keyword are misread, and hide what follows on the line (or to the next
+  backtick or `*/`) from the scan. The parser
+  (oxc-parser 0.148.0) dies natively, past any catch, on each shape the scan refuses, at the same size on node and
+  bun: parentheses about 5,700 deep and templates 5,000 deep (refused from 1,001), types nested in arguments 5,760
+  deep (from 2,000), arrows chained 9,536 and choices 12,480 (from 2,000), assignments 15,872 (from 4,000), elements
+  18,688 deep (from 2,000), an else-if chain of 27,648 (from 1,333), an expectation's matchers 47,616 (from 1,334),
+  and a sum, `&&` or `!` chained 74,752 (from 4,000, 2,000 and 4,000). Not guarded: elements nested with a line of
+  text between every two levels, which the scan reads as statements ended (the parser dies on it at about 18,700
+  levels, 243 KB), and any of those shapes behind text the scan misreads. There the process dies and the check fails;
+  it never passes. While reading, a law counts its steps (32 or 46 a character plus 400,000, never past 4,000,000;
+  our heaviest file needs 109,846), its judgements that follow names inside one another (at most 200; ours reach 4)
+  and its reads inside one another of any kind (at most 400, half of what node's stack holds on the deepest of them;
+  ours reach 25); the walks of the tree keep their own list. A file the parser reads with errors is refused too; none
+  of our 719 files has one. Each refusal is said once, at the line, in words for its cause: names too far, nested
+  too deep, too large, or not parsed. `packages/tooling/tool/cli/test/Steps.test.ts` holds each bound at and past
+  it, the fifteen crashing shapes, eight long shapes of ordinary code at 300 (a choice among 250) with the verdicts
+  both laws gave before the budget, and the five refs cases. Names given the one before are read at a thousand and
+  refused at ten thousand (half a million characters). Measured on node at a load average of 50 to 63: at the
+  ceiling, on files of about a million characters, the slowest shape took 1.7 s and the largest 670 MB (the refs law
+  on names assigned to each other). On our 719 files, and on 10,000 random programs for each law, the verdicts are
+  those of `ced42b0` wherever the law read the file (an object built with a `_tag` key aside, which the tags law now
+  refuses in every module); 761 of the refs law's programs (small files whose names are assigned to each other) ran
+  out of steps.
 - **The table's options:** our own code writes nothing during a draw. The vendored `useDataTable` sets its table's
   options when it draws, as published; vendored hooks stay as published, so that is not a departure.
 - **Decided since (2026-11-21), to build:** a held row and a refused row both hold the confirm, the screen says how many

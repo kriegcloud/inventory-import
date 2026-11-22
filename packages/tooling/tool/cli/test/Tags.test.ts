@@ -114,8 +114,8 @@ export const line = (state: Upload, effect: Effect.Effect<number, { readonly _ta
   })
 `
 
-// A case picked out of another type (\`Extract<…, { _tag: "Detail" }>\`) is not a case this module types, and a tag
-// that is not written out is never a case the module types: both are built by hand.
+// A case picked out of another type (\`Extract<…, { _tag: "Detail" }>\`), a tag that is not written out, and a case the
+// module types itself: each is built by hand.
 const picked = `import * as Data from "effect/Data"
 type Opened = Data.TaggedEnum<{ Detail: { readonly id: string }; Closed: {} }>
 const Opened = Data.taggedEnum<Opened>()
@@ -127,8 +127,7 @@ export const yes: Answer = { _tag: "Yes" }
 export const closed = Opened.Closed()
 `
 
-// A union typed by hand has no constructor: the module that types it builds it, and a test of it builds it with what
-// the module gives instead.
+// A union typed by hand has no constructor. Typing it by hand is no leave to build it by hand: it is a tagged enum.
 const typedHere = `export type Answer = { readonly _tag: "Yes" } | { readonly _tag: "No"; readonly why: string }
 export const yes: Answer = { _tag: "Yes" }
 export const no = (why: string): Answer => ({ _tag: "No", why })
@@ -316,13 +315,14 @@ describe("laws tags", () => {
     })
   )
 
-  it.effect("refuses a case picked out of another type, and a tag not written out, built by hand", () =>
+  it.effect("refuses a case picked from another type, a tag not written out and a case typed here", () =>
     Effect.gen(function* () {
       const report = yield* inTree({ "packages/review/src/internal/Grid.ts": picked }, inRepository)
       const literal = "an object built with a _tag key: use the case's own constructor or .make"
       expect(printed(report).slice(1)).toEqual([
         `err: packages/review/src/internal/Grid.ts:5  ${literal}`,
-        `err: packages/review/src/internal/Grid.ts:7  ${literal}`
+        `err: packages/review/src/internal/Grid.ts:7  ${literal}`,
+        `err: packages/review/src/internal/Grid.ts:8  ${literal}`
       ])
     })
   )
@@ -447,7 +447,7 @@ describe("laws tags", () => {
     })
   )
 
-  it.effect("lets the module that types a union build it, and refuses the same literals in a test", () =>
+  it.effect("refuses a union built by hand in the module that types it, and in a test", () =>
     Effect.gen(function* () {
       const report = yield* inTree(
         { "packages/catalog/web/src/Answer.ts": typedHere, "packages/catalog/web/test/Answer.test.ts": typedHere },
@@ -455,6 +455,8 @@ describe("laws tags", () => {
       )
       const literal = "an object built with a _tag key: use the case's own constructor or .make"
       expect(printed(report).slice(1)).toEqual([
+        `err: packages/catalog/web/src/Answer.ts:2  ${literal}`,
+        `err: packages/catalog/web/src/Answer.ts:3  ${literal}`,
         `err: packages/catalog/web/test/Answer.test.ts:2  ${literal}`,
         `err: packages/catalog/web/test/Answer.test.ts:3  ${literal}`
       ])

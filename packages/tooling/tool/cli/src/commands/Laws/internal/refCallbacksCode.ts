@@ -1,12 +1,26 @@
 // The refs of one screen, read from its syntax tree: each `ref` an element is given, each function handed to
 // `useAtomSubscribe`, and whether it is the same value on every draw. The tree is the parser's plain data, read here as
-// records of unknown values. A name is judged by where the file binds it, never by how its line is written.
+// records of unknown values. A name is judged by where the file binds it, never by how its line is written. Every
+// node walked, judgement, name followed and path compared spends the file's budget (`budget.ts`); the walks of the
+// tree keep their own list, so no file nests them past the stack; a file that needs more is refused at the place
+// being read, with the verdicts it would have had left unsaid, and so is one the scan or the parser refuses.
 import * as A from "effect/Array"
+import * as MutableHashSet from "effect/MutableHashSet"
 import * as O from "effect/Option"
 import * as P from "effect/Predicate"
 import * as R from "effect/Record"
 import * as Str from "effect/String"
 import { parseSync } from "oxc-parser"
+import {
+  type Budget,
+  budgetOf,
+  parseFailure,
+  refsStepsPerCharacter,
+  type Stopped,
+  Unread,
+  unreadable
+} from "./budget.ts"
+import { linesOf } from "./lines.ts"
 
 /** A node of the syntax tree. */
 type Node = Readonly<Record<string, unknown>> & { readonly type: string; readonly start: number; readonly end: number }
@@ -21,6 +35,16 @@ const children = (node: Node): ReadonlyArray<Node> =>
   A.flatMap(R.toEntries(node), ([key, value]) =>
     key === "parent" ? [] : A.isArray(value) ? A.filter(value, isNode) : isNode(value) ? [value] : []
   )
+
+/** The budget of the file being read: one file at a time, read from start to end without a pause. */
+const reading: { budget: Budget } = { budget: budgetOf({ length: 0, perCharacter: refsStepsPerCharacter }) }
+/** `read()` as one read inside another of the file being read, at `node`. */
+const nestedIn = <A>(node: Node, fallback: A, read: () => A): A => reading.budget.within(node.start, fallback, read)
+/** `judge()` as one judgement of the file being read that follows a name, at `node`. */
+const following = <A>(node: Node, fallback: A, judge: () => A): A =>
+  reading.budget.following(node.start, fallback, judge)
+/** Counts one step of the file being read. */
+const tick = (count = 1, at?: number): boolean => reading.budget.tick(count, at)
 
 const functions = ["FunctionDeclaration", "FunctionExpression", "ArrowFunctionExpression"] as const
 const isFunction = (node: Node): boolean => typeIs(node, ...functions)
@@ -73,7 +97,9 @@ type Binding =
 type Scope = Readonly<Record<string, Binding>>
 
 /** The names a pattern binds, each with the key it is taken out by when the pattern takes an object apart. */
-const namesIn = (pattern: Node): ReadonlyArray<{ readonly name: string; readonly prop: O.Option<string> }> => {
+const namesIn = (pattern: Node): ReadonlyArray<{ readonly name: string; readonly prop: O.Option<string> }> =>
+  nestedIn(pattern, [], () => namesInNow(pattern))
+const namesInNow = (pattern: Node): ReadonlyArray<{ readonly name: string; readonly prop: O.Option<string> }> => {
   if (pattern.type === "Identifier") return [{ name: nameOf(pattern), prop: O.none() }]
   if (pattern.type === "AssignmentPattern")
     return O.match(child(pattern, "left"), { onNone: () => [], onSome: namesIn })
@@ -95,15 +121,17 @@ const namesIn = (pattern: Node): ReadonlyArray<{ readonly name: string; readonly
   return O.match(child(pattern, "parameter"), { onNone: () => [], onSome: namesIn })
 }
 
-/** Every node of a function's body, not looking inside the functions written in it, that `keep` holds. */
+/**
+ * Every node of a function's body, not looking inside the functions written in it, that `keep` holds, in the order
+ * written: a step each, walked by a list of the nodes left, never by a call inside a call.
+ */
 const ownNodes = (body: Node, keep: (node: Node) => boolean): ReadonlyArray<Node> => {
   const found: Array<Node> = []
-  const visit = (node: Node): void => {
+  const pending = A.reverse(children(body))
+  for (let node = pending.pop(); node !== undefined && tick(1, node.start); node = pending.pop()) {
     if (keep(node)) found.push(node)
-    if (isFunction(node)) return
-    for (const next of children(node)) visit(next)
+    if (!isFunction(node)) for (const next of A.reverse(children(node))) pending.push(next)
   }
-  for (const next of children(body)) visit(next)
   return found
 }
 
@@ -134,7 +162,7 @@ const scopeOf = (fn: Node, element: O.Option<ElementOf> = O.none()): Scope => {
   })
   const assignedTo = (name: string): ReadonlyArray<Node> =>
     A.flatMap(assignments, (assignment) =>
-      O.exists(O.map(child(assignment, "left"), unwrapped), (left) => nameOf(left) === name)
+      tick() && O.exists(O.map(child(assignment, "left"), unwrapped), (left) => nameOf(left) === name)
         ? O.toArray(child(assignment, "right"))
         : []
     )
@@ -183,29 +211,39 @@ const scopeOf = (fn: Node, element: O.Option<ElementOf> = O.none()): Scope => {
   ])
 }
 
-/** The value under the wrappers that do not change it: a type assertion, a non-null mark, parentheses. */
-const unwrapped = (node: Node): Node =>
-  typeIs(
-    node,
-    "TSAsExpression",
-    "TSNonNullExpression",
-    "TSSatisfiesExpression",
-    "TSTypeAssertion",
-    "ParenthesizedExpression"
-  )
-    ? O.match(child(node, "expression"), { onNone: () => node, onSome: unwrapped })
-    : node
+const wrappers = [
+  "TSAsExpression",
+  "TSNonNullExpression",
+  "TSSatisfiesExpression",
+  "TSTypeAssertion",
+  "ParenthesizedExpression"
+]
 
-/** A member read (`a.b.c`): the name it starts from and each property after it. */
+/** The value under the wrappers that do not change it: a type assertion, a non-null mark, parentheses. A step each. */
+const unwrapped = (node: Node): Node => {
+  let inner = node
+  while (A.contains(wrappers, inner.type) && tick()) {
+    const next = child(inner, "expression")
+    if (O.isNone(next)) return inner
+    inner = next.value
+  }
+  return inner
+}
+
+/** A member read (`a.b.c`): the name it starts from and each property after it, a step each. */
 const memberOf = (node: Node): O.Option<{ readonly root: Node; readonly path: ReadonlyArray<string> }> => {
   if (node.type !== "MemberExpression") return O.none()
-  const property = O.getOrElse(O.map(child(node, "property"), nameOf), () => "")
-  return O.flatMap(child(node, "object"), (object) => {
-    const inner = unwrapped(object)
-    return inner.type === "MemberExpression"
-      ? O.map(memberOf(inner), (found) => ({ root: found.root, path: A.append(found.path, property) }))
-      : O.some({ root: inner, path: [property] })
-  })
+  const properties: Array<string> = []
+  let member = node
+  while (tick()) {
+    properties.push(O.getOrElse(O.map(child(member, "property"), nameOf), () => ""))
+    const object = child(member, "object")
+    if (O.isNone(object)) return O.none()
+    const inner = unwrapped(object.value)
+    if (inner.type !== "MemberExpression") return O.some({ root: inner, path: A.reverse(properties) })
+    member = inner
+  }
+  return O.none()
 }
 
 /** What a scope chain says of a name, with the depth of the scope that binds it (0 is the file's top level). */
@@ -213,11 +251,14 @@ const lookUpAt = (
   scopes: ReadonlyArray<Scope>,
   name: string
 ): O.Option<{ readonly binding: Binding; readonly at: number }> =>
-  O.flatMap(
-    A.findLastIndex(scopes, (scope) => R.has(scope, name)),
-    (at) =>
-      O.flatMap(O.fromUndefinedOr(scopes[at]), (scope) => O.map(R.get(scope, name), (binding) => ({ binding, at })))
-  )
+  // Each scope looked in is a step.
+  !tick(scopes.length)
+    ? O.none()
+    : O.flatMap(
+        A.findLastIndex(scopes, (scope) => R.has(scope, name)),
+        (at) =>
+          O.flatMap(O.fromUndefinedOr(scopes[at]), (scope) => O.map(R.get(scope, name), (binding) => ({ binding, at })))
+      )
 
 const lookUp = (scopes: ReadonlyArray<Scope>, name: string): O.Option<Binding> =>
   O.map(lookUpAt(scopes, name), (found) => found.binding)
@@ -308,7 +349,9 @@ const elementCallback = (call: Node): O.Option<{ readonly fn: Node; readonly lis
 }
 
 /** Judges a value in the scopes it is written in, innermost last. */
-const judge = (value: Node, scopes: ReadonlyArray<Scope>, depth = 0): Verdict => {
+const judge = (value: Node, scopes: ReadonlyArray<Scope>, depth = 0): Verdict =>
+  following(value, steady, () => judgeNow(value, scopes, depth))
+const judgeNow = (value: Node, scopes: ReadonlyArray<Scope>, depth: number): Verdict => {
   const node = unwrapped(value)
   if (typeIs(node, "ArrowFunctionExpression", "FunctionExpression")) {
     return refused("a function written where it is handed over is a new function on every draw")
@@ -414,7 +457,9 @@ const isLocalHelperCall = (call: Node, scopes: ReadonlyArray<Scope>): boolean =>
  * Judges a call's answer. A hook's holds across draws. Anything else answers anew on every draw, a function named
  * `use…` that is not a hook among them: one this file declares is judged by what it returns.
  */
-const judgeCall = (call: Node, scopes: ReadonlyArray<Scope>, depth: number): Verdict => {
+const judgeCall = (call: Node, scopes: ReadonlyArray<Scope>, depth: number): Verdict =>
+  following(call, steady, () => judgeCallNow(call, scopes, depth))
+const judgeCallNow = (call: Node, scopes: ReadonlyArray<Scope>, depth: number): Verdict => {
   if (isHookCall(call, scopes)) return steady
   const name = O.getOrElse(
     O.map(child(call, "callee"), (callee) => calleeName(unwrapped(callee))),
@@ -436,7 +481,9 @@ const judgeCall = (call: Node, scopes: ReadonlyArray<Scope>, depth: number): Ver
 }
 
 /** Judges what a function this file declares returns, in its own scope over the file's top level. */
-const judgeReturns = (fn: Node, scopes: ReadonlyArray<Scope>, depth: number): Verdict => {
+const judgeReturns = (fn: Node, scopes: ReadonlyArray<Scope>, depth: number): Verdict =>
+  following(fn, steady, () => judgeReturnsNow(fn, scopes, depth))
+const judgeReturnsNow = (fn: Node, scopes: ReadonlyArray<Scope>, depth: number): Verdict => {
   const own = A.append(A.take(scopes, 1), scopeOf(fn))
   const answers = O.match(child(fn, "body"), {
     onNone: () => [],
@@ -559,22 +606,45 @@ const writtenKey = (member: Node): O.Option<string> =>
  * side of `??`, `||` and `&&` (`refs ?? {}`), and either branch of a choice. Anything else is a value made there.
  */
 const placesOf = (value: Node): ReadonlyArray<Place> => {
-  const node = value.type === "ChainExpression" ? O.getOrElse(child(value, "expression"), () => value) : value
-  const bare = unwrapped(node)
-  if (bare !== node || node !== value) return placesOf(bare)
-  const of = (key: string): ReadonlyArray<Place> => O.match(child(bare, key), { onNone: () => [], onSome: placesOf })
-  if (bare.type === "Identifier") return [{ root: nameOf(bare), path: [], open: false }]
-  if (bare.type === "LogicalExpression") return A.appendAll(of("left"), of("right"))
-  if (bare.type === "ConditionalExpression") return A.appendAll(of("consequent"), of("alternate"))
-  if (bare.type !== "MemberExpression") return []
-  return A.map(of("object"), (place) =>
-    place.open
-      ? place
-      : O.match(writtenKey(bare), {
-          onNone: () => ({ ...place, open: true }),
-          onSome: (key) => ({ ...place, path: A.append(place.path, key) })
-        })
-  )
+  const found: Array<Place> = []
+  // What is left to read, each with the keys read after it, the nearest first: walked by a list, a step each.
+  const pending: Array<{ readonly node: Node; readonly after: KeysAfter }> = [{ node: value, after: undefined }]
+  for (let at = pending.pop(); at !== undefined && tick(); at = pending.pop()) {
+    let bare = at.node
+    for (;;) {
+      const node = bare.type === "ChainExpression" ? O.getOrElse(child(bare, "expression"), () => bare) : bare
+      const inner = unwrapped(node)
+      if (inner === bare) break
+      bare = inner
+    }
+    const after = at.after
+    const push = (...keys: ReadonlyArray<string>): void => {
+      for (const key of A.reverse(keys))
+        for (const next of O.toArray(child(bare, key))) pending.push({ node: next, after })
+    }
+    if (bare.type === "Identifier") found.push(keyed(nameOf(bare), after))
+    else if (bare.type === "LogicalExpression") push("left", "right")
+    else if (bare.type === "ConditionalExpression") push("consequent", "alternate")
+    else if (bare.type === "MemberExpression") {
+      for (const object of O.toArray(child(bare, "object"))) {
+        pending.push({ node: object, after: { key: writtenKey(bare), next: after } })
+      }
+    }
+  }
+  return found
+}
+
+/** The keys read after a value, the nearest first: none in `x[id]`. */
+type KeysAfter = { readonly key: O.Option<string>; readonly next: KeysAfter } | undefined
+
+/** The place a name stands for with `after` read from it: open from the first key not written out. */
+const keyed = (root: string, after: KeysAfter): Place => {
+  const path: Array<string> = []
+  for (let keys = after; keys !== undefined && tick(); keys = keys.next) {
+    if (O.isNone(keys.key)) return { root, path, open: true }
+    path.push(keys.key.value)
+  }
+  return { root, path, open: false }
 }
 
 /** A place followed by more keys: `base` then `prop` (a key a pattern took it out by) then `rest`'s keys. */
@@ -584,12 +654,35 @@ const extended = (base: Place, prop: O.Option<string>, rest: Place): Place => {
   return { root: withProp.root, path: A.appendAll(withProp.path, rest.path), open: rest.open }
 }
 
+/** True when `path` begins with `prefix`: each key compared is a step. */
 const startsWith = (path: ReadonlyArray<string>, prefix: ReadonlyArray<string>): boolean =>
-  prefix.length <= path.length && A.every(prefix, (key, index) => path[index] === key)
+  tick(prefix.length + 1) && prefix.length <= path.length && A.every(prefix, (key, index) => path[index] === key)
 
 /** True when a write into one place reaches what the other holds: one is the other, holds it, or is held by it. */
 const overlaps = (written: ReadonlyArray<string>, read: ReadonlyArray<string>): boolean =>
   startsWith(read, written) || startsWith(written, read)
+
+/**
+ * Each path once, in the order found; none once the budget is spent. Two paths are the same when their keys are, each
+ * key written after its length, so no two paths share a spelling: one look each, where comparing every pair grew with
+ * the square of the writes into one record.
+ */
+const samePathsOnce = (paths: ReadonlyArray<ReadonlyArray<string>>): ReadonlyArray<ReadonlyArray<string>> => {
+  const seen = MutableHashSet.empty<string>()
+  const kept: Array<ReadonlyArray<string>> = []
+  for (const path of paths) {
+    if (!tick(path.length + 1)) return []
+    const spelled = A.join(
+      A.map(path, (key) => `${key.length}:${key}`),
+      ""
+    )
+    if (!MutableHashSet.has(seen, spelled)) {
+      MutableHashSet.add(seen, spelled)
+      kept.push(path)
+    }
+  }
+  return kept
+}
 
 /** A value assigned to a top-level name somewhere in the file (`r = refs`), with the scopes it is written in. */
 interface TopAssigned {
@@ -616,33 +709,35 @@ const resolved = (
   depth = 0,
   followed: ReadonlyArray<string> = []
 ): ReadonlyArray<Place> =>
-  O.match(lookUpAt(scopes, place.root), {
-    onNone: () => [place],
-    onSome: ({ at, binding }): ReadonlyArray<Place> => {
-      // A name already followed on this path (`cache = cache ?? make()`) adds nothing new: following it again would
-      // branch once per such assignment at every step, which grew without bound on a lazily filled module variable.
-      const key = `${at}:${place.root}`
-      if (depth > maxAliases || A.contains(followed, key)) return binding.kind === "module" ? [place] : []
-      const where = A.take(scopes, at + 1)
-      const through = (source: Node, sourceScopes: ReadonlyArray<Scope>, prop: O.Option<string>) =>
-        A.flatMap(placesOf(source), (from) =>
-          resolved(extended(from, prop, place), sourceScopes, topAssigned, depth + 1, [...followed, key])
+  reading.budget.following(undefined, [], () =>
+    O.match(lookUpAt(scopes, place.root), {
+      onNone: () => [place],
+      onSome: ({ at, binding }): ReadonlyArray<Place> => {
+        // A name already followed on this path (`cache = cache ?? make()`) adds nothing new: following it again would
+        // branch once per such assignment at every step, which grew without bound on a lazily filled module variable.
+        const key = `${at}:${place.root}`
+        if (depth > maxAliases || A.contains(followed, key)) return binding.kind === "module" ? [place] : []
+        const where = A.take(scopes, at + 1)
+        const through = (source: Node, sourceScopes: ReadonlyArray<Scope>, prop: O.Option<string>) =>
+          A.flatMap(placesOf(source), (from) =>
+            resolved(extended(from, prop, place), sourceScopes, topAssigned, depth + 1, [...followed, key])
+          )
+        if (binding.kind === "module") {
+          const given = A.flatMap(O.toArray(binding.init), (init) => through(init, where, binding.prop))
+          const assigned = A.flatMap(
+            A.filter(topAssigned, (each) => each.name === place.root),
+            (each: TopAssigned) => through(each.value, each.scopes, O.none())
+          )
+          return A.prepend(A.appendAll(given, assigned), place)
+        }
+        if (binding.kind !== "inner") return []
+        return A.appendAll(
+          A.flatMap(O.toArray(binding.init), (init) => through(init, where, binding.prop)),
+          A.flatMap(binding.also, (value) => through(value, where, O.none()))
         )
-      if (binding.kind === "module") {
-        const given = A.flatMap(O.toArray(binding.init), (init) => through(init, where, binding.prop))
-        const assigned = A.flatMap(
-          A.filter(topAssigned, (each) => each.name === place.root),
-          (each: TopAssigned) => through(each.value, each.scopes, O.none())
-        )
-        return A.prepend(A.appendAll(given, assigned), place)
       }
-      if (binding.kind !== "inner") return []
-      return A.appendAll(
-        A.flatMap(O.toArray(binding.init), (init) => through(init, where, binding.prop)),
-        A.flatMap(binding.also, (value) => through(value, where, O.none()))
-      )
-    }
-  })
+    })
+  )
 
 /** The calls that write into the object they are handed first: `Object.assign(refs, { [id]: fn })` and its kin. */
 const writesInto = [
@@ -664,7 +759,12 @@ const writtenInFunctions = (program: Node, top: Scope): Written => {
   const writes: Array<{ readonly target: Node; readonly scopes: ReadonlyArray<Scope> }> = []
   const calls: Array<{ readonly call: Node; readonly scopes: ReadonlyArray<Scope> }> = []
   const topAssigned: Array<TopAssigned> = []
-  const visit = (node: Node, scopes: ReadonlyArray<Scope>): void => {
+  // Every node, a step each, walked by a list of the nodes left with the scopes they are written in.
+  const pending: Array<{ readonly node: Node; readonly scopes: ReadonlyArray<Scope> }> = [
+    { node: program, scopes: [top] }
+  ]
+  for (let at = pending.pop(); at !== undefined && tick(1, at.node.start); at = pending.pop()) {
+    const { node, scopes } = at
     const here = isFunction(node) ? A.append(scopes, scopeOf(node)) : scopes
     const atTop = (name: string): boolean => O.exists(lookUpAt(here, name), (bound) => bound.at === 0)
     const deleted = node.type === "UnaryExpression" && node["operator"] === "delete"
@@ -685,9 +785,8 @@ const writtenInFunctions = (program: Node, top: Scope): Written => {
       }
     }
     if (here.length > 1 && node.type === "CallExpression") calls.push({ call: node, scopes: here })
-    for (const next of children(node)) visit(next, here)
+    for (const next of A.reverse(children(node))) pending.push({ node: next, scopes: here })
   }
-  visit(program, [top])
   const placesIn = (value: Node, scopes: ReadonlyArray<Scope>): ReadonlyArray<Place> =>
     A.flatMap(placesOf(value), (place) => resolved(place, scopes, topAssigned))
   // A call writes into its first argument when what it calls is `Object.assign` or its kin, under any name.
@@ -702,19 +801,22 @@ const writtenInFunctions = (program: Node, top: Scope): Written => {
       : []
   )
   const slots = A.flatMap(A.appendAll(writes, filling), ({ target, scopes }) => placesIn(target, scopes))
+  // The slots under each name, found once: a name's places are compared with those under the same name only.
+  const slotsUnder = A.groupBy(slots, (slot) => slot.root)
   const filledAt = (name: string): ReadonlyArray<ReadonlyArray<string>> =>
-    A.dedupeWith(
+    samePathsOnce(
       A.flatMap(resolved({ root: name, path: [], open: false }, [top], topAssigned), (own) =>
         A.flatMap(
-          A.filter(slots, (slot) => slot.root === own.root),
+          reading.budget.stopped() !== undefined
+            ? []
+            : O.getOrElse(R.get(slotsUnder, own.root), (): ReadonlyArray<Place> => []),
           (slot: Place): ReadonlyArray<ReadonlyArray<string>> => {
             if (own.open) return overlaps(slot.path, own.path) ? [[]] : []
             if (startsWith(slot.path, own.path)) return [A.drop(slot.path, own.path.length)]
             return startsWith(own.path, slot.path) ? [[]] : []
           }
         )
-      ),
-      (a, b) => a.length === b.length && startsWith(a, b)
+      )
     )
   return { reassigned, filledAt }
 }
@@ -733,12 +835,18 @@ export interface ScreenRefs {
   readonly refs: ReadonlyArray<Handed>
   /** Every other attribute given a value in braces: judged only if its name turns out to be handed down to a ref. */
   readonly attributes: ReadonlyArray<Handed>
+  /** Where the law stopped reading and why (`budget.ts`): then nothing else of the file is said. */
+  readonly unread: O.Option<{ readonly line: number; readonly unread: Unread }>
+  /** The steps the reading took, the judgements it made inside one another by following names, and its reads. */
+  readonly steps: number
+  readonly deepest: number
+  readonly nestedMost: number
 }
 
 /**
- * Reads one screen. A file the parser cannot read gives nothing: the type-check says so, with the line. `hookModules`
- * names, each by its exact specifier, the modules of the repository whose `use…` exports are hooks besides React's
- * and the atoms' (`@inventory/ui/hooks/use-data-table`).
+ * Reads one screen. A file too large or too deep for the parser, or one it reads with errors, gives nothing but why.
+ * `hookModules` names, each by its exact specifier, the modules of the repository whose `use…` exports are hooks
+ * besides React's and the atoms' (`@inventory/ui/hooks/use-data-table`).
  *
  * @example readScreen({ file: "List.tsx", source: "const List = () => <p ref={(node) => node?.focus()} />" }).refs[0]?.verdict.kind // "refused"
  */
@@ -749,13 +857,24 @@ export const readScreen = (input: {
 }): ScreenRefs => {
   const { file, source } = input
   const hookModules = input.hookModules ?? []
+  const lineAt = linesOf(source)
+  const unreadAt = (stopped: Stopped, steps = 0, deepest = 0, nestedMost = 0): ScreenRefs => ({
+    refs: [],
+    attributes: [],
+    unread: O.some({ line: lineAt(stopped.at), unread: stopped.unread }),
+    steps,
+    deepest,
+    nestedMost
+  })
+  const refusedUnparsed = unreadable(source)
+  if (refusedUnparsed !== undefined) return unreadAt(refusedUnparsed)
   const parsed = parseSync(file, source)
+  const failed = parseFailure(parsed.errors)
+  if (failed !== undefined) return unreadAt(failed)
   const program: unknown = parsed.program
-  if (!isNode(program)) return { refs: [], attributes: [] }
-  const starts = A.reduce(Str.split("\n")(source), [0], (offsets, line) =>
-    A.append(offsets, (offsets[offsets.length - 1] ?? 0) + line.length + 1)
-  )
-  const lineAt = (offset: number): number => A.filter(starts, (start) => start <= offset).length
+  if (!isNode(program)) return unreadAt({ at: 0, unread: Unread.Unparsed({ message: "no program" }) })
+  const budget = budgetOf({ length: source.length, perCharacter: refsStepsPerCharacter })
+  reading.budget = budget
   const top = topLevel(
     program,
     writtenInFunctions(program, topLevel(program, { reassigned: [], filledAt: () => [] }, hookModules)),
@@ -763,7 +882,14 @@ export const readScreen = (input: {
   )
   const refs: Array<Handed> = []
   const attributes: Array<Handed> = []
-  const walk = (node: Node, scopes: ReadonlyArray<Scope>, element: O.Option<ElementOf>): void => {
+  // Every node, a step each, walked by a list of the nodes left with their scopes and the list each is an element of.
+  const pending: Array<{
+    readonly node: Node
+    readonly scopes: ReadonlyArray<Scope>
+    readonly element: O.Option<ElementOf>
+  }> = [{ node: program, scopes: [top], element: O.none() }]
+  for (let at = pending.pop(); at !== undefined && tick(1, at.node.start); at = pending.pop()) {
+    const { element, node, scopes } = at
     const here = isFunction(node) ? A.append(scopes, scopeOf(node, element)) : scopes
     if (node.type === "JSXAttribute") {
       const as = O.getOrElse(O.map(child(node, "name"), nameOf), () => "")
@@ -787,14 +913,19 @@ export const readScreen = (input: {
       }
     }
     const callback = elementCallback(node)
-    for (const next of children(node)) {
-      walk(
-        next,
-        here,
-        O.flatMap(callback, ({ fn, list }) => (fn === next ? O.some({ list, listScopes: here }) : O.none()))
-      )
+    for (const next of A.reverse(children(node))) {
+      pending.push({
+        node: next,
+        scopes: here,
+        element: O.flatMap(callback, ({ fn, list }) => (fn === next ? O.some({ list, listScopes: here }) : O.none()))
+      })
     }
   }
-  walk(program, [top], O.none())
-  return { refs, attributes }
+  const stopped = budget.stopped()
+  const steps = budget.steps()
+  const deepest = budget.deepest()
+  const nestedMost = budget.nestedMost()
+  return stopped === undefined
+    ? { refs, attributes, unread: O.none(), steps, deepest, nestedMost }
+    : unreadAt(stopped, steps, deepest, nestedMost)
 }

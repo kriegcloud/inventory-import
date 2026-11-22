@@ -238,14 +238,14 @@ package's task and replays it when nothing it reads has changed. The app's own s
 | `bun run dev` | Applies local migrations and the test accounts, then serves the app and API on http://localhost:5173, signed in by itself as the first test account |
 | `bun run check` | The loop check through turbo: type-check with Effect diagnostics, lint (with the two design lints), the fast tests, the proofs of the review's model (`prove`: half a minute when they run, replayed by turbo until the model's own files or the pinned library change), the format check, `docs:check`, the key scan (`keys:check`), the vendored-kit hash check (`vendor:check`), which package may import which (`boundaries:check`), the two stylesheet lists (`screens:check`), every `ref` a DOM ref or a callback that stays the same across draws (`refs:check`), no `_tag` compared or built by hand in any src or test folder (`tags:check`), no deprecated API used, read from every file's types (`deprecated:check`; `docs/standards/deprecated-apis.md`), the root's own configuration files type-check (`configs:check`) and the Effect imports (`imports:check`; `imports:fix` repairs code), every version written in more than one place equal to its one source (`version-sync`) and the configuration that follows from the workspaces (`config-sync:check`). Before every commit |
 | `bun run beep <group> <command>` | One of the repository's own rules by hand: `bun run beep laws boundaries`, `bun run beep quality ceilings`, `bun run beep vendor check`; `--help` on any of them lists its flags. `bun run check` runs them all under their root script names (`boundaries:check`, `vendor:check` and the rest) |
-| `bun run check:full` | `check` plus Verify's search of the whole model (`verify`: two minutes when it runs, replayed like the proofs), the slow tests (`*.slow.test.ts`: workerd, D1, sign-in) and the production build |
-| `bun run check:ci` | `check:full` without the proofs and the search, for CI's main job: CI runs those two in a job of their own (`proofs` in `ci.yml`, turbo's results restored from the last run on `main`) and again every night with nothing replayed (`.github/workflows/proofs-nightly.yml`). `bun run proofs` runs the two alone. `check`, `check:full` and `check:ci` share one list of tasks, `check:tasks` |
+| `bun run check:full` | `check` plus Verify's search of the whole model (`verify`: two minutes when it runs), the property that holds the model against the review region (`fold`: a minute and a half), a sample of the model's mutants (`mutants:sample`: under a minute), the slow tests (`*.slow.test.ts`: workerd, D1, sign-in) and the production build. The model's tasks are replayed by turbo until what they read changes |
+| `bun run check:ci` | What CI's main job runs: `check:full` without the model's proofs, search, fold and mutants. CI runs those in a job of their own (`proofs` in `ci.yml`, `bun run proofs`, turbo's results restored from the last run on `main`), and every night with nothing replayed and every mutant (`bun run proofs:nightly`, `.github/workflows/proofs-nightly.yml`) |
 | `bun run build` | The production build through turbo |
-| `bun run test` | Every test: fast, the proofs, the search and slow (Vitest, Node) |
+| `bun run test` | Every test: fast, the proofs, the search and slow (Vitest, Node). Not the fold or the mutants: `bun run proofs` |
 | `bun run format` | oxfmt, writes files: `bun run format -- <files>` for only yours, since a bare run rewrites every file. `format:check` only reports |
 | `bun run deps:update` | Moves every dependency of every package to its newest version, except the ones `.syncpackrc.json` holds back (each is named with its reason), runs `bun install`, then `version-sync -- --write`, and says what moved from which version to which. `-- --dry-run` says the same and writes nothing. `deps:lint` and `deps:outdated` (syncpack) read the same packages and the same held list |
 | `bun run version-sync` | Names every place where a version or a date differs from its one source (`.bun-version`, `engines.node`, the `effect` the packages state, the app's `wrangler.jsonc` and the rest) and fails. `-- --write` rewrites them, `-- --dry-run` lists what would be written. `docs/sync-commands.md` has every source and what is left alone |
-| `bun run config-sync` | Writes what follows from the workspaces: syncpack's sources, tsconfig references, each package's scripts, the paths that depend on a package's depth, the root tasks the two checks run. `config-sync:check` only compares, `-- --dry-run` lists what would be written |
+| `bun run config-sync` | Writes what follows from the workspaces: syncpack's sources, tsconfig references, each package's scripts, the paths that depend on a package's depth, the root tasks the three checks (`check`, `check:full`, `check:ci`) run. `config-sync:check` only compares, `-- --dry-run` lists what would be written |
 | `bun run docs:check` | Checks that `docs/`, `explorations/` and `goals/` are Open Knowledge Format bundles (the OKF skill's validator). Needs bash |
 | `bun run db:reset` | Deletes the local database and re-applies migrations. **Restart `bun run dev` afterwards.** |
 | `bun run preview` | Builds and serves the production build on http://localhost:4173, with security headers, compressed (brotli, else gzip) as Cloudflare serves it; `PREVIEW_COMPRESSION=off` for the raw bytes |
@@ -428,14 +428,17 @@ those files, read [docs/verify.md](docs/verify.md).
   and in every rule a decision reads; past 4,096 paths it proves nothing. The proof tests state each decision's paths.
 - **An aggregate's rule reads only what its own commands' middleware provides.** `Row` and `Group` have no command, so
   the rules about who may change a row or a group are rules of each decision that records on it, under the same
-  name in each. A new decision that records on one states them too: `test/rules.ts` lists them for each decision, and
-  its proof test fails by name when one is missing.
+  name in each. A new decision that records on one states them too: `test/Catalog.verify.test.ts` names the three for
+  each such aggregate and fails, by decision and rule, when one is missing.
 - **Annotate `keyOf`'s parameter** in a decision (`keyOf: (cmd: DecideRow) => ...`): without it the parameters of
   `decide` are `any`, and a typo in one passes the type-check.
-- **Every rule's standing is asserted by name** (`test/rules.ts`): a rule added, renamed or no longer proved fails
-  `bun run --cwd packages/catalog/model prove`. A rule over every instance at once is searched, never proved, and a
-  `sometimes` rule says only that one sequence gets there: `test/Catalog.verify.test.ts` says which is which, with
-  its depth.
+- **How each rule stands is asserted by its kind**: a proof test fails by the rule's name on any rule not proved, and
+  `test/Catalog.verify.test.ts` holds every rule to its kind's standing (proved; checked for a model's invariant, which
+  is searched and never proved; reached for a `sometimes` rule, which says only that one sequence gets there), with
+  its depth. Which rules there are is the lock's (below), not a list in the tests.
+- **Every check a `decide` makes has a mutant** (`packages/catalog/model/mutants/`): a change that removes it, and one
+  for each field of a new event, which a proof or a story must notice. A new check without one is a gap the nightly
+  cannot see; how to add one is in that folder's README.
 - **The rules as written are locked** (`test/Catalog.lock.json`, written by Verify): a rule taken out or whose text
   changed fails `bun run --cwd packages/catalog/model verify`, and in CI so does a rule the file does not list. To
   change a rule on purpose, run that once with `UPDATE_VERIFY_LOCK=1` and commit the file. Never set it to make a

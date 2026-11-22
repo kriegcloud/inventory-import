@@ -1290,3 +1290,54 @@ The agent chose these, and I was not asked:
   `scratch:graduate` deletes the folder and logs it.
 - **No law refuses private names** on this branch: only key-shaped strings are read for (`laws keys`), in the
   scratchpad as everywhere. Answer 3's "private names" has nothing to hold it yet.
+
+### 2026-11-22 — the review's model, a row decided after a group that is taken back
+
+A group is taken back; a row someone decided after the group, with the group in force over it, recorded that
+person's whole decision, the group's effect included. Today's review region would put back what the row held before
+the group, and lose the later decision. Answer: "Row 14 stays whole". The row keeps that person's whole decision,
+the group's effect included, and the screen names it. The model is right as it is; the review region's `act` is what
+changes, at the move that puts the review on the model. The fold's property names the difference in a test of its
+own, and compares the two only where one shared history has an answer. Reverse: a row's act over a group would have
+to record only what it changed, relative to the groups under it, and the fold would read it so.
+
+### 2026-11-22 — the review's model, a keep when a rival row is decided
+
+For when keeping one of two rows (the review's keep) is in a model; it is in none yet. Answer: a decision someone makes on a
+rival row wins over the keep, and two keeps of one SKU are both recorded and shown as a clash; no rival is left out
+against a decision made on it. Reverse: before that model exists, nothing to undo.
+
+### 2026-11-22 — the review's model, a waiting act when a group lands
+
+For the screen, at move 3. Answer: an act waiting on a row the group does not touch is sent again by itself; one on
+a row it touches is held and shown with both decisions. The model refuses either with `GroupedSince` and hands back
+no number; what the screen does next is this rule.
+
+### 2026-11-22 — the review's model, the lock, as built
+
+His answer stands: "The library's lock file", and the hand-written list of rule names goes once the lock was shown to
+catch a slipped rule. Shown on the one-unit model under `CI=true`: an invariant made to say less, a rule taken out, a
+rule renamed (the old name refused, the new one "not in" the file), and a decision's rule whose text changed are each
+refused by name. What the lock cannot catch, shown too: with a check removed from `UndoingGroup`'s `decide`, the rule
+it protects is only `checked`, nothing is undone, the report is verified, and the lock is silent, since the rule's
+text is unchanged. So the list is gone, and two assertions stay, each for one case the lock misses: every rule
+stands as its kind says (proved; checked for a model's invariant; reached for a `sometimes` rule), and every decision
+that records on a row or a group states the three rules about who may change it, held in each decision's proof and
+again over the whole model. This answers what the lock entry above left open, in his words as they were passed on:
+"if the lock alone can't catch something the list does, show me the case and keep one assertion for exactly that;
+otherwise remove the list." What the change costs: a rule taken out or renamed now fails only where the lock runs,
+the search of the whole model (`bun run check:full`, CI's proofs job), not `bun run check`. Reverse: put the lists
+back in `test/rules.ts`.
+
+### 2026-11-22 — the review's model, its long tests outside the loop check (agent, not asked)
+
+The fold's property (76 to 85 seconds) leaves `bun run check`: it is the task `fold` of the catalog's web package,
+replayed by turbo until that package or what it reads changes, part of `check:full` and of CI's proofs job, not of
+CI's main job. The mutants of the model (148, ported from an earlier trial of it: 116 noticed by a proof, 32 by a
+story only, none by neither; 24 minutes four at a time on a busy workstation) are a task the nightly workflow runs
+whole, with a sample of nine (about 22 seconds) in
+`check:full` and in the proofs job, and every night in a job of its own. Not his: the agent's, at the instruction of
+the person running this work. Reverse: rename `ReviewModelFold.fold.test.ts` back to `ReviewModelFold.test.ts`, drop
+the two projects and the `fold` script of the web package, remove the `fold`, `mutants` and `mutants:sample` tasks
+from both `turbo.json` files and the model package's two scripts, and take them out of the root's `check:full`,
+`proofs` and `proofs:nightly` and of both workflows.

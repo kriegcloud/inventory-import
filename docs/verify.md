@@ -20,7 +20,7 @@ Nothing a person sees uses the model yet, and nothing is stored through it.
 
 ## What is proved, and what tests hold
 
-Three kinds of rule, and one thing no rule says. Each is named in `packages/catalog/model/test/rules.ts`.
+Three kinds of rule, and one thing no rule says. Which rules there are is kept by the lock file (below).
 
 | | Rules | How far each is known to hold |
 | --- | --- | --- |
@@ -41,8 +41,16 @@ schemas and the invariants allow and every input, not sampled by a test.
 **No rule says that a valid act is taken.** A `decide` that refused everything would keep all 135. That an act is
 recorded, with the events it should record, is held by tests: the stories (`test/Review.story.test.ts` and
 `test/Group.story.test.ts`, 45 of them, one at least for each of the eleven commands), and the property that drives
-the model with the review region's own presses (`packages/catalog/web/test/ReviewModelFold.test.ts`). The eleven "can be taken" rules close part of the gap inside
-Verify: a command no sequence reaches fails the search. They are a search three commands deep.
+the model with the review region's own presses (`packages/catalog/web/test/ReviewModelFold.fold.test.ts`). The eleven
+"can be taken" rules close part of the gap inside Verify: a command no sequence reaches fails the search. They are a
+search three commands deep.
+
+**Where the model and today's review differ, on purpose.** A group is taken back; a row someone decided after the
+group keeps that person's whole decision, the group's effect included, and the screen names it (Benjamin,
+2026-11-22: "Row 14 stays whole"). The review region's `act` today puts back what the row held before the group
+and loses the later decision. The model is what was chosen; `act` changes at the move that puts the review on the
+model. The fold's property compares the two only where one shared history has an answer, and the test "row 14 stays
+whole" shows this case on its own.
 
 **Nothing evaluates a rule while the app runs.** What refuses a state is the code of `decide`. A proved rule means
 that code cannot break it.
@@ -70,10 +78,19 @@ One file alone:
 bun run --cwd packages/catalog/model prove test/Import.prove.test.ts
 ```
 
-In CI the two have a job of their own (`proofs` in `.github/workflows/ci.yml`), which restores turbo's results from
-the last run on `main` and so proves nothing unless one of those changed, and they run again every night with
-nothing replayed (`.github/workflows/proofs-nightly.yml`). `bun run check:ci` is `check:full` without the two, for
-CI's main job.
+Two more tasks hold the model, both in `bun run check:full`:
+
+- `bun run --cwd packages/catalog/web fold`: the property that the model, fed the review region's presses, holds
+  what the region decides (`test/ReviewModelFold.fold.test.ts`), a minute and a half.
+- `bun run --cwd packages/catalog/model mutants:sample`: a few of the model's mutants. A mutant is one change to a
+  `decide` (a check removed, an event's field given a wrong value, an act made to record nothing), which a proof or a
+  story must notice; `packages/catalog/model/mutants/README.md` has them all, what each class means and what they
+  cost. All of them run every night (`mutants`).
+
+In CI these four have a job of their own (`proofs` in `.github/workflows/ci.yml`, `bun run proofs`), which restores
+turbo's results from the last run on `main` and so runs nothing unless one of those changed, and they run again every
+night with nothing replayed and every mutant (`bun run proofs:nightly`, `.github/workflows/proofs-nightly.yml`).
+`bun run check:ci` is `check:full` without them, for CI's main job.
 
 ## Three rules to break
 
@@ -216,9 +233,15 @@ The screen had seen up to change -1, the import was at 0, and the group was reco
 ## The lock file
 
 `packages/catalog/model/test/Catalog.lock.json` is written by Verify, not by hand. It keeps every rule's text. A rule
-that is taken out or renamed, or whose text changed, fails `verify` by name; an aggregate's invariant is also compared
-for what it says, and one made to allow more fails with the state that now passes. It does not keep how a rule
-stands: that a rule is proved, and not only searched, is what the lists in `test/rules.ts` hold.
+that is taken out or renamed fails `verify` by name, and so does one whose text changed, with one exception: an
+aggregate's invariant is compared for what it says, so one made to allow more fails with the state that now passes,
+and one that still says at least as much is locked again as written. It does not keep how a rule
+stands. Shown on this model: with the line of `UndoingGroup` that refuses an undo while a later group is in force
+deleted, `OnlyTheLastGroupInForceIsTakenBack` is only `checked`, nothing is left undone, the report is verified,
+and the lock, whose text of the rule has not changed, is silent. So `test/Catalog.verify.test.ts` asserts how each
+rule stands by its kind (proved, checked for a model's invariant, reached for a `sometimes` rule), and that every
+decision that records on a row or a group states the rules about who may change it: a new decision that left one
+out would be a new rule list the lock accepts.
 
 - Outside CI, a new rule is added to the file when `verify` runs: commit the file with the rule.
 - In CI (`CI=true`) nothing is written, and a rule the file does not list fails.

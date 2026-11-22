@@ -12,6 +12,7 @@ import { emit } from "../../Report.schema.ts"
 import {
   bunInstall,
   bunTests,
+  bunFiles,
   bunTypes,
   scratchCheck,
   scratchEnd,
@@ -56,7 +57,7 @@ export const scratchListCommand = Command.make("list", {}, () =>
 
 /** `scratch check`: the scratchpad's own rules, then the type-checker with the Effect diagnostics. */
 export const scratchCheckCommand = Command.make("check", {}, () =>
-  Effect.flatMap(scratchCheck(bunTypes), emit(scratchSentence))
+  Effect.flatMap(scratchCheck(bunTypes, bunFiles), emit(scratchSentence))
 ).pipe(
   Command.withDescription(
     "No install inside an experiment, a note for each, and the type-checker with the Effect diagnostics over all of them"

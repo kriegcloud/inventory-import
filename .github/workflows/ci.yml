@@ -2,7 +2,8 @@ name: CI
 
 on:
   push:
-    # A release branch is checked as main is: a fix cherry-picked onto it is green before its tag is pushed.
+    # A release branch is checked as main is, and this check passing on a tagged head is what starts the release
+    # (deploy.yml).
     branches: [main, "release/**"]
   pull_request:
 

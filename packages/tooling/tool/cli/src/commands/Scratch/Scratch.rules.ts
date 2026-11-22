@@ -359,6 +359,90 @@ export const diagnosticLines =
     )
   }
 
+/**
+ * The comment that turns the type-checker, and with it every Effect diagnostic, off for a whole file. It is another
+ * spelling of "turn a diagnostic off", so the scratchpad refuses it as it refuses the Effect directive.
+ *
+ * @category rules
+ */
+export const noCheck = "@ts-nocheck"
+
+/**
+ * The lines of a file that name {@link noCheck}, numbered from 1, in any mix of capitals: the compiler lower-cases
+ * the name before it looks it up, so `@TS-NoCheck` turns the checks off as well. The compiler honours it only before
+ * the code; the scratchpad refuses it wherever it stands, so nobody has to reason about which comment is the leading
+ * one.
+ *
+ * @example
+ * uncheckedLines("// @ts-nocheck\nexport const count = 1\n") // [1]
+ *
+ * @category rules
+ */
+export const uncheckedLines = (text: string): ReadonlyArray<number> =>
+  A.flatMap(Str.split("\n")(text), (line, index) => (/@ts-nocheck/i.test(line) ? [index + 1] : []))
+
+/**
+ * The comment that hides whatever type error the next line has, and goes on hiding it once the code is right. The
+ * scratchpad refuses it (Benjamin's decision of 2026-11-22: "Refuse ignore, allow expect-error").
+ *
+ * @category rules
+ */
+export const ignore = "@ts-ignore"
+
+/**
+ * The comment an experiment may write instead of {@link ignore}: it says the next line must not compile, and is an
+ * error itself as soon as that line does.
+ *
+ * @category rules
+ */
+export const expectError = "@ts-expect-error"
+
+/**
+ * The lines of a file that name {@link ignore}, numbered from 1, in any mix of capitals, as for {@link noCheck}.
+ *
+ * @example
+ * ignoredLines("const count = 1\n// @ts-ignore\ncount()\n") // [2]
+ *
+ * @category rules
+ */
+export const ignoredLines = (text: string): ReadonlyArray<number> =>
+  A.flatMap(Str.split("\n")(text), (line, index) => (/@ts-ignore/i.test(line) ? [index + 1] : []))
+
+/** The files the type-check reads, each absolute. A test gives its own. */
+export type Listing = Effect.Effect<ReadonlyArray<string>, RepoError, Repo>
+
+/**
+ * The TypeScript files in what the compiler prints for `--listFilesOnly`: one absolute path a line, other lines (a
+ * runner's own) left out.
+ *
+ * @example
+ * programFiles("$ tsrs -p tsconfig.json\n/repo/scratchpad/vite.config.ts\n") // ["/repo/scratchpad/vite.config.ts"]
+ *
+ * @category rules
+ */
+export const programFiles = (output: string): ReadonlyArray<string> =>
+  A.filter(A.map(Str.split("\n")(output), Str.trim), (line) => /^(?:\/|[A-Za-z]:[\\/]).*\.[cm]?tsx?$/.test(line))
+
+/**
+ * Every file the scratchpad's type-check reads, asked of the compiler itself (`tsrs -p tsconfig.json
+ * --listFilesOnly`): what its `include` matches, following a linked folder, and every file those reach by an import,
+ * whatever folder it is in. Walking the folder instead would guess at both.
+ *
+ * @category rules
+ */
+export const bunFiles: Listing = Effect.gen(function* () {
+  const repo = yield* Repo
+  const dir = repo.join(repo.root, scratchpad)
+  const answer = yield* repo.run("bun", ["run", "types", "--listFilesOnly"], { cwd: dir })
+  if (answer.code !== 0) {
+    return yield* refuse(
+      repo.join(dir, "tsconfig.json"),
+      `the type-checker could not say which files it reads:\n${Str.trim(`${answer.stdout}\n${answer.stderr}`)}`
+    )
+  }
+  return programFiles(answer.stdout)
+})
+
 /** The test runner over the scratchpad, given the folder to run: every experiment's, or one's. */
 export type RunTests = (
   folder: string
@@ -613,30 +697,63 @@ export const scratchList = Effect.fn("Scratch.scratchList")(function* () {
  *
  * @category rules
  */
-export const scratchCheck = Effect.fn("Scratch.scratchCheck")(function* (types: Install) {
+export const scratchCheck = Effect.fn("Scratch.scratchCheck")(function* (types: Install, files: Listing) {
   const repo = yield* Repo
   const state = yield* reading()
   const problem = (where: string, message: string): ScratchFinding =>
     ScratchFinding.cases.Problem.make({ where, message })
-  // A diagnostic turned off: only `newSchemaClass`, only on the first line of a decide file.
+  // A diagnostic turned off: only `newSchemaClass`, only on the first line of a decide file. Read in the files the
+  // compiler itself says it reads, so a file it reaches by an import or through a linked folder is read here too,
+  // whatever its folder is called, and a file it never loads (JavaScript, a cache nothing imports) is not.
+  const program = yield* files
+  const inScratchpad = (file: string) => Str.startsWith(`${state.dir}/`)(file)
+  const owner: (dir: string) => Effect.Effect<O.Option<string>> = Effect.fnUntraced(function* (dir: string) {
+    if (yield* repo.exists(repo.join(dir, "package.json"))) return O.some(dir)
+    const parent = repo.dirname(dir)
+    return parent === dir ? O.none<string>() : yield* owner(parent)
+  })
+  // Outside the scratchpad, a file of a package is that package's own, held by its own check; any other file an
+  // experiment reached (one loose in the repository, or outside it) is the experiment's.
+  const ours = yield* Effect.filter(
+    A.filter(A.dedupe(program), (file) => !A.contains(Str.split("/")(file), "node_modules")),
+    (file) =>
+      inScratchpad(file)
+        ? Effect.succeed(true)
+        : Effect.map(
+            owner(repo.dirname(file)),
+            O.match({ onNone: () => true, onSome: (dir) => dir === repo.root || dir === state.dir })
+          ),
+    { concurrency: 1 }
+  )
+  const code = A.sort(
+    A.map(ours, (file) => repo.relative(repo.root, file)),
+    Order.String
+  )
   const turnedOff = yield* Effect.forEach(
-    state.experiments,
-    Effect.fnUntraced(function* (experiment) {
-      const code = A.filter(experiment.paths, (path) => !ownState(path) && /\.[cm]?[jt]sx?$/.test(path))
-      return yield* Effect.forEach(
-        code,
-        (path) =>
-          Effect.map(repo.text(repo.join(experiment.folder, path)), (text) =>
-            A.map(diagnosticLines(path)(text), (line) =>
-              problem(
-                `${scratchpad}/experiments/${experiment.slug}/${path}:${line}`,
-                `turns an Effect diagnostic off. Only a decide file (\`*.aggregate.ts\`, \`*.decision.ts\`) may, and only \`${decideFileLine}\` as its first line (decision 33 of the Alchemy brief): build with \`.make\` here`
-              )
+    code,
+    (path) =>
+      Effect.map(repo.text(repo.join(repo.root, path)), (text) =>
+        A.flatten([
+          A.map(diagnosticLines(path)(text), (line) =>
+            problem(
+              `${path}:${line}`,
+              `turns an Effect diagnostic off. Only a decide file (\`*.aggregate.ts\`, \`*.decision.ts\`) may, and only \`${decideFileLine}\` as its first line (decision 33 of the Alchemy brief): build with \`.make\` here`
             )
           ),
-        { concurrency: 1 }
-      )
-    }),
+          A.map(uncheckedLines(text), (line) =>
+            problem(
+              `${path}:${line}`,
+              `names \`${noCheck}\`, which turns the type-checker and every Effect diagnostic off for a whole file. No file of the scratchpad may hold it: remove the line and fix what the type-checker then says`
+            )
+          ),
+          A.map(ignoredLines(text), (line) =>
+            problem(
+              `${path}:${line}`,
+              `names \`${ignore}\`, which hides a type error on the next line and keeps hiding it after the code is fixed. Fix the error, or, where the experiment shows that a wrong call does not compile, write \`${expectError}\`, which fails by itself once the error is gone`
+            )
+          )
+        ])
+      ),
     { concurrency: 1 }
   )
   const perExperiment = A.flatMap(state.experiments, (experiment) => {
@@ -750,7 +867,7 @@ export const scratchCheck = Effect.fn("Scratch.scratchCheck")(function* (types: 
   )
   const problems = A.flatten([
     perExperiment,
-    A.flatten(A.flatten(turnedOff)),
+    A.flatten(turnedOff),
     sharedProblems,
     unaccounted,
     undeclared,

@@ -6,11 +6,19 @@
 // One page is one member's: asked again, the page keeps the member it had, and an answer that is somebody else, another
 // organization or nobody leaves the page (a full page load, as signing out is), so nothing a person typed, chose or
 // read is there for whoever is next. Only the person's own switch of organization goes on without one, as Benjamin
-// decided (2026-11-19, "atoms, the reads after a sign-out or a switch"): a switch back shows the rows at once.
+// decided (2026-11-19, "atoms, the reads after a sign-out or a switch"): a switch back shows the rows at once. Every tab
+// of the browser shares one session cookie, so each sign-in, sign-out, switch and session found ended is said to the
+// other tabs (`changedKey` in localStorage), and each of them asks again at once, as it does when it is shown again.
 import { forgetReads } from "@inventory/client/Api"
 import { forgetEarly } from "@inventory/client/Early"
 import { request } from "@inventory/client/Http"
-import { answeredFor, askedOfAnswer, keyOfMember, memberOfAnswer } from "@inventory/client/MemberAtoms"
+import {
+  answeredFor,
+  askedOfAnswer,
+  keyOfMember,
+  memberOfAnswer,
+  settledBeforeOwnSwitch
+} from "@inventory/client/MemberAtoms"
 import { leaveApp, navigate } from "@inventory/ui/Route"
 import {
   actorOfSession,
@@ -20,6 +28,7 @@ import {
 } from "@inventory/access-contract/SessionState"
 import type { Member } from "@inventory/kernel/Member"
 import * as Cause from "effect/Cause"
+import * as SecureRandom from "effect/crypto/SecureRandom"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as S from "effect/Schema"
@@ -105,6 +114,22 @@ const rememberSignedOut = (signedOut: boolean) => {
   }
 }
 
+/**
+ * Said in localStorage each time who is signed in changes in this tab on purpose (a sign-in, a sign-out, a switch of
+ * organization) or is found ended: the other tabs of the browser hear it (the `storage` event) and ask who is signed in
+ * again (`askedWhenChangedElsewhere`). Its value is new each time, and means nothing else.
+ */
+export const changedKey = "inventory:signed-in-changed"
+
+/** Tells the other tabs of this browser that who is signed in may have changed. */
+const sayChanged = (): void => {
+  try {
+    window.localStorage.setItem(changedKey, SecureRandom.uuidV4Unsafe())
+  } catch {
+    // Storage refused: the other tabs ask again when they are next shown.
+  }
+}
+
 const endedKey = "session-ended"
 
 /**
@@ -112,6 +137,7 @@ const endedKey = "session-ended"
  * they were, for them alone. Two lines: the member, and the address.
  */
 const rememberEnded = (who: O.Option<Member>) => {
+  sayChanged()
   try {
     const { pathname, search } = window.location
     window.sessionStorage.setItem(endedKey, `${keyOfMember(who)}\n${pathname}${search}`)
@@ -213,21 +239,30 @@ const settled = (answer: SessionState): void => {
  */
 export const session: Atom.Atom<AsyncResult.AsyncResult<SessionState, SessionFailure>> = Atom.make((get) => {
   const before = O.flatMap(get.self<AsyncResult.AsyncResult<SessionState, SessionFailure>>(), AsyncResult.value)
-  const to = get.once(switchingTo)
   const had = O.flatMap(before, actorOfSession)
   return askSession.pipe(
-    Effect.flatMap((answer) =>
-      answeredFor({
+    Effect.flatMap((answer) => {
+      const leave = () => {
+        if (answer.status === "signed-out") rememberEnded(had)
+        leavePage()
+      }
+      // A page that is one account's before it has a member (the screen that creates its first organization): anybody
+      // else, or nobody, leaves it, so nothing typed there is there for them.
+      if (
+        O.exists(before, (state) => state.status === "no-organization" && !O.contains(emailOf(answer), state.email))
+      ) {
+        return Effect.sync(leave).pipe(Effect.andThen(Effect.never))
+      }
+      return answeredFor({
         answer,
         before: had,
         after: actorOfSession(answer),
-        chosen: isChosen({ before, answer, to }),
-        leave: () => {
-          if (answer.status === "signed-out") rememberEnded(had)
-          leavePage()
-        }
+        // Read as the answer comes, not as it was asked: a switch pressed while this was already asked is the
+        // person's own all the same.
+        chosen: isChosen({ before, answer, to: get.registry.get(switchingTo) }),
+        leave
       })
-    ),
+    }),
     Effect.tap((answer) =>
       Effect.sync(() => {
         get.set(switchingTo, O.none())
@@ -291,7 +326,40 @@ export const sessionView: Atom.Atom<SessionView> = Atom.map(session, (result): S
  * API follows the member, so nothing else has to be emptied.
  */
 export const refreshSession = Atom.fnSync((_: void, get) => {
+  sayChanged()
   get.refresh(session)
+})
+
+/**
+ * Asks who is signed in again whenever another tab of this browser says it may have changed, and when this tab is
+ * shown, or gains focus, after it was hidden: the cookie is the browser's, not the tab's, and whoever pressed and read
+ * here may not be who it names now. Until the answer comes nothing is written (`signedInAsked`), and the server refuses
+ * a request named for another member than its cookie's (`pageMemberHeader`). Kept for the page's life.
+ */
+export const askedWhenChangedElsewhere: Atom.Atom<void> = Atom.readable((get) => {
+  if (typeof window === "undefined" || typeof document === "undefined") return
+  const ask = () => get.registry.refresh(session)
+  const away = { hidden: document.visibilityState === "hidden" }
+  const back = () => {
+    if (!away.hidden) return
+    away.hidden = false
+    ask()
+  }
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === changedKey) ask()
+  }
+  const onVisibility = () => {
+    if (document.visibilityState === "hidden") away.hidden = true
+    else back()
+  }
+  window.addEventListener("storage", onStorage)
+  window.addEventListener("focus", back)
+  document.addEventListener("visibilitychange", onVisibility)
+  get.addFinalizer(() => {
+    window.removeEventListener("storage", onStorage)
+    window.removeEventListener("focus", back)
+    document.removeEventListener("visibilitychange", onVisibility)
+  })
 })
 
 /**
@@ -306,11 +374,13 @@ export class SwitchRefused extends S.TaggedError<SwitchRefused, { readonly brand
 
 /**
  * Switches the session to another organization the person belongs to: the server checks the membership, then the
- * session is asked again and every read follows the new member. From the press until it has answered nothing else is
- * written (`signedInAsked`). Ends when the session has answered.
+ * session is asked again and every read follows the new member. What must end first as the member of the organization
+ * left (an upload's last request) ends before the switch is sent (`beforeOwnSwitch`); from then until the session has
+ * answered nothing else is written (`signedInAsked`). Ends when the session has answered.
  */
 export const switchOrganization = Atom.fn((organizationId: string, get) =>
-  Effect.sync(() => get.set(switchingTo, O.some(organizationId))).pipe(
+  settledBeforeOwnSwitch(get.registry).pipe(
+    Effect.andThen(Effect.sync(() => get.set(switchingTo, O.some(organizationId)))),
     Effect.andThen(
       Effect.tryPromise({
         try: () =>
@@ -323,6 +393,7 @@ export const switchOrganization = Atom.fn((organizationId: string, get) =>
     ),
     Effect.tapError(() => Effect.sync(() => get.set(switchingTo, O.none()))),
     Effect.andThen(() => {
+      sayChanged()
       // Said again: an answer that came meanwhile (the session asked again for another reason) ended it.
       get.set(switchingTo, O.some(organizationId))
       get.refresh(session)
@@ -344,6 +415,7 @@ export const signInAs = (account: { readonly email: string; readonly password: s
       .then(orThrow)
       .then(() => {
         rememberSignedOut(false)
+        sayChanged()
         leavePage()
       })
   )
@@ -357,6 +429,7 @@ export const signOut = (): Promise<void> =>
       .then(() => {
         rememberSignedIn(false)
         rememberSignedOut(true)
+        sayChanged()
         leavePage()
       })
   )

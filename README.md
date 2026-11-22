@@ -66,7 +66,7 @@ values in `.dev.vars.example`). After pulling a change to `apps/inventory/migrat
 | Command | What it does |
 | --- | --- |
 | `bun run dev` | App and API on http://localhost:5173, signed in as the first test account in development |
-| `bun run check` | Through turbo: type-check with Effect diagnostics, lint (including two design lints), the fast tests, format check and the docs check; a second run with nothing changed replays from the cache |
+| `bun run check` | Through turbo: type-check with Effect diagnostics, lint (including two design lints), the fast tests, format check, the docs check and the repository's own rules (no deprecated API is used, among them); a second run with nothing changed replays from the cache |
 | `bun run check:full` | `check` plus the slow tests and the production build |
 | `bun run test` | Every test, fast and slow (Vitest, on Node) |
 | `bun run db:reset` | Start again with an empty database (restart `bun run dev` afterwards) |

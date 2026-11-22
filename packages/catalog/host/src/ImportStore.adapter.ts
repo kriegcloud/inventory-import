@@ -232,7 +232,7 @@ export const ImportStoreD1 = Layer.effect(
     // -- Reads ---------------------------------------------------------------------------------------------------
 
     const draftColumns = sql`id, fileName, headJson, rowCount, status, actorName, createdAt, importedBy, importedAt,
-      revision, needsAtStart, choicesJson, movesJson, takenBackJson`
+      revision, needsAtStart, choicesJson, movesJson, takenBackJson, takenBackFrom`
     const findDraft = SqlSchema.findOneOption({
       Request: Scope,
       Result: Draft,
@@ -1128,9 +1128,9 @@ export const ImportStoreD1 = Layer.effect(
       Request: CommitScope,
       Result: Ids,
       // One revision on: a confirmed import is never taken for the open one of the same revision. What its matches
-      // took back is let go: there is nothing left to name.
+      // took back is let go: there is nothing left to name, and from this revision on it is kept again.
       execute: (r) => sql`UPDATE importDraft SET status = 'imported', revision = revision + 1,
-          importedBy = ${r.name}, importedAt = ${r.at}, takenBackJson = '[]'
+          importedBy = ${r.name}, importedAt = ${r.at}, takenBackJson = '[]', takenBackFrom = revision + 1
         WHERE organizationId = ${r.org} AND id = ${r.id} AND status = 'open' AND ${thisConfirm(r.org, r.batch)}
         RETURNING id`
     })

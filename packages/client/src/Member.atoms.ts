@@ -172,6 +172,16 @@ export class NotSentElsewhere extends S.TaggedError<NotSentElsewhere, { readonly
 ) {}
 
 /**
+ * The write not sent, as the person reads it (`sayError` says its `reason`, under "That did not work"): what happened,
+ * that nothing changed, and where to do it.
+ */
+export const notSentElsewhere = (): NotSentElsewhere =>
+  NotSentElsewhere.make({
+    reason:
+      "You opened another organization before it was sent, so it was not sent and nothing was changed. Switch back to do it there."
+  })
+
+/**
  * A write as the member who pressed it, or not at all: held while who is signed in is being asked (again), and sent
  * once the answer is that member. An answer that is somebody else leaves the page, and the write is never sent; after
  * the person's own switch of organization it fails, since it was made for the organization they left. Only a request
@@ -185,16 +195,21 @@ export const asPressed = <A, E, R>(send: Effect.Effect<A, E, R>): Effect.Effect<
       onSome: (registry) => {
         const pressedAs = registry.get(memberKey)
         return onceSignedInKnown(registry).pipe(
-          Effect.andThen(() =>
-            registry.get(memberKey) === pressedAs
-              ? send
-              : Effect.die(
-                  NotSentElsewhere.make({
-                    reason: "You changed organization before this was sent, so it was not. Nothing was changed."
-                  })
-                )
-          )
+          Effect.andThen(() => (registry.get(memberKey) === pressedAs ? send : Effect.die(notSentElsewhere())))
         )
       }
     })
   )
+
+/**
+ * What must end before the person's own switch of organization is sent, while the session is still the one they are
+ * leaving: each is work of that organization that can only be finished or cleaned up as its member (an upload's last
+ * request, or the rows it already sent). A screen adds its work while it runs and takes it out when it ends.
+ */
+export const beforeOwnSwitch: Atom.Writable<ReadonlyArray<Effect.Effect<void>>> = Atom.make<
+  ReadonlyArray<Effect.Effect<void>>
+>([]).pipe(Atom.keepAlive)
+
+/** Ends everything `beforeOwnSwitch` holds, all at once; done when each is. */
+export const settledBeforeOwnSwitch = (registry: AtomRegistry.AtomRegistry): Effect.Effect<void> =>
+  Effect.forEach(registry.get(beforeOwnSwitch), (work) => work, { concurrency: "unbounded", discard: true })

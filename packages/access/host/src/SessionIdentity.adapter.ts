@@ -1,13 +1,15 @@
 /**
  * SIGNED-IN IDENTITY. The Worker's `Identity` middleware: the session cookie names a user and their active
  * organization, and their membership there is the actor. Nothing in a request header or payload can choose who the
- * actor is. Handlers read `CurrentActor` and call `requireRole`. Writes from another site have already been refused
+ * actor is; the header a page names its member in (`pageMemberHeader`) can only refuse the request, when the session's
+ * member is somebody else. Handlers read `CurrentActor` and call `requireRole`. Writes from another site have already been refused
  * (`SameOrigin` on the whole API, and the same rule on /api/auth/* in `SignIn.route.ts`).
  *
  * @packageDocumentation
  */
 import { BetterAuth } from "@beep/better-auth/BetterAuth"
 import type { AuthSession } from "@beep/better-auth/BetterAuthSession"
+import { pageMemberHeader } from "@inventory/access-contract/Access"
 import {
   AccountEmail,
   type SessionState,
@@ -17,6 +19,7 @@ import {
 import { accessHandlers } from "@inventory/access-model/Handlers"
 import { MemberDirectory, SignedInUser } from "@inventory/access-model/MemberDirectory"
 import { CurrentActor } from "@inventory/kernel/Actor"
+import { NotSignedIn } from "@inventory/kernel/AccessError"
 import { Identity } from "@inventory/kernel/Identity"
 import { OrganizationId, UserId } from "@inventory/kernel/Ids"
 import * as A from "effect/Array"
@@ -58,6 +61,14 @@ export const SessionIdentityLive: Layer.Layer<Identity, never, BetterAuth | Memb
         const member = yield* accessHandlers
           .actorOf(O.map(session, signedIn))
           .pipe(Effect.provideService(MemberDirectory, directory))
+        // The page that sent it is another member's (somebody signed in, out or switched in another tab of the same
+        // browser): refused before the handler runs, so nothing is done as, or read for, whoever the cookie is now.
+        const forPage = request.headers[pageMemberHeader]
+        if (forPage !== undefined && forPage !== `${member.id}/${member.organizationId}`) {
+          return yield* NotSignedIn.make({
+            reason: "This page was opened for somebody else than is signed in now. Load the page again."
+          })
+        }
         // Ids only, never a name or an email: every span and log line inside the request carries who acted.
         const who = {
           "actor.id": member.id,

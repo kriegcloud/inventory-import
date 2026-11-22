@@ -19,7 +19,7 @@ import { useBadgeOverflow } from "@inventory/ui/components/data-grid/use-badge-o
 import { useDebouncedCallback } from "@inventory/ui/hooks/use-debounced-callback"
 import {
   createFileObjectUrl,
-  execInsertText,
+  // Local change: upstream imported `execInsertText` here.
   formatDateForDisplay,
   formatDateToString,
   formatFileSize,
@@ -38,10 +38,11 @@ import {
   getRowHeightValue,
   getTextCellValue,
   getUrlHref,
-  insertTextAtSelection,
+  // Local change: upstream also imported `insertTextAtSelection` here.
   moveCaretToEnd,
   parseLocalDate,
-  replaceEditableText
+  // Local change: `selectEditableText` is imported where upstream imported `replaceEditableText`.
+  selectEditableText
 } from "@inventory/ui/components/data-grid/data-grid-utils"
 import { DataGridCell, useCellValue } from "@inventory/ui/components/data-grid/data-grid-cell"
 import { Badge } from "@inventory/ui/components/badge"
@@ -153,18 +154,9 @@ export function LongTextCell<TData extends RowData>(props: DataGridCellProps<TDa
     const length = textarea.value.length
     textarea.setSelectionRange(length, length)
 
-    const pendingChar = getPendingChar(cell)
-    if (pendingChar) {
-      requestAnimationFrame(() => {
-        const textarea = textareaRef.current
-        if (textarea && document.activeElement === textarea) {
-          insertTextAtSelection(textarea, pendingChar)
-          textarea.scrollTop = textarea.scrollHeight
-        }
-      })
-    } else {
-      textarea.scrollTop = textarea.scrollHeight
-    }
+    // Local change: the browser types the key that opened the editor, after the text (see `typesInPlace` in
+    // data-grid-cell.tsx). Upstream typed it here on the next frame, and lost it when a second key came first.
+    textarea.scrollTop = textarea.scrollHeight
   }, [cell])
 
   const onBlur = React.useCallback(() => onSave(), [onSave])
@@ -277,15 +269,11 @@ export function NumberCell<TData extends RowData>(props: DataGridCellProps<TData
       isCancelingRef.current = false
       inputRef.current.focus()
 
-      const pendingChar = getPendingChar(cell)
-      if (pendingChar) {
-        inputRef.current.select()
-        if (!execInsertText(pendingChar)) {
-          setDraftValue(pendingChar)
-        }
-      }
+      // Local change: the browser types the key over the selection (see `typesInPlace` in data-grid-cell.tsx).
+      if (getPendingChar(cell)) inputRef.current.select()
     }
-  }, [cell, isEditing, setDraftValue])
+    // Local change: upstream's list also held `setDraftValue`, which its fallback called.
+  }, [cell, isEditing])
 
   return (
     <DataGridCell<TData> {...props} className="text-end" onCommit={onSave} onCancel={onCancel} commitOnEnter>
@@ -1361,9 +1349,9 @@ function useEditableText<TData extends RowData>({
         element.textContent = value
       }
 
-      const pendingChar = getPendingChar(cell)
-      if (pendingChar) {
-        replaceEditableText(element, pendingChar)
+      // Local change: the browser types the key over the selection (see `typesInPlace` in data-grid-cell.tsx).
+      if (getPendingChar(cell)) {
+        selectEditableText(element)
       } else if (element.textContent) {
         moveCaretToEnd(element)
       }

@@ -254,6 +254,33 @@ layer(signInApp(), { timeout: "60 seconds" })("sign-in with Better Auth", (it) =
     })
   )
 
+  it.effect("refuses what a page sends for its member once somebody else is signed in in the same browser", () =>
+    Effect.gen(function* () {
+      const tabs = browser("10.0.0.22")
+      yield* tabs.signIn("dana@example-works.test")
+      const dana = { "x-page-member": "mem_dana/org_prairie" }
+      expect((yield* tabs.send("GET", "/api/v1/identity/me", undefined, dana)).json.id).toBe("mem_dana")
+      // Marcus signs in in another tab: the browser's one cookie is his now.
+      yield* tabs.signIn("marcus@example-works.test")
+      const write = yield* tabs.send("POST", "/api/v1/imports/uploads", begin("pressed-by-dana.csv"), dana)
+      const read = yield* tabs.send("GET", "/api/v1/imports/open", undefined, dana)
+      expect([write.status, read.status]).toEqual([401, 401])
+      const refused = yield* S.decodeUnknownEffect(NotSignedIn)(write.json)
+      expect(refused.reason).toBe("This page was opened for somebody else than is signed in now. Load the page again.")
+      // Nothing of hers was made as him, and his own page is served as before.
+      const his = { "x-page-member": "mem_marcus/org_prairie" }
+      expect((yield* tabs.send("GET", "/api/v1/activity", undefined, his)).json).not.toContainEqual(
+        expect.objectContaining({ detail: expect.stringContaining("pressed-by-dana.csv") })
+      )
+      expect((yield* tabs.send("GET", "/api/v1/identity/me")).json.id).toBe("mem_marcus")
+      // Dana's own switch of organization: her page for the organization she left is refused there too.
+      const again = browser("10.0.0.23")
+      yield* again.signIn("dana@example-works.test")
+      yield* again.send("POST", "/api/auth/organization/set-active", { organizationId: "org_northline" })
+      expect((yield* again.send("GET", "/api/v1/imports/open", undefined, dana)).status).toBe(401)
+    })
+  )
+
   it.effect("refuses a rename through Better Auth's update-user, so a name cannot change under a decision", () =>
     Effect.gen(function* () {
       const dana = browser("10.0.0.21")

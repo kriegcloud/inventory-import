@@ -27,6 +27,8 @@ My engineering rules are in `CLAUDE.md` and [patterns](../patterns.md). This pag
   hold no Effect code may keep a listener list as an array; none here does, since `main.tsx` loads Effect for the
   API client. The vendored components in `packages/ui/src/components` (`@inventory/ui`) are as published. Check: `bun run check`
   (oxlint's `no-restricted-globals` refuses `new Map(` and `new Set(`).
+- **No deprecated API is used**, a library's or our own ([deprecated APIs](deprecated-apis.md)). Check: `bun run
+  check` (`deprecated:check`).
 - **`bun` is the only package manager** (`bun run`, `bun install`, `bunx`). Check: `packageManager` in
   `package.json` names bun, and `bun.lock` is the only lockfile.
 - **Migrations before features**, and **deployable at every commit**, deployed only when I ask. Check: `bun run

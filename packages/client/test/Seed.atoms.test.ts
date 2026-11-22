@@ -21,13 +21,16 @@ interface Rows {
 }
 class RowServer extends Context.Service<RowServer, Rows>()("@inventory/client/test/Seed.atoms.test/RowServer") {}
 
-const world = (takes: Duration.Input = "10 millis", idle = 50) => {
+const world = (takes: Duration.Input | Effect.Effect<void> = "10 millis", idle = 50) => {
   let reads = 0
   let starts = 0
   const layer = Layer.succeed(RowServer, {
     rows: Effect.sync(() => {
       starts += 1
-    }).pipe(Effect.andThen(Effect.sleep(takes)), Effect.andThen(Effect.sync(() => `server's rows ${++reads}`)))
+    }).pipe(
+      Effect.andThen(Effect.isEffect(takes) ? takes : Effect.sleep(takes)),
+      Effect.andThen(Effect.sync(() => `server's rows ${++reads}`))
+    )
   })
   const api = makeApiAtoms(RowServer)
   const rows = api.query((server) => server.rows)
@@ -121,11 +124,15 @@ describe("an answer given while the read is being asked again", () => {
     })
   )
 
-  it.live("three saves 2 ms apart behind a read of 30 ms: the read is asked once, lands, and is asked once more", () =>
+  it.live("three saves behind a read that is out: the read is asked once, lands, and is asked once more", () =>
     Effect.gen(function* () {
-      const t = world("30 millis")
+      // The server answers a read when the test says, so nothing here rests on how long anything takes.
+      const waiting: Array<() => void> = []
+      const t = world(Effect.callback<void>((resume) => void waiting.push(() => resume(Effect.void))))
+      const answer = Effect.sync(() => waiting.shift()?.()).pipe(Effect.andThen(Effect.sleep("20 millis")))
       t.registry.mount(t.rows)
-      yield* Effect.sleep("60 millis")
+      yield* Effect.sleep("20 millis")
+      yield* answer
       expect([t.seen(t.rows), t.starts()]).toEqual(["server's rows 1", 1])
       // The read is asked again, and while it is out three saves answer, each putting its own answer in place.
       t.registry.refresh(t.rows)
@@ -136,14 +143,14 @@ describe("an answer given while the read is being asked again", () => {
         shown.push(t.seen(t.rows))
       }
       expect(shown).toEqual(["save 1", "save 2", "save 3"])
-      yield* Effect.sleep("8 millis")
+      yield* Effect.sleep("20 millis")
       // No save ended the request or started another: one is out, the one asked before the saves.
       expect([t.seen(t.rows), t.starts(), t.reads()]).toEqual(["save 3", 2, 1])
       // It lands, and the server is asked once more for what the saves left: once, not once per save. Until that
       // answer, the last save's answer stays on screen, not the older one the server gave when the request left.
-      yield* Effect.sleep("25 millis")
+      yield* answer
       expect([t.seen(t.rows), t.starts(), t.reads()]).toEqual(["save 3", 3, 2])
-      yield* Effect.sleep("60 millis")
+      yield* answer
       expect([t.seen(t.rows), t.starts(), t.reads()]).toEqual(["server's rows 3", 3, 3])
     })
   )

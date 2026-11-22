@@ -897,36 +897,20 @@ export function getIsEventOnScrollbar(event: React.MouseEvent<HTMLElement>): boo
   )
 }
 
-export function insertTextAtSelection(element: HTMLTextAreaElement | HTMLInputElement, text: string) {
-  const start = element.selectionStart ?? element.value.length
-  const end = element.selectionEnd ?? start
-  element.focus()
-  element.setSelectionRange(start, end)
+// Local change: upstream's exported `insertTextAtSelection(element, text)` stood here. It typed the key that opened the
+// long-text editor, first with the deprecated `document.execCommand`; the browser types that key now (`typesInPlace`
+// in data-grid-cell.tsx), so it is removed.
 
-  const valueBeforeInsert = element.value
-
-  const inserted = execInsertText(text)
-  if (inserted && element.value !== valueBeforeInsert) return
-
-  element.setRangeText(text, start, end, "end")
-  dispatchInsertTextInput(element, text)
-}
-
-export function replaceEditableText(element: HTMLElement, text: string) {
+// Local change: selects the whole text and leaves the typing to the browser. Upstream's `replaceEditableText(element,
+// text)` typed it here, and its exported `execInsertText(text)`, which called the deprecated `document.execCommand`,
+// stood further down (marked there): both are removed.
+export function selectEditableText(element: HTMLElement) {
   element.focus()
   const selection = window.getSelection()
   const range = document.createRange()
   range.selectNodeContents(element)
   selection?.removeAllRanges()
   selection?.addRange(range)
-
-  const textBeforeInsert = element.textContent
-  const inserted = execInsertText(text)
-  if (inserted && element.textContent !== textBeforeInsert) return
-
-  element.textContent = text
-  moveCaretToEnd(element)
-  dispatchInsertTextInput(element, text)
 }
 
 export function moveCaretToEnd(element: HTMLElement) {
@@ -1004,23 +988,15 @@ export function getFileIcon(type: string): React.ComponentType<React.SVGProps<SV
   return File
 }
 
-export function execInsertText(text: string) {
-  return typeof document.execCommand === "function" && document.execCommand("insertText", false, text)
-}
-
 function escapeAttributeValue(value: string) {
   return value.replace(/["\\]/g, "\\$&")
 }
 
-function dispatchInsertTextInput(element: HTMLElement, text: string) {
-  element.dispatchEvent(
-    new InputEvent("input", {
-      bubbles: true,
-      data: text,
-      inputType: "insertText"
-    })
-  )
-}
+// Local change: upstream's `dispatchInsertTextInput(element, text)` stood here, which told React of text its fallbacks
+// had put in. Nothing puts text in now (the browser types it), so it is removed.
+
+// Local change: upstream's exported `execInsertText(text)` stood here, the call of the deprecated
+// `document.execCommand("insertText", false, text)`. It is removed.
 
 const objectUrlsByStore = new WeakMap<object, Set<string>>()
 

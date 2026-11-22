@@ -1,8 +1,11 @@
 // The deploy workflow as decided ("releases and deploys", docs/releasing.md), read from the file GitHub runs and
 // parsed as YAML, so a line that is commented out is not there and a job is found by its name whatever its name is.
 // It holds what starts the workflow, which job runs on which event, in which environment, with which secrets, and
-// every command each job runs, word for word: a job that deploys or destroys anything else fails here. The two shell
-// guards in it (the refusal of every stage but a preview, and staging's "only main's head") are run, not only read.
+// every step of every job in order: each action with its version and what it is given, each command word for word,
+// and each step's own condition. A step added, moved, swapped or switched off in any job fails here. The three shell
+// guards in it (the refusal of every stage but a preview, staging's "only main's head", and production's "still the
+// release branch's head" after the approval) are run, not only read. What an action does is not read: its name and
+// version are.
 // No runner is started: `release verify-head`'s own tests hold the guard that the release-tag job runs.
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import { expect, layer } from "@effect/vitest"
@@ -190,7 +193,7 @@ layer(here)("the deploy workflow", (it) => {
           cleanup: ["(Refuse any stage but a preview)", install, "(Destroy the preview)"],
           staging: ["(Deploy only the commit main is at)", install, "(Deploy staging)"],
           "release-tag": ["(Fetch the tags as pushed)", install, "(Refuse a release that is not one)"],
-          production: [install, "(Deploy production)"]
+          production: ["(Deploy only a release that is still its branch's head)", install, "(Deploy production)"]
         })
         const named = (job: string, name: string) =>
           O.getOrElse(
@@ -287,6 +290,76 @@ layer(here)("the deploy workflow", (it) => {
   )
 
   it.effect(
+    "every job's steps are these, in this order, and no other: each action with its version and what it is given, each command, each step's own condition",
+    () =>
+      Effect.gen(function* () {
+        const { jobs } = yield* deploy
+        // An action is told by its `uses`, whatever it is named, so a name cannot stand in for one.
+        const steps = (job: typeof Job.Type) =>
+          A.map(job.steps, (step) => ({
+            does: step.uses ?? (step.name === undefined ? step.run : `(${step.name})`),
+            given: step.with ?? {},
+            when: step.if ?? "always"
+          }))
+        const checkout = (given: Record<string, unknown>) => ({ does: "actions/checkout@v4", given, when: "always" })
+        const node = (when: string) => ({ does: "actions/setup-node@v4", given: { "node-version": 22 }, when })
+        const bun = (when: string) => ({
+          does: "oven-sh/setup-bun@v2",
+          given: { "bun-version-file": ".bun-version" },
+          when
+        })
+        const runs = (does: string, when = "always") => ({ does, given: {}, when })
+        const onHead = "steps.head.outputs.deploy == 'true'"
+        const ciCommit = { ref: "${{ github.event.workflow_run.head_sha }}" }
+        expect(each(jobs, steps)).toEqual({
+          preview: [checkout({}), node("always"), bun("always"), runs(install), runs("(Deploy the preview)")],
+          cleanup: [
+            runs("(Refuse any stage but a preview)"),
+            checkout({}),
+            node("always"),
+            bun("always"),
+            runs(install),
+            runs("(Destroy the preview)")
+          ],
+          staging: [
+            checkout(ciCommit),
+            runs("(Deploy only the commit main is at)"),
+            node(onHead),
+            bun(onHead),
+            runs(install, onHead),
+            runs("(Deploy staging)", onHead)
+          ],
+          "release-tag": [
+            checkout({ ref: "main", "fetch-depth": 0 }),
+            runs("(Fetch the tags as pushed)"),
+            bun("always"),
+            runs(install),
+            runs("(Refuse a release that is not one)")
+          ],
+          production: [
+            checkout(ciCommit),
+            runs("(Deploy only a release that is still its branch's head)"),
+            node("always"),
+            bun("always"),
+            runs(install),
+            runs("(Deploy production)")
+          ]
+        })
+        // Production's check after the approval is told the branch, the commit and the tag as values.
+        const recheck = O.getOrThrow(
+          O.flatMap(R.get(jobs, "production"), (job) =>
+            A.findFirst(job.steps, (step) => step.name === "Deploy only a release that is still its branch's head")
+          )
+        )
+        expect(recheck.env).toEqual({
+          BRANCH: "${{ github.event.workflow_run.head_branch }}",
+          CHECKED: "${{ github.event.workflow_run.head_sha }}",
+          TAG: "${{ needs.release-tag.outputs.tag }}"
+        })
+      })
+  )
+
+  it.effect(
     "makes each deploy wait in a group of its own: a pull request's, staging's only for a run that deploys, and one for each release tag",
     () =>
       Effect.gen(function* () {
@@ -326,7 +399,7 @@ const script = Effect.fn("script")(function* (job: string, name: string) {
   ).pipe(Effect.fromOption, Effect.orDie)
 })
 
-layer(here)("the deploy workflow's two shell guards, run", (it) => {
+layer(here)("the deploy workflow's three shell guards, run", (it) => {
   it.effect("the cleanup's refusal lets a preview's stage through and stops every other name", () =>
     Effect.gen(function* () {
       const refusal = yield* script("cleanup", "Refuse any stage but a preview")
@@ -415,6 +488,53 @@ layer(here)("the deploy workflow's two shell guards, run", (it) => {
           })
         )
         expect(seen).toEqual(["0 deploy=true", "0 deploy=false", "1"])
+      })
+  )
+
+  it.effect(
+    "production's step after the approval passes only for a commit that is still its release branch's head and still carries the tag: a release a later one replaced, a tag that moved and a branch it cannot read all fail",
+    () =>
+      Effect.gen(function* () {
+        const step = yield* script("production", "Deploy only a release that is still its branch's head")
+        const seen = yield* inTree(
+          { "a.txt": "a\n" },
+          Effect.gen(function* () {
+            const repo = yield* Repo
+            const git = (...args: ReadonlyArray<string>) =>
+              Effect.map(repo.run("git", args), (ran) => Str.trim(ran.stdout))
+            yield* git("init", "-q", "-b", "release/1.0")
+            yield* git("config", "user.name", "Test")
+            yield* git("config", "user.email", "test@example.test")
+            yield* git("config", "commit.gpgsign", "false")
+            yield* git("config", "tag.gpgsign", "false")
+            yield* git("add", "--all")
+            yield* git("commit", "-q", "-m", "chore: release v1.0.0")
+            yield* git("tag", "-a", "v1.0.0", "-m", "v1.0.0")
+            const first = yield* git("rev-parse", "HEAD")
+            yield* git("init", "-q", "--bare", ".git/origin.git")
+            yield* git("remote", "add", "origin", ".git/origin.git")
+            yield* git("push", "-q", "origin", "release/1.0", "v1.0.0")
+            const asked = (checked: string, tag: string, branch = "release/1.0") =>
+              Effect.map(
+                repo.run("bash", ["-e", "-c", step], { env: { BRANCH: branch, CHECKED: checked, TAG: tag } }),
+                (ran) => ran.code
+              )
+            const whileHead = yield* asked(first, "v1.0.0")
+            const noSuchTag = yield* asked(first, "v1.0.9")
+            const noSuchBranch = yield* asked(first, "v1.0.0", "release/9.9")
+            // A later release of the line is pushed while the first waits for its approval.
+            yield* git("commit", "-q", "--allow-empty", "-m", "chore: release v1.0.1")
+            yield* git("tag", "-a", "v1.0.1", "-m", "v1.0.1")
+            const second = yield* git("rev-parse", "HEAD")
+            yield* git("push", "-q", "origin", "release/1.0", "v1.0.1")
+            const replaced = yield* asked(first, "v1.0.0")
+            const later = yield* asked(second, "v1.0.1")
+            // The tag is moved off the commit that was checked.
+            const movedTag = yield* asked(second, "v1.0.0")
+            return [whileHead, noSuchTag, noSuchBranch, replaced, later, movedTag]
+          })
+        )
+        expect(seen).toEqual([0, 1, 1, 1, 0, 1])
       })
   )
 })

@@ -25,9 +25,9 @@ on `main`, so `main`'s file keeps the version it had (0.6.1) and staging reports
 Internal Packages: none is published, so none has a version of its own and Changesets is not used. It is added if a
 package is ever published. The "(v0.6.1)" in `README.md` names the version that was submitted and never moves.
 
-`CHANGELOG.md` is on release branches only, for the same reason. A new line's file starts from the last release's, so
-it holds every release before its cut and its own; a patch made on an older line after that cut is in that line's
-file and not in the newer one.
+`CHANGELOG.md` is on release branches only, for the same reason. A new line's file starts from the file of the
+highest release there is, and adds its own. A patch made on an older line after that highest release was cut is in
+the older line's file only: `release/0.9`'s file has no entry for a `v0.7.1` made after `v0.8.0`.
 
 ## Cutting a release
 
@@ -47,8 +47,10 @@ bun run release minor
 5. runs `bun run check:full` on that commit, writing to the terminal as it runs, and makes nothing if it fails;
 6. makes `release/<major>.<minor>` from `main` (or takes up one a stopped run left, if it is still where `main` is);
 7. writes the version (the app's file and `bun.lock`'s copy), and the release notes at the top of `CHANGELOG.md`:
-   the subjects of the commits the last release does not carry, grouped as Added (`feat`), Fixed (`fix`), and so
-   on. Commits are compared by their change, so a fix a patch already released is not listed again;
+   the subjects of the commits the highest release does not carry, grouped as Added (`feat`), Fixed (`fix`), and so
+   on. Commits are compared by their change, so a fix that release already carries as it landed is not listed
+   again. Two kinds of fix are listed again: one a patch carried with changes, and one an older line released
+   after the highest release was cut;
 8. commits `chore: release v<version>`, which changes those three files and nothing else, and makes an annotated
    tag holding the same notes.
 
@@ -69,21 +71,29 @@ job "Check the release" checks out `main`, fetches the tags and runs
 - deploys nothing, and says so, when the branch has moved on from the commit CI checked, or when that commit
   carries no release tag (a cherry-picked fix pushed before its `release patch`). A tag pushed alone starts
   nothing: no workflow listens for a tag;
-- refuses a branch that is not `release/<major>.<minor>`, a commit with more than one release tag, and a tag of
-  another line;
+- refuses a branch that is not `release/<major>.<minor>`, a commit with more than one release tag, and a tag that
+  is not a release of the branch CI passed on (a new branch pointed at an old release's commit deploys nothing);
 - then holds the release command's rules again on the tagged commit, against the remote's branches:
   - the tag is annotated, and a version;
   - its commit is on `origin/release/<major>.<minor>` and is not on `origin/main`;
-  - its commit is a release commit: one parent, the app's file there says the tag's version, and it changes only
-    that file, `bun.lock` and `CHANGELOG.md`;
+  - its commit is a release commit: one parent; it changes only the app's file, `bun.lock` and `CHANGELOG.md`, with
+    a rename told as a removal and an addition; the app's file and `bun.lock` are, byte for byte, their parent's
+    with the version moved, so a script, a dependency or a resolution added beside the version is refused. The
+    text of `CHANGELOG.md` is the one thing not compared;
   - what is under it landed on main: for `<major>.<minor>.0` its parent is a commit of `origin/main`; for a patch
     the release before it is under it, every commit between is one whose change `origin/main` holds or a pick with
-    changes (below), and none is a merge.
+    changes (below), and none is a merge;
+  - for a patch, the release before it passes these same rules, and the one before that, down to the line's first.
+    A tag the guard refuses therefore stops every later patch of its line until an admin deletes or replaces it.
 
 A question git cannot answer (a branch that was not fetched) refuses the release. A release that fails stops there,
-before anyone is asked to approve. Then production waits for Benjamin's approval in the `production` environment,
-and deploys the commit CI checked. Each tag waits in a group of its own, so a release that waits for its approval is
-never cancelled by a later one; two releases are not deployed at once because one person approves them.
+before anyone is asked to approve. Then production waits for Benjamin's approval in the `production` environment.
+After the approval, and on any re-run of that job, its first step asks the remote again: the commit must still be
+the head of its release branch and still carry the tag, or the job fails. Approving an old run after a later
+release of the same line was deployed therefore deploys nothing. Each tag waits in a group of its own, so a release
+that waits for its approval is never cancelled by a later one; two releases are not deployed at once because one
+person approves them. Nothing orders the releases of two lines: if `release/0.7` and `release/0.8` both wait, the
+one approved last is what production runs.
 
 `bun run beep release verify <tag>` runs the same rules on a tag by hand.
 
@@ -95,15 +105,21 @@ never cancelled by a later one; two releases are not deployed at once because on
 3. On that branch: `bun run release patch`. It fetches as a cut does, and refuses:
    - a commit since the last tag whose change `origin/main` does not hold. `git cherry` compares each commit's
      change, so a cherry-pick that applied as it was counts. One whose conflict was resolved by hand differs from
-     main's; it counts when its `(cherry picked from commit ...)` line, which `-x` writes, names a commit of
-     `origin/main` (Benjamin's choice of 2026-11-22: accept, and name it). No flag is typed. The command's output,
-     the notes and the tag's message list each such commit under "Picked with changes", with its hash here and the
-     one on main, so the difference can be read before the push. A commit with no such line, or whose line names a
-     commit main does not have, is refused. The line is the committer's word: nothing checks how far the edited
-     change is from main's, which is why it is named;
+     main's; it counts when its `(cherry picked from commit <hash>)` line, alone on a line as `-x` writes it, names
+     a commit of `origin/main` (Benjamin's choice of 2026-11-22: accept, and name it). No flag is typed. A commit
+     with no such line, with the words inside a sentence, or whose line names a commit main does not have, is
+     refused.
+
+     What is checked is that line and nothing more: nothing compares the edited change with main's, and the commit
+     it names can be any commit of main. So each such commit is listed under "Picked with changes", with its
+     subject, its hash here and the hash it names, in four places: the command's output, the notes, the tag's
+     message, and the log of the "Check the release" job. The approval screen itself shows none of it. Before
+     approving a release that lists one, read that commit (`git show <hash here>`) beside the one it names;
    - a merge commit, which `git cherry` never lists, so anything could ride in on one;
    - a branch here that does not hold the line's last release (a tag that was fetched, on a branch that was not
      pulled);
+   - a last release the deploy guard refuses, or one that was never pushed: a patch stands on a release the remote
+     holds and the guard passes, so what is under a tag made by hand is not forgotten by the next patch;
    - a branch on which nothing landed since the last tag, or that has never been tagged;
    - a version that would not go up: the app's file on the branch already says one at or above the next patch.
 
@@ -115,17 +131,21 @@ A patch never goes the other way: nothing lands on a release branch first.
 
 - **The release command's guards**, each with a test that fails without it
   (`packages/tooling/tool/cli/test/Release.test.ts`, on real git repositories with a remote): the refusals listed
-  above, a tag only on a `release/*` branch whose major and minor are its own, nothing after a red check. A major or
-  minor version cannot fail to go up, because it is worked out as the next above every release; the test shows that,
-  and the refusal itself is shown for a patch.
-- **The deploy guard**, `release verify-head` and the `release verify` it ends in, with a test for each refusal in
-  the same file, among them a tag made by hand on a commit `release` would not have made, a branch that moved on,
-  a head with no tag and a pick whose line names a commit main does not have.
+  above and nothing after a red check. A tag lands on the branch of its own major and minor by how the version is
+  worked out (a new line's branch is named from its version; a patch's version is the next on the branch it is run
+  on), and a major or minor version cannot fail to go up, because it is the next above every release; the refusal of
+  a version that would not go up is shown for a patch.
+- **The deploy guard**, `release verify-head` and the `release verify` it ends in, tested in the same file: every
+  refusal above has a test that fails without it, among them a release commit made by hand that changes more inside
+  a file it may touch, a tag on a merge, a branch pointed at an old release, a release standing on one the guard
+  refuses, and a commit with no message. Not tested: the answers for git itself failing on a question other than
+  "is the commit on main", and a lockfile that exists on one side of the release commit only.
 - **The deploy workflow** (`.github/workflows/deploy.yml`) starts production only after CI passed on a push to a
   `release/` branch of this repository, after its guard job found a tag that may deploy, and runs that guard from
   `main`. `test/DeployWorkflow.test.ts` in the same package parses the file and holds every job's event,
-  environment, secrets, checkouts and commands word for word, and runs its two shell guards. The workflow files are
-  inputs of that test in `turbo.json`, so a change to one always runs it.
+  environment and secrets, and every step of every job in order: each action by name and version with what it is
+  given, each command word for word, each step's own condition. It runs the three shell guards. What an action does
+  inside is not read. The workflow files are inputs of that test in `turbo.json`, so a change to one always runs it.
 - **The repository's stack** (`packages/infra/src/GitHub.stack.ts`): only an admin may create, move or delete a `v*`
   tag, and a `release/*` branch is never force-pushed or deleted (admins may bypass both). The `production`
   environment requires Benjamin's approval and takes only a run whose ref is `main`. A workflow started by another

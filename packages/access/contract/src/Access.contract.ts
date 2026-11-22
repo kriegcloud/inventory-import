@@ -22,6 +22,16 @@ import { SessionState } from "./Session/SessionState.read.ts"
 /** The request header the test identity reads. The Worker ignores it: the session cookie alone names the actor. */
 export const actingAsHeader = "x-acting-as"
 
+/**
+ * The request header a page of the app sends with every request of its API client: the member the page is for, as
+ * "memberId/organizationId". One browser has one session cookie for all its tabs, so somebody signing in, signing out
+ * or switching organization in another tab changes who every tab's requests act as. When the session's member is not
+ * the one named here, the request is refused with `NotSignedIn` before anything is read or written: nothing a page
+ * pressed is done as somebody else, and no page is answered with somebody else's data. A request without it is served
+ * as the session's member, as before.
+ */
+export const pageMemberHeader = "x-page-member"
+
 /** Who the caller is, and the people in their organization. */
 export class IdentityApi extends HttpApiGroup.make("identity")
   .add(

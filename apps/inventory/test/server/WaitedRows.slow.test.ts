@@ -221,3 +221,173 @@ layer(TypedApp)("who may send rows that waited", (it) => {
     })
   )
 })
+
+/** A sack whose cost reads 5 under "unit_cost" and 7 under "Net cost": a match of the cost changes how it compares. */
+const sackLine = { ...item, sku: "CCC-0001", name: "Jute Sack", unit_cost: "5", "Net cost": "7" }
+/** One whose cost reads 3 under both: no match of the cost changes how it compares. */
+const canvasLine = { ...item, sku: "CCC-0002", name: "Canvas Sack", unit_cost: "3", "Net cost": "3" }
+const sacks = tableOf("sacks.csv", [sackLine, canvasLine])
+const sackStock = tableOf("sack-stock.csv", [
+  { ...item, sku: "CCC-0001", name: "Jute Sack", unit_cost: "5" },
+  { ...item, sku: "CCC-0002", name: "Canvas Sack", unit_cost: "3" }
+])
+const mine = { stored: "replace", edits: { name: "Sack" } } satisfies RowDecisionFlags
+/** A Replace with an accept of the cost: a match of the cost takes the accept in any case, the Replace only on row 2. */
+const both = { stored: "replace", accepted: ["unitCost"] } satisfies RowDecisionFlags
+
+/** The sacks staged; `stock` confirms another import that stocks them, and its `takeBack` takes that one back. */
+const seededSacks = Effect.gen(function* () {
+  const client = yield* HttpApiTest.groups(Api, ["imports"])
+  const view = yield* upload({ client, table: sacks }).pipe(marcus)
+  const params = { id: view.id }
+  const stock = Effect.gen(function* () {
+    const staged = yield* upload({ client, table: sackStock }).pipe(marcus)
+    const at = { id: staged.id }
+    yield* client.imports
+      .commit({ params: at, payload: { revision: staged.revision, madeOn: {}, set: {}, clear: [] } })
+      .pipe(marcus)
+    const done = yield* client.imports.get({ params: at }).pipe(marcus)
+    return {
+      takeBack: client.imports.takeBack({ params: at, payload: { confirms: done.takeBack.confirms } }).pipe(marcus)
+    }
+  })
+  const stored = (rows: ReadonlyArray<string>) =>
+    Effect.map(client.imports.get({ params }).pipe(dana), (now) => A.map(rows, (row) => R.get(now.decisions, row)))
+  return {
+    client,
+    view,
+    params,
+    stock,
+    stored,
+    danaSaves: (save: Save) => client.imports.decide({ params, payload: request(save) }).pipe(dana),
+    marcusSaves: Effect.fnUntraced(function* (save: Omit<Save, "on">) {
+      const now = yield* client.imports.get({ params }).pipe(marcus)
+      return yield* client.imports.decide({ params, payload: request({ ...save, on: now.revision }) }).pipe(marcus)
+    }),
+    matched: () =>
+      client.imports.match({ params, payload: { field: "unitCost", column: O.some(column("Net cost")) } }).pipe(marcus)
+  }
+})
+const named = (since: ReadonlyArray<{ readonly rowId: string; readonly theirs: unknown }>) =>
+  A.map(since, ({ rowId, theirs }) => [rowId, theirs] as const)
+const waitedOverMine = (on: number): Save => ({
+  on,
+  set: { "row-2": { out: true } },
+  over: { "row-2": [O.none(), O.some(mine)] }
+})
+
+layer(TypedApp)("a row that waited across a match, an item stocked since", (it) => {
+  it.effect("a Replace the match left, put back by a colleague since: named with his, the item notwithstanding", () =>
+    Effect.gen(function* () {
+      const { view, stock, stored, danaSaves, marcusSaves, matched } = yield* seededSacks
+      yield* danaSaves({ on: view.revision, set: { "row-2": mine } })
+      // Nothing is stored under the sack's SKU: the match changes nothing of how it compares, and the Replace stands.
+      yield* matched()
+      const standing = yield* stored(["row-2"])
+      expect(standing).toEqual([some(mine)])
+      yield* marcusSaves({ set: { "row-2": { edits: { name: "Sack" } } } })
+      yield* stock
+      const saved = yield* danaSaves(waitedOverMine(view.revision))
+      expect(named(saved.decidedSince)).toEqual([["row-2", some({ edits: { name: "Sack" } })]])
+      const now = yield* stored(["row-2"])
+      expect(now).toEqual([some({ edits: { name: "Sack" } })])
+    })
+  )
+})
+
+layer(TypedApp)("a row that waited across a match, no item stocked since", (it) => {
+  it.effect("a Replace the match left, put back by a colleague since: named with his", () =>
+    Effect.gen(function* () {
+      const { view, stored, danaSaves, marcusSaves, matched } = yield* seededSacks
+      yield* danaSaves({ on: view.revision, set: { "row-2": mine } })
+      yield* matched()
+      yield* marcusSaves({ set: { "row-2": { edits: { name: "Sack" } } } })
+      const saved = yield* danaSaves(waitedOverMine(view.revision))
+      expect(named(saved.decidedSince)).toEqual([["row-2", some({ edits: { name: "Sack" } })]])
+      const now = yield* stored(["row-2"])
+      expect(now).toEqual([some({ edits: { name: "Sack" } })])
+    })
+  )
+})
+
+layer(TypedApp)("a row that waited across a match, its item taken back since", (it) => {
+  it.effect("a Replace the match took back: written over what the match left, the item gone notwithstanding", () =>
+    Effect.gen(function* () {
+      const { view, stock, stored, danaSaves, matched } = yield* seededSacks
+      const stocked = yield* stock
+      yield* danaSaves({ on: view.revision, set: { "row-2": mine } })
+      const match = yield* matched()
+      expect(A.map(match.takenBack, ({ field, kind, rows }) => [field, kind, rows])).toEqual([
+        ["unitCost", "stored", ["row-2"]]
+      ])
+      yield* stocked.takeBack
+      const saved = yield* danaSaves(waitedOverMine(view.revision))
+      expect(saved.decidedSince).toEqual([])
+      const now = yield* stored(["row-2"])
+      expect(now).toEqual([some({ out: true })])
+    })
+  )
+})
+
+layer(TypedApp)("a row that waited across a match, its item still there", (it) => {
+  it.effect("a Replace the match took back: written over what the match left", () =>
+    Effect.gen(function* () {
+      const { view, stock, stored, danaSaves, matched } = yield* seededSacks
+      yield* stock
+      yield* danaSaves({ on: view.revision, set: { "row-2": mine } })
+      yield* matched()
+      const saved = yield* danaSaves(waitedOverMine(view.revision))
+      expect(saved.decidedSince).toEqual([])
+      const now = yield* stored(["row-2"])
+      expect(now).toEqual([some({ out: true })])
+    })
+  )
+})
+
+/** Row 2's Replace and row 3's accept taken back by a match of the cost, row 3's Replace standing; then a save over both. */
+const takenAndStanding = Effect.gen(function* () {
+  const seeded = yield* seededSacks
+  yield* seeded.stock
+  yield* seeded.danaSaves({ on: seeded.view.revision, set: { "row-2": mine, "row-3": both } })
+  yield* seeded.matched()
+  const left = yield* seeded.stored(["row-2", "row-3"])
+  expect(left).toEqual([some({ edits: { name: "Sack" } }), some({ stored: "replace" })])
+  const waited: Save = {
+    on: seeded.view.revision,
+    set: { "row-2": { out: true }, "row-3": { out: true } },
+    over: { "row-2": [O.none(), O.some(mine)], "row-3": [O.none(), O.some(both)] }
+  }
+  return { ...seeded, waited }
+})
+
+layer(TypedApp)("a row that waited across a match whose take-backs are kept", (it) => {
+  it.effect("the Replace the match took and the one that stood are both what the match left: written", () =>
+    Effect.gen(function* () {
+      const { waited, stored, danaSaves } = yield* takenAndStanding
+      const saved = yield* danaSaves(waited)
+      expect(saved.decidedSince).toEqual([])
+      const now = yield* stored(["row-2", "row-3"])
+      expect(now).toEqual([some({ out: true }), some({ out: true })])
+    })
+  )
+})
+
+layer(TypedApp)("a row that waited across a match whose take-backs a confirm let go", (it) => {
+  it.effect("not known: named, the Replace the match took and the one that stood alike", () =>
+    Effect.gen(function* () {
+      const { client, params, waited, stored, danaSaves } = yield* takenAndStanding
+      const before = yield* client.imports.get({ params }).pipe(marcus)
+      yield* client.imports
+        .commit({ params, payload: { revision: before.revision, madeOn: {}, set: {}, clear: [] } })
+        .pipe(marcus)
+      yield* client.imports.reopen({ params }).pipe(marcus)
+      const saved = yield* danaSaves(waited)
+      expect(named(saved.decidedSince)).toEqual([
+        ["row-2", some({ edits: { name: "Sack" } })],
+        ["row-3", some({ stored: "replace" })]
+      ])
+      const now = yield* stored(["row-2", "row-3"])
+      expect(now).toEqual([some({ edits: { name: "Sack" } }), some({ stored: "replace" })])
+    })
+  )
+})

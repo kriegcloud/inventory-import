@@ -49,6 +49,10 @@ export const Draft = S.Struct({
   takenBackJson: S.String.annotateKey({
     description:
       "What each match of the open import took back from the stored decisions, oldest first: `MatchTakeBack`s as JSON; '[]' once it is confirmed"
+  }),
+  takenBackFrom: S.Int.annotateKey({
+    description:
+      "The revision from which `takenBackJson` holds what every match took back: 0 for an import created since it was kept, the confirm's revision after a confirm let them go. A match at or before it took back what no entry says"
   })
 }).annotate({ description: "An import as stored, without its rows" })
 /** The decoded value of `Draft`: an import as stored, without its rows. */

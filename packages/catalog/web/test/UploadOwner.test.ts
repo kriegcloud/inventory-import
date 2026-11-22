@@ -1,5 +1,7 @@
 // An upload is one member's: nothing of it is sent while who is signed in is being asked again, nor ever as anybody
-// else. Another organization the person switches to stops it, says so and keeps the chosen file where it was chosen; a
+// else. Another organization the person switches to waits for it: still sending, it is stopped, what reached the server
+// deleted and said; being prepared, its answer is waited for and said with its own reason. The chosen file is kept where
+// it was chosen; a
 // page the app leaves for another person asks the server nothing as them; and what the last upload said is not said in
 // another organization.
 import { describe, expect, it } from "@effect/vitest"
@@ -14,6 +16,9 @@ import { makeApi } from "@inventory/client/ApiRuntime"
 import { leavingApp } from "@inventory/ui/Route"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import type { ImportView } from "@inventory/catalog-contract/Import"
+import { FileProblem } from "@inventory/catalog-contract/FileProblem"
+import { settledBeforeOwnSwitch } from "@inventory/client/MemberAtoms"
+import type * as Fiber from "effect/Fiber"
 import { type CatalogApiClient, CatalogClient, configureCatalog } from "../src/Catalog.runtime.ts"
 import { ReadMessage } from "../src/internal/protocol.ts"
 import { UploadState } from "../src/Upload.machine.ts"
@@ -49,11 +54,14 @@ const browser = vi.hoisted(() => {
       return Promise.resolve(new Response(null, { status: 204 }))
     }
   })
-  return { readers, asked, said: [] as Array<string> }
+  return { readers, asked, said: [] as Array<string>, described: [] as Array<string> }
 })
 vi.mock("sonner", () => ({
   toast: Object.assign((title: string) => browser.said.push(title), {
-    error: (title: string) => browser.said.push(title),
+    error: (title: string, options?: { readonly description?: string }) => {
+      browser.said.push(title)
+      browser.described.push(options?.description ?? "")
+    },
     dismiss: () => undefined
   })
 }))
@@ -67,7 +75,7 @@ const head = { fileName: "items.csv", sheet: null, columns: [], notes: [] }
 const world = () => {
   const session = sessionStandIn(memberOf({ id: "mem_dana" }))
   const sent: Array<string> = []
-  const finished = Deferred.makeUnsafe<ImportView>()
+  const finished = Deferred.makeUnsafe<Result.Result<ImportView, FileProblem>>()
   const step = <A>(name: string, answer: A) =>
     Effect.sync(() => {
       sent.push(name)
@@ -81,7 +89,7 @@ const world = () => {
       finishUpload: () =>
         Effect.suspend(() => {
           sent.push("finish")
-          return Deferred.await(finished).pipe(Effect.map(Result.succeed))
+          return Deferred.await(finished)
         }),
       discardUpload: () => Effect.sync(() => sent.push("discard"))
     }
@@ -93,6 +101,7 @@ const world = () => {
     apiPrefix: "/api/v1"
   })
   browser.said.length = 0
+  browser.described.length = 0
   browser.asked.length = 0
   const ended: Array<UploadEnd> = []
   registry.mount(startUpload)
@@ -107,7 +116,7 @@ const world = () => {
     session.choose("org_northline")
     registry.refresh(session.signedIn)
     yield* settle
-    yield* session.answer(memberOf({ id: "mem_dana_northline", organization: "org_northline" }))
+    yield* session.answer(memberOf({ id: "mem_dana_northline", organization: "org_northline", account: "mem_dana" }))
     yield* settle
   })
   const state = () => registry.get(uploadState)
@@ -202,7 +211,7 @@ describe("an upload", () => {
       t.registry.set(startUpload, { file: new File(["b"], "more.csv") })
       yield* settle
       expect(browser.said).toEqual(["items.csv is still being prepared for the organization you chose it in"])
-      yield* Deferred.succeed(t.finished, viewAt({ revision: 1, fileName: "items.csv", mapping: [] }))
+      yield* Deferred.succeed(t.finished, Result.succeed(viewAt({ revision: 1, fileName: "items.csv", mapping: [] })))
       yield* settle
       expect(A.last(browser.said)).toEqual(
         A.last(["items.csv was uploaded for the organization you were in when you chose it. It is listed there."])
@@ -218,6 +227,80 @@ describe("an upload", () => {
       expect(UploadState.guards.Failed(t.state())).toBe(true)
       yield* t.switched
       expect(t.state()).toEqual(UploadState.cases.Idle.make({}))
+    })
+  )
+})
+
+/** Whether the switch has stopped waiting. */
+const ended = (fiber: Fiber.Fiber<unknown, unknown>): boolean => fiber.pollUnsafe() !== undefined
+
+describe("an upload, when the person presses another organization", () => {
+  it.live("still sending: is stopped and what reached the server deleted, as her, before the switch is sent", () =>
+    Effect.gen(function* () {
+      const t = world()
+      t.begin()
+      yield* settle
+      t.chunk(0)
+      yield* settle
+      const switching = yield* Effect.forkChild(settledBeforeOwnSwitch(t.registry))
+      yield* settle
+      // Done before the switch: nothing more is read or sent, and what was staged is deleted.
+      expect([ended(switching), t.reader.ended, t.sent]).toEqual([true, true, ["begin", "chunk", "discard"]])
+      expect([t.state(), browser.said, A.map(t.ended, UploadEnd.$is("Failed"))]).toEqual([
+        UploadState.cases.Idle.make({}),
+        ["items.csv was not uploaded"],
+        [true]
+      ])
+      yield* t.switched
+      expect(t.sent).toEqual(["begin", "chunk", "discard"])
+    })
+  )
+
+  it.live("being prepared: the switch waits for its answer, and a refusal is said with its own reason", () =>
+    Effect.gen(function* () {
+      const t = world()
+      t.begin()
+      yield* settle
+      t.chunk(0)
+      t.chunk(1)
+      t.says(ReadMessage.Done())
+      yield* settle
+      const switching = yield* Effect.forkChild(settledBeforeOwnSwitch(t.registry))
+      yield* settle
+      expect(ended(switching)).toBe(false)
+      const refused = FileProblem.make({
+        kind: "tooLarge",
+        fileName: "items.csv",
+        problem: "items.csv has more rows than one import takes.",
+        todo: "Split it into files of 5,000 rows or fewer."
+      })
+      yield* Deferred.succeed(t.finished, Result.fail(refused))
+      yield* settle
+      expect([ended(switching), A.last(t.sent)]).toEqual([true, A.last(["discard"])])
+      expect([browser.said, browser.described]).toEqual([
+        ["items.csv was not uploaded"],
+        ["items.csv has more rows than one import takes. Split it into files of 5,000 rows or fewer."]
+      ])
+    })
+  )
+
+  it.live("being prepared and arrived: said as listed in the organization it was chosen in, and not opened", () =>
+    Effect.gen(function* () {
+      const t = world()
+      t.begin()
+      yield* settle
+      t.chunk(0)
+      t.chunk(1)
+      t.says(ReadMessage.Done())
+      yield* settle
+      const switching = yield* Effect.forkChild(settledBeforeOwnSwitch(t.registry))
+      yield* settle
+      yield* Deferred.succeed(t.finished, Result.succeed(viewAt({ revision: 1, fileName: "items.csv", mapping: [] })))
+      yield* settle
+      expect([ended(switching), browser.said]).toEqual([
+        true,
+        ["items.csv was uploaded for the organization you were in when you chose it. It is listed there."]
+      ])
     })
   )
 })

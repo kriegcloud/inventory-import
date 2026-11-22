@@ -1035,3 +1035,55 @@ layer(App)("a match and another person's write that fall into each other", (it) 
     })
   )
 })
+
+layer(App)("a take-back of the import itself between a save's comparison of a row that waited and its batch", (it) => {
+  it.effect("compared again, and judged by what the match took back, not by the items the take-back changed", () =>
+    Effect.gen(function* () {
+      const client = yield* HttpApiTest.groups(Api, ["imports", "items"])
+      const confirmed = (id: ImportId, revision: number) =>
+        client.imports.commit({ params: { id }, payload: { revision, madeOn: {}, set: {}, clear: [] } })
+      const stocking = yield* upload({
+        client,
+        table: tableOf("sack-stock.csv", [{ ...item, sku: "CCC-0001", name: "Jute Sack", unit_cost: "5" }])
+      }).pipe(as("mem_marcus"))
+      yield* confirmed(stocking.id, stocking.revision).pipe(as("mem_marcus"))
+      // The sack reads 5 under "unit_cost" and 7 under "Net cost"; the burlap sack is created by the confirm below.
+      const view = yield* upload({
+        client,
+        table: tableOf("sacks.csv", [
+          { ...item, sku: "CCC-0001", name: "Jute Sack", unit_cost: "5", "Net cost": "7" },
+          { ...item, sku: "DDD-0001", name: "Burlap Sack", unit_cost: "2" }
+        ])
+      }).pipe(as("mem_marcus"))
+      const params = { id: view.id }
+      yield* confirmed(view.id, view.revision).pipe(as("mem_marcus"))
+      const open = yield* client.imports.reopen({ params }).pipe(as("mem_marcus"))
+      const mine = decisionFromFlags({ stored: "replace", edits: { name: "Sack" } })
+      yield* client.imports
+        .decide({ params, payload: { madeOn: { "row-2": open.revision }, set: { "row-2": mine }, clear: [] } })
+        .pipe(as("mem_dana"))
+      const match = yield* client.imports
+        .match({ params, payload: { field: "unitCost", column: O.some(column("Net cost")) } })
+        .pipe(as("mem_marcus"))
+      const confirms = match.takeBack.confirms
+      const takeBack = client.imports.takeBack({ params, payload: { confirms } }).pipe(as("mem_marcus"))
+      yield* around([{ before: Effect.orDie(takeBack) }, {}])
+      const saved = yield* client.imports
+        .decide({
+          params,
+          payload: {
+            madeOn: { "row-2": open.revision },
+            set: flags({ "row-2": { out: true } }),
+            clear: [],
+            over: { "row-2": [O.none(), O.some(mine)] }
+          }
+        })
+        .pipe(as("mem_dana"))
+      const sentBySave = MutableRef.get(sent)
+      const after = yield* client.imports.get({ params }).pipe(as("mem_marcus"))
+      // Two batches: the first found the draft moved on by the take-back and wrote nothing.
+      expect([sentBySave, saved.decidedSince, after.createdRows, after.status]).toEqual([2, [], [], "open"])
+      expect(R.get(after.decisions, "row-2")).toEqual(O.some(decisionFromFlags({ out: true })))
+    })
+  )
+})

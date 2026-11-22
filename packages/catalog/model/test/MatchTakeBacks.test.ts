@@ -428,8 +428,8 @@ describe("a draft that keeps changing under a request", () => {
           S.is(DraftBusy)(saving) ? saving.reason : "",
           S.is(DraftBusy)(matching) ? matching.reason : ""
         ]).toEqual([
-          "Others kept changing this import while your request was worked out, so nothing was written. Try again in a moment.",
-          "This import, or items it would change, kept being changed elsewhere (by others, another import or the Items page) while your request was worked out, so nothing was written. Try again in a moment."
+          "This import kept being changed (in another tab or by someone else) while your request was worked out, so nothing was written. Try again in a moment.",
+          "This import, or items it would change, kept being changed (in another tab, by someone else, by another import or on the Items page) while your request was worked out, so nothing was written. Try again in a moment."
         ])
       })
     )

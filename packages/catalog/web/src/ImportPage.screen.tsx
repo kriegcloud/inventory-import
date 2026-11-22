@@ -53,7 +53,7 @@ const nothingToFollow = Atom.readable((): void => undefined)
 
 /**
  * Mounted by the page while the address names an import: a read of it that could not be made (the network, the server's
- * own failure) is made again by itself once the connection is back.
+ * own failure) is made again by itself every half minute, and at once when the connection is back.
  */
 export const readAgainWhenBack = perKey((id: ImportId) =>
   Atom.readable((get): void => {
@@ -84,7 +84,9 @@ function NotReadAgain(props: { importId: ImportId; error: unknown }) {
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <p className="min-w-0">
               {sayError(props.error).sentence} What you see is how it was when it was last read.
-              {isTransient(props.error) ? " It is read again by itself when the connection is back." : ""}
+              {isTransient(props.error)
+                ? " It is read again by itself every half minute, and at once when the connection comes back."
+                : ""}
             </p>
             <Button variant="outline" size="xs" onClick={() => again(props.importId)}>
               Read it now

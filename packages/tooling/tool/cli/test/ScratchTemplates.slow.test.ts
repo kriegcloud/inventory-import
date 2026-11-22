@@ -72,7 +72,15 @@ describe("the scratchpad's templates", () => {
             const scratch = repo.join(repo.root, "scratchpad")
             const ran = yield* repo.run(
               "node",
-              [repo.join(here, "node_modules/vitest/vitest.mjs"), "run", "--reporter=json", "--outputFile=report.json"],
+              // Its own module cache: through the linked `node_modules` vitest would use this repository's, see another
+              // lockfile, and clear it under the other packages' tests running beside this one.
+              [
+                repo.join(here, "node_modules/vitest/vitest.mjs"),
+                "run",
+                "--reporter=json",
+                "--outputFile=report.json",
+                `--fsModuleCachePath=${repo.join(repo.root, ".vitest-cache")}`
+              ],
               { cwd: scratch }
             )
             const report = yield* repo.json(Report)(repo.join(scratch, "report.json"))

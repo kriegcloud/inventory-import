@@ -228,8 +228,8 @@ it.
 - **Used today:** no. `CurrentActor` is a plain service provided by `Identity` (`packages/kernel/src/Identity.middleware.ts`,
   an `HttpApiMiddleware`); `requireRole` is called at the top of each handler
   (`packages/catalog/model/src/Import/Imports.handler.ts`), and the organization filter is in every D1 query.
-- **Where it goes:** `packages/kernel/src/Actor.context.ts` and `Agent.context.ts` (the two classes become request
-  contexts), a new `Session` RPC middleware beside `Identity.middleware.ts`, its live layer beside
+- **Where it goes:** an `Actor.context.ts` and an `Agent.context.ts` in each model's own package (request contexts; the
+  kernel's two stay for `/api/v1`), a `Session` RPC middleware declared beside them, its live layer beside
   `packages/access/host/src/SessionIdentity.adapter.ts`, and the check in each `decide` of a future Import aggregate.
 - **What the person gets:** nothing they can see; the same refusals, now enforced where the import is decided.
 

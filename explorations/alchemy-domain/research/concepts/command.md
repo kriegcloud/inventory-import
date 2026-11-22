@@ -180,16 +180,16 @@ Checked in:
 
 ## In this app
 
-`ConfirmImport` checks that the review the person saw is still the latest. In the shape the brief recommends it names
-steps, never a count: the last change its screen received (`seen`), the screen's own id, and the change its plan was
-built at (`planAt`); the import takes it only when every change after `seen` came from that screen and `planAt` is
-its last change, and refuses it otherwise with `ReviewMovedOn` or `PlanBehind` (the third round of
-[the trial](../07-review-decisions-trial.md)). Each act of the review is a decision across the import's lifecycle and
-the row it names. The first form, kept below as the record of what ran, sent the import's `version` from the last
-receipt as `reviewedAt` and compared it with the decide context's `version`. A trial on 2026-11-19 ran a model like
-this on beta.87 with Effect 4.1.4, in memory: a `ConfirmImport` whose `reviewedAt` was
-not the context's `version` was rejected with `StaleReview { current: 1 }`, the right one answered version 2 with its
-reply, the same `commandId` sent again answered the same receipt, and a second confirm was rejected with `NotOpen`.
+`ConfirmImport` checks that the review the person saw is still the latest. In the shape the brief recommends the import
+numbers every change, and the confirm names the last one its screen has received with none before it missing (`seen`),
+the one its plan was built at (`planAt`), and what its button said (`shown`); the import takes it only when both numbers
+are its last and the plan does what was shown, and refuses it otherwise with `ReviewMovedOn`, `PlanBehind` or
+`NotWhatWasShown` (the fourth round of [the trial](../07-review-decisions-trial.md)). Each act of the review is a
+decision across the import's lifecycle and the row it names. The first form, kept below as the record of what ran, sent
+the import's `version` from the last receipt as `reviewedAt` and compared it with the decide context's `version`. A
+trial on 2026-11-19 ran a model like this on beta.87 with Effect 4.1.4, in memory: a `ConfirmImport` whose `reviewedAt`
+was not the context's `version` was rejected with `StaleReview { current: 1 }`, the right one answered version 2 with
+its reply, the same `commandId` sent again answered the same receipt, and a second confirm was rejected with `NotOpen`.
 The block below is in the trial's names; it was not itself compiled.
 
 ```ts

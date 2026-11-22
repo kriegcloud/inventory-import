@@ -15,9 +15,9 @@ Answered decisions move below with the date, the answer and how to reverse it.
 
 | # | Question | Recommendation | Source |
 | --- | --- | --- | --- |
-| 13 | A second vendor for confidence scores? | Not until a labelled calibration run shows a gain (at odds with "ai-typesafe confidence" on his list of wanted items; see "core, reversed"; asked again as decisions 36 to 38 of the alchemy-domain brief) | 03 §7.3 |
+| 13 | A second vendor for confidence scores? | Not until a labelled calibration run shows a gain (at odds with "ai-typesafe confidence" on his list of wanted items; see "core, reversed"; asked again as decisions 45 to 47 of the alchemy-domain brief) | 03 §7.3 |
 | 15 | Do model-preselected values count as Ready? | No | 03 §7.8 |
-| 16 | MCP for agents? | Own tools: reads plus proposal-only writes that need approval (asked again as decisions 41 and 42 of the alchemy-domain brief) | 01 §3 |
+| 16 | MCP for agents? | Own tools: reads plus proposal-only writes that need approval (asked again as decisions 50 and 51 of the alchemy-domain brief) | 01 §3 |
 
 ### Round four: shipping (answered 2026-11-19, entries "infra I1" to "infra I9" below)
 
@@ -400,7 +400,7 @@ reserved for a later confidence-score goal; no stage gets it, and it is not in `
 unused. It is never resolved by an agent.
 
 At odds with "ai-typesafe confidence" on his list of wanted items (see "core, reversed"). Whether the key is used
-is decision 37 of the alchemy-domain brief; this entry stands until he answers it. The key is still never resolved
+is decision 46 of the alchemy-domain brief; this entry stands until he answers it. The key is still never resolved
 by an agent.
 
 ### 2026-11-19 — infra I6, email (23) (at odds with "Resend email" on his list of wanted items; see "core, reversed")
@@ -701,9 +701,9 @@ What this touches in this file:
 - "infra I6, email (23)" (his "Not now" of 2026-11-19), open question 13, and the second paragraph of "infra I5"
   (the key reserved for confidence scores): not reversed in any words of his. Each is at odds with an item he marked
   as wanted. That they are reversed is inferred from his list and from "make use of ever single thing"; the
-  alchemy-domain brief asks him (its decisions 36 to 40), and these entries stand until he answers.
+  alchemy-domain brief asks him (its decisions 45 to 49), and these entries stand until he answers.
 - "infra I7, repository rules (24)" was answered "Yes, with an admin bypass" and is built; it stands. The
-  alchemy-domain brief proposes Alchemy Git beside it (its decision 46), not in place of the ruleset or of CI.
+  alchemy-domain brief proposes Alchemy Git beside it (its decision 55), not in place of the ruleset or of CI.
 - The rows of the README's table "Where the research disagrees with the request" that name those items say so.
 
 Rejected: keeping "core" and moving one aggregate later. Reverse: a new decision by him; the app as it stands on main

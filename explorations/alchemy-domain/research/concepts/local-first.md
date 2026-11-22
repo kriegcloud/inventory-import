@@ -35,7 +35,7 @@ There is no "local-first" declaration. The pieces are a stable command id per in
 const sent = client.DecideRow(importKey, { row, step, saw, flags }, { commandId: `${session}:${n}` })
 
 // Decide locally, as the server would. `context` is required when the command's middleware provides something.
-// (This block is the first form, which named a version; the brief's confirm names `seen`, `screen` and `planAt`.)
+// (This block is the first form, which named a version; the brief's confirm names `seen`, `planAt` and `shown`.)
 const outcome = Import.predict(state, new ConfirmImport({ reviewedAt: version }), {
   id: importKey,                      // beta.87 only; main reads the id from the command through `keyOf`
   now: DateTime.nowUnsafe(),

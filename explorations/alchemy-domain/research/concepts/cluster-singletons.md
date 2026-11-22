@@ -328,7 +328,7 @@ calendar-day reset (at midnight UTC, say) would change what the person is told (
 
 ## Verdict
 
-**Open: decision 19 of the brief**, which puts two uses on the pool to Benjamin: a cron that closes each
+**Open: decision 28 of the brief**, which puts two uses on the pool to Benjamin: a cron that closes each
 organization's day of model calls into a history, and a singleton that keeps the operator's live total, both over a
 registry entity on the pool. This page's own reading, below, is of the work the app schedules today.
 
@@ -338,7 +338,7 @@ runs in the pool's Worker, which cannot bind D1 at beta.87 or main (the pool dec
 settings and its own Durable Object namespaces, has no option for bindings, and a hosted class has no `Worker` for a D1
 binding to attach to). On runners it would need Postgres and a runner pool, which this deployment does not have. What
 would remove it: a `DurableObjectPool` option for extra bindings. The allowance gives a cluster cron nothing to reset
-either: as a rolling window, or by the UTC day (the brief's decision 16), the count starts again from the time a call
+either: as a rolling window, or by the UTC day (the brief's decision 25), the count starts again from the time a call
 is decided. The nearest thing that works, on beta.87: a Worker Cron Trigger, `crons: ["17 * * * *"]`
 on the `Website.Vite` props and a `scheduled` export in `worker.ts` that sweeps each organization's uploads begun an
 hour before `scheduledTime`; or `Cloudflare.Workers.cron` on the second, Effect-native Worker that

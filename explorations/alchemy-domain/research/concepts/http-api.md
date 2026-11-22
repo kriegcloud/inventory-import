@@ -1,7 +1,7 @@
 ---
 type: Reference
 title: Plain HTTP and OpenAPI (toHttpApi)
-description: toHttpApi publishes the calls of an Api you list as an Effect HttpApi group with an OpenAPI document; this page's reading keeps /api/v1 for the screens and uses it only for internal tools, while the brief's decision 22 recommends the screens call the model's Api.
+description: toHttpApi publishes the calls of an Api you list as an Effect HttpApi group with an OpenAPI document; this page's reading keeps /api/v1 for the screens and uses it only for internal tools, while the brief's decision 31 recommends the screens call the model's Api.
 tags: [alchemy-domain, surface]
 ---
 
@@ -153,7 +153,7 @@ What happens to it when the domain comes in. The domain names below are the ones
 | --- | --- |
 | `imports.commit` `POST /imports/:id/commit` | thin handler: sends `ConfirmImport`, reads the import's view at the receipt, maps it to `ImportView` |
 | `imports.takeBack` `POST /imports/:id/take-back` | thin handler: sends `TakeBackImport` |
-| `imports.decide` `PUT /imports/:id/decisions` | goes. Its payload is the difference between two pictures of the draft, which no handler can turn back into what the person did; the screen sends each act as a command (`DecideRow`, `UndoRowStep`) instead, through the Api's typed client or a thin handler, as the brief's decision 8 settles ([the brief](../../BRIEF.md), [the trial](../07-review-decisions-trial.md)) |
+| `imports.decide` `PUT /imports/:id/decisions` | goes. Its payload is the difference between two pictures of the draft, which no handler can turn back into what the person did; the screen sends each act as a command (`DecideRow`, `UndoRowStep`) instead, through the Api's typed client or a thin handler, as the brief's decision 31 settles ([the brief](../../BRIEF.md), [the trial](../07-review-decisions-trial.md)) |
 | `imports.reopen` `POST /imports/:id/reopen`, `imports.remove` `DELETE /imports/:id` | thin handlers over a command each |
 | `imports.match` `POST /imports/:id/mapping` | thin handler over a command, once matching is modelled |
 | `imports.open`, `imports.past`, `imports.changes`, `imports.get` | thin handlers over queries and the import's view |
@@ -256,7 +256,7 @@ rejection of the trial model; `AlreadyImported` carries one field, `reason`
 **Use:** keep `/api/v1` hand-written and move the handlers in the table onto `clientInProcess`; use `toHttpApi` only
 for an operators' `HttpApi` of its own, with a short, explicit `expose` list.
 
-The brief recommends otherwise in its decision 22: the screens call the model's Api, and `/api/v1` keeps what does
+The brief recommends otherwise in its decision 31: the screens call the model's Api, and `/api/v1` keeps what does
 not move (uploads, the staged table, sign-in, the status); `toHttpApi` serves the operator's document over `AdminApi`.
 
 ## Where this was read

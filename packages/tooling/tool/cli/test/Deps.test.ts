@@ -8,6 +8,7 @@ import {
   asksIn,
   depsSentence,
   depsUpdate,
+  heldBecause,
   newerThan,
   type PackageManager,
   versionOf,
@@ -30,7 +31,11 @@ const registry = (newest: Record<string, string>, installCode = 0): PackageManag
 
 const held = json({
   updateGroups: [
-    { label: "Patched at install: it moves by hand", dependencies: ["typescript", "@tool/**"], isIgnored: true },
+    {
+      label: "Patched at install: it moves by hand. To move: `bun run tool:repin -- main`, then the full check",
+      dependencies: ["typescript", "@tool/**"],
+      isIgnored: true
+    },
     { label: "A group that only limits how far", dependencies: ["react"], target: "minor" }
   ]
 })
@@ -101,8 +106,10 @@ describe("deps update", () => {
       const result = yield* run(tree(), registry(newest), "dry-run", ["packages/kernel/package.json"])
       expect(printed(result.first)).toEqual([
         "out: deps:update  3 package.json files, 6 dependencies: 3 to move, 2 held, 1 not compared (nothing written)",
-        "out:   held  @tool/patcher 0.70.0 (newest 0.73.2): Patched at install: it moves by hand",
-        "out:   held  typescript ~7.0.2 (newest 8.0.0): Patched at install: it moves by hand",
+        "out:   held  @tool/patcher 0.70.0 (newest 0.73.2)",
+        "out:   held  typescript ~7.0.2 (newest 8.0.0)",
+        "out:         why: Patched at install: it moves by hand.",
+        "out:         to move: `bun run tool:repin -- main`, then the full check",
         "out:   skip  xlsx https://cdn.example.test/xlsx-0.20.3.tgz: not written as a version the registry can be asked about",
         "out:   move   @effect/vitest 4.1.4 -> 4.1.5 (1 package.json)",
         "out:   move   effect 4.1.4 -> 4.1.5 (2 package.json files)",
@@ -125,8 +132,10 @@ describe("deps update", () => {
       ])
       expect(printed(result.first)).toEqual([
         "out: deps:update  3 package.json files, 6 dependencies: 3 moved, 2 held, 1 not compared",
-        "out:   held  @tool/patcher 0.70.0 (newest 0.73.2): Patched at install: it moves by hand",
-        "out:   held  typescript ~7.0.2 (newest 8.0.0): Patched at install: it moves by hand",
+        "out:   held  @tool/patcher 0.70.0 (newest 0.73.2)",
+        "out:   held  typescript ~7.0.2 (newest 8.0.0)",
+        "out:         why: Patched at install: it moves by hand.",
+        "out:         to move: `bun run tool:repin -- main`, then the full check",
         "out:   skip  xlsx https://cdn.example.test/xlsx-0.20.3.tgz: not written as a version the registry can be asked about",
         "out:   moved  @effect/vitest 4.1.4 -> 4.1.5 (1 package.json)",
         "out:   moved  effect 4.1.4 -> 4.1.5 (2 package.json files)",
@@ -144,8 +153,10 @@ describe("deps update", () => {
       expect(result.installed).toBe(true)
       expect(printed(result.second)).toEqual([
         "out: deps:update  3 package.json files, 6 dependencies: 0 moved, 2 held, 1 not compared",
-        "out:   held  @tool/patcher 0.70.0 (newest 0.73.2): Patched at install: it moves by hand",
-        "out:   held  typescript ~7.0.2 (newest 8.0.0): Patched at install: it moves by hand",
+        "out:   held  @tool/patcher 0.70.0 (newest 0.73.2)",
+        "out:   held  typescript ~7.0.2 (newest 8.0.0)",
+        "out:         why: Patched at install: it moves by hand.",
+        "out:         to move: `bun run tool:repin -- main`, then the full check",
         "out:   skip  xlsx https://cdn.example.test/xlsx-0.20.3.tgz: not written as a version the registry can be asked about"
       ])
     })
@@ -157,8 +168,10 @@ describe("deps update", () => {
       const result = yield* run(tree(), registry(behind), "write", ["packages/kernel/package.json"])
       expect(printed(result.first)).toEqual([
         "out: deps:update  3 package.json files, 6 dependencies: 1 moved, 2 held, 1 not compared",
-        "out:   held  @tool/patcher 0.70.0 (newest 0.73.2): Patched at install: it moves by hand",
-        "out:   held  typescript ~7.0.2 (newest 8.0.0): Patched at install: it moves by hand",
+        "out:   held  @tool/patcher 0.70.0 (newest 0.73.2)",
+        "out:   held  typescript ~7.0.2 (newest 8.0.0)",
+        "out:         why: Patched at install: it moves by hand.",
+        "out:         to move: `bun run tool:repin -- main`, then the full check",
         "out:   skip  xlsx https://cdn.example.test/xlsx-0.20.3.tgz: not written as a version the registry can be asked about",
         "out:   wait  effect and the @effect/* packages released with it are not at one newest version (@effect/vitest 4.1.4, effect 4.1.5): none of them moves until they are",
         "out:   moved  vitest ^5.1.0 -> ^5.2.0 (1 package.json)",
@@ -179,10 +192,12 @@ describe("deps update", () => {
       )
       expect(printed(result.first)).toEqual([
         "out: deps:update  3 package.json files, 8 dependencies: 0 to move, 2 held, 5 not compared (nothing written)",
+        "out:   held  @tool/patcher 0.70.0",
+        "out:   held  typescript ~7.0.2",
+        "out:         why: Patched at install: it moves by hand.",
+        "out:         to move: `bun run tool:repin -- main`, then the full check",
         "out:   skip  @effect/vitest 4.1.4: the registry named no newest version for it",
-        "out:   held  @tool/patcher 0.70.0: Patched at install: it moves by hand",
         "out:   skip  effect 4.1.4: the registry named no newest version for it",
-        "out:   held  typescript ~7.0.2: Patched at install: it moves by hand",
         "out:   skip  unknown-here ^1.0.0: the registry named no newest version for it",
         "out:   skip  vitest ^5.1.0: the registry named no newest version for it",
         "out:   skip  xlsx https://cdn.example.test/xlsx-0.20.3.tgz: not written as a version the registry can be asked about"
@@ -231,6 +246,14 @@ describe("deps update", () => {
       expect(result.files["packages/kernel/package.json"]).toBe(manifest("4.1.5", "^5.2.0"))
     })
   )
+
+  it("reads a held group's label as its reason and, after To move, what moves it", () => {
+    expect(heldBecause("Pinned as one set. To move: `bun run alchemy:repin -- main`")).toEqual({
+      reason: "Pinned as one set.",
+      move: O.some("`bun run alchemy:repin -- main`")
+    })
+    expect(heldBecause("Patched at install")).toEqual({ reason: "Patched at install", move: O.none() })
+  })
 
   it("reads how a dependency is written, and which version came later", () => {
     const later = (candidate: string, current: string) =>

@@ -7,7 +7,8 @@
  *   stays a caret range, `~1.2.3` a tilde range.
  * - **Held.** `.syncpackrc.json` lists the dependencies that do not move by themselves (`updateGroups` with
  *   `isIgnored`), each group's `label` being its reason. `deps:outdated` (syncpack) reads the same list, so the two
- *   agree. A held dependency is named with its reason every time the command runs.
+ *   agree. A held dependency is named every time the command runs, with the registry's newest, and its group with
+ *   the reason and, when the label ends " To move: ...", with what moves it by hand: one run says all an update needs.
  * - **Effect moves together.** `effect` and every `@effect/*` package released with it are at one exact version.
  *   When the registry's newest version is the same for all of them they all move to it; when it is not (one was
  *   published later than the others), none of them moves, and the command says which is behind.
@@ -63,6 +64,26 @@ export class SyncpackFile extends S.Class<SyncpackFile, { readonly brand: unique
 export interface Hold {
   readonly pattern: string
   readonly reason: string
+  /** How the group is moved by hand, when its label says (" To move: ..." at its end). */
+  readonly move: O.Option<string>
+  /** Which group of the list it belongs to, so a group's reason is said once for all it holds. */
+  readonly group: number
+}
+
+/**
+ * A held group's label as its reason and, after " To move: ", what moves it by hand.
+ *
+ * @example
+ * heldBecause("Pinned as one set. To move: `bun run alchemy:repin -- main`")
+ * // { reason: "Pinned as one set.", move: some("`bun run alchemy:repin -- main`") }
+ *
+ * @category rules
+ */
+export const heldBecause = (label: string): { readonly reason: string; readonly move: O.Option<string> } => {
+  const parts = Str.split(" To move: ")(label)
+  return parts.length < 2
+    ? { reason: Str.trim(label), move: O.none() }
+    : { reason: Str.trim(parts[0] ?? ""), move: O.some(Str.trim(A.join(A.drop(parts, 1), " To move: "))) }
 }
 
 /** One place a package.json asks for a dependency. */
@@ -158,9 +179,10 @@ export const DepsFinding = S.TaggedUnion({
   Held: {
     name: dependency,
     spec: S.String.pipe(S.annotateKey({ description: "How it is written today" })),
-    latest: S.OptionFromOptionalKey(S.String).pipe(S.annotateKey({ description: "The registry's newest, if asked" })),
-    reason: S.String.pipe(S.annotateKey({ description: "Why it is held, as written beside it" }))
+    latest: S.OptionFromOptionalKey(S.String).pipe(S.annotateKey({ description: "The registry's newest, if asked" }))
   },
+  HeldBecause: { reason: S.String.pipe(S.annotateKey({ description: "Why the dependencies above are held" })) },
+  HeldMoves: { how: S.String.pipe(S.annotateKey({ description: "What moves them by hand" })) },
   Skipped: {
     name: dependency,
     spec: S.String.pipe(S.annotateKey({ description: "How it is written today" })),
@@ -256,9 +278,8 @@ export const depsPlan = (input: DepsInput): DepsPlan => {
         uses,
         moves: A.empty<{ readonly ask: Ask; readonly to: string }>(),
         newest: O.none<string>(),
-        said: A.of<DepsFinding>(
-          DepsFinding.cases.Held.make({ name, spec, latest: R.get(input.latest, name), reason: hold.value.reason })
-        )
+        held: O.some(hold.value),
+        said: A.of<DepsFinding>(DepsFinding.cases.Held.make({ name, spec, latest: R.get(input.latest, name) }))
       }
     }
     const newest = O.flatMap(R.get(input.latest, name), (text) =>
@@ -271,6 +292,7 @@ export const depsPlan = (input: DepsInput): DepsPlan => {
         uses,
         moves: A.empty<{ readonly ask: Ask; readonly to: string }>(),
         newest: O.none<string>(),
+        held: O.none<Hold>(),
         said: A.of<DepsFinding>(
           DepsFinding.cases.Skipped.make({
             name,
@@ -286,6 +308,7 @@ export const depsPlan = (input: DepsInput): DepsPlan => {
         uses,
         moves: A.empty<{ readonly ask: Ask; readonly to: string }>(),
         newest: O.none<string>(),
+        held: O.none<Hold>(),
         said: A.of<DepsFinding>(
           DepsFinding.cases.Skipped.make({ name, spec, why: "the registry named no newest version for it" })
         )
@@ -298,7 +321,14 @@ export const depsPlan = (input: DepsInput): DepsPlan => {
           newerThan(now.version)(newest.value.version) ? [{ ask, to: `${now.lead}${newest.value.text}` }] : []
       })
     )
-    return { name, uses, moves, newest: O.some(newest.value.text), said: A.empty<DepsFinding>() }
+    return {
+      name,
+      uses,
+      moves,
+      newest: O.some(newest.value.text),
+      held: O.none<Hold>(),
+      said: A.empty<DepsFinding>()
+    }
   })
 
   // Effect and the packages released with it move to one version, or not at all.
@@ -328,7 +358,30 @@ export const depsPlan = (input: DepsInput): DepsPlan => {
       })
     }
   )
-  const said = A.flatMap(judged, (one) => one.said)
+  // A group's dependencies together, then once why they are held and what moves them.
+  const heldGroups = A.sort(
+    R.toEntries(
+      A.groupBy(
+        A.flatMap(judged, (one) =>
+          O.match(one.held, { onNone: () => [], onSome: (hold) => [{ hold, said: one.said }] })
+        ),
+        (one) => String(one.hold.group)
+      )
+    ),
+    Order.mapInput(Order.Number, (entry: readonly [string, unknown]) => Number(entry[0]))
+  )
+  const heldSaid = A.flatMap(heldGroups, ([, members]) => {
+    const first = A.headNonEmpty(members).hold
+    return A.flatten<ReadonlyArray<ReadonlyArray<DepsFinding>>>([
+      A.flatMap(members, (member) => member.said),
+      [DepsFinding.cases.HeldBecause.make({ reason: first.reason })],
+      O.match(first.move, { onNone: () => [], onSome: (how) => [DepsFinding.cases.HeldMoves.make({ how })] })
+    ])
+  })
+  const said = A.appendAll(
+    heldSaid,
+    A.flatMap(judged, (one) => (O.isSome(one.held) ? [] : one.said))
+  )
   const summary = DepsFinding.cases.Summary.make({
     packages: A.dedupe(A.map(input.asks, (ask) => ask.file)).length,
     dependencies: byName.length,
@@ -368,10 +421,10 @@ export const depsSentence: (finding: DepsFinding) => Line = DepsFinding.match({
         written ? "moved" : "to move"
       }, ${held} held, ${skipped} not compared${written ? "" : " (nothing written)"}`
     ),
-  Held: ({ name, spec, latest, reason }) =>
-    out(
-      `  held  ${name} ${spec}${O.match(latest, { onNone: () => "", onSome: (newest) => ` (newest ${newest})` })}: ${reason}`
-    ),
+  Held: ({ name, spec, latest }) =>
+    out(`  held  ${name} ${spec}${O.match(latest, { onNone: () => "", onSome: (newest) => ` (newest ${newest})` })}`),
+  HeldBecause: ({ reason }) => out(`        why: ${reason}`),
+  HeldMoves: ({ how }) => out(`        to move: ${how}`),
   Skipped: ({ name, spec, why }) => out(`  skip  ${name} ${spec}: ${why}`),
   Together: ({ family, versions }) =>
     out(
@@ -472,11 +525,12 @@ export const depsUpdate = Effect.fn("Deps.depsUpdate")(function* (mode: Mode, pa
   const hasConfig = yield* repo.exists(configFile)
   const configText = hasConfig ? yield* repo.text(configFile) : "{}"
   const config = yield* decodeJsonc(SyncpackFile)(".syncpackrc.json", configText)
-  const holds = A.flatMap(config.updateGroups ?? [], (group) =>
+  const holds = A.flatMap(config.updateGroups ?? [], (group, index) =>
     group.isIgnored === true
       ? A.map(group.dependencies ?? [], (pattern): Hold => ({
           pattern,
-          reason: group.label ?? "held in .syncpackrc.json, with no reason written"
+          ...heldBecause(group.label ?? "held in .syncpackrc.json, with no reason written"),
+          group: index
         }))
       : []
   )

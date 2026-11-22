@@ -12,7 +12,7 @@
   ],
   "updateGroups": [
     {
-      "label": "The Effect language service: a new version adds diagnostics the profile in tsconfig.base.json must name, and patches only the typescript, tsrs and oxlint versions it lists. Moved by hand, with them",
+      "label": "The Effect language service: a new version adds diagnostics the profile in tsconfig.base.json must name, and patches only the typescript, tsrs and oxlint versions it lists. Moved by hand, with them. To move: write the new @effect/tsgo in the package.json files that name it and run `bun install`, which stops and names the typescript, tsrs and oxlint versions it supports; write those, name any new diagnostic in tsconfig.base.json and the packages' own profiles, then `bun run check:full`",
       "dependencies": ["@effect/tsgo"],
       "isIgnored": true
     },
@@ -27,12 +27,12 @@
       "isIgnored": true
     },
     {
-      "label": "Its tables are a migration written by hand (docs/auth.md). After a move `bun run auth:schema` must print nothing, so it moves by hand",
+      "label": "Its tables are a migration written by hand (docs/auth.md). After a move `bun run auth:schema` must print nothing, so it moves by hand. To move: write the new version in the package.json files that name it, `bun install`, then `bun run auth:schema` and add the migration it prints, if any",
       "dependencies": ["better-auth"],
       "isIgnored": true
     },
     {
-      "label": "SheetJS publishes at its own address, and the registry's xlsx stopped at 0.18.5. Written as an address and moved by hand",
+      "label": "SheetJS publishes at its own address, and the registry's xlsx stopped at 0.18.5. Written as an address and moved by hand. To move: change the address in packages/foundation/modeling/xlsx/package.json to the new file on cdn.sheetjs.com, then `bun install`",
       "dependencies": ["xlsx"],
       "isIgnored": true
     }

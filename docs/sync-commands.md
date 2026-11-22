@@ -32,8 +32,10 @@ packages at different versions of `effect`, a package no `workspaces` pattern co
 - **Effect moves together.** `effect` and every `@effect/*` package released with it are at one exact version. When
   the registry's newest version is the same for all of them, all move; when one was published later than the rest,
   none moves and the command says which is behind.
-- **Held dependencies stay**, and each is named with its reason and the registry's newest version at every run. The list is `updateGroups` in
-  `.syncpackrc.json`, a group's `label` being its reason, so `deps:outdated` leaves the same ones out.
+- **Held dependencies stay**, and each is named at every run with the registry's newest version, and its group
+  with why it is held and what moves it by hand. So one run says everything an update needs: what moved, and for
+  what did not, the command or the steps. The list is `updateGroups` in `.syncpackrc.json`: a group's `label` is its
+  reason, and what follows ` To move: ` in it is how it moves. `deps:outdated` leaves the same ones out.
 - **After the move** `bun install` runs, then `version-sync --write`, and the command says what moved from which
   version to which. Run `bun run check:full` before committing: a new formatter or type-checker can find new things.
 
@@ -47,7 +49,8 @@ packages at different versions of `effect`, a package no `workspaces` pattern co
 | `better-auth` | Its tables are a migration written by hand ([Sign-in](auth.md)). After a move `bun run auth:schema` must print nothing, so it moves by hand |
 | `xlsx` | SheetJS publishes at its own address, and the registry's `xlsx` stopped at 0.18.5. It is written as an address and moved by hand |
 
-To hold another dependency, add a group with its reason to `updateGroups`; to release one, remove it.
+To hold another dependency, add a group to `updateGroups` with its reason as the `label`, ending ` To move: ` and
+what moves it; to release one, remove the group.
 
 ## One source for each version: `version-sync`
 

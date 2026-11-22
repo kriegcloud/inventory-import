@@ -942,7 +942,8 @@ findings in one skill's browser-probe script, which reads two deprecated CSS pro
 no TypeScript project; he had asked for no exemptions. Options: "Leave it out, by name (Recommended)"; "Read it and fix
 it", a local change to the probe script and a project for the 18 files. Answer: "Leave it out, by name". I chose; the
 agent recommended the same. It stays the one folder named as not read, said in the check's output and in its doc
-(`leftOut` in the law). Reverse: empty `leftOut`, give the 18 files a project and change the probe script.
+(`leftOut` in the law). Of its 18 code files, 16 are other people's skills and two (the ontology auditor's script and
+its test) are from his own beep-effect; all are copied as published and run by no part of the app or its checks. Reverse: empty `leftOut`, give the 18 files a project and change the probe script.
 
 ### 2026-11-22 — the vendored data grid's typing, for every column
 
@@ -952,15 +953,54 @@ Options: "Fix it for every column (Recommended)", keeping the built approach and
 browser test that types 56, -5 and a space into each editor and reads what is stored; "Remove the grid"; "Exempt the
 grid". Answer: "Fix it for every column". I chose; the agent recommended the same.
 
-Built: the cell's wrapper reads from its column whether the editor that will open takes typing (text, number, url,
-long text), so a column with its own `cell` behaves as a plain one; it opens and focuses that editor before the key
-handler ends, and the browser types the key. The long-text editor is included, which also ends its loss of the first
-key when a second came before the next frame, and no fallback is left. The test is `bun run grid:keys` in
-`apps/inventory`: it types 56, -5 and a space on each of the four editors in a plain column and in a column with its
-own `cell`, on a development-only page (`/gallery/grid`), and reads what the grid stored; with typing in place taken
-out, 24 of 24 fail. It runs by hand, in Chromium only, and is not part of `bun run check`: the repository runs no
-browser tests and the machine that runs the checks has no browser. Not measured: Firefox, Safari, a touch keyboard,
-an input method. A space is stored as the published grid stores it (a no-break space in a text cell; a number or url
-cell emptied), measured with its own mechanism; whether that is wanted was not asked. Reverse: the "Local change"
-marks in `packages/ui/src/components/data-grid/` (`data-grid-cell.tsx`, `data-grid-cell-variants.tsx`,
-`data-grid-utils.ts`), one on every changed line.
+Built: the cell's wrapper reads from its column whether the editor that will open takes typing, so a column with its
+own `cell` behaves as a plain one; it opens and focuses that editor before the key handler ends, and the browser types
+the key. No fallback that puts text in is left. Where the editor has not taken the focus by then (a screen that keeps
+the editing state itself and applies it later), the key is prevented and the editing ended: the key does nothing, and
+nothing is stored that was not typed. A column that writes its own cell (`meta.writeCell`) is left as published.
+
+"Every column" as built means the four editors that take typing: text, number, url and long text, in a plain column
+and in one with its own `cell`. The select, multi-select, date and file editors and the boolean's checkbox are as
+published and untouched; the published select and multi-select drop the key that opens them, and still do (agent, not
+asked whether he meant those too).
+
+The test is `bun run grid:keys` in `apps/inventory`, on a development-only page (`/gallery/grid`) that adds nothing to
+the production build (its stylesheet is 124,636 bytes with and without the page; the walk that lists the
+stylesheet's sources is told not to follow it). On each of the four editors, in both kinds of column, with no pause
+between keys and with 40 ms, it types 56, -5 and a space, types then presses Escape, types then undoes, and presses F2
+then types: 96 cases, read from what the grid stored. It fails on an error or a warning in the page's console, starts
+this checkout's own server on a port it asked the system for, and fails when no browser is found. On the grid as it
+was before the fix for every column, 22 of the 96 fail. Chromium only. Not measured: Firefox, Safari, a touch
+keyboard, an input method, a production build of the grid.
+
+Where the test runs (agent, not asked; he has been told): CI runs it as a step after the full check, with the
+runner's Chrome (`/usr/bin/google-chrome`, which GitHub's Ubuntu 24.04 image documents), and it is run by hand after a
+change to the grid. The step has not run on a runner yet: nothing is pushed. It is not part of `bun run check`. An
+earlier version of this entry said the machine that runs the checks has no browser; that was wrong.
+
+Not decided, and pinned by the test as "as published", not as rules:
+
+- A space typed on a focused cell replaces a text cell's value with one no-break space (U+00A0, the browser's way with
+  a lone space in an editable element) and empties a number or url cell. The published grid does the same, measured
+  with its own mechanism (`document.execCommand("insertText", false, " ")` on a selected value in Chromium).
+- Escape in the long-text editor keeps what was typed: its popover closes and saves. The published grid does the
+  same, measured on the grid as it was before any of these changes.
+
+Also seen, and not held by the test: the published long-text editor typed the opening key on the next frame, and in
+one run of the published grid with no pause between keys it stored a wrong value in one of its long-text cases. The
+browser types that key now, and no such run has failed since; the test does not fail on the old code every time.
+
+Reverse: the "Local change" marks in `packages/ui/src/components/data-grid/` (`data-grid-cell.tsx`,
+`data-grid-cell-variants.tsx`, `data-grid-utils.ts`), one at every changed or removed line.
+
+### 2026-11-22 — deprecated APIs, the scripts' and the page script's projects (agent, not asked)
+
+The check refuses a code file no tsconfig includes, so the app's development scripts (`apps/inventory/scripts`, plain
+JavaScript) and the one script the page loads (`public/theme-init.js`) each got a project, type-checked by the app's
+`check`. Both are looser than the repository's one profile: no Effect rule applies (`plugins` is empty; 78 findings in
+the scripts otherwise), and the scripts' project has `noImplicitAny` off, so an untyped parameter or a package that
+ships no types is `any` without an error and a deprecated call behind either is not seen. Before, nothing
+type-checked them at all. This is the agent's judgement, not a decision of his; he was told on 2026-11-22 and it was
+left as built. Other ways: the Effect rules on and the findings fixed; the scripts rewritten as TypeScript;
+`noImplicitAny` on alone. Reverse: remove `plugins` and `noImplicitAny` from `apps/inventory/scripts/tsconfig.json`
+and `plugins` from `apps/inventory/tsconfig.public.json`, and fix what the check then finds.

@@ -1,9 +1,11 @@
 {
   // The development scripts' project. The app's `check` type-checks it (tsconfig.json references it), so an import
-  // that stops resolving is an error here and cannot hide a deprecated call behind a type nobody knows
-  // (`bun run beep laws deprecated-apis` reads these types). The scripts are plain JavaScript run by Node: they are
-  // checked for what resolves and what fits, not held to the Effect rules (`plugins` is empty, parameters may be
-  // untyped), as before. reachable-sources.mjs is named in `files` because its .d.mts would otherwise stand in for it.
+  // that stops resolving is an error here (`bun run beep laws deprecated-apis` reads these types). The scripts are
+  // plain JavaScript run by Node, and this project is looser than the repository's profile, by the agent's judgement
+  // and not by a decision (explorations/ideal-architecture/DECISIONS.md, 2026-11-22): `plugins` is empty, so no Effect
+  // rule applies, and `noImplicitAny` is off, so an untyped parameter, or a package that ships no types, is `any`
+  // without an error, and a deprecated call behind either is not seen. Before, nothing type-checked the scripts at
+  // all. reachable-sources.mjs is named in `files` because its .d.mts would otherwise stand in for it.
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "tsBuildInfoFile": "../node_modules/.tmp/tsconfig.scripts.tsbuildinfo",

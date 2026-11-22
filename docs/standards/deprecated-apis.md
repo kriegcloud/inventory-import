@@ -22,8 +22,9 @@ it stands there: oxlint's `typescript/no-deprecated`, an error, with every other
 wherever it is: sources, tests, scripts and configuration files, a file in a new folder too. Built files are
 git-ignored.
 
-One folder is left out, by name in the law (`leftOut`): `.agents/`, 18 code files of other people's skills, vendored as
-they were published and run by no part of the app or its checks. One of them
+One folder is left out, by name in the law (`leftOut`): `.agents/`, the 18 code files of the agent skills, copied as
+they were published and run by no part of the app or its checks. Sixteen are other people's; two (the ontology
+auditor's script and its test) come from Benjamin's own beep-effect. One of them
 (`design-taste-frontend/scripts/lib/probe.mjs`) reads the deprecated CSS properties `clip` and `webkitBackgroundClip`
 on purpose, to report a page that uses them: 5 findings if the folder were read. Benjamin chose to leave it out by
 name, and the check says so each time it passes.
@@ -42,8 +43,10 @@ It also fails when the rule could be off, or a file unread:
   second rule, or the rule at `warn` or `off`: nothing is checked, and it says where the profile differs. The profile
   is plain JSON with no comment, so it is read whole.
 - **A comment that turns the rule off**, in any file it reads: `oxlint-disable` or `eslint-disable`, for a line, the
-  next line or the file, that names `no-deprecated` under any plugin's spelling or names no rule at all. A comment
-  that names only other rules passes.
+  next line or the file, that names `no-deprecated` under any plugin's spelling or names no rule at all. A block
+  comment is read to its end, over as many lines as it has, and a reason begins at the first `--`, as oxlint reads
+  both. A comment that names only other rules passes. The words are matched as text, so they are refused in a string
+  or in a sentence of a comment as well, where oxlint ignores them: write them another way there.
 - **A code file no tsconfig includes**, TypeScript or JavaScript: it would be read without its package's types, and a
   deprecated `node:url` function in it passes. A file's project is found from the nearest `tsconfig.json` above it and
   what that references. The root `tsconfig.json` is there for this: nothing compiles it, and it references each
@@ -53,12 +56,17 @@ It also fails when the rule could be off, or a file unread:
 
 A project only this check reads is type-checked as well, so an import that stops resolving there is an error and not
 a type nobody knows, which would hide every deprecated call behind it: `bun run configs:check` for
-`tsconfig.config.json` (part of `bun run check`), and the app's own `check` for its scripts and `public/`.
+`tsconfig.config.json` (part of `bun run check`), and the app's own `check` for its scripts and `public/`. Those last
+two projects are looser than the rest, by the agent's judgement: no Effect rule applies to them, and in the scripts an
+untyped parameter or a package that ships no types is `any` without an error, so a deprecated call behind one is not
+seen (`any` is the second row of the table below).
 
-Its answer is kept by Turborepo until a code file anywhere, a `tsconfig*.json`, a `package.json`, the profile or
-`bun.lock` changes, or the manifest of a package installed at the top of `node_modules`. The lockfile names every
-installed version, so a new `@deprecated` in a dependency that was installed from it is not hidden by an earlier
-answer. A nested `node_modules` folder that differs from the lockfile is not noticed: `bun install` puts it right.
+Its answer is kept by Turborepo until a code file or a `tsconfig*.json` anywhere, a workspace's `package.json`, the
+profile or `bun.lock` changes, or the manifest of any package installed in the root's `node_modules`. So a new
+`@deprecated` in a dependency is not hidden by an earlier answer, and neither is an install that has fallen behind
+the lockfile (recorded with `turbo run //#deprecated:check --dry=json`: installed effect's manifest at another
+version is a miss, put back a hit). What git ignores and the law does not read is not an input: `.agents`, and
+`.claude`, which in the main checkout holds every other checkout of the repository.
 It takes about two seconds when it runs (719 files, 64 threads) and none when nothing changed.
 
 It always reads the whole repository: there is no shorter run for one folder, and running oxlint by hand with the

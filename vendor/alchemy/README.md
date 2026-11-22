@@ -12,10 +12,11 @@
 ## What is here
 
 <!-- pin:start (written by repin.py from sources.json; do not edit by hand) -->
-The commit is `734c27a` of the library's `main`, pinned on 2026-11-22: 17 packages, 38.7 MB as files.
+The commit is `734c27a` of the library's `main`, pinned on 2026-11-22: 18 packages, 38.7 MB as files.
 
 | Package | Version | Licence | Size | Sibling addresses replaced |
 | --- | --- | --- | ---: | ---: |
+| `@alchemy.run/1password` | 2.0.0-beta.87 | Apache-2.0 | 22.8 kB | 1 |
 | `@alchemy.run/acme` | 2.0.0-beta.87 | Apache-2.0 | 61.8 kB | 2 |
 | `@alchemy.run/cloudflare` | 2.0.0-beta.87 | Apache-2.0 | 3.8 MB | 11 |
 | `@alchemy.run/cloudflare-runtime` | 2.0.0-beta.87 | Apache-2.0 | 1.6 MB | 2 |

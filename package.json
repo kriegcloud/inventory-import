@@ -79,6 +79,7 @@
     "typescript": "catalog:"
   },
   "overrides": {
+    "@alchemy.run/1password": "file:vendor/alchemy/alchemy.run-1password-734c27a.tgz",
     "@alchemy.run/acme": "file:vendor/alchemy/alchemy.run-acme-734c27a.tgz",
     "@alchemy.run/cloudflare": "file:vendor/alchemy/alchemy.run-cloudflare-734c27a.tgz",
     "@alchemy.run/cloudflare-runtime": "file:vendor/alchemy/alchemy.run-cloudflare-runtime-734c27a.tgz",

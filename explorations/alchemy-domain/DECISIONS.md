@@ -15,18 +15,15 @@ it.
 
 Decisions 1 to 40 shape the first moves. Decisions 41 to 62 can wait for the move that needs them. "Changes" names the
 earlier answers that remove or change an option. Decisions 1 to 8, 10 to 23, 25 to 40 and 57 to 59 were answered on
-2026-11-22 and are under "Answered"; 9 and 41 fell away with his answer to 7 and were not asked. Of 1 to 40 only four
-points his answers left are open: 14a and 14b, under decision 14, 21a, under decision 21, and 34a, under decision 34; 24
-stands on his earlier infra answer, I8 ("Close sign-up; I add accounts", 2026-11-19), and was not asked again: it is not
-open. Decisions 42 to 56 and 60 to 62 are asked each when its move opens, as he chose on 2026-11-22. The numbers of the
-others stay as the brief gives them.
+2026-11-22 and are under "Answered"; 9 and 41 fell away with his answer to 7 and were not asked. Of 1 to 40 only one
+point his answers left is open: 21a, under decision 21, asked when move 6 opens; 14a, 14b and 34a were answered later
+the same day and are under "Answered". 24 stands on his earlier infra answer, I8 ("Close sign-up; I add accounts",
+2026-11-19), and was not asked again: it is not open. Decisions 42 to 56 and 60 to 62 are asked each when its move
+opens, as he chose on 2026-11-22. The numbers of the others stay as the brief gives them.
 
 | # | Question | Recommended in the brief | Changes | Where it is argued |
 | --- | --- | --- | --- | --- |
-| 14a | A person decides a rival row while a keep stands: does their decision win over the keep? | | 14 | [the brief](BRIEF.md), decision 14 |
-| 14b | Two keeps of one SKU in the same moment: both are taken and both rows are left out. Is that what happens? | | 14 | [the brief](BRIEF.md), decision 14 |
-| 21a | With Better Auth's organization writes closed, sign-up no longer founds an organization: does the operator found each one with `FoundOrganization` on `AdminApi`, for an account that exists, and who is its actor before any member row exists? | | 21 | [the brief](BRIEF.md), decision 21 |
-| 34a | Where in CI does each model's search run? | | 34 | [the brief](BRIEF.md), decision 34 |
+| 21a | With Better Auth's organization writes closed, sign-up no longer founds an organization: does the operator found each one with `FoundOrganization` on `AdminApi`, for an account that exists, and who is its actor before any member row exists? (Asked when move 6 opens.) | | 21 | [the brief](BRIEF.md), decision 21 |
 | 42 | What answers the Items page? | A query that answers today's page | | [query](research/concepts/query.md) |
 | 43 | Do suggestions start by the person's press, or by themselves? | By the press, as today | | [policy](research/concepts/policy.md) |
 | 44 | How many calls may one pass take from the 40 a day? | One, as today | | [saga](research/concepts/saga.md) |
@@ -308,10 +305,13 @@ each: a new decision by him.
 
 What he was told with decision 7: 123 rules are proved, of the trial's model; one act for 6,000 rows took a median of
 214 ms in local workerd; Confirm never waits for a group; a colleague's act made before the group reached their screen
-is refused and shown again, on any row; Verify cannot check that the rows a group names are the ones the fix fits, and
-a property over 50,000 generated sequences holds the reading of a row through its groups; the screen and the stored rows
-that read through groups are not run. With decision 8 he was told the one case in which taking back an earlier group is
-not exact: an accept pressed because that group had made the proposal stays accepted.
+is refused and shown again, on any row; Verify cannot check that the rows a group names are the ones the fix fits, and a
+property over 50,000 generated sequences holds the reading of a row through its groups; the screen and the stored rows
+that read through groups are not run. He later answered otherwise on the colleague's act: a waiting act on a row the
+group does not touch is sent again by itself, and one on a row it touches is held and shown with both (the entry "a keep
+and its rivals, a group taken back over a changed row, waiting acts, and where the search runs"). With decision 8 he was
+told the one case in which taking back an earlier group is not exact: an accept pressed because that group had made the
+proposal stays accepted.
 
 What "the last group act" means, as it was put to him with decision 8: the last group still in force. "Ana's undo is
 refused and says Dana's group came after. She can undo once Dana has undone hers, or decide those rows again." So undo
@@ -385,5 +385,51 @@ Further answers by dialog on the same day. Reverse each: a new decision by him.
 - **What is shown on Wednesday 2026-11-25.** Answer: "Chosen design, parked one as fallback": the model with a group as
   one unit is the one built for `main`; the per-row model stays on a branch as what is shown if the chosen one is not
   merged by Tuesday evening.
-- **Open:** where decision 34's search runs in CI (34a under "Open").
+- **Where decision 34's search runs in CI** (34a): answered later the same day, under "a keep and its rivals, a group
+  taken back over a changed row, waiting acts, and where the search runs" below.
 
+### 2026-11-22 — a keep and its rivals, a group taken back over a changed row, waiting acts, and where the search runs
+
+Further answers by dialog on the same day. Of each: I chose; the agent recommended the same. Reverse each: a new
+decision by him.
+
+**Deciding a rival** (14a under decision 14). Question: rows 4 and 10 share a SKU; Ana keeps row 4, which leaves row 10
+out by rule; Dana, seeing that, decides row 10 herself anyway; does her decision win over the keep? Options: "Yes, and
+a clash is shown again" (Recommended); "No, the keep holds" (her act refused with "row 4 was kept by Ana"). Answer:
+"Yes, and a clash is shown again": row 10 takes her decision; if that leaves two kept rows with one SKU, the review
+flags the clash again as needing a decision, and neither row imports until someone settles it.
+
+**Two keeps at once** (14b under decision 14). Question: in the same moment Ana keeps row 4 and Dana keeps row 10,
+neither having seen the other's; as modelled both are taken and both rows end up left out, which neither chose.
+Options: "Both kept, clash shown again" (Recommended); "Second keep refused" (a rule reading both rows, not run); "Both
+left out, as modelled". Answer: "Both kept, clash shown again": both keeps are recorded, the review sees two kept rows
+with one SKU and flags the clash, naming both people; no row is left out that nobody chose to leave out.
+
+So under decision 14 a keep never leaves a rival out against a decision someone made on that rival, and two keeps of
+one SKU are a clash, not two leave-outs. That changes the rule `review` applies to rivals; it is in no model and not
+run.
+
+**Group undo, changed row.** Question: Ana accepts a fix for 12 rows; Dana types a quantity on row 14 on top of it; Ana
+undoes her group; the model leaves row 14 with Dana's whole decision, the group's fix included, where today's app strips
+the group's fix. Options: "Row 14 stays whole" (Recommended); "Strip the group's part". Answer: "Row 14 stays whole":
+her decision stands as she made it, and the screen names it ("Row 14 was changed by Dana and stays"). So where the
+reading of a row through its groups differs from today's `act` on such a row, the model's reading is the one chosen;
+today's `act` changes at the move that puts the review on the model.
+
+**Waiting acts and a group.** Question: he had been told, with decision 7, that a colleague's group makes every act from
+a screen that has not received it "refused and shown again, on any row"; the brief says a waiting act on a row the
+group does not touch is sent again by itself, and one on a row it touches is held and shown with both. Which? Options:
+"Yes: resend untouched, hold touched" (Recommended); "Show every refused act again". Answer: "Yes: resend untouched,
+hold touched". Not run.
+
+**Where each model's search runs in CI** (34a under decision 34). Question: where in CI does each model's search run?
+Answer: "Own job + nightly, no new infrastructure". Rejected: "Also replay from your remote cache"; "Full copy of
+beep-effect's tiers".
+
+Two notes:
+
+- Founding an organization (21a under decision 21) stays open, to be asked when move 6 opens, as he chose for the
+  decisions that wait for their move. Nothing is recommended beyond his earlier infra answer I8, "Close sign-up; I add
+  accounts".
+- He was not told, when he answered decision 39 (what is kept for ever), that each act on a group is an object kept for
+  ever, taken back or not, with its rows' text. He is to be told.

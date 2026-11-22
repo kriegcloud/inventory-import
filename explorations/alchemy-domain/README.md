@@ -4,7 +4,7 @@ title: Alchemy domain
 description: Everything @alchemy.run/domain and what plugs into it offers, concept by concept, with how inventory-import would use each. The reference the brief is built on, written so its pages can later become agent skills.
 status: active
 stage: shape
-next: decisions 1 to 40 of the brief are answered (2026-11-22; 9 fell away, 24 stands on infra I8) but for 14a, 14b, 21a and 34a, open in DECISIONS.md; 42 to 56 and 60 to 62 are asked each when its move opens; moves 0 and 1 are built first, on the atoms work as merged
+next: decisions 1 to 40 of the brief are answered (2026-11-22; 9 fell away, 24 stands on infra I8) but for 21a, open in DECISIONS.md and asked when move 6 opens; 42 to 56 and 60 to 62 are asked each when its move opens; moves 0 and 1 are built first, on the atoms work as merged
 goals: []
 ---
 
@@ -222,5 +222,6 @@ pages whose "Where this was read" names a file that changed.
 - 2026-11-22: he answered decisions 1 to 40 by dialog, 7 and 8 after a fifth round of trials, which decided a group of
   rows as one unit; then a sixth round (`review14`, the model he chose: 135 rules proved, 43 stories, 148 mutants) and
   his further answers (an undo after and behind a group, the pin `734c27a`, the names, the lock file, what is shown on
-  2026-11-25); 9 and 41 fell away, 24 stands on infra I8, and 42 to 56 and 60 to 62 are asked at their move. The brief
-  written on his answers. Nothing built; awaiting "the brief matches".
+  2026-11-25, a keep and its rivals, a group taken back over a changed row, waiting acts, where the search runs in CI);
+  9 and 41 fell away, 24 stands on infra I8, and 42 to 56 and 60 to 62 are asked at their move. The brief written on his
+  answers. Nothing built; awaiting "the brief matches".

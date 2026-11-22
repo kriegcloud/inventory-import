@@ -15,41 +15,30 @@ it.
 
 Decisions 1 to 40 shape the first moves. Decisions 41 to 62 can wait for the move that needs them. "Changes" names the
 earlier answers that remove or change an option. Decisions 1 to 8, 10 to 23, 25 to 40 and 57 to 59 were answered on
-2026-11-22 and are under "Answered"; 9 and 41 fell away with his answer to 7 and were not asked. Of 1 to 40 only one
-point his answers left is open: 21a, under decision 21, asked when move 6 opens (and five unnumbered points, below: a
-warning before a group's undo, under decision 8, accepted fixes after a keep, under decision 14, the check of who may
-change a row or a group beside the lock, how rows are adopted at first touch, under decision 37, and whether a staging
-deploy is one he keeps); 14a, 14b and 34a were answered later the same day and are under "Answered". 24 stands on his
-earlier infra answer, I8 ("Close sign-up; I add accounts", 2026-11-19), and was not asked again: it is not open.
-Decisions 42 to 56 and 60 to 62 are asked each when its move opens, as he chose on 2026-11-22. The numbers of the others
-stay as the brief gives them.
+2026-11-22 and are under "Answered"; 9 and 41 fell away with his answer to 7 and were not asked; 37 was answered twice
+that day, and "Start empty" replaced "Adopt at first touch". **Of decisions 1 to 40 only 21a is open**: a point under
+decision 21, asked when move 6 opens. 14a, 14b and 34a were answered later the same day and are under "Answered", and
+so are the points under decisions 8 and 14 and the check of who may change a row or a group. 24 stands on his earlier
+infra answer, I8 ("Close sign-up; I add accounts", 2026-11-19), and was not asked again: it is not open. Decisions 42
+to 56 and 60 to 62 are asked each when its move opens, as he chose on 2026-11-22. The numbers of the others stay as the
+brief gives them.
 
-One point the brief leaves open, under decision 8, not numbered and not yet asked: when Ana undoes a group after Dana
-changed one of its rows, the screen says "Row 14 was changed by Dana and stays". A group's undo names no `seen`, so the
-undo can be taken from a screen that has not received Dana's act, and the sentence can only follow the undo. Whether the
-screen also warns before the undo, when it already holds a later decision on one of the group's rows, is his to decide.
+**Several people on one import are no longer asked about.** Since his standing answer of 2026-11-22 ("Keep it, stop
+asking me", under "Answered"), a question about several people at once, a screen that is behind, or two decisions
+meeting is not put to him: it is decided by the rule "a press from a screen that is behind is never silently dropped or
+applied, it is held and shown", when its move opens, and added to the list "Decided by the rule, for him to overrule"
+(under "Answered"). None of decisions 42 to 62 is of that kind: what a page shows, which vendor, which key and the rest
+stay his questions.
 
-A second unnumbered point, under decision 14, not yet asked: a decision someone makes on a rival after the keep wins
-over the keep (14a), and a clash is shown when that would import both rows with one SKU. Whether an accept made on a
-rival after the keep counts as such a decision, or leaves the rival out as one made before the keep does ("As today,
-never overwrite a choice"), is his to decide.
+One unnumbered point, not a decision of 1 to 40, stays his: every push to `main` that passes CI deploys a `staging`
+stage by itself (the architecture's "releases and deploys"). Whether a staging deploy is one he keeps, or is wiped like
+a preview's, is his to decide. Not answered. What he has said so far, on 2026-11-22: "We can always tear down &
+redeploy from scratch."
 
-A third unnumbered point, not yet asked: whether our check that each decision recording on a row or a group states the
-three rules on who may change it (`missingRules`) stands beside his answer "no hand-written assertions". It was removed
-with the hand-written lists and restored on the build's branch, by the build's own report, without asking him.
-
-A fourth unnumbered point, under decision 37, not yet asked: his answer "Adopt at first touch" stands; open is how
-stored rows are adopted. The option was put to him as an `Adopt…` command, and the pin has a second way. By a command
-of the model: its rewritten rules (`NothingIsWrittenBeforeConfirm`, and decision 25's `ANewDayStartsAtOne` and
-`WithinADayTheCountRisesByOne`) are proved again with adoption, and it states the three rules on who may change a row
-or a group. By the library's `import` of events already decided: no rule is rewritten, but no proved rule says a state
-so reached keeps the aggregates' rules, and the change numbers that tie an import's events to its rows' are checked by
-no rule. The brief's decision 37 gives both; no move depends on either.
-
-A fifth unnumbered point, not yet asked: since his answer of 2026-11-22 that adoption and the rule against renames bind
-only from the first deploy he keeps, every push to `main` that passes CI deploys a `staging` stage by itself (the
-architecture's "releases and deploys"). Whether a staging deploy is one he keeps, or is wiped like a preview's, is his
-to decide.
+A second point rests on it, at move 7: `Usage` moves from Durable Objects onto an empty store on Effect Cluster's pool,
+and meets the day's count the new model itself wrote since move 2. Decision 37 asked only about rows the current app
+has stored, so it does not settle this. While no deploy he keeps holds counts, move 7 is a fresh start; otherwise
+whether the day's count is carried across or starts again is his, asked when move 7 opens.
 
 | # | Question | Recommended in the brief | Changes | Where it is argued |
 | --- | --- | --- | --- | --- |
@@ -186,7 +175,10 @@ him.
 ### 2026-11-22 — decisions 1, 2, 3 and 6 of the brief
 
 Asked by dialog from the brief as it stood. Each question and its options are the brief's. Of each: I chose; the agent
-recommended the same. Reverse each: a new decision by him.
+recommended the same. Of 2, 3 and 6, which are about several people at once or a screen that is behind: he picked the
+recommended option, later the same day said he had not had the picture of who Ana, Dana and Carl were, and they stand as
+consequences of the rule he then chose (the entry "several people on one import: the standing rule", below). Reverse
+each: a new decision by him.
 
 | # | Question | Options, the recommended one first | Answer |
 | --- | --- | --- | --- |
@@ -206,8 +198,10 @@ put to him with decision 7.
 ### 2026-11-22 — decisions 4, 13, 15 and 16 of the brief
 
 A second round of the same dialog. From this round on, the question and options in each table are the brief's wording,
-and the answer is the label he picked in the dialog. Of each: I chose; the agent recommended the same.
-Reverse each: a new decision by him.
+and the answer is the label he picked in the dialog. Of each: I chose; the agent recommended the same. Of 13, 15 and 16,
+which are about a screen that is behind: he picked the recommended option, later the same day said he had not had the
+picture of who Ana, Dana and Carl were, and they stand as consequences of the rule he then chose (the entry "several
+people on one import: the standing rule", below). Reverse each: a new decision by him.
 
 | # | Question | Options, the recommended one first | Answer |
 | --- | --- | --- | --- |
@@ -246,7 +240,10 @@ after it (the entry "decisions 7 and 8 of the brief, after the one-unit trial").
 
 ### 2026-11-22 — decisions 11, 14, 17 and 19 of the brief
 
-A fourth round of the same dialog. Of each: I chose; the agent recommended the same. Reverse each: a new decision by him.
+A fourth round of the same dialog. Of each: I chose; the agent recommended the same. Of 11 and 14, which are about
+several people at once: he picked the recommended option, later the same day said he had not had the picture of who Ana,
+Dana and Carl were, and they stand as consequences of the rule he then chose (the entry "several people on one import:
+the standing rule", below). Reverse each: a new decision by him.
 
 | # | Question | Options, the recommended one first | Answer |
 | --- | --- | --- | --- |
@@ -307,9 +304,8 @@ Decision 28 was put to him as not run. With decision 32 he was told that his ans
 `CurrentActor` stands, and that the model's is a second declaration of the same name. With decision 39 he was told that
 a removed person's email stays in the events until their organization leaves.
 
-Decision 37 was put to him with adoption by an `Adopt…` command. A second way exists at the pin: a client's `import`
-of events already decided, which runs no decision and to which policies and sagas never react (the brief, decision 37;
-not run). His answer, the outcome "Adopt at first touch", stands; which way is open (under "Open").
+Decision 37 was put to him with adoption by an `Adopt…` command. Its answer, "Adopt at first touch", was replaced later
+the same day by "Start empty" (the entry "rows already stored: start empty", below); it is no longer the plan.
 
 ### 2026-11-22 — decision 35 of the brief, 57 to 59, and the rest at their move
 
@@ -331,8 +327,10 @@ with his answer to 7. The options he saw for that answer are not on record here.
 ### 2026-11-22 — decisions 7 and 8 of the brief, after the one-unit trial
 
 Asked again by dialog once the one-unit design had run (trials 15 to 17 of the trial page). Of each: I chose; the agent
-recommended the same. The recommendation for 7 had been one act per row before the trial and changed with it. Reverse
-each: a new decision by him.
+recommended the same. Both are about several people at once: he picked the recommended option, later the same day said
+he had not had the picture of who Ana, Dana and Carl were, and they stand as consequences of the rule he then chose (the
+entry "several people on one import: the standing rule", below). The recommendation for 7 had been one act per row
+before the trial and changed with it. Reverse each: a new decision by him.
 
 | # | Question | Options, the recommended one first | Answer |
 | --- | --- | --- | --- |
@@ -382,8 +380,10 @@ nothing breaks no rule and fails at least one story.
 
 ### 2026-11-22 — an undo after a group, and an undo behind a group
 
-Asked by dialog after his answers to 7 and 8. Of each: I chose; the agent recommended the same. Reverse each: a new
-decision by him.
+Asked by dialog after his answers to 7 and 8. Of each: I chose; the agent recommended the same. Both are about several
+people at once: he picked the recommended option, later the same day said he had not had the picture of who Ana, Dana
+and Carl were, and they stand as consequences of the rule he then chose (the entry "several people on one import: the
+standing rule", below). Reverse each: a new decision by him.
 
 Question: his answer to decision 11 used the example of Ana leaving 12 rows out in one act, Dana typing a quantity on
 row 14, Ana undoing, then Dana undoing, and he chose "Row 14 is left out again, as Ana had it", before choosing one unit
@@ -407,8 +407,10 @@ Further answers by dialog on the same day. Reverse each: a new decision by him.
 
 - **The pin.** The library's `main` is pinned at `734c27a`, 67 commits past the `dbfd0dd` every trial on the trial page
   ran on; no trial ran on `734c27a`. On it the model he chose is built and merged into main (`0c4c5e5`, not yet on the
-  public remote; 135 rules proved, 7 searched, 11 reached, 47 stories, by the build's own report), and the per-row
-  model on another branch, not in this repository, as the fallback (96 proved, 3 searched, by the build's own report).
+  public remote). Counted in `packages/catalog/model` here: its lock keeps 153 rules, 135 of the kinds a proof covers,
+  7 across instances and 11 "can happen"; 47 stories; 154 mutants. That the 135 are proved, the 7 searched and the 11
+  reached is by the build's own report. The per-row model is on a local branch, not on main or the public remote, as the fallback
+  (96 proved, 3 searched, by the build's own report).
   His
   words: "All I know is I want the latest version of alchemy. We will likely need to update effect & alchemy again
   before Wednesday comes." How often it moves, under decision 1: "In the repo, re-pin only when needed"; one pin's
@@ -418,14 +420,15 @@ Further answers by dialog on the same day. Reverse each: a new decision by him.
   often. Which was recommended is not on record here.
 - **What is kept of what is deployed.** His words: "We can always tear down & redeploy from scratch. The idea is that we
   get our ideal version built. I don't care about anything we've deployed yet we can start from scratch so that we have
-  the best names & things." So the rule that a model, an aggregate or an event is never renamed, and the adoption of
-  rows already stored (decision 37), bind only from the first deploy he keeps.
+  the best names & things." So the rule that a model, an aggregate or an event is never renamed binds only from the
+  first deploy he keeps. Adoption of rows already stored (decision 37) was dropped later the same day: "Start empty".
 - **Names.** Not his answer: proposed, and open until the first hosted deploy he keeps stores an event under them. The
   aggregates are `Import`, `Row` and `Group`, in the model `Catalog` with `CatalogApi`. The trial page's `ImportLife`,
   `RowUnit`, `GroupUnit`, `Review` and `ReviewApi` are these.
 - **A rule that each command can happen.** Question: the library now has `sometimes` rules, which the search answers
-  "reached" or "unreached"; does each command get one, beside the stories? Answer: "Yes, one per command". On the
-  build's branch the eleven are reached, one for each command, by the build's own report; not run on any trial model.
+  "reached" or "unreached"; does each command get one, beside the stories? Answer: "Yes, one per command". On main the
+  lock keeps the eleven, one for each command (counted here); that each is reached is by the build's own report; not
+  run on any trial model.
   Options, as the architecture's record gives them: "Yes, one per command"; "Stories only" (put to him as a search,
   not a proof). Which was recommended is not on record. I chose.
 - **What holds the standing of each rule.** Answer: "The library's lock file": the library's `lock` option records each
@@ -449,13 +452,18 @@ For Wednesday neither the options he saw nor a recommendation is on record; for 
 ### 2026-11-22 — a keep and its rivals, a group taken back over a changed row, waiting acts, and where the search runs
 
 Further answers by dialog on the same day. Of each but 34a: I chose; the agent recommended the same. Of 34a: I chose;
-which was recommended is not on record. Reverse each: a new decision by him.
+which was recommended is not on record. Of the four that are about several people at once (14a, 14b, the group undo
+over a changed row, waiting acts): he picked the recommended option, later the same day said he had not had the
+picture of who Ana, Dana and Carl were, and they stand as consequences of the rule he then chose (the entry "several
+people on one import: the standing rule", below). Reverse each: a new decision by him.
 
 **Deciding a rival** (14a under decision 14). Question: rows 4 and 10 share a SKU; Ana keeps row 4, which leaves row 10
 out by rule; Dana, seeing that, decides row 10 herself anyway; does her decision win over the keep? Options: "Yes, and
 a clash is shown again" (Recommended); "No, the keep holds" (her act refused with "row 4 was kept by Ana"). Answer:
 "Yes, and a clash is shown again": row 10 takes her decision; if that leaves two kept rows with one SKU, the review
-flags the clash again as needing a decision, and neither row imports until someone settles it.
+flags the clash again as needing a decision, and neither row imports until someone settles it. An accepted fix on the
+rival is not such a decision (his later answer "No, row 10 stays out", under "the four answers settled under the
+rule", below).
 
 **Two keeps at once** (14b under decision 14). Question: in the same moment Ana keeps row 4 and Dana keeps row 10,
 neither having seen the other's; as modelled both are taken and both rows end up left out, which neither chose.
@@ -467,8 +475,8 @@ row acts, and the leave-out of both rows was the brief's written rule for `revie
 did not run.
 
 So under decision 14 a decision someone makes on a rival after the keep wins over the keep, with a clash shown when it
-would import both rows with one SKU, and two keeps of one SKU are a clash, not two leave-outs. Whether an accept made
-on a rival after the keep counts as such a decision was not asked and is open ("Open", above). That
+would import both rows with one SKU, and two keeps of one SKU are a clash, not two leave-outs. An accept made on a
+rival after the keep does not count as such a decision (his later answer "No, row 10 stays out"). That
 changes the rule `review` applies to rivals; it is in no model and not run. His later answer, "As today, never
 overwrite a choice" (under "the lock file corrected, a press that changes nothing, a keep after an earlier decision, a
 waiting undo" below), is of the other order, a rival decided before the keep: one whose decision made before the keep
@@ -502,8 +510,10 @@ Two notes:
 
 ### 2026-11-22 — the lock file corrected, a press that changes nothing, a keep after an earlier decision, a waiting undo
 
-Further answers by dialog on the same day. Of each: I chose; the agent recommended the same. Reverse each: a new
-decision by him.
+Further answers by dialog on the same day. Of each: I chose; the agent recommended the same. Of the three that are about
+several people at once (the press that changed nothing, the keep after an earlier decision, the waiting undo): he picked the recommended option, later the same day said he had not had the
+picture of who Ana, Dana and Carl were, and they stand as consequences of the rule he then chose (the entry "several
+people on one import: the standing rule", below). Reverse each: a new decision by him.
 
 **Lock file.** A correction of his answer "The library's lock file" (under "the pin, the names, and what holds the
 rules' standing" above), which stays recorded as it was. Question: he had chosen the library's lock file to hold each
@@ -513,8 +523,7 @@ of rule names. Options: "Lock plus the library's proved list" (Recommended); "Lo
 Answer: "Lock plus the library's proved list": the lock catches a rule removed or reworded; `require.proved` fails the
 build when a named rule is no longer proved; no hand-written assertions.
 
-What follows from it, as the library at the pin and the build's branch show it (the branch's figures by the build's own
-report):
+What follows from it, as the library at the pin and the model on main show it:
 
 - The lock and `require` are options of Verify's reports only: `Verify.report` and `Verify.model` over a model, and
   `Verify.aggregate`. `Prove.report` (an aggregate) and `Prove.decisionReport` (a decision) take the source file, and
@@ -527,15 +536,17 @@ report):
   are is not checked there: in `bun run check` a rule that slips is caught by the report itself, and a rule taken out of
   a decision or renamed is not caught; the lock catches it, in `check:full`, CI's `proofs` job and the nightly run. The
   lists of rule names written by hand (`packages/catalog/model/test/rules.ts`) are on the per-row model's branch only,
-  which is not in this repository.
+  a local branch, not on main or the public remote.
 - The lock acts in `check:full`, CI's `proofs` job and the nightly run, where `Catalog.verify.test.ts` runs
   `Verify.report` over `Catalog` with `lock: "./Catalog.lock.json"` and fails on a rule the lock holds differently or a
-  rule relocked. On the build's branch as it stands, that test passes `require.proved`, with every rule the lock keeps
-  of the kinds a proof covers (135, by the build's own report), in place of the assertion by kind it had before.
+  rule relocked. On main that test passes `require.proved` with every rule the lock keeps of the kinds a proof covers:
+  135 (114 transitions, 19 invariants, 2 relations, counted in `Catalog.lock.json` here), in place of the assertion by
+  kind it had before.
 - The check that every decision recording on a row or a group states that aggregate's three rules on who may change
-  it: on the build's branch each of the four decision proofs calls `missingRules`, which fails, naming the decision,
-  when one leaves out the three rules, by the build's own report. It was removed with the hand-written lists and then
-  restored; his answer did not name it (under "Open").
+  it: on main each of the four decision proofs calls `missingRules` (`packages/catalog/model/test/proving.ts`), which
+  fails, naming the decision, when one leaves out the three rules. It was removed with the hand-written lists and then
+  restored; his answer did not name it, and he was asked later the same day: "Keep it, named as ours" (under "the four
+  answers settled under the rule", below).
 
 **Press that changed nothing.** Question: Ana's group leaves 12 rows out; Dana presses something on row 14 that changes
 nothing, because the row already reads that way through the group; Ana undoes her group; as written, row 14 stays left
@@ -553,17 +564,17 @@ older matching is refused and held, not answered no change"), each shown by its 
 proves: with the exit put back ahead of the check of what the sender saw, every rule is still proved and both stories
 fail; with it moved between the two checks, every rule is still proved and only the matching story fails. On
 `review15` the row's act has 284 paths and 135 rules are proved, with 46 stories. No rule checks what the sender says.
-On the build's branch `Deciding.decision.ts` has the same exit, taken after the checks of the decision the sender saw
-and of the matching, by the build's own report; as read, that branch has the saw story but not the matching story, nor
-a mutant that puts the exit between the two checks, and the build is to carry both.
+On main `Deciding.decision.ts` has the same exit, taken after the checks of the decision the sender saw and of the
+matching. Main has the saw story (Carl's, in `test/Group.story.test.ts`) and its mutant (`row-covered-early`), but not
+the matching story, nor a mutant that puts the exit between the two checks; both are still to add.
 
 **Keep vs earlier** (decision 14a's other order, under decision 14). Question: row 10 already had a decision before Ana
 keeps row 4: does the keep leave it out? Options: "As today, never overwrite a choice" (Recommended); "Any earlier
 decision is a clash". Answer: "As today, never overwrite a choice": a rival whose decision was only accepted fixes, by a
 person or by a group, is left out by the keep, as today; a rival someone deliberately kept or edited is not overwritten:
 the clash is shown, naming both people, and neither row imports until it is settled. It is the other order from 14a
-above, a rival decided before the keep, and leaves 14a as it was for a decision made after the keep; whether an
-accept made on a rival after the keep counts there stays open ("Open", above). It changes the rule `review` applies
+above, a rival decided before the keep, and leaves 14a as it was for a decision made after the keep; an accept made on
+a rival after the keep does not count there ("No, row 10 stays out", below). It changes the rule `review` applies
 to rivals (decision 14 of the brief has the three cases). In no model and not run.
 
 **Waiting undo.** Question: when a colleague's group lands, what happens to a waiting undo on a row the group does not
@@ -571,3 +582,96 @@ touch? Options: "Sent again by itself" (Recommended); "Ask to press undo again".
 undo on a row the group touched is held and shown. So his earlier "Yes, refuse and show" for an undo behind a group
 (under "an undo after a group, and an undo behind a group" above) asks the person to press undo again only on a row the
 group touched. Not run.
+
+### 2026-11-22 — rows already stored: start empty
+
+This replaces decision 37's answer. His words, the same day: "Who is Carl, Dana & Ana I'm not sure who these 'people'
+are so I've been hitting recommended answers this whole time. Is this somehow related to existing data or something?
+This can all be thrown away as far as I'm concerned if so." Earlier that day he had said: "We can always tear down &
+redeploy from scratch... I don't care about anything we've deployed yet we can start from scratch so that we have the
+best names & things."
+
+Question: "Rows the current app has already stored (imports, items, organizations): should the new model carry them
+over, or start with nothing? Nothing is deployed anywhere, so today that data exists only in local development
+databases." Options: "Start empty (Recommended)": no carry-over is built; a fresh database starts on the new model;
+local development data is reset. "Carry it over". Answer: "Start empty (Recommended)". I chose; the agent recommended
+the same.
+
+What it replaces, kept as history. Decision 37 was answered first "Adopt at first touch" (under "decisions 28, 32, 33
+and 36 to 40" above). He was then asked which mechanism adopts stored data, and picked "The library's import
+(Recommended)"; the other options were "An Adopt command, proved" and "Try both in move 3, then ask". "Start empty"
+replaced both answers the same day. Neither is the plan.
+
+What it means: the new model's migrations create its tables on an empty database; the seeds (the test accounts, the
+seeded organization's reference data) are written for the new model; local development data is reset with
+`bun run db:reset`; no carry-over code or test exists. No `Adopt…` command, no rewritten rule for adoption, no use of the
+library's `import` for it. Reverse: a new decision by him, before the first deploy he keeps holds data.
+
+### 2026-11-22 — several people on one import: the standing rule
+
+Question: "Several people reviewing the same import at the same time is what most of my recent questions were about,
+and what the Alchemy model proves rules for. How much of that do you want?" Options: "Keep it, stop asking me
+(Recommended)": what is built and proved stays; for remaining edge cases one rule is applied without asking him: a
+press from a screen that is behind is never silently dropped or applied, it is held and shown; what was decided that
+way is listed so he can overrule any of it; the answers he already clicked stand as that rule's consequences. "One
+person at a time". "Keep it, walk me through it". Answer: "Keep it, stop asking me (Recommended)". I chose; the agent
+recommended the same.
+
+His standing decision. The rule: "a press from a screen that is behind is never silently dropped or applied, it is held
+and shown". What is built and proved stays. Every edge case among several people from now on is settled by it without
+asking him, and listed under "Decided by the rule, for him to overrule", below. His earlier answers of 2026-11-22 of
+that kind stand as the rule's consequences: each entry above says so. Questions of another kind (what a page shows, who
+founds an organization, which vendor, which key) are still his. Reverse: a new decision by him, or any line of the list
+overruled.
+
+### 2026-11-22 — the four answers settled under the rule
+
+Asked by dialog the same day. Of each: I chose; the agent recommended the same. The first three are about several
+people at once: of each, he picked the recommended option, later the same day said he had not had the picture of who
+Ana, Dana and Carl were, and they stand as consequences of the rule he then chose. The fourth is not about several
+people. Reverse each: a new decision by him.
+
+**A stale press that matches what the row holds** (found while building the model). Question: "Carl's screen is behind:
+Dana undid her last decision on row 14, so the row again holds her earlier fix F1 and Ana's group covers it. Carl, not
+having seen the undo, presses F1 on the row. The model answers 'no change' and drops the press. Should a stale press
+that happens to match what the row holds be dropped or held?" Options: "Hold it when behind (Recommended)": the early
+'no change' is given only when the sender has seen the row's latest decision, or the row's own decision is newer than
+the last group; otherwise the press is refused and shown. "Keep 'no change' as decided". Answer: "Hold it when behind
+(Recommended)". It narrows his answer of 2026-11-19, "Answer says 'no change'", as the model read it ("no change,
+whoever decided it and whether or not the sender has seen it"), for this one case. Not built on main: there `Deciding`
+answers a press its sender says no group covers "no change" when the text is what the row holds, before the check of
+what the sender saw, so Carl's press is still dropped. Not in the trial model `review15`; no trial numbers.
+
+**A warning before a group's undo** (under decision 8). Question: "Ana is about to undo her group. Her screen already
+holds a later decision by Dana on row 14 of that group, which the undo will leave in place. Does the screen warn Ana
+before the undo, or only say so after?" Options: "Say it after only (Recommended)"; "Warn before, when known". Answer:
+"Say it after only (Recommended)". The screen says "Row 14 was changed by Dana and stays" once the undo has landed, and
+gives no warning before. Not run.
+
+**An accepted fix on a rival after a keep** (under decision 14). Question: "Ana keeps row 4 of two rows sharing a SKU,
+which leaves rival row 10 out. Afterwards someone accepts a suggested fix on row 10 (not a deliberate keep or edit).
+Does that accept count as a decision that wins over the keep?" Options: "No, row 10 stays out (Recommended)": an
+accepted fix on a rival is treated the same whenever it was made; only a deliberate keep or edit after the keep wins
+over it and shows the clash. "Yes, it wins and clashes". Answer: "No, row 10 stays out (Recommended)". In no model and
+not run.
+
+**Our check of whose act a decision records.** Question: "You answered 'no hand-written assertions' ... One check of
+ours remains, restored without asking you: each decision that records on a row or group must state the three
+who-may-change rules. Does it stay?" Options: "Keep it, named as ours (Recommended)"; "Remove it". Answer: "Keep it,
+named as ours (Recommended)". I chose; the agent recommended the same. So "no hand-written assertions" means no
+hand-written list of rule names or standings; this one check, `missingRules` in `packages/catalog/model/test/proving.ts`,
+called by each of the four decision proofs on main, is kept and named as ours.
+
+### Decided by the rule, for him to overrule
+
+Each edge case among several people that the rule "a press from a screen that is behind is never silently dropped or
+applied, it is held and shown" settles, one line each: the case; what the rule gives; where it is built or will be.
+Overrule any line by saying so.
+
+- A stale press whose text matches what the row holds, from a screen that missed the row's latest decision, on a row
+  whose own decision is not newer than the last group; refused and held with both, not answered "no change"; to build
+  in `Deciding` (`packages/catalog/model/src/Review/Deciding.decision.ts`), with a story, in move 1's remaining work.
+- A group's undo while the undoer's screen holds a later decision on one of its rows; no warning before, the screen
+  names the row after the undo lands ("Row 14 was changed by Dana and stays"); the Review step's screen, move 3.
+- A suggested fix accepted on a rival row after a keep; the rival stays out, as an accept made before the keep; only a
+  deliberate keep or edit after the keep wins and shows the clash; `review`'s rule for rivals, move 3.

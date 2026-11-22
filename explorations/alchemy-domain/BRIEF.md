@@ -1,7 +1,7 @@
 ---
 type: Brief
 title: "Brief: the app on @alchemy.run/domain"
-description: How inventory-import uses all of @alchemy.run/domain and the extras Benjamin asked for. The saving of review decisions is modelled first, in the shape he chose, an import, its rows and its groups as three aggregates with four decisions and eleven commands over the app's fifteen fields, and on the library's dbfd0dd Verify proves its 135 rules and checks seven more across instances, the proofs covering what must never happen and 46 stories that each valid act is taken; then one table of every concept with its worked instance, its move and a check that fails without it; then the decisions that are his, one decision each, most consequential first, with what one large import costs under his answers. The library pinned at 734c27a is on main; the review's model is built on it and merged into main (0c4c5e5, not yet on the public remote; by the build's own report 135 rules proved, 7 searched, 11 reached and 47 stories); the rest of the build starts when he signs.
+description: How inventory-import uses all of @alchemy.run/domain and the extras Benjamin asked for. The saving of review decisions is modelled first, in the shape he chose, an import, its rows and its groups as three aggregates with four decisions and eleven commands over the app's fifteen fields, and on the library's dbfd0dd Verify proves its 135 rules and checks seven more across instances, the proofs covering what must never happen and 46 stories that each valid act is taken; then one table of every concept with its worked instance, its move and a check that fails without it; then the decisions that are his, one decision each, most consequential first, with what one large import costs under his answers. The library pinned at 734c27a is on main; the review's model is built on it and merged into main (0c4c5e5, not yet on the public remote: its lock keeps 135 rules of the kinds a proof covers, 7 across instances and 11 "can happen", with 47 stories and 154 mutants, counted here; proved, searched and reached by the build's own report); stored rows are not carried over (start empty); the rest of the build starts when he signs.
 ---
 
 # Brief: the app on `@alchemy.run/domain`
@@ -10,6 +10,13 @@ Benjamin, on 2026-11-19: "Not borrow use.", and "if possible find a way to make 
 pull request that adds `Verify`: "I'm particularly excited about this". That reverses the 2026-11-18 decision "core";
 his words are in [CAPTURE.md](CAPTURE.md). Seven rounds of trials stand behind this brief, with their sources and
 reports on [the trial page](research/07-review-decisions-trial.md).
+
+Ana, Dana and Carl, in the examples below, are invented names for people of one organization reviewing the same import
+at the same time: not stored data, not real accounts. The model is for the moment their decisions on the same rows
+meet: it settles, with proofs, what happens then, so no press is lost or applied without being seen. Since his answer of
+2026-11-22 ("Keep it, stop asking me") the edge cases left are settled by one rule, "a press from a screen that is
+behind is never silently dropped or applied, it is held and shown", and listed in [DECISIONS.md](DECISIONS.md) for him
+to overrule.
 
 Three rules shape every recommendation here:
 
@@ -22,8 +29,11 @@ Three rules shape every recommendation here:
 
 Two parts of the build exist. Decision 1's pin is on main (commit `ea95cd0`: the library's `main@734c27a`, its 17
 packages kept as files). The review's model of move 1 is built on that pin and merged into main (`0c4c5e5`, not yet on
-the public remote); its counts are the build's own report, checkable in `packages/catalog/model`. The per-row model,
-kept as the fallback, is on another branch, not in this repository. **The
+the public remote), in `packages/catalog/model`. Counted there: its lock (`test/Catalog.lock.json`) keeps 153 rules,
+135 of the kinds a proof covers (114 transitions, 19 invariants, 2 relations), 7 across instances and 11 "can happen";
+47 stories (34 in `test/Review.story.test.ts`, 13 in `test/Group.story.test.ts`); 154 mutants (`mutants/mutants.json`).
+What only a run of the prover gives (that the 135 are proved, the 7 searched, the 11 reached) is the build's own
+report. The per-row model, kept as the fallback, is on a local branch, not on main or the public remote. **The
 rest of the build starts after Benjamin says the brief matches.** The atoms goal, its other condition, is merged into
 main ([its plan](../../goals/atoms/PLAN.md)), and "today" in this brief is the code on main.
 
@@ -76,10 +86,11 @@ the repository; none ran on `734c27a`, and nothing was deployed. Those builds ar
 week after `main` moves past the commit (decision 1); the builds the trials installed were kept outside the repository
 and are not part of it, so once they are deleted no reader can install them from the registry and run the trials again.
 The repository pins `main@734c27a` (his answer of 2026-11-22). On that pin, with Effect 4.1.5, the model he chose is
-built and merged into main (`0c4c5e5`, not yet on the public remote): 135 rules proved, 7 searched, 11 "can be taken"
-rules reached and 47 stories, by the build's own report, checkable in `packages/catalog/model`. The per-row fallback is
-on another branch, not in this repository: 96 rules proved and 3 searched on the same pin, by the build's own report,
-which cannot be checked here.
+built and merged into main (`0c4c5e5`, not yet on the public remote): 135 rules proved, 7 searched and 11 "can be
+taken" rules reached, by the build's own report, the same counts its lock keeps; 47 stories and 154 mutants, counted in
+`packages/catalog/model`. The per-row fallback is
+on a local branch, not on main or the public remote: 96 rules proved and 3 searched on the same pin, by the build's own report,
+which is not checked from main.
 
 - **The model he chose is proved: 135 rules** (`review15`, the trial page's seventh round). Three aggregates (an import,
   a row, a group), four decisions (a row's act and its undo, a group's act and its undo) and eleven commands, with the
@@ -89,7 +100,7 @@ which cannot be checked here.
   act is one change, recorded on the import and the group or on neither, whatever its size; only the last group still in
   force is taken back, so undo walks back; a row's act and a row's undo each name the import's last group act. The model
   he did not choose, trial 13's one act per row sent by a saga with the import counting its rows (`review11`, 93 rules
-  proved and 1 relation checked, on `dbfd0dd`), stays on its own branch, not in this repository, as the fallback (his
+  proved and 1 relation checked, on `dbfd0dd`), stays on a local branch, not on main or the public remote, as the fallback (his
   answer "Chosen design, parked one as fallback"). There, on `734c27a`, it gives 96 rules proved and 3 searched, by the
   build's own report: the same rules, with its three on who may change a row stated on each of its two decisions instead
   of on the row (three fewer on the row, six more on the decisions), and the relation and the two rules across every
@@ -191,16 +202,16 @@ label of one press; a group act is one change under its step, and a step decides
 rules that read who is acting are stated on the decisions, not on the row and the group, because the library types an
 aggregate's rule with the context its own commands provide and those two have none. So every decision that records on a
 row or a group states that aggregate's three rules on who may change it itself: without them nothing checks who that
-decision acts as. Adoption (decision 37, its mechanism open) adds none if it imports events already decided, and must
-state them if it is a command of the model. On the build's branch each of the four decision proofs calls `missingRules`,
-which fails, naming the decision, when one leaves out the three rules, by the build's own report. It was removed with
-the hand-written lists and then restored. `review14` has no error under a strict type-check, with no cast, nor has
+decision acts as. On main each of the four decision proofs calls `missingRules` (`test/proving.ts`), which fails,
+naming the decision, when one leaves out the three rules. It was removed with the hand-written lists and then restored;
+his answer of 2026-11-22, "Keep it, named as ours", keeps it as our check: "no hand-written assertions" means no
+hand-written list of rule names or standings. `review14` has no error under a strict type-check, with no cast, nor has
 `review15` with its stories. Under the repository's profile as it was then (effect-tsgo 0.70.0, Effect 4.1.4; not run
 again under main's 0.73.2 and Effect 4.1.5) it had 133 Effect diagnostics and no type error: 73 `newSchemaClass`
 (decision 33's answer keeps `new` in the files that hold a `decide`), 32 `effectFnOpportunity`, 26 `preferEffectArray`,
 1 `missingPipeableSignature` and 1 `schemaClassMissingBrand`. Its functions are written `(p) => Effect.gen(...)`,
-because written `Effect.fn(function* (p) ...)` their parameters were typed `any`. The build's branch writes the import
-and the four decisions with `Effect.fn`, and its counts above, by the build's own report, are of that form on `734c27a`.
+because written `Effect.fn(function* (p) ...)` their parameters were typed `any`. The model on main writes the import
+and the four decisions with `Effect.fn`, and its counts above are of that form on `734c27a`.
 
 - **A row's act names the decision it saw on its row**, by the change that recorded it, the matching it was made on,
   whatever it decides, how many times the import had been confirmed (its opening), and the import's last group act as
@@ -223,10 +234,18 @@ and the four decisions with `Effect.fn`, and its counts above, by the build's ow
   shown by its own mutant, which the prover still proves: with the exit put back ahead of the check of `saw`, every rule
   is still proved and both stories fail; with it moved between the two checks, every rule is still proved and only the
   matching story fails. The trial model `review15` makes that change; `review14` does not have it. No rule checks what
-  the sender says. On the build's branch `Deciding.decision.ts` takes the `asItReads` exit only after the checks of
-  `saw` and of the matching, with the saw story and a mutant that puts the exit ahead of the check of `saw`, by the
-  build's own report; as read, it has neither the matching story nor a mutant that puts the exit between the two
-  checks, and the build is to carry both.
+  the sender says. On main `Deciding.decision.ts` takes the `asItReads` exit only after the checks of `saw` and of the
+  matching, with the saw story (Carl's, in `test/Group.story.test.ts`) and the mutant `row-covered-early`, which puts
+  the exit ahead of the check of `saw`; it has neither the matching story nor a mutant that puts the exit between the
+  two checks, and both are still to add.
+- **A stale press that matches what the row holds is held, not dropped** (his answer of 2026-11-22, "Hold it when
+  behind"). Dana undoes her last decision on row 14, so the row holds her earlier fix F1 again, under Ana's group. Carl,
+  whose screen has not received the undo, presses F1. On his screen no group covers the row, so he sends `covered:
+  false`, and the text is what the row holds. The early "no change" is given only when the sender has seen the row's
+  latest decision, or the row's own decision is newer than the last group; otherwise the press is refused and shown.
+  This narrows his answer of 2026-11-19, as the model read it ("no change, whoever decided it and whether or not the
+  sender has seen it"), for this one case. Not built on main: there `Deciding` answers the uncovered "no change" before
+  the check of `saw`, so Carl's press is still dropped. Not in `review15`; no trial numbers.
 - **A match says every field's column after it**, the headings' own choices and "none, on purpose" included, because
   giving a column to one field can move what another reads. It names the last match its sender saw, and is refused on
   another. The same columns again, by heading or by hand, record nothing and take nothing back. The import's events hold
@@ -258,8 +277,9 @@ and the four decisions with `Effect.fn`, and its counts above, by the build's ow
   group in force refuses it, not a row's act made since. So Ana's undo is taken from a screen that may not have received
   Dana's act on row 14, and the screen can say "Row 14 was changed by Dana and stays" only once the undo has landed and
   the act is received, counting the rows that changed; the import's event for the undo (`GroupCounted`) counts the
-  group's rows, row 14 among them. Whether the screen also warns before the undo, when it already holds a later decision
-  on one of the group's rows, is open (DECISIONS.md, "Open"). Not run.
+  group's rows, row 14 among them. The screen says it after only, with no warning before, even when it already holds a
+  later decision on one of the group's rows (his answer of 2026-11-22, "Say it after only", settled under the rule for
+  several people at once). Not run.
 - **A take-back is of everything in force**, from the result or while the import is open again, as today: the items its
   confirms created, removed or kept, and the items they replaced, put back or kept.
 - **A row's undo names the change it takes back, the import's last group act (`sawGroup`), and brings what goes under
@@ -305,16 +325,18 @@ so on stale screens it takes undos the model refuses; confirm, reopen, matching,
 organizations were not generated; nor three people, two tabs of one person, or today's draft machine with its saves in
 flight; the values come from small alphabets; and it says nothing of the model's proofs.
 
-On the build's branch, by the build's own report, the same reading runs on the model's own code
-(`packages/catalog/web/test/ReviewModelFold.fold.test.ts`, the `fold` task in `check:full`): the review region's presses
+On main the same reading runs on the model's own code
+(`packages/catalog/web/test/ReviewModelFold.fold.test.ts`, the `fold` task in `check:full`; its results by the build's
+own report): the review region's presses
 sent to `Catalog` in memory, for one person and for two on live screens, with a row's undo naming the last group act
 (`sawGroup`), and the case "row 14 stays whole"; stale screens, the queue and a second tab are not in it.
 
 **Every rule, what it is proved of, and what holds the rest** (`Verify.model` of the trial's `Review` on `review15`, the
 model of his answers: 135 rules proved, in 148 s at loads of 35 to 55; on `review14`, before the no-change
 answer, 135 in 110 s at about 28, and in 128 s at about 31 in a first run; the seven rules across instances by
-`Verify.model` of its `ReviewInvariants`). The names are the build's, which its lock file keeps: the rules are the same
-on both, and the build's branch gives the same 135 proved and 7 searched on `734c27a`, by the build's own report. Where
+`Verify.model` of its `ReviewInvariants`). The names are the build's, which its lock file on main keeps: the rules are
+the same on both, the lock holds the same 135 and 7 (counted here), and the build gives them proved and searched on
+`734c27a`, by its own report. Where
 a name starts with ".", it is of the block named before it in the same cell:
 
 | Rule, in words | Name | Standing | Proved of | What holds the rest |
@@ -554,13 +576,13 @@ command whose text is the row's decision and whose label is stored, so `Action` 
 ### His answers, carried into the model
 
 His answers given by dialog on saving the review, built in today's code, each with what the model holds and what stays
-tested. "Proved" names rules, under the build's names, that `review15`'s report prints as proved and the build's branch
+tested. "Proved" names rules, under the build's names, that `review15`'s report prints as proved and the model on main
 proves on `734c27a` by the build's own report; a blank means no rule of this model holds the answer. The options he
 rejected are in [DECISIONS.md](DECISIONS.md).
 
 | Answer (date) | In the model | Proved | Tested |
 | --- | --- | --- | --- |
-| "Answer says 'no change'" (2026-11-19), rows somebody else had just decided the same way among its cases | A row's act that leaves the row as it is records nothing, whoever made what is there; its receipt has no events. Only when the sender says the row is not covered by a group (`covered`), or that the act leaves the row reading as it reads through its groups (`asItReads`, his answer of 2026-11-22, "No change, Ana's undo applies"; in the trial model `review15`); no rule checks either; a group act is recorded whole. What that means for the second person is decision 3 | `DecideRow.AnActThatChangesNothingLeavesTheImport`, `.AnActThatChangesNothingLeavesTheRow` | That the screen reads an empty receipt as "no change"; that it sets `covered` and `asItReads` truly and leaves out of a group the rows that already hold what it gives: not run |
+| "Answer says 'no change'" (2026-11-19), rows somebody else had just decided the same way among its cases | A row's act that leaves the row as it is records nothing, whoever made what is there; its receipt has no events. From a screen that missed the row's latest decision, on a row whose own decision is not newer than the last group, it is refused and held instead (his answer of 2026-11-22, "Hold it when behind"; not built on main). Only when the sender says the row is not covered by a group (`covered`), or that the act leaves the row reading as it reads through its groups (`asItReads`, his answer of 2026-11-22, "No change, Ana's undo applies"; in the trial model `review15`); no rule checks either; a group act is recorded whole. What that means for the second person is decision 3 | `DecideRow.AnActThatChangesNothingLeavesTheImport`, `.AnActThatChangesNothingLeavesTheRow` | That the screen reads an empty receipt as "no change"; that it sets `covered` and `asItReads` truly and leaves out of a group the rows that already hold what it gives: not run |
 | "Refuse, show, confirm again" (2026-11-19): nothing is confirmed that was not on screen | The confirm names every change its screen received, the change its plan was built at, and what its button said. A group act is one numbered change, so no group is ever being sent and a confirm that has not received one is refused | `Import.AConfirmNamesEveryChange`, `.APlanIsOfEveryChange`, `.APlanDoesWhatWasShown` | The screen's and the handler's halves, a last change that is a group act included |
 | "Keep them and send them" (2026-11-20) | The queue of acts, with command ids, kept through a reload | | The fold's property test: every act is in the events or in the queue. Not run on this model |
 | "Name the rows, then drop them" (2026-11-20) | Nothing is decided on a closed import, nor after a reopen by an act, an undo, a group or a group's undo made before the confirm (decision 13) | `DecideRow.ARowIsDecidedOnlyOnAnOpenImport`, `.AnActIsOfThisOpening`; `UndoRowStep.AnUndoIsOfThisOpening`; `DecideGroup.AGroupIsDecidedOnlyOnAnOpenImport`, `.AGroupIsOfThisOpening`; `UndoGroup.AGroupsUndoIsOfThisOpening` | The Result step names the left-over acts |
@@ -573,7 +595,7 @@ rejected are in [DECISIONS.md](DECISIONS.md).
 | "Each tab keeps its own" (2026-11-20); a discarded tab counts as gone and says so; "Keep both, she picks" for a refused row beside a closed tab's (2026-11-21) | One queue a tab, taken up only from a tab that is gone; a command id answers its first receipt whichever tab sends it | | The queue's test with two tabs |
 | "Wait until she picks", "Wait, like a held row" (2026-11-21) | Confirm is sent only when no act is held or marked not saved | | The screen's half of the confirm |
 | "Take it back, say so" for a Replace on an import matched before moves were kept (2026-11-21) | Such a decision that arrives after the re-match is out of force and named, by the reader | | The reader's test; not run |
-| "Leave as made" (2026-11-22) for a Replace or Keep-stored already saved on such an import, its field not matched again | Adoption (decision 37) carries it as made; the next match of that same field takes it back and names it, a match of another field leaves it | | Adoption's test; not run. Adoption binds only from the first deploy he keeps |
+| "Leave as made" (2026-11-22) for a Replace or Keep-stored already saved on such an import, its field not matched again | Nothing: no stored decision is carried into the model (decision 37, "Start empty"), so every import on the model is matched after moves are kept. The answer holds for today's app, as built | | Today's tests |
 | "Yes, everyone" (2026-11-21): what a match took back is shown to newcomers until each dismisses it | `DraftRows` writes it with the match, in rows the first read returns | | A slow test; not run |
 
 ### Every single thing
@@ -584,13 +606,13 @@ check ran in a trial named on the trial page.
 
 | Concept | Worked instance | Move | Fails when missing |
 | --- | --- | --- | --- |
-| Model | `Catalog`, `Access`, `Usage` | 1, 6, 2 | `Verify.report` of each, the library's lock file keeping every rule's text and `require.proved` naming every rule that must be proved (his answer of 2026-11-22, "Lock plus the library's proved list"). The trials ran `Review` (`review14`, then `review15`) and `Access`; the build's branch runs `Catalog` on `734c27a` with the lock and `require.proved` (135 proved, 7 searched, 11 reached, by the build's own report); `Usage` not run |
-| Command, event, rejection | `DecideRow`, `RowDecided`, `GroupedSince`; `DecideGroup`, `GroupDecided`, `GroupedAfter`; `ConfirmImport`, `ImportConfirmed`, `ReviewMovedOn` | 1 | A story for each of the eleven commands accepted and for each refusal, each failing on a model whose `decide` records nothing for that command (on `review14` each mutant that records nothing fails stories); a "can happen" rule (`sometimes`) for each command, answered "reached": eleven reached on the build's branch (`Catalog.verify.test.ts`), by the build's own report; not run on any trial model |
-| Aggregate | `Import`, `Row`, `Group`, `Item`, `Allowance`, `Organization`, `Member` | 1, 4, 2, 6 | Each one's Verify test, with a mutant beside each check that must break its rule or fail a story. The mutants ran on the review's model only (`review14`, 148, before the no-change answer; `review15`, the three of its change; the build's branch has 154 mutants (the trial's 148 and six for the new checks), a sample in `check:full` and all nightly, by the build's own report); for `Item`, `Allowance`, `Organization` and `Member`: not run |
+| Model | `Catalog`, `Access`, `Usage` | 1, 6, 2 | `Verify.report` of each, the library's lock file keeping every rule's text and `require.proved` naming every rule that must be proved (his answer of 2026-11-22, "Lock plus the library's proved list"). The trials ran `Review` (`review14`, then `review15`) and `Access`; main runs `Catalog` on `734c27a` with the lock and `require.proved` (`Catalog.verify.test.ts`; the lock keeps 135 of the kinds a proof covers, 7 across instances and 11 "can happen", counted here; proved, searched and reached by the build's own report); `Usage` not run |
+| Command, event, rejection | `DecideRow`, `RowDecided`, `GroupedSince`; `DecideGroup`, `GroupDecided`, `GroupedAfter`; `ConfirmImport`, `ImportConfirmed`, `ReviewMovedOn` | 1 | A story for each of the eleven commands accepted and for each refusal, each failing on a model whose `decide` records nothing for that command (on `review14` each mutant that records nothing fails stories); a "can happen" rule (`sometimes`) for each command, answered "reached": eleven on main (`Catalog.verify.test.ts`), each reached by the build's own report; not run on any trial model |
+| Aggregate | `Import`, `Row`, `Group`, `Item`, `Allowance`, `Organization`, `Member` | 1, 4, 2, 6 | Each one's Verify test, with a mutant beside each check that must break its rule or fail a story. The mutants ran on the review's model only (`review14`, 148, before the no-change answer; `review15`, the three of its change; main has 154 mutants, counted in `packages/catalog/model/mutants/mutants.json` (the trial's 148 and six for the new checks), a sample in `check:full` and all nightly, what each run finds by the build's own report); for `Item`, `Allowance`, `Organization` and `Member`: not run |
 | Annotations | A description on every served command, view, stream and query, and on each Api | 1 on | A test that fails on a served declaration with none. Not run |
-| Decision | `Deciding`, `Undoing`, `DecidingGroup`, `UndoingGroup`; `FoundOrganization`, `AddMember`, `ChangeRole`, `RemoveMember` | 1; 6 | `Prove.decisionReport` of each in `bun run check`: every rule its report gives must be proved; which rules exist is the lock's, in `check:full`. On the build's branch each of the four decision proofs calls `missingRules`, which fails, naming the decision, when one leaves out the three rules, by the build's own report. It was removed with the hand-written lists and then restored. The members' four with `MemberEmail` not run |
+| Decision | `Deciding`, `Undoing`, `DecidingGroup`, `UndoingGroup`; `FoundOrganization`, `AddMember`, `ChangeRole`, `RemoveMember` | 1; 6 | `Prove.decisionReport` of each in `bun run check`: every rule its report gives must be proved; which rules exist is the lock's, in `check:full`. On main each of the four decision proofs calls `missingRules`, which fails, naming the decision, when one leaves out the three rules: our check, kept and named as ours (his answer of 2026-11-22, "Keep it, named as ours"). The members' four with `MemberEmail` not run |
 | Relation | `ARowBelongsToItsImportsOrganization`, `AGroupBelongsToItsImportsOrganization` (proved on `review15`); `AMemberWhoIsInIsCounted` (checked, trial 10) | 1; 6 | Each kept by the lock, and each proved one named in `require.proved` |
-| Invariants and transitions | Aggregate invariant `NoMoreInForceThanRows`; aggregate transition `AConfirmNamesEveryChange`; decision transition `ADecisionIsReplacedOnlyByAnActThatSawIt`; the seven model invariants across `Import`, `Row` and `Group`, `TheLastGroupInForceIsInForce` among them; model `eventually` `EveryUploadEnds` | 1, 5 | `Prove.report(Import)` and `Prove.decisionReport(Deciding)` in `bun run check` fail when `NoMoreInForceThanRows`, `AConfirmNamesEveryChange` or `ADecisionIsReplacedOnlyByAnActThatSawIt` is not proved (neither call takes the lock or `require`); one that is absent fails `Verify.report` in `check:full`, whose lock holds each one's text; `Verify.report` in `check:full` names the proved ones in `require.proved` and keeps, in the lock, the text of the seven model invariants (`Catalog.TheLastGroupInForceIsInForce` among them) and of `EveryUploadEnds`, each checked by the search. On the build's branch all but `EveryUploadEnds` run, by the build's own report |
+| Invariants and transitions | Aggregate invariant `NoMoreInForceThanRows`; aggregate transition `AConfirmNamesEveryChange`; decision transition `ADecisionIsReplacedOnlyByAnActThatSawIt`; the seven model invariants across `Import`, `Row` and `Group`, `TheLastGroupInForceIsInForce` among them; model `eventually` `EveryUploadEnds` | 1, 5 | `Prove.report(Import)` and `Prove.decisionReport(Deciding)` in `bun run check` fail when `NoMoreInForceThanRows`, `AConfirmNamesEveryChange` or `ADecisionIsReplacedOnlyByAnActThatSawIt` is not proved (neither call takes the lock or `require`); one that is absent fails `Verify.report` in `check:full`, whose lock holds each one's text; `Verify.report` in `check:full` names the proved ones in `require.proved` and keeps, in the lock, the text of the seven model invariants (`Catalog.TheLastGroupInForceIsInForce` among them) and of `EveryUploadEnds`, each checked by the search. On main the lock keeps all but `EveryUploadEnds` (counted here); their results are the build's own report |
 | Unique values | The email an admin adds a person by (`MemberEmail`); a SKU per organization under decision 17's first option | 6; 4 | A story: two admins add one email, one is refused. Not run; the SKU not run |
 | Deadlines | `ExpireUpload`, scheduled when an upload begins | 5 | A story with the clock moved past the deadline; the `eventually` rule. Not run |
 | Project layout | Blocks in each context's `model` package (decision 32) | 1 | A block Verify cannot read fails its test as "not read". Not run |
@@ -603,7 +625,7 @@ check ran in a trial named on the trial page.
 | Policy | `UploadDeadline`; `SuggestOnAsk`; `MailOnConfirm`; `TellTheChannel`; `EndReadsOnRemoval` | 5; 5; 8; 8; 6 | `Verify.model` runs each behind the others; a story. Not run |
 | Saga | `CreateItems` (decision 17); `SuggestionPass` | 4; 5 | A story on the memory host. Not run |
 | External system | `Suggester`, `Decider`, `Mailer`, `TeamChannel`, `CatalogueHistory` | 5, 8, 8, 8, 10 | Stubbed in stories; each adapter's own test. Not run |
-| Api | `MemberApi` (what a browser may send), `ServerApi` (`ConfirmImport`, what a saga sends; adoption at first touch through the server's own client, its mechanism open, decision 37), `AdminApi` | 2, 3, 6 | A test that `MemberApi` lists none of the server's commands. Not run |
+| Api | `MemberApi` (what a browser may send), `ServerApi` (`ConfirmImport`, what a saga sends), `AdminApi` | 2, 3, 6 | A test that `MemberApi` lists none of the server's commands. Not run |
 | HTTP and OpenAPI | The operator's document over `AdminApi` | 9 | The document lists exactly those calls. Not run |
 | CLI | The operator's command line, `toCli` | 9 | A test runs `--help`. Not run |
 | Agent tools and MCP | The assistant's read tools, `toToolkit`; an MCP server, `toMcp` (decisions 50, 51) | 9 | A test that neither exposes a command that confirms, takes back, edits or changes a role. Not run |
@@ -619,9 +641,9 @@ check ran in a trial named on the trial page.
 | Host on Rivet | **Cannot yet**: no Rivet control plane or pool runs on Cloudflare (decision 57) | | Its question answered |
 | Backfill | `ImportHistory` added in move 5, after imports exist | 5 | An import confirmed before that deploy is in the history after it, on the preview stage. Not run |
 | Observability | `Alchemy.Telemetry.layerOtlp` in the model's Worker | 2 | A test with an in-memory exporter sees a command's span and a `domain.*` metric. Not run |
-| Story | A story for each of the review's eleven commands and each refusal (46 written for `review15`, 47 on the build's branch by the build's own report), five on the item, six on the allowance, three on members | 1 on | A test that lists each model's commands and rejections and fails on one that no story names. Not run |
+| Story | A story for each of the review's eleven commands and each refusal (46 written for `review15`; 47 on main, counted here: 34 in `Review.story.test.ts`, 13 in `Group.story.test.ts`), five on the item, six on the allowance, three on members | 1 on | A test that lists each model's commands and rejections and fails on one that no story names. Not run |
 | Test tooling | Api tests in process; the library's harness with `dev: true` | 2 | The harness test fails without a model's binding. Not run |
-| Verify, Prove, Explore | `Prove.decisionReport` per decision in `bun run check`; for the import's own rules, `Prove.report(Import)` in the same task, which proves its 37 rules for each of its seven commands and leaves `ActCounted` and `GroupCounted` to the decisions (on `review14` the per-rule section of `Verify.aggregate` over the import, `ImportLife` there, gave the same 37 proved, the report itself `NotVerified` because the import folds events only a decision records); `Verify.report` per model in `check:full` and in CI, in its own job and nightly, with no new infrastructure (34a); a rule Verify breaks kept as a story | 1 | The Prove tests fail on any rule not proved; since `Prove` takes no lock and no `require`, which rules there are is held by the lock of `Verify.report`; `Verify.report` keeps every rule's text in the lock file and names the rules that must be proved in `require.proved` (decision 34, his answer "Lock plus the library's proved list"). On the build's branch both run, by the build's own report |
+| Verify, Prove, Explore | `Prove.decisionReport` per decision in `bun run check`; for the import's own rules, `Prove.report(Import)` in the same task, which proves its 37 rules for each of its seven commands and leaves `ActCounted` and `GroupCounted` to the decisions (on `review14` the per-rule section of `Verify.aggregate` over the import, `ImportLife` there, gave the same 37 proved, the report itself `NotVerified` because the import folds events only a decision records); `Verify.report` per model in `check:full` and in CI, in its own job and nightly, with no new infrastructure (34a); a rule Verify breaks kept as a story | 1 | The Prove tests fail on any rule not proved; since `Prove` takes no lock and no `require`, which rules there are is held by the lock of `Verify.report`; `Verify.report` keeps every rule's text in the lock file and names the rules that must be proved in `require.proved` (decision 34, his answer "Lock plus the library's proved list"). On main both are written (the `prove` and `verify` tasks); what they report is the build's own report |
 | The tutorial | Move 1 follows its parts 1 to 3 on this app's nouns | 1 | A test named for each part, which fails while that part's block is absent. Not run |
 | The Cloudflare tutorial | Part 3 is the harness test, part 4 is `alchemy dev`, part 5's pull-request comment is the GitHub provider's `Comment` | 2, 9 | A test named for each part: the harness test, `alchemy dev` answering, the comment read back from a preview's pull request. Part 4 ran; the others not run |
 | Effect Cluster | The pool that hosts `Usage`, its cron and its singleton (decision 28) | 7 | The pool's harness test. Not run |
@@ -693,7 +715,7 @@ The in-memory twins of what a model covers are retired for stories.
 | `importSuggestion` | Unchanged until move 8; then one import's suggestions in its own Drizzle object, with the suggestions of open imports copied in at that deploy | 8 |
 | `member`, `organization` | Written by `MemberRows` under decision 20's first option; unchanged under its second | 6 |
 | `activity` | As decision 36 says | 3, 6 |
-| `modelCall` | Goes under decision 26's first option, with today's count adopted | 2 |
+| `modelCall` | Goes under decision 26's first option; its count is not carried over (decision 37, "Start empty") | 2 |
 
 ### How a stored shape changes
 
@@ -750,9 +772,15 @@ either: with the covered exit ahead of the check of `saw`, or between that check
 The first option of each is the recommendation, with what it rests on. One decision each, most consequential first. Each
 says which earlier answers remove or change its options. Decisions 1 to 40 shape the first moves. Decisions 41 to 62 can
 wait until the move that needs them. Of decisions 1 to 40, all but 9 and 24 are answered (2026-11-22), each with its
-first option; 7 and 8 were answered with trials 15 to 17 before them; 9 and 41 fell away with that answer; 24 stands on
-his earlier infra answer and was not asked again; 21a, a point under 21, is open, to be asked when move 6 opens. Of 41
-to 62, 57 to 59 are accepted as "cannot yet" and the others wait for their move. "Proved" in a question is of the model
+first option but 37, whose first answer, "Adopt at first touch", he replaced the same day with "Start empty"; 7 and 8
+were answered with trials 15 to 17 before them; 9 and 41 fell away with that answer; 24 stands on his earlier infra
+answer and was not asked again; only 21a, a point under 21, is open, to be asked when move 6 opens. Of 41 to 62, 57 to
+59 are accepted as "cannot yet" and the others wait for their move. Since his answer "Keep it, stop asking me"
+(2026-11-22), no question about several people at once, a screen that is behind, or two decisions meeting is put to
+him: the rule "a press from a screen that is behind is never silently dropped or applied, it is held and shown" decides
+it, and DECISIONS.md lists each such case, "Decided by the rule, for him to overrule". The answers of that kind he gave
+on 2026-11-22 stand as that rule's consequences; DECISIONS.md says of each that he picked the recommended option before
+he had the picture of who Ana, Dana and Carl were. "Proved" in a question is of the model
 named beside it, as it ran.
 
 ### 1. How does the app take what exists only on the library's `main`?
@@ -761,7 +789,7 @@ named beside it, as it ran.
 others are kept below as what was rejected. The pin is `main@734c27a`, re-pinned only when needed (his answers of
 2026-11-22), and is on main (`ea95cd0`). Every trial on the trial page ran on `dbfd0dd`. On `734c27a` the model he chose
 is built and merged into main (`0c4c5e5`, not yet on the public remote; 135 proved, 7 searched, 11 reached, by the
-build's own report), and the per-row fallback on another branch, not in this repository (96 proved, 3 searched, by the
+build's own report), and the per-row fallback on a local branch, not on main or the public remote (96 proved, 3 searched, by the
 build's own report).
 
 `Decision`, `Relation`, invariants, transitions, `Verify`, and commands without `target` are not on npm. The library's
@@ -933,7 +961,7 @@ there. Nothing of the second import changed. Today it is confirmed, with other o
 - **As today: it is confirmed, and the result says what it did.**
 
 Beside the first option, not in it: on `review15`, the model of his answers, `Import.APlanDoesWhatWasShown` is proved,
-and on the build's branch at `734c27a` by the build's own report.
+and on main at `734c27a` by the build's own report.
 
 ### 7. How is an act on a group of rows carried?
 
@@ -978,8 +1006,8 @@ groups have up to 9 rows; a large file's can have thousands.
   act, each with its own rules and its own undo, and decision 41 sets the size. Nothing else of it was run.
 
 Beside the first option, not in it: the 123 rules and the six rules across instances are of `review12`; on `review15`,
-the model of his answers, 135 rules are proved and seven checked 3 commands deep, and the build's branch gives 135
-proved and 7 searched on `734c27a`, by the build's own report.
+the model of his answers, 135 rules are proved and seven checked 3 commands deep, and on main at `734c27a`
+the lock keeps the same 135 and 7, proved and searched by the build's own report.
 
 The 214 ms and 95 ms were each the first group act on a fresh import, 20 runs a
 size, on `review12`, before the last-group rule, and were not run again on the model with it; for 6,000 rows the mean
@@ -1106,7 +1134,7 @@ Ana's, who took that back?
 
 Beside the first option, not in it: on `review15`, the model of his answers,
 `UndoRowStep.AnUndoPutsBackTheDecisionThatWasThere` and `.AsTheirsWhoMadeIt` are proved, of a row's own levels, and on
-the build's branch at `734c27a`, by the build's own report.
+main at `734c27a`, by the build's own report.
 
 ### 12. Can an undo reach past a confirm that stands?
 
@@ -1124,8 +1152,8 @@ before the confirm and not imported: after "Fix 45 not imported", the undo of th
 - **Yes: the decision is taken back and the item keeps the value.**
 
 Beside the first option, not in it: on `review15`, the model of his answers,
-`UndoRowStep.AnUndoDoesNotReachPastAConfirm` and `UndoGroup.AGroupsUndoDoesNotReachPastAConfirm` are proved, and on the
-build's branch at `734c27a`, by the build's own report.
+`UndoRowStep.AnUndoDoesNotReachPastAConfirm` and `UndoGroup.AGroupsUndoDoesNotReachPastAConfirm` are proved, and on
+main at `734c27a`, by the build's own report.
 
 ### 13. An act made before a confirm arrives after the import was opened again. Is it taken?
 
@@ -1142,7 +1170,7 @@ or a group made before the confirm.
 
 Beside the first option, not in it: on `review15`, the model of his answers, `DecideRow.AnActIsOfThisOpening`,
 `UndoRowStep.AnUndoIsOfThisOpening`, `Import.AMatchIsOfThisOpening`, `DecideGroup.AGroupIsOfThisOpening` and
-`UndoGroup.AGroupsUndoIsOfThisOpening` are proved, and on the build's branch at `734c27a` by the build's own report;
+`UndoGroup.AGroupsUndoIsOfThisOpening` are proved, and on main at `734c27a` by the build's own report;
 a story: "a match, a group and an undo made before a confirm are not taken after the import is opened again either".
 
 ### 14. What is a keep of one of two rows, when someone decides the other row meanwhile?
@@ -1168,8 +1196,9 @@ SKU and Ana keeping row 4:
   decision, naming Ana and Dana, and neither row imports until it is settled ("As today, never overwrite a choice"). A
   decision someone makes on a rival after the keep wins over the keep (14a, "Yes, and a clash is shown again"): a clash
   is shown only when that would import both rows with one SKU, so if Dana leaves row 10 out after the keep there is no
-  clash and row 4 imports. Whether an accept made on a rival after the keep counts as such a decision, or leaves the
-  rival out as under (a), was not asked: open ([DECISIONS.md](DECISIONS.md), "Open").
+  clash and row 4 imports. A suggested fix accepted on a rival after the keep is not such a decision: the rival stays
+  out, as under (a), whenever the accept was made; only a deliberate keep or edit after the keep wins over it and shows
+  the clash (his answer of 2026-11-22, "No, row 10 stays out", settled under the rule for several people at once).
 - **(c) Two keeps of one SKU: a clash, naming both people.** Ana keeps row 4 and Dana keeps row 10, at once or one after
   the other: both keeps are recorded, the review shows the clash naming both, and neither row imports until it is
   settled ("Both kept, clash shown again").
@@ -1204,7 +1233,7 @@ others are kept below as what was rejected.
 - **As today: the last match wins**, and the accepts of the one before it are taken back.
 
 Beside the first option, not in it: on `review15`, the model of his answers, `Import.AMatchIsMadeOnTheLastOne` is
-proved, and on the build's branch at `734c27a` by the build's own report.
+proved, and on main at `734c27a` by the build's own report.
 
 Beside the second option, not in it: today a match also takes back a Replace, a Keep-stored, a keep of one of two and an
 undone fix on its field, not only accepts.
@@ -1223,7 +1252,7 @@ Today Remove names nothing it saw, and deletes every decision on the import.
 Beside the first option, not in it: under decision 7's answer no group is ever being sent, and the model of his answers
 has no `NothingEndsAReviewWhileAGroupIsSent`. A group act is a numbered change, so a remove whose screen has not
 received one is refused by `Import.TheRestNameEveryChangeToo`, proved on `review14` and, by the build's own report, on
-the build's branch.
+main.
 
 ### 17. Is an item an aggregate whose rules Verify holds?
 
@@ -1380,13 +1409,9 @@ that window.
 - **24 hours after each was used, as today.** The rule is checked, not proved, because the times of the day's calls
   are a list in the state.
 
-The seven proved rules are of trial 9's aggregate, which has one command, `TakeCall`. The count adopted in move 2 and
-in move 7 is adopted at first touch (mechanism open, see DECISIONS.md, "Open"), and is of the calls since 00:00 UTC that
-day under this answer. What it needs either way: if a command of the model sets a day's count, it breaks
-`ANewDayStartsAtOne` and `WithinADayTheCountRisesByOne` as written, and both are rewritten to except adoption and proved
-again with it; if the count is imported as events already decided, by the aggregate client's `import`, no command runs
-and neither rule changes, but no proved rule says the seven hold of a state so reached, and adoption's test checks
-them. Not run.
+The seven proved rules are of trial 9's aggregate, which has one command, `TakeCall`. No count is carried over
+(decision 37, "Start empty"): the allowance starts empty on the model, the first call of a day starts at 1, and
+`ANewDayStartsAtOne` and `WithinADayTheCountRisesByOne` stand as written. Not run.
 
 ### 26. Where does the model-call allowance live?
 
@@ -1411,8 +1436,12 @@ a public `workers.dev` address behind one token, with no option to turn it off.
 - **`Catalog` and `Access` on Durable Objects; `Usage`, the allowance and its view, on the Cluster pool
   (Recommended).** Both hosts are used and the same model runs on three. *Costs:* the gateway, which he would accept
   for production; 2 MiB a persisted value there. *Needs* decision 26's first answer. `Usage` is first hosted on
-  Durable Objects in move 2 and moves in move 7 with an `AdoptDay` per organization carrying the day's count; the
-  classes left on the model's Worker are kept, never renamed or dropped. Not run.
+  Durable Objects in move 2 and moves in move 7 onto an empty store on the pool. That move meets a count the new model
+  itself wrote on Durable Objects since move 2, which decision 37 did not ask about. Move 7 deploys onto an empty pool
+  as a fresh start only while no deploy he keeps holds counts (his words so far: "We can always tear down & redeploy
+  from scratch"); otherwise whether the day's count is carried across or starts again is his, asked when move 7 opens.
+  Dropped at a deploy in the middle of a day, it would let an organization make up to 80 calls that day. The classes
+  left on the model's Worker are kept, never renamed or dropped. Not run.
 - **Everything on Durable Objects.** Cluster then hosts nothing, and decision 28 has no use.
 - **`Access` on the pool.** *In the way:* its projection cannot write the `member` rows; it needs decision 20's third
   answer and mail sent from another Worker.
@@ -1510,14 +1539,14 @@ What holds each rule's standing he answered first as "The library's lock file", 
 keeps each rule's text and not its standing, as "Lock plus the library's proved list" (2026-11-22): the lock catches a
 rule removed or reworded, and `require.proved` fails the build when a named rule is no longer proved. Both are options
 of Verify's reports (`Verify.report`, `Verify.model`, `Verify.aggregate`); `Prove.report` and `Prove.decisionReport`
-take neither. So in `bun run check`, on the build's branch, the `prove` task's five tests (`Prove.report(Import)` and
+take neither. So in `bun run check`, on main, the `prove` task's five tests (`Prove.report(Import)` and
 `Prove.decisionReport` of `Deciding`, `Undoing`, `DecidingGroup` and `UndoingGroup`) fail on any rule their report
 does not give as proved; which rules there are is the lock's: it acts in `check:full` and CI, where
 `Catalog.verify.test.ts` runs `Verify.report` with `lock: "./Catalog.lock.json"`, so a rule taken out or renamed is not
 caught in `bun run check`. That test now passes `require.proved`, with the rules the lock keeps of the kinds a proof
-covers (135, by the build's own report), so a relock takes a rule out of both. On the build's branch each of the
-four decision proofs calls `missingRules`, which fails, naming the decision, when one leaves out the three rules, by the
-build's own report. It was removed with the hand-written lists and then restored. Which call
+covers (135, counted in the lock here), so a relock takes a rule out of both. On main each of the four decision proofs
+calls `missingRules`, which fails, naming the decision, when one leaves out the three rules; it was removed with the
+hand-written lists, restored, and kept by his answer of 2026-11-22, "Keep it, named as ours". Which call
 asserts the import's own rules in `bun run check` the build settled as `Prove.report(Import)`, which proves its 37 rules
 for each of its seven commands and leaves the two events only the decisions record to their tests.
 
@@ -1547,7 +1576,7 @@ have no commands of their own; its decisions took under 1 s to 22 s and `Verify.
 machine. On `review15`, the model of his answers: 0.8, 4.0, 24.5 and 24.3 s for its four decisions and 148 s for
 `Verify.model`, at loads of 35 to 55 (on `review14`, before the no-change answer, 0.5, 2.9, 9.1 and 19.4 s
 at loads of 25 to 33, and 110 s at about 28). Which call asserts the aggregates' own rules in `bun run check` is settled
-in move 1: on the build's branch, `Prove.report(Import)` for the import (above), and the row's and the group's rules in
+in move 1: on main, `Prove.report(Import)` for the import (above), and the row's and the group's rules in
 the tests of the decisions that record on them.
 
 ### 35. How does a stored state or event change shape?
@@ -1565,11 +1594,12 @@ of its own, in every decision that reads the aggregate, so a shape change made b
 paths. On `review15`, the model of his answers, the largest decision (`Undoing`) has 298 paths; four such doublings
 pass 4,096, and
 then nothing of it is proved (read from the source, not run). Each change is run through `Prove.decision` before it is
-merged; when the limit is near, the change is made another way (a new event, and a new field with a default that
-adoption writes) or, before production, by a wipe, chosen in the move that meets it. Since he answered, every push to
+merged; when the limit is near, the change is made another way (a new event, and a new field with a default) or,
+before production, by a wipe, chosen in the move that meets it. Since he answered, every push to
 `main` that passes CI deploys a `staging` stage by itself, and production deploys only from a release tag on a release
 branch, after his approval (the architecture's decision "releases and deploys", 2026-11-22). Staging is a rehearsal like
-a preview; whether its objects are wiped like a preview's, or kept as a deploy he keeps, is open (DECISIONS.md, "Open").
+a preview; whether its objects are wiped like a preview's, or kept as a deploy he keeps, is his and open (DECISIONS.md,
+"Open"). What he has said so far, on 2026-11-22: "We can always tear down & redeploy from scratch."
 
 ### 36. Who writes each audit line, and what answers the Activity page?
 
@@ -1585,47 +1615,23 @@ Today every change and its line land in one D1 batch.
 
 ### 37. How do rows already stored arrive in the model?
 
-**Answered 2026-11-22: the first option**, the one recommended ([DECISIONS.md](DECISIONS.md), "Answered"). The
-others are kept below as what was rejected.
+**Answered 2026-11-22: they do not. "Start empty"** replaced his first answer, "Adopt at first touch", the same day
+([DECISIONS.md](DECISIONS.md), "rows already stored: start empty"). I chose; the agent recommended the same.
 
-Nothing is deployed today; the rows that exist are in development databases. Adoption binds only from the first deploy
-he keeps (his answer of 2026-11-22: "We can always tear down & redeploy from scratch"). Every push to `main` that passes
-CI now deploys a `staging` stage by itself (the architecture's "releases and deploys"); whether that is a deploy he
-keeps is open (DECISIONS.md, "Open").
+The question that settled it: "Rows the current app has already stored (imports, items, organizations): should the new
+model carry them over, or start with nothing? Nothing is deployed anywhere, so today that data exists only in local
+development databases." Options: "Start empty (Recommended)", "Carry it over". It followed his words of that day: "This
+can all be thrown away as far as I'm concerned if so", and "We can always tear down & redeploy from scratch".
 
-- **Adopt at first touch (Recommended).** The first command that reaches an instance with rows in D1 and no events is
-  preceded by an `Adopt…` command built from those rows, under an id that makes a second send do nothing: imports in
-  move 3, items in move 4 under decision 17's first answer (at an item's first edit or take-back), organizations and
-  members in move 6, the allowance's count in move 2.
-- **Adopt everything at a deploy**, by the operator's command line.
-- **Start empty.** Open drafts are confirmed or removed before the move; stored imports become history that cannot be
-  taken back.
+History, short: put to him first with the options "Adopt at first touch", "Adopt everything at a deploy" and "Start
+empty", he picked "Adopt at first touch"; asked then which mechanism adopts, he picked "The library's import
+(Recommended)" over "An Adopt command, proved" and "Try both in move 3, then ask". Neither is the plan.
 
-Beside the first option, not in it: he chose the outcome, adoption at first touch. How rows are adopted is open
-(DECISIONS.md, "Open"): the option was put to him as an `Adopt…` command, and the pin has a second way. Each move that
-adopts says "adopted at first touch (mechanism open, see Open)" and what it needs either way:
-
-- **By a command of the model**, as put to him: an `Adopt…` decision across import and row with a numbered change.
-  *Costs:* the rules it breaks as written are rewritten to except adoption and proved again with it
-  (`NothingIsWrittenBeforeConfirm` for an import adopted as confirmed; decision 25's two for the allowance), and the
-  decision states the three rules on who may change a row or a group.
-- **By the library's `import`** at the pin (`import(target, events, { commandId, expectedVersion })`), which appends
-  events "decided elsewhere ... without running `decide`": `evolve` folds them into the state, views and projections
-  apply them like any other events, and "policies and sagas never react to them" (the client's `import`, `Aggregate.ts`
-  at `734c27a`). A second send under the same `commandId` returns the first receipt; it fails with `UnexpectedVersion`
-  when the instance is not at `expectedVersion` (0 by default) and with `ImportOutOfOrder` when an event's time comes
-  before the one ahead of it or after the platform's clock. *Costs:* no rule is rewritten, but a state reached by
-  imported events was reached by no command, so no proved rule says it keeps the aggregates' rules (not checked); an
-  import is of one instance, so the import's events and each row's are separate imports, and the change numbers that
-  tie them are written by the code that builds the events, which no rule checks.
-
-Either way, a projection that writes items from `ImportConfirmed` meets an adopted confirm, and its marker must make it
-write nothing (Proof 4). No trial ran either way, and the build's branch uses neither. Not written yet, and settled in
-move 3: what an adopted row's number is and how the screen learns it, and what becomes of rows kept waiting in a
-browser, of today's holds, of dismissed take-back lines and of the review region's undo history. A Replace or
-Keep-stored already saved on an import matched before moves were kept is adopted as made: only the next match of that
-same field takes it back and names it, and a match of another field leaves it (his answer of 2026-11-22, "Leave as
-made").
+What a fresh start means in every move: the new model's migrations create its tables on an empty database; the seeds
+(the test accounts, the seeded organization's reference data) are written for the new model; local development data is
+reset with `bun run db:reset`; no carry-over code or test exists. No `Adopt…` command, no rule rewritten to except
+adoption, no use of the library's `import` for it. That the pinned library can import events already decided is a fact
+about the library ([aggregate](research/concepts/aggregate.md)), not a plan here.
 
 ### 38. What does Remove do once decisions are events?
 
@@ -1667,7 +1673,11 @@ others are kept below as what was rejected.
 
 ### Decisions that can wait for their move
 
-On 2026-11-22 he chose to be asked each of decisions 41 to 56 and 60 to 62 when its move opens.
+On 2026-11-22 he chose to be asked each of decisions 41 to 56 and 60 to 62 when its move opens. None of them is about
+several people at once, a screen that is behind, or two decisions meeting, so each stays his question. A question of
+that kind that comes up when a move opens is not put to him: the rule "a press from a screen that is behind is never
+silently dropped or applied, it is held and shown" decides it, and it is added to DECISIONS.md's list "Decided by the
+rule, for him to overrule".
 
 **41. How long may a group act take before the group is decided as one unit?** (move 3) **Not asked: it fell away on
 2026-11-22** with his answer to decision 7, under which every group is a unit. It was for decision 7's third answer. In
@@ -1758,6 +1768,10 @@ Auth's error page.
 | 9 | A Cloudflare API token that reads analytics; a 1Password service-account token for a deploy that writes secrets |
 | 10 | A deploy: the stack makes the bucket and the Worker |
 
+No move needs stored data carried over (decision 37, "Start empty"): each move that changes the tables starts on a
+fresh database, created by the new model's migrations and filled by its seeds, with local development data reset by
+`bun run db:reset`.
+
 Under decision 30's answer, the browser pass runs on `alchemy dev`; the moves above that name a deploy also need it.
 A preview stage is deployed by CI for each pull request and a test stage by him from the workstation, as the infra goal
 lists them; once a move is on `main`, CI deploys it to `staging` by itself, and production only from a release tag he
@@ -1781,9 +1795,9 @@ packages they name that it does not hold (decision 1): a re-pin, run when he ask
   failed a story, and none passed both. On `review15` three mutants of its change ran: the new exit removed leaves
   `Deciding` not proved and fails 2 of the 11 group stories; the exit put back ahead of the check of `saw` leaves every
   rule proved and fails the saw story and the matching story; the exit moved between the two checks leaves every rule
-  proved and fails the matching story only. The build's branch has 154 mutants of its own: the 148 of `review14`'s kind
-  and six added since (`packages/catalog/model/mutants`: a sample in `check:full`, all of them nightly), by the build's
-  own report.
+  proved and fails the matching story only. Main has 154 mutants of its own, counted here: the 148 of `review14`'s kind
+  and six added since (`packages/catalog/model/mutants`: a sample in `check:full`, all of them nightly); what they find
+  is the build's own report.
 - **The time of a group act.** A median of 95 to 214 ms in local workerd, each an import's first group act, on the model
   before the last-group rule (trial 17); a later group on the same import, the projection's write of its rows and
   anything on `review14` or `review15` were not measured.
@@ -1803,7 +1817,8 @@ packages they name that it does not hold (decision 1): a re-pin, run when he ask
   the repository's proofs, search, stories and mutants run again on the new pin; the trials on the trial page stay of
   `dbfd0dd` and are not rerun.
 - **Never rename a model**, an aggregate or an event once the first deploy he keeps is out (his answer of 2026-11-22:
-  until then the names are open), and a deploy that adds an object class goes out whole.
+  until then the names are open), and a deploy that adds an object class goes out whole. Nothing stored before then is
+  carried into the model (decision 37, "Start empty").
 
 ## No-gos
 
@@ -1829,25 +1844,24 @@ taken.
    library's lock file, which catches a rule removed or reworded, and names the rules that must be proved in
    `require.proved`, which fails the build when one is no longer proved. `Prove.report` and `Prove.decisionReport` take
    neither, so which rules there are is held by the lock in `Verify.report` (`check:full`, CI's `proofs` job, nightly),
-   where a rule taken out or renamed fails; on the build's branch `Catalog.verify.test.ts` passes the lock and
-   `require.proved`, by the build's own report. The review's model, `Catalog`, proved again on the pinned `734c27a`: on
+   where a rule taken out or renamed fails; on main `Catalog.verify.test.ts` passes the lock and `require.proved`. The review's model, `Catalog`, proved again on the pinned `734c27a`: on
    `dbfd0dd` its trial model of his answers, `review15`, has 135 rules proved, both relations among them, seven rules
    across instances checked 3 commands deep (20,957 sequences), each of its four decisions proved with its paths (284,
-   298, 42 and 84) and 46 stories; the build's branch gives 135 proved, 7 searched and 11 "can be taken" rules reached
-   on `734c27a`, and the per-row fallback, on its own branch, 96 proved and 3 searched, each by the build's own report
-   (the per-row branch is not in this repository). The item's 10 (trial 8's model), the allowance's 7 (trial 9's,
-   whose one command is `TakeCall`; its count adopted at first touch, mechanism open, see Open: proved again with a
-   command's rewritten rules, or checked by adoption's test if it is imported, decision 25) and
+   298, 42 and 84) and 46 stories; the model on main gives 135 proved, 7 searched and 11 "can be taken" rules reached
+   on `734c27a`, by the build's own report (its lock keeps those 135, 7 and 11, counted here), and the per-row
+   fallback, on its own branch, 96 proved and 3 searched, by the build's own report (that branch is not in this
+   repository). The item's 10 (trial 8's model), the allowance's 7 (trial 9's,
+   whose one command is `TakeCall`; it starts empty, with no count carried over, decision 25) and
    the members' 19 (trial 10's `Access`: four decisions with `FoundOrganization`, a person added by member id; with
-   `MemberEmail` and adoption not run) proved again on the pin with what their moves add; their relation and model
+   `MemberEmail` not run) proved again on the pin with what their moves add; their relation and model
    invariant checked; `EveryUploadEnds` checked. Beside each check of a decision or an aggregate, a mutant that removes
    it and must break its rule or fail a story. A story for each of the review's eleven commands accepted and for each of
-   its refusals, each failing on a model whose `decide` records nothing for that command (47 stories on the build's
-   branch, by its own report); a "can happen" rule (`sometimes`) for each command, answered "reached" (11 reached on the
-   build's branch, by its own report). Every decision that records on a row or a group states that aggregate's three
-   rules on who may change it, and a test fails, naming the decision, when one does not: on the build's branch each of
-   the four decision proofs calls `missingRules`, by the build's own report; it was removed with the hand-written lists
-   and then restored.
+   its refusals, each failing on a model whose `decide` records nothing for that command (47 stories on main,
+   counted here); a "can happen" rule (`sometimes`) for each command, answered "reached" (11 on main, reached by the
+   build's own report). Every decision that records on a row or a group states that aggregate's three
+   rules on who may change it, and a test fails, naming the decision, when one does not: on main each of the
+   four decision proofs calls `missingRules`. It is our check, kept and named as ours (his answer of 2026-11-22, "Keep
+   it, named as ours"): "no hand-written assertions" means no hand-written list of rule names or standings.
 
 3. The property test of the client fold against the real model on the memory host, with the orderings as named cases
    (another person's act before the screen's own waiting act; a colleague's group landing before a waiting act, on a row
@@ -1858,13 +1872,15 @@ taken.
    of `saw` and of the matching (the order of the trial model `review15`, which no rule holds: its saw half held by the
    story "a press over a group from a screen that missed a later decision on the row is refused and held, not answered
    no change", its matching half by the story "a press over a group made on an older matching is refused and held, not
-   answered no change", each shown by its own mutant, which the prover still proves; the build is to carry both stories
-   and both mutants); a group taken back
+   answered no change", each shown by its own mutant, which the prover still proves; main has the saw story and its
+   mutant, and is to carry the matching story and its mutant); a stale press whose text matches what the row holds,
+   from a screen that missed the row's latest decision, on a row whose own decision is not newer than the last group,
+   refused and held, not answered "no change" (his answer "Hold it when behind"); a group taken back
    behind a later one; a group taken back over a row a colleague changed since, that row keeping her whole decision and
    the screen naming it; a colleague's group whose change on the import's events reaches the screen before the group's
    own event, its rows: no waiting act on a row it names is sent again until both are there; a keep of one of two rows
-   in decision 14's three cases: a rival with only accepted fixes before the keep, a rival kept or edited before the
-   keep or decided after it, and two keeps of one SKU; a second tab; a reload with acts waiting; a match beside a
+   in decision 14's three cases: a rival with only accepted fixes before the keep or after it, a rival kept or edited
+   before the keep or after it, and two keeps of one SKU; a second tab; a reload with acts waiting; a match beside a
    waiting accept), and the rules: every act the person made is in the model's events or in the queue; a row read
    through its groups equals today's `act` wherever `act` has an answer, for two people, on the model's own code with a
    row's undo that names the last group act; and where `act` has no answer, the reading he chose (his answers of
@@ -1881,9 +1897,11 @@ taken.
    changed by Dana and stays" read on both screens; a press over the other's group that changes nothing, then that group
    taken back; the same press from a screen that has not received the other's later act on that row, and one made before
    the other's new match reached the screen, each held with both and not answered "no change", since that answer is
-   taken only after the checks of `saw` and of the matching (the order and its two stories of Proof 3); a keep of one
-   row of a SKU while the other has accepted only fixes on its rival, has kept or edited the rival, or keeps the rival,
-   each with the clash or the leave-out read on both screens. Then `items_messy.csv` through Confirm with the three
+   taken only after the checks of `saw` and of the matching (the order and its two stories of Proof 3); a press whose text
+   matches what the row holds again after the other's undo, from a screen that has not received the undo, held with both
+   ("Hold it when behind"); a keep of one row of a SKU while the other has accepted only fixes on its rival, before the
+   keep or after it, has kept or edited the rival, or keeps the rival, each with the clash or the leave-out read on both
+   screens. Then `items_messy.csv` through Confirm with the three
    numbers read (200 rows, 155 imported, 155 stored), at phone width and in both themes.
 7. On a test stage he deploys, or a pull request's preview: the requests of one row act, one group act of the sample's
    largest group, one confirm and one item, read from Cloudflare's analytics, each within twice the figures measured
@@ -1891,14 +1909,14 @@ taken.
    6,000 rows; a confirm of 38,750 items to its end, before the Items page reads them.
 8. `bun run check:full`.
 9. Each of his answers of 2026-11-22 that the build must honour has a check that fails if it is built the other way.
-   Stories, rules and files named are on the build's branch, merged into main at `0c4c5e5` (stories by their title in
-   `test/Review.story.test.ts` and `test/Group.story.test.ts`), by the build's own report; "to write" where none exists
-   there yet.
+   Stories, rules and files named are on main, merged at `0c4c5e5` (stories by their title in
+   `test/Review.story.test.ts` and `test/Group.story.test.ts`); "to write" where none exists there yet. The answers of
+   that day about several people at once stand as consequences of his standing rule (DECISIONS.md).
 
 | His answer (2026-11-22) | What fails if it is built the other way |
 | --- | --- |
 | 2: theirs is held, both shown | `DecideRow.ADecisionIsReplacedOnlyByAnActThatSawIt`; the story "when someone else decided the row first, the act is refused with whose decision is there"; that the queue holds it and Confirm waits: to write (Proof 3) |
-| 3: it changes nothing, naming whose | `DecideRow.AnActThatChangesNothingLeavesTheImport`, `.AnActThatChangesNothingLeavesTheRow`; the story "a save that leaves the row as it is records nothing, seen or not: the answer says no change"; that the screen names whose: to write |
+| 3: it changes nothing, naming whose | `DecideRow.AnActThatChangesNothingLeavesTheImport`, `.AnActThatChangesNothingLeavesTheRow`; the story "a save that leaves the row as it is records nothing, seen or not: the answer says no change" (narrowed by "Hold it when behind", below); that the screen names whose: to write |
 | 4: an import, its rows and its groups as aggregates with decisions across | `Catalog.verify.test.ts`, whose lock holds every rule of the three aggregates and four decisions |
 | 5: the confirm and the take-back are facts on the import | `Import.NothingIsWrittenBeforeConfirm`, `.OnlyAnImportWithAConfirmStandingIsTakenBack`; that a take-back waits for the confirm's items: to write (the design under decision 5) |
 | 6: refused when the plan does other than was shown | `Import.APlanDoesWhatWasShown`; the story "a plan that would do something else than the button said is refused: the stored items changed" |
@@ -1908,11 +1926,11 @@ taken.
 | 11: an undo puts back exactly what was under, whose it was | `UndoRowStep.AnUndoPutsBackTheDecisionThatWasThere`, `.AsTheirsWhoMadeIt` |
 | 12: no undo past a confirm that stands | `UndoRowStep.AnUndoDoesNotReachPastAConfirm`, `UndoGroup.AGroupsUndoDoesNotReachPastAConfirm`; the story "an undo does not reach past a confirm that stands" |
 | 13: an act from before a confirm is refused after a reopen | `DecideRow.AnActIsOfThisOpening`; the story "a match, a group and an undo made before a confirm are not taken after the import is opened again either" |
-| 14, with 14a, 14b and "As today, never overwrite a choice" | To write: a test of `review`'s rule for rivals in its three cases (Proof 3) |
+| 14, with 14a, 14b, "As today, never overwrite a choice" and "No, row 10 stays out" | To write: a test of `review`'s rule for rivals in its three cases, an accepted fix on a rival after the keep among them (Proof 3) |
 | 15: a match on an unseen match is refused | `Import.AMatchIsMadeOnTheLastOne`; the story "a match made over one its sender never saw is refused, and the columns as they are, by heading or by hand, are no match" |
 | 16: Remove names the last change | `Import.TheRestNameEveryChangeToo`; the story "a take-back, a reopen and a remove each name the last change, so a press on an old screen is refused" |
 | 1, with "In the repo, re-pin only when needed": the pinned build kept as files | The clean install from `vendor/alchemy` with the library's registry refused, in `check:full` (move 0): to write |
-| "Chosen design, parked one as fallback" | The per-row model's branch, not in this repository, passes its own proofs on `734c27a` (96 proved, 3 searched, by the build's own report), kept on the pinned build with nothing else, until the chosen model is merged by the evening of 2026-11-24 |
+| "Chosen design, parked one as fallback" | The per-row model's branch, a local branch, not on main or the public remote, passes its own proofs on `734c27a` (96 proved, 3 searched, by the build's own report), kept on the pinned build with nothing else, until the chosen model is merged by the evening of 2026-11-24 |
 | 17: each item an object | `Item`'s Verify test, and a confirm whose items the Items page reads from their instances (moves 3 and 4): to write |
 | 18: a plan staged in the database | A confirm that writes from the plan staged at the import's last change, and refuses one built at an earlier change (move 3): to write |
 | 19: stay confirmed, keep retrying | A confirm whose write fails stays confirmed and its write is retried, never reopened (move 3): to write |
@@ -1920,19 +1938,25 @@ taken.
 | 23: a Discord sign-in with an unverified email refused | A Discord sign-in with an unverified email creates no account (move 8): to write |
 | 25, 26: the allowance per organization, back at 00:00 UTC | `Allowance`'s Verify test, with the `TestClock` across midnight UTC (move 2): to write |
 | 27, 28, 29, 30, 31: the hosts, two Workers, `alchemy dev`, the screens on the model's Api | Each move's rows of "Every single thing" (moves 2 and 7): to write, in that move |
-| 32, 33: blocks in each model package; `new` only in decide files | Built on the build's branch (a folder per aggregate in `packages/catalog/model/src`, the decisions in `src/Review/`); each Prove test fails when its report has a check it did not read (`unread`) |
-| 35, 36, 37, 38, 39: by rule; the activity table stays; adopt at first touch; mark removed, events stay; keep, delete when an org leaves | A stored event of an older shape read by its rule; each write of the model adding its `activity` line; a row stored before the move adopted at its first touch (mechanism open, see Open); Remove leaving the import's events and deleting its D1 rows; an operator's command deleting an organization's objects (moves 2 to 6): to write, in the move that builds each |
+| 32, 33: blocks in each model package; `new` only in decide files | Built on main (a folder per aggregate in `packages/catalog/model/src`, the decisions in `src/Review/`); each Prove test fails when its report has a check it did not read (`unread`) |
+| 35, 36, 37, 38, 39: by rule; the activity table stays; start empty; mark removed, events stay; keep, delete when an org leaves | A stored event of an older shape read by its rule; each write of the model adding its `activity` line; each move's migrations and seeds run on an empty database, with no carry-over code in the repository; Remove leaving the import's events and deleting its D1 rows; an operator's command deleting an organization's objects (moves 2 to 6): to write, in the move that builds each |
 | 40: review in memory, then host | The order of moves itself |
 | "Undecided: Ana took it back" | The story "a group taken back gives no row anything again: Ana's group of twelve rows, Dana types on row 14, both are taken back, and row 14 holds nothing" |
 | "Yes, refuse and show" (an undo behind a group) | `UndoRowStep.ARowsUndoSawTheLastGroupAct`; the story "refuse and show: a row's undo or act sent before the last group act reached its screen is refused and records nothing, and is taken sent again with it" |
 | "Row 14 stays whole" | The story "a group's undo touches no row: a row another person decided since keeps its decision, and a row's act made before the undo reached its screen is refused"; the sentence on screen: to write (Proof 6) |
-| "No change, Ana's undo applies" | The story "a press that leaves a row reading as it reads is no change: Ana's group of twelve rows, Dana's press on row 14 changes nothing, Ana takes the group back, and row 14 holds nothing"; and, on the build's branch by the build's own report, the story "a press from a screen that is behind is held, not lost as no change" (the trial model `review15` has it as "a press over a group from a screen that missed a later decision on the row is refused and held, not answered no change"); the story of a press over a group made on an older matching, held and not answered no change: to write (`review15` has it) |
+| "No change, Ana's undo applies" | The story "a press that leaves a row reading as it reads is no change: Ana's group of twelve rows, Dana's press on row 14 changes nothing, Ana takes the group back, and row 14 holds nothing"; and, on main, the story "a press from a screen that is behind is held, not lost as no change" (the trial model `review15` has it as "a press over a group from a screen that missed a later decision on the row is refused and held, not answered no change"); the story of a press over a group made on an older matching, held and not answered no change: to write (`review15` has it) |
 | "Yes: resend untouched, hold touched"; "Sent again by itself" | To write: the queue's test (Proof 3) |
-| "Yes, tests hold it, said plainly" | The 47 stories; each of the 154 mutants on the branch, run in `check:full` by a sample and nightly in full (by the build's own report) |
+| "Yes, tests hold it, said plainly" | The 47 stories; each of the 154 mutants on main, run in `check:full` by a sample and nightly in full (what they find by the build's own report) |
 | "Yes, one per command" | The 11 rules `Catalog.AnImportCanBeStaged` to `Catalog.AGroupCanBeUndone`, each answered "reached" in `Catalog.verify.test.ts` |
 | "Lock plus the library's proved list" | The lock in `Catalog.verify.test.ts` and its `require.proved` |
 | 34 and 34a: proofs in `bun run check`, search in `check:full`, its own CI job and nightly | The `prove` and `verify` turbo tasks; the `proofs` job in `.github/workflows/ci.yml` and `.github/workflows/proofs-nightly.yml` |
-| "Leave as made" | To write: adoption's test (move 3) |
+| "Leave as made" | None in the model: nothing stored carries over (decision 37, "Start empty"); today's tests hold it in today's app |
+| "Start empty" | No carry-over code or test exists; the migrations and seeds of each move run on an empty database |
+| "Keep it, stop asking me": the standing rule | Each line of "Decided by the rule, for him to overrule" in DECISIONS.md with its own check, below or in the move named there |
+| "Hold it when behind" | To write in move 1's remaining work: `Deciding` gives the uncovered "no change" only when `saw` matches or the row's own decision is newer than the last group, and a story in which Dana's undo puts back F1 under Ana's group and Carl's press of F1, from a screen without the undo, is refused with Dana's decision. Not built on main |
+| "Say it after only" | To write at move 3: the Review step names the row after a group's undo lands and shows no warning before it (Proof 6) |
+| "No, row 10 stays out" | To write at move 3: `review`'s test for rivals, an accepted fix on a rival after the keep leaving it out (Proof 3) |
+| "Keep it, named as ours" | `missingRules` in `packages/catalog/model/test/proving.ts`, called by each of the four decision proofs |
 
 ## Map
 
@@ -1940,7 +1964,7 @@ Four goals, each opened from this brief when the one before it is done. Under hi
 
 | Goal | Moves | First slice | Existing code it changes | Net new |
 | --- | --- | --- | --- | --- |
-| `domain-core` | 0 to 2 | The day's model calls counted by the `Allowance` aggregate and seen on the status line | `packages/infra/src/Inventory.stack.ts`, `packages/access/model` (the allowance's port), `apps/inventory/package.json` (`dev`) | The review's model, `Import`, `Row` and `Group` with the four decisions, and its tests, in `packages/catalog/model` (a folder for each aggregate, the decisions in `src/Review/`, as on the build's branch); the model's Worker; `Usage` |
+| `domain-core` | 0 to 2 | The day's model calls counted by the `Allowance` aggregate and seen on the status line | `packages/infra/src/Inventory.stack.ts`, `packages/access/model` (the allowance's port), `apps/inventory/package.json` (`dev`) | The review's model, `Import`, `Row` and `Group` with the four decisions, and its tests, in `packages/catalog/model` (a folder for each aggregate, the decisions in `src/Review/`, as on main); the model's Worker; `Usage` |
 | `domain-import` | 3 to 5 | One act of the review saved through the model, in two browsers | `packages/catalog` (all four packages), `packages/review`, `apps/inventory/migrations`, `docs/standards/undo.md`, `CLAUDE.md` | `DraftRows`, `ImportActs`, the markers, `Item`, `Upload`, the sagas |
 | `domain-access` | 6 | A person added by email through `AddMember` | `packages/access` (all four packages), the sign-in options | `Organization`, `Member`, `MemberEmail`, `MemberRows`, `AdminApi` with `FoundOrganization` (under 21a) |
 | `domain-extras` | 7 to 10 | `Usage` on the Cluster pool with its cron | `packages/infra`, `packages/drivers` | The pool, mail, the channel, scores, the operator's surface, the history |
@@ -1958,41 +1982,46 @@ proof. It is written for his answers; decision 40's answer is this order.
 1. **The review's model, in memory, on the pinned commit.** `Import`, `Row` and `Group`, the four decisions and the
    eleven commands, under the names proposed, which are open until the first deploy he keeps. Its rules proved again on
    `734c27a`, each rule's text kept in the library's lock file and the rules that must be proved named in its
-   `require.proved` (his answer of 2026-11-22, "Lock plus the library's proved list"; the build's branch passes both, by
-   its own report); a story for each command accepted and
+   `require.proved` (his answer of 2026-11-22, "Lock plus the library's proved list"; main passes both, by the build's
+   own report); a story for each command accepted and
    for each refusal; a mutant for each check; a "can happen" rule for each command; the fold's property test against the
    model, the reading of a row through its groups among it. The proofs cover what must never happen and the stories that
    each valid act is taken, the split he accepted. The row-by-row model stays on its branch as the fallback. Nothing the
-   person sees; nothing stored. Built on the build's branch and merged into main at `0c4c5e5` (its counts,
-   by its own report, under Proof 2); the `asItReads` exit after the checks of `saw` and of the matching, and the
-   check that each decision states the rules on who may change a row or a group, are on it too, by its own report. Still
-   to add there: the story of a press over a group made on an older matching, and the mutant that moves the exit
-   between the two checks, as `review15` has them.
+   person sees; nothing stored. Built and merged into main at `0c4c5e5` (its counts under Proof 2); the `asItReads`
+   exit after the checks of `saw` and of the matching, and the check that each decision states the rules on who may
+   change a row or a group (`missingRules`, kept as ours), are on main too. Still to add there: the story of a press
+   over a group made on an older matching, and the mutant that moves the exit between the two checks, as `review15` has
+   them; and his answer "Hold it when behind": the uncovered "no change" given only when `saw` matches or the row's own
+   decision is newer than the last group, with its story and mutant.
 2. **The host and the first slice.** The model's Worker, `bun run dev` as decision 30 says, the session, the two
    guards, the Api tests in process, the harness test, telemetry. The first slice is the allowance: its aggregate, its
-   view, and each model call's take going through it, with today's count adopted at first touch (mechanism open, see
-   Open; the calls since 00:00 UTC; decision 25 says what each way needs). The pin widened to `@alchemy.run/better-auth`
+   view, and each model call's take going through it, starting empty: no count is carried over, the migrations create
+   the model's tables on an empty database, and local development data is reset with `bun run db:reset` (decision 37).
+   The pin widened to `@alchemy.run/better-auth`
    and `@alchemy.run/test`. A preview stage deployed from the move's pull request.
    *Interim:* every import still runs on D1 as today.
 3. **The import's write side, in one move.** Stage, acts, group acts, match, suggestions recorded, confirm, take-back,
    reopen, remove; `DraftRows` and the batches with their markers; under decision 17's first answer, `Item`, its saga
-   and `ItemRows` in the same move, so the confirm's items are written once in their final shape; rows adopted at
-   first touch (mechanism open, see Open), once a deploy he keeps holds rows, with what that way needs (decision 37);
-   the Review step's fold, queue and stream; the review region's change; a preview stage deployed from the move's pull
+   and `ItemRows` in the same move, so the confirm's items are written once in their final shape; a fresh start
+   (decision 37): the new model's migrations create its tables on an empty database, the seeds (the test accounts, the
+   seeded organization's reference data) are written for the new model, local development data is reset with
+   `bun run db:reset`, and no carry-over code or test exists; the Review step's fold, queue and stream; the review region's change; a preview stage deployed from the move's pull
    request, and the group act and the confirm measured there. `PUT /imports/:id/decisions` and
    `SaveRequest` leave. *Interim:* the lists, the staged table and the suggestions' handler still read D1, which
    `DraftRows` keeps written.
-4. **The Items page** as queries; `EditItem` as a command; items stored before move 3 adopted at first touch (mechanism
-   open, see Open), once a deploy he keeps holds them.
+4. **The Items page** as queries; `EditItem` as a command; items only as the model creates them, from an empty
+   database, with nothing stored before move 3 carried over (decision 37).
 5. **The rest of the import**: `Upload` with its deadline, suggestions as a saga, the lists as queries,
    `ImportHistory` and its backfill.
 6. **People**: `Organization`, `Member`, `MemberEmail`, the four decisions (`FoundOrganization`, `AddMember`,
    `ChangeRole`, `RemoveMember`), `MemberRows`, `AdminApi` with `FoundOrganization`, by which the operator founds an
-   organization (under 21a, open, asked when the move opens), the organizations that exist adopted at first touch
-   (mechanism open, see Open) once a deploy he keeps holds them, and the model proved again with the email claim and the
-   founding, and adoption checked as its way needs, before any count is asserted; reads end on removal.
-7. **Cluster**: `Usage` moved to the pool with each day's count adopted at first touch (mechanism open, see Open), its
-   cron and singleton, the admin's live page. The pin widened to `@alchemy.run/effect-cluster`.
+   organization (under 21a, open, asked when the move opens); the organizations and test accounts come from seeds
+   written for the new model on an empty database, with local development data reset with `bun run db:reset` and
+   nothing carried over (decision 37); the model proved again with the email claim and the founding before any count is
+   asserted; reads end on removal.
+7. **Cluster**: `Usage` moved to the pool on an empty store, as a fresh start only while no deploy he keeps holds
+   counts; otherwise whether the day's count kept on Durable Objects since move 2 is carried across or starts again is
+   his, asked when the move opens (decision 27). Its cron and singleton, the admin's live page. The pin widened to `@alchemy.run/effect-cluster`.
 8. **Mail, the channel, Discord sign-in, scores, the suggestions' object.**
 9. **The operator's surface**: the command line, its HTTP document, the assistant's tools, the MCP server, the
    analytics driver and panel, the operator's scripts, secrets at a deploy, the repository resource.

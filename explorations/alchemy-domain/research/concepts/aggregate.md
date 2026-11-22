@@ -213,9 +213,8 @@ Each event is stamped with the platform's time, or with its own when passed as `
 `UnexpectedVersion` when the instance is not at `expectedVersion` (0 by default, so an instance with events refuses an
 import) and with `ImportOutOfOrder` when an event's time comes before the one ahead of it or after the platform's
 clock (`Aggregate.ts` at the pin, the client's `import`, `ImportOptions`, `Imported`). No command runs, so no rule of
-the aggregate is evaluated on the way in, and a state reached this way was reached by no command. In this app it is one
-of two ways the brief's decision 37 can adopt rows already stored, beside a command of the model; which is open. Not
-run.
+the aggregate is evaluated on the way in, and a state reached this way was reached by no command. This app does not use
+it: under the brief's decision 37, answered "Start empty", no stored row is carried into the model. Not run.
 
 ## Rules, and the mistakes to avoid
 

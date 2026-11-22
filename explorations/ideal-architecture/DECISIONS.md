@@ -1494,14 +1494,29 @@ for the person; each of those checks has its own mutant (154 in all). `DecideRow
 176; the lock was written again on purpose for the two rules' new text. Reverse: answer the covered "no change" with
 the other one, before `saw`, and accept that such a press is lost.
 
+Narrowed later the same day by his answer "Hold it when behind" (the alchemy-domain packet's DECISIONS.md): the
+uncovered "no change" is given only when the sender has seen the row's latest decision, or the row's own decision is
+newer than the last group; otherwise the press is refused and shown. Not built yet.
+
 ### 2026-11-22 — the review's model, whose act a decision records, held by a check of ours again
 
 The check that every decision recording on a row or a group states the three rules about who may change it
 (`missingRules`, in each decision's proof) is back. "No hand-written assertions" was about asserting how each rule
 stands, which the lock and `require.proved` do; this check guards what the library does not. A row and a group have no
-command and so no middleware of their own: a decision that records on one, adoption's when it comes included, says
-whose act it records only by stating those rules, and without them it would lock and prove and let anyone change the
-row. Reverse: drop `missingRules` from `test/proving.ts` and the four proofs.
+command and so no middleware of their own: a decision that records on one, any added later included, says whose act
+it records only by stating those rules, and without them it would lock and prove and let anyone change the row. Asked
+later the same day whether it stays, he answered "Keep it, named as ours": "no hand-written assertions" means no
+hand-written list of rule names or standings, and this one check is ours (the alchemy-domain packet's DECISIONS.md).
+Reverse: drop `missingRules` from `test/proving.ts` and the four proofs.
+
+### 2026-11-22 — the review's model, rows already stored: start empty
+
+Nothing the app has stored today (imports, items, organizations) is carried into the model. His answer: "Start empty
+(Recommended)"; I chose; the agent recommended the same. It replaces the alchemy-domain brief's decision 37 answer
+"Adopt at first touch", and the mechanism he then picked for it, the same day. Each move's migrations create the
+model's tables on an empty database, its seeds are written for the new model, and local development data is reset
+with `bun run db:reset`; no carry-over code or test exists. Recorded in full in the alchemy-domain packet's
+DECISIONS.md. Reverse: a new decision by him, before the first deploy he keeps holds data.
 
 ### 2026-11-22 — the screen at move 3: an undo waiting when a group lands, and a keep's rivals
 

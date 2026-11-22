@@ -4,7 +4,7 @@ title: Alchemy domain
 description: Everything @alchemy.run/domain and what plugs into it offers, read at its main@dbfd0dd, concept by concept, with how inventory-import would use each. The reference the brief is built on, written so its pages can later become agent skills.
 status: active
 stage: shape
-next: decisions 1 to 40 of the brief are answered (2026-11-22; 9 fell away, 24 stands on infra I8) but for 21a, open in DECISIONS.md and asked when move 6 opens; 42 to 56 and 60 to 62 are asked each when its move opens; the pin is on main, and the review's model of move 1 is built on it and merged into main (0c4c5e5, not yet on the public remote)
+next: decisions 1 to 40 of the brief are answered (2026-11-22; 9 fell away, 24 stands on infra I8, 37 is start empty) but for 21a, open in DECISIONS.md and asked when move 6 opens; edge cases among several people on one import are settled by his standing rule and listed for him to overrule; 42 to 56 and 60 to 62 are asked each when its move opens; the pin is on main, and the review's model of move 1 is built on it and merged into main (0c4c5e5, not yet on the public remote)
 goals: []
 ---
 
@@ -82,7 +82,10 @@ A model of this app, outside the repository ([the trial](research/04-trial.md)):
   group checked 3 commands deep, on `dbfd0dd`, not hosted; 43 stories and 148 mutants, each leaving a rule not proved
   or failing a story, none passing both (32 leave one not proved only as unconfirmed: the real code refuted the
   solver's counterexample, so those 32 are held only by the stories they fail); the proofs cover what must never
-  happen, and the stories that each valid act is taken (his answer of 2026-11-22). The seventh is the model he chose
+  happen, and the stories that each valid act is taken (his answer of 2026-11-22). Ana, Dana and Carl, from here on, are
+  invented names for people of one organization reviewing the same import at the same time, not stored data and not
+  real accounts; the model settles, with proofs, what happens when their decisions on the same rows meet, so no press
+  is lost or applied without being seen. The seventh is the model he chose
   (`review15`): `review14` with his answer "No change, Ana's undo applies", a press over a group that leaves the row
   reading as it reads recording nothing, and only after the checks of what the sender saw on the row and of the
   matching; 135 rules proved, a row's act with 284 paths, seven rules across instances checked 3 commands deep and 46
@@ -91,9 +94,10 @@ A model of this app, outside the repository ([the trial](research/04-trial.md)):
   were. The row-by-row model of the fourth round stays on a branch of its own as the fallback, where on the pinned
   `734c27a` it gives 96 rules proved and 3 searched (its three rules on who may change a row stated on each of its two
   decisions), by the build's own report. The model he chose is built on `734c27a` and merged into main (`0c4c5e5`,
-  not yet on the public remote): 135 rules proved, 7 searched, 11 "can be taken" rules reached and 47 stories, by the
-  build's own report, checkable in `packages/catalog/model`. The per-row branch is not in this repository, so its
-  counts cannot be checked here. The `dbfd0dd` builds
+  not yet on the public remote), in `packages/catalog/model`: counted there, its lock keeps 135 rules of the kinds a
+  proof covers, 7 across instances and 11 "can happen", with 47 stories and 154 mutants; that the 135 are proved, the
+  7 searched and the 11 reached is the build's own report. The per-row model is on a local branch, not on main or the public remote, so
+  its counts are not checked from main. The `dbfd0dd` builds
   the trials installed are deleted by the library's registry a week after `main` moves past that commit; they were kept
   outside the repository, so the trials cannot be run again from the registry after that.
 - The second round stored values in a local Durable Object through the domain host (about 8 MiB is the limit), and
@@ -243,4 +247,8 @@ pages whose "Where this was read" names a file that changed.
   a waiting undo), and a seventh round (`review15`, the model he chose, with his answer "No change, Ana's undo applies":
   135 rules proved, 46 stories); 9 and 41 fell away, 24 stands on infra I8, and 42 to 56 and 60 to 62 are asked at their
   move. The brief written on his answers. The pin is on main; the review's model is built on it and merged into main
-  (`0c4c5e5`, not yet on the public remote); the rest of the build awaits "the brief matches".
+  (`0c4c5e5`, not yet on the public remote); the rest of the build awaits "the brief matches". Later the same day he
+  replaced decision 37's "Adopt at first touch" with "Start empty": nothing stored is carried into the model. He chose
+  a standing rule for several people on one import, "Keep it, stop asking me": a press from a screen that is behind is
+  never silently dropped or applied, it is held and shown; the cases it settles are listed in DECISIONS.md for him to
+  overrule.

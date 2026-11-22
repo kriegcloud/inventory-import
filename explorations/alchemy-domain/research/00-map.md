@@ -147,8 +147,8 @@ against each page. Not marked breaking, and changing what a page says:
   survive JSON, fails the model.
 - `6182c062`: a command's middleware list is typed in declaration order.
 - `36aef35d` and `7397367b`: a client's `import(target, events, { commandId, expectedVersion })` appends events
-  decided elsewhere without running `decide`; policies and sagas never react to them (one of two ways decision 37 of
-  the brief can adopt rows already stored; which is open).
+  decided elsewhere without running `decide`; policies and sagas never react to them (a fact about the library: under
+  decision 37's answer, "Start empty", the app carries no stored rows into the model, this way or another).
 - `907881e0`: a live read ends when its middleware's verdict runs out (`setExpiry`).
 - The package's exports close every `./*/internal` path.
 

@@ -45,3 +45,16 @@ From his own list of 2026-11-18, the items he marked as wanted, in his labels: "
 "Drizzle v1 on Durable Objects"; "GraphQL (effect/graphql)"; "ai-typesafe confidence"; "Resend email", with the note
 "Resend through https://github.com/alchemy-run/distilled/tree/main/packages/resend"; "Discord sign-in, distilled
 clients"; "Alchemy Git". He did not mark R2 presigned uploads.
+
+## 2026-11-22
+
+On what is deployed:
+
+> We can always tear down & redeploy from scratch. The idea is that we get our ideal version built. I don't care
+> about anything we've deployed yet we can start from scratch so that we have the best names & things.
+
+On the people in the questions put to him:
+
+> Who is Carl, Dana & Ana I'm not sure who these 'people' are so I've been hitting recommended answers this whole
+> time. Is this somehow related to existing data or something? This can all be thrown away as far as I'm concerned if
+> so.

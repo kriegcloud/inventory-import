@@ -56,9 +56,9 @@ layer(TypedApp)("an import of items", (it) => {
         }
         const saved = yield* client.imports.decide(decisions).pipe(marcus)
         // The answer says this save moved the draft by one; the same save sent again changes nothing and says so.
-        expect(saved).toEqual({ revision: staged.revision + 1, changed: true, notApplied: [] })
+        expect(saved).toEqual({ revision: staged.revision + 1, changed: true, notApplied: [], decidedSince: [] })
         const savedAgain = yield* client.imports.decide(decisions).pipe(marcus)
-        expect(savedAgain).toEqual({ revision: saved.revision, changed: false, notApplied: [] })
+        expect(savedAgain).toEqual({ revision: saved.revision, changed: false, notApplied: [], decidedSince: [] })
         const confirmed = yield* client.imports
           .commit({
             params: { id: staged.id },

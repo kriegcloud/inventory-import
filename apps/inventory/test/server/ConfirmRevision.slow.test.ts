@@ -47,7 +47,7 @@ layer(TypedApp)("a confirm names the revision its screen showed", (it) => {
             payload: { madeOn: R.map(acceptComma, () => staged.revision), set: acceptComma, clear: [] }
           })
           .pipe(dana)
-        expect(theirs).toEqual({ revision: staged.revision + 1, changed: true, notApplied: [] })
+        expect(theirs).toEqual({ revision: staged.revision + 1, changed: true, notApplied: [], decidedSince: [] })
 
         // Marcus confirms the picture he has, with a decision of his own he had not sent yet.
         const refused = yield* Effect.flip(

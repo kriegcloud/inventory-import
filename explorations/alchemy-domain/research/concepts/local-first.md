@@ -35,6 +35,7 @@ There is no "local-first" declaration. The pieces are a stable command id per in
 const sent = client.DecideRow(importKey, { row, step, saw, flags }, { commandId: `${session}:${n}` })
 
 // Decide locally, as the server would. `context` is required when the command's middleware provides something.
+// (This block is the first form, which named a version; the brief's confirm names `seen`, `screen` and `planAt`.)
 const outcome = Import.predict(state, new ConfirmImport({ reviewedAt: version }), {
   id: importKey,                      // beta.87 only; main reads the id from the command through `keyOf`
   now: DateTime.nowUnsafe(),
@@ -122,7 +123,8 @@ the decisions, `toDraft` and `fromDraft` keep them through a refresh, and `useSa
 `localStorage` and the chosen file to IndexedDB per member and organization. An undo is therefore just another
 delta, never a server-side undo.
 
-With a domain model, each act of the review is the intent, and the Import aggregate decides it. An intent is what the
+With a domain model, each act of the review is the intent, decided across the import's lifecycle instance and the
+row it names. An intent is what the
 person did ("decide these rows as …", "undo my step"), never the difference between two pictures of the draft: the
 [trial on saving review decisions](../07-review-decisions-trial.md) shows that a command of rows to set and rows to
 clear cannot hold the rule "no command clears a decision its sender did not make", and [the brief](../../BRIEF.md)
@@ -143,7 +145,7 @@ export const DecisionIntent = S.Struct({
   flags: S.String // the row's decision as the text the database holds
 })
 
-// Before Confirm is sent: what the Import aggregate would say, from the state the screen holds.
+// Before Confirm is sent: what the Import aggregate would say, from the state the screen holds (the first form).
 const preview = (state: ImportState, version: number, member: Member) =>
   Import.predict(state, new ConfirmImport({ reviewedAt: version }), {
     id: importKey,

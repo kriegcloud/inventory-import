@@ -1,7 +1,7 @@
 ---
 type: Reference
 title: Plain HTTP and OpenAPI (toHttpApi)
-description: toHttpApi publishes the calls of an Api you list as an Effect HttpApi group with an OpenAPI document; inventory-import would use it only for internal tools and keep its own /api/v1 contract for the screens.
+description: toHttpApi publishes the calls of an Api you list as an Effect HttpApi group with an OpenAPI document; this page's reading keeps /api/v1 for the screens and uses it only for internal tools, while the brief's decision 22 recommends the screens call the model's Api.
 tags: [alchemy-domain, surface]
 ---
 
@@ -255,6 +255,9 @@ rejection of the trial model; `AlreadyImported` carries one field, `reason`
 
 **Use:** keep `/api/v1` hand-written and move the handlers in the table onto `clientInProcess`; use `toHttpApi` only
 for an operators' `HttpApi` of its own, with a short, explicit `expose` list.
+
+The brief recommends otherwise in its decision 22: the screens call the model's Api, and `/api/v1` keeps what does
+not move (uploads, the staged table, sign-in, the status); `toHttpApi` serves the operator's document over `AdminApi`.
 
 ## Where this was read
 

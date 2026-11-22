@@ -4,7 +4,7 @@ title: Alchemy domain
 description: Everything @alchemy.run/domain and what plugs into it offers, concept by concept, with how inventory-import would use each. The reference the brief is built on, written so its pages can later become agent skills.
 status: active
 stage: shape
-next: Benjamin answers the brief's decisions, 1 to 22 first, and says whether it matches; the build starts after that and after the atoms goal is merged
+next: Benjamin answers the brief's decisions, 1 to 31 first, and says whether it matches; the build starts after that and after the atoms goal is merged
 goals: []
 ---
 
@@ -26,12 +26,13 @@ concept with its instance, its move and its check, and the decisions in the orde
 under it:
 
 1. [The map](research/00-map.md): every concept on one page, with its verdict. Fifty-four pages give 59 verdicts:
-   46 "use" on the published release, 8 "use, from main", and 5 "cannot yet", each with what is in the way.
+   46 "use" on the published release, 8 "use, from main", 4 "cannot yet", each with what is in the way, and one
+   (singletons and crons) put to Benjamin as a decision of the brief.
 2. [The pull request he pointed at](research/01-pr-3260-verify.md): `Verify`, which proves a model's rules.
 3. [This app's rules under Verify](research/03-this-apps-rules-under-verify.md): the app's own rules, declared and
    proved, and [the trial](research/04-trial.md) that ran them. Then
-   [the trial on saving review decisions](research/07-review-decisions-trial.md): two rounds, every source and every
-   report of Verify. Read its second round's table first.
+   [the trial on saving review decisions](research/07-review-decisions-trial.md): three rounds, with their sources
+   and Verify's reports. Read its third round's table first.
 4. [What was merged since the published release](research/02-merged-since-beta-87.md): what `main` has that npm
    does not.
 5. The concept pages, in [research/concepts/](research/concepts/), one file per concept under a stable name.
@@ -64,14 +65,17 @@ A model of this app, outside the repository ([the trial](research/04-trial.md)):
   `Verify`. Nineteen of the app's rules were proved for every state and every input, and one was checked over 5,173
   sequences of commands. A rule broken on purpose came back with the state, the command and the shortest sequence
   that breaks it.
-- On `main`, the saving of review decisions, in two rounds ([07](research/07-review-decisions-trial.md)). The first
-  showed that a command of rows to set and rows to clear cannot hold "no command clears a decision its sender did not
-  make". The second, run after a review of the brief, found the shape under which the review's rules are proved: the
-  import's lifecycle as its own instance, one instance per decided row, and every act a decision across both. Verify
-  verified that model with 27 rules proved and 1 checked. One instance per import proves nothing, by the prover's
-  design.
-- The same round stored values in a local Durable Object through the domain host (about 8 MiB is the limit), and
-  ran a decision, a relation, a model invariant, an `eventually` rule and a broken rule kept as a story.
+- On `main`, the saving of review decisions, in three rounds ([07](research/07-review-decisions-trial.md)). The
+  first showed that a command of rows to set and rows to clear cannot hold "no command clears a decision its sender
+  did not make". The second found the shape under which the review's rules are proved: the import's lifecycle as its
+  own instance, one instance per decided row, and every act a decision across both; one instance per import proves
+  nothing, by the prover's design. The third ran that shape as it would be hosted, with the app's fifteen fields, a
+  confirm that names what its screen received and the change its plan was built at, a group act, "no change", and
+  undo at every depth: 32 rules proved and 1 checked.
+- The second round stored values in a local Durable Object through the domain host (about 8 MiB is the limit), and
+  ran a decision, a relation, a model invariant, an `eventually` rule and a broken rule kept as a story. The third
+  ran one decision across two objects on that host in local workerd (4 requests an act, about 110 ms), an item with
+  replace and restore, the allowance by day, and members as their own instances.
 
 ## What the reading found
 
@@ -94,15 +98,17 @@ Each line is argued on the page it links to. These are findings, not decisions.
 
 **How review decisions are saved**
 
-- The request that saves decisions does not say which picture of the draft it was worked out from, so no check on
-  the server can tell a decision its maker took back from one a stale screen cleared
-  ([07](research/07-review-decisions-trial.md)).
+- On the atoms branch a save names the draft revision it was made on, and a confirm names the revision the screen
+  shows; but a save's rows to set and to clear are not checked against that revision, so the later save wins over a
+  newer decision by someone else, and any caller of the contract can send a stale clear
+  ([07](research/07-review-decisions-trial.md); the brief, "Problem").
 - An aggregate's state is one stored value, written again at every accepted command. In local workerd, through the
   domain host, 8.3 MB was stored and 8.5 MB was refused. The 2 MiB in the library's source is a guard of its cluster
   package. One instance per import passes 8 MiB at about 42,800 decided rows; one instance per row is a few hundred
   bytes ([07](research/07-review-decisions-trial.md), trials 1 and 5).
-- The prover cannot prove a rule over the app's real decision shape, or over a list. A row's decision is held as
-  text, and no state in the recommended shape holds a list.
+- The prover cannot prove a rule over the app's real decision shape, or over a list, and every union in a state or
+  a command multiplies the paths of each decision that reads it. A row's decision is held as text, "none yet" as the
+  empty text, and no state in the recommended shape holds a list.
 - A handler named `Effect.fn("name")(…)` and a schema imported from another package are read by the prover; a
   request context imported from another package is not.
 
@@ -125,7 +131,8 @@ Each line is argued on the page it links to. These are findings, not decisions.
   moment between them. A batch that fails is retried and never dropped, so today's confirm and take-back batches
   need a marker that makes a second delivery write nothing ([projection](research/concepts/projection.md)).
 - What a confirm costs depends on where its rows travel. For a 50,000-row file that creates 38,750 items: the
-  import as one aggregate whose event names a plan staged in D1, 4 Durable Object requests; the rows carried in the
+  import as one aggregate whose event names a plan staged in D1, 4 Durable Object requests with one consumer and
+  about 14 to 20 with the six the brief names; the rows carried in the
   import's own events in chunks of 1,000, 104 to 204; every item as its own aggregate, 193,750, and at least 271,250
   counting each object's first delivery ([host on Cloudflare](research/concepts/host-cloudflare.md); arithmetic,
   not measured).
@@ -196,12 +203,9 @@ pages whose "Where this was read" names a file that changed.
 - 2026-11-19: packet opened. Every docs page and source file read at both refs; one page per concept written,
   checked against the source in a second pass, then extended by a third pass over what the first had only
   outlined; the trial run on the published release and on `main`. Awaiting Benjamin's reading, then the brief.
-- 2026-11-20: the brief written, with the saving of review decisions modelled first from a second trial under
-  Verify ([07](research/07-review-decisions-trial.md)); the open questions renumbered to the brief's sixteen.
-  Benjamin's reversal of "core" recorded in ideal-architecture. Nothing built; awaiting his answers and "the brief
+- 2026-11-20: the brief written, with the saving of review decisions modelled first under Verify
+  ([07](research/07-review-decisions-trial.md)). Benjamin's reversal of "core" recorded in ideal-architecture.
+- 2026-11-20: a second and a third round of trials run and added to [07](research/07-review-decisions-trial.md); the
+  brief written again on them, with fifty-three decisions, one decision each, and his five answers on today's review
+  saving under "Answered" with the options he rejected. Nothing built; awaiting his answers and "the brief
   matches".
-- 2026-11-20: a review of the brief found sixty points, four of them blocking: its recommended answers left almost
-  no rule proved, its check of what an act's sender saw could not work, and the limit on a stored value was in
-  doubt. A second round of trials was run and added to [07](research/07-review-decisions-trial.md); the brief was
-  rewritten on it, with thirty-five decisions in the order they must be asked. His five answers on today's review
-  saving are under "Answered". Nothing built.

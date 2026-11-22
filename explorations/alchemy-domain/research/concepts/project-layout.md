@@ -117,7 +117,7 @@ Checked in, at `v2.0.0-beta.87`: `website/src/content/docs/domain/project-layout
 | `packages/domain` (one per model) | `packages/<context>/contract` + `packages/<context>/model`, for `catalog` and `access` | `contract` holds wire schemas, ids, reads, rejections and the `HttpApi` contract; it may import only `@inventory/kernel` among workspace packages. `model` holds rules, ports, handlers and in-memory twins; it may import its own `contract` and `kernel`. |
 | `packages/server` | `packages/<context>/host` + `apps/inventory/src/server` | `host` holds D1 adapters (`*.adapter.ts`), the HTTP wiring (`*.http.ts`) and `Host.ts`; the app composes everything in `App.ts` and `worker.ts`. |
 | `packages/web` (foldkit) | `packages/<context>/web` + `apps/inventory/src/web` | React screens (`*.screen.tsx`), controllers, atoms, machines. Not foldkit. |
-| shared middleware and context at the domain package root | `packages/kernel` | `Identity.middleware.ts`, `SameOrigin.middleware.ts`, `Actor.context.ts`, `Agent.context.ts`, `Ids.id.ts`. |
+| shared middleware and context at the domain package root | `packages/kernel` for `/api/v1`; each model's own package for the model | `Identity.middleware.ts`, `SameOrigin.middleware.ts`, `Actor.context.ts`, `Agent.context.ts`, `Ids.id.ts` stay in the kernel for `/api/v1`. The model's request context and its middleware are declared again in each model's package, because the prover reads no rule through a context imported by package name (the `.id` row below); one session lookup fills both. |
 | `alchemy.run.ts` | `alchemy.run.ts` re-exporting `packages/infra/src/Inventory.stack.ts` | Already an Alchemy stack (`Cloudflare.Website.Vite`). |
 | `"exports": { "./*": "./src/*.ts" }` | one named entry per file (`"./Review": "./src/Review/Review.rules.ts"`) | The app lists exports exactly, no wildcard. |
 | domain package imports only domain + effect | `model` also imports `@beep/schema` and `@inventory/kernel` | A `@alchemy.run/domain` dependency is outside the boundary law's reach: it checks workspace packages only. |
@@ -165,8 +165,8 @@ closest thing to upstream's pure domain package, and importable by `host` and `w
 | `.saga` | `model` | `src/Import/BringInFile.saga.ts` |
 | `.external` | `model` (declaration, as today); adapter in `host` | `src/Answer/Answerer.external.ts`; `host/src/Answerer.adapter.ts` |
 | `.api` | `model` | `src/Catalog.api.ts`; its HTTP surface stays in `host/src/Catalog.http.ts` |
-| `.middleware` | `kernel` (declaration); `access/host` (implementation) | `kernel/src/Identity.middleware.ts`; `access/host/src/SessionIdentity.adapter.ts` |
-| `.context` | `kernel` | `kernel/src/Actor.context.ts` |
+| `.middleware` | each model's package (declaration, reached by a relative path); `access/host` (implementation) | `catalog/model/src/Session.middleware.ts`; `access/host/src/SessionIdentity.adapter.ts`. The kernel's `Identity.middleware.ts` stays for `/api/v1` |
+| `.context` | each model's package, reached by a relative path | `catalog/model/src/Actor.context.ts`, `access/model/src/Actor.context.ts`; the kernel's `Actor.context.ts` stays for `/api/v1` |
 | stories and the `verify` test | `model/test` | `test/Catalog.story.test.ts`, `test/Catalog.model.test.ts` |
 | hosting (the Worker) | `host` + the app | `catalog/host/src/Host.ts`, `apps/inventory/src/server/App.ts`, `worker.ts` |
 

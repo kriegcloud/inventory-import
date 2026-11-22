@@ -428,6 +428,13 @@ a day by rows written and 100,000 / 4 = 25,000 by requests. Stored data in objec
 about 1.6 million imports in the included 5 GB-month. The plan's bytes sit in D1, under D1's own limits and pricing
 (not priced here), and a plan that is never confirmed needs sweeping.
 
+With the consumers the brief names for `ImportConfirmed` (arithmetic): `DraftRows`, the `ImportStatus` view,
+`ImportHistory`'s writer, the item saga's start, `MailOnConfirm` and `TellTheChannel`, six in all. The first consumer
+is in the 4 above (the command, its delivery, two backstop alarms); each further one adds its delivery and its own
+object's backstop alarm, and at most one more alarm if its work is queued again, so 2 to 3 requests. 4 + 5 × (2 to 3)
+= 14 to 19, about 14 to 20 a confirm of any size. Rows written grow by 8 a further consumer (its delivery), so 18 + 5 ×
+8 = 58.
+
 **(a2) The events carry the rows, in chunks.** One `ConfirmRows` command per chunk of rows (each recording one
 `RowsConfirmed` event with each row's outcome and the item values of ready rows), then one closing `CloseImport`
 (recording `ImportConfirmed`). Each command has its own command id, so a stopped confirm is resumed by sending the same

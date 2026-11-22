@@ -262,8 +262,9 @@ middleware's live layer (see [better-auth](./better-auth.md)).
 
 ## Verdict
 
-**Use:** make `CurrentActor` and `CurrentAgent` request contexts in the kernel, provide them from one RPC `Session`
-middleware backed by the Better Auth lookup, and check organization then role in every `decide` through one shared
+**Use:** make `CurrentActor` and `CurrentAgent` request contexts declared in each model's own package (the prover
+reads no rule through a context imported by package name; the kernel's stay for `/api/v1`), provide them from one RPC
+`Session` middleware backed by the Better Auth lookup, and check organization then role in every `decide` through one shared
 function in a file the aggregate imports relatively. Keep each command's middleware list to one entry until the
 ordering on the ref you run is settled ([command](./command.md)), and test the middleware itself, because the proof
 assumes it.

@@ -275,6 +275,9 @@ screens never carry them.
 **Use:** declare one Api per kind of client over the catalog and access models, and call it from the existing
 hand-written `HttpApi` handlers with `clientInProcess`, so the screens' contract stays the app's own.
 
+The brief recommends otherwise in its decision 22: the screens call the model's Api, because the Review step needs
+the pushed stream of acts either way; `/api/v1` keeps the uploads, the staged table, sign-in and the status.
+
 ## Where this was read
 
 - https://alchemy.run/domain/api (the live site documents beta.87)

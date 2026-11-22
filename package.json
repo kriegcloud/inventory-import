@@ -42,7 +42,7 @@
     "scratch:new": "bun packages/tooling/tool/cli/src/bin.ts scratch new",
     "scratch:list": "bun packages/tooling/tool/cli/src/bin.ts scratch list",
     "scratch:check": "bun packages/tooling/tool/cli/src/bin.ts scratch check",
-    "scratch:test": "bun run --cwd scratchpad tests",
+    "scratch:test": "bun packages/tooling/tool/cli/src/bin.ts scratch test",
     "scratch:serve": "bun run --cwd scratchpad serve",
     "scratch:graduate": "bun packages/tooling/tool/cli/src/bin.ts scratch graduate",
     "scratch:drop": "bun packages/tooling/tool/cli/src/bin.ts scratch drop",

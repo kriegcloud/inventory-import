@@ -176,6 +176,11 @@ export const ScratchFinding = S.TaggedUnion({
     message: S.String.pipe(S.annotateKey({ description: "What is wrong and what to do" }))
   },
   Typed: { experiments: S.Int.pipe(S.annotateKey({ description: "How many experiments were type-checked" })) },
+  Tested: {
+    name: S.String.pipe(S.annotateKey({ description: "Which tests ran: every experiment's, or one's" })),
+    code: S.Int.pipe(S.annotateKey({ description: "The test runner's exit code" })),
+    output: S.String.pipe(S.annotateKey({ description: "What the test runner said" }))
+  },
   TypeErrors: { output: S.String.pipe(S.annotateKey({ description: "What the type-checker said" })) },
   Over: {
     ended: Ended.pipe(S.annotateKey({ description: "The line appended to the log" })),
@@ -254,8 +259,10 @@ export const scratchSentence: (finding: ScratchFinding) => Line = ScratchFinding
   Problem: ({ where, message }) => err(`  ${where}: ${message}`),
   Typed: ({ experiments }) =>
     out(
-      `scratch:check OK  ${plural(experiments, "experiment passes", "experiments pass")} the type-checker and the Effect diagnostics`
+      `scratch:check OK  the scratchpad's configuration and ${plural(experiments, "experiment pass", "experiments pass")} the type-checker and the Effect diagnostics`
     ),
+  Tested: ({ name: which, code, output }) =>
+    code === 0 ? out(`scratch:test OK  ${which}\n${output}`) : err(`scratch:test FAIL  ${which}\n${output}`),
   TypeErrors: ({ output }) =>
     err(`scratch:check FAIL  the type-checker, with the Effect diagnostics, over the experiments:\n${output}`),
   Over: ({ ended, files, libraries }) =>
@@ -278,7 +285,9 @@ const ownState = (path: string) =>
  * @category rules
  */
 export const readNote = (text: string): O.Option<Note> => {
-  const head = O.fromNullishOr(/^---\n([\s\S]*?)\n---/.exec(text)?.[1])
+  // A note saved on Windows, or with a byte-order mark, is the same note.
+  const plain = Str.replace(/\r\n?/g, "\n")(Str.replace(/^\uFEFF/, "")(text))
+  const head = O.fromNullishOr(/^---\n([\s\S]*?)\n---/.exec(plain)?.[1])
   const fields = O.map(head, (found) =>
     R.fromEntries(
       A.flatMap(Str.split("\n")(found), (line) =>
@@ -291,10 +300,13 @@ export const readNote = (text: string): O.Option<Note> => {
   )
   return O.flatMap(fields, (found) =>
     S.decodeUnknownOption(Note)({
-      status: found["status"],
-      started: found["started"],
-      template: found["template"],
-      libraries: A.filter(A.map(Str.split(",")(found["libraries"] ?? ""), Str.trim), (library) => library !== "")
+      status: O.getOrUndefined(R.get(found, "status")),
+      started: O.getOrUndefined(R.get(found, "started")),
+      template: O.getOrUndefined(R.get(found, "template")),
+      libraries: A.filter(
+        A.map(Str.split(",")(O.getOrElse(R.get(found, "libraries"), () => "")), Str.trim),
+        (library) => library !== ""
+      )
     })
   )
 }
@@ -334,6 +346,57 @@ export const bunTypes: Install = Effect.gen(function* () {
   const repo = yield* Repo
   const answer = yield* repo.run("bun", ["run", "types"], { cwd: repo.join(repo.root, scratchpad) })
   return { code: answer.code, output: Str.trim(`${answer.stdout}\n${answer.stderr}`) }
+})
+
+/** The test runner over the scratchpad, given the folder to run: every experiment's, or one's. */
+export type RunTests = (
+  folder: string
+) => Effect.Effect<{ readonly code: number; readonly output: string }, RepoError, Repo>
+
+/**
+ * vitest in the scratchpad, through its `tests` script, limited to the files under one folder: the folder ends in a
+ * slash, so `experiments/xlsx-dates/` never matches `experiments/xlsx-dates-2/`.
+ */
+export const bunTests: RunTests = Effect.fn("Scratch.bunTests")(function* (folder: string) {
+  const repo = yield* Repo
+  const answer = yield* repo.run("bun", ["run", "tests", `${folder}/`], { cwd: repo.join(repo.root, scratchpad) })
+  return { code: answer.code, output: Str.trim(`${answer.stdout}\n${answer.stderr}`) }
+})
+
+/**
+ * `scratch test [name]`: every experiment's tests, or one experiment's only. The name is a folder, so `xlsx-dates`
+ * never runs `xlsx-dates-2` too (a test runner's name filter matches any part of a path).
+ *
+ * @category rules
+ */
+export const scratchTest = Effect.fn("Scratch.scratchTest")(function* (name: O.Option<string>, run: RunTests) {
+  const state = yield* reading()
+  if (O.isSome(name) && !A.some(state.experiments, (one) => one.slug === name.value)) {
+    return yield* refuse(
+      `${scratchpad}/experiments/${name.value}`,
+      `${scratchpad}/experiments/${name.value} is not there. Open: ${
+        state.experiments.length === 0
+          ? "none"
+          : A.join(
+              A.map(state.experiments, (one) => one.slug),
+              ", "
+            )
+      }`
+    )
+  }
+  const folder = O.match(name, { onNone: () => "experiments", onSome: (slug) => `experiments/${slug}` })
+  const ran = yield* run(folder)
+  // An experiment with no test ran nothing, which is no pass: the scratchpad passes when empty, an experiment does not.
+  const none = O.isSome(name) && /No test files found/.test(ran.output)
+  return A.of<ScratchFinding>(
+    ScratchFinding.cases.Tested.make({
+      name: O.getOrElse(name, () => "every experiment"),
+      code: none ? 1 : ran.code,
+      output: none
+        ? `${ran.output}\n${folder} has no test file: an experiment starts with one (\`bun run scratch:new\`)`
+        : ran.output
+    })
+  )
 })
 
 /** `bun install`, at the repository's root. */
@@ -648,7 +711,7 @@ export const scratchCheck = Effect.fn("Scratch.scratchCheck")(function* (types: 
     : A.of<ScratchFinding>(
         ScratchFinding.cases.Kept.make({ experiments: state.experiments.length, dependencies: declared.length })
       )
-  if (state.experiments.length === 0) return structure
+  // The type-checker runs on an empty scratchpad too: its own configuration files are in the project.
   const typed = yield* types
   return A.append<ScratchFinding, ScratchFinding>(
     structure,

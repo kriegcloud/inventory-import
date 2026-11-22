@@ -4,6 +4,7 @@ import * as DateTime from "effect/DateTime"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
+import * as Str from "effect/String"
 import * as TestClock from "effect/testing/TestClock"
 import {
   type Install,
@@ -14,7 +15,8 @@ import {
   scratchEnd,
   scratchList,
   scratchNew,
-  scratchSentence
+  scratchSentence,
+  scratchTest
 } from "../src/commands/Scratch/Scratch.rules.ts"
 import { typeName } from "../src/commands/Scratch/Scratch.templates.ts"
 import { Repo } from "../src/Repo.service.ts"
@@ -176,7 +178,7 @@ describe("scratch", () => {
       // The library is accounted for: the experiment's note names it.
       expect(result.checked).toEqual([
         "out: scratch:check OK  1 experiment, none with an install of its own; 4 dependencies accounted for",
-        "out: scratch:check OK  1 experiment passes the type-checker and the Effect diagnostics"
+        "out: scratch:check OK  the scratchpad's configuration and 1 experiment pass the type-checker and the Effect diagnostics"
       ])
     })
   )
@@ -223,7 +225,7 @@ describe("scratch", () => {
     })
   )
 
-  it.effect("an empty scratchpad lists nothing, passes its check, and is not type-checked", () =>
+  it.effect("an empty scratchpad lists nothing, and its check type-checks its own configuration", () =>
     Effect.gen(function* () {
       const result = yield* inTree(
         repository(),
@@ -236,9 +238,10 @@ describe("scratch", () => {
       )
       expect(result.listed).toEqual(["out: scratch:list  no experiment is open"])
       expect(result.checked).toEqual([
-        "out: scratch:check OK  0 experiments, none with an install of its own; 3 dependencies accounted for"
+        "out: scratch:check OK  0 experiments, none with an install of its own; 3 dependencies accounted for",
+        "out: scratch:check OK  the scratchpad's configuration and 0 experiments pass the type-checker and the Effect diagnostics"
       ])
-      expect(result.typed).toBe(false)
+      expect(result.typed).toBe(true)
     })
   )
 
@@ -365,6 +368,49 @@ describe("scratch", () => {
       })
     })
   )
+
+  it.effect(
+    "test runs one experiment's folder, never another whose name starts the same, and refuses one that is not there",
+    () =>
+      Effect.gen(function* () {
+        const asked: Array<string> = []
+        const run = (folder: string) =>
+          Effect.sync(() => {
+            asked.push(folder)
+            return {
+              code: 0,
+              output:
+                folder === "experiments/empty" ? "No test files found, exiting with code 0" : "Test Files  1 passed (1)"
+            }
+          })
+        const result = yield* inTree(
+          repository({
+            "scratchpad/experiments/xlsx-dates/NOTE.md": note("2026-11-22"),
+            "scratchpad/experiments/xlsx-dates-2/NOTE.md": note("2026-11-22"),
+            "scratchpad/experiments/empty/NOTE.md": note("2026-11-22")
+          }),
+          Effect.gen(function* () {
+            const one = yield* said(scratchTest(O.some("xlsx-dates"), run))
+            const every = yield* said(scratchTest(O.none(), run))
+            const empty = yield* Effect.map(scratchTest(O.some("empty"), run), render(scratchSentence))
+            const missing = yield* Effect.flip(scratchTest(O.some("xlsx"), run))
+            return { one, every, empty, missing: missing.message }
+          })
+        )
+        expect(asked).toEqual(["experiments/xlsx-dates", "experiments", "experiments/empty"])
+        expect(result.one).toEqual(["out: scratch:test OK  xlsx-dates\nTest Files  1 passed (1)"])
+        expect(result.every).toEqual(["out: scratch:test OK  every experiment\nTest Files  1 passed (1)"])
+        expect(result.empty.failed).toBe(true)
+        expect(result.missing).toBe("scratchpad/experiments/xlsx is not there. Open: empty, xlsx-dates, xlsx-dates-2")
+      })
+  )
+
+  it("reads a note saved on Windows or with a byte-order mark as the same note", () => {
+    const unix = note("2026-11-22", "service", "zod")
+    const windows = `\uFEFF${A.join(Str.split("\n")(unix), "\r\n")}`
+    expect(readNote(windows)).toEqual(readNote(unix))
+    expect(O.isSome(readNote(windows))).toBe(true)
+  })
 
   it("a line of the log reads back as what was written, and a name becomes a type's", () => {
     const lines = [

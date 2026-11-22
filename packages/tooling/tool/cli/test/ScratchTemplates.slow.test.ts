@@ -1,3 +1,4 @@
+// @effect-diagnostics nodeBuiltinImport:off
 // Every template runs as written: `scratch new` makes an experiment from each, and then the real test runner and
 // the real type-checker, with the Effect diagnostics, pass over all of them. Slow, because it starts both.
 //
@@ -7,12 +8,14 @@
 //
 // What the test runner found is read from its JSON report, never from what it prints: its summary line is coloured
 // on CI (`CI` is set there) and not in a terminal, and a test that read it passed here and failed on GitHub.
+import { existsSync } from "node:fs"
 import { describe, expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as S from "effect/Schema"
 import { type Install, scratchNew } from "../src/commands/Scratch/Scratch.rules.ts"
 import { Repo } from "../src/Repo.service.ts"
+import { slowLimits } from "../../../../../vitest.shared.ts"
 import { inTree } from "./support/tree.ts"
 
 /** The parts of vitest's JSON report the test reads. */
@@ -25,8 +28,16 @@ const Report = S.Struct({
 
 const here = new URL("../../../../../", import.meta.url).pathname
 const noInstall: Install = Effect.succeed({ code: 0, output: "" })
+// The Verify template needs the prover, which is installed at the root only once a package asks for it. Until then
+// this test says plainly that it did not run it, and the template is checked by hand.
+const proverInstalled = existsSync(new URL("node_modules/@alchemy.run/domain/package.json", `file://${here}`))
+const templates = proverInstalled
+  ? (["probe", "service", "screen", "verify"] as const)
+  : (["probe", "service", "screen"] as const)
+
 const copied = [
   "tsconfig.base.json",
+  "vendor/alchemy/sources.json",
   "scratchpad/package.json",
   "scratchpad/tsconfig.json",
   "scratchpad/vitest.config.ts"
@@ -34,7 +45,9 @@ const copied = [
 
 describe("the scratchpad's templates", () => {
   it.effect(
-    "a probe, a service and a screen pass their tests and the type-checker as `scratch new` writes them",
+    proverInstalled
+      ? "a probe, a service, a screen and a Verify model pass their tests and the type-checker as `scratch new` writes them"
+      : "a probe, a service and a screen pass their tests and the type-checker as `scratch new` writes them (the Verify template is not run: @alchemy.run/domain is not installed at the root)",
     () =>
       Effect.gen(function* () {
         const result = yield* inTree(
@@ -51,7 +64,7 @@ describe("the scratchpad's templates", () => {
             )
             yield* repo.run("ln", ["-s", repo.join(here, "node_modules"), repo.join(repo.root, "node_modules")])
             yield* Effect.forEach(
-              ["probe", "service", "screen"] as const,
+              templates,
               (template) => scratchNew({ name: `try-${template}`, template, question: "" }, noInstall),
               { concurrency: 1, discard: true }
             )
@@ -79,12 +92,18 @@ describe("the scratchpad's templates", () => {
           failed: A.flatMap(report.testResults, (file) =>
             file.status === "passed" ? [] : [`${file.name}: ${file.message}`]
           )
-        }).toEqual({ code: 0, success: true, files: "3 of 3", tests: "4 of 4", failed: [] })
+        }).toEqual({
+          code: 0,
+          success: true,
+          files: proverInstalled ? "4 of 4" : "3 of 3",
+          tests: proverInstalled ? "6 of 6" : "4 of 4",
+          failed: []
+        })
         expect({ code: result.types.code, said: `${result.types.stdout}${result.types.stderr}` }).toEqual({
           code: 0,
           said: ""
         })
       }),
-    600_000
+    slowLimits.testTimeout
   )
 })

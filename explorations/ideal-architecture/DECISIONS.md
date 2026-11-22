@@ -1209,7 +1209,7 @@ chose; the agent recommended the same.
 
 Three defaults I was shown and accepted with the whole: the warning is at 30 days old or 200 files; an experiment
 that needs a database or a dev server keeps its state in its own ignored folder (`.state`) and on its own port,
-never the app's; a build session may use the scratchpad for trial code instead of a cache folder.
+never the app's; trial code written while building something goes in the scratchpad, not a cache folder.
 
 The agent chose these, and I was not asked:
 

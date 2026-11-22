@@ -11,12 +11,14 @@ import * as O from "effect/Option"
 import { emit } from "../../Report.schema.ts"
 import {
   bunInstall,
+  bunTests,
   bunTypes,
   scratchCheck,
   scratchEnd,
   scratchList,
   scratchNew,
-  scratchSentence
+  scratchSentence,
+  scratchTest
 } from "./Scratch.rules.ts"
 import { Template, templates } from "./Scratch.templates.ts"
 
@@ -36,6 +38,16 @@ const question = Flag.String("question").pipe(
 export const scratchNewCommand = Command.make("new", { name, template, question }, (flags) =>
   Effect.flatMap(scratchNew(flags, bunInstall), emit(scratchSentence))
 ).pipe(Command.withDescription("Start an experiment in its own folder of the scratchpad, from a template that runs"))
+
+const testedName = Argument.String("name").pipe(
+  Argument.withDescription("One experiment's name; every experiment's tests when none is given"),
+  Argument.optional
+)
+
+/** `scratch test [name]`: the experiments' tests, or one experiment's only. */
+export const scratchTestCommand = Command.make("test", { name: testedName }, (flags) =>
+  Effect.flatMap(scratchTest(flags.name, bunTests), emit(scratchSentence))
+).pipe(Command.withDescription("Run every experiment's tests, or one experiment's only"))
 
 /** `scratch list`: what is open, what is past a limit, and what the ended ones taught. */
 export const scratchListCommand = Command.make("list", {}, () =>
@@ -82,6 +94,7 @@ export const scratchCommand = Command.make("scratch").pipe(
     scratchDropCommand,
     scratchGraduateCommand,
     scratchListCommand,
-    scratchNewCommand
+    scratchNewCommand,
+    scratchTestCommand
   ])
 )

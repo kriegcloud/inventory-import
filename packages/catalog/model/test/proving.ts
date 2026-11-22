@@ -3,8 +3,6 @@
 import type * as Prove from "@alchemy.run/domain/Prove"
 import * as A from "effect/Array"
 import * as Match from "effect/Match"
-import * as O from "effect/Option"
-import * as R from "effect/Record"
 import * as Str from "effect/String"
 
 /**
@@ -40,32 +38,3 @@ export const standingOf = (verdict: Prove.Verdict): string =>
 /** One line for each rule a decision must keep: how it stands, then its name. */
 export const standings = (report: Prove.DecisionReport): ReadonlyArray<string> =>
   A.map(report.rules, (rule) => `${standingOf(rule.verdict)}  ${rule.name}`)
-
-/**
- * The rules about who may change an instance of an aggregate with no command of its own. Each decision that records
- * on one of these aggregates states them under these names (`CLAUDE.md`, "The model's blocks: what Verify reads").
- */
-export const ruleOfWhoMayChange: Readonly<Record<string, ReadonlyArray<string>>> = {
-  Row: ["NobodyClearsAnotherPersonsDecision", "OnlyItsOwnOrganizationChangesTheRow", "AViewerChangesNoRow"],
-  Group: ["NobodyUndoesAnotherPersonsGroup", "OnlyItsOwnOrganizationChangesTheGroup", "AViewerChangesNoGroup"]
-}
-
-/** The rules about who may change an instance of this aggregate, or none when it has commands of its own. */
-export const whoMayChange = (aggregate: string): ReadonlyArray<string> =>
-  O.getOrElse(R.get(ruleOfWhoMayChange, aggregate), () => A.empty<string>())
-
-/**
- * What a decision's report lacks: for each aggregate it reads, at least one rule of that aggregate (so a `reads`
- * entry the prover no longer sees shows), and the rules about who may change it that the decision must state itself.
- * Empty when nothing is missing. Which rules there are, one by one, is the lock's, in the search of the whole model.
- */
-export const missingRules = (report: Prove.DecisionReport): ReadonlyArray<string> =>
-  A.flatMap(report.reads, (read) => [
-    ...(A.some(report.rules, (rule) => Str.startsWith(`${read.aggregate}.`)(rule.name))
-      ? []
-      : [`no rule of ${read.aggregate}`]),
-    ...A.map(
-      A.filter(whoMayChange(read.aggregate), (name) => !A.some(report.rules, (rule) => rule.name === name)),
-      (name) => `does not state ${name}`
-    )
-  ])

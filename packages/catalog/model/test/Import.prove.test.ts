@@ -25,13 +25,9 @@ layer(NodeServices.layer)("Import", (it) => {
       const lines = A.flatMap([...report.invariants, ...report.transitions], (rule) =>
         A.map(rule.commands, (proof) => `${standingOf(proof.verdict)}  ${rule.name}  ${proof.command}`)
       )
-      // What is not proved, by name, with what the solver found; and every rule is proved for every command. Which
-      // rules there are is the lock's, in the search of the whole model.
+      // Ours, because `Prove` takes no lock and no `require`: what is not proved, by name, with what the solver found.
+      // Which rules there are, and that each stays proved, is the library's, in the search of the whole model.
       expect(notProved(lines), said).toEqual([])
-      expect(
-        A.map([...report.invariants, ...report.transitions], (rule) => rule.commands.length),
-        said
-      ).toEqual(A.map([...report.invariants, ...report.transitions], () => report.commands.length))
       expect(report.initial, said).toBe(true)
       expect(
         A.map(report.invariants, (rule) => rule.initial),

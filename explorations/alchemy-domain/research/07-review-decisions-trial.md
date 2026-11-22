@@ -1,7 +1,7 @@
 ---
 type: Research
 title: "Trial: saving review decisions, under Verify"
-description: Six rounds of models of how a review's decisions are saved, run through Verify on the library's main on 2026-11-19 to 2026-11-22. The first shows that a set-and-clear difference cannot hold the rule "no command clears a decision its sender did not make". The second finds the shape under which the review's rules are proved, measures the largest value an object stores, and runs a decision, a relation, a model invariant and an eventually rule. The third runs that shape as it would be hosted, with the app's fifteen fields (32 rules proved, and two orderings let through), the item with replace and restore, the allowance by day, members as instances, each proof alone, and one decision across two objects in local workerd. The fourth closes those orderings and every other ordering found that a model can hold, and measures that model in local workerd. The sources and Verify's reports, with what is proved, what is only checked, and what was not run; a report cut short says which lines it shows.
+description: Six rounds of models of how a review's decisions are saved, run through Verify on the library's main on 2026-11-19 to 2026-11-22. The first shows that a set-and-clear difference cannot hold the rule "no command clears a decision its sender did not make". The second finds the shape under which the review's rules are proved, measures the largest value an object stores, and runs a decision, a relation, a model invariant and an eventually rule. The third runs that shape as it would be hosted, with the app's fifteen fields (32 rules proved, and two orderings let through), the item with replace and restore, the allowance by day, members as instances, each proof alone, and one decision across two objects in local workerd. The fourth closes those orderings and every other ordering found that a model can hold, and measures that model in local workerd. The fifth decides a group of rows as one unit, compares the reading of a row through its groups with the review's own reducer over generated sequences, and measures one group act in local workerd. The sixth is the model the brief's answers describe: undo walks back through the groups still in force, a row's undo names the last group act, every command has a story and every check a mutant (135 rules proved). The sources and Verify's reports, with what is proved, what is only checked, and what was not run; a report cut short says which lines it shows.
 ---
 
 # Trial: saving review decisions, under Verify
@@ -3971,7 +3971,7 @@ source below is complete unless it is marked as an excerpt; every report is prin
 | 9 | The allowance by the UTC day, the day held as a day number (`AllowanceDay`) | **Verified. 7 rules proved**; no reset command, no cron | 5.2 s |
 | 9 | The same with the day as its date text | **Not verified**: the prover does not order text | |
 | 9 | Today's rolling 24 hours, the times held as a list (`AllowanceRolling`) | All 6 rules **checked**, not proved; six stories pass | 14.7 s |
-| 10 | Members as their own instances, three decisions across the organization, the member and the sender's own record (`Access`) | **Verified. 19 rules proved, 2 checked**; three stories pass | 88 s for two passes |
+| 10 | Members as their own instances, four decisions (founding, adding, changing a role, removing) across the organization, the member and the sender's own record (`Access`) | **Verified. 19 rules proved, 2 checked**; three stories pass | 88 s for two passes |
 | 11 | `Prove.decision` and the lifecycle's report alone, on the second round's 27-rule model | **Proved**, the 27 between them | 13.4 s, 2.6 s, 1.8 s |
 | 12 | One decision across two aggregates on the domain's Durable Object host, in local workerd | Recorded on both or refused with neither changed; 4 requests between objects an accepted act, 3 a refused one | about 110 ms an act |
 
@@ -7430,8 +7430,8 @@ them, runs stories of everything else a person would call wrong against what clo
 | # | What | Result | Time, load before and after |
 | --- | --- | --- | --- |
 | 13 | Two orderings as stories that must be refused, on the third round's model (trial 7) | **All three stories fail** there: the commands are accepted | under 1 s |
-| 13 | A first repair (`review9`): the import numbers every change, the row seals what lies below its decision | **Verified. 38 rules proved**, 1 checked; the three stories pass. Then 36 stories of behaviour a person would call wrong passed on it too | 248 s, 31.24 39.37 36.26 to 42.30 40.62 37.50 |
-| 13 | A second repair (`review10`) | **Verified.** The 36 are refused, or left as a question. Then 33 more stories passed on it | 459 s, 38.50 36.19 36.88 to 66.34 68.01 52.20 |
+| 13 | A first repair (`review9`): the import numbers every change, the row seals what lies below its decision | **Verified. 38 rules proved**, 1 checked; the three stories pass. Then 36 stories of behaviour a person would call wrong passed on it too (their output was not kept) | 248 s, 31.24 39.37 36.26 to 42.30 40.62 37.50 |
+| 13 | A second repair (`review10`) | **Verified.** The 36 are refused, or left as a question. Then 33 more stories passed on it (their output was not kept) | 459 s, 38.50 36.19 36.88 to 66.34 68.01 52.20 |
 | 13 | The final model with the undo of a group added by a branch in the import's fold | **Nothing proved of `Undoing`**: past 4,096 paths | 517 s, 33.58 48.79 50.05 to 90.45 64.16 54.79 |
 | 13 | The final model (`review11`), `Verify.model` | **Verified. 93 rules proved**, 1 checked (the relation) | 460.56 s, 33.22 32.99 38.45 to 55.77 42.02 39.92 |
 | 13 | `Prove.decision(Deciding)` on it | **Proved**, 332 paths | 25.43 s, 25.50 31.61 38.17 to 33.22 32.99 38.45 |
@@ -10448,7 +10448,8 @@ with other work; the load average stands beside each time, and no timeout was ra
 | 16 | The fold over units against today's `act`, a property over generated sequences | **Equal after every action of 50,000 sequences**, when a group's rows are split by what each got; unequal with one patch a group | 14 s for 25,000 |
 | 17 | The one-unit model on the Durable Object host in local workerd | One act for a group of 9, 600, 6,000 and 50,000 rows: a median of 95 to 214 ms, its undo 64 to 191 ms; no size refused | below, at loads of 36 to 60 |
 
-"Proved" here is of `review12` and its two variants, printed below, and of nothing else.
+"Proved" here is of `review12`, its two variants and `review13`, as each row names, and of nothing else. `review12` is
+printed below whole; `review13` is `review12` with the one check and rule named under "Two variants".
 
 ## Trial 15. A group as its own instance
 
@@ -11833,7 +11834,7 @@ action.
 
 ```ts
 // Trial, not app code: decisions stored as units (one per decided row, one per act over several rows) and read
-// back by a fold, row by row, from the units as they stand now. `act` in the worktree is the oracle.
+// back by a fold, row by row, from the units as they stand now. `act` in this repository is the oracle.
 const WT = "<repository>"
 import {
   appliedGroups,
@@ -12248,7 +12249,7 @@ export const plain = (decisions: Record<string, RowDecision>) => {
 
 ```ts
 // Trial: the fold over units equals act(...).state.decisions after EVERY action of generated sequences.
-// fast-check is not installed in the worktree; this imports beep-effect's copy (4.10.3) by absolute path.
+// fast-check is not installed in this repository; this imports beep-effect's copy (4.10.3) by absolute path.
 import fc from "<beep-effect>/node_modules/fast-check/lib/fast-check.js"
 import { describe, expect, it } from "vitest"
 import {

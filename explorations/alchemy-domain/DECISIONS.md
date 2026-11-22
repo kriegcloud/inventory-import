@@ -15,16 +15,17 @@ it.
 
 Decisions 1 to 40 shape the first moves. Decisions 41 to 62 can wait for the move that needs them. "Changes" names the
 earlier answers that remove or change an option. Decisions 1 to 8, 10 to 23, 25 to 40 and 57 to 59 were answered on
-2026-11-22 and are under "Answered"; 9 and 41 fell away with his answer to 7 and were not asked. Of 1 to 40 only three
-points his answers left are open: 14a and 14b, under decision 14, and 34a, under decision 34; 24 stands on his earlier
-infra answer, I8 ("Close sign-up; I add accounts", 2026-11-19), and was not asked again: it is not open. Decisions 42 to
-56 and 60 to 62 are asked each when its move opens, as he chose on 2026-11-22. The numbers of the others stay as the
-brief gives them.
+2026-11-22 and are under "Answered"; 9 and 41 fell away with his answer to 7 and were not asked. Of 1 to 40 only four
+points his answers left are open: 14a and 14b, under decision 14, 21a, under decision 21, and 34a, under decision 34; 24
+stands on his earlier infra answer, I8 ("Close sign-up; I add accounts", 2026-11-19), and was not asked again: it is not
+open. Decisions 42 to 56 and 60 to 62 are asked each when its move opens, as he chose on 2026-11-22. The numbers of the
+others stay as the brief gives them.
 
 | # | Question | Recommended in the brief | Changes | Where it is argued |
 | --- | --- | --- | --- | --- |
 | 14a | A person decides a rival row while a keep stands: does their decision win over the keep? | | 14 | [the brief](BRIEF.md), decision 14 |
 | 14b | Two keeps of one SKU in the same moment: both are taken and both rows are left out. Is that what happens? | | 14 | [the brief](BRIEF.md), decision 14 |
+| 21a | With Better Auth's organization writes closed, sign-up no longer founds an organization: does the operator found each one with `FoundOrganization` on `AdminApi`, for an account that exists, and who is its actor before any member row exists? | | 21 | [the brief](BRIEF.md), decision 21 |
 | 34a | Where in CI does each model's search run? | | 34 | [the brief](BRIEF.md), decision 34 |
 | 42 | What answers the Items page? | A query that answers today's page | | [query](research/concepts/query.md) |
 | 43 | Do suggestions start by the person's press, or by themselves? | By the press, as today | | [policy](research/concepts/policy.md) |
@@ -86,7 +87,9 @@ at Confirm. Rejected: "Their decision stands"; "As today: your screen wins".
 In the model (trial 13): the import numbers every change. The confirm names the last change its screen has received with
 none before it missing, the change its plan was built at, and what its button said; the import takes it only when both
 numbers are its last, the plan does what was shown, and no group act is being sent (`AConfirmNamesEveryChange`,
-`APlanIsOfEveryChange`, `APlanDoesWhatWasShown`, `NothingEndsAReviewWhileAGroupIsSent`, proved). The rule for the
+`APlanIsOfEveryChange`, `APlanDoesWhatWasShown`, `NothingEndsAReviewWhileAGroupIsSent`, proved). In the model he later
+chose (the sixth round, `review14`) a group is one act and is never "being sent": the first three rules are proved there
+too, and the fourth is not in it. The rule for the
 number a screen may name ran as a property, on a copy of the rule written in the test and not on the screen's code. That
 the screen sends Confirm only after its own acts came back, and that the handler builds the plan from rows written up to
 that change, are tests to write: not run. Reverse: a new decision by him.
@@ -164,8 +167,12 @@ recommended the same. Reverse each: a new decision by him.
 | 3 | A person saves, for a row, the decision someone else already made there. Is it theirs too? | No: it changes nothing, and the answer says so, naming whose it is; yes: it is recorded over the other's as their own | "No, it stays Dana's" |
 | 6 | The stored items changed since the screen was drawn, so Confirm would do something else than its button says. What happens? | It is refused, the screen shows the new counts, and the person confirms again; as today: it is confirmed, and the result says what it did | "Refuse, show, confirm again" |
 
-What each leaves unproved is in the brief under its number: for 2, that the queue holds the act and Confirm waits; for 3,
-that the screen says whose the row is; for 6, what the two digests cover.
+What each leaves unproved is in the brief under its number: for 2, that the queue holds the act and Confirm waits; for
+3, that the screen says whose the row is, and, under decision 7's later answer (a group is one unit), that "No, it stays
+Dana's" and "Answer says 'no change'" hold only when the screen sends `covered: false` and leaves out of a group the
+rows that already hold what it gives: no rule checks `covered`, and with it set a repeat is recorded as the sender's
+(the brief, decisions 3 and 7; not run); for 6, what the two digests cover. That condition was not put to him with
+decision 7.
 
 ### 2026-11-22 — decisions 4, 13, 15 and 16 of the brief
 
@@ -218,6 +225,9 @@ A fourth round of the same dialog. Of each: I chose; the agent recommended the s
 | 14 | What is a keep of one of two rows, when someone decides the other row meanwhile? | The keep is one act on the kept row, and `review` leaves its rivals out by rule; one decision across the rows that share the SKU; as today, row by row | "One act on the kept row" |
 | 17 | Is an item an aggregate whose rules Verify holds? | Yes: every item is its own instance, its record held as text; no: items stay rows that one batch writes per confirm | "Yes, each item an object" |
 | 19 | What happens when a confirm's write keeps failing? | The import stays confirmed and the write keeps being retried; after it has failed for a set time, the server opens the import again | "Stay confirmed, keep retrying" |
+
+His answer to 11 holds for single-row acts; for a group its maker took back, see the entry "an undo after a group, and
+an undo behind a group" below.
 
 With decision 17 he was told: ten rules are proved, of the trial's model; items arrive over minutes, and the Items page
 can show part of an import; 38,750 items take 194,000 to 271,000 requests, worked out and not measured; one object per
@@ -303,6 +313,12 @@ a property over 50,000 generated sequences holds the reading of a row through it
 that read through groups are not run. With decision 8 he was told the one case in which taking back an earlier group is
 not exact: an accept pressed because that group had made the proposal stays accepted.
 
+What "the last group act" means, as it was put to him with decision 8: the last group still in force. "Ana's undo is
+refused and says Dana's group came after. She can undo once Dana has undone hers, or decide those rows again." So undo
+walks back through the groups: when the last group in force is taken back, the one before it is the last in force
+again. The model of that is the trial page's sixth round (`review14`: `OnlyTheLastGroupInForceIsTakenBack`,
+`ThenTheOneUnderItIsTheLastInForce`, proved).
+
 The 214 ms was, each time, the first group act on a fresh import, on the model before the last-group rule (`review12`,
 trial 17).
 
@@ -320,6 +336,13 @@ variants each failing their rule. Is that enough?" Answer: "Yes, tests hold it, 
 recommended the same. The proofs cover what must never happen; the stories cover that each valid act is taken; the
 documents and any page that shows the proofs say exactly that split. Rejected: "Trial a rule for it first". Reverse: a
 new decision by him.
+
+The eight broken variants named in the question (of `review12`) each removed a refusal and were caught by the prover
+(`NotProved`): they show that the proofs break when a check is removed, which is the half of what must never happen. A
+variant that records nothing proved every rule and was caught only by a story. On the model he chose (the trial page's
+sixth round, `review14`) that each valid act is taken is held by its 43 stories, each of the eleven commands taken in a
+story with its events asserted; each of its 11 mutants whose act records nothing breaks no rule and fails at least one
+story.
 
 ### 2026-11-22 — an undo after a group, and an undo behind a group
 

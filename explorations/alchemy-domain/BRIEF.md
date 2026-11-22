@@ -1,7 +1,7 @@
 ---
 type: Brief
 title: "Brief: the app on @alchemy.run/domain"
-description: How inventory-import uses all of @alchemy.run/domain and the extras Benjamin asked for. The saving of review decisions is modelled first, in the shape he chose, an import, its rows and its groups as three aggregates with four decisions and eleven commands over the app's fifteen fields, and on the library's dbfd0dd Verify proves its 135 rules and checks seven more across instances; then one table of every concept with its worked instance, its move and a check that fails without it; then the decisions that are his, one decision each, most consequential first, with what one large import costs under his answers. Written only; nothing is built until he signs and the atoms goal is merged.
+description: How inventory-import uses all of @alchemy.run/domain and the extras Benjamin asked for. The saving of review decisions is modelled first, in the shape he chose, an import, its rows and its groups as three aggregates with four decisions and eleven commands over the app's fifteen fields, and on the library's dbfd0dd Verify proves its 135 rules and checks seven more across instances, the proofs covering what must never happen and 43 stories that each valid act is taken; then one table of every concept with its worked instance, its move and a check that fails without it; then the decisions that are his, one decision each, most consequential first, with what one large import costs under his answers. Written only; nothing is built until he signs and the atoms goal is merged.
 ---
 
 # Brief: the app on `@alchemy.run/domain`
@@ -102,10 +102,10 @@ and the model he chose was not.
   length into a text, nor read a loop, so it reads no hash.
 - **The group as one unit, before the last-group rule** (trials 15 to 17, for decision 7, on `review12`): 123 rules
   proved, the four decisions with 42 to 292 paths; one act for 6,000 rows a median of 214 ms in local workerd, each time
-  the first group act on a fresh import; and the reading of a row's decision through its groups equals today's `act`
-  over 50,000 generated sequences, when a group's rows are split by what each got. The same reading was then run for one
-  person and for two against main's `act`, with `review14`'s walk-back undo (under "The reading of a row through its
-  groups").
+  the first group act on a fresh import; and the reading of a row's decision through its groups equals today's `act` for
+  one person over 50,000 generated sequences, when a group's rows are split by what each got. The same reading was then
+  run for one person and for two against main's `act`, with `review14`'s walk-back undo (under "The reading of a row
+  through its groups").
 - **No rule holds that an act is taken.** A `decide` that records nothing for every act proved every rule of trial 13's
   model (run in trial 15): the prover checks a decision's rules on what an act records. On `review14` each of the four
   such mutants ends `NotProved`, as never accepted: that holds only that some act can be recorded, not that each valid
@@ -138,8 +138,9 @@ and the model he chose was not.
 - **One instance per import proves nothing**, by the prover's design (a list is tried with at most 2 items more than its
   schema asks for); its state passes 8 MiB at about 42,800 decided rows (the length of its JSON, for one mix of
   decisions).
-- **What the prover reads**: handlers written `Effect.fn("name")(…)`; an id or a value schema from another package; not
-  a request context imported from another package; `new Event(…)`, not `Event.make(…)`.
+- **What the prover reads**: handlers written `Effect.fn("name")(…)` (whose parameters are typed `any` unless `keyOf`'s
+  parameter is annotated); an id or a value schema from another package; not a request context imported from another
+  package; `new Event(…)`, not `Event.make(…)`.
 
 ## Sketch
 
@@ -164,7 +165,13 @@ model `Catalog` is `Review` and `CatalogApi` is `ReviewApi`.
 **The import numbers every change**, one higher each time, so no check rests on an id a sender makes. A step is only the
 label of one press; a group act is one change under its step, and a step decides at most one group (`StepTaken`). The
 rules that read who is acting are stated on the decisions, not on the row and the group, because the library types an
-aggregate's rule with the context its own commands provide and those two have none.
+aggregate's rule with the context its own commands provide and those two have none. `review14` has no error under a
+strict type-check, with no cast. Under the repository's profile it has 133 Effect diagnostics and no type error: 73
+`newSchemaClass` (decision 33's answer keeps `new` in the files that hold a `decide`), 32 `effectFnOpportunity`, 26
+`preferEffectArray`, 1 `missingPipeableSignature` and 1 `schemaClassMissingBrand`. Its functions are written `(p) =>
+Effect.gen(...)`, because written `Effect.fn(function* (p) ...)` their parameters were typed `any`. The `Effect.fn` form
+with `keyOf`'s parameter annotated was probed on the per-row model at `734c27a`, not on `review14`. Move 1 proves the
+four decisions and `Verify.model` again on the form it writes, and takes the counts from that run.
 
 - **A row's act names the decision it saw on its row**, by the change that recorded it, the matching it was made on,
   whatever it decides, how many times the import had been confirmed (its opening), and the import's last group act as
@@ -481,7 +488,7 @@ check ran in a trial named on the trial page.
 | --- | --- | --- | --- |
 | Model | `Catalog`, `Access`, `Usage` | 1, 6, 2 | `Verify.model` of each, every rule's standing held in the library's lock file (his answer of 2026-11-22; not run) and asserted by name. The trials ran `Review` (`review14`) and `Access`; `Usage` not run |
 | Command, event, rejection | `DecideRow`, `RowDecided`, `GroupedSince`; `DecideGroup`, `GroupDecided`, `GroupedAfter`; `ConfirmImport`, `ImportConfirmed`, `ReviewMovedOn` | 1 | A story for each of the eleven commands accepted and for each refusal, each failing on a model whose `decide` records nothing for that command (on `review14` each mutant that records nothing fails stories); a "can happen" rule (`sometimes`) for each command, answered "reached". The rules not run |
-| Aggregate | `Import`, `Row`, `Group`, `Item`, `Allowance`, `Organization`, `Member` | 1, 4, 2, 6 | Each one's Verify test, with a mutant beside each check that must break its rule or fail a story |
+| Aggregate | `Import`, `Row`, `Group`, `Item`, `Allowance`, `Organization`, `Member` | 1, 4, 2, 6 | Each one's Verify test, with a mutant beside each check that must break its rule or fail a story. The mutants ran on the review's model only (`review14`, 148); for `Item`, `Allowance`, `Organization` and `Member`: not run |
 | Annotations | A description on every served command, view, stream and query, and on each Api | 1 on | A test that fails on a served declaration with none. Not run |
 | Decision | `Deciding`, `Undoing`, `DecidingGroup`, `UndoingGroup`; `FoundOrganization`, `AddMember`, `ChangeRole`, `RemoveMember` | 1; 6 | `Prove.decision` of each in `bun run check`, its standing asserted. The members' four with `MemberEmail` not run |
 | Relation | `ARowBelongsToItsImportsOrganization`, `AGroupBelongsToItsImportsOrganization` (proved on `review14`); `AMemberWhoIsInIsCounted` (checked, trial 10) | 1; 6 | Each asserted by name with its standing |
@@ -516,7 +523,7 @@ check ran in a trial named on the trial page.
 | Observability | `Alchemy.Telemetry.layerOtlp` in the model's Worker | 2 | A test with an in-memory exporter sees a command's span and a `domain.*` metric. Not run |
 | Story | A story for each of the review's eleven commands and each refusal (43 written for `review14`), five on the item, six on the allowance, three on members | 1 on | A test that lists each model's commands and rejections and fails on one that no story names. Not run |
 | Test tooling | Api tests in process; the library's harness with `dev: true` | 2 | The harness test fails without a model's binding. Not run |
-| Verify, Prove, Explore | `Prove.decision` per decision and the import's and the group's reports, with the four decisions passed in `decisions`, in `bun run check`; `Verify.model` per model in `check:full` and CI (where in CI is open); a rule Verify breaks kept as a story | 1 | Each asserts every standing by name, held in the library's lock file (decision 34; the lock file not run) |
+| Verify, Prove, Explore | `Prove.decision` per decision in `bun run check`; for the import's own rules, the per-rule proof section of `Verify.aggregate(ImportLife)` (37 proved on `review14`, the report itself `NotVerified` because the import folds events only a decision records); a report with two decisions declared in one file passed to it fails with a `ProveError` (decision 34), and none with the decisions passed was run on `review14`, so which call asserts them is settled in move 1; `Verify.model` per model in `check:full` and CI (where in CI is open); a rule Verify breaks kept as a story | 1 | Each asserts every standing by name, held in the library's lock file (decision 34; the lock file not run) |
 | The tutorial | Move 1 follows its parts 1 to 3 on this app's nouns | 1 | A test named for each part, which fails while that part's block is absent. Not run |
 | The Cloudflare tutorial | Part 3 is the harness test, part 4 is `alchemy dev`, part 5's pull-request comment is the GitHub provider's `Comment` | 2, 9 | A test named for each part: the harness test, `alchemy dev` answering, the comment read back from a preview's pull request. Part 4 ran; the others not run |
 | Effect Cluster | The pool that hosts `Usage`, its cron and its singleton (decision 28) | 7 | The pool's harness test. Not run |
@@ -663,12 +670,15 @@ their availability.
 - **Wait for the release that has them.** Until then nothing is proved, and decision 4's first two options cannot be
   built.
 
-Beside the first option, not in it: "a clean copy installs without the registry" was not run. Every trial installed from
-the registry's addresses, and the kept builds' own manifests name their inner dependencies and peers by registry address
-(`alchemy` depends on `@alchemy.run/node-utils` so; `@alchemy.run/domain` names `alchemy`, `@alchemy.run/cloudflare`,
-`@alchemy.run/effect-cluster` and `@alchemy.run/rivet` as peers so), which keeping the top-level tarballs does not
-redirect. Move 0 proves it: every Alchemy package the lockfile resolves, inner dependencies and peers included, pointed
-at a kept file by `overrides`, then a clean install with the registry unreachable and an empty package cache.
+Beside the first option, not in it: no trial installed from files; every trial used the registry's addresses. The kept
+builds' own manifests name their inner dependencies and peers by registry address (`alchemy` names
+`@alchemy.run/node-utils` so; `@alchemy.run/domain` names `alchemy`, `@alchemy.run/cloudflare`,
+`@alchemy.run/effect-cluster` and `@alchemy.run/rivet` as peers so), and bun fetches an address before it applies an
+override. So the pin's 17 packages are kept as files, with each sibling address rewritten in the kept `package.json`
+(fifteen files) as well as in the root `overrides`. A clean install of the build at `734c27a` (commit `ea95cd0`), with
+an empty bun cache and through a proxy that refused the library's registry, installed from the kept files with no
+request refused; `@alchemy.run/domain`, which no workspace there asks for, was installed the same way in a copy that
+asks for it. Move 0 runs that install again in `bun run check:full`.
 
 ### 2. Two people decide the same row in the same moment. What does the second one see?
 
@@ -804,13 +814,15 @@ groups have up to 9 rows; a large file's can have thousands.
   act for 6,000 rows a median of 214 ms and its undo 191 ms, for 50,000 rows 95 and 64 ms, at loads of 36 to 60; no size
   refused. *By a property, not by a rule* (trial 16): the reading of a row's decision equals today's `act` after every
   action of 50,000 generated sequences, when the group's rows are split by exactly what each got; with one patch for the
-  whole group it does not. *By a story, not by a rule:* an act with the same text on a row a group covers is a change.
-  *What the person sees:* the group is saved at once; Confirm does not wait for it; another person's act on any row,
-  made before the group reached their screen, is refused and shown again, whether or not the group names that row; a
-  group pressed on a screen that is one change behind is refused and pressed again. *Not run:* the screen that computes a
-  group's rows, the screen and the projection that read a row through the groups, what a match does to a group in force,
-  and the projection's write of 6,000 rows after the one event. *It asks one more thing:* which group may be taken back
-  (decision 8).
+  whole group it does not. That run was one person, on a fold written for the trial and not the model's code; its redo
+  marked the undone group live again under the same number, and it took groups back at any depth. The run for two
+  people, on a copy of `review14`'s rules, is under "The reading of a row through its groups". *By a story, not by a
+  rule:* an act with the same text on a row a group covers is a change. *What the person sees:* the group is saved at
+  once; Confirm does not wait for it; another person's act on any row, made before the group reached their screen, is
+  refused and shown again, whether or not the group names that row; a group pressed on a screen that is one change
+  behind is refused and pressed again. *Not run:* the screen that computes a group's rows, the screen and the projection
+  that read a row through the groups, what a match does to a group in force, and the projection's write of 6,000 rows
+  after the one event. *It asks one more thing:* which group may be taken back (decision 8).
 - **One act per row under the group's step, sent by a saga, with the import counting its rows.** *Proved* (trial 13): no
   confirm and no remove is taken while a group is being sent, by anyone; no second group begins; its rows are answered
   one at a time, a refused one included, or it is stopped; a row of a group that is not being sent is refused, of an undo
@@ -827,12 +839,13 @@ groups have up to 9 rows; a large file's can have thousands.
 
 Beside the first option, not in it: the 214 ms and 95 ms were each the first group act on a fresh import, 20 runs a
 size, on `review12`, before the last-group rule, and were not run again on the model with it; for 6,000 rows the mean
-was 408 ms and the slowest 3.4 s. The time did not grow with the rows: 50,000 rows took less than 9, at the run's
-highest load; the run does not show why. A later group on the same import, a group's stored size and the projection's
-write were not measured. In the same run a row's act right after a group, each the first on its row, took a mean of
-250 ms (median 127 ms, slowest 6.2 s) and 6 to 9 calls counted in the Worker (median 6, 95th percentile 8; from the
-run's output, not printed on the trial page). *Kept for ever:* one object for each group act, undone
-ones too, each holding its rows' text.
+was 408 ms and the slowest 3.4 s. In that run every group's rows were one part with one patch for every row
+(`{"flags":"out"}`), built by the trial's driver; a group whose rows got different patches was not timed. The time did
+not grow with the rows: 50,000 rows took less than 9, at the run's highest load; the run does not show why. A later
+group on the same import, a group's stored size and the projection's write were not measured. In the same run a row's
+act right after a group, each the first on its row, took a mean of 250 ms (median 127 ms, slowest 6.2 s) and 6 to 9
+calls counted in the Worker (median 6, 95th percentile 8; from the run's output, not printed on the trial page). *Kept
+for ever:* one object for each group act, undone ones too, each holding its rows' text.
 
 A group's rows and what it does to them are on the group's own events (`GroupDecided`, and `GroupUndone` for its undo);
 the import's event for a group act (`GroupCounted`) carries only a count. So `DraftRows`, the history and the confirm's
@@ -841,8 +854,11 @@ for when the last change is a group act is not written. Not run. A row's undo, l
 group act and is refused when a group landed that the sender's screen had not received (his answer of 2026-11-22;
 `UndoRowStep.ARowsUndoSawTheLastGroupAct`, proved on `review14`). A row's act answers "no change" only when its sender
 says no group in force covers the row (`covered`), which no rule checks; a group act is recorded whole, so it answers
-"no change" for none of its rows; decision 3's answer and "Answer says 'no change'" then rest on the screen leaving
-out of a group the rows that already hold what it gives. Not run.
+"no change" for none of its rows; decision 3's answer and "Answer says 'no change'" then rest on the screen leaving out
+of a group the rows that already hold what it gives. Not run. Decision 11's example comes out otherwise under it: Ana's
+act on 12 rows is a group, and once she has taken it back it gives no row anything, so when Dana undoes her quantity row
+14 is undecided (his answer of 2026-11-22, "Undecided: Ana took it back"); decision 11's answer stands for single-row
+acts.
 
 ### 8. Which group may be taken back?
 
@@ -858,10 +874,12 @@ one person's group is being sent, what can the others do?", kept below and not a
 Ana accepts a fix on 2,340 rows; Dana then accepts another on 900, some of them the same rows; Ana undoes hers.
 
 - **Only the import's last group act; an earlier one is refused and says which came after (Recommended).** *Proved*
-  (trial 15, `review12last`): `OnlyTheLastGroupActIsTakenBack`, 84 paths. The undo is then exact for one person, as
-  today's `act` undoes only the last step too; with two, a row someone decided over the group keeps its effect after the
-  undo (under "The reading of a row through its groups"). Ana takes hers back after Dana takes back hers, or decides the
-  rows again.
+  (trial 15, `review12last`): `OnlyTheLastGroupActIsTakenBack`, 84 paths. On `review12last` a group's undo counted as
+  the last group act too, so once Dana had taken hers back Ana's was refused for good. The walk-back above, as it was
+  put to him, is `review14`'s: `UndoGroup.OnlyTheLastGroupInForceIsTakenBack` and `.ThenTheOneUnderItIsTheLastInForce`,
+  84 paths, and story G7. The undo is then exact for one person, as today's `act` undoes only the last step too; with
+  two, a row someone decided over the group keeps its effect after the undo (under "The reading of a row through its
+  groups"). Ana takes hers back after Dana takes back hers, or decides the rows again.
 - **Any group of one's own.** The rows that got a decision of their own since keep what the group did; the others lose
   it; later groups are applied again on what is left. Exact only where what a later act did does not rest on the group:
   an accept pressed because the group had made the proposal stays accepted (trial 16, two cases written by hand).

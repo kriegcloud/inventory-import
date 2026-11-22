@@ -17,6 +17,11 @@
  *   is not there for its code (`@tanstack/store`, kept for one test of the review package, once came back into its
  *   `src` this way and passed).
  *
+ * And nothing reaches the scratchpad (`scratchpad/`, decision "the scratchpad", 2026-11-22): no workspace declares
+ * its package, and no file of a workspace imports it, by its name or by a path into its folder. For this one rule a
+ * workspace's `scripts` folder and the files at its root (a build's configuration) are read too. The scratchpad
+ * imports every package; if a package could import it back, an experiment would be part of the app.
+ *
  * Every form of import is read: `import`, `export … from`, `import x = require(…)` and `import(…)`.
  *
  * @packageDocumentation
@@ -29,6 +34,7 @@ import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import { Repo, type Workspace } from "../../Repo.service.ts"
+import { scratchpadFolder } from "../../Repo.schema.ts"
 import { err, type Line, out } from "../../Report.schema.ts"
 import { readImports } from "./internal/importsCode.ts"
 
@@ -69,6 +75,14 @@ export const BoundariesFinding = S.TaggedUnion({
   ImportedAgainstRow: {
     where: S.String.pipe(S.annotateKey({ description: "The file, from the root" })),
     imported: S.String.pipe(S.annotateKey({ description: "The workspace package its row refuses" }))
+  },
+  DeclaresScratchpad: {
+    name: S.String.pipe(S.annotateKey({ description: "The workspace that declares the scratchpad" })),
+    dependency: S.String.pipe(S.annotateKey({ description: "The scratchpad's package name" }))
+  },
+  IntoScratchpad: {
+    where: S.String.pipe(S.annotateKey({ description: "The file, from the root" })),
+    specifier: S.String.pipe(S.annotateKey({ description: "What it imports: the scratchpad's name or a path into it" }))
   }
 }).pipe(
   $I.annoteSchema("BoundariesFinding", { description: "Every workspace within its row, or each import against it" })
@@ -98,7 +112,13 @@ export const boundariesSentence: (finding: BoundariesFinding) => Line = Boundari
     err(
       `  ${where} imports ${imported}, which ${name} declares only for its tests (devDependencies): declare it in dependencies, or keep it in test`
     ),
-  ImportedAgainstRow: ({ where, imported }) => err(`  ${where} imports ${imported}, which its layer may not use`)
+  ImportedAgainstRow: ({ where, imported }) => err(`  ${where} imports ${imported}, which its layer may not use`),
+  DeclaresScratchpad: ({ name, dependency }) =>
+    err(`  ${name} declares ${dependency}: nothing depends on the scratchpad. Move what it needs into a package`),
+  IntoScratchpad: ({ where, specifier }) =>
+    err(
+      `  ${where} imports "${specifier}": nothing imports from the scratchpad. An experiment's code graduates into a package first`
+    )
 })
 
 interface Kind {
@@ -194,6 +214,17 @@ export const boundaries = Effect.fn("Boundaries.boundaries")(function* () {
     const files = yield* repo.files(dir)
     return A.filter(files, (file) => !Str.includes("/node_modules/")(file) && /\.(m?ts|tsx)$/.test(file))
   })
+  // The scratchpad: its folder, and its package's name when it is there.
+  const scratchDir = repo.join(repo.root, scratchpadFolder)
+  const scratchManifest = repo.join(scratchDir, "package.json")
+  const hasScratchpad = yield* repo.exists(scratchManifest)
+  const scratchName = hasScratchpad
+    ? O.fromUndefinedOr((yield* repo.json(S.Struct({ name: S.optionalKey(S.String) }))(scratchManifest)).name)
+    : O.none<string>()
+  const intoScratchpad = (file: string, specifier: string): boolean =>
+    O.contains(scratchName, packageOf(specifier)) ||
+    (Str.startsWith(".")(specifier) &&
+      Str.startsWith(`${scratchDir}/`)(`${repo.resolve(repo.dirname(file), specifier)}/`))
   const perWorkspace = yield* Effect.forEach(
     workspaces,
     Effect.fnUntraced(function* (workspace) {
@@ -205,13 +236,47 @@ export const boundaries = Effect.fn("Boundaries.boundaries")(function* () {
       const forCode = R.keys({ ...workspace.manifest.dependencies, ...workspace.manifest.peerDependencies })
       const forTests = A.appendAll(forCode, R.keys({ ...workspace.manifest.devDependencies }))
       const declared = A.filter(forTests, (dependency) => R.has(byName, dependency))
-      const fromManifest = A.flatMap(declared, (dependency) =>
-        may(dependency)
-          ? A.empty<BoundariesFinding>()
-          : A.of(BoundariesFinding.cases.DeclaredAgainstRow.make({ name, dependency }))
+      const fromManifest = A.appendAll(
+        A.flatMap(declared, (dependency) =>
+          may(dependency)
+            ? A.empty<BoundariesFinding>()
+            : A.of(BoundariesFinding.cases.DeclaredAgainstRow.make({ name, dependency }))
+        ),
+        A.map(
+          A.filter(forTests, (dependency) => O.contains(scratchName, dependency)),
+          (dependency) => BoundariesFinding.cases.DeclaresScratchpad.make({ name, dependency })
+        )
       )
       const inSrc = yield* sources(repo.join(workspace.dir, "src"))
       const inTest = yield* sources(repo.join(workspace.dir, "test"))
+      // Read for the scratchpad's rule only: the package's scripts, and the files at its root.
+      const underScripts = yield* repo.files(repo.join(workspace.dir, "scripts"))
+      const inScripts = A.filter(
+        underScripts,
+        (file) => !Str.includes("/node_modules/")(file) && /\.(m?[jt]s|tsx)$/.test(file)
+      )
+      const atRoot = yield* repo.entries(workspace.dir)
+      const beside = A.appendAll(
+        inScripts,
+        A.map(
+          A.filter(atRoot, (entry) => !entry.directory && /\.(m?[jt]s|tsx)$/.test(entry.name)),
+          (entry) => entry.path
+        )
+      )
+      const fromBeside = yield* Effect.forEach(
+        beside,
+        (file) =>
+          repo.text(file).pipe(
+            Effect.map((text) =>
+              A.map(
+                A.filter(readImports({ file, source: text }), (specifier) => intoScratchpad(file, specifier)),
+                (specifier): BoundariesFinding =>
+                  BoundariesFinding.cases.IntoScratchpad.make({ where: repo.relative(repo.root, file), specifier })
+              )
+            )
+          ),
+        { concurrency: 1 }
+      )
       const fromFiles = yield* Effect.forEach(
         A.appendAll(
           A.map(inSrc, (file) => ({ file, code: true })),
@@ -229,6 +294,9 @@ export const boundaries = Effect.fn("Boundaries.boundaries")(function* () {
               const testOnlyFinding = (imported: string) =>
                 A.of(BoundariesFinding.cases.TestOnly.make({ where, imported, name }))
               return A.flatMap(readImports({ file, source: text }), (specifier) => {
+                if (intoScratchpad(file, specifier)) {
+                  return A.of(BoundariesFinding.cases.IntoScratchpad.make({ where, specifier }))
+                }
                 if (kind.family !== "app" && Str.startsWith(".")(specifier) && Str.includes("apps/")(specifier)) {
                   return A.of(BoundariesFinding.cases.IntoApps.make({ where, specifier }))
                 }
@@ -253,7 +321,7 @@ export const boundaries = Effect.fn("Boundaries.boundaries")(function* () {
           ),
         { concurrency: 1 }
       )
-      return A.appendAll(fromManifest, A.flatten(fromFiles))
+      return A.flatten([fromManifest, A.flatten(fromFiles), A.flatten(fromBeside)])
     }),
     { concurrency: 1 }
   )

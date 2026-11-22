@@ -52,7 +52,7 @@ const members = <F extends { readonly _tag: string }>(
 members<DeprecatedApisFinding>("laws deprecated-apis", DeprecatedApisFinding, deprecatedApisSentence, {
   Clean: [
     DeprecatedApisFinding.cases.Clean.make({}),
-    "out: deprecated:check OK  no deprecated API is used (.agents/ is not read)"
+    "out: deprecated:check OK  no deprecated API is used (.agents/ and scratchpad/ are not read)"
   ],
   Refused: [
     DeprecatedApisFinding.cases.Refused.make({}),
@@ -162,6 +162,17 @@ members<BoundariesFinding>("laws boundaries", BoundariesFinding, boundariesSente
   DeclaredAgainstRow: [
     BoundariesFinding.cases.DeclaredAgainstRow.make({ name: "@inventory/kernel", dependency: "@inventory/ui" }),
     "err:   @inventory/kernel declares @inventory/ui, which its layer may not use"
+  ],
+  DeclaresScratchpad: [
+    BoundariesFinding.cases.DeclaresScratchpad.make({ name: "@inventory/app", dependency: "@inventory/scratchpad" }),
+    "err:   @inventory/app declares @inventory/scratchpad: nothing depends on the scratchpad. Move what it needs into a package"
+  ],
+  IntoScratchpad: [
+    BoundariesFinding.cases.IntoScratchpad.make({
+      where: "apps/inventory/src/web/App.tsx",
+      specifier: "../../../../scratchpad/experiments/stock-count/StockCount.ts"
+    }),
+    'err:   apps/inventory/src/web/App.tsx imports "../../../../scratchpad/experiments/stock-count/StockCount.ts": nothing imports from the scratchpad. An experiment\'s code graduates into a package first'
   ],
   IntoApps: [
     BoundariesFinding.cases.IntoApps.make({

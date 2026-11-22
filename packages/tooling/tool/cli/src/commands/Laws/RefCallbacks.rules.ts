@@ -35,7 +35,9 @@
  * What it does not see: a ref among spread props (`{...first}`); a steady callback on an element whose `key` changes
  * (React makes the element anew, and calls the callback, whenever the key does: an effect on the key); a hook that
  * hands back a new function on each draw; and a prop's name shared by two unrelated components, which is judged as
- * one. The vendored kit keeps its own.
+ * one. The vendored kit keeps its own, and the scratchpad (`scratchpad/`) is left out by name: an experiment's
+ * screen is tried there under the type-checker only, and this law applies to it when it graduates into a package
+ * (decision "the scratchpad", 2026-11-22).
  *
  * "Every file git would commit" is git's answer to give, so this asks git, and fails when git does not answer.
  *
@@ -51,14 +53,25 @@ import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import { Repo, type Workspace } from "../../Repo.service.ts"
+import { scratchpadFolder } from "../../Repo.schema.ts"
 import { err, type Line, out } from "../../Report.schema.ts"
 import { unreadSentence } from "./internal/budget.ts"
 import { type Handed, readScreen } from "./internal/refCallbacksCode.ts"
 
 const $I = $RepoCliId.create("commands/Laws/RefCallbacks.rules")
 
-/** Our own screens: every .tsx git would commit, the vendored kit and the agents' skills left out. */
-const screens = ["--", "*.tsx", ":!packages/ui/src/components", ":!packages/ui/src/hooks", ":!.agents"]
+/**
+ * Our own screens: every .tsx git would commit, the vendored kit and the agents' skills left out, and the scratchpad:
+ * an experiment's screen is held to this when it graduates into a package, not while it is tried.
+ */
+const screens = [
+  "--",
+  "*.tsx",
+  ":!packages/ui/src/components",
+  ":!packages/ui/src/hooks",
+  ":!.agents",
+  `:!${scratchpadFolder}`
+]
 
 /**
  * What `laws ref-callbacks` finds: nothing, or a refusal and each `ref` that is not steady, with why.

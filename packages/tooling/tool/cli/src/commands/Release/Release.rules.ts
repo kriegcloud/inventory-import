@@ -691,6 +691,10 @@ const asked = Effect.fn("Release.asked")(function* (args: ReadonlyArray<string>)
  *
  * A question git cannot answer (a ref that was not fetched) refuses the tag: it never counts as "no".
  *
+ * It cannot hold itself: the deploy job runs this from the tagged commit, so a commit that changes this file or the
+ * workflow is judged by its own copy. What stands behind it is the reviewer's approval and the rule that only an
+ * admin makes a `v*` tag (docs/releasing.md, "What holds it").
+ *
  * @category rules
  */
 export const verifyTag = Effect.fn("Release.verifyTag")(function* (tag: string) {

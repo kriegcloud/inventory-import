@@ -8,6 +8,7 @@ import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as Str from "effect/String"
 import {
+  checkFull,
   notesOf,
   next,
   type ReleaseCheck,
@@ -78,7 +79,7 @@ const files = {
 }
 
 /** What `release` prints, and the state git is left in. */
-const releasing = Effect.fn("test.releasing")(function* (kind: ReleaseKind, check: ReleaseCheck = green) {
+const releasing = Effect.fn("test.releasing")(function* <R = never>(kind: ReleaseKind, check: ReleaseCheck<R> = green) {
   const found = yield* release(kind, check)
   const lines = printed(render(releaseSentence)(found))
   const branch = yield* git("rev-parse", "--abbrev-ref", "HEAD")
@@ -162,6 +163,23 @@ describe("release", () => {
         expect([result.branch, result.tags, result.branches]).toEqual(["main", [], ["main"]])
         const seen5 = yield* appVersion
         expect(seen5).toBe("0.6.1")
+      })
+    )
+  )
+
+  it.effect("the real check is `bun run check:full` from the root, and what it exits with stops the release", () =>
+    inTree(
+      {
+        ...files,
+        "package.json": json({ name: "root", workspaces: ["packages/*"], scripts: { "check:full": "exit 3" } })
+      },
+      Effect.gen(function* () {
+        yield* started
+        const result = yield* releasing("minor", checkFull)
+        expect(result.lines).toEqual([
+          "err: release FAIL  `bun run check:full` failed (exit 3), so nothing was made: a release is cut only from a green check"
+        ])
+        expect([result.tags, result.branches]).toEqual([[], ["main"]])
       })
     )
   )

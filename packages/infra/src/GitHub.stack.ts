@@ -10,8 +10,13 @@
  * --stage prod`. No workflow deploys it: a job that could rewrite its own approval rule would have none.
  *
  * Must not break: a preview or staging job holds no model key, no sign-up list and no token for production's
- * account; the previews' password is written as a secret and never printed; production deploys only from a release
- * tag, which only an admin can make, after the environment's reviewer approves.
+ * account; the previews' password is written as a secret and never printed; nothing reaches production without the
+ * environment's reviewer approving that run.
+ *
+ * What this stack does not hold: that production deploys only from a release tag. The `production` environment names
+ * no branch or tag (the comment on it says why), so the tag rule is the deploy workflow's and `release verify`'s,
+ * both read from the commit being deployed. And staging shares the previews' token, so any pull request's run can
+ * reach it. Both are open decisions of Benjamin's (asked 2026-11-22; docs/releasing.md says what holds meanwhile).
  *
  * @packageDocumentation
  */
@@ -119,7 +124,8 @@ export default Alchemy.Stack(
       reviewers: { users: [approver] }
     })
     const preview = yield* GitHub.Environment("Preview", { ...repository, name: "preview" })
-    // What `main` holds, deployed after every green push. Only main deploys it.
+    // Main's head, deployed when its check passed. Only a run for main may use this environment; its token is the
+    // previews', though, so that rule does not keep a pull request's run from reaching staging (see the header).
     const staging = yield* GitHub.Environment("Staging", {
       ...repository,
       name: "staging",

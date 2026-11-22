@@ -6,8 +6,10 @@ name: Deploy
 # - production only from a release tag, v<major>.<minor>.<patch>, whose commit is on release/<major>.<minor> and not
 #   on main, after the approval the `production` environment asks for. Nothing deploys production from main.
 # The environments, their secrets and variables are made by the repository's stack (packages/infra/src/GitHub.stack.ts),
-# deployed from a workstation. No job here can destroy any stage but `pr-<number>`, and no job deploys the repository's
-# stack.
+# deployed from a workstation. No job in this file destroys any stage but `pr-<number>`, and none deploys the
+# repository's stack. That is true of this file, and GitHub runs a pull request with the pull request's own copy of
+# it: the previews' token, which such a run holds, can change every stage on the previews' account, staging among
+# them (docs/releasing.md, "Staging").
 
 on:
   push:

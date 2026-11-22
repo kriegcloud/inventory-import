@@ -256,5 +256,22 @@ Nothing below was started. Every command names its stage.
       the previews' account profile, with `PREVIEW_TEST_ACCOUNT_PASSWORD` filled by `op run`.
     - **The first release**: on `main`, `bun run release minor`, read what it printed, push the branch, wait for
       CI on it, push the tag, approve the deploy in the Actions run.
+    - **Three decisions are open** (asked 2026-11-22, after the review of this step); until they are answered the
+      build is as described above and `docs/releasing.md` says what GitHub does and does not hold.
+      1. *Where production's gate lives.* Today the `production` environment names no ref, so the tag rule is in
+         the workflow file the tagged commit brings. Options: (a, recommended) production starts when CI passes on a
+         push to `release/**` whose head carries its tag, through `workflow_run`, which always runs `main`'s copy of
+         the workflow and of `release verify`; the environment takes back its `main`-only rule; he pushes branch
+         and tag together, `git push --atomic origin release/0.7 v0.7.0`. (b) production starts on a push to
+         `release/**` whose head carries the tag, the environment takes a `release/*` rule, and only admins may
+         push those branches. (c) as it is, with the approval as the only gate.
+      2. *Staging's Cloudflare credentials.* It shares the previews' token, and a token covers a whole account.
+         Options: (a, recommended) keep sharing, said plainly; (b) a third account for staging, with two new
+         `op://` references; (c) a required reviewer on `preview`. Staging on production's account is not offered:
+         an unapproved job would hold a token that can change production.
+      3. *A fix that needed edits when it was cherry-picked.* It is refused, by the command and by the deploy guard,
+         so today it cannot be released. Options: (a, recommended) it counts when its `cherry-pick -x` line names a
+         commit on `origin/main`, and the release names it under "Picked with changes"; (b) always refused; (c) as
+         (a), behind a flag he types.
 13. **Adding a person to production later**: add their email to `SIGN_UP` (step 8 again), deploy, and they sign
     up; or they sign up and an admin adds them on the People page.

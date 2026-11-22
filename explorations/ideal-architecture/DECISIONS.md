@@ -1130,8 +1130,8 @@ trying a falsified property again. Reverse: the three lines in `.github/workflow
 
 A limit above the shared one is set only with what was measured written beside it: the 2,000-run waited-rows property
 (180 s; 24 s alone on two pinned cores), the draft machine's four properties (120 s; 12 s the slowest seen), Steps'
-heaviest shapes (60 s; 9.7 s), the scratchpad's nested run (120 s) and the CLI's start-up (120 s: five starts, each
-stopped at 20 s). Limits set below the shared one were taken out, so the shared one applies: six test files had 10 s
+heaviest shapes (60 s; 9.7 s), the scratchpad's nested run (120 s) and the CLI's start-up (300 s: five starts, the
+slowest seen 19 s on the clock; no start is stopped by the clock, since 2026-11-22). Limits set below the shared one were taken out, so the shared one applies: six test files had 10 s
 or 20 s, the 50,000-row slow tests 60 s. The vendored kit and the scratchpad use the shared limits too; vendor sync
 writes them into the kit's configs.
 
@@ -1345,3 +1345,20 @@ The agent chose these, and I was not asked:
 - The release notes are the conventional commits since the last tag, grouped by type, written to `CHANGELOG.md` and
   into the annotated tag's message. The app's version is `apps/inventory/package.json`; the "(v0.6.1)" in
   `README.md` names the version that was submitted and is never moved.
+
+After the review of 2026-11-22 the agent changed these, and I was not asked:
+
+- "Main" in every release rule is `origin/main`, fetched by the command itself, never the local `main`; a release is
+  cut only from `main` exactly where the remote's is. A fetch that fails stops the release.
+- A patch refuses a merge commit and a branch that does not hold its line's last tag. `release verify` holds every
+  rule again on the tagged commit (a release commit, over commits main holds), and refuses when git cannot answer.
+- The release commit also moves `bun.lock`'s copy of the version. `CHANGELOG.md` and the version stay on release
+  branches only; a new line's changelog starts from the last release's. `main`'s version file is not moved by a
+  release. Whether `main` should carry either is mine to change.
+- Staging deploys only `main`'s head, so a check run again for an older commit never puts it back.
+- Each deploy job waits in its own group, one for each release tag.
+- A test that was tried again after a hang or a falsified property fails the run, even if a later try passed: the
+  reporter reads every error of every try, which vitest's retry condition cannot.
+
+Open, asked of me on 2026-11-22 and not answered yet (`goals/infra/PLAN.md`, step 12): where production's gate lives;
+staging's Cloudflare credentials; whether a cherry-pick that needed edits may be released.

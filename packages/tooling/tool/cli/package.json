@@ -17,7 +17,7 @@
     "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",
     "lint": "oxlint --quiet src test",
     "test": "vitest run --exclude 'test/**/*.slow.test.ts'",
-    "test:slow": "vitest run .slow.test"
+    "test:slow": "vitest run --config vitest.slow.config.ts"
   },
   "dependencies": {
     "@beep/identity": "workspace:*",

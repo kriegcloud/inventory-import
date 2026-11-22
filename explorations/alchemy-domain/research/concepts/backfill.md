@@ -196,7 +196,8 @@ to `item`'s columns is an edit of `apps/inventory/migrations/0001_init.sql` foll
 
 With the domain, `item` becomes a projection's store. The facts live as events: `ItemsImported` (one per confirm,
 with each created or replaced row's values), `ItemsTakenBack`, `ItemEdited`. A change of what a row holds is then a
-projection `version` bump: the deploy replays every organization's events into the table.
+projection `version` bump: the deploy replays every organization's events into the table. Those are the events the
+model itself recorded; rows stored before the model are not among them (decision 37, "Start empty").
 
 ```ts
 // SKETCH: not compiled

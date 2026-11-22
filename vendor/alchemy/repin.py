@@ -269,7 +269,7 @@ def wire(pin: dict) -> None:
 
 
 # ---------------------------------------------------------------------------------------------------------------
-# 4. The lockfile's hashes
+# 5. The lockfile's hashes
 # ---------------------------------------------------------------------------------------------------------------
 
 
@@ -283,7 +283,7 @@ def lock_entry(source: dict) -> re.Pattern:
 
 
 def write_lock_hashes(pin: dict) -> None:
-    """Step 4: `bun install` keeps the hash it already has for a local file, even when the file's bytes changed."""
+    """Step 5: `bun install` keeps the hash it already has for a local file, even when the file's bytes changed."""
     lock = LOCK.read_text()
     for source in pin["packages"]:
         actual = integrity(HERE / source["file"])
@@ -294,7 +294,7 @@ def write_lock_hashes(pin: dict) -> None:
 
 
 # ---------------------------------------------------------------------------------------------------------------
-# 5. The README's part that names the pin
+# 6. The README's part that names the pin
 # ---------------------------------------------------------------------------------------------------------------
 
 
@@ -327,7 +327,7 @@ def write_readme(pin: dict) -> None:
 
 
 # ---------------------------------------------------------------------------------------------------------------
-# 6. The check
+# 7. The check
 # ---------------------------------------------------------------------------------------------------------------
 
 
@@ -407,7 +407,7 @@ def check(pin: dict) -> None:
 
 
 # ---------------------------------------------------------------------------------------------------------------
-# 7. An install that is refused the registry
+# 8. An install that is refused the registry
 # ---------------------------------------------------------------------------------------------------------------
 
 
@@ -476,7 +476,7 @@ class RefusingProxy:
 
 
 def install_without_registry(pin: dict) -> None:
-    """Step 7: what a fresh clone gets, with nothing cached and the registry out of reach."""
+    """Step 8: what a fresh clone gets, with nothing cached and the registry out of reach."""
     listed = subprocess.run(
         ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
         cwd=ROOT,

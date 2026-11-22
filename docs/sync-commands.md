@@ -18,11 +18,32 @@ tree and changes nothing) and only then writes, so a check, a dry run and a writ
 | `bun run config-sync` | Writes the lists and paths that follow from the workspaces. `-- --dry-run` lists what would be written | as `config-sync:check` |
 | `bun run config-sync:check` | Names what `config-sync` would write, and fails | yes |
 | `bun run lockfile:check` | `bun.lock` holds what every package.json asks for, so CI's frozen install accepts it: resolved from bun's cache, never the network, writing nothing | yes |
-| `bun run deps:lint` | syncpack: one version of a dependency across the packages, Effect's pinned exactly | no |
+| `bun run deps:lint` | syncpack: one version of a dependency across the packages, Effect's pinned exactly, and every dependency of the catalog asked for as `catalog:` | no |
 | `bun run deps:outdated` | syncpack: what has a newer version, the held dependencies left out | no: it asks the registry |
 
 What a command cannot repair it says as a problem, in a sentence naming the file, and fails in every mode: two
 packages at different versions of `effect`, a package no `workspaces` pattern covers, a path that names nothing.
+
+## One place for a shared version: the catalog
+
+A dependency that more than one package.json asks for has its version written once, in the `catalog` of the root's
+package.json; every package.json that uses it says `"catalog:"`. A dependency only one package uses keeps its version
+where it is.
+
+- **Adding one.** `bun add --cwd <workspace> <name>` writes a version in that package.json. When a second package
+  needs the same dependency, move the version to the root's `catalog`, write `"catalog:"` in both, and run
+  `bun run config-sync` and `bun install`.
+- **What holds it.** `deps:lint` refuses a dependency of the catalog written as a version in a package.json (the
+  version group with `"policy": "catalog"` in `.syncpackrc.json`; `config-sync` writes its list of names from the
+  catalog). `version-sync` takes the catalog's `effect` as Effect's version. `deps:update` and `deps:outdated` read
+  and move the catalog's entry, and a held dependency stays held there. `bun run beep vendor sync` gives a vendored
+  package `"catalog:"` for a dependency the catalog names.
+- **What is not in it.** The Alchemy packages (`alchemy`, `@alchemy.run/*`, `@distilled.cloud/*`): the root's
+  `overrides` point each at a kept file and a patch is keyed by that file (`patchedDependencies`), so their versions
+  stay written in each package.json, where `alchemy:repin` and `version-sync` keep them. `xlsx` is an address, and the
+  scratchpad is no workspace.
+- **The lockfile.** `bun.lock` records the catalog. Moving a dependency into it changes no installed version: check
+  with `git diff bun.lock`, where only the `catalog` block and the `"catalog:"` references may differ.
 
 ## Moving dependencies: `deps:update`
 
@@ -36,6 +57,9 @@ packages at different versions of `effect`, a package no `workspaces` pattern co
 - **A patched dependency stops the update.** When a dependency the repository patches
   ([Patching a dependency](patches.md)) has a newer version, nothing is moved, and the command names the folder of
   its patches: a patch is made for one version, and bun would install the new one unpatched with one warning line.
+  A folder of patches whose headers do not say which package and version they are for (a field missing or empty,
+  or two that disagree) stops it the same way, whenever anything would move: finish the headers first
+  (`bun run beep patches check`).
 - **Held dependencies stay**, and each is named at every run with the registry's newest version (one written as an
   address, as `xlsx` is, has none: the registry cannot be asked about it), and its group
   with why it is held and what moves it by hand. So one run says everything an update needs: what moved, and for
@@ -113,6 +137,7 @@ depends on where it is and what it holds is written from that.
 | Rule | What is derived | From |
 | --- | --- | --- |
 | sources | `source` in `.syncpackrc.json` | the root's `workspaces` patterns |
+| catalog | the `dependencies` of the version group with `"policy": "catalog"` in `.syncpackrc.json`; a root with a catalog and no such group is a problem | the names in the root's `catalog` |
 | coverage | every package fits a `workspaces` pattern, and every pattern names a package (a problem, not repaired) | the folders with a `package.json` under `apps` and `packages` |
 | paths | a `$schema`, an `extends` and a path in a script that names nothing where it is, and would from the root | the depth of the folder it is in |
 | references | a solution file (`"files": []`) references every project beside it, the root's also each package's projects other than its `tsconfig.json`; a reference that names nothing is removed, one a person added is kept. A package's own projects are type-checked from source and have no references; none is derived | the `tsconfig*.json` files on disk |

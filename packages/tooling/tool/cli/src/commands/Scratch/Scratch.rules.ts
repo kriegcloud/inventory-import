@@ -388,7 +388,8 @@ type Comment = { readonly line: number; readonly text: string }
 /**
  * The comments of a TypeScript file, in order. What a string, a template or a regular expression holds is no comment,
  * so a fixture that quotes `// @ts-ignore` is not read as one. It is a small reader, not the compiler's: a regular
- * expression is known by what stands before its slash, and a slash after `)` or a name is taken as a division.
+ * expression is known by what stands before its slash, and a slash after `)` or a name is taken as a division, so a
+ * regular expression written there that holds a quote can hide a comment after it.
  *
  * @example
  * commentsOf('const sample = "// no"\n// yes\n') // [{ line: 2, text: "// yes" }]
@@ -400,7 +401,10 @@ export const commentsOf = (text: string): ReadonlyArray<Comment> => {
     /\/\/[^\n]*|\/\*[\s\S]*?(?:\*\/|$)|"(?:\\[\s\S]|[^"\\\n])*"?|'(?:\\[\s\S]|[^'\\\n])*'?|[`{}/]|[^/"'`{}]+/y
   const template = /(?:\\[\s\S]|\$(?!\{)|[^`\\$])*(?:`|\$\{|$)/y
   const regex = /\/(?![/*])(?:\\.|\[(?:\\.|[^\]\\\n])*\]|[^/\\\n[])+\//y
-  const mayStartRegex = /(?:^|[(,=:[!&|?{};+\-*%<>~^]|\b(?:return|typeof|case|in|of|void|delete|throw|yield|await))\s*$/
+  // A slash starts a regular expression after an operator that wants a value. After `++`, `--`, a `!` that follows a
+  // value (`count!`) and the `<` of a closing tag it is a division or a tag, and so is one after `)` or a name.
+  const mayStartRegex =
+    /(?:^|[(,=:[&|?{};*%~^]|=>|(?<![\w$)\]])!|(?<!\+)\+|(?<!-)-|\b(?:return|typeof|case|in|of|void|delete|throw|yield|await))\s*$/
   const found: Array<Comment> = []
   const open: Array<"brace" | "template"> = []
   let at = 0
@@ -821,7 +825,9 @@ export const scratchCheck = Effect.fn("Scratch.scratchCheck")(function* (types: 
     : []
   const inScratchpad = (file: string) => Str.startsWith(`${state.dir}/`)(file)
   const packages = yield* repo.workspaces
-  const workspaces = A.map(packages, (workspace) => `${workspace.dir}/`)
+  // What a workspace's own check reads is its `src` and `test` folders (its tsconfig's `include`); a file elsewhere in
+  // its folder is held by nothing.
+  const workspaces = A.flatMap(packages, (workspace) => [`${workspace.dir}/src/`, `${workspace.dir}/test/`])
   // A library's file is one inside a package an install put in a `node_modules`: the folder after the last
   // `node_modules` of its path (two folders for a scoped name) holds a package.json. A file somebody wrote in a folder
   // of that name is the experiment's.
@@ -841,8 +847,8 @@ export const scratchCheck = Effect.fn("Scratch.scratchCheck")(function* (types: 
       }
     )
   }
-  // Outside the scratchpad, a file of one of the repository's workspaces is that package's own, held by its own
-  // check; any other file an experiment reached (one loose in the repository, beside a package.json of its own, or
+  // Outside the scratchpad, a file in the `src` or `test` folder of one of the repository's workspaces is that
+  // package's own, held by its own check; any other file an experiment reached (one loose in the repository, beside a package.json of its own, or
   // outside the repository) is the experiment's.
   const ours = yield* Effect.filter(
     A.filter(

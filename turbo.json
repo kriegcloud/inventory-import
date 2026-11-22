@@ -15,7 +15,12 @@
     // A task with no script anywhere: depending on `^transit` folds every workspace dependency's source into a
     // task's hash, so a cached check cannot survive a change in a package it imports. Packages export TypeScript
     // source and never build, so `check` has no `^build` edge to do this.
-    "transit": { "dependsOn": ["^transit"], "inputs": ["$TURBO_DEFAULT$", "!**/*.md", "!test/**"] },
+    // It also waits for what is installed to hold every patch (`//#patches:installed`, below), and so does every
+    // task that depends on it: the type-check, the tests, the fold, the slow tests and the build.
+    "transit": {
+      "dependsOn": ["^transit", "//#patches:installed"],
+      "inputs": ["$TURBO_DEFAULT$", "!**/*.md", "!test/**"]
+    },
     // Type-check with the Effect diagnostics.
     // A package's check may run the repository's own commands (quality strict, laws exports): their source is an input.
     "check": {
@@ -25,7 +30,11 @@
     },
     // oxlint, and the design-system lint in packages with screens. A package's own lint profile is in its files; the
     // root profiles they extend (the atoms rule, the design lints) are inputs too, so a change to one is not replayed.
-    "lint": { "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/.oxlintrc*.json"], "outputs": [] },
+    "lint": {
+      "dependsOn": ["//#patches:installed"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/.oxlintrc*.json"],
+      "outputs": []
+    },
     // The fast tests. Their limits and retries are the root's (vitest.shared.ts, vitest.retries.ts), which every
     // package's vitest.config.ts imports.
     "test": {
@@ -36,16 +45,16 @@
     // The proofs of a model's rules (`*.prove.test.ts`, the "prove" project of a package's Vitest): minutes on a busy
     // machine, and part of `bun run check`. No `transit` edge: a proof reads the model's own files and the library, so
     // a package that has proofs names exactly those in its own turbo.json, and a proof is replayed until one changes.
-    "prove": { "outputs": [] },
+    "prove": { "dependsOn": ["//#patches:installed"], "outputs": [] },
     // The search of a whole model under Verify (`*.verify.test.ts`, the "verify" project): every proof again, then
     // every short sequence of commands and the longer walks. Longer than the proofs, so only `bun run check:full`
     // runs it. Like `prove` it has no `transit` edge and names its own inputs, and is replayed until one changes.
-    "verify": { "outputs": [] },
+    "verify": { "dependsOn": ["//#patches:installed"], "outputs": [] },
     // The mutants of a model: each one change to its code, which its proofs or its stories must notice. A package that
     // has them names their inputs in its own turbo.json. The sample is in `bun run check:full`; all of them run in
     // the nightly workflow.
-    "mutants:sample": { "outputs": [] },
-    "mutants": { "outputs": [] },
+    "mutants:sample": { "dependsOn": ["//#patches:installed"], "outputs": [] },
+    "mutants": { "dependsOn": ["//#patches:installed"], "outputs": [] },
     // A long property beside a package's fast tests (`*.fold.test.ts`, the "fold" project): the review's model held
     // against the review region, over a minute. Like the fast tests it reads its package and what it depends on, so
     // it is replayed until one of them changes; it is in `bun run check:full`, not in `bun run check`.
@@ -58,7 +67,7 @@
     "test:slow": { "dependsOn": ["transit"], "cache": false },
     // The production build and its identity check.
     "build": { "dependsOn": ["transit"], "outputs": ["dist/**"] },
-    "dev": { "cache": false, "persistent": true },
+    "dev": { "dependsOn": ["//#patches:installed"], "cache": false, "persistent": true },
     // Repository checks: root scripts that do not call turbo.
     // Every file but the scratchpad's: the formatter leaves it alone (.oxfmtrc.json), and an experiment that is not
     // formatted, or does not parse, fails nothing here.
@@ -224,6 +233,7 @@
     // Left out by name: what git ignores and the law does not read (`.agents`, the scratchpad, and `.claude`, which
     // in the main checkout holds every other checkout of this repository).
     "//#deprecated:check": {
+      "dependsOn": ["//#patches:installed"],
       "inputs": [
         ".oxlintrc.deprecated-apis.json",
         ".gitignore",
@@ -266,6 +276,7 @@
     // The root's own .ts files and each package's vitest.config.ts type-check (tsconfig.config.json). Only the linter
     // above reads that project otherwise, and an import that does not resolve there would hide a deprecated call.
     "//#configs:check": {
+      "dependsOn": ["//#patches:installed"],
       "inputs": [
         "tsconfig.config.json",
         "tsconfig.base.json",
@@ -315,8 +326,20 @@
     // node_modules, which no input can stand for: bun leaves a patch out with one warning line and exit 0. So this
     // runs every time; it takes about a second.
     "//#patches:check": { "cache": false },
-    // Each patch's test fails beside the package without its patches (`beep patches prove`): the patches and their
-    // tests, the kept files they are applied to, and what the tests are run with.
+    // What is in node_modules holds what every registered patch writes (`beep patches installed`). The patch files
+    // are in every task's hash and node_modules is in none, so a task run after a patch changed and before
+    // `bun install` would run on the package as it was and be stored under the new patch's hash, then replayed
+    // after the install. So every task that runs or type-checks code waits for this one, whichever script started
+    // it (`bun run test` and `bun run proofs` too), and a failure here runs none of them: every package task above
+    // (`beep patches check` refuses one that does not), and the two root tasks that read installed types. Never
+    // replayed; under a second. A waiting task takes this one's hash into its own: the files bun applies, which
+    // every task has already, and the root's package.json, which says which file bun applies to which package
+    // (turbo adds a package's own package.json to each of its tasks). So an edit to the root's package.json runs
+    // every task again: without it, a line taken out of `patchedDependencies` would replay results made with the
+    // patch.
+    "//#patches:installed": { "cache": false, "inputs": ["packages/patches/*.patch"] },
+    // Each patch's test fails beside the package with that one patch left out and the others applied (`beep patches
+    // prove`): the patches and their tests, the kept files they are applied to, and what the tests are run with.
     "//#patches:prove": {
       "inputs": [
         "packages/patches/**",

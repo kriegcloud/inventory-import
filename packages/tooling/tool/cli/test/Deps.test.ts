@@ -357,4 +357,33 @@ describe("deps update", () => {
         expect(result.installed).toBe(false)
       })
   )
+
+  it.effect(
+    "patches whose headers do not say what they are for stop the update too: they could be for what moves",
+    () =>
+      Effect.gen(function* () {
+        const unfinished: Tree = {
+          ...tree(),
+          "packages/patches/vitest/01-a-fix.patch": lines([
+            "Package: vitest",
+            "Applies-to: 5.1.0",
+            "Upstream: not yet reported",
+            "Why:",
+            "Remove-when: The runner keeps it.",
+            "Test: test/vitest/KeepsTheName.test.ts",
+            "",
+            "diff --git a/dist/run.js b/dist/run.js"
+          ])
+        }
+        const result = yield* run(unfinished, registry(newest), "write", ["packages/kernel/package.json"])
+        expect(A.last(printed(result.first))).toEqual(
+          O.some(
+            "err: deps:update STOP  packages/patches/vitest: its patches do not say which package and version they are for (a header with a field missing or empty, or two that disagree), so a dependency they patch could move and be installed unpatched. Nothing was moved. Run `bun run beep patches check`, finish the headers, then run `bun run deps:update` again"
+          )
+        )
+        expect(result.first.failed).toBe(true)
+        expect(result.files["packages/kernel/package.json"]).toBe(manifest("4.1.4", "^5.1.0"))
+        expect(result.installed).toBe(false)
+      })
+  )
 })

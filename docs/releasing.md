@@ -90,7 +90,8 @@ A question git cannot answer (a branch that was not fetched) refuses the release
 before anyone is asked to approve. Then production waits for Benjamin's approval in the `production` environment.
 After the approval, and on any re-run of that job, its first step asks the remote again: the commit must still be
 the head of its release branch and still carry the tag, or the job fails. Approving an old run after a later
-release of the same line was deployed therefore deploys nothing. Each tag waits in a group of its own, so a release
+release of the same line was deployed therefore deploys nothing. It reads only the ref whose name is exactly
+the branch's, or the tag's: `git ls-remote` also lists refs whose names merely end the same way. Each tag waits in a group of its own, so a release
 that waits for its approval is never cancelled by a later one; two releases are not deployed at once because one
 person approves them. Nothing orders the releases of two lines: if `release/0.7` and `release/0.8` both wait, the
 one approved last is what production runs.
@@ -144,7 +145,8 @@ A patch never goes the other way: nothing lands on a release branch first.
   `release/` branch of this repository, after its guard job found a tag that may deploy, and runs that guard from
   `main`. `test/DeployWorkflow.test.ts` in the same package parses the file and holds every job's event,
   environment and secrets, and every step of every job in order: each action by name and version with what it is
-  given, each command word for word, each step's own condition. It runs the three shell guards. What an action does
+  given, each command word for word, each step's own condition. The three shell guards are held as whole scripts, and run, with a branch and a tag
+  whose names only end as the real ones do on the remote. What an action does
   inside is not read. The workflow files are inputs of that test in `turbo.json`, so a change to one always runs it.
 - **The repository's stack** (`packages/infra/src/GitHub.stack.ts`): only an admin may create, move or delete a `v*`
   tag, and a `release/*` branch is never force-pushed or deleted (admins may bypass both). The `production`
@@ -160,6 +162,13 @@ that run through and refuses others; and that the job's groups keep a waiting re
 first real release is where they are verified: after the push, the Actions run named "Deploy" should show "Check
 the release" printing the tag, then `production` waiting for approval. If it does not start, nothing was deployed
 and nothing needs undoing.
+
+What GitHub has shown so far (read with `gh` on 2026-11-22, nothing changed there): after CI passed on the pushes
+of `main` at 3bc2522, 0c4c5e5 and c1322d6, a "Deploy" run started each time with the event `workflow_run`. In each,
+"Preview", "Remove the preview", "Check the release" and "Production" were skipped, and "Staging" ran: its step
+"Deploy only the commit main is at" passed, and "Deploy staging" failed with `MissingPreviewPassword`, as the
+Staging section below expects. So the trigger and staging's condition work as written for `main`. Nothing has run
+for a release branch: no release has been cut.
 
 ## Staging
 

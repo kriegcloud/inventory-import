@@ -424,7 +424,9 @@ describe("scratch", () => {
           "notes/own/Beside.ts": off,
           // A package's file is that package's, held by its own check.
           "packages/kernel/package.json": json({ name: "@x/kernel" }),
-          "packages/kernel/src/Role.ts": off
+          "packages/kernel/src/Role.ts": off,
+          // Elsewhere in a package's folder its check reads nothing, so there the file is the experiment's.
+          "packages/kernel/notes/Stray.ts": off
         },
         scratchCheck(
           types,
@@ -441,15 +443,17 @@ describe("scratch", () => {
             "scratchpad/node_modules/mine/Written.ts",
             "notes/Outside.ts",
             "notes/own/Beside.ts",
+            "packages/kernel/notes/Stray.ts",
             "packages/kernel/src/Role.ts"
           )
         ).pipe(said)
       )
       const refused = `turns an Effect diagnostic off. Only a decide file (\`*.aggregate.ts\`, \`*.decision.ts\`) may, and only \`${decideFileLine}\` as its first line (decision 33 of the Alchemy brief): build with \`.make\` here`
       expect(result).toEqual([
-        "err: scratch:check FAIL  10 problems",
+        "err: scratch:check FAIL  11 problems",
         `err:   notes/Outside.ts:1: ${refused}`,
         `err:   notes/own/Beside.ts:1: ${refused}`,
+        `err:   packages/kernel/notes/Stray.ts:1: ${refused}`,
         `err:   scratchpad/experiments/Loose.ts:1: ${refused}`,
         `err:   scratchpad/experiments/shelf/.lib/Imported.ts:1: ${refused}`,
         `err:   scratchpad/experiments/shelf/.state/Imported.ts:1: names \`${noCheck}\`, which turns the type-checker and every Effect diagnostic off for a whole file. No file of the scratchpad may hold it: remove the line and fix what the type-checker then says`,
@@ -516,6 +520,31 @@ describe("scratch", () => {
       { line: 4, text: "/* two */" },
       { line: 6, text: "// three" },
       { line: 7, text: "/* four\nstill four */" }
+    ])
+  })
+
+  it("a slash after a closing tag's `<`, a `++`, a `--` or a value's `!` starts no regular expression", () => {
+    const code = A.join(
+      [
+        "const label = <b>{name}</b> // one",
+        "const half = count++ / 2 // two",
+        "const less = count-- / 2 // three",
+        "const sure = count! / 2 // four",
+        "const not = !/[/]/.test(name) // five",
+        "const sum = 1 + /\\//.source.length // six"
+      ],
+      "\n"
+    )
+    expect(A.map(commentsOf(code), (comment) => comment.text)).toEqual([
+      "// one",
+      "// two",
+      "// three",
+      "// four",
+      "// five",
+      "// six"
+    ])
+    expect(ignoredLines(`const label = <b>{name}</b> // ${ignore}\nconst half = count++ / 2 // ${ignore}\n`)).toEqual([
+      1, 2
     ])
   })
 

@@ -997,7 +997,7 @@ The hooks left, each with its reason:
 - The libraries' own hooks stay: TanStack's `useTable` (`use-data-table.ts`), dnd-kit's `useSensor`, `useSensors`
   and `useSortable` (`sortable.tsx`), Radix's `useDirection` (`direction.tsx` and its readers).
 
-**A question for Benjamin: five `useContext` calls**, neither a DOM ref, `useId` nor a library's own hook, each read
+**Five `useContext` calls stay** (2026-11-22; kept under the rule's own words, "no hooks where an atom can do the job", since here one cannot. Benjamin was told and has not chosen: it is his to overrule), neither a DOM ref, `useId` nor a library's own hook, each read
 past the lint by one `oxlint-disable-next-line` on its import with the reason:
 
 - `faceted.tsx`, 1 (`useFacetedState`, read by `FacetedValue`, `FacetedItem` and `FacetedClear`): what `Faceted` was
@@ -1009,7 +1009,7 @@ past the lint by one `oxlint-disable-next-line` on its import with the reason:
 Each carries a value of the draw itself down to the parts drawn in it. An atom can hold it only if it is written during
 the draw (React refuses an update to another component while one draws) or after it (an effect, which is banned); a
 `ScopedAtom` takes its input once. The other way is for the callers to hand atoms instead of values, which changes
-every caller of these two components. Until Benjamin chooses, React context stays here and the lint is told so on
+every caller of these two components. Unless Benjamin overrules, React context stays here and the lint is told so on
 those two lines.
 
 Also changed beside the move, with nothing on screen different: upstream's memos that keyed on the table or on

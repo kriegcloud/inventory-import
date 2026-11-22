@@ -14,14 +14,8 @@ import { CurrentActor, Session } from "../Actor/Actor.context.ts"
 import { Group, GroupUndone, isDecidedGroup, isUntouchedGroup } from "../Group/Group.aggregate.ts"
 import { ConfirmedSince, GroupCounted, Import, isOpen, NotOpen, NotPermitted } from "../Import/Import.aggregate.ts"
 import { Change, ImportKey, Step } from "./Change.schema.ts"
+import { GroupedAfter } from "./Deciding.decision.ts"
 import { DecidedBeforeTheConfirm, NotYourStep } from "./Undoing.decision.ts"
-
-/** A later group is still in force over this one: its number. Take that one back first. */
-export class GroupedAfter extends Domain.Rejection(
-  "GroupedAfter",
-  { last: Change },
-  { description: "A later act on a group is still in force over this one: its number" }
-) {}
 
 /**
  * Take back one act on a group. `step` names the group; `undo` is the change that recorded it; `opening` is how many

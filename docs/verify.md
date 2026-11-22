@@ -38,9 +38,9 @@ Three kinds of rule, and one thing no rule says. Which rules there are is kept b
 **A proved rule says what never happens.** It is proved from the code of `decide` and `evolve`, for every state the
 schemas and the invariants allow and every input, not sampled by a test.
 
-**No rule says that a valid act is taken.** A `decide` that refused everything would keep all 135. That an act is
+**No rule says that a valid act is taken.** A `decide` that refused everything would keep all 136. That an act is
 recorded, with the events it should record, is held by tests: the stories (`test/Review.story.test.ts` and
-`test/Group.story.test.ts`, 47 of them, one at least for each of the eleven commands), and the property that drives
+`test/Group.story.test.ts`, 55 of them, one at least for each of the eleven commands), and the property that drives
 the model with the review region's own presses (`packages/catalog/web/test/ReviewModelFold.fold.test.ts`). The eleven
 "can be taken" rules close part of the gap inside Verify: a command no sequence reaches fails the search. They are a
 search three commands deep.
@@ -64,8 +64,33 @@ Because they are the sender's word, the covered "no change" is answered only aft
 and of the matching pass. A screen that is behind reads the row through a group as it read before another person's
 act, and its press would otherwise be lost as "no change" over a decision it never saw; refused instead, it is held
 and shown beside that decision (2026-11-22: "Same: hold, show both"; the story "a press from a screen that is behind
-is held, not lost as no change"). The press that leaves the row's own instance as it is, with no group over it, is no
-change whatever its sender saw, and is answered first.
+is held, not lost as no change"; the matching half has its own, "a covered press made on an older matching is held
+too").
+
+`covered: false` is the sender's word too. The press that leaves the row's own instance as it is (the same text, made
+on the same matching), with no group over it, is no change when its sender has seen what the row holds, or when no
+group was made since the row's own decision:
+then the row cannot read through a group the sender has not seen it under. From a screen that is behind after a group
+(the row's later decision was undone, and the group covers the row again) the same press would put the row's own
+decision over the group, so it is refused with what is there and held (Benjamin, 2026-11-22: "Hold it when behind";
+the story "a press that matches what the row holds is held when its screen is behind a group").
+
+What follows was settled by one rule and not asked (the decision log lists each, for Benjamin to overrule): a press
+from a screen that is behind is never dropped without a word and never applied; it is held and shown.
+
+- The same text made again on a newer matching is a change, and is recorded on the matching now. Whatever it decides,
+  a press made on an older matching is refused.
+- A row's decision is not taken back from under a later group in force that covers the row: `UndoRowStep` says
+  `covered`, from a screen that has every group act, and is refused `GroupedAfter` as a group's undo under a later
+  group is. Once the group is taken back, the undo is taken.
+- A refusal says what happened: `DecidedSince` when someone decided the row since, `PutBackSince` when what the sender
+  saw was taken back and an older decision is there again, `NoLongerThere` when nothing is.
+- A covered press sent twice is written once: the row holds that very act (the sender's, under the same step, with the
+  same text), and the second is answered with nothing new recorded.
+- `UndoGroup` names nothing its sender has seen, and is the one decision that takes a press from a screen that is
+  behind: it takes back its sender's own act and replaces nothing of anyone else's. A row decided since keeps that
+  person's whole decision ("Row 14 stays whole"), and the screen names such rows from the rows it holds; the answer
+  carries the group's undo and its number, not the rows.
 
 **Nothing evaluates a rule while the app runs.** What refuses a state is the code of `decide`. A proved rule means
 that code cannot break it.
@@ -258,7 +283,7 @@ stands. Shown on this model: with the line of `UndoingGroup` that refuses an und
 deleted, `OnlyTheLastGroupInForceIsTakenBack` is only `checked`, nothing is left undone, the report is verified,
 and the lock, whose text of the rule has not changed, is silent. So the test also gives Verify the library's list of
 rules that must stay proved (`require: { proved }`, Benjamin, 2026-11-22: "Lock plus the library's proved list"):
-the names the lock keeps of the kinds a proof covers, 135 of them. The same deletion then fails by name:
+the names the lock keeps of the kinds a proof covers, 136 of them. The same deletion then fails by name:
 
 ```text
 Not done
@@ -277,8 +302,9 @@ test has a check of ours, that every rule its report names is proved. And each d
 library has no counterpart for (`missingRules`, `test/proving.ts`): a decision that records on a row or a group states
 the three rules about who may change it. A row and a group have no command and so no middleware: without those rules
 nothing says whose act the decision records, and the lock and `require` would take a decision without them as it is
-written. Whoever adds one, adoption's included, writes the three, as `CLAUDE.md` says, and calls `missingRules` in its
-proof as the four do: the check runs only where a proof calls it.
+written. Whoever adds one writes the three, as `CLAUDE.md` says, and calls `missingRules` in its
+proof as the four do: the check runs only where a proof calls it. It stays, named as ours (Benjamin, 2026-11-22: "Keep
+it, named as ours"): "no hand-written assertions" means no hand-written list of rule names or of how each stands.
 
 - Outside CI, a new rule is added to the file when `verify` runs: commit the file with the rule.
 - In CI (`CI=true`) nothing is written, and a rule the file does not list fails.

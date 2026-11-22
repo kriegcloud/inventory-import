@@ -1,8 +1,8 @@
 // The deploy workflow as decided ("releases and deploys", docs/releasing.md), read from the file GitHub runs and
 // parsed as YAML, so a line that is commented out is not there and a job is found by its name whatever its name is.
 // It holds what starts the workflow, which job runs on which event, in which environment, with which secrets, and
-// every step of every job in order: each action with its version and what it is given, each command word for word,
-// and each step's own condition. A step added, moved, swapped or switched off in any job fails here. The three shell
+// every step of every job in order: each action with its version and what it is given, each command and each guard's
+// whole script word for word, and each step's own condition. A step added, moved, swapped or switched off in any job fails here. The three shell
 // guards in it (the refusal of every stage but a preview, staging's "only main's head", and production's "still the
 // release branch's head" after the approval) are run, not only read. What an action does is not read: its name and
 // version are.
@@ -80,6 +80,37 @@ const ownPullRequest = "github.event.pull_request.head.repo.full_name == github.
 const greenMain =
   "github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == github.repository"
 const install = "bun install --frozen-lockfile"
+
+// The three shell guards, word for word as the file has them: a line added to one (a second command after its last
+// `fi`, say) fails the step list below, whatever the script still exits with.
+const refusePreviewOnly = `case "$STAGE" in
+  pr-[1-9]|pr-[1-9][0-9]|pr-[1-9][0-9][0-9]|pr-[1-9][0-9][0-9][0-9]|pr-[1-9][0-9][0-9][0-9][0-9]|pr-[1-9][0-9][0-9][0-9][0-9][0-9]) ;;
+  *) echo "Refusing to destroy \\"$STAGE\\": only pr-<number> may be destroyed by a workflow." >&2; exit 1 ;;
+esac
+`
+const onlyMainsHead = `main="$(git ls-remote origin refs/heads/main | awk '$2 == "refs/heads/main" { print $1 }')"
+if [ -z "$main" ]; then
+  echo "git could not say where main is, so nothing is deployed." >&2
+  exit 1
+fi
+if [ "$main" = "$CHECKED" ]; then
+  echo "deploy=true" >> "$GITHUB_OUTPUT"
+else
+  echo "Not deploying $CHECKED: main is at $main now, and that commit's own CI run deploys staging."
+  echo "deploy=false" >> "$GITHUB_OUTPUT"
+fi
+`
+const onlyTheBranchsHead = `head="$(git ls-remote origin "refs/heads/$BRANCH" | awk '$2 == "refs/heads/" ENVIRON["BRANCH"] { print $1 }')"
+tagged="$(git ls-remote origin "refs/tags/$TAG^{}" | awk '$2 == "refs/tags/" ENVIRON["TAG"] "^{}" { print $1 }')"
+if [ -z "$head" ] || [ -z "$tagged" ]; then
+  echo "git could not say where $BRANCH and $TAG are, so nothing is deployed." >&2
+  exit 1
+fi
+if [ "$head" != "$CHECKED" ] || [ "$tagged" != "$CHECKED" ]; then
+  echo "Not deploying $TAG at $CHECKED: $BRANCH is at $head and $TAG at $tagged now. A later release of this line took its place." >&2
+  exit 1
+fi
+`
 
 layer(here)("the deploy workflow", (it) => {
   it.effect(
@@ -294,57 +325,73 @@ layer(here)("the deploy workflow", (it) => {
     () =>
       Effect.gen(function* () {
         const { jobs } = yield* deploy
-        // An action is told by its `uses`, whatever it is named, so a name cannot stand in for one.
+        // An action is told by its `uses`, whatever it is named, so a name cannot stand in for one; a command is its
+        // whole text, so a name cannot stand in for a script either.
         const steps = (job: typeof Job.Type) =>
           A.map(job.steps, (step) => ({
-            does: step.uses ?? (step.name === undefined ? step.run : `(${step.name})`),
+            does: step.uses ?? step.run,
+            named: step.name ?? "",
             given: step.with ?? {},
             when: step.if ?? "always"
           }))
-        const checkout = (given: Record<string, unknown>) => ({ does: "actions/checkout@v4", given, when: "always" })
-        const node = (when: string) => ({ does: "actions/setup-node@v4", given: { "node-version": 22 }, when })
-        const bun = (when: string) => ({
-          does: "oven-sh/setup-bun@v2",
-          given: { "bun-version-file": ".bun-version" },
+        const uses = (does: string, given: Record<string, unknown>, when = "always") => ({
+          does,
+          named: "",
+          given,
           when
         })
-        const runs = (does: string, when = "always") => ({ does, given: {}, when })
+        const checkout = (given: Record<string, unknown>) => uses("actions/checkout@v4", given)
+        const node = (when = "always") => uses("actions/setup-node@v4", { "node-version": 22 }, when)
+        const bun = (when = "always") => uses("oven-sh/setup-bun@v2", { "bun-version-file": ".bun-version" }, when)
+        const runs = (named: string, does: string, when = "always") => ({ does, named, given: {}, when })
         const onHead = "steps.head.outputs.deploy == 'true'"
         const ciCommit = { ref: "${{ github.event.workflow_run.head_sha }}" }
         expect(each(jobs, steps)).toEqual({
-          preview: [checkout({}), node("always"), bun("always"), runs(install), runs("(Deploy the preview)")],
-          cleanup: [
-            runs("(Refuse any stage but a preview)"),
+          preview: [
             checkout({}),
-            node("always"),
-            bun("always"),
-            runs(install),
-            runs("(Destroy the preview)")
+            node(),
+            bun(),
+            runs("", install),
+            runs("Deploy the preview", 'bunx alchemy deploy --stage "$STAGE" --yes')
+          ],
+          cleanup: [
+            runs("Refuse any stage but a preview", refusePreviewOnly),
+            checkout({}),
+            node(),
+            bun(),
+            runs("", install),
+            runs("Destroy the preview", 'bunx alchemy destroy --stage "$STAGE" --yes')
           ],
           staging: [
             checkout(ciCommit),
-            runs("(Deploy only the commit main is at)"),
+            runs("Deploy only the commit main is at", onlyMainsHead),
             node(onHead),
             bun(onHead),
-            runs(install, onHead),
-            runs("(Deploy staging)", onHead)
+            runs("", install, onHead),
+            runs("Deploy staging", "bunx alchemy deploy --stage staging --yes", onHead)
           ],
           "release-tag": [
             checkout({ ref: "main", "fetch-depth": 0 }),
-            runs("(Fetch the tags as pushed)"),
-            bun("always"),
-            runs(install),
-            runs("(Refuse a release that is not one)")
+            runs("Fetch the tags as pushed", "git fetch --force --tags origin"),
+            bun(),
+            runs("", install),
+            runs(
+              "Refuse a release that is not one",
+              'bun run beep release verify-head "$BRANCH" "$CHECKED" --output "$GITHUB_OUTPUT"'
+            )
           ],
           production: [
             checkout(ciCommit),
-            runs("(Deploy only a release that is still its branch's head)"),
-            node("always"),
-            bun("always"),
-            runs(install),
-            runs("(Deploy production)")
+            runs("Deploy only a release that is still its branch's head", onlyTheBranchsHead),
+            node(),
+            bun(),
+            runs("", install),
+            runs("Deploy production", "bunx alchemy deploy --stage prod --yes")
           ]
         })
+        // The only places the file names the deploy tool are those four commands: no script holds a fifth.
+        const source = yield* text("deploy.yml")
+        expect(A.length(Str.split("alchemy")(source)) - 1).toBe(4)
         // Production's check after the approval is told the branch, the commit and the tag as values.
         const recheck = O.getOrThrow(
           O.flatMap(R.get(jobs, "production"), (job) =>
@@ -482,12 +529,16 @@ layer(here)("the deploy workflow's three shell guards, run", (it) => {
             })
             const forHead = yield* asked(head)
             const forOlder = yield* asked(older)
+            // A branch whose name only ends as main's does, which `git ls-remote` lists first, answers for nothing.
+            yield* git("push", "-q", "origin", `${older}:refs/heads/a/refs/heads/main`)
+            const decoyAtOlder = yield* Effect.all([asked(head), asked(older)], { concurrency: 1 })
+            yield* git("push", "-q", "origin", "--delete", "a/refs/heads/main")
             yield* git("push", "-q", "origin", "--delete", "main")
             const unreadable = yield* asked(head)
-            return [forHead, forOlder, unreadable]
+            return [forHead, forOlder, ...decoyAtOlder, unreadable]
           })
         )
-        expect(seen).toEqual(["0 deploy=true", "0 deploy=false", "1"])
+        expect(seen).toEqual(["0 deploy=true", "0 deploy=false", "0 deploy=true", "0 deploy=false", "1"])
       })
   )
 
@@ -531,10 +582,17 @@ layer(here)("the deploy workflow's three shell guards, run", (it) => {
             const later = yield* asked(second, "v1.0.1")
             // The tag is moved off the commit that was checked.
             const movedTag = yield* asked(second, "v1.0.0")
-            return [whileHead, noSuchTag, noSuchBranch, replaced, later, movedTag]
+            // A branch and a tag whose names only end as the real ones do, at the first release's commit: `git
+            // ls-remote` lists them before the real ones, and the first release still may not deploy.
+            yield* git("push", "-q", "origin", `${first}:refs/heads/a/refs/heads/release/1.0`)
+            yield* git("push", "-q", "origin", "v1.0.0:refs/tags/a/refs/tags/v1.0.1")
+            const decoyBranch = yield* asked(first, "v1.0.0")
+            const decoyTag = yield* asked(first, "v1.0.1")
+            const laterStill = yield* asked(second, "v1.0.1")
+            return [whileHead, noSuchTag, noSuchBranch, replaced, later, movedTag, decoyBranch, decoyTag, laterStill]
           })
         )
-        expect(seen).toEqual([0, 1, 1, 1, 0, 1])
+        expect(seen).toEqual([0, 1, 1, 1, 0, 1, 1, 1, 0])
       })
   )
 })

@@ -21,8 +21,9 @@ tree and changes nothing) and only then writes, so a check, a dry run and a writ
 | `bun run deps:lint` | syncpack: one version of a dependency across the packages, Effect's pinned exactly, and every dependency of the catalog asked for as `catalog:` | no |
 | `bun run deps:outdated` | syncpack: what has a newer version, the held dependencies left out | no: it asks the registry |
 
-What a command cannot repair it says as a problem, in a sentence naming the file, and fails in every mode: two
-packages at different versions of `effect`, a package no `workspaces` pattern covers, a path that names nothing.
+What a command cannot repair it says as a problem, in a sentence naming the file, and fails in every mode: a root
+with a catalog and no version group in `.syncpackrc.json` that holds it, a package no `workspaces` pattern covers, a
+path that names nothing.
 
 ## One place for a shared version: the catalog
 
@@ -33,9 +34,12 @@ where it is.
 - **Adding one.** `bun add --cwd <workspace> <name>` writes a version in that package.json. When a second package
   needs the same dependency, move the version to the root's `catalog`, write `"catalog:"` in both, and run
   `bun run config-sync` and `bun install`.
-- **What holds it.** `deps:lint` refuses a dependency of the catalog written as a version in a package.json (the
-  version group with `"policy": "catalog"` in `.syncpackrc.json`; `config-sync` writes its list of names from the
-  catalog). `version-sync` takes the catalog's `effect` as Effect's version. `deps:update` and `deps:outdated` read
+- **What holds it.** `version-sync`, which `bun run check` runs, names a dependency of the catalog written as a
+  version in a package.json (`effect` at 4.1.4 in one package beside the catalog's 4.1.5 would install two copies),
+  and `-- --write` writes `"catalog:"` there; `bun install` then. `deps:lint`, which no check runs, refuses the same
+  (the version group with `"policy": "catalog"` in `.syncpackrc.json`; `config-sync` writes its list of names from
+  the catalog, whatever order the group's keys are in). `version-sync` takes the catalog's `effect` as Effect's
+  version. `deps:update` and `deps:outdated` read
   and move the catalog's entry, and a held dependency stays held there. `bun run beep vendor sync` gives a vendored
   package `"catalog:"` for a dependency the catalog names.
 - **What is not in it.** The Alchemy packages (`alchemy`, `@alchemy.run/*`, `@distilled.cloud/*`): the root's
@@ -47,7 +51,7 @@ where it is.
 
 ## Moving dependencies: `deps:update`
 
-- **Every package.** The root's `package.json` and every workspace's under `apps` and `packages`, 25 files today.
+- **Every package.** The root's `package.json` and every workspace's under `apps` and `packages`, 26 files today.
   The scratchpad's is not one of them: it is no workspace, and its libraries and its own lockfile are the
   experiments'. A dependency keeps the way it is
   written: an exact version stays exact, `^1.2.3` stays a caret range.
@@ -96,6 +100,7 @@ what moves it; to release one, remove the group.
 | --- | --- | --- |
 | bun | `.bun-version` | `packageManager` in the root's `package.json`; a `bun-version:` in a workflow; "Bun 1.4.4" in the standing documents |
 | Node | `engines.node` in the root's `package.json` (its major) | `node-version:` in every workflow; "Node 22 or newer" in the documents; the major of every `@types/node` (named, not written: the newest of a major is the registry's to say) |
+| A dependency of the catalog | its entry in the root's `catalog` | every `package.json` that asks for it: `"catalog:"`, never a version of its own |
 | Effect | the `effect` every `package.json` states (the root's `catalog`, when there is one) | every `@effect/*` package released with it; "Effect 4.1" and "effect 4.1.5" in the documents; the versions `vendor sync` writes into a vendored package |
 | `@effect/tsgo`, TypeScript, Better Auth | the one version the `package.json` files state | their name followed by a version in the documents |
 | Alchemy | `alchemy` in the `package.json` files; `vendor/alchemy/sources.json` once the packages are kept as files | every `@alchemy.run/*` dependency; with kept files, each dependency's `<version>-<commit>` and each override's file |

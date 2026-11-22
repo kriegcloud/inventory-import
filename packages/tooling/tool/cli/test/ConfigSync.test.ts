@@ -1,5 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
+import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
+import * as R from "effect/Record"
 import { configSync } from "../src/commands/ConfigSync/ConfigSync.rules.ts"
 import { Repo } from "../src/Repo.service.ts"
 import { syncSentence } from "../src/Sync.schema.ts"
@@ -111,6 +113,88 @@ describe("config-sync", () => {
         "err: config-sync FAIL  1 problem needs a person, and no command repairs it",
         'err:   .syncpackrc.json: has no version group that holds the catalog: add { "label": "...", "policy": "catalog", "dependencies": [], "dependencyTypes": ["prod", "dev", "peer"] } to "versionGroups" and run `bun run config-sync`, or a dependency of the root\'s catalog can be written as a version in one package.json'
       ])
+    })
+  )
+
+  it.effect(
+    "the catalog group is the one that says so, whatever order its keys are in and whatever else it holds",
+    () =>
+      Effect.gen(function* () {
+        const root = json({ name: "root", workspaces: ["packages/*"], catalog: { vitest: "^5.1.0", effect: "4.1.5" } })
+        const config = (dependencies: string) =>
+          lines([
+            "{",
+            '  "source": ["package.json", "packages/*/package.json"],',
+            '  "versionGroups": [',
+            '    { "label": "kept {files}", "dependencies": ["alchemy"], "isIgnored": true },',
+            "    {",
+            '      "label": "the } catalog",',
+            `      "dependencies": ${dependencies},`,
+            '      "severity": { "NotUsingCatalog": "error" },',
+            '      "policy": "catalog"',
+            "    }",
+            "  ]",
+            "}"
+          ])
+        const result = yield* run(
+          {
+            "package.json": root,
+            ".syncpackrc.json": config('["effect"]'),
+            "packages/kernel/package.json": json({ name: "@x/kernel", scripts, dependencies: { effect: "catalog:" } }),
+            "packages/kernel/tsconfig.json": "{}"
+          },
+          [".syncpackrc.json"]
+        )
+        expect(result.before).toEqual([
+          "err: config-sync FAIL  1 place differs from what it is derived from (`bun run config-sync` writes it)",
+          "err:   .syncpackrc.json:7  the catalog group's `dependencies`, from the `catalog` of package.json: found effect, expected effect, vitest"
+        ])
+        expect(result.files[".syncpackrc.json"]).toBe(config('["effect", "vitest"]'))
+        expect(result.again.length).toBe(1)
+      })
+  )
+
+  it.effect("a catalog group on one line whose list no longer fits there is written one key a line", () =>
+    Effect.gen(function* () {
+      const names = A.map(A.range(10, 21), (n) => `@scope/a-dependency-${n}`)
+      const root = json({
+        name: "root",
+        workspaces: ["packages/*"],
+        catalog: R.fromEntries(A.map(names, (name) => [name, "1.0.0"] as const))
+      })
+      const config = (group: ReadonlyArray<string>) =>
+        lines([
+          "{",
+          '  "source": ["package.json", "packages/*/package.json"],',
+          '  "versionGroups": [',
+          ...group,
+          "  ]",
+          "}"
+        ])
+      const result = yield* run(
+        {
+          "package.json": root,
+          ".syncpackrc.json": config([
+            '    { "label": "...", "policy": "catalog", "dependencies": [], "dependencyTypes": ["prod", "dev", "peer"] }'
+          ]),
+          "packages/kernel/package.json": json({ name: "@x/kernel", scripts }),
+          "packages/kernel/tsconfig.json": "{}"
+        },
+        [".syncpackrc.json"]
+      )
+      expect(result.files[".syncpackrc.json"]).toBe(
+        config([
+          "    {",
+          '      "label": "...",',
+          '      "policy": "catalog",',
+          '      "dependencies": [',
+          ...A.map(names, (name, index) => `        "${name}"${index === names.length - 1 ? "" : ","}`),
+          "      ],",
+          '      "dependencyTypes": ["prod", "dev", "peer"]',
+          "    }"
+        ])
+      )
+      expect(result.again.length).toBe(1)
     })
   )
 

@@ -327,6 +327,44 @@ describe("version-sync", () => {
     })
   )
 
+  it.effect(
+    "a version written beside the catalog is a place that differs: the catalog holds it, so it says `catalog:`",
+    () =>
+      Effect.gen(function* () {
+        const result = yield* run(
+          {
+            "package.json": json({
+              name: "root",
+              workspaces: ["packages/*"],
+              devDependencies: { react: "catalog:" },
+              catalog: { effect: "4.1.5", react: "19.2.0" }
+            }),
+            "packages/a/package.json": json({ name: "@x/a", dependencies: { effect: "4.1.4", react: "catalog:" } }),
+            "packages/b/package.json": json({
+              name: "@x/b",
+              dependencies: { effect: "catalog:", "left-pad": "1.3.0" },
+              peerDependencies: { react: "^19.0.0" }
+            })
+          },
+          ["packages/a/package.json", "packages/b/package.json"]
+        )
+        expect(result.before).toEqual([
+          "err: version-sync FAIL  2 places differ from what they are derived from (`bun run version-sync -- --write` writes them)",
+          "err:   packages/a/package.json:1  `effect`, which the catalog of the root's package.json holds (then `bun install`): found 4.1.4, expected catalog:",
+          "err:   packages/b/package.json:1  `react`, which the catalog of the root's package.json holds (then `bun install`): found ^19.0.0, expected catalog:"
+        ])
+        expect(result.files).toEqual({
+          "packages/a/package.json": json({ name: "@x/a", dependencies: { effect: "catalog:", react: "catalog:" } }),
+          "packages/b/package.json": json({
+            name: "@x/b",
+            dependencies: { effect: "catalog:", "left-pad": "1.3.0" },
+            peerDependencies: { react: "catalog:" }
+          })
+        })
+        expect(result.again).toEqual(result.after)
+      })
+  )
+
   it.effect("the compatibility date follows the app's wrangler.jsonc, and Alchemy's packages follow `alchemy`", () =>
     Effect.gen(function* () {
       const stack = (date: string) =>

@@ -1,5 +1,5 @@
 /**
- * The root command, `beep`: one group per kind of rule, and the command that keeps what is derived in step.
+ * The root command, `beep`: one group per kind of rule, and the commands that keep what is derived in step.
  *
  * @packageDocumentation
  */
@@ -9,6 +9,7 @@ import { docsCommand } from "./commands/Docs/Docs.command.ts"
 import { lawsCommand } from "./commands/Laws/Laws.command.ts"
 import { qualityCommand } from "./commands/Quality/Quality.command.ts"
 import { vendorCommand } from "./commands/Vendor/Vendor.command.ts"
+import { versionSyncCommand } from "./commands/VersionSync/VersionSync.command.ts"
 
 /**
  * `beep <group> <command>`.
@@ -17,5 +18,12 @@ import { vendorCommand } from "./commands/Vendor/Vendor.command.ts"
  */
 export const rootCommand = Command.make("beep").pipe(
   Command.withDescription("The repository's own rules, as commands"),
-  Command.withSubcommands([configSyncCommand, docsCommand, lawsCommand, qualityCommand, vendorCommand])
+  Command.withSubcommands([
+    configSyncCommand,
+    docsCommand,
+    lawsCommand,
+    qualityCommand,
+    vendorCommand,
+    versionSyncCommand
+  ])
 )

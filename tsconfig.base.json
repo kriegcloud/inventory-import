@@ -5,7 +5,7 @@
   // emits: outDir, rootDir, tsBuildInfoFile, incremental, composite, declaration, declarationMap, sourceMap,
   // rewriteRelativeImportExtensions and stripInternal; `noEmit` is added instead. A package that bundles for the
   // browser or the Worker (apps/inventory) sets its own lib, module, moduleResolution and types on top.
-  "$schema": "https://raw.githubusercontent.com/Effect-TS/tsgo/refs/heads/main/schema.json",
+  "$schema": "./node_modules/@effect/tsgo/schema.json",
   "include": [],
   "compilerOptions": {
     "noEmit": true,

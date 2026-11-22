@@ -256,7 +256,9 @@ What each step does, and with which tool:
 
 - **Which file a reference is read from.** The stacks read `op.env`, then his own `op.env.local`, and the last line
   of a name wins, so a name his own file has is that file's. The command reads the model key's and the previews'
-  password's references the same way (`referenceGiven`), and says which file it read: what it says, and the
+  password's references the same way (`referenceGiven`: the last line of the name, a reference or not, as the stacks'
+  `referencesIn` takes it; tooling may not import `@beep/infra`, so the rule is written twice and the CLI's tests
+  hold its cases), and says which file it read: what it says, and the
   `DEPLOY_WITHOUT_MODEL_KEY` it gives, come from the file the stack will take the reference from.
 - **1Password**, through `op-human` (the 1Password CLI as its owner runs it): if neither
   `packages/infra/env/op.env` nor `op.env.local` names a `PREVIEW_TEST_ACCOUNT_PASSWORD`, it looks for the item "inventory-import
@@ -397,13 +399,16 @@ that `cf accounts tokens verify` and `get` answer the fields read here; and that
 account-owned token. And for the checks added after the review: that `alchemy profile show`, read through a
 pipe, prints `accountId:` under the profile's Cloudflare line as its source does; that `gh variable get SIGN_UP
 --env production` answers the list and nothing else; and that a deploy of a test stage that changes nothing still
-prints its outputs, which is how he reads the password. `cf auth whoami` and `cf zones list` were run, to read the
-shape of their answers. For the stop on variables set outside: Alchemy's order (environment and root `.env` before
+prints its outputs, which is how he reads the password. An earlier version of this paragraph said `cf auth whoami`
+and `cf zones list` had been run to read the shape of their answers; no output of that run is kept, so it is not
+counted here: the shape of `cf auth whoami`'s answer is the stand-in's, not checked against a run or its source, and
+`cf zones list`'s was read from source only (below). For the stop on variables set outside: Alchemy's order (environment and root `.env` before
 a profile, for `state bootstrap` too) was read in the pinned build's source and never run; the comparison script
 was run in `sh` on made-up ids (same in another case with spaces: 0; different: 3), never under `op run`. What
 `cf zones list` answers was read, not run, in cf 1.0.0-beta.20's source and Cloudflare's published schema as
-`@distilled.cloud/cloudflare` 1.0.0-rc.20 types it: piped, it prints the response's `result` array as JSON (coloured
-only on a terminal or with `FORCE_COLOR` set, which would make the answer unreadable and stop a strict run); a
+`@distilled.cloud/cloudflare` 1.0.0-rc.20 types it: it prints the response's `result` array as JSON, uncoloured
+whenever its standard input or output is not a terminal, whatever `FORCE_COLOR` says (the command asks it with
+neither); a
 zone's `account` has an optional `id` and an optional, nullable `name`, so an account with no name is called by its
 id and one with no id names no account; `--status active` is one of the command's own filters. That it leaves out a
 pending copy of the zone in a second account is read from that filter, not tried. One gap is left for a stack

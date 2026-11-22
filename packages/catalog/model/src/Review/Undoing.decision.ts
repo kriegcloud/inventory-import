@@ -121,6 +121,16 @@ export class Undoing extends Domain.Decision(
       if (cmd.opening !== life.state.confirms) return yield* new ConfirmedSince({})
       if (cmd.sawGroup !== life.state.lastGroup) return yield* new GroupedSince({})
       if (!isDecided(row.state) || row.state.by !== actor.memberId || row.state.change !== cmd.undo) {
+        // The same undo sent again: the row took this very act already (this change, in this step, from this person),
+        // and it is written once. Its sender is answered as the first time, with nothing new, whatever was decided
+        // there since (2026-11-22, by the rule on a press from a screen that is behind).
+        if (
+          row.state.undone.change === cmd.undo &&
+          row.state.undone.step === cmd.step &&
+          row.state.undone.by === actor.memberId
+        ) {
+          return []
+        }
         return yield* new NotYourStep({})
       }
       // A group in force was decided after this decision and covers the row: it was drawn on a screen that had the
@@ -139,7 +149,9 @@ export class Undoing extends Domain.Decision(
       const next = kept ? cmd.next : row.state.below === CUT ? letGo : noLevel
       const under = row.state.under
       return [
-        row.record(new StepUndone({ next, below: kept ? cmd.below : "" })),
+        row.record(
+          new StepUndone({ next, below: kept ? cmd.below : "", undo: cmd.undo, step: cmd.step, by: actor.memberId })
+        ),
         life.record(
           new ActCounted({
             change: life.state.changes + 1,
@@ -171,6 +183,17 @@ export class Undoing extends Domain.Decision(
         isOpen(before.life) && command.sawGroup === before.life.lastGroup,
       // A decision a later group in force covers is not taken back from under it.
       ARowsUndoIsNotFromUnderALaterGroup: ({ command }) => !command.covered,
+      // The row keeps which undo it took: the change taken back, the step it was pressed in, and who pressed. The
+      // same undo sent again is known by these three, so each is what the act itself said.
+      TheRowKeepsWhichChangeWasTakenBack: ({ after, command }) =>
+        !isUntouched(after.row) && after.row.undone.change === command.undo,
+      AndTheStepItWasPressedIn: ({ after, command }) =>
+        !isUntouched(after.row) && after.row.undone.step === command.step,
+      AndWhoPressed: Effect.fn("Undoing.AndWhoPressed")(function* ({ after }) {
+        if (isUntouched(after.row)) return false
+        const actor = yield* CurrentActor
+        return after.row.undone.by === actor.memberId
+      }),
       // It does not reach past a confirm that stands.
       AnUndoDoesNotReachPastAConfirm: ({ before }) =>
         isOpen(before.life) && isDecided(before.row) && before.row.change > before.life.confirmedAt,

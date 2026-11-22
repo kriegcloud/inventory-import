@@ -617,6 +617,18 @@
       "UndoRowStep.ARowsUndoIsNotFromUnderALaterGroup": {
         "kind": "transition",
         "source": "({ command }) => !command.covered"
+      },
+      "UndoRowStep.TheRowKeepsWhichChangeWasTakenBack": {
+        "kind": "transition",
+        "source": "({ after, command }) =>\n        !isUntouched(after.row) && after.row.undone.change === command.undo"
+      },
+      "UndoRowStep.AndTheStepItWasPressedIn": {
+        "kind": "transition",
+        "source": "({ after, command }) =>\n        !isUntouched(after.row) && after.row.undone.step === command.step"
+      },
+      "UndoRowStep.AndWhoPressed": {
+        "kind": "transition",
+        "source": "Effect.fn(\"Undoing.AndWhoPressed\")(function* ({ after }) {\n        if (isUntouched(after.row)) return false\n        const actor = yield* CurrentActor\n        return after.row.undone.by === actor.memberId\n      })"
       }
     }
   }

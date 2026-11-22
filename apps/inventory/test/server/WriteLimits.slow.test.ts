@@ -23,7 +23,7 @@ import { maxStagedRows, StagedHead } from "@inventory/catalog-contract/Staged"
 import { ImportStoreD1 } from "@inventory/catalog-host/ImportStoreD1"
 import { ConfirmPlan } from "@inventory/catalog-model/Confirm"
 import { ConfirmWrite, ImportStore } from "@inventory/catalog-model/ImportStore"
-import { ItemsAsRead } from "@inventory/catalog-model/Rematch"
+import { ItemsAsRead, noItemsRead } from "@inventory/catalog-model/Rematch"
 import { Activity } from "@inventory/kernel/Activity"
 import { ActivityId, MemberId, OrganizationId } from "@inventory/kernel/Ids"
 import { Member } from "@inventory/kernel/Member"
@@ -32,11 +32,13 @@ import { as, testAppAround } from "./support/app.ts"
 
 /** The most values a statement of a save, a match or a confirm binds (the store's own arithmetic, beside its lists). */
 const mostBound = 31
-/** D1's limit on one bound text, which the local D1 does not hold a statement to. */
+/** D1's limit on one bound text, in bytes of UTF-8, which the local D1 does not hold a statement to. */
 const longestBound = 2_000_000
+const encoder = new TextEncoder()
+const bytesOf = (value: unknown): number => (P.isString(value) ? encoder.encode(value).length : 0)
 
 // D1 as it is, refusing a batch with a statement that binds more than the store says any does, whatever the file, or a
-// text longer than D1 takes.
+// text of more bytes than D1 takes.
 const CountedD1 = Layer.effect(
   D1,
   Effect.gen(function* () {
@@ -44,9 +46,9 @@ const CountedD1 = Layer.effect(
     const counted = <A, E, R>(query: Pending<A, E, R>): Pending<A, E, R> =>
       Effect.tap(query, (built) => {
         const [text, values] = built.statement.compile()
-        const longest = A.reduce(values, 0, (most, value) => Math.max(most, P.isString(value) ? value.length : 0))
+        const longest = A.reduce(values, 0, (most, value) => Math.max(most, bytesOf(value)))
         return values.length > mostBound || longest > longestBound
-          ? Effect.die(`${values.length} values bound, the longest ${longest} characters, by: ${text}`)
+          ? Effect.die(`${values.length} values bound, the longest ${longest} bytes, by: ${text}`)
           : Effect.void
       })
     // Each statement counted as it is built; the tuple's types are those of the statements as given.
@@ -120,7 +122,7 @@ const seeded = Effect.fn("seeded")(function* (id: ImportId, stored: number) {
     VALUES (${from}, ${org}, 'mem_marcus', 'Marcus Oyelaran', 'stocked.csv', ${json.head}, 0, 'imported', ${at})`
   yield* sql`INSERT INTO importBatch (id, organizationId, importId, confirmedById, confirmedByName, confirmedAt)
     VALUES (${from}, ${org}, ${from}, 'mem_marcus', 'Marcus Oyelaran', ${at})`
-  yield* sql`WITH RECURSIVE n(i) AS (SELECT 0 UNION ALL SELECT i + 1 FROM n WHERE i + 1 < ${stored})
+  yield* sql`WITH RECURSIVE n(i) AS (SELECT 0 WHERE ${stored} > 0 UNION ALL SELECT i + 1 FROM n WHERE i + 1 < ${stored})
     INSERT INTO item (id, organizationId, sku, skuKey, name, category, uom, unitCost, quantityOnHand, importId, batchId,
       sourceRow, createdById, createdBy, createdAt)
     SELECT printf('00000000-0000-4000-8000-%012d', i), ${org}, 'AA' || char(65 + i / 10000) || printf('-%04d', i % 10000),
@@ -215,6 +217,148 @@ layer(App, { timeout: 60_000 })("a save of long typed values", (it) => {
       const held = yield* savedFor(id)
       expect([saved.kind, held]).toEqual(["saved", [[2000, 0]]])
     })
+  )
+})
+
+// Written as JSON inside JSON, a quote and a backslash are four bytes each; "é" is two and "木" three, as UTF-8.
+const heavy: ReadonlyArray<readonly [string, string]> = [
+  ["quotes", '"'],
+  ["backslashes", "\\"],
+  ["letters of three bytes", "木"],
+  ["characters of four bytes", "📦"]
+]
+
+layer(App, { timeout: 60_000 })(
+  "a save, a match and a confirm of long typed values whose bytes are more than their characters",
+  (it) => {
+    for (const [index, [name, text]] of A.map(heavy, (one, index) => [index, one] as const)) {
+      it.effect(
+        `2,000 rows with 1,500 ${name} typed on each: every piece fits, and all are saved, matched and confirmed`,
+        () =>
+          Effect.gen(function* () {
+            const id = ImportId.make(`00000000-0000-4000-8000-0000000000${index + 1}1`)
+            yield* seeded(id, index === 0 ? 1 : 0)
+            const store = yield* ImportStore
+            const at = yield* DateTime.now
+            const draftNow = Effect.map(store.find(org, id), O.getOrThrow)
+            // The unit accepted too, so a match of the unit rewrites every one of them.
+            const typed = (by: string) =>
+              decisionFromFlags({ accepted: ["uom"], edits: { description: Str.repeat(1500)(text), name: by } })
+            const set = (by: string): Readonly<Record<string, RowDecision>> =>
+              R.fromEntries(counted(2000, (n) => [`row-${n + 2}`, typed(by)] as const))
+            const first = yield* draftNow
+            const saved = yield* store.decide(marcus, first, { set: set("saved"), clear: [] })
+            const second = yield* draftNow
+            const matched = yield* store.matchColumn(marcus, second, { field: "uom", column: null }, "Unit of measure")
+            const third = yield* draftNow
+            const confirmed = yield* store.commit(
+              ConfirmWrite.make({
+                draft: id,
+                fileName: "large.csv",
+                confirm: ConfirmId.make(`00000000-0000-4000-8000-0000000000${index + 1}2`),
+                expected: third.revision,
+                unsaved: { set: set("confirmed"), clear: [] },
+                plan: ConfirmPlan.make({ draft: id, rows: [] }),
+                itemIds: [],
+                read: noItemsRead,
+                audit: Activity.make({
+                  id: ActivityId.make(`00000000-0000-4000-8000-0000000000${index + 1}3`),
+                  organizationId: org,
+                  actorId: marcus.id,
+                  actorName: marcus.name,
+                  action: "Imported items",
+                  detail: "",
+                  agent: O.none(),
+                  createdAt: at
+                })
+              })
+            )
+            const held = yield* savedFor(id)
+            expect([saved.kind, matched, confirmed.kind, held]).toEqual(["saved", "saved", "confirmed", [[2000, 0]]])
+          })
+      )
+    }
+  }
+)
+
+layer(App, { timeout: 60_000 })("a save of 50,000 rows that waited", (it) => {
+  it.effect("each named with what it may be written over: every row but the one decided since is written", () =>
+    Effect.gen(function* () {
+      const id = ImportId.make("00000000-0000-4000-8000-0000000000f0")
+      yield* seeded(id, 1)
+      const client = yield* HttpApiTest.groups(Api, ["imports"])
+      const set: Readonly<Record<string, RowDecision>> = R.fromEntries(
+        counted(maxStagedRows, (n) => [`row-${n + 2}`, n === 0 ? replace : out] as const)
+      )
+      const theirs = decisionFromFlags({ edits: { name: "Pine Crate" } })
+      yield* client.imports
+        .decide({ params: { id }, payload: { madeOn: { "row-9": 1 }, set: { "row-9": theirs }, clear: [] } })
+        .pipe(as("mem_dana"))
+      const saved = yield* client.imports
+        .decide({
+          params: { id },
+          payload: { madeOn: R.map(set, () => 0), set, clear: [], over: R.map(set, () => [O.none(), O.some(replace)]) }
+        })
+        .pipe(as("mem_marcus"))
+      expect([saved.decidedSince, saved.changed, saved.revision]).toEqual([
+        [{ rowId: "row-9", theirs: O.some(theirs) }],
+        true,
+        3
+      ])
+      const held = yield* savedFor(id)
+      expect(held).toEqual([[maxStagedRows, 0]])
+    })
+  )
+})
+
+layer(App, { timeout: 60_000 })("a confirm that writes every row of a file of 50,000", (it) => {
+  it.effect(
+    "items created and replaced, rows left out, values typed: each is stored, and counted as stored",
+    () =>
+      Effect.gen(function* () {
+        const id = ImportId.make("00000000-0000-4000-8000-0000000000f5")
+        const replaced = 1000
+        const leftOut = 10_000
+        yield* seeded(id, replaced)
+        const client = yield* HttpApiTest.groups(Api, ["imports"])
+        // The first rows replace their stored item, the last are left out, and every row typed on has a long description
+        // whose bytes are more than its characters. A Replace was made before the cost was matched again: the confirm
+        // reads and checks everything its judgement rests on too.
+        const description = 'a "quoted" 木 word'
+        const typed = decisionFromFlags({ edits: { description } })
+        const replacing = decisionFromFlags({ stored: "replace", edits: { description } })
+        const set: Readonly<Record<string, RowDecision>> = R.fromEntries(
+          counted(
+            maxStagedRows,
+            (n) => [`row-${n + 2}`, n < replaced ? replacing : n >= maxStagedRows - leftOut ? out : typed] as const
+          )
+        )
+        const confirmed = yield* client.imports
+          .commit({ params: { id }, payload: { revision: 1, madeOn: R.map(set, () => 0), set, clear: [] } })
+          .pipe(as("mem_marcus"))
+        const result = O.getOrThrow(confirmed.result)
+        const written = maxStagedRows - leftOut
+        expect([result.created, result.updated, result.already, result.notImported]).toEqual([
+          written - replaced,
+          replaced,
+          0,
+          leftOut
+        ])
+        const sql = yield* SqlClient.SqlClient
+        const stored = yield* sql<{
+          readonly items: number
+          readonly changes: number
+          readonly outcomes: number
+        }>`SELECT
+        (SELECT COUNT(*) FROM item WHERE organizationId = ${org} AND description = ${description}) AS items,
+        (SELECT COUNT(*) FROM importChange WHERE importId = ${id}) AS changes,
+        (SELECT COUNT(*) FROM importOutcome WHERE importId = ${id}) AS outcomes`
+        expect(stored).toEqual([{ items: written, changes: written, outcomes: maxStagedRows }])
+        const held = yield* savedFor(id)
+        expect(held).toEqual([[maxStagedRows, 0]])
+      }),
+    // The whole file is reviewed and written, and the slow suite runs beside it.
+    120_000
   )
 })
 

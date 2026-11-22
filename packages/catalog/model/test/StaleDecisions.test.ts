@@ -19,10 +19,11 @@ import {
   columnsOf,
   comparisonQuestions,
   comparisonsChanged,
-  heldAtMatch,
+  heldToTries,
   movesOfMatch,
   withoutStaleDecisions
 } from "@inventory/catalog-model/Rematch"
+import { decisionsItemsChanged, ImportStore } from "@inventory/catalog-model/ImportStore"
 import { SuggestionStore } from "@inventory/catalog-model/SuggestionStore"
 import * as A from "effect/Array"
 import * as Arbitrary from "effect/Arbitrary"
@@ -197,15 +198,21 @@ const unitOfRow6 = (view: ImportView) => {
   }))
 }
 
-describe("a match's earlier tries, held", () => {
+describe("a request's earlier tries, held", () => {
   const replace = decisionFromFlags({ stored: "replace" })
-  const question = { rowId: "row-3", field: "unitCost" as const, made: 4, then: replace, now: replace }
+  const question = {
+    rowId: "row-3",
+    fields: [{ field: "unitCost" as const, made: 4 }],
+    decided: 3,
+    then: replace,
+    now: replace
+  }
   const { rows: _rows, ...head } = reviewed
   const net = column("Net cost")
   const choice = (index: number, at: number): MappingChoice => ({ field: "unitCost", column: index, by: "person", at })
   const move = (was: number, index: number, at: number): ColumnMove => ({ field: "unitCost", at, was, column: index })
   // A match of unit cost to "Net cost", asked of a draft at revision 4.
-  const firstTry = heldAtMatch({
+  const firstTry = heldToTries({
     earlier: O.none(),
     head,
     choices: [choice(net, 5)],
@@ -217,20 +224,27 @@ describe("a match's earlier tries, held", () => {
     readonly choices: ReadonlyArray<MappingChoice>
     readonly moves: ReadonlyArray<ColumnMove>
     readonly made: number
+    readonly decided?: number
   }) =>
-    heldAtMatch({
+    heldToTries({
       earlier: O.some(firstTry.held),
       head,
       choices: asked.choices,
       moves: asked.moves,
-      questions: [{ ...question, made: asked.made }],
+      questions: [
+        { ...question, fields: [{ field: "unitCost", made: asked.made }], decided: asked.decided ?? question.decided }
+      ],
       changed: [{ rowId: "row-3", field: "unitCost" }]
     }).changed
 
   it("hold down a take-back a later try finds while the columns are the same (an item changed in between)", () => {
+    expect(later({ choices: [choice(net, 5)], moves: [move(column("unit_cost"), net, 5)], made: 4 })).toEqual([])
+  })
+
+  it("never hold down a decision made again in between, even to the same choice: it takes the later try's answer", () => {
     expect(
-      later({ choices: [choice(net, 5)], moves: [move(column("unit_cost"), net, 5)], made: question.made })
-    ).toEqual([])
+      later({ choices: [choice(net, 7)], moves: [move(column("unit_cost"), net, 7)], made: 6, decided: 6 })
+    ).toEqual([{ rowId: "row-3", field: "unitCost" }])
   })
 
   it("hold it down across a save on another row, which moves the revision the match is stamped with and no column", () => {
@@ -563,6 +577,46 @@ describe("a Replace or Keep-stored across a re-match of another column", () => {
           expect(changed).toEqual([])
         })
     )
+
+    it.effect("is named by the field whose own move changes the comparison, though another field moved too", () =>
+      Effect.gen(function* () {
+        yield* seeded
+        // Row 2's unit reads the same under both unit columns; its cost reads the stored 3 only under "unit_cost".
+        const table = tableOf("named.csv", [
+          { ...item, sku: "AAA-0002", name: "Steel Bolt XL", unit_cost: "3", "Net cost": "9.00", "Pack unit": "EA" }
+        ])
+        const view = yield* stage(table).pipe(as(marcus))
+        const choices: ReadonlyArray<MappingChoice> = [
+          { field: "uom", column: column("Pack unit"), by: "person", at: 2 },
+          { field: "unitCost", column: column("Net cost"), by: "person", at: 3 }
+        ]
+        const moves = [
+          { field: "uom" as const, at: 2, was: column("uom"), column: column("Pack unit") },
+          { field: "unitCost" as const, at: 3, was: column("unit_cost"), column: column("Net cost") }
+        ]
+        const questions = comparisonQuestions({
+          choices,
+          moves,
+          madeOn: { "row-2": 1 },
+          set: flags({ "row-2": { stored: "replace" } })
+        })
+        // One question a row, of every field that moved, in the item's order.
+        expect(A.map(questions, ({ rowId, fields }) => [rowId, A.map(fields, ({ field }) => field)])).toEqual([
+          ["row-2", ["uom", "unitCost"]]
+        ])
+        const changed = comparisonsChanged({
+          table,
+          choices,
+          moves,
+          storedItems: view.storedItems,
+          createdIds: [],
+          suggestions: view.suggestions,
+          itemsOf: itemsOfRow,
+          questions
+        })
+        expect(changed).toEqual([{ rowId: "row-2", field: "unitCost" }])
+      })
+    )
   })
 })
 
@@ -864,6 +918,68 @@ describe("a Replace or Keep-stored on an import matched before moves were kept",
         expect(R.get(next.decisions, "row-2")).toEqual(O.some(decisionFromFlags({ stored: "replace" })))
       })
     )
+
+    it.effect(
+      "made after the old match and stored, it is taken back by the next match of that field though the row compares the same, and the entry names it",
+      () =>
+        Effect.gen(function* () {
+          const { imports, matching } = yield* seeded
+          const params = { id: matching.id }
+          yield* matchedLongAgo(matching.id)
+          const long = yield* imports.get({ params }).pipe(as(marcus))
+          // Decided on "List cost", which the import reads since: row 2 reads 99.00 in every cost column.
+          const replace = flags({ "row-2": { stored: "replace" } })
+          const saved = yield* imports
+            .decide({ params, payload: { madeOn: { "row-2": long.revision }, set: replace, clear: [] } })
+            .pipe(as(marcus))
+          expect(saved.notApplied).toEqual([])
+          const further = yield* imports
+            .match({ params, payload: { field: "unitCost", column: O.some(column("Net cost")) } })
+            .pipe(as(dana))
+          expect(R.get(further.decisions, "row-2")).toEqual(O.some(decisionFromFlags({})))
+          expect(further.takenBack).toEqual([
+            {
+              revision: further.revision,
+              by: "Dana Whitfield",
+              field: "unitCost",
+              matched: "unitCost",
+              reads: true,
+              kind: "stored",
+              count: 1,
+              rows: ["row-2"]
+            }
+          ])
+        })
+    )
+
+    it.effect(
+      "made after the old match and stored, it stands through a match of another field, and a confirm imports it as made",
+      () =>
+        Effect.gen(function* () {
+          const { imports, matching } = yield* seeded
+          const params = { id: matching.id }
+          yield* matchedLongAgo(matching.id)
+          const long = yield* imports.get({ params }).pipe(as(marcus))
+          const replace = flags({ "row-2": { stored: "replace" } })
+          yield* imports
+            .decide({ params, payload: { madeOn: { "row-2": long.revision }, set: replace, clear: [] } })
+            .pipe(as(marcus))
+          // Description moves to "Pack unit", empty on row 2 as its own column is: the cost was not matched again.
+          const other = yield* imports
+            .match({ params, payload: { field: "description", column: O.some(column("Pack unit")) } })
+            .pipe(as(dana))
+          expect([R.get(other.decisions, "row-2"), other.takenBack]).toEqual([
+            O.some(decisionFromFlags({ stored: "replace" })),
+            []
+          ])
+          // The confirm carries nothing of its own: the stored Replace is imported as made, not judged again.
+          const confirmed = yield* imports
+            .commit({ params, payload: { revision: other.revision, madeOn: {}, set: {}, clear: [] } })
+            .pipe(as(marcus))
+          const result = O.getOrThrow(confirmed.result)
+          expect(result.updated).toEqual(1)
+        })
+    )
   })
 })
 
@@ -933,6 +1049,58 @@ describe("a match worked out again because something changed between two tries",
     )
   })
 
+  layer(App)("an item stocked, and the same Replace taken back and made again", (it) => {
+    it.effect("the Replace made again takes the second try's answer: made on the column before, it is taken back", () =>
+      Effect.gen(function* () {
+        const plain = yield* importsEndpoints
+        const first = yield* stage(stocked).pipe(as(marcus))
+        // Nothing is stocked yet under either row's SKU; stocked, "unit_cost" compares otherwise than "List cost".
+        const view = yield* stage(
+          tableOf("again.csv", [
+            { ...item, sku: "AAA-0002", name: "Steel Bolt", unit_cost: "9.00", "List cost": "3" },
+            { ...item, sku: "AAA-0001", name: "Oak Crate", unit_cost: "9.00", "List cost": "12.50" }
+          ])
+        ).pipe(as(marcus))
+        const params = { id: view.id }
+        const both = flags({ "row-2": { stored: "replace" }, "row-3": { stored: "replace" } })
+        yield* plain
+          .decide({ params, payload: { madeOn: R.map(both, () => view.revision), set: both, clear: [] } })
+          .pipe(as(marcus))
+        // Marcus sees the stocked items and presses row 2's Replace again, by way of Keep: the same decision, made again.
+        const pressed = (stored: "keep" | "replace") =>
+          Effect.flatMap(plain.get({ params }).pipe(as(marcus)), (now) =>
+            plain
+              .decide({
+                params,
+                payload: {
+                  madeOn: { "row-2": now.revision },
+                  set: flags({ "row-2": { stored } }),
+                  clear: []
+                }
+              })
+              .pipe(as(marcus))
+          )
+        const { imports, asked } = yield* interrupted(
+          plain
+            .commit({ params: { id: first.id }, payload: { revision: first.revision, madeOn: {}, set: {}, clear: [] } })
+            .pipe(as(marcus), Effect.andThen(pressed("keep")), Effect.andThen(pressed("replace")), Effect.orDie)
+        )
+        const matched = yield* imports
+          .match({ params, payload: { field: "unitCost", column: O.some(column("List cost")) } })
+          .pipe(as(dana))
+        expect(MutableRef.get(asked)).toBe(3)
+        // Row 3's Replace is the one the first try found standing: the item stocked since takes nothing of it back.
+        expect(decided(matched.decisions, ["row-2", "row-3"])).toEqual([
+          O.some(decisionFromFlags({})),
+          O.some(decisionFromFlags({ stored: "replace" }))
+        ])
+        expect(A.map(matched.takenBack, (entry) => [entry.field, entry.kind, entry.rows])).toEqual([
+          ["unitCost", "stored", ["row-2"]]
+        ])
+      })
+    )
+  })
+
   layer(App)("another person's match", (it) => {
     it.effect("starts the answers afresh: a take-back its column causes is not held down by the first try's", () =>
       Effect.gen(function* () {
@@ -969,6 +1137,52 @@ describe("a match worked out again because something changed between two tries",
           ["Marcus Oyelaran", "unitCost", "stored", ["row-2"]],
           ["Dana Whitfield", "unitCost", "stored", ["row-2"]]
         ])
+      })
+    )
+  })
+})
+
+describe("a save worked out again because something it read changed, and a column matched before it is read again", () => {
+  const replace = flags({ "row-2": { stored: "replace" } })
+  layer(App)("is judged afresh on the columns it then reads", (it) => {
+    it.effect("a take-back the match causes is not held down by what the first try found", () =>
+      Effect.gen(function* () {
+        const plain = yield* importsEndpoints
+        const inner = yield* ImportStore
+        const first = yield* stage(stocked).pipe(as(marcus))
+        yield* plain
+          .commit({ params: { id: first.id }, payload: { revision: first.revision, madeOn: {}, set: {}, clear: [] } })
+          .pipe(as(marcus))
+        // Row 2 compares the same under "unit_cost" and "List cost"; "Net cost" says otherwise.
+        const view = yield* stage(
+          tableOf("between.csv", [
+            { ...item, sku: "AAA-0002", name: "Steel Bolt XL", unit_cost: "3", "List cost": "3", "Net cost": "9.00" }
+          ])
+        ).pipe(as(marcus))
+        const params = { id: view.id }
+        const match = (heading: (typeof headings)[number]) =>
+          plain.match({ params, payload: { field: "unitCost", column: O.some(column(heading)) } }).pipe(as(dana))
+        yield* match("List cost")
+        // The store finds an item the first try read edited since; before the save is read again, Dana matches the cost.
+        const tries = MutableRef.make(0)
+        const stepped = ImportStore.of({
+          ...inner,
+          decide: Effect.fn("stepped.decide")(function* (...args: Parameters<ImportStore["Service"]["decide"]>) {
+            if (MutableRef.updateAndGet(tries, (n) => n + 1) > 1) return yield* inner.decide(...args)
+            yield* Effect.orDie(match("Net cost"))
+            return decisionsItemsChanged
+          })
+        })
+        const imports = yield* importsEndpoints.pipe(Effect.provideService(ImportStore, stepped))
+        const saved = yield* imports
+          .decide({ params, payload: { madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
+          .pipe(as(marcus))
+        expect([MutableRef.get(tries), saved.notApplied]).toEqual([
+          2,
+          [{ rowId: "row-2", field: "unitCost", kind: "stored" }]
+        ])
+        const after = yield* plain.get({ params }).pipe(as(marcus))
+        expect(R.get(after.decisions, "row-2")).toEqual(O.some(decisionFromFlags({})))
       })
     )
   })

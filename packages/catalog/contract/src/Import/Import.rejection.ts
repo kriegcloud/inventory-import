@@ -73,15 +73,18 @@ export class RevisionAhead extends S.TaggedError<RevisionAhead, { readonly brand
 ) {}
 
 /**
- * The import kept changing while a save, a confirm or a match was worked out against it (others saving or matching at
- * the same moment, every try overtaken): nothing was written. The same limit holds in every store; the person tries
- * again.
+ * What a save, a confirm or a match was worked out against kept changing, under every try: nothing was written. It is the
+ * import (a column matched, or, for a match and a save of rows that waited, any save), or what the judgement of a Replace
+ * or Keep-stored across a re-match read beside it (a stored item edited, replaced, created or taken back, a row an
+ * earlier confirm created, a suggestion stored), or both: `reason` says which. The same limit holds in every store; the
+ * person tries again.
  */
 export class DraftBusy extends S.TaggedError<DraftBusy, { readonly brand: unique symbol }>()(
   "DraftBusy",
   { reason: reasonForPerson },
   {
-    description: "The import kept changing while the request was worked out against it. Nothing was written",
+    description:
+      "What the request was worked out against kept changing under every try: the import (a column matched, or, for a match and a save of rows that waited, any save), or the stored items, created rows or suggestions its judgement read. Nothing was written; `reason` says which",
     httpApiStatus: 409
   }
 ) {}

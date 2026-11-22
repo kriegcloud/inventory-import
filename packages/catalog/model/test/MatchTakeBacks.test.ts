@@ -118,6 +118,8 @@ describe("what a match took back from the stored decisions", () => {
               revision: matched.revision,
               by: "Dana Whitfield",
               field: "sku",
+              matched: "sku",
+              reads: true,
               kind: "stored",
               count: 2,
               rows: ["row-2", "row-3"]
@@ -126,6 +128,8 @@ describe("what a match took back from the stored decisions", () => {
               revision: matched.revision,
               by: "Dana Whitfield",
               field: "sku",
+              matched: "sku",
+              reads: true,
               kind: "twin",
               count: 2,
               rows: ["row-4", "row-5"]
@@ -257,6 +261,97 @@ describe("a Replace across a re-match of another column", () => {
             .pipe(as(dana))
           expect(R.get(matched.decisions, "row-2")).toEqual(O.some(decisionFromFlags({})))
         })
+    )
+
+    it.effect(
+      "is taken back when one match moves two fields and the row stops reading under both: the row is judged as a whole",
+      () =>
+        Effect.gen(function* () {
+          // Row 2 reads (cost 4.58, quantity 10) and differs from its stored item on the name and the cost.
+          const table = tableOf("displaced.csv", [
+            { ...item, sku: "AAA-0002", name: "Steel Bolt XL", unit_cost: "4.58", "Net cost": "9.99" }
+          ])
+          const replace = flags({ "row-2": { stored: "replace" } })
+          const { imports, view, params } = yield* seeded(table)
+          yield* imports
+            .decide({ params, payload: { madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
+            .pipe(as(marcus))
+          // The quantity is pointed at the cost's column: "4.58" is no count, and the cost reads no column.
+          const matched = yield* imports
+            .match({ params, payload: { field: "quantityOnHand", column: O.some(column("unit_cost")) } })
+            .pipe(as(dana))
+          expect(R.get(matched.decisions, "row-2")).toEqual(O.some(decisionFromFlags({})))
+          expect(A.map(matched.takenBack, (entry) => [entry.kind, entry.rows])).toEqual([["stored", ["row-2"]]])
+          // A save of the same Replace made before it is refused the same way, after the cost reads a column again too.
+          const saved = yield* imports
+            .decide({ params, payload: { madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
+            .pipe(as(marcus))
+          expect(A.map(saved.notApplied, (taken) => [taken.rowId, taken.kind])).toEqual([["row-2", "stored"]])
+          yield* imports
+            .match({ params, payload: { field: "unitCost", column: O.some(column("Net cost")) } })
+            .pipe(as(dana))
+          const later = yield* imports
+            .decide({ params, payload: { madeOn: { "row-2": view.revision }, set: replace, clear: [] } })
+            .pipe(as(marcus))
+          expect(A.map(later.notApplied, (taken) => [taken.rowId, taken.kind])).toEqual([["row-2", "stored"]])
+        })
+    )
+  })
+})
+
+describe("which field was matched by hand, and whether the field named reads a column since", () => {
+  layer(App)("is kept with what a match took back", (it) => {
+    it.effect("a field that lost its column to another, a field cleared, and one matched to another column", () =>
+      Effect.gen(function* () {
+        const { imports, view, params } = yield* seeded(reviewed)
+        const accepted = flags({ "row-2": { accepted: ["uom", "name"] } })
+        const accept = (on: number) =>
+          imports.decide({ params, payload: { madeOn: { "row-2": on }, set: accepted, clear: [] } }).pipe(as(marcus))
+        const said = (entries: ReadonlyArray<MatchTakeBack>, revision: number) =>
+          A.map(
+            A.filter(entries, (entry) => entry.revision === revision),
+            (entry) => [entry.field, entry.matched, entry.reads]
+          )
+        yield* accept(view.revision)
+        // Name takes the column headed "uom": the unit reads none since.
+        const displaced = yield* imports
+          .match({ params, payload: { field: "name", column: O.some(column("uom")) } })
+          .pipe(as(dana))
+        expect(said(displaced.takenBack, displaced.revision)).toEqual([
+          ["name", "name", true],
+          ["uom", "name", false]
+        ])
+        yield* accept(displaced.revision)
+        const cleared = yield* imports.match({ params, payload: { field: "name", column: O.none() } }).pipe(as(dana))
+        // Cleared, Name gives the column back to the unit, which reads it by its heading again.
+        expect(said(cleared.takenBack, cleared.revision)).toEqual([
+          ["name", "name", false],
+          ["uom", "name", true]
+        ])
+      })
+    )
+
+    it.effect("an entry stored before either was kept still reads, beside one with both", () =>
+      Effect.gen(function* () {
+        const { imports, view, params } = yield* seeded(reviewed)
+        const ref = yield* CatalogMemoryRef
+        const older = '{"revision":1,"by":"Dana Whitfield","field":"uom","kind":"accept","count":1,"rows":["row-4"]}'
+        yield* Ref.update(ref, (state) => ({
+          ...state,
+          drafts: A.map(state.drafts, (entry) =>
+            entry.draft.id === view.id ? { ...entry, draft: { ...entry.draft, takenBackJson: `[${older}]` } } : entry
+          )
+        }))
+        const accepted = flags({ "row-2": { accepted: ["uom"] } })
+        yield* imports
+          .decide({ params, payload: { madeOn: { "row-2": view.revision }, set: accepted, clear: [] } })
+          .pipe(as(marcus))
+        const matched = yield* imports.match({ params, payload: { field: "uom", column: O.none() } }).pipe(as(dana))
+        expect(A.map(matched.takenBack, (entry) => [entry.rows, "matched" in entry, entry.reads])).toEqual([
+          [["row-4"], false, undefined],
+          [["row-2"], true, false]
+        ])
+      })
     )
   })
 })
@@ -427,6 +522,8 @@ describe("what a draft keeps of its matches' take-backs", () => {
     const entries = takenBackOfMatch({
       revision: 13,
       by: "Dana Whitfield",
+      matched: "sku",
+      reads: () => true,
       notApplied: [
         { rowId: "row-9", field: "sku", kind: "stored" },
         { rowId: "not-a-row", field: "sku", kind: "stored" },

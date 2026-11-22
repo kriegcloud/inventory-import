@@ -69,9 +69,10 @@ the test's name says it was not run, and it was checked by hand.
   folder, a folder linked in, and every file one of those reaches by an import, whatever its folder is called and
   whether or not it is in the scratchpad. A list without the scratchpad's own `vite.config.ts` and `vitest.config.ts`
   is not the compiler's whole list, and the check fails and says so. Left alone are a file of an installed library
-  (under a `node_modules`, in a folder with a package.json), a file of one of the repository's workspaces, which that
-  package's own check holds, and a file the compiler never loads (JavaScript, or a cache nothing imports). A file
-  somebody wrote in a folder named `node_modules`, or beside a package.json that is no workspace's, is read.
+  (under a `node_modules`, in a folder with a package.json), a file in the `src` or `test` folder of one of the repository's
+  workspaces, which that package's own check holds, and a file the compiler never loads (JavaScript, or a cache nothing imports). A file
+  somebody wrote in a folder named `node_modules`, beside a package.json that is no workspace's, or in a
+  workspace's folder outside its `src` and `test`, is read.
 - **Not enforced inside:** the laws on how code is written (no `_tag` told apart by hand, the form of an Effect
   import, a ref that stays the same across draws) and the linter. Each of those laws names the scratchpad as left
   out. They apply the moment code graduates into a package, so write an experiment the way a package is written when

@@ -889,3 +889,14 @@ He asked, in his words: "In beep-effect we have this lint rule or something that
 used. Can you […] configure and set this up for us?" Built as beep-effect has it, oxlint's
 `typescript/no-deprecated` on every code file, as a law and a root task, `deprecated:check`
 (`docs/standards/deprecated-apis.md`). Reverse: drop the task from `check` and `check:full`.
+
+### 2026-11-21 — deprecated APIs, the vendored data grid's `document.execCommand`
+
+The check found `document.execCommand("insertText", …)` in the vendored data grid, which names no replacement.
+Question: what should happen to it? Options: "Local change (Recommended)"; "Exempt vendored kit"; also named, deleting
+the grid, which no screen uses. Answer: "Local change"; the agent recommended the same. The option was put as the
+fallbacks already in the file, at the cost of the browser's own undo in a cell's editor. Measured in Chromium, the
+number cell's fallback stored 6 for a typed 56 and 5 for a typed -5, so it is not used: the text, number and url
+editors let the browser type the key that opens them, which stores what it did before, undo included. Only the
+long-text editor uses its fallback, and pays that cost. Reverse: the "Local change" blocks in
+`packages/ui/src/components/data-grid/` (`data-grid-cell.tsx`, `data-grid-cell-variants.tsx`, `data-grid-utils.ts`).

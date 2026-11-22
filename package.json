@@ -45,7 +45,7 @@
   },
   "devDependencies": {
     "@beep/repo-cli": "workspace:*",
-    "@effect/tsgo": "0.70.0",
+    "@effect/tsgo": "0.73.2",
     "oxfmt": "^0.78.0",
     "oxlint": "1.93.0",
     "syncpack": "^15.3.3",

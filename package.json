@@ -32,6 +32,7 @@
     "docs:check": "bun packages/tooling/tool/cli/src/bin.ts docs check",
     "deps:lint": "syncpack lint",
     "deps:outdated": "syncpack update --check",
+    "release": "bun packages/tooling/tool/cli/src/bin.ts release cut",
     "deps:update": "bun packages/tooling/tool/cli/src/bin.ts deps update",
     "version-sync": "bun packages/tooling/tool/cli/src/bin.ts version-sync",
     "config-sync": "bun packages/tooling/tool/cli/src/bin.ts config-sync",

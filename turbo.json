@@ -120,18 +120,26 @@
     },
     // No deprecated API is used (`beep laws deprecated-apis`), read from every file's types: a new `@deprecated` in one
     // file, in a tsconfig's reach or in an installed package changes the answer for a file that did not change. So every
-    // code file git would commit is an input, wherever it is, with every tsconfig and manifest, and what is installed:
-    // the lockfile, which names the version of every installed package, nested ones included, and the manifest of each
-    // package installed at the top of node_modules, so an install there that has fallen behind the lockfile is not
-    // answered from one that had not. A nested node_modules folder is hashed through the lockfile only.
+    // code file and tsconfig is an input, in a folder nobody listed too, with every workspace's manifest and what is
+    // installed: the lockfile, and the manifest of every installed package in the root's node_modules, nested ones
+    // included, so an install that has fallen behind the lockfile is not answered from one that had not. Turbo applies
+    // every `!` to every line above it, so node_modules is not excluded whole: only its code files and tsconfigs are.
+    // Left out by name: what git ignores and the law does not read (`.agents`, and `.claude`, which in the main
+    // checkout holds every other checkout of this repository).
     "//#deprecated:check": {
       "inputs": [
         ".oxlintrc.deprecated-apis.json",
         ".gitignore",
         "**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
         "**/tsconfig*.json",
-        "**/package.json",
-        "!**/{node_modules,dist,.wrangler,.turbo}/**",
+        "package.json",
+        "apps/**/package.json",
+        "packages/**/package.json",
+        "!node_modules/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+        "!node_modules/**/tsconfig*.json",
+        "!apps/**/{node_modules,dist,.wrangler,.turbo}/**",
+        "!packages/**/{node_modules,dist,.turbo}/**",
+        "!{.claude,.codex,.agents,.turbo,.scratch,.wrangler,.alchemy,.taste-skill,.session}/**",
         "bun.lock",
         "node_modules/*/package.json",
         "node_modules/@*/*/package.json"

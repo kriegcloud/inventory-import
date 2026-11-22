@@ -13,7 +13,8 @@
  * - asks `tsgolint` (the linter `tsrs-lint` is a port of, and the one that says it) which project each file has, and
  *   fails on a file that has none, JavaScript included.
  *
- * One folder is left out, by name: `.agents/`, other people's skills vendored as they were published (`leftOut`).
+ * One folder is left out, by name and by Benjamin's decision: `.agents/`, the agent skills, vendored as they were
+ * published, most from other people and some from his own beep-effect (`leftOut`).
  *
  * "Every file git would commit" is git's answer to give, so this asks git, and fails when git does not answer.
  *
@@ -38,9 +39,12 @@ const profile = ".oxlintrc.deprecated-apis.json"
 const isCode = (file: string) => Str.match(/\.[cm]?[jt]sx?$/)(file).pipe(O.isSome)
 
 /**
- * The folders that are not read, each from the root with its closing slash. `.agents/` holds other people's skills,
- * vendored as they were published and never run by the app or its checks; one of them reads deprecated CSS properties
- * on purpose, to report a page that uses them. Anything else git would commit is read, a new folder included.
+ * The folders that are not read, each from the root with its closing slash. `.agents/` holds the agent skills, copied
+ * as they were published and never run by the app or its checks: 16 of its 18 code files are other people's, and two
+ * (the ontology auditor's script and its test) are from Benjamin's own beep-effect. One of the others reads deprecated
+ * CSS properties on purpose, to report a page that uses them. Leaving the folder out is his decision
+ * (explorations/ideal-architecture/DECISIONS.md, 2026-11-22). Anything else git would commit is read, a new folder
+ * included.
  */
 const leftOut: ReadonlyArray<string> = [".agents/"]
 
@@ -61,12 +65,23 @@ const Profile = S.Struct({
 
 const readProfile = S.decodeEffect(S.fromJsonString(Profile), { onExcessProperty: "error", errors: "all" })
 
-/** A comment that turns rules off: `oxlint-disable` or `eslint-disable`, for a line, the next one or the file. */
-const directive = /(?:\/\/|\/\*)\s*((?:oxlint|eslint)-disable(?:-next-line|-line)?)(?![\w-])([^\r\n]*)/g
+/**
+ * A comment that turns rules off: `oxlint-disable` or `eslint-disable`, for a line, the next one or the file, at the
+ * start of a `//` comment (read to the line's end) or of a block comment (read to its end, over as many lines as it
+ * has). Groups 1 and 2 are a line comment's directive and what follows it; 3 and 4 a block comment's.
+ *
+ * The text is matched, not parsed, so the same words inside a string or after `//` in a sentence of a doc comment are
+ * refused too, though oxlint ignores them there (measured on 1.93.0). That errs on the side of the rule: write the
+ * words another way there, as this law's own test does.
+ */
+const directive =
+  /\/\/[ \t]*((?:oxlint|eslint)-disable(?:-next-line|-line)?)(?![\w-])([^\r\n]*)|\/\*\s*((?:oxlint|eslint)-disable(?:-next-line|-line)?)(?![\w-])([\s\S]*?)\*\//g
 
-/** The rules a directive names: what follows it, up to its reason (` -- `) or the comment's end. */
-const namedRules = (rest: string) =>
-  A.filter(Str.split(/[\s,]+/)(`${Str.split(/\*\/|\s--\s/)(rest)[0]}`), (name) => Str.isNonEmpty(name) && name !== "--")
+/**
+ * The rules a directive names: what follows it up to its reason, which begins at the first `--`, with or without
+ * spaces around it, as oxlint reads it (measured: `typescript/no-deprecated--legacy` turns the rule off).
+ */
+const namedRules = (rest: string) => A.filter(Str.split(/[\s,]+/)(`${Str.split("--")(rest)[0]}`), Str.isNonEmpty)
 
 /** Whether a directive turns this rule off: it names it, under any plugin's spelling, or names no rule at all. */
 const silences = (rules: ReadonlyArray<string>) =>
@@ -258,11 +273,11 @@ export const deprecatedApis = Effect.fn("DeprecatedApis.deprecatedApis")(functio
       (file) =>
         Effect.map(repo.text(repo.join(repo.root, file)), (text) =>
           A.flatMap(A.fromIterable(Str.matchAll(directive)(text)), (found) =>
-            silences(namedRules(`${found[2]}`))
+            silences(namedRules(`${found[2] ?? found[4]}`))
               ? A.of<DeprecatedApisFinding>(
                   DeprecatedApisFinding.cases.Silenced.make({
                     place: `${file}:${A.length(Str.split("\n")(Str.slice(0, found.index)(text)))}`,
-                    directive: `${found[1]}`
+                    directive: `${found[1] ?? found[3]}`
                   })
                 )
               : A.empty<DeprecatedApisFinding>()

@@ -369,7 +369,7 @@ export const framed = <iframe title="Frame" frameBorder={0} />
   )
 
   it.effect(
-    "refuses a comment that turns the rule off, by its name or by naming none, and passes one that names another rule",
+    "refuses a comment that turns the rule off, by its name or by naming none, on one line or over several, and passes one that names another rule",
     () =>
       Effect.gen(function* () {
         const lines = yield* saidOf(`import { next, old } from "@x/lib/Lib"
@@ -381,6 +381,15 @@ export const sameLine = old // ${off("oxlint", "-line", "no-console, @typescript
 /* ${off("eslint", "")} */
 // ${off("oxlint", "-next-line", "no-console")}
 export const other = next
+/* ${off("eslint", "", "no-console,")}
+   typescript/no-deprecated */
+// ${off("oxlint", "-next-line", "no-deprecated--glued")}
+export const glued = old
+/*
+ ${off("oxlint", "", "no-console -- typescript/no-deprecated is only named in the reason")} */
+/* ${off("oxlint", "", "no-console")} */ export const after = "typescript/no-deprecated"
+// ${off("oxlint", "-next-line", "typescript/no-deprecated-thing")}
+export const another = next
 `)
         const silenced = (line: number, written: string) =>
           `err: deprecated:check FAIL  packages/use/src/Use.tsx:${line} turns the rule off (${written}): no comment does. Move to what the note names`
@@ -388,8 +397,30 @@ export const other = next
           silenced(2, off("eslint", "-next-line")),
           silenced(4, off("oxlint", "-next-line")),
           silenced(6, off("oxlint", "-line")),
-          silenced(7, off("eslint", ""))
+          silenced(7, off("eslint", "")),
+          silenced(10, off("eslint", "")),
+          silenced(12, off("oxlint", "-next-line"))
         ])
+      }),
+    patience
+  )
+
+  // The comments are matched as text, so the words in a string or in a sentence are refused though oxlint ignores them
+  // there: the law errs on the side of the rule, and docs/standards/deprecated-apis.md says so.
+  it.effect(
+    "refuses the same words in a string or in a sentence of a comment, where they turn nothing off",
+    () =>
+      Effect.gen(function* () {
+        const lines = yield* saidOf(`import { next } from "@x/lib/Lib"
+export const header = \`
+// ${off("eslint", "-next-line")}
+\`
+/** Never write // ${off("eslint", "-next-line", "typescript/no-deprecated")} here. */
+export const value = next
+`)
+        const silenced = (line: number, written: string) =>
+          `err: deprecated:check FAIL  packages/use/src/Use.tsx:${line} turns the rule off (${written}): no comment does. Move to what the note names`
+        expect(lines).toEqual([silenced(3, off("eslint", "-next-line")), silenced(5, off("eslint", "-next-line"))])
       }),
     patience
   )

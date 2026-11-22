@@ -199,3 +199,12 @@ Cloudflare token's Workers and D1 permissions cover a whole account, so every pr
 change or remove staging, and a pull request's run uses the pull request's own copy of the workflow. The `staging`
 environment's "only main" rule therefore says which run may use that environment, not who can reach staging: anyone
 who can push a branch to this repository can. Staging holds test accounts only and no model key.
+
+That token is Benjamin's own (his choice of 2026-11-22: "Use my own token"). The repository's stack does not make
+it: production's login does not reach the previews' account, so he made an account-owned token there, and the stack
+asks 1Password for it and writes it to the `preview` and `staging` environments. Said plainly: it is broader than a
+token made for the purpose, since it allows whatever he gave it in the dashboard and not only the five permissions a
+deploy needs; every preview job and every staging job holds it; and nobody rotates it but him. To rotate: make a new
+token in the previews' account (Manage Account, Account API Tokens), put its value in the 1Password item, run
+`bun run beep infra setup --staging` and read the plan (the two token secrets change, nothing else), then revoke
+the old one. Production's token is still made by the stack, narrow, in production's account.

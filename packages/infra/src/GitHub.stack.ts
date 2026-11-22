@@ -1,13 +1,14 @@
 /**
  * The repository's stack: what GitHub must hold so the deploy workflow can run. Three environments (`preview`,
- * `staging` and `production`), a Cloudflare token for production's account and one for the previews' (staging runs
- * there too, decision I4), production's model key and sign-up list (I5, I8), the rule that `main` takes a change only
+ * `staging` and `production`), a Cloudflare token it makes for production's account and the owner's own token for
+ * the previews' (staging runs there too, decision I4), production's model key and sign-up list (I5, I8), the rule that `main` takes a change only
  * through a pull request whose check passed, with an admin bypass (I7), and the release rules (decision "releases and
  * deploys"): only an admin creates, moves or deletes a `v*` tag, and a `release/*` branch is never rewritten.
  *
  * Deployed from a workstation only, by the repository's owner: `bunx alchemy deploy
- * packages/infra/src/GitHub.stack.ts --stage prod`. The model key and the previews' password are asked of 1Password
- * by the stack itself, from the references in `env/op.env`, for that one run (`OpReferences.secrets.ts`). No workflow
+ * packages/infra/src/GitHub.stack.ts --stage prod`. The model key, the previews' password and the previews'
+ * token and account id are asked of 1Password by the stack itself, from the references in `env/op.env` and the
+ * owner's own `env/op.env.local`, for that one run (`OpReferences.secrets.ts`). No workflow
  * deploys it: a job that could rewrite its own approval rule would have none.
  *
  * Must not break: a preview or staging job holds no model key, no sign-up list and no token for production's
@@ -19,6 +20,11 @@
  * the workflow, so anyone who can push a branch to this repository can change or remove staging. The `staging`
  * environment's rule says which run may use that environment, not who can reach the stage. Staging holds test
  * accounts only and no model key.
+ *
+ * Known too, and his choice of 2026-11-22 ("Use my own token"): that shared token is not one this stack makes with
+ * the five permissions a deploy needs. It is the account-owned token he made in the previews' account, so it allows
+ * whatever he gave it there, every preview and staging job holds it, and it changes only when he rotates it: a new
+ * token in that account, its value put in his 1Password item, and this stack deployed again.
  *
  * @packageDocumentation
  */
@@ -37,10 +43,13 @@ import { InfraStage } from "./InfraStage.context.ts"
 import { secretNamesOf } from "./OpReferences.rules.ts"
 import { opEnvReferences } from "./OpReferences.secrets.ts"
 import {
+  givenPreviewToken,
   givenTestPassword,
   modelKeyFor,
   planFor,
+  previewAccountVariable,
   previewPasswordVariable,
+  previewTokenVariable,
   withoutModelKeyFlag
 } from "./StagePlan.rules.ts"
 
@@ -50,7 +59,9 @@ const repository = { owner: "kriegcloud", repository: "inventory-import" } as co
 /** The secrets this stack writes to GitHub, by variable: production's (its model key) and the previews' password. */
 const repositorySecrets: ReadonlyArray<string> = [
   ...Result.match(planFor("prod"), { onFailure: () => [], onSuccess: secretNamesOf }),
-  previewPasswordVariable
+  previewPasswordVariable,
+  previewTokenVariable,
+  previewAccountVariable
 ]
 
 /**
@@ -107,7 +118,18 @@ export default Alchemy.Stack(
     yield* InfraStage
 
     const productionAccount = yield* Config.String("PRODUCTION_CLOUDFLARE_ACCOUNT_ID")
-    const previewAccount = yield* Config.String("PREVIEW_CLOUDFLARE_ACCOUNT_ID")
+    const previewAccount = yield* Config.String(previewAccountVariable)
+    // Benjamin's choice of 2026-11-22, "Use my own token": previews and staging deploy with the account-owned token
+    // he made in the previews' account. This stack mints none there, because the login it is deployed with does not
+    // reach that account; without the token it stops, as no preview could deploy.
+    const givenPreviewTokenValue = yield* Config.Redacted(previewTokenVariable).pipe(
+      Config.option,
+      Config.map(O.filter((value) => value.pipe(Redacted.value, Str.trim) !== ""))
+    )
+    const previewToken = yield* Result.match(givenPreviewToken(givenPreviewTokenValue), {
+      onFailure: Effect.die,
+      onSuccess: Effect.succeed
+    })
     const approver = yield* Config.String("PRODUCTION_APPROVER")
     const signUp = yield* Config.String("SIGN_UP").pipe(Config.withDefault("closed"))
     // Production's plan says where its model key comes from. With none given this stack stops, as production's own
@@ -159,10 +181,6 @@ export default Alchemy.Stack(
       accountId: productionAccount,
       policies: [account(productionAccount), zones(productionAccount)]
     })
-    const previewToken = yield* Cloudflare.ApiToken.AccountApiToken("PreviewDeployToken", {
-      accountId: previewAccount,
-      policies: [account(previewAccount)]
-    })
 
     yield* GitHub.Secret("ProductionCloudflareToken", {
       ...repository,
@@ -201,7 +219,7 @@ export default Alchemy.Stack(
       ...repository,
       environment: preview,
       name: "CLOUDFLARE_API_TOKEN",
-      value: previewToken.value
+      value: previewToken
     })
     yield* GitHub.Secret("PreviewTestAccountPassword", {
       ...repository,
@@ -221,7 +239,7 @@ export default Alchemy.Stack(
       ...repository,
       environment: staging,
       name: "CLOUDFLARE_API_TOKEN",
-      value: previewToken.value
+      value: previewToken
     })
     yield* GitHub.Secret("StagingTestAccountPassword", {
       ...repository,

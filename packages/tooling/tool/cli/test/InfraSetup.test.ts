@@ -193,10 +193,28 @@ const options = (over: Partial<SetupOptions> = {}): SetupOptions => ({
   ...over
 })
 
+// His own references, with a space in the item's name as his are; the names here are made up.
+const own = O.some(
+  A.join(
+    [
+      'PREVIEW_CLOUDFLARE_API_TOKEN="op://Vault/Second Account/ACCOUNT_API_TOKEN"',
+      'PREVIEW_CLOUDFLARE_ACCOUNT_ID="op://Vault/Second Account/ACCOUNT_ID"',
+      ""
+    ],
+    "\n"
+  )
+)
+
 /** One run in a repository holding this `op.env`: why it stopped (if it did), and the file afterwards. */
-const run = (w: World, given: SetupOptions, env = untouched, own: O.Option<string> = O.none()) =>
+// A run that sets up the repository's stack has his own file unless the test says otherwise: the stack needs it.
+const run = (
+  w: World,
+  given: SetupOptions,
+  env = untouched,
+  mine: O.Option<string> = A.contains(given.sizes, "staging") ? own : O.none()
+) =>
   inTree(
-    { [opEnvFile]: env, ...O.match(own, { onNone: () => ({}), onSome: (text) => ({ [localEnvFile]: text }) }) },
+    { [opEnvFile]: env, ...O.match(mine, { onNone: () => ({}), onSome: (text) => ({ [localEnvFile]: text }) }) },
     Effect.gen(function* () {
       const repo = yield* Repo
       const stopped = yield* setup(given).pipe(
@@ -215,6 +233,7 @@ const twoAccounts = [
   { id: "acc-preview", name: "Previews" },
   { id: "acc-production", name: "Production" }
 ]
+const productionOnly = [{ id: "acc-production", name: "Production" }]
 const connected = {
   "inventory-preview": "Cloudflare (oauth)",
   "inventory-production": "Cloudflare (oauth), GitHub (gh-cli), 1Password (desktop)"
@@ -452,17 +471,23 @@ describe("infra setup: the previews' password", () => {
 describe("infra setup: the repository's stack and production", () => {
   it.effect("one Cloudflare account for both roles stops it: decision I4 is not decided here", () =>
     Effect.gen(function* () {
+      // A test stage and production in one run, with no token of his own for a second account: both roles are cf's.
       const one = world({ profiles: connected })
-      const result = yield* run(one, options({ sizes: ["staging"] }))
+      const result = yield* run(one, options({ sizes: ["test-stage", "production"], signUp: O.some("closed") }))
       expect(O.getOrElse(result.stopped, () => "")).toContain("cf sees one account. Production and the previews")
-      expect(O.getOrElse(result.stopped, () => "")).toContain("add it as a member of the second account")
+      expect(O.getOrElse(result.stopped, () => "")).toContain("Name the second account's token and id in")
       expect(A.some(started(one), Str.includes("alchemy"))).toBe(false)
       // It stops on what cf said, before asking him which account is which.
       expect(A.some(one.log, Str.startsWith("confirm: Use the Cloudflare account"))).toBe(false)
       const same = world({ accounts: twoAccounts, profiles: connected })
       const named = yield* run(
         same,
-        options({ sizes: ["staging"], previewAccount: O.some("Previews"), productionAccount: O.some("acc-preview") })
+        options({
+          sizes: ["test-stage", "production"],
+          signUp: O.some("closed"),
+          previewAccount: O.some("Previews"),
+          productionAccount: O.some("acc-preview")
+        })
       )
       expect(O.getOrElse(named.stopped, () => "")).toContain("Both roles were given")
       expect(A.some(started(same), Str.includes("alchemy"))).toBe(false)
@@ -477,23 +502,23 @@ describe("infra setup: the repository's stack and production", () => {
         { id: "acc-preview", name: "Previews" }
       ]
       const w = world({ accounts, profiles: connected, zone: O.some("acc-production") })
-      const result = yield* run(w, options({ sizes: ["staging"] }))
+      const result = yield* run(w, options({ sizes: ["test-stage", "production"], signUp: O.some("closed") }))
       expect(result.stopped).toEqual(O.none())
       const asked =
         'confirm: Use "Production" for production and "Previews" for previews, test stages and staging? -> yes'
       expect(at(w, asked)).toBeGreaterThan(-1)
       expect(at(w, asked)).toBeLessThan(at(w, "ask: bunx alchemy profile list"))
       expect(A.some(w.log, Str.startsWith("choose: Which Cloudflare account"))).toBe(false)
-      expect(A.last(started(w)).pipe(O.getOrElse(() => ""))).toContain(
-        "PRODUCTION_CLOUDFLARE_ACCOUNT_ID=acc-production PREVIEW_CLOUDFLARE_ACCOUNT_ID=acc-preview"
-      )
+      expect(
+        at(w, 'say: Cloudflare: production is "Production"; previews, test stages and staging are "Previews".')
+      ).toBeLessThan(at(w, asked))
       const refused = world({
         accounts,
         profiles: connected,
         zone: O.some("acc-production"),
         yes: (question) => !Str.startsWith('Use "Production" for production')(question)
       })
-      const stopped = yield* run(refused, options({ sizes: ["staging"] }))
+      const stopped = yield* run(refused, options({ sizes: ["test-stage", "production"], signUp: O.some("closed") }))
       expect(O.getOrElse(stopped.stopped, () => "")).toContain("were not confirmed")
       expect(A.some(started(refused), Str.includes("alchemy"))).toBe(false)
     })
@@ -502,7 +527,7 @@ describe("infra setup: the repository's stack and production", () => {
   it.effect("when cf cannot tell who holds the zone, he is asked which account is which", () =>
     Effect.gen(function* () {
       const w = world({ accounts: twoAccounts, profiles: connected })
-      const result = yield* run(w, options({ sizes: ["staging"] }))
+      const result = yield* run(w, options({ sizes: ["test-stage", "production"], signUp: O.some("closed") }))
       expect(result.stopped).toEqual(O.none())
       expect(A.filter(w.log, Str.startsWith("choose: Which Cloudflare account"))).toEqual([
         "choose: Which Cloudflare account is for preview?",
@@ -525,18 +550,22 @@ describe("infra setup: the repository's stack and production", () => {
   )
 
   it.effect(
-    "the stack is planned and deployed with no `op run` around it, given the ids, the approver and the flag",
+    "the stack is planned and deployed with his own token for the previews: checked first, and never given by this command",
     () =>
       Effect.gen(function* () {
-        const w = world({ accounts: twoAccounts, profiles: connected })
-        const result = yield* run(
-          w,
-          options({ sizes: ["staging"], previewAccount: O.some("Previews"), productionAccount: O.some("Production") })
-        )
+        const w = world({ accounts: productionOnly, profiles: connected })
+        const result = yield* run(w, options({ sizes: ["staging"] }))
         expect(result.stopped).toEqual(O.none())
         const under = "bunx alchemy"
+        // The previews' account id and token are not among what the command gives: the stack asks 1Password.
         const given =
-          "given PRODUCTION_CLOUDFLARE_ACCOUNT_ID=acc-production PREVIEW_CLOUDFLARE_ACCOUNT_ID=acc-preview PRODUCTION_APPROVER=octo-owner SIGN_UP=closed DEPLOY_WITHOUT_MODEL_KEY=true"
+          "given PRODUCTION_CLOUDFLARE_ACCOUNT_ID=acc-production PRODUCTION_APPROVER=octo-owner SIGN_UP=closed DEPLOY_WITHOUT_MODEL_KEY=true"
+        // The token is verified and its permissions read before the first thing is made, the 1Password item included.
+        expect(A.take(started(w), 2)).toEqual([
+          'ask: op-human run --env-file packages/infra/env/op.env.local -- sh -c CLOUDFLARE_API_TOKEN="$PREVIEW_CLOUDFLARE_API_TOKEN" CLOUDFLARE_ACCOUNT_ID="$PREVIEW_CLOUDFLARE_ACCOUNT_ID" cf accounts tokens verify',
+          'ask: op-human run --env-file packages/infra/env/op.env.local -- sh -c CLOUDFLARE_API_TOKEN="$PREVIEW_CLOUDFLARE_API_TOKEN" CLOUDFLARE_ACCOUNT_ID="$PREVIEW_CLOUDFLARE_ACCOUNT_ID" cf accounts tokens get 0123456789abcdef0123456789abcdef'
+        ])
+        expect(at(w, "cf accounts tokens get")).toBeLessThan(at(w, "ask: op-human vault list"))
         expect(A.takeRight(started(w), 2)).toEqual([
           `hand: ${under} plan packages/infra/src/GitHub.stack.ts --stage prod --profile inventory-production | ${given}`,
           `hand: ${under} deploy packages/infra/src/GitHub.stack.ts --stage prod --profile inventory-production --yes | ${given}`
@@ -549,7 +578,7 @@ describe("infra setup: the repository's stack and production", () => {
 
   it.effect("a model key reference is left to 1Password: the flag is not given, the reference is not read", () =>
     Effect.gen(function* () {
-      const w = world({ accounts: twoAccounts, profiles: connected })
+      const w = world({ accounts: productionOnly, profiles: connected })
       const env = A.join(
         [
           "OPENROUTER_API_KEY=op://vault-1/model/credential",
@@ -562,8 +591,6 @@ describe("infra setup: the repository's stack and production", () => {
         w,
         options({
           sizes: ["staging"],
-          previewAccount: O.some("Previews"),
-          productionAccount: O.some("Production"),
           approver: O.some("someone-else"),
           signUp: O.some("owner@example.test")
         }),
@@ -573,7 +600,8 @@ describe("infra setup: the repository's stack and production", () => {
       const deploy = A.last(started(w)).pipe(O.getOrElse(() => ""))
       expect(deploy).not.toContain("DEPLOY_WITHOUT_MODEL_KEY")
       expect(deploy).toContain("PRODUCTION_APPROVER=someone-else SIGN_UP=owner@example.test")
-      expect(A.some(started(w), (entry) => /op-human (read|run|item get|inject)/.test(entry))).toBe(false)
+      expect(A.some(started(w), (entry) => /op-human (read|item get|inject)/.test(entry))).toBe(false)
+      expect(A.some(started(w), (entry) => /op-human run.*alchemy (plan|deploy)/.test(entry))).toBe(false)
       expect(result.env).toBe(env)
     })
   )
@@ -598,21 +626,15 @@ describe("infra setup: the repository's stack and production", () => {
 
   it.effect("no run ever starts a destroy, and `--yes` goes only on a deploy that followed a yes", () =>
     Effect.gen(function* () {
-      const w = world({ accounts: twoAccounts, profiles: {} })
-      yield* run(
-        w,
-        options({
-          sizes: ["test-stage", "staging", "production"],
-          previewAccount: O.some("Previews"),
-          productionAccount: O.some("Production"),
-          signUp: O.some("closed")
-        })
-      )
+      const w = world({ accounts: productionOnly, profiles: {} })
+      yield* run(w, options({ sizes: ["test-stage", "staging", "production"], signUp: O.some("closed") }))
       const calls = started(w)
       expect(A.filter(calls, Str.includes("alchemy deploy")).length).toBe(3)
       expect(A.some(calls, (entry) => /destroy|nuke|teardown|state delete/.test(entry))).toBe(false)
       expect(A.every(A.filter(calls, Str.includes("--yes")), Str.includes("alchemy deploy"))).toBe(true)
-      expect(A.some(calls, (entry) => /--reveal|op-human read|op-human run/.test(entry))).toBe(false)
+      expect(A.some(calls, (entry) => /--reveal|op-human read|op-human run.*alchemy (plan|deploy)/.test(entry))).toBe(
+        false
+      )
       // Production's profile is connected to 1Password too: its stacks ask it for their secrets themselves.
       expect(calls).toContain(
         "hand: bunx alchemy profile edit --profile inventory-production --add Cloudflare --add GitHub --add 1Password"
@@ -622,17 +644,6 @@ describe("infra setup: the repository's stack and production", () => {
 })
 
 describe("infra setup: the second account by its token", () => {
-  // His own references, with a space in the item's name as his are; the names here are made up.
-  const own = O.some(
-    A.join(
-      [
-        'PREVIEW_CLOUDFLARE_API_TOKEN="op://Vault/Second Account/ACCOUNT_API_TOKEN"',
-        'PREVIEW_CLOUDFLARE_ACCOUNT_ID="op://Vault/Second Account/ACCOUNT_ID"',
-        ""
-      ],
-      "\n"
-    )
-  )
   const underOwn = "op-human run --env-file packages/infra/env/op.env.local --"
   const asCf =
     'sh -c CLOUDFLARE_API_TOKEN="$PREVIEW_CLOUDFLARE_API_TOKEN" CLOUDFLARE_ACCOUNT_ID="$PREVIEW_CLOUDFLARE_ACCOUNT_ID" cf accounts tokens'
@@ -645,10 +656,10 @@ describe("infra setup: the second account by its token", () => {
         const result = yield* run(w, options(), untouched, own)
         expect(result.stopped).toEqual(O.none())
         expect(started(w)).toEqual([
-          "ask: bunx alchemy profile list",
-          "ask: bunx alchemy profile create inventory-preview",
           `ask: ${underOwn} ${asCf} verify`,
           `ask: ${underOwn} ${asCf} get 0123456789abcdef0123456789abcdef`,
+          "ask: bunx alchemy profile list",
+          "ask: bunx alchemy profile create inventory-preview",
           `hand: ${underOwn} bunx alchemy profile edit --profile inventory-preview --add Cloudflare --method stored --set apiToken=env:PREVIEW_CLOUDFLARE_API_TOKEN --set accountId=env:PREVIEW_CLOUDFLARE_ACCOUNT_ID`,
           "ask: bunx alchemy profile list",
           "hand: bunx alchemy state bootstrap --profile inventory-preview",
@@ -709,13 +720,13 @@ describe("infra setup: the second account by its token", () => {
       })
   )
 
-  it.effect("the repository's stack does not use the token: staging stops at once and says the two ways on", () =>
+  it.effect("without his own file the repository's stack is not set up: it stops at once and names the two lines", () =>
     Effect.gen(function* () {
-      const w = world({ profiles: connected })
-      const result = yield* run(w, options({ sizes: ["staging"] }), untouched, own)
-      expect(O.getOrElse(result.stopped, () => "")).toContain(
-        "add production's login as a member of the second account"
-      )
+      const w = world({ accounts: productionOnly, profiles: connected })
+      const result = yield* run(w, options({ sizes: ["staging"] }), untouched, O.none())
+      const said = O.getOrElse(result.stopped, () => "")
+      expect(said).toContain("your own token for the previews' account, and makes none there")
+      expect(said).toContain("packages/infra/env/op.env.local")
       expect(started(w)).toEqual([])
       expect(result.env).toBe(untouched)
     })

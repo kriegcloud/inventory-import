@@ -8,6 +8,7 @@ import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import * as Result from "effect/Result"
+import * as Str from "effect/String"
 import { referencesIn, secretNamesOf } from "@beep/infra/OpReferences"
 import { referencesWanted } from "@beep/infra/OpReferencesSecrets"
 import { planFor } from "@beep/infra/StagePlan"
@@ -17,10 +18,18 @@ const secret = "sk-live-do-not-hand-on"
 
 const names = (stage: string) => planFor(stage).pipe(Result.getOrThrow, secretNamesOf)
 
-/** `referencesWanted` with this file's text in place of `env/op.env`, and these variables as the environment. */
-const wanted = (text: string, env: Record<string, string>) =>
-  referencesWanted(["OPENROUTER_API_KEY", "PREVIEW_TEST_ACCOUNT_PASSWORD"]).pipe(
-    Effect.provideService(FileSystem.FileSystem, FileSystem.makeNoop({ readFileString: () => Effect.succeed(text) })),
+/**
+ * `referencesWanted` with this text in place of `env/op.env`, this one in place of the owner's own `op.env.local`,
+ * and these variables as the environment.
+ */
+const wanted = (text: string, env: Record<string, string>, own = "") =>
+  referencesWanted(["OPENROUTER_API_KEY", "PREVIEW_TEST_ACCOUNT_PASSWORD", "PREVIEW_CLOUDFLARE_API_TOKEN"]).pipe(
+    Effect.provideService(
+      FileSystem.FileSystem,
+      FileSystem.makeNoop({
+        readFileString: (file) => Effect.succeed(Str.endsWith("op.env.local")(file) ? own : text)
+      })
+    ),
     Effect.provideService(ConfigProvider.ConfigProvider, ConfigProvider.fromEnv({ env }))
   )
 
@@ -69,6 +78,19 @@ layer(Path.layer)("the references a stack asks 1Password for, read from the file
       })
       expect(inWorkflow).toEqual({})
       expect(unfilled).toEqual({})
+      // His own file is read too, after the committed one: a name in both takes his.
+      const withOwn = yield* wanted(
+        text,
+        {},
+        'PREVIEW_CLOUDFLARE_API_TOKEN="op://A Vault/Second Account/TOKEN"\nOPENROUTER_API_KEY=op://vault/own/key\n'
+      )
+      expect(withOwn).toEqual({
+        OPENROUTER_API_KEY: "op://vault/own/key",
+        PREVIEW_TEST_ACCOUNT_PASSWORD: "op://vault/preview/password",
+        PREVIEW_CLOUDFLARE_API_TOKEN: "op://A Vault/Second Account/TOKEN"
+      })
+      const ownInWorkflow = yield* wanted(text, { CI: "true" }, "PREVIEW_CLOUDFLARE_API_TOKEN=op://v/i/f\n")
+      expect(ownInWorkflow).toEqual({})
     })
   )
 })

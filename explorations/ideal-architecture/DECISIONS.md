@@ -1769,3 +1769,20 @@ reads, and no code holds one. In a workflow the entry does nothing. Production's
 1Password, and the app's "Integrate with other apps" must be on. Not tried against 1Password: the provider was never
 called by an agent. Rejected: keeping `op run`. Reverse: remove `secrets` from the two stacks and the dependency from
 `packages/infra`, and wrap the deploys in `op run` again (`git log` has both lines).
+
+### 2026-11-22 — infra: previews and staging deploy with my own Cloudflare token
+
+Question: the repository's stack made a deploy token in each Cloudflare account with the one login it is deployed
+with. My second account, for previews, test stages and staging, is under another login, so the stack could not make
+its token there. How does that account get its deploy key?
+Answer: "Use my own token". I chose; the agent recommended the same. The stack no longer makes a token in the
+previews' account: it asks 1Password for the account-owned token I made there and for the account's id, by the two
+references I keep in `packages/infra/env/op.env.local` (git ignores it), and writes them to the `preview` and
+`staging` environments. Production's token is still made by the stack, with only what a deploy needs. What I accept:
+my token is broader than one made for the purpose, since it allows whatever I gave it; every preview job and every
+staging job holds it, so anyone who can push a branch can use it; and I rotate it myself (a new token in that
+account, its value into the 1Password item, `bun run beep infra setup --staging`, then revoke the old one). The
+setup command checks the token's permissions against what previews and staging make and says what is missing before
+anything is made. Rejected: adding production's login as a member of the second account, so the stack could keep
+making a narrow token there. Reverse: add that login as a member, put `PreviewDeployToken` back in
+`packages/infra/src/GitHub.stack.ts`, and deploy the stack; the plan then replaces the two secrets.

@@ -7,7 +7,14 @@ import * as O from "effect/Option"
 import * as Result from "effect/Result"
 import * as S from "effect/Schema"
 import { StagePlan } from "@beep/infra/Stage"
-import { givenTestPassword, kindOf, modelKeyFor, planFor, testPasswordOf } from "@beep/infra/StagePlan"
+import {
+  givenPreviewToken,
+  givenTestPassword,
+  kindOf,
+  modelKeyFor,
+  planFor,
+  testPasswordOf
+} from "@beep/infra/StagePlan"
 
 const plan = (stage: string) => Result.getOrThrow(planFor(stage))
 
@@ -139,6 +146,20 @@ describe("the plan of a stage", () => {
           "could sign in to this preview. Write the reference " +
           "PREVIEW_TEST_ACCOUNT_PASSWORD=op://<vault>/<item>/<field> in packages/infra/env/op.env and deploy the " +
           "repository's stack, which asks 1Password for it and gives the password to the preview environment as a secret."
+      )
+    })
+  })
+
+  describe("the token previews and staging deploy with", () => {
+    it("is the one the owner gave; with none the repository's stack stops and says where the references go", () => {
+      expect(givenPreviewToken(O.some("his own token"))).toEqual(Result.succeed("his own token"))
+      const stopped = givenPreviewToken(O.none<string>())
+      expect(Result.isFailure(stopped) ? stopped.failure.message : "").toBe(
+        "The repository's stack has no Cloudflare token for previews and staging: PREVIEW_CLOUDFLARE_API_TOKEN is " +
+          "not set, so no pull request could get a preview and main could not reach staging. Write the references " +
+          'PREVIEW_CLOUDFLARE_API_TOKEN="op://<vault>/<item>/<field>" and ' +
+          'PREVIEW_CLOUDFLARE_ACCOUNT_ID="op://<vault>/<item>/<field>" in packages/infra/env/op.env.local (git ' +
+          "ignores it) and deploy the stack again; it asks 1Password for both."
       )
     })
   })

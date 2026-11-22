@@ -218,7 +218,7 @@ does nothing. It comes in three sizes, smallest first, and several can be given 
 | Flag | Steps below | What it does |
 | --- | --- | --- |
 | `--test-stage` | 2, 3, 4 | Finds the Cloudflare account with `cf`, makes and connects the Alchemy profile `inventory-preview`, makes sure of the state store, then plans, asks and deploys `test_<user>`: a live address on workers.dev. Needs one account and nothing from 1Password |
-| `--staging` | 5, 6, 8, 12 | Makes the previews' password in 1Password and writes its reference, does the same for production's account (profile `inventory-production`, connected to Cloudflare and GitHub), then plans, asks and deploys the repository's stack. Staging itself then deploys on the next push to `main` that passes CI |
+| `--staging` | 5, 6, 8, 12 | Checks his own token for the previews' account, makes the previews' password in 1Password and writes its reference, connects both profiles (production's `inventory-production` to Cloudflare, GitHub and 1Password), then plans, asks and deploys the repository's stack, which writes that token to GitHub for previews and staging. Staging itself then deploys on the next push to `main` that passes CI |
 | `--production` | 9 | Plans, asks and deploys production from the workstation; needs `--sign-up` |
 
 What each step does, and with which tool:
@@ -264,43 +264,62 @@ is his too: `bunx alchemy destroy --stage test_<user> --profile inventory-previe
 not in the command (accounts and Workers Paid, who may sign up, the zone's HTTPS setting, the push), and approving a
 production deploy on GitHub stays as `docs/releasing.md` says.
 
-**Two accounts, and which is which.** The command works the roles out from what `cf` can read: the account that
-holds the zone `beep-effect.com` is production's, the other is the previews'. It says both and asks before anything
-is made; when `cf` cannot tell, or there are more than two, he picks. A test stage put into the account that holds
-the zone is told so in the question. `--staging` and `--production` stop when both roles would be one account
-(decision I4).
+**Two accounts, two logins.** Seen 2026-11-22: `cf`'s login sees one account, the one holding the zone
+`beep-effect.com`, which makes it production's; the second account, for previews, test stages and staging, is under
+another login. So each account is reached its own way: production's by the browser login of its Alchemy profile,
+the previews' by a token Benjamin made there.
 
-**The second account must be reachable by the same login** (seen 2026-11-22: `cf`'s login sees one account, the
-one holding the zone; the second account Benjamin added is under another login). The repository's stack makes both
-deploy tokens (`AccountApiToken`, one in each account) with the single credential of the profile it is deployed
-with, so that credential has to reach both accounts. An API key of the second account's own login reaches only
-that account: Alchemy's profile takes one (`alchemy profile edit --add Cloudflare --method stored`, with `apiKey`
-and `email`, or `apiToken`, and the account's id), and it would serve a test stage and the state store there, but
-not the stack. What makes everything above work unchanged: in the second account's dashboard, Manage Account,
-Members, invite the first login as Super Administrator, and accept. `cf` then lists both accounts and one browser
-login serves both profiles. The other way is a change to the stack so each token is made with its own account's
-credential; it is not built.
-
-**The second account by its own token.** Benjamin made an account-owned API token for the second account and keeps
-it, with the account's id, in 1Password. He writes the two references himself into `packages/infra/env/op.env.local`,
-a file git ignores, so the names of his vault and item stay out of the repository (a name with a space takes
-quotes):
+**The previews' account by his own token** (Benjamin, 2026-11-22: "Use my own token"; the other way was adding
+production's login as a member of the second account). He made an account-owned API token in the second account and
+keeps it, with the account's id, in 1Password. He writes the two references himself into
+`packages/infra/env/op.env.local`, a file git ignores, so the names of his vault and item stay out of the repository
+(a name with a space takes quotes):
 
 ```
 PREVIEW_CLOUDFLARE_API_TOKEN="op://<vault>/<item>/<field>"
 PREVIEW_CLOUDFLARE_ACCOUNT_ID="op://<vault>/<item>/<field>"
 ```
 
-With both lines there, the previews' account is that one and needs no browser login: `--test-stage` asks `cf`
-nothing, checks the token under `op-human run --env-file` that file (`cf accounts tokens verify`, then `get` for
-what it allows, against the five permissions the repository's stack gives a deploy token), says what is missing and
-asks before going on, and connects the profile with `alchemy profile edit --add Cloudflare --method stored --set
-apiToken=env:... --set accountId=env:...`, the values filled by 1Password for that one command. Alchemy then keeps
-the token in its profile store on his machine. The command never reads either reference or prints a line of the
-file. A token's write permissions are only read, never tried: a permission whose name differs in the dashboard
-shows as missing and he may go on. `--staging` stops at once when that file names a token, for the reason above:
-the stack does not use it. The other references he keeps in that item (a global API key, and three for R2's S3
-API) are used by nothing here; no stack makes anything in R2.
+What uses them:
+
+- **The repository's stack** asks 1Password for both, writes the token to GitHub as the `preview` and `staging`
+  environments' `CLOUDFLARE_API_TOKEN` and the id as their `CLOUDFLARE_ACCOUNT_ID`, and makes no token in that
+  account. Production's token is still made by the stack, with the permissions a deploy needs and nothing more.
+  Without the token the stack stops with a sentence naming the two lines.
+- **`--staging`** needs both lines and stops at once without them. **`--test-stage`** uses them when they are there:
+  the stage goes to the second account with no browser login, and `cf` is asked nothing about it.
+- **Before the first step**, the command checks the token under `op-human run --env-file` that file: `cf accounts
+  tokens verify`, then `get` for what it allows, against what a preview's or staging's deploy makes (Account
+  Settings Read, Workers Scripts Write, D1 Write, Secrets Store Write, Workers Tail Read). It says what is missing
+  and asks before going on. A token that does not verify stops it. Permissions are read, never tried: one whose name
+  differs in the dashboard shows as missing, and he may go on.
+- **The previews' Alchemy profile** takes both values with `alchemy profile edit --add Cloudflare --method stored
+  --set apiToken=env:... --set accountId=env:...`, filled by 1Password for that one command; Alchemy then keeps the
+  token in its profile store on his machine.
+
+The command never reads either reference or prints a line of the file.
+
+**What this token is, said plainly.** It is not a token made for the purpose. The stack would have made one with five
+permissions; this one allows whatever Benjamin gave it in the dashboard. Every preview job and every staging job
+holds it, a pull request's run uses the pull request's own copy of the workflow, and so anyone who can push a branch
+to this repository can do with the previews' account whatever the token allows. Nothing rotates it but him:
+
+1. in the second account's dashboard, Manage Account, Account API Tokens: make a new token (or roll this one);
+2. put the new value in the 1Password item the reference names;
+3. run `bun run beep infra setup --staging` again and read the plan: the `preview` and `staging` token secrets
+   change, nothing else;
+4. revoke the old token in the dashboard.
+
+Until step 3 is deployed, previews and staging keep deploying with the old token; after step 4 without step 3 they
+fail.
+
+**When one login does see two accounts** (not his case today): the command works the roles out from what `cf` can
+read. The account that holds the zone is production's and the other is the previews'; it says both and asks before
+anything is made, and when `cf` cannot tell, or there are more than two, he picks. A test stage put into the account
+that holds the zone is told so in the question. A run that would give both roles to one account stops (decision I4).
+
+The other references he keeps in that item (a global API key, and three for R2's S3 API) are used by nothing here;
+no stack makes anything in R2.
 
 **Never run for real.** The command was tested with stand-ins for every tool (`test/InfraSetup.test.ts` in
 `packages/tooling/tool/cli`: what is started, in which order, with which arguments, and that each guard stops it)
@@ -343,7 +362,7 @@ account-owned token. `cf auth whoami` and `cf zones list` were run, to read the 
    stages take none.
 8. **`gh auth login`** with rights over the repository's settings, then the repository's stack, from the
    production account's profile:
-   `PRODUCTION_CLOUDFLARE_ACCOUNT_ID=... PREVIEW_CLOUDFLARE_ACCOUNT_ID=... PRODUCTION_APPROVER=<his GitHub login>
+   `PRODUCTION_CLOUDFLARE_ACCOUNT_ID=... PRODUCTION_APPROVER=<his GitHub login>
    SIGN_UP=<emails> bunx alchemy deploy packages/infra/src/GitHub.stack.ts --stage prod --profile <production's>`,
    after the same line with `plan`; the profile is connected to 1Password, which the stack asks for its two secrets. Points 6 and 8 are settled here.
 9. **Production**: `SIGN_UP=<emails> bunx alchemy plan --stage prod --profile <production's>`, read it, then the same with `deploy`. Open `https://inventory.beep-effect.com`: the sign-in page offers no

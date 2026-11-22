@@ -19,7 +19,7 @@ import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import * as R from "effect/Record"
-import { opEnvFile, referencesIn } from "./OpReferences.rules.ts"
+import { opEnvFile, ownEnvFile, referencesIn } from "./OpReferences.rules.ts"
 
 /** A `secrets` entry that reads this package's `env/op.env`. */
 export class OpEnvReferences extends Data.TaggedClass("@beep/infra/SecretProvider::OpEnvReferences")<{
@@ -27,17 +27,19 @@ export class OpEnvReferences extends Data.TaggedClass("@beep/infra/SecretProvide
 }> {}
 
 /**
- * The references to ask 1Password for: none in a workflow, none when the file is not there, else the ones `op.env`
- * gives for these names.
+ * The references to ask 1Password for: none in a workflow, none when neither file is there, else the ones `op.env`
+ * and the owner's own `op.env.local` give for these names.
  */
 export const referencesWanted = Effect.fn("OpReferences.referencesWanted")(function* (names: ReadonlyArray<string>) {
   const inWorkflow = yield* Config.Boolean("CI").pipe(Config.withDefault(false))
   if (inWorkflow) return R.empty<string, string>()
   const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
-  const file = path.resolve(import.meta.dirname, "..", opEnvFile)
-  const text = yield* fs.readFileString(file).pipe(Effect.orElseSucceed(() => ""))
-  return referencesIn({ text, names })
+  const textOf = (file: string) =>
+    fs.readFileString(path.resolve(import.meta.dirname, "..", file)).pipe(Effect.orElseSucceed(() => ""))
+  const committed = yield* textOf(opEnvFile)
+  const own = yield* textOf(ownEnvFile)
+  return referencesIn({ text: `${committed}\n${own}`, names })
 })
 
 /**

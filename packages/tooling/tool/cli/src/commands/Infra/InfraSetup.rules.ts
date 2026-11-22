@@ -442,7 +442,12 @@ export const described = (options: SetupOptions): ((step: Step) => ReadonlyArray
         })}: the plan is shown, you are asked, and only a yes deploys.`,
         `  ${shown(deployCall(options, step.target, "plan"))}`,
         `  ${shown(deployCall(options, step.target, "deploy"))}   (only after your yes)`,
-        ...given
+        ...given,
+        ...(step.target === "repository"
+          ? [
+              `  the stack asks 1Password itself for the previews' password, the model key, and your own token and account id for the previews' account (${localEnvFile}); it writes that token to GitHub for previews and staging and makes none there`
+            ]
+          : [])
       ]
     }
   })
@@ -570,7 +575,7 @@ const cloudflare = Effect.fn("InfraSetup.cloudflare")(function* (
     "Production and the previews are two Cloudflare accounts (decision I4): a preview's deploy token covers its whole account, so in one account every pull request's run could change or remove production. Nothing was changed."
   if (both && accounts.length === 1) {
     return yield* stop(
-      `cf sees one account. ${sameAccount} The repository's stack makes both deploy tokens with the one login it is deployed with, so that login must reach both accounts: add it as a member of the second account, then run this again.`
+      `cf sees one account. ${sameAccount} Name the second account's token and id in ${localEnvFile}: previews and test stages then go there with no login.`
     )
   }
   const unnamed = O.isNone(options.previewAccount) && O.isNone(options.productionAccount)
@@ -710,7 +715,6 @@ const profile = Effect.fn("InfraSetup.profile")(function* (
     return found
   }
   if (role === "preview" && found.previewByToken) {
-    yield* tokenChecked
     yield* workstation.say(
       `Alchemy: connecting profile "${name}" to the previews' account with the token and id ${localEnvFile} names. 1Password fills them for that one command; Alchemy then keeps the token in its profile store on this machine.`
     )
@@ -964,7 +968,7 @@ const deploy = Effect.fn("InfraSetup.deploy")(function* (target: Target, options
       "test-stage": () =>
         `Deployed ${stage}. Its address and testAccountPassword are in Alchemy's output above, shown to you only. Sign in as dana@example-works.test with that password. To remove the stage: \`bunx alchemy destroy --stage ${stage} --profile ${options.previewProfile}\`, yours to run.`,
       repository: () =>
-        "Deployed the repository's stack. The next push to main that passes CI deploys staging; a pull request gets a preview.",
+        "Deployed the repository's stack. The next push to main that passes CI deploys staging; a pull request gets a preview. Both deploy with your own token: to rotate it, make a new one in the previews' account, put it in your 1Password item, and run this again.",
       production: () => "Deployed production. Open its address and sign up with your email."
     })
   )
@@ -1019,11 +1023,13 @@ export const setup = Effect.fn("InfraSetup.setup")(function* (options: SetupOpti
     )
   }
   const previewByToken = token === "reference"
-  if (previewByToken && has(options.sizes, "staging")) {
+  if (!previewByToken && has(options.sizes, "staging")) {
     return yield* stop(
-      `${localEnvFile} names a token for the previews' account, which serves a test stage there. The repository's stack does not use it: it makes both accounts' deploy tokens itself, with the one login it is deployed with, and that login does not reach the second account. Two ways on, both Benjamin's to choose: add production's login as a member of the second account, or change the stack to write a token he made as the previews' secret. Nothing was started.`
+      `The repository's stack gives previews and staging your own token for the previews' account, and makes none there. Write ${previewTokenName}="op://<vault>/<item>/<field>" and ${previewAccountIdName}="op://<vault>/<item>/<field>" into ${localEnvFile} (git ignores it), then run this again. Nothing was started.`
     )
   }
+  // Before the first step, so a token that will not do is said before anything is made with it or beside it.
+  if (previewByToken) yield* tokenChecked
   const steps = stepsFor(options.sizes)
   yield* Effect.reduce(
     steps,

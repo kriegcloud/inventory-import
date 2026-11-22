@@ -48,12 +48,15 @@ the test's name says it was not run, and it was checked by hand.
 | `probe` | A plain function, the same as an Effect, and a test of both. It imports `@inventory/kernel/Role`, to show that any package is imported by its name |
 | `service` | A `Context.Service`, its twin for tests with everything in memory, something that uses it, and a test through the twin |
 | `screen` | A page of its own (`index.html`, `main.tsx`), a screen from the design system's components over atoms, and a test of the atoms. Served by `scratch:serve`; the app never loads it |
-| `verify` | An aggregate the prover reads (`<Name>.aggregate.ts`), a story that runs its model and a proof of its rules. It needs `@alchemy.run/domain`: until `vendor/alchemy/sources.json` lists that package, `scratch:new` refuses this template and says so; once it does, the package is added as the experiment's own library. The aggregate's file builds events with `new` and turns the one diagnostic that refuses it off on its first lines, because the prover does not read `X.make(...)`. Not decided: that line is a diagnostic turned off, which nothing else in the repository has; it is Benjamin's to accept, or to answer with a prover that reads `X.make` |
+| `verify` | An aggregate the prover reads (`<Name>.aggregate.ts`), a story that runs its model and a proof of its rules. It takes `@alchemy.run/domain` from the root's install: until a package asks for it, `scratch:new` refuses this template and says so. The prover knows an event or a rejection only by `new`, not by `X.make(...)`, so, as decision 33 of the Alchemy brief (2026-11-22, "`new` only in decide files") has it, a decide file (`*.aggregate.ts`, `*.decision.ts`) builds them with `new` and turns that one diagnostic off on its first line (`// @effect-diagnostics newSchemaClass:off`); every other file, the template's model and test included, builds with `.make` |
 
 ## What is and is not enforced inside it
 
 - **On, in `scratch:check`:** the type-checker with the repository's whole Effect profile (`tsconfig.base.json`, nothing
-  turned off). What it says of an experiment is what it would say of a package.
+  turned off). What it says of an experiment is what it would say of a package. A file may turn one diagnostic off
+  only as decision 33 of the Alchemy brief allows: `// @effect-diagnostics newSchemaClass:off` as the first line of a
+  `*.aggregate.ts` or `*.decision.ts`. `scratch:check` refuses any other `@effect-diagnostics` line, with its file and
+  line.
 - **Not enforced inside:** the laws on how code is written (no `_tag` told apart by hand, the form of an Effect
   import, a ref that stays the same across draws) and the linter. Each of those laws names the scratchpad as left
   out. They apply the moment code graduates into a package, so write an experiment the way a package is written when

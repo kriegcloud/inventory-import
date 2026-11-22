@@ -783,6 +783,17 @@ describe("infra setup: the repository's stack and production", () => {
       )
       expect(at(shadowed, "say: Model key: packages/infra/env/op.env.local names none")).toBeGreaterThan(-1)
       expect(A.last(started(shadowed)).pipe(O.getOrElse(() => ""))).toContain("DEPLOY_WITHOUT_MODEL_KEY=true")
+      // The review's case: the template left uncommented above his real line. The stack takes his line, and so does
+      // the command: production is deployed with its key, not told it has none.
+      const below = world({ accounts: productionOnly, profiles: connected })
+      yield* run(
+        below,
+        options({ sizes: ["production"], signUp: O.some("closed") }),
+        untouched,
+        O.some('OPENROUTER_API_KEY=op://<vault>/<item>/<field>\nOPENROUTER_API_KEY="op://Vault/Model Key/credential"\n')
+      )
+      expect(at(below, "say: Model key: packages/infra/env/op.env.local names a reference")).toBeGreaterThan(-1)
+      expect(A.some(below.log, Str.includes("DEPLOY_WITHOUT_MODEL_KEY"))).toBe(false)
     })
   )
 
@@ -1421,6 +1432,21 @@ describe("infra setup: what it reads", () => {
       file: opEnvFile
     })
     expect(referenceGiven({ committed: "", own: "", name: "B" })).toEqual({ state: "missing", file: opEnvFile })
+    // Within a file the last line is the one taken, as the stack takes it: a template left above his line does not
+    // hide it, and one left below it does.
+    const template = "A=op://<vault>/<item>/<field>"
+    expect(referenceGiven({ committed, own: `${template}\nA=op://w/j/k\n`, name: "A" })).toEqual({
+      state: "reference",
+      file: localEnvFile
+    })
+    expect(referenceGiven({ committed, own: `A=op://w/j/k\n${template}\n`, name: "A" })).toEqual({
+      state: "not-a-reference",
+      file: localEnvFile
+    })
+    expect(referenceGiven({ committed: `${template}\nA=op://v/i/f\n`, own: "", name: "A" })).toEqual({
+      state: "reference",
+      file: opEnvFile
+    })
   })
 
   it("a reference takes its commented line's place, or the end of the file, and no other line changes", () => {

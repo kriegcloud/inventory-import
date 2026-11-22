@@ -336,23 +336,34 @@ export const referenceState = (input: { readonly text: string; readonly name: st
 }
 
 /**
- * Which file gives a stack a variable's reference, and what that file holds for it. The stacks read `op.env` and then
- * the owner's `op.env.local`, and the last line of a name wins (`referencesIn` in `@beep/infra`), so a name his own
- * file has is that file's whatever `op.env` says. What this command says of a reference, and what it gives a deploy
- * beside it, is read from the same file the stack will take it from.
+ * Which file gives a stack a variable's reference, and whether the line it takes is one. The stacks read `op.env`
+ * and then the owner's `op.env.local` as one text and take the last line of a name, a reference or not
+ * (`referencesIn` in `@beep/infra`, which tooling may not import, so its rule is written again here and held to the
+ * same cases by this package's tests): a name his own file has is that file's, and within a file the last line wins
+ * over the ones above it. What this command says of a reference, and what it gives a deploy beside it, is read from
+ * that same line.
  *
  * @example
- * referenceGiven({ committed: "A=op://v/i/f\n", own: "A=op://w/j/g\n", name: "A" }) // { state: "reference", file: localEnvFile }
+ * referenceGiven({ committed: "A=op://v/i/f\n", own: "A=op://<vault>/<item>/<field>\nA=op://w/j/g\n", name: "A" })
+ * // { state: "reference", file: localEnvFile }
  */
 export const referenceGiven = (input: {
   readonly committed: string
   readonly own: string
   readonly name: string
 }): { readonly state: ReferenceState; readonly file: string } => {
-  const own = referenceState({ text: input.own, name: input.name })
-  return own === "missing"
-    ? { state: referenceState({ text: input.committed, name: input.name }), file: opEnvFile }
-    : { state: own, file: localEnvFile }
+  const lastOf = (text: string) => A.findLast(linesOf(text), Str.startsWith(`${input.name}=`))
+  const taken = O.match(lastOf(input.own), {
+    onSome: (line) => O.some({ line, file: localEnvFile }),
+    onNone: () => O.map(lastOf(input.committed), (line) => ({ line, file: opEnvFile }))
+  })
+  return O.match(taken, {
+    onNone: () => ({ state: "missing", file: opEnvFile }),
+    onSome: ({ line, file }) => ({
+      state: isReference(Str.slice(input.name.length + 1)(line)) ? "reference" : "not-a-reference",
+      file
+    })
+  })
 }
 
 /**

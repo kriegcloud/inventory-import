@@ -55,15 +55,23 @@ the test's name says it was not run, and it was checked by hand.
 - **On, in `scratch:check`:** the type-checker with the repository's whole Effect profile (`tsconfig.base.json`, nothing
   turned off). What it says of an experiment is what it would say of a package. A file may turn one diagnostic off
   only as decision 33 of the Alchemy brief allows: `// @effect-diagnostics newSchemaClass:off` as the first line of a
-  `*.aggregate.ts` or `*.decision.ts`. `scratch:check` refuses any other `@effect-diagnostics` line, and any
-  `@ts-nocheck` or `@ts-ignore` (in any mix of capitals), with its file and line. `@ts-expect-error` is allowed: it
-  is how an experiment shows that a wrong call does not compile, and it fails by itself once the error is gone, where
-  `@ts-ignore` would go on hiding it. It reads the files the
-  compiler itself lists for the scratchpad's type-check (`tsrs -p tsconfig.json --listFilesOnly`): the experiments
-  and the scratchpad's configuration, a file loose beside them or in a `dist` folder, a folder linked in, and every
-  file one of those reaches by an import, whatever its folder is called and whether or not it is in the scratchpad.
-  Left alone are a library's files (`node_modules`), a file of one of the repository's packages, which that
-  package's own check holds, and a file the compiler never loads (JavaScript, or a cache nothing imports).
+  `*.aggregate.ts` or `*.decision.ts`. `scratch:check` refuses, with the file and line:
+  - any other `@effect-diagnostics` line, wherever it stands (the checker reads it in a string too);
+  - `@effect-leakable-service` and `@effect-expect-leaking`, the two comments that silence the `leakingRequirements`
+    diagnostic, in any mix of capitals, wherever they stand;
+  - a comment that starts with `@ts-nocheck` or `@ts-ignore`, in any mix of capitals. A string, a template or a
+    sentence that only names one is left alone, as the compiler leaves it. `@ts-expect-error` is allowed: it is how an
+    experiment shows that a wrong call does not compile, and it fails by itself once the error is gone, where
+    `@ts-ignore` would go on hiding it.
+
+  It reads the files the compiler itself lists for the scratchpad's type-check (`tsrs -p tsconfig.json
+  --listFilesOnly`): the experiments and the scratchpad's configuration, a file loose beside them or in a `dist`
+  folder, a folder linked in, and every file one of those reaches by an import, whatever its folder is called and
+  whether or not it is in the scratchpad. A list without the scratchpad's own `vite.config.ts` and `vitest.config.ts`
+  is not the compiler's whole list, and the check fails and says so. Left alone are a file of an installed library
+  (under a `node_modules`, in a folder with a package.json), a file of one of the repository's workspaces, which that
+  package's own check holds, and a file the compiler never loads (JavaScript, or a cache nothing imports). A file
+  somebody wrote in a folder named `node_modules`, or beside a package.json that is no workspace's, is read.
 - **Not enforced inside:** the laws on how code is written (no `_tag` told apart by hand, the form of an Effect
   import, a ref that stays the same across draws) and the linter. Each of those laws names the scratchpad as left
   out. They apply the moment code graduates into a package, so write an experiment the way a package is written when

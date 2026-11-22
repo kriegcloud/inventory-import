@@ -826,8 +826,9 @@ discriminators" below. Then the groups the draft review's table above left open:
   listed holes, and the refs law's alias walk is bounded.
 - **The table's options:** our own code writes nothing during a draw. The vendored `useDataTable` sets its table's
   options when it draws, as published; vendored hooks stay as published, so that is not a departure.
-- **Built, not decided (asked):** a held row holds the whole confirm, and a refused row does not; a person who comes
-  later is shown the take-backs of matches made before. "Keep theirs" and "Use mine" answer one row at a time.
+- **Decided since (2026-11-21), to build:** a held row and a refused row both hold the confirm, the screen says how many
+  wait and takes the person there, and one press settles many. The take-backs of earlier matches are shown to everyone
+  until each dismisses them (as built).
 
 ## Step 8: TanStack Query removed, the lint everywhere, the documents
 

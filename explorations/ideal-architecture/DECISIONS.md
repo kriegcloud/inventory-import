@@ -795,10 +795,9 @@ decision of the person's own gone tab beside this tab's is held the same way ("R
 tab: …", `Hold.OtherTab`), with Use the other tab's and Keep this tab's. Use mine keeps the revision the decision was
 made on. Seen on screen (the Elsewhere line).
 
-Not decided, built as follows and asked: a row held this way holds the whole confirm, and the screen says so, until the
-person picks; a refused row does not hold it, and is imported without the person's decision and named on the result.
-Not decided either: a press on Import by another member than the one whose unsaved rows the screen shows confirms
-nothing and draws the screen again for them; a save answered that the import kept changing waits and is sent again.
+What such a row does to the confirm is decided in "a held row, a refused row and the confirm" below. Not decided, built
+as follows: a press on Import by another member than the one whose unsaved rows the screen shows confirms nothing and
+draws the screen again for them; a save answered that the import kept changing waits and is sent again.
 
 ### 2026-11-20 — atoms, what a refused save does to waiting rows
 
@@ -875,6 +874,23 @@ An import matched before migration 0002 has no record of the column a field read
 how a row compares cannot be known for a Replace or Keep-stored made before it. Question: what becomes of it? Options:
 "Take it back, say so (Recommended)"; "Keep it as made". Answer: "Take it back, say so". I chose; the agent
 recommended the same. The server takes it back, as it did; the screen names it.
+
+### 2026-11-21 — atoms, a held row, a refused row and the confirm
+
+As built, a row held because it was decided elsewhere since stopped the whole confirm, and a refused row did not (it was
+imported without the person's decision and named on the result). Question ("Held row and Confirm"): what does Import do
+while a row is held? Options: "Wait until she picks (Recommended)"; "Import, theirs stands". Answer: "Wait until she
+picks". I chose; the agent recommended the same. Import does nothing while a row is held; the screen says how many rows
+wait for the person and takes them there; one press settles many ("Keep theirs for all", "Use mine for all").
+Question ("Refused row and Confirm"): what does Import do while a row is refused ("not saved")? Options: "Wait, like a
+held row (Recommended)"; "Import and name it". Answer: "Wait, like a held row". I chose; the agent recommended the same.
+Nothing is imported until the person decides the row again or dismisses the line; held and refused rows behave the same.
+
+### 2026-11-21 — atoms, the take-backs of earlier matches and a person who comes later
+
+Question ("Earlier take-backs"): who is shown the line that names what a match took back? Options: "Yes, everyone
+(Recommended)"; "Only who was there". Answer: "Yes, everyone". I chose; the agent recommended the same. The line is
+shown to everyone working on the import, newcomers included, until each dismisses it.
 
 ### 2026-11-20 — no `switch`, the vendored components included
 

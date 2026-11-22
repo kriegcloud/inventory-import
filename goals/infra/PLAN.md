@@ -210,12 +210,12 @@ Nothing below was started. Every command names its stage.
 
 ### One command for steps 2 to 6, 8, 9 and the first part of 12
 
-`bun run beep infra setup` does those steps in order, on Benjamin's workstation. It is his to run, and no agent
-runs it. What enforces that is narrow: with no terminal, or with `CI` set, it stops before its first tool, which
+`bun run beep infra setup` does those steps in order, on Benjamin's workstation. It is his to run; an agent runs it
+only with `--dry-run`, which starts no tool (Benjamin's rule, written in CLAUDE.md). What enforces the rest is narrow: with no terminal, or with `CI` set, it stops before its first tool, which
 keeps a workflow and a plain agent shell out. A program that is given a terminal passes that test, so the rule for
 agents is a rule, and the command is built for the case where it is broken: it shows nothing secret itself, and
 everything it makes waits for a yes. `--dry-run` starts no tool and writes nothing; it prints the steps and the
-commands of a run, with the token's commands when his own file names one, and says when a run as things are would
+commands of a run (of all three sizes when none is given), with the token's commands when his own file names one, and says when a run as things are would
 stop before step 1. What a run finds on the way (an item already there, a profile already connected) only a run
 shows. Run again, it leaves alone what it can see is done: a reference already written, an item already there, a
 profile already connected to the right account. The state store is the exception: nothing reads whether it exists,
@@ -259,7 +259,11 @@ What each step does, and with which tool:
   password's references the same way (`referenceGiven`: the last line of the name, a reference or not, as the stacks'
   `referencesIn` takes it; tooling may not import `@beep/infra`, so the rule is written twice and the CLI's tests
   hold its cases), and says which file it read: what it says, and the
-  `DEPLOY_WITHOUT_MODEL_KEY` it gives, come from the file the stack will take the reference from.
+  `DEPLOY_WITHOUT_MODEL_KEY` it gives, come from the file the stack will take the reference from. The previews'
+  token and account id are read by the same rule, so a template line left above his real one is passed over as
+  the stack passes it over. A run stops when the line taken is in `op.env`: those two are his own, the commands
+  that use them read `op.env.local` alone, and `op.env` is public. Not checked: whether `op-human run --env-file`
+  accepts a file that still holds a template line above the real one (it is never run here).
 - **1Password**, through `op-human` (the 1Password CLI as its owner runs it): if neither
   `packages/infra/env/op.env` nor `op.env.local` names a `PREVIEW_TEST_ACCOUNT_PASSWORD`, it looks for the item "inventory-import
   PREVIEW_TEST_ACCOUNT_PASSWORD" in the vault (`--vault`, or asked when there are several), has 1Password make it with
@@ -356,6 +360,22 @@ What uses them:
   Settings Read, Workers Scripts Write, D1 Write, Secrets Store Write, Workers Tail Read). It says what is missing
   and asks before going on. A token that does not verify stops it. Permissions are read, never tried: one whose name
   differs in the dashboard shows as missing, and he may go on.
+- **Then the account's workers.dev subdomain**, the question Alchemy's state store asks before anything else
+  (`GET /accounts/{id}/workers/subdomain`, `resolveAccountId` in its `StateStore/State.ts` at 734c27a), which
+  reports every failure as "the current credentials can't access it". cf has no command for it, so curl asks under
+  the same `op-human run`, the token handed to curl on its input by the shell's own `printf`, never in an argument.
+  Cloudflare's 10007 (no subdomain yet, as cf's own source reads it) stops the run and says to pick one in the
+  dashboard under the previews' account, Workers & Pages; 10000 names the Workers Scripts permission; any other
+  error is shown in Cloudflare's words. Nothing is changed in each case. The dry run lists the question.
+- **Who did not answer is said, not guessed.** A call under `op-human` that fails with op's own error lines
+  (`[ERROR] …`, "error initializing client"), or any failure of an `op-human` command of its own (`vault list`,
+  `item list`, `item create`, the comparison of a profile's account), stops with "1Password did not answer", op's
+  words (they carry no value), and where to look: the app open and unlocked, Settings, Developer, "Integrate with
+  1Password CLI", and a run from his own terminal. A tool that answered with an error is shown in its own words;
+  an answer that does not decode is said as that; a token that is not active is said with the status cf gave. A
+  failed `cf zones list` is said in cf's words, not as a zone held in no account. The profile edit run under
+  `op-human` hands the terminal over, so its error is on screen above, and the stop names 1Password as a cause.
+  op's error format was read from its output in Benjamin's run, not from op's source.
 - **The previews' Alchemy profile** takes both values with `alchemy profile edit --add Cloudflare --method stored
   --set apiToken=env:... --set accountId=env:...`, filled by 1Password for that one command; Alchemy then keeps the
   token in its profile store on his machine.
@@ -395,8 +415,11 @@ edit --add Cloudflare --add GitHub` asks for both in one run; and, for the provi
 first reads a root `.env` as it did before. The provider itself was never called: the tests stop at the references
 that would be handed to it. Likewise not tried, for the second account's token: that `op run` fills a quoted reference whose item name has a
 space; that `cf` uses `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` from the environment over its own login;
-that `cf accounts tokens verify` and `get` answer the fields read here; and that `--method stored` takes an
-account-owned token. And for the checks added after the review: that `alchemy profile show`, read through a
+that `cf accounts tokens verify` and `get` answer the fields read here; that the subdomain question answers
+Cloudflare's usual `{ success, errors, result }` with the codes cf's source reads (10007, 10000), and that the
+token's Workers Scripts permission covers it; and that `--method stored` takes an account-owned token. That curl 8.23
+takes the header on its input was checked once, against a listener on 127.0.0.1 with a made-up value, through the
+same `sh -c` line with `op-human` left out. And for the checks added after the review: that `alchemy profile show`, read through a
 pipe, prints `accountId:` under the profile's Cloudflare line as its source does; that `gh variable get SIGN_UP
 --env production` answers the list and nothing else; and that a deploy of a test stage that changes nothing still
 prints its outputs, which is how he reads the password. An earlier version of this paragraph said `cf auth whoami`

@@ -1,7 +1,7 @@
 /**
  * `infra setup`: what the repository's owner does before the first deploy, as one command he runs on his
- * workstation (`goals/infra/PLAN.md`, "What Benjamin does by hand"). No agent and no CI job runs it; `--dry-run`
- * prints its steps and starts nothing.
+ * workstation (`goals/infra/PLAN.md`, "What Benjamin does by hand"). No CI job runs it, and an agent runs it only
+ * with `--dry-run`, which prints its steps (every size's when none is given) and starts nothing.
  *
  * @packageDocumentation
  */
@@ -25,7 +25,9 @@ const flags = {
   ),
   production: size("production", "Deploy production from this workstation"),
   dryRun: Flag.Boolean("dry-run").pipe(
-    Flag.withDescription("Print the steps and the commands a run would start, and start nothing"),
+    Flag.withDescription(
+      "Print the steps and the commands a run would start, and start nothing; with no size, every size's steps"
+    ),
     Flag.withDefault(false)
   ),
   user: Flag.String("user").pipe(
@@ -95,7 +97,7 @@ export const infraSetupCommand = Command.make("setup", flags, (args) =>
   )
 ).pipe(
   Command.withDescription(
-    "Set up what a deploy needs, on the owner's workstation: 1Password reference, Cloudflare accounts, Alchemy profiles and state store, then a plan he reads and a deploy he approves. Never run by an agent or CI"
+    "Set up what a deploy needs, on the owner's workstation: 1Password reference, Cloudflare accounts, Alchemy profiles and state store, then a plan he reads and a deploy he approves. Never run by CI, and by an agent only with --dry-run"
   )
 )
 

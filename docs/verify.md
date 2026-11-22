@@ -110,7 +110,8 @@ bun run --cwd packages/catalog/model verify
 
 The whole model: every proof again, then the search. About two minutes. `bun run check:full` runs it as the `verify`
 task. Turbo replays both until something a result depends on changes: a rule file, a decision, the kernel files they
-import, the pinned library, or the version of Effect or of the solver that `bun.lock` resolves.
+import, the pinned library, a patch to it (`packages/patches`), or the version of Effect or of the solver that
+`bun.lock` resolves.
 
 One file alone:
 
@@ -261,12 +262,14 @@ The screen had seen up to change -1, the import was at 0, and the group was reco
 - **The state can be one no sequence of commands reaches** (`seen: -1`, an empty organization). A proof starts from
   any state the schema and the invariants allow, which is why "no count is negative" is written as rules of its own.
 - **`not proved`** means the solver found inputs, and the real code kept the rule on them or refused them. It is not a
-  pass: the test fails on it by name, as on `violated`. One case of it is built into this model. A row's instance is
-  named `importId/row` and a group's `importId/step`, and the prover does not tie an instance's id to a name built
-  from two fields. So a broken rule whose counterexample needs a row or a group that was already decided comes back
-  as `not proved`, with the sentence "the real code rejects it with NotYourStep". Deleting the line of
-  `UndoingGroup` that refuses to take back a group while a later one is in force does that for
-  `OnlyTheLastGroupInForceIsTakenBack`. The rule still fails by name; what is missing is the counterexample.
+  pass: the test fails on it by name, as on `violated`.
+- **A row or a group that was already decided has its counterexample because of a patch.** A row's instance is
+  named `importId/row` and a group's `importId/step`. The library as published replays the solver's answer under
+  an empty id for a name built from two fields, so a broken rule whose counterexample needs such an instance came
+  back as `not proved`, with nothing to look at. The repository patches that
+  (`packages/patches/alchemy-domain/01-computed-instance-id.patch`, [Patching a dependency](patches.md)). With the
+  patch, deleting the line of `UndoingGroup` that refuses to take back a group while a later one is in force gives
+  `OnlyTheLastGroupInForceIsTakenBack: violated`, with the state and the command.
 - **`checked`** is a rule over every instance at once: it held in every sequence the search ran. **`reached`** is a
   rule that a command can be taken: one sequence got there, and the report prints it.
 
@@ -313,4 +316,5 @@ it, named as ours"): "no hand-written assertions" means no hand-written list of 
 `CLAUDE.md`, "The model's blocks: what Verify reads", has the rules the code is written to: where `new` is allowed,
 how a case is told and a state built so that the prover reads them, why a rule is one comparison, why the rules about
 who may change a row or a group are stated on each decision, and the 4,096 paths past which nothing is proved. The
-library itself is pinned to one commit and kept as files (`vendor/alchemy/`).
+library itself is pinned to one commit and kept as files (`vendor/alchemy/`), with the repository's patches to it
+applied at every install (`packages/patches`, [Patching a dependency](patches.md)).

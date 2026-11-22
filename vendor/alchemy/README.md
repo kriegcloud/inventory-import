@@ -76,26 +76,41 @@ fails:
 1. Downloads that commit's builds, checks each against the hash in its address, rewrites the addresses, replaces the
    files and `sources.json`, and says which packages are new or gone since the last pin.
 2. Rewrites the `overrides` in the root `package.json` and the version each workspace asks for.
-3. Runs `bun install`.
-4. Writes each file's hash into `bun.lock`. bun does not do this by itself for a local file whose bytes changed, and
+3. Carries the repository's patches to these packages to the new files (below), or stops on the first that does not
+   apply and names it.
+4. Runs `bun install`.
+5. Writes each file's hash into `bun.lock`. bun does not do this by itself for a local file whose bytes changed, and
    an install with `--frozen-lockfile` (CI, a deploy) then refuses the lockfile.
-5. Rewrites the table above.
-6. Checks that the files, `sources.json`, the overrides, the workspaces, `bun.lock` and this page agree, and that
-   `bun.lock` names nothing by `pkg.alchemy.run`.
-7. Installs a copy of the working tree with an empty cache through a proxy that refuses `pkg.alchemy.run`, and fails
+6. Rewrites the table above.
+7. Checks that the files, `sources.json`, the overrides, the workspaces, `bun.lock` and this page agree, that
+   `bun.lock` names nothing by `pkg.alchemy.run`, and that no patch is registered for a file that is not pinned.
+8. Installs a copy of the working tree with an empty cache through a proxy that refuses `pkg.alchemy.run`, and fails
    if the install asked for it, changed `bun.lock` or put anything else in place than the files here.
-8. Runs `bun run check:full -- --force`: every type-check, test and proof again, nothing replayed from the cache.
-   The library's `main` breaks code between releases, so a failure here is the library's change to read and answer
-   in the code, never a reason to keep the old result.
+9. Checks that every patch is installed (`bun run beep patches check`) and that each one's test still fails with
+   that patch alone left out (`bun run beep patches prove`).
+10. Runs `bun run check:full -- --force`: every type-check, test and proof again, nothing replayed from the cache.
+    The library's `main` breaks code between releases, so a failure here is the library's change to read and answer
+    in the code, never a reason to keep the old result.
 
-A step from 1 to 7 that fails puts every file it changed back as it was and runs `bun install` again, so the old pin
-stands. Step 8 failing leaves the pin moved, and prints the one line that goes back instead. Adding
-`--no-full-check` to the command leaves step 8 out.
+A step from 1 to 9 that fails puts every file it changed back as it was and runs `bun install` again, so the old pin
+stands. Step 10 failing leaves the pin moved, and prints the one line that goes back instead. Adding
+`--no-full-check` to the command leaves step 10 out.
 
-It commits nothing. What is left by hand: read the difference and what the library changed, fix what step 8 found,
+It commits nothing. What is left by hand: read the difference and what the library changed, fix what step 10 found,
 and commit.
 
-Steps 6 and 7 alone, on what is here now:
+## Patches to these packages
+
+A defect of the library that the repository meets is fixed by a patch, not by a change to a file here: the files stay
+the registry's bytes, and the patch is text that bun applies at every install (`packages/patches`,
+[docs/patches.md](../../docs/patches.md)). A patch names the file it was made for, and a file's name carries its
+commit, so a move of the pin would leave every patch behind: bun warns once about a patch whose package has another
+file, and installs the package unpatched. Step 3 is what prevents that. A patch that applies to the new file is
+carried to it. One that does not, or one whose test passes on the new build without it (step 9: the library fixed the
+defect), stops the move by name. Then, on the old pin, re-make the patch for the new code or drop it, and move the pin
+again.
+
+Steps 7 and 8 alone, on what is here now:
 
 ```bash
 bun run alchemy:check

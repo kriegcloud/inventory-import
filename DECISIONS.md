@@ -45,10 +45,6 @@ didn't": a messy file in, what is wrong fixed in the app, a clear account of the
       import or it is closed; when the row already has a line, it is named once in a toast and then gone.
     - An Undo or "Put row back" pressed while a save was on its way is lost when that save's answer takes back the
       rest of the row: the server keeps what the person took back.
-    - A sign-in as somebody else in another tab of the same browser is not noticed in this tab until a request is
-      refused: until then what is pressed here is written as the other person, and what is read here is theirs.
-    - A switch of organization pressed while the page is asking who is signed in loads the whole page again, and an
-      upload under way is dropped.
     - After a switch of organization the browser no longer asks before the page is left, though rows of the other
       organization still wait in this tab. They are kept in this browser.
     - After an import is closed and opened again in the same page, a late answer to an earlier save can be taken for

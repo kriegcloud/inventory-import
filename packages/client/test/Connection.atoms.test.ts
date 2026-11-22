@@ -1,14 +1,17 @@
 // A read that could not be made is made again by itself once the connection is back: when the browser says it is online,
-// and when the server has answered anything else. Never a read the server refused, which would be refused again, and
+// when the server has answered anything else, and every half minute while nothing does. Never a read the server refused, which would be refused again, and
 // never in a loop on a server that keeps failing.
 import { describe, expect, it } from "@effect/vitest"
+import * as Clock from "effect/Clock"
 import * as Context from "effect/Context"
+import type * as Duration from "effect/Duration"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as O from "effect/Option"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import * as HttpApiError from "effect/http-api/HttpApiError"
+import * as TestClock from "effect/testing/TestClock"
 import { beforeEach } from "vitest"
 import { makeApiAtoms, provideApi } from "@inventory/client/Api"
 import { askedAgainWhenBack, serverAnswered } from "@inventory/client/ConnectionAtoms"
@@ -27,8 +30,11 @@ interface Rows {
 }
 class RowServer extends Context.Service<RowServer, Rows>()("@inventory/client/test/Connection.atoms.test/RowServer") {}
 
-/** A read whose server answers as the test says, followed by what asks it again; `times` counts the requests. */
-const world = () => {
+/**
+ * A read whose server answers as the test says, followed by what asks it again; `times` counts the requests. With a
+ * `clock` (the test's own), the API's runtime runs on it and the server answers at once.
+ */
+const world = (clock?: Clock.Clock) => {
   const server: { answer: Effect.Effect<string, Refusal>; times: number } = {
     answer: Effect.succeed("rows"),
     times: 0
@@ -36,9 +42,9 @@ const world = () => {
   const layer = Layer.succeed(RowServer, {
     rows: Effect.suspend(() => {
       server.times += 1
-      return Effect.sleep("1 millis").pipe(Effect.andThen(server.answer))
+      return clock === undefined ? Effect.sleep("1 millis").pipe(Effect.andThen(server.answer)) : server.answer
     })
-  })
+  }).pipe(Layer.merge(clock === undefined ? Layer.empty : Layer.succeed(Clock.Clock, clock)))
   const rows = makeApiAtoms(RowServer).query((api) => api.rows)
   const registry = AtomRegistry.make({ initialValues: [provideApi(layer)] })
   const stop = registry.mount(askedAgainWhenBack({ read: rows, askAgain: (at) => rows.askAgain(at) }))
@@ -117,6 +123,36 @@ describe("a read that could not be made", () => {
       serverAnswered(200)
       yield* settle
       expect(t.server.times).toBe(failed)
+    })
+  )
+})
+
+describe("a read that could not be made, on a quiet page", () => {
+  it.effect("is made again every half minute while it stays failed, and no more once it is answered", () =>
+    Effect.gen(function* () {
+      const clock = yield* Clock.clockWith(Effect.succeed)
+      const t = world(clock)
+      const tick = (by: Duration.Input) => TestClock.adjust(by)
+      yield* tick("1 second")
+      t.server.answer = t.down
+      t.rows.askAgain(t.registry)
+      yield* tick("1 second")
+      expect(AsyncResult.isFailure(t.read())).toBe(true)
+      const failed = t.server.times
+      // Half a minute after it failed, and not before.
+      yield* tick("28 seconds")
+      expect(t.server.times).toBe(failed)
+      yield* tick("1 second")
+      // Asked again (and once more, as every read is), still down: and again half a minute later.
+      expect(t.server.times - failed).toBe(2)
+      yield* tick("30 seconds")
+      expect(t.server.times - failed).toBe(4)
+      t.server.answer = Effect.succeed("fresh rows")
+      yield* tick("30 seconds")
+      expect(AsyncResult.value(t.read())).toEqual(O.some("fresh rows"))
+      const answered = t.server.times
+      yield* tick("2 minutes")
+      expect(t.server.times).toBe(answered)
     })
   )
 })

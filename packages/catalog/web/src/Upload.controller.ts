@@ -5,8 +5,9 @@ import * as SecureRandom from "effect/crypto/SecureRandom"
 // The one thing not to break: Cancel stops everything (the worker, every request in flight) and then deletes what
 // reached the server, and the screen says it was cancelled only once the server has answered. And an upload is one
 // member's: nothing of it is sent while who is signed in is being asked again, nor ever as anybody else. A page left for
-// another person's ends it; after the person's own switch of organization it is stopped and said, and the chosen file
-// stays kept where it was chosen, to be continued there.
+// another person's ends it. The person's own switch of organization waits for it (`beforeOwnSwitch`): an upload still
+// sending is stopped and what reached the server deleted, one being prepared is let finish, and either is said where
+// the person is next, with its true reason; the chosen file stays kept where it was chosen, to be continued there.
 import * as Cause from "effect/Cause"
 import * as Data from "effect/Data"
 import * as Deferred from "effect/Deferred"
@@ -17,7 +18,14 @@ import * as O from "effect/Option"
 import * as Atom from "effect/reactivity/Atom"
 import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import { invalidate } from "@inventory/client/Api"
-import { askWhoIsSignedIn, keptOfMember, memberKey, onceSignedInKnown } from "@inventory/client/MemberAtoms"
+import {
+  askWhoIsSignedIn,
+  beforeOwnSwitch,
+  keptOfMember,
+  memberKey,
+  onceSignedInKnown
+} from "@inventory/client/MemberAtoms"
+import * as A from "effect/Array"
 import { leavingApp } from "@inventory/ui/Route"
 import * as Queue from "effect/Queue"
 import * as Result from "effect/Result"
@@ -159,6 +167,10 @@ interface Running {
   readonly last: boolean
   /** Stops listening for the page being left, and for another organization. */
   readonly stop: () => void
+  /** True once the person's own switch of organization waits for it: how it ends is said where they are next. */
+  readonly leaving: boolean
+  /** Done when it has ended, what reached the server deleted if it did not arrive: what a switch waits for. */
+  readonly ended: Deferred.Deferred<void>
 }
 const uploadRunning = Atom.make<O.Option<Running>>(O.none()).pipe(Atom.keepAlive)
 
@@ -298,12 +310,13 @@ const arrive = (input: {
   readonly file: File
   readonly done: Finished
   readonly startedAs: string
+  readonly leaving: boolean
 }) => {
   const { registry } = input
   const { view, table, workbook } = input.done
-  // The person changed organization while the file was being prepared: the import belongs to the one they left, and is
-  // listed there. Nothing of it is put in place or opened where they are now.
-  if (registry.get(memberKey) !== input.startedAs) {
+  // The person changed organization (or is changing, and the switch waited for this) while the file was being prepared:
+  // the import belongs to the one they left, and is listed there. Nothing of it is put in place or opened.
+  if (input.leaving || registry.get(memberKey) !== input.startedAs) {
     // Said where the person is now, with no way to open it: it is not this organization's to open.
     toast(`${view.fileName} was uploaded for the organization you were in when you chose it. It is listed there.`)
     return
@@ -354,7 +367,7 @@ const start = (input: {
   const mine = () => O.filter(registry.get(uploadRunning), (now) => now.fiber === fiber)
   /** It was for the organization the person has left: said where they are now, and kept where it was chosen. */
   const leftBehind = () =>
-    O.map(mine(), ({ onEnd, stop }) => {
+    O.map(mine(), ({ onEnd, stop, ended }) => {
       registry.set(uploadRunning, O.none())
       stop()
       set(registry, UploadState.cases.Idle.make({}))
@@ -364,7 +377,31 @@ const start = (input: {
         description:
           "You changed organization while it was on its way. It is kept for the one you chose it in: switch back there and continue it."
       })
+      Deferred.doneUnsafe(ended, Exit.void)
     })
+  /**
+   * The person's own switch of organization, pressed while this is under way, before it is sent: still sending, it is
+   * stopped and what reached the server is deleted, as their member; its last request out, its answer is waited for.
+   */
+  const beforeSwitch: Effect.Effect<void> = Effect.suspend(() =>
+    O.match(mine(), {
+      onNone: () => Effect.void,
+      onSome: (running) => {
+        registry.update(
+          uploadRunning,
+          O.map((now) => ({ ...now, leaving: true }))
+        )
+        if (running.last) return Deferred.await(running.ended)
+        return Effect.promise(() =>
+          fiber.pipe(Fiber.interrupt, runExit).then(() => {
+            const uploadId = O.getOrNull(O.flatMap(mine(), (now) => O.fromNullOr(now.uploadId)))
+            return uploadId === null ? true : discard({ registry, startedAs, uploadId })
+          })
+        ).pipe(Effect.andThen(Effect.sync(leftBehind)))
+      }
+    })
+  )
+  registry.update(beforeOwnSwitch, A.append(beforeSwitch))
   // The person is in another organization from now on: nothing more of it is read or sent. Once it is being prepared,
   // its last request is out, and its answer says where it went (`arrive`).
   const unfollow = registry.subscribe(memberKey, (now) => {
@@ -395,7 +432,13 @@ const start = (input: {
       onEnd: input.onEnd,
       startedAs,
       last: false,
+      leaving: false,
+      ended: Deferred.makeUnsafe<void>(),
       stop: () => {
+        registry.update(
+          beforeOwnSwitch,
+          A.filter((work) => work !== beforeSwitch)
+        )
         unfollow()
         window.removeEventListener("pagehide", onHide)
         window.removeEventListener(leavingApp, onLeave)
@@ -406,11 +449,9 @@ const start = (input: {
     const current = mine()
     // Cancel handles its own ending.
     if (O.isNone(current) || (Exit.isFailure(exit) && Cause.hasInterruptsOnly(exit.cause))) return
-    const { onEnd, stop, uploadId } = current.value
-    if (
-      Exit.isFailure(exit) &&
-      (registry.get(memberKey) !== startedAs || O.exists(Cause.findErrorOption(exit.cause), isLeftBehind))
-    ) {
+    const { onEnd, stop, uploadId, leaving, ended } = current.value
+    // Nothing of it could be sent any more: who is signed in is another organization of the person's.
+    if (Exit.isFailure(exit) && O.exists(Cause.findErrorOption(exit.cause), isLeftBehind)) {
       leftBehind()
       return
     }
@@ -419,14 +460,22 @@ const start = (input: {
     if (Exit.isSuccess(exit)) {
       set(registry, UploadState.cases.Idle.make({}))
       onEnd(UploadEnd.Arrived())
-      arrive({ registry, file, done: exit.value, startedAs })
+      arrive({ registry, file, done: exit.value, startedAs, leaving })
+      Deferred.doneUnsafe(ended, Exit.void)
       return
     }
     const error = Cause.squash(exit.cause)
-    // Nothing half-sent stays behind; the server would also delete it within the hour.
-    if (uploadId !== null) void discard({ registry, startedAs, uploadId })
+    // Nothing half-sent stays behind, as its member (a switch waits for this); the server would also delete it within
+    // the hour.
+    const discarded = uploadId === null ? Promise.resolve(true) : discard({ registry, startedAs, uploadId })
+    void discarded.then(() => Deferred.doneUnsafe(ended, Exit.void))
     // Nobody is signed in: the page's idea of who is signed in is out of date. The chosen file stays kept, to continue.
     if (S.is(NotSignedIn)(error)) askWhoIsSignedIn(registry)
+    // Its own reason, said where the person is next when they are leaving its organization: what the screen holds of
+    // it is that organization's, and is let go with it.
+    if (leaving || registry.get(memberKey) !== startedAs) {
+      void toast.error(`${file.name} was not uploaded`, { description: sayError(error).sentence })
+    }
     // The file's own problem is said as data: what is wrong with it and what to do.
     if (S.is(FileProblem)(error)) {
       onEnd(UploadEnd.Refused())
@@ -471,6 +520,7 @@ const cancel = (registry: AtomRegistry.AtomRegistry): Promise<void> => {
       return uploadId === null ? true : discard({ registry, startedAs: current.startedAs, uploadId })
     })
     .then((answered) => {
+      Deferred.doneUnsafe(current.ended, Exit.void)
       set(registry, UploadState.cases.Idle.make({}))
       if (answered) toast(`Cancelled. Nothing from ${current.fileName} was saved.`)
       else

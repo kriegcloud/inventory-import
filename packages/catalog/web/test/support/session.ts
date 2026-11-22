@@ -1,8 +1,8 @@
 // Who is signed in, as a test's page has it: one session atom that everything derives from, by the app's own rules
 // (`@inventory/client/MemberAtoms`), so a test is never on a page the app cannot be on. Asked again, the member stays
 // and nobody is certain until the test answers; the same member goes on; anybody else, another organization or nobody
-// leaves the page, which never becomes theirs (`left`); another organization the person chose (`choose`) is the one
-// change a page lives through. And what is drawn while there is a member, as the app's sign-in gate draws it.
+// leaves the page, which never becomes theirs (`left`); another organization the person chose (`choose`), answered for
+// the same account, is the one change a page lives through, and the choice is over with the next answer, as in the app. And what is drawn while there is a member, as the app's sign-in gate draws it.
 import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
 import { identity } from "effect/Function"
@@ -22,13 +22,21 @@ type Who = O.Option<Member>
 /** The session could not be read. */
 class Unread extends S.TaggedError<Unread, { readonly brand: unique symbol }>()("Unread", {}) {}
 
-/** A member, by id, in an organization (Prairie unless the test says otherwise). */
-export const memberOf = (who: { readonly id: string; readonly organization?: string }): Who => {
+/**
+ * A member, by id, in an organization (Prairie unless the test says otherwise), of an account (its id unless the test
+ * says otherwise): one account is one person, a member of each of their organizations. The account is the member's
+ * name here, as the app tells it by the session's email.
+ */
+export const memberOf = (who: {
+  readonly id: string
+  readonly organization?: string
+  readonly account?: string
+}): Who => {
   const organization = who.organization ?? "org_prairie"
   return O.some(
     Member.make({
       id: MemberId.make(who.id),
-      name: DisplayName.make(who.id),
+      name: DisplayName.make(who.account ?? who.id),
       role: "admin",
       organizationId: OrganizationId.make(organization),
       organizationName: DisplayName.make(organization)
@@ -55,17 +63,22 @@ export const sessionStandIn = (first: Who) => {
       out.push(question)
       return Deferred.await(question)
     }).pipe(
-      Effect.flatMap((answer) =>
-        answeredFor({
+      Effect.flatMap((answer) => {
+        const had = O.flatten(O.flatMap(before, AsyncResult.value))
+        const to = chosen.organization
+        // Over with this answer, whatever it is: as the app's own switch is.
+        chosen.organization = undefined
+        return answeredFor({
           answer,
-          before: O.flatten(O.flatMap(before, AsyncResult.value)),
+          before: had,
           after: answer,
-          chosen: O.exists(answer, (one) => one.organizationId === chosen.organization),
+          // The organization chosen, for the same account.
+          chosen: O.exists(answer, (one) => one.organizationId === to && O.exists(had, (was) => was.name === one.name)),
           leave: () => {
             left.times += 1
           }
         })
-      )
+      })
     )
   }).pipe(Atom.keepAlive)
   /** The question that is out: the last one asked. */
@@ -83,7 +96,10 @@ export const sessionStandIn = (first: Who) => {
     answer: (who: Who) => Deferred.succeed(question(), who),
     /** The question gets no answer (the network). */
     fail: () => Deferred.fail(question(), Unread.make({})),
-    /** The person chooses another of their organizations here: the next answer in it is their own switch. */
+    /**
+     * The person chooses another of their organizations here: the next answer, if it is their own account in it, is
+     * their own switch. Any answer ends the choice.
+     */
     choose: (organization: string) => {
       chosen.organization = organization
     },

@@ -2,13 +2,14 @@
 // whatever is drawn. One list, so what `main.tsx` starts the page with is what a test holds it to. The rules this file
 // protects: this tab's id and its lock are taken at page start, before anybody is signed in (a tab on the sign-in page
 // counts as open, and no other takes up the rows it kept); every web package's `member` is the session's; asking who is
-// signed in asks the session; and a session that could not be read is asked again by itself.
+// signed in asks the session; a session that could not be read is asked again by itself; and a change of who is signed
+// in, in another tab of the browser, is heard here and asked at once.
 import { scheduleTask } from "@effect/atom-react/RegistryContext"
 import * as A from "effect/Array"
 import type * as Layer from "effect/Layer"
 import * as Atom from "effect/reactivity/Atom"
 import * as AtomRegistry from "effect/reactivity/AtomRegistry"
-import { actor, session, signedInAsked } from "@inventory/access-web/Session"
+import { actor, askedWhenChangedElsewhere, session, signedInAsked } from "@inventory/access-web/Session"
 import { provideApi } from "@inventory/client/Api"
 import { askedAgainWhenBack } from "@inventory/client/ConnectionAtoms"
 import { provideMember, provideWhoIsSignedInAsked } from "@inventory/client/MemberAtoms"
@@ -23,7 +24,10 @@ const signedIn = Atom.readable(
   (refresh) => refresh(session)
 )
 
-/** The session asked again by itself once the connection is back: until it answers, nothing of the person's is sent. */
+/**
+ * The session asked again by itself every half minute while it could not be read, and at once when the connection is
+ * back: until it answers, nothing of the person's is sent.
+ */
 const sessionAskedAgain = askedAgainWhenBack({
   read: session,
   askAgain: (registry) => registry.refresh(session),
@@ -31,7 +35,7 @@ const sessionAskedAgain = askedAgainWhenBack({
 })
 
 /** Kept for the page's life, whatever is drawn. */
-const kept: ReadonlyArray<Atom.Atom<unknown>> = [thisTab, sessionAskedAgain]
+const kept: ReadonlyArray<Atom.Atom<unknown>> = [thisTab, sessionAskedAgain, askedWhenChangedElsewhere]
 
 /**
  * The app's registry, with everything the page starts with in it. `api` is the layer every web package's atoms call the

@@ -311,6 +311,35 @@ layer(App, { timeout: 60_000 })("a save of 50,000 rows that waited", (it) => {
   )
 })
 
+layer(App, { timeout: 60_000 })("a save of 50,000 Replaces that waited across a match of their cost", (it) => {
+  it.effect("each naming three decisions it may be written over: judged once, and every row written", () =>
+    Effect.gen(function* () {
+      const id = ImportId.make("00000000-0000-4000-8000-0000000000f1")
+      yield* seeded(id, 12_000)
+      const client = yield* HttpApiTest.groups(Api, ["imports"])
+      // Every row's own Replace was made before the cost was matched again: the file's review is asked of each.
+      const set: Readonly<Record<string, RowDecision>> = R.fromEntries(
+        counted(maxStagedRows, (n) => [`row-${n + 2}`, replace] as const)
+      )
+      const keep = decisionFromFlags({ stored: "keep" })
+      const saved = yield* client.imports
+        .decide({
+          params: { id },
+          payload: {
+            madeOn: R.map(set, () => 0),
+            set,
+            clear: [],
+            over: R.map(set, () => [O.none(), O.some(replace), O.some(keep)])
+          }
+        })
+        .pipe(as("mem_marcus"))
+      expect([saved.decidedSince, saved.notApplied, saved.changed]).toEqual([[], [], true])
+      const held = yield* savedFor(id)
+      expect(held).toEqual([[maxStagedRows, 0]])
+    })
+  )
+})
+
 layer(App, { timeout: 60_000 })("a confirm that writes every row of a file of 50,000", (it) => {
   it.effect(
     "items created and replaced, rows left out, values typed: each is stored, and counted as stored",

@@ -145,7 +145,9 @@ Better Auth's command line cannot reach D1, so its tables are migrations like an
    tables, part 2 the shared `organization` and `member`), then `bun run db:reset`. Once a database holds rows that
    must stay, save it as the next `migrations/NNNN_*.sql` instead: a line marked UNSAFE is a required column on a
    table that already has rows, so add it nullable and fill existing rows in the same file.
-4. `bun run check:full`: `test/server/AuthSchema.slow.test.ts` fails while anything is missing.
+4. `bun run check`: `test/server/AuthSchema.test.ts` fails while anything is missing. It also fails when a new Better
+   Auth wants a table or a column the migrations do not make, which is why `better-auth` is held and moved by hand
+   (`bun run deps:update` says how).
 
 Better Auth's tables come first in `0001_init.sql`, because `member.userId` references `user`.
 

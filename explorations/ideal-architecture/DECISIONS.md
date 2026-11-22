@@ -1228,3 +1228,31 @@ The agent chose these, and I was not asked:
   `scratch:graduate` deletes the folder and logs it.
 - **No law refuses private names** on this branch: only key-shaped strings are read for (`laws keys`), in the
   scratchpad as everywhere. Answer 3's "private names" has nothing to hold it yet.
+
+### 2026-11-22 — dependencies: the catalog, Node's types, Better Auth, and sentences that record a check
+
+Four questions left open when `deps:update`, `version-sync` and `config-sync` were built, answered by dialog.
+
+1. **One catalog of versions at the root?** Options: "After Wednesday (Recommended)"; "As soon as these merges
+   land"; "No catalog". Answer: "As soon as these merges land". I chose against the recommendation. Once `main` holds
+   the branches open today, one commit: a top-level `catalog` in the root's `package.json`, `catalog:` in the
+   workspace manifests, a new `bun.lock`, syncpack's catalog type and version group, and `vendor sync` writing
+   `catalog:`. The Alchemy overrides and the files in `vendor/alchemy` stay as they are.
+2. **`@types/node`, which `deps:update` would have moved from ^24 to ^26 while CI runs Node 22?** Options: "Hold at the
+   version CI runs (Recommended)"; "Let it move to latest". Answer: "Hold at the version CI runs". I chose; the agent
+   recommended the same. It is held at the major CI and `engines.node` name, and `version-sync` keeps the three
+   together. It was ^24 and is now ^22.20.5 everywhere; every type error that appeared would have been an API the
+   runner does not have, and none did (`bun run check`, 80 of 80). Where something truly needs a newer Node, the
+   answer is to move CI's Node, not to work around it.
+3. **`better-auth`, held by the agent's judgement because its tables are a migration written by hand?** Options:
+   "Hold it, and add the check (Recommended)"; "Hold it, no check"; "Don't hold it". Answer: "Hold it, and add the
+   check". I chose; the agent recommended the same. The check existed as a slow test; it takes half a second, needs
+   no secret, no network and no `.dev.vars` (an in-memory SQLite database and a dummy secret), and now runs in
+   `bun run check` (`apps/inventory/test/server/AuthSchema.test.ts`). It fails when Better Auth wants a table or a
+   column the migrations do not make, which is what `bun run auth:schema` would print.
+4. **A sentence that records a check ("checked in effect 4.1.4's source") is moved by `version-sync --write`,
+   though nobody checked again.** Answer: leave it as built. The agent's judgement: `--write` prints every line it
+   changes, and the person reads them.
+
+And: the scratchpad's lines in `CLAUDE.md` (the command table and the Layout) are written by the agent, as the
+commands of the request that made it.

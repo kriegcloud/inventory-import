@@ -12,6 +12,11 @@
   ],
   "updateGroups": [
     {
+      "label": "Node's types are held at the Node that CI runs and `engines.node` names (22), so a type for an API the runner does not have fails the type-check. version-sync keeps the three together. To move: change `engines.node` in the root's package.json, then `bun run version-sync` names every workflow and every @types/node to change; write @types/node at the newest of that major (`bun info @types/node@<major> version`), `bun install`, and fix what the type-check finds",
+      "dependencies": ["@types/node"],
+      "isIgnored": true
+    },
+    {
       "label": "The Effect language service: a new version adds diagnostics the profile in tsconfig.base.json must name, and patches only the typescript, tsrs and oxlint versions it lists. Moved by hand, with them. To move: write the new @effect/tsgo in the package.json files that name it and run `bun install`, which stops and names the typescript, tsrs and oxlint versions it supports; write those, name any new diagnostic in tsconfig.base.json and the packages' own profiles, then `bun run check:full`",
       "dependencies": ["@effect/tsgo"],
       "isIgnored": true
@@ -27,7 +32,7 @@
       "isIgnored": true
     },
     {
-      "label": "Its tables are a migration written by hand (docs/auth.md). After a move `bun run auth:schema` must print nothing, so it moves by hand. To move: write the new version in the package.json files that name it, `bun install`, then `bun run auth:schema` and add the migration it prints, if any",
+      "label": "Its tables are a migration written by hand (docs/auth.md), and a new version can want a table or a column they do not make: `bun run check` fails then (test/server/AuthSchema.test.ts). To move: write the new version in the package.json files that name it, `bun install`, `bun run auth:schema`, save what it prints as the next migration (nothing printed, nothing to save), then `bun run check`",
       "dependencies": ["better-auth"],
       "isIgnored": true
     },

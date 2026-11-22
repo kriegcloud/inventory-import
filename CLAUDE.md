@@ -246,6 +246,7 @@ package's task and replays it when nothing it reads has changed. The app's own s
 | `bun run deps:update` | Moves every dependency of every package to its newest version, except the ones `.syncpackrc.json` holds back (each is named with its reason), runs `bun install`, then `version-sync -- --write`, and says what moved from which version to which. `-- --dry-run` says the same and writes nothing. `deps:lint` and `deps:outdated` (syncpack) read the same packages and the same held list |
 | `bun run version-sync` | Names every place where a version or a date differs from its one source (`.bun-version`, `engines.node`, the `effect` the packages state, the app's `wrangler.jsonc` and the rest) and fails. `-- --write` rewrites them, `-- --dry-run` lists what would be written. `docs/sync-commands.md` has every source and what is left alone |
 | `bun run config-sync` | Writes what follows from the workspaces: syncpack's sources, tsconfig references, each package's scripts, the paths that depend on a package's depth, the root tasks the three checks (`check`, `check:full`, `check:ci`) run. `config-sync:check` only compares, `-- --dry-run` lists what would be written |
+| `bun run scratch:new <name> --template <probe\|service\|screen\|verify>` | Starts an experiment in `scratchpad/experiments/<name>` from a template whose test already passes. `scratch:test [name]` runs the experiments' tests (Vitest, Node); `scratch:check` holds the scratchpad's own rules (no install inside an experiment, a note for each) and runs the type-checker with the Effect diagnostics; `scratch:list` shows what is open with its age; `scratch:serve experiments/<name>` serves a screen on http://localhost:5273; `scratch:graduate <name> --to <path> --learned "<line>"` or `scratch:drop <name> --learned "<line>"` ends one. `bun run check`, the build and CI never read the scratchpad (`docs/scratchpad.md`) |
 | `bun run docs:check` | Checks that `docs/`, `explorations/` and `goals/` are Open Knowledge Format bundles (the OKF skill's validator). Needs bash |
 | `bun run db:reset` | Deletes the local database and re-applies migrations. **Restart `bun run dev` afterwards.** |
 | `bun run preview` | Builds and serves the production build on http://localhost:4173, with security headers, compressed (brotli, else gzip) as Cloudflare serves it; `PREVIEW_COMPRESSION=off` for the raw bytes |
@@ -340,12 +341,22 @@ explorations/           Questions being shaped: research, decisions, briefs.
 goals/                  Work with a definition of done: SPEC.md and PLAN.md.
 packages/tooling/tool/cli/  @beep/repo-cli: the repository's own rules as commands (`bun run beep <group> <command>`):
                         `laws` (boundaries: which package may import which; screens: every package with screens in
-                        both stylesheet lists; ref-callbacks: no ref callback made on each draw; tags: no `_tag` compared or built by hand in any src or test folder; exports; keys; deprecated-apis: no deprecated API used, in any code file git would commit outside `.agents`; effect-imports: every Effect import from its own path
+                        both stylesheet lists; ref-callbacks: no ref callback made on each draw; tags: no `_tag` compared or built by hand in any src or test folder; exports; keys; deprecated-apis: no deprecated API used, in any code file git would commit outside `.agents` and `scratchpad`; effect-imports: every Effect import from its own path
                         under its one name), `quality` (strict, ceilings), `docs check` and `vendor` (check; sync,
-                        which copies the kit from a beep-effect checkout). Nothing imports it.
+                        which copies the kit from a beep-effect checkout); `deps update`, `version-sync` and
+                        `config-sync`, which move dependencies and keep repeated versions and derived configuration in
+                        step (`docs/sync-commands.md`); and `scratch` (new, list, check, graduate, drop). Nothing
+                        imports it.
+scratchpad/             @inventory/scratchpad: a private workspace package that depends on every package, where an idea
+                        is tried in a folder of its own (experiments/<name>/: a NOTE.md, code and a test). No check,
+                        build or deploy reads it, and nothing may import from it (`bun run beep laws boundaries`). The
+                        laws on how code is written apply when an experiment's code graduates into a package; only the
+                        law on secrets reads it. LOG.md keeps one line for each experiment that ended
+                        (`docs/scratchpad.md`).
 tsconfig.json           References every package's tsconfig.test.json and tsconfig.config.json, so a linter that reads
-                        types and an editor find a test's project. Nothing compiles it. A new package adds its line.
-turbo.json              The task graph: nine package tasks and the root tasks (the repository's own rules, one each).
+                        types and an editor find a test's project. Nothing compiles it. `bun run config-sync` writes
+                        its list from the packages' projects.
+turbo.json              The task graph: twelve package tasks and the root tasks (the repository's own rules, one each).
 .agents/                Skills (see above). Not application code; the check ignores it.
 ```
 

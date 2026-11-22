@@ -15,7 +15,8 @@ import {
   type ConfirmRequest,
   type DecisionDelta,
   decisionFromFlags,
-  type SaveRequest
+  type SaveRequest,
+  type DecidedSince
 } from "@inventory/catalog-contract/Decision"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import type { ImportView } from "@inventory/catalog-contract/Import"
@@ -63,6 +64,7 @@ type Saved = {
   readonly revision: number
   readonly changed: boolean
   readonly notApplied: ReadonlyArray<{ readonly rowId: string; readonly field: string; readonly kind: "accept" }>
+  readonly decidedSince: ReadonlyArray<DecidedSince>
 }
 
 const settle = Effect.sleep("15 millis")
@@ -137,7 +139,7 @@ describe("a confirm", () => {
       t.press()
       yield* settle
       expect([t.sent(), t.confirming()]).toEqual([[], true])
-      yield* Deferred.succeed(t.saves[0]!.answer, { revision: 11, changed: true, notApplied: [] })
+      yield* Deferred.succeed(t.saves[0]!.answer, { revision: 11, changed: true, notApplied: [], decidedSince: [] })
       yield* settle
       // Row 1 is saved; the confirm carries no row at all, only the revision the screen now holds.
       expect(t.sent()).toEqual([{ revision: 11, madeOn: {}, set: {}, clear: [] }])
@@ -210,7 +212,7 @@ describe("a confirm", () => {
       yield* settle
       t.decide("row-1")
       yield* settle
-      yield* Deferred.succeed(t.saves[0]!.answer, { revision: 11, changed: true, notApplied: [] })
+      yield* Deferred.succeed(t.saves[0]!.answer, { revision: 11, changed: true, notApplied: [], decidedSince: [] })
       yield* settle
       page.said.length = 0
       page.went.length = 0
@@ -240,7 +242,8 @@ describe("a confirm", () => {
       yield* Deferred.succeed(t.saves[0]!.answer, {
         revision: 11,
         changed: true,
-        notApplied: [{ rowId: "row-55", field: "unitCost", kind: "accept" }]
+        notApplied: [{ rowId: "row-55", field: "unitCost", kind: "accept" }],
+        decidedSince: []
       })
       yield* settle
       expect(page.said).toEqual(["An accept was taken back"])

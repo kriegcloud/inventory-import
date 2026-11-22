@@ -10,7 +10,12 @@ import * as O from "effect/Option"
 import * as S from "effect/Schema"
 import * as HttpApiError from "effect/http-api/HttpApiError"
 import { vi } from "vitest"
-import { decisionFromFlags, type SavedDecisions, type SaveRequest } from "@inventory/catalog-contract/Decision"
+import {
+  decisionFromFlags,
+  type SavedDecisions,
+  type SaveRequest,
+  type DecidedSince
+} from "@inventory/catalog-contract/Decision"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import { type ImportView, MatchTakeBack } from "@inventory/catalog-contract/Import"
 import { AcceptsTakenBack } from "@inventory/catalog-contract/ImportRejection"
@@ -54,6 +59,7 @@ interface Saved {
   readonly revision: number
   readonly changed: boolean
   readonly notApplied: ReadonlyArray<{ readonly rowId: string; readonly field: string; readonly kind: "stored" }>
+  readonly decidedSince: ReadonlyArray<DecidedSince>
 }
 
 /** Rows 7 and 9 as the server names them: taken back because Unit cost was matched again. */
@@ -106,7 +112,7 @@ describe("a Replace and a Keep-stored taken back because another column than the
       page.said.length = 0
       t.happened(decides)
       yield* settle
-      yield* Deferred.succeed(t.saves[0]!, { revision: 11, changed: true, notApplied: taken })
+      yield* Deferred.succeed(t.saves[0]!, { revision: 11, changed: true, notApplied: taken, decidedSince: [] })
       yield* settle
       expect(page.said).toEqual([
         "2 decisions were taken back: A column was matched again after you decided: the keep-or-replace on row 7 (Unit cost matched again); the keep-or-replace on row 9 (Unit cost matched again). Each row shows what it reads now, to decide again."

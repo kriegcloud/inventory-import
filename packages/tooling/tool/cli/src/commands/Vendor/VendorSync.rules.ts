@@ -264,7 +264,7 @@ export const vendorSync = Effect.fn("VendorSync.vendorSync")(function* (from: st
           versioned(A.filter(testDependencies, (name) => !R.has(dependencies, name))),
           [["@effect/vitest", "4.1.5"]],
           A.some(testTexts, Str.includes("@effect/platform-node/")) ? [["@effect/platform-node", "4.1.5"]] : [],
-          [["@types/node", "^24.19.2"]],
+          [["@types/node", "^22.20.5"]],
           [["vitest", "^5.1.0"]]
         ]),
         byLocale

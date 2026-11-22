@@ -5,7 +5,7 @@
  * | What | Its one source | The places that follow it |
  * | --- | --- | --- |
  * | bun | `.bun-version` | `packageManager`; a `bun-version:` in a workflow; "Bun 1.2.3" in the standing documents |
- * | Node | `engines.node` of the root's package.json (its major) | `node-version:` in every workflow; "Node 22 or newer" in the documents |
+ * | Node | `engines.node` of the root's package.json (its major) | `node-version:` in every workflow; "Node 22 or newer" in the documents; the major of every `@types/node` (a problem, since only the registry knows the newest of a major) |
  * | Effect | the `effect` every package.json states (the root's `catalog` when there is one) | every `@effect/*` package that is released with it; "Effect 4.1" and "effect 4.1.4" in the documents; the versions `vendor sync` writes into a vendored package |
  * | `@effect/tsgo`, TypeScript, Better Auth | the one version the package.json files state | their name followed by a version in the documents |
  * | Alchemy | `alchemy` in the package.json files; `vendor/alchemy/sources.json` when the packages are kept as files | every `@alchemy.run/*` dependency; with kept files, each dependency's `<version>-<commit>` and each override's file |
@@ -362,13 +362,28 @@ export const versionSyncPlan = Effect.fn("VersionSync.plan")(function* () {
     if (O.isNone(major)) return nothing
     const same = () => major.value
     const what = "Node's version, from `engines.node` of the root's package.json"
+    // Node's types are for the Node that runs the code: their major is the major `engines.node` names. Which version
+    // of that major is newest only the registry knows, so a wrong major is a problem, not a repair.
+    const types = asked("@types/node")
+    const typesProblems = A.flatMap(types, ({ at, found }) => {
+      const typesMajor = /^[\^~]?(\d+)\./.exec(found.value)?.[1]
+      return typesMajor === major.value
+        ? []
+        : [
+            Problem.make({
+              file: at.file,
+              message: `line ${lineAt(at.text)(found.start)}: @types/node ${found.value} is not for Node ${major.value}, which \`engines.node\` and the workflows name: write the newest ${major.value}.x (\`bun info @types/node@${major.value} version\`), then \`bun install\``
+            })
+          ]
+    })
     return mergePlans(
-      A.appendAll(
+      A.flatten([
         A.map(workflows, (at) => places({ at: at, what: what, expected: same })(/\bnode-version:\s*["']?([\w.]+)/g)),
         A.map(documents, (at) =>
           places({ at: at, what: what, expected: same })(/\bNode(?:\.js)?\s+(\d+)(?= or newer)/g)
-        )
-      )
+        ),
+        [Plan.make({ checked: types.length, drifts: [], problems: typesProblems })]
+      ])
     )
   }
 

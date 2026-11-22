@@ -46,7 +46,8 @@ packages at different versions of `effect`, a package no `workspaces` pattern co
 | `@effect/tsgo` | A new Effect language service adds diagnostics the profile in `tsconfig.base.json` must name (every diagnostic is an error there), and it patches only the typescript, tsrs and oxlint versions it lists. It moves by hand, with them |
 | `typescript`, `tsrs`, `oxlint`, `oxlint-tsgolint` | `@effect/tsgo` patches them at install (the root's `prepare` script) and stops on a version it does not list. They move only with it |
 | `alchemy`, `@alchemy.run/*`, `@distilled.cloud/*` | A beta pinned as one set to one commit of its library and kept as files (`vendor/alchemy`). `bun run alchemy:repin -- main` moves the pin (a commit in place of `main` for that commit), and `deps:update` prints that command beside them |
-| `better-auth` | Its tables are a migration written by hand ([Sign-in](auth.md)). After a move `bun run auth:schema` must print nothing, so it moves by hand |
+| `@types/node` | Held at the Node that CI runs and `engines.node` names (22), so a type for an API the runner does not have fails the type-check. `version-sync` names an `@types/node` of another major, and the workflows |
+| `better-auth` | Its tables are a migration written by hand ([Sign-in](auth.md)), and a new version can want a table or a column they do not make. `bun run check` fails then (`apps/inventory/test/server/AuthSchema.test.ts`); `bun run auth:schema` prints the migration to add |
 | `xlsx` | SheetJS publishes at its own address, and the registry's `xlsx` stopped at 0.18.5. It is written as an address and moved by hand |
 
 To hold another dependency, add a group to `updateGroups` with its reason as the `label`, ending ` To move: ` and
@@ -57,7 +58,7 @@ what moves it; to release one, remove the group.
 | What | Its one source | The places that follow it |
 | --- | --- | --- |
 | bun | `.bun-version` | `packageManager` in the root's `package.json`; a `bun-version:` in a workflow; "Bun 1.4.4" in the standing documents |
-| Node | `engines.node` in the root's `package.json` (its major) | `node-version:` in every workflow; "Node 22 or newer" in the documents |
+| Node | `engines.node` in the root's `package.json` (its major) | `node-version:` in every workflow; "Node 22 or newer" in the documents; the major of every `@types/node` (named, not written: the newest of a major is the registry's to say) |
 | Effect | the `effect` every `package.json` states (the root's `catalog`, when there is one) | every `@effect/*` package released with it; "Effect 4.1" and "effect 4.1.5" in the documents; the versions `vendor sync` writes into a vendored package |
 | `@effect/tsgo`, TypeScript, Better Auth | the one version the `package.json` files state | their name followed by a version in the documents |
 | Alchemy | `alchemy` in the `package.json` files; `vendor/alchemy/sources.json` once the packages are kept as files | every `@alchemy.run/*` dependency; with kept files, each dependency's `<version>-<commit>` and each override's file |

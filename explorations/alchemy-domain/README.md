@@ -4,7 +4,7 @@ title: Alchemy domain
 description: Everything @alchemy.run/domain and what plugs into it offers, read at its main@dbfd0dd, concept by concept, with how inventory-import would use each. The reference the brief is built on, written so its pages can later become agent skills.
 status: active
 stage: shape
-next: decisions 1 to 40 of the brief are answered (2026-11-22; 9 fell away, 24 stands on infra I8) but for 21a, open in DECISIONS.md and asked when move 6 opens; 42 to 56 and 60 to 62 are asked each when its move opens; the pin is on main, and the review's model of move 1 is built on the build's own branch, which is to merge into main beside the brief
+next: decisions 1 to 40 of the brief are answered (2026-11-22; 9 fell away, 24 stands on infra I8) but for 21a, open in DECISIONS.md and asked when move 6 opens; 42 to 56 and 60 to 62 are asked each when its move opens; the pin is on main, and the review's model of move 1 is built on it and merged into main (0c4c5e5, not yet on the public remote)
 goals: []
 ---
 
@@ -85,13 +85,15 @@ A model of this app, outside the repository ([the trial](research/04-trial.md)):
   happen, and the stories that each valid act is taken (his answer of 2026-11-22). The seventh is the model he chose
   (`review15`): `review14` with his answer "No change, Ana's undo applies", a press over a group that leaves the row
   reading as it reads recording nothing, and only after the checks of what the sender saw on the row and of the
-  matching; 135 rules proved, a row's act with 284 paths, seven rules across instances checked 3 commands deep and 45
-  stories, on `dbfd0dd`; the 148 mutants were not run on it, two of its change were. The
-  row-by-row model of the fourth round stays on a branch kept privately as the fallback, where on the pinned `734c27a`
-  it gives 96 rules proved and 3 searched (its three rules on who may change a row stated on each of its two
-  decisions), by the build's own report. The model he chose is built on `734c27a` on the build's own branch, which is
-  to merge into main beside the brief: 135 rules proved, 7 searched, 11 "can be taken" rules reached and 47 stories,
-  by the build's own report. Neither branch is on the public remote until the first merges. The `dbfd0dd` builds
+  matching; 135 rules proved, a row's act with 284 paths, seven rules across instances checked 3 commands deep and 46
+  stories, on `dbfd0dd`. No rule holds that order: its saw half is held by one story and its matching half by another,
+  each shown by its own mutant, which the prover still proves; the 148 mutants were not run on it, three of its change
+  were. The row-by-row model of the fourth round stays on a branch of its own as the fallback, where on the pinned
+  `734c27a` it gives 96 rules proved and 3 searched (its three rules on who may change a row stated on each of its two
+  decisions), by the build's own report. The model he chose is built on `734c27a` and merged into main (`0c4c5e5`,
+  not yet on the public remote): 135 rules proved, 7 searched, 11 "can be taken" rules reached and 47 stories, by the
+  build's own report, checkable in `packages/catalog/model`. The per-row branch is not in this repository, so its
+  counts cannot be checked here. The `dbfd0dd` builds
   the trials installed are deleted by the library's registry a week after `main` moves past that commit; they were kept
   outside the repository, so the trials cannot be run again from the registry after that.
 - The second round stored values in a local Durable Object through the domain host (about 8 MiB is the limit), and
@@ -239,6 +241,6 @@ pages whose "Where this was read" names a file that changed.
   and its rivals, a group taken back over a changed row, waiting acts, where the search runs in CI, then the lock file
   corrected to "Lock plus the library's proved list", a press that changes nothing, a keep after an earlier decision and
   a waiting undo), and a seventh round (`review15`, the model he chose, with his answer "No change, Ana's undo applies":
-  135 rules proved, 45 stories); 9 and 41 fell away, 24 stands on infra I8, and 42 to 56 and 60 to 62 are asked at their
-  move. The brief written on his answers. The pin is on main; the review's model is built on its branch, to go into main
-  beside the brief; the rest awaits "the brief matches".
+  135 rules proved, 46 stories); 9 and 41 fell away, 24 stands on infra I8, and 42 to 56 and 60 to 62 are asked at their
+  move. The brief written on his answers. The pin is on main; the review's model is built on it and merged into main
+  (`0c4c5e5`, not yet on the public remote); the rest of the build awaits "the brief matches".

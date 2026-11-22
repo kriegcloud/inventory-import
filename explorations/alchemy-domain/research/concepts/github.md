@@ -1,7 +1,7 @@
 ---
 type: Reference
 title: GitHub provider
-description: Alchemy's provider for github.com (repositories, rulesets, environments, Actions secrets and variables, webhooks, comments and runtime API bindings); this app uses it to declare the repository's deploy settings and its rule on main.
+description: Alchemy's provider for github.com (repositories, rulesets, environments, Actions secrets and variables, webhooks, comments and runtime API bindings); this app uses it to declare the repository's deploy settings and its rules on main, release branches and release tags.
 tags: [alchemy-domain, extras]
 ---
 
@@ -233,25 +233,30 @@ Sources: each resource's `diff` and `delete`, and its removal policy: `Repositor
 
 ## In this app
 
-`packages/infra/src/GitHub.stack.ts` already declares, for `kriegcloud/inventory-import`: two `Environment`s
-(`production` with one required reviewer, read from the `PRODUCTION_APPROVER` setting, and only `main` may deploy;
-`preview`); two Cloudflare `AccountApiToken`s written as environment-scoped `CLOUDFLARE_API_TOKEN` `Secret`s;
-production's `OPENROUTER_API_KEY` `Secret` (only when a key is given); the previews' `PREVIEW_TEST_ACCOUNT_PASSWORD`
-`Secret`; `Variable`s `CLOUDFLARE_ACCOUNT_ID` (both), `SIGN_UP` and `DEPLOY_WITHOUT_MODEL_KEY` (production); and one
-`Ruleset` named `main` on `~DEFAULT_BRANCH`, active (pull request required, zero approvals, the check "Check, test and
-build" required without the up-to-date rule, no deletion, no force push, the admin repository role, id 5, bypasses
-always; `GitHub.stack.ts:109-190`). `.github/workflows/deploy.yml` reads exactly those names. It already uses one
+`packages/infra/src/GitHub.stack.ts` already declares, for `kriegcloud/inventory-import` (decisions I7 and "releases
+and deploys" of the architecture's record): three `Environment`s (`production` with one required reviewer, read from
+the `PRODUCTION_APPROVER` setting, and no branch rule, since the provider writes only branch rules and a tag rule could
+not be kept; `preview`; `staging`, which only `main` may deploy); two Cloudflare `AccountApiToken`s written as
+environment-scoped `CLOUDFLARE_API_TOKEN` `Secret`s (staging takes the previews' token); production's
+`OPENROUTER_API_KEY` `Secret` (only when a key is given); the previews' and staging's `PREVIEW_TEST_ACCOUNT_PASSWORD`
+`Secret`; `Variable`s `CLOUDFLARE_ACCOUNT_ID` (all three), `SIGN_UP` and `DEPLOY_WITHOUT_MODEL_KEY` (production); and
+three `Ruleset`s: `main` on `~DEFAULT_BRANCH`, active (pull request required, zero approvals, the check "Check, test
+and build" required without the up-to-date rule, no deletion, no force push, the admin repository role, id 5,
+bypasses always), "release tags" on `refs/tags/v*` (only an admin creates, moves or deletes one) and "release
+branches" on `refs/heads/release/*` (no deletion, no force push). `.github/workflows/deploy.yml` reads exactly those
+names: a pull request deploys its preview, a push to `main` whose CI passed deploys `staging`, and production deploys
+only from a `v*` tag whose commit is on its `release/*` branch, after the reviewer approves. It already uses one
 `Secret` per environment for `CLOUDFLARE_API_TOKEN`, as the `Secrets` collision requires.
 
 What taking each out of `GitHub.stack.ts` does:
 
-- `Ruleset("Main")`: the rule on `main` stays on GitHub, active, with nothing managing it. To remove it, deploy it once
+- `Ruleset("Main")` (or either release ruleset): the rule stays on GitHub, active, with nothing managing it. To remove it, deploy it once
   with `.pipe(RemovalPolicy.destroy())`, then delete the declaration.
-- `Environment("Production")` or `Environment("Preview")`: the environment is deleted, with its reviewer and branch
+- `Environment("Production")`, `Environment("Preview")` or `Environment("Staging")`: the environment is deleted, with its reviewer and branch
   policy. GitHub then drops that environment's secrets and variables too (GitHub's behaviour, not in this source).
 - Any `Secret` or `Variable`: deleted, so the next deploy job that reads it fails.
 
-On a first deploy against a repository configured by hand, the two environments and every secret and variable are
+On a first deploy against a repository configured by hand, the three environments and every secret and variable are
 taken over and overwritten without a prompt; a hand-made ruleset named `main` is left alone until `adopt(true)`.
 
 What it could add, each declared in the same stack:
@@ -290,7 +295,7 @@ What it cannot do here: write `ci.yml` or `deploy.yml`, set the workflow's `perm
 create a branch or commit.
 
 - **Used today:** yes: `packages/infra/src/GitHub.stack.ts` (`Environment`, `Secret`, `Variable`, `Ruleset`), at
-  `@alchemy.run/github` `2.0.0-beta.87` (`packages/infra/package.json`).
+  `@alchemy.run/github` `2.0.0-beta.87-734c27a`, the pin's file (`packages/infra/package.json`).
 - **Where it goes:** `packages/infra/src/GitHub.stack.ts` for repository settings; `packages/infra/src/Inventory.stack.ts`
   for a preview comment.
 - **What the person gets:** nothing they see in the app; the owner gets repository rules and CI credentials that are

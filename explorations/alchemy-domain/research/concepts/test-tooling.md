@@ -81,7 +81,9 @@ What the package holds at beta.87 (every file of `packages/alchemy-test` is the 
 
   Peers: `effect` is required; `vitest`, `@effect/vitest` and `alchemy` are optional (`package.json` 85-105), but
   `Core.ts` imports `alchemy/*` modules throughout (`src/Core.ts` 2-34), so `alchemy` must be installed. This app
-  already has `alchemy` 2.0.0-beta.87, `@effect/platform-node`, `vitest` 5.1.0 and `@effect/vitest` 4.1.4.
+  already has `alchemy` as the pin's file (`2.0.0-beta.87-734c27a`), `@effect/platform-node` 4.1.5, `vitest` 5.1.0 and
+  `@effect/vitest` 4.1.5 (its lockfile). The harness itself is not in the pin's files (`vendor/alchemy`; the brief,
+  decision 1).
 - **`Test.make(options)`** returns `{ test, beforeAll, beforeEach, afterAll, afterEach, deploy, destroy }`
   (`src/Vitest.ts` 86-97, 106). Options (`src/Core.ts` 51-127): `providers` (required), `state` (default
   `localState()`), `profile`, `limit` (a counted lock shared across files), `stage`, `adopt` (default `false`), `dev`,
@@ -308,9 +310,10 @@ is not verified, and this app signs in with a session cookie (`packages/access/h
 - Layer 4, on main: `Verify.aggregate` per aggregate and `Verify.model` per model. In the same trial they proved 19
   of this app's rules, and a deliberately broken `evolve` failed with `NotVerified` naming the rule, the command and
   the shortest sequence ([verify.md](./verify.md), [prove.md](./prove.md)).
-- Under `it.effect` the console is Effect's test console (`@effect/vitest` 4.1.4, the version the app installs,
-  `src/internal/internal.ts:68`, `:490`), so a report a test prints with Effect's `Console` does not show in Vitest's
-  output; `it.live`, which `@alchemy.run/test/Vitest` uses for every `test`, does not swap it (`:491`).
+- Under `it.effect` the console is Effect's test console (`@effect/vitest` 4.1.4 as read; the app installs 4.1.5,
+  not checked for these lines, `src/internal/internal.ts:68`, `:490`), so a report a test prints with Effect's
+  `Console` does not show in Vitest's output; `it.live`, which `@alchemy.run/test/Vitest` uses for every `test`,
+  does not swap it (`:491`).
 - `Domain.verify(Catalog)` returning `[]` checks the declaration (`packages/domain/src/index.ts` 284-285); at the pin
   `734c27a` it is removed, and a test that builds the model's Layer on `InMemory` checks it instead. Run in the
   trial on beta.87: `Domain.verify(Inventory)` answered `[]` for a one-aggregate model.
@@ -347,5 +350,6 @@ this app's Worker (the upstream example says its Effect entry point does not yet
   `v2.0.0-beta.87`; on `main@dbfd0ddb`: changed (the command calls take one input object)
 - `packages/integration-tests/test/Domain/conformance/*` on `main@dbfd0ddb`: new
 - `alchemy` 2.0.0-beta.87 (the app's installed copy): `src/Local/RpcSpawner.ts`
-- `@effect/vitest` 4.1.4 and `effect` 4.1.4 (the app's installed copies): `src/internal/internal.ts`, `src/Schedule.ts`
+- `@effect/vitest` 4.1.4 and `effect` 4.1.4 (read there; the app installs 4.1.5): `src/internal/internal.ts`,
+  `src/Schedule.ts`
 - A trial on 2026-11-19: stories on beta.87 and main, and `Verify` on main

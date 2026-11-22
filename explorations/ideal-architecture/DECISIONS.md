@@ -313,13 +313,13 @@ ticked.
 
 ### 2026-11-19 — who builds xlsx
 
-Question: who builds `@beep/xlsx`? Answer: "The same session (Recommended)": built by the same author as the brief, on its
-own branch `claude/beep-xlsx`. Rejected: a builder new to the work. Reverse: hand the branch and `goals/beep-xlsx/PLAN.md` to
+Question: who builds `@beep/xlsx`? Answer: "The same session (Recommended)", the one that wrote the brief, on a branch
+of its own. Rejected: a fresh session. Reverse: hand the branch and `goals/beep-xlsx/PLAN.md` to
 another builder.
 
 ### 2026-11-19 — xlsx merge
 
-Question: how does `claude/beep-xlsx` reach main? Answer: "Merge locally, I push (Recommended)"; merged into local
+Question: how does the xlsx work reach main? Answer: "Merge locally, I push (Recommended)"; merged into local
 main at `3253f2f`. Reverse: none planned.
 
 ### 2026-11-19 — where the new workbook reader differs from the old
@@ -400,8 +400,7 @@ reserved for a later confidence-score goal; no stage gets it, and it is not in `
 unused. It is never resolved by an agent.
 
 At odds with "ai-typesafe confidence" on his list of wanted items (see "core, reversed"). Whether the key is used
-is decision 46 of the alchemy-domain brief; this entry stands until he answers it. The key is still never resolved
-by an agent.
+is decision 46 of the alchemy-domain brief; this entry stands until he answers it.
 
 ### 2026-11-19 — infra I6, email (23) (at odds with "Resend email" on his list of wanted items; see "core, reversed")
 
@@ -582,7 +581,7 @@ beside infra (Recommended)". Rejected: build after infra; not yet. The goal is
 
 ### 2026-11-19 — merging the tooling CLI
 
-Question: how does `claude/tooling-cli` reach main? Answer: "Merge locally, I push (Recommended)". Merged into local
+Question: how does the tooling CLI reach main? Answer: "Merge locally, I push (Recommended)". Merged into local
 main at its last commit of that day.
 
 ### 2026-11-19 — tooling CLI: what a rule returns
@@ -647,7 +646,7 @@ is his to fill. Reverse: let a preview mint its own again (`testPasswordOf`) and
 
 ### 2026-11-19 — merging infra
 
-Question: how does `claude/infra` reach main? Answer: "Merge locally, I push (Recommended)". Merged into local main
+Question: how does the infra work reach main? Answer: "Merge locally, I push (Recommended)". Merged into local main
 at 8007ab5; the push, and with it `deploy.yml` on `main`, is his.
 
 ### 2026-11-19 — atoms, merging the goal
@@ -697,7 +696,8 @@ before porting beep-effect to it.
 Question: does the app use `@alchemy.run/domain`, or take its ideas? Answer: it uses it, all of it. How is not
 decided: the reading, the trials and the brief are their own packet, [alchemy-domain](../alchemy-domain/README.md),
 and its [brief](../alchemy-domain/BRIEF.md) puts each "how" to him. None of that brief's recommendations is his
-until he answers it. Only decision 1's pin is on main (as of 2026-11-22); nothing else of it is built until he signs it
+until he answers it. Decision 1's pin is on main (as of 2026-11-22), and the review's model of its move 1 is built on
+that pin and merged into main (`0c4c5e5`, not yet on the public remote); the rest of it is built after he signs it
 (the atoms goal, the other condition, is merged).
 
 From his own list of 2026-11-18, the items he marked as wanted (CAPTURE.md of that packet records them under
@@ -717,7 +717,8 @@ What this touches in this file:
 - The rows of the README's table "Where the research disagrees with the request" that name those items say so.
 
 Rejected: keeping "core" and moving one aggregate later. Reverse: a new decision by him; the app as it stands on main
-is the D1 core, and nothing of the reversal is built yet but the library's pin (on main, as of 2026-11-22).
+is the D1 core, and nothing of the reversal is on main yet but the library's pin and the review's model of move 1
+(as of 2026-11-22; `0c4c5e5`, not yet on the public remote).
 
 ### 2026-11-19 — atoms, the table's own store in the review package
 
@@ -1116,6 +1117,68 @@ per-row model from a local branch on his own machine, and says plainly that it i
 That branch is kept running on the pinned build and gets nothing else. Reverse: none needed; the fallback is deleted
 once the chosen model is in `main`.
 
+### 2026-11-22 — the review's model, a rule that each command can happen
+
+The model's rules say what never happens; a change that made the model refuse every command would keep them all.
+Question: should Verify itself hold that each command can be taken, beside the stories? Options: "Yes, one per
+command"; "Stories only". Answer: "Yes, one per command". Rejected: "Stories only". It was put to him as a search,
+not a proof, and as not yet tried on this model. Each command gets a `sometimes` rule on the model (a row can be
+decided, an import can be confirmed, an act can be undone), so a command nothing reaches shows as "never reached" in
+Verify's own report. The stories stay as tests.
+
+What it is, tried on the pinned build with the per-row model, not yet with the model he chose: the rule is given the
+whole model (every instance, with the events it recorded) and is searched from a model with nothing in it. "Reached"
+means one sequence of commands was found that gets there, printed and run on the real code; it says nothing of any
+other sequence. "Never reached" fails the verification, and can also mean only that the search was too short. Verify
+searches two commands deep unless told otherwise: there, with eleven of the twelve commands and no longer walks, four
+were not reached (a take-back, a reopening, a group's row skipped and a group stopped each take three commands), and
+with its 200 longer walks three, since a walk happened on the take-back. At three deep all were reached, and all
+twelve on the whole model, so the search is set to three. One way it does not fail: a search that stops at its
+budget with `allow: { truncated: true }` says nothing of the rules it did not reach, so that option is never set.
+Verify also says, with no rule written, when no state the invariants allow lets a command record an event; the rule
+adds that some sequence from nothing gets there. Reverse: delete the `sometimes` block of the model.
+
+### 2026-11-22 — the review's model, what keeps a rule from being taken out or weakened
+
+Question: what holds the rules, so that none is taken out or made to say less without it showing: the list of rule
+names written by hand in the tests, or the file the library's Verify keeps? Options: "The library's lock file";
+"Both"; "Keep the hand-written list". Answer: "The library's lock file". Rejected: "Both"; "Keep the hand-written
+list". The hand-written list was to go once the lock had been shown to refuse a rule that slipped.
+
+The answer came with the lock described as a file that keeps how each rule stands. It does not: on the pinned build
+(`lock: "./<Model>.lock.json"` on `Verify.report`) it is one file beside the test that keeps each rule's kind and
+its text. If that description is what he chose from, his answer rests on something that was wrong on that point; so
+the hand-written list, which does say how each rule stands, stays until he has answered what holds that.
+
+What the lock does, shown on the per-row model: an invariant made to say less ("says less than the rule locked",
+with the state that now passes), a rule taken out, a rule renamed, and a transition and a decision's rule whose text
+changed are each refused by name. It compares a rule's own text: only an aggregate's invariant is compared for what
+it says, any other rule whose text changed is refused whatever the change, and a rule made to allow more through a
+helper or a constant it calls passes, as does an invariant whose difference another invariant still covers. Under
+`CI` the file is never written, a rule it does not list fails, and `UPDATE_VERIFY_LOCK=1` is ignored; everything is
+proved and searched again first, the lock skips nothing. Outside CI a new rule is added to the file without a word,
+and `UPDATE_VERIFY_LOCK=1` locks every rule as it is written and passes, so that variable is never set to make a
+test pass.
+
+Not held by the lock, and not yet answered: whether a rule is still proved or has slipped to only searched. Verify's
+`require: { proved: [...] }`, one assertion that every rule but the few named as searched is proved, or the
+hand-written list as it is, each holds that. Reverse: delete the `lock` option and the file.
+
+### 2026-11-22 — the review's model, where its proofs run in CI
+
+Locally the proofs are part of `bun run check` and the search of the whole model part of `bun run check:full`.
+Question: where do they run in CI? Options: "Own job + nightly, no new infrastructure"; "Also replay from your
+remote cache"; "Full copy of beep-effect's tiers". Answer: "Own job + nightly, no new infrastructure". Rejected: the
+other two. The proofs and the search are each their own turbo task, whose inputs name what a result depends on: the
+model's files and the kernel files they import, the pinned library, the versions `bun.lock` resolves for the
+package (Effect, the solver, the parser), the file Verify locks the rules in, and the two variables Verify reads.
+CI's main job stops running them; a second job runs them, restoring turbo's results from the last run on `main`
+through GitHub's own cache and saving them only on `main`, so it proves nothing unless one of those changed. A
+nightly workflow runs everything with nothing replayed and opens or comments on one labelled issue when it fails;
+GitHub turns a schedule off after 60 days without a commit on a public repository, and turning it on again is done
+by hand. No secret, no remote cache. Not built yet: it goes in with the model. Reverse: put `prove` and the search
+back in the main job's command and delete the second job and the nightly workflow.
+
 ### 2026-11-22 — the check on GitHub's runner
 
 CI failed twice on code that had not changed: the CLI's start-up test, then two property tests of `@beep/xlsx`, each
@@ -1153,7 +1216,7 @@ three times in a row in 235, 208 and 276 s; two pinned cores, green in 298 s. No
 them. The slowest, five minutes, leaves about ten of the job's 15 for the install, the browser step and a runner
 slower than two pinned cores here. The runner itself has not run this yet: nothing is pushed.
 
-The concurrency, workers and limits were the agent's, not asked; the second try was put to him. Question, by dialog:
+The concurrency, workers and limits were not put to me; the second try was. Question, by dialog:
 the tests that wait in real time fail now and then under load and are tried again with no word, which can hide an
 intermittent fault in the review's save and confirm, and it is not a cure; what should happen to the retry? Options:
 "Retry for now, said aloud; remove after TestClock" (Recommended), "Remove it now", "Keep it as is". Answer: "Retry
@@ -1167,9 +1230,10 @@ trying a falsified property again. Reverse: the three lines in `.github/workflow
 `vitest.config.ts`, and `realTime` and `saidAloud` in the four that wait in real time.
 
 A limit above the shared one is set only with what was measured written beside it: the 2,000-run waited-rows property
-(180 s; 24 s alone on two pinned cores), the draft machine's four properties and its three seeded ones (120 s; 13 s the slowest seen), Steps'
-heaviest shapes (60 s; 9.7 s), the scratchpad's nested run (120 s) and the CLI's start-up (120 s: five starts, each
-stopped at 20 s). Limits set below the shared one were taken out, so the shared one applies: six test files had 10 s
+(180 s; 24 s alone on two pinned cores), the draft machine's four properties and its three seeded ones (120 s; 13 s
+the slowest seen), Steps' heaviest shapes (60 s; 9.7 s), the scratchpad's nested run (120 s) and the CLI's start-up
+(300 s: five starts, the slowest seen 19 s on the clock; no start is stopped by the clock, since 2026-11-22). Limits
+set below the shared one were taken out, so the shared one applies: six test files had 10 s
 or 20 s, the 50,000-row slow tests 60 s. The vendored kit and the scratchpad use the shared limits too; vendor sync
 writes them into the kit's configs.
 
@@ -1288,6 +1352,17 @@ These were not put to me:
 - **No law refuses private names** on this branch: only key-shaped strings are read for (`laws keys`), in the
   scratchpad as everywhere. Answer 3's "private names" has nothing to hold it yet.
 
+### 2026-11-22 — the scratchpad: a comment that hides a type error
+
+`scratch:check` refuses `@ts-nocheck` and any Effect diagnostic turned off outside the one line decision 33 of the
+Alchemy brief allows. I was asked: "In scratchpad experiments, `scratch:check` now refuses `@ts-nocheck` and any
+switched-off Effect diagnostic. Should it also refuse `@ts-ignore` and `@ts-expect-error`, which each hide one type
+error on the next line?" Options: "Refuse ignore, allow expect-error (Recommended)"; "Allow both"; "Refuse both".
+Answer: "Refuse ignore, allow expect-error". I chose; the agent recommended the same. `@ts-ignore` hides an error
+silently and keeps hiding it after the code is fixed, so `scratch:check` refuses it, in any capitals, in every file
+the scratchpad's type-check reads. `@ts-expect-error` stays: it is how an experiment shows that a wrong call does not
+compile, and it fails by itself once the error is gone.
+
 ### 2026-11-22 — dependencies: the catalog, Node's types, Better Auth, and sentences that record a check
 
 Four questions left open when `deps:update`, `version-sync` and `config-sync` were built, answered by dialog.
@@ -1316,6 +1391,127 @@ Four questions left open when `deps:update`, `version-sync` and `config-sync` we
 And: the scratchpad's lines in `CLAUDE.md` (the command table and the Layout) were written without my answer, as the
 commands of the request that made it.
 
+### 2026-11-22 — the review's model, a row decided after a group that is taken back
+
+A group is taken back; a row someone decided after the group, with the group in force over it, recorded that
+person's whole decision, the group's effect included. Today's review region would put back what the row held before
+the group, and lose the later decision. Answer: "Row 14 stays whole". The row keeps that person's whole decision,
+the group's effect included, and the screen names it. The model is right as it is; the review region's `act` is what
+changes, at the move that puts the review on the model. The fold's property names the difference in a test of its
+own, and compares the two only where one shared history has an answer. Reverse: a row's act over a group would have
+to record only what it changed, relative to the groups under it, and the fold would read it so.
+
+### 2026-11-22 — the review's model, a keep when a rival row is decided
+
+For when keeping one of two rows (the review's keep) is in a model; it is in none yet. Answer: a decision someone makes on a
+rival row wins over the keep, and two keeps of one SKU are both recorded and shown as a clash; no rival is left out
+against a decision made on it. Reverse: before that model exists, nothing to undo.
+
+### 2026-11-22 — the review's model, a waiting act when a group lands
+
+For the screen, at move 3. Answer: an act waiting on a row the group does not touch is sent again by itself; one on
+a row it touches is held and shown with both decisions. The model refuses either with `GroupedSince` and hands back
+no number; what the screen does next is this rule.
+
+### 2026-11-22 — the review's model, the lock, as built
+
+His answer stands: "The library's lock file", and the hand-written list of rule names goes once the lock was shown to
+catch a slipped rule. Shown on the one-unit model under `CI=true`: an invariant made to say less, a rule taken out, a
+rule renamed (the old name refused, the new one "not in" the file), and a decision's rule whose text changed are each
+refused by name. What the lock cannot catch, shown too: with a check removed from `UndoingGroup`'s `decide`, the rule
+it protects is only `checked`, nothing is undone, the report is verified, and the lock is silent, since the rule's
+text is unchanged. So the list is gone, and two assertions stay, each for one case the lock misses: every rule
+stands as its kind says (proved; checked for a model's invariant; reached for a `sometimes` rule), and every decision
+that records on a row or a group states the three rules about who may change it, held in each decision's proof and
+again over the whole model. This answers what the lock entry above left open, in his words:
+"if the lock alone can't catch something the list does, show me the case and keep one assertion for exactly that;
+otherwise remove the list." What the change costs: a rule taken out or renamed now fails only where the lock runs,
+the search of the whole model (`bun run check:full`, CI's proofs job), not `bun run check`. Reverse: put the lists
+back in `test/rules.ts`.
+
+### 2026-11-22 — the review's model, its long tests outside the loop check (not asked)
+
+The fold's property (76 to 85 seconds) leaves `bun run check`: it is the task `fold` of the catalog's web package,
+replayed by turbo until that package or what it reads changes, part of `check:full` and of CI's proofs job, not of
+CI's main job. The mutants of the model (148, ported from an earlier trial of it: 116 noticed by a proof, 32 by a
+story only, none by neither; 24 minutes four at a time on a busy workstation) are a task the nightly workflow runs
+whole, with a sample of nine (about 22 seconds) in
+`check:full` and in the proofs job, and every night in a job of its own. Not a decision of his: made while building
+the model, and his to reverse. Reverse: rename `ReviewModelFold.fold.test.ts` back to `ReviewModelFold.test.ts`, drop
+the two projects and the `fold` script of the web package, remove the `fold`, `mutants` and `mutants:sample` tasks
+from both `turbo.json` files and the model package's two scripts, and take them out of the root's `check:full`,
+`proofs` and `proofs:nightly` and of both workflows.
+
+### 2026-11-22 — the review's model, the lock and the library's list of what must stay proved
+
+The lock keeps each rule's text, not how it stands, so his first answer ("The library's lock file") left a rule that
+stops being proved unseen. Question, put again with that shown: what holds how each rule stands? Answer: "Lock plus
+the library's proved list". The lock catches a rule removed or reworded; Verify's `require: { proved }`, given a
+list of rule names, fails when a named rule is no longer proved. No hand-written assertions of ours. Built so: the
+list given to `require` is the lock's rules of the kinds a proof covers (an aggregate's invariant and transition, a
+decision's rule, a relation), 135, so the two never disagree. Shown under `CI=true`: with the check of
+`UndoingGroup` that refuses an undo behind a later group deleted, "UndoGroup.OnlyTheLastGroupInForceIsTakenBack is
+required to be proved, and is only checked"; with `DecideRow.AViewerChangesNoRow` taken out, both the list and the
+lock name it. `Prove.report` and `Prove.decisionReport` take no lock and no `require`, so each proof file keeps the
+smallest check of ours that fails when a rule stops being proved: every rule its report names is proved. The two
+assertions this replaces (every rule to its kind's standing; every decision on a row or a group states the three
+rules about who may change it) are gone; nothing now checks the second for a new decision. Reverse: drop `require`
+and put back the assertions of the entry above. The second came back the same day: see "whose act a decision
+records" below.
+
+### 2026-11-22 — the review's model, a press over a group that changes nothing
+
+A press on a row a group in force covers, that leaves the row reading as it already reads through the group. Before,
+the model recorded it as the sender's whole decision, the group's effect included, so the group's undo left that
+effect on the row. Answer: "No change, Ana's undo applies". Such a press is answered "no change" and recorded as
+nobody's; the group's undo then takes its effect off the row. `DecideRow` gains `asItReads`, the sender's word, like
+`covered`: on a covered row the act changes nothing when it leaves the row reading as it reads; on any other, when its
+text is what the row's own instance holds. Every rule that tested "no change" reads it through the same test. The
+story: Ana's group over twelve rows, Dana's press on row 14 that changes nothing records nothing, Ana takes the group
+back, and row 14 holds nothing; it fails with the old test put back. "Row 14 stays whole" holds only for a press that
+changed the row. All rules proved again: `DecideRow` at 176 paths, from 152. A mutant puts the old test back. Reverse:
+remove `asItReads` and test "no change" as `!covered && leavesAsItIs(...)` again.
+
+### 2026-11-22 — the review's model, a covered press from a screen that is behind
+
+A fault in the entry above, found on review: the covered "no change" was answered before the checks of what the
+sender saw (`saw`) and of the matching. A press from a screen that is behind was then lost as "no change": Ana's group
+leaves row 14 out, Dana types 8 on row 14, and Carl, whose screen has the group and not Dana's 8, presses "leave out"
+there. On his screen the row reads as his press leaves it, so he sends `covered` and `asItReads`, and the model
+answered "no change" over a decision he never saw. His answer on a press that met another's decision stands: "Same:
+hold, show both". Now the press that leaves the row's own instance as it is, with no group over it, is still no change
+whatever the sender saw; the covered one is no change only after `saw` and the matching pass, so Carl's is refused
+with Dana's decision and his screen holds it beside hers. The rules that a decision is replaced only by an act that
+saw it, and that an act is made on the matching now, excuse only the first kind. The story is Carl's, and it is the
+only thing that holds the order: it fails with the covered answer put before `saw` (a mutant does that), and no rule
+can, since a rule is checked only on a path that records and "no change" records nothing.
+
+How the `decide` is written matters to the prover. With the uncovered answer first, then the checks, then
+`cmd.covered && cmd.asItReads`, the relation "a row belongs to its import's organization" was no longer proved across
+`DecideRow`: past 4,096 paths, and `verify` failed on it. The prover takes both sides of `covered` each time the code
+asks it. So `covered` is asked once and each side makes its own checks of `saw` and the matching, in the same order
+for the person; each of those checks has its own mutant (154 in all). `DecideRow` at 284 paths in its own proof, from
+176; the lock was written again on purpose for the two rules' new text. Reverse: answer the covered "no change" with
+the other one, before `saw`, and accept that such a press is lost.
+
+### 2026-11-22 — the review's model, whose act a decision records, held by a check of ours again
+
+The check that every decision recording on a row or a group states the three rules about who may change it
+(`missingRules`, in each decision's proof) is back. "No hand-written assertions" was about asserting how each rule
+stands, which the lock and `require.proved` do; this check guards what the library does not. A row and a group have no
+command and so no middleware of their own: a decision that records on one, adoption's when it comes included, says
+whose act it records only by stating those rules, and without them it would lock and prove and let anyone change the
+row. Reverse: drop `missingRules` from `test/proving.ts` and the four proofs.
+
+### 2026-11-22 — the screen at move 3: an undo waiting when a group lands, and a keep's rivals
+
+For the screen, not the model. His answers: "a waiting undo on a row a landing group doesn't
+touch is sent again by itself; and for a keep, a rival with only accepted fixes is left out, as today, while one
+someone kept or edited makes a clash." The first adds the undo to the entry "a waiting act when a group lands". The
+second refines the entry "a keep when a rival row is decided": accepting a fix on a rival row is not "a decision made
+on it" that wins over the keep; keeping it or editing it is. Reverse: a rival with accepted fixes makes a clash too,
+as the earlier entry reads on its own; a waiting undo is held like a waiting act.
+
 ### 2026-11-22 — the scratchpad: its install
 
 The scratchpad was built as a workspace of the root, so the root's install, on CI and in every deploy, installed what
@@ -1338,7 +1534,7 @@ untouched.
    recommended the same. bun writes `scratchpad/bun.lock` with the first library; `scratch:check` asks for it once
    the scratchpad lists one.
 
-The agent chose, and I was not asked: the Verify template takes the prover from the root's install (a library of the
+This was not put to me: the Verify template takes the prover from the root's install (a library of the
 scratchpad would be a second Effect), so it works once a package asks for `@alchemy.run/domain`, and until then
 `scratch:new` says so.
 
@@ -1368,7 +1564,7 @@ staging after CI passes on `main`, and production only from a `v*` tag whose com
 behind the `production` environment; the previews are unchanged. Reverse: production on a push to `main` again in
 `deploy.yml`, and the `staging` stage out of the stage plan.
 
-The agent chose these, and I was not asked:
+These were not put to me:
 
 - The approval stays as code. The `production` environment and its reviewer are already made by the repository's
   stack (`packages/infra/src/GitHub.stack.ts`, decision I7), so nothing is clicked in GitHub's settings: the stack
@@ -1383,6 +1579,39 @@ The agent chose these, and I was not asked:
 - The release notes are the conventional commits since the last tag, grouped by type, written to `CHANGELOG.md` and
   into the annotated tag's message. The app's version is `apps/inventory/package.json`; the "(v0.6.1)" in
   `README.md` names the version that was submitted and is never moved.
+
+Changed later on 2026-11-22, and not put to me:
+
+- "Main" in every release rule is `origin/main`, fetched by the command itself, never the local `main`; a release is
+  cut only from `main` exactly where the remote's is. A fetch that fails stops the release.
+- A patch refuses a merge commit and a branch that does not hold its line's last tag. `release verify` holds every
+  rule again on the tagged commit (a release commit, over commits main holds), and refuses when git cannot answer.
+- The release commit also moves `bun.lock`'s copy of the version. `CHANGELOG.md` and the version stay on release
+  branches only; a new line's changelog starts from the last release's. `main`'s version file is not moved by a
+  release. Whether `main` should carry either is mine to change.
+- Staging deploys only `main`'s head, so a check run again for an older commit never puts it back.
+- Each deploy job waits in its own group, one for each release tag.
+- A test that was tried again after a hang or a falsified property fails the run, even if a later try passed: the
+  reporter reads every error of every try, which vitest's retry condition cannot.
+
+After that review I was asked three questions by dialog, on 2026-11-22:
+
+1. Where production's gate lives. GitHub's `production` environment named no branch or tag, so the rule "only from
+   a release tag" lived in the workflow file the tagged commit itself brings. Answer: "After CI on the release
+   branch (Recommended)". I chose; the agent recommended the same. Production starts when CI passes on a push to
+   `release/**` whose head commit carries its annotated `v*` tag. GitHub runs `main`'s copy of the workflow and of
+   the tag check for that, the `production` environment gets its `main`-only rule back, and I push branch and tag
+   together: `git push --atomic origin release/0.7 v0.7.0`. A tag pushed alone starts nothing. My approval stays.
+   Rejected: a push to `release/**` as the trigger with a `release/*` rule and admin-only release branches; leaving
+   it as it was with the approval as the only gate. This rests on GitHub's documented `workflow_run` behaviour and
+   is not verified on GitHub: the first real release is where it is.
+2. Staging's Cloudflare credentials. Answer: "Keep sharing, say so (Recommended)". I chose; the agent recommended
+   the same. Staging keeps the previews' account and token, and the code and the documents say plainly that a
+   pushed branch can reach staging. Rejected: a third account for staging; a required reviewer on `preview`.
+3. A fix that needed edits when it was cherry-picked. Answer: "Accept, and name it (Recommended)". I chose; the agent
+   recommended the same. A commit whose change differs from main's counts when its `git cherry-pick -x` line names
+   a commit that is on `origin/main`; the release's output, its notes and its tag message list it under "Picked
+   with changes". No flag. Rejected: always refusing it; accepting it only behind a flag.
 
 ### 2026-11-22 — atoms A1, the kit too
 

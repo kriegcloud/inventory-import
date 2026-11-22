@@ -375,9 +375,13 @@ D1 binding without passing `env.DB` by hand.
 - The package: `@alchemy.run/better-auth@2.0.0-beta.87`, whose published manifest asks for `alchemy` exactly
   `2.0.0-beta.87`, `better-auth` `^1.7.5` and `effect` `^4.1.4` (required), and, optional, `@alchemy.run/cloudflare`
   exactly `2.0.0-beta.87`, `kysely` `^0.29.4`, `drizzle-orm` `1.0.0-rc.5`, `pg` `^8.22.0`, `mysql2` `^3.24.2` and the
-  rest; its one dependency is `@alchemy.run/sql` `2.0.0-beta.87` (read from the npm registry). The app's installed
-  `better-auth` 1.7.22, `effect` 4.1.4, `alchemy` and `@alchemy.run/cloudflare` 2.0.0-beta.87 and `kysely` 0.29.9 all
-  satisfy it. Also the `nodejs_compat` flag and an Alchemy `Cloudflare.Worker` host.
+  rest; its one dependency is `@alchemy.run/sql` `2.0.0-beta.87` (read from the npm registry). The app's lockfile has
+  `better-auth` 1.7.22, `effect` 4.1.5 and `kysely` 0.29.9, which satisfy it; its `alchemy` and
+  `@alchemy.run/cloudflare` are the pin's files, `2.0.0-beta.87-734c27a` (`packages/infra/package.json`, the root
+  `overrides`), which do not satisfy an exact `2.0.0-beta.87`, and the root `overrides` send `@alchemy.run/sql` to the
+  pin's file too. So the published package does not fit the pin as it stands: the package built at the pin would be needed,
+  and the pin does not hold it (`vendor/alchemy`; the brief, decision 1). Not run. Also the `nodejs_compat` flag and an
+  Alchemy `Cloudflare.Worker` host.
 
 ## Verdict
 

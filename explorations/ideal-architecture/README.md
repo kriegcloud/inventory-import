@@ -130,4 +130,5 @@ Each step ends with the full check and an import of the messy sample in a browse
 - 2026-11-19: Benjamin reversed "core": the app uses `@alchemy.run/domain`, all of it. The reading, the trials and
   the brief are the packet [alchemy-domain](../alchemy-domain/README.md); how each part and each extra he marked as
   wanted is used was then open there. Nothing of it was built that day; since 2026-11-22 the library's pin is on
-  main, and the rest of the build starts after he signs that brief (the atoms goal, the other condition, is merged).
+  main and the review's model of move 1 is built on it and merged into main (`0c4c5e5`, not yet on the public remote);
+  the rest of the build starts after he signs it (the atoms goal, the other condition, is merged).

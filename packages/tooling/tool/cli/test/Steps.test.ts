@@ -301,6 +301,7 @@ describe("a law ends on any file within its budget, judged or refused in words",
   })
 
   // The shapes slowest to read at the ceiling: each ends within it, refused in words.
+  // 9.7 s on two pinned cores alone, above the shared 30 s once the rest of the check runs beside it: 60 s.
   it("the heaviest shapes at a million characters end within the ceiling", () => {
     const heaviest: ReadonlyArray<readonly ["tags" | "refs", Shape | undefined, number]> = [
       ["refs", refShapes["names assigned to each other"], 285],
@@ -339,7 +340,7 @@ describe("the shapes an ordinary file is made of are judged, not refused", () =>
       for (const n of [100, 1000]) expect(shape === undefined || refsRead(shape(n)).unread).toBe(false)
       expect(shape === undefined || refsRead(shape(10_000)).unread).toBe(true)
     }
-  }, 10_000)
+  })
 
   it("the refs law: a record a function writes into at ten thousand keys, read at another", () => {
     const writes = pieces(10_000, (index) => `big.k${index} = f; `)

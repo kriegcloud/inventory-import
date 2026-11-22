@@ -992,6 +992,8 @@ const play = (picks: typeof Picks.Type, may: Play): void => {
 // over the runs and a list is at least 30 long, so about the first half of the runs play 30 picks and the longest
 // come last. A run ends early when nothing is enabled any more. The seed is new on every run: a failure is printed
 // under its shortest ordering, which plays it again.
+// Each of the four takes 4 to 12 s in the full check (12 s the slowest seen, on four pinned cores), against the
+// shared 30 s: 120 s is ten times that.
 describe("the review's draft, whatever order things happen in", () => {
   it.prop(
     "sends only the person's own rows, never runs ahead of the server, never shows the region another thing than the draft, and waits for nothing it was not told is coming",

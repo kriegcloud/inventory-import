@@ -572,6 +572,6 @@ describe("a closed tab's entry taken up, whatever each tab held", () => {
         entryLeft = keptForm(waiting(moves(after, server, tab.after)))
       }
     },
-    { timeout: 120_000, arbitrary: { runs: 5000, size: 40 } }
+    { arbitrary: { runs: 5000, size: 40 } }
   )
 })

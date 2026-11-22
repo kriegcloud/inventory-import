@@ -85,6 +85,8 @@ describe("the scratchpad's templates", () => {
           said: ""
         })
       }),
-    600_000
+    // A nested vitest and type-check over the scratchpad: 1.2 s alone on two pinned cores when warm, far more when
+    // cold beside the rest of the check. 120 s is the shared limit of a slow test; a hang fails inside the job.
+    120_000
   )
 })

@@ -1,6 +1,20 @@
 {
-  // The development scripts, for the linter that reads types (`bun run beep laws deprecated-apis`): nothing compiles them.
+  // The development scripts' project. The app's `check` type-checks it (tsconfig.json references it), so an import
+  // that stops resolving is an error here and cannot hide a deprecated call behind a type nobody knows
+  // (`bun run beep laws deprecated-apis` reads these types). The scripts are plain JavaScript run by Node: they are
+  // checked for what resolves and what fits, not held to the Effect rules (`plugins` is empty, parameters may be
+  // untyped), as before. reachable-sources.mjs is named in `files` because its .d.mts would otherwise stand in for it.
   "extends": "../tsconfig.base.json",
-  "compilerOptions": { "lib": ["ESNext"], "types": ["node"], "module": "nodenext", "allowJs": true },
+  "compilerOptions": {
+    "tsBuildInfoFile": "../node_modules/.tmp/tsconfig.scripts.tsbuildinfo",
+    "lib": ["ESNext"],
+    "types": ["node"],
+    "module": "nodenext",
+    "allowJs": true,
+    "checkJs": true,
+    "noImplicitAny": false,
+    "plugins": []
+  },
+  "files": ["reachable-sources.mjs"],
   "include": ["."]
 }

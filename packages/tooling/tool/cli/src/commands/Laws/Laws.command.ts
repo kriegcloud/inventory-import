@@ -33,10 +33,10 @@ export const screensCommand = Command.make("screens", {}, () => Effect.flatMap(s
   Command.withDescription("Every package with screens is in both lists the stylesheet is built from")
 )
 
-/** `laws deprecated-apis`: no deprecated API is used, in any code file git would commit. */
+/** `laws deprecated-apis`: no deprecated API is used, in any code file git would commit outside `.agents`. */
 export const deprecatedApisCommand = Command.make("deprecated-apis", {}, () =>
   Effect.flatMap(deprecatedApis(), emit(deprecatedApisSentence))
-).pipe(Command.withDescription("No deprecated API is used, in any code file git would commit"))
+).pipe(Command.withDescription("No deprecated API is used, in any code file git would commit outside .agents"))
 
 /** `laws keys`: no key-shaped string in any file git would commit. */
 export const keysCommand = Command.make("keys", {}, () => Effect.flatMap(keys(), emit(keysSentence))).pipe(

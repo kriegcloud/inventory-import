@@ -2,7 +2,8 @@
   // Which project owns a file its package's own tsconfig.json leaves out: the tests (each package's
   // tsconfig.test.json), and the configuration files (tsconfig.config.json). Nothing compiles this file; an editor and
   // the linter that reads types (`bun run beep laws deprecated-apis`) find their project through it. A new package adds
-  // its tsconfig.test.json here: `bun run deprecated:check` names the files that have no project.
+  // its tsconfig.test.json here: `bun run deprecated:check` names the files that have no project. Each package's `check`
+  // type-checks its test project, and `bun run configs:check` type-checks tsconfig.config.json.
   "files": [],
   "references": [
     { "path": "./tsconfig.config.json" },

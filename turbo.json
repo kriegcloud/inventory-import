@@ -120,37 +120,50 @@
     },
     // No deprecated API is used (`beep laws deprecated-apis`), read from every file's types: a new `@deprecated` in one
     // file, in a tsconfig's reach or in an installed package changes the answer for a file that did not change. So every
-    // code file, tsconfig and manifest is an input, and what is installed: the lockfile, and each installed package's
-    // own manifest, so an install that has fallen behind the lockfile is not answered from one that had not.
+    // code file git would commit is an input, wherever it is, with every tsconfig and manifest, and what is installed:
+    // the lockfile, which names the version of every installed package, nested ones included, and the manifest of each
+    // package installed at the top of node_modules, so an install there that has fallen behind the lockfile is not
+    // answered from one that had not. A nested node_modules folder is hashed through the lockfile only.
     "//#deprecated:check": {
       "inputs": [
         ".oxlintrc.deprecated-apis.json",
         ".gitignore",
-        "tsconfig*.json",
-        "*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
-        "apps/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
-        "apps/**/tsconfig*.json",
-        "apps/**/package.json",
-        "packages/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
-        "packages/**/tsconfig*.json",
-        "packages/**/package.json",
-        "!apps/**/{node_modules,dist,.wrangler}/**",
-        "!packages/**/{node_modules,dist}/**",
-        "package.json",
+        "**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+        "**/tsconfig*.json",
+        "**/package.json",
+        "!**/{node_modules,dist,.wrangler,.turbo}/**",
         "bun.lock",
         "node_modules/*/package.json",
         "node_modules/@*/*/package.json"
       ],
       "outputs": []
     },
-    // Its tests run that law with the root's own profile and the installed packages.
+    // The root's own .ts files and each package's vitest.config.ts type-check (tsconfig.config.json). Only the linter
+    // above reads that project otherwise, and an import that does not resolve there would hide a deprecated call.
+    "//#configs:check": {
+      "inputs": [
+        "tsconfig.config.json",
+        "tsconfig.base.json",
+        "*.ts",
+        "packages/**/*.{ts,tsx}",
+        "packages/**/package.json",
+        "!packages/**/{node_modules,dist}/**",
+        "package.json",
+        "bun.lock"
+      ],
+      "outputs": []
+    },
+    // Its tests run that law with the root's own profile and the installed packages, whose deprecation notes they
+    // expect word for word: the same installed manifests are inputs here.
     "@beep/repo-cli#test": {
       "dependsOn": ["transit"],
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/.oxlintrc.deprecated-apis.json",
         "$TURBO_ROOT$/bun.lock",
-        "$TURBO_ROOT$/package.json"
+        "$TURBO_ROOT$/package.json",
+        "$TURBO_ROOT$/node_modules/*/package.json",
+        "$TURBO_ROOT$/node_modules/@*/*/package.json"
       ],
       "outputs": []
     },

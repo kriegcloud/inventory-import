@@ -65,11 +65,19 @@ members<DeprecatedApisFinding>("laws deprecated-apis", DeprecatedApisFinding, de
   ],
   Unread: [
     DeprecatedApisFinding.cases.Unread.make({ listed: 2, read: 1 }),
-    "err: deprecated:check FAIL  oxlint read 1 of 2 files: .oxlintrc.deprecated-apis.json leaves none out (no ignorePatterns)"
+    "err: deprecated:check FAIL  oxlint read 1 of the 2 files it was handed: none may be passed over"
   ],
   Unowned: [
     DeprecatedApisFinding.cases.Unowned.make({ file: "packages/a/test/a.test.ts" }),
-    "err: deprecated:check FAIL  packages/a/test/a.test.ts is in no tsconfig, so it is read without its package's types: include it in one the root tsconfig.json references"
+    "err: deprecated:check FAIL  packages/a/test/a.test.ts is in no tsconfig, so it is read without its package's types: include it in one the nearest tsconfig.json above it references, or the root's"
+  ],
+  Loosened: [
+    DeprecatedApisFinding.cases.Loosened.make({ why: 'Unexpected key with value [] at ["overrides"]' }),
+    'err: deprecated:check FAIL  .oxlintrc.deprecated-apis.json must be the one rule as an error and nothing else (no overrides, ignorePatterns or extends), so nothing was checked: Unexpected key with value [] at ["overrides"]'
+  ],
+  Silenced: [
+    DeprecatedApisFinding.cases.Silenced.make({ place: "a.ts:3", directive: "oxlint-disable-next-line" }),
+    "err: deprecated:check FAIL  a.ts:3 turns the rule off (oxlint-disable-next-line): no comment does. Move to what the note names"
   ]
 })
 

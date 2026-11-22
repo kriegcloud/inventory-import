@@ -37,7 +37,7 @@ export function reachableSources(input) {
   const pending = [resolve(entry)]
   while (pending.length > 0) {
     const file = pending.pop()
-    if (seen.has(file)) continue
+    if (file === undefined || seen.has(file)) continue
     seen.add(file)
     const text = readFileSync(file, "utf8")
     for (const match of text.matchAll(specifiers)) {

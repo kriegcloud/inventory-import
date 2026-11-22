@@ -3,11 +3,17 @@
  * overload, property or prop. The rule is oxlint's `typescript/no-deprecated`, which reads each file's types, in the
  * profile beep-effect runs it in (`.oxlintrc.deprecated-apis.json`): one rule, an error, on the same engine (`tsrs-lint`).
  *
- * What the law adds is that nothing is left unread. oxlint passes over a file its config ignores without a word, and
- * a file no tsconfig includes is read without its package's types (no Node types, so a deprecated `node:url` function
- * passes). So the law hands oxlint every code file git would commit, and fails when oxlint read fewer; and it asks
- * `tsgolint` (the linter `tsrs-lint` is a port of, and the one that says it) which project each file has, and fails on
- * a TypeScript file that has none. A plain .js or .mjs file may have none: its package's types are then unknown to it.
+ * What the law adds is that nothing is left unread and nothing is turned off. oxlint passes over a file its config
+ * ignores, drops a finding a comment or an `overrides` entry turns off, and reads a file no tsconfig includes without
+ * its package's types (no Node types, so a deprecated `node:url` function passes), each without a word. So the law:
+ *
+ * - refuses a profile that is anything but the one rule as an error (no `overrides`, `ignorePatterns` or `extends`);
+ * - hands oxlint every code file git would commit, wherever it is, and fails when oxlint read fewer;
+ * - refuses a comment in one of them that turns the rule off, by name or by naming no rule;
+ * - asks `tsgolint` (the linter `tsrs-lint` is a port of, and the one that says it) which project each file has, and
+ *   fails on a file that has none, JavaScript included.
+ *
+ * One folder is left out, by name: `.agents/`, other people's skills vendored as they were published (`leftOut`).
  *
  * "Every file git would commit" is git's answer to give, so this asks git, and fails when git does not answer.
  *
@@ -28,10 +34,43 @@ const $I = $RepoCliId.create("commands/Laws/DeprecatedApis.rules")
 /** The profile, from the root. */
 const profile = ".oxlintrc.deprecated-apis.json"
 
-/** Every code file under the workspaces and at the root, each a glob pathspec. Built files are not git's to commit. */
-const code = A.flatMap(["", "apps/**/", "packages/**/"], (folder) =>
-  A.map(["ts", "tsx", "mts", "cts", "js", "jsx", "mjs", "cjs"], (extension) => `:(glob)${folder}*.${extension}`)
-)
+/** A code file, by its name: TypeScript or JavaScript, wherever it is. */
+const isCode = (file: string) => Str.match(/\.[cm]?[jt]sx?$/)(file).pipe(O.isSome)
+
+/**
+ * The folders that are not read, each from the root with its closing slash. `.agents/` holds other people's skills,
+ * vendored as they were published and never run by the app or its checks; one of them reads deprecated CSS properties
+ * on purpose, to report a page that uses them. Anything else git would commit is read, a new folder included.
+ */
+const leftOut: ReadonlyArray<string> = [".agents/"]
+
+/** The profile as it must be: the one rule, an error, and nothing that turns it off or leaves a file out. */
+const Profile = S.Struct({
+  $schema: S.optionalKey(S.String).pipe(S.annotateKey({ description: "oxlint's own schema, for an editor" })),
+  plugins: S.Tuple([S.Literal("typescript")]).pipe(S.annotateKey({ description: "The one plugin the rule is in" })),
+  options: S.Struct({
+    typeAware: S.Literal(true).pipe(S.annotateKey({ description: "The rule reads types" }))
+  }).pipe(S.annotateKey({ description: "How oxlint runs" })),
+  categories: S.Record(S.String, S.Literal("off")).pipe(
+    S.annotateKey({ description: "Every category of other rules, off" })
+  ),
+  rules: S.Struct({
+    "typescript/no-deprecated": S.Literal("error").pipe(S.annotateKey({ description: "The rule, as an error" }))
+  }).pipe(S.annotateKey({ description: "The one rule" }))
+}).pipe($I.annoteSchema("Profile", { description: "The deprecated-API profile: one rule, an error, no exception" }))
+
+const readProfile = S.decodeEffect(S.fromJsonString(Profile), { onExcessProperty: "error", errors: "all" })
+
+/** A comment that turns rules off: `oxlint-disable` or `eslint-disable`, for a line, the next one or the file. */
+const directive = /(?:\/\/|\/\*)\s*((?:oxlint|eslint)-disable(?:-next-line|-line)?)(?![\w-])([^\r\n]*)/g
+
+/** The rules a directive names: what follows it, up to its reason (` -- `) or the comment's end. */
+const namedRules = (rest: string) =>
+  A.filter(Str.split(/[\s,]+/)(`${Str.split(/\*\/|\s--\s/)(rest)[0]}`), (name) => Str.isNonEmpty(name) && name !== "--")
+
+/** Whether a directive turns this rule off: it names it, under any plugin's spelling, or names no rule at all. */
+const silences = (rules: ReadonlyArray<string>) =>
+  A.isReadonlyArrayEmpty(rules) || A.some(rules, (name) => Str.match(/(?:^|\/)no-deprecated$/)(name).pipe(O.isSome))
 
 /**
  * What `laws deprecated-apis` finds: nothing, or each use; and what keeps it from being sure.
@@ -53,7 +92,14 @@ export const DeprecatedApisFinding = S.TaggedUnion({
     read: S.Int.pipe(S.annotateKey({ description: "How many of them oxlint read" }))
   },
   Unowned: {
-    file: S.String.pipe(S.annotateKey({ description: "A TypeScript file no tsconfig includes, from the root" }))
+    file: S.String.pipe(S.annotateKey({ description: "A code file no tsconfig includes, from the root" }))
+  },
+  Loosened: {
+    why: S.String.pipe(S.annotateKey({ description: "Where the profile is not the one rule as an error" }))
+  },
+  Silenced: {
+    place: S.String.pipe(S.annotateKey({ description: "The file and line of the comment, as file:line" })),
+    directive: S.String.pipe(S.annotateKey({ description: "The comment's directive, as written" }))
   }
 }).pipe(
   $I.annoteSchema("DeprecatedApisFinding", {
@@ -81,11 +127,17 @@ export const deprecatedApisSentence: (finding: DeprecatedApisFinding) => Line = 
   At: ({ note, place }) => err(`${place}  ${note}`),
   Unlisted: ({ why }) => fail(`git could not list the files, so none was checked: ${why}`),
   Unread: ({ listed, read }) =>
-    fail(`oxlint read ${read} of ${listed} files: ${profile} leaves none out (no ignorePatterns)`),
+    fail(`oxlint read ${read} of the ${listed} files it was handed: none may be passed over`),
   Unowned: ({ file }) =>
     fail(
-      `${file} is in no tsconfig, so it is read without its package's types: include it in one the root tsconfig.json references`
-    )
+      `${file} is in no tsconfig, so it is read without its package's types: include it in one the nearest tsconfig.json above it references, or the root's`
+    ),
+  Loosened: ({ why }) =>
+    fail(
+      `${profile} must be the one rule as an error and nothing else (no overrides, ignorePatterns or extends), so nothing was checked: ${why}`
+    ),
+  Silenced: ({ directive: written, place }) =>
+    fail(`${place} turns the rule off (${written}): no comment does. Move to what the note names`)
 })
 
 /** oxlint's JSON report: what it found, and how many files it read. */
@@ -115,8 +167,6 @@ const OwnersRequest = S.Struct({
 const asRequest = S.encodeEffect(S.fromJsonString(OwnersRequest))
 const readReport = S.decodeEffect(S.fromJsonString(OxlintReport))
 
-const isTypeScript = (file: string) => Str.match(/\.[cm]?tsx?$/)(file).pipe(O.isSome)
-
 /** A note as one line: its own line breaks and double spaces are the source comment's. */
 const oneLine = (note: string) => Str.trim(Str.replace(/\s+/g, " ")(note))
 
@@ -127,28 +177,41 @@ const oneLine = (note: string) => Str.trim(Str.replace(/\s+/g, " ")(note))
  */
 export const deprecatedApis = Effect.fn("DeprecatedApis.deprecatedApis")(function* () {
   const repo = yield* Repo
+  // The profile first: one that leaves a file out or turns the rule off answers nothing about the files.
+  const written = yield* repo.text(repo.join(repo.root, profile))
+  const loosened = yield* readProfile(written).pipe(
+    Effect.as(O.none<string>()),
+    Effect.catch((cause) => Effect.succeedSome(oneLine(cause.message)))
+  )
+  if (O.isSome(loosened)) {
+    return A.of<DeprecatedApisFinding>(DeprecatedApisFinding.cases.Loosened.make({ why: loosened.value }))
+  }
+  // Every file, each ended by a zero byte: with no `-z` git quotes a name that has a letter outside ASCII, and a
+  // quoted name is no file. No pathspec either: a code file in a folder nobody thought of is still listed.
   const listed = yield* repo.run("git", [
     "ls-files",
+    "-z",
     "--cached",
     "--others",
     "--exclude-standard",
-    "--deduplicate",
-    "--",
-    ...code
+    "--deduplicate"
   ])
   // A list git could not give is not an empty list: nothing was checked, and the law says so.
   if (listed.code !== 0) {
     return A.of<DeprecatedApisFinding>(DeprecatedApisFinding.cases.Unlisted.make({ why: Str.trim(listed.stderr) }))
   }
   const files = yield* Effect.filter(
-    A.filter(Str.split("\n")(listed.stdout), Str.isNonEmpty),
+    A.filter(
+      Str.split("\0")(listed.stdout),
+      (file) => isCode(file) && !A.some(leftOut, (folder) => Str.startsWith(folder)(file))
+    ),
     (file) => repo.exists(repo.join(repo.root, file)),
     { concurrency: 1 }
   )
   const tool = (name: string) => repo.join(repo.root, "node_modules", ".bin", name)
   const owners = tool("tsgolint")
 
-  /** The TypeScript files with no project, by the summary `tsgolint` logs: no summary is not an empty one. */
+  /** The files with no project, by the summary `tsgolint` logs: no summary is not an empty one. */
   const unowned = Effect.gen(function* () {
     const request = yield* asRequest({
       version: 2,
@@ -167,7 +230,7 @@ export const deprecatedApis = Effect.fn("DeprecatedApis.deprecatedApis")(functio
         message: `${owners} did not say which project each file has, so no file is known to be read with its types: ${Str.takeLeft(400)(Str.trim(answer.stderr))}`
       })
     }
-    return A.filter(named, isTypeScript)
+    return named
   })
 
   /** What oxlint found and how many files it read. It exits 1 when it found something; its report is still there. */
@@ -188,7 +251,29 @@ export const deprecatedApis = Effect.fn("DeprecatedApis.deprecatedApis")(functio
     )
   })
 
-  const [orphans, report] = yield* Effect.all([unowned, linted], { concurrency: "unbounded" })
+  /** Each comment that turns the rule off, in the files oxlint is handed: it would drop the finding without a word. */
+  const silenced = Effect.map(
+    Effect.forEach(
+      files,
+      (file) =>
+        Effect.map(repo.text(repo.join(repo.root, file)), (text) =>
+          A.flatMap(A.fromIterable(Str.matchAll(directive)(text)), (found) =>
+            silences(namedRules(`${found[2]}`))
+              ? A.of<DeprecatedApisFinding>(
+                  DeprecatedApisFinding.cases.Silenced.make({
+                    place: `${file}:${A.length(Str.split("\n")(Str.slice(0, found.index)(text)))}`,
+                    directive: `${found[1]}`
+                  })
+                )
+              : A.empty<DeprecatedApisFinding>()
+          )
+        ),
+      { concurrency: 16 }
+    ),
+    A.flatten
+  )
+
+  const [orphans, report, comments] = yield* Effect.all([unowned, linted, silenced], { concurrency: "unbounded" })
   const unread =
     report.number_of_files === A.length(files)
       ? A.empty<DeprecatedApisFinding>()
@@ -206,6 +291,7 @@ export const deprecatedApis = Effect.fn("DeprecatedApis.deprecatedApis")(functio
   )
   const problems = A.flatten<ReadonlyArray<ReadonlyArray<DeprecatedApisFinding>>>([
     unread,
+    comments,
     A.map(orphans, (file) => DeprecatedApisFinding.cases.Unowned.make({ file })),
     A.isReadonlyArrayNonEmpty(uses) ? [DeprecatedApisFinding.cases.Refused.make({}), ...uses] : []
   ])

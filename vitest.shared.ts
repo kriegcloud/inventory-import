@@ -17,3 +17,15 @@ export const limits = { testTimeout: 30_000, hookTimeout: 60_000 } as const
 
 /** The limits of a slow test (`*.slow.test.ts`: a real database, sign-in, or 50,000 rows). */
 export const slowLimits = { testTimeout: 120_000, hookTimeout: 120_000 } as const
+
+/**
+ * For a package whose tests wait in real time (`Effect.sleep("20 millis")`, then look): a wait that runs long on a
+ * busy machine lets the next timer of the code under test fire first, and the test fails on code that is right.
+ * Measured with the check pinned to four cores, two runs of three failed that way, each on another test. So such a
+ * test is tried again, three times at most, half a second apart. This hides a test that fails only now and then, and the reporter does not say
+ * a test was tried again: the cure is to move those tests onto `TestClock`, and this goes when they are.
+ *
+ * A property that was falsified is never tried again: a second try draws other values and would hide a
+ * counterexample that is real.
+ */
+export const realTime = { retry: { count: 3, delay: 500, condition: /^(?![\s\S]*Property falsified)/ } } as const

@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url"
 import { configDefaults, defineConfig } from "vitest/config"
-import { limits, slowLimits } from "../../vitest.shared.ts"
+import { limits, realTime, slowLimits } from "../../vitest.shared.ts"
 
 // Unit tests run in Node, without the Cloudflare plugin: they cover the domain and
 // services through their Effect interfaces. The running app is checked in workerd by `bun run dev`.
@@ -21,7 +21,8 @@ export default defineConfig({
           name: "fast",
           include: ["test/**/*.test.ts"],
           exclude: [...configDefaults.exclude, ...slow],
-          ...limits
+          ...limits,
+          ...realTime
         }
       },
       // The slow tests' own limits: sign-in hashes passwords, a busy machine slows workerd down, and a save of

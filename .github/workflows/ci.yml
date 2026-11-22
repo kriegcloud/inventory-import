@@ -38,3 +38,54 @@ jobs:
           bun run --cwd apps/inventory grid:keys
         env:
           CHROME_PATH: /usr/bin/google-chrome
+
+  # The proofs of the review's model and the search of the whole model, apart from the job above: minutes when they
+  # run, and they run only when something a result depends on changed (the model's files, the kernel it imports
+  # from, the pinned library, the versions the lockfile resolves for it). Turbo's results come back from the last
+  # run on main through GitHub's cache and are saved only on main, so a pull request that leaves the model alone
+  # replays them in seconds. A night's run proves everything again (proofs-nightly.yml).
+  proofs:
+    name: Proofs and search of the model
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      # The key is made of turbo's own hashes of the tasks, asked for without running them. So an exact hit means
+      # turbo will replay every one, and there is nothing new to keep; any other run starts from the newest results
+      # kept on main and proves what changed.
+      - name: Ask turbo what the results are filed under
+        id: filed
+        run: |
+          bunx turbo run prove verify --dry=json > "$RUNNER_TEMP/proofs.json"
+          node -e '
+            const { tasks } = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"))
+            const real = tasks.filter((task) => task.command !== "<NONEXISTENT>")
+            if (real.length === 0) throw new Error("no package has a prove or a verify task")
+            console.log("key=proofs-" + real.map((task) => task.hash).join("-"))
+          ' "$RUNNER_TEMP/proofs.json" >> "$GITHUB_OUTPUT"
+      - name: Bring back the results kept on main
+        id: results
+        uses: actions/cache/restore@v6
+        with:
+          path: .turbo/cache
+          key: ${{ steps.filed.outputs.key }}
+          restore-keys: |
+            proofs-
+      # Two tasks at a time and no more: the runner has four cores and each proof file starts its own solver.
+      - name: Prove and search
+        run: bunx turbo run prove verify --cache-dir=.turbo/cache --concurrency=2 --summarize
+      # Only what passed is kept (a failed step ends the job before this one), only from main, and only when the
+      # results are new.
+      - name: Keep the results for later runs
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.results.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: .turbo/cache
+          key: ${{ steps.filed.outputs.key }}

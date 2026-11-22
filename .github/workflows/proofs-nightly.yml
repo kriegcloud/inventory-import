@@ -1,0 +1,58 @@
+name: Proofs, every night
+
+# Every proof and the whole search again with nothing replayed, once a night and on request. The job in ci.yml
+# replays a result until the model, the pinned library or the lockfile changes; this one does not, so what changed
+# under them (the runner's image, a solver that answers otherwise) shows here. A failure opens one issue, or adds a
+# comment to it while it is open. GitHub turns a schedule off, without a word, after 60 days in which a public
+# repository had no commit: turn it on again from the Actions tab, or with `gh workflow enable`.
+on:
+  schedule:
+    - cron: "23 8 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One at a time, and a run that has started is never cancelled by the next.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  proofs:
+    name: Every proof and the search, nothing replayed
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      # The step has its own limit, shorter than the job's: a step that runs out of time fails, and the step below
+      # then opens the issue; a job that runs out of time is cancelled, and nothing after it runs.
+      - name: Prove and search, nothing replayed
+        timeout-minutes: 100
+        run: bunx turbo run prove verify --force --concurrency=2 --summarize
+      - name: Open the issue, or add to it
+        if: failure()
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const label = "proofs-nightly"
+            const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            const body = `The nightly run of the model's proofs and search failed: ${run}`
+            // The list holds pull requests too: only an issue is commented on.
+            const open = await github.rest.issues.listForRepo({ ...context.repo, labels: label, state: "open", per_page: 100 })
+            const issue = open.data.find((item) => item.pull_request === undefined)
+            if (issue !== undefined) {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: issue.number, body })
+            } else {
+              await github.rest.issues.create({ ...context.repo, title: "The nightly proofs failed", body, labels: [label] })
+            }

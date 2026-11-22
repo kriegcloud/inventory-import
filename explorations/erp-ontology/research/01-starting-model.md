@@ -8,8 +8,8 @@ description: The first cut of the classes, the party model and the layers, read 
 
 This is a proposal to argue with, not a decision. Inputs: the two seed reports of 2026-11-22 (the "architecture
 seed", `SUTTON_ARCHITECTURAL_CONTEXT_SEED.md`, and the "API design report", `Sutton API Ontology Design.md`),
-`~/YeeBois/Career/ontology/tbox.ttl` (30 classes), `~/YeeBois/Career/ERP_ONTOLOGY/DECISIONS.md` (G1 to G15),
-`~/YeeBois/Career/sutton/product/PRODUCT-MODEL.md`, and this repository's `explorations/ideal-architecture/research/01-alchemy-domain.md`.
+Benjamin's earlier private notes kept outside the repository (a first class list of 30 classes, a decision log G1 to
+G15 and a product model read from public sources), and this repository's `explorations/ideal-architecture/research/01-alchemy-domain.md`.
 Nothing here was loaded into a reasoner yet.
 
 ## 1. The one distinction everything else rests on

@@ -34,8 +34,8 @@ description: Benjamin's words on the ERP and WMS taxonomy and ontology, verbatim
 >
 > I've also attached some research reports that can help as a context seed
 
-Attached: `~/Downloads/Sutton API Ontology Design.md` and `~/Downloads/SUTTON_ARCHITECTURAL_CONTEXT_SEED.md`
-(both 2026-11-22, kept outside the repository).
+Attached: two seed reports, "Sutton API Ontology Design" and "Sutton architectural context seed" (both 2026-11-22,
+kept outside the repository).
 
 ### Answers to the four opening questions
 

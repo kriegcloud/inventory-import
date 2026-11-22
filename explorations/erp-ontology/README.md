@@ -19,8 +19,8 @@ this repository's domain model point at them?
 | [02 Schema as the source](research/02-schema-as-source.md) | TypeScript is the only hand-written source and Turtle is generated, but the terms live in one vocabulary module that records point at, not in the record schemas. |
 | [03 The ontology skills reviewed](research/03-skills-review.md) | 121 checked findings in beep-effect's ontology skills: commands that fail or run backwards, a shared folder never copied here, and a BFO and hand-edited-Turtle design that this packet's decisions replace. |
 
-Inputs kept outside the repository: the two seed reports of 2026-11-22 (`~/Downloads`), and the earlier work in
-`~/YeeBois/Career` (`ontology/`, `ERP_ONTOLOGY/`, `sutton/product/`).
+Inputs kept outside the repository: the two seed reports of 2026-11-22, and Benjamin's earlier private notes (a
+first class list, a decision log and a product model read from public sources).
 
 ## Trail
 

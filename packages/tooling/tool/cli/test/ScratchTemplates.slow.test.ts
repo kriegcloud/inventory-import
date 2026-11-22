@@ -14,11 +14,14 @@ import { describe, expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as S from "effect/Schema"
+import * as Str from "effect/String"
 import { scratchpadFiles } from "../src/commands/Scratch/Scratch.config.ts"
-import { scratchNew } from "../src/commands/Scratch/Scratch.rules.ts"
+import { bunFiles, noCheck, scratchCheck, scratchNew, scratchSentence } from "../src/commands/Scratch/Scratch.rules.ts"
+import { diagnosticDirective } from "../src/commands/Scratch/Scratch.templates.ts"
+import { render } from "../src/Report.schema.ts"
 import { Repo } from "../src/Repo.service.ts"
 import { slowLimits } from "../../../../../vitest.shared.ts"
-import { inTree } from "./support/tree.ts"
+import { inTree, printed } from "./support/tree.ts"
 
 /** The parts of vitest's JSON report the test reads. */
 const Report = S.Struct({
@@ -37,6 +40,67 @@ const templates = proverInstalled
   : (["probe", "service", "screen"] as const)
 
 const copied = ["tsconfig.base.json"]
+
+describe("what scratch:check reads", () => {
+  it.effect(
+    "a file the compiler reaches by an import or through a linked folder is read, in any folder; one it never loads is not",
+    () =>
+      Effect.gen(function* () {
+        const result = yield* inTree(
+          {},
+          Effect.gen(function* () {
+            const repo = yield* Repo
+            yield* Effect.forEach(
+              copied,
+              Effect.fnUntraced(function* (file) {
+                const text = yield* repo.text(repo.join(here, file))
+                yield* repo.write(repo.join(repo.root, file), text)
+              }),
+              { concurrency: 1, discard: true }
+            )
+            yield* Effect.forEach(
+              scratchpadFiles,
+              (file) => repo.write(repo.join(repo.root, "scratchpad", file.name), file.text),
+              { concurrency: 1, discard: true }
+            )
+            yield* repo.run("ln", ["-s", repo.join(here, "node_modules"), repo.join(repo.root, "node_modules")])
+            yield* scratchNew({ name: "shelf", template: "probe", question: "" })
+            const shelf = repo.join(repo.root, "scratchpad/experiments/shelf")
+            const off = `// ${diagnosticDirective} floatingEffect:off\nexport const count = 1\n`
+            // Reached only by an import, in a folder an `include` never matches.
+            yield* repo.write(repo.join(shelf, ".lib/Imported.ts"), off)
+            yield* repo.write(repo.join(shelf, "Reaches.ts"), 'export * from "./.lib/Imported.ts"\n')
+            // In the same kind of folder and imported by nothing: the compiler never loads it.
+            yield* repo.write(repo.join(shelf, ".lib/Alone.ts"), off)
+            // A folder linked into the experiment: the compiler's `include` follows the link.
+            yield* repo.write(repo.join(repo.root, "elsewhere/Linked.ts"), "// @TS-NoCheck\nexport const size = 1\n")
+            yield* repo.run("ln", ["-s", repo.join(repo.root, "elsewhere"), repo.join(shelf, "linked")])
+            // JavaScript is not in the program (`allowJs` is off), so its header changes nothing.
+            yield* repo.write(repo.join(shelf, "gen/api.js"), `// ${noCheck}\nexport const api = 1\n`)
+            // The list is asked for as `scratch:check` asks: `bun run types --listFilesOnly` in the scratchpad.
+            const types = Effect.succeed({ code: 0, output: "" })
+            const errors = (found: Effect.Success<ReturnType<typeof scratchCheck>>) =>
+              A.map(
+                A.filter(printed(render(scratchSentence)(found)), (line) => /^err: {3}/.test(line)),
+                (line) => Str.replace(/: (turns|names) .*$/, ": $1")(line)
+              )
+            const whole = yield* scratchCheck(types, bunFiles)
+            // With a syntax error the compiler ends in failure and still prints its list: the scan goes on, and the
+            // error is the type-check's to report.
+            yield* repo.write(repo.join(shelf, "Broken.ts"), "export const broken = {\n")
+            const broken = yield* scratchCheck(types, bunFiles)
+            return { whole: errors(whole), broken: errors(broken) }
+          })
+        )
+        const refused = [
+          "err:   scratchpad/experiments/shelf/.lib/Imported.ts:1: turns",
+          "err:   scratchpad/experiments/shelf/linked/Linked.ts:1: names"
+        ]
+        expect(result).toEqual({ whole: refused, broken: refused })
+      }),
+    slowLimits.testTimeout
+  )
+})
 
 describe("the scratchpad's templates", () => {
   it.effect(

@@ -1,6 +1,6 @@
 /**
- * The root command, `beep`: one group per kind of rule, the three commands that keep what is derived in step, and
- * `release`.
+ * The root command, `beep`: one group per kind of rule, the three commands that keep what is derived in step,
+ * `patches` and `release`.
  *
  * @packageDocumentation
  */
@@ -9,6 +9,7 @@ import { configSyncCommand } from "./commands/ConfigSync/ConfigSync.command.ts"
 import { depsCommand } from "./commands/Deps/Deps.command.ts"
 import { docsCommand } from "./commands/Docs/Docs.command.ts"
 import { lawsCommand } from "./commands/Laws/Laws.command.ts"
+import { patchesCommand } from "./commands/Patches/Patches.command.ts"
 import { qualityCommand } from "./commands/Quality/Quality.command.ts"
 import { releaseCommand } from "./commands/Release/Release.command.ts"
 import { scratchCommand } from "./commands/Scratch/Scratch.command.ts"
@@ -27,6 +28,7 @@ export const rootCommand = Command.make("beep").pipe(
     depsCommand,
     docsCommand,
     lawsCommand,
+    patchesCommand,
     qualityCommand,
     releaseCommand,
     scratchCommand,

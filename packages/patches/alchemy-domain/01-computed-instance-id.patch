@@ -1,0 +1,80 @@
+Package: @alchemy.run/domain
+Applies-to: vendor/alchemy/alchemy.run-domain-734c27a.tgz
+Upstream: not yet reported
+Why: When a decision's `keyOf` builds an instance's id from two fields (`${cmd.importId}/${cmd.row}`), the prover
+  replays the solver's answer under an empty id, on a stream the real `keyOf` never reads. A rule the decision
+  breaks then comes back "not proved", with no state to look at. With this it comes back "violated", with the state,
+  the command and the events.
+Remove-when: The library reads a computed id back with the inputs. `bun run beep patches prove` then says this
+  patch's test passes without it.
+Test: test/alchemy-domain/01-computed-instance-id/ComputedInstanceId.test.ts
+
+diff --git a/lib/Prove/internal/Check.js b/lib/Prove/internal/Check.js
+index 1d6f089..0354fea 100644
+--- a/lib/Prove/internal/Check.js
++++ b/lib/Prove/internal/Check.js
+@@ -340,9 +340,9 @@ export const agree = Effect.fn(function* (solver, aggregate, run, inputs, read)
+  */
+ export const check = (solver, aggregate, kept, run, inputs, condition) => judged(solver, run, condition, (model) => replay(aggregate, kept, run, inputs, model));
+ /** Whether `condition` can be false on a path: a counterexample counts only when `replay` confirms it. */
+-const judged = (solver, run, condition, replay) => condition === "true"
++const judged = (solver, run, condition, replay, reads = []) => condition === "true"
+     ? Effect.succeed({ _tag: "Proved" })
+-    : solve(solver, run, condition).pipe(Effect.flatMap((answer) => answer._tag === "Unsat"
++    : solve(solver, run, condition, reads).pipe(Effect.flatMap((answer) => answer._tag === "Unsat"
+         ? Effect.succeed({ _tag: "Proved" })
+         : answer._tag === "Unknown"
+             ? Effect.succeed({ _tag: "Unknown", reason: answer.reason })
+@@ -484,5 +484,12 @@ const ranStreams = (ran, step, streams) => ran._tag === "Accepted"
+  * A counterexample counts only when the real `decide` and `evolve`, run on
+  * it, break it too.
+  */
+-export const checkDecision = (solver, decision, aggregates, kept, run, step, condition) => judged(solver, run, condition, (model) => replayDecision(decision, aggregates, kept, run, step, model));
++export const checkDecision = (solver, decision, aggregates, kept, run, step, condition) => {
++    // An id `keyOf` computes is a term of its own, not an input: read it back with the inputs,
++    // so the replay names the stream the real `keyOf` reads.
++    const ids = new Map();
++    for (const slot of step.slots)
++        computed(slot.id, ids);
++    return judged(solver, run, condition, (model) => replayDecision(decision, aggregates, kept, run, step, model), [...ids.values()].filter((term) => !run.declarations.has(term.text)));
++};
+ //# sourceMappingURL=Check.js.map
+\ No newline at end of file
+diff --git a/src/Prove/internal/Check.ts b/src/Prove/internal/Check.ts
+index 322992f..680af81 100644
+--- a/src/Prove/internal/Check.ts
++++ b/src/Prove/internal/Check.ts
+@@ -514,10 +514,12 @@ const judged = (
+   run: Run,
+   condition: string,
+   replay: (model: Model) => Effect.Effect<Verdict, Verdict>,
++  /** Terms to read back with the inputs, for the replay. */
++  reads: ReadonlyArray<Smt.Term> = [],
+ ): Effect.Effect<Verdict, Smt.SolverError> =>
+   condition === "true"
+     ? Effect.succeed<Verdict>({ _tag: "Proved" })
+-    : solve(solver, run, condition).pipe(
++    : solve(solver, run, condition, reads).pipe(
+         Effect.flatMap((answer): Effect.Effect<Verdict> =>
+           answer._tag === "Unsat"
+             ? Effect.succeed({ _tag: "Proved" })
+@@ -748,7 +750,16 @@ export const checkDecision = (
+   run: Run,
+   step: DecisionStep,
+   condition: string,
+-): Effect.Effect<Verdict, Smt.SolverError> =>
+-  judged(solver, run, condition, (model) =>
+-    replayDecision(decision, aggregates, kept, run, step, model),
++): Effect.Effect<Verdict, Smt.SolverError> => {
++  // An id `keyOf` computes is a term of its own, not an input: read it back with the inputs,
++  // so the replay names the stream the real `keyOf` reads.
++  const ids = new Map<string, Smt.Term>();
++  for (const slot of step.slots) computed(slot.id, ids);
++  return judged(
++    solver,
++    run,
++    condition,
++    (model) => replayDecision(decision, aggregates, kept, run, step, model),
++    [...ids.values()].filter((term) => !run.declarations.has(term.text)),
+   );
++};

@@ -1,0 +1,149 @@
+Package: @alchemy.run/domain
+Applies-to: vendor/alchemy/alchemy.run-domain-734c27a.tgz
+Upstream: not yet reported
+Why: When a decision's `keyOf` builds an instance's id from two fields (`${cmd.importId}/${cmd.row}`), the prover
+  replays the solver's answer under an empty id, on a stream the real `keyOf` never reads. A rule the decision
+  breaks then comes back "not proved", with no state to look at. With this it comes back "violated", with the state,
+  the command and the events.
+Remove-when: The library reads a computed id back with the inputs. `bun run beep patches prove` then says this
+  patch's test passes without it.
+Test: test/alchemy-domain/01-computed-instance-id/ComputedInstanceId.test.ts
+
+diff --git a/lib/Prove/internal/Check.js b/lib/Prove/internal/Check.js
+index 1d6f089..0354fea 100644
+--- a/lib/Prove/internal/Check.js
++++ b/lib/Prove/internal/Check.js
+@@ -340,9 +340,9 @@ export const agree = Effect.fn(function* (solver, aggregate, run, inputs, read)
+  */
+ export const check = (solver, aggregate, kept, run, inputs, condition) => judged(solver, run, condition, (model) => replay(aggregate, kept, run, inputs, model));
+ /** Whether `condition` can be false on a path: a counterexample counts only when `replay` confirms it. */
+-const judged = (solver, run, condition, replay) => condition === "true"
++const judged = (solver, run, condition, replay, reads = []) => condition === "true"
+     ? Effect.succeed({ _tag: "Proved" })
+-    : solve(solver, run, condition).pipe(Effect.flatMap((answer) => answer._tag === "Unsat"
++    : solve(solver, run, condition, reads).pipe(Effect.flatMap((answer) => answer._tag === "Unsat"
+         ? Effect.succeed({ _tag: "Proved" })
+         : answer._tag === "Unknown"
+             ? Effect.succeed({ _tag: "Unknown", reason: answer.reason })
+@@ -484,5 +484,12 @@ const ranStreams = (ran, step, streams) => ran._tag === "Accepted"
+  * A counterexample counts only when the real `decide` and `evolve`, run on
+  * it, break it too.
+  */
+-export const checkDecision = (solver, decision, aggregates, kept, run, step, condition) => judged(solver, run, condition, (model) => replayDecision(decision, aggregates, kept, run, step, model));
++export const checkDecision = (solver, decision, aggregates, kept, run, step, condition) => {
++    // An id `keyOf` computes is a term of its own, not an input: read it back with the inputs,
++    // so the replay names the stream the real `keyOf` reads.
++    const ids = new Map();
++    for (const slot of step.slots)
++        computed(slot.id, ids);
++    return judged(solver, run, condition, (model) => replayDecision(decision, aggregates, kept, run, step, model), [...ids.values()].filter((term) => !run.declarations.has(term.text)));
++};
+ //# sourceMappingURL=Check.js.map
+\ No newline at end of file
+diff --git a/src/Prove/internal/Check.ts b/src/Prove/internal/Check.ts
+index 322992f..680af81 100644
+--- a/src/Prove/internal/Check.ts
++++ b/src/Prove/internal/Check.ts
+@@ -514,10 +514,12 @@ const judged = (
+   run: Run,
+   condition: string,
+   replay: (model: Model) => Effect.Effect<Verdict, Verdict>,
++  /** Terms to read back with the inputs, for the replay. */
++  reads: ReadonlyArray<Smt.Term> = [],
+ ): Effect.Effect<Verdict, Smt.SolverError> =>
+   condition === "true"
+     ? Effect.succeed<Verdict>({ _tag: "Proved" })
+-    : solve(solver, run, condition).pipe(
++    : solve(solver, run, condition, reads).pipe(
+         Effect.flatMap((answer): Effect.Effect<Verdict> =>
+           answer._tag === "Unsat"
+             ? Effect.succeed({ _tag: "Proved" })
+@@ -748,7 +750,16 @@ export const checkDecision = (
+   run: Run,
+   step: DecisionStep,
+   condition: string,
+-): Effect.Effect<Verdict, Smt.SolverError> =>
+-  judged(solver, run, condition, (model) =>
+-    replayDecision(decision, aggregates, kept, run, step, model),
++): Effect.Effect<Verdict, Smt.SolverError> => {
++  // An id `keyOf` computes is a term of its own, not an input: read it back with the inputs,
++  // so the replay names the stream the real `keyOf` reads.
++  const ids = new Map<string, Smt.Term>();
++  for (const slot of step.slots) computed(slot.id, ids);
++  return judged(
++    solver,
++    run,
++    condition,
++    (model) => replayDecision(decision, aggregates, kept, run, step, model),
++    [...ids.values()].filter((term) => !run.declarations.has(term.text)),
+   );
++};
+Package: @alchemy.run/domain
+Applies-to: vendor/alchemy/alchemy.run-domain-734c27a.tgz
+Upstream: not yet reported
+Why: A text's length written into a template (`${cmd.text.length}:${cmd.text}`) ends the whole proof with "z3 cannot
+  read back (str.len …): nothing declares it", naming no file and no line. With this the code is read: a rule that
+  holds is proved, and a broken one comes back with the text that breaks it.
+Remove-when: The library reads back an argument that is itself computed. `bun run beep patches prove` then says this
+  patch's test passes without it.
+Test: test/alchemy-domain/02-text-length-in-a-template/TextLength.test.ts
+
+diff --git a/lib/Prove/internal/Check.js b/lib/Prove/internal/Check.js
+index 0354fea..866081c 100644
+--- a/lib/Prove/internal/Check.js
++++ b/lib/Prove/internal/Check.js
+@@ -22,7 +22,12 @@ export const solve = Effect.fn(function* (solver, run, condition,
+ /** Terms to read back with the inputs: the model then has each by its text. */
+ reads = []) {
+     const applications = [...run.applications.values()];
+-    const named = reads.map((term, index) => ({ term, name: Smt.symbol(`$out.${index}`) }));
++    // An argument that is itself computed (the length of a text) is read back as a term, like `reads`:
++    // the solver reads a value back by the constant or function that heads it, and `str.len` is neither.
++    const computedArguments = applications
++        .filter((a) => !run.declarations.has(a.argument))
++        .map((a) => ({ sort: a.sort, text: a.argument }));
++    const named = [...reads, ...computedArguments].map((term, index) => ({ term, name: Smt.symbol(`$out.${index}`) }));
+     const declarations = [...run.declarations.values()];
+     const base = [
+         ...run.conditions,
+@@ -41,7 +46,7 @@ reads = []) {
+                 base.push(`(=> (= ${a.term} ${b.term}) (= ${a.argument} ${b.argument}))`);
+     const values = [
+         ...run.constants,
+-        ...applications.flatMap((a) => [a.term, a.argument]),
++        ...applications.flatMap((a) => (run.declarations.has(a.argument) ? [a.term, a.argument] : [a.term])),
+         ...named.map((read) => read.name),
+     ];
+     const facts = [];
+diff --git a/src/Prove/internal/Check.ts b/src/Prove/internal/Check.ts
+index 680af81..84bdcac 100644
+--- a/src/Prove/internal/Check.ts
++++ b/src/Prove/internal/Check.ts
+@@ -68,7 +68,15 @@ export const solve = Effect.fn(function* (
+   reads: ReadonlyArray<Smt.Term> = [],
+ ) {
+   const applications = [...run.applications.values()];
+-  const named = reads.map((term, index) => ({ term, name: Smt.symbol(`$out.${index}`) }));
++  // An argument that is itself computed (the length of a text) is read back as a term, like `reads`:
++  // the solver reads a value back by the constant or function that heads it, and `str.len` is neither.
++  const computedArguments = applications
++    .filter((a) => !run.declarations.has(a.argument))
++    .map((a): Smt.Term => ({ sort: a.sort, text: a.argument }));
++  const named = [...reads, ...computedArguments].map((term, index) => ({
++    term,
++    name: Smt.symbol(`$out.${index}`),
++  }));
+   const declarations = [...run.declarations.values()];
+   const base = [
+     ...run.conditions,
+@@ -87,7 +95,9 @@ export const solve = Effect.fn(function* (
+         base.push(`(=> (= ${a.term} ${b.term}) (= ${a.argument} ${b.argument}))`);
+   const values = [
+     ...run.constants,
+-    ...applications.flatMap((a) => [a.term, a.argument]),
++    ...applications.flatMap((a) =>
++      run.declarations.has(a.argument) ? [a.term, a.argument] : [a.term],
++    ),
+     ...named.map((read) => read.name),
+   ];
+   const facts: Array<string> = [];

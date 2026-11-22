@@ -18,17 +18,21 @@ A move, in order, stopping at the first step that fails:
 
 1. replaces the files and `sources.json`, and says which packages are new or gone since the last pin;
 2. rewrites the `overrides` in the root `package.json` and the version every workspace asks for;
-3. runs `bun install`;
-4. writes each file's hash into `bun.lock` (bun keeps the hash it has for a file whose bytes changed);
-5. rewrites the part of the README that names the commit, the packages and their sizes;
-6. checks all of that, as `alchemy:check` does;
-7. installs a copy of the working tree, with an empty cache, through a proxy that refuses the registry;
-8. runs `bun run check:full -- --force`: the library's `main` breaks code between releases, so every type-check,
-   test and proof is run again and nothing is replayed from the cache.
+3. carries the repository's patches to these packages (docs/patches.md) to the new files, or stops on the first
+   that does not apply: bun only warns about a patch made for the old file, and installs the package unpatched;
+4. runs `bun install`;
+5. writes each file's hash into `bun.lock` (bun keeps the hash it has for a file whose bytes changed);
+6. rewrites the part of the README that names the commit, the packages and their sizes;
+7. checks all of that, as `alchemy:check` does;
+8. installs a copy of the working tree, with an empty cache, through a proxy that refuses the registry;
+9. checks that every patch is installed, and that each one's test still fails without it: one whose test passes on
+   the new build alone is a defect the library has fixed, and the patch is dropped before the pin moves;
+10. runs `bun run check:full -- --force`: the library's `main` breaks code between releases, so every type-check,
+    test and proof is run again and nothing is replayed from the cache.
 
-A step from 1 to 7 that fails puts every file it changed back as it was. Step 8 failing leaves the pin moved, since
+A step from 1 to 9 that fails puts every file it changed back as it was. Step 10 failing leaves the pin moved, since
 what it found is the library's change to answer in the code, and says which files to restore to go back instead.
-`--no-full-check` leaves step 8 out. Nothing is committed: read the difference, then commit it.
+`--no-full-check` leaves step 10 out. Nothing is committed: read the difference, then commit it.
 """
 import base64, datetime, gzip, hashlib, io, json, os, re, select, shutil, socket, subprocess, sys, tarfile, tempfile
 import threading, urllib.request
@@ -45,6 +49,8 @@ ROOT = HERE.parent.parent
 SOURCES = HERE / "sources.json"
 README = HERE / "README.md"
 LOCK = ROOT / "bun.lock"
+PATCHES = ROOT / "packages" / "patches"
+CLI = "packages/tooling/tool/cli/src/bin.ts"
 SECTION = re.compile(r"(<!-- pin:start[^\n]*-->\n).*?(<!-- pin:end -->)", re.DOTALL)
 DEPENDENCY_KEYS = ("dependencies", "devDependencies", "peerDependencies", "optionalDependencies")
 
@@ -349,6 +355,14 @@ def problems(pin: dict) -> list:
         if str(spec).startswith("file:vendor/alchemy/") and name not in names:
             found.append(f"package.json: overrides[{name}] names a file of a package that is not pinned")
 
+    for key in manifest.get("patchedDependencies") or {}:
+        name, _, resolution = key.rpartition("@")
+        if resolution.startswith("vendor/alchemy/") and resolution.removeprefix("vendor/alchemy/") not in files:
+            found.append(
+                f"package.json: patchedDependencies names {key}, which is not the pinned build: bun installs {name} "
+                f"unpatched. `bun run beep patches check` says what to do with its patches"
+            )
+
     wanted = expected_spec(pin)
     for file in workspace_manifests():
         workspace = json.loads(file.read_text())
@@ -541,8 +555,18 @@ def run(command: list) -> None:
 
 
 def pin_files() -> list:
-    """Every file a move may change: the kept files and their list, the page, the lockfile and the manifests."""
-    return [ROOT / "package.json", LOCK, README, SOURCES, *sorted(HERE.glob("*.tgz")), *workspace_manifests()]
+    """Every file a move may change: the kept files and their list, the page, the lockfile, the manifests, and the
+    patches, whose headers and whose file for bun name the kept file they apply to."""
+    return [
+        ROOT / "package.json",
+        LOCK,
+        README,
+        SOURCES,
+        *sorted(HERE.glob("*.tgz")),
+        *workspace_manifests(),
+        *sorted(PATCHES.glob("*.patch")),
+        *sorted(PATCHES.glob("*/*.patch")),
+    ]
 
 
 def changed_since(before: dict) -> list:
@@ -575,17 +599,22 @@ def repin(commit: str, full_check: bool) -> None:
         pin = fetch(commit)
         say("2. The overrides in the root package.json and the version each workspace asks for")
         wire(pin)
-        say("3. bun install")
+        say("3. The patches to these packages, carried to the new files")
+        run(["bun", CLI, "patches", "carry"])
+        say("4. bun install")
         installed = True
         run(["bun", "install"])
-        say("4. The hash of each file, written into bun.lock")
+        say("5. The hash of each file, written into bun.lock")
         write_lock_hashes(pin)
-        say("5. The README's part that names the pin")
+        say("6. The README's part that names the pin")
         write_readme(pin)
-        say("6. The check")
+        say("7. The check")
         check(pin)
-        say("7. An install of a copy of this tree, with an empty cache, refused the registry")
+        say("8. An install of a copy of this tree, with an empty cache, refused the registry")
         install_without_registry(pin)
+        say("9. Every patch is installed, and its test still fails without it")
+        run(["bun", CLI, "patches", "check"])
+        run(["bun", CLI, "patches", "prove"])
     except BaseException as stopped:
         changed = changed_since(before)
         put_back(before)
@@ -601,7 +630,7 @@ def repin(commit: str, full_check: bool) -> None:
                 say("`bun install` failed: run it again by hand.")
         raise SystemExit(1) from stopped
     if full_check:
-        say("8. bun run check:full -- --force")
+        say("10. bun run check:full -- --force")
         if subprocess.run(["bun", "run", "check:full", "--", "--force"], cwd=ROOT).returncode != 0:
             changed = changed_since(before)
             tracked = [file for file in changed if not (file.startswith("vendor/alchemy/") and file.endswith(".tgz"))]
@@ -611,7 +640,7 @@ def repin(commit: str, full_check: bool) -> None:
                 f"`git checkout -- {' '.join(tracked)} vendor/alchemy && git clean -f -- vendor/alchemy && bun install`."
             )
     else:
-        say("8. Left out (--no-full-check): run `bun run check:full -- --force` before committing")
+        say("10. Left out (--no-full-check): run `bun run check:full -- --force` before committing")
     say("Nothing is committed. Read `git status` and `git diff`, then commit.")
 
 

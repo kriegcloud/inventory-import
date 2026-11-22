@@ -1,0 +1,69 @@
+Package: @alchemy.run/domain
+Applies-to: vendor/alchemy/alchemy.run-domain-734c27a.tgz
+Upstream: not yet reported
+Why: A text's length written into a template (`${cmd.text.length}:${cmd.text}`) ends the whole proof with "z3 cannot
+  read back (str.len …): nothing declares it", naming no file and no line. With this the code is read: a rule that
+  holds is proved, and a broken one comes back with the text that breaks it.
+Remove-when: The library reads back an argument that is itself computed. `bun run beep patches prove` then says this
+  patch's test passes without it.
+Test: test/alchemy-domain/02-text-length-in-a-template/TextLength.test.ts
+
+diff --git a/lib/Prove/internal/Check.js b/lib/Prove/internal/Check.js
+index 0354fea..866081c 100644
+--- a/lib/Prove/internal/Check.js
++++ b/lib/Prove/internal/Check.js
+@@ -22,7 +22,12 @@ export const solve = Effect.fn(function* (solver, run, condition,
+ /** Terms to read back with the inputs: the model then has each by its text. */
+ reads = []) {
+     const applications = [...run.applications.values()];
+-    const named = reads.map((term, index) => ({ term, name: Smt.symbol(`$out.${index}`) }));
++    // An argument that is itself computed (the length of a text) is read back as a term, like `reads`:
++    // the solver reads a value back by the constant or function that heads it, and `str.len` is neither.
++    const computedArguments = applications
++        .filter((a) => !run.declarations.has(a.argument))
++        .map((a) => ({ sort: a.sort, text: a.argument }));
++    const named = [...reads, ...computedArguments].map((term, index) => ({ term, name: Smt.symbol(`$out.${index}`) }));
+     const declarations = [...run.declarations.values()];
+     const base = [
+         ...run.conditions,
+@@ -41,7 +46,7 @@ reads = []) {
+                 base.push(`(=> (= ${a.term} ${b.term}) (= ${a.argument} ${b.argument}))`);
+     const values = [
+         ...run.constants,
+-        ...applications.flatMap((a) => [a.term, a.argument]),
++        ...applications.flatMap((a) => (run.declarations.has(a.argument) ? [a.term, a.argument] : [a.term])),
+         ...named.map((read) => read.name),
+     ];
+     const facts = [];
+diff --git a/src/Prove/internal/Check.ts b/src/Prove/internal/Check.ts
+index 680af81..84bdcac 100644
+--- a/src/Prove/internal/Check.ts
++++ b/src/Prove/internal/Check.ts
+@@ -68,7 +68,15 @@ export const solve = Effect.fn(function* (
+   reads: ReadonlyArray<Smt.Term> = [],
+ ) {
+   const applications = [...run.applications.values()];
+-  const named = reads.map((term, index) => ({ term, name: Smt.symbol(`$out.${index}`) }));
++  // An argument that is itself computed (the length of a text) is read back as a term, like `reads`:
++  // the solver reads a value back by the constant or function that heads it, and `str.len` is neither.
++  const computedArguments = applications
++    .filter((a) => !run.declarations.has(a.argument))
++    .map((a): Smt.Term => ({ sort: a.sort, text: a.argument }));
++  const named = [...reads, ...computedArguments].map((term, index) => ({
++    term,
++    name: Smt.symbol(`$out.${index}`),
++  }));
+   const declarations = [...run.declarations.values()];
+   const base = [
+     ...run.conditions,
+@@ -87,7 +95,9 @@ export const solve = Effect.fn(function* (
+         base.push(`(=> (= ${a.term} ${b.term}) (= ${a.argument} ${b.argument}))`);
+   const values = [
+     ...run.constants,
+-    ...applications.flatMap((a) => [a.term, a.argument]),
++    ...applications.flatMap((a) =>
++      run.declarations.has(a.argument) ? [a.term, a.argument] : [a.term],
++    ),
+     ...named.map((read) => read.name),
+   ];
+   const facts: Array<string> = [];

@@ -452,6 +452,21 @@
         "vitest": "^5.1.0",
       },
     },
+    "packages/patches": {
+      "name": "@inventory/patches",
+      "version": "0.0.0",
+      "dependencies": {
+        "@alchemy.run/domain": "2.0.0-beta.87-734c27a",
+        "alchemy": "2.0.0-beta.87-734c27a",
+        "effect": "4.1.5",
+      },
+      "devDependencies": {
+        "@effect/platform-node": "4.1.5",
+        "@effect/vitest": "4.1.5",
+        "@types/node": "^22.20.5",
+        "vitest": "^5.1.0",
+      },
+    },
     "packages/review": {
       "name": "@inventory/review",
       "version": "0.0.0",
@@ -503,6 +518,7 @@
         "@effect/vitest": "4.1.5",
         "@types/node": "^22.20.5",
         "vitest": "^5.1.0",
+        "yaml": "^2.9.1",
       },
     },
     "packages/ui": {
@@ -556,6 +572,9 @@
     "esbuild",
     "workerd",
   ],
+  "patchedDependencies": {
+    "@alchemy.run/domain@vendor/alchemy/alchemy.run-domain-734c27a.tgz": "packages/patches/alchemy-domain.patch",
+  },
   "overrides": {
     "@alchemy.run/acme": "file:vendor/alchemy/alchemy.run-acme-734c27a.tgz",
     "@alchemy.run/cloudflare": "file:vendor/alchemy/alchemy.run-cloudflare-734c27a.tgz",
@@ -869,6 +888,8 @@
     "@inventory/client": ["@inventory/client@workspace:packages/client"],
 
     "@inventory/kernel": ["@inventory/kernel@workspace:packages/kernel"],
+
+    "@inventory/patches": ["@inventory/patches@workspace:packages/patches"],
 
     "@inventory/review": ["@inventory/review@workspace:packages/review"],
 

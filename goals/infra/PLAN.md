@@ -239,22 +239,41 @@ Nothing below was started. Every command names its stage.
    sign-up to a stranger; his email signs up, creates the organization and is its admin.
 10. **On the zone**: "Always Use HTTPS" confirmed on.
 11. **Push `main`** (the branch is merged into it locally), so `deploy.yml` reaches GitHub. From then a pull request
-    gets a preview and a push to `main` that passes CI deploys `staging`; production deploys only from a release tag
-    (`docs/releasing.md`).
+    gets a preview and a push to `main` that passes CI deploys `staging`; production deploys only from a tagged release
+    branch that passed CI (`docs/releasing.md`).
 12. **Releases and staging** (decision "releases and deploys", 2026-11-22). Nothing new goes in
     `packages/infra/env/op.env`: staging takes the previews' token, account and password, which step 8 already
     gives. What he does:
     - **Deploy the repository's stack again** (step 8, the same line, `plan` first). The plan should show the new
       `staging` environment and its three values (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`,
-      `PREVIEW_TEST_ACCOUNT_PASSWORD`), the `production` environment losing its `main`-only rule while keeping
-      him as its required reviewer, and two rulesets: "release tags" (`refs/tags/v*`: only an admin creates, moves
-      or deletes one) and "release branches" (`refs/heads/release/*`: no force-push, no deletion). Nothing is
-      clicked in GitHub's settings. If he wants it, the setting itself is at Settings, Environments, `production`:
-      "Required reviewers" names him, and "Deployment branches and tags" is "No restriction" (the stack sets both).
-    - **The first staging deploy** happens by itself on the next push to `main` that passes CI. Before that, a look
+      `PREVIEW_TEST_ACCOUNT_PASSWORD`), the `production` environment unchanged (his approval, and only `main`:
+      if an earlier deploy of this step removed the `main`-only rule, the plan shows it coming back), and two
+      rulesets: "release tags" (`refs/tags/v*`: only an admin creates, moves or deletes one) and "release
+      branches" (`refs/heads/release/*`: no force-push, no deletion). Nothing is clicked in GitHub's settings. If
+      he wants it, the setting itself is at Settings, Environments, `production`: "Required reviewers" names him,
+      and "Deployment branches and tags" lists `main` (the stack sets both).
+    - **The first staging deploy** happens by itself on the next push to `main` that passes CI. Until the
+      stack above is deployed, each such push is followed by a failed "Deploy" run whose `staging` job says
+      `MissingPreviewPassword` (seen 2026-11-22); it deploys nothing and is expected. Before that, a look
       from the workstation: `op run --env-file packages/infra/env/op.env -- bunx alchemy plan --stage staging` from
       the previews' account profile, with `PREVIEW_TEST_ACCOUNT_PASSWORD` filled by `op run`.
-    - **The first release**: on `main`, `bun run release minor`, read what it printed, push the branch, wait for
-      CI on it, push the tag, approve the deploy in the Actions run.
+    - **The first release**: on `main`, `bun run release minor`, read what it printed, then the one push it
+      prints, `git push --atomic origin release/<major>.<minor> v<version>`. CI runs on the branch; when it passes,
+      the run named "Deploy" starts, "Check the release" prints the tag, and `production` waits for his approval.
+      **This is the first time the flow runs on GitHub**: that a workflow started by CI's end runs `main`'s copy
+      as `main`, that the environment's `main`-only rule lets it through, and that a waiting release is not
+      cancelled are documented behaviour, not verified. If "Deploy" does not start or the environment refuses the
+      run, nothing was deployed; the branch and tag stay as they are.
+    - **Benjamin's three answers of 2026-11-22**, each the recommended one, recorded in
+      `explorations/ideal-architecture/DECISIONS.md` and built:
+      1. *Where production's gate lives*: after CI on the release branch. Production starts when CI passes on a
+         push to `release/**` whose head carries its tag, from `main`'s copy of the workflow and of the tag check;
+         the environment keeps its `main`-only rule; branch and tag go in one atomic push; a tag pushed alone
+         starts nothing.
+      2. *Staging's Cloudflare credentials*: keep sharing the previews' token and account, said plainly: anyone
+         who can push a branch can reach staging.
+      3. *A fix that needed edits when it was cherry-picked*: accepted when its `cherry-pick -x` line names a
+         commit on `origin/main`, and named under "Picked with changes" in the output, the notes and the tag. No
+         flag.
 13. **Adding a person to production later**: add their email to `SIGN_UP` (step 8 again), deploy, and they sign
     up; or they sign up and an admin adds them on the People page.

@@ -1,0 +1,19 @@
+{
+  "$schema": "../../node_modules/turbo/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // A patch's test proves a small model with the patched package. What it reads beyond this folder (the patches
+    // are here, and the file bun applies): the kept file the patches are applied to, and the root's package.json,
+    // which says which file bun applies to which package. bun.lock holds a patch's path and never its content.
+    "test": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/vitest.shared.ts",
+        "$TURBO_ROOT$/vitest.retries.ts",
+        "$TURBO_ROOT$/vendor/alchemy/*.tgz",
+        "$TURBO_ROOT$/package.json"
+      ],
+      "outputs": []
+    }
+  }
+}

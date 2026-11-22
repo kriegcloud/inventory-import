@@ -53,8 +53,11 @@ real test runner and type-checker over it, so a template that stops working fail
   import, a ref that stays the same across draws) and the linter. Each of those laws names the scratchpad as left
   out. They apply the moment code graduates into a package, so write an experiment the way a package is written when
   you mean to keep it.
-- **Still refused:** a secret. `bun run check` reads every file git would commit for key-shaped strings, the
-  experiments too, because the repository is public. Use no real customer data and no private name in an experiment
+- **Still refused:** a secret, and a path that names a person's machine. `bun run check` reads every file git would
+  commit for key-shaped strings, the experiments too (`keys:check`), and every file of the scratchpad for an absolute
+  home path (`/home/<name>/`, `/Users/<name>/`, `C:\Users\<name>`) or a folder kept outside the repository
+  (`~/.claude`, `.config/Claude`) (`private-paths:check`). Each names the file and line, never what it found, because
+  the repository and its CI logs are public. Use no real customer data and no private name in an experiment
   for the same reason.
 - **Never the other way:** nothing imports from the scratchpad. `bun run check` refuses a package.json (a
   workspace's or the root's) that declares it or maps a `#` import into it, and any file that reaches it: by its

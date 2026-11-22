@@ -259,6 +259,11 @@
       ],
       "outputs": []
     },
+    // No home path or private folder is named in the scratchpad (`beep laws private-paths`): every file in it.
+    "//#private-paths:check": {
+      "inputs": ["scratchpad/**", "!scratchpad/**/node_modules/**", "packages/tooling/tool/cli/src/**"],
+      "outputs": []
+    },
     // Every file git would commit, so its hash is the whole repository's, the scratchpad's experiments included: a
     // key in an experiment is refused like any other, and this is the one root task an edit there re-runs.
     "//#keys:check": { "outputs": [] },

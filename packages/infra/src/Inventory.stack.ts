@@ -111,6 +111,9 @@ export default Alchemy.Stack(
     const givenPassword = passwordFrom === "given" ? yield* readGivenPassword() : O.none()
     // A workflow's log is public, so a minted password is shown only to a person deploying from their own machine.
     const inWorkflow = yield* Config.Boolean("CI").pipe(Config.withDefault(false))
+    // The setup command hands its terminal to the deploy, and a terminal is not proof of a person: it asks for the
+    // password to be left out, and its owner reads it with a deploy of his own (`goals/infra/PLAN.md`).
+    const hidden = yield* Config.String("HIDE_TEST_ACCOUNT_PASSWORD").pipe(Config.withDefault(""))
 
     const website = yield* Cloudflare.Website.Vite("Website", {
       rootDir: app,
@@ -155,7 +158,9 @@ export default Alchemy.Stack(
         onSome: (password) =>
           inWorkflow
             ? "minted for this stage; not shown in a workflow's log"
-            : Output.map(password.text, Redacted.value)
+            : hidden === "true"
+              ? "minted for this stage; not shown in this run. Deploy the stage again yourself to read it"
+              : Output.map(password.text, Redacted.value)
       })
     }
     // The stack is the entry point the CLI runs: this is where its one layer is provided.

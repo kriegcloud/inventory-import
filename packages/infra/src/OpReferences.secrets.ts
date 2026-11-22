@@ -4,8 +4,9 @@
  * owner to authorize the run; the values go to the stack's configuration only, never to the process's environment
  * or to disk.
  *
- * Must not break: in a workflow (`CI` set) this entry does nothing and 1Password is never contacted, because a
- * deploy job is given its secrets by its GitHub environment; and a stage that needs no secret asks for none.
+ * Must not break: in a workflow (`CI` set in the process's environment, which is read directly) this entry does
+ * nothing and 1Password is never contacted, because a deploy job is given its secrets by its GitHub environment; a
+ * variable already set in the process is not asked for; and a stage that needs no secret asks for none.
  *
  * @packageDocumentation
  */
@@ -13,13 +14,14 @@ import * as OnePassword from "@alchemy.run/1password"
 import type * as Secrets from "alchemy/Secrets"
 import { Stage } from "alchemy/Stage"
 import * as Config from "effect/Config"
+import * as ConfigProvider from "effect/ConfigProvider"
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import * as R from "effect/Record"
-import { opEnvFile, referencesIn } from "./OpReferences.rules.ts"
+import { opEnvFile, ownEnvFile, referencesIn } from "./OpReferences.rules.ts"
 
 /** A `secrets` entry that reads this package's `env/op.env`. */
 export class OpEnvReferences extends Data.TaggedClass("@beep/infra/SecretProvider::OpEnvReferences")<{
@@ -27,17 +29,35 @@ export class OpEnvReferences extends Data.TaggedClass("@beep/infra/SecretProvide
 }> {}
 
 /**
- * The references to ask 1Password for: none in a workflow, none when the file is not there, else the ones `op.env`
- * gives for these names.
+ * One variable of the process's own environment, read past whatever configuration the stack has assembled. A
+ * `secrets` entry is built on the entries listed before it, and Alchemy puts the process's environment last, so
+ * the configuration this entry is given never holds a workflow's `CI` or a variable exported in a shell.
+ */
+const ofProcess = (name: string) =>
+  Config.String(name)
+    .pipe(Config.withDefault(""))
+    .parse(ConfigProvider.fromEnv())
+    .pipe(Effect.orElseSucceed(() => ""))
+
+/**
+ * The references to ask 1Password for: none in a workflow, none for a variable the process already holds, none when
+ * neither file is there, else the ones `op.env` and the owner's own `op.env.local` give for these names.
  */
 export const referencesWanted = Effect.fn("OpReferences.referencesWanted")(function* (names: ReadonlyArray<string>) {
-  const inWorkflow = yield* Config.Boolean("CI").pipe(Config.withDefault(false))
-  if (inWorkflow) return R.empty<string, string>()
+  const ci = yield* ofProcess("CI")
+  if (ci !== "" && ci !== "false" && ci !== "0") return R.empty<string, string>()
+  // A variable set in the shell wins over this entry anyway, so 1Password is not asked for it: a stage run by hand
+  // with its secret exported needs no 1Password in its profile.
+  const unset = yield* Effect.filter(names, (name) => Effect.map(ofProcess(name), (value) => value === ""), {
+    concurrency: 1
+  })
   const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
-  const file = path.resolve(import.meta.dirname, "..", opEnvFile)
-  const text = yield* fs.readFileString(file).pipe(Effect.orElseSucceed(() => ""))
-  return referencesIn({ text, names })
+  const textOf = (file: string) =>
+    fs.readFileString(path.resolve(import.meta.dirname, "..", file)).pipe(Effect.orElseSucceed(() => ""))
+  const committed = yield* textOf(opEnvFile)
+  const own = yield* textOf(ownEnvFile)
+  return referencesIn({ text: `${committed}\n${own}`, names: unset })
 })
 
 /**

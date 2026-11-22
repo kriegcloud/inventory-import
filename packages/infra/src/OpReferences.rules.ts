@@ -21,6 +21,12 @@ import { previewPasswordVariable, testPasswordOf } from "./StagePlan.rules.ts"
 export const opEnvFile = "env/op.env"
 
 /**
+ * The owner's own references, from this package's folder: a file git ignores, so the names of his vault and items
+ * stay out of the repository. Its lines are read after `op.env`'s, so a name in both takes this file's.
+ */
+export const ownEnvFile = "env/op.env.local"
+
+/**
  * The reference a line's value is, without its quotes; none when it is anything else. A name with a space is
  * allowed only in quotes, and the template's `<vault>` is not a reference.
  */

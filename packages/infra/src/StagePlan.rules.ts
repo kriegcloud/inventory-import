@@ -177,6 +177,59 @@ export const givenTestPassword = <Password>(input: {
   })
 
 /**
+ * The variable of the Cloudflare token every preview's and staging's deploy job takes: the owner's own account-owned
+ * token for the previews' account (Benjamin, 2026-11-22: "Use my own token"), which the repository's stack writes to
+ * GitHub and never mints.
+ *
+ * @category constants
+ */
+export const previewTokenVariable = "PREVIEW_CLOUDFLARE_API_TOKEN"
+
+/**
+ * The variable of the previews' Cloudflare account id, kept beside that token.
+ *
+ * @category constants
+ */
+export const previewAccountVariable = "PREVIEW_CLOUDFLARE_ACCOUNT_ID"
+
+/**
+ * The repository's stack was deployed without the token the previews' and staging's jobs deploy with.
+ *
+ * @category errors
+ */
+export class MissingPreviewToken extends S.TaggedError<MissingPreviewToken, { readonly brand: unique symbol }>(
+  $I`MissingPreviewToken`
+)(
+  "MissingPreviewToken",
+  { variable: S.String.pipe(S.annotateKey({ description: "The variable that should hold the token" })) },
+  $I.annoteError<MissingPreviewToken>("MissingPreviewToken", {
+    description: "The repository's stack deployed without the Cloudflare token previews and staging deploy with"
+  })
+) {
+  /** What is missing and where its reference is written. */
+  override get message(): string {
+    return (
+      `The repository's stack has no Cloudflare token for previews and staging: ${this.variable} is not set, so no ` +
+      `pull request could get a preview and main could not reach staging. Write the references ` +
+      `${this.variable}="op://<vault>/<item>/<field>" and ${previewAccountVariable}="op://<vault>/<item>/<field>" ` +
+      `in packages/infra/env/op.env.local (git ignores it) and deploy the stack again; it asks 1Password for both.`
+    )
+  }
+}
+
+/**
+ * The token the previews' and staging's jobs deploy with: the one the owner gave, or the stack stops. None is minted,
+ * because the login this stack is deployed with does not reach the previews' account.
+ *
+ * @example givenPreviewToken(O.none()) // Result.fail(MissingPreviewToken)
+ */
+export const givenPreviewToken = <Token>(given: O.Option<Token>): Result.Result<Token, MissingPreviewToken> =>
+  O.match(given, {
+    onNone: () => Result.fail(MissingPreviewToken.make({ variable: previewTokenVariable })),
+    onSome: Result.succeed
+  })
+
+/**
  * The variable that deploys a stage without its model key on purpose, when set to `true`.
  *
  * @category constants

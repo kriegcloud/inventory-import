@@ -238,7 +238,23 @@ Nothing below was started. Every command names its stage.
    prod`, read it, then the same with `deploy`. Open `https://inventory.beep-effect.com`: the sign-in page offers no
    sign-up to a stranger; his email signs up, creates the organization and is its admin.
 10. **On the zone**: "Always Use HTTPS" confirmed on.
-11. **Push `main`** (the branch is merged into it locally), so `deploy.yml` reaches GitHub. From then a pull request gets a preview and a
-    push to `main` waits for his approval in the `production` environment.
-12. **Adding a person to production later**: add their email to `SIGN_UP` (step 8 again), deploy, and they sign
+11. **Push `main`** (the branch is merged into it locally), so `deploy.yml` reaches GitHub. From then a pull request
+    gets a preview and a push to `main` that passes CI deploys `staging`; production deploys only from a release tag
+    (`docs/releasing.md`).
+12. **Releases and staging** (decision "releases and deploys", 2026-11-22). Nothing new goes in
+    `packages/infra/env/op.env`: staging takes the previews' token, account and password, which step 8 already
+    gives. What he does:
+    - **Deploy the repository's stack again** (step 8, the same line, `plan` first). The plan should show the new
+      `staging` environment and its three values (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`,
+      `PREVIEW_TEST_ACCOUNT_PASSWORD`), the `production` environment losing its `main`-only rule while keeping
+      him as its required reviewer, and two rulesets: "release tags" (`refs/tags/v*`: only an admin creates, moves
+      or deletes one) and "release branches" (`refs/heads/release/*`: no force-push, no deletion). Nothing is
+      clicked in GitHub's settings. If he wants it, the setting itself is at Settings, Environments, `production`:
+      "Required reviewers" names him, and "Deployment branches and tags" is "No restriction" (the stack sets both).
+    - **The first staging deploy** happens by itself on the next push to `main` that passes CI. Before that, a look
+      from the workstation: `op run --env-file packages/infra/env/op.env -- bunx alchemy plan --stage staging` from
+      the previews' account profile, with `PREVIEW_TEST_ACCOUNT_PASSWORD` filled by `op run`.
+    - **The first release**: on `main`, `bun run release minor`, read what it printed, push the branch, wait for
+      CI on it, push the tag, approve the deploy in the Actions run.
+13. **Adding a person to production later**: add their email to `SIGN_UP` (step 8 again), deploy, and they sign
     up; or they sign up and an admin adds them on the People page.

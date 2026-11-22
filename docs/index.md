@@ -17,6 +17,7 @@ Paths here that start `src/`, `test/`, `migrations/`, `public/` or `scripts/` ar
 * [The review region](review-table.md) - How to wire ReviewRegion, the Review step of an import, to real rows and a pure check in minutes.
 * [Patterns](patterns.md) - Code and notes for cases in this stack that are easy to get wrong (D1, the API contract, the model, workbooks, accessibility).
 * [Inventory glossary](glossary.md) - The trade words in stock, purchasing and production files, each with the mistake an import makes with it.
+* [Break a rule and watch Verify catch it](verify.md) - The review as a model whose rules Verify proves from the code that decides: what is proved, the command, and three rules to break with a one-line edit, each with what it prints.
 * [Sign-in](auth.md) - How sign-in, sessions, organizations and roles are wired (Better Auth on D1), how development opens signed in, the People page, its settings, how it stays fast, how to change the schema, and what is not done.
 
 # Evidence written while building

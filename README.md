@@ -66,9 +66,9 @@ values in `.dev.vars.example`). After pulling a change to `apps/inventory/migrat
 | Command | What it does |
 | --- | --- |
 | `bun run dev` | App and API on http://localhost:5173, signed in as the first test account in development |
-| `bun run check` | Through turbo: type-check with Effect diagnostics, lint (including two design lints), the fast tests, format check, the docs check and the repository's own rules (no deprecated API is used, among them); a second run with nothing changed replays from the cache |
-| `bun run check:full` | `check` plus the slow tests and the production build |
-| `bun run test` | Every test, fast and slow (Vitest, on Node) |
+| `bun run check` | Through turbo: type-check with Effect diagnostics, lint (including two design lints), the fast tests, the proofs of the review's model ([docs/verify.md](docs/verify.md)), format check, the docs check and the repository's own rules (no deprecated API is used, among them); a second run with nothing changed replays from the cache |
+| `bun run check:full` | `check` plus Verify's search of the whole model, the slow tests and the production build |
+| `bun run test` | Every test: fast, the proofs, the search and slow (Vitest, on Node) |
 | `bun run db:reset` | Start again with an empty database (restart `bun run dev` afterwards) |
 | `bun run preview` | The production build on http://localhost:4173, with every security header, compressed as Cloudflare compresses it (`PREVIEW_COMPRESSION=off` sends it as it is) |
 | `bun run --cwd apps/inventory build:report` | The production build, and what each of its chunks is made of (`.scratch/bundle/client.html`, a treemap) |

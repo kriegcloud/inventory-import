@@ -764,7 +764,7 @@ draft its decisions were made on (`madeOn`, one field in) and its answer names t
 the first revision that has it (`MappingChoice.at`), so the server can tell without a history of matches. The screen
 takes the accepts out of the rows, draws the review again with their proposals open, and says which were taken back;
 a match made on this screen is not announced as a change on another screen. Reverse: `madeOn`, `notApplied`, `at`,
-and `withoutStaleAccepts`.
+and `withoutStaleDecisions` (which took the place of `withoutStaleAccepts`).
 
 ### 2026-11-20 — atoms, a Replace or a Keep-stored across a re-match of the SKU column
 
@@ -785,15 +785,20 @@ happens? Options: "Hold it, show both, ask (Recommended)"; "Send it, last press 
 "Hold it, show both, ask". I chose; the agent recommended the same. The row shows "Decided elsewhere since: <theirs>.
 Yours: <yours>" with a choice of which one stands; nothing is sent for that row until the person picks, and the other
 waiting rows go as usual. Built: each waiting row keeps the values it is known to have had (`Draft.seen`: what the server was known to hold
-when the row was first sent, then each value sent, any of which a failed save may have written; a value that never
+when the person began deciding it, then each value sent, any of which a failed save may have written; a value that never
 left the browser is not in it). A waiting row is never sent before it is checked against a fresh picture at least as
 new as the one held (never the picture a redraw gives again): a picture that holds none of its values puts it on hold
 (`Hold.Elsewhere`), said "Row N: decided since by someone else or another tab: <theirs>. Yours: <yours>." with Use
 mine and Keep theirs (Keep theirs offered to a view-only member too); the hold's theirs follows later pictures and the
-hold lets go when the server holds the person's decision; the confirm waits, and says so, until the person picks. A
+hold lets go when the server holds the person's decision. A
 decision of the person's own gone tab beside this tab's is held the same way ("Row N: from your other tab: … This
 tab: …", `Hold.OtherTab`), with Use the other tab's and Keep this tab's. Use mine keeps the revision the decision was
-made on. Seen on screen (the Elsewhere line, in an earlier round).
+made on. Seen on screen (the Elsewhere line).
+
+Not decided, built as follows and asked: a row held this way holds the whole confirm, and the screen says so, until the
+person picks; a refused row does not hold it, and is imported without the person's decision and named on the result.
+Not decided either: a press on Import by another member than the one whose unsaved rows the screen shows confirms
+nothing and draws the screen again for them; a save answered that the import kept changing waits and is sent again.
 
 ### 2026-11-20 — atoms, what a refused save does to waiting rows
 

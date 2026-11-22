@@ -448,12 +448,32 @@ const reasonOf = (answer: { readonly stdout: string; readonly stderr: string }) 
 }
 
 /**
- * The stop for a call 1Password did not answer: what op said (its error lines carry no value) and where to look.
- * Nothing about the token or the account is said, since nobody asked Cloudflare anything.
+ * Whether op's lines say its client never reached the 1Password app, as in Benjamin's run ("error initializing
+ * client: connecting to desktop app"). Every other error of op is 1Password answering and refusing.
+ *
+ * @example
+ * onePasswordUnreachable("[ERROR] 2026/11/22 10:00:00 error initializing client: connecting to desktop app: read: connection reset") // true
+ * onePasswordUnreachable('[ERROR] 2026/11/22 10:00:00 could not read secret "op://v/i/f": no item matched') // false
  */
-const onePasswordSilent = (what: string, stderr: string) =>
+export const onePasswordUnreachable = (stderr: string): boolean =>
+  A.some(
+    linesOf(stderr),
+    (line) => Str.includes("error initializing client")(line) || Str.includes("connecting to desktop app")(line)
+  )
+
+/** Where to look when 1Password answered and refused: the reference a run fills, or the vault it lists or writes. */
+const referencesRefused = `the references in ${localEnvFile} it fills (each names a vault, an item and a field that exist, with no template line left)`
+
+/**
+ * The stop for a call 1Password failed: what op said (its error lines carry no value) and where to look. An app op
+ * never reached is said as that, with where to look for it; any other error is 1Password refusing, with where the
+ * fix is. Nothing about the token or the account is said, since nobody asked Cloudflare anything.
+ */
+const onePasswordFailed = (what: string, stderr: string, refused: string) =>
   stop(
-    `1Password did not answer, so ${what} was never asked: ${reasonOf({ stdout: "", stderr })}. Open the 1Password app and unlock it, check that Settings, Developer, "Integrate with 1Password CLI" is on, and run this again from your own terminal. Nothing was changed.`
+    onePasswordUnreachable(stderr)
+      ? `1Password did not answer, so ${what} was never asked: ${reasonOf({ stdout: "", stderr })}. Open the 1Password app and unlock it, check that Settings, Developer, "Integrate with 1Password CLI" is on, and run this again from your own terminal. Nothing was changed.`
+      : `1Password refused ${what}: ${reasonOf({ stdout: "", stderr })}. Check ${refused}, then run this again. Nothing was changed.`
   )
 
 /** Whether a failed call under `op-human` failed in 1Password: any failure of op itself, or op's lines from `op run`. */
@@ -467,14 +487,15 @@ const failedInOnePassword = (call: Call, stderr: string) =>
 const heard = Effect.fn("InfraSetup.heard")(function* <Sch extends S.ConstraintDecoder<unknown>>(
   schema: Sch,
   call: Call,
-  what: string
+  what: string,
+  refused: string = referencesRefused
 ) {
   const workstation = yield* Workstation
   const answer = yield* workstation.ask(call.command, call.args)
   const failure = (why: string): Result.Result<Sch["Type"], string> => Result.fail(why)
   if (answer.code !== 0) {
-    if (failedInOnePassword(call, answer.stderr)) return yield* onePasswordSilent(what, answer.stderr)
-    return failure(`${what} answered with an error: ${reasonOf(answer)}`)
+    if (failedInOnePassword(call, answer.stderr)) return yield* onePasswordFailed(what, answer.stderr, refused)
+    return failure(`${what} failed: ${reasonOf(answer)}`)
   }
   return O.match(S.decodeOption(S.fromJsonString(schema))(answer.stdout), {
     onNone: () => failure(`${what} answered something this command cannot read`),
@@ -596,7 +617,7 @@ export const described = (options: SetupOptions): ((step: Step) => ReadonlyArray
     },
     StateStore: (step) => [
       `The state store in the ${step.role} account: asks first, then makes it or adopts the one that is there.`,
-      `  bunx alchemy state bootstrap --profile ${profileOf(options, step.role)}`
+      `  bunx alchemy state bootstrap --profile ${profileOf(options, step.role)}   (an account with no workers.dev subdomain yet fails here; the stop says so)`
     ],
     GitHubLogin: () => [
       "GitHub: who approves a production deploy. Logs in only when gh is not logged in.",
@@ -628,13 +649,24 @@ export const described = (options: SetupOptions): ((step: Step) => ReadonlyArray
     }
   })
 
+/**
+ * One argument as a POSIX shell reads it back: in single quotes, each single quote inside written `'\''`.
+ *
+ * @example
+ * shellQuoted("printf 'a' x") // "'printf '\\''a'\\'' x'"
+ */
+export const shellQuoted = (argument: string): string => `'${Str.replaceAll("'", "'\\''")(argument)}'`
+
 /** What `--dry-run` prints: every step in order, and that nothing was started. */
 export const dryRun = (input: {
   readonly options: SetupOptions
   /** Whether his own file names the previews' token: a run then asks cf nothing about that account. */
   readonly previewByToken: boolean
+  /** The token's names whose line the stack would take from the public op.env: a run stops before step 1. */
+  readonly misplaced?: ReadonlyArray<string>
 }): ReadonlyArray<string> => {
   const { options, previewByToken } = input
+  const misplaced = input.misplaced ?? []
   return [
     "Dry run: nothing is started and nothing is written. A run would do these steps, in this order:",
     `A run stops before its first tool when one of these is set in your shell or named in the root .env, since a deploy would use it in place of what the run checks: ${A.join(outranking(options.sizes), ", ")}.`,
@@ -643,12 +675,17 @@ export const dryRun = (input: {
           `As things are, a run stops before step 1: ${localEnvFile} does not name ${previewTokenName} and ${previewAccountIdName}, which the repository's stack needs.`
         ]
       : []),
+    ...(A.isReadonlyArrayNonEmpty(misplaced)
+      ? [
+          `As things are, a run stops before step 1: ${opEnvFile} names ${A.join(misplaced, " and ")}, which are your own and go in ${localEnvFile}.`
+        ]
+      : []),
     ...(previewByToken
       ? [
           `Before step 1, the previews' token (${localEnvFile}) is checked, and the previews' account is asked of cf in no step:`,
           `  op-human run --env-file ${localEnvFile} -- sh -c 'CLOUDFLARE_API_TOKEN="$${previewTokenName}" CLOUDFLARE_ACCOUNT_ID="$${previewAccountIdName}" cf accounts tokens verify'`,
           `  op-human run --env-file ${localEnvFile} -- sh -c '… cf accounts tokens get <token id>'`,
-          `  ${shown({ command: subdomainCall.command, args: A.take(subdomainCall.args, 6) })} '${A.last(subdomainCall.args).pipe(O.getOrElse(() => ""))}'   (the account's workers.dev subdomain, which Alchemy's state store needs: a run stops when there is none yet)`,
+          `  ${shown({ command: subdomainCall.command, args: A.take(subdomainCall.args, 6) })} ${shellQuoted(A.last(subdomainCall.args).pipe(O.getOrElse(() => "")))}   (the account's workers.dev subdomain, which Alchemy's state store needs: a run stops when there is none yet)`,
           `  and the previews' profile is connected with: op-human run --env-file ${localEnvFile} -- bunx alchemy profile edit --profile ${options.previewProfile} --add Cloudflare --method stored --set apiToken=env:${previewTokenName} --set accountId=env:${previewAccountIdName}`
         ]
       : []),
@@ -1114,7 +1151,7 @@ const tokenChecked = Effect.gen(function* () {
   const verified = yield* heard(Verified, asPreviews("cf accounts tokens verify"), "`cf accounts tokens verify`")
   if (Result.isFailure(verified)) {
     return yield* stop(
-      `Cloudflare did not verify the token ${localEnvFile} names for the previews' account: ${verified.failure}. Check ${previewTokenName} and ${previewAccountIdName} there. Nothing was changed.`
+      `The token ${localEnvFile} names for the previews' account was not verified: ${verified.failure}. That decides nothing about the token: if cf's words are about it, check ${previewTokenName} and ${previewAccountIdName} there; if they are about the network or cf itself, run this again. Nothing was changed.`
     )
   }
   if (verified.success.status !== "active") {
@@ -1320,9 +1357,10 @@ const profileAccountChecked = Effect.fn("InfraSetup.profileAccountChecked")(func
     ])
     // The script exits 0 or 3 only, so any other code is 1Password's: op ran nothing, or could not fill the id.
     if (same.code !== 0 && same.code !== 3) {
-      return yield* onePasswordSilent(
+      return yield* onePasswordFailed(
         `the comparison of profile "${name}"'s account with the id ${localEnvFile} names`,
-        same.stderr
+        same.stderr,
+        referencesRefused
       )
     }
     return same.code === 0
@@ -1416,6 +1454,15 @@ const profile = Effect.fn("InfraSetup.profile")(function* (
   return yield* profileAccountChecked(step.role, options, found)
 })
 
+/**
+ * What a failed `state bootstrap` says. Alchemy reports any failure to read the account's workers.dev subdomain as
+ * the credentials not reaching the account, and a new account has none. By his token that is asked before step 1;
+ * by a login nothing here may ask it (cf has no command for it, and the login's token is Alchemy's), so the stop
+ * names it as the likely cause when Alchemy said so.
+ */
+export const stateStoreFailed = (profile: string) =>
+  `\`bunx alchemy state bootstrap --profile ${profile}\` failed; what it said is above. If it says the current credentials "can't access" the account, the account most likely has no workers.dev subdomain yet: pick one in the Cloudflare dashboard under that account, Workers & Pages, and run this again.`
+
 const stateStore = Effect.fn("InfraSetup.stateStore")(function* (role: Role, options: SetupOptions, found: Found) {
   const workstation = yield* Workstation
   const name = profileOf(options, role)
@@ -1426,8 +1473,7 @@ const stateStore = Effect.fn("InfraSetup.stateStore")(function* (role: Role, opt
   const yes = yield* workstation.confirm(`Make sure the state store exists in ${account}?`)
   if (!yes) return yield* stop(`Stopped before the state store in ${account}. Nothing was made there by this step.`)
   const code = yield* workstation.hand("bunx", ["alchemy", "state", "bootstrap", "--profile", name])
-  if (code !== 0)
-    return yield* stop(`\`bunx alchemy state bootstrap --profile ${name}\` failed; what it said is above.`)
+  if (code !== 0) return yield* stop(stateStoreFailed(name))
   return found
 })
 
@@ -1465,7 +1511,8 @@ const previewPassword = Effect.fn("InfraSetup.previewPassword")(function* (optio
   const vaults = yield* heard(
     S.Array(Named),
     { command: "op-human", args: ["vault", "list", "--format", "json"] },
-    "`op-human vault list`"
+    "`op-human vault list`",
+    "that your 1Password account is signed in and may see its vaults"
   )
   if (Result.isFailure(vaults)) return yield* opFailed("`op-human vault list`", vaults.failure)
   const all = vaults.success
@@ -1500,7 +1547,8 @@ const previewPassword = Effect.fn("InfraSetup.previewPassword")(function* (optio
   const items = heard(
     S.Array(Titled),
     { command: "op-human", args: ["item", "list", "--vault", vault.id, "--format", "json"] },
-    "`op-human item list`"
+    "`op-human item list`",
+    `that your account may read the vault "${vault.name}" (or name another with \`--vault\`)`
   ).pipe(
     Effect.flatMap(
       Result.match({
@@ -1531,7 +1579,13 @@ const previewPassword = Effect.fn("InfraSetup.previewPassword")(function* (optio
       vault.id,
       "--generate-password"
     ])
-    if (made.code !== 0) return yield* onePasswordSilent("`op-human item create`", made.stderr)
+    if (made.code !== 0) {
+      return yield* onePasswordFailed(
+        "`op-human item create`",
+        made.stderr,
+        `that your account may make items in the vault "${vault.name}" (or name another with \`--vault\`)`
+      )
+    }
   } else {
     yield* workstation.say(`1Password: the item is in the vault "${vault.name}". Using it; its password is not read.`)
   }
@@ -1650,13 +1704,18 @@ export const setup = Effect.fn("InfraSetup.setup")(function* (given: SetupOption
   const workstation = yield* Workstation
   // A dry run with no size prints the steps of all three, so the command the agents' rule names prints steps.
   const unsized = !A.isReadonlyArrayNonEmpty(given.sizes)
-  const options: SetupOptions = unsized && given.dryRun ? { ...given, sizes: SetupSize.literals } : given
+  const stageName = /^[a-z0-9][-_a-z0-9]*$/
+  // Nobody asked for a test stage, so a name this machine's user does not make is shown as the placeholder.
+  const options: SetupOptions =
+    unsized && given.dryRun
+      ? { ...given, sizes: SetupSize.literals, user: stageName.test(given.user) ? given.user : "<user>" }
+      : given
   if (!A.isReadonlyArrayNonEmpty(options.sizes)) {
     return yield* stop(
       "Say how much to set up: `--test-stage` (a test stage and its address), `--staging` (the repository's stack) or `--production`. `--dry-run` prints the steps and starts nothing."
     )
   }
-  if (has(options.sizes, "test-stage") && !/^[a-z0-9][-_a-z0-9]*$/.test(options.user)) {
+  if (has(options.sizes, "test-stage") && !stageName.test(options.user) && !(unsized && options.dryRun)) {
     return yield* stop(
       `"test_${options.user}" is not a stage name (lower-case letters, digits, - and _). Pass \`--user <name>\`.`
     )
@@ -1675,7 +1734,15 @@ export const setup = Effect.fn("InfraSetup.setup")(function* (given: SetupOption
     accountId.file === localEnvFile
   if (options.dryRun) {
     const said = unsized ? ["No size was given, so these are the steps of all three sizes at once."] : []
-    return yield* Effect.forEach([...said, ...dryRun({ options, previewByToken })], workstation.say, {
+    const misplaced = A.filterMap(
+      [
+        [previewTokenName, token],
+        [previewAccountIdName, accountId]
+      ] as const,
+      ([name, given]) =>
+        given.file === opEnvFile && given.state !== "missing" ? Result.succeed(name) : Result.failVoid
+    )
+    return yield* Effect.forEach([...said, ...dryRun({ options, previewByToken, misplaced })], workstation.say, {
       concurrency: 1,
       discard: true
     })

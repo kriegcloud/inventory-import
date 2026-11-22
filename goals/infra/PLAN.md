@@ -215,7 +215,8 @@ only with `--dry-run`, which starts no tool (Benjamin's rule, written in CLAUDE.
 keeps a workflow and a plain agent shell out. A program that is given a terminal passes that test, so the rule for
 agents is a rule, and the command is built for the case where it is broken: it shows nothing secret itself, and
 everything it makes waits for a yes. `--dry-run` starts no tool and writes nothing; it prints the steps and the
-commands of a run (of all three sizes when none is given), with the token's commands when his own file names one, and says when a run as things are would
+commands of a run (of all three sizes when none is given, with `test_<user>` when this machine's user makes no
+stage name), with the token's commands when his own file names one, and says when a run as things are would
 stop before step 1. What a run finds on the way (an item already there, a profile already connected) only a run
 shows. Run again, it leaves alone what it can see is done: a reference already written, an item already there, a
 profile already connected to the right account. The state store is the exception: nothing reads whether it exists,
@@ -366,14 +367,20 @@ What uses them:
   the same `op-human run`, the token handed to curl on its input by the shell's own `printf`, never in an argument.
   Cloudflare's 10007 (no subdomain yet, as cf's own source reads it) stops the run and says to pick one in the
   dashboard under the previews' account, Workers & Pages; 10000 names the Workers Scripts permission; any other
-  error is shown in Cloudflare's words. Nothing is changed in each case. The dry run lists the question.
+  error is shown in Cloudflare's words. Nothing is changed in each case. The dry run lists the question, quoted as a
+  shell reads it back. Without his token (a test stage by cf's login) nothing here may ask it: cf has no command
+  for it and the login's token is Alchemy's. A failed `state bootstrap` then says that when Alchemy reports the
+  account "can't" be accessed, the likely cause is a missing subdomain, and where he picks one.
 - **Who did not answer is said, not guessed.** A call under `op-human` that fails with op's own error lines
-  (`[ERROR] …`, "error initializing client"), or any failure of an `op-human` command of its own (`vault list`,
-  `item list`, `item create`, the comparison of a profile's account), stops with "1Password did not answer", op's
-  words (they carry no value), and where to look: the app open and unlocked, Settings, Developer, "Integrate with
-  1Password CLI", and a run from his own terminal. A tool that answered with an error is shown in its own words;
-  an answer that does not decode is said as that; a token that is not active is said with the status cf gave. A
-  failed `cf zones list` is said in cf's words, not as a zone held in no account. The profile edit run under
+  (`[ERROR] …`), or any failure of an `op-human` command of its own (`vault list`, `item list`, `item create`, the
+  comparison of a profile's account), is 1Password's, and stops with op's words (they carry no value). Only an
+  app op never reached ("error initializing client", "connecting to desktop app", as in Benjamin's run) is
+  "1Password did not answer", with where to look: the app open and unlocked, Settings, Developer, "Integrate with
+  1Password CLI", and a run from his own terminal. Every other error of op is "1Password refused", with where the
+  fix is: a reference naming a vault, item and field that exist, a vault his account may see or read, or one it
+  may make items in. A tool that failed is shown in its own words; an answer that does not decode is said as that;
+  a token that is not active is said with the status cf gave; a verify that failed says it decides nothing about
+  the token. A failed `cf zones list` is said in cf's words, not as a zone held in no account. The profile edit run under
   `op-human` hands the terminal over, so its error is on screen above, and the stop names 1Password as a cause.
   op's error format was read from its output in Benjamin's run, not from op's source.
 - **The previews' Alchemy profile** takes both values with `alchemy profile edit --add Cloudflare --method stored

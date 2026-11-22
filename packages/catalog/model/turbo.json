@@ -6,7 +6,8 @@
     // asking and the values they share), the kernel those blocks import from, how the code is compiled, and the
     // pinned library; turbo adds the versions the lockfile resolves for this package (Effect, the solver, the
     // parser) and the vendored kit the kernel is built on, which the root depends on. It is replayed until one of
-    // them changes: an edit to a handler, a store or a screen's rule of this package does not run the proofs again.
+    // them changes, or the limits and retries its vitest config takes from the root: an edit to a handler, a store or
+    // a screen's rule of this package does not run the proofs again.
     "prove": {
       "inputs": [
         "package.json",
@@ -22,7 +23,9 @@
         "$TURBO_ROOT$/packages/kernel/package.json",
         "$TURBO_ROOT$/packages/kernel/src/**",
         "$TURBO_ROOT$/tsconfig.base.json",
-        "$TURBO_ROOT$/vendor/alchemy/*.tgz"
+        "$TURBO_ROOT$/vendor/alchemy/*.tgz",
+        "$TURBO_ROOT$/vitest.shared.ts",
+        "$TURBO_ROOT$/vitest.retries.ts"
       ],
       "outputs": []
     },
@@ -48,7 +51,9 @@
         "$TURBO_ROOT$/packages/kernel/package.json",
         "$TURBO_ROOT$/packages/kernel/src/**",
         "$TURBO_ROOT$/tsconfig.base.json",
-        "$TURBO_ROOT$/vendor/alchemy/*.tgz"
+        "$TURBO_ROOT$/vendor/alchemy/*.tgz",
+        "$TURBO_ROOT$/vitest.shared.ts",
+        "$TURBO_ROOT$/vitest.retries.ts"
       ],
       "outputs": []
     },
@@ -76,7 +81,8 @@
         "src/**/*.model.ts",
         "$TURBO_ROOT$/packages/catalog/contract/package.json",
         "$TURBO_ROOT$/packages/catalog/contract/src/**",
-        "$TURBO_ROOT$/vitest.shared.ts"
+        "$TURBO_ROOT$/vitest.shared.ts",
+        "$TURBO_ROOT$/vitest.retries.ts"
       ],
       "outputs": []
     },
@@ -101,7 +107,8 @@
         "src/**/*.model.ts",
         "$TURBO_ROOT$/packages/catalog/contract/package.json",
         "$TURBO_ROOT$/packages/catalog/contract/src/**",
-        "$TURBO_ROOT$/vitest.shared.ts"
+        "$TURBO_ROOT$/vitest.shared.ts",
+        "$TURBO_ROOT$/vitest.retries.ts"
       ],
       "outputs": []
     }

@@ -155,11 +155,26 @@ export const isDecided = (row: RowState): row is DecidedRow =>
   Match.value(row).pipe(byStatus({ Untouched: no, Undecided: no, Decided: yes }))
 
 /**
- * Taking these flags would leave the row as it is: it holds them already, or it holds nothing and they decide nothing.
- * Such an act records nothing, whoever decided what is there (Benjamin, 2026-11-19: "Answer says 'no change'").
+ * A decision's text with the matching it was made on, as one text: the matching's number ends at the first colon, so
+ * two are equal only when both the matching and the flags are. One text, because the prover takes both sides of every
+ * comparison it cannot settle, and "the same text on the same matching" is then one question and not two.
+ *
+ * @example onItsMatching({ flags: '{"kept":true}', madeOn: 1 }) // '1:{"kept":true}'
  */
-export const leavesAsItIs = (act: { readonly row: RowState; readonly flags: string }): boolean =>
-  isDecided(act.row) ? act.row.flags === act.flags : act.flags === NO_DECISION
+export const onItsMatching = (decision: { readonly flags: string; readonly madeOn: number }): string =>
+  `${decision.madeOn}:${decision.flags}`
+
+/**
+ * Taking these flags on this matching would leave the row as it is: it holds them already, made on the same matching,
+ * or it holds nothing and they decide nothing. Such an act records nothing, whoever decided what is there (Benjamin,
+ * 2026-11-19: "Answer says 'no change'"). The same text made again on a newer matching is a change: the row's
+ * decision is then on the matching now.
+ */
+export const leavesAsItIs = (act: {
+  readonly row: RowState
+  readonly flags: string
+  readonly madeOn: number
+}): boolean => (isDecided(act.row) ? onItsMatching(act.row) === onItsMatching(act) : act.flags === NO_DECISION)
 
 /**
  * One row of one import's review: its decision, the one under it, and the rest sealed. It has no command of its own,

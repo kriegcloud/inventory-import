@@ -61,7 +61,7 @@ export const whoMayChange = (aggregate: string): ReadonlyArray<string> =>
  *
  * Ours, and no rule's standing: the lock and `require.proved` hold the rules a decision has, but only as written, and
  * nothing in the library asks whether a decision that records on a Row or a Group says whose act it records. A Row or
- * a Group has no command, so no middleware of its own: a decision added later (adoption's, say) that records on one
+ * a Group has no command, so no middleware of its own: a decision added later that records on one
  * and states none of these would lock and prove, and let anyone change the row.
  */
 export const missingRules = (report: Prove.DecisionReport): ReadonlyArray<string> =>

@@ -29,7 +29,7 @@ import {
   StepUndone
 } from "../Row/Row.aggregate.ts"
 import { Change, ImportKey, RowKey, Step } from "./Change.schema.ts"
-import { GroupedSince } from "./Deciding.decision.ts"
+import { GroupedAfter, GroupedSince } from "./Deciding.decision.ts"
 
 /** The row does not hold the change named as its sender's own decision. */
 export class NotYourStep extends Domain.Rejection(
@@ -58,8 +58,9 @@ export class HistoryEnds extends Domain.Rejection(
 
 /**
  * Take back one change on one row. `undo` is the change taken back; `step` is this act's own; `sawGroup` is the
- * import's last act on a group as the sender's screen has it; `next`, with `below` under it, goes under the decision
- * put back.
+ * import's last act on a group as the sender's screen has it; `covered` says a group in force, decided after the
+ * decision taken back, covers the row (the sender's word, from a screen that has every group act: `sawGroup`); `next`,
+ * with `below` under it, goes under the decision put back.
  */
 export class UndoRowStep extends Domain.Command(
   "UndoRowStep",
@@ -71,6 +72,7 @@ export class UndoRowStep extends Domain.Command(
       undo: Change,
       step: Step,
       sawGroup: Change,
+      covered: S.Boolean,
       opening: S.Int,
       next: Level,
       // A history is sealed only while it is at most `MOST_BELOW` long, so no true `below` is longer.
@@ -83,6 +85,7 @@ export class UndoRowStep extends Domain.Command(
       ConfirmedSince,
       GroupedSince,
       NotYourStep,
+      GroupedAfter,
       DecidedBeforeTheConfirm,
       HistoryEnds,
       NotWhatWasUnder
@@ -120,6 +123,10 @@ export class Undoing extends Domain.Decision(
       if (!isDecided(row.state) || row.state.by !== actor.memberId || row.state.change !== cmd.undo) {
         return yield* new NotYourStep({})
       }
+      // A group in force was decided after this decision and covers the row: it was drawn on a screen that had the
+      // decision, as a later group was on one that had an earlier group. Refused and shown; once the group is taken
+      // back, the decision can be (2026-11-22, by the rule on a press from a screen that is behind).
+      if (cmd.covered) return yield* new GroupedAfter({ last: life.state.topGroup })
       // What a standing confirm wrote is taken back with the import, not here.
       if (row.state.change <= life.state.confirmedAt) return yield* new DecidedBeforeTheConfirm({})
       if (row.state.under.change === -1) return yield* new HistoryEnds({})
@@ -162,6 +169,8 @@ export class Undoing extends Domain.Decision(
       // A row's undo is made on a screen that has the import's last act on a group.
       ARowsUndoSawTheLastGroupAct: ({ before, command }) =>
         isOpen(before.life) && command.sawGroup === before.life.lastGroup,
+      // A decision a later group in force covers is not taken back from under it.
+      ARowsUndoIsNotFromUnderALaterGroup: ({ command }) => !command.covered,
       // It does not reach past a confirm that stands.
       AnUndoDoesNotReachPastAConfirm: ({ before }) =>
         isOpen(before.life) && isDecided(before.row) && before.row.change > before.life.confirmedAt,

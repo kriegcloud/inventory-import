@@ -450,7 +450,9 @@ those files, read [docs/verify.md](docs/verify.md).
   and in every rule a decision reads; past 4,096 paths it proves nothing. The proof tests state each decision's paths.
   A relation of the model is proved across each decision too, with paths of its own that no proof test states: a
   `decide` that asks the same thing of its command twice (`cmd.covered`, then `cmd.covered` again after other checks)
-  doubles them, and the relation is then only searched, which fails `verify`. Ask once, and branch.
+  doubles them, and the relation is then only searched, which fails `verify`. Ask once, and branch. What counts most
+  is how many ways through the `decide` reach the record: a check that lets an act go on in two ways ("the text
+  differs, or the matching does") is written as one comparison (`onItsMatching`).
 - **An aggregate's rule reads only what its own commands' middleware provides.** `Row` and `Group` have no command, so
   the rules about who may change a row or a group are rules of each decision that records on it, under the same
   name in each. A new decision that records on one states them too, and its proof calls the check that it

@@ -22,8 +22,12 @@
     },
     // oxlint, and the design-system lint in packages with screens.
     "lint": { "outputs": [] },
-    // The fast tests.
-    "test": { "dependsOn": ["transit"], "outputs": [] },
+    // The fast tests. Their limits are the root's (vitest.shared.ts), which every package's vitest.config.ts imports.
+    "test": {
+      "dependsOn": ["transit"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/vitest.shared.ts"],
+      "outputs": []
+    },
     // The slow tests: workerd, a real D1 database and sign-in. One suite calls a live service, so never cached.
     "test:slow": { "dependsOn": ["transit"], "cache": false },
     // The production build and its identity check.
@@ -167,6 +171,7 @@
       "dependsOn": ["transit"],
       "inputs": [
         "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/vitest.shared.ts",
         "$TURBO_ROOT$/.oxlintrc.deprecated-apis.json",
         "$TURBO_ROOT$/bun.lock",
         "$TURBO_ROOT$/package.json",

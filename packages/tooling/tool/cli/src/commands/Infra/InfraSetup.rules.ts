@@ -37,6 +37,31 @@ const $I = $RepoCliId.create("commands/Infra/InfraSetup.rules")
 /** The file of `op://` references, from the repository's root. */
 export const opEnvFile = "packages/infra/env/op.env"
 
+/**
+ * The owner's own references, from the repository's root: a file git ignores, so the names of his vault and items
+ * stay out of the repository. It may name the second account's token and id.
+ */
+export const localEnvFile = "packages/infra/env/op.env.local"
+
+/** The variable, in `op.env.local`, of an account-owned API token for the previews' account. */
+export const previewTokenName = "PREVIEW_CLOUDFLARE_API_TOKEN"
+
+/** The variable, in `op.env.local`, of the previews' account id. */
+export const previewAccountIdName = "PREVIEW_CLOUDFLARE_ACCOUNT_ID"
+
+/**
+ * What a token must be allowed in the previews' account for a deploy there: the same list the repository's stack
+ * gives the token it makes (`account` in `packages/infra/src/GitHub.stack.ts`, itself unverified until a first
+ * apply). Kept in step by hand: nothing in the tooling may import the stack.
+ */
+export const previewTokenNeeds: ReadonlyArray<string> = [
+  "Account Settings Read",
+  "Workers Scripts Write",
+  "D1 Write",
+  "Secrets Store Write",
+  "Workers Tail Read"
+]
+
 /** The repository's stack, from the repository's root. */
 export const repositoryStack = "packages/infra/src/GitHub.stack.ts"
 
@@ -238,7 +263,9 @@ export type ReferenceState = typeof ReferenceState.Type
 
 const linesOf = (text: string) => A.map(Str.split("\n")(text), Str.trim)
 
-const isReference = (value: string) => /^"?op:\/\/[^\s<>"/]+\/[^\s<>"/]+\/[^\s<>"]+"?$/.test(value)
+// A vault's or an item's name may hold spaces; the line is then quoted.
+const isReference = (value: string) =>
+  /^op:\/\/[^\s<>"/]+\/[^\s<>"/]+\/[^\s<>"]+$/.test(value) || /^"op:\/\/[^<>"/]+\/[^<>"/]+\/[^<>"]+"$/.test(value)
 
 /**
  * What `op.env` holds for one variable. A line still holding the template's `<vault>` is not a reference.
@@ -326,9 +353,11 @@ export interface Found {
   readonly preview: O.Option<Account>
   readonly production: O.Option<Account>
   readonly approver: O.Option<string>
+  /** Whether `op.env.local` names a token and an id for the previews' account: no login to it is then needed. */
+  readonly previewByToken: boolean
 }
 
-const nothingFound: Found = { preview: O.none(), production: O.none(), approver: O.none() }
+const nothingFound: Found = { preview: O.none(), production: O.none(), approver: O.none(), previewByToken: false }
 
 const accountOf = (found: Found, role: Role) =>
   Role.match(role, { preview: () => found.preview, production: () => found.production })
@@ -382,6 +411,7 @@ export const described = (options: SetupOptions): ((step: Step) => ReadonlyArray
     ],
     Cloudflare: (step) => [
       `Cloudflare: which account is for ${A.join(step.roles, " and for ")}. Logs in only when cf is not logged in; the login is yours, in the browser.`,
+      `  when ${localEnvFile} names ${previewTokenName} and ${previewAccountIdName}: the previews' account is that one, with no login; its profile is connected under \`op-human run --env-file ${localEnvFile}\` after \`cf accounts tokens verify\` and \`get\` say what the token allows`,
       "  cf auth whoami",
       "  cf auth login   (only when not logged in)",
       `  cf zones list --name ${productionZone}   (the account that holds it is production's; you are shown both roles and asked)`
@@ -497,11 +527,18 @@ const pick = Effect.fn("InfraSetup.pick")(function* (input: {
 })
 
 const cloudflare = Effect.fn("InfraSetup.cloudflare")(function* (
-  roles: ReadonlyArray<Role>,
+  wantedRoles: ReadonlyArray<Role>,
   options: SetupOptions,
   found: Found
 ) {
   const workstation = yield* Workstation
+  if (found.previewByToken) {
+    yield* workstation.say(
+      `Cloudflare: the previews' account is the one ${localEnvFile} names a token and an id for. No login to it is needed, and cf is not asked about it.`
+    )
+  }
+  const roles = found.previewByToken ? A.filter(wantedRoles, (role) => role !== "preview") : wantedRoles
+  if (!A.isReadonlyArrayNonEmpty(roles)) return found
   const whoAmI = read(WhoAmI, { command: "cf", args: ["auth", "whoami"] })
   const asked = yield* whoAmI
   const first = loggedIn(asked)
@@ -587,6 +624,65 @@ export const profilesOf = (listing: string): ReadonlyArray<{ readonly name: stri
 
 const connected = (providers: string, provider: string) => new RegExp(`(^|, )${provider} \\(`).test(providers)
 
+/** A call under 1Password with the owner's own references filled, the two of the previews' account under cf's names. */
+const asPreviews = (script: string): Call => ({
+  command: "op-human",
+  args: [
+    "run",
+    "--env-file",
+    localEnvFile,
+    "--",
+    "sh",
+    "-c",
+    `CLOUDFLARE_API_TOKEN="$${previewTokenName}" CLOUDFLARE_ACCOUNT_ID="$${previewAccountIdName}" ${script}`
+  ]
+})
+
+const Verified = S.Struct({ id: S.String, status: S.String }).pipe(
+  $I.annoteSchema("Verified", { description: "What `cf accounts tokens verify` answers: the token's id and status" })
+)
+
+const Permitted = S.Struct({
+  policies: S.Array(S.Struct({ effect: S.String, permission_groups: S.Array(S.Struct({ name: S.String })) }))
+}).pipe($I.annoteSchema("Permitted", { description: "A token's policies: what each allows, by permission group" }))
+
+/**
+ * Whether the previews' token works and is allowed what a deploy needs, said before anything is made with it. A
+ * token that cannot show its own permissions, or lacks one, is his to go on with or not.
+ */
+const tokenChecked = Effect.gen(function* () {
+  const workstation = yield* Workstation
+  const verified = yield* read(Verified, asPreviews("cf accounts tokens verify"))
+  if (O.isNone(verified) || verified.value.status !== "active" || !/^[0-9a-f]{32}$/.test(verified.value.id)) {
+    return yield* stop(
+      `The token ${localEnvFile} names for the previews' account did not verify as active (\`cf accounts tokens verify\`). Check ${previewTokenName} and ${previewAccountIdName} there. Nothing was changed.`
+    )
+  }
+  const needs = A.join(previewTokenNeeds, ", ")
+  const permitted = yield* read(Permitted, asPreviews(`cf accounts tokens get ${verified.value.id}`))
+  const lacking = O.map(permitted, (token) => {
+    const allowed = A.flatMap(token.policies, (policy) =>
+      policy.effect === "allow" ? A.map(policy.permission_groups, (group) => group.name) : []
+    )
+    return A.filter(previewTokenNeeds, (need) => !A.contains(allowed, need))
+  })
+  if (O.isSome(lacking) && !A.isReadonlyArrayNonEmpty(lacking.value)) {
+    return yield* workstation.say(
+      `Cloudflare: the previews' token is active and allows what a deploy needs (${needs}).`
+    )
+  }
+  yield* workstation.say(
+    O.match(lacking, {
+      onNone: () =>
+        `Cloudflare: the previews' token is active, but it may not read its own permissions, so they were not checked. A deploy needs: ${needs}.`,
+      onSome: (missing) =>
+        `Cloudflare: the previews' token is active and lacks: ${A.join(missing, ", ")}. A deploy needs: ${needs}. Add them to the token in the dashboard, or go on if the names differ there.`
+    })
+  )
+  const yes = yield* workstation.confirm("Go on with this token?")
+  if (!yes) return yield* stop("Stopped at the previews' token. Nothing was changed.")
+})
+
 const profile = Effect.fn("InfraSetup.profile")(function* (
   role: Role,
   github: boolean,
@@ -617,6 +713,38 @@ const profile = Effect.fn("InfraSetup.profile")(function* (
     yield* workstation.say(
       `Alchemy: profile "${name}" is there and connected to ${A.join(wanted, " and ")}. Left as it is.`
     )
+    return found
+  }
+  if (role === "preview" && found.previewByToken) {
+    yield* tokenChecked
+    yield* workstation.say(
+      `Alchemy: connecting profile "${name}" to the previews' account with the token and id ${localEnvFile} names. 1Password fills them for that one command; Alchemy then keeps the token in its profile store on this machine.`
+    )
+    const stored = yield* workstation.hand("op-human", [
+      "run",
+      "--env-file",
+      localEnvFile,
+      "--",
+      "bunx",
+      "alchemy",
+      "profile",
+      "edit",
+      "--profile",
+      name,
+      "--add",
+      "Cloudflare",
+      "--method",
+      "stored",
+      "--set",
+      `apiToken=env:${previewTokenName}`,
+      "--set",
+      `accountId=env:${previewAccountIdName}`
+    ])
+    if (stored !== 0) return yield* stop(`Connecting profile "${name}" did not finish; what it said is above.`)
+    const now = yield* listed
+    if (!O.exists(now, (one) => connected(one.providers, "Cloudflare"))) {
+      return yield* stop(`Profile "${name}" is still not connected to Cloudflare. Run this again.`)
+    }
     return found
   }
   const account = O.match(accountOf(found, role), { onNone: () => "", onSome: (one) => ` "${one.name}"` })
@@ -878,10 +1006,30 @@ export const setup = Effect.fn("InfraSetup.setup")(function* (options: SetupOpti
     return yield* Effect.forEach(dryRun(options), workstation.say, { concurrency: 1, discard: true })
   }
   yield* ownerOnly
+  const repo = yield* Repo
+  const local = repo.join(repo.root, localEnvFile)
+  const own = (yield* repo.exists(local)) ? yield* repo.text(local) : ""
+  const token = referenceState({ text: own, name: previewTokenName })
+  const accountId = referenceState({ text: own, name: previewAccountIdName })
+  if (
+    (token === "missing") !== (accountId === "missing") ||
+    token === "not-a-reference" ||
+    accountId === "not-a-reference"
+  ) {
+    return yield* stop(
+      `${localEnvFile} must name both ${previewTokenName} and ${previewAccountIdName} as op:// references (a name with a space in quotes), or neither. Nothing was started; no line was printed.`
+    )
+  }
+  const previewByToken = token === "reference"
+  if (previewByToken && has(options.sizes, "staging")) {
+    return yield* stop(
+      `${localEnvFile} names a token for the previews' account, which serves a test stage there. The repository's stack does not use it: it makes both accounts' deploy tokens itself, with the one login it is deployed with, and that login does not reach the second account. Two ways on, both Benjamin's to choose: add production's login as a member of the second account, or change the stack to write a token he made as the previews' secret. Nothing was started.`
+    )
+  }
   const steps = stepsFor(options.sizes)
   yield* Effect.reduce(
     steps,
-    (): Found => nothingFound,
+    (): Found => ({ ...nothingFound, previewByToken }),
     (found, step, index) =>
       workstation.say(`\nStep ${index + 1} of ${steps.length}.`).pipe(Effect.andThen(perform(options, found)(step)))
   )

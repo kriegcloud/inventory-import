@@ -11,7 +11,9 @@ import * as R from "effect/Record"
 import * as Str from "effect/String"
 import {
   dryRun,
+  localEnvFile,
   opEnvFile,
+  previewTokenNeeds,
   previewPasswordItem,
   profilesOf,
   referenceState,
@@ -51,6 +53,8 @@ interface World {
   github: O.Option<string>
   /** The id of the account that holds production's zone, when cf can tell. */
   zone: O.Option<string>
+  /** The second account's token: whether it verifies, and what it allows (none when it may not say). */
+  token: { active: boolean; allows: O.Option<ReadonlyArray<string>> }
   /** His answer to a yes-or-no question. */
   yes: (question: string) => boolean
   /** What a tool handed the terminal exits with. */
@@ -67,6 +71,7 @@ const world = (over: Partial<World> = {}): World => ({
   items: [],
   github: O.some("octo-owner"),
   zone: O.none(),
+  token: { active: true, allows: O.some(previewTokenNeeds) },
   yes: () => true,
   exits: () => 0,
   log: [],
@@ -92,6 +97,18 @@ const standIn = (w: World): Workstation["Service"] => {
         if (asked === "cf zones list --name beep-effect.com") {
           const zones = A.map(A.fromOption(w.zone), (id) => ({ name: "beep-effect.com", account: { id } }))
           return answer(json(zones))
+        }
+        if (Str.endsWith("cf accounts tokens verify")(asked)) {
+          return answer(
+            json({ id: "0123456789abcdef0123456789abcdef", status: w.token.active ? "active" : "disabled" })
+          )
+        }
+        if (Str.includes("cf accounts tokens get 0123456789abcdef0123456789abcdef")(asked)) {
+          return O.match(w.token.allows, {
+            onNone: () => answer("", 1),
+            onSome: (names) =>
+              answer(json({ policies: [{ effect: "allow", permission_groups: A.map(names, (name) => ({ name })) }] }))
+          })
         }
         if (asked === "bunx alchemy profile list") {
           return answer(
@@ -131,12 +148,13 @@ const standIn = (w: World): Workstation["Service"] => {
         if (code !== 0) return code
         if (handed === "cf auth login") w.cloudflare = true
         if (handed === "gh auth login") w.github = O.some("octo-owner")
-        const edited = Str.match(/^bunx alchemy profile edit --profile (\S+) (.*)$/)(handed)
+        const edited = Str.match(/bunx alchemy profile edit --profile (\S+) (.*)$/)(handed)
         if (O.isSome(edited)) {
           const name = `${edited.value[1]}`
           const added = A.map(
-            A.filter(Str.split(" ")(`${edited.value[2]}`), (word) => word !== "--add"),
-            (provider) => `${provider} (${provider === "GitHub" ? "gh-cli" : "oauth"})`
+            A.filter(Str.split(" ")(`${edited.value[2]}`), (word) => word === "Cloudflare" || word === "GitHub"),
+            (provider) =>
+              `${provider} (${provider === "GitHub" ? "gh-cli" : Str.includes("--method stored")(handed) ? "stored" : "oauth"})`
           )
           const before = R.get(w.profiles, name).pipe(O.getOrElse(() => ""))
           w.profiles = { ...w.profiles, [name]: A.join([...(before === "" ? [] : [before]), ...added], ", ") }
@@ -173,9 +191,9 @@ const options = (over: Partial<SetupOptions> = {}): SetupOptions => ({
 })
 
 /** One run in a repository holding this `op.env`: why it stopped (if it did), and the file afterwards. */
-const run = (w: World, given: SetupOptions, env = untouched) =>
+const run = (w: World, given: SetupOptions, env = untouched, own: O.Option<string> = O.none()) =>
   inTree(
-    { [opEnvFile]: env },
+    { [opEnvFile]: env, ...O.match(own, { onNone: () => ({}), onSome: (text) => ({ [localEnvFile]: text }) }) },
     Effect.gen(function* () {
       const repo = yield* Repo
       const stopped = yield* setup(given).pipe(
@@ -594,6 +612,107 @@ describe("infra setup: the repository's stack and production", () => {
   )
 })
 
+describe("infra setup: the second account by its token", () => {
+  // His own references, with a space in the item's name as his are; the names here are made up.
+  const own = O.some(
+    A.join(
+      [
+        'PREVIEW_CLOUDFLARE_API_TOKEN="op://Vault/Second Account/ACCOUNT_API_TOKEN"',
+        'PREVIEW_CLOUDFLARE_ACCOUNT_ID="op://Vault/Second Account/ACCOUNT_ID"',
+        ""
+      ],
+      "\n"
+    )
+  )
+  const underOwn = "op-human run --env-file packages/infra/env/op.env.local --"
+  const asCf =
+    'sh -c CLOUDFLARE_API_TOKEN="$PREVIEW_CLOUDFLARE_API_TOKEN" CLOUDFLARE_ACCOUNT_ID="$PREVIEW_CLOUDFLARE_ACCOUNT_ID" cf accounts tokens'
+
+  it.effect(
+    "a test stage goes there with no login: the token is checked, then the profile takes it from 1Password",
+    () =>
+      Effect.gen(function* () {
+        const w = world()
+        const result = yield* run(w, options(), untouched, own)
+        expect(result.stopped).toEqual(O.none())
+        expect(started(w)).toEqual([
+          "ask: bunx alchemy profile list",
+          "ask: bunx alchemy profile create inventory-preview",
+          `ask: ${underOwn} ${asCf} verify`,
+          `ask: ${underOwn} ${asCf} get 0123456789abcdef0123456789abcdef`,
+          `hand: ${underOwn} bunx alchemy profile edit --profile inventory-preview --add Cloudflare --method stored --set apiToken=env:PREVIEW_CLOUDFLARE_API_TOKEN --set accountId=env:PREVIEW_CLOUDFLARE_ACCOUNT_ID`,
+          "ask: bunx alchemy profile list",
+          "hand: bunx alchemy state bootstrap --profile inventory-preview",
+          "hand: bunx alchemy plan --stage test_ben --profile inventory-preview",
+          "hand: bunx alchemy deploy --stage test_ben --profile inventory-preview --yes"
+        ])
+        // Neither a reference nor the names in it reach a line or an argument: only the file's path does.
+        expect(A.some(w.log, (entry) => /op:\/\/|Second Account/.test(entry))).toBe(false)
+        expect(at(w, "say: Cloudflare: the previews' token is active and allows what a deploy needs")).toBeGreaterThan(
+          -1
+        )
+      })
+  )
+
+  it.effect(
+    "a token that lacks a permission, or may not show its own, is said and asked about before the profile",
+    () =>
+      Effect.gen(function* () {
+        const lacking = world({
+          token: { active: true, allows: O.some(["Workers Scripts Write", "Account Settings Read"]) },
+          yes: (question) => question !== "Go on with this token?"
+        })
+        const stopped = yield* run(lacking, options(), untouched, own)
+        expect(O.getOrElse(stopped.stopped, () => "")).toContain("Stopped at the previews' token")
+        expect(at(lacking, "lacks: D1 Write, Secrets Store Write, Workers Tail Read")).toBeGreaterThan(-1)
+        expect(A.some(started(lacking), Str.includes("profile edit"))).toBe(false)
+        const silent = world({ token: { active: true, allows: O.none() } })
+        const went = yield* run(silent, options(), untouched, own)
+        expect(went.stopped).toEqual(O.none())
+        expect(at(silent, "may not read its own permissions")).toBeLessThan(
+          at(silent, "confirm: Go on with this token?")
+        )
+        expect(at(silent, "confirm: Go on with this token?")).toBeLessThan(at(silent, "profile edit"))
+      })
+  )
+
+  it.effect(
+    "a token that does not verify stops it before the profile; one line of the two alone stops it at once",
+    () =>
+      Effect.gen(function* () {
+        const dead = world({ token: { active: false, allows: O.none() } })
+        const first = yield* run(dead, options(), untouched, own)
+        expect(O.getOrElse(first.stopped, () => "")).toContain("did not verify as active")
+        expect(A.some(started(dead), Str.includes("profile edit"))).toBe(false)
+        const half = world()
+        const second = yield* run(half, options(), untouched, O.some("PREVIEW_CLOUDFLARE_API_TOKEN=op://v/i/f\n"))
+        expect(O.getOrElse(second.stopped, () => "")).toContain("must name both")
+        const value = world()
+        const third = yield* run(
+          value,
+          options(),
+          untouched,
+          O.some(`PREVIEW_CLOUDFLARE_API_TOKEN=${secret}\nPREVIEW_CLOUDFLARE_ACCOUNT_ID=op://v/i/f\n`)
+        )
+        expect(O.getOrElse(third.stopped, () => "")).toContain("must name both")
+        expect([...started(half), ...started(value)]).toEqual([])
+        expect(A.some([...value.log, ...A.getSomes([third.stopped])], Str.includes(secret))).toBe(false)
+      })
+  )
+
+  it.effect("the repository's stack does not use the token: staging stops at once and says the two ways on", () =>
+    Effect.gen(function* () {
+      const w = world({ profiles: connected })
+      const result = yield* run(w, options({ sizes: ["staging"] }), untouched, own)
+      expect(O.getOrElse(result.stopped, () => "")).toContain(
+        "add production's login as a member of the second account"
+      )
+      expect(started(w)).toEqual([])
+      expect(result.env).toBe(untouched)
+    })
+  )
+})
+
 describe("infra setup: what it reads", () => {
   it("a variable of op.env is missing, a reference, or something else", () => {
     const name = "PREVIEW_TEST_ACCOUNT_PASSWORD"
@@ -602,6 +721,8 @@ describe("infra setup: what it reads", () => {
     expect(referenceState({ text: `  ${name}="op://v/i/section/field"`, name })).toBe("reference")
     expect(referenceState({ text: `${name}=op://<vault>/<item>/<field>`, name })).toBe("not-a-reference")
     expect(referenceState({ text: `${name}=hunter2`, name })).toBe("not-a-reference")
+    expect(referenceState({ text: `${name}="op://Vault/An Item/FIELD"`, name })).toBe("reference")
+    expect(referenceState({ text: `${name}=op://Vault/An Item/FIELD`, name })).toBe("not-a-reference")
     expect(referenceState({ text: `${name}=op://v/i/f\n${name}=hunter2`, name })).toBe("not-a-reference")
   })
 

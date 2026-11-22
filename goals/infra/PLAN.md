@@ -267,7 +267,28 @@ and `email`, or `apiToken`, and the account's id), and it would serve a test sta
 not the stack. What makes everything above work unchanged: in the second account's dashboard, Manage Account,
 Members, invite the first login as Super Administrator, and accept. `cf` then lists both accounts and one browser
 login serves both profiles. The other way is a change to the stack so each token is made with its own account's
-credential; it is not built. The command does not use the API key's reference, and nothing here resolves it.
+credential; it is not built.
+
+**The second account by its own token.** Benjamin made an account-owned API token for the second account and keeps
+it, with the account's id, in 1Password. He writes the two references himself into `packages/infra/env/op.env.local`,
+a file git ignores, so the names of his vault and item stay out of the repository (a name with a space takes
+quotes):
+
+```
+PREVIEW_CLOUDFLARE_API_TOKEN="op://<vault>/<item>/<field>"
+PREVIEW_CLOUDFLARE_ACCOUNT_ID="op://<vault>/<item>/<field>"
+```
+
+With both lines there, the previews' account is that one and needs no browser login: `--test-stage` asks `cf`
+nothing, checks the token under `op-human run --env-file` that file (`cf accounts tokens verify`, then `get` for
+what it allows, against the five permissions the repository's stack gives a deploy token), says what is missing and
+asks before going on, and connects the profile with `alchemy profile edit --add Cloudflare --method stored --set
+apiToken=env:... --set accountId=env:...`, the values filled by 1Password for that one command. Alchemy then keeps
+the token in its profile store on his machine. The command never reads either reference or prints a line of the
+file. A token's write permissions are only read, never tried: a permission whose name differs in the dashboard
+shows as missing and he may go on. `--staging` stops at once when that file names a token, for the reason above:
+the stack does not use it. The other references he keeps in that item (a global API key, and three for R2's S3
+API) are used by nothing here; no stack makes anything in R2.
 
 **Never run for real.** The command was tested with stand-ins for every tool (`test/InfraSetup.test.ts` in
 `packages/tooling/tool/cli`: what is started, in which order, with which arguments, and that each guard stops it)
@@ -275,7 +296,10 @@ and with `--dry-run`. No agent ran `op-human`, `alchemy` or a login. Read from t
 not tried: that `op-human item create --generate-password` and `item list` behave as their help says; that
 `alchemy profile list`, read through a pipe, prints one line a profile as its source does; that `alchemy profile
 edit --add Cloudflare --add GitHub` asks for both in one run; that `plan` prints in full under `op run`; and that
-`op-human run` passes the given variables on. `cf auth whoami` was run once, to read the shape of its answer.
+`op-human run` passes the given variables on. Likewise not tried, for the second account's token: that `op run` fills a quoted reference whose item name has a
+space; that `cf` uses `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` from the environment over its own login;
+that `cf accounts tokens verify` and `get` answer the fields read here; and that `--method stored` takes an
+account-owned token. `cf auth whoami` and `cf zones list` were run, to read the shape of their answers.
 
 ### The same steps, by hand
 

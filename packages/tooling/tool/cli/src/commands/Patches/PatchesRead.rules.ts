@@ -243,3 +243,17 @@ export const applyEach = Effect.fn("Patches.applyEach")(function* (set: PatchSet
 
 /** Where a package is installed, from the root. */
 export const installedAt = (name: string): string => `node_modules/${name}`
+
+/**
+ * Whether what is installed for a package holds every change a file bun applies writes: the file comes back out of
+ * it cleanly. An install made before the file last changed does not, and neither does one bun made without it.
+ *
+ * @category rules
+ */
+export const holdsPatches = Effect.fn("Patches.holdsPatches")(function* (name: string, built: string) {
+  const repo = yield* Repo
+  const installed = repo.join(repo.root, installedAt(name))
+  if (!(yield* repo.exists(installed))) return false
+  const answer = yield* gitApply(installed, ["--check", "--reverse"], repo.join(repo.root, built))
+  return answer.code === 0
+})

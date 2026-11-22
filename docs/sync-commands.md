@@ -36,6 +36,9 @@ packages at different versions of `effect`, a package no `workspaces` pattern co
 - **A patched dependency stops the update.** When a dependency the repository patches
   ([Patching a dependency](patches.md)) has a newer version, nothing is moved, and the command names the folder of
   its patches: a patch is made for one version, and bun would install the new one unpatched with one warning line.
+  A folder of patches whose headers do not say which package and version they are for (a field missing or empty,
+  or two that disagree) stops it the same way, whenever anything would move: finish the headers first
+  (`bun run beep patches check`).
 - **Held dependencies stay**, and each is named at every run with the registry's newest version (one written as an
   address, as `xlsx` is, has none: the registry cannot be asked about it), and its group
   with why it is held and what moves it by hand. So one run says everything an update needs: what moved, and for

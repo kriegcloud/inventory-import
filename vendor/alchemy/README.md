@@ -86,8 +86,8 @@ fails:
    `bun.lock` names nothing by `pkg.alchemy.run`, and that no patch is registered for a file that is not pinned.
 8. Installs a copy of the working tree with an empty cache through a proxy that refuses `pkg.alchemy.run`, and fails
    if the install asked for it, changed `bun.lock` or put anything else in place than the files here.
-9. Checks that every patch is installed (`bun run beep patches check`) and that each one's test still fails without
-   it (`bun run beep patches prove`).
+9. Checks that every patch is installed (`bun run beep patches check`) and that each one's test still fails with
+   that patch alone left out (`bun run beep patches prove`).
 10. Runs `bun run check:full -- --force`: every type-check, test and proof again, nothing replayed from the cache.
     The library's `main` breaks code between releases, so a failure here is the library's change to read and answer
     in the code, never a reason to keep the old result.

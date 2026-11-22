@@ -9,8 +9,18 @@ import * as R from "effect/Record"
 import * as Str from "effect/String"
 import { patchesBuild, patchesBuildSentence } from "../src/commands/Patches/PatchesBuild.rules.ts"
 import { patchesCarry, patchesCarrySentence } from "../src/commands/Patches/PatchesCarry.rules.ts"
-import { patchesCheck, patchesCheckSentence } from "../src/commands/Patches/PatchesCheck.rules.ts"
-import { withoutPatches } from "../src/commands/Patches/PatchesProve.rules.ts"
+import { patchesCheck, patchesCheckSentence, waits } from "../src/commands/Patches/PatchesCheck.rules.ts"
+import {
+  packageOf,
+  patchesInstalled,
+  patchesInstalledSentence
+} from "../src/commands/Patches/PatchesInstalled.rules.ts"
+import {
+  patchesProve,
+  patchesProveSentence,
+  withoutPatches,
+  withoutSome
+} from "../src/commands/Patches/PatchesProve.rules.ts"
 import { readPatches, resolutionsOf } from "../src/commands/Patches/PatchesRead.rules.ts"
 import { readPatch, withAppliesTo } from "../src/commands/Patches/Patches.schema.ts"
 import { Repo } from "../src/Repo.service.ts"
@@ -36,6 +46,10 @@ const diff = (from: string, to: string) =>
   `\ndiff --git a/index.js b/index.js\n--- a/index.js\n+++ b/index.js\n@@ -1 +1 @@\n-export const said = "${from}"\n+export const said = "${to}"\n`
 const patch = (appliesTo: string) => header(appliesTo) + diff("a", "b")
 const says = (what: string) => `export const said = "${what}"\n`
+/** A second file of the package, so that two patches can change it without touching each other's lines. */
+const otherSays = (what: string) => `export const other = "${what}"\n`
+const otherDiff = (from: string, to: string) =>
+  `\ndiff --git a/other.js b/other.js\n--- a/other.js\n+++ b/other.js\n@@ -1 +1 @@\n-export const other = "${from}"\n+export const other = "${to}"\n`
 
 /** `left@1.0.0` from a registry, patched to say b, installed patched. */
 const registry = (files: Tree = {}): Tree => ({
@@ -167,6 +181,92 @@ describe("patches check", () => {
       )
     })
   )
+
+  it.effect(
+    "takes an address under Upstream only when it has a host and a path: the scheme alone names no report",
+    () =>
+      Effect.gen(function* () {
+        const upstream = (value: string) =>
+          inTree(
+            registry({
+              "packages/patches/left/01-says-b.patch": header("1.0.0", { Upstream: value }) + diff("a", "b"),
+              "packages/patches/left.patch": header("1.0.0", { Upstream: value }) + diff("a", "b")
+            }),
+            checked
+          )
+        const scheme = yield* upstream("https://")
+        expect(scheme[0]).toBe(
+          'err: packages/patches/left/01-says-b.patch: Upstream is "https://". Write the address of the issue or pull request (https://…), or "not yet reported"'
+        )
+        const host = yield* upstream("https://github.com")
+        expect(host[0]).toMatch(/Upstream is "https:\/\/github\.com"/)
+        const whole = yield* upstream("https://github.com/left/left/issues/12")
+        expect(whole[0]).toMatch(/^out: patches:check OK {2}1 patch to 1 package/)
+      })
+  )
+
+  it.effect(
+    "refuses a patch that names another patch's test: what fails without one shows nothing about the other",
+    () =>
+      Effect.gen(function* () {
+        const second = header("1.0.0") + otherDiff("x", "y")
+        const lines = yield* inTree(
+          registry({
+            "packages/patches/left/02-other-says-y.patch": second,
+            "packages/patches/left.patch": patch("1.0.0") + second,
+            "node_modules/left/other.js": otherSays("y")
+          }),
+          checked
+        )
+        expect(lines).toEqual([
+          "err: packages/patches/left/02-other-says-y.patch: its header names the test packages/patches/test/left/SaysB.test.ts, which is packages/patches/left/01-says-b.patch's. A patch has a test of its own: what fails without one patch shows nothing about another",
+          "err: patches:check failed: 1 problem"
+        ])
+      })
+  )
+
+  it.effect(
+    "refuses a task that does not wait for what is installed to be read, in the root's turbo.json or a package's",
+    () =>
+      Effect.gen(function* () {
+        const turbo = (tasks: Readonly<Record<string, unknown>>) =>
+          `{\n  // which task waits for which\n  "tasks": ${json(tasks)}\n}\n`
+        const wired = {
+          transit: { dependsOn: ["^transit", "//#patches:installed"] },
+          test: { dependsOn: ["transit"], outputs: [] },
+          prove: { dependsOn: ["//#patches:installed"] },
+          "//#patches:installed": { cache: false },
+          "//#docs:check": {}
+        }
+        const held = yield* inTree(registry({ "turbo.json": turbo(wired) }), checked)
+        expect(held[0]).toMatch(/^out: patches:check OK/)
+        const lines = yield* inTree(
+          registry({
+            "turbo.json": turbo({ ...wired, prove: { outputs: [] }, fold: { dependsOn: ["^build"] } }),
+            "packages/patches/turbo.json": turbo({ test: { dependsOn: [] }, lint: { outputs: [] } })
+          }),
+          checked
+        )
+        const notWaiting = (file: string, task: string) =>
+          `err: ${file}: the task "${task}" does not wait for //#patches:installed, so it can run on an install that is behind the patches and be replayed after \`bun install\` as if it had run with them. Add "//#patches:installed" to its dependsOn, or to a task it depends on`
+        expect(lines).toEqual([
+          notWaiting("turbo.json", "prove"),
+          notWaiting("turbo.json", "fold"),
+          notWaiting("packages/patches/turbo.json", "test"),
+          "err: patches:check failed: 3 problems"
+        ])
+      })
+  )
+
+  it("follows a task to the one it waits for, through the tasks between, and stops at a circle", () => {
+    const root = { transit: ["^transit", "//#patches:installed"], test: ["transit"], a: ["b"], b: ["a"] }
+    expect([waits(root)(["transit"]), waits(root)(["test"]), waits(root)(["a"]), waits(root)([])]).toEqual([
+      true,
+      true,
+      false,
+      false
+    ])
+  })
 
   it.effect("refuses a patch for a version that is no longer installed", () =>
     Effect.gen(function* () {
@@ -310,6 +410,145 @@ describe("patches carry", () => {
       expect(still.lines).toEqual([
         "out: patches:carry OK  every patch of a kept package names the file the package is redirected to"
       ])
+    })
+  )
+})
+
+describe("patches installed", () => {
+  const installed = Effect.map(patchesInstalled(), (findings) => printed(render(patchesInstalledSentence)(findings)))
+
+  it("reads the package from a key of patchedDependencies, a scoped one too", () => {
+    expect([packageOf("left@1.0.0"), packageOf("@x/left@vendor/x-left-aaa.tgz")]).toEqual(["left", "@x/left"])
+  })
+
+  it.effect("passes when what is installed holds what each registered file writes, reading no header", () =>
+    Effect.gen(function* () {
+      const held = yield* inTree(registry({ "packages/patches/left/01-says-b.patch": diff("a", "b") }), installed)
+      expect(held).toEqual(["out: patches:installed OK  1 patched package is installed with what the patches write"])
+    })
+  )
+
+  it.effect("refuses an install made before the patch: every task that runs code waits for this", () =>
+    Effect.gen(function* () {
+      const behind = yield* inTree(registry({ "node_modules/left/index.js": says("a") }), installed)
+      expect(behind).toEqual([
+        "err: node_modules/left: does not hold what packages/patches/left.patch writes, so nothing was run: a test or a proof would run on the package as it was before and be replayed later as if it had run with the patch. Run `bun install`",
+        "err: patches:installed failed: 1 package not installed as patched"
+      ])
+    })
+  )
+})
+
+describe("patches prove", () => {
+  // The real vitest runs each test: the small repository gets the installed one, as a link.
+  const vitest = new URL("../../../../../node_modules/vitest", import.meta.url).pathname
+  const proved = Effect.gen(function* () {
+    const repo = yield* Repo
+    yield* repo.run("ln", ["-s", vitest, repo.join(repo.root, "node_modules/vitest")])
+    const findings = yield* patchesProve()
+    return printed(render(patchesProveSentence)(findings))
+  })
+  const expects = (what: string, how: "toBe" | "not.toBe" = "toBe") =>
+    `import { expect, it } from "vitest"\nimport { said } from "left"\n\nit("says it", () => {\n  expect(said).${how}("${what}")\n})\n`
+  const two = (second: string, files: Tree): Tree =>
+    registry({
+      "packages/patches/left/02-second.patch": second,
+      "packages/patches/left.patch": patch("1.0.0") + second,
+      "node_modules/left/package.json": json({ name: "left", version: "1.0.0", type: "module", main: "index.js" }),
+      ...files
+    })
+
+  it.effect("leaves out one patch at a time: a patch that names another's test is not shown to be needed", () =>
+    Effect.gen(function* () {
+      const lines = yield* inTree(
+        two(header("1.0.0") + otherDiff("x", "y"), {
+          "node_modules/left/other.js": otherSays("y"),
+          "packages/patches/test/left/SaysB.test.ts": expects("b")
+        }),
+        proved
+      )
+      expect(lines).toEqual([
+        "out:   needed  packages/patches/left/01-says-b.patch: with it left out and the others applied, 1 of its tests fails",
+        'err: packages/patches/left/02-second.patch: its test packages/patches/test/left/SaysB.test.ts passes with this patch left out and the others applied. If the library fixed the defect, drop the patch (docs/patches.md, "Dropping a patch"); if not, the test does not test this patch',
+        "err: patches:prove failed: 1 patch not shown to be needed"
+      ])
+    })
+  )
+
+  const onTop = header("1.0.0", { Test: "test/left/second/SaysC.test.ts" }) + diff("b", "c")
+
+  it.effect(
+    "leaves out a later patch written on the same lines too, and runs the test once more with only that out",
+    () =>
+      Effect.gen(function* () {
+        const lines = yield* inTree(
+          two(onTop, {
+            "node_modules/left/index.js": says("c"),
+            "packages/patches/test/left/SaysB.test.ts": expects("a", "not.toBe"),
+            "packages/patches/test/left/second/SaysC.test.ts": expects("c")
+          }),
+          proved
+        )
+        expect(lines).toEqual([
+          "out:   needed  packages/patches/left/01-says-b.patch: with it left out and the others applied, 1 of its tests fails (02-second.patch does not apply without it and was left out too; with only that out, the test passes)",
+          "out:   needed  packages/patches/left/02-second.patch: with it left out and the others applied, 1 of its tests fails",
+          "out: patches:prove OK  2 patches: each one's test fails with that patch alone left out"
+        ])
+      })
+  )
+
+  it.effect("refuses a test that fails for the later patch's sake: it shows nothing about the earlier one", () =>
+    Effect.gen(function* () {
+      const lines = yield* inTree(
+        two(onTop, {
+          "node_modules/left/index.js": says("c"),
+          "packages/patches/test/left/SaysB.test.ts": expects("c"),
+          "packages/patches/test/left/second/SaysC.test.ts": expects("c")
+        }),
+        proved
+      )
+      expect(lines).toEqual([
+        "err: packages/patches/left/01-says-b.patch: its test packages/patches/test/left/SaysB.test.ts fails with this patch applied once 02-second.patch is left out, so the test is of that later patch and shows nothing about this one. Give this patch a test of what it alone fixes",
+        "out:   needed  packages/patches/left/02-second.patch: with it left out and the others applied, 1 of its tests fails",
+        "err: patches:prove failed: 1 patch not shown to be needed"
+      ])
+    })
+  )
+})
+
+describe("a package with one patch left out, for a proof", () => {
+  const second = header("vendor/left-aaa.tgz") + otherDiff("x", "y")
+  const without = Effect.fnUntraced(function* (out: string) {
+    const repo = yield* Repo
+    const { sets } = yield* readPatches()
+    const into = repo.join(repo.root, "proof/node_modules/left")
+    const made = yield* withoutSome(O.getOrThrow(A.head(sets)), "left", "vendor/left-aaa.tgz", [out], into)
+    const index = yield* repo.text(repo.join(into, "index.js"))
+    const other = yield* repo.text(repo.join(into, "other.js"))
+    return [index, other, A.map(made.refused, (file) => file.name)] as const
+  })
+  const tree = (files: Tree) =>
+    kept(
+      { aaa: "a" },
+      { "stage/aaa/package/other.js": otherSays("x"), "packages/patches/left/02-second.patch": second, ...files }
+    )
+
+  it.effect("holds every other patch of the package, applied to the kept file in order", () =>
+    Effect.gen(function* () {
+      const first = yield* inTree(tree({}), packed(["aaa"], without("01-says-b.patch")))
+      expect(first).toEqual([says("a"), otherSays("y"), []])
+      const last = yield* inTree(tree({}), packed(["aaa"], without("02-second.patch")))
+      expect(last).toEqual([says("b"), otherSays("x"), []])
+    })
+  )
+
+  it.effect("names a later patch that does not apply without the one left out", () =>
+    Effect.gen(function* () {
+      const made = yield* inTree(
+        tree({ "packages/patches/left/02-second.patch": header("vendor/left-aaa.tgz") + diff("b", "c") }),
+        packed(["aaa"], without("01-says-b.patch"))
+      )
+      expect(made).toEqual([says("a"), otherSays("x"), ["02-second.patch"]])
     })
   )
 })

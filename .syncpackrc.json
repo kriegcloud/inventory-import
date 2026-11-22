@@ -22,7 +22,7 @@
       "isIgnored": true
     },
     {
-      "label": "A beta pinned as one set to one commit of its library. Re-pinned together by hand, never one package at a time from the registry",
+      "label": "A beta pinned as one set to one commit of its library and kept as files (vendor/alchemy). Re-pinned together, never one package at a time from the registry. To move: `bun run alchemy:repin -- main` moves the pin to the head of the library's main (a commit's first seven characters in place of main for that commit): it replaces the files, the overrides and the version each package.json asks for, installs, checks the pin and runs the full check, and commits nothing. `bun run alchemy:check` checks the pin as it is",
       "dependencies": ["alchemy", "@alchemy.run/**", "@distilled.cloud/**"],
       "isIgnored": true
     },
@@ -34,6 +34,14 @@
     {
       "label": "SheetJS publishes at its own address, and the registry's xlsx stopped at 0.18.5. Written as an address and moved by hand. To move: change the address in packages/foundation/modeling/xlsx/package.json to the new file on cdn.sheetjs.com, then `bun install`",
       "dependencies": ["xlsx"],
+      "isIgnored": true
+    }
+  ],
+  "versionGroups": [
+    {
+      "label": "An override names a kept package's file, not a version: version-sync holds each to vendor/alchemy/sources.json",
+      "dependencies": ["alchemy", "@alchemy.run/**", "@distilled.cloud/**"],
+      "dependencyTypes": ["overrides"],
       "isIgnored": true
     }
   ],

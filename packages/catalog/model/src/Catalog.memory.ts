@@ -535,8 +535,9 @@ const commitStep = (
         status: "imported",
         // One revision on: a confirmed import is never taken for the open one of the same revision.
         revision: entry.draft.revision + 1,
-        // What its matches took back is let go: there is nothing left to name.
+        // What its matches took back is let go: there is nothing left to name, and from this revision on it is kept again.
         takenBackJson: "[]",
+        takenBackFrom: entry.draft.revision + 1,
         importedBy: O.some<string>(audit.actorName),
         importedAt: O.some(at)
       }
@@ -1005,7 +1006,8 @@ export const ImportStoreMemory: Layer.Layer<ImportStore, never, CatalogMemoryRef
             needsAtStart,
             choicesJson: "[]",
             movesJson: "[]",
-            takenBackJson: "[]"
+            takenBackJson: "[]",
+            takenBackFrom: 0
           },
           rows: A.flatMap(
             A.sort(

@@ -1,0 +1,16 @@
+{
+  // The one script the page loads before the app (public/theme-init.js), so it has a project with the browser's
+  // types: `bun run beep laws deprecated-apis` refuses a code file that has none. It lives here, not in public/,
+  // because everything in public/ is served. `plugins` is empty: no Effect rule applies to this one browser script
+  // (the agent's judgement, as for scripts/tsconfig.json).
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.public.tsbuildinfo",
+    "lib": ["ES2022", "DOM"],
+    "allowJs": true,
+    "checkJs": true,
+    "moduleDetection": "auto",
+    "plugins": []
+  },
+  "include": ["public/*.js"]
+}

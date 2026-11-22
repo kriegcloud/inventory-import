@@ -58,5 +58,5 @@ const child = spawn(process.execPath, [vite, ...process.argv.slice(2)], {
   stdio: "inherit",
   env: { ...process.env, DEV_HTTPS_CERT: files.cert, DEV_HTTPS_KEY: files.key }
 })
-for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => child.kill(signal))
+for (const signal of /** @type {const} */ (["SIGINT", "SIGTERM"])) process.on(signal, () => child.kill(signal))
 child.on("exit", (code, signal) => process.exit(code ?? (signal === null ? 0 : 1)))

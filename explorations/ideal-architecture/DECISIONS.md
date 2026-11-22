@@ -556,6 +556,15 @@ the loop? Answer: "One entry and a budget (Recommended)": the bin loads the whol
 that does nothing takes longer than a number set from the first real measurement. Rejected: beep-effect's fast path
 from the start; move them to the root. Reverse: add the fast path to `src/bin.ts`.
 
+How the budget is measured changed on 2026-11-22 (agent, not asked): the rule and the one entry stand. The test held
+the time on the clock to 400 ms, and GitHub's four-core runner, busy with the rest of the check, took over five
+seconds for five starts, so CI failed on a CLI that had not changed. It now holds the processor time the start used
+(user and system, as bash's `time` reports them) to 700 ms: the same 3.6 times the measured start (110 ms on the
+clock, about 185 ms of processor time, since bun runs several threads). Shown both ways: with the CLI held to 8% of a
+core the old test timed out and the new one passes; with four heavy packages imported by the entry the new one fails
+(1,073 ms). What loading everything costs today: 121 ms on the clock for `--version`, of which bun alone is 18 ms and
+Effect's CLI with no command of ours 95 ms, so a fast path would save about 26 ms. Not built.
+
 ### 2026-11-19 — tooling CLI: what the tests stand on (T8)
 
 Question: what do the rules' tests stand on? Answer: "@effect/vitest and a real temp folder (Recommended)".
@@ -914,6 +923,160 @@ all 14"; the agent recommended leaving them. Read as: the vendored components ma
 marked "Local change" where it is made; a later `shadcn add` of one of those files is compared by hand. Rejected:
 leaving them as published; converting only the data table. Built with `@beep/schema` added to `@inventory/ui`. Reverse:
 the "Local change" blocks in those eleven files.
+
+### 2026-11-21 — deprecated APIs
+
+He asked, in his words: "In beep-effect we have this lint rule or something that errors when deprecated api's are
+used. Can you […] configure and set this up for us?" Built as beep-effect has it, oxlint's
+`typescript/no-deprecated`, as a law and a root task, `deprecated:check` (`docs/standards/deprecated-apis.md`), on
+every code file git would commit but the vendored skills under `.agents/` (decided below, 2026-11-22). Reverse: drop
+the task from `check` and `check:full`.
+
+### 2026-11-21 — deprecated APIs, the vendored data grid's `document.execCommand`
+
+The check found `document.execCommand("insertText", …)` in the vendored data grid, which names no replacement.
+Question: what should happen to it? Options: "Local change (Recommended)"; "Exempt vendored kit"; also named, deleting
+the grid, which no screen uses. Answer: "Local change"; the agent recommended the same. His answer covers the option as
+it was put to him: the fallbacks already in the file, at the cost of the browser's own undo in a cell's editor.
+
+What was built first was a different design, not put to him before it was built: measured in Chromium, the number
+cell's fallback stored 6 for a typed 56 and 5 for a typed -5, so the agent let the browser type the key that opens an
+editor, through a prop on the vendored cell and a `flushSync` in its key handler. A review found that wrong for a
+column with a variant and its own `cell`, which lost the opening key and stored 6 for a typed 56.
+
+### 2026-11-22 — deprecated APIs, `.agents/` is not read
+
+Question, by dialog: the check reads every code file except `.agents/`, the vendored agent skills; reading it gives 5
+findings in one skill's browser-probe script, which reads two deprecated CSS properties on purpose, plus 18 files with
+no TypeScript project; he had asked for no exemptions. Options: "Leave it out, by name (Recommended)"; "Read it and fix
+it", a local change to the probe script and a project for the 18 files. Answer: "Leave it out, by name". I chose; the
+agent recommended the same. It stays the one folder named as not read, said in the check's output and in its doc
+(`leftOut` in the law). Of its 18 code files, 16 are other people's skills and two (the ontology auditor's script and
+its test) are from his own beep-effect; all are copied as published and run by no part of the app or its checks. Reverse: empty `leftOut`, give the 18 files a project and change the probe script.
+
+### 2026-11-22 — the vendored data grid's typing, for every column
+
+Question, by dialog, after he was told that the fallbacks store wrong numbers, that typing in place had been built
+without asking, and that it still lost the first key in a column with its own `cell`: what should happen to the grid?
+Options: "Fix it for every column (Recommended)", keeping the built approach and extending it to those columns, with a
+browser test that types 56, -5 and a space into each editor and reads what is stored; "Remove the grid"; "Exempt the
+grid". Answer: "Fix it for every column". I chose; the agent recommended the same.
+
+Built: the cell's wrapper reads from its column whether the editor that will open takes typing, so a column with its
+own `cell` behaves as a plain one; it opens and focuses that editor before the key handler ends, and the browser types
+the key. No fallback that puts text in is left. Where the editor has not taken the focus by then (a screen that keeps
+the editing state itself and applies it later), the key is prevented and the editing ended: the key does nothing, and
+nothing is stored that was not typed. A column that writes its own cell (`meta.writeCell`) is left as published.
+
+"Every column" as built means the four editors that take typing: text, number, url and long text, in a plain column
+and in one with its own `cell`. The select, multi-select, date and file editors and the boolean's checkbox are as
+published and untouched; the published select and multi-select drop the key that opens them, and still do (agent, not
+asked whether he meant those too).
+
+The test is `bun run grid:keys` in `apps/inventory`, on a development-only page (`/gallery/grid`) that adds nothing to
+the production build (its stylesheet is 124,636 bytes with and without the page; the walk that lists the
+stylesheet's sources is told not to follow it). On each of the four editors, in both kinds of column, with no pause
+between keys and with 40 ms, it types 56, -5 and a space, types then presses Escape, types then undoes, and presses F2
+then types: 96 cases, read from what the grid stored. It fails on an error or a warning in the page's console, starts
+this checkout's own server on a port it asked the system for, and fails when no browser is found. On the grid as it
+was before the fix for every column, 22 of the 96 fail. Chromium only. Not measured: Firefox, Safari, a touch
+keyboard, an input method, a production build of the grid.
+
+Where the test runs (agent, not asked; he has been told): CI runs it as a step after the full check, with the
+runner's Chrome (`/usr/bin/google-chrome`, which GitHub's Ubuntu 24.04 image documents), and it is run by hand after a
+change to the grid. The step has not run on a runner yet: nothing is pushed. It is not part of `bun run check`. An
+earlier version of this entry said the machine that runs the checks has no browser; that was wrong.
+
+Not decided, and pinned by the test as "as published", not as rules:
+
+- A space typed on a focused cell replaces a text cell's value with one no-break space (U+00A0, the browser's way with
+  a lone space in an editable element) and empties a number or url cell. The published grid does the same, measured
+  with its own mechanism (`document.execCommand("insertText", false, " ")` on a selected value in Chromium).
+- Escape in the long-text editor keeps what was typed: its popover closes and saves. The published grid does the
+  same, measured on the grid as it was before any of these changes.
+
+Also seen, and not held by the test: the published long-text editor typed the opening key on the next frame, and in
+one run of the published grid with no pause between keys it stored a wrong value in one of its long-text cases. The
+browser types that key now, and no such run has failed since; the test does not fail on the old code every time.
+
+Reverse: the "Local change" marks in `packages/ui/src/components/data-grid/` (`data-grid-cell.tsx`,
+`data-grid-cell-variants.tsx`, `data-grid-utils.ts`), one at every changed or removed line.
+
+### 2026-11-22 — deprecated APIs, the scripts' and the page script's projects (agent, not asked)
+
+The check refuses a code file no tsconfig includes, so the app's development scripts (`apps/inventory/scripts`, plain
+JavaScript) and the one script the page loads (`public/theme-init.js`) each got a project, type-checked by the app's
+`check`. Both are looser than the repository's one profile: no Effect rule applies (`plugins` is empty; 78 findings in
+the scripts otherwise), and the scripts' project has `noImplicitAny` off, so an untyped parameter or a package that
+ships no types is `any` without an error and a deprecated call behind either is not seen. Before, nothing
+type-checked them at all. This is the agent's judgement, not a decision of his; he was told on 2026-11-22 and it was
+left as built. Other ways: the Effect rules on and the findings fixed; the scripts rewritten as TypeScript;
+`noImplicitAny` on alone. Reverse: remove `plugins` and `noImplicitAny` from `apps/inventory/scripts/tsconfig.json`
+and `plugins` from `apps/inventory/tsconfig.public.json`, and fix what the check then finds.
+
+### 2026-11-22 — no `try` statement, repository wide
+
+"I noticed some try catch blocks in the source code on main: packages/client/src/Tab.atoms.ts L26-30. In beep-effect
+I've banned try/catch blocks as my preference is either using Effect(s) or effect/Result for code which can fail with
+errors. I want this enforced repo wide." Three questions followed.
+
+The vendored kit has fourteen `try` blocks (`packages/ui/src/components` and `hooks`). Question: convert them too?
+Options: "Convert them too (Recommended)"; "Leave vendored as published". Answer: "Convert them too". I chose; the
+agent recommended the same. Each becomes `Result.try` or `Option.liftThrowable`, marked "Local change".
+
+Plain JavaScript: the telemetry start script, and `apps/inventory/public/theme-init.js`, which runs before the app
+loads and cannot import Effect without loading the library before first paint. Options: "Script yes, theme-init named
+(Recommended)"; "No exception at all". Answer: "Script yes, theme-init named". I chose; the agent recommended the
+same. The telemetry script is converted; `theme-init.js` is the one file the law names as allowed, with the reason
+beside it. `.agents/` is left out by name, as for the deprecated-API check.
+
+When? Options: "Next atoms batch (Recommended)"; "After Wednesday"; "Now, ahead of the fixes". Answer: "Next atoms
+batch". I chose; the agent recommended the same. Not built yet.
+
+### 2026-11-22 — Alchemy, which build, and the state store it upgrades
+
+The Alchemy packages are a build of the library's `main` (`vendor/alchemy`, commit `734c27a`), because
+`@alchemy.run/domain`'s `Decision` and `Verify` are in no release. The update to that build was held on one thing:
+it raises the Cloudflare state store's version from 8 to 9. The first thing on it that reaches a store an older build
+made upgrades that store, one way: `alchemy state bootstrap` and CI's deploys (`deploy.yml` passes `--yes`) without
+asking, a deploy from the workstation only after a confirm. A checkout on an older build is refused by the store from
+then on.
+
+"All I know is I want the latest version of alchemy. We will likely need to update effect & alchemy again before
+Wednesday comes." And on what is deployed: "We can always tear down & redeploy from scratch. The idea is that we get
+our ideal version built. I don't care about anything we've deployed yet we can start from scratch so that we have the
+best names & things."
+
+So the pin follows the library's `main`, the upgrade of the store is accepted, and nothing deployed so far is kept
+for its own sake. Only this repository's stacks keep their state in `Cloudflare.state()`; beep-effect's use
+`AWS.state(...)` and are not touched. Reverse: none for the store, the upgrade is one way; destroy the stages and
+deploy them again from an empty store.
+
+### 2026-11-22 — Alchemy, where the pinned build is kept and how often it moves
+
+A build of `main` is deleted from the library's registry a week after `main` moves on, so the build must be kept
+somewhere this repository controls: seventeen files, 38.7 MB. Options: the files in the repository, moved only when
+needed; the files as release assets on GitHub; in the repository, moved often. Answer: "In the repo, re-pin only when
+needed". Rejected: release files on GitHub; re-pin often. One move is expected before Wednesday 2026-11-25, so a
+move is one command, `bun run alchemy:repin -- <commit>` (`vendor/alchemy/README.md`). Reverse: delete
+`vendor/alchemy` and the root `overrides`, and ask for a release once one contains `Decision`.
+
+### 2026-11-22 — the review's model, its names (agent, not asked for each)
+
+Asked what the model's units should be called, he gave no names and said the names need not last yet: "I don't care
+about anything we've deployed yet we can start from scratch so that we have the best names & things." The names are
+the agent's, open to change until the first hosted deploy stores an event under them: the aggregates `Import`, `Row`
+and `Group`, in the model `Catalog`, served as `CatalogApi`. Reverse: rename before that deploy at no cost; after it,
+the events already stored carry the old names, and a rename needs an answer for them.
+
+### 2026-11-22 — the review's model, what is shown on Wednesday
+
+Two models of the review exist: one unit for each group act, which he chose, and one unit for each row, built first
+and set aside. Question: which is shown on 2026-11-25? Answer: "Chosen design, parked one as fallback". The one-unit
+model is built for `main`. If it is not checked and merged by the evening of 2026-11-24, he shows Verify on the
+per-row model from a local branch on his own machine, and says plainly that it is the alternative he did not choose.
+That branch is kept running on the pinned build and gets nothing else. Reverse: none needed; the fallback is deleted
+once the chosen model is in `main`.
 
 ### 2026-11-22 — dependencies, versions and derived configuration kept in step
 

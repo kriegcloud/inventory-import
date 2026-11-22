@@ -368,3 +368,49 @@ describe("an open editor and the server's answers to the item saves", () => {
     })
   )
 })
+
+describe("the answer of an item's last save", () => {
+  it.live("is let go the moment the person is in another organization, though no editor reads it", () =>
+    Effect.gen(function* () {
+      const member = (id: string, organizationId: string) =>
+        O.some(
+          Member.make({
+            id: MemberId.make(id),
+            name: DisplayName.make("Dana Whitfield"),
+            role: "admin",
+            organizationId: OrganizationId.make(organizationId),
+            organizationName: DisplayName.make(organizationId)
+          })
+        )
+      const who = Atom.make(member("mem_dana", "org_prairie"))
+      const registry = registryFor({
+        endpoints: {
+          items: {
+            edit: () => Effect.succeed({ ...item, revision: 4 }),
+            page: () => Effect.succeed({ data: [], total: 0, pageCount: 0 }),
+            facets: () => Effect.succeed({})
+          }
+        },
+        signedIn: who,
+        idleTTL: 20
+      })
+      registry.mount(editItem(itemId))
+      registry.set(editItem(itemId), save)
+      yield* afterIdle
+      // Answered at revision 4, with no editor open. She is in Northline a while, then back in Prairie.
+      registry.set(who, member("mem_dana_northline", "org_northline"))
+      yield* afterIdle
+      registry.set(who, member("mem_dana", "org_prairie"))
+      registry.mount(itemEditor(itemId))
+      registry.set(itemEditor(itemId), {
+        open: true,
+        base: O.some(item),
+        form: O.some(typed),
+        problems: {},
+        notice: null
+      })
+      // Nothing of Prairie waited in memory while she was in Northline: the editor opens on the row's revision.
+      expect(O.map(registry.get(itemEditor(itemId)).base, (base) => base.revision)).toEqual(O.some(3))
+    })
+  )
+})

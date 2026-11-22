@@ -254,7 +254,7 @@ export const vendorSync = Effect.fn("VendorSync.vendorSync")(function* (from: st
     const testFiles = A.map(tests[pkg.name] ?? [], (name) => `test/${name}`)
     const sourceDependencies = yield* dependenciesOf(pkg, sources)
     const dependencies = R.fromEntries(
-      A.sort(A.append(versioned(sourceDependencies), ["effect", "4.1.4"] as const), byLocale)
+      A.sort(A.append(versioned(sourceDependencies), ["effect", "4.1.5"] as const), byLocale)
     )
     const testDependencies = yield* dependenciesOf(pkg, testFiles)
     const testTexts = yield* Effect.forEach(testFiles, (file) => repo.text(repo.join(target, file)), { concurrency: 1 })
@@ -262,8 +262,8 @@ export const vendorSync = Effect.fn("VendorSync.vendorSync")(function* (from: st
       A.sort(
         A.flatten<ReadonlyArray<ReadonlyArray<readonly [string, string]>>>([
           versioned(A.filter(testDependencies, (name) => !R.has(dependencies, name))),
-          [["@effect/vitest", "4.1.4"]],
-          A.some(testTexts, Str.includes("@effect/platform-node/")) ? [["@effect/platform-node", "4.1.4"]] : [],
+          [["@effect/vitest", "4.1.5"]],
+          A.some(testTexts, Str.includes("@effect/platform-node/")) ? [["@effect/platform-node", "4.1.5"]] : [],
           [["@types/node", "^24.19.2"]],
           [["vitest", "^5.1.0"]]
         ]),

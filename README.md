@@ -66,7 +66,7 @@ values in `.dev.vars.example`). After pulling a change to `apps/inventory/migrat
 | Command | What it does |
 | --- | --- |
 | `bun run dev` | App and API on http://localhost:5173, signed in as the first test account in development |
-| `bun run check` | Through turbo: type-check with Effect diagnostics, lint (including two design lints), the fast tests, format check and the docs check; a second run with nothing changed replays from the cache |
+| `bun run check` | Through turbo: type-check with Effect diagnostics, lint (including two design lints), the fast tests, format check, the docs check and the repository's own rules (no deprecated API is used, among them); a second run with nothing changed replays from the cache |
 | `bun run check:full` | `check` plus the slow tests and the production build |
 | `bun run test` | Every test, fast and slow (Vitest, on Node) |
 | `bun run db:reset` | Start again with an empty database (restart `bun run dev` afterwards) |
@@ -138,6 +138,9 @@ What the starter held, now turned to the brief's inventory item:
   key its rules answer.
 - The toolchain: Vite, React, Tailwind, every shadcn/ui component and more from Dice UI's and tablecn's registries
   (MIT; `docs/kit.md` says what was changed), Effect, Wrangler, Vitest, a .csv and .xlsx reader, and syncpack.
+- Alchemy, for hosting: a build of one commit of its `main`, kept as files in `vendor/alchemy` (Apache-2.0, each
+  file with its own licence and notice; [vendor/alchemy/README.md](vendor/alchemy/README.md) says the one change
+  made to them and why they are kept here).
 - Two design lints in `bun run check` that hold every screen to the theme and its components.
 - `CLAUDE.md`, and the skills and agents my coding agent works from. Twenty-one skills come from my monorepo
   beep-effect; the rest are vendored unchanged, and [.agents/skills/README.md](.agents/skills/README.md) credits each

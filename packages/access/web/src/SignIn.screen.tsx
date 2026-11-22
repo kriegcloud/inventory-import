@@ -7,7 +7,7 @@ import * as S from "effect/Schema"
 import * as SecureRandom from "effect/crypto/SecureRandom"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as Atom from "effect/reactivity/Atom"
-import { type FormEvent, useId } from "react"
+import { type SubmitEvent, useId } from "react"
 import { Button } from "@inventory/ui/components/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@inventory/ui/components/card"
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@inventory/ui/components/field"
@@ -141,7 +141,7 @@ export function SignIn(props: { features: SignInFeatures | undefined; onSignedIn
       if (Exit.isSuccess(exit)) props.onSignedIn()
     })
   }
-  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const onSubmit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault()
     send(
       current === "sign-in"

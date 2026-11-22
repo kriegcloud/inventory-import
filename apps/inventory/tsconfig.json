@@ -15,6 +15,12 @@
     },
     {
       "path": "./tsconfig.test-web.json"
+    },
+    {
+      "path": "./scripts"
+    },
+    {
+      "path": "./tsconfig.public.json"
     }
   ],
   "compilerOptions": {

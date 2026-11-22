@@ -260,7 +260,9 @@ describe("the review while who is signed in is asked again", () => {
         t.registry.refresh(t.session.signedIn)
         yield* settle
         t.server.notFoundIn = "org_northline"
-        yield* t.session.answer(memberOf({ id: "mem_dana_northline", organization: "org_northline" }))
+        yield* t.session.answer(
+          memberOf({ id: "mem_dana_northline", organization: "org_northline", account: "mem_dana" })
+        )
         yield* settle
         expect([t.session.left.times, t.drew[t.drew.length - 1], A.length(t.saves)]).toEqual([0, "gone", 1])
         expect(A.length(keptOf(id, "mem_dana"))).toBe(1)

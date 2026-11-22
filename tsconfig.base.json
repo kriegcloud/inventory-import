@@ -1,10 +1,11 @@
 {
   // The repository-wide TypeScript and Effect language-service profile, copied from beep-effect's tsconfig.base.json
-  // at commit 820f870dc411 (2026-11-17; beep-effect main at 2a783b3fea45 when copied). Every package starts here with
-  // no override (stage A of the staged adoption in goals/workspace-and-strictness). Not copied, because nothing here
-  // emits: outDir, rootDir, tsBuildInfoFile, incremental, composite, declaration, declarationMap, sourceMap,
-  // rewriteRelativeImportExtensions and stripInternal; `noEmit` is added instead. A package that bundles for the
-  // browser or the Worker (apps/inventory) sets its own lib, module, moduleResolution and types on top.
+  // at commit c4002544ed93 (2026-11-21, which turns on the three diagnostics @effect/tsgo 0.73 added; beep-effect main
+  // at c656fcc7b3a5 when copied). Every package starts here with no override (stage A of the staged adoption in
+  // goals/workspace-and-strictness). Not copied, because nothing here emits: outDir, rootDir, tsBuildInfoFile,
+  // incremental, composite, declaration, declarationMap, sourceMap, rewriteRelativeImportExtensions and stripInternal;
+  // `noEmit` is added instead. A package that bundles for the browser or the Worker (apps/inventory) sets its own lib,
+  // module, moduleResolution and types on top.
   "$schema": "./node_modules/@effect/tsgo/schema.json",
   "include": [],
   "compilerOptions": {
@@ -139,6 +140,7 @@
           "flatMapConditionalToFilterOrFail": "error",
           "flatMapIdentityToFlatten": "error",
           "flatMapIgnoredParamToAndThen": "error",
+          "flatMapMapToZipWith": "error",
           "flatMapProvideServiceToProvideServiceEffect": "error",
           "flatMapToMap": "error",
           "flatMapToTap": "error",
@@ -208,7 +210,9 @@
           "preferUnsafeConstructor": "error",
           "processEnv": "error",
           "processEnvInEffect": "error",
+          "promiseAllInEffect": "error",
           "promiseInEffectSuccess": "error",
+          "promiseRaceInEffect": "error",
           "provideLayerSucceedToProvideService": "error",
           "provideMergeAllToArray": "error",
           "raceFirstWithSleepToTimeout": "error",

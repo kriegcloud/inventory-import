@@ -209,7 +209,11 @@ Nothing below was started. Every command names its stage.
    and test stages (I4).
 2. **Log in on the workstation** to each account (`bunx alchemy profile create`, one profile for each).
 3. **`bunx alchemy state bootstrap`** in the preview account. This is the first thing that exists outside this
-   machine: the state store's Worker.
+   machine: the state store's Worker. On the build of Alchemy kept in `vendor/alchemy` the Cloudflare state
+   store is version 9, so a store an older build made (version 8) is upgraded by the first thing on this build that
+   reaches it, one way, and a checkout on an older build is refused by it from then on: `alchemy state bootstrap` and
+   a deploy with `--yes` (every job in `deploy.yml`) upgrade it without asking, and a `plan` or `deploy` from the
+   workstation without `--yes` asks first.
 4. **A test stage in the preview account**: `bunx alchemy plan --stage test_<user>`, read it, then `bunx alchemy
    deploy --stage test_<user>`. Its output gives the address and `testAccountPassword`, minted for that stage. Open the address; sign in
    as dana@example-works.test with that password, and see local-test-password refused; load `items_messy.csv`

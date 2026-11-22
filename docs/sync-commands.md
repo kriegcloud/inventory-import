@@ -45,7 +45,7 @@ packages at different versions of `effect`, a package no `workspaces` pattern co
 | --- | --- |
 | `@effect/tsgo` | A new Effect language service adds diagnostics the profile in `tsconfig.base.json` must name (every diagnostic is an error there), and it patches only the typescript, tsrs and oxlint versions it lists. It moves by hand, with them |
 | `typescript`, `tsrs`, `oxlint`, `oxlint-tsgolint` | `@effect/tsgo` patches them at install (the root's `prepare` script) and stops on a version it does not list. They move only with it |
-| `alchemy`, `@alchemy.run/*`, `@distilled.cloud/*` | A beta pinned as one set to one commit of its library. Re-pinned together by hand, never one package at a time from the registry |
+| `alchemy`, `@alchemy.run/*`, `@distilled.cloud/*` | A beta pinned as one set to one commit of its library and kept as files (`vendor/alchemy`). `bun run alchemy:repin -- main` moves the pin (a commit in place of `main` for that commit), and `deps:update` prints that command beside them |
 | `better-auth` | Its tables are a migration written by hand ([Sign-in](auth.md)). After a move `bun run auth:schema` must print nothing, so it moves by hand |
 | `xlsx` | SheetJS publishes at its own address, and the registry's `xlsx` stopped at 0.18.5. It is written as an address and moved by hand |
 
@@ -58,7 +58,7 @@ what moves it; to release one, remove the group.
 | --- | --- | --- |
 | bun | `.bun-version` | `packageManager` in the root's `package.json`; a `bun-version:` in a workflow; "Bun 1.4.4" in the standing documents |
 | Node | `engines.node` in the root's `package.json` (its major) | `node-version:` in every workflow; "Node 22 or newer" in the documents |
-| Effect | the `effect` every `package.json` states (the root's `catalog`, when there is one) | every `@effect/*` package released with it; "Effect 4.1" and "effect 4.1.4" in the documents; the versions `vendor sync` writes into a vendored package |
+| Effect | the `effect` every `package.json` states (the root's `catalog`, when there is one) | every `@effect/*` package released with it; "Effect 4.1" and "effect 4.1.5" in the documents; the versions `vendor sync` writes into a vendored package |
 | `@effect/tsgo`, TypeScript, Better Auth | the one version the `package.json` files state | their name followed by a version in the documents |
 | Alchemy | `alchemy` in the `package.json` files; `vendor/alchemy/sources.json` once the packages are kept as files | every `@alchemy.run/*` dependency; with kept files, each dependency's `<version>-<commit>` and each override's file |
 | The Cloudflare compatibility date | `apps/inventory/wrangler.jsonc` | every other `wrangler*.jsonc`; `compatibility: { date }` in a package that declares `alchemy` |
@@ -68,7 +68,7 @@ what moves it; to release one, remove the group.
 | What the scratchpad runs on | the version the `package.json` files state for each dependency | the same dependency in `scratchpad/package.json`; a library only an experiment uses is left alone |
 
 The standing documents are `CLAUDE.md`, `AGENTS.md`, `README.md`, `docs/` and `.claude/agents`. A version is read in
-a sentence only after its own name ("Effect 4.1", "`effect` 4.1.4's source"), and as precisely as the sentence
+a sentence only after its own name ("Effect 4.1", "`effect` 4.1.5's source"), and as precisely as the sentence
 states it: "Effect 4.1" stays two numbers. After a name written small only a whole version is read, so "no effect
 1.5 s later" is left alone.
 

@@ -588,8 +588,9 @@ export const versionSyncPlan = Effect.fn("VersionSync.plan")(function* () {
       A.map(
         A.filter(own, ([, spec]) => isRegistryVersion(spec.value)),
         ([name, spec]) => {
-          const source = stated(name.value)
-          return O.match(source.spec, {
+          // A package kept as a file is asked for at its version and commit, by an experiment as by a package.
+          const source = O.orElse(R.get(keptSpecs, name.value), () => stated(name.value).spec)
+          return O.match(source, {
             // Two packages that disagree are named once already, where the dependency is the packages' own.
             onNone: () => nothing,
             onSome: (wanted) =>
@@ -619,6 +620,14 @@ export const versionSyncPlan = Effect.fn("VersionSync.plan")(function* () {
   })
 
   const bun = yield* bunPlan()
+  const keptRecord = yield* readIfThere(repo.join(repo.root, "vendor", "alchemy", "sources.json"))
+  const keptSpecs = yield* O.match(keptRecord, {
+    onNone: () => Effect.succeed<Record<string, string>>({}),
+    onSome: (record) =>
+      Effect.map(decodeJsonc(KeptPackages)(record.file, record.text), (kept) =>
+        R.fromEntries(A.map(kept.packages, (one) => [one.package, `${one.version}-${kept.commit}`] as const))
+      )
+  })
   const scratch = yield* scratchPlan()
   const effect = yield* effectPlan()
   const alchemy = yield* alchemyPlan()

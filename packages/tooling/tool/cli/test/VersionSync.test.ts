@@ -306,15 +306,22 @@ describe("version-sync", () => {
             '    "alchemy": "2.0.0-beta.88-bbb2222"',
             "  }",
             "}"
-          ])
+          ]),
+          // An experiment that uses a kept package asks for it as a package does.
+          "scratchpad/package.json": json({
+            name: "@x/scratchpad",
+            dependencies: { "@alchemy.run/cloudflare": "2.0.0-beta.87-aaa1111" }
+          })
         },
-        ["package.json", "packages/infra/package.json"]
+        ["package.json", "packages/infra/package.json", "scratchpad/package.json"]
       )
       expect(result.before).toEqual([
-        "err: version-sync FAIL  2 places differ from what they are derived from (`bun run version-sync -- --write` writes them)",
+        "err: version-sync FAIL  3 places differ from what they are derived from (`bun run version-sync -- --write` writes them)",
         "err:   package.json:5  a kept package's override, from vendor/alchemy/sources.json: found file:vendor/alchemy/alchemy.run-cloudflare-aaa1111.tgz, expected file:vendor/alchemy/alchemy.run-cloudflare-bbb2222.tgz",
-        "err:   packages/infra/package.json:4  a kept package's version and commit, from vendor/alchemy/sources.json: found 2.0.0-beta.87-aaa1111, expected 2.0.0-beta.88-bbb2222"
+        "err:   packages/infra/package.json:4  a kept package's version and commit, from vendor/alchemy/sources.json: found 2.0.0-beta.87-aaa1111, expected 2.0.0-beta.88-bbb2222",
+        "err:   scratchpad/package.json:1  the scratchpad's `@alchemy.run/cloudflare`, from the package.json files: found 2.0.0-beta.87-aaa1111, expected 2.0.0-beta.88-bbb2222"
       ])
+      expect(result.files["scratchpad/package.json"]).toContain('"@alchemy.run/cloudflare":"2.0.0-beta.88-bbb2222"')
       expect(result.files["packages/infra/package.json"]).toContain(
         '"@alchemy.run/cloudflare": "2.0.0-beta.88-bbb2222"'
       )

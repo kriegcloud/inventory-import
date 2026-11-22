@@ -60,6 +60,13 @@ const closedAs = (world: World): O.Option<SavedDecisions> =>
 /** How many orderings each property plays in the suite; raised to 20_000 for a long run by hand. */
 const runs = 1000
 
+/**
+ * Each property's limit, above the shared 30 s, by its run count: the slowest of the four took 9.6 s for 1,000 runs
+ * alone on two pinned cores (the stand-in for CI's runner), so 120 ms a run is twelve times that. 120 s in the suite;
+ * a long run by hand at 20,000 gets 40 minutes. A hang in the suite fails inside the job's 15 minutes.
+ */
+const limit = runs * 120
+
 // Each run draws 30 to 60 picks, each one enabled when it is drawn (`enabled`). A run ends early when nothing is enabled
 // any more. The seed is new on every run: a failure is printed under its shortest ordering, which plays it again.
 describe("the review's draft, whatever order things happen in", () => {
@@ -67,28 +74,28 @@ describe("the review's draft, whatever order things happen in", () => {
     "sends only the person's own rows, never writes over what somebody else decided unasked, and every decision of hers is on the server, waiting, on a line or named",
     { choices: Choices },
     ({ choices }) => play(choices, { confirms: false, elsewhere: false, tabs: false }),
-    { timeout: 300_000, arbitrary: { runs, size: 60 } }
+    { timeout: limit, arbitrary: { runs, size: 60 } }
   )
 
   it.prop(
     "with the person confirming: a confirm the server makes writes what its screen showed, and nothing is sent beside it",
     { choices: Choices },
     ({ choices }) => play(choices, { confirms: true, elsewhere: false, tabs: false }),
-    { timeout: 300_000, arbitrary: { runs, size: 60 } }
+    { timeout: limit, arbitrary: { runs, size: 60 } }
   )
 
   it.prop(
     "with reloads, sign-outs and closed tabs taken up: nothing the person decided is lost or sent blind",
     { choices: Choices },
     ({ choices }) => play(choices, { confirms: false, elsewhere: false, tabs: true }),
-    { timeout: 300_000, arbitrary: { runs, size: 60 } }
+    { timeout: limit, arbitrary: { runs, size: 60 } }
   )
 
   it.prop(
     "with somebody else confirming, reopening or removing the import: a step that knows it is closed sends nothing to it, and the rows left over are named",
     { choices: Choices },
     ({ choices }) => play(choices, { confirms: true, elsewhere: true, tabs: true }),
-    { timeout: 300_000, arbitrary: { runs, size: 60 } }
+    { timeout: limit, arbitrary: { runs, size: 60 } }
   )
 })
 

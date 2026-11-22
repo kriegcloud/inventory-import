@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url"
 import { configDefaults, defineConfig } from "vitest/config"
-import { limits, realTime, slowLimits } from "../../vitest.shared.ts"
+import { limits, realTime, saidAloud, slowLimits } from "../../vitest.shared.ts"
 
 // Unit tests run in Node, without the Cloudflare plugin: they cover the domain and
 // services through their Effect interfaces. The running app is checked in workerd by `bun run dev`.
@@ -14,6 +14,8 @@ export default defineConfig({
   resolve: { alias: { "@": fileURLToPath(new URL("./src/web", import.meta.url)) } },
   test: {
     environment: "node",
+    // The fast project tries tests that wait in real time again (`realTime`); this names each one that needed it.
+    ...saidAloud,
     projects: [
       {
         extends: true,

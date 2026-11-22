@@ -13,7 +13,6 @@ vi.mock("sonner", () => ({
   toast: Object.assign(() => 0, { dismiss: () => undefined, error: () => 0, loading: () => 0, success: () => 0 })
 }))
 // A cold start of the app's modules, on a busy machine.
-vi.setConfig({ testTimeout: 20_000 })
 
 const settle = Effect.sleep("30 millis")
 

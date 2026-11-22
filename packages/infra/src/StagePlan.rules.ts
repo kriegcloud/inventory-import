@@ -2,8 +2,10 @@
  * The plan of a stage, from its name. This is the one place that says what differs between stages, as Benjamin
  * decided it (decisions "infra I4", "I5" and "I8"): production alone answers at the real address and holds a model
  * key; it is never seeded; a preview and a test stage live on `workers.dev` with the test accounts and no sign-up, so
- * no real email is ever stored outside production; production takes the owner's list. A name that is none of the four kinds is refused, `live_<user>` among them, which is what a deploy
- * without `--stage` would use.
+ * no real email is ever stored outside production; production takes the owner's list. Staging, what `main` holds
+ * (decision "releases and deploys"), is a rehearsal the same way: the test accounts, sign-up closed, and no model key,
+ * since decision I5 gives one to production only. A name that is none of the five kinds is refused, `live_<user>`
+ * among them, which is what a deploy without `--stage` would use.
  *
  * @packageDocumentation
  */
@@ -33,23 +35,24 @@ const $I = $InfraId.create("StagePlan")
 export const production = { hostname: "inventory.beep-effect.com", zone: "beep-effect.com" } as const
 
 /**
- * The stage name is none of: `prod`, `pr-<number>`, `test_<user>`, `dev_<user>`.
+ * The stage name is none of: `prod`, `staging`, `pr-<number>`, `test_<user>`, `dev_<user>`.
  *
  * @category errors
  */
 export class UnknownStage extends S.TaggedError<UnknownStage, { readonly brand: unique symbol }>($I`UnknownStage`)(
   "UnknownStage",
   { stage: S.String.pipe(S.annotateKey({ description: "The name that was given" })) },
-  $I.annoteError<UnknownStage>("UnknownStage", { description: "A stage name that is none of the four kinds" })
+  $I.annoteError<UnknownStage>("UnknownStage", { description: "A stage name that is none of the five kinds" })
 ) {
   /** What to do about it. */
   override get message(): string {
-    return `"${this.stage}" is not a stage of this app. Name one with --stage: prod, pr-<number>, test_<user> or dev_<user>.`
+    return `"${this.stage}" is not a stage of this app. Name one with --stage: prod, staging, pr-<number>, test_<user> or dev_<user>.`
   }
 }
 
 const kinds: ReadonlyArray<readonly [RegExp, StageKind]> = [
   [/^prod$/, "production"],
+  [/^staging$/, "staging"],
   [/^pr-[1-9][0-9]{0,8}$/, "preview"],
   [/^test_[a-z0-9][-_a-z0-9]{0,40}$/, "test"],
   [/^dev_[a-z0-9][-_a-z0-9]{0,40}$/, "personal"]
@@ -99,6 +102,7 @@ export const planFor = (stage: string): Result.Result<StagePlan, UnknownStage> =
           deployed: true
         }),
       preview: () => rehearsal(true),
+      staging: () => rehearsal(true),
       test: () => rehearsal(true),
       personal: () => rehearsal(false)
     })
@@ -115,15 +119,17 @@ export const previewPasswordVariable = "PREVIEW_TEST_ACCOUNT_PASSWORD"
  * Where a stage's test accounts get their password. The password written in the repository opens them only on a
  * developer's own machine (decision "infra, the test accounts' password"). A test stage, deployed by hand, mints
  * its own. A preview, deployed by a workflow whose log is public, is given the one password every preview shares,
- * which its reviewer already holds (decision "infra, a preview's password").
+ * which its reviewer already holds (decision "infra, a preview's password"); staging, deployed the same way, takes
+ * that same password.
  *
  * @example testPasswordOf(planOfPreview) // "given"
+ * @example testPasswordOf(planOfStaging) // "given"
  * @example testPasswordOf(planOfTestStage) // "minted"
  * @example testPasswordOf(planOfProduction) // "none": it has no test account
  */
 export const testPasswordOf = (plan: StagePlan): TestPassword => {
   if (!plan.deployed || !A.contains(plan.seeds, "accounts")) return "none"
-  return plan.kind === "preview" ? "given" : "minted"
+  return plan.kind === "preview" || plan.kind === "staging" ? "given" : "minted"
 }
 
 /**
@@ -147,9 +153,10 @@ export class MissingPreviewPassword extends S.TaggedError<MissingPreviewPassword
   override get message(): string {
     return (
       `Stage "${this.stage}" has no password for its test accounts: ${this.variable} is not set, so nobody could ` +
-      `sign in to this preview. Write the reference ${this.variable}=op://<vault>/<item>/<field> in ` +
-      `packages/infra/env/op.env and deploy the repository's stack under \`op run\`, which gives the password to ` +
-      `the preview environment as a secret.`
+      `sign in to this ${this.stage === "staging" ? "stage" : "preview"}. Write the reference ` +
+      `${this.variable}=op://<vault>/<item>/<field> in packages/infra/env/op.env and deploy the repository's stack ` +
+      `under \`op run\`, which gives the password to the ${this.stage === "staging" ? "staging" : "preview"} ` +
+      `environment as a secret.`
     )
   }
 }

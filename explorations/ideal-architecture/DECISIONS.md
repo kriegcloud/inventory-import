@@ -882,3 +882,10 @@ all 14"; the agent recommended leaving them. Read as: the vendored components ma
 marked "Local change" where it is made; a later `shadcn add` of one of those files is compared by hand. Rejected:
 leaving them as published; converting only the data table. Built with `@beep/schema` added to `@inventory/ui`. Reverse:
 the "Local change" blocks in those eleven files.
+
+### 2026-11-21 — deprecated APIs
+
+He asked, in his words: "In beep-effect we have this lint rule or something that errors when deprecated api's are
+used. Can you […] configure and set this up for us?" Built as beep-effect has it, oxlint's
+`typescript/no-deprecated` on every code file, as a law and a root task, `deprecated:check`
+(`docs/standards/deprecated-apis.md`). Reverse: drop the task from `check` and `check:full`.

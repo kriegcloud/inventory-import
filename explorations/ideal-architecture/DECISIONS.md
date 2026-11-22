@@ -1574,6 +1574,20 @@ After that review I was asked three questions by dialog, on 2026-11-22:
    a commit that is on `origin/main`; the release's output, its notes and its tag message list it under "Picked
    with changes". No flag. Rejected: always refusing it; accepting it only behind a flag.
 
+The agent chose these while closing the second review of that build, and I was not asked. Each can be reversed in
+`Release.rules.ts` or `deploy.yml`:
+
+- The pick's line counts only alone on a line, as `-x` writes it. Nothing compares the edited change with main's;
+  the documents and the "Picked with changes" lines say so, and that the approval screen shows none of it.
+- A release commit made by hand passes only when the app's file and `bun.lock` are their parent's with the version
+  moved. The text of `CHANGELOG.md` is not compared.
+- A patch is refused, by the command and by the deploy guard, when a release of its line under it is one the guard
+  refuses, or was never pushed. A bad tag stops its line until an admin deletes or replaces it.
+- Production asks the remote again after my approval: the commit must still be its release branch's head and carry
+  the tag, or the job fails. Nothing orders the releases of two lines.
+- The failed "Deploy" run after each green push to `main`, until I deploy the repository's stack with the `staging`
+  environment, is left failing and written down, not skipped.
+
 ### 2026-11-22 — atoms A1, the kit too
 
 Question: A1 left the vendored kit (`packages/ui/src/components`, `packages/ui/src/hooks`) its own React state. I

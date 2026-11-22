@@ -6,9 +6,11 @@ import { describe, expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
+import * as Result from "effect/Result"
 import * as Str from "effect/String"
 import {
   checkFull,
+  comparedOf,
   notesOf,
   next,
   type ReleaseCheck,
@@ -112,6 +114,16 @@ const appVersion = Effect.gen(function* () {
   const repo = yield* Repo
   const text = yield* repo.text(repo.join(repo.root, "apps/inventory/package.json"))
   return O.match(Str.match(/"version":\s*"([^"]*)"/)(text), { onNone: () => "", onSome: (found) => `${found[1]}` })
+})
+
+/**
+ * A first release cut from main and pushed, branch and tag: a patch stands on a release the remote holds, since
+ * `release patch` judges that release as the deploy guard will.
+ */
+const cutAndPushed = Effect.gen(function* () {
+  const result = yield* releasing("minor")
+  yield* git("push", "-q", "origin", "HEAD", "--tags")
+  return result
 })
 
 describe("release", () => {
@@ -238,7 +250,7 @@ describe("release", () => {
       files,
       Effect.gen(function* () {
         yield* started
-        yield* releasing("minor")
+        yield* cutAndPushed
         yield* git("switch", "-q", "main")
         const fix = yield* landed("c.txt", "fix: a waited row is never written over")
         yield* git("switch", "-q", "release/0.7")
@@ -263,7 +275,7 @@ describe("release", () => {
       files,
       Effect.gen(function* () {
         yield* started
-        yield* releasing("minor")
+        yield* cutAndPushed
         yield* commit("d.txt", "fix: only on the release branch")
         const result = yield* releasing("patch")
         expect(Str.replace(/[0-9a-f]{7,40} /, "<hash> ")(`${result.lines[0]}`)).toBe(
@@ -281,7 +293,7 @@ describe("release", () => {
       files,
       Effect.gen(function* () {
         yield* started
-        yield* releasing("minor")
+        yield* cutAndPushed
         const nothing = yield* releasing("patch")
         expect(nothing.lines).toEqual([
           "err: release FAIL  nothing has landed on this branch since v0.7.0: cherry-pick a fix from main first"
@@ -391,7 +403,7 @@ describe("release", () => {
         files,
         Effect.gen(function* () {
           yield* started
-          yield* releasing("minor")
+          yield* cutAndPushed
           yield* git("switch", "-q", "main")
           yield* commit("c.txt", "fix: only on main here")
           const fix = yield* git("rev-parse", "HEAD")
@@ -416,7 +428,7 @@ describe("release", () => {
       files,
       Effect.gen(function* () {
         yield* started
-        yield* releasing("minor")
+        yield* cutAndPushed
         yield* git("switch", "-q", "main")
         const fix = yield* landed("c.txt", "fix: a waited row is never written over")
         yield* git("switch", "-q", "release/0.7")
@@ -444,7 +456,7 @@ describe("release", () => {
         files,
         Effect.gen(function* () {
           yield* started
-          yield* releasing("minor")
+          yield* cutAndPushed
           yield* pickedWithChanges
           const result = yield* releasing("patch")
           const hashes = Str.replace(/[0-9a-f]{7} (here|on main)/g, "<hash> $1")
@@ -452,7 +464,7 @@ describe("release", () => {
             A.join(
               [
                 "out: release OK  v0.7.1 is tagged on release/0.7. Nothing was pushed.",
-                "  Picked with changes: each differs from the commit on main it names, so read it before approving the deploy:",
+                "  Picked with changes: each differs from the commit on main its message names. Nothing compares the two, so read each commit before approving the deploy:",
                 "    fix: the count is right (<hash> here, <hash> on main)",
                 "  Push the branch and the tag together. Production deploys once CI passes on the branch and the production environment's reviewer approves:",
                 "  git push --atomic origin release/0.7 v0.7.1"
@@ -478,7 +490,7 @@ describe("release", () => {
         files,
         Effect.gen(function* () {
           yield* started
-          yield* releasing("minor")
+          yield* cutAndPushed
           // A commit that exists, on a branch that never reached main.
           yield* git("switch", "-q", "-c", "elsewhere", "main")
           yield* commit("e.txt", "fix: never landed")
@@ -506,7 +518,7 @@ describe("release", () => {
       files,
       Effect.gen(function* () {
         yield* started
-        yield* releasing("minor")
+        yield* cutAndPushed
         yield* git("switch", "-q", "main")
         const first = yield* landed("c.txt", "fix: the first")
         yield* git("switch", "-q", "release/0.7")
@@ -535,7 +547,7 @@ describe("release", () => {
         files,
         Effect.gen(function* () {
           yield* started
-          yield* releasing("minor")
+          yield* cutAndPushed
           yield* git("switch", "-q", "main")
           const repo = yield* Repo
           const versionPath = repo.join(repo.root, "apps/inventory/package.json")
@@ -564,7 +576,7 @@ describe("release", () => {
         files,
         Effect.gen(function* () {
           yield* started
-          yield* releasing("minor")
+          yield* cutAndPushed
           yield* git("switch", "-q", "main")
           const fix = yield* landed("c.txt", "fix: a waited row is never written over")
           yield* git("switch", "-q", "release/0.7")
@@ -589,6 +601,90 @@ describe("release", () => {
           )
           const body = yield* git("tag", "--list", "--format=%(contents:body)", "v0.8.0")
           expect(Str.includes("a waited row")(body)).toBe(false)
+        })
+      )
+  )
+
+  it.effect(
+    "a commit with no message is compared with main like any other: a patch over one is refused, by the command and by the deploy guard",
+    () =>
+      inTree(
+        files,
+        Effect.gen(function* () {
+          yield* started
+          yield* cutAndPushed
+          const repo = yield* Repo
+          yield* repo.write(repo.join(repo.root, "evil.txt"), "never on main\n")
+          yield* git("add", "evil.txt")
+          yield* git("commit", "-q", "--allow-empty-message", "-m", "")
+          const result = yield* releasing("patch")
+          expect(A.map(result.lines, Str.replace(/[0-9a-f]{7} /, "<hash> "))).toEqual([
+            "err: release FAIL  a patch carries only fixes already on origin/main, and these are not (land each on main, then `git cherry-pick -x` it here):\n  <hash> (no message)"
+          ])
+          expect(result.tags).toEqual(["v0.7.0"])
+          // The same commit under a release commit made by hand.
+          yield* repo.write(repo.join(repo.root, "apps/inventory/package.json"), appFile("0.7.1"))
+          yield* git("commit", "-q", "-am", "chore: release v0.7.1")
+          yield* git("tag", "-a", "v0.7.1", "-m", "v0.7.1")
+          yield* published
+          const found = yield* verifyTag("v0.7.1")
+          expect(A.map(printed(render(tagSentence)(found)), Str.replace(/[0-9a-f]{7} /, "<hash> "))).toEqual([
+            "err: release FAIL  v0.7.1 carries what origin/main does not hold, and a release carries only what landed on main:\n  <hash> (no message)"
+          ])
+        })
+      )
+  )
+
+  it.effect(
+    "the line that names main's commit counts only alone on a line, as `cherry-pick -x` writes it: the same words inside a sentence do not",
+    () =>
+      inTree(
+        files,
+        Effect.gen(function* () {
+          yield* started
+          yield* cutAndPushed
+          const onMain = yield* git("rev-parse", "main")
+          const repo = yield* Repo
+          yield* repo.write(repo.join(repo.root, "d.txt"), "only here\n")
+          yield* git("add", "d.txt")
+          yield* git(
+            "commit",
+            "-q",
+            "-m",
+            `fix: only here\n\nSee (cherry picked from commit ${onMain}) for what this is not.`
+          )
+          const result = yield* releasing("patch")
+          expect(Str.includes("a patch carries only fixes already on origin/main")(`${result.lines[0]}`)).toBe(true)
+          expect(result.tags).toEqual(["v0.7.0"])
+        })
+      )
+  )
+
+  it.effect(
+    "refuses a patch on top of a release the deploy guard refuses, and says what the guard says: what is under a tag made by hand is not forgotten",
+    () =>
+      inTree(
+        files,
+        Effect.gen(function* () {
+          yield* started
+          yield* cutAndPushed
+          // A commit main never held, with a release commit and a tag made by hand on top of it.
+          yield* commit("x.txt", "fix: never on main")
+          const repo = yield* Repo
+          yield* repo.write(repo.join(repo.root, "apps/inventory/package.json"), appFile("0.7.1"))
+          yield* git("commit", "-q", "-am", "chore: release v0.7.1")
+          yield* git("tag", "-a", "v0.7.1", "-m", "v0.7.1")
+          yield* published
+          // Then a real fix, picked as it should be.
+          yield* git("switch", "-q", "main")
+          const fix = yield* landed("c.txt", "fix: a waited row is never written over")
+          yield* git("switch", "-q", "release/0.7")
+          yield* git("cherry-pick", "-x", fix)
+          const result = yield* releasing("patch")
+          expect(A.map(result.lines, Str.replace(/[0-9a-f]{7} /, "<hash> "))).toEqual([
+            "err: release FAIL  v0.7.1, the release this patch would stand on, is not one that may deploy, so nothing on top of it may. If it was never pushed, push it with its branch; if it was made by hand, an admin deletes or replaces it. Then run it again. The deploy guard says:\n  release FAIL  v0.7.1 carries what origin/main does not hold, and a release carries only what landed on main:\n  <hash> fix: never on main"
+          ])
+          expect(result.tags).toEqual(["v0.7.0", "v0.7.1"])
         })
       )
   )
@@ -624,6 +720,19 @@ describe("release's rules", () => {
       O.none(),
       O.none()
     ])
+  })
+
+  it("reads `git cherry`'s lines as a sign and a full hash, and names the first line that is anything else: none is skipped", () => {
+    const sha = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+    expect(Result.getOrThrow(comparedOf(`+ ${sha}\n- ${sha}`))).toEqual([
+      { sha, held: false },
+      { sha, held: true }
+    ])
+    expect(
+      A.map([`+ ${sha}\n+ 4b825dc`, `+ ${sha} fix: a subject`, `+ ${sha}\n? ${sha}`, `+${sha}`], (text) =>
+        Result.match(comparedOf(text), { onFailure: (line) => line, onSuccess: () => "read" })
+      )
+    ).toEqual(["+ 4b825dc", `+ ${sha} fix: a subject`, `? ${sha}`, `+${sha}`])
   })
 
   it("moves the version by the kind", () => {
@@ -707,7 +816,7 @@ describe("release verify, the production deploy's guard", () => {
               "err: release FAIL  v0.7.9 is on a commit main holds: main never deploys production, and a release commit is on its release branch only"
             ],
             [
-              "err: release FAIL  v0.8.0 is not on release/0.8: a release tag deploys only from its own release branch, never from main"
+              "err: release FAIL  v0.8.0 is not on release/0.8 as the remote holds it: a release tag deploys only from its own release branch, never from main"
             ],
             [
               "err: release FAIL  v0.7.8 is a lightweight tag: `bun run release` makes an annotated one, and only that deploys"
@@ -730,7 +839,7 @@ describe("release verify, the production deploy's guard", () => {
         yield* published
         const said = yield* verified("v0.7.1")
         expect(A.map(said, Str.replace(/[0-9a-f]{7} (here|on main)/g, "<hash> $1"))).toEqual([
-          "out: release verify OK  v0.7.1 is an annotated release tag on release/0.7\n  Picked with changes: each differs from the commit on main it names, so read it before approving the deploy:\n    fix: the count is right (<hash> here, <hash> on main)"
+          "out: release verify OK  v0.7.1 is an annotated release tag on release/0.7\n  Picked with changes: each differs from the commit on main its message names. Nothing compares the two, so read each commit before approving the deploy:\n    fix: the count is right (<hash> here, <hash> on main)"
         ])
       })
     )
@@ -812,6 +921,180 @@ describe("release verify, the production deploy's guard", () => {
           )
         )
       )
+  )
+
+  it.effect(
+    "refuses a release commit made by hand that changes more inside a file a release may touch: a script beside the version, another line of the lockfile, a file renamed into the notes, a file made executable",
+    () => {
+      /** release/0.7 cut by hand from main, with what `change` does in its one release commit, tagged v0.7.0. */
+      const cutByHand = <E>(change: Effect.Effect<void, E, Repo>) =>
+        inTree(
+          {
+            ...files,
+            "bun.lock": `{\n  "workspaces": {\n    "apps/inventory": {\n      "name": "@inventory/app",\n      "version": "0.6.1",\n      "dependencies": { "x": "1" },\n    },\n    "packages/a": { "name": "a", "version": "0.6.1" },\n  },\n}\n`
+          },
+          Effect.gen(function* () {
+            yield* started
+            yield* git("switch", "-q", "-c", "release/0.7")
+            yield* change
+            yield* git("add", "--all")
+            yield* git("commit", "-q", "-m", "chore: release v0.7.0")
+            yield* git("tag", "-a", "v0.7.0", "-m", "v0.7.0")
+            yield* published
+            const said = yield* verified("v0.7.0")
+            return A.join(A.drop(Str.split(": ")(`${said[0]}`), 2), ": ")
+          })
+        )
+      const lockAt = (version: string, x: string) =>
+        `{\n  "workspaces": {\n    "apps/inventory": {\n      "name": "@inventory/app",\n      "version": "${version}",\n      "dependencies": { "x": "${x}" },\n    },\n    "packages/a": { "name": "a", "version": "0.6.1" },\n  },\n}\n`
+      const wrote = Effect.fn("test.wrote")(function* (file: string, text: string) {
+        const repo = yield* Repo
+        yield* repo.write(repo.join(repo.root, file), text)
+      })
+      return Effect.gen(function* () {
+        const asReleaseWrites = yield* cutByHand(
+          Effect.andThen(
+            wrote("apps/inventory/package.json", appFile("0.7.0")),
+            wrote("bun.lock", lockAt("0.7.0", "1"))
+          )
+        )
+        const script = yield* cutByHand(
+          Effect.andThen(
+            wrote(
+              "apps/inventory/package.json",
+              json({ name: "@inventory/app", version: "0.7.0", private: true, scripts: { postinstall: "anything" } })
+            ),
+            wrote("bun.lock", lockAt("0.7.0", "1"))
+          )
+        )
+        const resolution = yield* cutByHand(
+          Effect.andThen(
+            wrote("apps/inventory/package.json", appFile("0.7.0")),
+            wrote("bun.lock", lockAt("0.7.0", "2"))
+          )
+        )
+        const renamed = yield* cutByHand(
+          Effect.gen(function* () {
+            yield* wrote("apps/inventory/package.json", appFile("0.7.0"))
+            yield* wrote("bun.lock", lockAt("0.7.0", "1"))
+            yield* git("mv", "a.txt", "CHANGELOG.md")
+          })
+        )
+        const executable = yield* cutByHand(
+          Effect.gen(function* () {
+            yield* wrote("apps/inventory/package.json", appFile("0.7.0"))
+            yield* wrote("bun.lock", lockAt("0.7.0", "1"))
+            yield* git("config", "core.filemode", "false")
+            yield* git("update-index", "--chmod=+x", "bun.lock")
+          })
+        )
+        expect([asReleaseWrites, script, resolution, renamed, executable]).toEqual([
+          "",
+          "apps/inventory/package.json there differs from its parent's in more than the version",
+          "bun.lock there differs from its parent's in more than the app's version",
+          "its commit changes more than the version and the notes: a.txt",
+          "a release commit edits apps/inventory/package.json and bun.lock and edits or adds CHANGELOG.md, each a plain file, and this one does otherwise to bun.lock"
+        ])
+      })
+    }
+  )
+
+  it.effect(
+    "refuses a patch whose release before it the guard refuses, though the patch's own commits are right: every release under a tag is judged, down to the line's first",
+    () =>
+      inTree(
+        files,
+        Effect.gen(function* () {
+          yield* released
+          yield* commit("x.txt", "fix: never on main")
+          yield* byHand("0.7.1")
+          yield* git("switch", "-q", "main")
+          const fix = yield* landed("c.txt", "fix: a waited row is never written over")
+          yield* git("switch", "-q", "release/0.7")
+          yield* git("cherry-pick", "-x", fix)
+          yield* byHand("0.7.2")
+          const said = yield* verified("v0.7.2")
+          expect(A.map(said, Str.replace(/[0-9a-f]{7} /, "<hash> "))).toEqual([
+            "err: release FAIL  v0.7.2 stands on v0.7.1, which is not a release that may deploy (the next line says why), so v0.7.2 may not either: an admin deletes or replaces v0.7.1",
+            "err: release FAIL  v0.7.1 carries what origin/main does not hold, and a release carries only what landed on main:\n  <hash> fix: never on main"
+          ])
+        })
+      )
+  )
+
+  it.effect(
+    "refuses a tag on a merge, a patch tag on a line with no release before it, a patch that does not hold the release before it, and a patch over a pick whose line names a commit main does not have",
+    () =>
+      Effect.gen(function* () {
+        const why = (lines: ReadonlyArray<string>) => Str.replace(/[0-9a-f]{7} /, "<hash> ")(`${lines[0]}`)
+        const merge = yield* inTree(
+          files,
+          Effect.gen(function* () {
+            yield* released
+            yield* git("switch", "-q", "main")
+            yield* landed("g.txt", "feat: lands on main")
+            yield* git("switch", "-q", "release/0.7")
+            yield* git("merge", "-q", "--no-ff", "--no-commit", "main")
+            const repo = yield* Repo
+            yield* repo.write(repo.join(repo.root, "apps/inventory/package.json"), appFile("0.7.1"))
+            yield* git("add", "--all")
+            yield* git("commit", "-q", "-m", "chore: release v0.7.1")
+            yield* git("tag", "-a", "v0.7.1", "-m", "v0.7.1")
+            yield* published
+            const said = yield* verified("v0.7.1")
+            return why(said)
+          })
+        )
+        const noneBefore = yield* inTree(
+          files,
+          Effect.gen(function* () {
+            yield* started
+            yield* git("switch", "-q", "-c", "release/0.9")
+            yield* byHand("0.9.1")
+            const said = yield* verified("v0.9.1")
+            return why(said)
+          })
+        )
+        const notHeld = yield* inTree(
+          files,
+          Effect.gen(function* () {
+            yield* released
+            // v0.7.1 exists, on a commit this line's branch never held.
+            yield* git("switch", "-q", "-c", "side", "main")
+            yield* commit("s.txt", "fix: on a side branch")
+            yield* git("tag", "-a", "v0.7.1", "-m", "v0.7.1")
+            yield* git("switch", "-q", "release/0.7")
+            yield* byHand("0.7.2")
+            const said = yield* verified("v0.7.2")
+            return why(said)
+          })
+        )
+        const forged = yield* inTree(
+          files,
+          Effect.gen(function* () {
+            yield* released
+            const offMain = yield* git("rev-parse", "HEAD")
+            const repo = yield* Repo
+            yield* repo.write(repo.join(repo.root, "d.txt"), "only here\n")
+            yield* git("add", "d.txt")
+            yield* git(
+              "commit",
+              "-q",
+              "-m",
+              `fix: names a commit main does not hold\n\n(cherry picked from commit ${offMain})`
+            )
+            yield* byHand("0.7.1")
+            const said = yield* verified("v0.7.1")
+            return why(said)
+          })
+        )
+        expect([merge, noneBefore, notHeld, forged]).toEqual([
+          "err: release FAIL  v0.7.1 is not on a release commit as `bun run release` makes one: its commit is a merge or has no parent, and a release commit has exactly one",
+          "err: release FAIL  v0.9.1 is not on a release commit as `bun run release` makes one: there is no release of release/0.9 before it to patch",
+          "err: release FAIL  v0.7.2 is not on a release commit as `bun run release` makes one: it does not hold v0.7.1, the release before it",
+          "err: release FAIL  v0.7.1 carries what origin/main does not hold, and a release carries only what landed on main:\n  <hash> fix: names a commit main does not hold"
+        ])
+      })
   )
 
   it.effect("refuses a first release cut by hand from commits the remote's main does not hold", () =>
@@ -950,13 +1233,12 @@ describe("release verify-head, what the deploy runs after CI passed on a release
           yield* published
           const made = yield* git("rev-parse", "HEAD")
           const byHand = yield* head("release/0.7", made)
-          // A tag of another line alone on a release branch's head.
-          yield* git("switch", "-q", "-c", "release/0.9", "main")
-          yield* commit("n.txt", "chore: release v0.5.0")
-          yield* git("tag", "-a", "v0.5.0", "-m", "by hand")
+          // A new branch pointed at an old release's commit: the commit is on its own line's branch too, so only
+          // the comparison of the branch CI passed on with the tag's line refuses it.
+          yield* git("tag", "-d", "v0.8.0")
+          yield* git("branch", "release/0.9", tagged)
           yield* published
-          const otherHead = yield* git("rev-parse", "HEAD")
-          const otherLine = yield* head("release/0.9", otherHead)
+          const otherLine = yield* head("release/0.9", tagged)
           expect(
             A.map([notRelease, injected, unread, notAHash, two, byHand, otherLine], (one) => [
               A.join(A.take(Str.split(":")(`${one.said[0]}`), 2), ":"),
@@ -969,7 +1251,7 @@ describe("release verify-head, what the deploy runs after CI passed on a release
             ["err: release FAIL  whether HEAD may deploy could not be told, so it may not", "none"],
             ["err: release FAIL  <hash> carries more than one release tag, and a release commit carries one", "none"],
             ["err: release FAIL  v0.7.1 is not on a release commit as `bun run release` makes one", "none"],
-            ["err: release FAIL  v0.5.0 is not on release/0.5", "none"]
+            ["err: release FAIL  v0.7.0 is not a release of release/0.9, the branch CI passed on", "none"]
           ])
         })
       )

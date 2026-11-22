@@ -1129,9 +1129,10 @@ trying a falsified property again. Reverse: the three lines in `.github/workflow
 `vitest.config.ts`, and `realTime` and `saidAloud` in the four that wait in real time.
 
 A limit above the shared one is set only with what was measured written beside it: the 2,000-run waited-rows property
-(180 s; 24 s alone on two pinned cores), the draft machine's four properties (120 s; 12 s the slowest seen), Steps'
-heaviest shapes (60 s; 9.7 s), the scratchpad's nested run (120 s) and the CLI's start-up (300 s: five starts, the
-slowest seen 19 s on the clock; no start is stopped by the clock, since 2026-11-22). Limits set below the shared one were taken out, so the shared one applies: six test files had 10 s
+(180 s; 24 s alone on two pinned cores), the draft machine's four properties and its three seeded ones (120 s; 13 s
+the slowest seen), Steps' heaviest shapes (60 s; 9.7 s), the scratchpad's nested run (120 s) and the CLI's start-up
+(300 s: five starts, the slowest seen 19 s on the clock; no start is stopped by the clock, since 2026-11-22). Limits
+set below the shared one were taken out, so the shared one applies: six test files had 10 s
 or 20 s, the 50,000-row slow tests 60 s. The vendored kit and the scratchpad use the shared limits too; vendor sync
 writes them into the kit's configs.
 
@@ -1360,5 +1361,35 @@ After the review of 2026-11-22 the agent changed these, and I was not asked:
 - A test that was tried again after a hang or a falsified property fails the run, even if a later try passed: the
   reporter reads every error of every try, which vitest's retry condition cannot.
 
-Open, asked of me on 2026-11-22 and not answered yet (`goals/infra/PLAN.md`, step 12): where production's gate lives;
-staging's Cloudflare credentials; whether a cherry-pick that needed edits may be released.
+After that review I was asked three questions by dialog, on 2026-11-22:
+
+1. Where production's gate lives. GitHub's `production` environment named no branch or tag, so the rule "only from
+   a release tag" lived in the workflow file the tagged commit itself brings. Answer: "After CI on the release
+   branch (Recommended)". I chose; the agent recommended the same. Production starts when CI passes on a push to
+   `release/**` whose head commit carries its annotated `v*` tag. GitHub runs `main`'s copy of the workflow and of
+   the tag check for that, the `production` environment gets its `main`-only rule back, and I push branch and tag
+   together: `git push --atomic origin release/0.7 v0.7.0`. A tag pushed alone starts nothing. My approval stays.
+   Rejected: a push to `release/**` as the trigger with a `release/*` rule and admin-only release branches; leaving
+   it as it was with the approval as the only gate. This rests on GitHub's documented `workflow_run` behaviour and
+   is not verified on GitHub: the first real release is where it is.
+2. Staging's Cloudflare credentials. Answer: "Keep sharing, say so (Recommended)". I chose; the agent recommended
+   the same. Staging keeps the previews' account and token, and the code and the documents say plainly that a
+   pushed branch can reach staging. Rejected: a third account for staging; a required reviewer on `preview`.
+3. A fix that needed edits when it was cherry-picked. Answer: "Accept, and name it (Recommended)". I chose; the agent
+   recommended the same. A commit whose change differs from main's counts when its `git cherry-pick -x` line names
+   a commit that is on `origin/main`; the release's output, its notes and its tag message list it under "Picked
+   with changes". No flag. Rejected: always refusing it; accepting it only behind a flag.
+
+### 2026-11-22 — atoms A1, the kit too
+
+Question: A1 left the vendored kit (`packages/ui/src/components`, `packages/ui/src/hooks`) its own React state. I
+saw the `React.useEffect` in `packages/ui/src/hooks/use-data-table.ts` and asked: "I still see react hooks did we
+finish the atom migration?", then said "Yeah we will still want to migrate this to atom". How far, and when?
+Answer: "Whole kit, table first (Recommended)". I chose; the agent recommended the same. Every file of the kit that
+calls a hook moves to atoms under the rule our own code has: no effect hook, another hook only where no atom can do
+the job (a DOM ref, a hook of TanStack Table, TanStack Virtual or react-hook-form, which stay by A4). The data table
+goes first, then the rest in batches, each checked and merged; nothing a person sees changes. The kit stops being
+as published: a changed file is marked as changed here, and a later update of it from its registry is merged by
+hand. This ends the last clause of "atoms A1, what stays a hook" ("the vendored kit is not ours"). Rejected: the
+table only; the kit left as it is. Reverse: take a file again from its registry and add it back to the lint's
+ignore list. The batches are in `goals/atoms/PLAN.md`, "The kit on atoms".

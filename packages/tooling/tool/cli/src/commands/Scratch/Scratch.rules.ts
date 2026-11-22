@@ -359,6 +359,33 @@ export const diagnosticLines =
     )
   }
 
+/**
+ * The comment that turns the type-checker, and with it every Effect diagnostic, off for a whole file. It is another
+ * spelling of "turn a diagnostic off", so the scratchpad refuses it as it refuses the Effect directive.
+ *
+ * @category rules
+ */
+export const noCheck = "@ts-nocheck"
+
+/**
+ * The lines of a file that name {@link noCheck}, numbered from 1. The compiler honours it only before the code; the
+ * scratchpad refuses it wherever it stands, so nobody has to reason about which comment is the leading one.
+ *
+ * @example
+ * uncheckedLines("// @ts-nocheck\nexport const count = 1\n") // [1]
+ *
+ * @category rules
+ */
+export const uncheckedLines = (text: string): ReadonlyArray<number> =>
+  A.flatMap(Str.split("\n")(text), (line, index) => (Str.includes(noCheck)(line) ? [index + 1] : []))
+
+/**
+ * A path the scratchpad's type-check never reads: one with a `node_modules` folder in it, or a file or folder whose
+ * name starts with a dot (an experiment's `.state`), which a tsconfig `include` does not match.
+ */
+const unread = (path: string) =>
+  A.some(Str.split("/")(path), (segment) => segment === "node_modules" || Str.startsWith(".")(segment))
+
 /** The test runner over the scratchpad, given the folder to run: every experiment's, or one's. */
 export type RunTests = (
   folder: string
@@ -618,25 +645,44 @@ export const scratchCheck = Effect.fn("Scratch.scratchCheck")(function* (types: 
   const state = yield* reading()
   const problem = (where: string, message: string): ScratchFinding =>
     ScratchFinding.cases.Problem.make({ where, message })
-  // A diagnostic turned off: only `newSchemaClass`, only on the first line of a decide file.
+  // A diagnostic turned off: only `newSchemaClass`, only on the first line of a decide file. Read in every file the
+  // type-checker reads, not only an experiment's own: a file loose in `experiments/`, one in a `dist` folder, the
+  // scratchpad's configuration, and anything else in the scratchpad an experiment could import.
+  const top = yield* repo.entries(state.dir)
+  const listed = yield* Effect.forEach(
+    A.filter(top, (entry) => !unread(entry.name)),
+    (entry) =>
+      entry.directory
+        ? Effect.map(
+            repo.tree(repo.join(state.dir, entry.name)),
+            A.map((path) => `${entry.name}/${path}`)
+          )
+        : Effect.succeed([entry.name]),
+    { concurrency: 1 }
+  )
+  const code = A.sort(
+    A.filter(A.flatten(listed), (path) => !unread(path) && /\.[cm]?[jt]sx?$/.test(path)),
+    Order.String
+  )
   const turnedOff = yield* Effect.forEach(
-    state.experiments,
-    Effect.fnUntraced(function* (experiment) {
-      const code = A.filter(experiment.paths, (path) => !ownState(path) && /\.[cm]?[jt]sx?$/.test(path))
-      return yield* Effect.forEach(
-        code,
-        (path) =>
-          Effect.map(repo.text(repo.join(experiment.folder, path)), (text) =>
-            A.map(diagnosticLines(path)(text), (line) =>
-              problem(
-                `${scratchpad}/experiments/${experiment.slug}/${path}:${line}`,
-                `turns an Effect diagnostic off. Only a decide file (\`*.aggregate.ts\`, \`*.decision.ts\`) may, and only \`${decideFileLine}\` as its first line (decision 33 of the Alchemy brief): build with \`.make\` here`
-              )
+    code,
+    (path) =>
+      Effect.map(repo.text(repo.join(state.dir, path)), (text) =>
+        A.appendAll(
+          A.map(diagnosticLines(path)(text), (line) =>
+            problem(
+              `${scratchpad}/${path}:${line}`,
+              `turns an Effect diagnostic off. Only a decide file (\`*.aggregate.ts\`, \`*.decision.ts\`) may, and only \`${decideFileLine}\` as its first line (decision 33 of the Alchemy brief): build with \`.make\` here`
             )
           ),
-        { concurrency: 1 }
-      )
-    }),
+          A.map(uncheckedLines(text), (line) =>
+            problem(
+              `${scratchpad}/${path}:${line}`,
+              `names \`${noCheck}\`, which turns the type-checker and every Effect diagnostic off for a whole file. No file of the scratchpad may hold it: remove the line and fix what the type-checker then says`
+            )
+          )
+        )
+      ),
     { concurrency: 1 }
   )
   const perExperiment = A.flatMap(state.experiments, (experiment) => {
@@ -750,7 +796,7 @@ export const scratchCheck = Effect.fn("Scratch.scratchCheck")(function* (types: 
   )
   const problems = A.flatten([
     perExperiment,
-    A.flatten(A.flatten(turnedOff)),
+    A.flatten(turnedOff),
     sharedProblems,
     unaccounted,
     undeclared,

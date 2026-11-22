@@ -8,6 +8,7 @@ import * as Str from "effect/String"
 import * as TestClock from "effect/testing/TestClock"
 import {
   diagnosticLines,
+  noCheck,
   type Install,
   logLine,
   readLogLine,
@@ -17,7 +18,8 @@ import {
   scratchList,
   scratchNew,
   scratchSentence,
-  scratchTest
+  scratchTest,
+  uncheckedLines
 } from "../src/commands/Scratch/Scratch.rules.ts"
 import { scratchpadFiles } from "../src/commands/Scratch/Scratch.config.ts"
 import { decideFileLine, diagnosticDirective, typeName } from "../src/commands/Scratch/Scratch.templates.ts"
@@ -357,6 +359,59 @@ describe("scratch", () => {
         "err: scratch:check FAIL  3 problems",
         `err:   scratchpad/experiments/shelf/Shelf.decision.ts:2: ${refused}`,
         `err:   scratchpad/experiments/shelf/Shelf.test.ts:1: ${refused}`,
+        `err:   scratchpad/experiments/shelf/Shelf.ts:1: ${refused}`,
+        "out: scratch:check OK  the scratchpad's configuration and 1 experiment pass the type-checker and the Effect diagnostics"
+      ])
+    })
+  )
+
+  it.effect("check reads every file the type-checker reads, not only an experiment's own", () =>
+    Effect.gen(function* () {
+      const off = `// ${diagnosticDirective} floatingEffect:off\n`
+      const result = yield* inTree(
+        repository({
+          "scratchpad/experiments/shelf/NOTE.md": note("2026-11-22", "probe", ""),
+          "scratchpad/experiments/Loose.ts": off,
+          "scratchpad/experiments/shelf/dist/Shelf.ts": off,
+          "scratchpad/shared/Helper.ts": off,
+          "scratchpad/extra.config.ts": off,
+          "scratchpad/experiments/shelf/.state/cache.ts": off,
+          "scratchpad/node_modules/left-pad/index.ts": off
+        }),
+        scratchCheck(types).pipe(said)
+      )
+      const refused = `turns an Effect diagnostic off. Only a decide file (\`*.aggregate.ts\`, \`*.decision.ts\`) may, and only \`${decideFileLine}\` as its first line (decision 33 of the Alchemy brief): build with \`.make\` here`
+      expect(result).toEqual([
+        "err: scratch:check FAIL  4 problems",
+        `err:   scratchpad/experiments/Loose.ts:1: ${refused}`,
+        `err:   scratchpad/experiments/shelf/dist/Shelf.ts:1: ${refused}`,
+        `err:   scratchpad/extra.config.ts:1: ${refused}`,
+        `err:   scratchpad/shared/Helper.ts:1: ${refused}`,
+        "out: scratch:check OK  the scratchpad's configuration and 1 experiment pass the type-checker and the Effect diagnostics"
+      ])
+    })
+  )
+
+  it("the comment that turns a whole file's checks off is found on any line", () => {
+    expect(uncheckedLines(`// ${noCheck}\nexport const count = 1\n`)).toEqual([1])
+    expect(uncheckedLines(`/* a note */\r\n/// ${noCheck}\r\n`)).toEqual([2])
+    expect(uncheckedLines("// @ts-check\nexport const count = 1\n")).toEqual([])
+  })
+
+  it.effect("check refuses a file that turns the type-checker off whole, a decide file too", () =>
+    Effect.gen(function* () {
+      const result = yield* inTree(
+        repository({
+          "scratchpad/experiments/shelf/NOTE.md": note("2026-11-22", "verify", ""),
+          "scratchpad/experiments/shelf/Shelf.ts": `// ${noCheck}\nexport const count = 1\n`,
+          "scratchpad/experiments/shelf/Shelf.aggregate.ts": `${decideFileLine}\n// ${noCheck}\n`
+        }),
+        scratchCheck(types).pipe(said)
+      )
+      const refused = `names \`${noCheck}\`, which turns the type-checker and every Effect diagnostic off for a whole file. No file of the scratchpad may hold it: remove the line and fix what the type-checker then says`
+      expect(result).toEqual([
+        "err: scratch:check FAIL  2 problems",
+        `err:   scratchpad/experiments/shelf/Shelf.aggregate.ts:2: ${refused}`,
         `err:   scratchpad/experiments/shelf/Shelf.ts:1: ${refused}`,
         "out: scratch:check OK  the scratchpad's configuration and 1 experiment pass the type-checker and the Effect diagnostics"
       ])

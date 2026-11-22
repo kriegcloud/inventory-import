@@ -26,9 +26,13 @@ remodelled in the same pass as its move (A6).
 
 ## Non-goals
 
-From the brief's No-gos: no change to what a person sees or to any rule, count or sentence; no edit to the vendored kit
-(`packages/ui/src/components`, `packages/ui/src/hooks`); no server-side rendering, hydration or `AtomRpc`; no new state
+From the brief's No-gos: no change to what a person sees or to any rule, count or sentence; no server-side rendering, hydration or `AtomRpc`; no new state
 library beside atoms. TanStack Table, TanStack Virtual and react-hook-form stay (A4).
+
+The brief's no-go "no edit to the vendored kit" ended on 2026-11-22 (decision "atoms A1, the kit too"): the kit
+(`packages/ui/src/components`, `packages/ui/src/hooks`) moves to atoms under the same rule as our code, the data
+table first. A changed file is no longer as published: it is marked as changed here, and a later update of it from
+its registry is merged by hand. PLAN.md, "The kit on atoms", has the batches.
 
 ## Constraints
 

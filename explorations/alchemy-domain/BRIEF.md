@@ -8,7 +8,7 @@ description: How inventory-import uses all of @alchemy.run/domain and the extras
 
 Benjamin, on 2026-11-19: "Not borrow use.", and "if possible find a way to make use of ever single thing". Of the
 pull request that adds `Verify`: "I'm particularly excited about this". That reverses the 2026-11-18 decision "core";
-his words are in [CAPTURE.md](CAPTURE.md). Four rounds of trials stand behind this brief, with their sources and
+his words are in [CAPTURE.md](CAPTURE.md). Five rounds of trials stand behind this brief, with their sources and
 reports on [the trial page](research/07-review-decisions-trial.md).
 
 Three rules shape every recommendation here:
@@ -87,6 +87,12 @@ was deployed.
   as chains of `&&`, and when the undo of a group was added (4,097 paths, nothing proved). With one comparison a rule, a
   group counted by a number instead of cleared by a branch, and no rule weaker, `Deciding` has 332 paths and `Undoing`
   2,652. It also cannot write a text's length into a text, nor read a loop, so it reads no hash.
+- **A group of rows decided as one unit is proved too** (trials 15 to 17, a model beside the final one, for decision
+  7): 123 rules, the four decisions with 42 to 292 paths; one act for 6,000 rows a median of 214 ms in local workerd;
+  and the reading of a row's decision through its groups equals today's `act` over 50,000 generated sequences, when a
+  group's rows are split by what each got.
+- **No rule holds that an act is taken.** A `decide` that records nothing for every act proves every rule of the final
+  model (trial 15): the prover checks a decision's rules on what an act records. The stories hold that acts are taken.
 - **The hosted model on the domain's Durable Object host, in local workerd** (trial 14, the final model): 600 acts one
   after another, each the first act on a row of its own, in two runs: 131 and 151 ms an act on the mean, 79 to 98 ms in
   the middle, the slowest 12.4 s, at load averages of 27 to 46. A later act on a row was not timed. Counting the
@@ -170,7 +176,7 @@ load average of 33 rising to 56). Where a name ends in "…", the rule is writte
 | No undo clears a decision its sender did not make | `RowUnit.NobodyClearsAnotherPersonsDecision` | proved | The row's maker and the actor | An act that puts a row back to nothing is recorded as its sender's, over what they saw |
 | An act is made on the matching now, and in this opening of the import | `DecideRow.AnActIsMadeOnTheMatchingNow`, `.AnActIsOfThisOpening` | proved | The numbers the act states | Which part of a text is still in force: a reader over the columns at each match, and a test, not run. That a carried part keeps its number: a test of the client's merge, not run |
 | An act that changes nothing records nothing | `DecideRow.AnActThatChangesNothing…` | proved | The row's text | That one encoder writes the text, so the same decision is the same text: a test, not run |
-| Any other act is recorded as its sender said and as theirs | `DecideRow.AnyOtherActIsRecorded`, `.WithItsText`, `.OnItsMatching`, `.UnderItsStep`, `.AsItsSenders` | proved | The row | |
+| An act that is recorded is recorded as its sender said and as theirs | `DecideRow.AnyOtherActIsRecorded`, `.WithItsText`, `.OnItsMatching`, `.UnderItsStep`, `.AsItsSenders` | proved | The row | That an act is taken at all: no rule holds it. A `decide` that records nothing for every act proves every rule too, `AnyOtherActIsRecorded` included (run on this model: proved, 344 paths). The stories hold it |
 | What an act replaces is kept under it (its number, maker, text and matching), and what was below that stays below | `DecideRow.AnActKeepsWhichDecisionItReplaces`, `.AndWhose`, `.AndItsText`, `.AndItsMatching`, `.AndWhatWasBelowStaysBelow` | proved | The row and the sealed text | That the step and the label kept under it are the replaced decision's: no rule |
 | An undo takes back only its sender's own decision, puts back the decision that was under it (its number, maker, text, matching and step), and leaves under that exactly what was recorded | `UndoRowStep.AnUndoTakesBackOnlyItsSendersOwnStep`, `.AnUndoLeavesADecisionWhenOneWasUnder`, `.AndNoneWhenNoneWas`, `.AnUndoPutsBackTheDecisionThatWasThere`, `.AsTheirsWhoMadeIt`, `.WithItsTextAsItWas`, `.OnItsMatchingAsItWas`, `.UnderItsStepAsItWas`, `.NothingIsBelowWhatWasTheLastKept`, `.WhatLiesUnderIsWhatWasRecorded`; `RowUnit.TheSizeOf…`, four | proved, every depth | The seal of what is brought against the seal the row holds, and the sizes of its texts | That two levels never share a seal: `unseal` reads one back, a property over 2,000 random single levels, each sealed over a random text. That the label put back is the one under it: the evolve copies it (`StepUndone`), and no rule checks it |
 | An undo is of this opening, waits for its group, is counted as a row of one while that group is sent, and does not reach past a confirm that stands | `UndoRowStep.AnUndoIsOfThisOpening`, `.AnUndoWaitsForItsGroup`, `.AnUndoOfAGroupIsTakenOnlyWhileItIsSent`, `.AnUndoDoesNotReachPastAConfirm` | proved | The import's group and the confirm's number | |
@@ -600,34 +606,58 @@ there. Nothing of the second import changed. Today it is confirmed, with other o
 
 ### 7. How is an act on a group of rows carried?
 
-**Not decided.** Asked on 2026-11-22, he chose to have the one-unit design run as a trial first: one act per row is
-proved, and takes 13 to 15 minutes for 6,000 rows with Confirm waiting; the one-unit design has not been run, so what
-Verify holds of it is not known. Decisions 8, 9 and 41 wait on that trial.
+**Not decided.** Asked on 2026-11-22, he chose to have the one-unit design run as a trial first. It ran (trials 15 to 17,
+the fifth round), and the recommendation below changed with it: the first option was the second. Decisions 8, 9 and 41
+follow from this one.
 
-*Asked under decision 4's first option; under its second, each row's act is one request and they go in parallel;
-under its third, a group is one command.* Accepting a fix for a group is the review's main act. The sample's groups
-have up to 9 rows; a large file's can have thousands.
+*Asked under decision 4's first option, as answered.* Accepting a fix for a group is the review's main act. The sample's
+groups have up to 9 rows; a large file's can have thousands.
 
-- **One act per row under the group's step, sent by a saga, with the import counting its rows (Recommended).** *Proved*
-  (trial 13): no confirm and no remove is taken while a group is being sent, by anyone; no second group begins; its rows
-  are answered one at a time, a refused one included, or it is stopped; a row of a group that is not being sent is
-  refused, of an undo of a group too; a confirm that names a change before the group's last is refused. That a screen
-  which received only part of the group names such a change is held by a property on a copy of the screen's rule and a
-  story, not by a rule. *By a story and the code of `decide`, not by a rule:* no match and no take-back is taken
-  meanwhile. *What the person sees:* their own screen shows the whole group at once, as its own acts, with "saving 2,340
-  of 6,000"; others see the rows change a few at a time; Confirm waits; their own later acts wait in their queue until
-  the group ends. *Costs:* 131 to 151 ms an act on the mean in local workerd (trial 14), so 13 to 15 minutes for 6,000
-  rows, worked out; undoing the group is as many acts again. *If it stops:* the saga sends the rest when it runs again,
-  or it is stopped (decision 9). The saga was not run.
-- **The group is decided as one unit**: one instance per decided group, and the review's fold gives each row its
-  decision from its own unit and its groups'. One act, recorded or not as a whole; its undo is one act. *In the way:*
-  the fold has to be rewritten and shown to give what today's `act` gives for every sequence, and a row's act has to
-  name the group decision it saw as well, which changes `Deciding`. Not run; its rules' standing is not known.
+- **The group is decided as one unit (Recommended).** One instance for each decided group: its rows and what the act
+  does to them as two texts, who made it and the number of its change. One act, recorded on the import and the group or
+  on neither; its undo is one act. A row's decision is read from the row's own instance and the groups in force that
+  name it. *Proved* (trial 15, of that model, `review12`): 123 rules, all four decisions, with 42, 82, 152 and 292
+  paths; a group is taken only from a screen that names the import's last change, in this opening, on the matching now;
+  only its maker takes it back, once, and not past a confirm that stands; a row's act names the import's last group act.
+  *Checked*, 3 commands deep: six rules across every import, row and group. *Measured* in local workerd (trial 17): one
+  act for 6,000 rows a median of 214 ms and its undo 191 ms, for 50,000 rows 95 and 64 ms, at loads of 36 to 60; no size
+  refused. *By a property, not by a rule* (trial 16): the reading of a row's decision equals today's `act` after every
+  action of 50,000 generated sequences, when the group's rows are split by exactly what each got; with one patch for the
+  whole group it does not. *By a story, not by a rule:* an act with the same text on a row a group covers is a change.
+  *What the person sees:* the group is saved at once; Confirm does not wait for it; another person's act on any row,
+  made before the group reached their screen, is refused and shown again, whether or not the group names that row; a
+  group pressed on a screen that is one change behind is refused and pressed again. *Not run:* the screen that computes a
+  group's rows, the screen and the projection that read a row through the groups, what a match does to a group in force,
+  and the projection's write of 6,000 rows after the one event. *It asks one more thing:* which group may be taken back
+  (decision 8).
+- **One act per row under the group's step, sent by a saga, with the import counting its rows.** *Proved* (trial 13): no
+  confirm and no remove is taken while a group is being sent, by anyone; no second group begins; its rows are answered
+  one at a time, a refused one included, or it is stopped; a row of a group that is not being sent is refused, of an undo
+  of a group too. A confirm that names a change before the group's last is refused; that a screen names the last change
+  truly is held by a property on a copy of the screen's rule and a story, not by a rule. *By a story and the code of
+  `decide`, not by a rule:* no match and no take-back is taken meanwhile. *What the person sees:* their own screen shows
+  the whole group at once, as its own acts, with "saving 2,340 of 6,000"; others see the rows change a few at a time;
+  Confirm waits; their own later acts wait in their queue until the group ends. *Costs:* 131 to 151 ms an act on the
+  mean in local workerd (trial 14), so 13 to 15 minutes for 6,000 rows, worked out; undoing the group is as many acts
+  again. *If it stops:* the saga sends the rest when it runs again, or it is stopped (decision 9). The saga was not run.
+- **Both: a group under some size row by row, a larger one as a unit.** *Proved* (trial 15, `review12mix`): the two
+  together, with 44, 86, 476 and 2,652 paths; a unit is refused while a group is being sent. Two ways to save the same
+  act, each with its own rules and its own undo, and decision 41 sets the size. Nothing else of it was run.
 
 ### 8. While one person's group is being sent, what can the others do?
 
-*Asked under decision 7's first answer.* Ana accepts a fix on 2,340 rows; Dana matches a column, or begins a group too,
-before it is over.
+*Under decision 7's first answer, the group as one unit, this question is another: which group may be taken back?*
+Ana accepts a fix on 2,340 rows; Dana then accepts another on 900, some of them the same rows; Ana undoes hers.
+
+- **Only the import's last group act; an earlier one is refused and says which came after (Recommended).** *Proved*
+  (trial 15, `review12last`): `OnlyTheLastGroupActIsTakenBack`, 84 paths. The undo is then exact: today's `act` undoes
+  only the last step too. Ana takes hers back after Dana takes back hers, or decides the rows again.
+- **Any group of one's own.** The rows that got a decision of their own since keep what the group did; the others lose
+  it; later groups are applied again on what is left. Exact only where what a later act did does not rest on the group:
+  an accept pressed because the group had made the proposal stays accepted (trial 16, two cases written by hand).
+
+*Under decision 7's second answer, one act per row:* Ana accepts a fix on 2,340 rows; Dana matches a column, or begins
+a group too, before it is over.
 
 - **Decide and undo single rows; a match, a second group, a confirm, a take-back and a remove wait and are sent when it
   is over (Recommended).** *Proved:* `OneGroupAtATime`, `NothingEndsAReviewWhileAGroupIsSent` (trial 13); that a match
@@ -637,6 +667,8 @@ before it is over.
   run.
 
 ### 9. Who may stop a group act whose sender no longer can?
+
+*Asked under decision 7's second or third answer; under its first there is nothing to stop: a group is one act.*
 
 A person begins a group and then loses the editor's role, leaves, or their saga dies. Until the group is over nobody can
 confirm, match a column or remove the import.
@@ -1088,8 +1120,9 @@ others are kept below as what was rejected.
 
 On 2026-11-22 he chose to be asked each of decisions 41 to 56 and 60 to 62 when its move opens.
 
-**41. How long may a group act take before the group is decided as one unit?** (move 3) In local workerd 13 to 15
-minutes for 6,000 rows, worked out from trial 14. Options: 1 minute; 5 minutes (Recommended, as a first number to
+**41. How long may a group act take before the group is decided as one unit?** (move 3) Asked only under decision 7's
+third answer; under its first every group is a unit. In local workerd 13 to 15 minutes for 6,000 rows row by row, worked
+out from trial 14, and a median of 214 ms as a unit (trial 17). Options: 1 minute; 5 minutes (Recommended, as a first number to
 measure against on the preview stage); no limit.
 
 **42. What answers the Items page?** (move 4) A query that answers today's page (Recommended), rows, total and page

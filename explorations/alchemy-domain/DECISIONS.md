@@ -21,8 +21,8 @@ its move opens, as he chose on 2026-11-22. The numbers of the others stay as the
 
 | # | Question | Recommended in the brief | Changes | Where it is argued |
 | --- | --- | --- | --- | --- |
-| 7 | How is an act on a group of rows carried? | One act per row under the group's step, the import counting its rows. **Asked 2026-11-22, not decided:** he chose to have the one-unit design trialled first; 8, 9 and 41 wait on it | 4 | [07](research/07-review-decisions-trial.md) third round, [saga](research/concepts/saga.md) |
-| 8 | While one person's group is being sent, what can the others do? | Decide and undo single rows; matches, groups, confirm, take-back and remove wait | 7 | [07](research/07-review-decisions-trial.md) fourth round |
+| 7 | How is an act on a group of rows carried? | The group decided as one unit. **Asked 2026-11-22, not decided:** he chose to have that design trialled first; it ran (trials 15 to 17) and is now the recommendation | 4 | [07](research/07-review-decisions-trial.md) fifth round |
+| 8 | Under 7's first answer: which group may be taken back? Under its second: while one person's group is being sent, what can the others do? | Only the import's last group act; or, row by row, single rows are decided and the rest waits | 7 | [07](research/07-review-decisions-trial.md) fifth and fourth rounds |
 | 9 | Who may stop a group act whose sender no longer can? | Its sender or an admin; the rows not sent are counted on the import | 7 | [07](research/07-review-decisions-trial.md) fourth round |
 | 24 | Can a person with no account be invited? | No, as his infra I8 | | [Resend](research/concepts/resend.md) |
 | 41 | How long may a group act take before a group is decided as one unit? | 5 minutes | 7 | [07](research/07-review-decisions-trial.md) third and fourth rounds |

@@ -1,7 +1,7 @@
 ---
 type: Research
 title: "Trial: saving review decisions, under Verify"
-description: Four rounds of models of how a review's decisions are saved, run through Verify on the library's main on 2026-11-19 to 2026-11-21. The first shows that a set-and-clear difference cannot hold the rule "no command clears a decision its sender did not make". The second finds the shape under which the review's rules are proved, measures the largest value an object stores, and runs a decision, a relation, a model invariant and an eventually rule. The third runs that shape as it would be hosted, with the app's fifteen fields (32 rules proved, and two orderings let through), the item with replace and restore, the allowance by day, members as instances, each proof alone, and one decision across two objects in local workerd. The fourth closes those orderings and every other ordering found that a model can hold, and measures that model in local workerd. The sources and Verify's reports, with what is proved, what is only checked, and what was not run; a report cut short says which lines it shows.
+description: Five rounds of models of how a review's decisions are saved, run through Verify on the library's main on 2026-11-19 to 2026-11-21. The first shows that a set-and-clear difference cannot hold the rule "no command clears a decision its sender did not make". The second finds the shape under which the review's rules are proved, measures the largest value an object stores, and runs a decision, a relation, a model invariant and an eventually rule. The third runs that shape as it would be hosted, with the app's fifteen fields (32 rules proved, and two orderings let through), the item with replace and restore, the allowance by day, members as instances, each proof alone, and one decision across two objects in local workerd. The fourth closes those orderings and every other ordering found that a model can hold, and measures that model in local workerd. The sources and Verify's reports, with what is proved, what is only checked, and what was not run; a report cut short says which lines it shows.
 ---
 
 # Trial: saving review decisions, under Verify
@@ -9,7 +9,7 @@ description: Four rounds of models of how a review's decisions are saved, run th
 Everything on this page was run in folders outside this repository, on `@alchemy.run/domain` at `main@dbfd0ddb`.
 Nothing in the repository was changed. This is the case [the brief](../BRIEF.md) models first.
 
-There are four rounds. The first, of 2026-11-19, is below as it was written, with three sentences corrected; it
+There are five rounds. The first, of 2026-11-19, is below as it was written, with three sentences corrected; it
 claimed more than it had shown, and [the second round](#the-second-round), of 2026-11-20, lists the corrections and
 runs what the first did not. [The third round](#the-third-round), the same day, runs the shape the brief recommends as
 it would be hosted. **Read the third round's table first**: the design in the brief rests on it.
@@ -10422,3 +10422,2752 @@ The first run, before its driver had the two lines about a row decided unseen, g
 
 As the third round: each trial's files in one folder beside `test/Actor.context.ts`, and
 `node node_modules/vitest/vitest.mjs run <folder>/<file>`. Trial 14 takes trial 12's manifest.
+
+# The fifth round
+
+Run on 2026-11-22, on the same builds, after decision 7 of the brief was asked and left open for a trial: a group of rows
+decided as **one unit** instead of one act a row. The fourth round's model (`review11`, trial 13) is the base; `review12`
+is that model with the group sent row by row taken out and a group as its own instance put in. The machine was busy
+with other work; the load average stands beside each time, and no timeout was raised.
+
+| # | What | Result | Time, load before and after |
+| --- | --- | --- | --- |
+| 15 | `Prove.decision(DecidingGroup)`, one act for a whole group | **Proved**, 42 paths | 795 ms, 25.79 40.82 47.52 to 25.79 40.82 47.52 |
+| 15 | `Prove.decision(UndoingGroup)`, its undo as one act | **Proved**, 82 paths | 3.46 s, 25.79 40.82 47.52 to 24.52 40.31 47.32 |
+| 15 | `Prove.decision(Deciding)`, a row's act, which now names the last group act | **Proved**, 152 paths (trial 13: 332) | 7.05 s, 24.52 40.31 47.32 to 27.52 40.40 47.27 |
+| 15 | `Prove.decision(Undoing)`, a row's undo | **Proved**, 292 paths (trial 13: 2,652) | 22.43 s, 27.52 40.40 47.27 to 29.29 39.93 46.97 |
+| 15 | `Verify.model(Review)`: three aggregates, four decisions, two relations | **Verified. 123 rules proved**, the two relations among them | 114.32 s, 29.29 39.93 46.97 to 18.21 32.59 43.49 |
+| 15 | Six rules across every import, row and group | **Checked**, every sequence of up to 2 commands (9,374 sequences) and of up to 3 (16,530 sequences, 3,653 states) | 40.34 s, 18.21 32.59 43.49 to 15.05 29.99 42.16; 47.41 s, 15.05 29.99 42.16 to 17.03 28.12 40.88 |
+| 15 | `Verify.aggregate` of `GroupUnit` and of `ImportLife` alone | "Not verified" alone: each folds events only a decision records | under 5 s |
+| 15 | Eight mutants, each with one new check removed | **Each breaks the rule named for that check**, below | 135.63 s for the eight, three at a time, 18.35 27.36 40.10 to 30.80 27.63 38.37 |
+| 15 | A decision that records nothing for every act | **Proved all the same**, on this model and on trial 13's: no rule holds that an act is taken | 7.65 s, 24.08 39.95 47.17 to 27.64 40.21 47.17; 26.92 s, 27.92 39.85 46.98 to 28.63 38.96 46.46 |
+| 15 | Six stories of a group as one unit | **All pass**; the one about a row decided over a group fails on a model without that check | under 1 s |
+| 15 | Only the import's last group act may be taken back (`review12last`) | **Proved**, 84 paths | 3.62 s, 17.03 28.12 40.88 to 17.03 28.12 40.88 |
+| 15 | Both ways at once: trial 13's group sent row by row, with the unit beside it (`review12mix`) | **Proved**: 44, 86, 476 and 2652 paths | 36.35 s, 17.03 28.12 40.88 to 18.35 27.36 40.10; 285.84 s, 45.46 52.15 53.45 to 40.63 44.66 49.83 |
+| 16 | The fold over units against today's `act`, a property over generated sequences | **Equal after every action of 50,000 sequences**, when a group's rows are split by what each got; unequal with one patch a group | 14 s for 25,000 |
+| 17 | The one-unit model on the Durable Object host in local workerd | One act for a group of 9, 600, 6,000 and 50,000 rows: a median of 95 to 214 ms, its undo 64 to 191 ms; no size refused | below, at loads of 36 to 60 |
+
+"Proved" here is of `review12` and its two variants, printed below, and of nothing else.
+
+## Trial 15. A group as its own instance
+
+What changes from trial 13:
+
+- **The import** no longer begins a group, counts its rows, skips one or stops it. It holds one number more, `lastGroup`:
+  the number of the last act on a group, its undo included.
+- **A group** is an instance of its own, named by its import and its step: the rows it names as one text, what the act
+  does to them as one text, who made it, the import's matching it was made on, the number of the change that recorded
+  it, and the number of the change that took it back (0 while it is in force). No command changes what it decided.
+- **`DecideGroup`** is decided across the import and the group, and recorded on both or on neither. It is taken only
+  from a screen that names the import's last change (`seen`), in this opening, on the matching now, and under a step no
+  group has. It is one change of the import, whatever the number of rows.
+- **`UndoGroup`** is one act: only the group's maker, once, in this opening, and not past a confirm that stands.
+- **A row's act** names `sawGroup`, the import's last group act as its screen has it, and is refused with `GroupedSince`
+  on any other. It also says `covered`: a group in force on the row was decided after the row's own decision. Then the row
+  is not as its own instance has it, and an act with the same text is a change, not "no change".
+- **A row's decision** is read from the row's own instance and the groups in force that name it: no instance holds that
+  reading. Trial 16 is about it.
+
+What the prover holds, and what it does not:
+
+- Every rule of the four decisions and the three aggregates: 123 with the two relations. The names are in the
+  report below.
+- **Not in an aggregate:** that a group's number is one its import gave, and that its undo comes after it. The prover
+  starts from any state the schema allows (an import whose count of changes is -1), so
+  `GroupUnit.AGroupIsNumbered` came back unconfirmed. They are rules across every import and group, searched to 3
+  commands, with four more: no row and group hold the same change, no two groups do, no two rows do, and no group act is
+  later than the one its import holds as its last.
+- **Not by any rule:** that a row named in a group's text is a row the act fits, that `covered` is true, and what a
+  row's decision is once groups name it. The group's rows and what it does are two texts the model compares and never
+  reads. A screen that has every change computes them; that it computes them rightly is trial 16's property and a test
+  of the screen, not run.
+- **Not by any rule, here or in trial 13: that an act is taken.** A `decide` that returns no events for every act proves
+  every rule, `AnyOtherActIsRecorded` included, on this model (146 paths) and on trial 13's
+  (344 paths). The prover checks a decision's rules on what an act records. The stories hold that acts are
+  taken; the story of a row decided over a group fails when the `covered` check is removed, where the prover saw nothing.
+- **What a row's act is refused for now:** any act on a group that its screen has not received, whether or not the group
+  names its row. The import cannot tell: it holds no rows.
+
+`Seen.value.ts`, the two lines added:
+
+```ts
+// The rows of one group act as one text an encoder writes, and what the act does to each of them.
+export const Rows = S.String.check(S.isMinLength(1), S.isMaxLength(600_000))
+export const Patch = S.String.check(S.isMaxLength(10_000))
+```
+
+`GroupUnit.aggregate.ts`:
+
+```ts
+// One act on a group of rows as its own instance: which rows, what it does to each, who made it and the number of the
+// change that recorded it. It is recorded whole or not at all, and never changes after; its undo records only when.
+// The group decides nothing alone: `DecidingGroup` and `UndoingGroup` record its events. A row's decision is read from
+// the row's own instance and the groups that name it; no instance holds that reading.
+import * as Domain from "@alchemy.run/domain"
+import * as Effect from "effect/Effect"
+import * as S from "effect/Schema"
+import { CurrentActor } from "../test/Actor.context.ts"
+import { Change, Patch, Rows, Step } from "./Seen.value.ts"
+
+export class GroupDecided extends Domain.Event("GroupDecided", {
+  importId: S.String,
+  organizationId: S.String,
+  change: Change,
+  by: S.String,
+  step: Step,
+  patch: Patch,
+  rows: Rows,
+  count: S.Int,
+  madeOn: S.Int,
+  label: S.String,
+}) {}
+export class GroupUndone extends Domain.Event("GroupUndone", { change: Change }) {}
+
+export const GroupState = S.Union([
+  S.TaggedStruct("Untouched", {}),
+  S.TaggedStruct("Decided", {
+    importId: S.String,
+    organizationId: S.String,
+    change: Change,
+    by: S.String,
+    step: S.String,
+    patch: S.String,
+    rows: S.String,
+    count: S.Int,
+    madeOn: S.Int,
+    label: S.String,
+    // The change that took it back, or 0 while it is in force.
+    undoneAt: Change,
+  }),
+])
+
+export class GroupUnit extends Domain.Aggregate("GroupUnit", {
+  id: S.String,
+  state: GroupState,
+  initial: { _tag: "Untouched" },
+  invariants: {
+    AGroupHasRows: (s) => s._tag !== "Decided" || s.count >= 1,
+    // That its number is one its import gave, and that its undo comes after it, need the import: they are rules over
+    // every import and group in the model, searched and not proved.
+  },
+  transitions: {
+    // What a group decided never changes: its rows, what it does to them, its number, whose it is.
+    AGroupKeepsItsRows: ({ before, after }) =>
+      before._tag !== "Decided" || after._tag !== "Decided" || after.rows === before.rows,
+    AGroupKeepsItsPatch: ({ before, after }) =>
+      before._tag !== "Decided" || after._tag !== "Decided" || after.patch === before.patch,
+    AGroupKeepsItsNumber: ({ before, after }) =>
+      before._tag !== "Decided" || after._tag !== "Decided" || after.change === before.change,
+    AGroupKeepsItsMaker: ({ before, after }) =>
+      before._tag !== "Decided" || after._tag !== "Decided" || after.by === before.by,
+    ADecidedGroupStaysDecided: ({ before, after }) => before._tag !== "Decided" || after._tag === "Decided",
+    // Only its maker takes it back, and a group taken back stays so.
+    NobodyUndoesAnotherPersonsGroup: Effect.fn(function* ({ before, after }) {
+      if (before._tag !== "Decided" || after._tag !== "Decided" || after.undoneAt === before.undoneAt) return true
+      return (yield* CurrentActor).memberId === before.by
+    }),
+    AGroupTakenBackStaysTakenBack: ({ before, after }) =>
+      before._tag !== "Decided" || after._tag !== "Decided" || before.undoneAt === 0 || after.undoneAt === before.undoneAt,
+    AGroupNeverChangesImportOrOrganization: ({ before, after }) =>
+      before._tag === "Untouched" ||
+      after._tag === "Untouched" ||
+      (before.organizationId === after.organizationId && before.importId === after.importId),
+    OnlyItsOwnOrganizationChangesAGroup: Effect.fn(function* ({ before }) {
+      if (before._tag === "Untouched") return true
+      return (yield* CurrentActor).organizationId === before.organizationId
+    }),
+    AViewerChangesNothing: Effect.fn(function* () {
+      return (yield* CurrentActor).role !== "viewer"
+    }),
+  },
+  events: [GroupDecided, GroupUndone],
+  evolve: {
+    GroupDecided: (s, e) =>
+      s._tag === "Untouched"
+        ? {
+            _tag: "Decided" as const,
+            importId: e.importId,
+            organizationId: e.organizationId,
+            change: e.change,
+            by: e.by,
+            step: e.step,
+            patch: e.patch,
+            rows: e.rows,
+            count: e.count,
+            madeOn: e.madeOn,
+            label: e.label,
+            undoneAt: 0,
+          }
+        : s,
+    GroupUndone: (s, e) => (s._tag === "Decided" ? { ...s, undoneAt: e.change } : s),
+  },
+}) {}
+```
+
+`Group.decision.ts`:
+
+```ts
+// One act on a group of rows, decided across the import and the group it names, and recorded on both or on neither:
+// one command, whatever the number of rows. It is taken only from a screen that has every change of the import, so the
+// rows it names are the ones the act fits now. Its undo is one act too.
+import * as Domain from "@alchemy.run/domain"
+import * as Effect from "effect/Effect"
+import * as S from "effect/Schema"
+import { CurrentActor, Session } from "../test/Actor.context.ts"
+import { GroupDecided, GroupUndone, GroupUnit } from "./GroupUnit.aggregate.ts"
+import {
+  ConfirmedSince,
+  GroupCounted,
+  ImportId,
+  ImportLife,
+  MatchedSince,
+  NotOpen,
+  NotPermitted,
+  ReviewMovedOn,
+} from "./ImportLife.aggregate.ts"
+import { DecidedBeforeTheConfirm, NotYourStep } from "./Review.decision.ts"
+import { Change, Patch, Rows, Step } from "./Seen.value.ts"
+
+// A group was already decided under this step.
+export class StepTaken extends Domain.Rejection("StepTaken", {}) {}
+
+export class DecideGroup extends Domain.Command("DecideGroup", {
+  middleware: [Session],
+  input: {
+    importId: ImportId,
+    step: Step,
+    opening: S.Int,
+    // The screen has received every change up to this number.
+    seen: Change,
+    madeOn: S.Int,
+    patch: Patch,
+    rows: Rows,
+    count: S.Int.check(S.isGreaterThanOrEqualTo(1)),
+    label: S.String.check(S.isMaxLength(200)),
+  },
+  events: [GroupDecided, GroupCounted],
+  rejects: [NotOpen, NotPermitted, StepTaken, ConfirmedSince, ReviewMovedOn, MatchedSince],
+}) {}
+
+export class UndoGroup extends Domain.Command("UndoGroup", {
+  middleware: [Session],
+  input: { importId: ImportId, step: Step, undo: Change, opening: S.Int },
+  events: [GroupUndone, GroupCounted],
+  rejects: [NotOpen, NotPermitted, ConfirmedSince, NotYourStep, DecidedBeforeTheConfirm],
+}) {}
+
+export class DecidingGroup extends Domain.Decision(DecideGroup, {
+  reads: { life: ImportLife, group: GroupUnit },
+  keyOf: (cmd) => ({ life: cmd.importId, group: `${cmd.importId}/${cmd.step}` }),
+  decide: Effect.fn(function* ({ life, group }, cmd) {
+    const actor = yield* CurrentActor
+    if (life.state._tag !== "Open") return yield* new NotOpen({})
+    if (actor.organizationId !== life.state.organizationId || actor.role === "viewer") {
+      return yield* new NotPermitted({})
+    }
+    if (group.state._tag !== "Untouched") return yield* new StepTaken({})
+    if (cmd.opening !== life.state.confirms) return yield* new ConfirmedSince({})
+    if (cmd.seen !== life.state.changes) return yield* new ReviewMovedOn({ last: life.state.changes })
+    if (cmd.madeOn !== life.state.matching) return yield* new MatchedSince({ matching: life.state.matching })
+    const change = life.state.changes + 1
+    return [
+      group.record(
+        new GroupDecided({
+          importId: cmd.importId,
+          organizationId: life.state.organizationId,
+          change,
+          by: actor.memberId,
+          step: cmd.step,
+          patch: cmd.patch,
+          rows: cmd.rows,
+          count: cmd.count,
+          madeOn: cmd.madeOn,
+          label: cmd.label,
+        }),
+      ),
+      life.record(new GroupCounted({ change, step: cmd.step, rows: cmd.count, label: cmd.label, by: actor.memberId })),
+    ]
+  }),
+  transitions: {
+    AGroupIsDecidedOnlyOnAnOpenImport: ({ before }) => before.life._tag === "Open",
+    AGroupIsOfThisOpening: ({ before, command }) =>
+      before.life._tag === "Open" && command.opening === before.life.confirms,
+    // Its screen had every change: the rows it names are the ones the act fits.
+    AGroupIsMadeOnEveryChange: ({ before, command }) =>
+      before.life._tag === "Open" && command.seen === before.life.changes,
+    AGroupIsMadeOnTheMatchingNow: ({ before, command }) =>
+      before.life._tag === "Open" && command.madeOn === before.life.matching,
+    AStepDecidesOneGroup: ({ before }) => before.group._tag === "Untouched",
+    // It is recorded whole: every row it names, what it does to them, as its sender's, in force.
+    AGroupIsRecorded: ({ after }) => after.group._tag === "Decided",
+    WithEveryRowItNames: ({ after, command }) => after.group._tag !== "Decided" || after.group.rows === command.rows,
+    WithWhatItDoes: ({ after, command }) => after.group._tag !== "Decided" || after.group.patch === command.patch,
+    WithItsCount: ({ after, command }) => after.group._tag !== "Decided" || after.group.count === command.count,
+    OnItsMatching: ({ after, command }) => after.group._tag !== "Decided" || after.group.madeOn === command.madeOn,
+    InForce: ({ after }) => after.group._tag !== "Decided" || after.group.undoneAt === 0,
+    AsItsSenders: Effect.fn(function* ({ after }) {
+      if (after.group._tag !== "Decided") return true
+      return after.group.by === (yield* CurrentActor).memberId
+    }),
+    // It is one change of the import, whatever the number of its rows, with the same number on the group.
+    AGroupIsOneChange: ({ before, after }) =>
+      before.life._tag !== "Open" || after.life._tag !== "Open" || after.life.changes === before.life.changes + 1,
+    OnTheGroupToo: ({ after }) =>
+      after.life._tag !== "Open" || after.group._tag !== "Decided" || after.group.change === after.life.changes,
+    TheImportHoldsItAsItsLastGroupAct: ({ after }) =>
+      after.life._tag !== "Open" || after.life.lastGroup === after.life.changes,
+    TheImportsEventSaysHowManyRows: ({ command, events }) =>
+      events.every((e) => e._tag !== "GroupCounted" || e.rows === command.count),
+  },
+}) {}
+
+export class UndoingGroup extends Domain.Decision(UndoGroup, {
+  reads: { life: ImportLife, group: GroupUnit },
+  keyOf: (cmd) => ({ life: cmd.importId, group: `${cmd.importId}/${cmd.step}` }),
+  decide: Effect.fn(function* ({ life, group }, cmd) {
+    const actor = yield* CurrentActor
+    if (life.state._tag !== "Open") return yield* new NotOpen({})
+    if (actor.organizationId !== life.state.organizationId || actor.role === "viewer") {
+      return yield* new NotPermitted({})
+    }
+    if (cmd.opening !== life.state.confirms) return yield* new ConfirmedSince({})
+    if (group.state._tag !== "Decided") return yield* new NotYourStep({})
+    if (group.state.importId !== cmd.importId || group.state.organizationId !== life.state.organizationId) {
+      return yield* new NotPermitted({})
+    }
+    if (group.state.by !== actor.memberId || group.state.change !== cmd.undo || group.state.undoneAt !== 0) {
+      return yield* new NotYourStep({})
+    }
+    if (group.state.change <= life.state.confirmedAt) return yield* new DecidedBeforeTheConfirm({})
+    const change = life.state.changes + 1
+    return [
+      group.record(new GroupUndone({ change })),
+      life.record(
+        new GroupCounted({ change, step: cmd.step, rows: group.state.count, label: "undo", by: actor.memberId }),
+      ),
+    ]
+  }),
+  transitions: {
+    AGroupsUndoTakesBackOnlyItsSendersOwn: Effect.fn(function* ({ before, command }) {
+      if (before.life._tag !== "Open" || before.group._tag !== "Decided") return false
+      return before.group.change === command.undo && (yield* CurrentActor).memberId === before.group.by
+    }),
+    AGroupsUndoIsOfThisOpening: ({ before, command }) =>
+      before.life._tag === "Open" && command.opening === before.life.confirms,
+    AGroupIsTakenBackOnce: ({ before }) => before.group._tag === "Decided" && before.group.undoneAt === 0,
+    AGroupsUndoDoesNotReachPastAConfirm: ({ before }) =>
+      before.life._tag === "Open" && before.group._tag === "Decided" && before.group.change > before.life.confirmedAt,
+    // It is one change, whatever the number of rows, and the group says when.
+    AGroupsUndoIsOneChange: ({ before, after }) =>
+      before.life._tag === "Open" && after.life._tag === "Open" && after.life.changes === before.life.changes + 1,
+    AndTheGroupSaysWhen: ({ after }) =>
+      after.life._tag !== "Open" || after.group._tag !== "Decided" || after.group.undoneAt === after.life.changes,
+    TheImportHoldsItAsItsLastGroupAct: ({ after }) =>
+      after.life._tag !== "Open" || after.life.lastGroup === after.life.changes,
+    TheImportsEventSaysHowManyRows: ({ before, events }) =>
+      events.every((e) => e._tag !== "GroupCounted" || before.group._tag !== "Decided" || e.rows === before.group.count),
+  },
+}) {}
+```
+
+`ImportLife.aggregate.ts`, against trial 13's:
+
+```diff
+--- review11/ImportLife.aggregate.ts
++++ review12/ImportLife.aggregate.ts
+@@ -1,8 +1,8 @@
+ // One import's lifecycle as its own instance, with no list in its state: staged, matched, confirmed, taken back,
+ // opened again, removed. It numbers every change. A confirm, a take-back, a reopen and a remove each name the last
+-// change their sender's screen has received, with none before it missing, and are refused on any other. A group act
+-// says how many rows it has; each is answered, as a decision or as a skipped row, and no confirm or remove is taken
+-// until every one is, or until its sender or an admin stops it and the rows not sent are recorded. Rows are not here.
++// change their sender's screen has received, with none before it missing, and are refused on any other. An act on a
++// group of rows is one change, recorded with the group's own instance; the import holds its number as the last group
++// act. Rows and groups are not here.
+ import * as Domain from "@alchemy.run/domain"
+ import * as Effect from "effect/Effect"
+ import * as S from "effect/Schema"
+@@ -31,8 +31,6 @@
+ export class ActCounted extends Domain.Event("ActCounted", {
+   change: Change,
+   step: Step,
+-  // How many rows of the group being sent it answers: 1 for a row of a group, 0 for any other act.
+-  answers: S.Int,
+   row: S.String,
+   label: S.String,
+   holds: Change,
+@@ -42,16 +40,15 @@
+   flags: S.String,
+   madeOn: S.Int,
+ }) {}
+-export class GroupBegun extends Domain.Event("GroupBegun", { change: Change, step: Step, by: S.String, rows: Count }) {}
+-// A row of the group that was not decided: somebody else's decision is there, or it held this one already.
+-export class GroupRowSkipped extends Domain.Event("GroupRowSkipped", {
++// One act on a group of rows, or its undo, numbered by its import and recorded by the decision that also records the
++// group: how many rows it is of, and who acted.
++export class GroupCounted extends Domain.Event("GroupCounted", {
+   change: Change,
+-  row: S.String,
+-  why: S.String,
++  step: Step,
++  rows: Count,
++  label: S.String,
+   by: S.String,
+ }) {}
+-// The group was stopped with rows not sent: how many, and who stopped it.
+-export class GroupStopped extends Domain.Event("GroupStopped", { change: Change, unsent: Count, by: S.String }) {}
+ export class SuggestionRecorded extends Domain.Event("SuggestionRecorded", { by: S.String }) {}
+ export class ImportConfirmed extends Domain.Event("ImportConfirmed", {
+   change: Change,
+@@ -83,9 +80,6 @@
+ export class PlanBehind extends Domain.Rejection("PlanBehind", { last: Change }) {}
+ // What the plan would do is not what the button said: the stored items changed, with no change of this import between.
+ export class NotWhatWasShown extends Domain.Rejection("NotWhatWasShown", {}) {}
+-// A group act is being sent: its step.
+-export class GroupUnderWay extends Domain.Rejection("GroupUnderWay", { step: Step }) {}
+-export class NoGroupUnderWay extends Domain.Rejection("NoGroupUnderWay", {}) {}
+ // The import was confirmed after the act was made: the screen names it.
+ export class ConfirmedSince extends Domain.Rejection("ConfirmedSince", {}) {}
+ // A column was matched again: the matching now.
+@@ -108,25 +102,7 @@
+   // `columns`: every field's column after the match. `saw`: the import's matching as the sender's screen has it.
+   input: { importId: ImportId, columns: Columns, saw: S.Int, opening: S.Int },
+   events: [ColumnMatched],
+-  rejects: [NotPermitted, NotOpen, ConfirmedSince, GroupUnderWay, MatchedSince],
+-}) {}
+-export class BeginGroup extends Domain.Command("BeginGroup", {
+-  middleware: [Session],
+-  input: { importId: ImportId, step: Step, rows: S.Int.check(S.isGreaterThanOrEqualTo(1)), madeOn: S.Int, opening: S.Int },
+-  events: [GroupBegun],
+-  rejects: [NotPermitted, NotOpen, ConfirmedSince, GroupUnderWay, MatchedSince],
+-}) {}
+-export class SkipGroupRow extends Domain.Command("SkipGroupRow", {
+-  middleware: [Session],
+-  input: { importId: ImportId, step: Step, row: S.String, why: S.String.check(S.isMaxLength(200)) },
+-  events: [GroupRowSkipped],
+-  rejects: [NotPermitted, NotOpen, NoGroupUnderWay],
+-}) {}
+-export class StopGroup extends Domain.Command("StopGroup", {
+-  middleware: [Session],
+-  input: { importId: ImportId, step: Step },
+-  events: [GroupStopped],
+-  rejects: [NotPermitted, NotOpen, NoGroupUnderWay],
++  rejects: [NotPermitted, NotOpen, ConfirmedSince, MatchedSince],
+ }) {}
+ export class RecordSuggestion extends Domain.Command("RecordSuggestion", {
+   middleware: [Session],
+@@ -151,13 +127,13 @@
+     notImported: Count,
+   },
+   events: [ImportConfirmed],
+-  rejects: [NotPermitted, NotOpen, GroupUnderWay, ReviewMovedOn, PlanBehind, NotWhatWasShown, CountsDoNotAddUp],
++  rejects: [NotPermitted, NotOpen, ReviewMovedOn, PlanBehind, NotWhatWasShown, CountsDoNotAddUp],
+ }) {}
+ export class TakeBackImport extends Domain.Command("TakeBackImport", {
+   middleware: [Session],
+   input: { importId: ImportId, seen: Change, kept: Count, keptReplaced: Count },
+   events: [ImportTakenBack],
+-  rejects: [NotPermitted, NotImported, GroupUnderWay, ReviewMovedOn, MoreKeptThanInForce],
++  rejects: [NotPermitted, NotImported, ReviewMovedOn, MoreKeptThanInForce],
+ }) {}
+ export class ReopenImport extends Domain.Command("ReopenImport", {
+   middleware: [Session],
+@@ -169,7 +145,7 @@
+   middleware: [Session],
+   input: { importId: ImportId, seen: Change },
+   events: [ImportRemoved],
+-  rejects: [NotPermitted, NotOpen, GroupUnderWay, ReviewMovedOn, HasItemsInForce],
++  rejects: [NotPermitted, NotOpen, ReviewMovedOn, HasItemsInForce],
+ }) {}
+ 
+ const kept = {
+@@ -187,16 +163,13 @@
+   inForce: S.Int,
+   replaced: S.Int,
+   standing: S.Int,
++  // The number of the last act on a group, its undo included (0 when there was none): a row's act names it.
++  lastGroup: S.Int,
+ }
+ export const ImportState = S.Union([
+   S.TaggedStruct("Unstaged", {}),
+   S.TaggedStruct("Open", {
+     ...kept,
+-    // The last group act begun, who began it, and how many of its rows are not answered yet: it is being sent while
+-    // that is not 0.
+-    groupStep: S.String,
+-    groupBy: S.String,
+-    groupLeft: S.Int,
+     suggestions: S.Int,
+   }),
+   S.TaggedStruct("Imported", { ...kept, created: S.Int, updated: S.Int, already: S.Int, notImported: S.Int }),
+@@ -230,7 +203,6 @@
+     NothingStandsThatWasTakenBack: (s) => s._tag !== "TakenBack" || s.standing === 0,
+     WhatIsInForceThenIsWhatWasKept: (s) => s._tag !== "TakenBack" || s.inForce === s.kept,
+     // No group has fewer than no rows left to answer.
+-    RowsLeftAreNotNegative: (s) => s._tag !== "Open" || s.groupLeft >= 0,
+   },
+   transitions: {
+     // The status becomes Imported only by a confirm.
+@@ -270,23 +242,6 @@
+       after._tag === "Removed" ||
+       after.changes === before.changes + (command._tag === "RecordSuggestion" ? 0 : 1),
+     // No confirm and no remove is taken while a group act is being sent.
+-    NothingEndsAReviewWhileAGroupIsSent: ({ before, after }) =>
+-      before._tag !== "Open" || after._tag === "Open" || before.groupLeft === 0,
+-    // A group's rows are answered one at a time, each by a change of its own, unless it is stopped.
+-    AGroupIsAnsweredRowByRow: ({ before, after, command }) =>
+-      command._tag === "StopGroup" ||
+-      before._tag !== "Open" ||
+-      after._tag !== "Open" ||
+-      after.groupLeft >= before.groupLeft - 1,
+-    // No group begins over another.
+-    OneGroupAtATime: ({ before, after, command }) =>
+-      command._tag !== "BeginGroup" || before._tag !== "Open" || after._tag !== "Open" || before.groupLeft === 0,
+-    // A group is stopped only by the person who began it or by an admin.
+-    AGroupIsStoppedByItsSenderOrAnAdmin: Effect.fn(function* ({ before, command }) {
+-      if (command._tag !== "StopGroup" || before._tag !== "Open") return true
+-      const actor = yield* CurrentActor
+-      return actor.memberId === before.groupBy || actor.role === "admin"
+-    }),
+     OnlyAnImportWithAConfirmStandingIsTakenBack: ({ before, after, command }) =>
+       command._tag !== "TakeBackImport" ||
+       before._tag === "Unstaged" ||
+@@ -316,8 +271,8 @@
+       return events.every((e) => (e._tag === "ActCounted" ? e.actor === actor.memberId : e.by === actor.memberId))
+     }),
+     // A match and a group are made in this opening of the import.
+-    AMatchAndAGroupAreOfThisOpening: ({ before, after, command }) =>
+-      (command._tag !== "MatchColumn" && command._tag !== "BeginGroup") ||
++    AMatchIsOfThisOpening: ({ before, after, command }) =>
++      command._tag !== "MatchColumn" ||
+       before._tag !== "Open" ||
+       after._tag !== "Open" ||
+       command.opening === before.confirms,
+@@ -366,16 +321,13 @@
+   commands: [
+     StageImport,
+     MatchColumn,
+-    BeginGroup,
+-    SkipGroupRow,
+-    StopGroup,
+     RecordSuggestion,
+     ConfirmImport,
+     TakeBackImport,
+     ReopenImport,
+     RemoveImport,
+   ],
+-  events: [ActCounted],
++  events: [ActCounted, GroupCounted],
+   keyOf: (cmd) => cmd.importId,
+   decide: {
+     StageImport: Effect.fn(function* (s, cmd) {
+@@ -396,7 +348,6 @@
+       if (s._tag !== "Open") return yield* new NotOpen({})
+       if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* new NotPermitted({})
+       if (cmd.opening !== s.confirms) return yield* new ConfirmedSince({})
+-      if (s.groupLeft !== 0) return yield* new GroupUnderWay({ step: s.groupStep })
+       if (cmd.saw !== s.matching) return yield* new MatchedSince({ matching: s.matching })
+       // Every field reads this already, by its heading or by hand: nothing is recorded, and nothing is taken back.
+       if (s.columns === cmd.columns) return []
+@@ -409,31 +360,6 @@
+         }),
+       ]
+     }),
+-    BeginGroup: Effect.fn(function* (s, cmd) {
+-      const actor = yield* CurrentActor
+-      if (s._tag !== "Open") return yield* new NotOpen({})
+-      if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* new NotPermitted({})
+-      if (cmd.opening !== s.confirms) return yield* new ConfirmedSince({})
+-      if (s.groupLeft !== 0) return yield* new GroupUnderWay({ step: s.groupStep })
+-      if (cmd.madeOn !== s.matching) return yield* new MatchedSince({ matching: s.matching })
+-      return [new GroupBegun({ change: s.changes + 1, step: cmd.step, by: actor.memberId, rows: cmd.rows })]
+-    }),
+-    SkipGroupRow: Effect.fn(function* (s, cmd) {
+-      const actor = yield* CurrentActor
+-      if (s._tag !== "Open") return yield* new NotOpen({})
+-      if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* new NotPermitted({})
+-      if (s.groupLeft === 0 || s.groupStep !== cmd.step) return yield* new NoGroupUnderWay({})
+-      if (s.groupBy !== actor.memberId) return yield* new NotPermitted({})
+-      return [new GroupRowSkipped({ change: s.changes + 1, row: cmd.row, why: cmd.why, by: actor.memberId })]
+-    }),
+-    StopGroup: Effect.fn(function* (s, cmd) {
+-      const actor = yield* CurrentActor
+-      if (s._tag !== "Open") return yield* new NotOpen({})
+-      if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* new NotPermitted({})
+-      if (s.groupLeft === 0 || s.groupStep !== cmd.step) return yield* new NoGroupUnderWay({})
+-      if (s.groupBy !== actor.memberId && actor.role !== "admin") return yield* new NotPermitted({})
+-      return [new GroupStopped({ change: s.changes + 1, unsent: s.groupLeft, by: actor.memberId })]
+-    }),
+     RecordSuggestion: Effect.fn(function* (s) {
+       const actor = yield* CurrentActor
+       if (s._tag !== "Open") return yield* new NotOpen({})
+@@ -444,7 +370,6 @@
+       const actor = yield* CurrentActor
+       if (s._tag !== "Open") return yield* new NotOpen({})
+       if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* new NotPermitted({})
+-      if (s.groupLeft !== 0) return yield* new GroupUnderWay({ step: s.groupStep })
+       if (cmd.seen !== s.changes) return yield* new ReviewMovedOn({ last: s.changes })
+       if (cmd.planAt !== s.changes) return yield* new PlanBehind({ last: s.changes })
+       if (cmd.plan !== cmd.shown) return yield* new NotWhatWasShown({})
+@@ -468,7 +393,6 @@
+       if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* new NotPermitted({})
+       if (s.standing < 1) return yield* new NotImported({})
+       if (cmd.seen !== s.changes) return yield* new ReviewMovedOn({ last: s.changes })
+-      if (s._tag === "Open" && s.groupLeft !== 0) return yield* new GroupUnderWay({ step: s.groupStep })
+       if (cmd.kept > s.inForce || cmd.keptReplaced > s.replaced) return yield* new MoreKeptThanInForce({})
+       return [
+         new ImportTakenBack({
+@@ -492,7 +416,6 @@
+       const actor = yield* CurrentActor
+       if (s._tag !== "Open") return yield* new NotOpen({})
+       if (actor.organizationId !== s.organizationId || actor.role === "viewer") return yield* new NotPermitted({})
+-      if (s.groupLeft !== 0) return yield* new GroupUnderWay({ step: s.groupStep })
+       if (cmd.seen !== s.changes) return yield* new ReviewMovedOn({ last: s.changes })
+       if (s.inForce !== 0 || s.standing !== 0) return yield* new HasItemsInForce({})
+       return [new ImportRemoved({ change: s.changes + 1, by: actor.memberId })]
+@@ -511,9 +434,7 @@
+       inForce: 0,
+       replaced: 0,
+       standing: 0,
+-      groupStep: "",
+-      groupBy: "",
+-      groupLeft: 0,
++      lastGroup: 0,
+       suggestions: 0,
+     }),
+     ColumnMatched: (s, e) =>
+@@ -525,12 +446,8 @@
+             columns: e.columns,
+           }
+         : s,
+-    ActCounted: (s, e) =>
+-      s._tag === "Open" ? { ...s, changes: e.change, groupLeft: s.groupLeft - e.answers } : s,
+-    GroupBegun: (s, e) =>
+-      s._tag === "Open" ? { ...s, changes: e.change, groupStep: e.step, groupBy: e.by, groupLeft: e.rows } : s,
+-    GroupRowSkipped: (s, e) => (s._tag === "Open" ? { ...s, changes: e.change, groupLeft: s.groupLeft - 1 } : s),
+-    GroupStopped: (s, e) => (s._tag === "Open" ? { ...s, changes: e.change, groupLeft: 0 } : s),
++    ActCounted: (s, e) => (s._tag === "Open" ? { ...s, changes: e.change } : s),
++    GroupCounted: (s, e) => (s._tag === "Open" ? { ...s, changes: e.change, lastGroup: e.change } : s),
+     SuggestionRecorded: (s) => (s._tag === "Open" ? { ...s, suggestions: s.suggestions + 1 } : s),
+     ImportConfirmed: (s, e) =>
+       s._tag === "Open"
+@@ -546,6 +463,7 @@
+             inForce: s.inForce + e.created,
+             replaced: s.replaced + e.updated,
+             standing: s.standing + 1,
++            lastGroup: s.lastGroup,
+             created: e.created,
+             updated: e.updated,
+             already: e.already,
+@@ -569,6 +487,7 @@
+               inForce: e.kept,
+               replaced: 0,
+               standing: 0,
++              lastGroup: s.lastGroup,
+               removed: e.removed,
+               kept: e.kept,
+             }
+@@ -587,9 +506,7 @@
+             inForce: s.inForce,
+             replaced: s.replaced,
+             standing: s.standing,
+-            groupStep: "",
+-            groupBy: "",
+-            groupLeft: 0,
++            lastGroup: s.lastGroup,
+             suggestions: 0,
+           }
+         : s,
+```
+
+`Review.decision.ts`, against trial 13's:
+
+```diff
+--- review11/Review.decision.ts
++++ review12/Review.decision.ts
+@@ -8,7 +8,6 @@
+ import {
+   ActCounted,
+   ConfirmedSince,
+-  GroupUnderWay,
+   ImportId,
+   ImportLife,
+   MatchedSince,
+@@ -35,8 +34,8 @@
+ export class DecidedSince extends Domain.Rejection("DecidedSince", { by: S.String, change: Change }) {}
+ // The decision its sender saw is no longer there, and the row has none.
+ export class NoLongerThere extends Domain.Rejection("NoLongerThere", {}) {}
+-// The act is of a group that is not being sent, or not by its sender.
+-export class NotThisGroup extends Domain.Rejection("NotThisGroup", {}) {}
++// An act on a group of rows was recorded that the sender has not seen: its number.
++export class GroupedSince extends Domain.Rejection("GroupedSince", { last: Change }) {}
+ export class NotYourStep extends Domain.Rejection("NotYourStep", {}) {}
+ // A confirm that stands was made after it: the row is decided again, the item edited, or the import taken back.
+ export class DecidedBeforeTheConfirm extends Domain.Rejection("DecidedBeforeTheConfirm", {}) {}
+@@ -54,8 +53,10 @@
+     importId: ImportId,
+     row: RowName,
+     step: Step,
+-    // It is a row of the group act with this step.
+-    inGroup: S.Boolean,
++    // The import's last group act as the sender's screen has it, and whether a group in force on this row was decided
++    // after the row's own decision: then the row is not as its own instance has it, and the same text is a change.
++    sawGroup: Change,
++    covered: S.Boolean,
+     // How many times the import had been confirmed when the act was made.
+     opening: S.Int,
+     // The change that recorded the decision the sender saw on the row, or 0 for none.
+@@ -66,7 +67,7 @@
+     label: Label,
+   },
+   events: [RowDecided, ActCounted],
+-  rejects: [NotOpen, NotPermitted, ConfirmedSince, NotThisGroup, DecidedSince, NoLongerThere, MatchedSince],
++  rejects: [NotOpen, NotPermitted, ConfirmedSince, GroupedSince, DecidedSince, NoLongerThere, MatchedSince],
+ }) {}
+ 
+ export class UndoRowStep extends Domain.Command("UndoRowStep", {
+@@ -78,7 +79,6 @@
+     row: RowName,
+     undo: Change,
+     step: Step,
+-    inGroup: S.Boolean,
+     opening: S.Int,
+     next: Level,
+     below: S.String,
+@@ -88,9 +88,7 @@
+     NotOpen,
+     NotPermitted,
+     ConfirmedSince,
+-    NotThisGroup,
+     NotYourStep,
+-    GroupUnderWay,
+     DecidedBeforeTheConfirm,
+     HistoryEnds,
+     NotWhatWasUnder,
+@@ -120,14 +118,9 @@
+       return yield* new NotPermitted({})
+     }
+     if (cmd.opening !== life.state.confirms) return yield* new ConfirmedSince({})
+-    if (
+-      cmd.inGroup &&
+-      (life.state.groupLeft === 0 || cmd.step !== life.state.groupStep || actor.memberId !== life.state.groupBy)
+-    ) {
+-      return yield* new NotThisGroup({})
+-    }
++    if (cmd.sawGroup !== life.state.lastGroup) return yield* new GroupedSince({ last: life.state.lastGroup })
+     // The row says this already, whoever decided it and whether or not the sender has seen it.
+-    if (leavesAsItIs(row.state, cmd.flags)) return []
++    if (!cmd.covered && leavesAsItIs(row.state, cmd.flags)) return []
+     if (row.state._tag === "Decided") {
+       if (cmd.saw !== row.state.change) return yield* new DecidedSince({ by: row.state.by, change: row.state.change })
+     } else if (cmd.saw !== 0) {
+@@ -152,7 +145,6 @@
+         new ActCounted({
+           change,
+           step: cmd.step,
+-          answers: cmd.inGroup ? 1 : 0,
+           row: cmd.row,
+           label: cmd.label,
+           holds: change,
+@@ -169,49 +161,48 @@
+     // An act is taken only in the opening it was made in: one made before a confirm is not taken after a reopen.
+     AnActIsOfThisOpening: ({ before, command }) =>
+       before.life._tag === "Open" && command.opening === before.life.confirms,
+-    // A group's row is taken only while that group is being sent.
+-    AGroupsRowIsTakenOnlyWhileItIsSent: ({ before, command }) =>
+-      !command.inGroup ||
+-      (before.life._tag === "Open" && before.life.groupLeft !== 0 && command.step === before.life.groupStep),
++    // A row's act is made on a screen that has the import's last group act.
++    ARowsActSawTheLastGroupAct: ({ before, command }) =>
++      before.life._tag === "Open" && command.sawGroup === before.life.lastGroup,
+     // A decision is replaced only by an act whose sender saw it, by the number of the change that recorded it.
+     ADecisionIsReplacedOnlyByAnActThatSawIt: ({ before, command }) =>
+-      leavesAsItIs(before.row, command.flags) ||
++      (!command.covered && leavesAsItIs(before.row, command.flags)) ||
+       (before.row._tag === "Decided" ? command.saw === before.row.change : command.saw === 0),
+     // Whatever it decides, an act is made on the import's matching now; one made on an older matching is not applied.
+     AnActIsMadeOnTheMatchingNow: ({ before, command }) =>
+-      leavesAsItIs(before.row, command.flags) ||
++      (!command.covered && leavesAsItIs(before.row, command.flags)) ||
+       (before.life._tag === "Open" && command.madeOn === before.life.matching),
+     // An act that would leave the row's decision as it is records nothing: the row and the import are unchanged.
+     AnActThatChangesNothingLeavesTheImport: ({ before, after, command }) =>
+-      !leavesAsItIs(before.row, command.flags) ||
++      !(!command.covered && leavesAsItIs(before.row, command.flags)) ||
+       before.life._tag !== "Open" ||
+       after.life._tag !== "Open" ||
+       after.life.changes === before.life.changes,
+     AnActThatChangesNothingLeavesTheRow: ({ before, after, command }) =>
+-      !leavesAsItIs(before.row, command.flags) ||
++      !(!command.covered && leavesAsItIs(before.row, command.flags)) ||
+       before.row._tag !== "Decided" ||
+       after.row._tag !== "Decided" ||
+       after.row.change === before.row.change,
+     // Any other act is recorded as its sender said, and gets the import's next number on the row and on the import.
+     AnyOtherActIsRecorded: ({ before, after, command }) =>
+-      leavesAsItIs(before.row, command.flags) || after.row._tag === "Decided",
++      (!command.covered && leavesAsItIs(before.row, command.flags)) || after.row._tag === "Decided",
+     WithItsText: ({ before, after, command }) =>
+-      leavesAsItIs(before.row, command.flags) || after.row._tag !== "Decided" || after.row.flags === command.flags,
++      (!command.covered && leavesAsItIs(before.row, command.flags)) || after.row._tag !== "Decided" || after.row.flags === command.flags,
+     OnItsMatching: ({ before, after, command }) =>
+-      leavesAsItIs(before.row, command.flags) || after.row._tag !== "Decided" || after.row.madeOn === command.madeOn,
++      (!command.covered && leavesAsItIs(before.row, command.flags)) || after.row._tag !== "Decided" || after.row.madeOn === command.madeOn,
+     UnderItsStep: ({ before, after, command }) =>
+-      leavesAsItIs(before.row, command.flags) || after.row._tag !== "Decided" || after.row.step === command.step,
++      (!command.covered && leavesAsItIs(before.row, command.flags)) || after.row._tag !== "Decided" || after.row.step === command.step,
+     AsItsSenders: Effect.fn(function* ({ before, after, command }) {
+-      if (leavesAsItIs(before.row, command.flags) || after.row._tag !== "Decided") return true
++      if ((!command.covered && leavesAsItIs(before.row, command.flags)) || after.row._tag !== "Decided") return true
+       return after.row.by === (yield* CurrentActor).memberId
+     }),
+     AndGetsTheNextNumber: ({ before, after, command }) =>
+-      leavesAsItIs(before.row, command.flags) ||
++      (!command.covered && leavesAsItIs(before.row, command.flags)) ||
+       before.life._tag !== "Open" ||
+       after.life._tag !== "Open" ||
+       after.life.changes === before.life.changes + 1,
+     OnTheRowToo: ({ before, after, command }) =>
+-      leavesAsItIs(before.row, command.flags) ||
++      (!command.covered && leavesAsItIs(before.row, command.flags)) ||
+       after.life._tag !== "Open" ||
+       after.row._tag !== "Decided" ||
+       after.row.change === after.life.changes,
+@@ -230,28 +221,28 @@
+     // The decision an act replaces is kept under it.
+     AnActKeepsWhichDecisionItReplaces: ({ before, after, command }) =>
+       before.row._tag !== "Decided" ||
+-      leavesAsItIs(before.row, command.flags) ||
++      (!command.covered && leavesAsItIs(before.row, command.flags)) ||
+       after.row._tag !== "Decided" ||
+       after.row.under.change === before.row.change,
+     AndWhose: ({ before, after, command }) =>
+       before.row._tag !== "Decided" ||
+-      leavesAsItIs(before.row, command.flags) ||
++      (!command.covered && leavesAsItIs(before.row, command.flags)) ||
+       after.row._tag !== "Decided" ||
+       after.row.under.by === before.row.by,
+     AndItsText: ({ before, after, command }) =>
+       before.row._tag !== "Decided" ||
+-      leavesAsItIs(before.row, command.flags) ||
++      (!command.covered && leavesAsItIs(before.row, command.flags)) ||
+       after.row._tag !== "Decided" ||
+       after.row.under.flags === before.row.flags,
+     AndItsMatching: ({ before, after, command }) =>
+       before.row._tag !== "Decided" ||
+-      leavesAsItIs(before.row, command.flags) ||
++      (!command.covered && leavesAsItIs(before.row, command.flags)) ||
+       after.row._tag !== "Decided" ||
+       after.row.under.madeOn === before.row.madeOn,
+     // What was below that stays below it, sealed, unless the history is let go.
+     AndWhatWasBelowStaysBelow: ({ before, after, command }) =>
+       before.row._tag !== "Decided" ||
+-      leavesAsItIs(before.row, command.flags) ||
++      (!command.covered && leavesAsItIs(before.row, command.flags)) ||
+       after.row._tag !== "Decided" ||
+       after.row.below ===
+         (before.row.under.change === 0
+@@ -278,19 +269,9 @@
+       return yield* new NotPermitted({})
+     }
+     if (cmd.opening !== life.state.confirms) return yield* new ConfirmedSince({})
+-    if (
+-      cmd.inGroup &&
+-      (life.state.groupLeft === 0 || cmd.step !== life.state.groupStep || actor.memberId !== life.state.groupBy)
+-    ) {
+-      return yield* new NotThisGroup({})
+-    }
+     if (row.state._tag !== "Decided" || row.state.by !== actor.memberId || row.state.change !== cmd.undo) {
+       return yield* new NotYourStep({})
+     }
+-    // A step whose rows are still being sent is not undone in part.
+-    if (life.state.groupLeft !== 0 && row.state.step === life.state.groupStep) {
+-      return yield* new GroupUnderWay({ step: life.state.groupStep })
+-    }
+     // What a standing confirm wrote is taken back with the import, not here.
+     if (row.state.change <= life.state.confirmedAt) return yield* new DecidedBeforeTheConfirm({})
+     if (row.state.under.change === -1) return yield* new HistoryEnds({})
+@@ -308,7 +289,6 @@
+         new ActCounted({
+           change: life.state.changes + 1,
+           step: cmd.step,
+-          answers: cmd.inGroup ? 1 : 0,
+           row: cmd.row,
+           label: "undo",
+           holds: under.change,
+@@ -326,17 +306,8 @@
+       if (before.life._tag !== "Open" || before.row._tag !== "Decided") return false
+       return before.row.change === command.undo && (yield* CurrentActor).memberId === before.row.by
+     }),
+-    // It is of this opening, and as a row of a group it is taken only while that group is being sent.
+     AnUndoIsOfThisOpening: ({ before, command }) =>
+       before.life._tag === "Open" && command.opening === before.life.confirms,
+-    AnUndoOfAGroupIsTakenOnlyWhileItIsSent: ({ before, command }) =>
+-      !command.inGroup ||
+-      (before.life._tag === "Open" && before.life.groupLeft !== 0 && command.step === before.life.groupStep),
+-    // It is not taken while its step's rows are still being sent.
+-    AnUndoWaitsForItsGroup: ({ before }) =>
+-      before.life._tag === "Open" &&
+-      before.row._tag === "Decided" &&
+-      (before.life.groupLeft === 0 || before.row.step !== before.life.groupStep),
+     // It does not reach past a confirm that stands.
+     AnUndoDoesNotReachPastAConfirm: ({ before }) =>
+       before.life._tag === "Open" && before.row._tag === "Decided" && before.row.change > before.life.confirmedAt,
+```
+
+`Review.model.ts`, with the rules across instances:
+
+```ts
+// The review of one import as a model, with a group decided as one unit: the lifecycle, the rows, the groups, the four
+// decisions, and the rules across an import and its rows and groups.
+import * as Domain from "@alchemy.run/domain"
+import { DecidingGroup, UndoingGroup } from "./Group.decision.ts"
+import { GroupUnit } from "./GroupUnit.aggregate.ts"
+import { ImportLife } from "./ImportLife.aggregate.ts"
+import { Deciding, Undoing } from "./Review.decision.ts"
+import { RowUnit } from "./RowUnit.aggregate.ts"
+
+export class Review extends Domain.Model("Review", {
+  aggregates: [ImportLife, RowUnit, GroupUnit],
+  decisions: [Deciding, Undoing, DecidingGroup, UndoingGroup],
+  relations: {
+    ARowBelongsToItsImportsOrganization: Domain.Relation({
+      over: { life: ImportLife, row: RowUnit },
+      holds: ({ life, row }) =>
+        row.state._tag === "Untouched" ||
+        row.state.importId !== life.id ||
+        (life.state._tag !== "Unstaged" && row.state.organizationId === life.state.organizationId),
+    }),
+    AGroupBelongsToItsImportsOrganization: Domain.Relation({
+      over: { life: ImportLife, group: GroupUnit },
+      holds: ({ life, group }) =>
+        group.state._tag === "Untouched" ||
+        group.state.importId !== life.id ||
+        (life.state._tag !== "Unstaged" && group.state.organizationId === life.state.organizationId),
+    }),
+  },
+}) {}
+export class ReviewApi extends Domain.Api("ReviewApi", { model: Review }) {}
+
+// The same model with rules over every import, row and group at once: searched, never proved.
+export class ReviewInvariants extends Domain.Model("ReviewInvariants", {
+  aggregates: [ImportLife, RowUnit, GroupUnit],
+  decisions: [Deciding, Undoing, DecidingGroup, UndoingGroup],
+  invariants: {
+    NoTwoRowsHoldTheSameChange: (all) =>
+      all.RowUnit.every((a) =>
+        all.RowUnit.every(
+          (b) =>
+            a.id === b.id ||
+            a.state._tag !== "Decided" ||
+            b.state._tag !== "Decided" ||
+            a.state.importId !== b.state.importId ||
+            a.state.change !== b.state.change,
+        ),
+      ),
+    NoRowAndGroupHoldTheSameChange: (all) =>
+      all.RowUnit.every((row) =>
+        all.GroupUnit.every(
+          (group) =>
+            row.state._tag !== "Decided" ||
+            group.state._tag !== "Decided" ||
+            row.state.importId !== group.state.importId ||
+            (row.state.change !== group.state.change && row.state.change !== group.state.undoneAt),
+        ),
+      ),
+    NoTwoGroupsHoldTheSameChange: (all) =>
+      all.GroupUnit.every((a) =>
+        all.GroupUnit.every(
+          (b) =>
+            a.id === b.id ||
+            a.state._tag !== "Decided" ||
+            b.state._tag !== "Decided" ||
+            a.state.importId !== b.state.importId ||
+            a.state.change !== b.state.change,
+        ),
+      ),
+    AGroupsChangeIsOneItsImportGave: (all) =>
+      all.GroupUnit.every((group) =>
+        all.ImportLife.every(
+          (life) =>
+            group.state._tag !== "Decided" ||
+            group.state.importId !== life.id ||
+            life.state._tag === "Removed" ||
+            (life.state._tag !== "Unstaged" && group.state.change >= 1 && group.state.undoneAt <= life.state.changes),
+        ),
+      ),
+    AGroupsUndoComesAfterIt: (all) =>
+      all.GroupUnit.every(
+        (group) => group.state._tag !== "Decided" || group.state.undoneAt === 0 || group.state.undoneAt > group.state.change,
+      ),
+    // While an import is open, no act on a group of it is later than the one it holds as its last.
+    NoGroupActIsLaterThanTheImportsLast: (all) =>
+      all.GroupUnit.every((group) =>
+        all.ImportLife.every(
+          (life) =>
+            group.state._tag !== "Decided" ||
+            group.state.importId !== life.id ||
+            life.state._tag === "Removed" ||
+            life.state._tag === "Unstaged" ||
+            (group.state.change <= life.state.lastGroup && group.state.undoneAt <= life.state.lastGroup),
+        ),
+      ),
+  },
+}) {}
+export class ReviewInvariantsApi extends Domain.Api("ReviewInvariantsApi", { model: ReviewInvariants }) {}
+```
+
+`Group.story.test.ts`:
+
+```ts
+// A group decided as one unit, as stories on the model: what one act records, what it refuses, and what a row's act
+// and a confirm have to have seen of it.
+import { Story } from "@alchemy.run/domain/Story"
+import { it } from "@effect/vitest"
+import { CurrentActor } from "../test/Actor.context.ts"
+import { DecideGroup, StepTaken, UndoGroup } from "./Group.decision.ts"
+import { GroupDecided, GroupUndone, GroupUnit } from "./GroupUnit.aggregate.ts"
+import {
+  ActCounted,
+  ColumnMatched,
+  ConfirmImport,
+  ConfirmedSince,
+  GroupCounted,
+  ImportConfirmed,
+  ImportId,
+  ImportLife,
+  ImportReopened,
+  ImportStaged,
+  MatchColumn,
+  MatchedSince,
+  ReopenImport,
+  ReviewMovedOn,
+} from "./ImportLife.aggregate.ts"
+import { DecideRow, DecidedBeforeTheConfirm, GroupedSince, NotYourStep } from "./Review.decision.ts"
+import { Review } from "./Review.model.ts"
+import { RowDecided, RowUnit } from "./RowUnit.aggregate.ts"
+
+const story = Story.make(Review)
+const id = ImportId.make("imp_1")
+const life = ImportLife.ref(id)
+const g1 = GroupUnit.ref("imp_1/g1")
+const row12 = RowUnit.ref("imp_1/row-12")
+const ana = { organizationId: "org_prairie", memberId: "ana", role: "editor" as const }
+const dana = { organizationId: "org_prairie", memberId: "dana", role: "editor" as const }
+const staged = new ImportStaged({ organizationId: "org_prairie", rows: 50_000, columns: "by heading", by: "ana" })
+// 6,000 rows named in one text.
+const rows = Array.from({ length: 6_000 }, (_, n) => `row-${n + 1}`).join(",")
+const patch = '{"accept":"unit"}'
+const accepted = '{"accepted":["unit"]}'
+const leftOut = '{"out":true}'
+const group = (input: { step?: string; seen: number; opening?: number; madeOn?: number }) =>
+  new DecideGroup({ importId: id, step: "g1", opening: 0, madeOn: 0, patch, rows, count: 6_000, label: "6,000 fixes accepted", ...input })
+const groupDecided = (change: number) =>
+  new GroupDecided({ importId: id, organizationId: "org_prairie", change, by: "ana", step: "g1", patch, rows, count: 6_000, madeOn: 0, label: "6,000 fixes accepted" })
+const groupCounted = (change: number, label = "6,000 fixes accepted") =>
+  new GroupCounted({ change, step: "g1", rows: 6_000, label, by: "ana" })
+const act = (input: { step: string; saw: number; sawGroup: number; covered: boolean; flags: string }) =>
+  new DecideRow({ importId: id, row: "row-12", madeOn: 0, opening: 0, label: "Decide", ...input })
+const counts = { created: 155, updated: 0, already: 0, notImported: 49_845 }
+const confirm = (seen: number) => new ConfirmImport({ importId: id, shown: "155", plan: "155", seen, planAt: seen, ...counts })
+
+it.effect("a group of 6,000 rows is one act and one change, and a confirm has to have received it", () =>
+  story(
+    Story.given(life, staged),
+    Story.provide(CurrentActor, ana),
+    Story.when(group({ seen: 0 })),
+    Story.then(g1, groupDecided(1)),
+    Story.then(life, groupCounted(1)),
+    Story.provide(CurrentActor, dana),
+    Story.when(confirm(0)),
+    Story.rejected(new ReviewMovedOn({ last: 1 })),
+    Story.when(confirm(1)),
+    Story.then(life, new ImportConfirmed({ change: 2, ...counts, by: "dana" })),
+  ),
+)
+it.effect("a group is taken only from a screen that has every change, and a step decides one group", () =>
+  story(
+    Story.given(life, staged, new ActCounted({ change: 1, step: "d1", row: "row-12", label: "Decide", holds: 1, by: "dana", actor: "dana", flags: leftOut, madeOn: 0 })),
+    Story.given(row12, new RowDecided({ importId: id, organizationId: "org_prairie", change: 1, by: "dana", step: "d1", flags: leftOut, madeOn: 0, label: "Decide" })),
+    Story.provide(CurrentActor, ana),
+    // Ana's screen drew the group before Dana left row 12 out.
+    Story.when(group({ seen: 0 })),
+    Story.rejected(new ReviewMovedOn({ last: 1 })),
+    Story.when(group({ seen: 1 })),
+    Story.then(g1, groupDecided(2)),
+    Story.then(life, groupCounted(2)),
+    Story.when(group({ seen: 2 })),
+    Story.rejected(new StepTaken({})),
+  ),
+)
+it.effect("a row's act names the last group act, and the same text over a group in force is a change", () =>
+  story(
+    Story.given(life, staged, groupCounted(1)),
+    Story.given(g1, groupDecided(1)),
+    Story.provide(CurrentActor, dana),
+    // Dana typed on row 12 before the group reached her screen.
+    Story.when(act({ step: "d1", saw: 0, sawGroup: 0, covered: false, flags: leftOut })),
+    Story.rejected(new GroupedSince({ last: 1 })),
+    // Having seen it, she leaves the row with nothing decided of its own: over the group, that is a decision.
+    Story.when(act({ step: "d2", saw: 0, sawGroup: 1, covered: true, flags: "{}" })),
+    Story.then(row12, new RowDecided({ importId: id, organizationId: "org_prairie", change: 2, by: "dana", step: "d2", flags: "{}", madeOn: 0, label: "Decide" })),
+    Story.then(life, new ActCounted({ change: 2, step: "d2", row: "row-12", label: "Decide", holds: 2, by: "dana", actor: "dana", flags: "{}", madeOn: 0 })),
+  ),
+)
+it.effect("only its maker takes a group back, in one act, once; a row another person decided since is not touched", () =>
+  story(
+    Story.given(life, staged, groupCounted(1), new ActCounted({ change: 2, step: "d1", row: "row-12", label: "Decide", holds: 2, by: "dana", actor: "dana", flags: accepted, madeOn: 0 })),
+    Story.given(g1, groupDecided(1)),
+    Story.given(row12, new RowDecided({ importId: id, organizationId: "org_prairie", change: 2, by: "dana", step: "d1", flags: accepted, madeOn: 0, label: "Decide" })),
+    Story.provide(CurrentActor, dana),
+    Story.when(new UndoGroup({ importId: id, step: "g1", undo: 1, opening: 0 })),
+    Story.rejected(new NotYourStep({})),
+    Story.provide(CurrentActor, ana),
+    Story.when(new UndoGroup({ importId: id, step: "g1", undo: 1, opening: 0 })),
+    Story.then(g1, new GroupUndone({ change: 3 })),
+    Story.then(life, groupCounted(3, "undo")),
+    Story.then(row12),
+    Story.when(new UndoGroup({ importId: id, step: "g1", undo: 1, opening: 0 })),
+    Story.rejected(new NotYourStep({})),
+    // A row's act made before the undo reached its screen is refused.
+    Story.provide(CurrentActor, dana),
+    Story.when(act({ step: "d2", saw: 2, sawGroup: 1, covered: false, flags: leftOut })),
+    Story.rejected(new GroupedSince({ last: 3 })),
+  ),
+)
+it.effect("a group made on an older matching is refused", () =>
+  story(
+    Story.given(life, staged, new ColumnMatched({ change: 1, matching: 1, columns: "unit: Unit of measure", by: "dana" })),
+    Story.provide(CurrentActor, ana),
+    Story.when(group({ seen: 1, madeOn: 0 })),
+    Story.rejected(new MatchedSince({ matching: 1 })),
+    Story.when(new MatchColumn({ importId: id, columns: "unit: UoM", saw: 1, opening: 0 })),
+    Story.then(life, new ColumnMatched({ change: 2, matching: 2, columns: "unit: UoM", by: "ana" })),
+  ),
+)
+it.effect("a group's undo does not reach past a confirm that stands, and a group made before it is not taken after a reopen", () =>
+  story(
+    Story.given(life, staged, groupCounted(1), new ImportConfirmed({ change: 2, ...counts, by: "ana" })),
+    Story.given(g1, groupDecided(1)),
+    Story.provide(CurrentActor, ana),
+    Story.when(new ReopenImport({ importId: id, seen: 2 })),
+    Story.then(life, new ImportReopened({ change: 3, by: "ana" })),
+    Story.when(new UndoGroup({ importId: id, step: "g1", undo: 1, opening: 0 })),
+    Story.rejected(new ConfirmedSince({})),
+    Story.when(new UndoGroup({ importId: id, step: "g1", undo: 1, opening: 1 })),
+    Story.rejected(new DecidedBeforeTheConfirm({})),
+    Story.when(group({ step: "g2", seen: 3, opening: 0 })),
+    Story.rejected(new ConfirmedSince({})),
+  ),
+)
+```
+
+The stories:
+
+```text
+ ✓ review12/Group.story.test.ts > a group of 6,000 rows is one act and one change, and a confirm has to have received it 22ms
+ ✓ review12/Group.story.test.ts > a group is taken only from a screen that has every change, and a step decides one group 4ms
+ ✓ review12/Group.story.test.ts > a row's act names the last group act, and the same text over a group in force is a change 3ms
+ ✓ review12/Group.story.test.ts > only its maker takes a group back, in one act, once; a row another person decided since is not touched 3ms
+ ✓ review12/Group.story.test.ts > a group made on an older matching is refused 2ms
+ ✓ review12/Group.story.test.ts > a group's undo does not reach past a confirm that stands, and a group made before it is not taken after a reopen 3ms
+      Tests  6 passed (6)
+```
+
+The same stories on the model with the `covered` check taken out of `decide`:
+
+```text
+ ✓ review12story-covered/Group.story.test.ts > a group of 6,000 rows is one act and one change, and a confirm has to have received it 22ms
+ ✓ review12story-covered/Group.story.test.ts > a group is taken only from a screen that has every change, and a step decides one group 6ms
+ × review12story-covered/Group.story.test.ts > a row's act names the last group act, and the same text over a group in force is a change 8ms
+ ✓ review12story-covered/Group.story.test.ts > only its maker takes a group back, in one act, once; a row another person decided since is not touched 4ms
+ ✓ review12story-covered/Group.story.test.ts > a group made on an older matching is refused 3ms
+ ✓ review12story-covered/Group.story.test.ts > a group's undo does not reach past a confirm that stands, and a group made before it is not taken after a reopen 4ms
+      Tests  1 failed | 5 passed (6)
+```
+
+### Reports
+
+`Verify.model(Review)`, the standing of each rule:
+
+```text
+VERIFIED
+proved  ImportLife.OutcomesAddUpToTheRows
+proved  ImportLife.RowsAreNotNegative
+proved  ImportLife.InForceIsNotNegative
+proved  ImportLife.ReplacedIsNotNegative
+proved  ImportLife.StandingIsNotNegative
+proved  ImportLife.CreatedIsNotNegative
+proved  ImportLife.UpdatedIsNotNegative
+proved  ImportLife.AlreadyIsNotNegative
+proved  ImportLife.NotImportedIsNotNegative
+proved  ImportLife.RemovedIsNotNegative
+proved  ImportLife.KeptIsNotNegative
+proved  ImportLife.NoMoreInForceThanRows
+proved  ImportLife.NothingStandsThatWasTakenBack
+proved  ImportLife.WhatIsInForceThenIsWhatWasKept
+proved  ImportLife.NothingIsWrittenBeforeConfirm
+proved  ImportLife.AConfirmOfAClosedImportWritesNothing
+proved  ImportLife.AConfirmNamesEveryChange
+proved  ImportLife.APlanIsOfEveryChange
+proved  ImportLife.APlanDoesWhatWasShown
+proved  ImportLife.TheRestNameEveryChangeToo
+proved  ImportLife.EveryChangeHasItsOwnNumber
+proved  ImportLife.OnlyAnImportWithAConfirmStandingIsTakenBack
+proved  ImportLife.ATakeBackIsOfEverythingInForce
+proved  ImportLife.AndOfEverythingReplaced
+proved  ImportLife.EveryEventSaysWhose
+proved  ImportLife.AMatchIsOfThisOpening
+proved  ImportLife.ASuggestionWritesNothing
+proved  ImportLife.AMatchIsMadeOnTheLastOne
+proved  ImportLife.AMatchHoldsTheColumnsItSays
+proved  ImportLife.AMatchIsTheNextOne
+proved  ImportLife.OnlyAnOpenImportIsReviewed
+proved  ImportLife.AnImportIsOpenedAgainOnlyByReopen
+proved  ImportLife.ARemovedImportStaysRemoved
+proved  ImportLife.OnlyAnImportWithNothingInForceIsRemoved
+proved  ImportLife.AnImportNeverChangesOrganization
+proved  ImportLife.OnlyItsOwnOrganizationChangesAnImport
+proved  ImportLife.AViewerChangesNothing
+proved  RowUnit.TheSizeOfByIsTrue
+proved  RowUnit.TheSizeOfStepIsTrue
+proved  RowUnit.TheSizeOfFlagsIsTrue
+proved  RowUnit.TheSizeOfLabelIsTrue
+proved  RowUnit.NobodyClearsAnotherPersonsDecision
+proved  RowUnit.ARowIsUndecidedOnlyWhenNothingWasUnder
+proved  RowUnit.ARowNeverChangesImportOrOrganization
+proved  RowUnit.OnlyItsOwnOrganizationChangesARow
+proved  RowUnit.AViewerChangesNothing
+proved  GroupUnit.AGroupHasRows
+proved  GroupUnit.AGroupKeepsItsRows
+proved  GroupUnit.AGroupKeepsItsPatch
+proved  GroupUnit.AGroupKeepsItsNumber
+proved  GroupUnit.AGroupKeepsItsMaker
+proved  GroupUnit.ADecidedGroupStaysDecided
+proved  GroupUnit.NobodyUndoesAnotherPersonsGroup
+proved  GroupUnit.AGroupTakenBackStaysTakenBack
+proved  GroupUnit.AGroupNeverChangesImportOrOrganization
+proved  GroupUnit.OnlyItsOwnOrganizationChangesAGroup
+proved  GroupUnit.AViewerChangesNothing
+proved  DecideRow.ARowIsDecidedOnlyOnAnOpenImport
+proved  DecideRow.AnActIsOfThisOpening
+proved  DecideRow.ARowsActSawTheLastGroupAct
+proved  DecideRow.ADecisionIsReplacedOnlyByAnActThatSawIt
+proved  DecideRow.AnActIsMadeOnTheMatchingNow
+proved  DecideRow.AnActThatChangesNothingLeavesTheImport
+proved  DecideRow.AnActThatChangesNothingLeavesTheRow
+proved  DecideRow.AnyOtherActIsRecorded
+proved  DecideRow.WithItsText
+proved  DecideRow.OnItsMatching
+proved  DecideRow.UnderItsStep
+proved  DecideRow.AsItsSenders
+proved  DecideRow.AndGetsTheNextNumber
+proved  DecideRow.OnTheRowToo
+proved  DecideRow.TheImportsEventSaysWhichDecisionTheRowHolds
+proved  DecideRow.TheImportsEventSaysWhose
+proved  DecideRow.TheImportsEventSaysItsText
+proved  DecideRow.TheImportsEventSaysWhoActed
+proved  DecideRow.AnActKeepsWhichDecisionItReplaces
+proved  DecideRow.AndWhose
+proved  DecideRow.AndItsText
+proved  DecideRow.AndItsMatching
+proved  DecideRow.AndWhatWasBelowStaysBelow
+proved  UndoRowStep.AnUndoTakesBackOnlyItsSendersOwnStep
+proved  UndoRowStep.AnUndoIsOfThisOpening
+proved  UndoRowStep.AnUndoDoesNotReachPastAConfirm
+proved  UndoRowStep.AnUndoLeavesADecisionWhenOneWasUnder
+proved  UndoRowStep.AndNoneWhenNoneWas
+proved  UndoRowStep.AnUndoPutsBackTheDecisionThatWasThere
+proved  UndoRowStep.AsTheirsWhoMadeIt
+proved  UndoRowStep.WithItsTextAsItWas
+proved  UndoRowStep.OnItsMatchingAsItWas
+proved  UndoRowStep.UnderItsStepAsItWas
+proved  UndoRowStep.NothingIsBelowWhatWasTheLastKept
+proved  UndoRowStep.WhatLiesUnderIsWhatWasRecorded
+proved  UndoRowStep.TheImportsEventSaysWhichDecisionTheRowHolds
+proved  UndoRowStep.TheImportsEventSaysWhose
+proved  UndoRowStep.TheImportsEventSaysItsText
+proved  UndoRowStep.TheImportsEventSaysWhoActed
+proved  UndoRowStep.AnUndoIsNumbered
+proved  DecideGroup.AGroupIsDecidedOnlyOnAnOpenImport
+proved  DecideGroup.AGroupIsOfThisOpening
+proved  DecideGroup.AGroupIsMadeOnEveryChange
+proved  DecideGroup.AGroupIsMadeOnTheMatchingNow
+proved  DecideGroup.AStepDecidesOneGroup
+proved  DecideGroup.AGroupIsRecorded
+proved  DecideGroup.WithEveryRowItNames
+proved  DecideGroup.WithWhatItDoes
+proved  DecideGroup.WithItsCount
+proved  DecideGroup.OnItsMatching
+proved  DecideGroup.InForce
+proved  DecideGroup.AsItsSenders
+proved  DecideGroup.AGroupIsOneChange
+proved  DecideGroup.OnTheGroupToo
+proved  DecideGroup.TheImportHoldsItAsItsLastGroupAct
+proved  DecideGroup.TheImportsEventSaysHowManyRows
+proved  UndoGroup.AGroupsUndoTakesBackOnlyItsSendersOwn
+proved  UndoGroup.AGroupsUndoIsOfThisOpening
+proved  UndoGroup.AGroupIsTakenBackOnce
+proved  UndoGroup.AGroupsUndoDoesNotReachPastAConfirm
+proved  UndoGroup.AGroupsUndoIsOneChange
+proved  UndoGroup.AndTheGroupSaysWhen
+proved  UndoGroup.TheImportHoldsItAsItsLastGroupAct
+proved  UndoGroup.TheImportsEventSaysHowManyRows
+proved  Review.ARowBelongsToItsImportsOrganization
+proved  Review.AGroupBelongsToItsImportsOrganization
+```
+
+`Prove.decision`, the first three lines of each (every rule after them is "Proved"):
+
+```text
+PROVED
+elapsed 502 ms
+schema Proved; accepted true; paths 42
+```
+
+```text
+PROVED
+elapsed 3128 ms
+schema Proved; accepted true; paths 82
+```
+
+```text
+PROVED
+elapsed 6754 ms
+schema Proved; accepted true; paths 152
+```
+
+```text
+PROVED
+elapsed 21940 ms
+schema Proved; accepted true; paths 292
+```
+
+The rules across instances, every sequence of up to 3 commands:
+
+```text
+VERIFIED
+checked  ReviewInvariants.NoTwoRowsHoldTheSameChange
+checked  ReviewInvariants.NoRowAndGroupHoldTheSameChange
+checked  ReviewInvariants.NoTwoGroupsHoldTheSameChange
+checked  ReviewInvariants.AGroupsChangeIsOneItsImportGave
+checked  ReviewInvariants.AGroupsUndoComesAfterIt
+checked  ReviewInvariants.NoGroupActIsLaterThanTheImportsLast
+16,530 sequences, 3,653 states
+Sampled: 200 longer sequences, of up to 7 commands picked at random (seed 1)
+Run on the real model: 56 sequences the explorer found and 113 walks of commands picked at random, as stories
+```
+
+`GroupUnit` alone, and the rule that needs the import (from the first run of `Prove.decision(DecidingGroup)`):
+
+```text
+NotVerified
+  ✗ GroupUnit folds GroupDecided, GroupUndone, which a decision records: no sequence here has that step, so explore the model that hosts both
+✗ GroupUnit folds GroupDecided, GroupUndone, which none of its commands records: a decision does
+```
+
+```text
+✗ GroupUnit.AGroupIsNumbered: not proved
+    the solver found DecideGroup { importId: "", step: "A", opening: 0, seen: -1, … } on { life: { _tag: "Open", … changes: -1, … } }, but the real code keeps GroupUnit.AGroupIsNumbered on it
+```
+
+### The mutants
+
+| The check removed | The rule it breaks |
+| --- | --- |
+| A group names the import's last change | `AGroupIsMadeOnEveryChange` |
+| A group names the opening | `AGroupIsOfThisOpening` |
+| A group names the matching | `AGroupIsMadeOnTheMatchingNow` |
+| A step decides one group | `GroupUnit.OnlyItsOwnOrganizationChangesAGroup`, `AStepDecidesOneGroup`, `WithEveryRowItNames`, `WithWhatItDoes`, `WithItsCount`, `OnItsMatching`, `InForce`, `AsItsSenders`, `OnTheGroupToo` |
+| A group's undo does not reach past a confirm | `AGroupsUndoDoesNotReachPastAConfirm` |
+| Only its maker takes a group back | `GroupUnit.NobodyUndoesAnotherPersonsGroup`, `AGroupsUndoTakesBackOnlyItsSendersOwn` |
+| A group is taken back once | `GroupUnit.AGroupTakenBackStaysTakenBack`, `AGroupIsTakenBackOnce` |
+| A row's act names the last group act | `ARowsActSawTheLastGroupAct` |
+
+A ninth, the `covered` check, breaks no rule: see above.
+
+### Two variants
+
+- **`review12last`: only the import's last group act is taken back as a unit.** `UndoingGroup` refuses with `GroupedAfter`
+  when another act on a group came after it, and `OnlyTheLastGroupActIsTakenBack` is proved. Under it the undo of a group
+  is exact (trial 16); without it an undo of an earlier group is the fold's, with the cases trial 16 names.
+- **`review12mix`: both ways at once.** Trial 13's model whole, a group sent row by row and counted by the import, with
+  `GroupUnit`, `DecideGroup` and `UndoGroup` beside it; a unit is refused while a group is being sent. All four decisions
+  prove, `Undoing` with trial 13's 2,652 paths. A group under some size sent row by row and a larger one as a unit is
+  therefore open to the prover; which size, and who decides it, is not in a model.
+
+## Trial 16. The fold, against today's `act`
+
+Today the review keeps one map from row to decision, and `act` (`packages/review/src/ReviewDraft.rules.ts`) changes it.
+With units there is no such map: a row's decision is its own instance's, then what each group in force that names it and
+is later than it does to the row, in the order of their changes. The property: for generated rows and generated
+sequences of every kind of action, undo and redo included, the fold over the units equals `act`'s decisions after every
+action.
+
+- **One patch a group is not enough.** With one patch taken from the group's first row the property fails in two or
+  three actions: an accept over rows whose proposals are on different columns; a keep, whose copies are left out while
+  the kept row is kept; a choice of one value for a group, which `act` accepts on a row whose proposal is that value and
+  types into a row whose proposal is another.
+- **A patch that leaves the column to the fold is not enough either.** Which problem of a row is open at the press
+  depends on its copies' decisions then (a copy left out settles it), and the fold reads no other row's past. With rows
+  that have no copies it passes (10,000 sequences).
+- **It holds when the group's rows are split by exactly what each got**: accept on a column, a value typed on a column,
+  kept, left out, a fix undone on a column. One unit still, recorded whole and undone as one. The parts are at most one
+  or two a column; only the row ids grow with the rows. 50,000 sequences, about 1.48 million actions, of 1 to 60
+  actions over 1 to 8 rows, seeds 20261122 and 7: equal after every action. In the model the parts are the group's two
+  texts, `rows` and `patch`, which it never reads.
+- **Where `act` has no answer.** `act` undoes only the last step of one person. Undoing a group that is not the last:
+  a row that got a decision of its own after the group keeps what the group did, because its own instance holds a whole
+  decision; the other rows lose it; later groups are applied again on what is left. That is exact only for a patch that
+  reads nothing but the row's own decision before it: an accept pressed only because an earlier group had made the
+  proposal stays accepted when that group is undone. Shown by two cases written by hand, not by a property.
+- **Not generated:** model fixes of low confidence, choice rows, more than one recheck function. `fast-check` is not in
+  this repository; the run took another repository's copy (4.10.3).
+- **The cost of the fold:** for 50,000 rows with 10 groups of 6,000 in force, a median of 87.8 ms in Node (load 38.76
+  49.69 52.56); one group of 6,000 row ids is 70,552 bytes as JSON.
+
+`Units.ts`, the units, how an action is recorded into them, and the fold:
+
+```ts
+// Trial, not app code: decisions stored as units (one per decided row, one per act over several rows) and read
+// back by a fold, row by row, from the units as they stand now. `act` in the worktree is the oracle.
+const WT = "<repository>"
+import {
+  appliedGroups,
+  columnFor,
+  restored,
+  viewRows,
+  waitingGroups,
+  emptyState,
+  type Action
+} from "<repository>/packages/review/src/ReviewDraft.rules.ts"
+import {
+  isKept,
+  isLeftOut,
+  kept,
+  leftOut,
+  putBack,
+  ReviewDecision
+} from "<repository>/packages/review/src/ReviewDecision.schema.ts"
+import type {
+  Problem,
+  ReviewRow,
+  ReviewState,
+  RowView
+} from "<repository>/packages/review/src/ReviewRegion.types.ts"
+void WT
+
+export type RowDecision = ReviewDecision
+export type Recheck = ((input: { row: ReviewRow; cells: Readonly<Record<string, string>> }) => Problem | undefined) | undefined
+export type Options = { recheck?: Recheck; fixable?: (kind: string) => boolean; rejects?: boolean }
+
+/**
+ * How much a group unit carries.
+ * - constant: ONE patch per group, taken from its first changed row (the kind and its column / value).
+ * - recompute: patches without a column; the fold works the column out from the row's own decision and data.
+ * - partition: the group's row ids split by the exact patch each row got (accept@column, edit@column=value,
+ *   kept, leaveOut, revert@column). One record, a handful of (patch, ids) parts.
+ */
+export type Variant = "constant" | "recompute" | "partition"
+
+export type Patch =
+  | { kind: "accept"; column?: string }
+  | { kind: "edit"; column: string; value: string }
+  | { kind: "choose"; value: string; groupColumn: string } // recompute only
+  | { kind: "leaveOut" }
+  | { kind: "kept" }
+  | { kind: "putBack" }
+  | { kind: "revert"; column: string }
+
+export type Part = { patch: Patch; rowIds: Array<string> }
+export type GroupUnit = {
+  n: number
+  act: Action["type"]
+  parts: Array<Part>
+  live: boolean
+  /** Derived index, not stored: row id -> its part. */
+  partOf: Record<string, number>
+}
+export type RowEntry = { n: number; decision: RowDecision | undefined }
+type UndoRef = { kind: "row"; rowId: string } | { kind: "group"; unit: GroupUnit }
+type RedoRef = { kind: "row"; rowId: string; entry: RowEntry } | { kind: "group"; unit: GroupUnit }
+
+const undecided = ReviewDecision.make({})
+const keptFlag = (d: RowDecision): boolean => isKept(d.place) || (d.place.kind === "leftOut" && d.place.wasKept)
+const without = (list: ReadonlyArray<string> | undefined, item: string): ReadonlyArray<string> =>
+  (list ?? []).filter((e) => e !== item)
+const decidedByPerson = (d: RowDecision | undefined): boolean =>
+  d !== undefined && (isLeftOut(d.place) || keptFlag(d) || Object.keys(d.edits).length > 0)
+const has = (r: object, k: string): boolean => Object.hasOwn(r, k)
+
+const stateOf = (decisions: Record<string, RowDecision>): ReviewState => restored({ ...decisions })
+
+export class Units {
+  counter = 0
+  /** Row units: the stack's last entry is the row's current decision; under it, what it replaced. */
+  rows: Record<string, Array<RowEntry>> = {}
+  groups: Array<GroupUnit> = []
+  /** Derived index: row id -> the group units that name it, in change order. */
+  groupsOf: Record<string, Array<GroupUnit>> = {}
+  undo: Array<UndoRef> = []
+  redo: Array<RedoRef> = []
+  readonly byId: Record<string, ReviewRow> = {}
+  readonly input: ReadonlyArray<ReviewRow>
+  readonly options: Options
+  readonly variant: Variant
+
+  constructor(input: ReadonlyArray<ReviewRow>, initial: ReviewState, options: Options, variant: Variant) {
+    this.input = input
+    this.options = options
+    this.variant = variant
+    for (const row of input) this.byId[row.id] = row
+    for (const [rowId, decision] of initial.decisions) this.rows[rowId] = [{ n: 0, decision }]
+  }
+
+  // -------------------------------------------------------------------------------------------------------------
+  // The fold
+  // -------------------------------------------------------------------------------------------------------------
+
+  /** One row's decision from the units as they stand now. Reads only this row's data and units. */
+  foldRow(rowId: string): RowDecision | undefined {
+    const stack = this.rows[rowId]
+    const own = stack === undefined ? undefined : stack[stack.length - 1]
+    let d = own?.decision
+    const m = own?.n ?? -1
+    const row = this.byId[rowId]
+    for (const g of this.groupsOf[rowId] ?? []) {
+      if (!g.live || g.n <= m) continue
+      const at = g.partOf[rowId]
+      if (at === undefined || row === undefined) continue
+      d = this.applyPatch(row, d, g.parts[at]!.patch)
+    }
+    return d
+  }
+
+  fold(): Record<string, RowDecision> {
+    const out: Record<string, RowDecision> = {}
+    const ids = new Set<string>([...Object.keys(this.rows), ...Object.keys(this.groupsOf)])
+    for (const rowId of ids) {
+      const d = this.foldRow(rowId)
+      if (d !== undefined) out[rowId] = d
+    }
+    return out
+  }
+
+  /** The row's own view with only its own decision: what `recompute` may read. */
+  private ownView(row: ReviewRow, d: RowDecision | undefined): RowView {
+    const state = d === undefined ? emptyState : stateOf({ [row.id]: d })
+    return viewRows({
+      rows: [row],
+      state,
+      recheck: this.options.recheck,
+      ...(this.options.fixable === undefined ? {} : { fixable: this.options.fixable }),
+      ...(this.options.rejects === undefined ? {} : { rejects: this.options.rejects })
+    })[0]!
+  }
+
+  applyPatch(row: ReviewRow, d: RowDecision | undefined, patch: Patch): RowDecision {
+    const d0 = d ?? undecided
+    switch (patch.kind) {
+      case "accept": {
+        let column = patch.column
+        if (column === undefined) {
+          const view = this.ownView(row, d)
+          const fix = view.problem?.fix
+          if (view.status !== "needs" || fix === undefined) return d0
+          column = fix.column
+        }
+        const wasApplied = (row.applied ?? []).some((f) => f.column === column)
+        return wasApplied
+          ? ReviewDecision.make({
+              ...d0,
+              reverted: without(d0.reverted, column),
+              accepted: [...without(d0.accepted, column), column]
+            })
+          : ReviewDecision.make({ ...d0, accepted: [...without(d0.accepted, column), column] })
+      }
+      case "choose": {
+        const view = this.ownView(row, d)
+        const fix = view.problem?.fix
+        if (patch.value === fix?.to) return this.applyPatch(row, d, { kind: "accept" })
+        const column = fix === undefined ? patch.groupColumn : columnFor(fix, patch.value)
+        return ReviewDecision.make({ ...d0, edits: { ...d0.edits, [column]: patch.value } })
+      }
+      case "edit":
+        return ReviewDecision.make({ ...d0, edits: { ...d0.edits, [patch.column]: patch.value } })
+      case "leaveOut":
+        return ReviewDecision.make({ ...d0, place: leftOut(d !== undefined && keptFlag(d)) })
+      case "kept":
+        return ReviewDecision.make({ ...d0, place: kept })
+      case "putBack":
+        return ReviewDecision.make({ ...d0, place: putBack(d0.place) })
+      case "revert":
+        return ReviewDecision.make({
+          ...d0,
+          reverted: [...without(d0.reverted, patch.column), patch.column],
+          accepted: without(d0.accepted, patch.column)
+        })
+    }
+  }
+
+  // -------------------------------------------------------------------------------------------------------------
+  // Recording one action
+  // -------------------------------------------------------------------------------------------------------------
+
+  /** What each changed row gets from this action, worked out on the screen's current state (the fold now). */
+  private patchesFor(action: Action): { order: Array<string>; patch: Record<string, Patch>; groupColumn?: string } {
+    const current = this.fold()
+    const views = viewRows({
+      rows: this.input,
+      state: stateOf(current),
+      recheck: this.options.recheck,
+      ...(this.options.fixable === undefined ? {} : { fixable: this.options.fixable }),
+      ...(this.options.rejects === undefined ? {} : { rejects: this.options.rejects })
+    })
+    const byId: Record<string, RowView> = {}
+    for (const v of views) byId[v.row.id] = v
+    const viewOf = (id: string): RowView | undefined => (has(byId, id) ? byId[id] : undefined)
+    const pre = (id: string): RowDecision | undefined => (has(current, id) ? current[id] : undefined)
+    const order: Array<string> = []
+    const patch: Record<string, Patch> = {}
+    const set = (id: string, p: Patch): void => {
+      if (!has(patch, id)) order.push(id)
+      patch[id] = p
+    }
+    const accept = (view: RowView): void => {
+      const fix = view.problem?.fix
+      if (view.status !== "needs" || fix === undefined) return
+      set(view.row.id, { kind: "accept", column: fix.column })
+    }
+    let groupColumn: string | undefined
+    switch (action.type) {
+      case "accept":
+        for (const id of action.rowIds) {
+          const v = viewOf(id)
+          if (v !== undefined) accept(v)
+        }
+        break
+      case "acceptGroup": {
+        const group = waitingGroups({ views }).find((g) => g.id === action.groupId)
+        for (const id of group?.rowIds ?? []) {
+          if (action.except?.includes(id) === true) continue
+          const v = viewOf(id)
+          if (v !== undefined) accept(v)
+        }
+        break
+      }
+      case "chooseGroup": {
+        const group = waitingGroups({ views }).find((g) => g.id === action.groupId)
+        groupColumn = group?.column
+        for (const id of group?.rowIds ?? []) {
+          if (action.except?.includes(id) === true) continue
+          const v = viewOf(id)
+          if (v === undefined) continue
+          if (action.value === v.problem?.fix?.to) accept(v)
+          else {
+            const fix = v.problem?.fix
+            const column = fix === undefined ? group!.column : columnFor(fix, action.value)
+            set(id, { kind: "edit", column, value: action.value })
+          }
+        }
+        break
+      }
+      case "keep": {
+        const v = viewOf(action.rowId)
+        if (v === undefined || v.status !== "needs" || v.problem?.rivals === undefined) break
+        set(action.rowId, { kind: "kept" })
+        for (const rival of v.problem.rivals) {
+          if (!has(byId, rival) || decidedByPerson(pre(rival))) continue
+          set(rival, { kind: "leaveOut" })
+        }
+        break
+      }
+      case "leaveOut":
+        for (const id of action.rowIds) {
+          const v = viewOf(id)
+          if (v === undefined || v.status === "out" || v.status === "stored" || v.status === "cannot") continue
+          set(id, { kind: "leaveOut" })
+        }
+        break
+      case "putBack": {
+        const d = pre(action.rowId)
+        if (d === undefined || !isLeftOut(d.place)) break
+        set(action.rowId, { kind: "putBack" })
+        break
+      }
+      case "edit": {
+        const v = viewOf(action.rowId)
+        if (v === undefined || v.status === "stored" || v.status === "cannot") break
+        set(action.rowId, { kind: "edit", column: action.column, value: action.value })
+        break
+      }
+      case "revert": {
+        const v = viewOf(action.rowId)
+        const mark = v?.marks[action.column]
+        if (v === undefined || mark === undefined || mark.by === "you" || v.status === "stored") break
+        set(action.rowId, { kind: "revert", column: action.column })
+        break
+      }
+      case "revertGroup": {
+        const group = appliedGroups(views).find((g) => g.id === action.groupId)
+        for (const id of group?.rowIds ?? []) set(id, { kind: "revert", column: group!.column })
+        break
+      }
+      default:
+        break
+    }
+    return { order, patch, ...(groupColumn === undefined ? {} : { groupColumn }) }
+  }
+
+  /** Whether this act is recorded as one group unit (per the design) or as a row unit. */
+  private isGroupAct(action: Action, order: ReadonlyArray<string>): boolean {
+    switch (action.type) {
+      case "acceptGroup":
+      case "chooseGroup":
+      case "revertGroup":
+        return true
+      case "accept":
+      case "leaveOut":
+        return order.length > 1
+      case "keep":
+        return order.length > 1
+      default:
+        return false
+    }
+  }
+
+  private clearRedo(): void {
+    for (const ref of this.redo) {
+      if (ref.kind !== "group") continue
+      // A taken-back group that can no longer be redone is dropped whole.
+      this.groups = this.groups.filter((g) => g !== ref.unit)
+      for (const part of ref.unit.parts)
+        for (const id of part.rowIds) this.groupsOf[id] = (this.groupsOf[id] ?? []).filter((g) => g !== ref.unit)
+    }
+    this.redo = []
+  }
+
+  private storedPatch(p: Patch, groupColumn: string | undefined, action: Action): Patch {
+    if (this.variant !== "recompute") return p
+    if (action.type === "chooseGroup") return { kind: "choose", value: action.value, groupColumn: groupColumn ?? "" }
+    if (p.kind === "accept") return { kind: "accept" }
+    return p
+  }
+
+  record(action: Action): void {
+    if (action.type === "undo") {
+      const ref = this.undo.pop()
+      if (ref === undefined) return
+      if (ref.kind === "row") {
+        const entry = this.rows[ref.rowId]!.pop()!
+        if (this.rows[ref.rowId]!.length === 0) delete this.rows[ref.rowId]
+        this.redo.push({ kind: "row", rowId: ref.rowId, entry })
+      } else {
+        ref.unit.live = false
+        this.redo.push({ kind: "group", unit: ref.unit })
+      }
+      return
+    }
+    if (action.type === "redo") {
+      const ref = this.redo.pop()
+      if (ref === undefined) return
+      if (ref.kind === "row") {
+        ;(this.rows[ref.rowId] ??= []).push(ref.entry)
+        this.undo.push({ kind: "row", rowId: ref.rowId })
+      } else {
+        ref.unit.live = true // marked live again, same change number: no new unit was needed
+        this.undo.push({ kind: "group", unit: ref.unit })
+      }
+      return
+    }
+    const { order, patch, groupColumn } = this.patchesFor(action)
+    if (order.length === 0) return
+    this.clearRedo()
+    const n = ++this.counter
+    if (!this.isGroupAct(action, order)) {
+      // A single-row act writes the row's whole resulting decision into its own unit.
+      const rowId = order[0]!
+      const decision = this.applyPatch(this.byId[rowId]!, this.foldRow(rowId), patch[rowId]!)
+      ;(this.rows[rowId] ??= []).push({ n, decision })
+      this.undo.push({ kind: "row", rowId })
+      return
+    }
+    const parts: Array<Part> = []
+    if (this.variant === "constant") {
+      parts.push({ patch: patch[order[0]!]!, rowIds: [...order] })
+    } else {
+      const byKey: Record<string, Part> = {}
+      for (const id of order) {
+        const p = this.storedPatch(patch[id]!, groupColumn, action)
+        const key = JSON.stringify(p)
+        if (!has(byKey, key)) {
+          byKey[key] = { patch: p, rowIds: [] }
+          parts.push(byKey[key]!)
+        }
+        byKey[key]!.rowIds.push(id)
+      }
+    }
+    const unit: GroupUnit = { n, act: action.type, parts, live: true, partOf: {} }
+    parts.forEach((part, i) => {
+      for (const id of part.rowIds) {
+        unit.partOf[id] = i
+        ;(this.groupsOf[id] ??= []).push(unit)
+      }
+    })
+    this.groups.push(unit)
+    this.undo.push({ kind: "group", unit })
+  }
+
+  /** Outside `act`: mark any group unit undone by its change number (a second person's undo). */
+  undoGroupByNumber(n: number): boolean {
+    const g = this.groups.find((u) => u.n === n)
+    if (g === undefined) return false
+    g.live = false
+    return true
+  }
+}
+
+/** A decision as plain data, for comparing. */
+export const plainDecision = (d: RowDecision) => ({
+  place: d.place.kind === "leftOut" ? { kind: "leftOut", wasKept: d.place.wasKept } : { kind: d.place.kind },
+  accepted: [...d.accepted],
+  reverted: [...d.reverted],
+  edits: { ...d.edits }
+})
+export const plain = (decisions: Record<string, RowDecision>) => {
+  const out: Record<string, ReturnType<typeof plainDecision>> = {}
+  for (const k of Object.keys(decisions).sort()) out[k] = plainDecision(decisions[k]!)
+  return out
+}
+```
+
+`Fold.prop.test.ts`:
+
+```ts
+// Trial: the fold over units equals act(...).state.decisions after EVERY action of generated sequences.
+// fast-check is not installed in the worktree; this imports beep-effect's copy (4.10.3) by absolute path.
+import fc from "<beep-effect>/node_modules/fast-check/lib/fast-check.js"
+import { describe, expect, it } from "vitest"
+import {
+  act,
+  emptyState,
+  proposing,
+  type Action
+} from "<repository>/packages/review/src/ReviewDraft.rules.ts"
+import {
+  Fix,
+  Problem,
+  ReviewRow,
+  Why,
+  type ReviewState
+} from "<repository>/packages/review/src/ReviewRegion.types.ts"
+import { plain, Units, type Options, type Recheck, type Variant } from "./Units.ts"
+
+const C = ["a", "b", "c"] as const
+const V = ["x", "y", "z", ""] as const
+const K = ["k0", "k1", "k2"] as const
+const G = ["g0", "g1"] as const
+
+const fixArb = (column?: string) =>
+  fc
+    .record(
+      {
+        column: column === undefined ? fc.constantFrom(...C) : fc.constant(column),
+        to: fc.constantFrom(...V),
+        kind: fc.constantFrom(...K),
+        group: fc.constantFrom(...G),
+        by: fc.constantFrom("rule" as const, "model" as const),
+        alt: fc.constantFrom(...V),
+        targets: fc.boolean()
+      },
+      { requiredKeys: ["column", "to", "kind"] }
+    )
+    .chain((f) =>
+      fc.tuple(fc.constant(f), fc.constantFrom(...C), fc.constantFrom(...C))
+    )
+    .map(([f, t1, t2]) =>
+      Fix.make({
+        column: f.column,
+        to: f.to,
+        kind: f.kind,
+        ...(f.group === undefined ? {} : { group: f.group }),
+        ...(f.by === undefined ? {} : { by: f.by }),
+        why: Why.make({
+          basis: "b",
+          ...(f.alt === undefined ? {} : { alternatives: [f.alt] }),
+          ...(f.alt !== undefined && f.targets === true ? { targets: [t1, t2] } : {})
+        })
+      })
+    )
+
+/** An optional value: present with probability `p` (of 1). */
+const maybe = <A>(arb: fc.Arbitrary<A>, p: number): fc.Arbitrary<A | undefined> =>
+  fc.oneof({ weight: Math.round(p * 10), arbitrary: arb }, { weight: Math.round((1 - p) * 10), arbitrary: fc.constant(undefined) })
+
+const fixArbG = fixArb().chain((f) =>
+  fc.constantFrom(...G).map((g) => (f.group === undefined ? Fix.make({ ...f, group: g }) : f))
+)
+
+const rowArb = (id: string, line: number, ids: ReadonlyArray<string>) =>
+  fc
+    .record({
+      cells: fc.record({ a: fc.constantFrom(...V), b: fc.constantFrom(...V), c: fc.constantFrom(...V) }),
+      applied: fc.uniqueArray(fixArb(), { maxLength: 3, selector: (f) => f.column }),
+      problem: maybe(
+        fc.record({
+          kind: fc.constantFrom(...K),
+          tone: maybe(fc.constant("blocker" as const), 0.1),
+          column: maybe(fc.constantFrom(...C), 0.5),
+          fix: maybe(fc.oneof({ weight: 3, arbitrary: fixArbG }, { weight: 1, arbitrary: fixArb() }), 0.8),
+          rivals: maybe(fc.subarray([...ids], { minLength: 1 }), process.env.NO_RIVALS === "1" ? 0 : 0.35)
+        }),
+        0.8
+      ),
+      stored: maybe(fc.constant(true), 0.07),
+      blocked: maybe(fc.boolean(), 0.15)
+    })
+    .map((r) =>
+      ReviewRow.make({
+        id,
+        line,
+        cells: r.cells,
+        ...(r.applied.length === 0 ? {} : { applied: r.applied }),
+        ...(r.problem === undefined
+          ? {}
+          : {
+              problem: Problem.make({
+                kind: r.problem.kind,
+                ...(r.problem.tone === undefined ? {} : { tone: r.problem.tone }),
+                ...(r.problem.column === undefined ? {} : { column: r.problem.column }),
+                ...(r.problem.fix === undefined ? {} : { fix: r.problem.fix }),
+                ...(r.problem.rivals === undefined ? {} : { rivals: r.problem.rivals })
+              })
+            }),
+        ...(r.stored === undefined ? {} : { stored: true }),
+        ...(r.blocked === undefined ? {} : { blocked: r.blocked })
+      })
+    )
+
+const recheckA: Recheck = ({ cells }) =>
+  cells.a === "z"
+    ? Problem.make({
+        kind: "k1",
+        column: "a",
+        reason: "a is z",
+        fix: Fix.make({ column: "a", to: "x", kind: "k1", group: "g1", why: Why.make({ basis: "recheck" }) })
+      })
+    : cells.b === "" ? Problem.make({ kind: "k0", column: "b", reason: "b empty" }) : undefined
+
+type World = { rows: ReadonlyArray<ReviewRow>; options: Options; initial: ReviewState; actions: ReadonlyArray<Action> }
+
+const actionArb = (ids: ReadonlyArray<string>) => {
+  const id = fc.constantFrom(...ids, "rX")
+  const some = fc.array(id, { minLength: 1, maxLength: 5 })
+  const groupId = fc.constantFrom(...G, "a:x", "b:y", "c:z", "a:", "b:x")
+  const except = fc.option(fc.subarray([...ids]), { nil: undefined })
+  const exc = (e: ReadonlyArray<string> | undefined) => (e === undefined ? {} : { except: e })
+  return fc.oneof(
+    { weight: 3, arbitrary: some.map((rowIds): Action => ({ type: "accept", rowIds })) },
+    { weight: 1, arbitrary: fc.constant<Action>({ type: "accept", rowIds: [...ids] }) },
+    { weight: 1, arbitrary: fc.constant<Action>({ type: "leaveOut", rowIds: [...ids] }) },
+    { weight: 3, arbitrary: fc.tuple(fc.constantFrom(...G), except).map(([groupId, e]): Action => ({ type: "acceptGroup", groupId, ...exc(e) })) },
+    {
+      weight: 3,
+      arbitrary: fc
+        .tuple(fc.constantFrom(...G), fc.constantFrom(...V), except)
+        .map(([groupId, value, e]): Action => ({ type: "chooseGroup", groupId, value, ...exc(e) }))
+    },
+    { weight: 3, arbitrary: id.map((rowId): Action => ({ type: "keep", rowId })) },
+    { weight: 3, arbitrary: some.map((rowIds): Action => ({ type: "leaveOut", rowIds })) },
+    { weight: 2, arbitrary: id.map((rowId): Action => ({ type: "putBack", rowId })) },
+    {
+      weight: 3,
+      arbitrary: fc
+        .tuple(id, fc.constantFrom(...C), fc.constantFrom(...V))
+        .map(([rowId, column, value]): Action => ({ type: "edit", rowId, column, value }))
+    },
+    { weight: 2, arbitrary: groupId.map((groupId): Action => ({ type: "revertGroup", groupId })) },
+    {
+      weight: 2,
+      arbitrary: fc
+        .tuple(id, fc.constantFrom(...C), fc.constantFrom("undo" as const, "reject" as const))
+        .map(([rowId, column, how]): Action => ({ type: "revert", rowId, column, how }))
+    },
+    { weight: 5, arbitrary: fc.constant<Action>({ type: "undo" }) },
+    { weight: 3, arbitrary: fc.constant<Action>({ type: "redo" }) }
+  )
+}
+
+const MAXLEN = Number(process.env.MAXLEN ?? 60)
+
+const worldArb: fc.Arbitrary<World> = fc.integer({ min: 1, max: 8 }).chain((n) => {
+  const ids = Array.from({ length: n }, (_, i) => `r${i}`)
+  return fc
+    .record({
+      rows: fc.tuple(...ids.map((id, i) => rowArb(id, i + 1, ids))),
+      rejects: fc.boolean(),
+      recheck: fc.boolean(),
+      notFixable: fc.boolean(),
+      proposing: fc.boolean(),
+      actions: fc.array(actionArb(ids), { minLength: 1, maxLength: MAXLEN, size: "max" })
+    })
+    .map((w) => ({
+      rows: w.rows,
+      options: {
+        rejects: w.rejects,
+        ...(w.recheck ? { recheck: recheckA } : {}),
+        ...(w.notFixable ? { fixable: (kind: string) => kind !== "k2" } : {})
+      },
+      initial: w.proposing ? proposing(w.rows) : emptyState,
+      actions: w.actions
+    }))
+})
+
+/** Runs one world; returns undefined when the fold matched after every action, else the first mismatch. */
+export const effective: Record<string, number> = {}
+export const runWorld = (w: World, variant: Variant) => {
+  let state = w.initial
+  const units = new Units(w.rows, w.initial, w.options, variant)
+  for (let i = 0; i < w.actions.length; i++) {
+    const action = w.actions[i]!
+    const out = act({ rows: w.rows, state, action, ...w.options })
+    if (out.changed.length > 0) {
+      const k = `${action.type}${out.changed.length > 1 ? "*" : ""}`
+      effective[k] = (effective[k] ?? 0) + 1
+    }
+    state = out.state
+    const groupsBefore = units.groups.length
+    units.record(action)
+    if (units.groups.length > groupsBefore) effective["groupUnits"] = (effective["groupUnits"] ?? 0) + 1
+    const want = plain(Object.fromEntries(state.decisions))
+    const got = plain(units.fold())
+    if (JSON.stringify(want) !== JSON.stringify(got)) return { step: i, action, want, got }
+  }
+  return undefined
+}
+
+const VARIANT = (process.env.VARIANT ?? "partition") as Variant
+const RUNS = Number(process.env.FC_RUNS ?? 2000)
+const SEED = Number(process.env.FC_SEED ?? 20261122)
+
+describe(`fold over units (${VARIANT})`, () => {
+  it(`equals act after every action, ${RUNS} sequences, seed ${SEED}`, () => {
+    const started = Date.now()
+    let lengths = 0
+    const tally: Record<string, number> = {}
+    const result = fc.check(
+      fc.property(worldArb, (w) => {
+        lengths += w.actions.length
+        for (const a of w.actions) tally[a.type] = (tally[a.type] ?? 0) + 1
+        const bad = runWorld(w, VARIANT)
+        if (bad !== undefined) throw new Error(JSON.stringify(bad))
+      }),
+      { numRuns: RUNS, seed: SEED, endOnFailure: process.env.NO_SHRINK === "1" }
+    )
+    console.log(
+      JSON.stringify({ variant: VARIANT, runs: RUNS, seed: SEED, failed: result.failed, numRuns: result.numRuns, ms: Date.now() - started, actions: lengths, tally, effective })
+    )
+    if (result.failed) {
+      const ce = result.counterexample?.[0] as World | undefined
+      console.log("COUNTEREXAMPLE rows:", JSON.stringify(ce?.rows))
+      console.log("COUNTEREXAMPLE options:", JSON.stringify({ ...ce?.options, recheck: ce?.options.recheck !== undefined, fixable: ce?.options.fixable !== undefined }))
+      console.log("COUNTEREXAMPLE initial:", JSON.stringify(Object.fromEntries(ce?.initial.decisions ?? [])))
+      console.log("COUNTEREXAMPLE actions:", JSON.stringify(ce?.actions))
+      console.log("MISMATCH:", result.errorInstance instanceof Error ? result.errorInstance.message : String(result.errorInstance))
+      console.log("path:", result.counterexamplePath, "shrinks:", result.numShrinks)
+    }
+    expect(result.failed).toBe(false)
+  }, Number(process.env.TIMEOUT ?? 600_000))
+})
+```
+
+`Fold.demo.test.ts`, the two orders `act` cannot express:
+
+```ts
+// Orders `act` cannot express (undo of a group that is not the last step): what the fold does. No oracle here;
+// the assertions record the fold's answer.
+import { describe, expect, it } from "vitest"
+import { emptyState } from "<repository>/packages/review/src/ReviewDraft.rules.ts"
+import { Fix, Problem, ReviewRow, Why } from "<repository>/packages/review/src/ReviewRegion.types.ts"
+import { plain, Units } from "./Units.ts"
+
+const fix = (column: string, to: string, group: string) =>
+  Fix.make({ column, to, kind: "unit", group, why: Why.make({ basis: "b" }) })
+const row = (id: string, line: number, f: Fix) =>
+  ReviewRow.make({ id, line, cells: { a: "ea", b: "1" }, problem: Problem.make({ kind: "unit", column: f.column, fix: f }) })
+
+describe("non-LIFO undo of a group", () => {
+  it("a row touched by a later single-row act keeps the group's effect when the group is undone", () => {
+    const rows = [row("r0", 1, fix("a", "EA", "g")), row("r1", 2, fix("a", "EA", "g"))]
+    const u = new Units(rows, emptyState, { rejects: false }, "partition")
+    u.record({ type: "acceptGroup", groupId: "g" }) // n=1, group unit over r0, r1
+    u.record({ type: "edit", rowId: "r0", column: "b", value: "2" }) // n=2, r0's own unit: whole decision
+    expect(u.undoGroupByNumber(1)).toBe(true) // a second person takes back the group, not the last step
+    const out = plain(u.fold())
+    console.log("demo1", JSON.stringify(out))
+    expect(out.r0?.accepted).toEqual(["a"]) // still accepted: the snapshot in r0's own unit covers the group
+    expect(out.r1).toBeUndefined() // the group gone, r1 has no decision at all
+  })
+
+  it("a later group still applies on top when an earlier group under it is undone (rebase)", () => {
+    const rows = [row("r0", 1, fix("a", "EA", "g")), row("r1", 2, fix("a", "EA", "g"))]
+    const u = new Units(rows, emptyState, { rejects: false }, "partition")
+    u.record({ type: "leaveOut", rowIds: ["r0", "r1"] }) // n=1
+    u.record({ type: "acceptGroup", groupId: "g" }) // nothing: left-out rows wait for nobody
+    u.record({ type: "undo" })
+    u.record({ type: "acceptGroup", groupId: "g" }) // n=2
+    u.record({ type: "leaveOut", rowIds: ["r0", "r1"] }) // n=3 over the accepted rows
+    u.undoGroupByNumber(2) // take back the accept under the leave-out
+    const out = plain(u.fold())
+    console.log("demo2", JSON.stringify(out))
+    expect(out.r0).toEqual({ place: { kind: "leftOut", wasKept: false }, accepted: [], reverted: [], edits: {} })
+  })
+})
+```
+
+The runs that passed, each line cut short:
+
+```text
+load before: 50.10 52.86 53.66 49/15702 1166408
+{"variant":"partition","runs":25000,"seed":20261122,"failed":false,"numRuns":25000,"ms":16332,"actions":740655,"tally":{"leaveOut":87018,"revert":43618,"putBack":43770,"edit":64847
+      Tests  1 passed (1)
+load mid: 47.47 52.13 53.41 20/14552 1178137
+{"variant":"partition","runs":25000,"seed":7,"failed":false,"numRuns":25000,"ms":13878,"actions":742481,"tally":{"acceptGroup":65636,"accept":86764,"redo":65390,"revert":43598,"und
+      Tests  1 passed (1)
+load after: 47.39 51.96 53.34 10/13734 1187434
+```
+
+The runs that failed, with one patch a group ("constant") and with the column left to the fold ("recompute"): the actions and the first difference, cut short:
+
+```text
+=== partition recheck after constructor edit, seed 99, 3000 runs
+{"variant":"partition","runs":3000,"seed":99,"failed":false,"numRuns":3000,"ms":1795,"actions":88071,"tally":{"leaveOut":10494,"putBack":5047,"edit":7891,"accept":10326,"keep":7690,"undo":12791,"rever
+=== constant seed 1
+{"variant":"constant","runs":3000,"seed":1,"failed":true,"numRuns":2,"ms":51,"actions":1858,"tally":{"revert":88,"leaveOut":91,"accept":367,"putBack":173,"undo":352,"redo":172,"acceptGroup":172,"choos
+COUNTEREXAMPLE actions: [{"type":"accept","rowIds":["r6","r5","r0"]}]
+MISMATCH: {"step":0,"action":{"type":"accept","rowIds":["r6","r5","r0"]},"want":{"r5":{"place":{"kind":"open"},"accepted":["a"],"reverted":[],"edits":{}},"r6":{"place":{"kind":"open"},"accepted":["b"]
+=== constant seed 2
+{"variant":"constant","runs":3000,"seed":2,"failed":true,"numRuns":6,"ms":27,"actions":529,"tally":{"chooseGroup":19,"undo":93,"edit":44,"revert":32,"accept":83,"keep":81,"leaveOut":26,"acceptGroup":7
+COUNTEREXAMPLE actions: [{"type":"keep","rowId":"r1"},{"type":"redo"}]
+MISMATCH: {"step":0,"action":{"type":"keep","rowId":"r1"},"want":{"r0":{"place":{"kind":"leftOut","wasKept":false},"accepted":[],"reverted":[],"edits":{}},"r1":{"place":{"kind":"kept"},"accepted":[],"
+=== constant seed 3
+{"variant":"constant","runs":3000,"seed":3,"failed":true,"numRuns":16,"ms":50,"actions":1643,"tally":{"edit":106,"redo":120,"undo":215,"acceptGroup":256,"accept":105,"leaveOut":40,"revertGroup":96,"ke
+COUNTEREXAMPLE actions: [{"type":"chooseGroup","groupId":"g0","value":"x"},{"type":"undo"}]
+MISMATCH: {"step":0,"action":{"type":"chooseGroup","groupId":"g0","value":"x"},"want":{"r0":{"place":{"kind":"open"},"accepted":["a"],"reverted":[],"edits":{}},"r1":{"place":{"kind":"open"},"accepted"
+=== constant seed 4
+{"variant":"constant","runs":3000,"seed":4,"failed":true,"numRuns":7,"ms":44,"actions":1532,"tally":{"edit":173,"undo":189,"redo":15,"leaveOut":263,"revert":96,"acceptGroup":90,"chooseGroup":174,"putB
+COUNTEREXAMPLE actions: [{"type":"accept","rowIds":["r0","r1","r2","r3","r4","r5","r6"]}]
+MISMATCH: {"step":0,"action":{"type":"accept","rowIds":["r0","r1","r2","r3","r4","r5","r6"]},"want":{"r3":{"place":{"kind":"open"},"accepted":["a"],"reverted":[],"edits":{}},"r4":{"place":{"kind":"ope
+=== constant seed 5
+{"variant":"constant","runs":3000,"seed":5,"failed":true,"numRuns":1,"ms":57,"actions":4044,"tally":{"accept":542,"edit":559,"leaveOut":334,"revert":314,"chooseGroup":631,"putBack":307,"redo":326,"und
+COUNTEREXAMPLE actions: [{"type":"chooseGroup","groupId":"g0","value":"x"},{"type":"edit","rowId":"r0","column":"a","value":"x"}]
+MISMATCH: {"step":0,"action":{"type":"chooseGroup","groupId":"g0","value":"x"},"want":{"r2":{"place":{"kind":"open"},"accepted":["a"],"reverted":[],"edits":{}},"r7":{"place":{"kind":"open"},"accepted"
+=== recompute seed 1
+{"variant":"recompute","runs":3000,"seed":1,"failed":true,"numRuns":1242,"ms":1074,"actions":40974,"tally":{"revert":2218,"leaveOut":4763,"accept":5232,"putBack":2298,"undo":5916,"redo":3634,"acceptGr
+COUNTEREXAMPLE actions: [{"type":"leaveOut","rowIds":["r3","r0"]},{"type":"accept","rowIds":["r2","r1"]},{"type":"revertGroup","groupId":"g0"}]
+MISMATCH: {"step":1,"action":{"type":"accept","rowIds":["r2","r1"]},"want":{"r0":{"place":{"kind":"leftOut","wasKept":false},"accepted":[],"reverted":[],"edits":{}},"r1":{"place":{"kind":"open"},"acce
+=== recompute seed 2
+{"variant":"recompute","runs":3000,"seed":2,"failed":true,"numRuns":361,"ms":434,"actions":15423,"tally":{"chooseGroup":1301,"undo":2091,"edit":1288,"revert":1037,"accept":1795,"keep":1311,"leaveOut":
+COUNTEREXAMPLE actions: [{"type":"leaveOut","rowIds":["r3"]},{"type":"revertGroup","groupId":"g0"},{"type":"acceptGroup","groupId":"g0"},{"type":"revert","rowId":"r0","column":"a","how":"undo"}]
+MISMATCH: {"step":2,"action":{"type":"acceptGroup","groupId":"g0"},"want":{"r0":{"place":{"kind":"open"},"accepted":["a"],"reverted":[],"edits":{}},"r1":{"place":{"kind":"open"},"accepted":["a"],"reve
+=== recompute seed 3
+{"variant":"recompute","runs":3000,"seed":3,"failed":true,"numRuns":49,"ms":389,"actions":11906,"tally":{"edit":852,"redo":1406,"undo":1233,"acceptGroup":1403,"accept":951,"leaveOut":1720,"revertGroup
+COUNTEREXAMPLE actions: [{"type":"leaveOut","rowIds":["r5"]},{"type":"accept","rowIds":["r0","r1","r2","r3","r4","r5"]},{"type":"keep","rowId":"r0"}]
+MISMATCH: {"step":1,"action":{"type":"accept","rowIds":["r0","r1","r2","r3","r4","r5"]},"want":{"r0":{"place":{"kind":"open"},"accepted":["a"],"reverted":[],"edits":{}},"r1":{"place":{"kind":"open"},"
+=== recompute seed 4
+{"variant":"recompute","runs":3000,"seed":4,"failed":true,"numRuns":131,"ms":277,"actions":9140,"tally":{"edit":877,"undo":881,"redo":882,"leaveOut":1776,"revert":604,"acceptGroup":482,"chooseGroup":8
+COUNTEREXAMPLE actions: [{"type":"leaveOut","rowIds":["r0","r1","r2","r3","r4","r5","r6"]},{"type":"acceptGroup","groupId":"g0"},{"type":"edit","rowId":"r0","column":"a","value":"x"}]
+MISMATCH: {"step":1,"action":{"type":"acceptGroup","groupId":"g0"},"want":{"r0":{"place":{"kind":"leftOut","wasKept":false},"accepted":[],"reverted":[],"edits":{}},"r1":{"place":{"kind":"open"},"accep
+=== recompute seed 5
+{"variant":"recompute","runs":3000,"seed":5,"failed":true,"numRuns":1215,"ms":1218,"actions":43096,"tally":{"accept":5328,"edit":3606,"leaveOut":6058,"revert":2216,"chooseGroup":3776,"putBack":2222,"r
+COUNTEREXAMPLE actions: [{"type":"leaveOut","rowIds":["r1","r0"]},{"type":"chooseGroup","groupId":"g0","value":"x"}]
+MISMATCH: {"step":1,"action":{"type":"chooseGroup","groupId":"g0","value":"x"},"want":{"r0":{"place":{"kind":"leftOut","wasKept":false},"accepted":[],"reverted":[],"edits":{}},"r1":{"place":{"kind":"l
+=== recompute NO_RIVALS seed 11 (10000 runs)
+{"variant":"recompute","runs":10000,"seed":11,"failed":false,"numRuns":10000,"ms":6417,"actions":292438,"tally":{"accept":34363,"keep":25907,"revertGroup":17188,"undo":43149,"leaveOut":34450,"acceptGr
+```
+
+The bench:
+
+```text
+fold, 50,000 rows, 10 live groups x 6,000: median 87.8 ms, min 81.7 ms, max 102.0 ms (15 reps)
+rows with a decision: 42814
+index rebuild (row -> groups) for the same units: median 6.4 ms, min 3.7 ms, max 14.5 ms (15 reps)
+group unit as JSON: 70552 bytes for 6000 row ids (ids like "row-12345")
+of which the ids alone: 70412 bytes; patches and header: 140 bytes
+load before: 38.76 49.69 52.56 17/13593 1200966
+load after:  38.76 49.69 52.56 22/13634 1201805
+```
+
+## Trial 17. The one-unit model on the Durable Object host, in local workerd
+
+As trial 14, with `review12`: `alchemy dev` with local state, no login and an empty `HOME`. Times are taken inside the
+Worker around the send.
+
+| Rows | The rows as text | `DecideGroup`: mean, median, slowest of 20 | `UndoGroup`: mean, median, slowest of 20 | Load before and after |
+| --- | --- | --- | --- | --- |
+| 9 | 53 bytes | 231, 189, 867 ms | 217, 110, 1,332 ms | 36.31 45.67 50.87 to 38.71 45.58 50.72 |
+| 600 | 4,691 bytes | 147, 137, 326 ms | 128, 86, 382 ms | 38.71 45.58 50.72 to 36.22 44.82 50.42 |
+| 6,000 | 52,892 bytes | 408, 214, 3,444 ms | 263, 191, 787 ms | 36.22 44.82 50.42 to 42.66 45.77 50.62 |
+| 50,000 | 488,893 bytes | 107, 95, 274 ms | 85, 64, 251 ms | 42.66 45.77 50.62 to 52.24 47.74 51.20 |
+
+- The time does not grow with the rows; the 9-row runs came first, with the server starting, and the slowest follow the
+  load. Each was on a fresh import, so each group act was its import's first.
+- **Requests to objects:** 4 for a `DecideGroup` and 4 for an `UndoGroup` (one to the group, three to the import), 1 or
+  2 more the first time a group is seen (its entry in the domain's directory); 3 for a refused one.
+- **A row's act right after a group**, naming the new `sawGroup`, 100 of them: a mean of 250 ms, a median of 127, the
+  slowest 6.2 s (load 45.50 46.46 50.73 to 45.18 49.26 51.06).
+- **Each refusal once:** `GroupedSince`, `ReviewMovedOn`, `StepTaken`, `NotYourStep` (another person's group, and a
+  second undo), `ConfirmedSince`, `DecidedBeforeTheConfirm`, `MatchedSince`.
+- **Two groups sent in the same moment**, both naming the last change, five times: one taken, the other refused with
+  `ReviewMovedOn` each time.
+- **Not measured:** what follows the one event: a projection that writes 6,000 or 50,000 rows, or reads them through
+  the fold; the stored size of a group; a second group on the same import; anything deployed.
+
+`worker.ts`:
+
+```ts
+// The review with a group decided as one unit (review12), hosted on the domain's Durable Object host and driven by HTTP:
+// /stage, /match, /confirm, /takeback, /reopen, /group (DecideGroup), /ungroup (UndoGroup), /decide, /undo, /state,
+// /calls. Every act answers with `ms`, the time taken inside the Worker around the send. /group builds its rows text
+// here: N row ids joined by ",". Who acts comes from the query, as the session middleware would provide it.
+import * as Cloudflare from "@alchemy.run/cloudflare"
+import { WorkerEnvironment } from "@alchemy.run/cloudflare/Workers/WorkerRuntime"
+import * as DomainCloudflare from "@alchemy.run/domain/Cloudflare"
+import * as Cause from "effect/Cause"
+import * as Effect from "effect/Effect"
+import * as Exit from "effect/Exit"
+import { HttpServerRequest } from "effect/http/HttpServerRequest"
+import * as HttpServerResponse from "effect/http/HttpServerResponse"
+import * as Layer from "effect/Layer"
+import * as Option from "effect/Option"
+import { CurrentActor, type Actor } from "./Actor.context.ts"
+import { ensurePatched, reset, snapshot } from "./calls.ts"
+import { DecideGroup, DecidingGroup, UndoGroup, UndoingGroup } from "./Group.decision.ts"
+import { GroupUnit } from "./GroupUnit.aggregate.ts"
+import {
+  ConfirmImport,
+  ImportId,
+  ImportLife,
+  MatchColumn,
+  ReopenImport,
+  StageImport,
+  TakeBackImport,
+} from "./ImportLife.aggregate.ts"
+import { DecideRow, Deciding, UndoRowStep, Undoing } from "./Review.decision.ts"
+import { Review } from "./Review.model.ts"
+import { RowUnit, noLevel } from "./RowUnit.aggregate.ts"
+
+const ReviewLive = Review.layer(Layer.empty).pipe(Layer.provide(DomainCloudflare.layerDurableObjects()))
+
+/** A failure as data: a rejection's tag and fields, or the pretty cause of a defect. */
+const failureOf = (cause: Cause.Cause<unknown>) => {
+  const error = Cause.findErrorOption(cause)
+  return error._tag === "Some" ? { rejected: error.value } : { defect: Cause.pretty(cause).slice(0, 3000) }
+}
+
+export default class ReviewWorker extends Cloudflare.Worker<ReviewWorker>()(
+  "ReviewWorker",
+  { main: import.meta.url },
+  Effect.gen(function* () {
+    const lives = yield* ImportLife
+    const rows = yield* RowUnit
+    const groups = yield* GroupUnit
+    const deciding = yield* Deciding
+    const undoing = yield* Undoing
+    const decidingGroup = yield* DecidingGroup
+    const undoingGroup = yield* UndoingGroup
+    return {
+      fetch: Effect.gen(function* () {
+        const request = yield* HttpServerRequest
+        const url = new URL(request.url, "http://localhost")
+        if (url.searchParams.get("plain") === null)
+          ensurePatched(Option.getOrUndefined(yield* Effect.serviceOption(WorkerEnvironment)))
+        const parts = url.pathname.split("/").filter((p) => p !== "")
+        const q = (name: string) => url.searchParams.get(name)
+        const n = (name: string, fallback = 0) => Number(q(name) ?? fallback)
+        const actor: Actor = {
+          organizationId: q("org") ?? "org_prairie",
+          memberId: q("member") ?? "ana",
+          role: (q("role") as Actor["role"] | null) ?? "editor",
+        }
+        const as = <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.provideService(effect, CurrentActor, actor)
+        // Send, timed inside the Worker around the send only, and answer with the outcome as data.
+        const timed = <A, E, R>(effect: Effect.Effect<A, E, R>, extra: Record<string, unknown> = {}) =>
+          Effect.gen(function* () {
+            const from = Date.now()
+            const exit = yield* Effect.exit(as(effect))
+            const ms = Date.now() - from
+            return yield* Exit.isSuccess(exit)
+              ? HttpServerResponse.json({ ok: true, ms, ...extra, value: exit.value })
+              : HttpServerResponse.json({ ok: false, ms, ...extra, ...failureOf(exit.cause) })
+          })
+        const [verb, imp, a, b] = parts
+        if (verb === "calls") {
+          if (a === undefined && imp === "reset") reset()
+          return yield* HttpServerResponse.json(snapshot())
+        }
+        if (imp === undefined) return HttpServerResponse.text("Not Found", { status: 404 })
+        const importId = ImportId.make(imp)
+        if (verb === "stage")
+          return yield* timed(lives.send(new StageImport({ importId, rows: Number(a), columns: "by heading" })))
+        if (verb === "match")
+          return yield* timed(
+            lives.send(new MatchColumn({ importId, columns: `${a}: ${b}`, saw: n("saw"), opening: n("opening") })),
+          )
+        if (verb === "takeback")
+          return yield* timed(lives.send(new TakeBackImport({ importId, seen: n("seen"), kept: Number(a), keptReplaced: 0 })))
+        if (verb === "reopen") return yield* timed(lives.send(new ReopenImport({ importId, seen: n("seen") })))
+        if (verb === "confirm")
+          return yield* timed(
+            lives.send(
+              new ConfirmImport({
+                importId,
+                seen: n("seen"),
+                planAt: n("plan"),
+                shown: q("shown") ?? "same",
+                plan: "same",
+                updated: 0,
+                already: 0,
+                created: Number(a),
+                notImported: Number(b),
+              }),
+            ),
+          )
+        if (verb === "group" && a !== undefined) {
+          // /group/<import>/<step>/<N>: one DecideGroup naming N generated rows `<prefix>-1` .. `<prefix>-N` as one text.
+          const count = Number(b ?? 1)
+          const prefix = q("prefix") ?? "row"
+          const ids: Array<string> = []
+          for (let i = 1; i <= count; i++) ids.push(`${prefix}-${i}`)
+          const text = ids.join(",")
+          return yield* timed(
+            decidingGroup.send(
+              new DecideGroup({
+                importId,
+                step: a,
+                opening: n("opening"),
+                seen: n("seen"),
+                madeOn: n("on"),
+                patch: q("patch") ?? '{"flags":"out"}',
+                rows: text,
+                count,
+                label: "Leave out",
+              }),
+            ),
+            { size: text.length },
+          )
+        }
+        if (verb === "ungroup" && a !== undefined)
+          return yield* timed(
+            undoingGroup.send(new UndoGroup({ importId, step: a, undo: n("undo"), opening: n("opening") })),
+          )
+        if (verb === "decide" && a !== undefined)
+          return yield* timed(
+            deciding.send(
+              new DecideRow({
+                importId,
+                row: a,
+                step: q("step") ?? "s",
+                sawGroup: n("sawGroup"),
+                covered: q("covered") !== null,
+                opening: n("opening"),
+                saw: n("saw"),
+                flags: q("flags") ?? "{}",
+                madeOn: n("on"),
+                label: "Decide",
+              }),
+            ),
+          )
+        if (verb === "undo" && a !== undefined)
+          return yield* timed(
+            undoing.send(
+              new UndoRowStep({
+                importId,
+                row: a,
+                undo: n("undo"),
+                step: q("step") ?? "u",
+                opening: n("opening"),
+                next: noLevel,
+                below: "",
+              }),
+            ),
+          )
+        if (verb === "state") {
+          // Each side read back on its own: the import's lifecycle, and the row and group the query names.
+          const life = yield* lives.get(importId)
+          const row = q("row") === null ? null : yield* rows.get(`${imp}/${q("row")}`)
+          const group = q("group") === null ? null : yield* groups.get(`${imp}/${q("group")}`)
+          return yield* HttpServerResponse.json({ life, row, group })
+        }
+        return HttpServerResponse.text("Not Found", { status: 404 })
+      }),
+    }
+  }).pipe(Effect.provide(ReviewLive)),
+) {}
+```
+
+`drive.sh`:
+
+```sh
+#!/bin/sh
+# Drives the review with a group decided as one unit (review12) through the Worker under `alchemy dev` (local state, no
+# account). 1: DecideGroup and its UndoGroup at N = 9, 600, 6000, 50000 rows on fresh imports, nothing counted or
+# logged, timed inside the Worker; then one of each per size with its calls between objects counted. 2: 100 row acts,
+# each right after a group, counted and timed. 3: each refusal once. 4: two groups at once, 5 times.
+# Usage: ./drive.sh. Output: drive.out.
+HERE=$(cd "$(dirname "$0")" && pwd)
+cd "$HERE" || exit 1
+exec > drive.out 2>&1
+rm -rf .alchemy
+./start.sh
+U=$(cat url.txt)
+[ -n "$U" ] || { tail -40 dev.log; ./stop.sh; exit 1; }
+T=$(mktemp -d "$HERE/tmp.XXXX")
+
+load() { echo "load: $(cut -d' ' -f1-3 /proc/loadavg)"; }
+# A row text in an answer is printed as its length only.
+short='walk(if type == "object" and has("rows") and (.rows | type) == "string" then .rows = "(\(.rows | length) chars)" else . end)'
+stats() { jq -s -c 'sort | {n: length, mean: ((add / length * 10 | round) / 10), median: .[(length / 2 | floor)], p95: .[(length * 0.95 | floor)], max: .[-1]}'; }
+# act <label> <path>: reset the counter, send, print the answer, the calls it made in this isolate, and the log's count.
+act() {
+  curl -s -X POST "$U/calls/reset" > /dev/null
+  before=$(grep -c '\[do-call\]' dev.log)
+  answer=$(curl -s -m 600 -X POST "$U$2")
+  sleep 1
+  after=$(grep -c '\[do-call\]' dev.log)
+  echo "--- $1  (POST $2)"
+  echo "answer: $(echo "$answer" | jq -c "$short" 2>/dev/null || echo "$answer" | cut -c1-1500)" | cut -c1-1500
+  curl -s "$U/calls" | jq -c '{total, byMethod, calls: [.calls[] | "\(.instance) \(.method)"]}' | cut -c1-1200
+  echo "dev.log [do-call] lines for this act: $((after - before))"
+}
+
+load
+echo "== 1. DecideGroup then UndoGroup on fresh imports, nothing counted or logged (ms inside the Worker)"
+for N in 9 600 6000 50000; do
+  echo "-- N = $N"
+  load
+  : > "$T/g"; : > "$T/u"; fails=0; k=0; begun=$(date +%s)
+  while [ $k -lt 20 ]; do
+    k=$((k + 1)); imp="imp_g${N}_$k"
+    curl -s -m 120 -X POST "$U/stage/$imp/$N?plain=1" > "$T/s"
+    curl -s -m 600 -X POST "$U/group/$imp/g/$N?plain=1&seen=0&on=0&opening=0" > "$T/a"
+    curl -s -m 600 -X POST "$U/ungroup/$imp/g?plain=1&undo=1&opening=0" > "$T/b"
+    if [ "$(jq -r '.ok' "$T/a")" = "true" ] && [ "$(jq -r '.ok' "$T/b")" = "true" ]; then
+      jq '.ms' "$T/a" >> "$T/g"; jq '.ms' "$T/b" >> "$T/u"
+      [ $k -eq 1 ] && echo "rows text: $(jq '.size' "$T/a") bytes; first group answer: $(jq -c "$short" "$T/a" | cut -c1-500)"
+    else
+      fails=$((fails + 1))
+      echo "rep $k failed: stage $(cut -c1-300 "$T/s")"
+      echo "  group: $(jq -c "$short" "$T/a" 2>/dev/null || cut -c1-3000 "$T/a")" | cut -c1-3500
+      echo "  undo: $(jq -c "$short" "$T/b" 2>/dev/null || cut -c1-1500 "$T/b")" | cut -c1-2000
+      [ $fails -ge 3 ] && break
+    fi
+    [ $(( $(date +%s) - begun )) -gt 900 ] && { echo "stopped after $k reps: over 900 s"; break; }
+  done
+  echo "DecideGroup N=$N: $(stats < "$T/g")"
+  echo "UndoGroup   N=$N: $(stats < "$T/u")"
+  echo "failures: $fails; wall time $(( $(date +%s) - begun )) s"
+  load
+done
+
+echo "== 1b. one DecideGroup and its UndoGroup per size, counted"
+for N in 9 600 6000 50000; do
+  act "stage imp_c$N" "/stage/imp_c$N/$N"
+  act "group of $N" "/group/imp_c$N/g/$N?seen=0&on=0&opening=0"
+  act "undo of the group of $N" "/ungroup/imp_c$N/g?undo=1&opening=0"
+done
+
+echo "== 2. 100 row acts, each right after a group of 9 (names the new sawGroup), counted"
+load
+act "stage imp_p" "/stage/imp_p/200"
+: > "$T/r"; : > "$T/c"; : > "$T/l"; rfails=0
+i=0
+while [ $i -lt 100 ]; do
+  i=$((i + 1))
+  seen=$((2 * (i - 1))); last=$((2 * i - 1))
+  g=$(curl -s -m 120 -X POST "$U/group/imp_p/g$i/9?prefix=p$i&seen=$seen&on=0&opening=0" | jq -r '.ok')
+  curl -s -X POST "$U/calls/reset" > /dev/null
+  before=$(grep -c '\[do-call\]' dev.log)
+  curl -s -m 120 -X POST "$U/decide/imp_p/p$i-1?step=r$i&sawGroup=$last&covered=1&saw=0&on=0&flags=kept" > "$T/a"
+  sleep 1
+  after=$(grep -c '\[do-call\]' dev.log)
+  if [ "$g" = "true" ] && [ "$(jq -r '.ok' "$T/a")" = "true" ]; then
+    jq '.ms' "$T/a" >> "$T/r"
+    curl -s "$U/calls" | jq '.total' >> "$T/c"
+    echo $((after - before)) >> "$T/l"
+    [ $i -eq 1 ] && { echo "first row act: $(jq -c . "$T/a" | cut -c1-700)"; curl -s "$U/calls" | jq -c '{total, byMethod, calls: [.calls[] | "\(.instance) \(.method)"]}'; }
+  else
+    rfails=$((rfails + 1)); echo "act $i failed: group ok=$g row $(jq -c . "$T/a" | cut -c1-800)"
+  fi
+done
+echo "row act after a group, ms:                 $(stats < "$T/r")"
+echo "calls counted in the Worker's isolate:     $(stats < "$T/c")"
+echo "dev.log [do-call] lines (every isolate):   $(stats < "$T/l")"
+echo "failures: $rfails"
+load
+
+echo "== 3. each refusal once (imp_r, 200 rows)"
+act "stage imp_r" "/stage/imp_r/200"
+act "match sku to column B (matching 1, change 1)" "/match/imp_r/sku/B?saw=0"
+act "group made on matching 0: MatchedSince" "/group/imp_r/g0/3?seen=1&on=0"
+act "group g1 of 3 rows (change 2)" "/group/imp_r/g1/3?seen=1&on=1"
+act "row-1 act naming sawGroup 0: GroupedSince" "/decide/imp_r/row-1?step=a1&sawGroup=0&covered=1&saw=0&on=1&flags=kept"
+act "row-1 act naming sawGroup 2 (change 3)" "/decide/imp_r/row-1?step=a1&sawGroup=2&covered=1&saw=0&on=1&flags=kept"
+act "group g2 with seen 2: ReviewMovedOn" "/group/imp_r/g2/3?seen=2&on=1"
+act "a second group under step g1: StepTaken" "/group/imp_r/g1/3?seen=3&on=1"
+act "dana undoes ana's group g1: NotYourStep" "/ungroup/imp_r/g1?undo=2&member=dana"
+act "ana undoes g1 (change 4)" "/ungroup/imp_r/g1?undo=2"
+act "ana undoes g1 again: NotYourStep" "/ungroup/imp_r/g1?undo=2"
+act "group g3 (change 5)" "/group/imp_r/g3/3?seen=4&on=1"
+act "confirm (change 6)" "/confirm/imp_r/155/45?seen=5&plan=5"
+act "reopen (change 7)" "/reopen/imp_r?seen=6"
+act "undo g3 after confirm and reopen, opening 0" "/ungroup/imp_r/g3?undo=5&opening=0"
+act "undo g3 after confirm and reopen, opening 1" "/ungroup/imp_r/g3?undo=5&opening=1"
+echo "state: $(curl -s "$U/state/imp_r?plain=1&group=g3&row=row-1" | jq -c "$short")" | cut -c1-1500
+
+echo "== 4. two DecideGroup at the same moment on one import (different steps, both seen 0), 5 times"
+load
+for k in 1 2 3 4 5; do
+  curl -s -m 60 -X POST "$U/stage/imp_race$k/600?plain=1" > /dev/null
+  curl -s -m 120 -X POST "$U/group/imp_race$k/ana$k/600?plain=1&seen=0" > "$T/x" &
+  curl -s -m 120 -X POST "$U/group/imp_race$k/dana$k/600?plain=1&seen=0&member=dana" > "$T/y" &
+  wait
+  echo "race $k: ana $(jq -c '{ok, ms, rejected: (.rejected // null), defect: ((.defect // "") | .[0:400]), change: (.value.events[0].change // null)}' "$T/x")"
+  echo "        dana $(jq -c '{ok, ms, rejected: (.rejected // null), defect: ((.defect // "") | .[0:400]), change: (.value.events[0].change // null)}' "$T/y")"
+  echo "        import: $(curl -s "$U/state/imp_race$k?plain=1" | jq -c '.life | {tag: ._tag, changes, lastGroup}')"
+done
+load
+./stop.sh
+rm -rf "$T"
+echo "dev log (without [do-call] lines):"
+grep -v '\[do-call\]' dev.log | cut -c1-400 | tail -150
+```
+
+Its output, each line cut short:
+
+```text
+url: http://localhost:1337 after 9s (pid 1249603)
+load: 36.31 45.67 50.87
+== 1. DecideGroup then UndoGroup on fresh imports, nothing counted or logged (ms inside the Worker)
+-- N = 9
+load: 36.31 45.67 50.87
+rows text: 53 bytes; first group answer: {"ok":true,"ms":440,"size":53,"value":{"commits":[{"stream":"GroupUnit/imp_g9_1/g","version":1},{"stream":"ImportLife/imp_g9_1","version":2}],"events":[{"_tag"
+DecideGroup N=9: {"n":20,"mean":231.4,"median":189,"p95":867,"max":867}
+UndoGroup   N=9: {"n":20,"mean":216.6,"median":110,"p95":1332,"max":1332}
+failures: 0; wall time 20 s
+load: 38.71 45.58 50.72
+-- N = 600
+load: 38.71 45.58 50.72
+rows text: 4691 bytes; first group answer: {"ok":true,"ms":172,"size":4691,"value":{"commits":[{"stream":"GroupUnit/imp_g600_1/g","version":1},{"stream":"ImportLife/imp_g600_1","version":2}],"events":
+DecideGroup N=600: {"n":20,"mean":147.2,"median":137,"p95":326,"max":326}
+UndoGroup   N=600: {"n":20,"mean":128.4,"median":86,"p95":382,"max":382}
+failures: 0; wall time 10 s
+load: 36.22 44.82 50.42
+-- N = 6000
+load: 36.22 44.82 50.42
+rows text: 52892 bytes; first group answer: {"ok":true,"ms":441,"size":52892,"value":{"commits":[{"stream":"GroupUnit/imp_g6000_1/g","version":1},{"stream":"ImportLife/imp_g6000_1","version":2}],"even
+DecideGroup N=6000: {"n":20,"mean":407.8,"median":214,"p95":3444,"max":3444}
+UndoGroup   N=6000: {"n":20,"mean":263.2,"median":191,"p95":787,"max":787}
+failures: 0; wall time 20 s
+load: 42.66 45.77 50.62
+-- N = 50000
+load: 42.66 45.77 50.62
+rows text: 488893 bytes; first group answer: {"ok":true,"ms":274,"size":488893,"value":{"commits":[{"stream":"GroupUnit/imp_g50000_1/g","version":1},{"stream":"ImportLife/imp_g50000_1","version":2}],"
+DecideGroup N=50000: {"n":20,"mean":106.9,"median":95,"p95":274,"max":274}
+UndoGroup   N=50000: {"n":20,"mean":85.3,"median":64,"p95":251,"max":251}
+failures: 0; wall time 8 s
+load: 52.24 47.74 51.20
+== 1b. one DecideGroup and its UndoGroup per size, counted
+--- stage imp_c9  (POST /stage/imp_c9/9)
+answer: {"ok":true,"ms":37,"value":{"stream":"ImportLife/imp_c9","version":1,"commits":[{"stream":"ImportLife/imp_c9","version":1}],"events":[{"_tag":"ImportStaged","organizationId":"org_prairie","row
+{"total":3,"byMethod":{"send":1,"register":1,"child":1},"calls":["imp_c9 send","node:ImportLife:ee register","node:ImportLife:e child"]}
+dev.log [do-call] lines for this act: 3
+--- group of 9  (POST /group/imp_c9/g/9?seen=0&on=0&opening=0)
+answer: {"ok":true,"ms":77,"size":53,"value":{"commits":[{"stream":"GroupUnit/imp_c9/g","version":1},{"stream":"ImportLife/imp_c9","version":2}],"events":[{"_tag":"GroupDecided","importId":"imp_c9","o
+{"total":5,"byMethod":{"txDecide":1,"txRead":1,"txPrepare":1,"txCommit":1,"register":1},"calls":["imp_c9/g txDecide","imp_c9 txRead","imp_c9 txPrepare","imp_c9 txCommit","node:GroupUnit:f7 register"]}
+dev.log [do-call] lines for this act: 5
+--- undo of the group of 9  (POST /ungroup/imp_c9/g?undo=1&opening=0)
+answer: {"ok":true,"ms":55,"value":{"commits":[{"stream":"GroupUnit/imp_c9/g","version":2},{"stream":"ImportLife/imp_c9","version":3}],"events":[{"_tag":"GroupUndone","change":2},{"_tag":"GroupCounted
+{"total":4,"byMethod":{"txDecide":1,"txRead":1,"txPrepare":1,"txCommit":1},"calls":["imp_c9/g txDecide","imp_c9 txRead","imp_c9 txPrepare","imp_c9 txCommit"]}
+dev.log [do-call] lines for this act: 4
+--- stage imp_c600  (POST /stage/imp_c600/600)
+answer: {"ok":true,"ms":30,"value":{"stream":"ImportLife/imp_c600","version":1,"commits":[{"stream":"ImportLife/imp_c600","version":1}],"events":[{"_tag":"ImportStaged","organizationId":"org_prairie",
+{"total":3,"byMethod":{"send":1,"register":1,"child":1},"calls":["imp_c600 send","node:ImportLife:00 register","node:ImportLife:0 child"]}
+dev.log [do-call] lines for this act: 3
+--- group of 600  (POST /group/imp_c600/g/600?seen=0&on=0&opening=0)
+answer: {"ok":true,"ms":82,"size":4691,"value":{"commits":[{"stream":"GroupUnit/imp_c600/g","version":1},{"stream":"ImportLife/imp_c600","version":2}],"events":[{"_tag":"GroupDecided","importId":"imp_
+{"total":6,"byMethod":{"txDecide":1,"txRead":1,"txPrepare":1,"txCommit":1,"register":1,"child":1},"calls":["imp_c600/g txDecide","imp_c600 txRead","imp_c600 txPrepare","imp_c600 txCommit","node:GroupU
+dev.log [do-call] lines for this act: 6
+--- undo of the group of 600  (POST /ungroup/imp_c600/g?undo=1&opening=0)
+answer: {"ok":true,"ms":57,"value":{"commits":[{"stream":"GroupUnit/imp_c600/g","version":2},{"stream":"ImportLife/imp_c600","version":3}],"events":[{"_tag":"GroupUndone","change":2},{"_tag":"GroupCou
+{"total":4,"byMethod":{"txDecide":1,"txRead":1,"txPrepare":1,"txCommit":1},"calls":["imp_c600/g txDecide","imp_c600 txRead","imp_c600 txPrepare","imp_c600 txCommit"]}
+dev.log [do-call] lines for this act: 4
+--- stage imp_c6000  (POST /stage/imp_c6000/6000)
+answer: {"ok":true,"ms":31,"value":{"stream":"ImportLife/imp_c6000","version":1,"commits":[{"stream":"ImportLife/imp_c6000","version":1}],"events":[{"_tag":"ImportStaged","organizationId":"org_prairie
+{"total":3,"byMethod":{"send":1,"register":1,"child":1},"calls":["imp_c6000 send","node:ImportLife:25 register","node:ImportLife:2 child"]}
+dev.log [do-call] lines for this act: 3
+--- group of 6000  (POST /group/imp_c6000/g/6000?seen=0&on=0&opening=0)
+answer: {"ok":true,"ms":86,"size":52892,"value":{"commits":[{"stream":"GroupUnit/imp_c6000/g","version":1},{"stream":"ImportLife/imp_c6000","version":2}],"events":[{"_tag":"GroupDecided","importId":"i
+{"total":6,"byMethod":{"txDecide":1,"txRead":1,"txPrepare":1,"txCommit":1,"register":1,"child":1},"calls":["imp_c6000/g txDecide","imp_c6000 txRead","imp_c6000 txPrepare","imp_c6000 txCommit","node:Gr
+dev.log [do-call] lines for this act: 6
+--- undo of the group of 6000  (POST /ungroup/imp_c6000/g?undo=1&opening=0)
+answer: {"ok":true,"ms":69,"value":{"commits":[{"stream":"GroupUnit/imp_c6000/g","version":2},{"stream":"ImportLife/imp_c6000","version":3}],"events":[{"_tag":"GroupUndone","change":2},{"_tag":"GroupC
+{"total":4,"byMethod":{"txDecide":1,"txRead":1,"txPrepare":1,"txCommit":1},"calls":["imp_c6000/g txDecide","imp_c6000 txRead","imp_c6000 txPrepare","imp_c6000 txCommit"]}
+dev.log [do-call] lines for this act: 4
+--- stage imp_c50000  (POST /stage/imp_c50000/50000)
+answer: {"ok":true,"ms":32,"value":{"stream":"ImportLife/imp_c50000","version":1,"commits":[{"stream":"ImportLife/imp_c50000","version":1}],"events":[{"_tag":"ImportStaged","organizationId":"org_prair
+{"total":3,"byMethod":{"send":1,"register":1,"child":1},"calls":["imp_c50000 send","node:ImportLife:65 register","node:ImportLife:6 child"]}
+dev.log [do-call] lines for this act: 3
+--- group of 50000  (POST /group/imp_c50000/g/50000?seen=0&on=0&opening=0)
+answer: {"ok":true,"ms":98,"size":488893,"value":{"commits":[{"stream":"GroupUnit/imp_c50000/g","version":1},{"stream":"ImportLife/imp_c50000","version":2}],"events":[{"_tag":"GroupDecided","importId"
+{"total":6,"byMethod":{"txDecide":1,"txRead":1,"txPrepare":1,"txCommit":1,"register":1,"child":1},"calls":["imp_c50000/g txDecide","imp_c50000 txRead","imp_c50000 txPrepare","imp_c50000 txCommit","nod
+dev.log [do-call] lines for this act: 6
+--- undo of the group of 50000  (POST /ungroup/imp_c50000/g?undo=1&opening=0)
+answer: {"ok":true,"ms":63,"value":{"commits":[{"stream":"GroupUnit/imp_c50000/g","version":2},{"stream":"ImportLife/imp_c50000","version":3}],"events":[{"_tag":"GroupUndone","change":2},{"_tag":"Grou
+{"total":4,"byMethod":{"txDecide":1,"txRead":1,"txPrepare":1,"txCommit":1},"calls":["imp_c50000/g txDecide","imp_c50000 txRead","imp_c50000 txPrepare","imp_c50000 txCommit"]}
+dev.log [do-call] lines for this act: 4
+== 2. 100 row acts, each right after a group of 9 (names the new sawGroup), counted
+load: 45.50 46.46 50.73
+--- stage imp_p  (POST /stage/imp_p/200)
+answer: {"ok":true,"ms":62,"value":{"stream":"ImportLife/imp_p","version":1,"commits":[{"stream":"ImportLife/imp_p","version":1}],"events":[{"_tag":"ImportStaged","organizationId":"org_prairie","rows"
+{"total":3,"byMethod":{"send":1,"register":1,"child":1},"calls":["imp_p send","node:ImportLife:76 register","node:ImportLife:7 child"]}
+dev.log [do-call] lines for this act: 3
+first row act: {"ok":true,"ms":78,"value":{"commits":[{"stream":"ImportLife/imp_p","version":3},{"stream":"RowUnit/imp_p/p1-1","version":1}],"events":[{"_tag":"RowDecided","importId":"imp_p","organiza
+{"total":8,"byMethod":{"txDecide":1,"txRead":1,"txPrepare":1,"txCommit":1,"register":1,"child":3},"calls":["imp_p txDecide","imp_p/p1-1 txRead","imp_p/p1-1 txPrepare","imp_p/p1-1 txCommit","node:RowUn
+row act after a group, ms:                 {"n":100,"mean":250.2,"median":127,"p95":746,"max":6184}
+calls counted in the Worker's isolate:     {"n":100,"mean":6.4,"median":6,"p95":8,"max":9}
+dev.log [do-call] lines (every isolate):   {"n":100,"mean":6,"median":6,"p95":7,"max":8}
+failures: 0
+load: 45.18 49.26 51.06
+== 3. each refusal once (imp_r, 200 rows)
+--- stage imp_r  (POST /stage/imp_r/200)
+answer: {"ok":true,"ms":35,"value":{"stream":"ImportLife/imp_r","version":1,"commits":[{"stream":"ImportLife/imp_r","version":1}],"events":[{"_tag":"ImportStaged","organizationId":"org_prairie","rows"
+{"total":3,"byMethod":{"send":1,"register":1,"child":1},"calls":["imp_r send","node:ImportLife:fc register","node:ImportLife:f child"]}
+dev.log [do-call] lines for this act: 3
+--- match sku to column B (matching 1, change 1)  (POST /match/imp_r/sku/B?saw=0)
+answer: {"ok":true,"ms":4,"value":{"stream":"ImportLife/imp_r","version":2,"commits":[{"stream":"ImportLife/imp_r","version":2}],"events":[{"_tag":"ColumnMatched","change":1,"matching":1,"columns":"sk
+{"total":1,"byMethod":{"send":1},"calls":["imp_r send"]}
+dev.log [do-call] lines for this act: 1
+--- group made on matching 0: MatchedSince  (POST /group/imp_r/g0/3?seen=1&on=0)
+answer: {"ok":false,"ms":18,"size":17,"rejected":{"_tag":"MatchedSince","matching":1}}
+{"total":3,"byMethod":{"txDecide":1,"txRead":2},"calls":["imp_r/g0 txDecide","imp_r txRead","imp_r txRead"]}
+dev.log [do-call] lines for this act: 3
+--- group g1 of 3 rows (change 2)  (POST /group/imp_r/g1/3?seen=1&on=1)
+answer: {"ok":true,"ms":86,"size":17,"value":{"commits":[{"stream":"GroupUnit/imp_r/g1","version":1},{"stream":"ImportLife/imp_r","version":3}],"events":[{"_tag":"GroupDecided","importId":"imp_r","org
+{"total":6,"byMethod":{"txDecide":1,"txRead":1,"txPrepare":1,"txCommit":1,"register":1,"child":1},"calls":["imp_r/g1 txDecide","imp_r txRead","imp_r txPrepare","imp_r txCommit","node:GroupUnit:23 regi
+dev.log [do-call] lines for this act: 6
+--- row-1 act naming sawGroup 0: GroupedSince  (POST /decide/imp_r/row-1?step=a1&sawGroup=0&covered=1&saw=0&on=1&flags=kept)
+answer: {"ok":false,"ms":39,"rejected":{"_tag":"GroupedSince","last":2}}
+{"total":3,"byMethod":{"txDecide":1,"txRead":2},"calls":["imp_r txDecide","imp_r/row-1 txRead","imp_r/row-1 txRead"]}
+dev.log [do-call] lines for this act: 3
+--- row-1 act naming sawGroup 2 (change 3)  (POST /decide/imp_r/row-1?step=a1&sawGroup=2&covered=1&saw=0&on=1&flags=kept)
+answer: {"ok":true,"ms":194,"value":{"commits":[{"stream":"ImportLife/imp_r","version":4},{"stream":"RowUnit/imp_r/row-1","version":1}],"events":[{"_tag":"RowDecided","importId":"imp_r","organizationI
+{"total":6,"byMethod":{"txDecide":1,"txRead":1,"txPrepare":1,"txCommit":1,"register":1,"child":1},"calls":["imp_r txDecide","imp_r/row-1 txRead","imp_r/row-1 txPrepare","imp_r/row-1 txCommit","node:Ro
+dev.log [do-call] lines for this act: 6
+--- group g2 with seen 2: ReviewMovedOn  (POST /group/imp_r/g2/3?seen=2&on=1)
+answer: {"ok":false,"ms":40,"size":17,"rejected":{"_tag":"ReviewMovedOn","last":3}}
+{"total":3,"byMethod":{"txDecide":1,"txRead":2},"calls":["imp_r/g2 txDecide","imp_r txRead","imp_r txRead"]}
+dev.log [do-call] lines for this act: 3
+--- a second group under step g1: StepTaken  (POST /group/imp_r/g1/3?seen=3&on=1)
+answer: {"ok":false,"ms":3,"size":17,"rejected":{"_tag":"StepTaken"}}
+{"total":3,"byMethod":{"txDecide":1,"txRead":2},"calls":["imp_r/g1 txDecide","imp_r txRead","imp_r txRead"]}
+dev.log [do-call] lines for this act: 3
+--- dana undoes ana's group g1: NotYourStep  (POST /ungroup/imp_r/g1?undo=2&member=dana)
+answer: {"ok":false,"ms":2,"rejected":{"_tag":"NotYourStep"}}
+{"total":3,"byMethod":{"txDecide":1,"txRead":2},"calls":["imp_r/g1 txDecide","imp_r txRead","imp_r txRead"]}
+dev.log [do-call] lines for this act: 3
+--- ana undoes g1 (change 4)  (POST /ungroup/imp_r/g1?undo=2)
+answer: {"ok":true,"ms":79,"value":{"commits":[{"stream":"GroupUnit/imp_r/g1","version":2},{"stream":"ImportLife/imp_r","version":5}],"events":[{"_tag":"GroupUndone","change":4},{"_tag":"GroupCounted"
+{"total":4,"byMethod":{"txDecide":1,"txRead":1,"txPrepare":1,"txCommit":1},"calls":["imp_r/g1 txDecide","imp_r txRead","imp_r txPrepare","imp_r txCommit"]}
+dev.log [do-call] lines for this act: 4
+--- ana undoes g1 again: NotYourStep  (POST /ungroup/imp_r/g1?undo=2)
+answer: {"ok":false,"ms":2,"rejected":{"_tag":"NotYourStep"}}
+{"total":3,"byMethod":{"txDecide":1,"txRead":2},"calls":["imp_r/g1 txDecide","imp_r txRead","imp_r txRead"]}
+dev.log [do-call] lines for this act: 3
+--- group g3 (change 5)  (POST /group/imp_r/g3/3?seen=4&on=1)
+answer: {"ok":true,"ms":122,"size":17,"value":{"commits":[{"stream":"GroupUnit/imp_r/g3","version":1},{"stream":"ImportLife/imp_r","version":6}],"events":[{"_tag":"GroupDecided","importId":"imp_r","or
+{"total":6,"byMethod":{"txDecide":1,"txRead":1,"txPrepare":1,"txCommit":1,"register":1,"child":1},"calls":["imp_r/g3 txDecide","imp_r txRead","imp_r txPrepare","imp_r txCommit","node:GroupUnit:5e regi
+dev.log [do-call] lines for this act: 6
+--- confirm (change 6)  (POST /confirm/imp_r/155/45?seen=5&plan=5)
+answer: {"ok":true,"ms":6,"value":{"stream":"ImportLife/imp_r","version":7,"commits":[{"stream":"ImportLife/imp_r","version":7}],"events":[{"_tag":"ImportConfirmed","change":6,"created":155,"updated":
+{"total":1,"byMethod":{"send":1},"calls":["imp_r send"]}
+dev.log [do-call] lines for this act: 1
+--- reopen (change 7)  (POST /reopen/imp_r?seen=6)
+answer: {"ok":true,"ms":26,"value":{"stream":"ImportLife/imp_r","version":8,"commits":[{"stream":"ImportLife/imp_r","version":8}],"events":[{"_tag":"ImportReopened","change":7,"by":"ana"}]}}
+{"total":1,"byMethod":{"send":1},"calls":["imp_r send"]}
+dev.log [do-call] lines for this act: 1
+--- undo g3 after confirm and reopen, opening 0  (POST /ungroup/imp_r/g3?undo=5&opening=0)
+answer: {"ok":false,"ms":575,"rejected":{"_tag":"ConfirmedSince"}}
+{"total":3,"byMethod":{"txDecide":1,"txRead":2},"calls":["imp_r/g3 txDecide","imp_r txRead","imp_r txRead"]}
+dev.log [do-call] lines for this act: 3
+--- undo g3 after confirm and reopen, opening 1  (POST /ungroup/imp_r/g3?undo=5&opening=1)
+answer: {"ok":false,"ms":3,"rejected":{"_tag":"DecidedBeforeTheConfirm"}}
+{"total":3,"byMethod":{"txDecide":1,"txRead":2},"calls":["imp_r/g3 txDecide","imp_r txRead","imp_r txRead"]}
+dev.log [do-call] lines for this act: 3
+state: {"life":{"_tag":"Open","organizationId":"org_prairie","rows":200,"confirms":1,"matching":1,"columns":"sku: B","changes":7,"confirmedAt":6,"inForce":155,"replaced":0,"standing":1,"lastGroup":5,"
+== 4. two DecideGroup at the same moment on one import (different steps, both seen 0), 5 times
+load: 59.65 52.12 51.95
+race 1: ana {"ok":true,"ms":152,"rejected":null,"defect":"","change":1}
+        dana {"ok":false,"ms":266,"rejected":{"_tag":"ReviewMovedOn","last":1},"defect":"","change":null}
+        import: {"tag":"Open","changes":1,"lastGroup":1}
+race 2: ana {"ok":true,"ms":136,"rejected":null,"defect":"","change":1}
+        dana {"ok":false,"ms":208,"rejected":{"_tag":"ReviewMovedOn","last":1},"defect":"","change":null}
+        import: {"tag":"Open","changes":1,"lastGroup":1}
+race 3: ana {"ok":true,"ms":149,"rejected":null,"defect":"","change":1}
+        dana {"ok":false,"ms":203,"rejected":{"_tag":"ReviewMovedOn","last":1},"defect":"","change":null}
+        import: {"tag":"Open","changes":1,"lastGroup":1}
+race 4: ana {"ok":false,"ms":255,"rejected":{"_tag":"ReviewMovedOn","last":1},"defect":"","change":null}
+        dana {"ok":true,"ms":139,"rejected":null,"defect":"","change":1}
+        import: {"tag":"Open","changes":1,"lastGroup":1}
+race 5: ana {"ok":false,"ms":243,"rejected":{"_tag":"ReviewMovedOn","last":1},"defect":"","change":null}
+        dana {"ok":true,"ms":159,"rejected":null,"defect":"","change":1}
+        import: {"tag":"Open","changes":1,"lastGroup":1}
+load: 59.65 52.12 51.95
+stopping: 1249603 1250240
+1251467
+1255820
+dev log (without [do-call] lines):
+[00:58:02.482] INFO: Dev · route6
+[00:58:02.486] INFO: Importing stack module
+[00:58:03.102] INFO: Resolving stack services
+[00:58:03.132] INFO: Loading stack state
+[00:58:03.664] INFO: Computing plan
+[00:58:03.669] INFO: Plan ready (1.2s)
+[00:58:03.671] INFO: Plan: 2 to create, 5 binding changes
+[00:58:03.671] INFO: [Review.DomainBackfill] create (local)
+[00:58:03.671] INFO: [ReviewWorker] create (local)
+[00:58:03.672] INFO: [ReviewWorker/Review.DomainBackfill] create
+[00:58:03.672] INFO: [ReviewWorker/Review.DomainDirectory] create
+[00:58:03.672] INFO: [ReviewWorker/Review.GroupUnitAggregate] create
+[00:58:03.672] INFO: [ReviewWorker/Review.ImportLifeAggregate] create
+[00:58:03.672] INFO: [ReviewWorker/Review.RowUnitAggregate] create
+[00:58:03.672] INFO: 
+[00:58:03.682] INFO: [ReviewWorker] pre-creating (local)
+[00:58:03.699] INFO: [Review.DomainBackfill] creating (local)
+[00:58:03.711] INFO: [ReviewWorker] creating (local)
+[00:58:08.397] INFO: [ReviewWorker] Started in 4679ms → http://localhost:1337/
+[00:58:08.400] INFO: [ReviewWorker] ready at http://localhost:1337
+[00:58:08.403] INFO: [Review.DomainBackfill] created (local) (4.7s)
+[00:58:08.404] INFO: [ReviewWorker] created (local) (4.7s)
+[00:58:08.405] INFO: { url: 'http://localhost:1337' }
+[00:58:08.405] INFO: 
+[00:58:08.405] INFO: Done: 2 succeeded (4.7s)
+
+Exited.
+```
+
+## What the fifth round did not run
+
+- The screen that computes a group's rows and parts, and the screen and the projection that read a row's decision
+  through the fold; one encoder for the two texts.
+- What a match does to a group in force: the reader of what a match put out of force, as for a row.
+- A redo of a group as its own act (a redo is a new group, from a screen that has every change).
+- A keep of one of two rows as one act, which a unit of two parts could carry; a saga; anything deployed.
+- The trial's files under a type-check. A type-check of trial 17's copy reports that an aggregate's rule may not read
+  the request context (`Effect<boolean, never, CurrentActor>` is not assignable to `boolean | Effect<boolean, never,
+  never>`), on `RowUnit` and `GroupUnit`; Vitest strips types, and Verify ran and proved those rules. Not looked into.
+
+## Running the fifth round again
+
+As the fourth round: `review12` beside `test/Actor.context.ts`, and `node node_modules/vitest/vitest.mjs run <file>`.
+Trial 16 needs `fast-check` and this repository's `packages/review`; trial 17 takes trial 12's manifest.

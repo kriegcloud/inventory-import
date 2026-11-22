@@ -31,8 +31,8 @@ under it:
 2. [The pull request he pointed at](research/01-pr-3260-verify.md): `Verify`, which proves a model's rules.
 3. [This app's rules under Verify](research/03-this-apps-rules-under-verify.md): the app's own rules, declared and
    proved, and [the trial](research/04-trial.md) that ran them. Then
-   [the trial on saving review decisions](research/07-review-decisions-trial.md): four rounds, with their sources
-   and Verify's reports. Read its fourth round's table first.
+   [the trial on saving review decisions](research/07-review-decisions-trial.md): five rounds, with their sources
+   and Verify's reports. Read its fourth round's table first, and the fifth's for decision 7.
 4. [What was merged since the published release](research/02-merged-since-beta-87.md): what `main` has that npm
    does not.
 5. The concept pages, in [research/concepts/](research/concepts/), one file per concept under a stable name.
@@ -65,7 +65,7 @@ A model of this app, outside the repository ([the trial](research/04-trial.md)):
   `Verify`. Nineteen of the app's rules were proved for every state and every input, and one was checked over 5,173
   sequences of commands. A rule broken on purpose came back with the state, the command and the shortest sequence
   that breaks it.
-- On `main`, the saving of review decisions, in four rounds ([07](research/07-review-decisions-trial.md)). The
+- On `main`, the saving of review decisions, in five rounds ([07](research/07-review-decisions-trial.md)). The
   first showed that a command of rows to set and rows to clear cannot hold "no command clears a decision its sender
   did not make". The second found the shape under which the review's rules are proved: the import's lifecycle as its
   own instance, one instance per decided row, and every act a decision across both; one instance per import proves

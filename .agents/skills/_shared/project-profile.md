@@ -13,7 +13,7 @@ below with their reasons; its `research/` reports hold the evidence.
 | --- | --- | --- |
 | 1 | The ontology is the model of record for this repository's contexts (catalog, access, and those to come); Sutton is a mapping | Scope and competency questions come from this repository's records and rules, not from a published domain ontology |
 | 2 | One hand-written TypeScript vocabulary module owns every term fact: IRI, label, definition, parent, disjointness, kind or role tag, SKOS scheme, alignment. Record schemas (Effect Schema) carry a typed pointer to a term and own their record rules. All Turtle (OWL, SKOS, SHACL) is generated | No skill edits a `.ttl`, `.owl` or SHACL file, and none proposes ROBOT templates, KGCL, rdflib, OWLAPY or LinkML as the way to change a term. A change to a term is a proposed change to the vocabulary module; a change to a required field, datatype, pattern or allowed value is a proposed change to a record schema |
-| 3 | A Sutton Account is an `Organization` with role flags (customer, vendor, carrier, contract manufacturer), not a relationship class | Do not propose a trading-relationship relator or role classes for accounts unless Benjamin reopens this |
+| 3 | A Sutton Account is an `Organization` with role flags (customer, vendor), not a relationship class. Carrier and contract manufacturer were listed here as decided; they are not (the recorded answer names customer and vendor only): packet decision 89 asks | Do not propose a trading-relationship relator or role classes for accounts unless Benjamin reopens this |
 | 4 | The upper ontology is a small projection of gist (Semantic Arts). IOF and ISA-95 are alignments only | The scope document records gist. Use `gist-categories.md`, never `bfo-categories.md`. An IOF or ISA-95 match is an alignment row, never an import or a parent |
 | 5 | A small local projector writes the Turtle from the vocabulary and the Schema AST | Generated files are read-only inputs to checks |
 | 6 | Checks: generated Turtle byte-compared and re-parsed in `bun run check`; an OWL reasoner in `bun run check:full`; SHACL over the stored rows of the messy sample as a slow test. Owed: which reasoner, and how it runs, is not chosen | The validator skill reports against these gates. The reasoner and its route (a ROBOT jar, a standalone HermiT or Openllet, a JavaScript reasoner) are a question for Benjamin |
@@ -63,9 +63,11 @@ Beware: `gist:Account` is an agreement with a balance, not the Sutton Account (d
 
 ## What exists today, and what does not
 
-- Exists: the packet, its decisions and three research reports, all untracked (`git ls-files explorations/erp-ontology`
-  lists 0 files), and these skills with `_shared/`, also uncommitted. Nothing in the packet can be pinned to a commit
-  until Benjamin commits it.
+- Exists: the packet. Committed (commits `12415b0`, `6d9acff`): `CAPTURE.md`, `DECISIONS.md`, `README.md`, reports 01
+  to 03 and `assets/03-skills-review.json`. Untracked as of 2026-11-22: `BRIEF.md` and reports 04 to 13, and the
+  edits to `DECISIONS.md` and `README.md` that hold the open decisions 8 to 91 (the register every report's
+  "(pending Qn)" maps into). These skills with `_shared/` were committed in `edf1c3f`. A fact from an untracked file
+  cannot be pinned to a commit until Benjamin commits it.
 - Does not exist yet: the vocabulary module, the projector, any generated Turtle, any SHACL, any competency-question
   suite, the reasoner step. A skill never reports a check as run that has no code behind it; it says "not built".
 - ROBOT and oaklib are not installed on Benjamin's machine. `uvx` is, so `uvx --from oaklib runoak`,

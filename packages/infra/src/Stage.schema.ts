@@ -62,7 +62,8 @@ export type VariableName = typeof VariableName.Type
 
 /**
  * What a stage is for. Personal is one developer's machine; test is the deploy test's own copy; preview is a pull
- * request's; staging is what `main` holds, deployed after every green push; production is the one people use.
+ * request's; staging is main's head, deployed when its check passed (an older commit's check never puts it back);
+ * production is the one people use.
  *
  * @category schemas
  */

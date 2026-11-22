@@ -14,11 +14,21 @@ import { describe, expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as S from "effect/Schema"
+import * as Str from "effect/String"
 import { scratchpadFiles } from "../src/commands/Scratch/Scratch.config.ts"
-import { scratchNew } from "../src/commands/Scratch/Scratch.rules.ts"
+import {
+  type Listing,
+  noCheck,
+  programFiles,
+  scratchCheck,
+  scratchNew,
+  scratchSentence
+} from "../src/commands/Scratch/Scratch.rules.ts"
+import { diagnosticDirective } from "../src/commands/Scratch/Scratch.templates.ts"
+import { render } from "../src/Report.schema.ts"
 import { Repo } from "../src/Repo.service.ts"
 import { slowLimits } from "../../../../../vitest.shared.ts"
-import { inTree } from "./support/tree.ts"
+import { inTree, printed } from "./support/tree.ts"
 
 /** The parts of vitest's JSON report the test reads. */
 const Report = S.Struct({
@@ -37,6 +47,66 @@ const templates = proverInstalled
   : (["probe", "service", "screen"] as const)
 
 const copied = ["tsconfig.base.json"]
+
+// The compiler's own answer to "which files do you read", as `scratch:check` asks it.
+const compilerFiles: Listing = Effect.gen(function* () {
+  const repo = yield* Repo
+  const answer = yield* repo.run(
+    repo.join(here, "node_modules/.bin/tsrs"),
+    ["-p", "tsconfig.json", "--listFilesOnly"],
+    { cwd: repo.join(repo.root, "scratchpad") }
+  )
+  return programFiles(answer.stdout)
+})
+
+describe("what scratch:check reads", () => {
+  it.effect(
+    "a file the compiler reaches by an import or through a linked folder is read, in any folder; one it never loads is not",
+    () =>
+      Effect.gen(function* () {
+        const result = yield* inTree(
+          {},
+          Effect.gen(function* () {
+            const repo = yield* Repo
+            yield* Effect.forEach(
+              copied,
+              Effect.fnUntraced(function* (file) {
+                const text = yield* repo.text(repo.join(here, file))
+                yield* repo.write(repo.join(repo.root, file), text)
+              }),
+              { concurrency: 1, discard: true }
+            )
+            yield* Effect.forEach(
+              scratchpadFiles,
+              (file) => repo.write(repo.join(repo.root, "scratchpad", file.name), file.text),
+              { concurrency: 1, discard: true }
+            )
+            yield* repo.run("ln", ["-s", repo.join(here, "node_modules"), repo.join(repo.root, "node_modules")])
+            yield* scratchNew({ name: "shelf", template: "probe", question: "" })
+            const shelf = repo.join(repo.root, "scratchpad/experiments/shelf")
+            const off = `// ${diagnosticDirective} floatingEffect:off\nexport const count = 1\n`
+            // Reached only by an import, in a folder an `include` never matches.
+            yield* repo.write(repo.join(shelf, ".lib/Imported.ts"), off)
+            yield* repo.write(repo.join(shelf, "Reaches.ts"), 'export * from "./.lib/Imported.ts"\n')
+            // In the same kind of folder and imported by nothing: the compiler never loads it.
+            yield* repo.write(repo.join(shelf, ".lib/Alone.ts"), off)
+            // A folder linked into the experiment: the compiler's `include` follows the link.
+            yield* repo.write(repo.join(repo.root, "elsewhere/Linked.ts"), "// @TS-NoCheck\nexport const size = 1\n")
+            yield* repo.run("ln", ["-s", repo.join(repo.root, "elsewhere"), repo.join(shelf, "linked")])
+            // JavaScript is not in the program (`allowJs` is off), so its header changes nothing.
+            yield* repo.write(repo.join(shelf, "gen/api.js"), `// ${noCheck}\nexport const api = 1\n`)
+            const found = yield* scratchCheck(Effect.succeed({ code: 0, output: "" }), compilerFiles)
+            return A.filter(printed(render(scratchSentence)(found)), (line) => /^err: {3}/.test(line))
+          })
+        )
+        expect(A.map(result, (line) => Str.replace(/: (turns|names) .*$/, ": $1")(line))).toEqual([
+          "err:   scratchpad/experiments/shelf/.lib/Imported.ts:1: turns",
+          "err:   scratchpad/experiments/shelf/linked/Linked.ts:1: names"
+        ])
+      }),
+    slowLimits.testTimeout
+  )
+})
 
 describe("the scratchpad's templates", () => {
   it.effect(
@@ -72,7 +142,15 @@ describe("the scratchpad's templates", () => {
             const scratch = repo.join(repo.root, "scratchpad")
             const ran = yield* repo.run(
               "node",
-              [repo.join(here, "node_modules/vitest/vitest.mjs"), "run", "--reporter=json", "--outputFile=report.json"],
+              // Its own module cache: through the linked `node_modules` vitest would use this repository's, see another
+              // lockfile, and clear it under the other packages' tests running beside this one.
+              [
+                repo.join(here, "node_modules/vitest/vitest.mjs"),
+                "run",
+                "--reporter=json",
+                "--outputFile=report.json",
+                `--fsModuleCachePath=${repo.join(repo.root, ".vitest-cache")}`
+              ],
               { cwd: scratch }
             )
             const report = yield* repo.json(Report)(repo.join(scratch, "report.json"))

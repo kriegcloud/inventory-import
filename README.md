@@ -66,9 +66,9 @@ values in `.dev.vars.example`). After pulling a change to `apps/inventory/migrat
 | Command | What it does |
 | --- | --- |
 | `bun run dev` | App and API on http://localhost:5173, signed in as the first test account in development |
-| `bun run check` | Through turbo: type-check with Effect diagnostics, lint (including two design lints), the fast tests, format check, the docs check and the repository's own rules (no deprecated API is used, among them); a second run with nothing changed replays from the cache |
-| `bun run check:full` | `check` plus the slow tests and the production build |
-| `bun run test` | Every test, fast and slow (Vitest, on Node) |
+| `bun run check` | Through turbo: type-check with Effect diagnostics, lint (including two design lints), the fast tests, the proofs of the review's model ([docs/verify.md](docs/verify.md)), format check, the docs check and the repository's own rules (no deprecated API is used, among them); a second run with nothing changed replays from the cache |
+| `bun run check:full` | `check` plus Verify's search of the whole model, the slow tests and the production build |
+| `bun run test` | Every test: fast, the proofs, the search and slow (Vitest, on Node) |
 | `bun run db:reset` | Start again with an empty database (restart `bun run dev` afterwards) |
 | `bun run preview` | The production build on http://localhost:4173, with every security header, compressed as Cloudflare compresses it (`PREVIEW_COMPRESSION=off` sends it as it is) |
 | `bun run --cwd apps/inventory build:report` | The production build, and what each of its chunks is made of (`.scratch/bundle/client.html`, a treemap) |
@@ -77,7 +77,7 @@ values in `.dev.vars.example`). After pulling a change to `apps/inventory/migrat
 | `bun run version-sync` | Checks that every version written in more than one place equals its one source; `-- --write` rewrites the places that differ |
 | `bun run config-sync` | Writes the configuration that follows from the workspaces (syncpack's sources, tsconfig references, each package's scripts); `config-sync:check` only compares ([docs/sync-commands.md](docs/sync-commands.md)) |
 | `bun run scratch:new <name> --template probe` | Starts an experiment in `scratchpad/experiments/<name>`, from a template whose test already passes (`probe`, `service`, `screen`, `verify`). `scratch:test`, `scratch:check` and `scratch:list` run, type-check and list the experiments; `scratch:graduate` and `scratch:drop` end one ([docs/scratchpad.md](docs/scratchpad.md)). No check, build or deploy reads the scratchpad |
-| `bun run release minor` | Cuts `release/<major>.<minor>` from `main`, sets the app's version, writes the notes, runs `check:full`, commits and tags; pushes nothing and prints the two push commands. `patch` on a release branch tags a cherry-picked fix ([releasing](docs/releasing.md)) |
+| `bun run release minor` | Cuts `release/<major>.<minor>` from `main`, sets the app's version, writes the notes, runs `check:full`, commits and tags; pushes nothing and prints the one push that sends branch and tag together; production deploys once CI passes on the branch and the deploy is approved. `patch` on a release branch tags a cherry-picked fix ([releasing](docs/releasing.md)) |
 | `bunx alchemy deploy --stage <name>` | Host it on Cloudflare: the stack in `packages/infra` makes the database and the Worker (needs a Cloudflare login; [goals/infra/PLAN.md](goals/infra/PLAN.md) has the steps, in order) |
 
 ### Signing in

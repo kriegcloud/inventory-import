@@ -14,8 +14,8 @@
  *   `references` lists the packages its `package.json` declares;
  * - `scripts`: a package has the scripts turbo runs for what it holds: `check` type-checks each of its projects and
  *   counts against its ceiling file, `test` exists beside a `vitest.config.ts`, `lint` unless it is vendored;
- * - `tasks`: every root task `turbo.json` defines (`//#name`) has a root script and is run by `check` and
- *   `check:full`;
+ * - `tasks`: every root task `turbo.json` defines (`//#name`) has a root script and is run by `check`, `check:full`
+ *   and `check:ci` (CI's main job);
  * - `vendored`: the formatter leaves every vendored package alone.
  *
  * The scratchpad (`scratchpad/`) is no workspace and is not read: its experiments import every package from the
@@ -506,7 +506,7 @@ export const configSyncPlan = Effect.fn("ConfigSync.plan")(function* () {
     { concurrency: 1 }
   )
 
-  // tasks: every root task of turbo.json has a root script and is run by the two checks.
+  // tasks: every root task of turbo.json has a root script and is run by `check`, `check:full` and `check:ci`.
   const tasksPlan = Effect.fn("ConfigSync.tasks")(function* () {
     const turbo = yield* readIfThere(repo.join(repo.root, "turbo.json"))
     if (O.isNone(turbo)) return nothing
@@ -524,7 +524,7 @@ export const configSyncPlan = Effect.fn("ConfigSync.plan")(function* () {
         })
     )
     const block = objectOf("scripts")(rootPackage.text)
-    const runners = A.flatMap(["check", "check:full"], (script) =>
+    const runners = A.flatMap(["check", "check:full", "check:ci"], (script) =>
       O.toArray(
         O.flatMap(block, (scriptsBlock) =>
           O.map(A.findFirst(stringValues(script)(rootPackage.text), inside(scriptsBlock)), (found) => ({

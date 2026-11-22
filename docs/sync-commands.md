@@ -117,7 +117,7 @@ depends on where it is and what it holds is written from that.
 | paths | a `$schema`, an `extends` and a path in a script that names nothing where it is, and would from the root | the depth of the folder it is in |
 | references | a solution file (`"files": []`) references every project beside it, the root's also each package's projects other than its `tsconfig.json`; a reference that names nothing is removed, one a person added is kept. A package's own projects are type-checked from source and have no references; none is derived | the `tsconfig*.json` files on disk |
 | scripts | `check` type-checks each of the package's projects and counts against its ceiling file; `test` exists beside a `vitest.config.ts`; `lint` exists unless the package is vendored | what the package holds |
-| tasks | `check` and `check:full` run every root task `turbo.json` defines and no other; each has a root script (a problem when it has none) | the `//#name` tasks of `turbo.json` |
+| tasks | `check`, `check:full` and `check:ci` (CI's main job) run every root task `turbo.json` defines and no other; each has a root script (a problem when it has none) | the `//#name` tasks of `turbo.json` |
 | vendored | the formatter's `ignorePatterns` name every vendored package, and no package of the repository's own | the packages with a `vendor.json` |
 
 A reference a person added by hand to a solution file is kept while it names something. The scratchpad is no workspace, and no rule reads it. A list or object that holds

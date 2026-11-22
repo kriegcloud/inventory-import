@@ -3,6 +3,7 @@ import { AppShell } from "@/components/app/AppShell"
 import { SignedIn } from "@/components/app/SignedIn"
 import { Skeleton } from "@inventory/ui/components/skeleton"
 import { useAtomMount, useAtomValue } from "@effect/atom-react"
+import * as Str from "effect/String"
 import { thisTab } from "@inventory/client/TabAtoms"
 import { location } from "@inventory/ui/Route"
 import { workspace } from "./preload.ts"
@@ -15,6 +16,8 @@ const Workspace = lazy(workspace)
 // Development only: the review region's gallery at /gallery/review. In a production build the condition is a
 // constant false, so the page and its made-up data are not in the bundle.
 const ReviewGallery = import.meta.env.DEV ? lazy(() => import("@/pages/ReviewGallery")) : undefined
+// Development only too: the data grid's typing page at /gallery/grid, which `bun run grid:keys` drives in a browser.
+const GridGallery = import.meta.env.DEV ? lazy(() => import("@/pages/GridGallery")) : undefined
 
 /** The app: the sign-in screen for anyone not signed in, the workspace for a member of an organization. */
 export default function App() {
@@ -26,6 +29,13 @@ export default function App() {
     return (
       <Suspense fallback={null}>
         <ReviewGallery />
+      </Suspense>
+    )
+  }
+  if (GridGallery !== undefined && Str.startsWith("/gallery/grid")(path)) {
+    return (
+      <Suspense fallback={null}>
+        <GridGallery />
       </Suspense>
     )
   }

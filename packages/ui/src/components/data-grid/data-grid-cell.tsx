@@ -11,15 +11,19 @@ import { flushSync } from "react-dom"
 import type { DataGridFeatures } from "@inventory/ui/components/data-grid/data-grid-features"
 import type { DataGridCellProps, StopEditingOptions } from "@inventory/ui/components/data-grid/data-grid-types"
 
-import { CELL_TINTS, getCellFocusTarget, getCellLayoutStyle } from "@inventory/ui/components/data-grid/data-grid-utils"
+// Local change: `getHasCustomCell`, for `typesInPlace` below.
+import {
+  CELL_TINTS,
+  getCellFocusTarget,
+  getCellLayoutStyle,
+  getHasCustomCell
+} from "@inventory/ui/components/data-grid/data-grid-utils"
 
 interface DataGridCellElementProps<TData extends RowData>
   extends DataGridCellProps<TData>, React.ComponentProps<"div"> {
   onCommit?: (options?: StopEditingOptions) => void
   onCancel?: () => void
   commitOnEnter?: boolean
-  /** Local change: the editor sits in the cell, so the browser types the key that opens it. */
-  typesInPlace?: boolean
 }
 
 export function DataGridCell<TData extends RowData>({
@@ -43,8 +47,6 @@ export function DataGridCell<TData extends RowData>({
   onCancel,
   onKeyDown: onKeyDownProp,
   commitOnEnter = false,
-  // Local change: `typesInPlace`.
-  typesInPlace = false,
   className,
   style,
   ref,
@@ -53,6 +55,13 @@ export function DataGridCell<TData extends RowData>({
   const rowId = cell.row.id
   const columnId = cell.column.id
   const cellRef = React.useRef<HTMLDivElement>(null)
+  // Local change: whether the editor this column opens takes typing (text, number, url, long text), so the browser can
+  // type the key that opens it. It is read from the column, not passed by the editor: a column with a variant and its
+  // own `cell` is drawn by this wrapper alone until the person edits, and its editor mounts only then.
+  const variant = cell.column.columnDef.meta?.variant ?? "text"
+  const typesInPlace =
+    !getHasCustomCell(cell.column) &&
+    (variant === "text" || variant === "number" || variant === "url" || variant === "long-text")
   const composedRef = useComposedRefs(ref, cellRef)
 
   React.useLayoutEffect(() => {
@@ -129,10 +138,10 @@ export function DataGridCell<TData extends RowData>({
 
       if (event.key === "F2" || event.key === "Enter" || isPrintable) {
         event.stopPropagation()
-        // Local change: an editor in the cell is opened, focused and its value selected before this handler ends, and
-        // the browser then types the key into it, as a key typed over a selection (upstream prevented the key and typed
-        // it with the deprecated `document.execCommand`). So a sign or a decimal point that begins a number stays, and
-        // the browser's own undo holds it.
+        // Local change: the editor is opened and focused before this handler ends (in the cell with its value selected,
+        // or, for long text, in its popover with the caret after the text), and the browser then types the key into it
+        // (upstream prevented the key and typed it with the deprecated `document.execCommand`). So a sign or a decimal
+        // point that begins a number stays, a second key cannot overtake the first, and the browser's own undo holds it.
         if (isPrintable && typesInPlace) {
           flushSync(() => cell.startEditing({ pendingChar: event.key }))
           return

@@ -37,7 +37,7 @@ import {
   getRowHeightValue,
   getTextCellValue,
   getUrlHref,
-  insertTextAtSelection,
+  // Local change: upstream also imported `insertTextAtSelection` here.
   moveCaretToEnd,
   // Local change: `selectEditableText` is imported where upstream imported `execInsertText` and `replaceEditableText`.
   parseLocalDate,
@@ -72,8 +72,7 @@ export function ShortTextCell<TData extends RowData>(props: DataGridCellProps<TD
   const { onCommit, onCancel, textProps } = useEditableText(props)
 
   return (
-    // Local change: `typesInPlace`.
-    <DataGridCell<TData> {...props} onCommit={onCommit} onCancel={onCancel} commitOnEnter typesInPlace>
+    <DataGridCell<TData> {...props} onCommit={onCommit} onCancel={onCancel} commitOnEnter>
       <EditableText {...textProps} />
     </DataGridCell>
   )
@@ -154,18 +153,9 @@ export function LongTextCell<TData extends RowData>(props: DataGridCellProps<TDa
     const length = textarea.value.length
     textarea.setSelectionRange(length, length)
 
-    const pendingChar = getPendingChar(cell)
-    if (pendingChar) {
-      requestAnimationFrame(() => {
-        const textarea = textareaRef.current
-        if (textarea && document.activeElement === textarea) {
-          insertTextAtSelection(textarea, pendingChar)
-          textarea.scrollTop = textarea.scrollHeight
-        }
-      })
-    } else {
-      textarea.scrollTop = textarea.scrollHeight
-    }
+    // Local change: the browser types the key that opened the editor, after the text (see `typesInPlace` in
+    // data-grid-cell.tsx). Upstream typed it here on the next frame, and lost it when a second key came first.
+    textarea.scrollTop = textarea.scrollHeight
   }, [cell])
 
   const onBlur = React.useCallback(() => onSave(), [onSave])
@@ -278,22 +268,14 @@ export function NumberCell<TData extends RowData>(props: DataGridCellProps<TData
       isCancelingRef.current = false
       inputRef.current.focus()
 
-      // Local change: the browser types the key over the selection (see `typesInPlace`).
+      // Local change: the browser types the key over the selection (see `typesInPlace` in data-grid-cell.tsx).
       if (getPendingChar(cell)) inputRef.current.select()
     }
     // Local change: upstream's list also held `setDraftValue`, which its fallback called.
   }, [cell, isEditing])
 
   return (
-    <DataGridCell<TData>
-      {...props}
-      className="text-end"
-      onCommit={onSave}
-      onCancel={onCancel}
-      commitOnEnter
-      // Local change: `typesInPlace`.
-      typesInPlace
-    >
+    <DataGridCell<TData> {...props} className="text-end" onCommit={onSave} onCancel={onCancel} commitOnEnter>
       {isEditing ? (
         <input
           aria-label={getColumnLabel(cell.column)}
@@ -364,15 +346,7 @@ export function UrlCell<TData extends RowData>(props: DataGridCellProps<TData>) 
   const isDangerousUrl = displayValue && !urlHref
 
   return (
-    <DataGridCell<TData>
-      {...props}
-      onCommit={onCommit}
-      onCancel={onCancel}
-      onKeyDown={onWrapperKeyDown}
-      commitOnEnter
-      // Local change: `typesInPlace`.
-      typesInPlace
-    >
+    <DataGridCell<TData> {...props} onCommit={onCommit} onCancel={onCancel} onKeyDown={onWrapperKeyDown} commitOnEnter>
       {!isEditing && displayValue ? (
         <div data-slot="data-grid-cell-content" dir="auto" className="size-full overflow-hidden">
           <a
@@ -1374,7 +1348,7 @@ function useEditableText<TData extends RowData>({
         element.textContent = value
       }
 
-      // Local change: the browser types the key over the selection (see `typesInPlace`).
+      // Local change: the browser types the key over the selection (see `typesInPlace` in data-grid-cell.tsx).
       if (getPendingChar(cell)) {
         selectEditableText(element)
       } else if (element.textContent) {

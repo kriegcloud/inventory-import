@@ -897,21 +897,13 @@ export function getIsEventOnScrollbar(event: React.MouseEvent<HTMLElement>): boo
   )
 }
 
-export function insertTextAtSelection(element: HTMLTextAreaElement | HTMLInputElement, text: string) {
-  const start = element.selectionStart ?? element.value.length
-  const end = element.selectionEnd ?? start
-  element.focus()
-  element.setSelectionRange(start, end)
-
-  // Local change: upstream first tried the deprecated `document.execCommand`. This editor opens in a popover, after the
-  // key is gone, so the text is put in here; the browser's own undo does not hold it.
-  element.setRangeText(text, start, end, "end")
-  dispatchInsertTextInput(element, text)
-}
+// Local change: upstream's exported `insertTextAtSelection(element, text)` stood here. It typed the key that opened the
+// long-text editor, first with the deprecated `document.execCommand`; the browser types that key now (`typesInPlace`
+// in data-grid-cell.tsx), so it is removed.
 
 // Local change: selects the whole text and leaves the typing to the browser. Upstream's `replaceEditableText(element,
 // text)` typed it here, and its exported `execInsertText(text)`, which called the deprecated `document.execCommand`,
-// stood below `dispatchInsertTextInput`: both are removed.
+// stood further down: both are removed.
 export function selectEditableText(element: HTMLElement) {
   element.focus()
   const selection = window.getSelection()
@@ -1000,15 +992,8 @@ function escapeAttributeValue(value: string) {
   return value.replace(/["\\]/g, "\\$&")
 }
 
-function dispatchInsertTextInput(element: HTMLElement, text: string) {
-  element.dispatchEvent(
-    new InputEvent("input", {
-      bubbles: true,
-      data: text,
-      inputType: "insertText"
-    })
-  )
-}
+// Local change: upstream's `dispatchInsertTextInput(element, text)` stood here, which told React of text its fallbacks
+// had put in. Nothing puts text in now (the browser types it), so it is removed.
 
 const objectUrlsByStore = new WeakMap<object, Set<string>>()
 

@@ -16,6 +16,7 @@ import * as Str from "effect/String"
 import * as Atom from "effect/reactivity/Atom"
 import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import { member } from "@inventory/client/MemberAtoms"
+import { sharedStorage } from "@inventory/client/Storage"
 import { thisTab } from "@inventory/client/TabAtoms"
 import { kept } from "@inventory/review/Kept"
 import { progressKey } from "@inventory/review/SavedProgress"
@@ -37,15 +38,6 @@ const keyOf = (of: Member, tab: string): string =>
 const noticesAt = Atom.family((key: string) =>
   kept({ key, schema: NoticesKept, defaultValue: (): NoticesKept => O.none() })
 )
-
-/** The browser's storage shared by every tab, or none where reading it is itself refused (some private windows). */
-const sharedStorage = (): Storage | undefined => {
-  try {
-    return window.localStorage
-  } catch {
-    return undefined
-  }
-}
 
 const listOf = (stored: NoticesKept): ReadonlyArray<Notice> => O.getOrElse(stored, (): ReadonlyArray<Notice> => [])
 
@@ -121,17 +113,14 @@ const leave = (input: {
   const key = keyOf(of, tab)
   const here = O.exists(registry.get(thisTab), (own) => own === tab)
   if (here) registry.set(noticesAt(key), withNotice(registry.get(noticesAt(key)), notice))
-  const storage = sharedStorage()
-  if (storage === undefined) return
-  try {
+  // Storage refused (full, or turned off): the decisions are with the tab that took them up, and only this is not said.
+  sharedStorage.attempt((storage) => {
     if (!here) {
       const text = noticesText(withNotice(noticesFromText(storage.getItem(key)), notice))
       O.map(text, (kept) => storage.setItem(key, kept))
     }
     bounding(storage, of)
-  } catch {
-    // Storage refused (full, or turned off): the decisions are with the tab that took them up, and only this is not said.
-  }
+  })
 }
 
 /** The import a notice is about: its id, and its file's name where it was kept with the rows. */

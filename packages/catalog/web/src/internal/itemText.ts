@@ -1,3 +1,4 @@
+import * as O from "effect/Option"
 import { parse } from "@inventory/ui/Json"
 import { costDigits, type UnitCost } from "@inventory/catalog-contract/Item"
 // How an item's values read on screen, in one place: the Items table, the editor and the review show a cost, the
@@ -96,13 +97,8 @@ export const vendorsText = (vendors: ReadonlyArray<VendorShown>): string => {
   return `${vendors.length} · ${preferred.length === 0 ? "none preferred" : `${names} preferred`}`
 }
 
-const parsed = (text: string): unknown => {
-  try {
-    return parse(text) as unknown
-  } catch {
-    return undefined
-  }
-}
+/** The cell's JSON, or nothing where it is not JSON: the cell then stays as the file has it. */
+const parsed = (text: string): unknown => O.getOrUndefined(O.liftThrowable(parse)(text))
 
 const isObject = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value)

@@ -1,11 +1,14 @@
+// Local change: moved from React's hooks to atoms (goals/atoms, "The kit on atoms", batch 1); no longer as its registry has it.
 "use client"
 
+import { useAtom, useAtomValue } from "@effect/atom-react"
 import type { Column, RowData } from "@tanstack/react-table"
 
 import { cn } from "cn"
-import * as React from "react"
+import { type ComponentProps, type FocusEvent, type KeyboardEvent, useId } from "react"
 
 import type { DataTableFeatures } from "@inventory/ui/components/data-table/data-table-features"
+import { boundsDraft, oneTimer } from "@inventory/ui/components/data-table/data-table-state"
 import type { ColumnFilterItem } from "@inventory/ui/components/data-table/data-table-types"
 
 import {
@@ -17,7 +20,7 @@ import { Input } from "@inventory/ui/components/input"
 
 const INVALID_RING_DELAY_MS = 500
 
-interface DataTableRangeFilterProps<TData extends RowData> extends React.ComponentProps<"div"> {
+interface DataTableRangeFilterProps<TData extends RowData> extends ComponentProps<"div"> {
   filter: ColumnFilterItem
   column: Column<DataTableFeatures, TData>
   inputId: string
@@ -37,24 +40,26 @@ export function DataTableRangeFilter<TData extends RowData>({
   const bounds = getColumnNumberOptions(meta)
 
   const [startValue, endValue] = getRangeFilterValues(filter.value).map(getInputValue)
-  const [drafts, setDrafts] = React.useState<[string | null, string | null]>([null, null])
+  // The boxes' drafts and the ring's delay are atoms of this filter's own; the delay is cleared when it leaves.
+  const instance = useId()
+  const [{ drafts, showInvalid }, setBounds] = useAtom(boundsDraft(instance))
+  const invalidTimer = useAtomValue(oneTimer(instance))
+  const setDrafts = (next: readonly [string | null, string | null]) =>
+    setBounds((previous) => ({ ...previous, drafts: next }))
+  const setShowInvalid = (next: boolean) => setBounds((previous) => ({ ...previous, showInvalid: next }))
   const [startInput, endInput] = getInputValues(drafts)
-  const [showInvalid, setShowInvalid] = React.useState(false)
-  const invalidTimeoutRef = React.useRef<number | undefined>(undefined)
-
-  React.useEffect(() => () => window.clearTimeout(invalidTimeoutRef.current), [])
 
   function onInvalidChange(isInvalid: boolean) {
-    window.clearTimeout(invalidTimeoutRef.current)
+    invalidTimer.cancel()
     if (!isInvalid) {
       setShowInvalid(false)
       return
     }
     if (showInvalid) return
-    invalidTimeoutRef.current = window.setTimeout(() => setShowInvalid(true), INVALID_RING_DELAY_MS)
+    invalidTimer.start(() => setShowInvalid(true), INVALID_RING_DELAY_MS)
   }
 
-  function getInputValues(nextDrafts: [string | null, string | null]): [string, string] {
+  function getInputValues(nextDrafts: readonly [string | null, string | null]): [string, string] {
     return [nextDrafts[0] ?? startValue ?? "", nextDrafts[1] ?? endValue ?? ""]
   }
 
@@ -81,13 +86,13 @@ export function DataTableRangeFilter<TData extends RowData>({
     onInvalidChange(false)
   }
 
-  function onContainerBlur(event: React.FocusEvent<HTMLDivElement>) {
+  function onContainerBlur(event: FocusEvent<HTMLDivElement>) {
     onBlur?.(event)
     if (event.currentTarget.contains(event.relatedTarget)) return
     onDraftCommit()
   }
 
-  function onInputKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+  function onInputKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Enter") onDraftCommit()
   }
 

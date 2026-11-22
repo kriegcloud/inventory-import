@@ -221,8 +221,14 @@ const leadingWords = [
   "readonly",
   "unique",
   "infer",
-  "asserts"
+  "asserts",
+  "do"
 ]
+/**
+ * The words that open a statement's head: once its parentheses close, they join the statement it governs to them, so
+ * heads nested without braces (`if (a)` on each line, as the parser reads them, one inside another) chain as one.
+ */
+const headWords = ["if", "while", "for", "with"]
 /** The words after which a `/` starts a regular expression. */
 const beforeRegex = [
   "return",
@@ -243,7 +249,8 @@ const beforeRegex = [
 
 /**
  * Where a law refuses `source` before parsing it, and why, if it does: longer than `maxFileSize`, brackets deeper than
- * `maxBrackets`, or one expression chaining more than `maxChain` operators. Strings, comments, a template's text and
+ * `maxBrackets`, or one expression or statement chaining more than `maxChain` operators (statements' heads nested
+ * without braces, `if (a)` on each line, chain as one). Strings, comments, a template's text and
  * regular expressions are skipped, so a bracket in them neither opens nor closes; a closing bracket with none open is
  * passed over. A quote straight after a letter is a letter (JSX text: `Don't`).
  *
@@ -254,9 +261,11 @@ export const unreadable = (source: string): Stopped | undefined => {
   if (length > maxFileSize) return { at: 0, unread: Unread.Large() }
   const charAt = (offset: number): string => source[offset] ?? ""
   const nested = (offset: number): Stopped => ({ at: offset, unread: Unread.Nested() })
-  // For each bracket open, whether it is a template's `${`; what each has chained since it last ended; and for each
-  // element written in it and not yet closed (`<p`, or a type's `<T`, which never is), what it had chained before.
+  // For each bracket open, whether it is a template's `${`, and whether it is a statement's head (`if (`); what each
+  // has chained since it last ended; and for each element written in it and not yet closed (`<p`, or a type's `<T`,
+  // which never is), what it had chained before.
   const opened: Array<boolean> = []
+  const heads: Array<boolean> = []
   const chained: Array<number> = [0]
   const elements: Array<Array<number>> = [[]]
   let total = 0
@@ -265,6 +274,9 @@ export const unreadable = (source: string): Stopped | undefined => {
   let lineEnded = false
   let regexNext = true
   let inTemplate = false
+  // Whether the next `(` opens a statement's head, and whether a `;` ended a statement an `else` may still continue.
+  let headNext = false
+  let endPending = false
   let at = 0
   const count = (): boolean => {
     total += 1
@@ -284,8 +296,9 @@ export const unreadable = (source: string): Stopped | undefined => {
       chained[chained.length - 1] = before
     }
   }
-  const open = (template: boolean): boolean => {
+  const open = (template: boolean, head = false): boolean => {
     opened.push(template)
+    heads.push(head)
     chained.push(0)
     elements.push([])
     return opened.length <= maxBrackets
@@ -331,6 +344,10 @@ export const unreadable = (source: string): Stopped | undefined => {
     let after = at
     while (after < length && isWordChar(charAt(after))) after += 1
     const word = Str.slice(at, after)(source)
+    // A statement a `;` ended goes on in an `else` (an else-if chain is one statement nested in another), and else
+    // ended there.
+    if (endPending && word !== "else") end()
+    endPending = false
     // A line ended between two words neither of which joins the other: what was before it has ended.
     if (lineEnded && !joins && !isOperator(char) && !A.contains(joiningWords, word)) end()
     lineEnded = false
@@ -340,11 +357,14 @@ export const unreadable = (source: string): Stopped | undefined => {
       if (chains && !count()) return nested(at)
       joins = chains
       regexNext = A.contains(beforeRegex, word)
+      headNext = A.contains(headWords, word) || (headNext && word === "await")
       // A quote straight after a letter is part of the text it is in.
       while (charAt(at) === "'" || charAt(at) === '"') at += 1
       continue
     }
     at += 1
+    const head = headNext && char === "("
+    headNext = false
     if (char === "'" || char === '"') {
       while (at < length) {
         const inner = charAt(at)
@@ -356,11 +376,12 @@ export const unreadable = (source: string): Stopped | undefined => {
       regexNext = false
     } else if (char === "`") inTemplate = true
     else if (char === "(" || char === "[" || char === "{") {
-      if (!count() || !open(false)) return nested(at - 1)
+      if (!count() || !open(false, head)) return nested(at - 1)
       joins = true
       regexNext = true
     } else if (char === ")" || char === "]" || char === "}") {
       const template = opened.pop()
+      const closedHead = heads.pop() === true
       if (template !== undefined) {
         // What a bracket chained is chained by what holds it.
         const inner = chained.pop() ?? 0
@@ -368,10 +389,16 @@ export const unreadable = (source: string): Stopped | undefined => {
         chained[chained.length - 1] = (chained[chained.length - 1] ?? 0) + inner
       }
       inTemplate = template === true
-      joins = false
-      regexNext = false
-    } else if (char === "," || char === ";") {
+      // A head's parentheses join the statement it governs to them: a line end after them ends nothing.
+      joins = closedHead
+      regexNext = closedHead
+    } else if (char === ",") {
       end()
+      joins = true
+      regexNext = true
+    } else if (char === ";") {
+      // What it ends is ended at the next word, unless that word is `else`.
+      endPending = true
       joins = true
       regexNext = true
     } else if (char === "<" && charAt(at) === "/") {

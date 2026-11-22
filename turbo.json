@@ -28,8 +28,13 @@
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/tooling/tool/cli/src/**"],
       "outputs": []
     },
-    // oxlint, and the design-system lint in packages with screens.
-    "lint": { "dependsOn": ["//#patches:installed"], "outputs": [] },
+    // oxlint, and the design-system lint in packages with screens. A package's own lint profile is in its files; the
+    // root profiles they extend (the atoms rule, the design lints) are inputs too, so a change to one is not replayed.
+    "lint": {
+      "dependsOn": ["//#patches:installed"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/.oxlintrc*.json"],
+      "outputs": []
+    },
     // The fast tests. Their limits and retries are the root's (vitest.shared.ts, vitest.retries.ts), which every
     // package's vitest.config.ts imports.
     "test": {
@@ -78,6 +83,10 @@
       ],
       "outputs": []
     },
+    // The Alchemy packages kept as files are the ones `vendor/alchemy/sources.json` names, hash for hash, and the
+    // overrides, the README's table and the lockfile agree with it (`vendor/alchemy/repin.py --check`; needs
+    // python3). A third of a second, so it runs every time and names no inputs.
+    "//#alchemy:check": { "cache": false },
     // The stage C ceilings of the packages with screens add up to at most 678 (`beep quality ceilings`).
     "//#ceilings:check": {
       "inputs": ["apps/*/strict-ceiling.json", "packages/**/strict-ceiling.json", "packages/tooling/tool/cli/src/**"],
@@ -245,6 +254,26 @@
         "bun.lock",
         "node_modules/*/package.json",
         "node_modules/@*/*/package.json"
+      ],
+      "outputs": []
+    },
+    // No `try` statement is written (`beep laws try`), in the code or in a doc comment's example, read from each file's
+    // own syntax tree: every code file git would commit is an input, in a folder nobody listed too (`.claude` and
+    // `.codex` among them), with `.gitignore`, `bun.lock` (the parser's version) and the law's own source. Left out
+    // by name: what the law does not read (`.agents`, the scratchpad and theme-init.js), what is installed or built,
+    // and `.claude/worktrees`, which git ignores and which in the main checkout holds every other checkout.
+    "//#try:check": {
+      "inputs": [
+        ".gitignore",
+        "bun.lock",
+        "**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+        "!**/node_modules/**",
+        "!apps/**/{dist,.wrangler,.turbo}/**",
+        "!packages/**/{dist,.turbo}/**",
+        "!.claude/worktrees/**",
+        "!{.agents,.turbo,.scratch,.wrangler,.alchemy,.taste-skill,.session,scratchpad}/**",
+        "!apps/inventory/public/theme-init.js",
+        "packages/tooling/tool/cli/src/**"
       ],
       "outputs": []
     },

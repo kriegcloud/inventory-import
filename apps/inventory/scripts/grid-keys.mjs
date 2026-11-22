@@ -18,6 +18,7 @@ import { existsSync } from "node:fs"
 import { createServer } from "node:net"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
+import * as Effect from "effect/Effect"
 import { chromium } from "playwright-core"
 
 const nbsp = " "
@@ -209,26 +210,40 @@ const typeAll = async (browser, origin, delay) => {
   return failures
 }
 
+/** A step that failed, as the error the last line prints: its own when it threw one, else one naming what it threw. */
+const failed = (cause) => (cause instanceof Error ? cause : new Error(String(cause)))
+
+/** A promise as an Effect, its failure as an Error. */
+const step = (promise) => Effect.tryPromise({ try: promise, catch: failed })
+
 const run = async () => {
   const executablePath = browserPath()
   const port = await freePort()
-  const server = await serve(port)
-  try {
-    const browser = await chromium.launch({ executablePath, args: ["--no-sandbox"] })
-    try {
-      console.log(`grid:keys  ${executablePath} ${browser.version()}, this checkout's server on port ${port}`)
-      // With no pause a second key follows the first at once, which is where the long-text editor lost the first;
-      // 40 ms is a fast typist.
-      const fast = await typeAll(browser, `http://localhost:${port}`, 0)
-      const typist = await typeAll(browser, `http://localhost:${port}`, 40)
-      return [...fast, ...typist]
-    } finally {
-      await browser.close()
-    }
-  } finally {
-    server.removeAllListeners("exit")
-    server.kill()
-  }
+  // The server is stopped, and the browser closed, however the typing ends.
+  return Effect.runPromise(
+    Effect.acquireUseRelease(
+      step(() => serve(port)),
+      () =>
+        Effect.acquireUseRelease(
+          step(() => chromium.launch({ executablePath, args: ["--no-sandbox"] })),
+          (browser) =>
+            step(async () => {
+              console.log(`grid:keys  ${executablePath} ${browser.version()}, this checkout's server on port ${port}`)
+              // With no pause a second key follows the first at once, which is where the long-text editor lost the
+              // first; 40 ms is a fast typist.
+              const fast = await typeAll(browser, `http://localhost:${port}`, 0)
+              const typist = await typeAll(browser, `http://localhost:${port}`, 40)
+              return [...fast, ...typist]
+            }),
+          (browser) => Effect.promise(() => browser.close())
+        ),
+      (server) =>
+        Effect.sync(() => {
+          server.removeAllListeners("exit")
+          server.kill()
+        })
+    )
+  )
 }
 
 run().then(

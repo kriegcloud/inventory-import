@@ -29,6 +29,8 @@ didn't": a messy file in, what is wrong fixed in the app, a clear account of the
   - "Why flagged?" asks about the rows that the view, the problem kind and the search narrow the table to. There is
     no tick box for picking rows one at a time.
   - On a phone the grey line under the result's heading is cut to one line.
+  - On Items, a filter value typed in the Filter menu and followed within a third of a second by a click on another
+    page is written into that page's address (`/activity?name=brass`). It was so before the table moved to atoms.
   - A take-back restores at most ten replaces of one item in turn. No test covers two rows of one file replacing the
     same SKU.
   - **A review that saves as you decide, open in two tabs or by two people.** Each of these needs two tabs, two people
@@ -45,17 +47,15 @@ didn't": a messy file in, what is wrong fixed in the app, a clear account of the
       new page, and replace it without a word.
     - Import, while rows wait on lines, first asks "Import 155 items?", and only after that says nothing was imported
       because the rows wait.
-    - When somebody else confirms the import and opens it again while this screen is behind, a decision she picks
-      on a line can be let go without a word, if an older answer then says the import is closed and that confirm
-      wrote the same value; a colleague's decision made after the reopening stands.
     - A decision of hers that a confirm wrote, whose own save is refused after the import was opened again because
       somebody changed the row since, comes back to her to pick only if her screen had already read the reopened
       import when the refusal arrived. If the refusal arrives first, it is dropped without a word.
-    - A row taken up from a closed tab, beside a save of hers whose answer was lost, can be said as "decided since by
-      someone else or another tab" when only she decided it.
-  - **For whoever changes the code.** `tags:check` and `refs:check` read a file within a budget and refuse one past
-    it in words; a file built to kill the parser behind text their scan misreads still kills the check, which then
-    fails (`goals/atoms/PLAN.md` names the shapes). The kept form of a held row is a tagged union whose cases are
+  - **For whoever changes the code.** `tags:check`, `refs:check` and `try:check` read a file within a budget and
+    refuse one past it in words; a file built to kill the parser behind text their scan misreads still kills the
+    check, which then fails (`goals/atoms/PLAN.md` and `docs/standards/no-try.md` name the shapes). `try:check`
+    misses a `try` in a few doc-comment examples that are not modules by themselves (`docs/standards/no-try.md`
+    lists them). No test fails when the guard on browser storage is taken out of the review's kept store or of
+    the five places that write who was signed in. The kept form of a held row is a tagged union whose cases are
     still built by hand. Nothing fails when the held-confirm line is removed.
 - **Not verified:** how good the model help is on other files, and what it costs; the dark theme on the new screens;
   a restore after several confirms of one import replaced the same item in turn.

@@ -1,9 +1,15 @@
+// Local change: moved from React's hooks to atoms (goals/atoms, "The kit on atoms", batch 1); no longer as its registry has it.
 "use client"
 
+import { useAtom, useAtomValue } from "@effect/atom-react"
 import { type Column, type RowData, Subscribe } from "@tanstack/react-table"
-import * as React from "react"
+import * as MutableHashSet from "effect/MutableHashSet"
+import * as O from "effect/Option"
+import * as Atom from "effect/reactivity/Atom"
+import { type FocusEvent, type KeyboardEvent, type MouseEvent, useId } from "react"
 
 import type { DataTableFeatures } from "@inventory/ui/components/data-table/data-table-features"
+import { boundsDraft, oneTimer } from "@inventory/ui/components/data-table/data-table-state"
 
 import {
   getColumnNumberOptions,
@@ -22,6 +28,15 @@ import { XCircle, PlusCircle } from "lucide-react"
 const INVALID_RING_DELAY_MS = 500
 
 type RangeValue = [number, number]
+
+/**
+ * The range of the column's values as the filter keeps it: read again and kept each time the filter opens, and read
+ * as the filter is drawn until it first opens (upstream read it once, when the filter was first drawn).
+ */
+const facetedRangeOf = Atom.family((_instance: string) => Atom.make<O.Option<RangeValue | null>>(O.none()))
+
+// The columns already warned of in development: once a column, while the page is open.
+const warnedOf = MutableHashSet.empty<string>()
 
 interface DataTableSliderFilterProps<TData extends RowData> {
   column: Column<DataTableFeatures, TData>
@@ -44,63 +59,65 @@ function DataTableSliderFilterContent<TData extends RowData>({
   columnFilterValue: unknown
 }) {
   const dir = useDirection()
-  const id = React.useId()
+  const id = useId()
 
   const numberMeta = getColumnNumberOptions(column.columnDef.meta)
   const declaredMin = numberMeta?.min
   const declaredMax = numberMeta?.max
   const unit = numberMeta?.unit
 
-  const [facetedRange, setFacetedRange] = React.useState(() => getFacetedRange(column))
+  const [facetedRangeKept, setFacetedRange] = useAtom(facetedRangeOf(id))
+  const facetedRange = O.getOrElse(facetedRangeKept, () => getFacetedRange(column))
   const min = declaredMin ?? facetedRange?.[0] ?? 0
   const max = declaredMax ?? facetedRange?.[1] ?? 100
   const hasNoValues = (declaredMin === undefined || declaredMax === undefined) && getFacetedRange(column) === null
   const step = getRangeStep(min, max)
 
   function onOpenChange(open: boolean) {
-    if (open) setFacetedRange(getFacetedRange(column))
+    if (open) setFacetedRange(O.some(getFacetedRange(column)))
   }
 
-  React.useEffect(() => {
-    if (!import.meta.env.DEV) return
-    if (!column.table.options.manualFiltering) return
-    if (declaredMin !== undefined && declaredMax !== undefined) return
+  if (
+    import.meta.env.DEV &&
+    column.table.options.manualFiltering === true &&
+    (declaredMin === undefined || declaredMax === undefined) &&
+    !MutableHashSet.has(warnedOf, column.id)
+  ) {
+    MutableHashSet.add(warnedOf, column.id)
     console.warn(
       `DataTableSliderFilter: column "${column.id}" is missing \`meta.min\` or \`meta.max\`, so in server mode its bounds only cover the rows on the current page. Set both to the full range of the data.`
     )
-  }, [column, declaredMin, declaredMax])
+  }
 
   const bounds = parseRangeBounds(columnFilterValueProp)
   const columnFilterValue: RangeValue | undefined = bounds ? [bounds[0] ?? min, bounds[1] ?? max] : undefined
   const range: RangeValue = columnFilterValue ?? [min, max]
-  const [drafts, setDrafts] = React.useState<[string | null, string | null]>([null, null])
-  const [showInvalid, setShowInvalid] = React.useState(false)
-  const invalidTimeoutRef = React.useRef<number | undefined>(undefined)
-
-  React.useEffect(() => () => window.clearTimeout(invalidTimeoutRef.current), [])
+  // The boxes' drafts and the ring's delay are atoms of this filter's own; the delay is cleared when it leaves.
+  const [{ drafts, showInvalid }, setBounds] = useAtom(boundsDraft(id))
+  const invalidTimer = useAtomValue(oneTimer(id))
+  const setDrafts = (next: readonly [string | null, string | null]) =>
+    setBounds((previous) => ({ ...previous, drafts: next }))
+  const setShowInvalid = (next: boolean) => setBounds((previous) => ({ ...previous, showInvalid: next }))
 
   function onInvalidChange(isInvalid: boolean) {
-    window.clearTimeout(invalidTimeoutRef.current)
+    invalidTimer.cancel()
     if (!isInvalid) {
       setShowInvalid(false)
       return
     }
     if (showInvalid) return
-    invalidTimeoutRef.current = window.setTimeout(() => setShowInvalid(true), INVALID_RING_DELAY_MS)
+    invalidTimer.start(() => setShowInvalid(true), INVALID_RING_DELAY_MS)
   }
 
-  const formatValue = React.useCallback((value: number) => {
+  function formatValue(value: number) {
     return value.toLocaleString(undefined, { maximumFractionDigits: 2 })
-  }, [])
+  }
 
-  const setRangeFilter = React.useCallback(
-    ([start = min, end = max]: [number | undefined, number | undefined]) => {
-      column.setFilterValue(start <= min && end >= max ? undefined : [start, end])
-    },
-    [column, min, max]
-  )
+  function setRangeFilter([start = min, end = max]: [number | undefined, number | undefined]) {
+    column.setFilterValue(start <= min && end >= max ? undefined : [start, end])
+  }
 
-  function getInputValues(nextDrafts: [string | null, string | null]): [string, string] {
+  function getInputValues(nextDrafts: readonly [string | null, string | null]): [string, string] {
     return [nextDrafts[0] ?? range[0].toString(), nextDrafts[1] ?? range[1].toString()]
   }
 
@@ -121,12 +138,12 @@ function DataTableSliderFilterContent<TData extends RowData>({
     onInvalidChange(false)
   }
 
-  function onInputsBlur(event: React.FocusEvent<HTMLDivElement>) {
+  function onInputsBlur(event: FocusEvent<HTMLDivElement>) {
     if (event.currentTarget.contains(event.relatedTarget)) return
     onDraftCommit()
   }
 
-  function onInputKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+  function onInputKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Enter") onDraftCommit()
   }
 
@@ -138,7 +155,7 @@ function DataTableSliderFilterContent<TData extends RowData>({
     }
   }
 
-  function onReset(event: React.MouseEvent) {
+  function onReset(event: MouseEvent) {
     event.stopPropagation()
     setDrafts([null, null])
     onInvalidChange(false)

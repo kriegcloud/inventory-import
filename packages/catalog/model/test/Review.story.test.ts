@@ -853,7 +853,7 @@ it.effect(
       Story.when(act({ row: "row-12", step: "d1", saw: 1, flags: kept })),
       ...recorded(row12, "row-12", { change: 2, by: "dana", step: "d1", flags: kept }),
       Story.when(undo({ row: "row-12", undo: 2, step: "u1" })),
-      Story.then(row12, StepUndone.make({ next: noLevel, below: "" })),
+      Story.then(row12, StepUndone.make({ next: noLevel, below: "", undo: 2, step: "u1", by: "dana" })),
       Story.then(
         life,
         ActCounted.make({
@@ -883,7 +883,7 @@ it.effect("a decision its sender saw that was taken back since is no longer ther
     Story.given(row12, decided({ change: 1, by: "ana", step: "a1", flags: leftOut })),
     Story.provide(CurrentActor, ana),
     Story.when(undo({ row: "row-12", undo: 1, step: "u1" })),
-    Story.then(row12, StepUndone.make({ next: noLevel, below: "" })),
+    Story.then(row12, StepUndone.make({ next: noLevel, below: "", undo: 1, step: "u1", by: "ana" })),
     Story.then(life, undone({ change: 2, row: "row-12", step: "u1", holds: 0, by: "", flags: "", madeOn: -1 })),
     // Dana's screen still shows Ana's decision on row 12.
     Story.provide(CurrentActor, dana),
@@ -966,25 +966,87 @@ it.effect("undos go down every level exactly as it was, and end at none", () =>
       row12,
       StepUndone.make({
         next: level({ change: 2, by: "ana", step: "a2", flags: "2" }),
-        below: seal({ level: level({ change: 1, by: "ana", step: "a1", flags: "1" }), below: "" })
+        below: seal({ level: level({ change: 1, by: "ana", step: "a1", flags: "1" }), below: "" }),
+        undo: 4,
+        step: "u1",
+        by: "ana"
       })
     ),
     Story.then(life, undone({ change: 5, row: "row-12", step: "u1", holds: 3, by: "ana", flags: "3" })),
     Story.when(
       undo({ row: "row-12", undo: 3, step: "u2", next: level({ change: 1, by: "ana", step: "a1", flags: "1" }) })
     ),
-    Story.then(row12, StepUndone.make({ next: level({ change: 1, by: "ana", step: "a1", flags: "1" }), below: "" })),
+    Story.then(
+      row12,
+      StepUndone.make({
+        next: level({ change: 1, by: "ana", step: "a1", flags: "1" }),
+        below: "",
+        undo: 3,
+        step: "u2",
+        by: "ana"
+      })
+    ),
     Story.then(life, undone({ change: 6, row: "row-12", step: "u2", holds: 2, by: "ana", flags: "2" })),
     Story.when(undo({ row: "row-12", undo: 2, step: "u3" })),
-    Story.then(row12, StepUndone.make({ next: noLevel, below: "" })),
+    Story.then(row12, StepUndone.make({ next: noLevel, below: "", undo: 2, step: "u3", by: "ana" })),
     Story.then(life, undone({ change: 7, row: "row-12", step: "u3", holds: 1, by: "ana", flags: "1" })),
     Story.when(undo({ row: "row-12", undo: 1, step: "u4" })),
-    Story.then(row12, StepUndone.make({ next: noLevel, below: "" })),
+    Story.then(row12, StepUndone.make({ next: noLevel, below: "", undo: 1, step: "u4", by: "ana" })),
     Story.then(life, undone({ change: 8, row: "row-12", step: "u4", holds: 0, by: "", flags: "", madeOn: -1 })),
     // A row with no decision has no step to undo.
     Story.when(undo({ row: "row-12", undo: 1, step: "u5" })),
     Story.rejected(NotYourStep.make({}))
   )
+)
+it.effect(
+  "an undo sent twice is written once and answered the same, whatever was decided there since: Ana leaves row 12 out, Dana keeps it and takes that back, and her screen sends the undo again",
+  () =>
+    story(
+      Story.given(life, staged),
+      Story.provide(CurrentActor, ana),
+      Story.when(act({ row: "row-12", step: "a1", saw: 0, flags: leftOut })),
+      ...recorded(row12, "row-12", { change: 1, by: "ana", step: "a1", flags: leftOut }),
+      Story.provide(CurrentActor, dana),
+      Story.when(act({ row: "row-12", step: "d1", saw: 1, flags: kept })),
+      ...recorded(row12, "row-12", { change: 2, by: "dana", step: "d1", flags: kept }),
+      Story.when(undo({ row: "row-12", undo: 2, step: "u1" })),
+      Story.then(row12, StepUndone.make({ next: noLevel, below: "", undo: 2, step: "u1", by: "dana" })),
+      Story.then(
+        life,
+        ActCounted.make({
+          change: 3,
+          step: "u1",
+          row: "row-12",
+          label: "undo",
+          holds: 1,
+          by: "ana",
+          actor: "dana",
+          flags: leftOut,
+          madeOn: 0
+        })
+      ),
+      // The answer was lost and her screen sends the very same undo. The row took it already (that change, in that
+      // step, from her): nothing more is recorded, and she is not told the step is not hers.
+      Story.when(undo({ row: "row-12", undo: 2, step: "u1" })),
+      Story.then(row12),
+      Story.then(life),
+      // The admin types a name there, having received the undo. Dana's same undo, sent once more, is still known.
+      Story.provide(CurrentActor, admin),
+      Story.when(act({ row: "row-12", step: "x1", saw: 1, flags: typed })),
+      ...recorded(row12, "row-12", { change: 4, by: "ada", step: "x1", flags: typed }),
+      Story.provide(CurrentActor, dana),
+      Story.when(undo({ row: "row-12", undo: 2, step: "u1" })),
+      Story.then(row12),
+      Story.then(life),
+      // Another undo of hers of that change, pressed anew, is refused: the row does not hold it as her decision.
+      Story.when(undo({ row: "row-12", undo: 2, step: "u2" })),
+      Story.rejected(NotYourStep.make({})),
+      // And nobody else is answered for her undo: the same step and change from Ana is refused.
+      Story.provide(CurrentActor, ana),
+      Story.when(undo({ row: "row-12", undo: 2, step: "u1" })),
+      Story.rejected(NotYourStep.make({})),
+      Story.state(row12, { status: "Decided", by: "ada", change: 4 })
+    )
 )
 it.effect("an undo that puts back another person's decision stops there", () =>
   story(
@@ -996,7 +1058,7 @@ it.effect("an undo that puts back another person's decision stops there", () =>
     ),
     Story.provide(CurrentActor, ana),
     Story.when(undo({ row: "row-12", undo: 2, step: "u1" })),
-    Story.then(row12, StepUndone.make({ next: noLevel, below: "" })),
+    Story.then(row12, StepUndone.make({ next: noLevel, below: "", undo: 2, step: "u1", by: "ana" })),
     Story.then(life, undone({ change: 3, row: "row-12", step: "u1", holds: 1, by: "dana", flags: kept })),
     Story.when(undo({ row: "row-12", undo: 1, step: "u2" })),
     Story.rejected(NotYourStep.make({}))
@@ -1019,7 +1081,7 @@ it.effect(
       Story.when(act({ row: "row-12", step: "a6", saw: 5, flags: "6" })),
       ...recorded(row12, "row-12", { change: 6, by: "ana", step: "a6", flags: "6" }),
       Story.when(undo({ row: "row-12", undo: 6, step: "u1" })),
-      Story.then(row12, StepUndone.make({ next: letGo, below: "" })),
+      Story.then(row12, StepUndone.make({ next: letGo, below: "", undo: 6, step: "u1", by: "ana" })),
       Story.then(life, undone({ change: 7, row: "row-12", step: "u1", holds: 5, by: "ana", flags: "5" })),
       Story.when(undo({ row: "row-12", undo: 5, step: "u2" })),
       Story.rejected(HistoryEnds.make({}))

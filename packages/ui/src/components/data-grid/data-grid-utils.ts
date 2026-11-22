@@ -31,6 +31,9 @@ import {
 
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import * as Match from "effect/Match"
+// Local change: `Option` and `Result`, for the `try` statements upstream has here (none in this repository).
+import * as O from "effect/Option"
+import * as Result from "effect/Result"
 import type { DataGridFeatures } from "@inventory/ui/components/data-grid/data-grid-features"
 import type {
   CellPosition,
@@ -73,11 +76,30 @@ export function stringifyUnknown(value: unknown): string {
     return String(value)
   }
   if (value instanceof Date) return value.toISOString()
-  try {
-    return JSON.stringify(value) ?? ""
-  } catch {
-    return ""
-  }
+  // Local change: `Option.liftThrowable` where upstream has a `try` statement; a value JSON cannot write is "".
+  return O.getOrElse(O.liftThrowable(() => JSON.stringify(value) ?? "")(), () => "")
+}
+
+/**
+ * Local change: what a callback the grid is given (an upload, a delete, a new row, a copy) ends with, as a `Result`,
+ * so its failure is handled where upstream has a `try` statement. The callback is called at once, inside the event
+ * that asked for it, as upstream's was: a clipboard call keeps the person's gesture. Only its end is turned: a
+ * callback that throws at once fails the same way as one whose promise is rejected, and `onFailure` turns what it
+ * threw into the failure the caller handles.
+ */
+export function settle<T, E>(
+  run: () => T | Promise<T>,
+  onFailure: (error: unknown) => E
+): Promise<Result.Result<T, E>> {
+  const started = Result.try({ try: run, catch: onFailure })
+  if (Result.isFailure(started)) return Promise.resolve(Result.fail(started.failure))
+  const running = started.success
+  return Promise.resolve()
+    .then(() => running)
+    .then(
+      (value) => Result.succeed(value),
+      (error: unknown) => Result.fail(onFailure(error))
+    )
 }
 
 export function getIsFileCellData(item: unknown): item is FileCellData {
@@ -223,24 +245,20 @@ export function parsePastedCellValue(text: string, meta: DataGridColumnMeta | un
     }),
     Match.when({ variant: "file" }, (): PastedValue => {
       if (!text) return { value: [] }
-      try {
-        const parsed: unknown = JSON.parse(text)
-        if (!Array.isArray(parsed)) return null
-        const validFiles = parsed.filter(getIsFileCellData)
-        return parsed.length > 0 && validFiles.length === 0 ? null : { value: validFiles }
-      } catch {
-        return null
-      }
+      // Local change: `Option.liftThrowable` where upstream has a `try` statement; text that is not JSON is refused.
+      const read = O.liftThrowable((): unknown => JSON.parse(text))()
+      if (O.isNone(read)) return null
+      const parsed = read.value
+      if (!Array.isArray(parsed)) return null
+      const validFiles = parsed.filter(getIsFileCellData)
+      return parsed.length > 0 && validFiles.length === 0 ? null : { value: validFiles }
     }),
     Match.when({ variant: "url" }, (): PastedValue => {
       if (!text) return { value: "" }
       if (text[0] === "[" || text[0] === "{") return null
-      try {
-        new URL(text)
-        return { value: text }
-      } catch {
-        return DOMAIN_REGEX.test(text) ? { value: text } : null
-      }
+      // Local change: `Option.liftThrowable` where upstream has a `try` statement; text that is no URL may be a domain.
+      if (O.isSome(O.liftThrowable(() => new URL(text))())) return { value: text }
+      return DOMAIN_REGEX.test(text) ? { value: text } : null
     }),
     Match.orElse((): PastedValue => ({ value: text ? parseTextValue(text) : "" }))
   )
@@ -694,14 +712,12 @@ function matchSelectOption(value: string, options: { value: string; label: strin
 }
 
 function parseMultiSelectValues(text: string): string[] {
-  try {
-    const parsed: unknown = JSON.parse(text)
-    if (Array.isArray(parsed)) {
-      return parsed.filter((item): item is string => typeof item === "string")
-    }
-  } catch {
-    // Falls back to comma-separated values.
+  // Local change: `Option.liftThrowable` where upstream has a `try` statement.
+  const parsed = O.getOrUndefined(O.liftThrowable((): unknown => JSON.parse(text))())
+  if (Array.isArray(parsed)) {
+    return parsed.filter((item): item is string => typeof item === "string")
   }
+  // Falls back to comma-separated values.
   return text ? text.split(",").map((item) => item.trim()) : []
 }
 
@@ -716,23 +732,25 @@ function parseTextValue(text: string): unknown {
     return text
   }
 
-  try {
-    const parsed: unknown = JSON.parse(text)
-    if (Array.isArray(parsed)) {
-      if (parsed.length > 0 && parsed.every(getIsFileCellData)) {
-        return parsed.map((file) => file.name).join(", ")
-      }
-      if (parsed.every((item) => typeof item === "string")) {
-        return parsed.join(", ")
-      }
-    } else if (typeof parsed === "boolean") {
-      return parsed ? "Checked" : "Unchecked"
-    }
-  } catch {
+  // Local change: `Option.liftThrowable` where upstream has a `try` statement.
+  const read = O.liftThrowable((): unknown => JSON.parse(text))()
+  if (O.isNone(read)) {
     const lower = text.toLowerCase()
     if (lower === "true" || lower === "false") {
       return lower === "true" ? "Checked" : "Unchecked"
     }
+    return text
+  }
+  const parsed = read.value
+  if (Array.isArray(parsed)) {
+    if (parsed.length > 0 && parsed.every(getIsFileCellData)) {
+      return parsed.map((file) => file.name).join(", ")
+    }
+    if (parsed.every((item) => typeof item === "string")) {
+      return parsed.join(", ")
+    }
+  } else if (typeof parsed === "boolean") {
+    return parsed ? "Checked" : "Unchecked"
   }
   return text
 }

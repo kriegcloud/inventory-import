@@ -1070,7 +1070,9 @@ same. The telemetry script is converted; `theme-init.js` is the one file the law
 beside it. `.agents/` is left out by name, as for the deprecated-API check.
 
 When? Options: "Next atoms batch (Recommended)"; "After Wednesday"; "Now, ahead of the fixes". Answer: "Next atoms
-batch". I chose; the agent recommended the same. Not built yet.
+batch". I chose; the agent recommended the same. Built: every `try` is converted but theme-init's, and
+`bun run check` refuses one in any code file git would commit, its doc comments' examples included, outside `.agents/`
+and the scratchpad (`try:check`, `docs/standards/no-try.md`).
 
 ### 2026-11-22 — Alchemy, which build, and the state store it upgrades
 
@@ -1585,6 +1587,12 @@ answered before, and not asked. I can overrule any of them.
 6. From the entry above: a row left with no decision is guarded as a decided one is (a "clear" from a screen that
    still shows a decision there, after a group, is refused `NoLongerThere`); and with no group made since the row's
    own decision, a press that matches what the row holds from a screen that is behind is still "no change".
+7. **An undo sent twice is written once and answered the same** (added the same day, by the same rule as 4). A row
+   keeps the last undo it took: the change taken back, the step the undo was pressed in, and who pressed. Dana takes
+   back her keep on row 12 and the answer is lost; her screen sends the undo again: nothing more is recorded, and
+   she is not told `NotYourStep`. It is known whatever was decided on the row since, and only as hers, in that step,
+   of that change. Before, the second sending was refused as an undo of a decision the row no longer holds. Reverse:
+   remove `undone` from the row's state and the check in `Undoing`.
 
 With 1, the two rules "a decision is replaced only by an act that saw it" and "an act is made on the matching now"
 excuse nothing any more: every act that records saw the row's decision and was made on the matching now. On a row no
@@ -1597,6 +1605,9 @@ the record, and "the text differs, or the text is the same and the matching diff
 matching's number and the text as one text, `onItsMatching`) it is one, and the relation is proved: 204 paths, and
 `UndoRowStep` at 300 from 298. 136 rules proved under `CI=true` (one new: a row's undo is not from under a later
 group); the lock written again on purpose for the two rules above. 55 stories, 165 mutants.
+
+With 7: `UndoRowStep` at 324 paths, 139 rules proved under `CI=true` (three new, each one comparison: the row keeps
+which change was taken back, the step it was pressed in, and who pressed), 56 stories, 169 mutants.
 
 ### 2026-11-22 — the review's model, rows already stored: start empty
 

@@ -1,10 +1,11 @@
-// Vendored from beep-effect c5cebd5c9de7:packages/foundation/modeling/utils/src/Utils.ts (MIT, see LICENSE). Do not edit: bun run beep vendor check compares the rest of this file with its recorded hash.
+// Vendored from beep-effect c5cebd5c9de7:packages/foundation/modeling/utils/src/Utils.ts (MIT, see LICENSE). Patched on purpose: the patch and its reason are in vendor.json (patches) and in the patches bun run beep vendor sync applies (sourcePatches). Do not edit: bun run beep vendor check compares the rest of this file with its recorded hash.
 /**
  * Miscellaneous runtime utilities and structural comparison hooks.
  *
  * @packageDocumentation
  * @since 0.0.0
  */
+import * as Result from "effect/Result";
 import * as GlobalValue from "./GlobalValue.ts";
 
 /**
@@ -75,12 +76,11 @@ export const structuralRegion = <A>({
   if (tester !== undefined) {
     structuralRegionState.tester = tester;
   }
-  try {
-    return body();
-  } finally {
-    structuralRegionState.enabled = current;
-    structuralRegionState.tester = currentTester;
-  }
+  // The region ends whether `body` returns or throws; what it threw is thrown on unchanged.
+  const outcome = Result.try({ try: body, catch: (thrown) => ({ thrown }) });
+  structuralRegionState.enabled = current;
+  structuralRegionState.tester = currentTester;
+  return Result.getOrThrowWith(outcome, ({ thrown }) => thrown);
 };
 
 /**

@@ -541,7 +541,7 @@ export const configSyncPlan = Effect.fn("ConfigSync.plan")(function* () {
     { concurrency: 1 }
   )
 
-  // tasks: every root task of turbo.json has a root script and is run by the two checks.
+  // tasks: every root task of turbo.json has a root script and is run by `check`, `check:full` and `check:ci`.
   const tasksPlan = Effect.fn("ConfigSync.tasks")(function* () {
     const turbo = yield* readIfThere(repo.join(repo.root, "turbo.json"))
     if (O.isNone(turbo)) return nothing

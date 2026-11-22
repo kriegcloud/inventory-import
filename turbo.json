@@ -36,6 +36,19 @@
     // every short sequence of commands and the longer walks. Longer than the proofs, so only `bun run check:full`
     // runs it. Like `prove` it has no `transit` edge and names its own inputs, and is replayed until one changes.
     "verify": { "outputs": [] },
+    // The mutants of a model: each one change to its code, which its proofs or its stories must notice. A package that
+    // has them names their inputs in its own turbo.json. The sample is in `bun run check:full`; all of them run in
+    // the nightly workflow.
+    "mutants:sample": { "outputs": [] },
+    "mutants": { "outputs": [] },
+    // A long property beside a package's fast tests (`*.fold.test.ts`, the "fold" project): the review's model held
+    // against the review region, over a minute. Like the fast tests it reads its package and what it depends on, so
+    // it is replayed until one of them changes; it is in `bun run check:full`, not in `bun run check`.
+    "fold": {
+      "dependsOn": ["transit"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/vitest.shared.ts"],
+      "outputs": []
+    },
     // The slow tests: workerd, a real D1 database and sign-in. One suite calls a live service, so never cached.
     "test:slow": { "dependsOn": ["transit"], "cache": false },
     // The production build and its identity check.

@@ -47,11 +47,13 @@ jobs:
         env:
           CHROME_PATH: /usr/bin/google-chrome
 
-  # The proofs of the review's model and the search of the whole model, apart from the job above: minutes when they
-  # run, and they run only when something a result depends on changed (the model's files, the kernel it imports
-  # from, the pinned library, the versions the lockfile resolves for it). Turbo's results come back from the last
-  # run on main through GitHub's cache and are saved only on main, so a pull request that leaves the model alone
-  # replays them in seconds. A night's run proves everything again (proofs-nightly.yml).
+  # The review's model, apart from the job above: its proofs, the search of the whole model, the property that holds it
+  # against the review region (`fold`) and a sample of its mutants. Each is a turbo task that names what it reads: the
+  # proofs, the search and the mutants rerun when the model's files, its stories or proofs, the mutants, the kernel,
+  # the pinned library or a version the lockfile resolves for the package change; the fold reruns on any change to
+  # the web package or what it imports. Turbo's results come back from the last run on main through GitHub's cache
+  # and are saved only on main, so a pull request that leaves those alone replays them in seconds. Every night they
+  # run again with every mutant (proofs-nightly.yml).
   proofs:
     name: Proofs and search of the model
     runs-on: ubuntu-latest
@@ -71,11 +73,11 @@ jobs:
       - name: Ask turbo what the results are filed under
         id: filed
         run: |
-          bunx turbo run prove verify --dry=json > "$RUNNER_TEMP/proofs.json"
+          bunx turbo run prove verify fold mutants:sample --dry=json > "$RUNNER_TEMP/proofs.json"
           node -e '
             const { tasks } = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"))
             const real = tasks.filter((task) => task.command !== "<NONEXISTENT>")
-            if (real.length === 0) throw new Error("no package has a prove or a verify task")
+            if (real.length === 0) throw new Error("no package has any of these tasks")
             console.log("key=proofs-" + real.map((task) => task.hash).join("-"))
           ' "$RUNNER_TEMP/proofs.json" >> "$GITHUB_OUTPUT"
       - name: Bring back the results kept on main
@@ -87,8 +89,8 @@ jobs:
           restore-keys: |
             proofs-
       # Two tasks at a time and no more: the runner has four cores and each proof file starts its own solver.
-      - name: Prove and search
-        run: bunx turbo run prove verify --cache-dir=.turbo/cache --concurrency=2 --summarize
+      - name: Prove, search, fold and a sample of the mutants
+        run: bunx turbo run prove verify fold mutants:sample --cache-dir=.turbo/cache --concurrency=2 --summarize
       # Only what passed is kept (a failed step ends the job before this one), only from main, and only when the
       # results are new.
       - name: Keep the results for later runs

@@ -321,4 +321,40 @@ describe("deps update", () => {
       "effect 4.1.4 line 3"
     ])
   })
+
+  it.effect(
+    "a patched dependency with a newer version stops the update: nothing moves, and its patches are named",
+    () =>
+      Effect.gen(function* () {
+        const patched: Tree = {
+          ...tree(),
+          "packages/patches/vitest/01-a-fix.patch": lines([
+            "Package: vitest",
+            "Applies-to: 5.1.0",
+            "Upstream: not yet reported",
+            "Why: The runner drops a test's name.",
+            "Remove-when: The runner keeps it.",
+            "Test: test/vitest/KeepsTheName.test.ts",
+            "",
+            "diff --git a/dist/run.js b/dist/run.js"
+          ])
+        }
+        const result = yield* run(patched, registry(newest), "write", ["packages/kernel/package.json"])
+        expect(printed(result.first)).toEqual([
+          "out: deps:update  3 package.json files, 6 dependencies: 3 to move, 2 held, 1 not compared (nothing written)",
+          "out:   held  @tool/patcher 0.70.0 (newest 0.73.2)",
+          "out:   held  typescript ~7.0.2 (newest 8.0.0)",
+          "out:         why: Patched at install: it moves by hand.",
+          "out:         to move: `bun run tool:repin -- main`, then the full check",
+          "out:   skip  xlsx https://cdn.example.test/xlsx-0.20.3.tgz: not written as a version the registry can be asked about",
+          "out:   move   @effect/vitest 4.1.4 -> 4.1.5 (1 package.json)",
+          "out:   move   effect 4.1.4 -> 4.1.5 (2 package.json files)",
+          "out:   move   vitest ^5.1.0 -> ^5.2.0 (1 package.json)",
+          'err: deps:update STOP  vitest would move to ^5.2.0, and packages/patches/vitest holds patches made for 5.1.0. Nothing was moved: bun would install vitest unpatched. Re-make each patch for the new version or drop it (docs/patches.md, "When a patched dependency moves"), then run `bun run deps:update` again'
+        ])
+        expect(result.first.failed).toBe(true)
+        expect(result.files["packages/kernel/package.json"]).toBe(manifest("4.1.4", "^5.1.0"))
+        expect(result.installed).toBe(false)
+      })
+  )
 })

@@ -3,7 +3,10 @@
   "futureFlags": { "globalConfiguration": true },
   "global": {
     // Every task's hash starts from these. A package's own package.json is already in its inputs.
-    "inputs": [".bun-version", "bunfig.toml"],
+    // The files bun applies to dependencies at an install are among them (docs/patches.md): bun.lock holds a patch's
+    // path and never its content, so without them a changed patch would replay a result made with the old one, a
+    // proof of the review's model included.
+    "inputs": [".bun-version", "bunfig.toml", "packages/patches/*.patch"],
     // Tasks see the whole environment (the slow tests start workerd and wrangler, which read many variables); none
     // of it changes a cached result, so none of it is hashed.
     "envMode": "loose"
@@ -283,6 +286,24 @@
         "bun.lock",
         "bunfig.toml",
         "!**/node_modules/**"
+      ],
+      "outputs": []
+    },
+    // Every patch to a dependency has its header and its test, is for what bun.lock holds, applies to the kept file
+    // it names, and is what is installed (`beep patches check`, docs/patches.md). The last is read from
+    // node_modules, which no input can stand for: bun leaves a patch out with one warning line and exit 0. So this
+    // runs every time; it takes about a second.
+    "//#patches:check": { "cache": false },
+    // Each patch's test fails beside the package without its patches (`beep patches prove`): the patches and their
+    // tests, the kept files they are applied to, and what the tests are run with.
+    "//#patches:prove": {
+      "inputs": [
+        "packages/patches/**",
+        "!packages/patches/node_modules/**",
+        "vendor/alchemy/*.tgz",
+        "package.json",
+        "bun.lock",
+        "packages/tooling/tool/cli/src/**"
       ],
       "outputs": []
     },

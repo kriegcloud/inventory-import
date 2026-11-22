@@ -281,22 +281,22 @@ describe("an item edited again after its save has answered, before the table is 
   )
 })
 
-describe("the server's answers to the item saves", () => {
+describe("an open editor and the server's answers to the item saves", () => {
   it.live(
-    "are let go once another member is signed in, as every read of the previous person's is (saved-items-outlive-signout)",
+    "are one member's: in another organization nothing typed or answered is there, and nothing of it can be sent",
     () =>
       Effect.gen(function* () {
-        const member = (id: string) =>
+        const member = (id: string, organizationId: string) =>
           O.some(
             Member.make({
               id: MemberId.make(id),
-              name: DisplayName.make(id),
+              name: DisplayName.make("Dana Whitfield"),
               role: "admin",
-              organizationId: OrganizationId.make("org_prairie"),
-              organizationName: DisplayName.make("Prairie")
+              organizationId: OrganizationId.make(organizationId),
+              organizationName: DisplayName.make(organizationId)
             })
           )
-        const who = Atom.make(member("mem_dana"))
+        const who = Atom.make(member("mem_dana", "org_prairie"))
         const registry = registryFor({
           endpoints: {
             items: {
@@ -315,9 +315,56 @@ describe("the server's answers to the item saves", () => {
         registry.set(itemEditor(itemId), opened)
         // Dana's save answered at revision 4: her editor opened on the row's revision 3 is on 4.
         expect(O.map(registry.get(itemEditor(itemId)).base, (base) => base.revision)).toEqual(O.some(4))
-        // Somebody else signs in on this page: nothing of Dana's answers is kept for them.
-        registry.set(who, member("mem_lee"))
+        // The same member, as the session answers when it is asked again: everything stays.
+        registry.set(who, member("mem_dana", "org_prairie"))
+        expect(registry.get(itemEditor(itemId)).form).toEqual(O.some(typed))
+        // She switches to her other organization: no editor is open there, and nothing is typed in one.
+        registry.set(who, member("mem_dana_northline", "org_northline"))
+        expect(registry.get(itemEditor(itemId))).toMatchObject({ open: false, base: O.none(), form: O.none() })
+        // Opened anew on the row's revision 3: the answer of the other organization's save is not taken for its base.
+        registry.set(itemEditor(itemId), opened)
         expect(O.map(registry.get(itemEditor(itemId)).base, (base) => base.revision)).toEqual(O.some(3))
       })
+  )
+
+  it.live("'Edit again' of a save that was not kept opens no editor in another organization, and says why", () =>
+    Effect.gen(function* () {
+      const member = (id: string, organizationId: string) =>
+        O.some(
+          Member.make({
+            id: MemberId.make(id),
+            name: DisplayName.make("Dana Whitfield"),
+            role: "admin",
+            organizationId: OrganizationId.make(organizationId),
+            organizationName: DisplayName.make(organizationId)
+          })
+        )
+      const who = Atom.make(member("mem_dana", "org_prairie"))
+      const registry = registryFor({
+        endpoints: {
+          items: {
+            edit: () =>
+              Effect.fail(
+                Forbidden.make({ reason: "Your role is viewer, and saving an item needs editor.", required: "editor" })
+              ),
+            page: () => Effect.succeed({ data: [], total: 0, pageCount: 0 }),
+            facets: () => Effect.succeed({})
+          }
+        },
+        signedIn: who
+      })
+      registry.mount(editItem(itemId))
+      registry.set(editItem(itemId), save)
+      yield* Effect.sleep("20 millis")
+      const again = page.toasts[page.toasts.length - 1]?.again
+      registry.set(who, member("mem_dana_northline", "org_northline"))
+      page.went.length = 0
+      again?.()
+      expect([registry.get(itemEditor(itemId)).open, page.went, page.toasts[page.toasts.length - 1]?.title]).toEqual([
+        false,
+        [],
+        "Hex bolt M6 is not in this organization"
+      ])
+    })
   )
 })

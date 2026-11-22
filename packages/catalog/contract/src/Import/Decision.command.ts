@@ -308,17 +308,17 @@ export type DecisionDelta = typeof DecisionDelta.Type
 /** A draft's revision: 0 for a draft nobody has changed, one more for every change. Never negative. */
 const Revision = S.Int.check(S.isGreaterThanOrEqualTo(0))
 
-// As bounded as the rows it speaks of: one key per row of `set`, each a row id.
+// As bounded as the rows it speaks of: one key per row of `set` (or cleared row of a save's `over`), each a row id.
 const madeOn = S.Record(bounded(40), Revision)
   .check(S.isMaxProperties(50000))
   .annotate({
     description:
-      "For each row in `set`, the draft's revision the screen held when that row was last decided (`ImportView.revision` as it was read then)",
+      "For each row in `set`, and each row in `over`, the draft's revision the screen held when that row was last decided (`ImportView.revision` as it was read then)",
     examples: [{ "row-55": 11, "row-9": 12 }]
   })
   .annotateKey({
     description:
-      "The revision each row's decision was made on. A part of it that rests on a column matched again after that revision is not applied, and the answer names it: an accept or an undone fix of that field, a Replace, Keep-stored or keep-one-of-two after the SKU's column, and a Replace or Keep-stored after another field's column when that changed how the row compares with the stored item. A row of `set` left out counts as made on revision 0. A revision later than the draft's is refused",
+      "The revision each row's decision was made on. A part of it that rests on a column matched again after that revision is not applied, and the answer names it: an accept or an undone fix of that field, a Replace, Keep-stored or keep-one-of-two after the SKU's column, and a Replace or Keep-stored after another field's column when that changed how the row compares with the stored item. A row of `set` left out counts as made on revision 0, and so does a cleared row named in a save's `over`. A revision later than the draft's is refused",
     messageMissingKey:
       "Send `madeOn`: for each row in `set`, the import's revision as the screen held it when that row was decided."
   })
@@ -360,9 +360,11 @@ export type StaleAccept = typeof StaleAccept.Type
 /**
  * For each row of a save that waited (its first save failed, it was kept across a reload, or a closed tab kept it),
  * the decisions this tab knows the server may hold of it: what the server held when the person began deciding the
- * row, and each decision this tab sent whose fate it does not know; null for no decision. Such a row is written only
- * while what is stored is one of them, so a decision made elsewhere since is never overwritten unasked (Benjamin,
- * 2026-11-20: "Hold it, show both, ask"). A row not named here is a live press: the last one stands.
+ * row, and each decision this tab sent whose fate it does not know; null for no decision, the same as a decision that
+ * says nothing. Such a row is written only while what is stored is one of them, or one of them with the parts a match
+ * took back since removed, so a decision made elsewhere since is never overwritten unasked (Benjamin, 2026-11-20: "Hold
+ * it, show both, ask"). A row not named here is a live press: the last one stands. A key naming no row of `set` or
+ * `clear` is not read.
  */
 const over = S.Record(bounded(40), RowDecision.pipe(S.OptionFromNullOr, S.Array, S.check(S.isMaxLength(50))))
   .check(S.isMaxProperties(50000))

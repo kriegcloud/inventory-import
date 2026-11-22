@@ -15,7 +15,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@inventory/
 import { Input } from "@inventory/ui/components/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@inventory/ui/components/popover"
 import { Spinner } from "@inventory/ui/components/spinner"
-import { member, memberKey } from "@inventory/client/MemberAtoms"
+import { member, memberKey, ofMember } from "@inventory/client/MemberAtoms"
 import { apiRuntime, perKey } from "@inventory/client/Api"
 import { useAtomValue } from "@effect/atom-react"
 import { catalogApi } from "./Catalog.runtime.ts"
@@ -120,10 +120,12 @@ const conversationOf = perKey((key: string) =>
 /** The conversation while nobody is known yet: nothing to keep. */
 const noConversation = Atom.make<Conversation>(emptyConversation)
 
-/** One table's assistant on screen: open or not, and what is typed. */
-const assistantOf = perKey((_table: string) =>
-  Atom.make<{ readonly open: boolean; readonly prompt: string }>({ open: false, prompt: "" })
-)
+/** One table's assistant on screen: open or not, and what the person signed in has typed. */
+interface AssistantUi {
+  readonly open: boolean
+  readonly prompt: string
+}
+export const assistantOf = perKey((_table: string) => ofMember((): AssistantUi => ({ open: false, prompt: "" })))
 
 /**
  * The request on its way for one person's conversation about one table: what they asked. Kept while it is out, since

@@ -186,10 +186,10 @@ export const tookBack: TookBack = TakenBack.make({})
 export const nothingInForce: TookBack = NothingInForce.make({})
 
 /** What a save of decisions did. */
-export const DecidedKind = LiteralKit(["saved", "closed", "rematched", "itemsChanged"]).annotate({
+export const DecidedKind = LiteralKit(["saved", "closed", "rematched", "moved", "itemsChanged"]).annotate({
   identifier: "DecidedKind",
   description:
-    "The save was written; or nothing was, because the import was no longer open, because a column was matched again since the choices its decisions were judged against, or because a stored item that judgement read changed since"
+    "The save was written; or nothing was, because the import was no longer open, because a column was matched again since the choices its decisions were judged against, because the draft moved on from the revision its rows that waited were compared at, or because a stored item that judgement read changed since"
 })
 class DecisionsSaved extends S.Opaque<DecisionsSaved, { readonly brand: unique symbol }>()(
   S.Struct({
@@ -211,6 +211,13 @@ class DecisionsRematched extends S.Opaque<DecisionsRematched, { readonly brand: 
       "A column was matched again since the draft was read: its decisions were judged against choices it no longer has, and nothing was saved"
   })
 ) {}
+class DecisionsMoved extends S.Opaque<DecisionsMoved, { readonly brand: unique symbol }>()(
+  S.Struct({ kind: S.tag("moved") }).annotate({
+    identifier: "DecisionsMoved",
+    description:
+      "The draft moved on from the revision the save's rows that waited were compared at (somebody saved, matched or confirmed in between): nothing was saved"
+  })
+) {}
 class DecisionsItemsChanged extends S.Opaque<DecisionsItemsChanged, { readonly brand: unique symbol }>()(
   S.Struct({ kind: S.tag("itemsChanged") }).annotate({
     identifier: "DecisionsItemsChanged",
@@ -223,7 +230,7 @@ class DecisionsItemsChanged extends S.Opaque<DecisionsItemsChanged, { readonly b
  * with `Decided.match` or its `guards`.
  */
 export const Decided = DecidedKind.mapMembers(() =>
-  Tuple.make(DecisionsSaved, DecisionsClosed, DecisionsRematched, DecisionsItemsChanged)
+  Tuple.make(DecisionsSaved, DecisionsClosed, DecisionsRematched, DecisionsMoved, DecisionsItemsChanged)
 ).pipe(S.annotate({ identifier: "Decided", description: "What a save of decisions did" }), S.toTaggedUnion("kind"))
 /** The decoded value of `Decided`. */
 export type Decided = typeof Decided.Type
@@ -234,13 +241,19 @@ export const decisionsSaved = (saved: { readonly revision: number; readonly chan
 export const decisionsClosed: Decided = DecisionsClosed.make({})
 /** A column was matched again since the draft was read: nothing was saved. */
 export const decisionsRematched: Decided = DecisionsRematched.make({})
+/** The draft moved on from the revision the save's rows that waited were compared at: nothing was saved. */
+export const decisionsMoved: Decided = DecisionsMoved.make({})
 /** A stored item, created row or suggestion the save's judgement read changed since: nothing was saved. */
 export const decisionsItemsChanged: Decided = DecisionsItemsChanged.make({})
 
-/** The saved draft of a review, and who last decided each row. */
+/**
+ * The saved draft of a review, who last decided each row, and the revision that decision was saved at: a row decided
+ * again, even to the same decision by way of another, has a later one (0 for a row saved before this was kept).
+ */
 export type StoredDecisions = {
   readonly decisions: SavedDecisions
   readonly authors: Readonly<Record<string, string>>
+  readonly savedAt: Readonly<Record<string, number>>
 }
 
 /**
@@ -251,9 +264,10 @@ export type ChoicesSaved = "saved" | "same" | "closed" | "busy"
 
 /**
  * How many times a request worked out against a draft as read is tried before it gives up with nothing written: a
- * match, in either store; a save, checked against the draft's column choices and what its judgement read; and a
- * confirm, checked against what its judgement read. Each try that is overtaken (somebody saved or matched in between,
- * or an item, a created row or a suggestion the judgement read changed) reads the draft again; a request overtaken
+ * match, in either store; a save, checked against the draft's column choices, what its judgement read, and when it has
+ * rows that waited the draft's revision; and a confirm, checked against what its judgement read. Each try that is
+ * overtaken (somebody saved or matched in between, or an item, a created row or a suggestion the judgement read changed)
+ * reads the draft again; a request overtaken
  * this many times running is answered as busy (`DraftBusy`, saying which kept changing), never retried without end and
  * never a server error.
  */
@@ -335,7 +349,7 @@ export class ImportStore extends Context.Service<
      * written nothing, when the import is gone, is not open, or still has items: those must stay.
      */
     remove(actor: Member, draft: Draft): Effect.Effect<boolean>
-    /** The saved draft: each row's decision, and who made it. */
+    /** The saved draft: each row's decision, who made it, and the revision it was saved at. */
     decisions(organizationId: OrganizationId, importId: string): Effect.Effect<StoredDecisions>
     /**
      * Saves what changed in the draft, row by row, under the member's name, and answers the draft's revision and
@@ -345,10 +359,19 @@ export class ImportStore extends Context.Service<
      * (`rematched`): each of the delta's decisions that rests on a column (an accept, an undone fix, a Replace or
      * Keep-stored, a keep of one of two) was judged against those choices, and a match since may have made it stale;
      * or when the stored items, created rows or suggestions `read` names are no longer as it read them
-     * (`itemsChanged`): a Replace or Keep-stored across a re-match was judged against them. Both checks are part of the save's own write, so no match and
-     * no item change can fall between the judgement and the write. `read` defaults to none (`noItemsRead`).
+     * (`itemsChanged`): a Replace or Keep-stored across a re-match was judged against them. `expected` is the revision the
+     * rows that waited were compared at, when the save has any: nothing is saved, and no revision answered, once the
+     * draft is at another (`moved`), an empty delta included. Every check is part of the save's own write, so no match,
+     * no save and no item change can fall between the judgement and the write. `read` defaults to none (`noItemsRead`),
+     * and `expected` to any revision.
      */
-    decide(actor: Member, draft: Draft, delta: DecisionDelta, read?: ItemsAsRead): Effect.Effect<Decided>
+    decide(
+      actor: Member,
+      draft: Draft,
+      delta: DecisionDelta,
+      read?: ItemsAsRead,
+      expected?: O.Option<number>
+    ): Effect.Effect<Decided>
     /** The columns people chose for fields, as stored with the draft. */
     choices(draft: Draft): Effect.Effect<ReadonlyArray<MappingChoice>>
     /** Every field that began to read another column at a match, oldest first, as stored with the draft. */

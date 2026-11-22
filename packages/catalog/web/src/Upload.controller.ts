@@ -3,7 +3,10 @@ import * as SecureRandom from "effect/crypto/SecureRandom"
 // One file on its way in: read in a worker, sent to the server in chunks, turned into an import. The upload lives in
 // this module, not in a component, so it carries on while the person opens another page, and there is one per tab.
 // The one thing not to break: Cancel stops everything (the worker, every request in flight) and then deletes what
-// reached the server, and the screen says it was cancelled only once the server has answered.
+// reached the server, and the screen says it was cancelled only once the server has answered. And an upload is one
+// member's: nothing of it is sent while who is signed in is being asked again, nor ever as anybody else. A page left for
+// another person's ends it; after the person's own switch of organization it is stopped and said, and the chosen file
+// stays kept where it was chosen, to be continued there.
 import * as Cause from "effect/Cause"
 import * as Data from "effect/Data"
 import * as Deferred from "effect/Deferred"
@@ -14,7 +17,8 @@ import * as O from "effect/Option"
 import * as Atom from "effect/reactivity/Atom"
 import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import { invalidate } from "@inventory/client/Api"
-import { memberKey } from "@inventory/client/MemberAtoms"
+import { askWhoIsSignedIn, keptOfMember, memberKey, onceSignedInKnown } from "@inventory/client/MemberAtoms"
+import { leavingApp } from "@inventory/ui/Route"
 import * as Queue from "effect/Queue"
 import * as Result from "effect/Result"
 import * as Schedule from "effect/Schedule"
@@ -47,12 +51,41 @@ class ReadFailed extends S.TaggedError<ReadFailed, { readonly brand: unique symb
   message: S.String
 }) {}
 
+/** The person switched organization while the file was on its way: it was for the one they left. */
+class LeftBehind extends S.TaggedError<LeftBehind, { readonly brand: unique symbol }>()("LeftBehind", {}) {}
+const isLeftBehind = S.is(LeftBehind)
+
 /**
  * What the upload can end in short of an import: the file's own problem (from the reader or the server's answer), the
- * reader failing, or a request failing (a typed refusal, the network, an answer that did not decode).
+ * reader failing, the person leaving its organization, or a request failing (a typed refusal, the network, an answer
+ * that did not decode).
  */
 type Refused<K extends "beginUpload" | "putChunk" | "finishUpload"> = Effect.Error<ReturnType<Client["imports"][K]>>
-type UploadError = FileProblem | ReadFailed | Refused<"beginUpload"> | Refused<"putChunk"> | Refused<"finishUpload">
+type UploadError =
+  | FileProblem
+  | ReadFailed
+  | LeftBehind
+  | Refused<"beginUpload">
+  | Refused<"putChunk">
+  | Refused<"finishUpload">
+
+/**
+ * Sends one request of an upload as whoever started it, or not at all: held while who is signed in is being asked
+ * (again), and never sent as anybody else. Asked of every try, a retry included.
+ */
+const asStarter = (input: {
+  readonly registry: AtomRegistry.AtomRegistry
+  readonly startedAs: string
+}): (<A, E>(request: Effect.Effect<A, E>) => Effect.Effect<A, E | LeftBehind>) => {
+  const { registry, startedAs } = input
+  return (request) =>
+    onceSignedInKnown(registry).pipe(
+      Effect.andThen((): Effect.Effect<void, LeftBehind> =>
+        registry.get(memberKey) === startedAs ? Effect.void : Effect.fail(LeftBehind.make({}))
+      ),
+      Effect.andThen(request)
+    )
+}
 
 /** A staging step's answer: what it made, or the file's problem as this upload's failure. */
 const staged = <A, E>(answer: Effect.Effect<Result.Result<A, FileProblem>, E>): Effect.Effect<A, E | FileProblem> =>
@@ -62,7 +95,7 @@ const staged = <A, E>(answer: Effect.Effect<Result.Result<A, FileProblem>, E>): 
 const inFlight = 3
 
 /** Errors that say something about the request itself; sending it again would get the same answer. */
-const final = S.Union([UploadNotFound, Forbidden, NotSignedIn, ReadFailed])
+const final = S.Union([UploadNotFound, Forbidden, NotSignedIn, ReadFailed, LeftBehind])
 const transient = (error: unknown): boolean => !S.is(final)(error)
 
 /** The reader's last word: the file is read (`Done`), cannot be staged (`Refused`), or the reader failed (`Crashed`). */
@@ -80,12 +113,21 @@ const isLast = (message: ReadMessage): boolean =>
 const retrying = <A, E>(effect: Effect.Effect<A, E>) =>
   effect.pipe(Effect.retry({ schedule: Schedule.exponential("400 millis"), times: 3, while: transient }))
 
-/** Where the upload of this tab stands: kept for the page, as the upload carries on across pages. */
-export const uploadState = Atom.make<UploadState>(UploadState.cases.Idle.make({})).pipe(Atom.keepAlive)
+/**
+ * Where the upload of this tab stands: kept for the page, as the upload carries on across pages. What the last one said
+ * (a file that could not be read, a save that failed) is that member's: in another organization nothing is said of it.
+ */
+export const uploadState = keptOfMember((): UploadState => UploadState.cases.Idle.make({}))
 
 /** Says where the upload stands, in the registry it was started from (the tab's one). */
 const set = (registry: AtomRegistry.AtomRegistry, next: UploadState) => {
   registry.set(uploadState, next)
+  if (UploadState.isAnyOf(["Preparing", "Cancelling"])(next)) {
+    registry.update(
+      uploadRunning,
+      O.map((now) => ({ ...now, last: true }))
+    )
+  }
   // While the rows are saving, fetch the review's code, so it is ready when the import is.
   if (UploadState.guards.Saving(next)) void import("./ReviewStep.screen.tsx")
 }
@@ -111,9 +153,11 @@ interface Running {
   readonly fileName: string
   readonly uploadId: ImportId | null
   readonly onEnd: (end: UploadEnd) => void
-  /** Who the upload was started as: its import is theirs, whoever is signed in when it lands. */
+  /** Who the upload was started as: it is sent as them alone, and its import is theirs. */
   readonly startedAs: string
-  /** Stops listening for the page being left. */
+  /** True once its last request is out (it is being prepared), or it is being cancelled: nothing more to stop. */
+  readonly last: boolean
+  /** Stops listening for the page being left, and for another organization. */
   readonly stop: () => void
 }
 const uploadRunning = Atom.make<O.Option<Running>>(O.none()).pipe(Atom.keepAlive)
@@ -159,9 +203,11 @@ const reader = (request: ReadRequest) =>
 const program = Effect.fn("upload.program")(function* (
   registry: AtomRegistry.AtomRegistry,
   client: Client,
-  request: ReadRequest
+  request: ReadRequest,
+  startedAs: string
 ) {
   const fileName = request.file.name
+  const mine = asStarter({ registry, startedAs })
   const begun = yield* Deferred.make<{ readonly id: ImportId; readonly sizes: ReadonlyArray<number> }>()
   const chunks: Array<ReadonlyArray<StagedRow>> = []
   const acknowledged: Array<number> = []
@@ -192,11 +238,9 @@ const program = Effect.fn("upload.program")(function* (
         // One key for this file: a begin sent again after a lost answer is the same upload on the server, so the
         // begin can be retried like every other step.
         const key = UploadKey.make(SecureRandom.uuidV4Unsafe())
-        const { id } = yield* staged(
-          client.imports.beginUpload({
-            payload: { key, head: read, rowCount: rows, chunkCount: message.chunkSizes.length }
-          })
-        )
+        const { id } = yield* client.imports
+          .beginUpload({ payload: { key, head: read, rowCount: rows, chunkCount: message.chunkSizes.length } })
+          .pipe(mine, staged)
         registry.update(
           uploadRunning,
           O.map((now) => ({ ...now, uploadId: id }))
@@ -207,7 +251,9 @@ const program = Effect.fn("upload.program")(function* (
       Chunk: Effect.fn("Upload.chunk")(function* (message) {
         chunks[message.seq] = message.rows
         const { id, sizes } = yield* Deferred.await(begun)
-        yield* staged(client.imports.putChunk({ params: { id }, payload: { seq: message.seq, rows: message.rows } }))
+        yield* client.imports
+          .putChunk({ params: { id }, payload: { seq: message.seq, rows: message.rows } })
+          .pipe(mine, staged)
         acknowledged.push(message.seq)
         const rows = sizes.reduce((sum, size) => sum + size, 0)
         set(
@@ -230,15 +276,19 @@ const program = Effect.fn("upload.program")(function* (
   const { id, sizes } = yield* Deferred.await(begun)
   const rows = sizes.reduce((sum, size) => sum + size, 0)
   set(registry, UploadState.cases.Preparing.make({ fileName, uploadId: id, rows }))
-  const view = yield* staged(client.imports.finishUpload({ params: { id } }))
+  const view = yield* client.imports.finishUpload({ params: { id } }).pipe(mine, staged)
   if (head === undefined) return yield* Effect.die("the reader sent chunks without a head")
   const table: StagedTable = { ...head, rows: chunks.flat() }
   return { view, table, workbook } satisfies Finished
 })
 
-/** Asks the server to delete an upload. Resolves to whether it answered. */
-const discard = (uploadId: ImportId): Promise<boolean> =>
-  fork((client) => client.imports.discardUpload({ params: { id: uploadId } }))
+/** Asks the server to delete an upload, as whoever started it. Resolves to whether it answered. */
+const discard = (input: {
+  readonly registry: AtomRegistry.AtomRegistry
+  readonly startedAs: string
+  readonly uploadId: ImportId
+}): Promise<boolean> =>
+  fork((client) => client.imports.discardUpload({ params: { id: input.uploadId } }).pipe(asStarter(input)))
     .pipe(Fiber.join, runExit)
     .then(Exit.isSuccess)
 
@@ -251,7 +301,7 @@ const arrive = (input: {
 }) => {
   const { registry } = input
   const { view, table, workbook } = input.done
-  // The person changed organization while the file was on its way: the import belongs to the one they left, and is
+  // The person changed organization while the file was being prepared: the import belongs to the one they left, and is
   // listed there. Nothing of it is put in place or opened where they are now.
   if (registry.get(memberKey) !== input.startedAs) {
     // Said where the person is now, with no way to open it: it is not this organization's to open.
@@ -280,7 +330,16 @@ const start = (input: {
   readonly onEnd: (end: UploadEnd) => void
 }) => {
   const { file, registry } = input
-  if (O.isSome(registry.get(uploadRunning))) return
+  const running = registry.get(uploadRunning)
+  if (O.isSome(running)) {
+    // The screen of this organization shows no upload: the one under way is another's, on its last request.
+    if (running.value.startedAs !== registry.get(memberKey)) {
+      toast(`${running.value.fileName} is still being prepared for the organization you chose it in`, {
+        description: `Choose ${file.name} again in a moment.`
+      })
+    }
+    return
+  }
   set(
     registry,
     UploadState.cases.Reading.make({
@@ -289,9 +348,30 @@ const start = (input: {
       rows: rowsOf({ rowsAbout: null, exact: false })
     })
   )
-  const fiber = fork((client) => program(registry, client, { file, sheet: input.sheet }))
+  const startedAs = registry.get(memberKey)
+  const fiber = fork((client) => program(registry, client, { file, sheet: input.sheet }, startedAs))
   /** This upload, while it is still the one under way. */
   const mine = () => O.filter(registry.get(uploadRunning), (now) => now.fiber === fiber)
+  /** It was for the organization the person has left: said where they are now, and kept where it was chosen. */
+  const leftBehind = () =>
+    O.map(mine(), ({ onEnd, stop }) => {
+      registry.set(uploadRunning, O.none())
+      stop()
+      set(registry, UploadState.cases.Idle.make({}))
+      // As a save that failed: the chosen file stays kept for the organization it was chosen in, for Continue there.
+      onEnd(UploadEnd.Failed({ step: "save" }))
+      void toast.error(`${file.name} was not uploaded`, {
+        description:
+          "You changed organization while it was on its way. It is kept for the one you chose it in: switch back there and continue it."
+      })
+    })
+  // The person is in another organization from now on: nothing more of it is read or sent. Once it is being prepared,
+  // its last request is out, and its answer says where it went (`arrive`).
+  const unfollow = registry.subscribe(memberKey, (now) => {
+    if (now === startedAs || O.exists(mine(), (running) => running.last)) return
+    leftBehind()
+    void fiber.pipe(Fiber.interrupt, runExit)
+  })
   // Leaving the page mid-upload: ask the server to delete what arrived, in a request that outlives the page.
   const onHide = () => {
     const id = O.getOrNull(O.map(mine(), (now) => now.uploadId))
@@ -301,7 +381,11 @@ const start = (input: {
       keepalive: true
     }).catch(() => {})
   }
+  // The app itself leaves the page (a sign-out, somebody else signed in): whoever is signed in by then is not who
+  // uploaded it, so nothing is asked of the server as them. It deletes what arrived within the hour.
+  const onLeave = () => window.removeEventListener("pagehide", onHide)
   window.addEventListener("pagehide", onHide)
+  window.addEventListener(leavingApp, onLeave)
   registry.set(
     uploadRunning,
     O.some({
@@ -309,15 +393,27 @@ const start = (input: {
       fileName: file.name,
       uploadId: null,
       onEnd: input.onEnd,
-      startedAs: registry.get(memberKey),
-      stop: () => window.removeEventListener("pagehide", onHide)
+      startedAs,
+      last: false,
+      stop: () => {
+        unfollow()
+        window.removeEventListener("pagehide", onHide)
+        window.removeEventListener(leavingApp, onLeave)
+      }
     })
   )
   fiber.addObserver((exit) => {
     const current = mine()
     // Cancel handles its own ending.
     if (O.isNone(current) || (Exit.isFailure(exit) && Cause.hasInterruptsOnly(exit.cause))) return
-    const { onEnd, startedAs, stop, uploadId } = current.value
+    const { onEnd, stop, uploadId } = current.value
+    if (
+      Exit.isFailure(exit) &&
+      (registry.get(memberKey) !== startedAs || O.exists(Cause.findErrorOption(exit.cause), isLeftBehind))
+    ) {
+      leftBehind()
+      return
+    }
     registry.set(uploadRunning, O.none())
     stop()
     if (Exit.isSuccess(exit)) {
@@ -328,7 +424,9 @@ const start = (input: {
     }
     const error = Cause.squash(exit.cause)
     // Nothing half-sent stays behind; the server would also delete it within the hour.
-    if (uploadId !== null) void discard(uploadId)
+    if (uploadId !== null) void discard({ registry, startedAs, uploadId })
+    // Nobody is signed in: the page's idea of who is signed in is out of date. The chosen file stays kept, to continue.
+    if (S.is(NotSignedIn)(error)) askWhoIsSignedIn(registry)
     // The file's own problem is said as data: what is wrong with it and what to do.
     if (S.is(FileProblem)(error)) {
       onEnd(UploadEnd.Refused())
@@ -370,7 +468,7 @@ const cancel = (registry: AtomRegistry.AtomRegistry): Promise<void> => {
       registry.set(uploadRunning, O.none())
       current.stop()
       current.onEnd(UploadEnd.Cancelled())
-      return uploadId === null ? true : discard(uploadId)
+      return uploadId === null ? true : discard({ registry, startedAs: current.startedAs, uploadId })
     })
     .then((answered) => {
       set(registry, UploadState.cases.Idle.make({}))

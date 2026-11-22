@@ -96,15 +96,21 @@ class DraftBusy extends S.TaggedError<DraftBusy, { readonly brand: unique symbol
   reason: S.String
 }) {}
 
-describe("a draft too busy to work a request out against", () => {
-  it("says so in its own words, with the server's reason: nothing was written, try again", () => {
+describe("a request whose every try was overtaken", () => {
+  // The server's three sentences: the import kept changing, the items did and the import did not, or both.
+  const reasons = [
+    "Others kept changing this import while your request was worked out, so nothing was written. Try again in a moment.",
+    "Items this would change kept being changed elsewhere (by another import, on the Items page or by a take-back), or suggestions kept arriving for this import, while your request was worked out, so nothing was written. The import itself did not change. Try again in a moment.",
+    "This import, or items it would change, kept being changed elsewhere (by others, another import or the Items page) while your request was worked out, so nothing was written. Try again in a moment."
+  ]
+  it("is said under a title true of each, with the server's reason: what kept changing, and to try again", () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined)
-    const reason = "The import kept changing while this was worked out. Nothing was written; try again."
-    expect(sayError(DraftBusy.make({ reason }))).toEqual({
-      title: "The import kept changing",
-      sentence: reason,
-      problems: []
-    })
+    for (const reason of reasons) {
+      const said = sayError(DraftBusy.make({ reason }))
+      expect(said).toEqual({ title: "Nothing was written", sentence: reason, problems: [] })
+      // The title names neither the import nor the items: one of the sentences says the import did not change.
+      expect(said.title).not.toMatch(/import|item/i)
+    }
   })
 })
 

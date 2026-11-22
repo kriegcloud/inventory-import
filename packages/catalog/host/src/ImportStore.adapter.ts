@@ -54,6 +54,7 @@ import {
   decisionsSaved,
   decisionsClosed,
   decisionsRematched,
+  decisionsMoved,
   decisionsItemsChanged
 } from "@inventory/catalog-model/ImportStore"
 import * as SqlClient from "effect/sql/SqlClient"
@@ -66,6 +67,7 @@ import { ItemRow, itemColumns, storedItem } from "./internal/itemRow.ts"
 import { abandonedAfterMinutes, maxChunkChars } from "@inventory/catalog-model/Upload"
 import { fileProblem } from "@inventory/catalog-contract/FileProblem"
 import { lineOf } from "./internal/auditLine.ts"
+import { JsonPiece, jsonPieces } from "./internal/pieces.ts"
 import { plannedItems, PlannedRow } from "@inventory/catalog-model/Confirm"
 import {
   type CompareAtMatch,
@@ -77,60 +79,6 @@ import {
   takenBackWords,
   withTakeBacks
 } from "@inventory/catalog-model/Rematch"
-const textOf = (item: ItemFields | null): number =>
-  item === null
-    ? 0
-    : 600 +
-      item.name.length +
-      O.getOrElse(item.description, () => "").length +
-      A.reduce(item.tags, 0, (total, tag) => total + tag.length + 3) +
-      A.reduce(item.vendors, 0, (total, vendor) => total + vendor.vendorName.length + 120)
-
-/**
- * Splits rows into groups, each at most `most` rows and about 600,000 characters of text (`size` says a row's), so the
- * JSON a group travels as stays well under D1's 2 MB limit on a value however long the cells are.
- */
-const grouped = <A>(
-  rows: ReadonlyArray<A>,
-  options: { readonly size: (row: A) => number; readonly most: number }
-): ReadonlyArray<ReadonlyArray<A>> => {
-  const groups: Array<Array<A>> = []
-  let current: Array<A> = []
-  let weight = 0
-  for (const row of rows) {
-    const cost = options.size(row)
-    if (current.length > 0 && (current.length >= options.most || weight + cost > 600_000)) {
-      groups.push(current)
-      current = []
-      weight = 0
-    }
-    current.push(row)
-    weight += cost
-  }
-  if (current.length > 0) groups.push(current)
-  return groups
-}
-
-/** Rows grouped for one statement each: at most `chunkRows` of them, counting the JSON around their text. */
-const bySize = <A>(rows: ReadonlyArray<A>, size: (row: A) => number): ReadonlyArray<ReadonlyArray<A>> =>
-  grouped(rows, { size: (row) => size(row) + 200, most: chunkRows })
-
-/** The pieces a list of plain texts (keys, ids) travels in. */
-const textPieces = (texts: ReadonlyArray<string>): ReadonlyArray<ReadonlyArray<string>> =>
-  grouped(texts, { size: (text) => text.length + 3, most: 5000 })
-
-/** Decisions as they travel to SQL, in pieces. */
-const decisionPieces = (set: Readonly<Record<string, RowDecision>>) =>
-  grouped(
-    A.map(R.toEntries(set), ([rowId, json]) => ({ rowId, json })),
-    {
-      size: ({ rowId, json }) =>
-        rowId.length +
-        200 +
-        A.reduce(R.toEntries(json.edits), 0, (sum, [field, text]) => sum + field.length + text.length),
-      most: 2000
-    }
-  )
 
 const HeadJson = S.fromJsonString(StagedHead)
 const RowsJson = StagedRow.pipe(S.Array, S.fromJsonString)
@@ -138,10 +86,10 @@ const DecisionJson = S.fromJsonString(RowDecision)
 const ChoicesJson = MappingChoice.pipe(S.Array, S.fromJsonString)
 const MovesJson = ColumnMove.pipe(S.Array, S.fromJsonString)
 const TakenBackJson = MatchTakeBack.pipe(S.Array, S.fromJsonString)
-// The stored items a question to the review read, each at its revision, as one JSON parameter.
-const ItemsRead = S.Struct({ id: ItemId, revision: S.Int }).pipe(S.Array, S.fromJsonString)
-// The import's created rows a question to the review read, by row and part, as one JSON parameter.
-const CreatedRead = S.Struct({ rowNumber: S.Int, part: S.Int }).pipe(S.Array, S.fromJsonString)
+// One stored item a question to the review read, at its revision.
+const ItemRead = S.Struct({ id: ItemId, revision: S.Int })
+// One of the import's created rows a question to the review read, by row and part.
+const CreatedRead = S.Struct({ rowNumber: S.Int, part: S.Int })
 const IdList = S.String.pipe(S.Array, S.fromJsonString).annotate({
   description: "Ids or keys bound as one JSON parameter and read with json_each"
 })
@@ -156,7 +104,6 @@ const Acting = { org: OrganizationId, actor: MemberId, name: S.String }
 
 // One decision as it travels to SQL: the row it is for, and the decision as the JSON `importDecision` stores.
 const DecisionEntry = S.Struct({ rowId: S.String, json: DecisionJson })
-const DecisionEntries = DecisionEntry.pipe(S.Array, S.fromJsonString)
 
 // One item a confirm writes, as it travels to SQL, with the key that makes the SKU unique.
 const ItemInsert = S.Struct({
@@ -166,7 +113,6 @@ const ItemInsert = S.Struct({
   part: S.Int,
   skuKey: S.String
 }).annotate({ description: "An item a confirm writes, as the JSON one statement reads with json_each" })
-const ItemInserts = ItemInsert.pipe(S.Array, S.fromJsonString)
 
 // What a confirm items for one item of the file.
 const OutcomeInsert = S.Struct({
@@ -179,7 +125,6 @@ const OutcomeInsert = S.Struct({
   decidedBy: S.NullOr(S.Literals(["person", "nobody"])),
   decidedByName: S.NullOr(S.String)
 }).annotate({ description: "The review's verdict on one row, before the confirm knows whether its item landed" })
-const OutcomeInserts = OutcomeInsert.pipe(S.Array, S.fromJsonString)
 
 // One changed value a confirm items.
 // A change as `importChange`'s columns hold it: the words of `how` are the ones the table has always stored.
@@ -202,7 +147,19 @@ const ChangeInsert = S.Struct({
   update: S.Boolean,
   decidedByName: S.NullOr(S.String)
 }).annotate({ description: "One value a confirm writes that differs from the file" })
-const ChangeInserts = ChangeInsert.pipe(S.Array, S.fromJsonString)
+
+// The pieces the long lists travel in (`internal/pieces.ts`): as many values as a statement reads well, and never more
+// bytes than a bound value may have.
+const textPieces = jsonPieces({ of: S.String, most: 5000 })
+const itemReadPieces = jsonPieces({ of: ItemRead, most: 5000 })
+const createdReadPieces = jsonPieces({ of: CreatedRead, most: 5000 })
+const decisionEntryPieces = jsonPieces({ of: DecisionEntry, most: 2000 })
+const itemPieces = jsonPieces({ of: ItemInsert, most: chunkRows })
+const outcomePieces = jsonPieces({ of: OutcomeInsert, most: chunkRows })
+const changePieces = jsonPieces({ of: ChangeInsert, most: chunkRows })
+/** Decisions as they travel to SQL, in pieces. */
+const decisionPieces = (set: Readonly<Record<string, RowDecision>>) =>
+  decisionEntryPieces(A.map(R.toEntries(set), ([rowId, json]) => ({ rowId, json })))
 
 const ChangeRow = S.Struct({
   importId: ImportId,
@@ -296,9 +253,9 @@ export const ImportStoreD1 = Layer.effect(
     })
     const findDecisions = SqlSchema.findAll({
       Request: Scope,
-      Result: S.Struct({ rowId: S.String, decisionJson: S.String, decidedByName: S.String }),
+      Result: S.Struct({ rowId: S.String, decisionJson: S.String, decidedByName: S.String, savedRevision: S.Int }),
       execute: ({ org, id }) =>
-        sql`SELECT rowId, decisionJson, decidedByName FROM importDecision
+        sql`SELECT rowId, decisionJson, decidedByName, savedRevision FROM importDecision
           WHERE organizationId = ${org} AND importId = ${id}`
     })
     // A value counts as taken back when its confirm was taken back and the item it went into is gone with it, or,
@@ -346,7 +303,7 @@ export const ImportStoreD1 = Layer.effect(
           WHERE organizationId = ${org} AND importId = ${id} AND outcome = 'created' ORDER BY rowNumber, part`
     })
     const findStored = SqlSchema.findAll({
-      Request: S.Struct({ org: OrganizationId, keys: IdList }),
+      Request: S.Struct({ org: OrganizationId, keys: JsonPiece }),
       Result: ItemRow,
       execute: ({ org, keys }) =>
         sql`SELECT ${itemColumns(sql)} FROM item WHERE organizationId = ${org}
@@ -582,7 +539,8 @@ export const ImportStoreD1 = Layer.effect(
       )
       return {
         decisions: R.fromEntries(decoded),
-        authors: R.fromEntries(A.map(rows, (row) => [row.rowId, row.decidedByName] as const))
+        authors: R.fromEntries(A.map(rows, (row) => [row.rowId, row.decidedByName] as const)),
+        savedAt: R.fromEntries(A.map(rows, (row) => [row.rowId, row.savedRevision] as const))
       }
     }, Effect.orDie)
 
@@ -596,7 +554,7 @@ export const ImportStoreD1 = Layer.effect(
     //
     // What each statement of those three batches binds, for a file of any length:
     //
-    //   a piece put (putPiece)        6 = write, list, seq, piece, org, import
+    //   a piece put (putPiece)        6 = write, list, seq, piece, org, import; 7 with the revision it is put at
     //   the guard (itemsAsRead)      20 = items under the keys 5 (org, keys 3, found), each item read 3, created rows
     //                                     counted 3 and each 3, suggestions counted 3 and each 3
     //   openChoices                  22 = the guard 20, org, import
@@ -606,57 +564,39 @@ export const ImportStoreD1 = Layer.effect(
     //   matchedLine                  30 = 6 of the line, org, import, revision, choices, the guard 20
     //   insertBatch                  29 = 6 of the confirm's row, org, import, revision, the guard 20
     //   saveChoice 9, closeDraft 6, countBatch 10, importedLine 14, openRevision 2, dropLists 2
-    //   one per piece: rewriteDecisions 6, saveAtConfirm 8, clearAtConfirm 5, insertItems 9, keepReplaced 7,
-    //     replaceItems 7, insertOutcomes 13, insertChanges 9; a read of stored items by key (findStored) 2
+    //   one per piece: rewriteDecisions 6, saveAtConfirm 10, clearAtConfirm 5, insertItems 9, keepReplaced 7,
+    //     replaceItems 8, insertOutcomes 13, insertChanges 9; a read of stored items by key (findStored) 2
     //
     // What grows with the file is how many statements a batch has, never what one binds: 31 at most, at 50,000 rows as
     // at one. At 50,000 rows a list is put in 25 statements (decisions set) or 10 (cleared, keys, items found, each
-    // 50,000 created rows); texts long enough to pass 600,000 characters a piece make more of them. Every other
+    // 50,000 created rows); texts long enough to pass `pieceBytes` a piece make more of them. Every other
     // statement here binds a fixed handful, its rows (if any) as one JSON value (a take-back's confirms, at most 10).
     type ListName = "sets" | "clears" | "keys" | "items" | "created" | "suggestions"
-    const Put = { org: OrganizationId, id: S.String, write: S.String, seq: S.Int }
-    const putPiece = (
-      list: ListName,
-      r: {
-        readonly org: string
-        readonly id: string
-        readonly write: string
-        readonly seq: number
-        readonly piece: string
-      }
-    ) => sql`INSERT INTO importWriteList (organizationId, importId, writeId, list, seq, piece)
-      SELECT organizationId, id, ${r.write}, ${list}, ${r.seq}, ${r.piece} FROM importDraft
-      WHERE organizationId = ${r.org} AND id = ${r.id}`
-    const putSets = D1.statement({
-      Request: S.Struct({ ...Put, piece: DecisionEntries }),
-      Result: NoRows,
-      execute: (r) => putPiece("sets", r)
+    //
+    // A list given a revision is put only while the draft is at it, before anything in the batch moves it: at another
+    // one there is nothing to write from, so nothing of the save is written.
+    const PutRequest = S.Struct({
+      org: OrganizationId,
+      id: S.String,
+      write: S.String,
+      seq: S.Int,
+      piece: JsonPiece,
+      expected: S.NullOr(S.Int)
     })
-    const putClears = D1.statement({
-      Request: S.Struct({ ...Put, piece: IdList }),
-      Result: NoRows,
-      execute: (r) => putPiece("clears", r)
-    })
-    const putKeys = D1.statement({
-      Request: S.Struct({ ...Put, piece: IdList }),
-      Result: NoRows,
-      execute: (r) => putPiece("keys", r)
-    })
-    const putItems = D1.statement({
-      Request: S.Struct({ ...Put, piece: ItemsRead }),
-      Result: NoRows,
-      execute: (r) => putPiece("items", r)
-    })
-    const putCreated = D1.statement({
-      Request: S.Struct({ ...Put, piece: CreatedRead }),
-      Result: NoRows,
-      execute: (r) => putPiece("created", r)
-    })
-    const putSuggestions = D1.statement({
-      Request: S.Struct({ ...Put, piece: IdList }),
-      Result: NoRows,
-      execute: (r) => putPiece("suggestions", r)
-    })
+    const putList = (list: ListName) =>
+      D1.statement({
+        Request: PutRequest,
+        Result: NoRows,
+        execute: (r) => sql`INSERT INTO importWriteList (organizationId, importId, writeId, list, seq, piece)
+          SELECT organizationId, id, ${r.write}, ${list}, ${r.seq}, ${r.piece} FROM importDraft
+          WHERE organizationId = ${r.org} AND id = ${r.id}${r.expected === null ? sql`` : sql` AND revision = ${r.expected}`}`
+      })
+    const putSets = putList("sets")
+    const putClears = putList("clears")
+    const putKeys = putList("keys")
+    const putItems = putList("items")
+    const putCreated = putList("created")
+    const putSuggestions = putList("suggestions")
     const dropLists = D1.statement({
       Request: S.Struct({ org: OrganizationId, write: S.String }),
       Result: NoRows,
@@ -690,19 +630,23 @@ export const ImportStoreD1 = Layer.effect(
       createdCount: read.created.length,
       suggestionCount: read.suggestions.length
     })
-    // The statements that put what a judgement read where the guard below reads it.
-    const putRead = (
+    // The statements that put what a judgement read where the guard below reads it, at whatever revision the draft is.
+    const putRead = Effect.fnUntraced(function* (
       scope: { readonly org: OrganizationId; readonly id: string; readonly write: string },
       read: ItemsAsRead
-    ) =>
-      read.asked
-        ? [
-            ...A.map(textPieces(read.keys), (piece, seq) => putKeys({ ...scope, seq, piece })),
-            ...A.map(A.chunksOf(read.items, 5000), (piece, seq) => putItems({ ...scope, seq, piece })),
-            ...A.map(A.chunksOf(read.created, 5000), (piece, seq) => putCreated({ ...scope, seq, piece })),
-            ...A.map(A.chunksOf(read.suggestions, 5000), (piece, seq) => putSuggestions({ ...scope, seq, piece }))
-          ]
-        : []
+    ) {
+      if (!read.asked) return []
+      const keys = yield* textPieces(read.keys)
+      const items = yield* itemReadPieces(read.items)
+      const created = yield* createdReadPieces(read.created)
+      const suggestions = yield* textPieces(read.suggestions)
+      return [
+        ...A.map(keys, (piece, seq) => putKeys({ ...scope, seq, piece, expected: null })),
+        ...A.map(items, (piece, seq) => putItems({ ...scope, seq, piece, expected: null })),
+        ...A.map(created, (piece, seq) => putCreated({ ...scope, seq, piece, expected: null })),
+        ...A.map(suggestions, (piece, seq) => putSuggestions({ ...scope, seq, piece, expected: null }))
+      ]
+    })
     // What the judgement read of import `id` is still so: the organization's items under those keys exactly the ones
     // read, each still at the revision read (one edited, replaced, created or taken back since makes this false); the
     // import's created rows exactly those read (a take-back marks them); its suggestions exactly those read (a request
@@ -765,14 +709,17 @@ export const ImportStoreD1 = Layer.effect(
     const upsertDecisions = D1.statement({
       Request: S.Struct({ ...SaveWrite.fields, ...Acting, at: S.String }),
       Result: NoRows,
-      // The same decision sent again leaves the row (and who made it) as it is.
+      // The same decision sent again leaves the row (who made it, and the revision it was saved at) as it is. Saved at
+      // the revision this save moved the draft to, the statement before.
       execute: (r) => sql`INSERT INTO importDecision (importId, organizationId, rowId, decisionJson, decidedById,
-          decidedByName, updatedAt)
+          decidedByName, updatedAt, savedRevision)
         SELECT ${r.id}, ${r.org}, json_extract(j.value, '$.rowId'), json_extract(j.value, '$.json'), ${r.actor},
-          ${r.name}, ${r.at}
+          ${r.name}, ${r.at}, (SELECT d.revision FROM importDraft d
+            WHERE d.organizationId = w.organizationId AND d.id = w.importId)
         FROM ${inList(r.org, r.write, "sets")} AND ${sameChoices(r.org, r.id, r.choices, r)}
         ON CONFLICT (organizationId, importId, rowId) DO UPDATE SET decisionJson = excluded.decisionJson,
-          decidedById = excluded.decidedById, decidedByName = excluded.decidedByName, updatedAt = excluded.updatedAt
+          decidedById = excluded.decidedById, decidedByName = excluded.decidedByName, updatedAt = excluded.updatedAt,
+          savedRevision = excluded.savedRevision
         WHERE importDecision.decisionJson IS NOT excluded.decisionJson`
     })
     const clearDecisions = D1.statement({
@@ -804,31 +751,37 @@ export const ImportStoreD1 = Layer.effect(
       actor: Member,
       draft: Draft,
       delta: DecisionDelta,
-      read: ItemsAsRead = noItemsRead
+      read: ItemsAsRead = noItemsRead,
+      expected: O.Option<number> = O.none()
     ) {
       const at = yield* now
       const org = actor.organizationId
       const choices = draft.choicesJson
-      const sets = decisionPieces(delta.set)
-      const cleared = textPieces(delta.clear)
+      const sets = yield* decisionPieces(delta.set)
+      const cleared = yield* textPieces(delta.clear)
+      const movedOn = (revision: number): boolean => O.exists(expected, (compared) => compared !== revision)
       if (sets.length + cleared.length === 0) {
         const open = yield* run(openRevision({ org, id: draft.id }))
         return O.match(A.head(open), {
           onNone: () => decisionsClosed,
-          onSome: (row) => decisionsSaved({ revision: row.revision, changed: false })
+          onSome: (row) =>
+            movedOn(row.revision) ? decisionsMoved : decisionsSaved({ revision: row.revision, changed: false })
         })
       }
       const write = yield* random.uuidV4()
       const scope = { org, id: draft.id, write }
       const save = { ...scope, choices, ...guardOf(write, read) }
+      const put = { ...scope, expected: O.getOrNull(expected) }
+      const reads = yield* putRead(scope, read)
       // The revision is read, then moved, and only for a delta that changes something; read again right after, it is
       // the revision these decisions are saved under, and a higher one than before says this save is what moved it.
       // The writes after it change no revision. One batch: nobody else's save can fall between the two reads, and
-      // every write in it holds only while the choices and the stored items are those the save was judged against.
+      // every write in it holds only while the choices and the stored items are those the save was judged against, and
+      // writes from lists put only while the draft is at the revision its rows that waited were compared at.
       const answers = yield* batch([
-        ...A.map(sets, (piece, seq) => putSets({ ...scope, seq, piece })),
-        ...A.map(cleared, (piece, seq) => putClears({ ...scope, seq, piece })),
-        ...putRead(scope, read),
+        ...A.map(sets, (piece, seq) => putSets({ ...put, seq, piece })),
+        ...A.map(cleared, (piece, seq) => putClears({ ...put, seq, piece })),
+        ...reads,
         openChoices(save),
         bumpRevision(save),
         openChoices({ ...save, asked: 0 }),
@@ -842,9 +795,11 @@ export const ImportStoreD1 = Layer.effect(
         ? decisionsClosed
         : before.choicesJson !== choices
           ? decisionsRematched
-          : before.itemsSame !== 1
-            ? decisionsItemsChanged
-            : decisionsSaved({ revision: after.revision, changed: after.revision > before.revision })
+          : movedOn(before.revision)
+            ? decisionsMoved
+            : before.itemsSame !== 1
+              ? decisionsItemsChanged
+              : decisionsSaved({ revision: after.revision, changed: after.revision > before.revision })
     }, Effect.orDie)
 
     const ReopenRequest = S.Struct({
@@ -1032,14 +987,17 @@ export const ImportStoreD1 = Layer.effect(
         RETURNING id`
     })
     // The stored decisions the match takes back, as the match worked them out, whoever made them (who made them
-    // stays); only when this batch wrote the match's audit line.
+    // stays); only when this batch wrote the match's audit line. Each entry of the piece finds its row by the key first
+    // (the CROSS JOIN keeps that order, LIMIT -1 keeps the subquery whole), and the rows found are written by rowid:
+    // a match that rewrites every row of a large file reads each row once a piece, never once for each entry.
     const rewriteDecisions = D1.statement({
-      Request: S.Struct({ org: OrganizationId, id: S.String, activity: S.String, entries: DecisionEntries }),
+      Request: S.Struct({ org: OrganizationId, id: S.String, activity: S.String, entries: JsonPiece }),
       Result: NoRows,
-      execute: (r) => sql`UPDATE importDecision SET decisionJson = (SELECT json_extract(j.value, '$.json')
-          FROM json_each(${r.entries}) AS j WHERE json_extract(j.value, '$.rowId') = importDecision.rowId)
-        WHERE organizationId = ${r.org} AND importId = ${r.id}
-          AND rowId IN (SELECT json_extract(value, '$.rowId') FROM json_each(${r.entries}))
+      execute: (r) => sql`UPDATE importDecision SET decisionJson = e.json
+        FROM (SELECT found.rowid AS at, json_extract(j.value, '$.json') AS json FROM json_each(${r.entries}) AS j
+          CROSS JOIN importDecision AS found ON found.organizationId = ${r.org} AND found.importId = ${r.id}
+            AND found.rowId = json_extract(j.value, '$.rowId') LIMIT -1) AS e
+        WHERE importDecision.rowid = e.at AND importDecision.organizationId = ${r.org}
           AND ${thisMatch(r.org, r.activity)}`
     })
 
@@ -1072,11 +1030,18 @@ export const ImportStoreD1 = Layer.effect(
             choices: before,
             moves: yield* moves(current),
             decisions: stored.decisions,
+            savedAt: stored.savedAt,
             choice,
             revision: current.revision,
             compare
           })
-          const took = takenBackOfMatch({ revision: plan.at, by: actor.name, notApplied: plan.notApplied })
+          const took = takenBackOfMatch({
+            revision: plan.at,
+            by: actor.name,
+            matched: choice.field,
+            reads: plan.reads,
+            notApplied: plan.notApplied
+          })
           const at = yield* now
           const activity = yield* random.uuidV4()
           const request = {
@@ -1089,9 +1054,10 @@ export const ImportStoreD1 = Layer.effect(
             at
           }
           const read = O.getOrElse(plan.read, () => noItemsRead)
-          const scope = { org, id: draft.id, write: activity }
+          const reads = yield* putRead({ org, id: draft.id, write: activity }, read)
+          const rewrites = yield* decisionPieces(plan.rewrites)
           const answers = yield* batch([
-            ...putRead(scope, read),
+            ...reads,
             matchedLine({ ...request, ...guardOf(activity, read) }),
             saveChoice({
               ...request,
@@ -1099,9 +1065,7 @@ export const ImportStoreD1 = Layer.effect(
               moves: plan.moves,
               takenBack: withTakeBacks({ kept, added: took })
             }),
-            ...A.map(decisionPieces(plan.rewrites), (entries) =>
-              rewriteDecisions({ org, id: draft.id, activity, entries })
-            ),
+            ...A.map(rewrites, (entries) => rewriteDecisions({ org, id: draft.id, activity, entries })),
             dropLists({ org, write: activity })
           ])
           // Only the draft's own update answers a row, and only when this batch was the match.
@@ -1121,7 +1085,8 @@ export const ImportStoreD1 = Layer.effect(
       keys: ReadonlyArray<string>
     ) {
       // The keys travel as one JSON value per piece, each piece its own statement of two bound values.
-      const found = yield* Effect.forEach(textPieces(keys), (some) => findStored({ org: organizationId, keys: some }), {
+      const pieces = yield* textPieces(keys)
+      const found = yield* Effect.forEach(pieces, (some) => findStored({ org: organizationId, keys: some }), {
         concurrency: 1
       })
       return A.map(A.flatten(found), storedItem)
@@ -1172,19 +1137,21 @@ export const ImportStoreD1 = Layer.effect(
     // The confirming person's own decisions not saved yet, under their name, in the confirm's own write: after the
     // confirm's row, so only the confirm that won writes them, and before the close.
     const saveAtConfirm = D1.statement({
-      Request: S.Struct({ ...CommitScope.fields, entries: DecisionEntries }),
+      Request: S.Struct({ ...CommitScope.fields, entries: JsonPiece }),
       Result: NoRows,
+      // Saved at the revision the confirm moves the draft to when it closes it, after this.
       execute: (r) => sql`INSERT INTO importDecision (importId, organizationId, rowId, decisionJson, decidedById,
-          decidedByName, updatedAt)
+          decidedByName, updatedAt, savedRevision)
         SELECT ${r.id}, ${r.org}, json_extract(value, '$.rowId'), json_extract(value, '$.json'), ${r.actor}, ${r.name},
-          ${r.at}
+          ${r.at}, (SELECT d.revision + 1 FROM importDraft d WHERE d.organizationId = ${r.org} AND d.id = ${r.id})
         FROM json_each(${r.entries}) WHERE ${thisConfirm(r.org, r.batch)}
         ON CONFLICT (organizationId, importId, rowId) DO UPDATE SET decisionJson = excluded.decisionJson,
-          decidedById = excluded.decidedById, decidedByName = excluded.decidedByName, updatedAt = excluded.updatedAt
+          decidedById = excluded.decidedById, decidedByName = excluded.decidedByName, updatedAt = excluded.updatedAt,
+          savedRevision = excluded.savedRevision
         WHERE importDecision.decisionJson IS NOT excluded.decisionJson`
     })
     const clearAtConfirm = D1.statement({
-      Request: S.Struct({ ...CommitScope.fields, rowIds: IdList }),
+      Request: S.Struct({ ...CommitScope.fields, rowIds: JsonPiece }),
       Result: NoRows,
       execute: (r) => sql`DELETE FROM importDecision WHERE organizationId = ${r.org} AND importId = ${r.id}
         AND rowId IN (SELECT value FROM json_each(${r.rowIds})) AND ${thisConfirm(r.org, r.batch)}`
@@ -1192,7 +1159,7 @@ export const ImportStoreD1 = Layer.effect(
     // One statement per 500 rows, the rows as one JSON value read with json_each: a handful of bound values a
     // statement however many rows it writes. A stored code is left as it is (ON CONFLICT DO NOTHING).
     const insertItems = D1.statement({
-      Request: S.Struct({ ...CommitScope.fields, items: ItemInserts }),
+      Request: S.Struct({ ...CommitScope.fields, items: JsonPiece }),
       Result: NoRows,
       execute: (r) => sql`INSERT INTO item (id, organizationId, sku, skuKey, name, description, category, uom,
           unitCost, quantityOnHand, reorderPoint, isActive, lotTracked, tags, firstReceivedOn, discontinuedOn,
@@ -1209,9 +1176,11 @@ export const ImportStoreD1 = Layer.effect(
         ON CONFLICT (organizationId, skuKey) DO NOTHING`
     })
     // Before a replace, in the same batch: the stored item as it is, so a take-back of this confirm can put it back.
-    // revisionAfter is the revision the replace below gives it; one copy per item, however many rows name it.
+    // revisionAfter is the revision the replace below gives it; one copy per item, however many rows name it. CROSS JOIN
+    // keeps the order written: each row of the piece finds its item by the SKU's index. Left to choose, SQLite reads every
+    // item of the organization and scans the piece for each, which at 50,000 items takes minutes.
     const keepReplaced = D1.statement({
-      Request: S.Struct({ ...CommitScope.fields, items: ItemInserts }),
+      Request: S.Struct({ ...CommitScope.fields, items: JsonPiece }),
       Result: NoRows,
       execute: (r) => sql`INSERT INTO importReplaced (organizationId, importId, batchId, itemId, sourceRow,
           sourcePart, name, description, category, uom, unitCost, quantityOnHand, reorderPoint, isActive, lotTracked,
@@ -1222,29 +1191,31 @@ export const ImportStoreD1 = Layer.effect(
           i.reorderPoint, i.isActive, i.lotTracked, i.tags, i.firstReceivedOn, i.discontinuedOn, i.dimensions,
           i.vendors, i.revision, i.updatedById, i.updatedBy, i.updatedAt, i.revision + 1
         FROM json_each(${r.items}) AS j
-        JOIN item i ON i.organizationId = ${r.org} AND i.skuKey = json_extract(j.value, '$.skuKey')
+        CROSS JOIN item i ON i.organizationId = ${r.org} AND i.skuKey = json_extract(j.value, '$.skuKey')
         WHERE ${thisConfirm(r.org, r.batch)}
         ON CONFLICT (organizationId, batchId, itemId) DO NOTHING`
     })
     // A stored item the person chose to replace with the file's row: every value but its SKU and its origin is
-    // written over, and its revision goes up, so the import that created it can no longer take it back.
+    // written over, and its revision goes up, so the import that created it can no longer take it back. Found as the copy
+    // above finds it (LIMIT -1 keeps the subquery whole), then written by its rowid.
     const replaceItems = D1.statement({
-      Request: S.Struct({ ...CommitScope.fields, items: ItemInserts }),
+      Request: S.Struct({ ...CommitScope.fields, items: JsonPiece }),
       Result: NoRows,
-      execute: (r) => sql`UPDATE item SET name = json_extract(j.value, '$.name'),
-          description = json_extract(j.value, '$.description'), category = json_extract(j.value, '$.category'),
-          uom = json_extract(j.value, '$.uom'), unitCost = json_extract(j.value, '$.unitCost'),
-          quantityOnHand = json_extract(j.value, '$.quantityOnHand'),
-          reorderPoint = json_extract(j.value, '$.reorderPoint'),
-          isActive = json_extract(j.value, '$.stocking.kind') = 'active',
-          lotTracked = json_extract(j.value, '$.lotTracked'), tags = json_extract(j.value, '$.tags'),
-          firstReceivedOn = json_extract(j.value, '$.firstReceivedOn'),
-          discontinuedOn = json_extract(j.value, '$.stocking.on'),
-          dimensions = json_extract(j.value, '$.dimensions'), vendors = json_extract(j.value, '$.vendors'),
-          revision = revision + 1, updatedById = ${r.actor}, updatedBy = ${r.name}, updatedAt = ${r.at}
-        FROM json_each(${r.items}) AS j
-        WHERE item.organizationId = ${r.org} AND item.skuKey = json_extract(j.value, '$.skuKey')
-          AND ${thisConfirm(r.org, r.batch)}`
+      execute: (r) => sql`UPDATE item SET name = json_extract(e.value, '$.name'),
+          description = json_extract(e.value, '$.description'), category = json_extract(e.value, '$.category'),
+          uom = json_extract(e.value, '$.uom'), unitCost = json_extract(e.value, '$.unitCost'),
+          quantityOnHand = json_extract(e.value, '$.quantityOnHand'),
+          reorderPoint = json_extract(e.value, '$.reorderPoint'),
+          isActive = json_extract(e.value, '$.stocking.kind') = 'active',
+          lotTracked = json_extract(e.value, '$.lotTracked'), tags = json_extract(e.value, '$.tags'),
+          firstReceivedOn = json_extract(e.value, '$.firstReceivedOn'),
+          discontinuedOn = json_extract(e.value, '$.stocking.on'),
+          dimensions = json_extract(e.value, '$.dimensions'), vendors = json_extract(e.value, '$.vendors'),
+          revision = item.revision + 1, updatedById = ${r.actor}, updatedBy = ${r.name}, updatedAt = ${r.at}
+        FROM (SELECT found.rowid AS at, j.value AS value FROM json_each(${r.items}) AS j
+          CROSS JOIN item AS found ON found.organizationId = ${r.org} AND found.skuKey = json_extract(j.value, '$.skuKey')
+          LIMIT -1) AS e
+        WHERE item.rowid = e.at AND item.organizationId = ${r.org} AND ${thisConfirm(r.org, r.batch)}`
     })
     // A row counts as created only if its item is really there: a ready row whose code someone else stored in the
     // meantime is reported as already there, never as created. A row an earlier confirm created is created still.
@@ -1252,7 +1223,7 @@ export const ImportStoreD1 = Layer.effect(
       AND r.importId = ${id} AND r.sourceRow = json_extract(value, '$.rowNumber')
       AND r.sourcePart = json_extract(value, '$.part'))`
     const insertOutcomes = D1.statement({
-      Request: S.Struct({ ...CommitScope.fields, outcomes: OutcomeInserts }),
+      Request: S.Struct({ ...CommitScope.fields, outcomes: JsonPiece }),
       Result: NoRows,
       execute: (r) => sql`INSERT INTO importOutcome (importId, organizationId, rowNumber, part, sku, name, outcome,
           reason, decidedBy, decidedByName)
@@ -1278,7 +1249,7 @@ export const ImportStoreD1 = Layer.effect(
     })
     // A changed value is recorded only for a row this confirm really created, and only once.
     const insertChanges = D1.statement({
-      Request: S.Struct({ ...CommitScope.fields, changes: ChangeInserts }),
+      Request: S.Struct({ ...CommitScope.fields, changes: JsonPiece }),
       Result: NoRows,
       execute: (r) => sql`INSERT INTO importChange (importId, batchId, organizationId, rowNumber, part, sku, field,
           fromValue, toValue, source, decidedBy, decidedByName, how, basis, confidence, createdAt)
@@ -1338,19 +1309,17 @@ export const ImportStoreD1 = Layer.effect(
       const ready = A.filter(written, PlannedRow.guards.ready)
       const replacing = A.filter(written, PlannedRow.guards.update)
       const entries = (list: ReadonlyArray<readonly [(typeof written)[number], string]>) =>
-        A.map(
-          bySize(list, ([row]) => textOf(row.item)),
-          (chunk) =>
-            A.map(chunk, ([row, id]) => ({
-              ...row.item,
-              id,
-              rowNumber: row.rowNumber,
-              part: row.part,
-              skuKey: skuKey(row.item)
-            }))
+        itemPieces(
+          A.map(list, ([row, id]) => ({
+            ...row.item,
+            id,
+            rowNumber: row.rowNumber,
+            part: row.part,
+            skuKey: skuKey(row.item)
+          }))
         )
-      const items = entries(A.zip(ready, write.itemIds))
-      const replacements = entries(A.map(replacing, (row) => [row, ""] as const))
+      const items = yield* entries(A.zip(ready, write.itemIds))
+      const replacements = yield* entries(A.map(replacing, (row) => [row, ""] as const))
       // What the outcome rows store: the reason of a row that is not written, and who left it out.
       const reasonOf = (row: PlannedRow): string =>
         PlannedRow.guards.already(row) || PlannedRow.guards.notImported(row) ? row.reason : ""
@@ -1358,21 +1327,19 @@ export const ImportStoreD1 = Layer.effect(
         PlannedRow.guards.notImported(row) ? row.decidedBy.kind : null
       const decidedByName = (row: PlannedRow): string | null =>
         PlannedRow.guards.notImported(row) && DecidedBy.guards.person(row.decidedBy) ? row.decidedBy.name : null
-      const outcomes = A.map(
-        bySize(rows, (row) => row.sku.length + row.name.length + reasonOf(row).length),
-        (chunk) =>
-          A.map(chunk, (row) => ({
-            rowNumber: row.rowNumber,
-            part: row.part,
-            sku: row.sku,
-            name: row.name,
-            status: row.status,
-            reason: reasonOf(row),
-            decidedBy: decidedBy(row),
-            decidedByName: decidedByName(row)
-          }))
+      const outcomes = yield* outcomePieces(
+        A.map(rows, (row) => ({
+          rowNumber: row.rowNumber,
+          part: row.part,
+          sku: row.sku,
+          name: row.name,
+          status: row.status,
+          reason: reasonOf(row),
+          decidedBy: decidedBy(row),
+          decidedByName: decidedByName(row)
+        }))
       )
-      const changes = bySize(
+      const changes = yield* changePieces(
         A.flatMap(written, (row) =>
           A.map(row.changes, (entry) => ({
             ...changeToStored(entry.change),
@@ -1382,15 +1349,17 @@ export const ImportStoreD1 = Layer.effect(
             sku: row.sku,
             update: PlannedRow.guards.update(row)
           }))
-        ),
-        (change) => change.from.length + change.to.length + (change.basis ?? "").length + change.sku.length
+        )
       )
       const lists = { org: audit.org, id: write.draft, write: write.confirm }
+      const reads = yield* putRead(lists, write.read)
+      const unsaved = yield* decisionPieces(write.unsaved.set)
+      const cleared = yield* textPieces(write.unsaved.clear)
       const answers = yield* batch([
-        ...putRead(lists, write.read),
+        ...reads,
         insertBatch({ ...scope, expected: write.expected, ...guardOf(write.confirm, write.read) }),
-        ...A.map(decisionPieces(write.unsaved.set), (entries) => saveAtConfirm({ ...scope, entries })),
-        ...A.map(textPieces(write.unsaved.clear), (rowIds) => clearAtConfirm({ ...scope, rowIds })),
+        ...A.map(unsaved, (entries) => saveAtConfirm({ ...scope, entries })),
+        ...A.map(cleared, (rowIds) => clearAtConfirm({ ...scope, rowIds })),
         closeDraft(scope),
         ...A.map(items, (chunk) => insertItems({ ...scope, items: chunk })),
         ...A.map(replacements, (chunk) => keepReplaced({ ...scope, items: chunk })),

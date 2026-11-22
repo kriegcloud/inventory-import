@@ -4,12 +4,13 @@ import * as O from "effect/Option"
 import * as S from "effect/Schema"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
 import * as Atom from "effect/reactivity/Atom"
-import type { ReactNode } from "react"
+import { Fragment, type ReactNode } from "react"
 import { Alert, AlertDescription, AlertTitle } from "@inventory/ui/components/alert"
 import { Button } from "@inventory/ui/components/button"
 import { Skeleton } from "@inventory/ui/components/skeleton"
-import { signedOutHere, signInWithPassword } from "@/lib/actor"
+import { sessionEnded, signedOutHere, signInWithPassword } from "@/lib/actor"
 import { refreshSession, session, sessionView, signOut } from "@inventory/access-web/Session"
+import { memberKey } from "@inventory/client/MemberAtoms"
 import { sayError } from "@inventory/client/SayError"
 import { CreateOrganization, SignIn } from "@inventory/access-web/SignIn"
 import { AppShell } from "./AppShell.tsx"
@@ -59,18 +60,31 @@ const developmentSignIn = Atom.make((get) => {
   )
 })
 
+/** Said above the sign-in form when the page before this one was left because its member's session had ended. */
+const Ended = () => (
+  <Alert className="mx-auto mb-6 max-w-sm">
+    <AlertTitle>You were signed out</AlertTitle>
+    <AlertDescription>
+      Sign in again to go on where you were. Decisions that were not saved yet are kept in this browser, for you.
+    </AlertDescription>
+  </Alert>
+)
+
 /**
  * Shows its children only to a signed-in member of an organization. Anyone else gets the sign-in screen, or the
- * screen that creates their first organization. The server enforces the same rule on every request.
+ * screen that creates their first organization. The server enforces the same rule on every request. Once drawn, they
+ * stay drawn while the session is asked again, and are drawn anew, with nothing typed or open in them, for another
+ * organization the person switches to.
  */
 export function SignedIn(props: { title: string; children: ReactNode }) {
   const { status, error, features, probablySignedOut } = useAtomValue(sessionView)
   const retry = useAtomRefresh(session)
   const refresh = useAtomSet(refreshSession)
   const signingIn = useAtomValue(developmentSignIn)
+  const drawnFor = useAtomValue(memberKey)
   // On its way while the sign-in runs; "idle" or "failed" once it has ended or was not wanted.
   const development = AsyncResult.isSuccess(signingIn) && !signingIn.waiting ? signingIn.value : "signing-in"
-  if (status === "ready") return props.children
+  if (status === "ready") return <Fragment key={drawnFor}>{props.children}</Fragment>
   return (
     <AppShell title={props.title}>
       {error !== null ? (
@@ -91,7 +105,10 @@ export function SignedIn(props: { title: string; children: ReactNode }) {
         // In development the first test account is about to sign in: the placeholder, not a form that vanishes.
         (status === "loading" && probablySignedOut && !(import.meta.env.DEV && !signedOutHere())) ? (
         // Until the answer comes, `features` is undefined: the test accounts appear with it.
-        <SignIn features={features} onSignedIn={() => refresh()} />
+        <>
+          {sessionEnded() ? <Ended /> : null}
+          <SignIn features={features} onSignedIn={() => refresh()} />
+        </>
       ) : status === "no-organization" ? (
         <CreateOrganization onCreated={() => refresh()} onSignOut={() => void signOut()} />
       ) : (

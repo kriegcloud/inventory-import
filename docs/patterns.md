@@ -32,7 +32,12 @@ A statement that needs a whole list at once (does any of these 50,000 rows diffe
 cannot bind one value per piece of it: 100 values are soon passed, and one value holds at most 2 MB. Its batch first
 puts the list into `importWriteList`, a piece to a statement, the statement reads it back with `json_each` (three bound
 values however long it is), and the batch's last statement deletes it (`putPiece` and `inList` in the same adapter;
-tested at 50,000 rows in `test/server/WriteLimits.slow.test.ts`, which counts what every statement binds).
+tested at 50,000 rows in `test/server/WriteLimits.slow.test.ts`, which counts what every statement binds). A piece is
+cut by the bytes of UTF-8 of the text bound, as D1 counts them, never by characters: a "木" is three bytes, and a quote
+typed into a decision, JSON inside JSON, is escaped twice (`pieced` in `packages/catalog/host/src/internal/pieces.ts`).
+A statement that writes rows found by a key in such a piece finds them first, in a subquery that drives from the piece
+(`CROSS JOIN`, kept whole with `LIMIT -1`), and writes them by `rowid`: left to choose, SQLite reads every row of the
+organization and scans the piece for each.
 
 In the Layer: `const sql = yield* D1Client.D1Client`. In the migration, the natural key is
 `TEXT NOT NULL COLLATE NOCASE` with `UNIQUE (organizationId, code)`, so case variants are one key. Rows go in and come
@@ -399,6 +404,13 @@ step (`packages/catalog/web/src/ResultStep.screen.tsx`) says what it will do and
   (`stored`). The rest of the row's decision is applied, and the answer names each part in `notApplied` by row, field
   and kind. A confirm carries the same `madeOn` for the rows it carries, and is refused whole (`AcceptsTakenBack`,
   409) when any part of one of them would not be applied.
+- **A row that waited is written only over what its sender knew.** A save's `over` names, for each row that waited (a
+  failed save, a reload, a closed tab), the decisions the sender knows the server may hold of it. Such a row is
+  written only while what is stored is one of them, or one of them with what a match took back since removed (the same
+  `withoutStaleDecisions`, on the row's `madeOn`), or already what the save leaves (the same save sent again); otherwise
+  it is not written and the answer names it in `decidedSince` with what is stored. The comparison and the write are
+  one: the save's lists are put only while the draft is at the revision the comparison read, so a save, a match or a
+  confirm in between makes it be compared again (`Waited.rules.ts`, `test/server/WaitedRows.slow.test.ts`).
 - **A match takes back what rests on the columns it moves, and keeps what it took.** The same rule, on the stored
   decisions as if each was made on the revision before the match, in the match's own atomic write; what it took back
   is kept with the draft by field and kind (`ImportView.takenBack`, the first 200 rows named and all counted) so every

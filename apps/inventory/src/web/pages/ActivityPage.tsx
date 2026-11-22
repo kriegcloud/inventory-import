@@ -2,7 +2,6 @@ import { useAtom, useAtomRefresh, useAtomValue } from "@effect/atom-react"
 import * as Cause from "effect/Cause"
 import * as O from "effect/Option"
 import * as AsyncResult from "effect/reactivity/AsyncResult"
-import * as Atom from "effect/reactivity/Atom"
 import { PageHeader, Views } from "@inventory/ui/PageHeader"
 import { Alert, AlertDescription, AlertTitle } from "@inventory/ui/components/alert"
 import { TableSkeleton } from "@inventory/ui/Skeletons"
@@ -14,12 +13,13 @@ import {
   importDecisionsCaption,
   importDecisions
 } from "@inventory/catalog-web/ImportDecisions"
+import { ofMember } from "@inventory/client/MemberAtoms"
 import { sayError } from "@inventory/client/SayError"
 import { pastImports } from "@inventory/catalog-web/Imports"
 import { pastImportColumns, pastImportsCaption, PastImportsList } from "@inventory/catalog-web/PastImports"
 
 /** The list the person chose; none until they choose, and the page opens on the one with something in it. */
-const chosenView = Atom.make<O.Option<"decisions" | "events" | "imports">>(O.none())
+export const chosenView = ofMember((): O.Option<"decisions" | "events" | "imports"> => O.none())
 
 /**
  * Who decided what: the shell over three lists. "Decisions" is the catalog screens' list of every value an import

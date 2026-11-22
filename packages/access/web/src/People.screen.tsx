@@ -41,6 +41,7 @@ import {
 import { Field, FieldGroup, FieldLabel } from "@inventory/ui/components/field"
 import { Input } from "@inventory/ui/components/input"
 import { NativeSelect, NativeSelectOption } from "@inventory/ui/components/native-select"
+import { ofMember } from "@inventory/client/MemberAtoms"
 import { optimisticChange, optimisticWrite, shown } from "@inventory/client/OptimisticAtoms"
 import { AddPerson as AddPersonCommand, ChangeRole } from "@inventory/access-contract/PeopleCommand"
 import { Person } from "@inventory/access-contract/Person"
@@ -113,10 +114,10 @@ const remove = optimisticWrite({
   settled: accessKeys.activity
 })
 
-/** The add form: whether it is open, and what is typed in it. */
-const addOpen = Atom.make(false)
-const addEmail = Atom.make("")
-const addRole = Atom.make<Role>("editor")
+/** The add form: whether it is open, and what the person signed in has typed in it. */
+export const addOpen = ofMember(() => false)
+export const addEmail = ofMember(() => "")
+export const addRole = ofMember((): Role => "editor")
 
 /**
  * Adding a person. Not optimistic: only the server knows whose email it is. Through the command's schema, which trims

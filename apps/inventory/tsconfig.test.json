@@ -7,5 +7,7 @@
     "moduleResolution": "bundler",
     "types": ["node", "vite/client"]
   },
-  "include": ["test"]
+  // The tests of the browser's code have the browser's types: tsconfig.test-web.json.
+  "include": ["test"],
+  "exclude": ["test/web"]
 }

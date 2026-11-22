@@ -22,7 +22,7 @@ import { Button } from "@inventory/ui/components/button"
 import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@inventory/ui/components/item"
 import { FileUpload, FileUploadDropzone } from "@inventory/ui/components/file-upload"
 import { Progress } from "@inventory/ui/components/progress"
-import { member } from "@inventory/client/MemberAtoms"
+import { member, ofMember } from "@inventory/client/MemberAtoms"
 import { when, whenShort } from "@inventory/ui/Dates"
 import { giveView, openImports as openImportsRead, pastImports, removeImport } from "./Imports.atoms.ts"
 import { resultOf } from "./internal/result.ts"
@@ -288,7 +288,7 @@ function PastImports() {
 }
 
 /** A sentence for a file the screen itself could not take (a sample that would not load, a file no longer kept). */
-const uploadProblem = Atom.make<string | undefined>(undefined)
+export const uploadProblem = ofMember((): string | undefined => undefined)
 
 /**
  * The first screen: choose or drop a file, or take the sample list, which goes through the same code. The chosen

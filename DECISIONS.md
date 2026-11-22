@@ -41,18 +41,16 @@ didn't": a messy file in, what is wrong fixed in the app, a clear account of the
       compared with the server while another save was on its way; "Suggest fixes" was pressed while it waited.
     - A "from your other tab" line does not follow what the server holds. Picking a side can replace a colleague's
       newer decision the line never showed, and Import goes through while the line still asks.
-    - With no connection, the next decision or "Save again" replaces the review with "This import could not be
-      opened" until the connection is back. What was decided is kept in this browser.
-    - When a colleague removes the import a person has open, on a slow connection the review comes and goes without
-      end instead of saying the import was removed.
     - A decision from a tab since closed, held beside this tab's own, is not named when someone else confirms the
       import or it is closed; when the row already has a line, it is named once in a toast and then gone.
     - An Undo or "Put row back" pressed while a save was on its way is lost when that save's answer takes back the
       rest of the row: the server keeps what the person took back.
+    - A sign-in as somebody else in another tab of the same browser is not noticed in this tab until a request is
+      refused: until then what is pressed here is written as the other person, and what is read here is theirs.
+    - A switch of organization pressed while the page is asking who is signed in loads the whole page again, and an
+      upload under way is dropped.
     - After a switch of organization the browser no longer asks before the page is left, though rows of the other
       organization still wait in this tab. They are kept in this browser.
-    - After a sign-out and a sign-in as somebody else in the same page, the item editor opens with the previous
-      person's typed, unsaved values, and Save sends them as the new person. A page reload clears it.
     - After an import is closed and opened again in the same page, a late answer to an earlier save can be taken for
       the answer to a newer one.
     - A waiting row is held as "decided since by someone else or another tab" when nobody decided it (a column matched
@@ -68,18 +66,12 @@ didn't": a messy file in, what is wrong fixed in the app, a clear account of the
       saying the column was matched again after the accept. Accepting again works.
     - The take-back line says a field "was matched again" and "to decide again" also when its column was cleared or
       went to another field, after the rows were decided again, and to people who cannot decide.
-    - A Replace stays when one match swaps the columns of two fields and neither new column reads. A save tried again
-      after an item changed keeps its first answers though somebody's match landed in between, so a Replace that
-      match should have taken back is saved.
-    - A request refused because items kept changing is titled "The import kept changing" above a sentence saying the
-      import did not change.
   - **For whoever changes the code.** `tags:check` takes 38 s on a chain of 20 calls, and `refs:check` does not
     return on seven module variables assigned to each other; no file here is of either shape. `WordMatch`, `Read`
     and the kept form of a held row are tagged unions whose cases are still built by hand. The property test of the
-    draft generates no take-back, empty decision, settled line, taken-up row or sign-out. Nothing fails when the tab
-    lock at page start, the session wiring in `main.tsx`, the bounds of `madeOn` or the held-confirm line is
-    removed, and three tests of a save while the session is asked again keep a person signed in, which the app does
-    not.
+    draft generates no take-back, empty decision, settled line, taken-up row or sign-out. Nothing fails when the
+    held-confirm line is removed, and three tests of a save while the session is asked again keep a person signed
+    in, which the app does not.
 - **Not verified:** how good the model help is on other files, and what it costs; the dark theme on the new screens;
   a restore after several confirms of one import replaced the same item in turn.
 - **Where my agent was wrong:** its profile missed rows 92 and 103 ("2024-13-01"), caught by the rules on the real

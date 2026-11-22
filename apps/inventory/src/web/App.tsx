@@ -2,9 +2,8 @@ import { lazy, Suspense } from "react"
 import { AppShell } from "@/components/app/AppShell"
 import { SignedIn } from "@/components/app/SignedIn"
 import { Skeleton } from "@inventory/ui/components/skeleton"
-import { useAtomMount, useAtomValue } from "@effect/atom-react"
+import { useAtomValue } from "@effect/atom-react"
 import * as Str from "effect/String"
-import { thisTab } from "@inventory/client/TabAtoms"
 import { location } from "@inventory/ui/Route"
 import { workspace } from "./preload.ts"
 
@@ -22,9 +21,6 @@ const GridGallery = import.meta.env.DEV ? lazy(() => import("@/pages/GridGallery
 /** The app: the sign-in screen for anyone not signed in, the workspace for a member of an organization. */
 export default function App() {
   const { path } = useAtomValue(location)
-  // This tab's id and its lock, from page start for the page's life: a tab on the sign-in page, or still loading the
-  // workspace, counts as open, and no other tab takes up the rows it kept.
-  useAtomMount(thisTab)
   if (ReviewGallery !== undefined && path.startsWith("/gallery/review")) {
     return (
       <Suspense fallback={null}>

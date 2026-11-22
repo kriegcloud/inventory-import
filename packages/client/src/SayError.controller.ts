@@ -129,10 +129,10 @@ export const sayError = (
         problems.length > 1 ? problems : []
       )
     }),
-    // The import kept changing while a save, a confirm or a match was worked out (others saving or matching at the
-    // same moment): nothing was written, and its reason says to try again.
+    // What a save, a confirm or a match was worked out against kept changing: the import, the items it would change, or
+    // both. Its reason says which, so the title says neither; nothing was written, and the reason says to try again.
     Match.when(S.is(DraftBusy), () =>
-      said("The import kept changing", reasonOf(error) ?? "Nothing was written. Try again in a moment.")
+      said("Nothing was written", reasonOf(error) ?? "Something kept changing meanwhile. Try again in a moment.")
     ),
     Match.when(isServerProblem, () =>
       said(

@@ -10,8 +10,12 @@ import {
   BreadcrumbSeparator
 } from "@inventory/ui/components/breadcrumb"
 import { ReviewSkeleton, someColumns, StepsSkeleton, TablePageSkeleton, UploadSkeleton } from "@inventory/ui/Skeletons"
-import { useAtomMount, useAtomValue } from "@effect/atom-react"
-import { sessionView } from "@inventory/access-web/Session"
+import { useAtomMount, useAtomRefresh, useAtomValue } from "@effect/atom-react"
+import { Alert, AlertDescription, AlertTitle } from "@inventory/ui/components/alert"
+import { Button } from "@inventory/ui/components/button"
+import { isNarrow } from "@inventory/ui/ContentWidth"
+import { sayError } from "@inventory/client/SayError"
+import { session, sessionView } from "@inventory/access-web/Session"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import { importInAddress } from "@inventory/catalog-web/Route"
 import { KeptNotices } from "@inventory/catalog-web/KeptNotices"
@@ -132,6 +136,33 @@ export default function Workspace() {
   return <WorkspaceFrame current={current} path={path} params={params} />
 }
 
+/**
+ * Who is signed in could not be read again: the page stays as it is, with what is typed in it, and nothing is sent
+ * until it is known. It is asked again by itself; the button asks now.
+ */
+function SessionNotice() {
+  const { error } = useAtomValue(sessionView)
+  const ask = useAtomRefresh(session)
+  const narrow = useAtomValue(isNarrow)
+  if (error === null) return null
+  return (
+    <Alert className={narrow ? "mx-4 my-3 w-auto flex-none" : "mx-6 my-4 w-auto flex-none"}>
+      <AlertTitle>We could not check that you are still signed in</AlertTitle>
+      <AlertDescription>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <p className="min-w-0">
+            {sayError(error).sentence} Nothing you decide or save is sent until we can, and it is checked again by
+            itself when the connection is back.
+          </p>
+          <Button variant="outline" size="xs" onClick={ask}>
+            Check now
+          </Button>
+        </div>
+      </AlertDescription>
+    </Alert>
+  )
+}
+
 function WorkspaceFrame(props: { current: AppPage; path: string; params: URLSearchParams }) {
   const { current, path, params } = props
   return (
@@ -144,6 +175,7 @@ function WorkspaceFrame(props: { current: AppPage; path: string; params: URLSear
       <div className="flex h-full flex-col">
         {/* Whatever page is shown: what became of the person's unsaved decisions while this tab was away. */}
         <KeptNotices />
+        <SessionNotice />
         <div className="min-h-0 flex-1">
           <Suspense fallback={<PageSkeleton path={path} params={params} />}>
             {current.path === peoplePath ? (

@@ -1,10 +1,15 @@
 ---
 name: ontology-validator
 description: >
-  Comprehensive ontology validation and quality assurance. Runs OWL
-  reasoners, SHACL validation, CQ test suites, and ROBOT quality reports.
-  Computes quality metrics and generates diff reports. Use when checking
-  ontology quality or before committing changes.
+  Reports on this repository's ontology gates, each as passed, failed or
+  not built: the generated Turtle (OWL, SKOS, SHACL projected from the
+  TypeScript vocabulary module) byte-compared and re-parsed, the OWL
+  reasoner, SHACL over the stored rows of the messy sample, the
+  competency-question SPARQL suite, and label and definition coverage.
+  Also validates an SSSOM mapping file. Use when asked to validate,
+  reason over or quality-check the ontology or its vocabulary, or before
+  an ontology release. Not for checking a spreadsheet, imported rows,
+  item records, Effect Schemas, column matching or the app's own tests.
 ---
 
 # Ontology Validator
@@ -14,24 +19,50 @@ description: >
 You are responsible for the evaluation phase — comprehensive validation
 across logical, structural, and documentation dimensions. You run the
 full quality checklist, report results, and flag issues for upstream
-skills to fix. You do NOT fix issues yourself (except trivial annotation
-fixes) — you report and hand back to the appropriate skill.
+skills to fix. You do NOT edit the ontology, its shapes or its tests, not
+even to add a missing label — you report and hand back to the appropriate
+skill.
+
+## In this repository
+
+Read `../_shared/project-profile.md` first; it wins over this file. Terms live in one TypeScript vocabulary module,
+record rules in Effect Schemas, and every Turtle file is generated. None of that exists yet: the vocabulary module,
+the projector, generated Turtle, SHACL, the competency-question suite and the reasoner step are not built. Report each
+such gate as "not built", never as run or passed. ROBOT is not installed; do not download it without asking.
+
+| Upstream step or output | Here |
+| --- | --- |
+| Byte-compare and re-parse of the Turtle (not upstream) | The first gate, in `bun run check` (decision 6). Not built |
+| Step 1 reasoner | The reasoner step in `bun run check:full`. Not built, and which reasoner is not chosen: put it to Benjamin |
+| Step 2 ROBOT report | Label and definition coverage as a vocabulary-module test or SPARQL over the generated Turtle; the properties are open, so read `skos:prefLabel` and `skos:definition`, never `rdfs:label` alone. Not built |
+| Step 3 SHACL over the ontology | The generated shapes over the 155 stored rows of the messy sample plus must-fail fixtures, a slow test. Not built. The sample stores items only: a party term has no stored row, so only the CQ suite's named `test_` fixtures (not built) could cover it; which data proves the party model is Benjamin's |
+| Step 4 CQ suite | Not built. Run nothing; say so |
+| Step 5 metrics, Step 6 dimensions | Apply, from whatever gates exist; a gate not built is not a 0% or a PASS |
+| Step 7 diff | `git diff` of the generated Turtle, once it exists |
+| Also check | No `owl:inverseOf`, no `owl:sameAs`, every IRI under the `example.org` placeholder (the `laws ontology-terms` rule, not built) |
+| SSSOM validation | Applies: `uvx --from sssom sssom validate` on a file under `explorations/erp-ontology/assets/mappings/`. Every row is a candidate until Benjamin's `rat-` record for it exists, whatever its confidence |
+| Validation report | A section of `explorations/erp-ontology/research/NN-title.md` (frontmatter `type`, `title`, `description`); then `bun run docs:check` |
+| A fix | Never an edit to Turtle. A proposed change to the vocabulary module or a record schema, for Benjamin; a missing or wrong shape is a projector bug |
 
 ## When to Activate
 
-- User mentions "validate", "verify", "check", "quality", or "test"
-- After any ontology modification (should be invoked automatically)
-- Before commits or releases
+- The user asks to validate, reason over, or quality-check an ontology,
+  its SHACL shapes, its competency-question tests, or its SSSOM mappings
+- After another ontology skill changed an ontology file
+- Before an ontology release
 - Pipeline A Step 5, Pipeline B Step 3, Pipeline C Step 2
 
 ## Shared Reference Materials
 
-Read these files from `_shared/` before beginning work:
+Read these files from `../_shared/` (relative to this skill's directory)
+before beginning work:
 
-- `_shared/methodology-backbone.md` — lifecycle phase context (Phase 6: Evaluation)
-- `_shared/quality-checklist.md` — the full validation checklist
-- `_shared/anti-patterns.md` — anti-pattern detection queries
-- `_shared/naming-conventions.md` — naming compliance checks
+- `../_shared/project-profile.md`: this repository's decisions; read it first, it wins
+- `../_shared/gist-categories.md`: the gist projection the orphan and parent checks read
+- `../_shared/methodology-backbone.md` — lifecycle phase context (Phase 6: Evaluation)
+- `../_shared/quality-checklist.md` — the full validation checklist
+- `../_shared/anti-patterns.md` — anti-pattern detection queries
+- `../_shared/naming-conventions.md` — naming compliance checks
 
 ## Consistency vs. Validity (OWA vs. CWA)
 
@@ -54,17 +85,30 @@ It can also pass SHACL and still be logically inconsistent.
 
 ### Step 1: Logical Validation (Level 1)
 
+> Here: the reasoner step in `bun run check:full` is not built and its reasoner is not chosen. Report "not built" and put the choice to Benjamin: ELK is complete only if the projector emits EL constructs alone (subClassOf, some, DisjointClasses); HermiT or Openllet is needed once it emits unionOf, only, cardinality or disjointUnionOf. The route is part of the question (a pinned ROBOT jar through `java`, a standalone HermiT or Openllet, a JavaScript reasoner); once he has chosen, propose how `check:full` gets a pinned copy, and ask before downloading anything.
+
 ```bash
-# Consistency check with ELK (fast, for EL profile)
+mkdir -p results
+
+# Does the ontology stay within OWL 2 EL? (an error when it does not)
+robot validate-profile --profile EL --input ontology.ttl \
+  --output results/el-profile.txt
+
+# EL ontology only: consistency check with ELK (fast)
 robot reason --reasoner ELK --input ontology.ttl
 
-# Consistency check with HermiT (complete, for full DL)
+# Any ontology outside EL: consistency check with HermiT (full OWL 2 DL)
 robot reason --reasoner HermiT --input ontology.ttl
 
-# Check for unsatisfiable classes
+# Unsatisfiable classes: reason fails on them and writes a debug module
 robot reason --reasoner HermiT --input ontology.ttl \
-  --dump-unsatisfiable unsatisfiable.txt
+  --dump-unsatisfiable results/unsatisfiable.owl
 ```
+
+ELK reasons over OWL 2 EL only and ignores every other axiom. It is the
+consistency gate only when `validate-profile --profile EL` passes; for any
+other ontology a green ELK run checks nothing outside EL.
+ROBOT's reasoners are `ELK` (the default), `hermit`, `jfact`, `whelk`, `emr` and `structural`; Openllet runs through its own CLI.
 
 If inconsistent:
 1. Parse the reasoner explanation
@@ -75,41 +119,133 @@ If inconsistent:
 
 ### Step 2: Quality Report (Level 2)
 
+> Here: ROBOT is not installed. Label and `skos:definition` coverage over the generated Turtle is a vocabulary-module test or the SPARQL below run with rdflib; not built, so report "not built".
+
 ```bash
 robot report --input ontology.ttl \
   --fail-on ERROR \
   --output report.tsv
 ```
 
-Checks: missing labels, missing definitions, multiple labels in same
+Checks: missing labels, missing definitions (see below), multiple labels in same
 language, deprecated term references, annotation whitespace issues.
+
+In ROBOT's default profile a missing label is an ERROR but a missing
+definition is only a WARN, and `missing_definition` reads only
+`obo:IAO_0000115` (or the `IAO_0000600` elucidation), never
+`skos:definition`. So `--fail-on ERROR` never fails on definitions. Use
+the one definition property the project records, and gate it: for
+`skos:definition`, copy ROBOT's default `report_profile.txt`, add a tab-
+separated line `ERROR	file:./missing-skos-definition.rq`, and pass
+`--profile` (a profile runs only the queries it names). A custom report
+query returns exactly `?entity ?property ?value`:
+
+```sparql
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+SELECT DISTINCT ?entity ?property ?value WHERE {
+  ?entity a owl:Class .
+  FILTER(isIRI(?entity))
+  FILTER NOT EXISTS { ?entity owl:deprecated true }
+  FILTER NOT EXISTS { ?entity skos:definition ?d }
+  BIND(skos:definition AS ?property)
+  BIND("" AS ?value)
+}
+```
 
 ### Step 3: SHACL Validation (Level 3)
 
+> Here: the shapes are generated from the record schemas and run over the 155 stored rows of the messy sample plus must-fail fixtures, as a slow test. T-Box lint (labels, definitions, orphans) belongs to Step 2; a label shape reads `skos:prefLabel` until the label property is decided. Not built: report "not built".
+
 ```bash
-uv run pyshacl -s shapes/ontology-shapes.ttl -i rdfs ontology.ttl -f human
+uvx pyshacl -s shapes/ontology-shapes.ttl -i none ontology.ttl -f human
 ```
+
+Validate without inference (`-i none`). With `-i rdfs`, pyshacl first adds
+what RDFS entails: `rdfs:domain` and `rdfs:range` give every subject and
+object the very type a shape checks, so a domain or range shape passes by
+construction. `rdfs:domain` and `rdfs:range` are inference rules, not
+constraints; a required type is stated in the shapes as `sh:class` or
+`sh:datatype` on a property shape. pyshacl exits 1 when the data does not
+conform.
 
 Standard shapes:
 - Every class has `rdfs:label` (minCount 1)
-- Every class has `skos:definition` (minCount 1, severity: Warning)
+- Every class has the project's definition property (minCount 1)
 - No orphan classes (every class has a parent)
-- Domain/range constraints satisfied
+- Subjects and objects of each property have the class or datatype the
+  shapes require (`sh:class`, `sh:datatype`)
 
 ### Step 4: CQ Test Suite (Level 4)
 
+> Here: no competency-question suite exists. Report "not built" and run nothing.
+
+`tests/cq-test-manifest.yaml`, written by `ontology-requirements`, names
+each CQ's query, fixture graph, expected result (`tests/expected/`),
+must-fail case and reasoning step. Every query runs against the ontology
+merged with its CQ's fixture, never against the ontology alone, and
+every output goes to a scratch path.
+
 ```bash
-# Run all CQ test queries
-robot verify --input ontology.ttl \
-  --queries ontologies/{name}/tests/ \
-  --output-dir test-results/
+mkdir -p test-results/merged test-results/verify test-results/query
+
+# One merged copy per CQ
+robot merge --input ontology.ttl --input tests/fixtures/cq-001.ttl \
+  --output test-results/merged/cq-001.ttl
+
+# When the manifest records a reasoning step: reason the merged copy
+robot merge --input ontology.ttl --input tests/fixtures/cq-001.ttl \
+  reason --reasoner <one that covers the ontology's profile> \
+  --axiom-generators "SubClass ClassAssertion" --include-indirect true \
+  --output test-results/merged/cq-001.ttl
+
+# SELECT and ASK CQs: one result file per query, named after it
+robot query --input test-results/merged/cq-001.ttl \
+  --queries tests/cq-001.sparql --output-dir test-results/query/
+
+# Constraint CQs: robot verify fails when the query returns any row
+robot verify --input test-results/merged/cq-002.ttl \
+  --queries tests/cq-002.sparql --output-dir test-results/verify/
 ```
 
-For each test:
-- Enumerative CQs: verify non-empty results
-- Constraint CQs: verify zero violations (zero-result queries pass)
+A CQ passes by the rule `ontology-requirements` set for its type:
+
+| CQ type | Passes when |
+|---------|-------------|
+| Enumerative, relational, temporal (SELECT) | Result rows equal the expected-rows CSV, order ignored |
+| Quantitative (SELECT with COUNT/SUM) | The single row equals the expected value |
+| Boolean (ASK) | `robot query` writes `true` or `false`; it equals the expected answer |
+| Constraint (SELECT of violations) | Zero rows, AND its companion antecedent query, run with `robot query` on the same merged copy, returns rows |
+
+A constraint whose antecedent query returns nothing passes vacuously and
+counts as a FAIL. A result that only parses, or is only non-empty, is not
+a pass. Compare rows without the header and in sorted order:
+
+```bash
+diff <(tail -n +2 test-results/query/cq-001.csv | tr -d '\r' | sort) \
+     <(tail -n +2 tests/expected/cq-001.csv | tr -d '\r' | sort)
+```
+
+Then run each test on its must-fail case (the ontology or fixture with
+the needed axiom or value removed, written to a scratch file). The test
+must report FAIL there; a test that still passes certifies nothing and
+goes back to `ontology-requirements`.
+
+Without ROBOT, rdflib prints the rows as CSV, or the ASK answer, for a
+query over the ontology and its fixture. It does no OWL reasoning, so it
+stands in only for a CQ with no reasoning step:
+
+```bash
+uv run --with rdflib python -c 'import sys,rdflib; g=rdflib.Graph(); [g.parse(f) for f in sys.argv[2:]]; r=g.query(open(sys.argv[1]).read()); print(str(r.askAnswer).lower()) if r.type=="ASK" else sys.stdout.write(r.serialize(format="csv").decode())' tests/cq-001.sparql ontology.ttl tests/fixtures/cq-001.ttl
+```
+
+A failing CQ test is never edited to pass. The ontology is fixed by its
+owning skill, or the requirement is changed with the person's sign-off
+and the change recorded by `ontology-requirements`.
 
 ### Step 5: Coverage Metrics (Level 5)
+
+> Here: report a metric only for a gate that exists; for the rest write "not built", never 0% or PASS. Label coverage counts `skos:prefLabel` until the label property is decided.
 
 Calculate and report:
 
@@ -117,8 +253,8 @@ Calculate and report:
 |--------|--------|--------|
 | Consistency | PASS | `robot reason` |
 | Label coverage | 100% | Count classes with `rdfs:label` |
-| Definition coverage | ≥ 80% | Count classes with `skos:definition` |
-| CQ test pass rate | 100% (Must-Have) | `robot verify` |
+| Definition coverage | 100%: definitions are required; a gap does not block a commit and blocks a release | Count classes with the project's definition property |
+| CQ test pass rate | 100% (Must-Have), each failing on its must-fail case | `robot query` and `robot verify` on the ontology merged with each fixture |
 | SHACL conformance | PASS | `pyshacl` |
 | Unsatisfiable classes | 0 | `robot reason` |
 | Orphan classes | 0 | SPARQL check |
@@ -136,6 +272,8 @@ judgments with rationale.
 
 ### Step 7: Diff Report (for PRs/releases)
 
+> Here: `git diff` of the generated Turtle, once a projector writes it; until then "not built".
+
 ```bash
 robot diff --left previous.ttl --right ontology.ttl \
   --format markdown --output diff.md
@@ -145,33 +283,53 @@ robot diff --left previous.ttl --right ontology.ttl \
 
 ### Anti-pattern detection queries
 
-Run SPARQL queries from `_shared/anti-patterns.md`:
+> Here: run them, once generated Turtle exists, with the rdflib command of Step 4 (`uv run --with rdflib python ...`), not `robot query`.
+
+Save the detection queries from `../_shared/anti-patterns.md` to files:
+section 1 (singleton hierarchy) as `singleton-check.sparql`, section 4
+(missing disjointness) as `disjoint-check.sparql`, section 8 (orphan
+class) as `orphan-check.sparql`. `--query` takes a query file and an
+output file:
 
 ```bash
-# Singleton hierarchy detection
-robot query --input ontology.ttl --query singleton-check.sparql --output singletons.csv
-
-# Orphan class detection
-robot query --input ontology.ttl --query orphan-check.sparql --output orphans.csv
-
-# Missing disjointness detection
-robot query --input ontology.ttl --query disjoint-check.sparql --output missing-disjoint.csv
+robot query --input ontology.ttl \
+  --query singleton-check.sparql results/singletons.csv \
+  --query orphan-check.sparql results/orphans.csv \
+  --query disjoint-check.sparql results/missing-disjoint.csv
 ```
 
 ### SSSOM validation (when applicable)
 
+> Here: the mapping file sits under `explorations/erp-ontology/assets/`, not `ontologies/{name}/mappings/`.
+
 ```bash
-uv run sssom validate ontologies/{name}/mappings/source-to-target.sssom.tsv
+uvx --from sssom sssom validate ontologies/{name}/mappings/source-to-target.sssom.tsv
 ```
 
 ### Naming convention compliance
 
+> Here: names are set in the vocabulary module; a naming test there is not built. Over generated Turtle, run the query with rdflib, not ROBOT.
+
+Classes whose local name is not CamelCase (`../_shared/naming-conventions.md`;
+not for opaque numeric IDs), saved as `naming-check.sparql`:
+
+```sparql
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+SELECT ?class WHERE {
+  ?class a owl:Class .
+  FILTER(isIRI(?class))
+  BIND(REPLACE(STR(?class), "^.*[/#]", "") AS ?local)
+  FILTER(!REGEX(?local, "^[A-Z][A-Za-z0-9]*$"))
+}
+```
+
 ```bash
-# Check CamelCase class names (custom query)
-robot query --input ontology.ttl --query naming-check.sparql --output naming-issues.csv
+robot query --input ontology.ttl --query naming-check.sparql results/naming-issues.csv
 ```
 
 ## Outputs
+
+> Here: the report is a section of `explorations/erp-ontology/research/NN-title.md`; result files go to a scratch folder, never `docs/` or `ontologies/{name}/`.
 
 This skill produces:
 
@@ -181,9 +339,11 @@ This skill produces:
 | ROBOT report | `{name}-report.tsv` | TSV | Detailed quality report |
 | Test results | `test-results/` | Directory | Per-CQ test outputs |
 | Diff report | `ontologies/{name}/docs/diff.md` | Markdown | Changes between versions |
-| Unsatisfiable list | `unsatisfiable.txt` | Text | List of unsatisfiable classes (if any) |
+| Unsatisfiable debug module | `results/unsatisfiable.owl` | OWL | Unsatisfiable classes and the axioms behind them (if any) |
 
 ## Handoff
+
+> Here: the inputs are the generated Turtle and its tests (none built yet) and SSSOM files under `explorations/erp-ontology/assets/mappings/`. A curator's or architect's proposal arrives as a research report with the module diff: review it against each gate, reported as not built. Fixes go back as a proposed change to the vocabulary module or a record schema. Each checklist item is passed, failed or not built; a not-built gate is never ticked as executed.
 
 **Receives from**:
 - `ontology-architect` — `ontologies/{name}/{name}.ttl`,
@@ -204,6 +364,8 @@ This skill produces:
 - [ ] Recommendations for fixes reference the appropriate upstream skill
 
 ## Quality Report Format
+
+> Here: the report opens with OKF frontmatter (`type`, `title`, `description`), and every level without code behind it reads "Status: not built"; Overall is PASS only when every gate ran, and otherwise reads "not built (N of M gates ran)" or FAIL.
 
 ```markdown
 # Validation Report: {name}
@@ -238,7 +400,7 @@ Date: {date}
 | Metric | Value | Target | Status |
 |--------|-------|--------|--------|
 | Label coverage | X% | 100% | PASS/FAIL |
-| Definition coverage | X% | ≥80% | PASS/FAIL |
+| Definition coverage | X% | 100% | PASS/FAIL |
 | Orphan classes | N | 0 | PASS/FAIL |
 
 ## Level 6: Evaluation Dimensions
@@ -253,18 +415,22 @@ Date: {date}
 
 ## Anti-Patterns to Avoid
 
+> Here: "must be checked" means each level is reported as passed, failed or not built; a not-built level is never called checked.
+
 - **Shallow validation**: Don't just run the reasoner and declare success.
   All six validation levels (plus diff review for releases/PRs) must be checked.
 - **Ignoring warnings**: WARNINGs don't block commit but should be tracked
   and addressed.
 - **Fixing in the wrong skill**: The validator reports; the architect or
-  curator fixes. Don't modify the ontology from the validator unless the
-  fix is trivial (e.g., adding a missing label).
+  curator fixes. The validator never modifies the ontology, a missing
+  label included.
 - **Skipping CQ tests**: CQ tests are acceptance criteria. A passing
   reasoner with failing CQ tests means the ontology is logically consistent
   but functionally incomplete.
 
 ## Error Handling
+
+> Here: a missing shapes file is a projector bug or a gate not built, not a hand-back to the architect; a missing CQ suite is "not built".
 
 Missing validation prerequisites are blockers, not passing checks. The validator
 reports them and requests the owning role's output; it does not author replacement
@@ -272,7 +438,7 @@ shapes or tests while acting as the evaluator.
 
 | Error | Likely Cause | Recovery |
 |-------|-------------|----------|
-| Reasoner timeout | Ontology too large or complex for HermiT | Switch to ELK; profile the ontology for complexity hotspots |
+| Reasoner timeout | Ontology too large or complex for HermiT | Report the DL consistency check as NOT RUN and profile the ontology for complexity hotspots. An ELK run may be added only for an EL ontology; for any other, say which axioms ELK left unchecked, and never report it as the consistency result |
 | SHACL shapes file missing | Architect did not supply the prerequisite shapes | Report the SHACL check as NOT RUN and hand back to the architect to supply shapes; rerun validation after delivery |
 | CQ test files missing | Requirements skill output not available | Report CQ testing as NOT RUN and hand back to the requirements skill to supply tests from the competency questions; rerun after delivery |
-| ROBOT report fails to parse | Corrupt or malformed Turtle | Run `robot validate --input ontology.ttl` to find syntax errors |
+| ROBOT report fails to parse | Corrupt or malformed Turtle | Load the file to find the syntax error: `robot convert --input ontology.ttl --format ttl --output results/parse-check.ttl`, or `uv run --with rdflib python -c 'import sys,rdflib; rdflib.Graph().parse(sys.argv[1], format="turtle")' ontology.ttl`. Report it and hand back to the owning skill |

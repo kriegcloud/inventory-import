@@ -1,16 +1,12 @@
 ---
 name: ontology-foundational-auditor
 description: >
-  Use whenever source code, schemas, types, enums, or configuration are
-  about to become ontology classes, properties, or taxonomy — any
-  extraction-to-T-Box step. Use when the user asks whether something is a
-  kind, role, phase, relator, event, or "just an implementation artifact";
-  when auditing a taxonomy or class hierarchy for category mistakes; when
-  deciding if two concepts are related at all; or whenever the words
-  denotation, identity criterion, rigidity, OntoClean, UFO, foundational
-  audit, or ontological commitment come up. Runs between ontology-scout
-  and ontology-conceptualizer as the gate that keeps representations from
-  silently becoming referents.
+  Audits a candidate term for this repository's ERP ontology (the explorations/erp-ontology packet) before it enters
+  the TypeScript vocabulary module: whether a source declaration or quoted text denotes anything at all, and if so its
+  identity criterion, rigidity and category (kind, role, phase, relator, event, information object), attacked by an
+  independent adversary and decided by Benjamin. Use for denotation, OntoClean, UFO or foundational audits of ontology
+  terms or of an existing ontology hierarchy. Not for reviewing app code, record schemas, database tables, file
+  columns or tests.
 ---
 
 # Ontology Foundational Auditor
@@ -42,6 +38,27 @@ models remain viable` are valid SUCCESSFUL outcomes. Models are empirically
 weak at asserting unrelatedness — abstention is a scored capability here, not
 a failure.
 
+## In this repository
+
+Read `../_shared/project-profile.md` first: it wins over this file. The method below is unchanged; where it writes,
+what it proposes and who decides are not.
+
+| Step or output | Here |
+| --- | --- |
+| `$ONT` (`ontologies/{name}`) | `explorations/erp-ontology/assets/audit/<name>`. `.oxfmtrc.json` ignores `explorations/**`, so the sha256 over exact bytes holds; never pass these files to a formatter |
+| CQ file, `docs/scope.md` | `ontology-requirements` writes `explorations/erp-ontology/assets/requirements/competency-questions.yaml` and `scope.md` (OKF frontmatter); the manifest's `cq_suite.path` and `scope_doc.path` name them, and every `$ONT/docs/...` below means them. Never copy them. Without them the hard stop applies |
+| Commits in steps 1 and 2, pinning | Benjamin's. The packet is untracked, so `--repo` refuses until he commits it or waives the pin (`pin_waived`, his reason). `bun run check` reads every code file git would commit outside `.agents/` and `scratchpad/`, so run it with the adapter copy in place before asking (not verified). A prose-only run (no code declares the term) still needs one `adapters` entry, and no route is tested: ask him, and stop at step 1 |
+| Step 4, identity | Report 01's "tenant and a source id" is a `reidentification_key` of a tenant's record; `identity_criterion` stays `unresolved: <the question to Benjamin>` until he says what makes two companies one |
+| Step 5, reuse | gist first (`../_shared/gist-categories.md`). IOF, ISA-95, schema.org, W3C ORG and Sutton matches are alignment rows, never parents. `foundational.gufo_alignment` stays a UFO analysis tag |
+| Step 6, proposal | A proposed entry in the vocabulary module (sketched as `Terms.vocab.ts` in research/02; not built), shown as a TypeScript sketch in a research report. `proposed_iri` under `example.org`. No inverse property, no `owl:sameAs` merge, identity never a SKU or a name |
+| Step 7, seats | Launched as the session's rules allow (`CLAUDE.md` "Sub-agents", the user's routing rules). `codex exec` is one launcher. Each seat is a fresh context with only its inputs |
+| Step 8, steward | Benjamin, through `AskUserQuestion`, one proposal per question, recommended answer first. Without that tool (a subagent, a workflow child) hand the questions back in "Needs the person" and write no `rat-` record |
+| Outputs, Handoff | The `rat-` file in `$ONT/governance/ratifications/` is the ratification; add a one-line mirror to the packet's `DECISIONS.md`. The conceptualizer, architect, mapper and curator read the `rat-` file |
+| Validator | Run from the repository root; `effect` and `yaml` resolve from the root `node_modules` (`yaml` 2.9.1 is only a devDependency of `@beep/repo-cli`, hoisted; `effect` 4.1.5). `scripts/validate_artifacts.test.ts` (`bun:test`) and `scripts/parity-fixtures.json` (beep-effect trees) do not apply here |
+
+Does not apply: editing any `.ttl`, `.owl` or SHACL file, BFO, writing under `docs/` or `ontologies/`, minting an IRI
+under a real domain. The vocabulary module, the projector, generated Turtle, SHACL and the CQ suite are not built.
+
 ## When to Activate
 
 - Pipeline position: after `ontology-requirements` and `ontology-scout`,
@@ -55,20 +72,26 @@ a failure.
 
 ## Shared Reference Materials
 
-Read before working:
+Read before working. Each path is relative to this skill's directory; the
+validator resolves `../_shared` the same way and needs it there.
 
-- `_shared/foundational-analysis.md` — the six laws, category cheat-sheet,
+- `../_shared/project-profile.md` (read it first), `../_shared/gist-categories.md` (the upper ontology, for reuse).
+- `../_shared/foundational-analysis.md` — the six laws, category cheat-sheet,
   software-domain failure modes, admission discipline.
-- `_shared/stage-authority-matrix.yaml` — who produces what, with what
+- `../_shared/stage-authority-matrix.yaml` — who produces what, with what
   authority; the forbidden-autonomous-decisions list.
-- `_shared/ontoclean-rules.yaml` — mechanical BLOCK/REVIEW taxonomy checks.
-- `_shared/schemas/*.schema.yaml` — the artifact contracts (one file per record
-  kind; the review disposition and dispositions index are contracted by the
-  template + validator).
-- `_shared/methodology-backbone.md`, `_shared/naming-conventions.md` — family
+- `../_shared/ontoclean-rules.yaml` — BLOCK/REVIEW taxonomy rules the adversary
+  applies; the validator does not read it (it checks category and rigidity
+  one record at a time, never across a `parents` edge).
+- `../_shared/schemas/*.schema.yaml` — the artifact contracts (one file per record
+  kind; the review disposition by its template + validator; the dispositions index
+  by the validator alone: a LIST of `{observation, outcome, ref}` rows, step 9).
+- `../_shared/methodology-backbone.md`, `../_shared/naming-conventions.md` — family
   lifecycle context and term standards.
 
 ## Core Workflow
+
+> Here: `ontologies/{name}` is `explorations/erp-ontology/assets/audit/<name>`, and no CQ suite exists yet, so the hard stop below applies.
 
 Work is a state machine over content-addressed artifacts, not a conversation.
 Working directory: `ontologies/{name}/work/` — `{name}` is the ontology id
@@ -86,18 +109,22 @@ them. The validator verifies the count
 against the CQ file itself under `--repo`; an asserted count is not a count.
 
 1. **Pin the corpus.** Write `work/run-manifest.yaml` per
-   `_shared/schemas/run-manifest.schema.yaml`: commit SHA, scope-doc and CQ
+   `../_shared/schemas/run-manifest.schema.yaml`: commit SHA (a commit that
+   already holds the adapter snapshot, golden fixture, CQ file and scope doc;
+   Tool Commands step 2 gives the order), scope-doc and CQ
    digests, adapter script digests, per-agent model + prompt digests. Pinning
    is REQUIRED by default; only an explicit user waiver recorded in the
    manifest relaxes it. Dirty/unpinned source without a waiver is a hard stop.
-2. **Observe (script-produced, never hand-typed).** For parseable
+2. > Here: the adapter script and golden fixture are committed only when Benjamin asks; until then `--repo` refuses (In this repository, commits).
+
+   **Observe (script-produced, never hand-typed).** For parseable
    source, the agent AUTHORS an adapter script (strongest parser available:
    compiler API > AST > generic syntax parser > structured-text parser),
    commits it, records its digest in the manifest, and the SCRIPT emits the
    `SourceObservation` records — hand-typing observation records for
    parseable source is forbidden (an LLM transcribing syntax is not a
    deterministic parser). Predicates come ONLY from the closed syntactic
-   vocabulary in `_shared/schemas/source-observation.schema.yaml` — they
+   vocabulary in `../_shared/schemas/source-observation.schema.yaml` — they
    describe syntax (`extends_syntactically`), never interpretation, and the
    `object` field is grammar-checked per predicate (an identifier, never
    prose: interpretation smuggled into the object is the same crime as a
@@ -110,7 +137,16 @@ against the CQ file itself under `--repo`; an asserted count is not a count.
    exact span text (the validator recomputes it from the pinned tree under
    `--repo`, so an adapter that emits facts it did not read fails
    mechanically); before the run, prove the adapter on one golden fixture
-   (input snippet → expected records, committed beside it). Prose enters
+   (input snippet → expected records, committed beside it; name expected
+   records `*.expected.yaml`, never with a record prefix such as `so-`, because
+   the validator scans `$ONT` and would read them as live records). **Adapter
+   CLI** (the runner passes exactly these): `--self-check /golden` exits 0 only
+   when its output on the fixture input equals the expected records;
+   `--repo /repo --out /out` writes one record per file into `/out`. The
+   sandbox has Bun/Node builtins only; for a compiler API, import the
+   repository's own installed copy by absolute path (TypeScript: `import ts
+   from "/repo/node_modules/typescript"`, read-only) and record its version
+   in `extractor.parser`. Prose enters
    ONLY as `ProseObservation` quotation records in `prose-observations/` —
    the one hand-captured kind, quote-verbatim, no paraphrase.
 3. **Hypothesize denotation** (`prompts/denotation.md`). For each
@@ -123,7 +159,9 @@ against the CQ file itself under `--repo`; an asserted count is not a count.
    `representation_status` is `domain_referent` or `information_artifact`;
    everything else dispositions as outcome `irrelevant` or `unresolved` in
    the index (step 9).
-4. **Analyze foundation** (`prompts/ufo-analysis.md`). For each
+4. > Here: a party's "tenant and a source id" (report 01) goes in `reidentification_key`; `identity_criterion` stays `unresolved: <question to Benjamin>`.
+
+   **Analyze foundation** (`prompts/ufo-analysis.md`). For each
    surviving hypothesis: identity criterion, rigidity, dependence,
    temporality, category, the spec-vs-execution / world-vs-information /
    role-vs-bearer tests, strongest counterexample, remaining rival models.
@@ -135,13 +173,17 @@ against the CQ file itself under `--repo`; an asserted count is not a count.
    defensible) — forcing every deferral into a proposal would make deferral
    an admission ramp, and dropping it would make deferral a trapdoor. Both
    surfaces reach the steward.
-5. **Reuse pass.** Check candidates against `ontology-scout` results
-   (gUFO/BFO/domain vocabularies). **Mapping to an existing term is NOT an
+5. > Here: the upper ontology is the gist projection (`../_shared/gist-categories.md`); IOF, ISA-95 and the rest are alignment rows only.
+
+   **Reuse pass.** Check candidates against `ontology-scout` results
+   (the upper ontology the scope document names, plus domain vocabularies). **Mapping to an existing term is NOT an
    analysis bypass**: it becomes an `OntologyTermProposal` with
    `reuse.exact_reuse_found: true` + the mapping — IdentityCard and
    semantic-compatibility justification still required, adversarial pass
    still applies (a reused class must actually match the intended semantics).
-6. **Propose** (`prompts/synthesis.md`). Emit `OntologyTermProposal`
+6. > Here: a proposal targets the vocabulary module (not built), with `proposed_iri` under `example.org`; no `owl:inverseOf`, no `owl:sameAs`.
+
+   **Propose** (`prompts/synthesis.md`). Emit `OntologyTermProposal`
    records. Warrant rules: decision terms cite CQs the term is REQUIRED to
    answer (a listing-CQ that merely mentions a word does not warrant minting
    it); support terms cite the DECISION TERMS they serve — never a CQ, never
@@ -149,7 +191,9 @@ against the CQ file itself under `--repo`; an asserted count is not a count.
    rival models, emit BOTH proposals (or one proposal + an explicit
    steward-choice open issue) — parking a viable rival in `open_issues` is
    the forbidden silent merge. `status: proposed`, always.
-7. **Adversarial pass — independent by construction.** Two seats, two
+7. > Here: launch each seat as this session's rules allow; the role separation and blinding below still hold.
+
+   **Adversarial pass — independent by construction.** Two seats, two
    artifact shapes. (a) The ADVERSARY runs `prompts/ontoclean-adversary.md`
    (owning taxonomy + identity + warrant + null-discriminator attacks) as a
    SEPARATE invocation whose input is the proposals, foundational records,
@@ -179,7 +223,9 @@ against the CQ file itself under `--repo`; an asserted count is not a count.
    for a NEW synthesis pass, never into `notes`, never applied in place. A
    referent is DISPUTED when the adversary returned non-PASS, the seats'
    categories diverge, or its analysis lists a viable rival.
-8. **Gate, then hand to the steward.** The gate is MECHANICAL: run the
+8. > Here: the steward is Benjamin, asked through `AskUserQuestion` (or handed back when the tool is absent); mirror each `rat-` record in `DECISIONS.md`.
+
+   **Gate, then hand to the steward.** The gate is MECHANICAL: run the
    validator in `--gate` mode (Tool Commands). It refuses submission when any
    proposal lacks a current adversary review, when the latest review for a
    proposal is FAIL (revise via `revision_requests` + new synthesis pass +
@@ -194,7 +240,7 @@ against the CQ file itself under `--repo`; an asserted count is not a count.
    Prepare a ratification-request package presenting EVERY submittable
    proposal individually (never only a summary table). The STEWARD authors
    the `Ratification` records — one decision per proposal
-   (`_shared/schemas/ratification.schema.yaml`). Scribing rules: a batch
+   (`../_shared/schemas/ratification.schema.yaml`). Scribing rules: a batch
    utterance ("accept all 12") is ONE decision, not twelve — re-present each
    proposal and scribe each answer; the validator rejects a
    `verbatim_decision` that does not name its proposal and rejects
@@ -222,22 +268,31 @@ against the CQ file itself under `--repo`; an asserted count is not a count.
 
 ## Tool Commands
 
-One exact command per workflow stage. `$SKILL` = this skill's directory;
-`$ONT` = `ontologies/{name}` (`{name}` = manifest `ontology.name`); `$WORK` =
-`$ONT/work`; `VAL` = the validator invocation below. The validator
+> Here: set `ONT="explorations/erp-ontology/assets/audit/<name>"` and read each `$ONT/docs/competency-questions.yaml` and `$ONT/docs/scope.md` as the `assets/requirements/` files; the `git commit` waits for Benjamin; launch `seat()` as the session's rules allow.
+
+One exact command per workflow stage, run from the repository root. The
+block sets `$SKILL` (this skill's directory), `$ONT` (`ontologies/{name}`,
+`{name}` = manifest `ontology.name`) and `$WORK` (`$ONT/work`); `VAL` is the
+validator invocation below. The validator
 (`$SKILL/scripts/validate_artifacts.ts`) is the machine enforcement of every
 contract — the schema files are readable exemplars; the script encodes
 required keys, enums, object grammars, content rules, and cross-record rules.
 Run `--self-test` once per session to prove the rules fire. Validation ALWAYS
 scans `$ONT` (the ontology root), never `$WORK` alone — governance and the
-manifest must be inside the scan.
+manifest must be inside the scan. Nothing but this run's records may sit
+under `$ONT`: no `work-*` copy, no scratch rerun, no golden record with a
+record prefix.
 
 ```bash
-# Step 0 — layout + self-test. VAL is a FUNCTION (an alias defined in the same
-# non-interactive block does not survive parsing). $SHARED = the family contract dir.
+# Step 0 — variables, layout, self-test. VAL is a FUNCTION (an alias defined in
+# the same non-interactive block does not survive parsing).
+set -euo pipefail; if [ -n "${BASH_VERSION:-}" ]; then shopt -s nullglob; else setopt NULL_GLOB; fi  # bash or zsh
+SKILL="<absolute path of this skill's directory>"
+ONT="ontologies/<name>"; WORK="$ONT/work"; SHARED="$SKILL/../_shared"
+[ -f "$SKILL/scripts/validate_artifacts.ts" ] && [ -d "$SHARED/schemas" ] || { echo "refusing: \$SKILL is wrong or ../_shared is missing beside it" >&2; exit 1; }
 mkdir -p $WORK/{observations,prose-observations,hypotheses,foundational,alternative,proposals,rejections} $ONT/governance/ratifications $ONT/adapters/golden
-SHARED="$SKILL/../_shared"
-# Dependencies are the checkout root node_modules; no workspace build is needed.
+# The validator imports `effect` and `yaml`; both must resolve from the skill's
+# directory (the checkout's node_modules). No workspace build is needed.
 VAL() { bun "$SKILL/scripts/validate_artifacts.ts" "$@"; }
 VAL --self-test
 # MODEL = the exact model id every seat command runs with; it is what the
@@ -249,8 +304,7 @@ EFFORT="<reasoning-effort-recorded-in-manifest>"  # Exact effort every Codex sea
 # (FULL sha256 for record ids; 12-hex short forms for manifest display fields).
 # Adapter scripts are PER-RUN artifacts, but repository copies are NEVER
 # executed. Author or audit each adapter in a fresh, user-owned 0700 directory
-# outside the audited repository. Adapters are TypeScript run by Bun and use only Bun/Node builtins, so
-# the sandbox needs no package cache or writable environment.
+# outside the audited repository (adapter CLI and imports: Core Workflow step 2).
 TRUSTED_ADAPTER_BASE="${XDG_RUNTIME_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/beep}"
 mkdir -p "$TRUSTED_ADAPTER_BASE"
 chmod 700 "$TRUSTED_ADAPTER_BASE"
@@ -262,96 +316,103 @@ RUN_ADAPTER="$SKILL/scripts/run_adapter_sandbox.sh"
 # then EDIT every field. Pin script_sha256_12 from the exact trusted bytes that
 # will execute; the manifest script path still names the later repo snapshot.
 sha256sum $ONT/docs/competency-questions.yaml $ONT/docs/scope.md $SKILL/prompts/*.md
+# engine.validator_sha256_12, then engine.contracts_sha256_12 (framed over the
+# contract closure exactly as the validator computes it):
+sha256sum "$SKILL/scripts/validate_artifacts.ts" | cut -c1-12
+python3 -c 'import glob,hashlib,os,sys
+os.chdir(sys.argv[1]); h=hashlib.sha256()
+for f in sorted(glob.glob("_shared/schemas/*.yaml")+glob.glob("_shared/*.yaml")+glob.glob("_shared/*.md")+glob.glob("_shared/*.json")+glob.glob(sys.argv[2]+"/templates/*.yaml")):
+  b=open(f,"rb").read(); h.update(f"{f}\n{len(b)}\n".encode()); h.update(b)
+print(h.hexdigest()[:12])' "$SKILL/.." "$(basename "$SKILL")"
 TRUSTED_ADAPTER_SHA256=$(sha256sum "$TRUSTED_ADAPTER" | awk '{print $1}')
 printf 'manifest script_sha256_12: %.12s\n' "$TRUSTED_ADAPTER_SHA256"
 find $ONT/adapters/golden -type f -exec sha256sum {} +
 
-# Step 2 — Observe: prove the trusted adapter on its golden fixture FIRST, then
-# run it in a read-only, no-network bubblewrap sandbox with a scrubbed
-# environment, bounded resources, and one dedicated writable output. The
-# runner rejects symlinked, repository-resident, foreign-owned, or
-# group/world-writable adapter locations and fails closed when isolation tools
-# are unavailable. Only after both runs succeed may its byte-identical snapshot
-# be installed as provenance under $ONT/adapters/.
-# (The dispositions index is a COMPLETION invariant — the validator does not
-# demand it until proposals exist, so this stage-boundary check is green on a
-# legitimate observe-stage tree.)
+# Step 2 — Observe. ORDER MATTERS under --repo: the manifest commit must equal
+# HEAD, and the adapter snapshot, golden fixture, CQ file and scope doc are read
+# at that commit (untracked fixture members are refused). So: prove the trusted
+# adapter on its golden fixture, install its byte-identical snapshot, COMMIT
+# those inputs, pin HEAD in the manifest, then observe and validate. The runner
+# is a read-only, no-network bubblewrap sandbox that fails closed. (The
+# dispositions index is not demanded until proposals exist.)
 ADAPTER=$ONT/adapters/adapter-typescript.ts   # committed provenance copy; never execute this path
 "$RUN_ADAPTER" "$TRUSTED_ADAPTER" . self-check $ONT/adapters/golden/
-"$RUN_ADAPTER" "$TRUSTED_ADAPTER" . observe $WORK/observations
 install -m 0644 "$TRUSTED_ADAPTER" "$ADAPTER"
 cmp -s "$TRUSTED_ADAPTER" "$ADAPTER" || { echo "refusing: committed adapter differs from trusted bytes"; exit 1; }
 [ "$(sha256sum "$ADAPTER" | awk '{print $1}')" = "$TRUSTED_ADAPTER_SHA256" ] || { echo "refusing: installed adapter digest differs from trusted bytes"; exit 1; }
+git add -- "$ADAPTER" $ONT/adapters/golden $ONT/docs/competency-questions.yaml $ONT/docs/scope.md
+git commit -m "<message naming the adapter id and version>" -- "$ADAPTER" $ONT/adapters/golden $ONT/docs/competency-questions.yaml $ONT/docs/scope.md   # only these paths; follow the repository's commit rules
+git rev-parse HEAD   # -> manifest repository.commit
+"$RUN_ADAPTER" "$TRUSTED_ADAPTER" . observe $WORK/observations
 VAL $ONT --repo .
-#   record id = full digest, computed INSIDE the adapter with the CANONICAL
-#   serialization the validator RECOMPUTES (see source-observation.schema.yaml):
-#   sha256 of canonical-JSON [commit, path, start_line, end_line,
-#   sorted [predicate, object] pairs, adapter_id, adapter_version] — a
-#   random or stale id cannot match (content-consistency, not authorship
-#   — Known Limits); a parser upgrade MUST change every id
+#   record id = full digest computed INSIDE the adapter with the canonical serialization
+#   the validator recomputes (source-observation.schema.yaml); a parser upgrade changes every id.
+# Idempotence: same pinned source + same adapter version => same RECORD IDS.
+# The rerun goes inside the repository (the runner requires it) but OUTSIDE
+# $ONT (the scan root), and is removed after the comparison.
+RERUN=$(mktemp -d "$(dirname "$ONT")/.rerun.XXXXXX")
+"$RUN_ADAPTER" "$TRUSTED_ADAPTER" . observe "$RERUN"
+diff <(grep -h '^id:' $WORK/observations/*.yaml | sort) <(grep -h '^id:' "$RERUN"/*.yaml | sort) || { rm -r -- "$RERUN"; echo "refusing: rerun ids differ" >&2; exit 1; }
+rm -r -- "$RERUN"
 
-# Step 3 — Denote: fresh agent context; contracts passed EXPLICITLY (a fresh
-# agent in a target repo has no _shared/ of its own)
-codex exec -s workspace-write --cd . -m "$MODEL" -c "model_reasoning_effort=\"$EFFORT\"" "$(cat $SKILL/prompts/denotation.md)
+# Steps 3-7 — each seat runs in a FRESH directory holding copies of ONLY its
+# allowed inputs (in/) and writes ONLY to out/, so blinding and write scope do
+# not rest on prompt wording alone (the agent sandbox can still read the disk:
+# Known Limits); stdin is closed. `codex exec` is one way to start a fresh
+# context; any launcher fits if the manifest records the model and effort it ran.
+seat() {  # seat [--revise] <prompt> <dest dir> <note> <inputs...>; --revise: may replace an input proposal, nothing else
+  local revise=0 prompt dest note dir f a ok; [ "$1" = --revise ] && { revise=1; shift; }; prompt=$1 dest=$2 note=$3; shift 3
+  dir=$(mktemp -d "${TMPDIR:-/tmp}/ontology-seat.XXXXXX"); mkdir "$dir/in" "$dir/out"
+  cp -- "$@" "$dir/in/"
+  codex exec -s workspace-write --skip-git-repo-check --cd "$dir" -m "$MODEL" -c "model_reasoning_effort=\"$EFFORT\"" "$(cat "$prompt")
 
-CONTRACTS: $SHARED/schemas/denotation-hypothesis.schema.yaml $SHARED/foundational-analysis.md
-INPUT FILES: $WORK/observations/*.yaml $WORK/prose-observations/*.yaml  CQ suite: $ONT/docs/competency-questions.yaml
-OUTPUT: one DenotationHypothesis per file into $WORK/hypotheses/"
+INPUT FILES (contracts and records, read-only copies): in/
+OUTPUT: write only into out/, one record per file. $note" </dev/null
+  for f in "$dir"/out/*; do [ -e "$dest/${f##*/}" ] || continue; ok=0
+    if [ $revise = 1 ]; then case ${f##*/} in *.review.yaml) ;; *) for a in "$@"; do if [ "$a" = "$dest/${f##*/}" ]; then ok=1; fi; done ;; esac; fi
+    [ $ok = 1 ] || { echo "refusing: $dest/${f##*/} exists" >&2; rm -r -- "$dir"; return 1; }; done
+  cp -- "$dir"/out/* "$dest"/ && rm -r -- "$dir"
+}
 
-# Step 4 — Analyze: foundational analysis of SURVIVING hypotheses, fresh context
-codex exec -s workspace-write --cd . -m "$MODEL" -c "model_reasoning_effort=\"$EFFORT\"" "$(cat $SKILL/prompts/ufo-analysis.md)
+# Step 3 — Denote
+seat $SKILL/prompts/denotation.md $WORK/hypotheses "One DenotationHypothesis per file." \
+  $SHARED/schemas/denotation-hypothesis.schema.yaml $SHARED/foundational-analysis.md \
+  $WORK/observations/*.yaml $WORK/prose-observations/*.yaml $ONT/docs/competency-questions.yaml
 
-CONTRACTS: $SHARED/schemas/identity-card.schema.yaml $SHARED/schemas/foundational-analysis.schema.yaml $SHARED/foundational-analysis.md $SHARED/ontoclean-rules.yaml
-INPUT FILES: $WORK/hypotheses/*.yaml $WORK/observations/*.yaml $WORK/prose-observations/*.yaml
-OUTPUT: ic-/fa- record pairs into $WORK/foundational/"
+# Step 4 — Analyze: foundational analysis of SURVIVING hypotheses
+seat $SKILL/prompts/ufo-analysis.md $WORK/foundational "ic-/fa- record pairs." \
+  $SHARED/schemas/identity-card.schema.yaml $SHARED/schemas/foundational-analysis.schema.yaml $SHARED/foundational-analysis.md $SHARED/ontoclean-rules.yaml \
+  $WORK/hypotheses/*.yaml $WORK/observations/*.yaml $WORK/prose-observations/*.yaml
 
-# Steps 5+6 — Reuse + Propose: ONE command — the scout reuse report is part of
-# synthesis input; reuse candidates become PROPOSALS (exact_reuse_found: true +
-# mappings with compatibility justification), never index shortcuts. First pass
-# NEVER sees reviews; a REVISION pass ADDS the prior proposals + their reviews
-# to INPUT FILES and each revised proposal MUST carry a revision_log entry
-# naming the FAILed digest it answers (the gate refuses a post-FAIL PASS
-# without one — a whitespace tweak is not a revision).
-codex exec -s workspace-write --cd . -m "$MODEL" -c "model_reasoning_effort=\"$EFFORT\"" "$(cat $SKILL/prompts/synthesis.md)
-
-CONTRACTS: $SHARED/schemas/ontology-term-proposal.schema.yaml
-INPUT FILES: $WORK/hypotheses/*.yaml $WORK/foundational/*.yaml  CQ suite: $ONT/docs/competency-questions.yaml  reuse report: <scout report path>
-OUTPUT: one OntologyTermProposal per file into $WORK/proposals/"
+# Steps 5+6 — Reuse + Propose: ONE seat; the scout reuse report is synthesis
+# input and reuse candidates become PROPOSALS (exact_reuse_found: true + mappings
+# with compatibility justification), never index shortcuts. A REVISION pass adds
+# the prior proposals + reviews as inputs and runs `seat --revise` (step 7).
+seat $SKILL/prompts/synthesis.md $WORK/proposals "One OntologyTermProposal per file." \
+  $SHARED/schemas/ontology-term-proposal.schema.yaml \
+  $WORK/hypotheses/*.yaml $WORK/foundational/*.yaml $ONT/docs/competency-questions.yaml "<scout reuse report path>"
 
 # Step 7a — adversary seat: NEEDS observations (all kinds) + the CQ file
-codex exec -s workspace-write --cd . -m "$MODEL" -c "model_reasoning_effort=\"$EFFORT\"" "$(cat $SKILL/prompts/ontoclean-adversary.md)
-
-CONTRACTS: $SKILL/templates/review-disposition.yaml $SHARED/ontoclean-rules.yaml $SHARED/foundational-analysis.md
-INPUT FILES: $WORK/proposals/otp-*.yaml $WORK/foundational/*.yaml $WORK/observations/*.yaml $WORK/prose-observations/*.yaml $WORK/hypotheses/*.yaml  CQ suite: $ONT/docs/competency-questions.yaml
-OUTPUT: one review per proposal into $WORK/proposals/ (filename otp-<slug>-<nnn>[-rN].review.yaml
-MUST correspond to the target; rounds are CONTIGUOUS, one review per round;
-target_sha256 = sha256 of the reviewed proposal FILE; chain_sha256 = FRAMED
-sha256 of the FULL closure — OTP+IC+FA+DH plus every cited SO/PO record,
-sorted by filename, each member hashed as filename + newline + byte length +
-newline + bytes, plus a final virtual member cq:<sha256_12-of-CQ-file> — the
-gate rejects reviews bound to other bytes or to a mutated closure; every
-attack row needs rule + counterexample and evidence cites observation/CQ ids)"
+CQ12=$(sha256sum $ONT/docs/competency-questions.yaml | cut -c1-12)   # must equal manifest cq_suite.sha256_12
+seat $SKILL/prompts/ontoclean-adversary.md $WORK/proposals "One review per proposal, named otp-<slug>-<nnn>[-rN].review.yaml after its target; rounds are CONTIGUOUS, one review per round. target_sha256 and chain_sha256 as the prompt computes them; cq_suite sha256_12 = $CQ12. Every attack row needs rule + counterexample; evidence cites observation/CQ ids." \
+  $SKILL/templates/review-disposition.yaml $SHARED/ontoclean-rules.yaml $SHARED/foundational-analysis.md \
+  $WORK/proposals/otp-*.yaml $WORK/foundational/*.yaml $WORK/observations/*.yaml $WORK/prose-observations/*.yaml $WORK/hypotheses/*.yaml $ONT/docs/competency-questions.yaml
 
 # Step 7b — blinded alternative seat: observations + hypotheses ONLY; emits
 # BOTH an ic- and an fa- record per hypothesis (half a second opinion is none)
-codex exec -s workspace-write --cd . -m "$MODEL" -c "model_reasoning_effort=\"$EFFORT\"" "$(cat $SKILL/prompts/alternative-model.md)
-
-CONTRACTS: $SHARED/schemas/identity-card.schema.yaml $SHARED/schemas/foundational-analysis.schema.yaml $SHARED/foundational-analysis.md
-INPUT FILES: $WORK/observations/*.yaml $WORK/prose-observations/*.yaml $WORK/hypotheses/*.yaml
-OUTPUT: ic-/fa- record PAIRS into $WORK/alternative/"
+seat $SKILL/prompts/alternative-model.md $WORK/alternative "ic-/fa- record PAIRS." \
+  $SHARED/schemas/identity-card.schema.yaml $SHARED/schemas/foundational-analysis.schema.yaml $SHARED/foundational-analysis.md \
+  $WORK/observations/*.yaml $WORK/prose-observations/*.yaml $WORK/hypotheses/*.yaml
 
 # Step 8 — the MECHANICAL submission gate (fidelity INCLUDED — --repo is
 # required here; the refusal output names every blocker)
 VAL $ONT --gate --repo .
-# then present each submittable proposal to the steward INDIVIDUALLY and
-# scribe each verbatim per-proposal decision — one NEW file per decision,
-# numbered past the existing records (overwriting rat-001.yaml destroys a
-# steward decision; the [ -e ] guard is not optional):
+# then present each submittable proposal to the steward INDIVIDUALLY and scribe
+# each verbatim decision into one NEW file numbered past the existing records:
 LAST=$(find $ONT/governance/ratifications -name 'rat-*.yaml' 2>/dev/null | sed -n 's/.*rat-0*\([0-9][0-9]*\)\.yaml$/\1/p' | sort -n | tail -1)
 NUM=$(( ${LAST:-0} + 1 ))
 F=$ONT/governance/ratifications/$(printf 'rat-%03d.yaml' $NUM)
-# noclobber makes the create ATOMIC — a check-then-write race can never
-# truncate an existing steward decision
+# noclobber makes the create ATOMIC: an existing steward decision is never truncated
 if ( set -C; cat > "$F" ) <<EOF
 id: "rat:$NUM"
 proposal_ref: "otp:<slug>:<nnn>"
@@ -366,82 +427,22 @@ else echo "refusing to overwrite $F"; fi   # noclobber already blocked the write
 # rejections additionally get a rejection-ledger entry (validator-joined):
 #   $WORK/rejections/rej-<nnn>.yaml  (id, proposal_ref, substantive rationale)
 
-# Step 9 — POST-SCRIBE gate re-run: this is what prints the RATIFICATION
-# SUMMARY for the human to audit (a gate run before scribing cannot), plus
-# stale-rat and rejection-ledger joins; then full validation at every later
-# stage boundary
+# Step 9 — POST-SCRIBE gate re-run: prints the RATIFICATION SUMMARY for the human
+# to audit, plus stale-rat and rejection-ledger joins; re-run at every later stage
 VAL $ONT --gate --repo .
 
-# NEXT-RUN ROTATION — FAIL-CLOSED (the manifest/index are singletons at work/;
-# archives use NON-CANONICAL names; destinations are never clobbered; sources
-# are removed only after both copies verify). The run id comes from the
-# VALIDATOR's own parser (--print-run-id): one duplicate-free YAML scalar,
-# the validator's ISO grammar, control characters refused — never a sed over
-# raw bytes (CRLF residue, duplicate-key last-wins, and !!str tags are all
-# validator-legal inputs a byte-level extractor mangles into destructive
-# archive names):
-RID=$(VAL --print-run-id "$ONT") || RID=""
-[ -n "$RID" ] && mkdir -p $ONT/runs
-AM=$ONT/runs/$RID.manifest.yaml; AI=$ONT/runs/$RID.index.yaml
-if [ -z "$RID" ]; then :; elif [ -e "$AM" ] || [ -e "$AI" ]; then echo "refusing: archive for $RID exists"; else
-  cp "$WORK/run-manifest.yaml" "$AM" && cp "$WORK/dispositions.index.yaml" "$AI" && \
-  cmp -s "$WORK/run-manifest.yaml" "$AM" && cmp -s "$WORK/dispositions.index.yaml" "$AI" && \
-  rm "$WORK/run-manifest.yaml" "$WORK/dispositions.index.yaml" && \
-  echo "rotated; prior_index: runs/$RID.index.yaml  prior_index_sha256_12: $(sha256sum "$AI" | cut -c1-12)"
-fi
-# OBSERVATIONS ARE RUN-SCOPED: their canonical ids embed the pinned commit
-# and adapter version, so a new run's manifest can never re-validate the old
-# records — left in place they poison the next scan as stale, undispositioned
-# observations. Archive them at the SIBLING shelter, OUTSIDE the scan root
-# (refuse-if-exists; deterministically regenerable from the archived
-# manifest's pin). runs/ itself is the ROTATION LEDGER — manifest/index
-# pairs and engine history only; the validator (v15) REFUSES record-prefixed
-# files under runs/, so per-run record trees can never ride there as live
-# evidence, and no in-root exemption exists to hide live records in:
-ARCH=$(dirname "$ONT")/archives/$(basename "$ONT")
-AO=$ARCH/$RID.observations
-if [ -z "$RID" ]; then :; elif [ -e "$AO" ]; then echo "refusing: observation archive for $RID exists"; else
-  mkdir -p "$AO" && mv "$WORK/observations" "$WORK/prose-observations" "$AO"/ && \
-  mkdir -p "$WORK/observations" "$WORK/prose-observations" && \
-  echo "observations archived to $AO/"
-fi
-# CARRY-FORWARD POLICY (by design): reviews/analyses are CONTENT-ADDRESSED —
-# a new run reuses them only while their closures still verify; an engine,
-# prompt, contract, or corpus change stales the manifest or the chains and
-# forces re-lock/re-review. Carrying verified artifacts across runs is
-# therefore reuse of still-valid authority, not revival of stale authority.
-# When a later run DOES stale carried seat trees or ratifications, relocate
-# them byte-identically to the same sibling shelter with a dated README note
-# — and sweep every historical gate or script that joins on the old paths
-# before publishing the relocation.
-
-# Idempotence check: same pinned source + same adapter version => same RECORD
-# IDS (filenames prove nothing — two runs can name files alike with different
-# content; the rerun tree is GENERATED here, it does not preexist)
-mkdir -p $WORK-rerun/observations
-"$RUN_ADAPTER" "$TRUSTED_ADAPTER" . observe $WORK-rerun/observations
-diff <(grep -h '^id:' $WORK/observations/*.yaml | sort) <(grep -h '^id:' $WORK-rerun/observations/*.yaml | sort)
+# NEXT-RUN ROTATION, observation archive, carry-forward: references/next-run-rotation.md (moved verbatim).
 ```
 
 ## Outputs
+
+> Here: every path is under `explorations/erp-ontology/assets/audit/<name>/`, never `ontologies/`; the `rat-` file is the ratification.
 
 All paths under `ontologies/{name}/` unless absolute. One record per file,
 YAML, filename = record kind prefix + id fragment (validator recognizes kinds
 by prefix). Confidence values are STRIPPED from anything shown to the steward.
 
-| Artifact | Location + filename pattern | Authority |
-|---|---|---|
-| Run manifest | `work/run-manifest.yaml` | Deterministic |
-| `SourceObservation` | `work/observations/so-<sha12>.yaml` (id keeps the FULL digest) | Deterministic (script-produced) |
-| `ProseObservation` | `work/prose-observations/po-<sha12>.yaml` | Source text (quotation) |
-| `DenotationHypothesis` | `work/hypotheses/dh-<slug>-<nnn>.yaml` | Proposal only |
-| `IdentityCard` / `FoundationalAnalysis` | `work/foundational/ic-…​.yaml` / `fa-…​.yaml` | Proposal only |
-| Alternative-seat `ic-`/`fa-` records | `work/alternative/ic-…​.yaml` / `fa-…​.yaml` (blinded seat; joined on `hypothesis_ref`) | Proposal only |
-| `OntologyTermProposal` | `work/proposals/otp-<slug>-<nnn>.yaml` | Proposal only |
-| Adversary review dispositions | `work/proposals/otp-<slug>-<nnn>[-r2].review.yaml` (latest per target governs) | Proposal only |
-| Dispositions index | `work/dispositions.index.yaml` | Deterministic (validator-enforced totality) |
-| Rejection ledger | `work/rejections/rej-<nnn>.yaml` | Steward decision |
-| Ratifications | `governance/ratifications/rat-<nnn>.yaml` | HUMAN — authoritative |
+The artifact table (kind, location and filename pattern, authority): [references/outputs.md](references/outputs.md).
 
 ## Known Limits (honest boundary — read before trusting a green gate)
 
@@ -449,6 +450,8 @@ A green gate binds records to bytes, never to minds or deleted history:
 [references/known-limits.md](references/known-limits.md).
 
 ## Handoff
+
+> Here: the `rat-` files under `$ONT/governance/ratifications/` (mirrored one line each in `DECISIONS.md`) are what the next skills read.
 
 **Receives from**: `ontology-requirements` (CQs, scope, and the pre-glossary
 CANDIDATE harvest), `ontology-scout` (reuse candidates), plus the pinned
@@ -486,10 +489,4 @@ ratification, confidence laundering: [references/anti-patterns.md](references/an
 
 ## Error Handling
 
-| Error | Likely cause | Recovery |
-|---|---|---|
-| Parser cannot resolve a symbol | Generated/excluded source, syntax level too weak | Fall back one level (AST → generic parser → quoted prose); mark `epistemic_status` honestly; never guess facts |
-| Hypothesis has no CQ warrant | Term is bookkeeping or the CQ suite has a gap | DEFAULT: disposition as `implementation_artifact_only`/`unresolved`. The candidate-CQ escape to `ontology-requirements` is legal ONLY when you can name the concrete decision the new CQ would serve — an unnamed "might need it" keeps the null standing, and a hypothesis may not idle on `semantic_support_for` waiting for a warrant |
-| Category unresolved after analysis | Genuinely ambiguous referent | `verdict: explicitly_deferred` with the discriminating evidence named — a first-class outcome |
-| Two proposals collide on one referent | Rival models both viable | Keep both, blinded adversarial comparison, steward picks; never merge silently |
-| Steward unavailable | — | Everything stays `proposed`; downstream skills must refuse unratified input |
+Parser gaps, missing warrants, open categories, rivals, no steward: [references/error-handling.md](references/error-handling.md).

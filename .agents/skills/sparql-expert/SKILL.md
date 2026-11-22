@@ -1,10 +1,11 @@
 ---
 name: sparql-expert
 description: >
-  Expert system for SPARQL 1.1 and SPARQL-star query generation,
-  validation, and execution. Handles differences between GraphDB,
-  Stardog, Fuseki, and local rdflib graphs. Use when querying
-  knowledge graphs or debugging SPARQL.
+  Writes and syntax-checks SPARQL 1.1 queries over RDF files: here, external
+  ontology files (gist, IOF) read with rdflib, and competency-question queries
+  drafted in an ERP-ontology research report. Use when someone asks for SPARQL
+  or wants to query a .ttl, .owl or other RDF file. Not for the app's SQL or D1
+  queries, the Items search, the table assistant, API queries or tests.
 ---
 
 # SPARQL Expert
@@ -12,41 +13,70 @@ description: >
 ## Role Statement
 
 You are responsible for generating, validating, and executing SPARQL
-queries across different backends. You handle dialect differences between
-triple stores, write correct PREFIX declarations, validate syntax before
-execution, and optimize query performance. You serve all other skills
+queries across different backends. You write correct PREFIX declarations,
+check syntax before execution, note where RDF-star support differs between
+stores, and optimize query performance. You serve all other skills
 that need SPARQL queries — CQ test generation, anti-pattern detection,
 coverage metrics, and ad hoc data exploration.
 
+## In this repository
+
+Read `../_shared/project-profile.md` first; it wins over this file. The ontology work lives in
+`explorations/erp-ontology/`. Nothing queryable of this repository's own exists yet: the vocabulary module, the
+projector, the generated Turtle, the SHACL, the competency-question suite and the reasoner step are not built. For
+any of them, say "not built"; never report a query as run against them.
+
+| Upstream step or output | Here |
+| --- | --- |
+| Step 1 target: endpoint or local file | An external ontology file (gist, IOF, a published vocabulary). No endpoint, no triple store |
+| Step 2 schema lookup | Take `gist:`, `inv:` (example only), `iof-core:` and the alignment prefixes from `namespaces.json`; our terms are the proposal in `research/02-schema-as-source.md` until the vocabulary module exists. gist labels are `skos:prefLabel` (no `rdfs:label`): a query over gist reads that |
+| Step 4 syntax check | Runs as written, with `uv run --no-project --with rdflib` (checked 2026-11-22) |
+| Step 5 ROBOT query | Does not apply: ROBOT is not installed, and is not downloaded without asking. Use the rdflib form |
+| Step 5 over our ontology | Not built: there is no generated Turtle to query |
+| A CQ query for `ontology-requirements` | Query text in a research report, with its entailment regime stated. No JavaScript SPARQL engine is installed or chosen; research/02 plans N3 and shacl-engine in Vitest, not tried |
+| `sparql/{name}.sparql`, results | A fenced block in `explorations/erp-ontology/research/NN-title.md`, or a file under `explorations/erp-ontology/assets/` |
+| RDF-star, federated queries | Do not apply |
+
+A result is over asserted triples only until the reasoner step exists; say so beside it.
+
 ## When to Activate
 
-- User mentions "SPARQL", "query", or "knowledge graph"
+- User mentions "SPARQL", "RDF", "triple store", or an RDF knowledge graph
 - User wants to extract data from an ontology or triple store
 - User wants to debug or optimize a SPARQL query
 - Another skill needs a SPARQL query generated or executed
 
+> Here: never for a database query, a search box or a "query" in the app's API; those are SQL and Effect, not SPARQL.
+
 ## Shared Reference Materials
 
-Read these files from `_shared/` before beginning work:
+Read these files from `../_shared/` (relative to this skill's directory)
+before beginning work:
 
-- `_shared/namespaces.json` — canonical prefix-to-IRI map (always include
+- `../_shared/project-profile.md`: this repository's decisions; read first
+- `../_shared/gist-categories.md`: the gist classes a query may name
+- `../_shared/namespaces.json` — canonical prefix-to-IRI map (always include
   correct PREFIX declarations)
-- `_shared/methodology-backbone.md` — lifecycle context (cross-cutting)
+- `../_shared/methodology-backbone.md` — lifecycle context (cross-cutting)
 
 ## Core Workflow
 
 ### Step 1: Analyze Intent
 
+> Here: the target is always a local file; there is no endpoint, and this repository's own Turtle is not built.
+
 Determine:
 - **Query type**: SELECT, CONSTRUCT, ASK, DESCRIBE
-- **Target**: Local file (ROBOT/rdflib), SPARQL endpoint, or oaklib adapter
+- **Target**: Local file (ROBOT/rdflib) or SPARQL endpoint
 - **Purpose**: Exploration, testing, reporting, or data extraction
 - **Constraints**: Result size limits, performance requirements
 
 ### Step 2: Schema Lookup
 
+> Here: take `gist:`, `inv:` (an `example.org` placeholder) and `iof-core:` from `namespaces.json`; never add a prefix by hand, never a real domain.
+
 Before writing the query:
-1. Read `_shared/namespaces.json` for correct prefixes
+1. Read `../_shared/namespaces.json` for correct prefixes
 2. If targeting an endpoint, check available named graphs
 3. If querying a specific ontology, check its class/property structure
 
@@ -81,39 +111,42 @@ LIMIT 100
 
 ### Step 4: Validate Syntax
 
+> Here: add `--no-project` after `uv run`; save the query under the scratchpad or `explorations/erp-ontology/assets/`.
+
+Save the drafted query to a file and parse that file:
+
 ```bash
-# Validate via rdflib parser
-uv run python -c "
+# Parse the drafted query with rdflib; a syntax error or unknown prefix raises
+uv run --with rdflib python -c "
+import sys
 from rdflib.plugins.sparql import prepareQuery
-q = '''
-PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-PREFIX owl: <http://www.w3.org/2002/07/owl#>
-SELECT ?s WHERE { ?s rdf:type owl:Class }
-'''
-prepareQuery(q)
-print('Valid SPARQL')
-"
+prepareQuery(open(sys.argv[1]).read())
+print('Valid SPARQL:', sys.argv[1])
+" sparql/query.sparql
 ```
+
+rdflib pre-binds common prefixes (`rdf`, `rdfs`, `owl`, `xsd` and others), so
+the parser accepts `rdfs:label` with no PREFIX line. Check the prologue against
+the prefixes the query uses by hand; other engines reject the missing line.
 
 ### Step 5: Execute
 
-```bash
-# Via ROBOT (local ontology files)
-robot query --input ontology.ttl --query query.sparql --output output.csv
+> Here: rdflib only, on an external file; ROBOT is not installed. Over this repository's ontology: "not built".
 
-# Via oaklib
-uv run runoak -i sqlite:obo:hp query \
-  "SELECT ?x ?label WHERE { ?x rdfs:label ?label } LIMIT 10"
+```bash
+# Via ROBOT (local ontology files): --query takes the query file and the
+# results file; --output is only for the ontology changed by an UPDATE
+robot query --input ontology.ttl --query query.sparql output.csv
 
 # Via rdflib (Python)
-uv run python -c "
+uv run --with rdflib python -c "
+import sys
 from rdflib import Graph
 g = Graph()
-g.parse('ontology.ttl', format='turtle')
-results = g.query(open('query.sparql').read())
-for row in results:
+g.parse(sys.argv[1], format='turtle')
+for row in g.query(open(sys.argv[2]).read()):
     print(row)
-"
+" ontology.ttl query.sparql
 ```
 
 ## Tool Commands
@@ -172,8 +205,8 @@ ORDER BY DESC(?usage)
 |---------|---------|---------|
 | `*` | Zero or more hops | `?x rdfs:subClassOf* ?y` |
 | `+` | One or more hops | `?x rdfs:subClassOf+ ?y` |
-| `|` | Alternative path | `?x (skos:exactMatch|skos:closeMatch) ?y` |
-| `^` | Inverse property | `?x ^rdfs:subClassOf ?parent` |
+| `\|` | Alternative path | `?x (skos:exactMatch\|skos:closeMatch) ?y` |
+| `^` | Inverse property | `?x ^rdfs:subClassOf ?child` (same as `?child rdfs:subClassOf ?x`) |
 | `/` | Concatenation | `?x rdfs:subClassOf/rdfs:subClassOf ?gparent` |
 
 Common caution points:
@@ -183,40 +216,48 @@ Common caution points:
 
 ### RDF-star patterns
 
+> Here: does not apply; no store is chosen, and the ontology needs no statements about statements.
+
 ```sparql
 PREFIX : <http://example.org/>
 
-# GraphDB: match asserted triple with metadata
-SELECT ?s ?p ?o ?metaValue WHERE {
-  ?s ?p ?o .
-  << ?s ?p ?o >> :hasConfidence ?metaValue .
-}
-
-# Stardog: edge properties (if enabled)
+# SPARQL-star (GraphDB; Stardog with edge properties enabled):
+# match an asserted triple and the metadata on its quoted form
 SELECT ?s ?p ?o ?conf WHERE {
   ?s ?p ?o .
   << ?s ?p ?o >> :confidence ?conf .
 }
 ```
 
+RDF 1.2 and SPARQL 1.2 change this syntax: `<< s p o >>` names a reifier of
+the triple, and a triple term is written `<<( s p o )>>`. Check which syntax
+the target store implements before writing either.
+
 ### Federated queries
+
+> Here: does not apply. No `owl:sameAs` links exist (identity is a recorded decision), and no query sends this repository's terms to a public endpoint.
 
 ```sparql
 PREFIX : <http://example.org/>
-PREFIX dbo: <http://dbpedia.org/ontology/>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
-# Query across multiple endpoints
-SELECT ?local ?external WHERE {
-  ?local a :LocalClass .
-  SERVICE <http://dbpedia.org/sparql> {
-    ?external a dbo:Thing ;
-              rdfs:label ?label .
+# Query across multiple endpoints; ?external joins the local pattern to the
+# remote one (with no shared variable the result is a Cartesian product)
+SELECT ?local ?external ?label WHERE {
+  ?local a :LocalClass ;
+         owl:sameAs ?external .
+  SERVICE <https://dbpedia.org/sparql> {
+    ?external rdfs:label ?label .
+    FILTER(lang(?label) = "en")
   }
 }
+LIMIT 100
 ```
 
 ## Entailment Regime Awareness
+
+> Here: asserted triples only until the reasoner step in `check:full` exists; which reasoner is not chosen.
 
 Query results depend on whether inference is applied:
 
@@ -227,6 +268,8 @@ Query results depend on whether inference is applied:
 
 ## Outputs
 
+> Here: a query is a fenced block in a research report or a file under `explorations/erp-ontology/assets/`; never a root `sparql/` folder.
+
 This skill produces:
 
 | Artifact | Location | Format | Description |
@@ -235,6 +278,8 @@ This skill produces:
 | Query results | `{context-dependent}` | CSV/TSV/JSON | Query output |
 
 ## Handoff
+
+> Here: "saved to `sparql/`" means saved in the packet's report or `assets/`; run `bun run docs:check` after adding a report.
 
 **Receives from**: Any skill that needs SPARQL queries generated or executed
 
@@ -260,11 +305,11 @@ This skill produces:
 ## Anti-Patterns to Avoid
 
 - **Missing PREFIXes**: Every CURIE must have a corresponding PREFIX
-  declaration. Use `_shared/namespaces.json` as the source.
+  declaration. Use `../_shared/namespaces.json` as the source.
 - **No LIMIT on exploration**: Always limit exploratory queries. An
   unbounded SELECT against a large graph can timeout or crash.
 - **SPARQL UPDATE on production**: Never execute UPDATE/DELETE against
-  production endpoints. (Safety Rule #8)
+  production endpoints.
 - **Assuming RDF-star assertion**: In GraphDB, `<< s p o >>` does NOT
   assert the triple. You must also state `s p o .` separately.
 - **Ignoring blank nodes**: Always filter blank nodes when counting or

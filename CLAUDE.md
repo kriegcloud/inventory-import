@@ -139,7 +139,7 @@ one you can run yourself, to put open decisions to him as questions.
 | Open-ended design or naming with no known answer | `adhd` | Divergent ideation; skip it for closed questions |
 | Turborepo tasks, caching, `turbo.json` | `turborepo` | Reads the docs bundled in the installed `turbo` package |
 | Named local dev URLs | `portless` | `bun run --cwd apps/inventory dev:portless` serves the app as `inventory` |
-| Ontology work (classes, mappings, SPARQL) | the `ontology-*` skills, `sparql-expert` | Not used by the app today |
+| Ontology work (classes, mappings, SPARQL) | the `ontology-*` skills, `sparql-expert` | For `explorations/erp-ontology` only, not the app. Each reads `.agents/skills/_shared/project-profile.md` first: it holds this repository's ontology decisions and wins over skill text |
 | Cutting filler from prose | `unslop` | On documents and messages, never on code |
 | A screen looks generic | `design-taste-frontend` | App screens only: read its `references/app-screens.md` and run `inspect.mjs --app`. Never its page build (pictures and fonts from the network; our policy blocks them). Where it and "UI" below disagree, "UI" below wins |
 | Before hand-building a component | `shadcn`, with the `shadcn` MCP server | Look it up in `@shadcn`, `@diceui` and `@tablecn` first (the MCP tools, or `bunx shadcn@latest search`). Add it with the CLI, `yes n \| bunx shadcn@latest add <item>`, then `bun install`. Never `--overwrite`. Steps in `docs/kit.md` "Finding and adding a component". Where it and "UI" below disagree (`cn` comes from `"cn"`, status is `StatusPill`), "UI" below wins |

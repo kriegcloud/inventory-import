@@ -13,11 +13,20 @@ were removed with that build's tooling; git history has them.
 
 Copied as they stand from Benjamin's own monorepo, [beep-effect](https://github.com/beep-effect/beep-effect)
 (Apache-2.0), at commit `ef2886e94dd`: `adhd`, `crispen`, `effect-first-development`, `schema-first-development`,
-`grill-with-docs`, `grilling`, `grill-me`, `teach`, `portless`, `turborepo`, `quality-review-fix-loop`, `unslop`,
-`sparql-expert` and the ontology set (`ontology-scout`, `ontology-requirements`, `ontology-conceptualizer`,
-`ontology-architect`, `ontology-mapper`, `ontology-validator`, `ontology-curator`, `ontology-foundational-auditor`).
+`grill-with-docs`, `grilling`, `grill-me`, `teach`, `portless`, `turborepo`, `quality-review-fix-loop` and `unslop`.
 They still name beep-effect's standards and paths in places; those are corrected as this repository takes on that
-layout. `grilling`, `grill-me` and `unslop` began as the vendored skills in the table below and keep their licences.
+layout.
+
+`sparql-expert`, the ontology set (`ontology-scout`, `ontology-requirements`, `ontology-conceptualizer`,
+`ontology-architect`, `ontology-mapper`, `ontology-validator`, `ontology-curator`, `ontology-foundational-auditor`)
+and the `_shared` folder they read are from beep-effect at commit `3933c9da187` (its branch
+`fix/ontology-skills-review`, where their commands and facts were corrected), and are then adapted for this
+repository. The adaptation is additive so the copies stay comparable: each `SKILL.md` has its own description and an
+"In this repository" section, a step that does not apply here opens with a `> Here:` line, and three files are this
+repository's own (`_shared/project-profile.md`, which every ontology skill reads first and which wins over skill
+text; `_shared/gist-categories.md`; and the references the longer skills were split into). The review behind both
+steps is `explorations/erp-ontology/research/03-skills-review.md`.
+`grilling`, `grill-me` and `unslop` began as the vendored skills in the table below and keep their licences.
 
 ## Vendored, with their licences
 

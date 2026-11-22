@@ -14,8 +14,8 @@
   ],
   "type": "module",
   "scripts": {
-    "check": "turbo run check lint test //#format:check //#docs:check //#keys:check //#vendor:check //#ceilings:check //#boundaries:check //#screens:check //#refs:check //#tags:check //#imports:check",
-    "check:full": "turbo run check lint test test:slow build //#format:check //#docs:check //#keys:check //#vendor:check //#ceilings:check //#boundaries:check //#screens:check //#refs:check //#tags:check //#imports:check",
+    "check": "turbo run check lint test //#format:check //#docs:check //#keys:check //#vendor:check //#ceilings:check //#boundaries:check //#screens:check //#refs:check //#tags:check //#imports:check //#deprecated:check //#configs:check",
+    "check:full": "turbo run check lint test test:slow build //#format:check //#docs:check //#keys:check //#vendor:check //#ceilings:check //#boundaries:check //#screens:check //#refs:check //#tags:check //#imports:check //#deprecated:check //#configs:check",
     "beep": "bun run packages/tooling/tool/cli/src/bin.ts --",
     "dev": "bun run --cwd apps/inventory dev",
     "build": "turbo run build",
@@ -41,6 +41,8 @@
     "refs:check": "bun packages/tooling/tool/cli/src/bin.ts laws ref-callbacks",
     "tags:check": "bun packages/tooling/tool/cli/src/bin.ts laws tags",
     "imports:check": "bun packages/tooling/tool/cli/src/bin.ts laws effect-imports",
+    "deprecated:check": "bun packages/tooling/tool/cli/src/bin.ts laws deprecated-apis",
+    "configs:check": "tsrs -p tsconfig.config.json --noEmit",
     "imports:fix": "bun packages/tooling/tool/cli/src/bin.ts laws effect-imports --write"
   },
   "devDependencies": {
@@ -48,7 +50,9 @@
     "@effect/tsgo": "0.70.0",
     "oxfmt": "^0.78.0",
     "oxlint": "1.93.0",
+    "oxlint-tsgolint": "7.0.2006",
     "syncpack": "^15.3.3",
+    "tsrs": "0.25.0-ts7.1.0-beta",
     "turbo": "2.11.11",
     "typescript": "~7.0.2"
   },

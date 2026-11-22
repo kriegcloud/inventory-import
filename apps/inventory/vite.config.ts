@@ -76,13 +76,24 @@ const screenPackages = {
   "@inventory/access-web": fileURLToPath(new URL("../../packages/access/web", import.meta.url)),
   "@inventory/catalog-web": fileURLToPath(new URL("../../packages/catalog/web", import.meta.url))
 }
+// The data grid's page, which App.tsx shows only in a development build (`import.meta.env.DEV`). The walk reads
+// imports as text and cannot see that condition, so the page is named: no production screen draws the grid, and
+// following it put 19 kB of its classes into every page's stylesheet (143,797 bytes against 124,636).
+const developmentPages = [`${web}/pages/GridGallery.tsx`]
+
 const usedSourcesOnly = (): Plugin => ({
   name: "inventory:used-sources",
   apply: "build",
   enforce: "pre",
   transform(code, id) {
     if (!Str.endsWith("/src/web/index.css")(id)) return undefined
-    const files = reachableSources({ entry: `${web}/main.tsx`, root: web, alias: web, packages: screenPackages })
+    const files = reachableSources({
+      entry: `${web}/main.tsx`,
+      root: web,
+      alias: web,
+      packages: screenPackages,
+      except: developmentPages
+    })
     const sources = A.join(
       A.map(files, (file) => `@source "${file}";`),
       "\n"

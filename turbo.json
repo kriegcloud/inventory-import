@@ -118,6 +118,63 @@
       ],
       "outputs": []
     },
+    // No deprecated API is used (`beep laws deprecated-apis`), read from every file's types: a new `@deprecated` in one
+    // file, in a tsconfig's reach or in an installed package changes the answer for a file that did not change. So every
+    // code file and tsconfig is an input, in a folder nobody listed too, with every workspace's manifest and what is
+    // installed: the lockfile, and the manifest of every installed package in the root's node_modules, nested ones
+    // included, so an install that has fallen behind the lockfile is not answered from one that had not. Turbo applies
+    // every `!` to every line above it, so node_modules is not excluded whole: only its code files and tsconfigs are.
+    // Left out by name: what git ignores and the law does not read (`.agents`, and `.claude`, which in the main
+    // checkout holds every other checkout of this repository).
+    "//#deprecated:check": {
+      "inputs": [
+        ".oxlintrc.deprecated-apis.json",
+        ".gitignore",
+        "**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+        "**/tsconfig*.json",
+        "package.json",
+        "apps/**/package.json",
+        "packages/**/package.json",
+        "!node_modules/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+        "!node_modules/**/tsconfig*.json",
+        "!apps/**/{node_modules,dist,.wrangler,.turbo}/**",
+        "!packages/**/{node_modules,dist,.turbo}/**",
+        "!{.claude,.codex,.agents,.turbo,.scratch,.wrangler,.alchemy,.taste-skill,.session}/**",
+        "bun.lock",
+        "node_modules/*/package.json",
+        "node_modules/@*/*/package.json"
+      ],
+      "outputs": []
+    },
+    // The root's own .ts files and each package's vitest.config.ts type-check (tsconfig.config.json). Only the linter
+    // above reads that project otherwise, and an import that does not resolve there would hide a deprecated call.
+    "//#configs:check": {
+      "inputs": [
+        "tsconfig.config.json",
+        "tsconfig.base.json",
+        "*.ts",
+        "packages/**/*.{ts,tsx}",
+        "packages/**/package.json",
+        "!packages/**/{node_modules,dist}/**",
+        "package.json",
+        "bun.lock"
+      ],
+      "outputs": []
+    },
+    // Its tests run that law with the root's own profile and the installed packages, whose deprecation notes they
+    // expect word for word: the same installed manifests are inputs here.
+    "@beep/repo-cli#test": {
+      "dependsOn": ["transit"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/.oxlintrc.deprecated-apis.json",
+        "$TURBO_ROOT$/bun.lock",
+        "$TURBO_ROOT$/package.json",
+        "$TURBO_ROOT$/node_modules/*/package.json",
+        "$TURBO_ROOT$/node_modules/@*/*/package.json"
+      ],
+      "outputs": []
+    },
     // Every file git would commit, so its hash is the whole repository's.
     "//#keys:check": { "outputs": [] },
     "//#docs:check": {

@@ -1,0 +1,7 @@
+{
+  // The root's own .ts files (alchemy.run.ts) and each package's vitest.config.ts (see tsconfig.json), type-checked by
+  // `bun run configs:check`.
+  "extends": "./tsconfig.base.json",
+  "include": ["*.ts", "packages/**/vitest.config.ts"],
+  "compilerOptions": { "types": ["node"] }
+}

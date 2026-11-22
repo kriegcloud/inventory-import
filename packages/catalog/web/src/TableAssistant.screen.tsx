@@ -6,7 +6,7 @@ import * as Exit from "effect/Exit"
 import * as O from "effect/Option"
 import * as Atom from "effect/reactivity/Atom"
 import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
-import { type FormEvent, useRef } from "react"
+import { type SubmitEvent, useRef } from "react"
 import * as Clock from "effect/Clock"
 import * as Effect from "effect/Effect"
 import * as Result from "effect/Result"
@@ -439,7 +439,7 @@ export function TableAssistant(props: {
   const suggestions = suggestionsFor(props.columns)
   const latest = pending ?? conversation.entries[conversation.entries.length - 1]?.prompt
 
-  const submit = (event: FormEvent) => {
+  const submit = (event: SubmitEvent) => {
     event.preventDefault()
     send(prompt)
   }

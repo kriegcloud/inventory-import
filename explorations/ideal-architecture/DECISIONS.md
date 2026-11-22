@@ -1369,3 +1369,42 @@ the person running this work. Reverse: rename `ReviewModelFold.fold.test.ts` bac
 the two projects and the `fold` script of the web package, remove the `fold`, `mutants` and `mutants:sample` tasks
 from both `turbo.json` files and the model package's two scripts, and take them out of the root's `check:full`,
 `proofs` and `proofs:nightly` and of both workflows.
+
+### 2026-11-22 — the review's model, the lock and the library's list of what must stay proved
+
+The lock keeps each rule's text, not how it stands, so his first answer ("The library's lock file") left a rule that
+stops being proved unseen. Question, put again with that shown: what holds how each rule stands? Answer: "Lock plus
+the library's proved list". The lock catches a rule removed or reworded; Verify's `require: { proved }`, given a
+list of rule names, fails when a named rule is no longer proved. No hand-written assertions of ours. Built so: the
+list given to `require` is the lock's rules of the kinds a proof covers (an aggregate's invariant and transition, a
+decision's rule, a relation), 135, so the two never disagree. Shown under `CI=true`: with the check of
+`UndoingGroup` that refuses an undo behind a later group deleted, "UndoGroup.OnlyTheLastGroupInForceIsTakenBack is
+required to be proved, and is only checked"; with `DecideRow.AViewerChangesNoRow` taken out, both the list and the
+lock name it. `Prove.report` and `Prove.decisionReport` take no lock and no `require`, so each proof file keeps the
+smallest check of ours that fails when a rule stops being proved: every rule its report names is proved. The two
+assertions this replaces (every rule to its kind's standing; every decision on a row or a group states the three
+rules about who may change it) are gone; nothing now checks the second for a new decision. Reverse: drop `require`
+and put back the assertions of the entry above.
+
+### 2026-11-22 — the review's model, a press over a group that changes nothing
+
+A press on a row a group in force covers, that leaves the row reading as it already reads through the group. Before,
+the model recorded it as the sender's whole decision, the group's effect included, so the group's undo left that
+effect on the row. Answer: "No change, Ana's undo applies". Such a press is answered "no change" and recorded as
+nobody's; the group's undo then takes its effect off the row. `DecideRow` gains `asItReads`, the sender's word, like
+`covered`: on a covered row the act changes nothing when it leaves the row reading as it reads; on any other, when its
+text is what the row's own instance holds. Every rule that tested "no change" reads it through the same test. The
+story: Ana's group over twelve rows, Dana's press on row 14 that changes nothing records nothing, Ana takes the group
+back, and row 14 holds nothing; it fails with the old test put back. "Row 14 stays whole" holds only for a press that
+changed the row. All rules proved again: `DecideRow` at 176 paths, from 152. A mutant puts the old test back. Reverse:
+remove `asItReads` and test "no change" as `!covered && leavesAsItIs(...)` again.
+
+### 2026-11-22 — the screen at move 3: an undo waiting when a group lands, and a keep's rivals
+
+For the screen, not the model. His answers, as they were passed on: "a waiting undo on a row a landing group doesn't
+touch is sent again by itself; and for a keep, a rival with only accepted fixes is left out, as today, while one
+someone kept or edited makes a clash." The first adds the undo to the entry "a waiting act when a group lands". The
+second refines the entry "a keep when a rival row is decided": accepting a fix on a rival row is not "a decision made
+on it" that wins over the keep; keeping it or editing it is. Reverse: a rival with accepted fixes makes a clash too,
+as the earlier entry reads on its own; a waiting undo is held like a waiting act.
+

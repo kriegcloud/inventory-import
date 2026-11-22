@@ -439,14 +439,15 @@ those files, read [docs/verify.md](docs/verify.md).
   and in every rule a decision reads; past 4,096 paths it proves nothing. The proof tests state each decision's paths.
 - **An aggregate's rule reads only what its own commands' middleware provides.** `Row` and `Group` have no command, so
   the rules about who may change a row or a group are rules of each decision that records on it, under the same
-  name in each. A new decision that records on one states them too: `test/Catalog.verify.test.ts` names the three for
-  each such aggregate and fails, by decision and rule, when one is missing.
+  name in each. A new decision that records on one states them too, and nothing checks that it does: the lock and the
+  list of rules that must stay proved take its rules as they are written.
 - **Annotate `keyOf`'s parameter** in a decision (`keyOf: (cmd: DecideRow) => ...`): without it the parameters of
   `decide` are `any`, and a typo in one passes the type-check.
-- **How each rule stands is asserted by its kind**: a proof test fails by the rule's name on any rule not proved, and
-  `test/Catalog.verify.test.ts` holds every rule to its kind's standing (proved; checked for a model's invariant, which
-  is searched and never proved; reached for a `sometimes` rule, which says only that one sequence gets there), with
-  its depth. Which rules there are is the lock's (below), not a list in the tests.
+- **Which rules there are, and that each stays proved, is the library's**: the lock (below), and Verify's
+  `require: { proved }` in `test/Catalog.verify.test.ts`, given the lock's rules of the kinds a proof covers. A proof
+  file (`Prove.report`, `Prove.decisionReport`) takes neither, so each has one check of ours: every rule its report
+  names is proved. A model's invariant is only searched, and a `sometimes` rule says only that one sequence gets
+  there.
 - **Every check a `decide` makes has a mutant** (`packages/catalog/model/mutants/`): a change that removes it, and one
   for each field of a new event, which a proof or a story must notice. A new check without one is a gap the nightly
   cannot see; how to add one is in that folder's README.

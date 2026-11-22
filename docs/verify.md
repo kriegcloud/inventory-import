@@ -40,17 +40,25 @@ schemas and the invariants allow and every input, not sampled by a test.
 
 **No rule says that a valid act is taken.** A `decide` that refused everything would keep all 135. That an act is
 recorded, with the events it should record, is held by tests: the stories (`test/Review.story.test.ts` and
-`test/Group.story.test.ts`, 45 of them, one at least for each of the eleven commands), and the property that drives
+`test/Group.story.test.ts`, 46 of them, one at least for each of the eleven commands), and the property that drives
 the model with the review region's own presses (`packages/catalog/web/test/ReviewModelFold.fold.test.ts`). The eleven
 "can be taken" rules close part of the gap inside Verify: a command no sequence reaches fails the search. They are a
 search three commands deep.
 
-**Where the model and today's review differ, on purpose.** A group is taken back; a row someone decided after the
-group keeps that person's whole decision, the group's effect included, and the screen names it (Benjamin,
-2026-11-22: "Row 14 stays whole"). The review region's `act` today puts back what the row held before the group
-and loses the later decision. The model is what was chosen; `act` changes at the move that puts the review on the
-model. The fold's property compares the two only where one shared history has an answer, and the test "row 14 stays
-whole" shows this case on its own.
+**A press over a group, and the group's undo.** A press on a row a group in force covers either changes how the row
+reads or it does not. When it does not, it is no change: nothing is recorded, and when the group is taken back the
+row gives up the group's effect with the rest (Benjamin, 2026-11-22: "No change, Ana's undo applies"; the story
+"a press that leaves a row reading as it reads is no change"). When it does, the row keeps that person's whole
+decision, the group's effect included, after the group is taken back, and the screen names it ("Row 14 stays
+whole"). There the model and the review region's `act` of today differ on purpose: `act` puts back what the row held
+before the group and loses the later decision. The model is what was chosen; `act` changes at the move that puts the
+review on the model. The fold's property compares the two only where one shared history has an answer, and its test
+"row 14 stays whole" shows that case on its own.
+
+Which of the two a press is, the model cannot tell: it keeps no reading of a row through its groups. The sender says
+it, in `DecideRow`'s `covered` (a group in force covers the row since its own decision) and `asItReads` (the press
+leaves the row reading as it reads). Both are the sender's word, as `saw` is not: the screen must work them out from
+what it has received, as the fold's property does.
 
 **Nothing evaluates a rule while the app runs.** What refuses a state is the code of `decide`. A proved rule means
 that code cannot break it.
@@ -238,10 +246,26 @@ aggregate's invariant is compared for what it says, so one made to allow more fa
 and one that still says at least as much is locked again as written. It does not keep how a rule
 stands. Shown on this model: with the line of `UndoingGroup` that refuses an undo while a later group is in force
 deleted, `OnlyTheLastGroupInForceIsTakenBack` is only `checked`, nothing is left undone, the report is verified,
-and the lock, whose text of the rule has not changed, is silent. So `test/Catalog.verify.test.ts` asserts how each
-rule stands by its kind (proved, checked for a model's invariant, reached for a `sometimes` rule), and that every
-decision that records on a row or a group states the rules about who may change it: a new decision that left one
-out would be a new rule list the lock accepts.
+and the lock, whose text of the rule has not changed, is silent. So the test also gives Verify the library's list of
+rules that must stay proved (`require: { proved }`, Benjamin, 2026-11-22: "Lock plus the library's proved list"):
+the names the lock keeps of the kinds a proof covers, 135 of them. The same deletion then fails by name:
+
+```text
+Not done
+  ✗ UndoGroup.OnlyTheLastGroupInForceIsTakenBack is required to be proved, and is only checked
+```
+
+and a rule taken out fails twice, once for each:
+
+```text
+  ✗ DecideRow.AViewerChangesNoRow is required to be proved, and the model has no rule of that name
+  ✗ DecideRow.AViewerChangesNoRow is locked in Catalog.lock.json, and is no longer a rule of Catalog
+```
+
+Neither runs in a proof file: `Prove.report` and `Prove.decisionReport` take no lock and no `require`. So each proof
+test has one check of ours, that every rule its report names is proved. What nothing holds: that a new decision on a
+row or a group states the three rules about who may change it. Its rules go into the lock as they are written, and
+the list of what must be proved follows the lock. Whoever adds one writes the three, as `CLAUDE.md` says.
 
 - Outside CI, a new rule is added to the file when `verify` runs: commit the file with the rule.
 - In CI (`CI=true`) nothing is written, and a rule the file does not list fails.

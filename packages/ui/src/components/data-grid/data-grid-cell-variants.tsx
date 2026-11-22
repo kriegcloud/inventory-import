@@ -19,7 +19,6 @@ import { useBadgeOverflow } from "@inventory/ui/components/data-grid/use-badge-o
 import { useDebouncedCallback } from "@inventory/ui/hooks/use-debounced-callback"
 import {
   createFileObjectUrl,
-  execInsertText,
   formatDateForDisplay,
   formatDateToString,
   formatFileSize,
@@ -41,7 +40,7 @@ import {
   insertTextAtSelection,
   moveCaretToEnd,
   parseLocalDate,
-  replaceEditableText
+  selectEditableText
 } from "@inventory/ui/components/data-grid/data-grid-utils"
 import { DataGridCell, useCellValue } from "@inventory/ui/components/data-grid/data-grid-cell"
 import { Badge } from "@inventory/ui/components/badge"
@@ -72,7 +71,7 @@ export function ShortTextCell<TData extends RowData>(props: DataGridCellProps<TD
   const { onCommit, onCancel, textProps } = useEditableText(props)
 
   return (
-    <DataGridCell<TData> {...props} onCommit={onCommit} onCancel={onCancel} commitOnEnter>
+    <DataGridCell<TData> {...props} onCommit={onCommit} onCancel={onCancel} commitOnEnter typesInPlace>
       <EditableText {...textProps} />
     </DataGridCell>
   )
@@ -277,18 +276,20 @@ export function NumberCell<TData extends RowData>(props: DataGridCellProps<TData
       isCancelingRef.current = false
       inputRef.current.focus()
 
-      const pendingChar = getPendingChar(cell)
-      if (pendingChar) {
-        inputRef.current.select()
-        if (!execInsertText(pendingChar)) {
-          setDraftValue(pendingChar)
-        }
-      }
+      // Local change: the browser types the key over the selection (see `typesInPlace`).
+      if (getPendingChar(cell)) inputRef.current.select()
     }
-  }, [cell, isEditing, setDraftValue])
+  }, [cell, isEditing])
 
   return (
-    <DataGridCell<TData> {...props} className="text-end" onCommit={onSave} onCancel={onCancel} commitOnEnter>
+    <DataGridCell<TData>
+      {...props}
+      className="text-end"
+      onCommit={onSave}
+      onCancel={onCancel}
+      commitOnEnter
+      typesInPlace
+    >
       {isEditing ? (
         <input
           aria-label={getColumnLabel(cell.column)}
@@ -359,7 +360,14 @@ export function UrlCell<TData extends RowData>(props: DataGridCellProps<TData>) 
   const isDangerousUrl = displayValue && !urlHref
 
   return (
-    <DataGridCell<TData> {...props} onCommit={onCommit} onCancel={onCancel} onKeyDown={onWrapperKeyDown} commitOnEnter>
+    <DataGridCell<TData>
+      {...props}
+      onCommit={onCommit}
+      onCancel={onCancel}
+      onKeyDown={onWrapperKeyDown}
+      commitOnEnter
+      typesInPlace
+    >
       {!isEditing && displayValue ? (
         <div data-slot="data-grid-cell-content" dir="auto" className="size-full overflow-hidden">
           <a
@@ -1361,9 +1369,9 @@ function useEditableText<TData extends RowData>({
         element.textContent = value
       }
 
-      const pendingChar = getPendingChar(cell)
-      if (pendingChar) {
-        replaceEditableText(element, pendingChar)
+      // Local change: the browser types the key over the selection (see `typesInPlace`).
+      if (getPendingChar(cell)) {
+        selectEditableText(element)
       } else if (element.textContent) {
         moveCaretToEnd(element)
       }

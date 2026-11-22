@@ -903,30 +903,20 @@ export function insertTextAtSelection(element: HTMLTextAreaElement | HTMLInputEl
   element.focus()
   element.setSelectionRange(start, end)
 
-  const valueBeforeInsert = element.value
-
-  const inserted = execInsertText(text)
-  if (inserted && element.value !== valueBeforeInsert) return
-
+  // Local change: upstream first tried the deprecated `document.execCommand`. This editor opens in a popover, after the
+  // key is gone, so the text is put in here; the browser's own undo does not hold it.
   element.setRangeText(text, start, end, "end")
   dispatchInsertTextInput(element, text)
 }
 
-export function replaceEditableText(element: HTMLElement, text: string) {
+// Local change: selects the whole text and leaves the typing to the browser (upstream typed it here).
+export function selectEditableText(element: HTMLElement) {
   element.focus()
   const selection = window.getSelection()
   const range = document.createRange()
   range.selectNodeContents(element)
   selection?.removeAllRanges()
   selection?.addRange(range)
-
-  const textBeforeInsert = element.textContent
-  const inserted = execInsertText(text)
-  if (inserted && element.textContent !== textBeforeInsert) return
-
-  element.textContent = text
-  moveCaretToEnd(element)
-  dispatchInsertTextInput(element, text)
 }
 
 export function moveCaretToEnd(element: HTMLElement) {
@@ -1002,10 +992,6 @@ export function getFileIcon(type: string): React.ComponentType<React.SVGProps<SV
     return Presentation
   }
   return File
-}
-
-export function execInsertText(text: string) {
-  return typeof document.execCommand === "function" && document.execCommand("insertText", false, text)
 }
 
 function escapeAttributeValue(value: string) {

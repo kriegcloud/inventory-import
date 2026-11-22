@@ -5,6 +5,7 @@ import type { Cell, RowData } from "@tanstack/react-table"
 import { cn } from "cn"
 import { useComposedRefs } from "radix-ui/internal"
 import * as React from "react"
+import { flushSync } from "react-dom"
 
 import type { DataGridFeatures } from "@inventory/ui/components/data-grid/data-grid-features"
 import type { DataGridCellProps, StopEditingOptions } from "@inventory/ui/components/data-grid/data-grid-types"
@@ -16,6 +17,8 @@ interface DataGridCellElementProps<TData extends RowData>
   onCommit?: (options?: StopEditingOptions) => void
   onCancel?: () => void
   commitOnEnter?: boolean
+  /** Local change: the editor sits in the cell, so the browser types the key that opens it. */
+  typesInPlace?: boolean
 }
 
 export function DataGridCell<TData extends RowData>({
@@ -39,6 +42,7 @@ export function DataGridCell<TData extends RowData>({
   onCancel,
   onKeyDown: onKeyDownProp,
   commitOnEnter = false,
+  typesInPlace = false,
   className,
   style,
   ref,
@@ -122,12 +126,20 @@ export function DataGridCell<TData extends RowData>({
       const isPrintable = event.key.length === 1 && !event.ctrlKey && !event.metaKey
 
       if (event.key === "F2" || event.key === "Enter" || isPrintable) {
-        event.preventDefault()
         event.stopPropagation()
+        // Local change: an editor in the cell is opened, focused and its value selected before this handler ends, and
+        // the browser then types the key into it, as a key typed over a selection (upstream prevented the key and typed
+        // it with the deprecated `document.execCommand`). So a sign or a decimal point that begins a number stays, and
+        // the browser's own undo holds it.
+        if (isPrintable && typesInPlace) {
+          flushSync(() => cell.startEditing({ pendingChar: event.key }))
+          return
+        }
+        event.preventDefault()
         cell.startEditing(isPrintable ? { pendingChar: event.key } : undefined)
       }
     },
-    [cell, onKeyDownProp, isFocused, isEditing, readOnly, onCommit, onCancel, commitOnEnter]
+    [cell, onKeyDownProp, isFocused, isEditing, readOnly, onCommit, onCancel, commitOnEnter, typesInPlace]
   )
 
   return (

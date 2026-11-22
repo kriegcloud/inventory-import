@@ -914,3 +914,22 @@ all 14"; the agent recommended leaving them. Read as: the vendored components ma
 marked "Local change" where it is made; a later `shadcn add` of one of those files is compared by hand. Rejected:
 leaving them as published; converting only the data table. Built with `@beep/schema` added to `@inventory/ui`. Reverse:
 the "Local change" blocks in those eleven files.
+
+### 2026-11-22 — no `try` statement, repository wide
+
+"I noticed some try catch blocks in the source code on main: packages/client/src/Tab.atoms.ts L26-30. In beep-effect
+I've banned try/catch blocks as my preference is either using Effect(s) or effect/Result for code which can fail with
+errors. I want this enforced repo wide." Three questions followed.
+
+The vendored kit has fourteen `try` blocks (`packages/ui/src/components` and `hooks`). Question: convert them too?
+Options: "Convert them too (Recommended)"; "Leave vendored as published". Answer: "Convert them too". I chose; the
+agent recommended the same. Each becomes `Result.try` or `Option.liftThrowable`, marked "Local change".
+
+Plain JavaScript: the telemetry start script, and `apps/inventory/public/theme-init.js`, which runs before the app
+loads and cannot import Effect without loading the library before first paint. Options: "Script yes, theme-init named
+(Recommended)"; "No exception at all". Answer: "Script yes, theme-init named". I chose; the agent recommended the
+same. The telemetry script is converted; `theme-init.js` is the one file the law names as allowed, with the reason
+beside it. `.agents/` is left out by name, as for the deprecated-API check.
+
+When? Options: "Next atoms batch (Recommended)"; "After Wednesday"; "Now, ahead of the fixes". Answer: "Next atoms
+batch". I chose; the agent recommended the same. Not built yet.

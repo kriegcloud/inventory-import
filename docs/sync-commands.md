@@ -13,10 +13,11 @@ tree and changes nothing) and only then writes, so a check, a dry run and a writ
 
 | Command | What it does | In `bun run check` |
 | --- | --- | --- |
-| `bun run deps:update` | Moves every dependency of every package to the registry's newest version, except the ones held back; installs; then runs `version-sync --write`. `-- --dry-run` lists the same and writes nothing | no: it asks the registry |
+| `bun run deps:update` | Moves every dependency of every package to the registry's newest version, except the ones held back; runs `version-sync --write`; then installs once. `-- --dry-run` lists the moves and the held, and writes nothing: what `version-sync` would then bring along is not listed | no: it asks the registry |
 | `bun run version-sync` | Names every place where a version or a date differs from its one source, and fails. `-- --write` rewrites them, `-- --dry-run` lists what would be written | yes |
 | `bun run config-sync` | Writes the lists and paths that follow from the workspaces. `-- --dry-run` lists what would be written | as `config-sync:check` |
 | `bun run config-sync:check` | Names what `config-sync` would write, and fails | yes |
+| `bun run lockfile:check` | `bun.lock` holds what every package.json asks for, so CI's frozen install accepts it: resolved from bun's cache, never the network, writing nothing | yes |
 | `bun run deps:lint` | syncpack: one version of a dependency across the packages, Effect's pinned exactly | no |
 | `bun run deps:outdated` | syncpack: what has a newer version, the held dependencies left out | no: it asks the registry |
 
@@ -32,12 +33,21 @@ packages at different versions of `effect`, a package no `workspaces` pattern co
 - **Effect moves together.** `effect` and every `@effect/*` package released with it are at one exact version. When
   the registry's newest version is the same for all of them, all move; when one was published later than the rest,
   none moves and the command says which is behind.
-- **Held dependencies stay**, and each is named at every run with the registry's newest version, and its group
+- **Held dependencies stay**, and each is named at every run with the registry's newest version (one written as an
+  address, as `xlsx` is, has none: the registry cannot be asked about it), and its group
   with why it is held and what moves it by hand. So one run says everything an update needs: what moved, and for
   what did not, the command or the steps. The list is `updateGroups` in `.syncpackrc.json`: a group's `label` is its
   reason, and what follows ` To move: ` in it is how it moves. `deps:outdated` leaves the same ones out.
-- **After the move** `bun install` runs, then `version-sync --write`, and the command says what moved from which
-  version to which. Run `bun run check:full` before committing: a new formatter or type-checker can find new things.
+- **After the move** `version-sync --write` brings along every place a moved version is repeated (the scratchpad,
+  the documents, the pins in code), and only then `bun install` runs, once, so `bun.lock` is made from what the files
+  finally say. The command says what moved from which version to which. Run `bun run check:full` before committing: a
+  new formatter or type-checker can find new things.
+- **If the install fails**, every file the command wrote is put back as it was, `bun.lock` included, and it says so.
+  `node_modules` may be half installed: `bun install` puts it back. Fix what bun said and run `bun run deps:update`
+  again: it finds the same moves.
+- **`config-sync` installs too** when it writes a package.json (the scratchpad's dependencies, a package's scripts),
+  so `bun.lock` follows at once. `bun run lockfile:check`, in `bun run check`, refuses a package.json that asks for a
+  version `bun.lock` does not hold, which is what CI's frozen install refuses.
 
 ### What is held, and why
 

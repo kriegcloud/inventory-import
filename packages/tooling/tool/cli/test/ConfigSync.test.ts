@@ -1,12 +1,23 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import { configSync } from "../src/commands/ConfigSync/ConfigSync.rules.ts"
+import { Repo } from "../src/Repo.service.ts"
 import { syncSentence } from "../src/Sync.schema.ts"
 import { cycle, lines } from "./support/sync.ts"
 import { json } from "./support/tree.ts"
 
+// An install that writes a lockfile from the scratchpad's package.json as it is when the install runs, as bun does:
+// no network, nothing installed. A test then sees in bun.lock what the install was given.
+const install = Effect.gen(function* () {
+  const repo = yield* Repo
+  const scratch = repo.join(repo.root, "scratchpad", "package.json")
+  const text = (yield* repo.exists(scratch)) ? yield* repo.text(scratch) : ""
+  yield* repo.write(repo.join(repo.root, "bun.lock"), `locked from: ${text}`)
+  return { code: 0, output: "" }
+})
+
 const run = (tree: Record<string, string>, files: ReadonlyArray<string> = []) =>
-  cycle({ tree, command: configSync, sentence: syncSentence, files })
+  cycle({ tree, command: (mode) => configSync(mode, install), sentence: syncSentence, files })
 
 // A package that already has every script turbo runs in it, so a test of something else stays about that.
 const scripts = { check: "tsrs -p tsconfig.json", lint: "oxlint --quiet src" }
@@ -474,8 +485,13 @@ describe("config-sync", () => {
           "scratchpad/tsconfig.json": lines(["{", '  "extends": "../../tsconfig.base.json"', "}"]),
           "tsconfig.base.json": "{}"
         },
-        ["scratchpad/package.json", "scratchpad/tsconfig.json", ".syncpackrc.json"]
+        ["scratchpad/package.json", "scratchpad/tsconfig.json", ".syncpackrc.json", "bun.lock"]
       )
+      // The write changed a package.json, so it installed: the lockfile follows the scratchpad as it now is.
+      expect(result.written.at(-1)).toBe(
+        "out: config-sync  a package.json changed, so bun install ran: bun.lock follows what the package.json files say"
+      )
+      expect(result.files["bun.lock"]).toBe(`locked from: ${result.files["scratchpad/package.json"]}`)
       expect(result.before).toEqual([
         "err: config-sync FAIL  2 places differ from what they are derived from (`bun run config-sync` writes them)",
         "err:   scratchpad/package.json:3  the scratchpad's `dependencies`, from the packages under packages/: found without @x/ui, with @x/gone, which is no package, expected every package, as workspace:*",
@@ -493,7 +509,8 @@ describe("config-sync", () => {
           "}"
         ]),
         "scratchpad/tsconfig.json": lines(["{", '  "extends": "../tsconfig.base.json"', "}"]),
-        ".syncpackrc.json": lines(["{", '  "source": ["package.json", "packages/*/package.json"]', "}"])
+        ".syncpackrc.json": lines(["{", '  "source": ["package.json", "packages/*/package.json"]', "}"]),
+        "bun.lock": `locked from: ${result.files["scratchpad/package.json"]}`
       })
       expect(result.after[0]).toMatch(/^out: config-sync OK /)
       expect(result.again).toEqual(result.after)

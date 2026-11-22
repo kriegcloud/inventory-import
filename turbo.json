@@ -238,6 +238,21 @@
       ],
       "outputs": []
     },
+    // bun.lock says what every package.json asks for, so CI's `bun install --frozen-lockfile` accepts it. Resolved
+    // from bun's cache, never the network, and nothing is written or installed: a package.json that asks for a
+    // version bun.lock does not hold fails here, before a push.
+    "//#lockfile:check": {
+      "inputs": [
+        "package.json",
+        "apps/**/package.json",
+        "packages/**/package.json",
+        "scratchpad/package.json",
+        "bun.lock",
+        "bunfig.toml",
+        "!**/node_modules/**"
+      ],
+      "outputs": []
+    },
     // Every file git would commit, so its hash is the whole repository's, the scratchpad's experiments included: a
     // key in an experiment is refused like any other, and this is the one root task an edit there re-runs.
     "//#keys:check": { "outputs": [] },

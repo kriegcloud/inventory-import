@@ -32,6 +32,7 @@ import * as P from "effect/Predicate"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
+import type { RepoError } from "../../Cli.errors.ts"
 import { Repo, type Workspace } from "../../Repo.service.ts"
 import { scratchpadFolder } from "../../Repo.schema.ts"
 import {
@@ -50,7 +51,7 @@ import {
   stringsIn,
   stringValues
 } from "../../Sync.rules.ts"
-import { Drift, mergePlans, type Mode, Plan, Problem, settle } from "../../Sync.schema.ts"
+import { Drift, mergePlans, type Mode, Plan, Problem, settle, SyncFinding } from "../../Sync.schema.ts"
 
 const $I = $RepoCliId.create("commands/ConfigSync/ConfigSync.rules")
 
@@ -730,7 +731,25 @@ export const configSyncPlan = Effect.fn("ConfigSync.plan")(function* () {
  *
  * @category rules
  */
-export const configSync = Effect.fn("ConfigSync.configSync")(function* (mode: Mode) {
+export const configSync = Effect.fn("ConfigSync.configSync")(function* (
+  mode: Mode,
+  install: Effect.Effect<{ readonly code: number; readonly output: string }, RepoError, Repo>
+) {
   const plan = yield* configSyncPlan()
-  return yield* settle({ command: "config-sync", repair: "bun run config-sync", mode }, plan)
+  const said = yield* settle({ command: "config-sync", repair: "bun run config-sync", mode }, plan)
+  // A package.json it wrote (the scratchpad's dependencies, a package's scripts) changes what bun.lock must say, so
+  // the lockfile is brought along at once, as `deps:update` does: committed without it, the change can make CI's
+  // frozen install refuse the lockfile.
+  const manifests = A.some(plan.drifts, (drift) => Str.endsWith("package.json")(drift.file))
+  if (mode !== "write" || !manifests) return said
+  const installed = yield* install
+  return A.append<SyncFinding, SyncFinding>(
+    said,
+    installed.code === 0
+      ? SyncFinding.cases.Installed.make({ command: "config-sync" })
+      : SyncFinding.cases.InstallFailed.make({
+          command: "config-sync",
+          output: A.join(A.takeRight(Str.split("\n")(installed.output), 12), "\n")
+        })
+  )
 })

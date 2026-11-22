@@ -19,12 +19,30 @@ import { render } from "../src/Report.schema.ts"
 import { lines } from "./support/sync.ts"
 import { inTree, json, printed, type Tree } from "./support/tree.ts"
 
-// A registry that answers from a table, and an install that only leaves a mark: no network, nothing installed.
+// A registry that answers from a table, and an install that writes a lockfile from every package.json as it is when
+// the install runs, the scratchpad's included, as bun does: no network, nothing installed. A test then sees in
+// bun.lock what the install was given. A failing install still writes its lockfile first, as a half-finished one can.
+const lockOf = Effect.gen(function* () {
+  const repo = yield* Repo
+  const workspaces = yield* repo.workspaces
+  const scratch = repo.join(repo.root, "scratchpad", "package.json")
+  const hasScratch = yield* repo.exists(scratch)
+  const files = A.flatten([
+    [repo.join(repo.root, "package.json")],
+    A.map(workspaces, (workspace) => repo.join(workspace.dir, "package.json")),
+    hasScratch ? [scratch] : []
+  ])
+  const texts = yield* Effect.forEach(
+    files,
+    (file) => Effect.map(repo.text(file), (text) => `${repo.relative(repo.root, file)} ${text}`),
+    { concurrency: 1 }
+  )
+  yield* repo.write(repo.join(repo.root, "bun.lock"), A.join(texts, ""))
+})
 const registry = (newest: Record<string, string>, installCode = 0): PackageManager => ({
   newest: (name) => Effect.succeed(R.get(newest, name)),
   install: Effect.gen(function* () {
-    const repo = yield* Repo
-    yield* repo.write(repo.join(repo.root, "installed"), "yes\n")
+    yield* lockOf
     return { code: installCode, output: "error: lockfile had changes\nline two" }
   })
 })
@@ -72,7 +90,8 @@ const tree = (extra: ReadonlyArray<string> = []): Tree => ({
   ".syncpackrc.json": held,
   "packages/kernel/package.json": manifest("4.1.4", "^5.1.0", extra),
   "packages/schema/package.json": json({ name: "@x/schema", dependencies: { effect: "4.1.4" } }),
-  "README.md": "Effect 4.1.4\n"
+  "README.md": "Effect 4.1.4\n",
+  "bun.lock": "the lockfile before\n"
 })
 
 const newest = {
@@ -95,8 +114,8 @@ const run = (files: Tree, packages: PackageManager, mode: "write" | "dry-run", r
         (file) => Effect.map(repo.text(repo.join(repo.root, file)), (text) => [file, text] as const),
         { concurrency: 1 }
       )
-      const installed = yield* repo.exists(repo.join(repo.root, "installed"))
-      return { first, second, files: R.fromEntries(texts), installed }
+      const lock = yield* repo.text(repo.join(repo.root, "bun.lock"))
+      return { first, second, files: R.fromEntries(texts), installed: lock !== "the lockfile before\n", lock }
     })
   )
 
@@ -140,9 +159,9 @@ describe("deps update", () => {
         "out:   moved  @effect/vitest 4.1.4 -> 4.1.5 (1 package.json)",
         "out:   moved  effect 4.1.4 -> 4.1.5 (2 package.json files)",
         "out:   moved  vitest ^5.1.0 -> ^5.2.0 (1 package.json)",
-        "out: deps:update  bun install ran: bun.lock and node_modules follow the new versions",
         "out: version-sync  wrote 1 place in 1 file",
-        "out:   README.md:1  Effect's version, from the `effect` the package.json files state: 4.1.4 -> 4.1.5"
+        "out:   README.md:1  Effect's version, from the `effect` the package.json files state: 4.1.4 -> 4.1.5",
+        "out: deps:update  bun install ran: bun.lock and node_modules follow the new versions"
       ])
       expect(result.files).toEqual({
         "packages/kernel/package.json": manifest("4.1.5", "^5.2.0"),
@@ -175,8 +194,8 @@ describe("deps update", () => {
         "out:   skip  xlsx https://cdn.example.test/xlsx-0.20.3.tgz: not written as a version the registry can be asked about",
         "out:   wait  effect and the @effect/* packages released with it are not at one newest version (@effect/vitest 4.1.4, effect 4.1.5): none of them moves until they are",
         "out:   moved  vitest ^5.1.0 -> ^5.2.0 (1 package.json)",
-        "out: deps:update  bun install ran: bun.lock and node_modules follow the new versions",
-        "out: version-sync OK  2 places agree with what they are derived from"
+        "out: version-sync OK  2 places agree with what they are derived from",
+        "out: deps:update  bun install ran: bun.lock and node_modules follow the new versions"
       ])
       expect(result.files["packages/kernel/package.json"]).toBe(manifest("4.1.4", "^5.2.0"))
     })
@@ -227,23 +246,36 @@ describe("deps update", () => {
       expect(printed(result.first)[0]).toBe(
         "out: deps:update  3 package.json files, 6 dependencies: 3 moved, 2 held, 1 not compared"
       )
-      // `effect` follows through version-sync, which runs after the move; `zod` stays where the experiment put it.
-      expect(result.files["scratchpad/package.json"]).toBe(
-        json({ name: "@x/scratchpad", dependencies: { effect: "4.1.5", zod: "^3.0.0" } })
-      )
+      // `effect` follows through version-sync; `zod` stays where the experiment put it.
+      const followed = json({ name: "@x/scratchpad", dependencies: { effect: "4.1.5", zod: "^3.0.0" } })
+      expect(result.files["scratchpad/package.json"]).toBe(followed)
+      // And the install ran after version-sync: the lockfile was made from the scratchpad as it now is.
+      expect(result.lock).toContain(`scratchpad/package.json ${followed}`)
     })
   )
 
-  it.effect("an install that fails is said with what bun printed, after the files were written", () =>
+  it.effect("an install that fails puts every file back, the lockfile too, so a second run finds the same moves", () =>
     Effect.gen(function* () {
-      const result = yield* run(tree(), registry(newest, 1), "write", ["packages/kernel/package.json"])
+      const result = yield* run(tree(), registry(newest, 1), "write", [
+        "packages/kernel/package.json",
+        "packages/schema/package.json",
+        "README.md"
+      ])
+      const failed =
+        "err: deps:update FAIL  bun install did not finish, so the 4 files written (the package.json files, what version-sync brought along, bun.lock) are put back as they were. node_modules may be half installed: `bun install` puts it back. Fix what bun said, then run `bun run deps:update` again. bun said:\nerror: lockfile had changes\nline two"
       expect(result.first.failed).toBe(true)
-      expect(A.last(printed(result.first))).toEqual(
-        O.some(
-          "err: deps:update FAIL  bun install did not finish after the versions were written. The package.json files hold the new versions; bun.lock may not. bun said:\nerror: lockfile had changes\nline two"
-        )
+      expect(A.last(printed(result.first))).toEqual(O.some(failed))
+      expect(result.files).toEqual({
+        "packages/kernel/package.json": manifest("4.1.4", "^5.1.0"),
+        "packages/schema/package.json": json({ name: "@x/schema", dependencies: { effect: "4.1.4" } }),
+        "README.md": "Effect 4.1.4\n"
+      })
+      expect(result.lock).toBe("the lockfile before\n")
+      // The second run is not a silent "0 moved": it finds the same three moves and tries again.
+      expect(printed(result.second)[0]).toBe(
+        "out: deps:update  3 package.json files, 6 dependencies: 3 moved, 2 held, 1 not compared"
       )
-      expect(result.files["packages/kernel/package.json"]).toBe(manifest("4.1.5", "^5.2.0"))
+      expect(A.last(printed(result.second))).toEqual(O.some(failed))
     })
   )
 

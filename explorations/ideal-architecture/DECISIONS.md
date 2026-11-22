@@ -1078,7 +1078,7 @@ per-row model from a local branch on his own machine, and says plainly that it i
 That branch is kept running on the pinned build and gets nothing else. Reverse: none needed; the fallback is deleted
 once the chosen model is in `main`.
 
-### 2026-11-22 — the check on GitHub's runner (agent, not asked)
+### 2026-11-22 — the check on GitHub's runner
 
 CI failed twice on code that had not changed: the CLI's start-up test, then two property tests of `@beep/xlsx`, each
 "timed out in 5000ms". Reproduced with the whole check pinned to four cores (`taskset`): turbo starts ten tasks at
@@ -1090,8 +1090,8 @@ of it a test's own number or what a test asserts:
 - One file, `vitest.shared.ts`, holds every test's limit (30 s, hooks 60 s, slow tests 120 s) in place of vitest's 5 s
   and 10 s. Sized from the slowest tests on two pinned cores: 4.4 s and 31 s.
 - In the four places whose tests wait in real time (`packages/client`, `packages/catalog/web`, `packages/review` and
-  the app's fast tests), a test that fails is tried again, three times at most and half a second apart; a property that was falsified
-  never is.
+  the app's fast tests), a test that fails is tried again, three times at most and half a second apart; a property
+  that was falsified, and a test or hook that ran out of time, never are. This one is his decision, below.
 - No property test's run count was lowered and nothing is skipped.
 
 Measured, cold, pinned (`taskset`), the whole check each time, 80 tasks:
@@ -1110,14 +1110,27 @@ The last two rows are what CI runs. Every red run after the first row was a test
 limit. One test worker costs about a minute on four cores; the job's limit is 15 minutes and the two-core run, which
 stands in for the runner's slower cores, took under six. The runner itself has not run this yet: nothing is pushed.
 
-The second try is the part to look at twice: it makes a test that fails now and then pass in silence (the reporter
-names a try only on a test that still failed), and it is not a cure: with two tries one session test failed all
-three times in one run. It stands only because those tests break the standard's own rule that
-anything timed runs on `TestClock`. Rejected: a longer limit for the xlsx tests alone (the next heavy test would be
-next); a second try for every package (only these four wait in real time); trying a falsified property again.
-Reverse: the three lines in `.github/workflows/ci.yml`, and `limits` and `realTime` in each `vitest.config.ts`.
+The concurrency, workers and limits were the agent's, not asked; the second try was put to him. Question, by dialog:
+the tests that wait in real time fail now and then under load and are tried again with no word, which can hide an
+intermittent fault in the review's save and confirm, and it is not a cure; what should happen to the retry? Options:
+"Retry for now, said aloud; remove after TestClock" (Recommended), "Remove it now", "Keep it as is". Answer: "Retry
+for now, said aloud; remove after TestClock". I chose; the agent recommended the same. Built as: a reporter
+(`vitest.retries.ts`) names every test that passed on a later try, with its file, line and which try, in the run's
+output and as a GitHub warning on that line, and counts them at the end of each run; a test or hook that ran out of
+time is never tried again, so a hang cannot eat the job four times over. The retry is removed in the same change that
+moves the last of the 28 files onto `TestClock` (the atoms work). Rejected besides: a longer limit for the xlsx tests
+alone (the next heavy test would be next); a second try for every package (only these four wait in real time);
+trying a falsified property again. Reverse: the three lines in `.github/workflows/ci.yml`, `limits` in each
+`vitest.config.ts`, and `realTime` and `saidAloud` in the four that wait in real time.
 
-Two things this does not end, both found while measuring and neither in files of this change:
+A limit above the shared one is set only with what was measured written beside it: the 2,000-run waited-rows property
+(180 s; 24 s alone on two pinned cores), the draft machine's four properties (120 s; 12 s the slowest seen), Steps'
+heaviest shapes (60 s; 9.7 s), the scratchpad's nested run (120 s) and the CLI's start-up (120 s: five starts, each
+stopped at 20 s). Limits set below the shared one were taken out, so the shared one applies: six test files had 10 s
+or 20 s, the 50,000-row slow tests 60 s. The vendored kit and the scratchpad use the shared limits too; vendor sync
+writes them into the kit's configs.
+
+Two things this does not end, both found while measuring:
 
 - The tests that wait in real time (28 files) still fail now and then under load on any machine, and only the second
   try keeps that out of sight.

@@ -119,36 +119,38 @@ and a `weaker` one with the rules no longer named. A mutant held by a rule where
 
 ## What it costs
 
-The run below is of the first 148. The six added since took 20 to 170 s each when run six at a time.
+Measured on 2026-11-22 on a 64-core workstation busy with other work (load average 34 to 112), `--nice 5`, ten at a
+time: the 179 mutants there were then.
 
-Measured on a 64-core workstation with a load average of 20 to 37 from other work, `--nice 10`:
+| Target | Mutants | Test time | Longest |
+| --- | --- | --- | --- |
+| import | 60 | 397 s | 9 s |
+| DecideGroup | 24 | 65 s | 4 s |
+| UndoGroup | 17 | 107 s | 10 s |
+| UndoRowStep | 28 | 1,080 s | 82 s |
+| DecideRow | 50 | 8,367 s | 1,504 s (`row-open`) |
 
-| Target | Mutants | Test time | Each | Longest |
-| --- | --- | --- | --- | --- |
-| import | 60 | 231 s | about 4 s | 4.7 s |
-| DecideGroup | 24 | 34 s | about 1.4 s | 2.9 s |
-| UndoGroup | 16 | 63 s | about 4 s | 7.4 s |
-| UndoRowStep | 21 | 503 s | 20 to 53 s | 52.6 s |
-| DecideRow | 27 | 4,572 s | 6 s to 20 min | 1,200 s (`row-open`) |
+- `--all --jobs 10`: 10,016 s of test time in 1,598 s of wall time (27 minutes), the baselines included. DecideRow
+  is most of it: a mutant that breaks one of its rules takes the prover minutes to confirm the counterexample, and
+  one that breaks none takes ten seconds. The wall time is bounded below by `row-open` alone.
+- `row-open` (the check that the import is open, removed) is the slow one: about 25 minutes on that machine. In
+  that run it passed the 25 minutes its proof test then had, and was counted as nothing and failed, as a test out
+  of time must be. The proof's limit is 50 minutes since; run again alone at a load of 40 to 55 it took 1,531 s and
+  was held by its five rules. On a slower machine it may still run out, and the run then fails and says so.
+- `--sample`: about 25 s of wall time, each mutant 1 to 4 s.
 
-- `--all --jobs 4`: 5,402 s of test time in 1,413 s of wall time (24 minutes), the baselines included (33 s).
-  DecideRow is most of it: a mutant that breaks one of its rules takes the prover one to twenty minutes to confirm
-  the counterexample, and one that breaks none takes six seconds. The wall time is bounded below by `row-open`
-  alone.
-- `--sample`: 21 to 24 s of wall time, each mutant 1 to 4 s.
-
-The result of that run: 116 held by a rule, 32 by a story only, 0 by neither, every one of the trial's 111 still held
-by a rule. Five the trial had as a story only are now held by the proof: the four decisions' "records nothing"
-(`row-nothing`, `undo-nothing`, `group-nothing`, `gundo-nothing`: the proof's "some state lets it record") and
-`undo-history` (the proof's path count, 296 where it expects 298; no rule notices the let-go level).
+The result, of that run and of the reruns of what changed after it (38 mutants, the five added since among them),
+not of one run of all 184: none held by neither, none out of time. Held by a rule violated: 124. By the proof's own
+numbers or its "not decided" and "not read", with a story failing too: 32. By a story only: 28. Every mutant kept as
+held by a rule is held by every rule recorded for it, each given as violated.
 
 ## The sample
 
 Nine mutants, named with their reason in `SAMPLE` in `run.py`: only the import's commands and the two group
 decisions, whose proofs take a second or a few; DecideRow and UndoRowStep are left out, since a broken rule there
 takes the prover minutes to confirm. Among them a check, a field and "records nothing", each held by a rule and by a
-story only as the trial found (no "records nothing" was held by a rule in the trial: `group-nothing` now is, by the
-proof's "some state lets it record").
+story only as recorded (`group-nothing` is held by its stories, and the proof's "some state lets it record" notices
+it too: class `proof`).
 
 ## Adding a mutant when a check is added to a `decide`
 

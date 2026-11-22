@@ -66,13 +66,17 @@ values in `.dev.vars.example`). After pulling a change to `apps/inventory/migrat
 | Command | What it does |
 | --- | --- |
 | `bun run dev` | App and API on http://localhost:5173, signed in as the first test account in development |
-| `bun run check` | Through turbo: type-check with Effect diagnostics, lint (including two design lints), the fast tests, format check and the docs check; a second run with nothing changed replays from the cache |
+| `bun run check` | Through turbo: type-check with Effect diagnostics, lint (including two design lints), the fast tests, format check, the docs check and the repository's own rules (no deprecated API is used, among them); a second run with nothing changed replays from the cache |
 | `bun run check:full` | `check` plus the slow tests and the production build |
 | `bun run test` | Every test, fast and slow (Vitest, on Node) |
 | `bun run db:reset` | Start again with an empty database (restart `bun run dev` afterwards) |
 | `bun run preview` | The production build on http://localhost:4173, with every security header, compressed as Cloudflare compresses it (`PREVIEW_COMPRESSION=off` sends it as it is) |
 | `bun run --cwd apps/inventory build:report` | The production build, and what each of its chunks is made of (`.scratch/bundle/client.html`, a treemap) |
 | `bun run auth:schema` | After a change to Better Auth's options, prints the migration it still needs (Node 22.18 or newer) |
+| `bun run deps:update` | Moves every dependency of every package to its newest version, except the ones held back with a reason in `.syncpackrc.json`, then installs. `-- --dry-run` only says what would move |
+| `bun run version-sync` | Checks that every version written in more than one place equals its one source; `-- --write` rewrites the places that differ |
+| `bun run config-sync` | Writes the configuration that follows from the workspaces (syncpack's sources, tsconfig references, each package's scripts); `config-sync:check` only compares ([docs/sync-commands.md](docs/sync-commands.md)) |
+| `bun run scratch:new <name> --template probe` | Starts an experiment in `scratchpad/experiments/<name>`, from a template whose test already passes (`probe`, `service`, `screen`, `verify`). `scratch:test`, `scratch:check` and `scratch:list` run, type-check and list the experiments; `scratch:graduate` and `scratch:drop` end one ([docs/scratchpad.md](docs/scratchpad.md)). No check, build or deploy reads the scratchpad |
 | `bunx alchemy deploy --stage <name>` | Host it on Cloudflare: the stack in `packages/infra` makes the database and the Worker (needs a Cloudflare login; [goals/infra/PLAN.md](goals/infra/PLAN.md) has the steps, in order) |
 
 ### Signing in
@@ -134,6 +138,9 @@ What the starter held, now turned to the brief's inventory item:
   key its rules answer.
 - The toolchain: Vite, React, Tailwind, every shadcn/ui component and more from Dice UI's and tablecn's registries
   (MIT; `docs/kit.md` says what was changed), Effect, Wrangler, Vitest, a .csv and .xlsx reader, and syncpack.
+- Alchemy, for hosting: a build of one commit of its `main`, kept as files in `vendor/alchemy` (Apache-2.0, each
+  file with its own licence and notice; [vendor/alchemy/README.md](vendor/alchemy/README.md) says the one change
+  made to them and why they are kept here).
 - Two design lints in `bun run check` that hold every screen to the theme and its components.
 - `CLAUDE.md`, and the skills and agents my coding agent works from. Twenty-one skills come from my monorepo
   beep-effect; the rest are vendored unchanged, and [.agents/skills/README.md](.agents/skills/README.md) credits each

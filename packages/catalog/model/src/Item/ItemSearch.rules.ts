@@ -3,6 +3,7 @@
 // into statements.
 // Commas and semicolons around a word are how people list words ("nut, bolt"), not part of what they look for.
 import * as A from "effect/Array"
+import * as Data from "effect/Data"
 import * as Str from "effect/String"
 import { maxSearchWords, closeFrom, indexedFrom } from "@inventory/catalog-contract/ItemSearch"
 const edges = /^[,;]+|[,;]+$/g
@@ -86,10 +87,16 @@ export const closeMatches = (word: string): ReadonlyArray<string> => {
  * for the index, compared as text. `Close`: not in the organization's items as typed, so compared with one letter
  * different.
  */
-export type WordMatch =
-  | { readonly _tag: "Indexed"; readonly word: string; readonly phrase: string }
-  | { readonly _tag: "Contains"; readonly word: string; readonly patterns: ReadonlyArray<string> }
-  | { readonly _tag: "Close"; readonly word: string; readonly patterns: ReadonlyArray<string> }
+export type WordMatch = Data.TaggedEnum<{
+  Indexed: { readonly word: string; readonly phrase: string }
+  Contains: { readonly word: string; readonly patterns: ReadonlyArray<string> }
+  Close: { readonly word: string; readonly patterns: ReadonlyArray<string> }
+}>
+
+/** The constructors, guards and matcher of `WordMatch`. */
+export const WordMatch = Data.taggedEnum<WordMatch>()
+// Taken out of the enum once, so a search builds each word with a plain function.
+const { Close, Contains, Indexed } = WordMatch
 
 /**
  * The words that need asking first whether the organization's items contain them as typed: those long enough to be
@@ -104,7 +111,7 @@ export const wordsToCheck = (words: ReadonlyArray<string>): ReadonlyArray<string
  *
  * @example
  * plan({ words: ["m8", "washr"], found: [] })
- * // [{ _tag: "Contains", word: "m8", patterns: ["%m8%"] }, { _tag: "Close", word: "washr", patterns: [...] }]
+ * // [WordMatch.Contains({ word: "m8", patterns: ["%m8%"] }), WordMatch.Close({ word: "washr", patterns: [...] })]
  */
 export const plan = (input: {
   readonly words: ReadonlyArray<string>
@@ -112,7 +119,7 @@ export const plan = (input: {
 }): ReadonlyArray<WordMatch> =>
   A.map(input.words, (word): WordMatch => {
     const n = characters(word)
-    if (n < indexedFrom) return { _tag: "Contains", word, patterns: [contains(word)] }
-    if (n < closeFrom || A.contains(input.found, word)) return { _tag: "Indexed", word, phrase: phrase(word) }
-    return { _tag: "Close", word, patterns: closeMatches(word) }
+    if (n < indexedFrom) return Contains({ word, patterns: [contains(word)] })
+    if (n < closeFrom || A.contains(input.found, word)) return Indexed({ word, phrase: phrase(word) })
+    return Close({ word, patterns: closeMatches(word) })
   })

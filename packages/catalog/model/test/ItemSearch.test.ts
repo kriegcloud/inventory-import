@@ -4,7 +4,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
-import * as Match from "effect/Match"
 import * as Str from "effect/String"
 import * as S from "effect/Schema"
 import { ItemQueryParams } from "@inventory/catalog-contract/Catalog"
@@ -16,7 +15,7 @@ import {
   phrase,
   plan,
   searchWords,
-  type WordMatch,
+  WordMatch,
   wordsLeftOut,
   wordsToCheck
 } from "@inventory/catalog-model/ItemSearch"
@@ -84,14 +83,19 @@ describe("the words of a search", () => {
 
   it("are read by length and by whether the items hold them as typed", () => {
     expect(wordsToCheck(["m8", "nut", "washr", "lock"])).toEqual(["washr", "lock"])
-    const how = (word: WordMatch) =>
-      Match.valueTags(word, { Contains: () => "contains", Indexed: () => "indexed", Close: () => "close" })
-    expect(A.map(plan({ words: ["m8", "nut", "washr", "lock"], found: ["lock"] }), how)).toEqual([
-      "contains",
-      "indexed",
-      "close",
-      "indexed"
+    const planned = plan({ words: ["m8", "nut", "washr", "lock"], found: ["lock"] })
+    expect(planned).toEqual([
+      WordMatch.Contains({ word: "m8", patterns: ["%m8%"] }),
+      WordMatch.Indexed({ word: "nut", phrase: '"nut"' }),
+      WordMatch.Close({ word: "washr", patterns: closeMatches("washr") }),
+      WordMatch.Indexed({ word: "lock", phrase: '"lock"' })
     ])
+    const patterns = WordMatch.$match({
+      Contains: (word) => word.patterns.length,
+      Indexed: () => 0,
+      Close: (word) => word.patterns.length
+    })
+    expect(A.map(planned, patterns)).toEqual([1, 0, closeMatches("washr").length, 0])
   })
 })
 

@@ -151,8 +151,8 @@ function SessionNotice() {
       <AlertDescription>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <p className="min-w-0">
-            {sayError(error).sentence} Nothing you decide or save is sent until we can, and it is checked again by
-            itself when the connection is back.
+            {sayError(error).sentence} Nothing you decide or save is sent until we can. It is checked again by itself
+            every half minute, and at once when the connection comes back.
           </p>
           <Button variant="outline" size="xs" onClick={ask}>
             Check now

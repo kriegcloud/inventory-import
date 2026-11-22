@@ -242,6 +242,9 @@ export const takenBackRowsNamed = 200
  * 3: "the screen names it as taken back"). Every screen of the import names them from its picture, the matcher's
  * included, until the person dismisses them: a decision already saved is the usual case, and the match rewrites it
  * where nobody's save or confirm would say so. `rows` names up to `takenBackRowsNamed` of them; `count` is all.
+ * `saved` says, for each row named, which stored decision the part was taken from (the revision it was saved at): a
+ * row that waited over a decision is written across this match only when the decision the match took from is one the
+ * sender named, never a colleague's made since that happens to read the same.
  */
 export const MatchTakeBack = S.Struct({
   revision: S.Int.check(S.isGreaterThanOrEqualTo(0)).annotateKey({
@@ -263,7 +266,14 @@ export const MatchTakeBack = S.Struct({
   count: S.Int.check(S.isGreaterThanOrEqualTo(1)).annotateKey({ description: "How many rows had one taken back" }),
   rows: S.Array(RowId)
     .check(S.isMaxLength(takenBackRowsNamed))
-    .annotateKey({ description: "The first rows, in the file's order; `count` says how many there are in all" })
+    .annotateKey({ description: "The first rows, in the file's order; `count` says how many there are in all" }),
+  saved: S.Record(RowId, S.Int.check(S.isGreaterThanOrEqualTo(0)))
+    .check(S.isMaxProperties(takenBackRowsNamed))
+    .pipe(S.optionalKey)
+    .annotateKey({
+      description:
+        "For each row in `rows`, the draft's revision the stored decision the match took the part from was saved at: which decision it was, since a match never changes it and every save of another decision does. Left out on an entry stored before this was kept: such an entry cannot say whose decision it took from"
+    })
 }).annotate({
   identifier: "MatchTakeBack",
   description: "Decisions of one kind a match of one field took back from what was stored, with the rows"

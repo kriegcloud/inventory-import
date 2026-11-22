@@ -11,7 +11,7 @@
  */
 import * as A from "effect/Array"
 import * as BigDecimal from "effect/BigDecimal"
-import * as Match from "effect/Match"
+import * as Data from "effect/Data"
 import * as O from "effect/Option"
 import * as Str from "effect/String"
 import {
@@ -136,11 +136,27 @@ const VendorsCell = VendorCell.pipe(S.Array, S.fromJsonString)
 const decodeVendors = S.decodeUnknownOption(VendorsCell)
 const encodeVendors = S.encodeOption(VendorsCell)
 
+/** A value of a cell that holds JSON: read (`ok`), or the sentence that says what is wrong with it (`bad`). */
+export type Read<A> = Data.TaggedEnum<{
+  ok: { readonly value: A }
+  bad: { readonly message: string }
+}>
+
 /** A value of a cell that holds JSON, read. */
-export type ReadOk<A> = { readonly _tag: "ok"; readonly value: A }
-/** A value of a cell that holds JSON: read, or the sentence that says what is wrong with it. */
-export type Read<A> = ReadOk<A> | { readonly _tag: "bad"; readonly message: string }
-const ok = <A>(value: A): Read<A> => ({ _tag: "ok", value })
+export type ReadOk<A> = Data.TaggedEnum.Value<Read<A>, "ok">
+
+interface ReadOfAny extends Data.TaggedEnum.WithGenerics<1> {
+  readonly taggedEnum: Read<this["A"]>
+}
+
+/** The constructors, guards and matcher of `Read`. */
+export const Read = Data.taggedEnum<ReadOfAny>()
+
+// Taken out of the enum once: every cell of a file that holds JSON is read through these.
+const { bad: makeBad, ok: makeOk } = Read
+const isOk = Read.$is("ok")
+const ok = <A>(value: A): Read<A> => makeOk({ value })
+const bad = <A>(message: string): Read<A> => makeBad({ message })
 
 /**
  * True when a cell was read: its value is there, and no sentence. Read by its case, so the review and the forms tell
@@ -148,9 +164,7 @@ const ok = <A>(value: A): Read<A> => ({ _tag: "ok", value })
  *
  * @example wasRead(readDimensions('{"length":31.2,"width":41.4,"height":2,"unit":"cm"}')) // true
  */
-export const wasRead = <A>(read: Read<A>): read is ReadOk<A> =>
-  Match.valueTags(read, { ok: () => true, bad: () => false })
-const bad = <A>(message: string): Read<A> => ({ _tag: "bad", message })
+export const wasRead = <A>(read: Read<A>): read is ReadOk<A> => isOk(read)
 
 /**
  * The dimensions a cell holds: none for an empty cell, the three measurements and their unit, or what is wrong, in a
@@ -209,12 +223,9 @@ export const readVendors = (text: string): Read<ReadonlyArray<Vendor>> => {
       isPreferred: vendor.is_preferred === true
     })
   })
-  const wrong = A.findFirst(
-    read,
-    Match.valueTags({ ok: () => O.none<string>(), bad: ({ message }) => O.some(message) })
-  )
+  const wrong = A.findFirst(read, Read.$match({ ok: () => O.none<string>(), bad: ({ message }) => O.some(message) }))
   if (O.isSome(wrong)) return bad(wrong.value)
-  return ok(A.flatMap(read, Match.valueTags({ ok: ({ value }) => [value], bad: () => [] })))
+  return ok(A.flatMap(read, Read.$match({ ok: ({ value }) => [value], bad: () => [] })))
 }
 
 /** The vendors cell again with only the vendor at `keep` preferred: one reading of a cell that marks several. */

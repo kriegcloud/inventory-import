@@ -1,0 +1,193 @@
+{
+  "commit": "734c27a",
+  "pinnedOn": "2026-11-22",
+  "packages": [
+    {
+      "package": "@alchemy.run/acme",
+      "version": "2.0.0-beta.87",
+      "license": "Apache-2.0",
+      "file": "alchemy.run-acme-734c27a.tgz",
+      "bytes": 61829,
+      "sha256": "617d3ddbf6f5e297f1f77beceb188dca4b081445b4c93c5988a43d42d140bf2b",
+      "registryAddress": "https://pkg.alchemy.run/@alchemy.run/acme/-/fed20ae49a572549b5529c18f869a392617d6e65a40e8ccd1a3a944063fd7021.tgz",
+      "registryBytes": 61442,
+      "addressesRewritten": 2
+    },
+    {
+      "package": "@alchemy.run/cloudflare",
+      "version": "2.0.0-beta.87",
+      "license": "Apache-2.0",
+      "file": "alchemy.run-cloudflare-734c27a.tgz",
+      "bytes": 3805456,
+      "sha256": "276b8c3c2c66b3406e08c2142b594c8868fbb782ec2446f496717be77430fe5e",
+      "registryAddress": "https://pkg.alchemy.run/@alchemy.run/cloudflare/-/78af428d3da0a195dbd8443afe50ca088f21e50e2d732a8b7456672777f4d16d.tgz",
+      "registryBytes": 3762253,
+      "addressesRewritten": 11
+    },
+    {
+      "package": "@alchemy.run/cloudflare-runtime",
+      "version": "2.0.0-beta.87",
+      "license": "Apache-2.0",
+      "file": "alchemy.run-cloudflare-runtime-734c27a.tgz",
+      "bytes": 1625645,
+      "sha256": "c5afc3c0fc36d674d0cf36d56846c8dfc3385f5c0b4eb76c90328d09242f0a40",
+      "registryAddress": "https://pkg.alchemy.run/@alchemy.run/cloudflare-runtime/-/afec317806de006c7138008a4e93fbae08f90b678dc9dd71c1d85807810a917d.tgz",
+      "registryBytes": 1618736,
+      "addressesRewritten": 2
+    },
+    {
+      "package": "@alchemy.run/docker",
+      "version": "2.0.0-beta.87",
+      "license": "Apache-2.0",
+      "file": "alchemy.run-docker-734c27a.tgz",
+      "bytes": 299287,
+      "sha256": "9f886478f9ff7569b6d1040e39151be4483b9f4a81769299550296bfad885d54",
+      "registryAddress": "https://pkg.alchemy.run/@alchemy.run/docker/-/06b208ecb839cef3f2ee6d1720fddb537f04d474da26858fadefcf6e547e4f43.tgz",
+      "registryBytes": 297487,
+      "addressesRewritten": 1
+    },
+    {
+      "package": "@alchemy.run/domain",
+      "version": "2.0.0-beta.87",
+      "license": "Apache-2.0",
+      "file": "alchemy.run-domain-734c27a.tgz",
+      "bytes": 1169964,
+      "sha256": "111f0f01b8e26c38e64b95d6e424e3c25373270d939045868d8b45eb429de854",
+      "registryAddress": "https://pkg.alchemy.run/@alchemy.run/domain/-/ee1f74c3a3eedc24421182143cc4d902e072de672d2cbe9bfb610ed08a4b5be6.tgz",
+      "registryBytes": 1158364,
+      "addressesRewritten": 5
+    },
+    {
+      "package": "@alchemy.run/github",
+      "version": "2.0.0-beta.87",
+      "license": "Apache-2.0",
+      "file": "alchemy.run-github-734c27a.tgz",
+      "bytes": 202258,
+      "sha256": "0161df4ccce91d5e8528102638f47bb8535abd2c3dda1aebe5f6ed956ef15552",
+      "registryAddress": "https://pkg.alchemy.run/@alchemy.run/github/-/f071addaf03029cafd830badee9119a7d7e220752dfc88ff4c489353c7805230.tgz",
+      "registryBytes": 200180,
+      "addressesRewritten": 3
+    },
+    {
+      "package": "@alchemy.run/node-utils",
+      "version": "2.0.0-beta.87",
+      "license": "Apache-2.0",
+      "file": "alchemy.run-node-utils-734c27a.tgz",
+      "bytes": 83073,
+      "sha256": "3ac66c7f1348b366450188594ee3013ea56adb8cb5bff8088cba7960961df25e",
+      "registryAddress": "https://pkg.alchemy.run/@alchemy.run/node-utils/-/3ac66c7f1348b366450188594ee3013ea56adb8cb5bff8088cba7960961df25e.tgz",
+      "registryBytes": 83073,
+      "addressesRewritten": 0
+    },
+    {
+      "package": "@alchemy.run/sql",
+      "version": "2.0.0-beta.87",
+      "license": "Apache-2.0",
+      "file": "alchemy.run-sql-734c27a.tgz",
+      "bytes": 121339,
+      "sha256": "d8d5062c7a851e70c8cd317f49075b3ff71f65fb17687f7192b893c3437bc518",
+      "registryAddress": "https://pkg.alchemy.run/@alchemy.run/sql/-/df61e0cbc26c7e47d513250f11ab983cbfcba0eaff2bde3f11fea2eaf133af01.tgz",
+      "registryBytes": 120342,
+      "addressesRewritten": 1
+    },
+    {
+      "package": "@distilled.cloud/acme",
+      "version": "1.0.0-rc.20",
+      "license": "Apache-2.0",
+      "file": "distilled.cloud-acme-734c27a.tgz",
+      "bytes": 54445,
+      "sha256": "c15def2574ced4d5a1755cd92aee46c1a90fb09c6f31ec6c80ba6299a3952aca",
+      "registryAddress": "https://pkg.alchemy.run/@distilled.cloud/acme/-/93cdeb63385c621e30cc363c24b6111d68f2e9796416c9d22532b5f3d6f14a0e.tgz",
+      "registryBytes": 54297,
+      "addressesRewritten": 1
+    },
+    {
+      "package": "@distilled.cloud/aws",
+      "version": "1.0.0-rc.20",
+      "license": "Apache-2.0",
+      "file": "distilled.cloud-aws-734c27a.tgz",
+      "bytes": 19664912,
+      "sha256": "4d393d6ef708110a423287df00311a4778d3c2607f29bc5cf29f08b35e1d8e8c",
+      "registryAddress": "https://pkg.alchemy.run/@distilled.cloud/aws/-/c9214b86cf4d1e68dd4023fa72e4a9fe8c2e384b1d4e4c45160dc52b0055e188.tgz",
+      "registryBytes": 19459473,
+      "addressesRewritten": 2
+    },
+    {
+      "package": "@distilled.cloud/aws4signer",
+      "version": "1.0.0-rc.20",
+      "license": "Apache-2.0",
+      "file": "distilled.cloud-aws4signer-734c27a.tgz",
+      "bytes": 44107,
+      "sha256": "7c32131ff7eae4cabe4266ed0a0dcff1a1c39281c092e3708f7fda14dcc52a04",
+      "registryAddress": "https://pkg.alchemy.run/@distilled.cloud/aws4signer/-/3b17306505bb7e32801a8266f47ccc28276318777fe1e79e62f13aff9e4a899a.tgz",
+      "registryBytes": 44229,
+      "addressesRewritten": 1
+    },
+    {
+      "package": "@distilled.cloud/cloudflare",
+      "version": "1.0.0-rc.20",
+      "license": "Apache-2.0",
+      "file": "distilled.cloud-cloudflare-734c27a.tgz",
+      "bytes": 6475814,
+      "sha256": "1d87f2430c1cf0a075cfb623e02b3a3ac4f666fd892ea6f10653a5120f574f72",
+      "registryAddress": "https://pkg.alchemy.run/@distilled.cloud/cloudflare/-/8ce7588c1725c1b71f5cdbf5fed6c7fdac2192f915d16e06e03dfe9a8e36a464.tgz",
+      "registryBytes": 6395154,
+      "addressesRewritten": 2
+    },
+    {
+      "package": "@distilled.cloud/core",
+      "version": "1.0.0-rc.20",
+      "license": "Apache-2.0",
+      "file": "distilled.cloud-core-734c27a.tgz",
+      "bytes": 391182,
+      "sha256": "4cad6ddeafd8ef5b74e38ab721d5d8abc77d32f6894519781b5811983e758fed",
+      "registryAddress": "https://pkg.alchemy.run/@distilled.cloud/core/-/4cad6ddeafd8ef5b74e38ab721d5d8abc77d32f6894519781b5811983e758fed.tgz",
+      "registryBytes": 391182,
+      "addressesRewritten": 0
+    },
+    {
+      "package": "@distilled.cloud/github",
+      "version": "1.0.0-rc.20",
+      "license": "Apache-2.0",
+      "file": "distilled.cloud-github-734c27a.tgz",
+      "bytes": 2354510,
+      "sha256": "95c1288b37eab2bcdb9c5c1ba3d128d323027252cd83d59291a98d15004e8b21",
+      "registryAddress": "https://pkg.alchemy.run/@distilled.cloud/github/-/4747d0b95bacbe183325734a7940960eda85d91c43cddf4d12f29ad784b2f480.tgz",
+      "registryBytes": 2319284,
+      "addressesRewritten": 1
+    },
+    {
+      "package": "@distilled.cloud/iceberg",
+      "version": "1.0.0-rc.20",
+      "license": "Apache-2.0",
+      "file": "distilled.cloud-iceberg-734c27a.tgz",
+      "bytes": 97802,
+      "sha256": "49d56c33b9d8591e7a133c764e901025ca4e07d318e6ca83839c779d634c9d85",
+      "registryAddress": "https://pkg.alchemy.run/@distilled.cloud/iceberg/-/53b5fb0a6c5c72a24cee7364f343d4e8606b98ce19845eb7ef4adc06a212a3d9.tgz",
+      "registryBytes": 97426,
+      "addressesRewritten": 1
+    },
+    {
+      "package": "@distilled.cloud/s3",
+      "version": "1.0.0-rc.20",
+      "license": "Apache-2.0",
+      "file": "distilled.cloud-s3-734c27a.tgz",
+      "bytes": 465183,
+      "sha256": "24101cc88dd497f9e49a15a9c501e07a9c1454286cf3d8cbc50ba60913cd4dc2",
+      "registryAddress": "https://pkg.alchemy.run/@distilled.cloud/s3/-/34a6e15ca62c2458eedbef8ce425703066d7cb91c79889b8bd767bfb53c7325d.tgz",
+      "registryBytes": 460760,
+      "addressesRewritten": 2
+    },
+    {
+      "package": "alchemy",
+      "version": "2.0.0-beta.87",
+      "license": "Apache-2.0",
+      "file": "alchemy-734c27a.tgz",
+      "bytes": 1804898,
+      "sha256": "92aa361d933d8334524b376a5c97521dc73db2168dffccf13e635d532b33423c",
+      "registryAddress": "https://pkg.alchemy.run/alchemy/-/37771eb287bb8dfbf74309f72ba026e976e31f906d7f75a8748a3e3ae41f9c45.tgz",
+      "registryBytes": 1789153,
+      "addressesRewritten": 2
+    }
+  ]
+}

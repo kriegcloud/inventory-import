@@ -946,7 +946,8 @@ describe("a Replace or Keep-stored on an import matched before moves were kept",
               reads: true,
               kind: "stored",
               count: 1,
-              rows: ["row-2"]
+              rows: ["row-2"],
+              saved: { "row-2": saved.revision }
             }
           ])
         })

@@ -42,6 +42,15 @@ export interface ToolAnswer {
   readonly code: number
 }
 
+/** How a tool is run: from which folder (the root), with what on standard input and which variables beside its own. */
+export interface RunOptions {
+  readonly cwd?: string
+  /** Standard input, as text: none when left out. */
+  readonly stdin?: string
+  /** Variables added to the process's own environment. */
+  readonly env?: Readonly<Record<string, string>>
+}
+
 /** One entry of a folder: its name and whether it is a folder itself. */
 export interface Entry {
   readonly name: string
@@ -116,7 +125,7 @@ export class Repo extends Context.Service<
     readonly run: (
       command: string,
       args: ReadonlyArray<string>,
-      options?: { readonly cwd?: string }
+      options?: RunOptions
     ) => Effect.Effect<ToolAnswer, RepoError>
   }
 >()($I`Repo`) {
@@ -246,10 +255,19 @@ export class Repo extends Context.Service<
           concurrency: 1
         }).pipe(Effect.map(A.flatten))
 
-        const run = (command: string, args: ReadonlyArray<string>, runOptions?: { readonly cwd?: string }) =>
+        const run = (command: string, args: ReadonlyArray<string>, runOptions: RunOptions = {}) =>
           Effect.gen(function* () {
             const handle = yield* spawner.spawn(
-              ChildProcess.make(command, args, { cwd: O.getOrElse(O.fromUndefinedOr(runOptions?.cwd), () => root) })
+              ChildProcess.make(command, args, {
+                cwd: O.getOrElse(O.fromUndefinedOr(runOptions.cwd), () => root),
+                ...(runOptions.stdin === undefined
+                  ? {}
+                  : { stdin: Stream.make(runOptions.stdin).pipe(Stream.encodeText) }),
+                // Every tool is run to read what it says, so it says it without colour, in a terminal or on CI
+                // (where a tool colours its output because `CI` is set): a caller's own variables come after.
+                env: { NO_COLOR: "1", FORCE_COLOR: "0", ...runOptions.env },
+                extendEnv: true
+              })
             )
             const [chunks, stderr, code] = yield* Effect.all(
               [

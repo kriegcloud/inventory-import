@@ -1,0 +1,59 @@
+{
+  "name": "@inventory/scratchpad",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A place to try an idea against the repository's own packages: one folder for each experiment, read by no check, build or deploy",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "types": "tsrs -p tsconfig.json",
+    "tests": "vitest run",
+    "serve": "vite --config vite.config.ts"
+  },
+  "dependencies": {
+    "@beep/better-auth": "workspace:*",
+    "@beep/csv": "workspace:*",
+    "@beep/d1": "workspace:*",
+    "@beep/identity": "workspace:*",
+    "@beep/infra": "workspace:*",
+    "@beep/openrouter": "workspace:*",
+    "@beep/repo-cli": "workspace:*",
+    "@beep/schema": "workspace:*",
+    "@beep/types": "workspace:*",
+    "@beep/utils": "workspace:*",
+    "@beep/xlsx": "workspace:*",
+    "@effect/atom-react": "4.1.5",
+    "@inventory/access-contract": "workspace:*",
+    "@inventory/access-host": "workspace:*",
+    "@inventory/access-model": "workspace:*",
+    "@inventory/access-web": "workspace:*",
+    "@inventory/catalog-contract": "workspace:*",
+    "@inventory/catalog-host": "workspace:*",
+    "@inventory/catalog-model": "workspace:*",
+    "@inventory/catalog-web": "workspace:*",
+    "@inventory/client": "workspace:*",
+    "@inventory/kernel": "workspace:*",
+    "@inventory/review": "workspace:*",
+    "@inventory/ui": "workspace:*",
+    "effect": "4.1.5",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@effect/platform-node": "4.1.5",
+    "@effect/vitest": "4.1.5",
+    "@tailwindcss/vite": "^4.3.5",
+    "@types/node": "^22.20.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "tailwindcss": "^4.3.5",
+    "tsrs": "7.1.0-beta.tsrs3",
+    "typescript": "~7.0.2",
+    "vite": "^8.3.6",
+    "vitest": "^5.1.0"
+  },
+  "beep": {
+    "family": "scratchpad"
+  }
+}

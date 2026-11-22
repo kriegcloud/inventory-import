@@ -23,9 +23,16 @@ browser ── cookie inventory.session_token ──> Worker
                     Better Auth getSession(cookie) -> { userId, email, activeOrganizationId }
                     Members.findByUser(userId, activeOrganizationId) -> Member { id, name, role, organization }
                     no session or no membership -> NotSignedIn (401) with a sentence
+                    x-page-member names another member than the session's -> NotSignedIn (401)
   /api/v1/identity/session -> who is signed in, as whom, and what the sign-in page offers: always a 200
 ```
 
+- **One cookie for every tab.** A browser's tabs share the session cookie, so a sign-in, a sign-out or a switch of
+  organization in one tab changes who the others' requests act as. Each request of the app's API client names the
+  member its page is for (`x-page-member`, `pageMemberHeader` in `@inventory/access-contract/Access`), and the
+  server refuses it when the session's member is another; the page then asks who is signed in, and is left for a
+  fresh one unless it is the person's own switch. Each tab also tells the others through localStorage
+  (`inventory:signed-in-changed`) and asks again when it is shown after being hidden.
 - **Identity is the id.** `CurrentActor.id` (the member: one user in one organization) and the session's user id
   are who someone is. Display names are never compared for permissions: a rule such as "nobody approves their own
   count" compares ids. Better Auth's `update-user` is off (`disabledPaths` in `packages/access/host/src/internal/authOptions.ts`), so
@@ -138,7 +145,9 @@ Better Auth's command line cannot reach D1, so its tables are migrations like an
    tables, part 2 the shared `organization` and `member`), then `bun run db:reset`. Once a database holds rows that
    must stay, save it as the next `migrations/NNNN_*.sql` instead: a line marked UNSAFE is a required column on a
    table that already has rows, so add it nullable and fill existing rows in the same file.
-4. `bun run check:full`: `test/server/AuthSchema.slow.test.ts` fails while anything is missing.
+4. `bun run check`: `test/server/AuthSchema.test.ts` fails while anything is missing. It also fails when a new Better
+   Auth wants a table or a column the migrations do not make, which is why `better-auth` is held and moved by hand
+   (`bun run deps:update` says how).
 
 Better Auth's tables come first in `0001_init.sql`, because `member.userId` references `user`.
 

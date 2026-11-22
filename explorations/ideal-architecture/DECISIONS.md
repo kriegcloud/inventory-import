@@ -560,6 +560,15 @@ the loop? Answer: "One entry and a budget (Recommended)": the bin loads the whol
 that does nothing takes longer than a number set from the first real measurement. Rejected: beep-effect's fast path
 from the start; move them to the root. Reverse: add the fast path to `src/bin.ts`.
 
+How the budget is measured changed on 2026-11-22 (agent, not asked): the rule and the one entry stand. The test held
+the time on the clock to 400 ms, and GitHub's four-core runner, busy with the rest of the check, took over five
+seconds for five starts, so CI failed on a CLI that had not changed. It now holds the processor time the start used
+(user and system, as bash's `time` reports them) to 700 ms: the same 3.6 times the measured start (110 ms on the
+clock, about 185 ms of processor time, since bun runs several threads). Shown both ways: with the CLI held to 8% of a
+core the old test timed out and the new one passes; with four heavy packages imported by the entry the new one fails
+(1,073 ms). What loading everything costs today: 121 ms on the clock for `--version`, of which bun alone is 18 ms and
+Effect's CLI with no command of ours 95 ms, so a fast path would save about 26 ms. Not built.
+
 ### 2026-11-19 — tooling CLI: what the tests stand on (T8)
 
 Question: what do the rules' tests stand on? Answer: "@effect/vitest and a real temp folder (Recommended)".
@@ -951,3 +960,336 @@ all 14"; the agent recommended leaving them. Read as: the vendored components ma
 marked "Local change" where it is made; a later `shadcn add` of one of those files is compared by hand. Rejected:
 leaving them as published; converting only the data table. Built with `@beep/schema` added to `@inventory/ui`. Reverse:
 the "Local change" blocks in those eleven files.
+
+### 2026-11-21 — deprecated APIs
+
+He asked, in his words: "In beep-effect we have this lint rule or something that errors when deprecated api's are
+used. Can you […] configure and set this up for us?" Built as beep-effect has it, oxlint's
+`typescript/no-deprecated`, as a law and a root task, `deprecated:check` (`docs/standards/deprecated-apis.md`), on
+every code file git would commit but the vendored skills under `.agents/` (decided below, 2026-11-22). Reverse: drop
+the task from `check` and `check:full`.
+
+### 2026-11-21 — deprecated APIs, the vendored data grid's `document.execCommand`
+
+The check found `document.execCommand("insertText", …)` in the vendored data grid, which names no replacement.
+Question: what should happen to it? Options: "Local change (Recommended)"; "Exempt vendored kit"; also named, deleting
+the grid, which no screen uses. Answer: "Local change"; the agent recommended the same. His answer covers the option as
+it was put to him: the fallbacks already in the file, at the cost of the browser's own undo in a cell's editor.
+
+What was built first was a different design, not put to him before it was built: measured in Chromium, the number
+cell's fallback stored 6 for a typed 56 and 5 for a typed -5, so the agent let the browser type the key that opens an
+editor, through a prop on the vendored cell and a `flushSync` in its key handler. A review found that wrong for a
+column with a variant and its own `cell`, which lost the opening key and stored 6 for a typed 56.
+
+### 2026-11-22 — deprecated APIs, `.agents/` is not read
+
+Question, by dialog: the check reads every code file except `.agents/`, the vendored agent skills; reading it gives 5
+findings in one skill's browser-probe script, which reads two deprecated CSS properties on purpose, plus 18 files with
+no TypeScript project; he had asked for no exemptions. Options: "Leave it out, by name (Recommended)"; "Read it and fix
+it", a local change to the probe script and a project for the 18 files. Answer: "Leave it out, by name". I chose; the
+agent recommended the same. It stays the one folder named as not read, said in the check's output and in its doc
+(`leftOut` in the law). Of its 18 code files, 16 are other people's skills and two (the ontology auditor's script and
+its test) are from his own beep-effect; all are copied as published and run by no part of the app or its checks. Reverse: empty `leftOut`, give the 18 files a project and change the probe script.
+
+### 2026-11-22 — the vendored data grid's typing, for every column
+
+Question, by dialog, after he was told that the fallbacks store wrong numbers, that typing in place had been built
+without asking, and that it still lost the first key in a column with its own `cell`: what should happen to the grid?
+Options: "Fix it for every column (Recommended)", keeping the built approach and extending it to those columns, with a
+browser test that types 56, -5 and a space into each editor and reads what is stored; "Remove the grid"; "Exempt the
+grid". Answer: "Fix it for every column". I chose; the agent recommended the same.
+
+Built: the cell's wrapper reads from its column whether the editor that will open takes typing, so a column with its
+own `cell` behaves as a plain one; it opens and focuses that editor before the key handler ends, and the browser types
+the key. No fallback that puts text in is left. Where the editor has not taken the focus by then (a screen that keeps
+the editing state itself and applies it later), the key is prevented and the editing ended: the key does nothing, and
+nothing is stored that was not typed. A column that writes its own cell (`meta.writeCell`) is left as published.
+
+"Every column" as built means the four editors that take typing: text, number, url and long text, in a plain column
+and in one with its own `cell`. The select, multi-select, date and file editors and the boolean's checkbox are as
+published and untouched; the published select and multi-select drop the key that opens them, and still do (agent, not
+asked whether he meant those too).
+
+The test is `bun run grid:keys` in `apps/inventory`, on a development-only page (`/gallery/grid`) that adds nothing to
+the production build (its stylesheet is 124,636 bytes with and without the page; the walk that lists the
+stylesheet's sources is told not to follow it). On each of the four editors, in both kinds of column, with no pause
+between keys and with 40 ms, it types 56, -5 and a space, types then presses Escape, types then undoes, and presses F2
+then types: 96 cases, read from what the grid stored. It fails on an error or a warning in the page's console, starts
+this checkout's own server on a port it asked the system for, and fails when no browser is found. On the grid as it
+was before the fix for every column, 22 of the 96 fail. Chromium only. Not measured: Firefox, Safari, a touch
+keyboard, an input method, a production build of the grid.
+
+Where the test runs (agent, not asked; he has been told): CI runs it as a step after the full check, with the
+runner's Chrome (`/usr/bin/google-chrome`, which GitHub's Ubuntu 24.04 image documents), and it is run by hand after a
+change to the grid. The step has not run on a runner yet: nothing is pushed. It is not part of `bun run check`. An
+earlier version of this entry said the machine that runs the checks has no browser; that was wrong.
+
+Not decided, and pinned by the test as "as published", not as rules:
+
+- A space typed on a focused cell replaces a text cell's value with one no-break space (U+00A0, the browser's way with
+  a lone space in an editable element) and empties a number or url cell. The published grid does the same, measured
+  with its own mechanism (`document.execCommand("insertText", false, " ")` on a selected value in Chromium).
+- Escape in the long-text editor keeps what was typed: its popover closes and saves. The published grid does the
+  same, measured on the grid as it was before any of these changes.
+
+Also seen, and not held by the test: the published long-text editor typed the opening key on the next frame, and in
+one run of the published grid with no pause between keys it stored a wrong value in one of its long-text cases. The
+browser types that key now, and no such run has failed since; the test does not fail on the old code every time.
+
+Reverse: the "Local change" marks in `packages/ui/src/components/data-grid/` (`data-grid-cell.tsx`,
+`data-grid-cell-variants.tsx`, `data-grid-utils.ts`), one at every changed or removed line.
+
+### 2026-11-22 — deprecated APIs, the scripts' and the page script's projects (agent, not asked)
+
+The check refuses a code file no tsconfig includes, so the app's development scripts (`apps/inventory/scripts`, plain
+JavaScript) and the one script the page loads (`public/theme-init.js`) each got a project, type-checked by the app's
+`check`. Both are looser than the repository's one profile: no Effect rule applies (`plugins` is empty; 78 findings in
+the scripts otherwise), and the scripts' project has `noImplicitAny` off, so an untyped parameter or a package that
+ships no types is `any` without an error and a deprecated call behind either is not seen. Before, nothing
+type-checked them at all. This is the agent's judgement, not a decision of his; he was told on 2026-11-22 and it was
+left as built. Other ways: the Effect rules on and the findings fixed; the scripts rewritten as TypeScript;
+`noImplicitAny` on alone. Reverse: remove `plugins` and `noImplicitAny` from `apps/inventory/scripts/tsconfig.json`
+and `plugins` from `apps/inventory/tsconfig.public.json`, and fix what the check then finds.
+
+### 2026-11-22 — no `try` statement, repository wide
+
+"I noticed some try catch blocks in the source code on main: packages/client/src/Tab.atoms.ts L26-30. In beep-effect
+I've banned try/catch blocks as my preference is either using Effect(s) or effect/Result for code which can fail with
+errors. I want this enforced repo wide." Three questions followed.
+
+The vendored kit has fourteen `try` blocks (`packages/ui/src/components` and `hooks`). Question: convert them too?
+Options: "Convert them too (Recommended)"; "Leave vendored as published". Answer: "Convert them too". I chose; the
+agent recommended the same. Each becomes `Result.try` or `Option.liftThrowable`, marked "Local change".
+
+Plain JavaScript: the telemetry start script, and `apps/inventory/public/theme-init.js`, which runs before the app
+loads and cannot import Effect without loading the library before first paint. Options: "Script yes, theme-init named
+(Recommended)"; "No exception at all". Answer: "Script yes, theme-init named". I chose; the agent recommended the
+same. The telemetry script is converted; `theme-init.js` is the one file the law names as allowed, with the reason
+beside it. `.agents/` is left out by name, as for the deprecated-API check.
+
+When? Options: "Next atoms batch (Recommended)"; "After Wednesday"; "Now, ahead of the fixes". Answer: "Next atoms
+batch". I chose; the agent recommended the same. Not built yet.
+
+### 2026-11-22 — Alchemy, which build, and the state store it upgrades
+
+The Alchemy packages are a build of the library's `main` (`vendor/alchemy`, commit `734c27a`), because
+`@alchemy.run/domain`'s `Decision` and `Verify` are in no release. The update to that build was held on one thing:
+it raises the Cloudflare state store's version from 8 to 9. The first thing on it that reaches a store an older build
+made upgrades that store, one way: `alchemy state bootstrap` and CI's deploys (`deploy.yml` passes `--yes`) without
+asking, a deploy from the workstation only after a confirm. A checkout on an older build is refused by the store from
+then on.
+
+"All I know is I want the latest version of alchemy. We will likely need to update effect & alchemy again before
+Wednesday comes." And on what is deployed: "We can always tear down & redeploy from scratch. The idea is that we get
+our ideal version built. I don't care about anything we've deployed yet we can start from scratch so that we have the
+best names & things."
+
+So the pin follows the library's `main`, the upgrade of the store is accepted, and nothing deployed so far is kept
+for its own sake. Only this repository's stacks keep their state in `Cloudflare.state()`; beep-effect's use
+`AWS.state(...)` and are not touched. Reverse: none for the store, the upgrade is one way; destroy the stages and
+deploy them again from an empty store.
+
+### 2026-11-22 — Alchemy, where the pinned build is kept and how often it moves
+
+A build of `main` is deleted from the library's registry a week after `main` moves on, so the build must be kept
+somewhere this repository controls: seventeen files, 38.7 MB. Options: the files in the repository, moved only when
+needed; the files as release assets on GitHub; in the repository, moved often. Answer: "In the repo, re-pin only when
+needed". Rejected: release files on GitHub; re-pin often. One move is expected before Wednesday 2026-11-25, so a
+move is one command, `bun run alchemy:repin -- <commit>` (`vendor/alchemy/README.md`). Reverse: delete
+`vendor/alchemy` and the root `overrides`, and ask for a release once one contains `Decision`.
+
+### 2026-11-22 — the review's model, its names (agent, not asked for each)
+
+Asked what the model's units should be called, he gave no names and said the names need not last yet: "I don't care
+about anything we've deployed yet we can start from scratch so that we have the best names & things." The names are
+the agent's, open to change until the first hosted deploy stores an event under them: the aggregates `Import`, `Row`
+and `Group`, in the model `Catalog`, served as `CatalogApi`. Reverse: rename before that deploy at no cost; after it,
+the events already stored carry the old names, and a rename needs an answer for them.
+
+### 2026-11-22 — the review's model, what is shown on Wednesday
+
+Two models of the review exist: one unit for each group act, which he chose, and one unit for each row, built first
+and set aside. Question: which is shown on 2026-11-25? Answer: "Chosen design, parked one as fallback". The one-unit
+model is built for `main`. If it is not checked and merged by the evening of 2026-11-24, he shows Verify on the
+per-row model from a local branch on his own machine, and says plainly that it is the alternative he did not choose.
+That branch is kept running on the pinned build and gets nothing else. Reverse: none needed; the fallback is deleted
+once the chosen model is in `main`.
+
+### 2026-11-22 — the check on GitHub's runner (agent, not asked)
+
+CI failed twice on code that had not changed: the CLI's start-up test, then two property tests of `@beep/xlsx`, each
+"timed out in 5000ms". Reproduced with the whole check pinned to four cores (`taskset`): turbo starts ten tasks at
+once and each test run a worker per core, so tests ran several times slower than they are, and a different one hit
+its limit each time (the xlsx property, the review's parity test, a slow test's 10 s hook). What was changed, none
+of it a test's own number or what a test asserts:
+
+- CI runs two tasks at a time with one test worker each, and `--continue`, so a red run lists every failure.
+- One file, `vitest.shared.ts`, holds every test's limit (30 s, hooks 60 s, slow tests 120 s) in place of vitest's 5 s
+  and 10 s. Sized from the slowest tests on two pinned cores: 4.4 s and 31 s.
+- In the four places whose tests wait in real time (`packages/client`, `packages/catalog/web`, `packages/review` and
+  the app's fast tests), a test that fails is tried again, three times at most and half a second apart; a property that was falsified
+  never is.
+- No property test's run count was lowered and nothing is skipped.
+
+Measured, cold, pinned (`taskset`), the whole check each time, 80 tasks:
+
+| Cores | Tasks at once | Test workers | Second try | Runs | Green | Seconds |
+| --- | --- | --- | --- | --- | --- | --- |
+| 4 | 10 (as before) | one per core | no | 1 | 0 | 117 |
+| 4 | 2 | 2 | no | 3 | 1 | 106 to 118 |
+| 2 | 2 | 2 | no | 3 | 2 | 144 to 236 |
+| 4 | 2 | 2 | twice | 6 | 5 | 102 to 145 |
+| 2 | 2 | 2 | twice | 3 | 3 | 152 to 160 |
+| 4 | 2 | 1 | three times, 0.5 s apart | 3 | 3 | 168 to 192 |
+| 2 | 2 | 1 | three times, 0.5 s apart | 1 | 1 | 342 |
+
+The last two rows are what CI runs. Every red run after the first row was a test that waits in real time, never a
+limit. One test worker costs about a minute on four cores; the job's limit is 15 minutes and the two-core run, which
+stands in for the runner's slower cores, took under six. The runner itself has not run this yet: nothing is pushed.
+
+The second try is the part to look at twice: it makes a test that fails now and then pass in silence (the reporter
+names a try only on a test that still failed), and it is not a cure: with two tries one session test failed all
+three times in one run. It stands only because those tests break the standard's own rule that
+anything timed runs on `TestClock`. Rejected: a longer limit for the xlsx tests alone (the next heavy test would be
+next); a second try for every package (only these four wait in real time); trying a falsified property again.
+Reverse: the three lines in `.github/workflows/ci.yml`, and `limits` and `realTime` in each `vitest.config.ts`.
+
+Two things this does not end, both found while measuring and neither in files of this change:
+
+- The tests that wait in real time (28 files) still fail now and then under load on any machine, and only the second
+  try keeps that out of sight.
+- One property test of the review's draft found a real counterexample: "with the person confirming: a confirm the
+  server makes writes what its screen showed, and nothing is sent beside it" is falsified by seed 369148268449177
+  after 651 runs ("after everything landed, a row of the person's still waits"), every time, on an idle machine too.
+  A second seed, -2416120108841983, falsified it after 762 runs in an unpinned run of the full check. Seeds are drawn
+  at random and it was met twice in about twenty runs here, so CI will meet it.
+
+### 2026-11-22 — dependencies, versions and derived configuration kept in step
+
+I asked "do we have a `deps:update` script like beep-effect?" (there was none: only `deps:lint` and `deps:outdated`,
+and syncpack read 7 of the 25 `package.json` files), and then: "Actually I would like a version-sync & config-sync
+command as well that keeps hard coded values & configs up to date & in sync along with the update:deps". Built as
+three commands of the repository's CLI, in beep-effect's shapes and without its packages: `deps update`,
+`version-sync` (check, `--write`, `--dry-run`) and `config-sync` (writes; `--check`, `--dry-run`). `version-sync`
+and `config-sync --check` are part of `bun run check`. What each covers and leaves alone is in
+`docs/sync-commands.md`. `version-sync --write` may change a version number in `CLAUDE.md`, and nothing else there.
+
+The agent chose these, and I was not asked. Each is small to reverse:
+
+- **The held list is `updateGroups` in `.syncpackrc.json`**, a group's `label` being its reason, where beep-effect
+  keeps a ledger of holds with a probe for each. One list, read by syncpack (`deps:outdated`) and by `deps update`.
+  Rejected: a ledger with probes (a goal of its own); a second file beside syncpack's. Reverse: move the groups.
+- **What is held**: `@effect/tsgo` and the four tools it patches (`typescript`, `tsrs`, `oxlint`,
+  `oxlint-tsgolint`); `alchemy`, `@alchemy.run/*` and `@distilled.cloud/*`, pinned as one set to one commit;
+  `better-auth`, whose tables are a migration written by hand; `xlsx`, which is an address. Not held, and it would
+  move: `@types/node`, from ^24 to ^26, while the workflows run Node 22. Reverse: one group each.
+- **`deps update` asks the registry itself** (`bun info <name> version`) and does not call `syncpack update`, so its
+  plan is tested with no network, and `effect` and the `@effect/*` packages released with it move to one version or
+  not at all. Rejected: reading what syncpack prints.
+- **Records are never rewritten**: `explorations/`, `goals/`, the root's `DECISIONS.md`, `docs/qa`. The
+  standing documents are `CLAUDE.md`, `AGENTS.md`, `README.md`, `docs/` and `.claude/agents`.
+- **A sentence that records a check is moved with the rest** ("checked in effect's source at this version"): the
+  command prints each line it changes, and a person re-checks or rewords. Rejected: guessing which sentences are
+  records.
+- **Three places were wrong and are written**: syncpack's sources (now one pattern for each workspace pattern), the
+  app's `wrangler.jsonc` `$schema` (it named a file that does not exist from that folder), and `tsconfig.base.json`'s
+  `$schema` (the library's repository instead of the installed `@effect/tsgo`).
+- **No package gets project references.** Each is type-checked from source by `tsrs -p`; references would need
+  `composite` and a build order, which is a change to how the repository type-checks. `config-sync` keeps the
+  solution files (the app's, and the root's when there is one) and holds a project's references to its declared
+  packages only where a project already has them.
+
+Not decided, and mine: **one catalog at the root** (versions written once, each package saying `catalog:`). The
+commands already read a root `catalog` first, and a test holds that. It would take: a top-level `"catalog"` in the
+root's `package.json` (not `workspaces.catalog`: every rule reads `workspaces` as a list); `catalog:` in the 24
+workspace `package.json` files; a new `bun.lock`; `customTypes.catalog` and a version group in `.syncpackrc.json`,
+as beep-effect has; and `vendor sync` writing `catalog:` into a vendored package. One commit touching all 25 files,
+for a day when no other branch is open.
+
+### 2026-11-22 — the scratchpad
+
+I asked: "So beep-effect has this `scratchpad` folder modeled after effects. It has grown a little out of hand
+overtime but I'd like a similar thing in this repository. Could you look at how effect does it? Id like to be able to
+import any package from the repo into it as well has have a structured way for us to write tests when I want to try
+experiments or explore ideas I have in a non destructive & isolated way." What was found: Effect's `scratchpad/` is a
+private workspace package that depends on every package, three files committed and everything else ignored, no tests
+and no structure; beep-effect's holds 1,126 tracked files and 135 MB, whole projects with their own lockfile, read by
+the main build, and nothing in it ever ends. Built as `scratchpad/`, the `scratch:*` commands and
+`docs/scratchpad.md`. Eight questions, answered by dialog, and the whole confirmed with "Yes, build it". For each: I
+chose; the agent recommended the same.
+
+1. **Kept or thrown away?** Answer: "Committed, one folder each". Rejected: "Ignored, like Effect"; "Ignored by
+   default, kept on request". An experiment is `scratchpad/experiments/<name>/`, in git.
+2. **In the check?** Answer: "Its own commands only". `scratch:check` and `scratch:test` type-check and test it on
+   request; `bun run check`, the build and CI never read it; the one thing `bun run check` enforces is that nothing
+   outside the scratchpad imports from it. Rejected: "Type-checked in check"; "Fully in check and CI".
+3. **Rules inside?** Answer: "Types on, bans at graduation". The type-checker with the Effect diagnostics runs in
+   `scratch:check`; the laws on how code is written and my bans (no try/catch, no switch, the import form, tags) are
+   not enforced inside it and apply when code graduates into a package; secrets and private names are still refused,
+   since the repository is public. Rejected: "Your bans always"; "Everything applies". This gives the laws on tags,
+   Effect imports and refs a named exemption, the scratchpad, where they had the vendored kit or none: each law's
+   doc says so.
+4. **Staying small** (all four chosen): every experiment has a status (open; graduated, and where to; dropped) and
+   `scratch:list` shows them with their age; no nested installs (a `package.json` or a lockfile inside an experiment
+   is refused); graduate or delete (the folder goes in the same change and one line of what was learned stays in a
+   log); a size and age limit as a warning in `scratch:list`, not a failed check.
+5. **Starting points** (all four chosen), each a small template with a test that already runs, made by one command:
+   a plain probe and its test; a service with a test layer; a Verify model with stories, refused with a sentence
+   until `@alchemy.run/domain` is pinned in the repository and available after; a screen in the browser on a page of
+   its own with the design system and atoms.
+6. **Extra libraries?** Answer: "In the scratchpad's package.json". Only there, never in the app or a package, each
+   named with the experiment that needs it; `deps:update` leaves them alone; deleting or graduating the experiment
+   removes the library in the same change. Rejected: "Not at all".
+7. **First contents?** Answer: "No, start empty". The Alchemy trial models stay where they are; the log points to
+   the brief's trial page once that page is in `main`. Rejected: "Yes, the final model only"; "Yes, all rounds".
+8. **When?** Answer: "After the sync commands".
+
+Three defaults I was shown and accepted with the whole: the warning is at 30 days old or 200 files; an experiment
+that needs a database or a dev server keeps its state in its own ignored folder (`.state`) and on its own port,
+never the app's; a build session may use the scratchpad for trial code instead of a cache folder.
+
+The agent chose these, and I was not asked:
+
+- **Status is not kept twice.** A note only ever says `open`: an experiment that graduated or was dropped has no
+  folder, and its line in `scratchpad/LOG.md` says which. `scratch:list` reads both.
+- **A library is named in its experiment's note** (`libraries:`), and `scratch:check` fails on a dependency of the
+  scratchpad that is not a workspace package, not one the packages also use, and not named by a note.
+- **The checks that keep it small run in `scratch:check`**, not in `bun run check` (answer 2).
+- **The scratchpad's profile is the root's, with nothing turned off**: no third exception to the type-check.
+- **The screen template is its own Vite entry** inside the experiment, served on port 5273 (`scratch:serve`). The app
+  has no route to it, so its production bundle cannot change; the boundaries law holds that.
+- **`config-sync` writes the scratchpad's dependencies** (every package under `packages/`, not the app), and
+  **`version-sync` holds what it shares with the packages** to their versions. syncpack and `deps:update` do not
+  read it.
+- **Graduating does not move code.** The person moves it into a package and makes the check pass there;
+  `scratch:graduate` deletes the folder and logs it.
+- **No law refuses private names** on this branch: only key-shaped strings are read for (`laws keys`), in the
+  scratchpad as everywhere. Answer 3's "private names" has nothing to hold it yet.
+
+### 2026-11-22 — dependencies: the catalog, Node's types, Better Auth, and sentences that record a check
+
+Four questions left open when `deps:update`, `version-sync` and `config-sync` were built, answered by dialog.
+
+1. **One catalog of versions at the root?** Options: "After Wednesday (Recommended)"; "As soon as these merges
+   land"; "No catalog". Answer: "As soon as these merges land". I chose against the recommendation. Once `main` holds
+   the branches open today, one commit: a top-level `catalog` in the root's `package.json`, `catalog:` in the
+   workspace manifests, a new `bun.lock`, syncpack's catalog type and version group, and `vendor sync` writing
+   `catalog:`. The Alchemy overrides and the files in `vendor/alchemy` stay as they are.
+2. **`@types/node`, which `deps:update` would have moved from ^24 to ^26 while CI runs Node 22?** Options: "Hold at the
+   version CI runs (Recommended)"; "Let it move to latest". Answer: "Hold at the version CI runs". I chose; the agent
+   recommended the same. It is held at the major CI and `engines.node` name, and `version-sync` keeps the three
+   together. It was ^24 and is now ^22.20.5 everywhere; every type error that appeared would have been an API the
+   runner does not have, and none did (`bun run check`, 80 of 80). Where something truly needs a newer Node, the
+   answer is to move CI's Node, not to work around it.
+3. **`better-auth`, held by the agent's judgement because its tables are a migration written by hand?** Options:
+   "Hold it, and add the check (Recommended)"; "Hold it, no check"; "Don't hold it". Answer: "Hold it, and add the
+   check". I chose; the agent recommended the same. The check existed as a slow test; it takes half a second, needs
+   no secret, no network and no `.dev.vars` (an in-memory SQLite database and a dummy secret), and now runs in
+   `bun run check` (`apps/inventory/test/server/AuthSchema.test.ts`). It fails when Better Auth wants a table or a
+   column the migrations do not make, which is what `bun run auth:schema` would print.
+4. **A sentence that records a check ("checked in effect 4.1.4's source") is moved by `version-sync --write`,
+   though nobody checked again.** Answer: leave it as built. The agent's judgement: `--write` prints every line it
+   changes, and the person reads them.
+
+And: the scratchpad's lines in `CLAUDE.md` (the command table and the Layout) are written by the agent, as the
+commands of the request that made it.

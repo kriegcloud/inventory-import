@@ -27,5 +27,21 @@ jobs:
           bun-version-file: .bun-version
       - run: bun install --frozen-lockfile
       # Through turbo: type-check, lint, fast and slow tests, the production build, format and docs checks.
+      # The runner has four cores. Turbo would start ten tasks at once and each test run a worker per core, which
+      # made tests several times slower than they are and failed them on their limits; two tasks at a time with one
+      # test worker each is what four cores carry (measured: docs/standards/engineering.md, "The check on CI").
+      # `--continue` runs every task even after one fails, so a red run lists everything that is wrong.
       - name: Check, test and build
-        run: bun run check:full -- --summarize
+        run: bun run check:full -- --summarize --continue --concurrency=2
+        env:
+          VITEST_MAX_WORKERS: 1
+      # The data grid's typing, in a real browser: what is typed on a cell is what is stored. The runner image has
+      # Chrome at this path (CHROME_BIN in actions/runner-images; the runs are on Ubuntu 26.04, whose image lists
+      # Google Chrome as 24.04's does). The browser says its version first,
+      # so a path that is wrong fails on that line with the path in it.
+      - name: Type on the data grid
+        run: |
+          "$CHROME_PATH" --version
+          bun run --cwd apps/inventory grid:keys
+        env:
+          CHROME_PATH: /usr/bin/google-chrome

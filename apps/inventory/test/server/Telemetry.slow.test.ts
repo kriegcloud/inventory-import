@@ -11,7 +11,7 @@ import { OpenRouterTest } from "@beep/openrouter/OpenRouterTest"
 import { toTracedFetch } from "../../src/server/App.ts"
 import { RequestTelemetry } from "../../src/server/RequestTelemetry.ts"
 import { collector } from "../../src/server/Telemetry.ts"
-import { inMemoryApp, settingsLayer, testOrigin, testSettings } from "./support/app.ts"
+import { inMemoryApp, settingsLayer, settled, testOrigin, testSettings } from "./support/app.ts"
 
 // A collector that cannot be reached (src/server/Telemetry.ts): its exporters retry each batch for seconds under
 // `waitUntil`. The first failed connection marks a miss, and for thirty seconds after it nothing is built for the
@@ -57,13 +57,13 @@ it.effect("after a refused connection, the next requests build nothing for the c
       )
       const ask = () => served.fetch(new Request(`${testOrigin}/api/v1/identity/me`))
       expect((yield* Effect.promise(ask)).status).toBe(200)
-      yield* Effect.promise(() => Promise.all(pending))
+      yield* settled(pending)
       const afterFirst = attempts
       expect(afterFirst).toBeGreaterThan(0)
       // The miss is remembered: two more requests answer, and neither tries the collector.
       expect((yield* Effect.promise(ask)).status).toBe(200)
       expect((yield* Effect.promise(ask)).status).toBe(200)
-      yield* Effect.promise(() => Promise.all(pending))
+      yield* settled(pending)
       expect(attempts).toBe(afterFirst)
     })
   )

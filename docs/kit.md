@@ -157,6 +157,18 @@ return <DataGrid {...grid} table={table} height={560} actionBar={<ReviewActions 
 - Keyboard: arrows move, Enter or F2 edits, Enter commits and moves down, Escape cancels, Ctrl or Cmd+F searches
   (`enableSearch`), Space on the first column selects the row. **Local patch:** Tab leaves the grid (upstream moved
   cell by cell, which kept the action bar out of reach). Say so in a `Kbd` hint under the grid.
+- **Local patch:** typing on a focused cell opens its editor and the browser types that key into it, in a text,
+  number, url or long-text column, with its own `cell` or without; upstream typed it with the deprecated
+  `document.execCommand`, and its fallbacks stored 6 for a typed 56. The select, multi-select, date and file editors
+  are as published: the select and multi-select drop the key that opens them.
+- **The grid's browser check:** `bun run --cwd apps/inventory grid:keys` types on those four editors, in both kinds
+  of column, on the development page `/gallery/grid`, and reads what the grid stored: 56, -5, a space, a key then
+  Escape, a key then undo, F2 then a key, each with no pause between keys and with 40 ms (96 cases). It fails on an
+  error or warning in the page's console and when it finds no browser (`CHROME_PATH`). CI runs it after the full
+  check; run it yourself after any change to the grid or a `shadcn add` of it. Measured in Chromium only. Not
+  measured: Firefox, Safari, a touch keyboard, an input method, a production build of the grid.
+- **As published, and not decided:** a space typed on a focused cell replaces a text cell's value with one no-break
+  space and empties a number or url cell; Escape in the long-text editor keeps what was typed.
 - Selection: `table.getSelectedRowModel().rows`, `table.getSelectedCells()` (a range of cells),
   `table.clearSelection()`. Re-render on change with `<Subscribe source={table.store} selector={(s) => s.rowSelection}>`
   from `@tanstack/react-table`. Write values with `table.updateCells([{ rowId, columnId, value }])`.

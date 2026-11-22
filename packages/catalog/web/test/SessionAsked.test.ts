@@ -58,6 +58,15 @@ vi.mock("sonner", () => ({
 }))
 
 const settle = Effect.sleep("20 millis")
+
+/** Settles until `done` holds, a hundred times at most: for what must happen, however busy the machine is. */
+const until = (done: () => boolean, left = 100): Effect.Effect<void> =>
+  done() || left === 0
+    ? Effect.void
+    : Effect.andThen(
+        settle,
+        Effect.suspend(() => until(done, left - 1))
+      )
 const out = decisionFromFlags({ out: true })
 const dana = memberOf({ id: "mem_dana" })
 const marcus = memberOf({ id: "mem_marcus" })
@@ -209,7 +218,9 @@ describe("the review while who is signed in is asked again", () => {
       ])
       // Dana signs in again: her rows come back with her page, and are sent.
       const hers = page(id, dana)
-      yield* settle
+      // Her page sends once its reads have landed, which on a busy machine is later than one settle: waited for,
+      // two seconds at most. A try that looked too early also left her rows kept, and every further try then failed.
+      yield* until(() => A.length(A.flatten(hers.sent())) >= 2)
       expect(A.sort(A.flatten(hers.sent()), Str.Order)).toEqual(["row-2", "row-7"])
     })
   )
@@ -260,7 +271,9 @@ describe("the review while who is signed in is asked again", () => {
         t.registry.refresh(t.session.signedIn)
         yield* settle
         t.server.notFoundIn = "org_northline"
-        yield* t.session.answer(memberOf({ id: "mem_dana_northline", organization: "org_northline" }))
+        yield* t.session.answer(
+          memberOf({ id: "mem_dana_northline", organization: "org_northline", account: "mem_dana" })
+        )
         yield* settle
         expect([t.session.left.times, t.drew[t.drew.length - 1], A.length(t.saves)]).toEqual([0, "gone", 1])
         expect(A.length(keptOf(id, "mem_dana"))).toBe(1)

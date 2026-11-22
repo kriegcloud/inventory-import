@@ -1343,11 +1343,23 @@ const answeringStray = (draft: Draft, event: Answer): Stepped =>
             }
           : editing(moved, (book) => {
               for (const { rowId, theirs } of since) {
-                if (O.isSome(latest(book, rowId)) || R.has(flying(moved), rowId)) continue
+                // A decision of hers made in this tab since stands in its place. A closed tab's, taken up and waiting
+                // or on its way, does not: the two are sides of one line, as when a tab is taken up beside this one's.
+                const standing = [...A.fromOption(latest(book, rowId)), ...A.fromOption(R.get(flying(moved), rowId))]
+                if (A.some(standing, (side) => side.here)) continue
                 O.map(R.get(stray.rows, rowId), (one) => {
                   // As it was sent, on the revisions it was made on (a side is never re-dated). Not written, so it put
                   // nothing there; and what somebody decided since is not seen until the line shows it to her.
-                  const side: Side = { ...one, seen: [], live: false, here: true, overtaken: false, refused: O.none() }
+                  // Beside a closed tab's decision that stands, it is the older of the two and not this tab's latest:
+                  // that one's answer puts it on the line beside this, and neither takes the other's place.
+                  const side: Side = {
+                    ...one,
+                    seen: [],
+                    live: false,
+                    here: !A.isReadonlyArrayNonEmpty(standing),
+                    overtaken: false,
+                    refused: O.none()
+                  }
                   book.lines[rowId] = { sides: withSides([side], sidesOf(book, rowId)), theirs: O.some(theirs) }
                 })
               }

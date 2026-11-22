@@ -9,6 +9,7 @@ import * as O from "effect/Option"
 import * as R from "effect/Record"
 import { type DecisionDelta, decisionFromFlags, type SavedDecisions } from "@inventory/catalog-contract/Decision"
 import {
+  type Draft,
   DraftEffect,
   DraftEvent,
   emptyDraft,
@@ -1057,6 +1058,45 @@ describe("a save's answer that comes after its draft closed", () => {
       answer(2, 5, [{ rowId: "a", theirs: O.some(kept) }])
     ])
     expect([late.draft.lines, late.draft.unsent]).toEqual([{}, {}])
+  })
+
+  it("brings her refused pick back beside a closed tab's decision of the row taken up and sent since", () => {
+    // Left out here and held as sent by the closed picture; in the import opened again her closed tab's "keep" (made
+    // over "left out") is taken up and sent. A colleague accepts the row, and the first save's answer says so while
+    // the second is out: "left out" is a side of the row's line, never dropped because another decision of the row
+    // is on its way. The second, refused the same way, is the other side.
+    const events = [
+      DraftEvent.Opened({ kept: O.none() }),
+      DraftEvent.ViewArrived({ revision: 4, decisions: {}, open: true, confirms: 0 }),
+      DraftEvent.Decided({ changes: { a: O.some(out) } }),
+      DraftEvent.ViewArrived({ revision: 6, decisions: { a: out }, open: false, confirms: 1 }),
+      DraftEvent.ViewArrived({ revision: 7, decisions: { a: out }, open: true, confirms: 1 }),
+      DraftEvent.TakenUp({
+        kept: {
+          rows: {
+            a: {
+              decision: O.some(kept),
+              madeOn: 7,
+              dates: {},
+              seen: [O.some(out)],
+              live: false,
+              here: false,
+              overtaken: false,
+              refused: O.none()
+            }
+          },
+          lines: {},
+          confirms: O.some(1),
+          leftOver: O.none()
+        }
+      }),
+      answer(1, 9, [{ rowId: "a", theirs: O.some(accepted) }])
+    ]
+    const late = played(events)
+    const sides = (draft: Draft) => A.map(draft.lines.a?.sides ?? [], (side) => side.decision)
+    expect([A.map(sends(late.effects), (send) => send.id), sides(late.draft)]).toEqual([[1, 2], [O.some(out)]])
+    const both = played([...events, answer(2, 9, [{ rowId: "a", theirs: O.some(accepted) }])])
+    expect([sides(both.draft), both.draft.unsent]).toEqual([[O.some(kept), O.some(out)], {}])
   })
 
   it("names once a row whose later decision of hers waited behind the save when its draft closed", () => {

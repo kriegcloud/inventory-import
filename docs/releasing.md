@@ -176,7 +176,10 @@ for a release branch: no release has been cut.
 accounts, keeps sign-up closed, and has no model key. The rules answer, since decision I5 gives a key to production
 only. Its test accounts take the one password the previews share. It runs on the previews' Cloudflare account, from
 the `staging` environment, which only `main` may deploy to. Nobody deploys it until Benjamin has deployed the
-repository's stack with the `staging` environment in it (`goals/infra/PLAN.md`, "What Benjamin does by hand").
+repository's stack with the `staging` environment in it: `bun run beep infra setup --staging` on his workstation,
+which makes the previews' password in 1Password, finds the two Cloudflare accounts, shows the stack's plan and
+deploys it after his yes (`goals/infra/PLAN.md`, "What Benjamin does by hand"; `--dry-run` prints its steps). The
+browser logins, unlocking 1Password, reading the plan and, later, approving each production deploy stay his.
 
 Until then every push to `main` that passes CI is followed by a failed "Deploy" run: the `staging` job stops with
 `MissingPreviewPassword` ("Stage "staging" has no password for its test accounts"), because the environment that

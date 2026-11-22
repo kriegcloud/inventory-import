@@ -205,6 +205,68 @@ take-back), straight after a preview server was stopped, and passed on three run
 
 Nothing below was started. Every command names its stage.
 
+### One command for steps 2 to 6, 8, 9 and the first part of 12
+
+`bun run beep infra setup` does those steps in order, on Benjamin's workstation. It is his to run: with no terminal,
+or with `CI` set, it stops before its first tool, so no agent and no CI job runs it. `--dry-run` prints every step
+and every command a run would start, and starts nothing. It can be run again: a step whose work is there says so and
+does nothing. It comes in three sizes, smallest first, and several can be given at once:
+
+| Flag | Steps below | What it does |
+| --- | --- | --- |
+| `--test-stage` | 2, 3, 4 | Finds the Cloudflare account with `cf`, makes and connects the Alchemy profile `inventory-preview`, makes sure of the state store, then plans, asks and deploys `test_<user>`: a live address on workers.dev. Needs one account and nothing from 1Password |
+| `--staging` | 5, 6, 8, 12 | Makes the previews' password in 1Password and writes its reference, does the same for production's account (profile `inventory-production`, connected to Cloudflare and GitHub), then plans, asks and deploys the repository's stack. Staging itself then deploys on the next push to `main` that passes CI |
+| `--production` | 9 | Plans, asks and deploys production from the workstation; needs `--sign-up` |
+
+What each step does, and with which tool:
+
+- **1Password**, through `op-human` (the plain CLI; `op` on this machine is the agents' shim): if
+  `packages/infra/env/op.env` names no `PREVIEW_TEST_ACCOUNT_PASSWORD`, it looks for the item "inventory-import
+  PREVIEW_TEST_ACCOUNT_PASSWORD" in the vault (`--vault`, or asked when there are several), has 1Password make it with
+  a generated password when it is not there, and writes `op://<vault id>/<item id>/password` to that file. The
+  command never sees the password: the output of the one call that makes it is thrown away unread, the item is found
+  again by its title in a list of which only ids and titles are kept, and no line of `op.env` is ever printed. The model key's line
+  stays his to fill in; while it is empty the two production-facing deploys are given `DEPLOY_WITHOUT_MODEL_KEY=true`
+  and the command says so before the plan.
+- **Cloudflare**, through `cf`: `cf auth whoami` names the accounts, so no id is typed; when `cf` is not logged in
+  it starts `cf auth login` and waits. One account is used for a test stage only after he says yes; with several he
+  picks (`--preview-account`, `--production-account`, by name or id, skip the question). The two ids go to the
+  repository's stack as `PRODUCTION_CLOUDFLARE_ACCOUNT_ID` and `PREVIEW_CLOUDFLARE_ACCOUNT_ID`.
+- **Alchemy profiles and state**: `bunx alchemy profile create`, `profile edit --profile <name> --add Cloudflare`
+  (and `--add GitHub` for production's), then, after a yes, `bunx alchemy state bootstrap --profile <name>`.
+- **GitHub**, through `gh`: his login is the production approver (`--approver` names another); `gh auth login` is
+  started when `gh` is not logged in.
+- **Each deploy** is `plan` on his terminal, then "Deploy ... as that plan says?", then `deploy --yes` only after a
+  yes. A plan that fails, or a no, deploys nothing. The stack's and production's run under
+  `op-human run --env-file packages/infra/env/op.env`, which fills the references for that one process. `--yes` is
+  there because Alchemy asks about a plan only when its input and output are both a terminal, and `op run` puts its
+  masking of secrets between a tool's output and the terminal (read in Alchemy's source and 1Password's help, not
+  tried); the question is asked by this command instead, about the plan just shown. With `--yes` Alchemy also
+  repairs drift and upgrades an older state store without asking.
+
+**Still his, while it runs**: approving each login in the browser (Cloudflare for `cf`, then once for each Alchemy
+profile; in Alchemy's own question, picking the account the command names and `gh-cli` for GitHub), unlocking
+1Password when it asks, reading each plan, and answering each question. A test stage's address and its
+`testAccountPassword` are printed by Alchemy to his terminal only; the command reads neither. Removing a test stage
+is his too: `bunx alchemy destroy --stage test_<user> --profile inventory-preview`. Steps 1, 7, 10 and 11 below are
+not in the command (accounts and Workers Paid, who may sign up, the zone's HTTPS setting, the push), and approving a
+production deploy on GitHub stays as `docs/releasing.md` says.
+
+**One Cloudflare account is not two.** `cf` on his workstation saw one account on 2026-11-22. A test stage needs
+only one. The repository's stack takes two ids and would accept the same one twice, but decision I4 gives previews
+an account of their own because a deploy token covers a whole account; so `--staging` and `--production` stop when
+both roles would be the same account, and whether to share one for now is Benjamin's decision, not made.
+
+**Never run for real.** The command was tested with stand-ins for every tool (`test/InfraSetup.test.ts` in
+`packages/tooling/tool/cli`: what is started, in which order, with which arguments, and that each guard stops it)
+and with `--dry-run`. No agent ran `op-human`, `alchemy` or a login. Read from the tools' own help and source, and
+not tried: that `op-human item create --generate-password` and `item list` behave as their help says; that
+`alchemy profile list`, read through a pipe, prints one line a profile as its source does; that `alchemy profile
+edit --add Cloudflare --add GitHub` asks for both in one run; that `plan` prints in full under `op run`; and that
+`op-human run` passes the given variables on. `cf auth whoami` was run once, to read the shape of its answer.
+
+### The same steps, by hand
+
 1. **Cloudflare accounts.** One that holds the zone `beep-effect.com`, on Workers Paid (I9); a second for previews
    and test stages (I4).
 2. **Log in on the workstation** to each account (`bunx alchemy profile create`, one profile for each).

@@ -1,3 +1,4 @@
+// Local change: React is imported by name, so the atoms lint reads this file (goals/atoms, "The kit on atoms", batch 1); no longer as its registry has it.
 "use client"
 
 import {
@@ -12,7 +13,7 @@ import {
   type TableState
 } from "@tanstack/react-table"
 import { cn } from "cn"
-import * as React from "react"
+import { type ComponentProps, type KeyboardEvent as ReactKeyboardEvent, memo, type ReactNode } from "react"
 
 import type { DataTableFeatures } from "@inventory/ui/components/data-table/data-table-features"
 
@@ -26,14 +27,14 @@ import { DataTablePagination } from "@inventory/ui/components/data-table/data-ta
 import { useDirection } from "@inventory/ui/components/direction"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@inventory/ui/components/table"
 
-interface DataTableProps<TData extends RowData> extends React.ComponentProps<"div"> {
+interface DataTableProps<TData extends RowData> extends ComponentProps<"div"> {
   table: ReactTable<DataTableFeatures, TData, unknown>
-  actionBar?: React.ReactNode
+  actionBar?: ReactNode
   onEscapeKeyDown?: (event: KeyboardEvent) => void
   stickyHeader?: boolean
   // Local change: what the body says when there are no rows (upstream: "No results."), and whether the paging bar
   // shows, so a list that fits one page has no bar that can do nothing.
-  empty?: React.ReactNode
+  empty?: ReactNode
   withPagination?: boolean
 }
 
@@ -52,7 +53,7 @@ export function DataTable<TData extends RowData>({
 }: DataTableProps<TData>) {
   const dir = useDirection()
 
-  function onTableKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+  function onTableKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
     const nativeEvent = event.nativeEvent
     if (event.key !== "Escape" || nativeEvent.defaultPrevented) return
     if (!(event.target instanceof Node) || !event.currentTarget.contains(event.target)) {
@@ -104,11 +105,11 @@ export function DataTable<TData extends RowData>({
 }
 
 interface DataTableLayoutProps<TData extends RowData> extends Pick<
-  React.ComponentProps<"table">,
+  ComponentProps<"table">,
   "aria-label" | "aria-labelledby"
 > {
   table: ReactTable<DataTableFeatures, TData, unknown>
-  children: React.ReactNode
+  children: ReactNode
 }
 
 function DataTableLayout<TData extends RowData>({ table, children, ...props }: DataTableLayoutProps<TData>) {
@@ -186,7 +187,7 @@ function getCellClassName(pinned: ColumnPinningPosition) {
 
 interface DataTableBodyProps<TData extends RowData> {
   table: ReactTable<DataTableFeatures, TData, unknown>
-  empty: React.ReactNode
+  empty: ReactNode
 }
 
 function DataTableBody<TData extends RowData>({ table, empty }: DataTableBodyProps<TData>) {
@@ -222,7 +223,7 @@ function DataTableBody<TData extends RowData>({ table, empty }: DataTableBodyPro
 
 interface DataTableActionBarProps<TData extends RowData> {
   table: ReactTable<DataTableFeatures, TData, unknown>
-  actionBar: React.ReactNode
+  actionBar: ReactNode
 }
 
 function DataTableActionBar<TData extends RowData>({ table, actionBar }: DataTableActionBarProps<TData>) {
@@ -237,7 +238,7 @@ interface DataTableRowProps<TData extends RowData> {
   row: Row<DataTableFeatures, TData>
 }
 
-const DataTableRow = React.memo(DataTableRowImpl) as typeof DataTableRowImpl
+const DataTableRow = memo(DataTableRowImpl) as typeof DataTableRowImpl
 
 function DataTableRowImpl<TData extends RowData>({ row }: DataTableRowProps<TData>) {
   return (
@@ -266,7 +267,7 @@ interface DataTableCellProps<TData extends RowData> {
   pinned: ColumnPinningPosition
 }
 
-const DataTableCell = React.memo(DataTableCellImpl) as typeof DataTableCellImpl
+const DataTableCell = memo(DataTableCellImpl) as typeof DataTableCellImpl
 
 function DataTableCellImpl<TData extends RowData>({ cell, pinned }: DataTableCellProps<TData>) {
   return (

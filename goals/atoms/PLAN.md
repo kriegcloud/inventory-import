@@ -966,8 +966,12 @@ screen (`localTableState`, the draft of a typed filter, `oneTimer` for the 300 m
 address is the app's `location` atom, written as before. Popovers' open state, a menu's shortcut (a window listener
 in an atom, cleaned up by its finalizer), the range boxes' drafts and their red ring's delay are per-instance atoms; a
 day's focus in the calendar is a ref that changes when the day becomes the focused one. `packages/ui/.oxlintrc.kit.json`
-reads the 15 files that changed; `data-table.tsx`, `data-table-pagination.tsx` (one `useId`),
-`data-table-faceted-filter.tsx` and `direction.tsx` had no hook to move and are unchanged, so it does not read them.
+reads the whole `components/data-table/` folder (a file added to it too) and the six files the table stands on;
+`data-table.tsx`, `data-table-pagination.tsx` (one `useId`), `data-table-faceted-filter.tsx`, `direction.tsx` and
+five more of the folder had no hook to move, and changed only in importing React by name, which the lint asks for.
+A single-choice `Faceted` remembers in an atom of its own whether the caller held the value in the draw before (a
+record written while it draws, as upstream's ref was in a layout effect): without it, a filter cleared from outside
+still read as chosen and took two clicks.
 
 | File | Before | After |
 | --- | --- | --- |
@@ -1026,7 +1030,8 @@ The tests: `packages/catalog/web/test/ItemsTableAddress.test.ts` drives the Item
 config, under Vitest's fake timers: the address after a sort (`?sort=unitCost.desc`, page one), after a page and a
 page size, after a search, after a filter chosen from a list; a typed filter written after 300 ms and not at 299; a
 change of page writing a waiting filter first (`?name=wash&page=2`); a waiting filter never written once the table
-has left; two changes in one tick both landing in the table's own atoms. Each but the last was seen to fail with one
+has left; the store's changes each starting from the one before in the table's own atoms. No test draws `useDataTable`
+itself, so that the handlers it gives the table are the store's is held by none. Each but the last was seen to fail with one
 line of the code changed (the page kept on a sort, a 200 ms pause, no write of the waiting filter, the page kept on a
 filter, no finalizer on the timer, a repeated sort written).
 

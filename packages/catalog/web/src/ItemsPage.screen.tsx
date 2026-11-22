@@ -576,6 +576,9 @@ export const quickFilterOptions = Atom.readable((get) => {
 /** The page's sorting and filtering as the table reads it, for a test to put the columns through as the table does. */
 export const itemsTableConfig = itemsTable
 
+/** The same while a search is on: no order of its own, so the best match comes first and the SKU order is one she chose. */
+export const searchedItemsTableConfig = searchedTable
+
 /**
  * The list filters used all day, in the toolbar beside the menus: Category and UoM, each offering what
  * `quickFilterOptions` holds, so a new answer reaches them without a new column.

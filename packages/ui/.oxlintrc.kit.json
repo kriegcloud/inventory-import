@@ -11,21 +11,14 @@
     "!src/",
     "!src/hooks/",
     "!src/components/",
-    "!src/components/data-table/",
-    // Batch 1, the data table.
+    // Batch 1, the data table: the folder whole, so a file added to it is read from its first line, and what the
+    // table stands on.
+    "!src/components/data-table/**",
     "!src/hooks/use-data-table.ts",
     "!src/hooks/use-debounced-callback.ts",
-    "!src/components/data-table/data-table-state.ts",
-    "!src/components/data-table/data-table-records.tsx",
-    "!src/components/data-table/data-table-toolbar.tsx",
-    "!src/components/data-table/data-table-view-options.tsx",
-    "!src/components/data-table/data-table-sort-menu.tsx",
-    "!src/components/data-table/data-table-filter-menu.tsx",
-    "!src/components/data-table/data-table-slider-filter.tsx",
-    "!src/components/data-table/data-table-range-filter.tsx",
-    "!src/components/data-table/data-table-date-filter.tsx",
     "!src/components/faceted.tsx",
     "!src/components/sortable.tsx",
+    "!src/components/direction.tsx",
     "!src/components/calendar.tsx",
     "!src/components/slider.tsx"
   ]

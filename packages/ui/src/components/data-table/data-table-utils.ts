@@ -1,3 +1,4 @@
+// Local change: React is imported by name, so the atoms lint reads this file (goals/atoms, "The kit on atoms", batch 1); no longer as its registry has it.
 import type { Column, ColumnDef, ColumnFilter, RowData, SortingState, Table } from "@tanstack/react-table"
 
 import type { DataTableFeatures } from "@inventory/ui/components/data-table/data-table-features"
@@ -13,7 +14,7 @@ import type {
 
 import { LiteralKit } from "@beep/schema/LiteralKit"
 import { formatDate } from "@inventory/ui/components/data-table/format"
-import * as React from "react"
+import type { AriaAttributes, CSSProperties } from "react"
 
 export const FILTER_VARIANTS = ["text", "number", "date", "boolean", "select"] as const
 
@@ -424,7 +425,7 @@ export function getValidRangeFilterBounds(
   return [start, end]
 }
 
-export function getAriaSort(sorting: SortingState, columnId: string): React.AriaAttributes["aria-sort"] {
+export function getAriaSort(sorting: SortingState, columnId: string): AriaAttributes["aria-sort"] {
   const sort = sorting[0]
   if (sort?.id !== columnId) return undefined
   return sort.desc ? "descending" : "ascending"
@@ -437,7 +438,7 @@ export function getVisibleSelectedRows<TData extends RowData>(table: Table<DataT
 export function getColumnPinningStyle<TData extends RowData>(
   column: Column<DataTableFeatures, TData>,
   isPinned = column.getIsPinned()
-): React.CSSProperties {
+): CSSProperties {
   return {
     insetInlineStart: isPinned === "start" ? `var(${getColumnVar(column.id, "offset")})` : undefined,
     insetInlineEnd: isPinned === "end" ? `var(${getColumnVar(column.id, "offset")})` : undefined,
@@ -447,9 +448,7 @@ export function getColumnPinningStyle<TData extends RowData>(
   }
 }
 
-export function getColumnSizingStyle<TData extends RowData>(
-  table: Table<DataTableFeatures, TData>
-): React.CSSProperties {
+export function getColumnSizingStyle<TData extends RowData>(table: Table<DataTableFeatures, TData>): CSSProperties {
   const style: Record<string, string> = {
     minWidth: `${table.getTotalSize()}px`
   }

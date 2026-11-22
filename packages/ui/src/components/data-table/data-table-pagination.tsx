@@ -1,9 +1,10 @@
+// Local change: React is imported by name, so the atoms lint reads this file (goals/atoms, "The kit on atoms", batch 1); no longer as its registry has it.
 "use client"
 
 import type { ReactTable, RowData } from "@tanstack/react-table"
 
 import { cn } from "cn"
-import * as React from "react"
+import { type ComponentProps, useId } from "react"
 
 import type { DataTableFeatures } from "@inventory/ui/components/data-table/data-table-features"
 
@@ -19,7 +20,7 @@ import {
 } from "@inventory/ui/components/select"
 import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react"
 
-interface DataTablePaginationProps<TData extends RowData> extends React.ComponentProps<"div"> {
+interface DataTablePaginationProps<TData extends RowData> extends ComponentProps<"div"> {
   table: ReactTable<DataTableFeatures, TData, unknown>
 }
 
@@ -53,7 +54,7 @@ export function DataTablePagination<TData extends RowData>({
   )
 }
 
-interface DataTablePaginationContentProps<TData extends RowData> extends React.ComponentProps<"div"> {
+interface DataTablePaginationContentProps<TData extends RowData> extends ComponentProps<"div"> {
   table: ReactTable<DataTableFeatures, TData, unknown>
   pageIndex: number
   pageSize: number
@@ -72,7 +73,7 @@ function DataTablePaginationContent<TData extends RowData>({
   className,
   ...props
 }: DataTablePaginationContentProps<TData>) {
-  const pageSizeLabelId = React.useId()
+  const pageSizeLabelId = useId()
   const sizeOptions = pageSizeOptions.includes(pageSize)
     ? pageSizeOptions
     : [...pageSizeOptions, pageSize].sort((a, b) => a - b)

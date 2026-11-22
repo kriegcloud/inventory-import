@@ -1,11 +1,12 @@
-import type * as React from "react"
+// Local change: React is imported by name, so the atoms lint reads this file (goals/atoms, "The kit on atoms", batch 1); no longer as its registry has it.
+import type { ComponentProps } from "react"
 
 import { cn } from "cn"
 
 import { Skeleton } from "@inventory/ui/components/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@inventory/ui/components/table"
 
-interface DataTableSkeletonProps extends React.ComponentProps<"div"> {
+interface DataTableSkeletonProps extends ComponentProps<"div"> {
   columnCount: number
   rowCount?: number
   filterCount?: number

@@ -21,10 +21,10 @@
             "message": "The kit's effect and ref hooks are for the vendored kit alone: an effect is banned with no exception, and a ref holds a DOM node only (goals/atoms)."
           },
           {
-            // A pause in typing is an atom's (Atom.debounce): the kit's hook keeps its function in a ref that a
-            // layout effect points anew after every draw.
+            // A pause in typing is an atom's (Atom.debounce). The kit's hook is the vendored kit's own: it runs the
+            // function of the draw it was called in, which is right only for the kit's callers.
             "group": ["**/hooks/use-debounced-callback*"],
-            "message": "The kit's debounce hook is an effect after every draw, and is for the vendored kit alone: a pause is Atom.debounce on the atom that holds what is typed (goals/atoms)."
+            "message": "The kit's debounce hook is for the vendored kit alone: a pause is Atom.debounce on the atom that holds what is typed (goals/atoms)."
           },
           {
             // The same hooks under the packages they are hoisted as: radix-ui/internal re-exports these, and React's

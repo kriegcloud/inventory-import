@@ -1,6 +1,7 @@
+// Local change: React is imported by name, so the atoms lint reads this file (goals/atoms, "The kit on atoms", batch 1); no longer as its registry has it.
 "use client"
 
-import type * as React from "react"
+import type { MouseEvent as ReactMouseEvent } from "react"
 
 import { type Column, type RowData, Subscribe } from "@tanstack/react-table"
 
@@ -74,7 +75,7 @@ function DataTableFacetedFilterContent<TData extends RowData, TValue>({
     column?.setFilterValue(values.length > 0 ? values : undefined)
   }
 
-  function onReset(event: React.MouseEvent) {
+  function onReset(event: ReactMouseEvent) {
     event.stopPropagation()
     column?.setFilterValue(undefined)
   }

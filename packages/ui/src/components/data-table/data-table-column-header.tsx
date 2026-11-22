@@ -1,8 +1,9 @@
+// Local change: React is imported by name, so the atoms lint reads this file (goals/atoms, "The kit on atoms", batch 1); no longer as its registry has it.
 "use client"
 
 import { type Column, type RowData, type SortDirection, type SortingState, Subscribe } from "@tanstack/react-table"
 import { cn } from "cn"
-import * as React from "react"
+import type { ComponentProps } from "react"
 
 import type { DataTableFeatures } from "@inventory/ui/components/data-table/data-table-features"
 
@@ -14,9 +15,7 @@ import {
 } from "@inventory/ui/components/dropdown-menu"
 import { ChevronDown, ChevronUp, ChevronsUpDown, EyeOff } from "lucide-react"
 
-interface DataTableColumnHeaderProps<TData extends RowData, TValue> extends React.ComponentProps<
-  typeof DropdownMenuTrigger
-> {
+interface DataTableColumnHeaderProps<TData extends RowData, TValue> extends ComponentProps<typeof DropdownMenuTrigger> {
   column: Column<DataTableFeatures, TData, TValue>
   label?: string
   // Local addition: a second, quieter line under the label (the unit the values are in), and the label at the

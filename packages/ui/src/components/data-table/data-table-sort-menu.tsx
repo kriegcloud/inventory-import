@@ -63,7 +63,7 @@ const menuTrigger = Atom.family((_instance: string) => Atom.make<HTMLButtonEleme
  * the listener is on the window while the menu is on screen, and goes with the atom. A disabled trigger takes no
  * shortcut, as upstream's `disabled` prop.
  */
-const menuShortcut = Atom.family((instance: string) =>
+export const menuShortcut = Atom.family((instance: string) =>
   Atom.readable((get) => {
     const registry = get.registry
     function onKeyDown(event: KeyboardEvent) {
@@ -89,7 +89,9 @@ const menuShortcut = Atom.family((instance: string) =>
 
     window.addEventListener("keydown", onKeyDown)
     get.addFinalizer(() => window.removeEventListener("keydown", onKeyDown))
-  })
+    // Let go the moment the menu leaves, whatever time the registry keeps an unread atom: the listener is not left
+    // on the window to take the shortcut on the page the person went to.
+  }).pipe(Atom.setIdleTTL(0))
 )
 
 /** Which of one sort row's two lists is open, made for each row (its `useId`). */

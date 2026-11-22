@@ -4,7 +4,7 @@
 // `Faceted` was drawn with from a React context, the one hook left in this file (goals/atoms PLAN, "The kit on atoms").
 "use client"
 
-import { useAtom } from "@effect/atom-react"
+import { useAtom, useAtomValue } from "@effect/atom-react"
 import { Command as CommandPrimitive } from "cmdk"
 import { cn } from "cn"
 import * as O from "effect/Option"
@@ -57,6 +57,42 @@ const facetedOpen = Atom.family((_instance: string) => Atom.make<O.Option<boolea
 
 /** The value one `Faceted` holds, when its caller does not hold it: nothing until something is chosen. */
 const facetedValue = Atom.family((_instance: string) => Atom.make<O.Option<string | string[] | undefined>>(O.none()))
+
+/**
+ * What one `Faceted` remembers of its draws: whether the caller held the value in the last one, and which kept value
+ * that left stale. A caller that holds the value hands `undefined` when nothing is chosen, which reads the same as a
+ * caller that holds nothing; only the draw before tells them apart. Upstream kept this in a ref and a layout effect.
+ */
+export interface FacetedMemory {
+  held: boolean
+  stale: O.Option<string | string[] | undefined> | null
+}
+
+const facetedMemory = Atom.family((_instance: string) => Atom.make<FacetedMemory>({ held: false, stale: null }))
+
+/**
+ * The value a `Faceted` shows in this draw. The caller's, when it hands one. Otherwise what the list kept itself,
+ * unless the caller held the value in the draw before: it has just cleared it (the filter's X, the toolbar's Reset,
+ * the address going back), and the kept copy from before it took over is nothing chosen any more, so one click on
+ * an item chooses it again. `memory` is this instance's own and is written here: the same draw twice says the same.
+ */
+export function facetedValueNow(
+  memory: FacetedMemory,
+  valueProp: string | string[] | undefined,
+  valueKept: O.Option<string | string[] | undefined>,
+  defaultValue: string | string[] | undefined
+): string | string[] | undefined {
+  if (valueProp !== undefined) {
+    memory.held = true
+    return valueProp
+  }
+  if (memory.held) {
+    memory.held = false
+    memory.stale = valueKept
+  }
+  if (memory.stale === valueKept && O.isSome(valueKept)) return undefined
+  return O.getOrElse(valueKept, () => defaultValue)
+}
 
 function getIsValueSelected(value: string | string[] | undefined, multiple: boolean, itemValue: string) {
   if (multiple) return Array.isArray(value) && value.includes(itemValue)
@@ -160,9 +196,8 @@ function Faceted<Multiple extends boolean = false>({
   const [valueKept, setValueKept] = useAtom(facetedValue(instance))
   const open = openProp ?? O.getOrElse(openKept, () => defaultOpen)
   const isValueControlled = valueProp !== undefined
-  const value: string | string[] | undefined = isValueControlled
-    ? valueProp
-    : O.getOrElse(valueKept, (): string | string[] | undefined => defaultValue)
+  const memory = useAtomValue(facetedMemory(instance))
+  const value = facetedValueNow(memory, valueProp, valueKept, defaultValue)
 
   function setOpen(nextOpen: boolean) {
     onOpenChange?.(nextOpen)

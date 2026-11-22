@@ -1,7 +1,7 @@
 ---
 type: Standard
 title: No try statement
-description: Code that can fail is an Effect, or a Result or an Option outside one, never a try statement, in every code file and in the examples of doc comments; a check that reads every file's syntax tree holds it, with the three paths it does not read and why.
+description: Code that can fail is an Effect, or a Result or an Option outside one, never a try statement, in every TypeScript and JavaScript file and in the examples of doc comments; a check that reads every file's syntax tree holds it, with the three paths it does not read and why.
 tags: [effect, engineering]
 status: draft
 ---
@@ -11,7 +11,7 @@ beep-effect I've banned try/catch blocks as my preference is either using Effect
 can fail with errors. I want this enforced repo wide." A `try` hides what can fail from the type: its `catch` is
 handed `unknown`, and what it answers is a value no caller can tell from a success.
 
-It holds in every code file, sources, tests, scripts and the vendored components alike (each change to a vendored
+It holds in every TypeScript and JavaScript file, sources, tests, scripts and the vendored components alike (each change to a vendored
 file is marked "Local change" where it is made), and in the code examples of doc comments: an example is copied, so
 one that shows a `try` teaches it.
 
@@ -102,4 +102,6 @@ Three paths, each by name in the law (`tryLeftOut`) and in the line it prints ea
   import Effect without loading the library before first paint" (explorations/ideal-architecture/DECISIONS.md,
   "2026-11-22 — no `try` statement, repository wide"). A file beside it in `public/` is read.
 
-It does not read prose outside a doc comment: an example in `docs/` or in a `//` comment.
+It does not read prose outside a doc comment: an example in `docs/` or in a `//` comment. And it reads no Python:
+the two Python scripts the checks run (`packages/catalog/model/mutants/run.py`, `vendor/alchemy/repin.py`) hold
+`try` statements, that language's own way to handle an error.

@@ -1,7 +1,8 @@
+// Local change: React is imported by name, so the atoms lint reads this file (goals/atoms, "The kit on atoms", batch 1); no longer as its registry has it.
 "use client"
 
 import { FlexRender, type ReactTable, type RowData } from "@tanstack/react-table"
-import * as React from "react"
+import type { ReactNode } from "react"
 
 import type { DataTableFeatures } from "@inventory/ui/components/data-table/data-table-features"
 
@@ -17,13 +18,13 @@ interface DataTableCardsProps<TData extends RowData> {
   /** What the cards hold, for the scroll region. */
   label: string
   /** Shown in place of cards when the page has no rows. */
-  empty: React.ReactNode
+  empty: ReactNode
   /** True when this row has nothing in this column: the card leaves the line out. */
   blank?: (columnId: string, row: TData) => boolean
   /** Columns that are not lines of the card, such as a column of row buttons. */
   hide?: ReadonlyArray<string>
   /** The row's own buttons, at the foot of its card in reach of a thumb. */
-  actions?: (row: TData) => React.ReactNode
+  actions?: (row: TData) => ReactNode
 }
 
 export function DataTableCards<TData extends RowData>({

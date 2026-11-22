@@ -29,8 +29,10 @@ didn't": a messy file in, what is wrong fixed in the app, a clear account of the
   - "Why flagged?" asks about the rows that the view, the problem kind and the search narrow the table to. There is
     no tick box for picking rows one at a time.
   - On a phone the grey line under the result's heading is cut to one line.
-  - On Items, a filter value typed in the Filter menu and followed within a third of a second by a click on another
-    page is written into that page's address (`/activity?name=brass`). It was so before the table moved to atoms.
+  - On Items, a filter value typed in the Filter menu and followed within a third of a second by a click on a page
+    not opened yet since the app loaded is written into that page's address (`/activity?name=brass`): the Items
+    page stays drawn while the other page's code loads. On a page opened before, nothing is written. It was so
+    before the table moved to atoms.
   - A take-back restores at most ten replaces of one item in turn. No test covers two rows of one file replacing the
     same SKU.
   - **A review that saves as you decide, open in two tabs or by two people.** Each of these needs two tabs, two people
@@ -49,7 +51,8 @@ didn't": a messy file in, what is wrong fixed in the app, a clear account of the
       because the rows wait.
     - A decision of hers that a confirm wrote, whose own save is refused after the import was opened again because
       somebody changed the row since, comes back to her to pick only if her screen had already read the reopened
-      import when the refusal arrived. If the refusal arrives first, it is dropped without a word.
+      import when the refusal arrived. If the refusal arrives first, she is told it was not sent and is not offered
+      the pick. The same decision gets one of two outcomes by the order two answers arrive in.
   - **For whoever changes the code.** `tags:check`, `refs:check` and `try:check` read a file within a budget and
     refuse one past it in words; a file built to kill the parser behind text their scan misreads still kills the
     check, which then fails (`goals/atoms/PLAN.md` and `docs/standards/no-try.md` name the shapes). `try:check`

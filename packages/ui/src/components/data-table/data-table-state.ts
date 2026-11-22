@@ -174,7 +174,8 @@ export interface OneTimer {
 /**
  * A component's `OneTimer`, made for each instance (its `useId`); read it with `useAtomValue` to keep it mounted. It is
  * let go the moment nobody reads it, whatever time the registry keeps an unread atom for: what waits is cancelled when
- * the component leaves the screen, never run on the page the person went to.
+ * the component leaves the screen. While the component is still drawn it runs, also after the address has changed: a
+ * page whose code is still loading keeps the one before it drawn (DECISIONS.md, "Known wrong or missing").
  */
 export const oneTimer = Atom.family((_instance: string) =>
   Atom.readable((get): OneTimer => {

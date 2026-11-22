@@ -6,11 +6,10 @@ import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
 import * as A from "effect/Array"
 import * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import { vi } from "vitest"
-import { itemPageSizes } from "@inventory/catalog-contract/ItemQuery"
-import { createDataTableConfig } from "@inventory/ui/components/data-table/data-table-config"
 import type { ColumnFilterItem } from "@inventory/ui/components/data-table/data-table-types"
 import { dataTableAtoms, dataTableStore } from "@inventory/ui/hooks/use-data-table"
 import { location } from "@inventory/ui/Route"
+import { itemsTableConfig, searchedItemsTableConfig } from "../src/ItemsPage.screen.tsx"
 
 // The browser's address and history, as the app's navigation uses them.
 const browser = vi.hoisted(() => {
@@ -21,7 +20,10 @@ const browser = vi.hoisted(() => {
     at.search = url.search
   }
   Object.assign(globalThis, {
+    // The page's module asks for the sidebar's cookie and the window's width when it is first read.
+    document: { cookie: "" },
     window: {
+      innerWidth: 1440,
       location: at,
       history: { pushState: go, replaceState: go },
       addEventListener: () => undefined,
@@ -31,25 +33,15 @@ const browser = vi.hoisted(() => {
   return { at, go }
 })
 
-// The Items page's config (`ItemsPage.screen.tsx`, `itemsTable`), with the columns these cases use.
-const itemsTable = createDataTableConfig({
-  columns: {
-    name: { variant: "text" },
-    sku: { variant: "text" },
-    category: { variant: "select" },
-    unitCost: { variant: "number" },
-    isActive: { variant: "select", enableSorting: false }
-  },
-  defaultPageSize: 20,
-  pageSizeOptions: itemPageSizes,
-  enableGlobalFilter: true,
-  defaultSorting: [{ id: "sku", desc: false }]
-})
+vi.mock("sonner", () => ({ toast: Object.assign(() => 0, { dismiss: () => undefined, error: () => 0 }) }))
+
+// The Items page's own two configs: a change to the page's columns, page size or address keys is a change here.
+const itemsTable = itemsTableConfig
 
 const here = () => `${browser.at.pathname}${decodeURIComponent(browser.at.search)}`
 
 /** One Items table on screen, mounted as `useDataTable` mounts it. */
-const table = (urlState: boolean) => {
+const table = (urlState: boolean, config: typeof itemsTableConfig = itemsTable) => {
   // As the app's registry is made: an atom nobody reads is kept 400 ms before it is let go.
   const registry = AtomRegistry.make({ defaultIdleTTL: 400 })
   const atoms = dataTableAtoms("items-table")
@@ -60,7 +52,7 @@ const table = (urlState: boolean) => {
     registry.mount(atoms.draft),
     registry.mount(atoms.pause)
   ]
-  const store = dataTableStore({ registry, instance: "items-table", config: itemsTable, urlState })
+  const store = dataTableStore({ registry, instance: "items-table", config, urlState })
   return { store, leave: () => A.forEach(unmount, (off) => off()) }
 }
 
@@ -95,6 +87,13 @@ describe("the Items table's address", () => {
     const { store, leave } = table(true)
     store.onSortingChange([{ id: "sku", desc: false }])
     expect(here()).toBe("/items?page=3")
+    leave()
+  })
+
+  it("while a search is on, the SKU order is one she chose and is written", () => {
+    const { store, leave } = table(true, searchedItemsTableConfig)
+    store.onSortingChange([{ id: "sku", desc: false }])
+    expect(here()).toBe("/items?sort=sku.asc")
     leave()
   })
 
@@ -155,7 +154,7 @@ describe("the Items table's address", () => {
     expect(here()).toBe("/items?page=3")
   })
 
-  it("kept in the table's own atoms, two changes in one tick both land and the address is left alone", () => {
+  it("kept in the table's own atoms, the store's changes each start from the one before and the address is left alone", () => {
     const { store, leave } = table(false)
     store.onPaginationChange({ pageIndex: 2, pageSize: 20 })
     store.onSortingChange([{ id: "name", desc: false }])

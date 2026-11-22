@@ -235,6 +235,82 @@ describe("version-sync", () => {
       })
   )
 
+  it.effect(
+    "a write leaves nothing for the next check when an Effect package lags `effect`, type-fest's pin included",
+    () =>
+      Effect.gen(function* () {
+        const result = yield* run(
+          {
+            "package.json": json({ name: "root", workspaces: ["packages/*", "scratchpad"] }),
+            "packages/a/package.json": json({
+              name: "@x/a",
+              dependencies: { effect: "4.2.0", "type-fest": "^6.2.0" },
+              devDependencies: { "@effect/vitest": "4.1.5" }
+            }),
+            "packages/cli/package.json": json({ name: "@beep/repo-cli" }),
+            "packages/cli/src/commands/Vendor/VendorSync.rules.ts": lines([
+              'const kit = [["@effect/vitest", "4.1.5"]]',
+              'const versionOf = (name: string) => (name === "type-fest" ? "^6.0.1" : "workspace:*")'
+            ]),
+            "scratchpad/package.json": json({ name: "@x/scratchpad", devDependencies: { "@effect/vitest": "4.1.5" } })
+          },
+          ["packages/cli/src/commands/Vendor/VendorSync.rules.ts", "scratchpad/package.json"]
+        )
+        expect(result.files).toEqual({
+          "packages/cli/src/commands/Vendor/VendorSync.rules.ts": lines([
+            'const kit = [["@effect/vitest", "4.2.0"]]',
+            'const versionOf = (name: string) => (name === "type-fest" ? "^6.2.0" : "workspace:*")'
+          ]),
+          "scratchpad/package.json": json({ name: "@x/scratchpad", devDependencies: { "@effect/vitest": "4.2.0" } })
+        })
+        // One write, and the next check agrees.
+        expect(result.after[0]).toMatch(/^out: version-sync OK /)
+      })
+  )
+
+  it.effect("a value in a comment is not a place, and a value that only looks like a version is left alone", () =>
+    Effect.gen(function* () {
+      const workflow = lines([
+        "jobs:",
+        "  check:",
+        "    steps:",
+        "      # node-version: 20 broke the build once",
+        "      - uses: actions/setup-node@v4 # node-version: 18",
+        "        with:",
+        "          node-version: lts/*",
+        "      - uses: actions/checkout@0123456789abcdef0123456789abcdef01234567 # v4.2.2"
+      ])
+      const wrangler = lines([
+        "{",
+        '  // "compatibility_date": "2025-06-01" was needed once',
+        '  "compatibility_date": "2026-11-01"',
+        "}"
+      ])
+      const result = yield* run(
+        {
+          ".bun-version": "1.4.4\n",
+          "package.json": json({
+            name: "root",
+            workspaces: ["apps/*", "packages/*"],
+            engines: { node: ">=22" },
+            packageManager: "bun@1.4.4+sha512.abc123"
+          }),
+          ".github/workflows/ci.yml": lines(["jobs:", "  check:", "    steps:", "      - uses: actions/checkout@v5"]),
+          ".github/workflows/deploy.yml": workflow,
+          "apps/shop/package.json": json({ name: "@x/shop" }),
+          "apps/shop/wrangler.jsonc": lines(["{", '  "compatibility_date": "2026-11-01"', "}"]),
+          "packages/d1/package.json": json({ name: "@x/d1" }),
+          "packages/d1/wrangler.test.jsonc": wrangler
+        },
+        [".github/workflows/deploy.yml", "packages/d1/wrangler.test.jsonc", "package.json"]
+      )
+      expect(result.before[0]).toMatch(/^out: version-sync OK /)
+      expect(result.files[".github/workflows/deploy.yml"]).toBe(workflow)
+      expect(result.files["packages/d1/wrangler.test.jsonc"]).toBe(wrangler)
+      expect(result.files["package.json"]).toContain('"packageManager":"bun@1.4.4+sha512.abc123"')
+    })
+  )
+
   it.effect("with a catalog at the root, the catalog is the source", () =>
     Effect.gen(function* () {
       const result = yield* run(

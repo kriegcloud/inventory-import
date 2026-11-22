@@ -1032,3 +1032,46 @@ beside it. `.agents/` is left out by name, as for the deprecated-API check.
 
 When? Options: "Next atoms batch (Recommended)"; "After Wednesday"; "Now, ahead of the fixes". Answer: "Next atoms
 batch". I chose; the agent recommended the same. Not built yet.
+
+### 2026-11-22 — Alchemy, which build, and the state store it upgrades
+
+The Alchemy packages are a build of the library's `main` (`vendor/alchemy`, commit `734c27a`), because
+`@alchemy.run/domain`'s `Decision` and `Verify` are in no release. The update to that build was held on one thing:
+it raises the Cloudflare state store's version from 8 to 9, the first deploy on it upgrades the store without asking
+(`deploy.yml` passes `--yes`), and a checkout on an older build is refused by the store from then on.
+
+"All I know is I want the latest version of alchemy. We will likely need to update effect & alchemy again before
+Wednesday comes." And on what is deployed: "We can always tear down & redeploy from scratch. The idea is that we get
+our ideal version built. I don't care about anything we've deployed yet we can start from scratch so that we have the
+best names & things."
+
+So the pin follows the library's `main`, the upgrade of the store is accepted, and nothing deployed so far is kept
+for its own sake. Only this repository's stacks keep their state in `Cloudflare.state()`; beep-effect's use
+`AWS.state(...)` and are not touched. Reverse: none for the store, the upgrade is one way; destroy the stages and
+deploy them again from an empty store.
+
+### 2026-11-22 — Alchemy, where the pinned build is kept and how often it moves
+
+A build of `main` is deleted from the library's registry a week after `main` moves on, so the build must be kept
+somewhere this repository controls: seventeen files, 38.7 MB. Options: the files in the repository, moved only when
+needed; the files as release assets on GitHub; in the repository, moved often. Answer: "In the repo, re-pin only when
+needed". Rejected: release files on GitHub; re-pin often. One move is expected before Wednesday 2026-11-25, so a
+move is one command, `bun run alchemy:repin -- <commit>` (`vendor/alchemy/README.md`). Reverse: delete
+`vendor/alchemy` and the root `overrides`, and ask for a release once one contains `Decision`.
+
+### 2026-11-22 — the review's model, its names (agent, not asked for each)
+
+Asked what the model's units should be called, he gave no names and said the names need not last yet: "I don't care
+about anything we've deployed yet we can start from scratch so that we have the best names & things." The names are
+the agent's, open to change until the first hosted deploy stores an event under them: the aggregates `Import`, `Row`
+and `Group`, in the model `Catalog`, served as `CatalogApi`. Reverse: rename before that deploy at no cost; after it,
+the events already stored carry the old names, and a rename needs an answer for them.
+
+### 2026-11-22 — the review's model, what is shown on Wednesday
+
+Two models of the review exist: one unit for each group act, which he chose, and one unit for each row, built first
+and set aside. Question: which is shown on 2026-11-25? Answer: "Chosen design, parked one as fallback". The one-unit
+model is built for `main`. If it is not checked and merged by the evening of 2026-11-24, he shows Verify on the
+per-row model from a local branch on his own machine, and says plainly that it is the alternative he did not choose.
+That branch is kept running on the pinned build and gets nothing else. Reverse: none needed; the fallback is deleted
+once the chosen model is in `main`.

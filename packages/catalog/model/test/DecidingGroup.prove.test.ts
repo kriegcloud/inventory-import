@@ -6,7 +6,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices"
 import { expect, layer } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import { DecidingGroup } from "../src/Review/DecidingGroup.decision.ts"
-import { notProved, standingOf, standings, whatBroke } from "./proving.ts"
+import { missingRules, notProved, standingOf, standings, whatBroke } from "./proving.ts"
 
 layer(NodeServices.layer)("DecidingGroup", (it) => {
   it.effect(
@@ -19,6 +19,9 @@ layer(NodeServices.layer)("DecidingGroup", (it) => {
       // Ours, because `Prove` takes no lock and no `require`: what is not proved, by name, with what the solver found.
       // Which rules there are, and that each stays proved, is the library's, in the search of the whole model.
       expect(notProved(standings(report)), said).toEqual([])
+      // Ours too, because the library does not ask whose act a decision records: the rules of every aggregate it reads
+      // are there, and the ones about who may change a row or a group it states itself.
+      expect(missingRules(report), said).toEqual([])
       // Every state it leaves is one its aggregate's schema allows.
       expect(standingOf(report.schema), said).toBe("proved")
       // Some state lets it record: it is not proved only because it never does anything.

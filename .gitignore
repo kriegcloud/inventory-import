@@ -46,3 +46,6 @@ scratchpad/**/.state/
 .session/
 # The copies the review's mutant runner makes and its results: never committed
 packages/catalog/model/.mutants/
+# What Python writes when a script of ours is imported (the mutant runner, the Alchemy re-pin): never committed
+__pycache__/
+*.pyc

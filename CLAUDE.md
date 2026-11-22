@@ -439,15 +439,19 @@ those files, read [docs/verify.md](docs/verify.md).
   union is keyed by `status`.
 - **A rule is one comparison.** The prover takes both sides of every `&&`, `||` and `?:` it cannot settle, in the code
   and in every rule a decision reads; past 4,096 paths it proves nothing. The proof tests state each decision's paths.
+  A relation of the model is proved across each decision too, with paths of its own that no proof test states: a
+  `decide` that asks the same thing of its command twice (`cmd.covered`, then `cmd.covered` again after other checks)
+  doubles them, and the relation is then only searched, which fails `verify`. Ask once, and branch.
 - **An aggregate's rule reads only what its own commands' middleware provides.** `Row` and `Group` have no command, so
   the rules about who may change a row or a group are rules of each decision that records on it, under the same
-  name in each. A new decision that records on one states them too, and nothing checks that it does: the lock and the
-  list of rules that must stay proved take its rules as they are written.
+  name in each. A new decision that records on one states them too, and its proof calls the check that it
+  does, as the four do (`missingRules` in `test/proving.ts`, which runs only where a proof calls it): ours, because the lock and the list of rules that must stay proved take its
+  rules as they are written, and nothing in the library asks whose act a decision records.
 - **Annotate `keyOf`'s parameter** in a decision (`keyOf: (cmd: DecideRow) => ...`): without it the parameters of
   `decide` are `any`, and a typo in one passes the type-check.
 - **Which rules there are, and that each stays proved, is the library's**: the lock (below), and Verify's
   `require: { proved }` in `test/Catalog.verify.test.ts`, given the lock's rules of the kinds a proof covers. A proof
-  file (`Prove.report`, `Prove.decisionReport`) takes neither, so each has one check of ours: every rule its report
+  file (`Prove.report`, `Prove.decisionReport`) takes neither, so each has a check of ours: every rule its report
   names is proved. A model's invariant is only searched, and a `sometimes` rule says only that one sequence gets
   there.
 - **Every check a `decide` makes has a mutant** (`packages/catalog/model/mutants/`): a change that removes it, and one

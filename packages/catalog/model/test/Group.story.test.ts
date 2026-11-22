@@ -25,7 +25,7 @@ import {
   ReopenImport,
   ReviewMovedOn
 } from "../src/Import/Import.aggregate.ts"
-import { DecideRow, GroupedSince } from "../src/Review/Deciding.decision.ts"
+import { DecidedSince, DecideRow, GroupedSince } from "../src/Review/Deciding.decision.ts"
 import { DecideGroup, StepTaken } from "../src/Review/DecidingGroup.decision.ts"
 import { DecidedBeforeTheConfirm, NotYourStep, UndoRowStep } from "../src/Review/Undoing.decision.ts"
 import { GroupedAfter, UndoGroup } from "../src/Review/UndoingGroup.decision.ts"
@@ -43,6 +43,7 @@ const row14 = Row.ref(`${id}/row-14`)
 
 const ana: Actor = { organizationId: "org_prairie", memberId: "ana", role: "editor" }
 const dana: Actor = { organizationId: "org_prairie", memberId: "dana", role: "editor" }
+const carl: Actor = { organizationId: "org_prairie", memberId: "carl", role: "editor" }
 const staged = ImportStaged.make({ organizationId: "org_prairie", rows: 50_000, columns: "by heading", by: "ana" })
 // 6,000 rows named in one text, as the screen encodes them.
 const rows = A.join(
@@ -58,6 +59,7 @@ const accepted = '{"accepted":["unit"]}'
 const leftOut = '{"out":true}'
 const kept = '{"kept":true}'
 const typed = '{"edits":{"name":"Hex bolt M8"}}'
+const typedEight = '{"edits":{"quantityOnHand":"8"}}'
 
 const group = (input: {
   readonly seen: number
@@ -67,6 +69,7 @@ const group = (input: {
   readonly rows?: string
   readonly count?: number
   readonly label?: string
+  readonly patch?: string
 }) =>
   DecideGroup.make({
     importId: id,
@@ -74,7 +77,7 @@ const group = (input: {
     opening: input.opening ?? 0,
     seen: input.seen,
     madeOn: input.madeOn ?? 0,
-    patch,
+    patch: input.patch ?? patch,
     rows: input.rows ?? rows,
     count: input.count ?? 6_000,
     label: input.label ?? label
@@ -88,6 +91,7 @@ const groupDecided = (input: {
   readonly label?: string
   readonly madeOn?: number
   readonly under?: number
+  readonly patch?: string
 }) =>
   GroupDecided.make({
     importId: id,
@@ -95,7 +99,7 @@ const groupDecided = (input: {
     change: input.change,
     by: input.by ?? "ana",
     step: input.step ?? "g1",
-    patch,
+    patch: input.patch ?? patch,
     rows: input.rows ?? rows,
     count: input.count ?? 6_000,
     madeOn: input.madeOn ?? 0,
@@ -431,6 +435,31 @@ it.effect(
       Story.then(life, groupCounted({ change: 2, rows: 12, label: "undo", top: 0 })),
       Story.state(row14, { status: "Untouched" }),
       Story.state(g1, { status: "Decided", undoneAt: 2 })
+    )
+)
+it.effect(
+  "a press from a screen that is behind is held, not lost as no change: Ana's group leaves row 14 out, Dana types 8 on it, and Carl, who has not received her 8, presses leave out there",
+  () =>
+    story(
+      Story.given(life, staged),
+      Story.provide(CurrentActor, ana),
+      Story.when(group({ seen: 0, rows: "row-3,row-14", count: 2, patch: leftOut })),
+      Story.then(g1, groupDecided({ change: 1, rows: "row-3,row-14", count: 2, patch: leftOut })),
+      Story.then(life, groupCounted({ change: 1, rows: 2 })),
+      // Dana types 8 in Quantity on row 14, which the group covers: a change, recorded as hers.
+      Story.provide(CurrentActor, dana),
+      Story.when(act({ row: "row-14", step: "d1", saw: 0, sawGroup: 1, covered: true, flags: typedEight })),
+      Story.then(row14, decided({ change: 2, by: "dana", step: "d1", flags: typedEight })),
+      Story.then(life, counted({ change: 2, step: "d1", by: "dana", flags: typedEight, row: "row-14" })),
+      // Carl's screen has the group and not Dana's 8: on it, row 14 reads as left out through the group, and his
+      // press leaves it so. It is not "no change": it is refused with Dana's decision, so his screen holds it and
+      // shows both (2026-11-22: "Same: hold, show both"), and nothing is recorded.
+      Story.provide(CurrentActor, carl),
+      Story.when(
+        act({ row: "row-14", step: "c1", saw: 0, sawGroup: 1, covered: true, asItReads: true, flags: leftOut })
+      ),
+      Story.rejected(DecidedSince.make({ by: "dana", change: 2 })),
+      Story.state(row14, { status: "Decided", by: "dana", change: 2 })
     )
 )
 it.effect(

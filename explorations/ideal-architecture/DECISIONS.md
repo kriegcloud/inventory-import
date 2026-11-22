@@ -1351,21 +1351,21 @@ it protects is only `checked`, nothing is undone, the report is verified, and th
 text is unchanged. So the list is gone, and two assertions stay, each for one case the lock misses: every rule
 stands as its kind says (proved; checked for a model's invariant; reached for a `sometimes` rule), and every decision
 that records on a row or a group states the three rules about who may change it, held in each decision's proof and
-again over the whole model. This answers what the lock entry above left open, in his words as they were passed on:
+again over the whole model. This answers what the lock entry above left open, in his words:
 "if the lock alone can't catch something the list does, show me the case and keep one assertion for exactly that;
 otherwise remove the list." What the change costs: a rule taken out or renamed now fails only where the lock runs,
 the search of the whole model (`bun run check:full`, CI's proofs job), not `bun run check`. Reverse: put the lists
 back in `test/rules.ts`.
 
-### 2026-11-22 — the review's model, its long tests outside the loop check (agent, not asked)
+### 2026-11-22 — the review's model, its long tests outside the loop check (not asked)
 
 The fold's property (76 to 85 seconds) leaves `bun run check`: it is the task `fold` of the catalog's web package,
 replayed by turbo until that package or what it reads changes, part of `check:full` and of CI's proofs job, not of
 CI's main job. The mutants of the model (148, ported from an earlier trial of it: 116 noticed by a proof, 32 by a
 story only, none by neither; 24 minutes four at a time on a busy workstation) are a task the nightly workflow runs
 whole, with a sample of nine (about 22 seconds) in
-`check:full` and in the proofs job, and every night in a job of its own. Not his: the agent's, at the instruction of
-the person running this work. Reverse: rename `ReviewModelFold.fold.test.ts` back to `ReviewModelFold.test.ts`, drop
+`check:full` and in the proofs job, and every night in a job of its own. Not a decision of his: made while building
+the model, and his to reverse. Reverse: rename `ReviewModelFold.fold.test.ts` back to `ReviewModelFold.test.ts`, drop
 the two projects and the `fold` script of the web package, remove the `fold`, `mutants` and `mutants:sample` tasks
 from both `turbo.json` files and the model package's two scripts, and take them out of the root's `check:full`,
 `proofs` and `proofs:nightly` and of both workflows.
@@ -1384,7 +1384,8 @@ lock name it. `Prove.report` and `Prove.decisionReport` take no lock and no `req
 smallest check of ours that fails when a rule stops being proved: every rule its report names is proved. The two
 assertions this replaces (every rule to its kind's standing; every decision on a row or a group states the three
 rules about who may change it) are gone; nothing now checks the second for a new decision. Reverse: drop `require`
-and put back the assertions of the entry above.
+and put back the assertions of the entry above. The second came back the same day: see "whose act a decision
+records" below.
 
 ### 2026-11-22 — the review's model, a press over a group that changes nothing
 
@@ -1399,9 +1400,40 @@ back, and row 14 holds nothing; it fails with the old test put back. "Row 14 sta
 changed the row. All rules proved again: `DecideRow` at 176 paths, from 152. A mutant puts the old test back. Reverse:
 remove `asItReads` and test "no change" as `!covered && leavesAsItIs(...)` again.
 
+### 2026-11-22 — the review's model, a covered press from a screen that is behind
+
+A fault in the entry above, found on review: the covered "no change" was answered before the checks of what the
+sender saw (`saw`) and of the matching. A press from a screen that is behind was then lost as "no change": Ana's group
+leaves row 14 out, Dana types 8 on row 14, and Carl, whose screen has the group and not Dana's 8, presses "leave out"
+there. On his screen the row reads as his press leaves it, so he sends `covered` and `asItReads`, and the model
+answered "no change" over a decision he never saw. His answer on a press that met another's decision stands: "Same:
+hold, show both". Now the press that leaves the row's own instance as it is, with no group over it, is still no change
+whatever the sender saw; the covered one is no change only after `saw` and the matching pass, so Carl's is refused
+with Dana's decision and his screen holds it beside hers. The rules that a decision is replaced only by an act that
+saw it, and that an act is made on the matching now, excuse only the first kind. The story is Carl's, and it is the
+only thing that holds the order: it fails with the covered answer put before `saw` (a mutant does that), and no rule
+can, since a rule is checked only on a path that records and "no change" records nothing.
+
+How the `decide` is written matters to the prover. With the uncovered answer first, then the checks, then
+`cmd.covered && cmd.asItReads`, the relation "a row belongs to its import's organization" was no longer proved across
+`DecideRow`: past 4,096 paths, and `verify` failed on it. The prover takes both sides of `covered` each time the code
+asks it. So `covered` is asked once and each side makes its own checks of `saw` and the matching, in the same order
+for the person; each of those checks has its own mutant (154 in all). `DecideRow` at 284 paths in its own proof, from
+176; the lock was written again on purpose for the two rules' new text. Reverse: answer the covered "no change" with
+the other one, before `saw`, and accept that such a press is lost.
+
+### 2026-11-22 — the review's model, whose act a decision records, held by a check of ours again
+
+The check that every decision recording on a row or a group states the three rules about who may change it
+(`missingRules`, in each decision's proof) is back. "No hand-written assertions" was about asserting how each rule
+stands, which the lock and `require.proved` do; this check guards what the library does not. A row and a group have no
+command and so no middleware of their own: a decision that records on one, adoption's when it comes included, says
+whose act it records only by stating those rules, and without them it would lock and prove and let anyone change the
+row. Reverse: drop `missingRules` from `test/proving.ts` and the four proofs.
+
 ### 2026-11-22 — the screen at move 3: an undo waiting when a group lands, and a keep's rivals
 
-For the screen, not the model. His answers, as they were passed on: "a waiting undo on a row a landing group doesn't
+For the screen, not the model. His answers: "a waiting undo on a row a landing group doesn't
 touch is sent again by itself; and for a keep, a rival with only accepted fixes is left out, as today, while one
 someone kept or edited makes a clash." The first adds the undo to the entry "a waiting act when a group lands". The
 second refines the entry "a keep when a rival row is decided": accepting a fix on a rival row is not "a decision made

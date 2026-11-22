@@ -406,10 +406,9 @@ again if they still mean it.
 Further answers by dialog on the same day. Reverse each: a new decision by him.
 
 - **The pin.** The library's `main` is pinned at `734c27a`, 67 commits past the `dbfd0dd` every trial on the trial page
-  ran on; no trial ran on `734c27a`. On it the model he chose is built and merged into main (`0c4c5e5`, not yet on the
-  public remote). Counted in `packages/catalog/model` here: its lock keeps 153 rules, 135 of the kinds a proof covers,
+  ran on; no trial ran on `734c27a`. On it the model he chose is built and merged into main (`0c4c5e5`). Counted in `packages/catalog/model` here: its lock keeps 153 rules, 135 of the kinds a proof covers,
   7 across instances and 11 "can happen"; 47 stories; 154 mutants. That the 135 are proved, the 7 searched and the 11
-  reached is by the build's own report. The per-row model is on a local branch, not on main or the public remote, as the fallback
+  reached is by the build's own report. The per-row model is on a branch of its own, not on main, as the fallback
   (96 proved, 3 searched, by the build's own report).
   His
   words: "All I know is I want the latest version of alchemy. We will likely need to update effect & alchemy again
@@ -536,7 +535,7 @@ What follows from it, as the library at the pin and the model on main show it:
   are is not checked there: in `bun run check` a rule that slips is caught by the report itself, and a rule taken out of
   a decision or renamed is not caught; the lock catches it, in `check:full`, CI's `proofs` job and the nightly run. The
   lists of rule names written by hand (`packages/catalog/model/test/rules.ts`) are on the per-row model's branch only,
-  a local branch, not on main or the public remote.
+  a branch of its own, not on main.
 - The lock acts in `check:full`, CI's `proofs` job and the nightly run, where `Catalog.verify.test.ts` runs
   `Verify.report` over `Catalog` with `lock: "./Catalog.lock.json"` and fails on a rule the lock holds differently or a
   rule relocked. On main that test passes `require.proved` with every rule the lock keeps of the kinds a proof covers:

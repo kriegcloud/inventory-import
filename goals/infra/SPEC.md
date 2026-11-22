@@ -24,8 +24,8 @@ From the brief's No-gos: no Effect Cluster, workflows, Drizzle, Durable Objects 
 email; no `Zone` resource; no `alchemy dev` in place of `bun run dev`; no change to an import rule or count.
 
 This goal's own limit: **nothing outside this machine**. No login command, no token, no account, DNS record, GitHub
-setting or secret is touched, nothing is deployed or planned against a real account, and the reference
-`op://BEEP_SECRETS/BEEP_SECRETS/TYPESAFE_AI_API_KEY` is never resolved and is given to no stage.
+setting or secret is touched, nothing is deployed or planned against a real account, and
+the 1Password reference for `TYPESAFE_AI_API_KEY` is never resolved and is given to no stage.
 
 ## Constraints
 

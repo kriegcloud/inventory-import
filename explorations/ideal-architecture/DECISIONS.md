@@ -395,7 +395,7 @@ preview token at the production account.
 Question: which stages get a model key? Answer: "Production only, one vendor (Recommended)". Rejected: no key
 anywhere at first; production and previews. Reverse: add or remove the key in the stage plan.
 
-The reference `op://BEEP_SECRETS/BEEP_SECRETS/TYPESAFE_AI_API_KEY`: "Not deployed for now (Recommended)". It is
+The 1Password reference for `TYPESAFE_AI_API_KEY`: "Not deployed for now (Recommended)". It is
 reserved for a later confidence-score goal; no stage gets it, and it is not in `env/op.env`. Rejected: declare it,
 unused. It is never resolved by an agent.
 

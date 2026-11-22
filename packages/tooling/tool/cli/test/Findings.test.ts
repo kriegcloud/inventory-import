@@ -8,6 +8,7 @@ import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import { OkfFinding, okfSentence } from "../src/commands/Docs/Okf.rules.ts"
 import { BoundariesFinding, boundariesSentence } from "../src/commands/Laws/Boundaries.rules.ts"
+import { DeprecatedApisFinding, deprecatedApisSentence } from "../src/commands/Laws/DeprecatedApis.rules.ts"
 import {
   EffectImportsFinding,
   effectImportsSentence,
@@ -47,6 +48,30 @@ const members = <F extends { readonly _tag: string }>(
       })
     }
   })
+
+members<DeprecatedApisFinding>("laws deprecated-apis", DeprecatedApisFinding, deprecatedApisSentence, {
+  Clean: [DeprecatedApisFinding.cases.Clean.make({}), "out: deprecated:check OK  no deprecated API is used"],
+  Refused: [
+    DeprecatedApisFinding.cases.Refused.make({}),
+    "err: deprecated:check FAIL  a deprecated API is used. Move to what its note names:"
+  ],
+  At: [
+    DeprecatedApisFinding.cases.At.make({ place: "a.ts:1:2", note: "`old` is deprecated. use next" }),
+    "err: a.ts:1:2  `old` is deprecated. use next"
+  ],
+  Unlisted: [
+    DeprecatedApisFinding.cases.Unlisted.make({ why: "not a git repository" }),
+    "err: deprecated:check FAIL  git could not list the files, so none was checked: not a git repository"
+  ],
+  Unread: [
+    DeprecatedApisFinding.cases.Unread.make({ listed: 2, read: 1 }),
+    "err: deprecated:check FAIL  oxlint read 1 of 2 files: .oxlintrc.deprecated-apis.json leaves none out (no ignorePatterns, no overrides)"
+  ],
+  Unowned: [
+    DeprecatedApisFinding.cases.Unowned.make({ file: "packages/a/test/a.test.ts" }),
+    "err: deprecated:check FAIL  packages/a/test/a.test.ts is in no tsconfig, so it is read without its package's types: include it in one the root tsconfig.json references"
+  ]
+})
 
 members<CeilingsFinding>("quality ceilings", CeilingsFinding, ceilingsSentence, {
   Ceiling: [CeilingsFinding.cases.Ceiling.make({ where: "packages/ui", ceiling: 52 }), "out:   packages/ui: 52"],

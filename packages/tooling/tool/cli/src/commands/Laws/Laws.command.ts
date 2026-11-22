@@ -9,6 +9,7 @@ import * as Command from "effect/cli/Command"
 import * as Flag from "effect/cli/Flag"
 import { emit } from "../../Report.schema.ts"
 import { boundaries, boundariesSentence } from "./Boundaries.rules.ts"
+import { deprecatedApis, deprecatedApisSentence } from "./DeprecatedApis.rules.ts"
 import { effectImports } from "./EffectImports.rules.ts"
 import { effectImportsSentence } from "./EffectImports.schema.ts"
 import { exactExports, exportsSentence } from "./Exports.rules.ts"
@@ -31,6 +32,11 @@ export const boundariesCommand = Command.make("boundaries", {}, () =>
 export const screensCommand = Command.make("screens", {}, () => Effect.flatMap(screens(), emit(screensSentence))).pipe(
   Command.withDescription("Every package with screens is in both lists the stylesheet is built from")
 )
+
+/** `laws deprecated-apis`: no deprecated API is used, in any code file git would commit. */
+export const deprecatedApisCommand = Command.make("deprecated-apis", {}, () =>
+  Effect.flatMap(deprecatedApis(), emit(deprecatedApisSentence))
+).pipe(Command.withDescription("No deprecated API is used, in any code file git would commit"))
 
 /** `laws keys`: no key-shaped string in any file git would commit. */
 export const keysCommand = Command.make("keys", {}, () => Effect.flatMap(keys(), emit(keysSentence))).pipe(
@@ -72,6 +78,7 @@ export const lawsCommand = Command.make("laws").pipe(
   Command.withDescription("The repository's rules over its own source"),
   Command.withSubcommands([
     boundariesCommand,
+    deprecatedApisCommand,
     effectImportsCommand,
     exportsCommand,
     keysCommand,

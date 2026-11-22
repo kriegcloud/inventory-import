@@ -172,6 +172,22 @@ const changesNothing = (act: {
 const sawIt = (act: { readonly row: RowState; readonly command: { readonly saw: number } }): boolean =>
   isDecided(act.row) ? act.command.saw === act.row.change : act.command.saw === 0
 
+/**
+ * The row holds this very act already: this step, from this person, with this text on the matching it was made on. A
+ * copy of a press that was recorded is known by it, and is answered as the first time, with nothing new.
+ */
+const holdsThisAct = (act: {
+  readonly row: RowState
+  readonly step: string
+  readonly by: string
+  readonly flags: string
+  readonly madeOn: number
+}): boolean =>
+  isDecided(act.row) &&
+  act.row.step === act.step &&
+  act.row.by === act.by &&
+  onItsMatching(act.row) === onItsMatching(act)
+
 /** One act of the review: read from the import and the row, recorded on both or on neither. */
 export class Deciding extends Domain.Decision(
   DecideRow,
@@ -191,8 +207,27 @@ export class Deciding extends Domain.Decision(
       ) {
         return yield* new NotPermitted({})
       }
-      if (cmd.opening !== life.state.confirms) return yield* new ConfirmedSince({})
-      if (cmd.sawGroup !== life.state.lastGroup) return yield* new GroupedSince({})
+      // The same press sent again: the row holds this very act already, and it is written once. Its sender is answered
+      // as the first time, with nothing new, whatever landed on the import between the two sendings: a confirm and a
+      // reopening, or an act on a group, which the copy cannot have seen (2026-11-22, by the rule on a press from a
+      // screen that is behind; a row's undo sent twice is answered the same way). It is asked inside each refusal, so
+      // that its comparisons are not taken on every way through this `decide` by the prover.
+      if (cmd.opening !== life.state.confirms) {
+        if (
+          holdsThisAct({ row: row.state, step: cmd.step, by: actor.memberId, flags: cmd.flags, madeOn: cmd.madeOn })
+        ) {
+          return []
+        }
+        return yield* new ConfirmedSince({})
+      }
+      if (cmd.sawGroup !== life.state.lastGroup) {
+        if (
+          holdsThisAct({ row: row.state, step: cmd.step, by: actor.memberId, flags: cmd.flags, madeOn: cmd.madeOn })
+        ) {
+          return []
+        }
+        return yield* new GroupedSince({})
+      }
       // `covered` is asked once, and each side makes its own checks: the prover takes both sides of every question it
       // cannot settle, each time it is asked, and with `covered` asked again after the checks the relation of a row
       // to its import's organization is past 4,096 paths and no longer proved.

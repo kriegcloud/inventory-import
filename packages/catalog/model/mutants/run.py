@@ -4,6 +4,7 @@
     python3 -I mutants/run.py --sample              nine fast mutants, chosen below (about a minute)
     python3 -I mutants/run.py --all --jobs 4        all of them (an hour or more on a busy machine)
     python3 -I mutants/run.py --only key1,key2      the ones named
+    python3 -I mutants/run.py --all --except key1   all but the ones named (a slow one, run apart)
     python3 -I mutants/run.py --list                the mutants, one a line, and nothing run
 
 Run from anywhere; paths are taken from this file. Each mutant named in `mutants.json` (next to this file) is one
@@ -135,6 +136,8 @@ RULE_NAME = re.compile(r"^((?:[A-Z][A-Za-z0-9]*\.)?[A-Z][A-Za-z0-9]*)(?=$|:| \()
 STANDING = re.compile(r"^(?:Violated|Unconfirmed|violated|not proved|proved for short lists only|read wrongly|not read|not decided)\s+")
 BROKEN = re.compile(r"\bviolated\b")
 TIMED_OUT = "timed out"
+# How a proof test ends: its time limit in milliseconds, alone on a line, then the call closed.
+PROOF_LIMIT = re.compile(r"\n    [0-9_]+\n  \)\n")
 
 
 def rule_name(text):
@@ -230,13 +233,25 @@ def class_of(read):
     return "neither"
 
 
-def run_copy(key, mutant, proof, keep, nice, timeout):
+def run_copy(key, mutant, proof, keep, nice, timeout, proof_limit=0):
     """Copies the package, makes the change (none for the baseline), runs vitest. Returns a result record."""
     dest = os.path.join(WORK, key)
     started = time.time()
     record = dict(key=key, cls="error", seconds=0.0, why=[], rules=[], stories=[], note="")
     try:
         copy_package(dest)
+        if proof_limit:
+            # The proof test's own time limit, made longer in the copy only: the package's file keeps the limit that
+            # the proofs' jobs are sized for. The limit is the number that closes the test, written once.
+            target = os.path.join(dest, proof)
+            with open(target) as f:
+                text = f.read()
+            found = PROOF_LIMIT.findall(text)
+            if len(found) != 1:
+                record["note"] = f"the proof's time limit is found {len(found)} times in {proof}, where it must be once"
+                return record
+            with open(target, "w") as f:
+                f.write(PROOF_LIMIT.sub(f"\n    {proof_limit * 1000}\n  )\n", text))
         if mutant is not None:
             target = os.path.join(dest, mutant["file"])
             with open(target) as f:
@@ -333,20 +348,22 @@ def main():
     pick.add_argument("--sample", action="store_true", help="the fixed fast sample")
     pick.add_argument("--only", help="keys, comma-separated")
     pick.add_argument("--list", action="store_true", help="list the mutants and run nothing")
+    parser.add_argument("--except", dest="left_out", default="", help="keys to leave out, comma-separated")
     parser.add_argument("--jobs", type=int, default=2, help="mutants run at once (default 2)")
     parser.add_argument("--keep", action="store_true", help="keep each copy after it is classified")
     parser.add_argument("--no-baseline", action="store_true", help="skip the run of the unchanged copy")
     parser.add_argument("--nice", type=int, default=10, help="niceness of each vitest run (default 10; 0 for none)")
     parser.add_argument("--timeout", type=int, default=3600, help="seconds before a mutant's run is stopped (default 3600)")
+    parser.add_argument("--proof-limit", type=int, default=0,
+                        help="seconds a proof test may take, set in each copy (default: what the test file says)")
     opts = parser.parse_args()
+    if opts.proof_limit and opts.proof_limit >= opts.timeout:
+        print("--proof-limit must be below --timeout: a run stopped from outside leaves no result", file=sys.stderr)
+        return 1
 
     mutants = load()
     by_key = {m["key"]: m for m in mutants}
-    if opts.list:
-        for m in mutants:
-            print(f"{m['key']:36} {m['target']:12} {m['kind']:8} {m['expect']:6} {m['file']}")
-        return 0
-    if opts.all:
+    if opts.all or opts.list:
         chosen = mutants
     else:
         keys = SAMPLE if opts.sample else [k.strip() for k in opts.only.split(",") if k.strip()]
@@ -355,19 +372,39 @@ def main():
             print("unknown keys: " + ", ".join(unknown), file=sys.stderr)
             return 1
         chosen = [by_key[k] for k in keys]
+    left_out = [k.strip() for k in opts.left_out.split(",") if k.strip()]
+    unknown = [k for k in left_out if k not in by_key]
+    if unknown:
+        print("unknown keys to leave out: " + ", ".join(unknown), file=sys.stderr)
+        return 1
+    if left_out:
+        chosen = [m for m in chosen if m["key"] not in left_out]
+        print("left out, to be run apart: " + ", ".join(left_out), flush=True)
+    if not chosen:
+        print("nothing is left to run", file=sys.stderr)
+        return 1
+    if opts.list:
+        for m in chosen:
+            print(f"{m['key']:36} {m['target']:12} {m['kind']:8} {m['expect']:6} {m['file']}")
+        return 0
     if not os.path.exists(VITEST):
         print(f"vitest not found at {VITEST}: run bun install first", file=sys.stderr)
         return 1
 
-    # Every chosen mutant must apply to the package's own text before anything runs.
+    # Every chosen mutant must apply to the package's own text before anything runs, and one kept as held by a rule
+    # must record each of its rules as violated: any other standing is the prover giving up, which holds nothing.
     problems = []
     for m in chosen:
         with open(os.path.join(PKG, m["file"])) as f:
             _, reason = apply(f.read(), m)
+        if not reason and m["expect"] == "rule":
+            other = [t for t in m["trialRules"] if STANDING.match(t) and not t.lower().startswith("violated ")]
+            if other:
+                reason = "kept as held by a rule on a standing that is not a rule violated: " + "; ".join(other)
         if reason:
             problems.append((m, reason))
     for m, reason in problems:
-        print(f"DOES NOT APPLY {m['key']}: {reason}")
+        print(f"NOT RUN {m['key']}: {reason}")
     ready = [m for m in chosen if all(m is not p[0] for p in problems)]
 
     os.makedirs(WORK, exist_ok=True)
@@ -378,7 +415,7 @@ def main():
     if not opts.no_baseline:
         proofs = sorted({m["proof"] for m in ready})
         for proof in proofs:
-            base = run_copy("baseline-" + file_of(proof).replace(".prove", ""), None, proof, opts.keep, opts.nice, opts.timeout)
+            base = run_copy("baseline-" + file_of(proof).replace(".prove", ""), None, proof, opts.keep, opts.nice, opts.timeout, opts.proof_limit)
             if base["cls"] != "neither":
                 print(f"BASELINE FAILS for {proof} ({base['seconds']} s): {base['cls']} {base['why']} {base['stories']} {base['note']}")
                 print("every mutant would look held; nothing more is run")
@@ -389,7 +426,7 @@ def main():
     results = {}
 
     def one(m):
-        r = run_copy(m["key"], m, m["proof"], opts.keep, opts.nice, opts.timeout)
+        r = run_copy(m["key"], m, m["proof"], opts.keep, opts.nice, opts.timeout, opts.proof_limit)
         r["verdict"] = verdict(m, r)
         with lock:
             results[m["key"]] = r

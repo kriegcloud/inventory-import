@@ -32,7 +32,7 @@ the lock (`test/Proving.test.ts`).
 | An act on a row (`DecideRow`) | 26 | Proved |
 | Its undo (`UndoRowStep`) | 29 | Proved |
 | An act on a group (`DecideGroup`) | 20 | Proved |
-| Its undo (`UndoGroup`) | 14 | Proved |
+| Its undo (`UndoGroup`) | 15 | Proved |
 | Between an import and one row, or one group | 2 | Proved: every decision that records on both keeps it |
 | Over every import, row and group at once | 8 | Searched: every sequence of up to three commands, and 200 longer walks. Never proved |
 | That each command can be taken | 11 | Reached: one sequence of commands was found that gets there. Not a proof, and it says nothing of any other sequence |
@@ -40,7 +40,7 @@ the lock (`test/Proving.test.ts`).
 **A proved rule says what never happens.** It is proved from the code of `decide` and `evolve`, for every state the
 schemas and the invariants allow and every input, not sampled by a test.
 
-**No rule says that a valid act is taken.** A `decide` that refused everything would keep all 144. That an act is
+**No rule says that a valid act is taken.** A `decide` that refused everything would keep all 145. That an act is
 recorded, with the events it should record, is held by tests: the stories (`test/Review.story.test.ts` and
 `test/Group.story.test.ts`, 66 of them, one at least for each of the eleven commands), and the property that drives
 the model with the review region's own presses (`packages/catalog/web/test/ReviewModelFold.fold.test.ts`). The eleven
@@ -77,10 +77,8 @@ then the row cannot read through a group the sender has not seen it under. From 
 decision over the group, so it is refused with what is there and held (Benjamin, 2026-11-22: "Hold it when behind";
 the story "a press that matches what the row holds is held when its screen is behind a group").
 
-What follows, down to the end of the list, was settled by one rule and not asked (the decision log lists each, for
-Benjamin to overrule): a press from a screen that is behind is never dropped without a word and never applied; it is
-held and shown. The one press from such a screen that is taken is named after the list, with the answer it stands
-by.
+What follows was settled by one rule and not asked (the decision log lists each, for Benjamin to overrule): a press
+from a screen that is behind is never dropped without a word and never applied; it is held and shown.
 
 One of them is a row's undo from under a later group: Dana's decision is under Ana's group in force, so Dana's undo
 is refused naming that group (`GroupedAfter`), nothing is recorded, and once the group is taken back the same undo is
@@ -117,17 +115,27 @@ group is refused naming the group, and taken once the group is taken back" shows
   and from a screen that has not received a match it is refused `MatchedSince` and held.
 - `GroupedAfter` carries the import's last group in force, the one to take back first. For a row's undo that is the
   group over the row or one made after it: the model keeps no reading of a group's rows and cannot say which.
-- A row's undo from a screen that has not received an undo on the row is refused `UndoneSince` too, naming who took
-  that undo and of which change. Dana keeps row 12, Ana leaves it out and takes that back: the row holds Dana's keep
-  again, as her screen shows it, though her screen has neither of Ana's acts. `UndoRowStep` therefore says the last
-  undo its screen has of the row (`sawUndone`), as `DecideRow` does; her undo is held, and taken once her screen has
-  Ana's undo. A rule of `Undoing` and a story hold it.
+- A row's undo of a decision the row holds again, from a screen that has not received the undo that put it back, is
+  refused `UndoneSince`, naming who took that undo and of which change. Dana keeps row 12, Ana leaves it out and
+  takes that back: the row holds Dana's keep again, as her screen shows it, though her screen has neither of Ana's
+  acts. `UndoRowStep` therefore says the last undo its screen has of the row (`sawUndone`), as `DecideRow` does; her
+  undo is held, and taken once her screen has Ana's undo. A rule of `Undoing` and a story hold it. `UndoneSince` is
+  the answer only there: the check comes after those of the opening, the last act on a group and the row's own
+  decision, and before those of the matching and of a group over the row. If the row holds another decision
+  by then (Ana left it out again), the undo is refused `NotYourStep`; after an act on a group it is refused
+  `GroupedSince`, after a confirm and a reopening `ConfirmedSince`; and a copy of an undo the row already took is
+  answered with nothing recorded.
+- A group's undo from a screen that has not received every change of the import is refused `ReviewMovedOn`, naming
+  the import's last change, as a group's act is. Ana's group covers row 14, Dana types 8 on it, and Ana, whose screen
+  has not received the 8, takes her group back: before, the undo was taken, and Ana learned only afterwards that
+  row 14 stays as Dana decided it. Now `UndoGroup` says every change its screen has (`seen`); her undo is held, and
+  taken once her screen has the 8. Taken, it still touches no row: a row decided since keeps that person's whole
+  decision ("Row 14 stays whole"), and the screen names such rows from the rows it holds; the answer carries the
+  group's undo and its number, not the rows. The check is of the whole import, not of the group's rows: the model
+  keeps no reading of a group's rows, so a change on any row that the screen lacks holds the undo. A rule of
+  `UndoingGroup` and a story hold it.
 
-One press from a screen that is behind is taken, and it is not the rule's doing: it stands by Benjamin's own answer
-("Row 14 stays whole"). `UndoGroup` names nothing its sender has seen of the rows: it takes back its sender's own act
-and replaces nothing of anyone else's. A row decided since keeps that person's whole decision, and the screen names
-such rows from the rows it holds; the answer carries the group's undo and its number, not the rows. No other press
-from a screen that is behind is taken.
+With these, no press from a screen that is behind on what its command names is taken.
 
 **Nothing evaluates a rule while the app runs.** What refuses a state is the code of `decide`. A proved rule means
 that code cannot break it.
@@ -169,9 +177,10 @@ Two more tasks hold the model, both in `bun run check:full`:
   that screen saw, and for a row's act whether a group covers the row and whether the press leaves it reading as it
   reads, from what that screen holds. A row's undo is sent from one behind a group act, or behind another
   person's decision made over the sender's on that row. Behind an undo on the row the seed sends none; a test of its
-  own in that file sends it, and the undo is refused `UndoneSince` and taken once the screen has the undo. A group's undo from such a screen is
-  taken, as `UndoGroup` names nothing seen. Its tallies say how often the seed reached each case, a covered row's "no
-  change" (`asItReads`) and a group taken back behind a later row act on its rows included.
+  own in that file sends it, and the undo is refused `UndoneSince` and taken once the screen has the undo. A
+  group's undo from such a screen is refused `ReviewMovedOn`, and taken once the screen has every change. Its
+  tallies say how often the seed reached each case, a covered row's "no change" (`asItReads`) and a group taken
+  back behind a later row act on its rows included.
 - `bun run --cwd packages/catalog/model mutants:sample`: a few of the model's mutants. A mutant is one change to a
   `decide` (a check removed, an event's field given a wrong value, an act made to record nothing), which a proof or a
   story must notice; `packages/catalog/model/mutants/README.md` has them all, what each class means and what they
@@ -182,7 +191,9 @@ In CI these four have a job of their own (`proofs` in `.github/workflows/ci.yml`
 `bun run proofs` through turbo itself), which restores turbo's results from the last run on `main` and so runs
 nothing unless one of those changed. They run again every night with nothing replayed and every mutant
 (`.github/workflows/proofs-nightly.yml`, which also calls turbo itself). `bun run proofs:nightly` is the same four
-tasks by hand, with `--force`, so it replays nothing either, with one difference: by hand every mutant runs in the
+tasks by hand, with `--force`, so it replays nothing either, with two differences. By hand turbo starts the four
+tasks at once on the one machine, so the first mutants share it with the proofs, Verify's search and the fold; the
+nightly runs those three in one job and the mutants on runners of their own. And by hand every mutant runs in the
 one task, two at a time, and `row-open` keeps the proof's own 50 minutes beside another mutant, where the nightly
 runs it alone with 100. It took 1,544 s on the workstation; on a slower machine run it as the nightly does
 (`packages/catalog/model/mutants/README.md`). `bun run check:ci` is `check:full` without them, for
@@ -340,7 +351,7 @@ stands. Shown on this model: with the line of `UndoingGroup` that refuses an und
 deleted, `OnlyTheLastGroupInForceIsTakenBack` is only `checked`, nothing is left undone, the report is verified,
 and the lock, whose text of the rule has not changed, is silent. So the test also gives Verify the library's list of
 rules that must stay proved (`require: { proved }`, Benjamin, 2026-11-22: "Lock plus the library's proved list"):
-the names the lock keeps of the kinds a proof covers, 144 of them (the Verify test states the number, so it cannot drift from this page unseen). The same deletion then fails by name:
+the names the lock keeps of the kinds a proof covers, 145 of them (the Verify test states the number, so it cannot drift from this page unseen). The same deletion then fails by name:
 
 ```text
 Not done

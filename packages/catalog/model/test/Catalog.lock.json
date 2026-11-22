@@ -653,6 +653,10 @@
       "UndoRowStep.AnUndoIsMadeOnAScreenThatHasTheRowsLastUndo": {
         "kind": "transition",
         "source": "({ before, command }) =>\n        command.sawUndone === before.row.undone.change"
+      },
+      "UndoGroup.AGroupsUndoIsMadeOnEveryChange": {
+        "kind": "transition",
+        "source": "({ before, command }) =>\n        isOpen(before.life) && command.seen === before.life.changes"
       }
     }
   }

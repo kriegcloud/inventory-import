@@ -1578,12 +1578,11 @@ answered before, and not asked. I can overrule any of them.
 4. **A covered press sent twice is written once and answered the same.** The resend is known by the row holding this
    very act: the sender's, under the same step, with the same text. It is answered with nothing new recorded, not
    refused with the sender's own decision. The library gives a decision no number of the command to know a resend by.
-5. **A group's undo is taken from a screen that is behind on the rows.** This stands by my answer "Row 14 stays
-   whole": the undo takes back its sender's own act and touches no row, so a row decided since keeps that person's
-   whole decision, and the screen then names it. It takes a press from a screen that is behind because it replaces
-   nothing of anyone else's. No other press from such a screen is taken. The answer is the group's undo and its number; which rows
-   were decided since and stay is read from the rows, not carried in the answer: the model keeps no reading of a
-   group's rows.
+5. **A group's undo touches no row.** This stands by my answer "Row 14 stays whole": the undo takes back its
+   sender's own act, so a row decided since keeps that person's whole decision, and the screen names it. The answer
+   is the group's undo and its number; which rows were decided since and stay is read from the rows, not carried in
+   the answer: the model keeps no reading of a group's rows. This item first said the undo is therefore taken from a
+   screen that is behind on the rows; my answer was on what the row keeps, not on that, and 16 holds the press.
 6. From the entry above: a row left with no decision is guarded as a decided one is (a "clear" from a screen that
    still shows a decision there, after a group, is refused `NoLongerThere`); and with no group made since the row's
    own decision, a press that matches what the row holds from a screen that is behind is still "no change".
@@ -1629,8 +1628,16 @@ answered before, and not asked. I can overrule any of them.
     it, and her screen has neither of Ana's acts. Before, her undo of her keep was taken from that screen; now
     `UndoRowStep` says the last undo its screen has of the row (`sawUndone`, as `DecideRow` does in 8), and a press
     without it is refused `UndoneSince` with who took the undo and of which change. Once her screen has Ana's undo
-    the same press is taken. Reverse: remove `sawUndone` from `UndoRowStep` and its check. I first wrote this case
-    down as not decided by the rule and left the press applied; the rule decides it, as it does 8.
+    the same press is taken. Reverse: remove `sawUndone` from `UndoRowStep` and its check. This item first said the
+    case was not decided by the rule and left the press applied; the rule decides it, as it does 8.
+16. **A group's undo from a screen that has not received every change of the import is held** (2026-11-22, the
+    review after that). Ana's group covers row 14, Dana types 8 on it, and Ana, whose screen has not received the 8,
+    takes her group back. Before, the undo was taken, and Ana learned only afterwards that row 14 stays as Dana
+    decided it. Now `UndoGroup` says every change its screen has (`seen`, as `DecideGroup` does), and a press without
+    them is refused `ReviewMovedOn` with the import's last change; once her screen has the 8 the same undo is
+    taken, and row 14 stays whole as in 5. The check is of the whole import: the model keeps no reading of a
+    group's rows, so a change on a row outside the group holds the undo too, until the screen has it. Reverse:
+    remove `seen` from `UndoGroup` and its check.
 
 With 1, the two rules "a decision is replaced only by an act that saw it" and "an act is made on the matching now"
 excuse nothing any more: every act that records saw the row's decision and was made on the matching now. On a row no
@@ -1671,7 +1678,8 @@ Rules that said less than their names, each either made to say it or renamed (th
 143 rules of the kinds a proof covers under `CI=true`; the lock written again on purpose for these. With 14:
 `DecideRow` at 234 paths, the relation still proved across it, no rule changed; 65 stories, 190 mutants. With 15:
 `UndoRowStep` at 364 paths, one rule more (144 of the kinds a proof covers under `CI=true`), the lock written again
-on purpose for it; 66 stories, 191 mutants.
+on purpose for it; 66 stories, 191 mutants. With 16: `UndoGroup` at 86 paths, one rule more (145), the lock written
+again on purpose for it; 66 stories, 192 mutants.
 
 ### 2026-11-22 — the review's model, rows already stored: start empty
 

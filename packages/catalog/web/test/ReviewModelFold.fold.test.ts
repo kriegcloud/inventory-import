@@ -881,7 +881,8 @@ const modelSide = (input: { readonly rows: number; readonly first: Actor }) => {
         onNone: (): Undid => "NotYourStep",
         onSome: (group): Undid => {
           as(actor)
-          const command = UndoGroup.make({ importId, step, undo: group.change, opening: 0 })
+          const commandSaw = (seen: number) => UndoGroup.make({ importId, step, undo: group.change, opening: 0, seen })
+          const command = commandSaw(changes)
           const nothingNew = [Story.then(Group.ref(`${importId}/${step}`)), Story.then(life)]
           if (group.undoneAt !== 0 || group.by !== actor.memberId) {
             steps.push(Story.when(command), Story.rejected(NotYourStep.make({})), ...nothingNew)
@@ -892,8 +893,18 @@ const modelSide = (input: { readonly rows: number; readonly first: Actor }) => {
             steps.push(Story.when(command), Story.rejected(GroupedAfter.make({ last: topGroup })), ...nothingNew)
             return "GroupedAfter"
           }
-          // UndoGroup names nothing its screen saw: from a screen that is behind it is the same command, and taken.
-          if (O.isSome(staleFor(actor, screen))) behindGroupUndos += 1
+          // From a screen that has not received the other person's last act: the review moved on, nothing is
+          // recorded, and the same undo is taken once the screen has every change.
+          O.map(staleFor(actor, screen), (stale) => {
+            if (stale.changes === changes) return
+            steps.push(
+              Story.when(commandSaw(stale.changes)),
+              Story.rejected(ReviewMovedOn.make({ last: changes })),
+              ...nothingNew
+            )
+            behindGroupUndos += 1
+            heldBack("UndoGroup", "ReviewMovedOn")
+          })
           const named = A.flatMap(group.parts, (part) => part.rows)
           if (A.some(named, (row) => O.exists(A.last(stackOf(row)), (top) => top.level.change > group.change))) {
             behindRowActs += 1
@@ -1589,7 +1600,8 @@ interface Walked {
   /**
    * Presses sent from a screen that is behind, by what the model answered: a row act refused as GroupedSince,
    * DecidedSince, PutBackSince or NoLongerThere, or answered "no change"; a row undo refused as GroupedSince, or as
-   * NotYourStep behind another person's decision over the sender's; a group act refused as ReviewMovedOn. Each
+   * NotYourStep behind another person's decision over the sender's; a group act or a group's undo refused as
+   * ReviewMovedOn. Each
    * recorded nothing, and the screen then caught up and sent it again. `behindCoveredOtherwise` counts the row acts
    * among them whose word on the row being covered was not what a screen with every change would say.
    */
@@ -1605,7 +1617,7 @@ interface Walked {
   readonly behindReviewMovedOn: number
   /** Row acts from a screen behind an undo on the row it has not received, refused as UndoneSince. */
   readonly behindUndoneSince: number
-  /** Group undos sent from a screen that is behind: UndoGroup names nothing seen, so each is taken as from any. */
+  /** Group undos sent first from a screen that is behind: each refused as ReviewMovedOn, and taken once caught up. */
   readonly behindGroupUndos: number
 }
 
@@ -1900,8 +1912,8 @@ it("two people met every case: compared presses, no-answer undos, refusals, pres
   // Presses from a screen behind the other person's acts, each answered with nothing recorded before the screen
   // caught up: row acts refused as GroupedSince 64 times, DecidedSince 15, PutBackSince 1, NoLongerThere 5 and
   // UndoneSince 1, and answered "no change" 2 (the same text the row holds, no group since); row undos refused as
-  // GroupedSince 58; group acts refused as ReviewMovedOn 32. 27 group undos were sent from a screen that is behind
-  // and taken, as UndoGroup names nothing seen.
+  // GroupedSince 58; group acts refused as ReviewMovedOn 32. 27 group undos were sent first from a screen that is
+  // behind and refused as ReviewMovedOn, then taken from one that had every change.
   expect(twoTally.behindGroupedSince).toBe(64)
   expect(twoTally.behindDecidedSince).toBe(15)
   expect(twoTally.behindPutBackSince).toBe(1)

@@ -31,7 +31,7 @@ the table's columns and remounted it).
 
 ## The inventory
 
-Counted in the worktree at `4bf0939` with one pattern per hook (a call, with or without `React.`). A hook's own
+Counted in this repository at `4bf0939` with one pattern per hook (a call, with or without `React.`). A hook's own
 definition counts as one. "ui (own)" is `packages/ui/src` without `components/` and `hooks/`, which are the vendored
 kit.
 

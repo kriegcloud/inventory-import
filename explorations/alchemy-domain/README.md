@@ -4,7 +4,7 @@ title: Alchemy domain
 description: Everything @alchemy.run/domain and what plugs into it offers, concept by concept, with how inventory-import would use each. The reference the brief is built on, written so its pages can later become agent skills.
 status: active
 stage: shape
-next: decisions 1 to 40 of the brief are answered (2026-11-22; 9 fell away, 24 stands on infra I8) but for 21a, open in DECISIONS.md and asked when move 6 opens; 42 to 56 and 60 to 62 are asked each when its move opens; moves 0 and 1 are built first, on the atoms work as merged
+next: decisions 1 to 40 of the brief are answered (2026-11-22; 9 fell away, 24 stands on infra I8) but for 21a, open in DECISIONS.md and asked when move 6 opens; 42 to 56 and 60 to 62 are asked each when its move opens; the pin is on main, and the review's model of move 1 is built on the branch claude/alchemy-review-model-f206c6, which goes into main beside the brief
 goals: []
 ---
 
@@ -16,8 +16,8 @@ its designs before porting beep-effect to it. His words are in [CAPTURE.md](CAPT
 
 This packet is the reading that comes before the design. It holds one page for every concept of the library and of
 what he asked to have used beside it, each saying what the thing is, how it is declared, what to avoid, what it
-would be in this app, how to check it, and where it was read. Nothing here is built. The design, with the decisions
-only he can make, is [the brief](BRIEF.md).
+would be in this app, how to check it, and where it was read. The design, with the decisions only he can make, is
+[the brief](BRIEF.md); what of it is built is in the brief's opening lines.
 
 ## How to read it
 
@@ -31,8 +31,8 @@ under it:
 2. [The pull request he pointed at](research/01-pr-3260-verify.md): `Verify`, which proves a model's rules.
 3. [This app's rules under Verify](research/03-this-apps-rules-under-verify.md): the app's own rules, declared and
    proved, and [the trial](research/04-trial.md) that ran them. Then
-   [the trial on saving review decisions](research/07-review-decisions-trial.md): six rounds, with their sources
-   and Verify's reports. Read its sixth round's table first, for the model his answers describe (`review14`); then the
+   [the trial on saving review decisions](research/07-review-decisions-trial.md): seven rounds, with their sources
+   and Verify's reports. Read its sixth round's table first, for the model his answers describe (`review14`, with the seventh round's one change, `review15`); then the
    fifth's, which decided a group as one unit before the last-group rule, and the fourth's, the row-by-row model kept as
    the fallback.
 4. [What was merged since the published release](research/02-merged-since-beta-87.md): what `main` has that npm
@@ -67,21 +67,27 @@ A model of this app, outside the repository ([the trial](research/04-trial.md)):
   `Verify`. Nineteen of the app's rules were proved for every state and every input, and one was checked over 5,173
   sequences of commands. A rule broken on purpose came back with the state, the command and the shortest sequence
   that breaks it.
-- On `main`, the saving of review decisions, in six rounds ([07](research/07-review-decisions-trial.md)). The first
+- On `main`, the saving of review decisions, in seven rounds ([07](research/07-review-decisions-trial.md)). The first
   showed that a command of rows to set and rows to clear cannot hold "no command clears a decision its sender did not
   make". The second found the shape under which the review's rules are proved: the import's lifecycle as its own
   instance, one instance per decided row, and every act a decision across both; one instance per import proves nothing,
   by the prover's design. The third ran that shape with the app's fifteen fields, and its rules were proved while two
   orderings they were named for still went through. The fourth closed those and the other orderings found that a model
-  can hold: 93 rules proved, 1 checked, and two rules across every import and row checked. The fifth decided a group of
-  rows as one unit (`review12`, and `review13` with only the import's last group act taken back): 123 and 124 rules
-  proved, six rules across every import, row and group checked 3 commands deep, the reading of a row through its groups
-  equal to today's `act` over 50,000 generated sequences, and one group act in local workerd. The sixth is the model he
-  chose (`review14`): three aggregates, four decisions and eleven commands, with only the last group still in force
-  taken back, so undo walks back; 135 rules proved and seven rules across every import, row and group checked 3 commands
-  deep, on `dbfd0dd`, not hosted; 43 stories and 148 mutants, each mutant breaking a rule or failing a story; the proofs
-  cover what must never happen, and the stories that each valid act is taken (his answer of 2026-11-22). The row-by-row
-  model of the fourth round stays on a branch as the fallback.
+  can hold: 93 rules proved, 1 checked, and two rules across every import and row checked, on `dbfd0dd`. The fifth
+  decided a group of rows as one unit (`review12`, and `review13` with only the import's last group act taken back): 123
+  and 124 rules proved, six rules across every import, row and group checked 3 commands deep, the reading of a row
+  through its groups equal to today's `act` over 50,000 generated sequences, and one group act in local workerd. The
+  sixth is the model he chose (`review14`): three aggregates, four decisions and eleven commands, with only the last
+  group still in force taken back, so undo walks back; 135 rules proved and seven rules across every import, row and
+  group checked 3 commands deep, on `dbfd0dd`, not hosted; 43 stories and 148 mutants, each leaving a rule not proved
+  (32 of them only as unconfirmed) or failing a story, none passing both; the proofs cover what must never happen, and
+  the stories that each valid act is taken (his answer of 2026-11-22). The row-by-row model of the fourth round stays on
+  the branch `claude/alchemy-review-model-parked` as the fallback, where on the pinned `734c27a` it gives 96 rules
+  proved and 3 searched (its three rules on who may change a row stated on each of its two decisions). The model he
+  chose is built on `734c27a` on the branch `claude/alchemy-review-model-f206c6`, which goes into main beside the brief:
+  135 rules proved, 7 searched, 11 "can be taken" rules reached and 45 stories, by its own report. The `dbfd0dd` builds
+  the trials installed are deleted by the library's registry a week after `main` moves past that commit; they were kept
+  outside the repository, so the trials cannot be run again from the registry after that.
 - The second round stored values in a local Durable Object through the domain host (about 8 MiB is the limit), and
   ran a decision, a relation, a model invariant, an `eventually` rule and a broken rule kept as a story. The third
   ran one decision across two objects on that host in local workerd (the second round's model), an item with replace and
@@ -222,6 +228,9 @@ pages whose "Where this was read" names a file that changed.
 - 2026-11-22: he answered decisions 1 to 40 by dialog, 7 and 8 after a fifth round of trials, which decided a group of
   rows as one unit; then a sixth round (`review14`, the model he chose: 135 rules proved, 43 stories, 148 mutants) and
   his further answers (an undo after and behind a group, the pin `734c27a`, the names, the lock file, what is shown on
-  2026-11-25, a keep and its rivals, a group taken back over a changed row, waiting acts, where the search runs in CI);
+  2026-11-25, a keep and its rivals, a group taken back over a changed row, waiting acts, where the search runs in CI,
+  then the lock file corrected to "Lock plus the library's proved list", a press that changes nothing, a keep after an
+  earlier decision and a waiting undo);
   9 and 41 fell away, 24 stands on infra I8, and 42 to 56 and 60 to 62 are asked at their move. The brief written on his
-  answers. Nothing built; awaiting "the brief matches".
+  answers. The pin is on main; the review's model is built on its branch, to go into main beside the brief; the rest
+  awaits "the brief matches".

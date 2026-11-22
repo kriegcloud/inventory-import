@@ -1101,10 +1101,10 @@ move is one command, `bun run alchemy:repin -- <commit>` (`vendor/alchemy/README
 ### 2026-11-22 — the review's model, its names (agent, not asked for each)
 
 Asked what the model's units should be called, he gave no names and said the names need not last yet: "I don't care
-about anything we've deployed yet we can start from scratch so that we have the best names & things." The names are
-the agent's, open to change until the first hosted deploy stores an event under them: the aggregates `Import`, `Row`
-and `Group`, in the model `Catalog`, served as `CatalogApi`. Reverse: rename before that deploy at no cost; after it,
-the events already stored carry the old names, and a rename needs an answer for them.
+about anything we've deployed yet we can start from scratch so that we have the best names & things." The names are the
+agent's, open to change until the first hosted deploy he keeps stores an event under them: the aggregates `Import`,
+`Row` and `Group`, in the model `Catalog`, served as `CatalogApi`. Reverse: rename before that deploy at no cost; after
+it, the events already stored carry the old names, and a rename needs an answer for them.
 
 ### 2026-11-22 — the review's model, what is shown on Wednesday
 

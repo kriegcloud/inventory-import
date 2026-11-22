@@ -101,8 +101,9 @@ jobs:
   # The slow mutant, alone: `row-open` (the check that the import is open, removed from DecideRow) has the prover
   # confirm five broken rules, 1,531 s by itself on the workstation. Run with the other mutants it shares four cores
   # with three of them, and a run that only ran out of time would fail the whole job with nothing known of the
-  # rest. Here it has the runner to itself and its own limits: the proof test's (100 minutes), the runner's for one
-  # run (110) and the step's (130). At half the workstation's speed it would take about 51 minutes; not measured on
+  # rest. Here it has the runner to itself and its own limits: the proof test's, made 100 minutes in the runner's
+  # copy only (`--proof-limit`; the test file keeps its 50, which the proofs' jobs are sized for), the runner's for
+  # one run (110) and the step's (130). At half the workstation's speed it would take about 51 minutes; not measured on
   # this runner. When this job fails, the model's mutants above are not in question: its log says whether the mutant
   # was not held, or ran out of time, in which case nothing is known of it and the limits are what to look at.
   slow-mutant:
@@ -121,9 +122,12 @@ jobs:
         with:
           bun-version-file: .bun-version
       - run: bun install --frozen-lockfile
+      # The runner is called without turbo here, so the check its task waits for is run by name: what is installed
+      # holds the repository's patches, or the mutant would be proved against the library as published.
+      - run: bun run patches:installed
       - name: Run the slow mutant
         timeout-minutes: 130
-        run: python3 -I packages/catalog/model/mutants/run.py --only row-open --jobs 1 --nice 0 --timeout 6600
+        run: python3 -I packages/catalog/model/mutants/run.py --only row-open --jobs 1 --nice 0 --proof-limit 6000 --timeout 6600
       - name: Open the issue, or add to it
         if: failure()
         uses: actions/github-script@v9

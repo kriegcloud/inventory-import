@@ -33,6 +33,6 @@ layer(NodeServices.layer)("Deciding", (it) => {
       expect(report.unread).toEqual([])
       expect(report.unkept).toEqual([])
     }),
-    6_000_000
+    3_000_000
   )
 })

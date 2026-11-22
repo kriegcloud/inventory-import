@@ -103,7 +103,9 @@ python3 -I mutants/run.py --list                # every mutant, and nothing run
 
 Flags: `--jobs N` (mutants at once, default 2), `--keep` (keep each copy in `.mutants/<key>/`, with its
 `result.json` and `vitest.log`), `--no-baseline`, `--nice N` (default 10), `--timeout S` (seconds before a run is
-stopped, default 3600), `--except key1,key2` (leave these out). It needs `bun install` to have run (it uses the repository's `node_modules/.bin/vitest`) and
+stopped, default 3600), `--except key1,key2` (leave these out; a run left with nothing fails), `--proof-limit S`
+(seconds a proof test may take, set in each copy only; it must be below `--timeout`, since a run stopped from outside
+leaves no result to read). It needs `bun install` to have run (it uses the repository's `node_modules/.bin/vitest`) and
 `node` on the path, and nothing else: Python 3, standard library only.
 
 What a run does: every chosen mutant is first checked to apply to the package's text, and one kept as held by a
@@ -140,8 +142,9 @@ time: one run of all 190.
 - `row-open` (the check that the import is open, removed) is the slow one: 1,544 s in that run, held by its five
   rules (1,531 s run alone). In an earlier run at a load near 100 it passed the 25 minutes its proof test then
   had, and was counted as nothing and failed, as a test out of time must be. The
-  proof's limit is 100 minutes now, and the nightly runs it apart: the job of all mutants leaves it out
-  (`--except row-open`), and a job of its own runs it alone (`--only row-open --jobs 1 --timeout 6600`), so that
+  proof test's limit stays 50 minutes, below the hour a run is given, and the nightly runs this mutant apart: the
+  job of all mutants leaves it out (`--except row-open`), and a job of its own runs it alone with the proof's limit
+  made 100 minutes in its copy (`--only row-open --jobs 1 --proof-limit 6000 --timeout 6600`), so that
   running out of time there fails that job, named for it, and says nothing of the other 189. On GitHub's runner,
   at about half this machine's speed, it would take about 51 minutes: an estimate, not measured there. A run that
   only ran out of time still fails, as it must: nothing is known of the mutant then.

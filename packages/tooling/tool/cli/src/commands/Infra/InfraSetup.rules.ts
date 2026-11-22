@@ -38,6 +38,7 @@ import * as ConfigProvider from "effect/ConfigProvider"
 import * as Effect from "effect/Effect"
 import { pipe } from "effect/Function"
 import * as O from "effect/Option"
+import * as Result from "effect/Result"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import { RepoError } from "../../Cli.errors.ts"
@@ -431,15 +432,54 @@ const Titled = S.Struct({ id: S.String, title: S.String }).pipe(
   $I.annoteSchema("Titled", { description: "A 1Password item: its id and title, none of its fields" })
 )
 
-/** A tool's JSON answer through a schema; none when it did not answer or answered something else. */
-const read = Effect.fn("InfraSetup.read")(function* <Sch extends S.ConstraintDecoder<unknown>>(
+/**
+ * Whether a failed call's error lines are 1Password's own: `op` writes `[ERROR] <date> <time> <what>`, and a client
+ * that never reached the app says "error initializing client". Read from op's error format, not seen in a test here.
+ *
+ * @example
+ * onePasswordSaid("[ERROR] 2026/11/22 10:00:00 error initializing client: connecting to desktop app: read: connection reset") // true
+ */
+export const onePasswordSaid = (stderr: string): boolean =>
+  A.some(linesOf(stderr), (line) => Str.startsWith("[ERROR] ")(line) || Str.includes("error initializing client")(line))
+
+const reasonOf = (answer: { readonly stdout: string; readonly stderr: string }) => {
+  const said = Str.trim(answer.stderr) === "" ? Str.trim(answer.stdout) : Str.trim(answer.stderr)
+  return said === "" ? "no reason given" : said
+}
+
+/**
+ * The stop for a call 1Password did not answer: what op said (its error lines carry no value) and where to look.
+ * Nothing about the token or the account is said, since nobody asked Cloudflare anything.
+ */
+const onePasswordSilent = (what: string, stderr: string) =>
+  stop(
+    `1Password did not answer, so ${what} was never asked: ${reasonOf({ stdout: "", stderr })}. Open the 1Password app and unlock it, check that Settings, Developer, "Integrate with 1Password CLI" is on, and run this again from your own terminal. Nothing was changed.`
+  )
+
+/** Whether a failed call under `op-human` failed in 1Password: any failure of op itself, or op's lines from `op run`. */
+const failedInOnePassword = (call: Call, stderr: string) =>
+  call.command === "op-human" && (call.args[0] !== "run" || onePasswordSaid(stderr))
+
+/**
+ * A tool's JSON answer through a schema. 1Password not answering stops the run with op's words; a tool that answered
+ * with an error, or with something the schema does not read, is a failure carrying a sentence that says which.
+ */
+const heard = Effect.fn("InfraSetup.heard")(function* <Sch extends S.ConstraintDecoder<unknown>>(
   schema: Sch,
-  call: Call
+  call: Call,
+  what: string
 ) {
   const workstation = yield* Workstation
   const answer = yield* workstation.ask(call.command, call.args)
-  if (answer.code !== 0) return O.none<Sch["Type"]>()
-  return S.decodeOption(S.fromJsonString(schema))(answer.stdout)
+  const failure = (why: string): Result.Result<Sch["Type"], string> => Result.fail(why)
+  if (answer.code !== 0) {
+    if (failedInOnePassword(call, answer.stderr)) return yield* onePasswordSilent(what, answer.stderr)
+    return failure(`${what} answered with an error: ${reasonOf(answer)}`)
+  }
+  return O.match(S.decodeOption(S.fromJsonString(schema))(answer.stdout), {
+    onNone: () => failure(`${what} answered something this command cannot read`),
+    onSome: (value): Result.Result<Sch["Type"], string> => Result.succeed(value)
+  })
 })
 
 /** What the steps before one found, for the steps after it. */
@@ -608,6 +648,7 @@ export const dryRun = (input: {
           `Before step 1, the previews' token (${localEnvFile}) is checked, and the previews' account is asked of cf in no step:`,
           `  op-human run --env-file ${localEnvFile} -- sh -c 'CLOUDFLARE_API_TOKEN="$${previewTokenName}" CLOUDFLARE_ACCOUNT_ID="$${previewAccountIdName}" cf accounts tokens verify'`,
           `  op-human run --env-file ${localEnvFile} -- sh -c '… cf accounts tokens get <token id>'`,
+          `  ${shown({ command: subdomainCall.command, args: A.take(subdomainCall.args, 6) })} '${A.last(subdomainCall.args).pipe(O.getOrElse(() => ""))}'   (the account's workers.dev subdomain, which Alchemy's state store needs: a run stops when there is none yet)`,
           `  and the previews' profile is connected with: op-human run --env-file ${localEnvFile} -- bunx alchemy profile edit --profile ${options.previewProfile} --add Cloudflare --method stored --set apiToken=env:${previewTokenName} --set accountId=env:${previewAccountIdName}`
         ]
       : []),
@@ -840,32 +881,43 @@ const cloudflare = Effect.fn("InfraSetup.cloudflare")(function* (
     )
   }
   const roles = found.previewByToken ? A.filter(wantedRoles, (role) => role !== "preview") : wantedRoles
-  const whoAmI = read(WhoAmI, { command: "cf", args: ["auth", "whoami"] })
-  const zoneHolder = read(S.Array(Zone), zoneCall).pipe(
-    Effect.map(O.flatMap((zones) => (zones.length === 1 ? A.head(zones) : O.none()))),
-    Effect.map(
+  // cf logged out answers with an error, so any failure here is read as not logged in, and a login is started.
+  const whoAmI = heard(WhoAmI, { command: "cf", args: ["auth", "whoami"] }, "`cf auth whoami`").pipe(
+    Effect.map(Result.getSuccess)
+  )
+  // Which account holds the zone, or why cf could not say: an error is shown in cf's words, not as "in no account".
+  const zoneAsked = heard(S.Array(Zone), zoneCall, `\`${shown(zoneCall)}\``)
+  const holderOf = (asked: Result.Result<ReadonlyArray<typeof Zone.Type>, string>) =>
+    pipe(
+      Result.getSuccess(asked),
+      O.flatMap((zones) => (zones.length === 1 ? A.head(zones) : O.none())),
       O.map(({ account }) =>
         Account.make({ id: account.id, name: O.getOrElse(O.fromNullishOr(account.name), () => account.id) })
       )
     )
-  )
+  const unheard = (asked: Result.Result<ReadonlyArray<typeof Zone.Type>, string>) =>
+    O.match(Result.getFailure(asked), { onNone: () => "", onSome: (why) => ` (${why})` })
   if (!A.isReadonlyArrayNonEmpty(roles)) {
     // No account is asked of cf here, and no login is started for it. If cf happens to be logged in, though, it can
     // say which account holds production's zone, which is what the token's account is then held against.
     const looked = yield* whoAmI
-    const holder = pipe(looked, loggedIn, O.isSome) ? yield* zoneHolder : O.none<Account>()
+    const zone = pipe(looked, loggedIn, O.isSome) ? yield* Effect.asSome(zoneAsked) : O.none()
+    const holder = O.flatMap(zone, holderOf)
+    const failed = O.match(zone, { onNone: () => "", onSome: unheard })
     yield* workstation.say(
       O.match(holder, {
         onSome: (account) =>
           `Cloudflare: cf says "${account.name}" (${account.id}) holds the zone ${productionZone}: that one is production's account.`,
         onNone: () =>
-          `Cloudflare: cf is not logged in to an account that holds the zone ${productionZone}, so it cannot say which account is production's.`
+          failed === ""
+            ? `Cloudflare: cf is not logged in to an account that holds the zone ${productionZone}, so it cannot say which account is production's.`
+            : `Cloudflare: cf could not say which account holds the zone ${productionZone}${failed}.`
       })
     )
     return { ...found, zoneHolder: holder }
   }
-  const asked = yield* whoAmI
-  const first = loggedIn(asked)
+  const looked = yield* whoAmI
+  const first = loggedIn(looked)
   if (O.isNone(first)) {
     yield* workstation.say("Cloudflare: cf is not logged in. Starting `cf auth login`: approve it in the browser.")
     const code = yield* workstation.hand("cf", ["auth", "login"])
@@ -883,12 +935,13 @@ const cloudflare = Effect.fn("InfraSetup.cloudflare")(function* (
   yield* workstation.say(
     `Cloudflare: cf is logged in and sees ${accounts.length === 1 ? "one account" : `${accounts.length} accounts`}: ${named(accounts)}.`
   )
-  const holder = yield* zoneHolder
+  const asked = yield* zoneAsked
+  const holder = holderOf(asked)
   yield* workstation.say(
     O.match(holder, {
       onSome: (account) =>
         `Cloudflare: "${account.name}" holds the zone ${productionZone}, so it is production's account.`,
-      onNone: () => `Cloudflare: cf could not tell which account holds the zone ${productionZone}.`
+      onNone: () => `Cloudflare: cf could not tell which account holds the zone ${productionZone}${unheard(asked)}.`
     })
   )
   // Production's address is on the zone, so production's account is the one that holds it. When cf cannot name that
@@ -896,7 +949,7 @@ const cloudflare = Effect.fn("InfraSetup.cloudflare")(function* (
   // account from the previews', and decision I4 rests on telling them apart: the run stops instead of guessing.
   if (A.contains(roles, "production") && O.isNone(holder)) {
     return yield* stop(
-      `cf cannot name the account that holds the zone ${productionZone} (\`${shown(zoneCall)}\` found it active in none of the accounts it sees, or did not answer). That account is production's, and the setup of production or of the repository's stack does not go on without it: log cf in to the account that holds the zone (\`cf auth login\`), then run this again. Nothing was made.`
+      `cf cannot name the account that holds the zone ${productionZone} (\`${shown(zoneCall)}\` found it active in none of the accounts it sees, or did not answer${unheard(asked)}). That account is production's, and the setup of production or of the repository's stack does not go on without it: log cf in to the account that holds the zone (\`cf auth login\`), then run this again. Nothing was made.`
     )
   }
   const both = A.contains(roles, "preview") && A.contains(roles, "production")
@@ -986,40 +1039,126 @@ const Permitted = S.Struct({
 }).pipe($I.annoteSchema("Permitted", { description: "A token's policies: what each allows, by permission group" }))
 
 /**
- * Whether the previews' token works and is allowed what a deploy needs, said before anything is made with it. A
- * token that cannot show its own permissions, or lacks one, is his to go on with or not.
+ * The question that asks Cloudflare for the previews' account's workers.dev subdomain, the one Alchemy's state store
+ * asks (`GET /accounts/{id}/workers/subdomain`, in `resolveAccountId`) before it says the account "can't" be
+ * accessed whatever the cause. cf has no command for it, so curl asks, under 1Password like the other calls of that
+ * account; the token goes to curl on its input through the shell's own printf, never in an argument.
+ */
+export const subdomainCall: Call = {
+  command: "op-human",
+  args: [
+    "run",
+    "--env-file",
+    localEnvFile,
+    "--",
+    "sh",
+    "-c",
+    `printf 'Authorization: Bearer %s\\n' "$${previewTokenName}" | curl -sS -H @- "https://api.cloudflare.com/client/v4/accounts/$${previewAccountIdName}/workers/subdomain"`
+  ]
+}
+
+const Answered = S.Struct({
+  success: S.Boolean,
+  errors: S.Array(S.Struct({ code: S.Int, message: S.String })),
+  result: S.Struct({ subdomain: S.String }).pipe(S.NullOr, S.optionalKey)
+}).pipe(
+  $I.annoteSchema("Answered", {
+    description: "Cloudflare's answer to the workers.dev subdomain question: the subdomain, or its errors by code"
+  })
+)
+
+/** Cloudflare's code for an account with no workers.dev subdomain yet (cf's own source reads it so). */
+const noSubdomainYet = 10007
+/** Cloudflare's code for a request the token is not allowed. */
+const notAuthorized = 10000
+
+/**
+ * What a run says of the previews' workers.dev subdomain, from Cloudflare's answer: none yet, a token not allowed to
+ * ask, or Cloudflare's own words. A new account has none until he picks one, and Alchemy then reports only that the
+ * account cannot be accessed.
+ *
+ * @example
+ * subdomainSaid({ success: false, errors: [{ code: 10007, message: "workers.api.error.subdomain_not_found" }] }) // Result.fail("… no workers.dev subdomain yet …")
+ */
+export const subdomainSaid = (answer: typeof Answered.Type): Result.Result<string, string> => {
+  const subdomain = O.map(O.fromNullishOr(answer.result), (result) => result.subdomain)
+  if (answer.success && O.isSome(subdomain)) {
+    return Result.succeed(
+      `Cloudflare: the previews' account has its workers.dev subdomain, ${subdomain.value}.workers.dev.`
+    )
+  }
+  const codes = A.map(answer.errors, (error) => error.code)
+  if (A.contains(codes, noSubdomainYet)) {
+    return Result.fail(
+      "The previews' account has no workers.dev subdomain yet, and Alchemy's state store and every preview and test stage live on one; without it the state store says only that the account cannot be accessed. Pick one in the Cloudflare dashboard: open the previews' account, Workers & Pages, and choose its workers.dev subdomain. Then run this again. Nothing was changed."
+    )
+  }
+  if (A.contains(codes, notAuthorized)) {
+    return Result.fail(
+      `Cloudflare answered ${notAuthorized} (not authorized): the previews' token may not read the account's workers.dev subdomain, which takes the Workers Scripts permission (Read, or the Write a deploy needs) on that account. Give the token Workers Scripts Write on the previews' account in the dashboard, then run this again. Nothing was changed.`
+    )
+  }
+  const words = A.map(answer.errors, (error) => `${error.code}: ${error.message}`)
+  return Result.fail(
+    `Cloudflare would not give the previews' account's workers.dev subdomain: ${A.isReadonlyArrayNonEmpty(words) ? A.join(words, "; ") : "no reason given"}. Nothing was changed.`
+  )
+}
+
+/**
+ * Whether the previews' token works and is allowed what a deploy needs, and its account has the workers.dev
+ * subdomain the state store needs, said before anything is made with it. A token that cannot show its own
+ * permissions, or lacks one, is his to go on with or not; an account with no subdomain stops the run.
  */
 const tokenChecked = Effect.gen(function* () {
   const workstation = yield* Workstation
-  const verified = yield* read(Verified, asPreviews("cf accounts tokens verify"))
-  if (O.isNone(verified) || verified.value.status !== "active" || !/^[0-9a-f]{32}$/.test(verified.value.id)) {
+  const verified = yield* heard(Verified, asPreviews("cf accounts tokens verify"), "`cf accounts tokens verify`")
+  if (Result.isFailure(verified)) {
     return yield* stop(
-      `The token ${localEnvFile} names for the previews' account did not verify as active (\`cf accounts tokens verify\`). Check ${previewTokenName} and ${previewAccountIdName} there. Nothing was changed.`
+      `Cloudflare did not verify the token ${localEnvFile} names for the previews' account: ${verified.failure}. Check ${previewTokenName} and ${previewAccountIdName} there. Nothing was changed.`
+    )
+  }
+  if (verified.success.status !== "active") {
+    return yield* stop(
+      `cf says the token ${localEnvFile} names for the previews' account is "${verified.success.status}", not active (\`cf accounts tokens verify\`). Check ${previewTokenName} there, or the token in the dashboard. Nothing was changed.`
+    )
+  }
+  if (!/^[0-9a-f]{32}$/.test(verified.success.id)) {
+    return yield* stop(
+      "`cf accounts tokens verify` answered a token id that is not 32 hexadecimal characters, so its permissions cannot be asked for. Nothing was changed."
     )
   }
   const needs = A.join(previewTokenNeeds, ", ")
-  const permitted = yield* read(Permitted, asPreviews(`cf accounts tokens get ${verified.value.id}`))
-  const lacking = O.map(permitted, (token) => {
+  const getCall = `cf accounts tokens get ${verified.success.id}`
+  const permitted = yield* heard(Permitted, asPreviews(getCall), `\`${getCall}\``)
+  const lacking = Result.map(permitted, (token) => {
     const allowed = A.flatMap(token.policies, (policy) =>
       policy.effect === "allow" ? A.map(policy.permission_groups, (group) => group.name) : []
     )
     return A.filter(previewTokenNeeds, (need) => !A.contains(allowed, need))
   })
-  if (O.isSome(lacking) && !A.isReadonlyArrayNonEmpty(lacking.value)) {
-    return yield* workstation.say(
-      `Cloudflare: the previews' token is active and allows what a deploy needs (${needs}).`
+  if (Result.isSuccess(lacking) && !A.isReadonlyArrayNonEmpty(lacking.success)) {
+    yield* workstation.say(`Cloudflare: the previews' token is active and allows what a deploy needs (${needs}).`)
+  } else {
+    yield* workstation.say(
+      Result.match(lacking, {
+        onFailure: (why) =>
+          `Cloudflare: the previews' token is active, but its permissions were not shown (${why}), so they were not checked. A deploy needs: ${needs}.`,
+        onSuccess: (missing) =>
+          `Cloudflare: the previews' token is active and lacks: ${A.join(missing, ", ")}. A deploy needs: ${needs}. Add them to the token in the dashboard, or go on if the names differ there.`
+      })
+    )
+    const yes = yield* workstation.confirm("Go on with this token?")
+    if (!yes) return yield* stop("Stopped at the previews' token. Nothing was changed.")
+  }
+  const subdomain = yield* heard(Answered, subdomainCall, "Cloudflare's workers.dev subdomain question")
+  if (Result.isFailure(subdomain)) {
+    return yield* stop(
+      `Cloudflare could not be asked for the previews' account's workers.dev subdomain: ${subdomain.failure}. Nothing was changed.`
     )
   }
-  yield* workstation.say(
-    O.match(lacking, {
-      onNone: () =>
-        `Cloudflare: the previews' token is active, but it may not read its own permissions, so they were not checked. A deploy needs: ${needs}.`,
-      onSome: (missing) =>
-        `Cloudflare: the previews' token is active and lacks: ${A.join(missing, ", ")}. A deploy needs: ${needs}. Add them to the token in the dashboard, or go on if the names differ there.`
-    })
-  )
-  const yes = yield* workstation.confirm("Go on with this token?")
-  if (!yes) return yield* stop("Stopped at the previews' token. Nothing was changed.")
+  const said = subdomainSaid(subdomain.success)
+  if (Result.isFailure(said)) return yield* stop(said.failure)
+  yield* workstation.say(said.success)
 })
 
 const profileConnected = Effect.fn("InfraSetup.profileConnected")(function* (
@@ -1079,7 +1218,11 @@ const profileConnected = Effect.fn("InfraSetup.profileConnected")(function* (
       "--set",
       `accountId=env:${previewAccountIdName}`
     ])
-    if (stored !== 0) return yield* stop(`Connecting profile "${name}" did not finish; what it said is above.`)
+    if (stored !== 0) {
+      return yield* stop(
+        `Connecting profile "${name}" did not finish; what it said is above. If those are 1Password's lines ("[ERROR]", "error initializing client"), 1Password did not answer and Alchemy was never started: open the 1Password app and unlock it, check that Settings, Developer, "Integrate with 1Password CLI" is on, and run this again from your own terminal.`
+      )
+    }
     const now = yield* listed
     if (!O.exists(now, (one) => connected(one.providers, "Cloudflare"))) {
       return yield* stop(`Profile "${name}" is still not connected to Cloudflare. Run this again.`)
@@ -1175,9 +1318,11 @@ const profileAccountChecked = Effect.fn("InfraSetup.profileAccountChecked")(func
       "sh",
       id
     ])
+    // The script exits 0 or 3 only, so any other code is 1Password's: op ran nothing, or could not fill the id.
     if (same.code !== 0 && same.code !== 3) {
-      return yield* stop(
-        `Could not compare profile "${name}"'s account with the id ${localEnvFile} names: 1Password did not fill it (${Str.trim(same.stderr) === "" ? "no reason given" : Str.trim(same.stderr)}). Unlock or authorize 1Password and run this again.`
+      return yield* onePasswordSilent(
+        `the comparison of profile "${name}"'s account with the id ${localEnvFile} names`,
+        same.stderr
       )
     }
     return same.code === 0
@@ -1317,9 +1462,13 @@ const previewPassword = Effect.fn("InfraSetup.previewPassword")(function* (optio
   yield* workstation.say(
     `1Password: ${opEnvFile} names no ${previewPasswordName}. Looking for the item "${previewPasswordItem}"; 1Password may ask you to unlock.`
   )
-  const vaults = yield* read(S.Array(Named), { command: "op-human", args: ["vault", "list", "--format", "json"] })
-  if (O.isNone(vaults)) return yield* opFailed("`op-human vault list`", "it gave no list of vaults")
-  const all = vaults.value
+  const vaults = yield* heard(
+    S.Array(Named),
+    { command: "op-human", args: ["vault", "list", "--format", "json"] },
+    "`op-human vault list`"
+  )
+  if (Result.isFailure(vaults)) return yield* opFailed("`op-human vault list`", vaults.failure)
+  const all = vaults.success
   if (!A.isReadonlyArrayNonEmpty(all)) return yield* opFailed("`op-human vault list`", "no vault is visible")
   const vault = yield* O.match(options.vault, {
     onSome: (wanted) =>
@@ -1348,10 +1497,18 @@ const previewPassword = Effect.fn("InfraSetup.previewPassword")(function* (optio
         )
     }
   })
-  const items = read(S.Array(Titled), {
-    command: "op-human",
-    args: ["item", "list", "--vault", vault.id, "--format", "json"]
-  }).pipe(Effect.map(O.map(A.filter((item) => item.title === previewPasswordItem))))
+  const items = heard(
+    S.Array(Titled),
+    { command: "op-human", args: ["item", "list", "--vault", vault.id, "--format", "json"] },
+    "`op-human item list`"
+  ).pipe(
+    Effect.flatMap(
+      Result.match({
+        onFailure: (why) => opFailed("`op-human item list`", why),
+        onSuccess: (listed) => Effect.succeedSome(A.filter(listed, (item) => item.title === previewPasswordItem))
+      })
+    )
+  )
   const before = yield* items
   if (O.isNone(before)) return yield* opFailed("`op-human item list`", "it gave no list of items")
   if (before.value.length > 1) {
@@ -1374,7 +1531,7 @@ const previewPassword = Effect.fn("InfraSetup.previewPassword")(function* (optio
       vault.id,
       "--generate-password"
     ])
-    if (made.code !== 0) return yield* opFailed("`op-human item create`", made.stderr)
+    if (made.code !== 0) return yield* onePasswordSilent("`op-human item create`", made.stderr)
   } else {
     yield* workstation.say(`1Password: the item is in the vault "${vault.name}". Using it; its password is not read.`)
   }

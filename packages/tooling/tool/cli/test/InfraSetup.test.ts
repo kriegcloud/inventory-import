@@ -9,6 +9,7 @@ import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
+import * as Result from "effect/Result"
 import * as Str from "effect/String"
 import {
   accountIn,
@@ -22,6 +23,9 @@ import {
   profilesOf,
   referenceGiven,
   referenceState,
+  subdomainCall,
+  subdomainSaid,
+  onePasswordSaid,
   type SetupOptions,
   setup,
   Step,
@@ -45,6 +49,10 @@ const untouched = A.join(
   "\n"
 )
 
+/** What op says when its client cannot reach the 1Password app, as Benjamin's run printed it. */
+const opDownSaid =
+  "[ERROR] 2026/11/22 10:00:00 error initializing client: connecting to desktop app: read: connection reset"
+
 /** A value no line of output and no argument may ever hold. */
 const secret = "sk-live-do-not-print"
 
@@ -61,6 +69,10 @@ interface World {
   zone: O.Option<string>
   /** Whether cf's answer gives the zone's account a name: Cloudflare's published schema makes it optional. */
   zoneNamed: boolean
+  /** cf's error words when the zone listing fails. */
+  zoneFails: O.Option<string>
+  /** What a failing `op-human vault list` writes, when it fails with no op line of its own. */
+  vaultsFail: O.Option<string>
   /** How many `alchemy profile list` calls answer before the listing fails; each call counts. */
   listFailsAfter: number
   /** The account each profile ends up connected to when Alchemy's own login is used. */
@@ -73,6 +85,12 @@ interface World {
   token: { active: boolean; allows: O.Option<ReadonlyArray<string>> }
   /** What `op-human run` exits with when 1Password itself does not answer (locked, declined). */
   opFails: O.Option<number>
+  /** Part of the `op-human` calls 1Password's app does not answer: each fails with op's own error line. */
+  opDown: O.Option<string>
+  /** What `cf accounts tokens verify` answers in place of its usual answer: an API error, or something unreadable. */
+  verifyRaw: O.Option<Answer>
+  /** Cloudflare's error code for the previews' workers.dev subdomain; none when the account has one. */
+  subdomainError: O.Option<number>
   /** His answer to a yes-or-no question. */
   yes: (question: string) => boolean
   /** What a tool handed the terminal exits with. */
@@ -90,12 +108,17 @@ const world = (over: Partial<World> = {}): World => ({
   github: O.some("octo-owner"),
   zone: O.some("acc-production"),
   zoneNamed: true,
+  zoneFails: O.none(),
+  vaultsFail: O.none(),
   listFailsAfter: Number.POSITIVE_INFINITY,
   connects: { "inventory-preview": "acc-preview", "inventory-production": "acc-production" },
   tokenAccount: "acc-preview",
   signUpOnGitHub: O.some("closed"),
   token: { active: true, allows: O.some(previewTokenNeeds) },
   opFails: O.none(),
+  opDown: O.none(),
+  verifyRaw: O.none(),
+  subdomainError: O.none(),
   yes: () => true,
   exits: () => 0,
   log: [],
@@ -113,12 +136,25 @@ const standIn = (w: World): Workstation["Service"] => {
       Effect.sync(() => {
         const asked = line(command, args)
         w.log.push(`ask: ${asked}`)
+        if (command === "op-human" && O.exists(w.opDown, (part) => Str.includes(part)(asked))) {
+          return { stdout: "", stderr: `${opDownSaid}\n`, code: 1 }
+        }
+        if (Str.includes("/workers/subdomain")(asked)) {
+          return O.match(w.subdomainError, {
+            onNone: () => answer(json({ success: true, errors: [], result: { subdomain: "previews-owner" } })),
+            onSome: (code) =>
+              answer(
+                json({ success: false, errors: [{ code, message: `error ${code} from Cloudflare` }], result: null })
+              )
+          })
+        }
         if (asked === "cf auth whoami") {
           return w.cloudflare
             ? answer(json({ authenticated: true, tokenValid: true, email: "owner@example.test", accounts: w.accounts }))
             : answer(json({ authenticated: false, accounts: [] }))
         }
         if (asked === "cf zones list --name beep-effect.com --status active") {
+          if (O.isSome(w.zoneFails)) return { stdout: "", stderr: w.zoneFails.value, code: 1 }
           const zones = A.map(A.fromOption(w.zone), (id) => ({
             name: "beep-effect.com",
             account: w.zoneNamed
@@ -133,6 +169,7 @@ const standIn = (w: World): Workstation["Service"] => {
           return answer(json(zones))
         }
         if (Str.endsWith("cf accounts tokens verify")(asked)) {
+          if (O.isSome(w.verifyRaw)) return w.verifyRaw.value
           return answer(
             json({ id: "0123456789abcdef0123456789abcdef", status: w.token.active ? "active" : "disabled" })
           )
@@ -196,7 +233,10 @@ const standIn = (w: World): Workstation["Service"] => {
           w.profiles = { ...w.profiles, [`${A.last(args).pipe(O.getOrElse(() => ""))}`]: "" }
           return answer("")
         }
-        if (asked === "op-human vault list --format json") return answer(json(w.vaults))
+        if (asked === "op-human vault list --format json") {
+          if (O.isSome(w.vaultsFail)) return { stdout: "", stderr: w.vaultsFail.value, code: 1 }
+          return answer(json(w.vaults))
+        }
         if (Str.startsWith("op-human item list ")(asked)) return answer(json(w.items))
         if (asked === "gh api user --jq .login") {
           return O.match(w.github, { onNone: () => answer("", 1), onSome: (login) => answer(`${login}\n`) })
@@ -1222,6 +1262,7 @@ describe("infra setup: the second account by its token", () => {
         expect(started(w)).toEqual([
           `ask: ${underOwn} ${asCf} verify`,
           `ask: ${underOwn} ${asCf} get 0123456789abcdef0123456789abcdef`,
+          `ask: ${A.join(["op-human", ...subdomainCall.args], " ")}`,
           "ask: cf auth whoami",
           "ask: cf zones list --name beep-effect.com --status active",
           "ask: bunx alchemy profile list",
@@ -1312,7 +1353,7 @@ describe("infra setup: the second account by its token", () => {
       const locked = world({ opFails: O.some(1) })
       const first = yield* run(locked, options(), untouched, own)
       const said = O.getOrElse(first.stopped, () => "")
-      expect(said).toContain('Could not compare profile "inventory-preview"\'s account')
+      expect(said).toContain('1Password did not answer, so the comparison of profile "inventory-preview"\'s account')
       expect(said).not.toContain("which is not the one")
       const other = world({ tokenAccount: "acc-other", connects: { "inventory-preview": "acc-preview" } })
       // A profile connected by a login, to another account than the id his file names.
@@ -1342,9 +1383,11 @@ describe("infra setup: the second account by its token", () => {
         const silent = world({ token: { active: true, allows: O.none() } })
         const went = yield* run(silent, options(), untouched, own)
         expect(went.stopped).toEqual(O.none())
-        expect(at(silent, "may not read its own permissions")).toBeLessThan(
-          at(silent, "confirm: Go on with this token?")
-        )
+        // cf's own words for why it would not show them, not a guess about the token.
+        const notShown =
+          "its permissions were not shown (`cf accounts tokens get 0123456789abcdef0123456789abcdef` answered with an error: refused)"
+        expect(at(silent, notShown)).toBeGreaterThan(-1)
+        expect(at(silent, notShown)).toBeLessThan(at(silent, "confirm: Go on with this token?"))
         expect(at(silent, "confirm: Go on with this token?")).toBeLessThan(at(silent, "profile edit"))
       })
   )
@@ -1355,7 +1398,7 @@ describe("infra setup: the second account by its token", () => {
       Effect.gen(function* () {
         const dead = world({ token: { active: false, allows: O.none() } })
         const first = yield* run(dead, options(), untouched, own)
-        expect(O.getOrElse(first.stopped, () => "")).toContain("did not verify as active")
+        expect(O.getOrElse(first.stopped, () => "")).toContain('is "disabled", not active')
         expect(A.some(started(dead), Str.includes("profile edit"))).toBe(false)
         const half = world()
         const second = yield* run(half, options(), untouched, O.some("PREVIEW_CLOUDFLARE_API_TOKEN=op://v/i/f\n"))
@@ -1549,4 +1592,152 @@ describe("infra setup: what it reads", () => {
       { name: "p2", providers: "Cloudflare (stored), GitHub (gh-cli)" }
     ])
   })
+})
+
+describe("infra setup: who did not answer", () => {
+  it.effect("1Password not answering is said as that, with op's words, and nothing is said of the token", () =>
+    Effect.gen(function* () {
+      const w = world({ opDown: O.some("cf accounts tokens verify") })
+      const result = yield* run(w, options(), untouched, own)
+      const said = O.getOrElse(result.stopped, () => "")
+      expect(said).toContain("1Password did not answer, so `cf accounts tokens verify` was never asked")
+      expect(said).toContain(opDownSaid)
+      expect(said).toContain('"Integrate with 1Password CLI"')
+      expect(said).toContain("from your own terminal")
+      expect(said).not.toContain("verify as active")
+      expect(said).not.toContain("Check PREVIEW_CLOUDFLARE_API_TOKEN")
+      expect(A.some(started(w), Str.includes("profile edit"))).toBe(false)
+      // The same for the permissions, the subdomain and 1Password's own lists.
+      const get = yield* run(world({ opDown: O.some("tokens get") }), options(), untouched, own)
+      expect(O.getOrElse(get.stopped, () => "")).toContain("1Password did not answer, so `cf accounts tokens get")
+      const sub = yield* run(world({ opDown: O.some("workers/subdomain") }), options(), untouched, own)
+      expect(O.getOrElse(sub.stopped, () => "")).toContain(
+        "1Password did not answer, so Cloudflare's workers.dev subdomain question was never asked"
+      )
+      const vaults = yield* run(world({ opDown: O.some("vault list") }), options({ sizes: ["staging"] }))
+      expect(O.getOrElse(vaults.stopped, () => "")).toContain("1Password did not answer, so `op-human vault list`")
+    })
+  )
+
+  it.effect("cf answering with an error shows cf's words; an answer it cannot read is said as that", () =>
+    Effect.gen(function* () {
+      const words = "Authentication error [code: 10001]"
+      const refused = world({ verifyRaw: O.some({ stdout: "", stderr: words, code: 1 }) })
+      const first = yield* run(refused, options(), untouched, own)
+      expect(O.getOrElse(first.stopped, () => "")).toContain(
+        `\`cf accounts tokens verify\` answered with an error: ${words}`
+      )
+      expect(O.getOrElse(first.stopped, () => "")).not.toContain("1Password did not answer")
+      const garbled = world({ verifyRaw: O.some({ stdout: "not json", stderr: "", code: 0 }) })
+      const second = yield* run(garbled, options(), untouched, own)
+      expect(O.getOrElse(second.stopped, () => "")).toContain(
+        "`cf accounts tokens verify` answered something this command cannot read"
+      )
+      expect(A.filter([...started(refused), ...started(garbled)], Str.includes("profile edit"))).toEqual([])
+    })
+  )
+
+  it("op's own error lines are told from a tool's", () => {
+    expect(onePasswordSaid(opDownSaid)).toBe(true)
+    expect(onePasswordSaid("error initializing client: connecting to desktop app: read: connection reset")).toBe(true)
+    expect(onePasswordSaid("[ERROR] 2026/11/22 10:00:00 authorization prompt dismissed, please try again")).toBe(true)
+    expect(onePasswordSaid("Authentication error [code: 10001]")).toBe(false)
+    expect(onePasswordSaid("")).toBe(false)
+  })
+})
+
+describe("infra setup: the previews' workers.dev subdomain", () => {
+  it.effect("an account with none stops the run before the state store, and says where he picks one", () =>
+    Effect.gen(function* () {
+      const w = world({ subdomainError: O.some(10007) })
+      const result = yield* run(w, options(), untouched, own)
+      const said = O.getOrElse(result.stopped, () => "")
+      expect(said).toContain("The previews' account has no workers.dev subdomain yet")
+      expect(said).toContain("Workers & Pages")
+      expect(A.some(started(w), Str.includes("state bootstrap"))).toBe(false)
+      expect(A.some(started(w), Str.includes("profile edit"))).toBe(false)
+      // The token reaches curl on its input, never in an argument, and no reference reaches a line.
+      const asked = A.join(subdomainCall.args, " ")
+      expect(asked).toContain(
+        "printf 'Authorization: Bearer %s\\n' \"$PREVIEW_CLOUDFLARE_API_TOKEN\" | curl -sS -H @- "
+      )
+      expect(A.some(w.log, (entry) => /op:\/\/|Second Account/.test(entry))).toBe(false)
+    })
+  )
+
+  it.effect("a token not allowed to ask names the permission; any other error is Cloudflare's own words", () =>
+    Effect.gen(function* () {
+      const denied = yield* run(world({ subdomainError: O.some(10000) }), options(), untouched, own)
+      expect(O.getOrElse(denied.stopped, () => "")).toContain("Cloudflare answered 10000 (not authorized)")
+      expect(O.getOrElse(denied.stopped, () => "")).toContain("Workers Scripts")
+      const other = yield* run(world({ subdomainError: O.some(10013) }), options(), untouched, own)
+      expect(O.getOrElse(other.stopped, () => "")).toContain("10013: error 10013 from Cloudflare")
+      const fine = world()
+      const went = yield* run(fine, options(), untouched, own)
+      expect(went.stopped).toEqual(O.none())
+      expect(at(fine, "workers.dev subdomain, previews-owner.workers.dev")).toBeLessThan(at(fine, "state bootstrap"))
+      expect(at(fine, "workers.dev subdomain, previews-owner.workers.dev")).toBeGreaterThan(-1)
+    })
+  )
+
+  it("reads Cloudflare's answer by its code", () => {
+    expect(subdomainSaid({ success: true, errors: [], result: { subdomain: "ab" } })).toEqual(
+      Result.succeed("Cloudflare: the previews' account has its workers.dev subdomain, ab.workers.dev.")
+    )
+    expect(Result.isFailure(subdomainSaid({ success: true, errors: [], result: null }))).toBe(true)
+    expect(
+      subdomainSaid({
+        success: false,
+        errors: [
+          { code: 10000, message: "x" },
+          { code: 10007, message: "y" }
+        ]
+      })
+    ).toEqual(subdomainSaid({ success: false, errors: [{ code: 10007, message: "y" }] }))
+  })
+
+  it.effect("the dry run lists the question", () =>
+    Effect.gen(function* () {
+      const w = world({ terminal: false })
+      yield* run(w, options({ dryRun: true }), untouched, own)
+      expect(A.join(w.log, "\n")).toContain("/workers/subdomain")
+      expect(A.join(w.log, "\n")).toContain("workers.dev subdomain")
+      expect([...started(w), ...checks(w)]).toEqual([])
+    })
+  )
+})
+
+describe("infra setup: failures named for what failed", () => {
+  it.effect("a zone listing that fails is said in cf's words, not as a zone in no account", () =>
+    Effect.gen(function* () {
+      const w = world({ zoneFails: O.some("zones: rate limited") })
+      const result = yield* run(w, options({ sizes: ["production"] }))
+      expect(O.getOrElse(result.stopped, () => "")).toContain(
+        "(`cf zones list --name beep-effect.com --status active` answered with an error: zones: rate limited)"
+      )
+      const byToken = world({ zoneFails: O.some("zones: rate limited") })
+      yield* run(byToken, options(), untouched, own)
+      expect(at(byToken, "cf could not say which account holds the zone beep-effect.com (")).toBeGreaterThan(-1)
+    })
+  )
+
+  it.effect("a failing 1Password command of its own is 1Password's, whatever it wrote", () =>
+    Effect.gen(function* () {
+      const w = world({ vaultsFail: O.some("account is locked") })
+      const result = yield* run(w, options({ sizes: ["staging"] }))
+      expect(O.getOrElse(result.stopped, () => "")).toContain(
+        "1Password did not answer, so `op-human vault list` was never asked: account is locked"
+      )
+    })
+  )
+
+  it.effect("a profile edit under 1Password that fails points at 1Password as well as what is above", () =>
+    Effect.gen(function* () {
+      const w = world({ exits: (line) => (Str.includes("--method stored")(line) ? 1 : 0) })
+      const result = yield* run(w, options(), untouched, own)
+      const said = O.getOrElse(result.stopped, () => "")
+      expect(said).toContain('Connecting profile "inventory-preview" did not finish; what it said is above')
+      expect(said).toContain('"Integrate with 1Password CLI"')
+    })
+  )
 })

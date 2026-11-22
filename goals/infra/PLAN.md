@@ -46,8 +46,9 @@ Where the brief left a choice open, or the code showed the brief could not be fo
 
 - **A stage's differences are data, decided in one function.** `planFor(stage)` gives the plan (address, seeds,
   where the model key and the sign-up list come from, whether it is deployed at all) and the stacks only read it.
-  The brief's `SecretReference` type was not built: no code holds a reference, `env/op.env` does, and 1Password
-  fills a variable for one process, so the plan names a variable, never a reference.
+  The brief's `SecretReference` type was not built: no code holds a reference, `env/op.env` does, and the stack
+  asks 1Password for the ones its stage needs through Alchemy's provider (since 2026-11-22; before that `op run`
+  filled a variable for one process), so the plan names a variable, never a reference.
 - **An unknown stage stops both stacks.** The stage service refuses any name but `prod`, `pr-<number>` and
   `test_<user>`, so a deploy typed without `--stage` (Alchemy names it `live_<user>`) makes nothing. It stops as a
   defect with a sentence saying what to type, because a stack's only typed failure is a missing setting.
@@ -64,7 +65,7 @@ Where the brief left a choice open, or the code showed the brief could not be fo
 - **A test stage's minted password is shown only to a person deploying from their own machine**, as the stack's
   output `testAccountPassword`; in a workflow (`CI=true`) the output would say it was minted and not show it.
 - **Every preview takes one given password** (Benjamin: "One preview password in 1Password"). A preview mints
-  none: the repository's stack reads `PREVIEW_TEST_ACCOUNT_PASSWORD` under `op run` and writes it to the `preview`
+  none: the repository's stack asks 1Password for `PREVIEW_TEST_ACCOUNT_PASSWORD` and writes it to the `preview`
   environment as a secret, the workflow's preview job hands it to the deploy, and the stack gives it to the Worker.
   It is never printed: the stack's output says only "the one every preview shares; never shown". A preview deploy
   with none stops with a sentence naming the reference, and so does the repository's stack, since without it no
@@ -237,12 +238,21 @@ What each step does, and with which tool:
 - **GitHub**, through `gh`: his login is the production approver (`--approver` names another); `gh auth login` is
   started when `gh` is not logged in.
 - **Each deploy** is `plan` on his terminal, then "Deploy ... as that plan says?", then `deploy --yes` only after a
-  yes. A plan that fails, or a no, deploys nothing. The stack's and production's run under
-  `op-human run --env-file packages/infra/env/op.env`, which fills the references for that one process. `--yes` is
-  there because Alchemy asks about a plan only when its input and output are both a terminal, and `op run` puts its
-  masking of secrets between a tool's output and the terminal (read in Alchemy's source and 1Password's help, not
-  tried); the question is asked by this command instead, about the plan just shown. With `--yes` Alchemy also
-  repairs drift and upgrades an older state store without asking.
+  yes. A plan that fails, or a no, deploys nothing. No deploy is wrapped in `op run`: the stacks
+  ask 1Password for their secrets themselves (below), so the 1Password app asks him to authorize once for the plan
+  and once for the deploy. `--yes` is there because the question was asked by this command, about the plan just
+  shown; with it Alchemy also repairs drift and upgrades an older state store without asking.
+- **Secrets through Alchemy's 1Password provider** (Benjamin, 2026-11-22: "use alchemy's built in 1password"). The
+  references stay where they were, in `packages/infra/env/op.env`, and no code holds one. Each stack lists one
+  `secrets` entry (`packages/infra/src/OpReferences.secrets.ts`) that reads that file, keeps the lines that are
+  references for the variables its stage's plan reads as secrets (production: the model key; a preview or staging:
+  the previews' password; the repository's stack: both; a test stage: none), and hands them to
+  `@alchemy.run/1password`, which resolves them in one batch into the stack's configuration, never into the
+  process's environment or a file. In a workflow (`CI` set) the entry does nothing and 1Password is not contacted:
+  a job's secrets come from its GitHub environment. For this, production's profile is also connected to 1Password
+  (`alchemy profile edit --add 1Password`: the desktop app and his account), and in the 1Password app, Settings,
+  Developer, "Integrate with other apps" must be on. A variable already set in his shell still wins over the
+  provider, as Alchemy ranks the process's environment last.
 
 **Still his, while it runs**: approving each login in the browser (Cloudflare for `cf`, then once for each Alchemy
 profile; in Alchemy's own question, picking the account the command names and `gh-cli` for GitHub), unlocking
@@ -295,8 +305,10 @@ API) are used by nothing here; no stack makes anything in R2.
 and with `--dry-run`. No agent ran `op-human`, `alchemy` or a login. Read from the tools' own help and source, and
 not tried: that `op-human item create --generate-password` and `item list` behave as their help says; that
 `alchemy profile list`, read through a pipe, prints one line a profile as its source does; that `alchemy profile
-edit --add Cloudflare --add GitHub` asks for both in one run; that `plan` prints in full under `op run`; and that
-`op-human run` passes the given variables on. Likewise not tried, for the second account's token: that `op run` fills a quoted reference whose item name has a
+edit --add Cloudflare --add GitHub` asks for both in one run; and, for the provider, that the desktop app authorizes a run started this way, that `alchemy profile edit --add
+1Password` is asked in the same run as the other two, and that a stack whose `secrets` lists `Secrets.DotEnv()`
+first reads a root `.env` as it did before. The provider itself was never called: the tests stop at the references
+that would be handed to it. Likewise not tried, for the second account's token: that `op run` fills a quoted reference whose item name has a
 space; that `cf` uses `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` from the environment over its own login;
 that `cf accounts tokens verify` and `get` answer the fields read here; and that `--method stored` takes an
 account-owned token. `cf auth whoami` and `cf zones list` were run, to read the shape of their answers.
@@ -330,10 +342,9 @@ account-owned token. `cf auth whoami` and `cf zones list` were run, to read the 
 8. **`gh auth login`** with rights over the repository's settings, then the repository's stack, from the
    production account's profile:
    `PRODUCTION_CLOUDFLARE_ACCOUNT_ID=... PREVIEW_CLOUDFLARE_ACCOUNT_ID=... PRODUCTION_APPROVER=<his GitHub login>
-   SIGN_UP=<emails> op run --env-file packages/infra/env/op.env -- bunx alchemy deploy
-   packages/infra/src/GitHub.stack.ts --stage prod`, after the same line with `plan`. Points 6 and 8 are settled here.
-9. **Production**: `SIGN_UP=<emails> op run --env-file packages/infra/env/op.env -- bunx alchemy plan --stage
-   prod`, read it, then the same with `deploy`. Open `https://inventory.beep-effect.com`: the sign-in page offers no
+   SIGN_UP=<emails> bunx alchemy deploy packages/infra/src/GitHub.stack.ts --stage prod --profile <production's>`,
+   after the same line with `plan`; the profile is connected to 1Password, which the stack asks for its two secrets. Points 6 and 8 are settled here.
+9. **Production**: `SIGN_UP=<emails> bunx alchemy plan --stage prod --profile <production's>`, read it, then the same with `deploy`. Open `https://inventory.beep-effect.com`: the sign-in page offers no
    sign-up to a stranger; his email signs up, creates the organization and is its admin.
 10. **On the zone**: "Always Use HTTPS" confirmed on.
 11. **Push `main`** (the branch is merged into it locally), so `deploy.yml` reaches GitHub. From then a pull request
@@ -353,8 +364,8 @@ account-owned token. `cf auth whoami` and `cf zones list` were run, to read the 
     - **The first staging deploy** happens by itself on the next push to `main` that passes CI. Until the
       stack above is deployed, each such push is followed by a failed "Deploy" run whose `staging` job says
       `MissingPreviewPassword` (seen 2026-11-22); it deploys nothing and is expected. Before that, a look
-      from the workstation: `op run --env-file packages/infra/env/op.env -- bunx alchemy plan --stage staging` from
-      the previews' account profile, with `PREVIEW_TEST_ACCOUNT_PASSWORD` filled by `op run`.
+      from the workstation: `bunx alchemy plan --stage staging` from the previews' account profile, connected to
+      1Password too so the stack can ask it for `PREVIEW_TEST_ACCOUNT_PASSWORD`.
     - **The first release**: on `main`, `bun run release minor`, read what it printed, then the one push it
       prints, `git push --atomic origin release/<major>.<minor> v<version>`. CI runs on the branch; when it passes,
       the run named "Deploy" starts, "Check the release" prints the tag, and `production` waits for his approval.

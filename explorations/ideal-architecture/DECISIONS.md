@@ -1744,3 +1744,17 @@ as published: a changed file is marked as changed here, and a later update of it
 hand. This ends the last clause of "atoms A1, what stays a hook" ("the vendored kit is not ours"). Rejected: the
 table only; the kit left as it is. Reverse: take a file again from its registry and add it back to the lint's
 ignore list. The batches are in `goals/atoms/PLAN.md`, "The kit on atoms".
+
+### 2026-11-22 — infra: the stacks read their secrets through Alchemy's 1Password provider
+
+Question: the by-hand deploy ran every stack under `op run --env-file packages/infra/env/op.env`. Should the stacks
+ask 1Password themselves?
+Answer: "Or even better use alchemy's built in 1password", then "Yes, add it" (keep `@alchemy.run/1password` as a
+file at the commit already pinned) and "Yes, wire it". I chose; the agent had built the `op run` way first and
+recommended neither. Each stack lists a `secrets` entry that hands the references its stage needs to the provider;
+`op run` is gone from every deploy line and from `bun run beep infra setup`. The agent told me this would move the
+references into the stacks' code; as built it does not: they stay in `packages/infra/env/op.env`, which the entry
+reads, and no code holds one. In a workflow the entry does nothing. Production's Alchemy profile is connected to
+1Password, and the app's "Integrate with other apps" must be on. Not tried against 1Password: the provider was never
+called by an agent. Rejected: keeping `op run`. Reverse: remove `secrets` from the two stacks and the dependency from
+`packages/infra`, and wrap the deploys in `op run` again (`git log` has both lines).

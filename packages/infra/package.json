@@ -10,6 +10,8 @@
     "./package.json": "./package.json",
     "./GitHub": "./src/GitHub.stack.ts",
     "./InfraStage": "./src/InfraStage.context.ts",
+    "./OpReferences": "./src/OpReferences.rules.ts",
+    "./OpReferencesSecrets": "./src/OpReferences.secrets.ts",
     "./Inventory": "./src/Inventory.stack.ts",
     "./Stage": "./src/Stage.schema.ts",
     "./StagePlan": "./src/StagePlan.rules.ts"
@@ -20,6 +22,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@alchemy.run/1password": "2.0.0-beta.87-734c27a",
     "@alchemy.run/cloudflare": "2.0.0-beta.87-734c27a",
     "@alchemy.run/github": "2.0.0-beta.87-734c27a",
     "@beep/identity": "workspace:*",

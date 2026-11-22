@@ -138,7 +138,7 @@ describe("the plan of a stage", () => {
         'Stage "pr-42" has no password for its test accounts: PREVIEW_TEST_ACCOUNT_PASSWORD is not set, so nobody ' +
           "could sign in to this preview. Write the reference " +
           "PREVIEW_TEST_ACCOUNT_PASSWORD=op://<vault>/<item>/<field> in packages/infra/env/op.env and deploy the " +
-          "repository's stack under `op run`, which gives the password to the preview environment as a secret."
+          "repository's stack, which asks 1Password for it and gives the password to the preview environment as a secret."
       )
     })
   })
@@ -153,7 +153,7 @@ describe("the plan of a stage", () => {
       expect(Result.isFailure(stopped) ? stopped.failure.message : "").toBe(
         'Stage "prod" has no model key: OPENROUTER_API_KEY is not set, so every model feature would be answered by ' +
           "rules. Write the reference OPENROUTER_API_KEY=op://<vault>/<item>/<field> in packages/infra/env/op.env " +
-          "and deploy the repository's stack under `op run`, which gives the key to the production environment. To " +
+          "and deploy the repository's stack, which asks 1Password for it and gives the key to the production environment. To " +
           "deploy without a model on purpose, set DEPLOY_WITHOUT_MODEL_KEY=true."
       )
     })

@@ -5,9 +5,10 @@
  * through a pull request whose check passed, with an admin bypass (I7), and the release rules (decision "releases and
  * deploys"): only an admin creates, moves or deletes a `v*` tag, and a `release/*` branch is never rewritten.
  *
- * Deployed from a workstation only, by the repository's owner, under `op run` so the model key is filled for that
- * one process: `op run --env-file packages/infra/env/op.env -- bunx alchemy deploy packages/infra/src/GitHub.stack.ts
- * --stage prod`. No workflow deploys it: a job that could rewrite its own approval rule would have none.
+ * Deployed from a workstation only, by the repository's owner: `bunx alchemy deploy
+ * packages/infra/src/GitHub.stack.ts --stage prod`. The model key and the previews' password are asked of 1Password
+ * by the stack itself, from the references in `env/op.env`, for that one run (`OpReferences.secrets.ts`). No workflow
+ * deploys it: a job that could rewrite its own approval rule would have none.
  *
  * Must not break: a preview or staging job holds no model key, no sign-up list and no token for production's
  * account; the previews' password is written as a secret and never printed; only a run whose ref is `main` may use
@@ -24,6 +25,7 @@
 import * as Cloudflare from "@alchemy.run/cloudflare"
 import * as GitHub from "@alchemy.run/github"
 import * as Alchemy from "alchemy"
+import * as Secrets from "alchemy/Secrets"
 import * as Config from "effect/Config"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
@@ -32,6 +34,8 @@ import * as Redacted from "effect/Redacted"
 import * as Result from "effect/Result"
 import * as Str from "effect/String"
 import { InfraStage } from "./InfraStage.context.ts"
+import { secretNamesOf } from "./OpReferences.rules.ts"
+import { opEnvReferences } from "./OpReferences.secrets.ts"
 import {
   givenTestPassword,
   modelKeyFor,
@@ -42,6 +46,12 @@ import {
 
 /** The repository the deploy workflow runs in. */
 const repository = { owner: "kriegcloud", repository: "inventory-import" } as const
+
+/** The secrets this stack writes to GitHub, by variable: production's (its model key) and the previews' password. */
+const repositorySecrets: ReadonlyArray<string> = [
+  ...Result.match(planFor("prod"), { onFailure: () => [], onSuccess: secretNamesOf }),
+  previewPasswordVariable
+]
 
 /** The name of the job in `.github/workflows/ci.yml` that a pull request must pass. */
 const requiredCheck = "Check, test and build"
@@ -80,7 +90,13 @@ const zones = (accountId: string): Cloudflare.ApiToken.Policy => ({
  */
 export default Alchemy.Stack(
   "inventory-github",
-  { providers: Layer.mergeAll(Cloudflare.providers(), GitHub.providers()), state: Cloudflare.state() },
+  {
+    providers: Layer.mergeAll(Cloudflare.providers(), GitHub.providers()),
+    state: Cloudflare.state(),
+    // This stack writes production's model key and the previews' password to GitHub, so it asks 1Password for
+    // both, whichever of them `env/op.env` gives a reference for. A `.env` at the root is still read first.
+    secrets: [Secrets.DotEnv(), opEnvReferences(() => repositorySecrets)]
+  },
   Effect.gen(function* () {
     // Asked for so that an unknown stage name stops this stack too; the repository has one set of settings.
     yield* InfraStage

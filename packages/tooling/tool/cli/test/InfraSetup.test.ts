@@ -152,9 +152,12 @@ const standIn = (w: World): Workstation["Service"] => {
         if (O.isSome(edited)) {
           const name = `${edited.value[1]}`
           const added = A.map(
-            A.filter(Str.split(" ")(`${edited.value[2]}`), (word) => word === "Cloudflare" || word === "GitHub"),
+            A.filter(
+              Str.split(" ")(`${edited.value[2]}`),
+              (word) => word === "Cloudflare" || word === "GitHub" || word === "1Password"
+            ),
             (provider) =>
-              `${provider} (${provider === "GitHub" ? "gh-cli" : Str.includes("--method stored")(handed) ? "stored" : "oauth"})`
+              `${provider} (${provider === "GitHub" ? "gh-cli" : provider === "1Password" ? "desktop" : Str.includes("--method stored")(handed) ? "stored" : "oauth"})`
           )
           const before = R.get(w.profiles, name).pipe(O.getOrElse(() => ""))
           w.profiles = { ...w.profiles, [name]: A.join([...(before === "" ? [] : [before]), ...added], ", ") }
@@ -214,7 +217,7 @@ const twoAccounts = [
 ]
 const connected = {
   "inventory-preview": "Cloudflare (oauth)",
-  "inventory-production": "Cloudflare (oauth), GitHub (gh-cli)"
+  "inventory-production": "Cloudflare (oauth), GitHub (gh-cli), 1Password (desktop)"
 }
 
 describe("infra setup: the steps", () => {
@@ -262,7 +265,7 @@ describe("infra setup: the steps", () => {
       const said = A.join(w.log, "\n")
       expect(said).toContain("bunx alchemy plan --stage test_ben --profile inventory-preview")
       expect(said).toContain(
-        "op-human run --env-file packages/infra/env/op.env -- bunx alchemy deploy packages/infra/src/GitHub.stack.ts --stage prod --profile inventory-production --yes"
+        "bunx alchemy deploy packages/infra/src/GitHub.stack.ts --stage prod --profile inventory-production --yes"
       )
       expect(A.length(dryRun(options({ sizes: ["test-stage"] })))).toBeGreaterThan(4)
     })
@@ -521,25 +524,27 @@ describe("infra setup: the repository's stack and production", () => {
     })
   )
 
-  it.effect("the stack is planned and deployed under 1Password, given the ids, the approver and the flag", () =>
-    Effect.gen(function* () {
-      const w = world({ accounts: twoAccounts, profiles: connected })
-      const result = yield* run(
-        w,
-        options({ sizes: ["staging"], previewAccount: O.some("Previews"), productionAccount: O.some("Production") })
-      )
-      expect(result.stopped).toEqual(O.none())
-      const under = "op-human run --env-file packages/infra/env/op.env -- bunx alchemy"
-      const given =
-        "given PRODUCTION_CLOUDFLARE_ACCOUNT_ID=acc-production PREVIEW_CLOUDFLARE_ACCOUNT_ID=acc-preview PRODUCTION_APPROVER=octo-owner SIGN_UP=closed DEPLOY_WITHOUT_MODEL_KEY=true"
-      expect(A.takeRight(started(w), 2)).toEqual([
-        `hand: ${under} plan packages/infra/src/GitHub.stack.ts --stage prod --profile inventory-production | ${given}`,
-        `hand: ${under} deploy packages/infra/src/GitHub.stack.ts --stage prod --profile inventory-production --yes | ${given}`
-      ])
-      expect(at(w, "say: Model key: packages/infra/env/op.env names none")).toBeGreaterThan(-1)
-      expect(at(w, "say: Sign-up in production: closed")).toBeGreaterThan(-1)
-      expect(at(w, `hand: ${under} plan`)).toBeLessThan(at(w, "confirm: Deploy the repository's stack"))
-    })
+  it.effect(
+    "the stack is planned and deployed with no `op run` around it, given the ids, the approver and the flag",
+    () =>
+      Effect.gen(function* () {
+        const w = world({ accounts: twoAccounts, profiles: connected })
+        const result = yield* run(
+          w,
+          options({ sizes: ["staging"], previewAccount: O.some("Previews"), productionAccount: O.some("Production") })
+        )
+        expect(result.stopped).toEqual(O.none())
+        const under = "bunx alchemy"
+        const given =
+          "given PRODUCTION_CLOUDFLARE_ACCOUNT_ID=acc-production PREVIEW_CLOUDFLARE_ACCOUNT_ID=acc-preview PRODUCTION_APPROVER=octo-owner SIGN_UP=closed DEPLOY_WITHOUT_MODEL_KEY=true"
+        expect(A.takeRight(started(w), 2)).toEqual([
+          `hand: ${under} plan packages/infra/src/GitHub.stack.ts --stage prod --profile inventory-production | ${given}`,
+          `hand: ${under} deploy packages/infra/src/GitHub.stack.ts --stage prod --profile inventory-production --yes | ${given}`
+        ])
+        expect(at(w, "say: Model key: packages/infra/env/op.env names none")).toBeGreaterThan(-1)
+        expect(at(w, "say: Sign-up in production: closed")).toBeGreaterThan(-1)
+        expect(at(w, `hand: ${under} plan`)).toBeLessThan(at(w, "confirm: Deploy the repository's stack"))
+      })
   )
 
   it.effect("a model key reference is left to 1Password: the flag is not given, the reference is not read", () =>
@@ -568,7 +573,7 @@ describe("infra setup: the repository's stack and production", () => {
       const deploy = A.last(started(w)).pipe(O.getOrElse(() => ""))
       expect(deploy).not.toContain("DEPLOY_WITHOUT_MODEL_KEY")
       expect(deploy).toContain("PRODUCTION_APPROVER=someone-else SIGN_UP=owner@example.test")
-      expect(A.some(started(w), (entry) => /op-human (read|item get|inject)/.test(entry))).toBe(false)
+      expect(A.some(started(w), (entry) => /op-human (read|run|item get|inject)/.test(entry))).toBe(false)
       expect(result.env).toBe(env)
     })
   )
@@ -582,7 +587,7 @@ describe("infra setup: the repository's stack and production", () => {
       const w = world({ profiles: connected })
       const result = yield* run(w, options({ sizes: ["production"], signUp: O.some("owner@example.test") }))
       expect(result.stopped).toEqual(O.none())
-      const under = "op-human run --env-file packages/infra/env/op.env -- bunx alchemy"
+      const under = "bunx alchemy"
       const given = "given SIGN_UP=owner@example.test DEPLOY_WITHOUT_MODEL_KEY=true"
       expect(A.takeRight(started(w), 2)).toEqual([
         `hand: ${under} plan --stage prod --profile inventory-production | ${given}`,
@@ -607,7 +612,11 @@ describe("infra setup: the repository's stack and production", () => {
       expect(A.filter(calls, Str.includes("alchemy deploy")).length).toBe(3)
       expect(A.some(calls, (entry) => /destroy|nuke|teardown|state delete/.test(entry))).toBe(false)
       expect(A.every(A.filter(calls, Str.includes("--yes")), Str.includes("alchemy deploy"))).toBe(true)
-      expect(A.some(calls, (entry) => /--reveal|op-human read/.test(entry))).toBe(false)
+      expect(A.some(calls, (entry) => /--reveal|op-human read|op-human run/.test(entry))).toBe(false)
+      // Production's profile is connected to 1Password too: its stacks ask it for their secrets themselves.
+      expect(calls).toContain(
+        "hand: bunx alchemy profile edit --profile inventory-production --add Cloudflare --add GitHub --add 1Password"
+      )
     })
   )
 })

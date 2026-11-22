@@ -425,6 +425,7 @@
       "name": "@beep/infra",
       "version": "0.0.0",
       "dependencies": {
+        "@alchemy.run/1password": "2.0.0-beta.87-734c27a",
         "@alchemy.run/cloudflare": "2.0.0-beta.87-734c27a",
         "@alchemy.run/github": "2.0.0-beta.87-734c27a",
         "@beep/identity": "workspace:*",
@@ -644,6 +645,12 @@
     "wrangler": "^4.161.0",
   },
   "packages": {
+    "@1password/sdk": ["@1password/sdk@0.5.0", "", { "dependencies": { "@1password/sdk-core": "0.5.0" } }, "sha512-k6kov3pcA7PRg2tev9CgTfEf/3JSyAp11BPQNCEsqAD32QbqM032OXC1rfjyC8Ba0sfH+NHYZxcifUZToyGyYA=="],
+
+    "@1password/sdk-core": ["@1password/sdk-core@0.5.0", "", {}, "sha512-9g7LWOKRKdePZ85evVgE9xEom3DAg3hRIyQdOwLPvpL/F7KpDXmUHMi72rsqJxKaDbWApXmrYjDExMSPqUg7xw=="],
+
+    "@alchemy.run/1password": ["@alchemy.run/1password@vendor/alchemy/alchemy.run-1password-734c27a.tgz", { "dependencies": { "@1password/sdk": "0.5.0" }, "peerDependencies": { "alchemy": "2.0.0-beta.87-734c27a", "effect": "^4.1.4" } }, "sha512-C0s9FbgBPpbVlbGqQM6YbuCSnCXLRImXLfj7I63K/QjVSzpoOe7u+0YJB8QcwvPeAd2U0+cELi5XbktxlOMw6w=="],
+
     "@alchemy.run/acme": ["@alchemy.run/acme@vendor/alchemy/alchemy.run-acme-734c27a.tgz", { "dependencies": { "@distilled.cloud/acme": "1.0.0-rc.20-734c27a" }, "peerDependencies": { "alchemy": "2.0.0-beta.87-734c27a", "effect": "^4.1.4" } }, "sha512-B4ev6p8yNK54t3QU8dNxq0XCWPr7y28W0YZa/rcQKJ2Y4mDwB17X3ayEnil4aQqHe95qAYFDc2/54F++u8L/rg=="],
 
     "@alchemy.run/cloudflare": ["@alchemy.run/cloudflare@vendor/alchemy/alchemy.run-cloudflare-734c27a.tgz", { "dependencies": { "@alchemy.run/acme": "2.0.0-beta.87-734c27a", "@alchemy.run/cloudflare-runtime": "2.0.0-beta.87-734c27a", "@alchemy.run/docker": "2.0.0-beta.87-734c27a", "@alchemy.run/sql": "2.0.0-beta.87-734c27a", "@distilled.cloud/aws": "1.0.0-rc.20-734c27a", "@distilled.cloud/aws4signer": "1.0.0-rc.20-734c27a", "@distilled.cloud/cloudflare": "1.0.0-rc.20-734c27a", "@distilled.cloud/core": "1.0.0-rc.20-734c27a", "@distilled.cloud/iceberg": "1.0.0-rc.20-734c27a", "@effect/sql-d1": "^4.1.4", "pathe": "^2.0.3", "picomatch": "^4.0.7", "rolldown": "1.2.16", "tinyglobby": "^0.2.17" }, "peerDependencies": { "@alchemy.run/frontend-frameworks": "2.0.0-beta.87-734c27a", "@effect/platform-bun": "^4.1.4", "@effect/platform-node": "^4.1.4", "alchemy": "2.0.0-beta.87-734c27a", "effect": "^4.1.4", "vite": "^7.0.0 || ^8.0.0" }, "optionalPeers": ["@alchemy.run/frontend-frameworks", "@effect/platform-bun", "@effect/platform-node", "vite"] }, "sha512-2bj5kYd85NiI8AnjKy8+T/w+u2wqPANkczHZpfNxO0fmOfvw0QhL40LUDvNQXhRB+RqVWRT5mJv4CxV9v/ECjg=="],

@@ -4,7 +4,7 @@
 `main`. Its registry, `https://pkg.alchemy.run`, serves a build of every commit of `main` and deletes it a week after
 `main` has moved on. So the build this repository uses is kept here, and an install needs that registry for nothing.
 
-`packages/infra` uses `alchemy`, `@alchemy.run/cloudflare` and `@alchemy.run/github`. The model of the review in
+`packages/infra` uses `alchemy`, `@alchemy.run/cloudflare`, `@alchemy.run/github` and `@alchemy.run/1password`. The model of the review in
 `packages/catalog/model`, and the test in `packages/catalog/web` that holds it against the review region, use
 `@alchemy.run/domain`, which is the reason for the pin. All of them come from the same commit because one
 `node_modules` holds one `alchemy`.

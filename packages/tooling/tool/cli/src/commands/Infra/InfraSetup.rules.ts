@@ -214,12 +214,6 @@ export interface Call {
 
 const alchemy = (...args: ReadonlyArray<string>): Call => ({ command: "bunx", args: ["alchemy", ...args] })
 
-/** A call run under 1Password, which fills the references of `op.env` for that one process. */
-const underOp = (call: Call): Call => ({
-  command: "op-human",
-  args: ["run", "--env-file", opEnvFile, "--", call.command, ...call.args]
-})
-
 const profileOf = (options: SetupOptions, role: Role) =>
   Role.match(role, { preview: () => options.previewProfile, production: () => options.productionProfile })
 
@@ -233,16 +227,15 @@ const stageOf = (options: SetupOptions, target: Target) =>
 
 /**
  * The call that plans or deploys one target. A deploy carries `--yes` because the owner has just read this plan
- * and said yes to this command. Alchemy asks only when its input and output are both a terminal, and `op run` puts
- * its masking between a tool's output and the terminal (read in both tools' sources and help, not tried).
+ * and said yes to this command's question about it. The stacks ask 1Password for their secrets themselves
+ * (`packages/infra/src/OpReferences.secrets.ts`), so no call is wrapped in `op run`.
  */
 const deployCall = (options: SetupOptions, target: Target, verb: "plan" | "deploy"): Call => {
   const yes = verb === "deploy" ? ["--yes"] : []
   return Target.match(target, {
     "test-stage": () => alchemy(verb, "--stage", stageOf(options, target), "--profile", options.previewProfile, ...yes),
-    repository: () =>
-      underOp(alchemy(verb, repositoryStack, "--stage", "prod", "--profile", options.productionProfile, ...yes)),
-    production: () => underOp(alchemy(verb, "--stage", "prod", "--profile", options.productionProfile, ...yes))
+    repository: () => alchemy(verb, repositoryStack, "--stage", "prod", "--profile", options.productionProfile, ...yes),
+    production: () => alchemy(verb, "--stage", "prod", "--profile", options.productionProfile, ...yes)
   })
 }
 
@@ -419,10 +412,10 @@ export const described = (options: SetupOptions): ((step: Step) => ReadonlyArray
     Profile: (step) => {
       const name = profileOf(options, step.role)
       return [
-        `Alchemy profile "${name}" (${step.role} account), connected to Cloudflare${step.github ? " and GitHub" : ""}. One that is there and connected is left alone.`,
+        `Alchemy profile "${name}" (${step.role} account), connected to Cloudflare${step.github ? ", GitHub" : ""}${step.role === "production" ? " and 1Password" : ""}. One that is there and connected is left alone.`,
         "  bunx alchemy profile list",
         `  bunx alchemy profile create ${name}   (only when there is none)`,
-        `  bunx alchemy profile edit --profile ${name} --add Cloudflare${step.github ? " --add GitHub" : ""}   (only what is not connected; the browser login and the account are yours to pick)`
+        `  bunx alchemy profile edit --profile ${name} --add Cloudflare${step.github ? " --add GitHub" : ""}${step.role === "production" ? " --add 1Password" : ""}   (only what is not connected; the browser login and the account are yours to pick)`
       ]
     },
     StateStore: (step) => [
@@ -691,7 +684,8 @@ const profile = Effect.fn("InfraSetup.profile")(function* (
 ) {
   const workstation = yield* Workstation
   const name = profileOf(options, role)
-  const wanted = ["Cloudflare", ...(github ? ["GitHub"] : [])]
+  // Production's stacks ask 1Password for their secrets through the profile, so its profile is connected to it too.
+  const wanted = ["Cloudflare", ...(github ? ["GitHub"] : []), ...(role === "production" ? ["1Password"] : [])]
   const listed = Effect.gen(function* () {
     const answer = yield* workstation.ask("bunx", ["alchemy", "profile", "list"])
     if (answer.code !== 0) {
@@ -753,7 +747,11 @@ const profile = Effect.fn("InfraSetup.profile")(function* (
       A.contains(toConnect, "Cloudflare")
         ? `, and if Alchemy asks which account, pick${account} (the ${role} account)`
         : ""
-    }${A.contains(toConnect, "GitHub") ? "; for GitHub pick gh-cli" : ""}.`
+    }${A.contains(toConnect, "GitHub") ? "; for GitHub pick gh-cli" : ""}${
+      A.contains(toConnect, "1Password")
+        ? '; for 1Password pick the desktop app and your account (in the app, Settings, Developer, "Integrate with other apps" must be on)'
+        : ""
+    }.`
   )
   const code = yield* workstation.hand("bunx", [
     "alchemy",
@@ -926,7 +924,7 @@ const deploy = Effect.fn("InfraSetup.deploy")(function* (target: Target, options
     }
     yield* workstation.say(
       modelKey === "reference"
-        ? `Model key: ${opEnvFile} names a reference for ${modelKeyName}. 1Password fills it for the deploy; this command never reads it.`
+        ? `Model key: ${opEnvFile} names a reference for ${modelKeyName}. The stack asks 1Password for it at the deploy, and the app asks you to authorize; this command never reads it.`
         : `Model key: ${opEnvFile} names none, so this deploys with DEPLOY_WITHOUT_MODEL_KEY=true: production runs without a model and its rules answer. To use a model, fill in that line and run this again.`
     )
     if (target === "repository" && referenceState({ text, name: previewPasswordName }) !== "reference") {

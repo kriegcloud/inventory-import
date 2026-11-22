@@ -4,7 +4,7 @@ title: Alchemy domain
 description: Everything @alchemy.run/domain and what plugs into it offers, concept by concept, with how inventory-import would use each. The reference the brief is built on, written so its pages can later become agent skills.
 status: active
 stage: shape
-next: Benjamin answers the brief's open decisions, those up to 40 first (7, with 8, 9 and 41, after the trial he asked for), and says whether it matches; the build starts after that and after the atoms goal is merged
+next: decisions 1 to 40 of the brief are answered (2026-11-22); 42 to 56 and 60 to 62 are asked each when its move opens; moves 0 and 1 are built first, on the atoms work as merged
 goals: []
 ---
 

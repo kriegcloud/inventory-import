@@ -14,18 +14,14 @@ it.
 ## Open
 
 Decisions 1 to 40 shape the first moves. Decisions 41 to 62 can wait for the move that needs them. "Changes" names
-the earlier answers that remove or change an option. Decisions 1 to 6, 10 to 23, 25 to 40 and 57 to 59 were answered
-on 2026-11-22 and are under "Answered". Of 1 to 40 only 7, 8 and 9 are open, waiting with 41 on a trial he asked for;
-24 stands on his earlier infra answer, I8, and was not asked again. Decisions 41 to 56 and 60 to 62 are asked each when
+the earlier answers that remove or change an option. Decisions 1 to 8, 10 to 23, 25 to 40 and 57 to 59 were answered
+on 2026-11-22 and are under "Answered"; 9 and 41 fell away with his answer to 7 and were not asked. Nothing of 1 to 40
+is open; 24 stands on his earlier infra answer, I8, and was not asked again. Decisions 41 to 56 and 60 to 62 are asked each when
 its move opens, as he chose on 2026-11-22. The numbers of the others stay as the brief gives them.
 
 | # | Question | Recommended in the brief | Changes | Where it is argued |
 | --- | --- | --- | --- | --- |
-| 7 | How is an act on a group of rows carried? | The group decided as one unit. **Asked 2026-11-22, not decided:** he chose to have that design trialled first; it ran (trials 15 to 17) and is now the recommendation | 4 | [07](research/07-review-decisions-trial.md) fifth round |
-| 8 | Under 7's first answer: which group may be taken back? Under its second: while one person's group is being sent, what can the others do? | Only the import's last group act; or, row by row, single rows are decided and the rest waits | 7 | [07](research/07-review-decisions-trial.md) fifth and fourth rounds |
-| 9 | Who may stop a group act whose sender no longer can? | Its sender or an admin; the rows not sent are counted on the import | 7 | [07](research/07-review-decisions-trial.md) fourth round |
 | 24 | Can a person with no account be invited? | No, as his infra I8 | | [Resend](research/concepts/resend.md) |
-| 41 | How long may a group act take before a group is decided as one unit? | 5 minutes | 7 | [07](research/07-review-decisions-trial.md) third and fourth rounds |
 | 42 | What answers the Items page? | A query that answers today's page | | [query](research/concepts/query.md) |
 | 43 | Do suggestions start by the person's press, or by themselves? | By the press, as today | | [policy](research/concepts/policy.md) |
 | 44 | How many calls may one pass take from the 40 a day? | One, as today | | [saga](research/concepts/saga.md) |
@@ -270,7 +266,7 @@ The last round of the same dialog. Of each: I chose; the agent recommended the s
 | # | Question | Options, the recommended one first | Answer |
 | --- | --- | --- | --- |
 | 35 | How does a stored state or event change shape? | By rule; always wipe | "By rule" |
-| 57, 58, 59 | Which do you want built anyway? | None: each "cannot yet" accepted; Rivet, a runner for CI on Alchemy Git, or a resource for workflow files through the GitHub provider | "None: accept all three" |
+| 57, 58, 59 | Three things from your "use every single thing" list can't be used yet, each for a stated reason. The brief counts one as done only once you accept it. Rivet: no Rivet control plane or pool runs on Cloudflare. CI on Alchemy Git: the package has no runner. Workflow files through the GitHub provider: nothing in the provider writes repository contents. Which do you want built anyway, rather than written down as "cannot yet"? (more than one could be chosen) | None: accept all three; Rivet; a CI runner for Alchemy Git; GitHub contents resource | "None: accept all three" |
 
 Decisions 57, 58 and 59 were asked as one question. Each is accepted as "cannot yet", with what would remove its blocker
 as the brief states it: for 57 a Rivet control plane the Worker can reach and a pool outside Cloudflare, for 58 a runner
@@ -278,3 +274,36 @@ the project builds, for 59 a resource over the contents API.
 
 Decisions 41 to 56 and 60 to 62 were put to him together, and his answer was "At their move": he does not want them
 now, and each is asked when its move opens. They stay under "Open".
+
+### 2026-11-22 — decisions 7 and 8 of the brief, after the trial he asked for
+
+Asked again by dialog once the one-unit design had run (trials 15 to 17 of the trial page). Of each: I chose; the agent
+recommended the same. The recommendation for 7 had been one act per row before the trial and changed with it. Reverse
+each: a new decision by him.
+
+| # | Question | Options, the recommended one first | Answer |
+| --- | --- | --- | --- |
+| 7 | How is an act on a group of rows carried? | The group is decided as one unit; one act per row under the group's step, sent by a saga; both, a group under some size row by row and a larger one as a unit | "One unit per group" |
+| 8 | Which group may be taken back? | Only the import's last group act; any group of one's own | "Only the last group act" |
+
+What he was told with decision 7: 123 rules are proved, of the trial's model; one act for 6,000 rows took a median of
+214 ms in local workerd; Confirm never waits for a group; a colleague's act made before the group reached their screen
+is refused and shown again, on any row; Verify cannot check that the rows a group names are the ones the fix fits, and
+a property over 50,000 generated sequences holds the reading of a row through its groups; the screen and the stored rows
+that read through groups are not run. With decision 8 he was told the one case in which taking back an earlier group is
+not exact: an accept pressed because that group had made the proposal stays accepted.
+
+Decisions 9 (who may stop a group act) and 41 (how long a group act may take before it is decided as one unit) fell away
+with his answer to 7 and were not asked: a group is one act.
+
+He was also given two corrections before these questions: the 93 rules of the final model stand, but none of them says
+that an act is taken; and the 131 to 151 ms an act was measured only on a row's first act.
+
+### 2026-11-22 — what the proofs cover, and what the tests cover
+
+Question: "Verify proves what must never happen. It does not prove that a valid act is actually recorded: a model that
+recorded nothing would pass every rule. Today that half is held by tests: the stories, and 8 of 8 deliberately broken
+variants each failing their rule. Is that enough?" Answer: "Yes, tests hold it, said plainly". I chose; the agent
+recommended the same. The proofs cover what must never happen; the stories cover that each valid act is taken; the
+documents and the demo page say exactly that split. Rejected: "Trial a rule for it first". Reverse: a new decision by
+him.

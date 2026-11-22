@@ -93,6 +93,8 @@ was deployed.
   group's rows are split by what each got.
 - **No rule holds that an act is taken.** A `decide` that records nothing for every act proves every rule of the final
   model (trial 15): the prover checks a decision's rules on what an act records. The stories hold that acts are taken.
+  His answer of 2026-11-22: tests hold it, said plainly. The proofs cover what must never happen; the stories cover that
+  each valid act is taken; the documents and any page that shows the proofs say exactly that split.
 - **The hosted model on the domain's Durable Object host, in local workerd** (trial 14, the final model): 600 acts one
   after another, each the first act on a row of its own, in two runs: 131 and 151 ms an act on the mean, 79 to 98 ms in
   the middle, the slowest 12.4 s, at load averages of 27 to 46. A later act on a row was not timed. Counting the
@@ -477,9 +479,9 @@ and the person's wait is not that of one import.
 
 The first option of each is the recommendation, with what it rests on. One decision each, most consequential first.
 Each says which earlier answers remove or change its options. Decisions 1 to 40 shape the first moves. Decisions 41
-to 62 can wait until the move that needs them. Of decisions 1 to 40, all but 7, 8, 9 and 24 are answered
-(2026-11-22), each with its first option; 7 waits on a trial he asked for, and 8, 9 and 41 on it; 24 stands on his
-earlier infra answer and was not asked again. Of 41 to 62, 57 to 59 are accepted as "cannot yet" and the others wait
+to 62 can wait until the move that needs them. Of decisions 1 to 40, all but 9 and 24 are answered
+(2026-11-22), each with its first option; 7 was answered after the trial he asked for, and 8 with it; 9 and 41 fell away
+with that answer; 24 stands on his earlier infra answer and was not asked again. Of 41 to 62, 57 to 59 are accepted as "cannot yet" and the others wait
 for their move. "Proved" in a question is of the model named beside it, as it ran.
 
 ### 1. How does the app take what exists only on the library's `main`?
@@ -606,9 +608,10 @@ there. Nothing of the second import changed. Today it is confirmed, with other o
 
 ### 7. How is an act on a group of rows carried?
 
-**Not decided.** Asked on 2026-11-22, he chose to have the one-unit design run as a trial first. It ran (trials 15 to 17,
-the fifth round), and the recommendation below changed with it: the first option was the second. Decisions 8, 9 and 41
-follow from this one.
+**Answered 2026-11-22: the first option**, the group as one unit ([DECISIONS.md](DECISIONS.md), "Answered"). Asked
+first on the same day, he chose to have that design run as a trial before deciding; it ran (trials 15 to 17, the fifth
+round), the recommendation changed to it, and he took it. The others are kept below as what was rejected. Decision 8 is
+answered with it; decisions 9 and 41 fall away.
 
 *Asked under decision 4's first option, as answered.* Accepting a fix for a group is the review's main act. The sample's
 groups have up to 9 rows; a large file's can have thousands.
@@ -646,6 +649,8 @@ groups have up to 9 rows; a large file's can have thousands.
 
 ### 8. While one person's group is being sent, what can the others do?
 
+**Answered 2026-11-22: the first option**, only the import's last group act ([DECISIONS.md](DECISIONS.md), "Answered").
+
 *Under decision 7's first answer, the group as one unit, this question is another: which group may be taken back?*
 Ana accepts a fix on 2,340 rows; Dana then accepts another on 900, some of them the same rows; Ana undoes hers.
 
@@ -656,7 +661,8 @@ Ana accepts a fix on 2,340 rows; Dana then accepts another on 900, some of them 
   it; later groups are applied again on what is left. Exact only where what a later act did does not rest on the group:
   an accept pressed because the group had made the proposal stays accepted (trial 16, two cases written by hand).
 
-*Under decision 7's second answer, one act per row:* Ana accepts a fix on 2,340 rows; Dana matches a column, or begins
+*Under decision 7's second answer, one act per row, which he did not take, and so not asked:* Ana accepts a fix on
+2,340 rows; Dana matches a column, or begins
 a group too, before it is over.
 
 - **Decide and undo single rows; a match, a second group, a confirm, a take-back and a remove wait and are sent when it
@@ -668,7 +674,8 @@ a group too, before it is over.
 
 ### 9. Who may stop a group act whose sender no longer can?
 
-*Asked under decision 7's second or third answer; under its first there is nothing to stop: a group is one act.*
+**Not asked: it fell away on 2026-11-22** with his answer to decision 7. Under the group as one unit there is nothing to
+stop: a group is one act.
 
 A person begins a group and then loses the editor's role, leaves, or their saga dies. Until the group is over nobody can
 confirm, match a column or remove the import.
@@ -749,8 +756,11 @@ or a group made before the confirm.
 
 ### 14. What is a keep of one of two rows, when someone decides the other row meanwhile?
 
-**Answered 2026-11-22: the first option**, the one recommended ([DECISIONS.md](DECISIONS.md), "Answered"). The
-others are kept below as what was rejected. It was put to him as not run.
+**Answered 2026-11-22: the first option**, one act on the kept row ([DECISIONS.md](DECISIONS.md), "Answered"). The
+others are kept below as what was rejected. It was put to him as not run, and it is in no model: every model here decides
+one row an act. The likely shape is a unit of two parts, the kept row and the rows left out, as decision 7's group is a
+unit of parts; the reading of a keep through such a unit equalled today's `act` in trial 16, and it was not run as a
+decision.
 
 Today "keep this row" also leaves its rivals out, as separate rows of one act. Sent row by row, it can be taken in part:
 row 10 is left out, then Dana leaves row 4 out so that row 10 goes in, then Ana's keep of row 4 is refused. Both are left
@@ -1120,8 +1130,8 @@ others are kept below as what was rejected.
 
 On 2026-11-22 he chose to be asked each of decisions 41 to 56 and 60 to 62 when its move opens.
 
-**41. How long may a group act take before the group is decided as one unit?** (move 3) Asked only under decision 7's
-third answer; under its first every group is a unit. In local workerd 13 to 15 minutes for 6,000 rows row by row, worked
+**41. How long may a group act take before the group is decided as one unit?** (move 3) **Not asked: it fell away on
+2026-11-22** with his answer to decision 7, under which every group is a unit. It was for decision 7's third answer. In local workerd 13 to 15 minutes for 6,000 rows row by row, worked
 out from trial 14, and a median of 214 ms as a unit (trial 17). Options: 1 minute; 5 minutes (Recommended, as a first number to
 measure against on the preview stage); no limit.
 

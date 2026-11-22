@@ -3,24 +3,35 @@
 What the proofs and the stories of the review are worth is measured by breaking the model on purpose and seeing
 whether anything notices. A **mutant** is one change to the model's source, made in a copy of the package:
 
-- **check**: one check of a `decide` removed (`if (!isOpen(s)) return yield* new NotOpen({})` goes), 77 of them;
-- **field**: one field of an event given a wrong value (`by: actor.memberId` becomes `by: actor.organizationId`), 77;
+- **check**: one check of a `decide` removed (`if (!isOpen(s)) return yield* new NotOpen({})` goes), 78 of them;
+- **field**: one field of an event given a wrong value (`by: actor.memberId` becomes `by: actor.organizationId`), 80;
 - **nothing**: an accepted act made to record nothing (`return []` before the events), 11.
 
 They cover the import's seven commands (`src/Import/Import.aggregate.ts`) and the four decisions
 (`src/Review/{Deciding,Undoing,DecidingGroup,UndoingGroup}.decision.ts`). Each runs against its proof
 (`test/Import.prove.test.ts` or the decision's `test/*.prove.test.ts`) and both story files
-(`test/Review.story.test.ts`, `test/Group.story.test.ts`). The result is one of three classes:
+(`test/Review.story.test.ts`, `test/Group.story.test.ts`). The result is one of these classes:
 
 | Class | What failed | What it means |
 | --- | --- | --- |
-| `rule` | the proof | a proved rule, or one of the report's own counts (its paths, "some state lets it record"), notices the change for every state and input |
+| `rule` | the proof, naming a rule | a rule is no longer proved: it notices the change for every state and input |
+| `proof` | the proof, on no rule | only a number the proof test states moved (its count of paths, "some state lets it record"): the change is seen, and no rule says it is wrong |
 | `story` | only a story | an example shows the change is wrong, but no rule says so: the next change of the same kind may pass both |
 | `neither` | nothing | the change goes unnoticed: a gap, to be closed by a rule or a story |
+| `timeout` | nothing but a test that ran out of time | nothing is known: no rule and no story held it |
+| `error` | a file did not load, or no result | nothing is known |
+
+A test that ran out of time has noticed nothing, in the proof file or in a story file: the runner counts it apart,
+writes it in the note, and never lets it make a class. So a mutant whose proof only timed out is not `rule`, and one
+whose only failing story timed out is not `story`; a mutant with nothing else is `timeout`, and fails the run.
 
 An earlier trial of this model ran 148 of these changes and found 111 held by a rule, 37 by a story only and 0 by
-neither. Each mutant in `mutants.json` keeps what that trial found (`expect`, and the rules it saw break in
-`trialRules`), so a run can say when a rule got weaker.
+neither. Each mutant in `mutants.json` keeps what was found for it (`expect`, the rules seen to break in
+`trialRules`, the stories in `trialStories`). A run compares with that by name, not by class alone: a mutant kept as
+`rule` is `same` only when the proof still names every rule in its `trialRules` (the name, whatever its standing:
+"violated" and "not proved" are both the rule noticing), and is `weaker` when one of them is no longer named, or when
+no rule is named at all and only the count of paths moved. A mutant kept as `story` is `same` while a story fails,
+whatever the proof's numbers do, and `weaker` when none does.
 
 Six were added since, all in `Deciding`, when its `decide` came to ask `covered` once and make each side's checks
 there: the three refusals on the covered side (`row-saw-covered`, `row-nolonger-covered`, `row-madeon-covered`), the
@@ -43,6 +54,11 @@ that says what the sender saw was taken back, removed (`row-putback`, `row-putba
 twice no longer known (`row-resend-covered`), and a row's undo taken from under a later group (`undo-covered`). A rule
 holds the first and the last; the others are kept as held by their stories.
 
+Four more came with the undo sent twice (2026-11-22): the answer to a second sending removed (`undo-resend`, kept as
+held by its story: an act answered with nothing recorded has no rule), and the three fields of `StepUndone` by which a
+row knows the undo it took, each given a wrong value (`undo-stepundone-undo`, `undo-stepundone-step`,
+`undo-stepundone-by`), each held by its own rule.
+
 ## Where they run
 
 The sample is the turbo task `mutants:sample` (`bun run --cwd packages/catalog/model mutants:sample`), part of
@@ -56,7 +72,7 @@ From `packages/catalog/model` (the runner finds its paths from its own place, so
 
 ```sh
 python3 -I mutants/run.py --sample              # nine fast mutants, about 25 s
-python3 -I mutants/run.py --all --jobs 4        # all 165
+python3 -I mutants/run.py --all --jobs 4        # all 169
 python3 -I mutants/run.py --only confirm-sum,group-madeon
 python3 -I mutants/run.py --list                # every mutant, and nothing run
 ```
@@ -74,9 +90,10 @@ and vitest run in the copy on the proof and the two story files with its JSON re
 class, seconds, how it compares with the trial, what failed), then the counts by target and the times. Everything
 goes to `.mutants/results.tsv` (git-ignored). The package's own files are never written.
 
-It exits 1 when a mutant is held by `neither`, when one the trial found held by a rule is now held by a story only
-(`weaker`), when a mutant does not apply, or when a run gave no result; each is printed with its change and what ran.
-A mutant held by a rule where the trial had a story is printed as an `improvement`, and is not a failure.
+It exits 1 when a mutant is held by `neither`, when all that is known of one is a `timeout`, when one is `weaker`
+(above), when a mutant does not apply, or when a run gave no result; each is printed with its change and what ran,
+and a `weaker` one with the rules no longer named. A mutant held by a rule where a story was kept is printed as an
+`improvement`, and is not a failure. The unchanged copy must pass with no test out of time, or nothing more is run.
 
 ## What it costs
 
@@ -145,8 +162,10 @@ an object to `mutants.json`:
 - `old`, `new`: the exact text, indentation and line ends included. A removed check is its whole line or lines,
   ending with `\n`, and `new` is `""`. `old` must occur exactly once between the anchors and `until`, or the runner
   refuses the mutant.
-- `proof`: the proof file of the target. `expect`: the class it must keep, `rule` for a new check (a check with no rule
-  under it is what this catches). `trialRules` and `trialStories`: what was seen to break, or `[]`.
+- `proof`: the proof file of the target. `expect`: `rule` or `story`, what must go on holding it; `rule` for a new
+  check (a check with no rule under it is what this catches: the count of paths moving is class `proof`, and is not
+  enough). `trialRules`: the rules seen to break, each of which must stay named (`"Violated <rule>"` or the bare
+  name; only the name is compared). `trialStories`: the stories seen to fail.
 
 Then run it alone (`--only <key> --keep`) and read `.mutants/<key>/vitest.log` if it is not what you expect. When
 the source is reformatted, a mutant whose `old` no longer matches is refused by name: rewrite its text from the file,

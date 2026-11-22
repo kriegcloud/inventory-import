@@ -1618,7 +1618,7 @@
       "file": "src/Review/Undoing.decision.ts",
       "anchors": ["Effect.fn(\"Undoing.decide\")"],
       "until": "    transitions: {",
-      "old": "      if (!isDecided(row.state) || row.state.by !== actor.memberId || row.state.change !== cmd.undo) {\n        return yield* new NotYourStep({})\n      }\n",
+      "old": "      if (!isDecided(row.state) || row.state.by !== actor.memberId || row.state.change !== cmd.undo) {\n        // The same undo sent again: the row took this very act already (this change, in this step, from this person),\n        // and it is written once. Its sender is answered as the first time, with nothing new, whatever was decided\n        // there since (2026-11-22, by the rule on a press from a screen that is behind).\n        if (\n          row.state.undone.change === cmd.undo &&\n          row.state.undone.step === cmd.step &&\n          row.state.undone.by === actor.memberId\n        ) {\n          return []\n        }\n        return yield* new NotYourStep({})\n      }\n",
       "new": "",
       "proof": "test/Undoing.prove.test.ts",
       "expect": "rule",
@@ -1629,6 +1629,22 @@
       "trialStories": [
         "Review: an undo that puts back another person's decision stops there",
         "Review: undos go down every level exactly as it was, and end at none"
+      ]
+    },
+    {
+      "key": "undo-resend",
+      "target": "UndoRowStep",
+      "kind": "check",
+      "file": "src/Review/Undoing.decision.ts",
+      "anchors": ["Effect.fn(\"Undoing.decide\")"],
+      "until": "    transitions: {",
+      "old": "        // The same undo sent again: the row took this very act already (this change, in this step, from this person),\n        // and it is written once. Its sender is answered as the first time, with nothing new, whatever was decided\n        // there since (2026-11-22, by the rule on a press from a screen that is behind).\n        if (\n          row.state.undone.change === cmd.undo &&\n          row.state.undone.step === cmd.step &&\n          row.state.undone.by === actor.memberId\n        ) {\n          return []\n        }\n",
+      "new": "",
+      "proof": "test/Undoing.prove.test.ts",
+      "expect": "story",
+      "trialRules": [],
+      "trialStories": [
+        "Review: an undo sent twice is written once and answered the same, whatever was decided there since: Ana leaves row 12 out, Dana keeps it and takes that back, and her screen sends the undo again"
       ]
     },
     {
@@ -2378,6 +2394,48 @@
       "expect": "rule",
       "trialRules": ["Unconfirmed WhatLiesUnderIsWhatWasRecorded"],
       "trialStories": ["Review: undos go down every level exactly as it was, and end at none"]
+    },
+    {
+      "key": "undo-stepundone-undo",
+      "target": "UndoRowStep",
+      "kind": "field",
+      "file": "src/Review/Undoing.decision.ts",
+      "anchors": ["Effect.fn(\"Undoing.decide\")", "new StepUndone({"],
+      "until": "\n",
+      "old": "undo: cmd.undo",
+      "new": "undo: cmd.undo + 1",
+      "proof": "test/Undoing.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated TheRowKeepsWhichChangeWasTakenBack"],
+      "trialStories": []
+    },
+    {
+      "key": "undo-stepundone-step",
+      "target": "UndoRowStep",
+      "kind": "field",
+      "file": "src/Review/Undoing.decision.ts",
+      "anchors": ["Effect.fn(\"Undoing.decide\")", "new StepUndone({"],
+      "until": "\n",
+      "old": "step: cmd.step",
+      "new": "step: cmd.row",
+      "proof": "test/Undoing.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated AndTheStepItWasPressedIn"],
+      "trialStories": []
+    },
+    {
+      "key": "undo-stepundone-by",
+      "target": "UndoRowStep",
+      "kind": "field",
+      "file": "src/Review/Undoing.decision.ts",
+      "anchors": ["Effect.fn(\"Undoing.decide\")", "new StepUndone({"],
+      "until": "\n",
+      "old": "by: actor.memberId",
+      "new": "by: actor.organizationId",
+      "proof": "test/Undoing.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated AndWhoPressed"],
+      "trialStories": []
     },
     {
       "key": "undo-actcounted-change",

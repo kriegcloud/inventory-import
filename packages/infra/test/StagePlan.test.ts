@@ -160,8 +160,9 @@ describe("the plan of a stage", () => {
           'PREVIEW_CLOUDFLARE_API_TOKEN="op://<vault>/<item>/<field>" and ' +
           'PREVIEW_CLOUDFLARE_ACCOUNT_ID="op://<vault>/<item>/<field>" in packages/infra/env/op.env.local (git ' +
           "ignores it) and deploy the stack again; it asks 1Password for both. If they are written there already, " +
-          "PREVIEW_CLOUDFLARE_API_TOKEN is exported empty in your shell or the root .env, and an empty one wins over " +
-          "1Password's answer: unset it."
+          "one of three things kept 1Password's answer out: CI is set in your shell (the stack then asks 1Password " +
+          "for nothing, as in a workflow: unset it), the 1Password field is empty, or PREVIEW_CLOUDFLARE_API_TOKEN is " +
+          "exported empty in your shell (an empty one is used before 1Password's answer: unset it)."
       )
     })
   })

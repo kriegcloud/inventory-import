@@ -263,7 +263,10 @@ export class Repo extends Context.Service<
                 ...(runOptions.stdin === undefined
                   ? {}
                   : { stdin: Stream.make(runOptions.stdin).pipe(Stream.encodeText) }),
-                ...(runOptions.env === undefined ? {} : { env: runOptions.env, extendEnv: true })
+                // Every tool is run to read what it says, so it says it without colour, in a terminal or on CI
+                // (where a tool colours its output because `CI` is set): a caller's own variables come after.
+                env: { NO_COLOR: "1", FORCE_COLOR: "0", ...runOptions.env },
+                extendEnv: true
               })
             )
             const [chunks, stderr, code] = yield* Effect.all(

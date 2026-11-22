@@ -195,6 +195,46 @@ describe("version-sync", () => {
       })
   )
 
+  it.effect(
+    "Node's types are for the Node that engines and the workflows name, or a person writes the newest of it",
+    () =>
+      Effect.gen(function* () {
+        const result = yield* run(
+          {
+            "package.json": json({
+              name: "root",
+              workspaces: ["packages/*"],
+              engines: { node: ">=22" },
+              devDependencies: { "@types/node": "^22.20.5" }
+            }),
+            ".github/workflows/ci.yml": workflow("24", "v4", ["          bun-version-file: .bun-version"]),
+            "packages/a/package.json": lines([
+              "{",
+              '  "name": "@x/a",',
+              '  "devDependencies": {',
+              '    "@types/node": "^24.19.2"',
+              "  }",
+              "}"
+            ])
+          },
+          ["packages/a/package.json"]
+        )
+        const problem =
+          "err:   packages/a/package.json: line 4: @types/node ^24.19.2 is not for Node 22, which `engines.node` and the workflows name: write the newest 22.x (`bun info @types/node@22 version`), then `bun install`"
+        expect(result.before).toEqual([
+          "err: version-sync FAIL  1 place differs from what it is derived from (`bun run version-sync -- --write` writes it); 1 problem needs a person, and no command repairs it",
+          "err:   .github/workflows/ci.yml:7  Node's version, from `engines.node` of the root's package.json: found 24, expected 22",
+          problem
+        ])
+        // The workflow is written; the types' version is the person's, since only the registry knows the newest 22.x.
+        expect(result.files["packages/a/package.json"]).toContain('"@types/node": "^24.19.2"')
+        expect(result.after).toEqual([
+          "err: version-sync FAIL  1 problem needs a person, and no command repairs it",
+          problem
+        ])
+      })
+  )
+
   it.effect("with a catalog at the root, the catalog is the source", () =>
     Effect.gen(function* () {
       const result = yield* run(

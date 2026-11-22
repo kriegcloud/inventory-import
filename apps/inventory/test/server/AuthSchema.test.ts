@@ -10,7 +10,10 @@ import { describe, expect, it } from "vitest"
 import { authOptions } from "@inventory/access-host/AuthOptions"
 
 // The migrations give Better Auth every table and column its configuration needs. Adding a plugin (or a field) to
-// the sign-in options (@inventory/access-host) without a migration fails here; `bun run auth:schema` prints the SQL to add.
+// the sign-in options (@inventory/access-host) without a migration fails here, and so does a new Better Auth that
+// wants a table or a column the migrations do not make: `better-auth` is held (`.syncpackrc.json`) and moved by hand,
+// and this is what says a move needs a migration. `bun run auth:schema` prints the SQL to add. In the loop check: an
+// in-memory SQLite database, a dummy secret, no network, half a second.
 
 const migrations = import.meta.glob<string>("../../migrations/*.sql", { query: "?raw", import: "default", eager: true })
 

@@ -7,4 +7,6 @@ export declare function reachableSources(input: {
   readonly root: string
   readonly alias: string
   readonly packages?: Readonly<Record<string, string>>
+  /** Files that are not followed: pages only a development build shows. */
+  readonly except?: ReadonlyArray<string>
 }): ReadonlyArray<string>

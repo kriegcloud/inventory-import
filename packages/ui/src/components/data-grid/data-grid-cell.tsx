@@ -11,12 +11,13 @@ import { flushSync } from "react-dom"
 import type { DataGridFeatures } from "@inventory/ui/components/data-grid/data-grid-features"
 import type { DataGridCellProps, StopEditingOptions } from "@inventory/ui/components/data-grid/data-grid-types"
 
-// Local change: `getHasCustomCell`, for `typesInPlace` below.
+// Local change: `getHasCustomCell` and `getIsEditableTarget`, for `typesInPlace` below.
 import {
   CELL_TINTS,
   getCellFocusTarget,
   getCellLayoutStyle,
-  getHasCustomCell
+  getHasCustomCell,
+  getIsEditableTarget
 } from "@inventory/ui/components/data-grid/data-grid-utils"
 
 interface DataGridCellElementProps<TData extends RowData>
@@ -59,7 +60,9 @@ export function DataGridCell<TData extends RowData>({
   // type the key that opens it. It is read from the column, not passed by the editor: a column with a variant and its
   // own `cell` is drawn by this wrapper alone until the person edits, and its editor mounts only then.
   const variant = cell.column.columnDef.meta?.variant ?? "text"
+  // A column that writes its own cell (`meta.writeCell`) opens no editor, so its key is prevented as upstream did.
   const typesInPlace =
+    !cell.column.columnDef.meta?.writeCell &&
     !getHasCustomCell(cell.column) &&
     (variant === "text" || variant === "number" || variant === "url" || variant === "long-text")
   const composedRef = useComposedRefs(ref, cellRef)
@@ -141,9 +144,20 @@ export function DataGridCell<TData extends RowData>({
         // Local change: the editor is opened and focused before this handler ends (in the cell with its value selected,
         // or, for long text, in its popover with the caret after the text), and the browser then types the key into it
         // (upstream prevented the key and typed it with the deprecated `document.execCommand`). So a sign or a decimal
-        // point that begins a number stays, a second key cannot overtake the first, and the browser's own undo holds it.
+        // point that begins a number stays, and a second key cannot overtake the first (`bun run grid:keys` in
+        // apps/inventory types on each editor and reads what is stored, its Escape and undo too).
         if (isPrintable && typesInPlace) {
           flushSync(() => cell.startEditing({ pendingChar: event.key }))
+          // Local change: the browser types the key only where the editor has the focus by now. Where it has not (a
+          // screen that keeps the editing state itself and applies it later, an editor that did not open), the key
+          // would go nowhere and the editor would open afterwards with its value selected, so the next key would
+          // replace the whole value. So the key is prevented and the editing is ended: the key does nothing, and
+          // nothing is stored that was not typed.
+          const active = document.activeElement
+          if (active === event.currentTarget || !getIsEditableTarget(active)) {
+            event.preventDefault()
+            cell.table.stopEditing()
+          }
           return
         }
         event.preventDefault()

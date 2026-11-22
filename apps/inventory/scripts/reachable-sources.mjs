@@ -28,9 +28,12 @@ const exported = (specifier, packages) => {
  * Every file under `root`, or inside one of the workspace `packages` (name to folder), reachable from `entry` by
  * static or dynamic imports, `@/` meaning `alias` and a package's specifier meaning the file its exact export names.
  * Other packages are left to their own stylesheets.
+ * A file named in `except` is not followed: a page that only a development build shows.
  */
 export function reachableSources(input) {
   const { entry, root, alias } = input
+  // Pages only a development build shows: their imports are not followed, so their classes stay out of the stylesheet.
+  const except = new Set((input.except ?? []).map((file) => resolve(file)))
   const packages = Object.fromEntries(Object.entries(input.packages ?? {}).map(([name, dir]) => [name, resolve(dir)]))
   const inside = (path) => path.startsWith(root) || Object.values(packages).some((dir) => path.startsWith(`${dir}/`))
   const seen = new Set()
@@ -52,7 +55,7 @@ export function reachableSources(input) {
         .map((ext) => `${local}${ext}`)
         .find((path) => existsSync(path) && statSync(path).isFile())
       if (found === undefined) throw new Error(`${relative(root, file)} imports "${specifier}", which was not found`)
-      if (inside(found)) pending.push(found)
+      if (inside(found) && !except.has(found)) pending.push(found)
     }
   }
   return [...seen].sort()

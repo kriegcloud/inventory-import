@@ -37,7 +37,7 @@ const row = (id: string): GridRow => ({
   longShown: "ab"
 })
 
-const rows = Atom.make<ReadonlyArray<GridRow>>(A.map(["r1", "r2", "r3"], row))
+const rows = Atom.make<ReadonlyArray<GridRow>>(A.map(["r1", "r2", "r3", "r4", "r5", "r6"], row))
 
 const col = createColumnHelper<DataGridFeatures, GridRow>()
 
@@ -89,7 +89,7 @@ export default function GridGallery() {
   return (
     <main className="flex flex-col gap-4 p-4">
       <h1 className="text-lg font-semibold">Data grid: typing on a cell</h1>
-      <DataGrid {...grid} table={table} height={240} />
+      <DataGrid {...grid} table={table} height={320} />
       <ul className="grid grid-cols-4 gap-1 font-mono text-xs">
         {A.flatMap(data, (each) =>
           A.map(

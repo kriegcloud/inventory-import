@@ -903,7 +903,7 @@ export function getIsEventOnScrollbar(event: React.MouseEvent<HTMLElement>): boo
 
 // Local change: selects the whole text and leaves the typing to the browser. Upstream's `replaceEditableText(element,
 // text)` typed it here, and its exported `execInsertText(text)`, which called the deprecated `document.execCommand`,
-// stood further down: both are removed.
+// stood further down (marked there): both are removed.
 export function selectEditableText(element: HTMLElement) {
   element.focus()
   const selection = window.getSelection()
@@ -994,6 +994,9 @@ function escapeAttributeValue(value: string) {
 
 // Local change: upstream's `dispatchInsertTextInput(element, text)` stood here, which told React of text its fallbacks
 // had put in. Nothing puts text in now (the browser types it), so it is removed.
+
+// Local change: upstream's exported `execInsertText(text)` stood here, the call of the deprecated
+// `document.execCommand("insertText", false, text)`. It is removed.
 
 const objectUrlsByStore = new WeakMap<object, Set<string>>()
 

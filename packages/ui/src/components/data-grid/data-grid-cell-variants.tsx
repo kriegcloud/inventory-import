@@ -19,6 +19,7 @@ import { useBadgeOverflow } from "@inventory/ui/components/data-grid/use-badge-o
 import { useDebouncedCallback } from "@inventory/ui/hooks/use-debounced-callback"
 import {
   createFileObjectUrl,
+  // Local change: upstream imported `execInsertText` here.
   formatDateForDisplay,
   formatDateToString,
   formatFileSize,
@@ -39,8 +40,8 @@ import {
   getUrlHref,
   // Local change: upstream also imported `insertTextAtSelection` here.
   moveCaretToEnd,
-  // Local change: `selectEditableText` is imported where upstream imported `execInsertText` and `replaceEditableText`.
   parseLocalDate,
+  // Local change: `selectEditableText` is imported where upstream imported `replaceEditableText`.
   selectEditableText
 } from "@inventory/ui/components/data-grid/data-grid-utils"
 import { DataGridCell, useCellValue } from "@inventory/ui/components/data-grid/data-grid-cell"

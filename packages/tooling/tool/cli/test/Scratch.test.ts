@@ -600,6 +600,19 @@ describe("scratch", () => {
     ])
   })
 
+  it("in a block comment only the last line is read for the one, and none for the other, as the compiler reads them", () => {
+    // A doc comment whose line starts with the name hides nothing: the compiler reports the next line's error.
+    expect(ignoredLines("Try.ts")(`/**\n * ${ignore} is what this wrapper replaces.\n */\ncount()\n`)).toEqual([])
+    expect(ignoredLines("Try.ts")(`/*\n * ${ignore}\n * and more */\ncount()\n`)).toEqual([])
+    // On the last line it hides the line after the comment, whatever stands above it.
+    expect(ignoredLines("Try.ts")(`/**\n * why\n * ${ignore} */\ncount()\n`)).toEqual([3])
+    expect(ignoredLines("Try.ts")(`/* a\n b */ /* ${ignore} */\ncount()\n`)).toEqual([2])
+    expect(ignoredLines("Try.ts")(`/* ${ignore} */ count()\ncount()\n`)).toEqual([1])
+    // The whole file's switch is read in a `//` comment only.
+    expect(uncheckedLines("Try.ts")(`/* ${noCheck} */\n/**\n * ${noCheck}\n */\n/*\n ${noCheck} */\n`)).toEqual([])
+    expect(uncheckedLines("Try.ts")(`/* a note */ // ${noCheck}\n`)).toEqual([1])
+  })
+
   it("the comments that silence a leaking requirement are found in any capitals, wherever they stand", () => {
     expect(leakingComments).toEqual(["@effect-leakable-service", "@effect-expect-leaking"])
     expect(

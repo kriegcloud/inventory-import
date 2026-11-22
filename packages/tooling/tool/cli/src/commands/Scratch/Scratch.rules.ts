@@ -416,12 +416,14 @@ export const commentsOf =
         )
   }
 
-// The lines on which a comment starts with a directive, as the compiler reads one: after the comment's marks and
-// spaces, on a `//` comment or on a line of a block comment. A sentence that only mentions it is no directive. In a
-// file the parser refuses nobody knows which lines are comments, so every line that names the directive is given: the
-// file has to be mended before it type-checks anyway, and a line that hides an error must not pass meanwhile.
+// The lines on which a comment starts with a directive, where the compiler reads one: after the comment's marks and
+// spaces, on a `//` comment, and for a directive it reads in a block comment too on that comment's last line, the
+// only one it looks at. A sentence that only mentions it is no directive, and neither is a line of a doc comment that
+// starts with it and is not the last. In a file the parser refuses nobody knows which lines are comments, so every
+// line that names the directive is given: the file has to be mended before it type-checks anyway, and a line that
+// hides an error must not pass meanwhile.
 const directiveLines =
-  (directive: string) =>
+  (directive: string, blocks: "last line" | "never") =>
   (path: string) =>
   (text: string): ReadonlyArray<number> => {
     const names = new RegExp(directive, "i")
@@ -431,11 +433,12 @@ const directiveLines =
       : O.match(commentsOf(path)(text), {
           onNone: () => A.flatMap(Str.split(lineEnd)(text), (row, index) => (names.test(row) ? [index + 1] : [])),
           onSome: (comments) =>
-            A.flatMap(comments, (comment) =>
-              A.flatMap(Str.split(lineEnd)(comment.text), (row, index) =>
-                starts.test(Str.trimStart(row)) ? [comment.line + index] : []
-              )
-            )
+            A.flatMap(comments, (comment) => {
+              const rows = Str.split(lineEnd)(comment.text)
+              const last = rows.length - 1
+              const read = blocks === "last line" || Str.startsWith("//")(comment.text)
+              return read && starts.test(Str.trimStart(rows[last] ?? "")) ? [comment.line + last] : []
+            })
         })
   }
 
@@ -450,18 +453,19 @@ export const noCheck = "@ts-nocheck"
 /**
  * The lines of a file where a comment starts with {@link noCheck}, numbered from 1, in any mix of capitals: the
  * compiler lower-cases the name before it looks it up, so `@TS-NoCheck` turns the checks off as well. The compiler
- * honours it only in a `//` comment before the code; the scratchpad refuses it at the start of any comment, so nobody
- * has to reason about which comment is the leading one. A string or a sentence that names it is left alone: the
- * compiler does not read those (asked of tsrs 7.1.0-beta, 2026-11-22). In a file the parser refuses, every line that
- * names it is given.
+ * honours it only in a `//` comment before the code; the scratchpad refuses it at the start of any `//` comment, so
+ * nobody has to reason about which comment is the leading one. A string, a sentence that names it or a block comment
+ * that holds it is left alone: the compiler does not read those (asked of tsrs 7.1.0-beta, 2026-11-22). In a file the
+ * parser refuses, every line that names it is given.
  *
  * @example
  * uncheckedLines("Try.ts")("// @ts-nocheck\nexport const count = 1\n") // [1]
  * uncheckedLines("Try.ts")('export const sample = "// @ts-nocheck"\n') // []
+ * uncheckedLines("Try.ts")("/* @ts-nocheck *\/\nexport const count = 1\n") // []
  *
  * @category rules
  */
-export const uncheckedLines = directiveLines(noCheck)
+export const uncheckedLines = directiveLines(noCheck, "never")
 
 /**
  * The comment that hides whatever type error the next line has, and goes on hiding it once the code is right. The
@@ -480,17 +484,21 @@ export const ignore = "@ts-ignore"
 export const expectError = "@ts-expect-error"
 
 /**
- * The lines of a file where a comment starts with {@link ignore}, numbered from 1, as for {@link noCheck}: a `//`
- * comment, one at the end of a line of code, or a line of a block comment. The compiler honours only the exact
- * capitals; the scratchpad refuses any, which costs nothing. The path says whether the file is read as JSX.
+ * The lines of a file where a comment starts with {@link ignore}, numbered from 1: a `//` comment, one at the end of
+ * a line of code, or the last line of a block comment, which is the only line of one the compiler reads for it. A
+ * line of a doc comment that starts with it and is not the last hides nothing, and is left alone (asked of tsrs
+ * 7.1.0-beta, 2026-11-22). The compiler honours only the exact capitals; the scratchpad refuses any, which costs
+ * nothing. The path says whether the file is read as JSX.
  *
  * @example
  * ignoredLines("Try.ts")("const count = 1\n// @ts-ignore\ncount()\n") // [2]
  * ignoredLines("Try.ts")("/** Replaces @ts-ignore with the other. *\/\n") // []
+ * ignoredLines("Try.ts")("/**\n * @ts-ignore is what this replaces.\n *\/\n") // []
+ * ignoredLines("Try.ts")("/*\n * why\n * @ts-ignore *\/\ncount()\n") // [3]
  *
  * @category rules
  */
-export const ignoredLines = directiveLines(ignore)
+export const ignoredLines = directiveLines(ignore, "last line")
 
 /** The part of a tsconfig file the scan reads. */
 const Included = S.Struct({ include: S.String.pipe(S.Array, S.optionalKey) })

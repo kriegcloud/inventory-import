@@ -315,11 +315,11 @@ export const versionSyncPlan = Effect.fn("VersionSync.plan")(function* () {
   }
   // The catalog: a dependency it names has its version there and nowhere else. One written as a version in a
   // package.json beside it would be installed as a second copy, and nothing that follows the catalog would say so.
+  const names = O.match(objectOf("catalog")(rootPackage.text), {
+    onNone: () => A.empty<string>(),
+    onSome: (catalog) => A.map(entriesOf(catalog)(rootPackage.text), ([name]) => name.value)
+  })
   const cataloguedPlan = (): Plan => {
-    const names = O.match(objectOf("catalog")(rootPackage.text), {
-      onNone: () => A.empty<string>(),
-      onSome: (catalog) => A.map(entriesOf(catalog)(rootPackage.text), ([name]) => name.value)
-    })
     const beside = A.flatMap(names, (name) =>
       A.map(
         A.filter(asked(name), (one) => one.block !== "catalog"),
@@ -343,8 +343,11 @@ export const versionSyncPlan = Effect.fn("VersionSync.plan")(function* () {
       )
     })
   }
+  // A version that follows another. For a name the catalog holds, only the catalog's own entry follows: a version
+  // written beside it is `cataloguedPlan`'s to name, once, with the one thing to write there.
   const following = (name: string, spec: string, what: string): Plan => {
-    const uses = asked(name)
+    const held = A.contains(names, name)
+    const uses = A.filter(asked(name), (one) => !held || one.block === "catalog")
     return Plan.make({
       checked: uses.length,
       problems: [],

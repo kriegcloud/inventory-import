@@ -59,8 +59,10 @@ the test's name says it was not run, and it was checked by hand.
   - any other `@effect-diagnostics` line, wherever it stands (the checker reads it in a string too);
   - `@effect-leakable-service` and `@effect-expect-leaking`, the two comments that silence the `leakingRequirements`
     diagnostic, in any mix of capitals, wherever they stand;
-  - a comment that starts with `@ts-nocheck` or `@ts-ignore`, in any mix of capitals. A string, a template, the text
-    of a JSX element or a sentence that only names one is left alone, as the compiler leaves it. `@ts-expect-error`
+  - a comment that starts with `@ts-nocheck` or `@ts-ignore`, in any mix of capitals, where the compiler reads one:
+    `@ts-ignore` in a `//` comment or on the last line of a block comment, `@ts-nocheck` in a `//` comment. A string,
+    a template, the text of a JSX element, a sentence that only names one, and a line of a doc comment that starts
+    with one and is not its last are left alone, as the compiler leaves them. `@ts-expect-error`
     is allowed: it is how an experiment shows that a wrong call does not compile, and it fails by itself once the
     error is gone, where `@ts-ignore` would go on hiding it. Which stretches of a file are comments is a parser's
     answer (oxc-parser, the one the repository's laws read code with), not a guess from the characters around a

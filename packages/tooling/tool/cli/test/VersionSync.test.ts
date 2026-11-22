@@ -328,6 +328,39 @@ describe("version-sync", () => {
   )
 
   it.effect(
+    "a catalogued package that follows `effect`, written as a version, is named once: `catalog:`, never the version too",
+    () =>
+      Effect.gen(function* () {
+        const result = yield* run(
+          {
+            "package.json": json({
+              name: "root",
+              workspaces: ["packages/*"],
+              catalog: { effect: "4.1.5", "@effect/vitest": "4.1.5" }
+            }),
+            "packages/a/package.json": json({
+              name: "@x/a",
+              dependencies: { effect: "catalog:" },
+              devDependencies: { "@effect/vitest": "4.1.4" }
+            })
+          },
+          ["package.json", "packages/a/package.json"]
+        )
+        expect(result.before).toEqual([
+          "err: version-sync FAIL  1 place differs from what it is derived from (`bun run version-sync -- --write` writes it)",
+          "err:   packages/a/package.json:1  `@effect/vitest`, which the catalog of the root's package.json holds (then `bun install`): found 4.1.4, expected catalog:"
+        ])
+        expect(result.files["packages/a/package.json"]).toEqual(
+          json({
+            name: "@x/a",
+            dependencies: { effect: "catalog:" },
+            devDependencies: { "@effect/vitest": "catalog:" }
+          })
+        )
+      })
+  )
+
+  it.effect(
     "a version written beside the catalog is a place that differs: the catalog holds it, so it says `catalog:`",
     () =>
       Effect.gen(function* () {

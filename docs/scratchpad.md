@@ -55,8 +55,10 @@ the test's name says it was not run, and it was checked by hand.
 - **On, in `scratch:check`:** the type-checker with the repository's whole Effect profile (`tsconfig.base.json`, nothing
   turned off). What it says of an experiment is what it would say of a package. A file may turn one diagnostic off
   only as decision 33 of the Alchemy brief allows: `// @effect-diagnostics newSchemaClass:off` as the first line of a
-  `*.aggregate.ts` or `*.decision.ts`. `scratch:check` refuses any other `@effect-diagnostics` line, with its file and
-  line.
+  `*.aggregate.ts` or `*.decision.ts`. `scratch:check` refuses any other `@effect-diagnostics` line, and any
+  `@ts-nocheck`, with its file and line, in every code file of the scratchpad the type-checker can read: the
+  experiments, a file loose beside them or in a `dist` folder, and the scratchpad's own configuration (all but
+  `node_modules` and a folder whose name starts with a dot, such as `.state`).
 - **Not enforced inside:** the laws on how code is written (no `_tag` told apart by hand, the form of an Effect
   import, a ref that stays the same across draws) and the linter. Each of those laws names the scratchpad as left
   out. They apply the moment code graduates into a package, so write an experiment the way a package is written when

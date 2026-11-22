@@ -33,41 +33,22 @@ didn't": a messy file in, what is wrong fixed in the app, a clear account of the
     same SKU.
   - **A review that saves as you decide, open in two tabs or by two people.** Each of these needs two tabs, two people
     or a lost connection; one person in one tab with a connection meets none of them.
-    - On a phone, a line above the review (a confirm held back, rows not saved, a take-back) pushes Import below the
-      edge of a page that does not scroll. The person dismisses the lines to reach it; a held confirm cannot be sent
-      again from there.
-    - A row waiting to be saved again can be sent over a colleague's newer decision of that row without asking, in
-      three cases: it was decided twice while its first save was on its way and the second save failed; it was
-      compared with the server while another save was on its way; "Suggest fixes" was pressed while it waited.
-    - A "from your other tab" line does not follow what the server holds. Picking a side can replace a colleague's
-      newer decision the line never showed, and Import goes through while the line still asks.
-    - A decision from a tab since closed, held beside this tab's own, is not named when someone else confirms the
-      import or it is closed; when the row already has a line, it is named once in a toast and then gone.
-    - An Undo or "Put row back" pressed while a save was on its way is lost when that save's answer takes back the
-      rest of the row: the server keeps what the person took back.
-    - After a switch of organization the browser no longer asks before the page is left, though rows of the other
-      organization still wait in this tab. They are kept in this browser.
-    - After an import is closed and opened again in the same page, a late answer to an earlier save can be taken for
-      the answer to a newer one.
     - A waiting row is held as "decided since by someone else or another tab" when nobody decided it (a column matched
       again took part of it back, or a colleague put the row back), and it holds Import until the person picks.
-    - A confirm held because a colleague decided a row says the row has "a decision from your other tab beside this
-      tab's own".
-    - Each held row is one line and one press, with no press for all of them, and Import waits for every one. A
-      screen reader is read the whole list again after each press.
-    - This tab's waiting decision can be held by a closed tab's "Not saved" line whose only button is Dismiss; the
-      screen says it will be sent again, and Import asks for a pick that is not offered.
-    - The toast's "Save again" does nothing unless the person is on that import's Review or Result step.
-    - An accept made just after a column was matched again, on a row still being saved, can be taken back with a toast
-      saying the column was matched again after the accept. Accepting again works.
-    - The take-back line says a field "was matched again" and "to decide again" also when its column was cleared or
-      went to another field, after the rows were decided again, and to people who cannot decide.
+    - A row she left out, whose save reached the server but whose answer was lost, is sent again by "Save again"
+      over a colleague who put the row back meanwhile, without asking: the server keeps no record of a row put back.
+    - An accept unticked and ticked again after a colleague matched its column again, while the first save was on
+      its way, is dropped without a word; the take-back line names the row.
+    - On a line for a decision of this tab the server refused, beside a closed tab's other decision, "Keep this
+      tab's" keeps nothing: it drops the closed tab's decision and leaves only Dismiss.
+    - A save still on its way when the page is reloaded can land after a newer decision of the same row made on the
+      new page, and replace it without a word.
+    - Import, while rows wait on lines, first asks "Import 155 items?", and only after that says nothing was imported
+      because the rows wait.
   - **For whoever changes the code.** `tags:check` and `refs:check` read a file within a budget and refuse one past
     it in words; a file built to kill the parser behind text their scan misreads still kills the check, which then
     fails (`goals/atoms/PLAN.md` names the shapes). The kept form of a held row is a tagged union whose cases are
-    still built by hand. The property test of the draft generates no take-back, empty decision, settled line,
-    taken-up row or sign-out. Nothing fails when the held-confirm line is removed, and three tests of a save while
-    the session is asked again keep a person signed in, which the app does not.
+    still built by hand. Nothing fails when the held-confirm line is removed.
 - **Not verified:** how good the model help is on other files, and what it costs; the dark theme on the new screens;
   a restore after several confirms of one import replaced the same item in turn.
 - **Where my agent was wrong:** its profile missed rows 92 and 103 ("2024-13-01"), caught by the rules on the real

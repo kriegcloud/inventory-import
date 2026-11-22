@@ -20,7 +20,7 @@ import { decisionFromFlags, type SavedDecisions, type SaveRequest } from "@inven
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import type { ImportView } from "@inventory/catalog-contract/Import"
 import { ImportNotFound } from "@inventory/catalog-contract/ImportRejection"
-import { Hold } from "../src/Draft.machine.ts"
+import * as Order from "effect/Order"
 import { noticeWords } from "../src/internal/notices.ts"
 
 // The browser: storage every tab shares, the storage of the tab being loaded, the locks, the leave question, and the
@@ -229,7 +229,13 @@ const tab = (own: Record<string, string> = {}, signedIn: O.Option<Member> = dana
         },
         decide: (id: ImportId, rowId: string, to = out) =>
           registry.set(review.draftEvents(id), machine.DraftEvent.Decided({ changes: { [rowId]: O.some(to) } })),
-        onHold: (id: ImportId) => registry.get(review.rowsOnHold(id)),
+        /** The lines above the review, each row's: its sides, as decision and whether this tab's, and theirs. */
+        lines: (id: ImportId) =>
+          R.map(registry.get(review.reviewLines(id)), (line) => ({
+            sides: A.map(line.sides, (side) => [side.decision, side.here] as const),
+            going: line.going,
+            theirs: line.theirs
+          })),
         /** What this tab says of unsaved decisions, as the person reads it; and the first of it dismissed. */
         says: () => A.map(registry.get(noticed.notices), (one) => noticeWords(one).text),
         dismiss: () => registry.set(noticed.dismissNotice, registry.get(noticed.notices)[0]!),
@@ -343,7 +349,7 @@ describe("two tabs of one person", () => {
   )
 
   it.live(
-    "rows taken up from a tab that is gone are held, not sent, where someone decided them otherwise since (takenup-sends-without-g2)",
+    "rows taken up from a tab that is gone, that the picture shows somebody decided since, are on a line with theirs and not sent while it asks",
     () =>
       Effect.gen(function* () {
         freshServer()
@@ -363,40 +369,38 @@ describe("two tabs of one person", () => {
         later.open(id)
         yield* settle
         expect(later.saves).toEqual([])
-        expect(later.onHold(id)).toEqual({
-          "row-5": { mine: O.some(out), madeOn: 4, why: Hold.Elsewhere({ theirs: O.some(kept) }), closed: [] }
+        expect(later.lines(id)).toEqual({
+          "row-5": { sides: [[O.some(out), false]], going: O.none(), theirs: O.some(O.some(kept)) }
         })
       })
   )
 
-  it.live(
-    "two tabs that open the import together never both take up a gone tab's entry (two-tabs-take-up-same-orphan)",
-    () =>
-      Effect.gen(function* () {
-        freshServer()
-        const id = "00000000-0000-4000-8000-0000000000a5" as ImportId
-        const gone = yield* tab()
-        yield* settle
-        gone.open(id)
-        yield* settle
-        gone.decide(id, "row-2")
-        yield* settle
-        gone.close()
-        const one = yield* tab()
-        const other = yield* tab()
-        yield* settle
-        // Opened at the same moment, before either has done anything with what it found.
-        one.open(id)
-        other.open(id)
-        yield* settle
-        // The row is in one tab's entry, and sent once.
-        const holding = A.filter(R.values(entriesOf(id)), (text) => Str.includes('"row-2"')(text))
-        expect([A.length(holding), A.length(one.saves) + A.length(other.saves)]).toEqual([1, 1])
-      })
+  it.live("two tabs that open the import together never both take up a gone tab's entry", () =>
+    Effect.gen(function* () {
+      freshServer()
+      const id = "00000000-0000-4000-8000-0000000000a5" as ImportId
+      const gone = yield* tab()
+      yield* settle
+      gone.open(id)
+      yield* settle
+      gone.decide(id, "row-2")
+      yield* settle
+      gone.close()
+      const one = yield* tab()
+      const other = yield* tab()
+      yield* settle
+      // Opened at the same moment, before either has done anything with what it found.
+      one.open(id)
+      other.open(id)
+      yield* settle
+      // The row is in one tab's entry, and sent once.
+      const holding = A.filter(R.values(entriesOf(id)), (text) => Str.includes('"row-2"')(text))
+      expect([A.length(holding), A.length(one.saves) + A.length(other.saves)]).toEqual([1, 1])
+    })
   )
 
   it.live(
-    "a row this tab decided otherwise than a tab that is gone is held, both said; it is never dropped unnamed (takeup-drops-gone-tab-decision-unnamed)",
+    "a row this tab decided otherwise than a tab that is gone is one line with both sides; it is never dropped unnamed",
     () =>
       Effect.gen(function* () {
         freshServer()
@@ -419,44 +423,38 @@ describe("two tabs of one person", () => {
         yield* settle
         second.open(id)
         yield* settle
-        expect(second.onHold(id)).toEqual({
-          "row-12": {
-            mine: O.some(kept),
-            madeOn: 4,
-            why: Hold.OtherTab(),
-            closed: [{ decision: O.some(out), madeOn: 4, seen: O.some([O.none(), O.some(out)]), refused: O.none() }]
-          }
+        // This tab's decision is on its way (the server has not answered): the line has the closed tab's beside it.
+        expect(second.lines(id)).toEqual({
+          "row-12": { sides: [[O.some(out), false]], going: O.some(O.some(kept)), theirs: O.none() }
         })
-        // Kept in this tab's entry, with its own row, until the person picks.
+        // Kept in this tab's entry as that line, until the person picks.
         const own = A.filter(R.toEntries(entriesOf(id)), ([key]) => Str.endsWith(second.id)(key))
-        expect(A.map(own, ([, text]) => Str.includes("othertab")(text))).toEqual([true])
+        expect(A.map(own, ([, text]) => Str.includes('"lines":{"row-12":{"sides"')(text))).toEqual([true])
       })
   )
 
-  it.live(
-    "a gone tab's rows for an import confirmed since are named on the result, never erased unnamed (takenup-into-ended-draft-dropped)",
-    () =>
-      Effect.gen(function* () {
-        freshServer()
-        const id = "00000000-0000-4000-8000-0000000000a7" as ImportId
-        const gone = yield* tab()
-        yield* settle
-        gone.open(id)
-        yield* settle
-        gone.decide(id, "row-7")
-        yield* settle
-        gone.close()
-        // Somebody confirmed the import without row 7.
-        browser.server.revision = 5
-        browser.closed = true
-        const result = yield* tab()
-        yield* settle
-        result.open(id)
-        yield* settle
-        expect(result.registry.get(result.review.rowsLeftOver(id))).toEqual(
-          O.some({ rows: { "row-7": O.some(out) }, beside: {} })
-        )
-      })
+  it.live("a gone tab's rows for an import confirmed since are named on the result, never erased unnamed", () =>
+    Effect.gen(function* () {
+      freshServer()
+      const id = "00000000-0000-4000-8000-0000000000a7" as ImportId
+      const gone = yield* tab()
+      yield* settle
+      gone.open(id)
+      yield* settle
+      gone.decide(id, "row-7")
+      yield* settle
+      gone.close()
+      // Somebody confirmed the import without row 7.
+      browser.server.revision = 5
+      browser.closed = true
+      const result = yield* tab()
+      yield* settle
+      result.open(id)
+      yield* settle
+      expect(result.registry.get(result.review.rowsLeftOver(id))).toEqual(
+        O.some({ rows: { "row-7": O.some(out) }, beside: {}, theirs: {} })
+      )
+    })
   )
 
   it.live("a copy of an open tab (its storage copied, the id with it) takes an id of its own", () =>
@@ -469,55 +467,51 @@ describe("two tabs of one person", () => {
     })
   )
 
-  it.live(
-    "a copy of an open tab asks nothing before leaving for the rows the original keeps (copied-tab-and-removed-import-leave-question)",
-    () =>
-      Effect.gen(function* () {
-        freshServer()
-        const id = "00000000-0000-4000-8000-0000000000a8" as ImportId
-        const first = yield* tab()
-        yield* settle
-        first.open(id)
-        yield* settle
-        first.decide(id, "row-2")
-        yield* settle
-        browser.listeners["beforeunload"] = []
-        const copy = yield* tab({ ...first.session })
-        // The copy counts its rows as the page starts, before its lock has answered.
-        expect(copy.asks()).toBe(false)
-        yield* settle
-        expect(copy.asks()).toBe(false)
-      })
+  it.live("a copy of an open tab asks nothing before leaving for the rows the original keeps", () =>
+    Effect.gen(function* () {
+      freshServer()
+      const id = "00000000-0000-4000-8000-0000000000a8" as ImportId
+      const first = yield* tab()
+      yield* settle
+      first.open(id)
+      yield* settle
+      first.decide(id, "row-2")
+      yield* settle
+      browser.listeners["beforeunload"] = []
+      const copy = yield* tab({ ...first.session })
+      // The copy counts its rows as the page starts, before its lock has answered.
+      expect(copy.asks()).toBe(false)
+      yield* settle
+      expect(copy.asks()).toBe(false)
+    })
   )
 
-  it.live(
-    "a tab on the sign-in page still holds its lock: nobody takes up its rows (signed-out-tab-counts-as-gone)",
-    () =>
-      Effect.gen(function* () {
-        freshServer()
-        const id = "00000000-0000-4000-8000-0000000000a9" as ImportId
-        const first = yield* tab()
-        yield* settle
-        first.open(id)
-        yield* settle
-        first.decide(id, "row-2")
-        yield* settle
-        // Signed out: the tab loads the sign-in page, the same tab, and nobody is signed in there.
-        first.close()
-        const signInPage = yield* tab(first.session, O.none())
-        yield* settle
-        const other = yield* tab()
-        yield* settle
-        other.open(id)
-        yield* settle
-        expect([signInPage.id, other.saves]).toEqual([first.id, []])
-      })
+  it.live("a tab on the sign-in page still holds its lock: nobody takes up its rows", () =>
+    Effect.gen(function* () {
+      freshServer()
+      const id = "00000000-0000-4000-8000-0000000000a9" as ImportId
+      const first = yield* tab()
+      yield* settle
+      first.open(id)
+      yield* settle
+      first.decide(id, "row-2")
+      yield* settle
+      // Signed out: the tab loads the sign-in page, the same tab, and nobody is signed in there.
+      first.close()
+      const signInPage = yield* tab(first.session, O.none())
+      yield* settle
+      const other = yield* tab()
+      yield* settle
+      other.open(id)
+      yield* settle
+      expect([signInPage.id, other.saves]).toEqual([first.id, []])
+    })
   )
 })
 
 describe("a tab taken up from that comes back", () => {
   it.live(
-    "and is gone again is taken up again, by the page that took it up before: the claim is let go once the take-up is done (claim-held-for-page-life)",
+    "and is gone again is taken up again, by the page that took it up before: the claim is let go once the take-up is done",
     () =>
       Effect.gen(function* () {
         freshServer()
@@ -571,11 +565,11 @@ const held = (answer: Deferred.Deferred<void>): Promise<void> => answer.pipe(Def
 
 /** What a tab says when it loads and finds its waiting rows 12 and 31 taken up. */
 const taken12And31 =
-  "Row 12, row 31 of items_messy.csv: another tab of yours has your decisions now, and this tab no longer sends them."
+  "Row 12, row 31 of items_messy.csv: another tab of yours has your decisions now, and this tab no longer does."
 
 describe("a tab the browser discarded (or had not loaded yet), taken up from, that loads again", () => {
   it.live(
-    "says so, naming the import and the rows, until dismissed; restores and sends none of them; and nobody else is told (taken-tab-says-so)",
+    "says so, naming the import and the rows, until dismissed; restores and sends none of them; and nobody else is told",
     () =>
       Effect.gen(function* () {
         freshServer()
@@ -594,7 +588,13 @@ describe("a tab the browser discarded (or had not loaded yet), taken up from, th
         taker.open(id)
         yield* settle
         // The tab that took them up sends them, and says nothing of it.
-        expect([A.flatMap(taker.saves, (save) => R.keys(save.set)), taker.says()]).toEqual([["row-31", "row-12"], []])
+        expect([
+          A.sort(
+            A.flatMap(taker.saves, (save) => R.keys(save.set)),
+            Order.String
+          ),
+          taker.says()
+        ]).toEqual([["row-12", "row-31"], []])
         yield* Effect.sleep("600 millis")
         // Marcus signs in on the discarded tab first: Dana's rows are not his to be told of.
         const asMarcus = yield* tab(session, marcus)
@@ -608,7 +608,7 @@ describe("a tab the browser discarded (or had not loaded yet), taken up from, th
         back.open(id)
         yield* settle
         const own = A.filter(R.keys(entriesOf(id)), (key) => Str.endsWith(back.id)(key))
-        expect([back.saves, back.onHold(id), back.registry.get(back.review.rowsNotSaved(id)), own]).toEqual([
+        expect([back.saves, back.lines(id), back.registry.get(back.review.rowsNotSaved(id)), own]).toEqual([
           [],
           {},
           0,
@@ -630,7 +630,7 @@ describe("a tab the browser discarded (or had not loaded yet), taken up from, th
   )
 
   it.live(
-    "loading while the other tab is in the middle of taking its rows up: one of the two sends them, never both (discarded-tab-loads-mid-claim)",
+    "loading while the other tab is in the middle of taking its rows up: one of the two sends them, never both",
     () =>
       Effect.gen(function* () {
         freshServer()
@@ -664,7 +664,7 @@ describe("a tab the browser discarded (or had not loaded yet), taken up from, th
           1,
           discarded.id,
           0,
-          ["Row 2 of items_messy.csv: another tab of yours has your decision now, and this tab no longer sends it."]
+          ["Row 2 of items_messy.csv: another tab of yours has your decision now, and this tab no longer does."]
         ])
         const holding = A.filter(R.values(entriesOf(id)), (text) => Str.includes('"row-2"')(text))
         expect(A.length(holding)).toBe(1)
@@ -672,7 +672,7 @@ describe("a tab the browser discarded (or had not loaded yet), taken up from, th
   )
 
   it.live(
-    "loaded before the other tab looked: it is open, nothing is taken from it, and it sends its rows itself (loaded-before-the-look)",
+    "loaded before the other tab looked: it is open, nothing is taken from it, and it sends its rows itself",
     () =>
       Effect.gen(function* () {
         freshServer()
@@ -696,84 +696,80 @@ describe("a tab the browser discarded (or had not loaded yet), taken up from, th
       })
   )
 
-  it.live(
-    "never coming back: the records left for such tabs are bounded, by how many and by age (taken-records-bounded)",
-    () =>
-      Effect.gen(function* () {
-        freshServer()
-        for (const key of R.keys(browser.kept)) delete browser.kept[key]
-        const record = (n: string) => `progress:v1:org_prairie:mem_dana:notices%3A${n}`
-        const left = (at: number) => `[{"_tag":"TakenUp","importId":"i","fileName":null,"rows":["row-1"],"at":${at}}]`
-        const now = DateTime.toEpochMillis(DateTime.nowUnsafe())
-        const day = 24 * 60 * 60 * 1000
-        // Thirty tabs taken up from within the month, one longer ago than that, and one of another member's.
-        for (const n of A.range(1, 30)) browser.kept[record(`tab-${n}`)] = left(now - n * 60_000)
-        browser.kept[record("old")] = left(now - 31 * day)
-        browser.kept["progress:v1:org_prairie:mem_marcus:notices%3Atheirs"] = left(now - 31 * day)
-        const id = "00000000-0000-4000-8000-0000000000d4" as ImportId
-        const gone = yield* tab()
-        yield* settle
-        gone.open(id)
-        yield* settle
-        gone.decide(id, "row-2")
-        yield* settle
-        gone.close()
-        const taker = yield* tab()
-        yield* settle
-        taker.open(id)
-        yield* settle
-        const ofDana = A.filter(R.keys(browser.kept), Str.startsWith(record("")))
-        // The newest twenty: the one just left, and the nineteen before it. Nothing of another member's is touched.
-        expect([
-          A.length(ofDana),
-          A.contains(ofDana, record(gone.id)),
-          A.contains(ofDana, record("tab-19")),
-          A.contains(ofDana, record("tab-20")),
-          A.contains(ofDana, record("old")),
-          R.has(browser.kept, "progress:v1:org_prairie:mem_marcus:notices%3Atheirs")
-        ]).toEqual([20, true, true, false, false, true])
-        // Fewer than twenty: one from longer ago than a month still goes when the next is left.
-        for (const n of A.range(1, 30)) delete browser.kept[record(`tab-${n}`)]
-        browser.kept[record("old")] = left(now - 31 * day)
-        taker.decide(id, "row-5")
-        yield* settle
-        taker.close()
-        const next = yield* tab()
-        yield* settle
-        next.open(id)
-        yield* settle
-        const few = A.filter(R.keys(browser.kept), Str.startsWith(record("")))
-        expect(A.sort(few, Str.Order)).toEqual(A.sort([record(gone.id), record(taker.id)], Str.Order))
-      })
+  it.live("never coming back: the records left for such tabs are bounded, by how many and by age", () =>
+    Effect.gen(function* () {
+      freshServer()
+      for (const key of R.keys(browser.kept)) delete browser.kept[key]
+      const record = (n: string) => `progress:v1:org_prairie:mem_dana:notices%3A${n}`
+      const left = (at: number) => `[{"_tag":"TakenUp","importId":"i","fileName":null,"rows":["row-1"],"at":${at}}]`
+      const now = DateTime.toEpochMillis(DateTime.nowUnsafe())
+      const day = 24 * 60 * 60 * 1000
+      // Thirty tabs taken up from within the month, one longer ago than that, and one of another member's.
+      for (const n of A.range(1, 30)) browser.kept[record(`tab-${n}`)] = left(now - n * 60_000)
+      browser.kept[record("old")] = left(now - 31 * day)
+      browser.kept["progress:v1:org_prairie:mem_marcus:notices%3Atheirs"] = left(now - 31 * day)
+      const id = "00000000-0000-4000-8000-0000000000d4" as ImportId
+      const gone = yield* tab()
+      yield* settle
+      gone.open(id)
+      yield* settle
+      gone.decide(id, "row-2")
+      yield* settle
+      gone.close()
+      const taker = yield* tab()
+      yield* settle
+      taker.open(id)
+      yield* settle
+      const ofDana = A.filter(R.keys(browser.kept), Str.startsWith(record("")))
+      // The newest twenty: the one just left, and the nineteen before it. Nothing of another member's is touched.
+      expect([
+        A.length(ofDana),
+        A.contains(ofDana, record(gone.id)),
+        A.contains(ofDana, record("tab-19")),
+        A.contains(ofDana, record("tab-20")),
+        A.contains(ofDana, record("old")),
+        R.has(browser.kept, "progress:v1:org_prairie:mem_marcus:notices%3Atheirs")
+      ]).toEqual([20, true, true, false, false, true])
+      // Fewer than twenty: one from longer ago than a month still goes when the next is left.
+      for (const n of A.range(1, 30)) delete browser.kept[record(`tab-${n}`)]
+      browser.kept[record("old")] = left(now - 31 * day)
+      taker.decide(id, "row-5")
+      yield* settle
+      taker.close()
+      const next = yield* tab()
+      yield* settle
+      next.open(id)
+      yield* settle
+      const few = A.filter(R.keys(browser.kept), Str.startsWith(record("")))
+      expect(A.sort(few, Str.Order)).toEqual(A.sort([record(gone.id), record(taker.id)], Str.Order))
+    })
   )
 })
 
 describe("a step drawn before this tab's id is its own", () => {
-  it.live(
-    "reads the rows the tab kept before a reload once its id is, and writes nothing over them before (opened-before-tab)",
-    () =>
-      Effect.gen(function* () {
-        freshServer()
-        const id = "00000000-0000-4000-8000-0000000000c2" as ImportId
-        const before = yield* tab()
-        yield* settle
-        before.open(id)
-        yield* settle
-        before.decide(id, "row-2")
-        yield* settle
-        before.close()
-        // The reload draws the step at once, before the tab's lock has answered.
-        const after = yield* tab(before.session)
-        after.open(id)
-        yield* settle
-        // The row kept came back, was checked by an answer of the import, and was sent.
-        expect(A.map(after.saves, (save) => R.keys(save.set))).toEqual([["row-2"]])
-        const own = A.filter(R.toEntries(entriesOf(id)), ([key]) => Str.endsWith(after.id)(key))
-        expect(A.map(own, ([, text]) => Str.includes('"row-2"')(text))).toEqual([true])
-      })
+  it.live("reads the rows the tab kept before a reload once its id is, and writes nothing over them before", () =>
+    Effect.gen(function* () {
+      freshServer()
+      const id = "00000000-0000-4000-8000-0000000000c2" as ImportId
+      const before = yield* tab()
+      yield* settle
+      before.open(id)
+      yield* settle
+      before.decide(id, "row-2")
+      yield* settle
+      before.close()
+      // The reload draws the step at once, before the tab's lock has answered.
+      const after = yield* tab(before.session)
+      after.open(id)
+      yield* settle
+      // The row kept came back, was checked by an answer of the import, and was sent.
+      expect(A.map(after.saves, (save) => R.keys(save.set))).toEqual([["row-2"]])
+      const own = A.filter(R.toEntries(entriesOf(id)), ([key]) => Str.endsWith(after.id)(key))
+      expect(A.map(own, ([, text]) => Str.includes('"row-2"')(text))).toEqual([true])
+    })
   )
 
-  it.live("keeps a row decided meanwhile as soon as its id is (decided-before-tab)", () =>
+  it.live("keeps a row decided meanwhile as soon as its id is", () =>
     Effect.gen(function* () {
       freshServer()
       const id = "00000000-0000-4000-8000-0000000000c3" as ImportId
@@ -796,75 +792,71 @@ describe("a step drawn before this tab's id is its own", () => {
 })
 
 describe("an import removed", () => {
-  it.live(
-    "takes with it the rows a tab that is gone kept for it, and leaves a tab still open its own (two-of-49-partly-open)",
-    () =>
-      Effect.gen(function* () {
-        freshServer()
-        const id = "00000000-0000-4000-8000-0000000000b1" as ImportId
-        const gone = yield* tab()
-        yield* settle
-        gone.open(id)
-        yield* settle
-        gone.decide(id, "row-2")
-        yield* settle
-        // Another tab has its own row of the import, opened while the first was still open (it took nothing up).
-        const open = yield* tab()
-        yield* settle
-        open.open(id)
-        yield* settle
-        open.decide(id, "row-3")
-        yield* settle
-        const goneId = gone.id
-        gone.close()
-        // A third tab removes the import before taking anything up.
-        const remover = yield* tab()
-        yield* settle
-        remover.remove(id)
-        yield* settle
-        expect(A.map(R.keys(entriesOf(id)), (key) => [Str.endsWith(goneId)(key), Str.endsWith(open.id)(key)])).toEqual([
-          [false, true]
-        ])
-      })
+  it.live("takes with it the rows a tab that is gone kept for it, and leaves a tab still open its own", () =>
+    Effect.gen(function* () {
+      freshServer()
+      const id = "00000000-0000-4000-8000-0000000000b1" as ImportId
+      const gone = yield* tab()
+      yield* settle
+      gone.open(id)
+      yield* settle
+      gone.decide(id, "row-2")
+      yield* settle
+      // Another tab has its own row of the import, opened while the first was still open (it took nothing up).
+      const open = yield* tab()
+      yield* settle
+      open.open(id)
+      yield* settle
+      open.decide(id, "row-3")
+      yield* settle
+      const goneId = gone.id
+      gone.close()
+      // A third tab removes the import before taking anything up.
+      const remover = yield* tab()
+      yield* settle
+      remover.remove(id)
+      yield* settle
+      expect(A.map(R.keys(entriesOf(id)), (key) => [Str.endsWith(goneId)(key), Str.endsWith(open.id)(key)])).toEqual([
+        [false, true]
+      ])
+    })
   )
 
-  it.live(
-    "found gone by a tab still open: its rows and those of her closed tabs are named there, and let go (removed-names-closed-tabs)",
-    () =>
-      Effect.gen(function* () {
-        freshServer()
-        const id = "00000000-0000-4000-8000-0000000000b2" as ImportId
-        const open = yield* tab()
-        yield* settle
-        open.open(id)
-        yield* settle
-        open.decide(id, "row-3")
-        yield* settle
-        // Another tab opened meanwhile decides row 12 otherwise than nobody, and row 3 otherwise; then it is closed.
-        const closed = yield* tab()
-        yield* settle
-        closed.open(id)
-        yield* settle
-        closed.decide(id, "row-12")
-        closed.decide(id, "row-3", kept)
-        yield* settle
-        closed.close()
-        // A colleague removes the import.
-        browser.server.removed = true
-        open.readsAgain(id)
-        yield* settle
-        expect([open.says(), R.keys(entriesOf(id))]).toEqual([
-          [
-            "Your decisions on it that were not saved went with it. Row 3: you left out; Row 3: you kept over the other row with its SKU, in another tab of yours; Row 12: you left out."
-          ],
-          []
-        ])
-      })
+  it.live("found gone by a tab still open: its rows and those of her closed tabs are named there, and let go", () =>
+    Effect.gen(function* () {
+      freshServer()
+      const id = "00000000-0000-4000-8000-0000000000b2" as ImportId
+      const open = yield* tab()
+      yield* settle
+      open.open(id)
+      yield* settle
+      open.decide(id, "row-3")
+      yield* settle
+      // Another tab opened meanwhile decides row 12 otherwise than nobody, and row 3 otherwise; then it is closed.
+      const closed = yield* tab()
+      yield* settle
+      closed.open(id)
+      yield* settle
+      closed.decide(id, "row-12")
+      closed.decide(id, "row-3", kept)
+      yield* settle
+      closed.close()
+      // A colleague removes the import.
+      browser.server.removed = true
+      open.readsAgain(id)
+      yield* settle
+      expect([open.says(), R.keys(entriesOf(id))]).toEqual([
+        [
+          "Your decisions on it that were not saved went with it. Row 3: you left out; Row 3: you kept over the other row with its SKU, in another tab of yours; Row 12: you left out."
+        ],
+        []
+      ])
+    })
   )
 })
 
 describe("an import opened by its address and found removed", () => {
-  it.live("names what the person's closed tabs kept for it, and lets it go (removed-by-address)", () =>
+  it.live("names what the person's closed tabs kept for it, and lets it go", () =>
     Effect.gen(function* () {
       freshServer()
       const id = "00000000-0000-4000-8000-0000000000b3" as ImportId
@@ -889,21 +881,19 @@ describe("an import opened by its address and found removed", () => {
 })
 
 describe("one tab", () => {
-  it.live(
-    "keeps one id for its life: the leave question drawn afresh asks for no lock again (tab-id-changes-on-remount)",
-    () =>
-      Effect.gen(function* () {
-        const one = yield* tab()
-        yield* settle
-        const before = one.id
-        const stop = one.mountsAskAgain()
-        yield* settle
-        stop()
-        yield* settle
-        one.mountsAskAgain()
-        yield* settle
-        expect(one.id).toBe(before)
-      })
+  it.live("keeps one id for its life: the leave question drawn afresh asks for no lock again", () =>
+    Effect.gen(function* () {
+      const one = yield* tab()
+      yield* settle
+      const before = one.id
+      const stop = one.mountsAskAgain()
+      yield* settle
+      stop()
+      yield* settle
+      one.mountsAskAgain()
+      yield* settle
+      expect(one.id).toBe(before)
+    })
   )
 })
 

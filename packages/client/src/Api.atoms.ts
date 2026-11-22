@@ -15,6 +15,7 @@ import * as Eq from "effect/Equal"
 import * as Exit from "effect/Exit"
 import * as Fiber from "effect/Fiber"
 import { dual } from "effect/Function"
+import * as HashMap from "effect/HashMap"
 import * as Layer from "effect/Layer"
 import * as MutableHashMap from "effect/MutableHashMap"
 import * as O from "effect/Option"
@@ -182,6 +183,15 @@ const keepFor = (
   }
 }
 
+/** What a sign-out names, so each registry lets go of what it holds for the person (`givenHeld`). */
+const everyRead: Reactivity.KeysInput = ["every read held, for anyone"]
+
+/** A registry's hold on an answer given to a read nobody shows, and the read it holds. */
+interface GivenHold {
+  readonly beside: Atom.Atom<unknown>
+  readonly release: () => void
+}
+
 /** Every query's held reads, so a sign-out can let them all go at once. */
 const heldByQueries: Array<{ readonly forget: () => void; readonly members: () => ReadonlyArray<string> }> = []
 
@@ -191,6 +201,7 @@ const heldByQueries: Array<{ readonly forget: () => void; readonly members: () =
  * organization does not call this: the person's reads for the organization they left are kept for `keepUnwatched`.
  */
 export const forgetReads = (): void => {
+  invalidate(everyRead)
   for (const query of heldByQueries) query.forget()
 }
 
@@ -309,19 +320,28 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
     // previous organization's rows marked as waiting. Held with ordinary references, not `Atom.family`'s weak ones: a
     // collected one would be made anew on a return, empty (measured: after 35 s away).
     const reads = MutableHashMap.empty<string, PerMember<A, E>>()
-    // An answer given to a read nobody shows is held in the registry by this module, until the read takes it, is let
-    // go, or the person signs out. Each hold names the read it holds: a request of a read already let go that lands
-    // late lets go of its own hold only, never the one of the read made since for the same member.
-    const givenHeld = MutableHashMap.empty<
-      string,
-      { readonly beside: Atom.Atom<unknown>; readonly release: () => void }
-    >()
-    const letGiven = (member: string, of?: Atom.Atom<unknown>): void =>
-      O.match(MutableHashMap.get(givenHeld, member), {
+    // An answer given to a read nobody shows is held in its registry, by member, until the read takes it, is let go, or
+    // the person signs out. Each hold names the read it holds: a request of a read already let go that lands late lets
+    // go of its own hold only, never the one of the read made since for the same member.
+    const givenHeld: Atom.Writable<HashMap.HashMap<string, GivenHold>> = Atom.writable(
+      (get): HashMap.HashMap<string, GivenHold> => {
+        get.addFinalizer(
+          reactivity.registerUnsafe(everyRead, () => {
+            const held = get.registry.get(givenHeld)
+            get.registry.set(givenHeld, HashMap.empty())
+            HashMap.forEach(held, (hold) => hold.release())
+          })
+        )
+        return HashMap.empty()
+      },
+      (ctx, held: HashMap.HashMap<string, GivenHold>) => ctx.setSelf(held)
+    ).pipe(Atom.keepAlive)
+    const letGiven = (registry: AtomRegistry.AtomRegistry, member: string, of?: Atom.Atom<unknown>): void =>
+      O.match(HashMap.get(registry.get(givenHeld), member), {
         onNone: () => {},
         onSome: (hold) => {
           if (of !== undefined && hold.beside !== of) return
-          MutableHashMap.remove(givenHeld, member)
+          registry.update(givenHeld, HashMap.remove(member))
           hold.release()
         }
       })
@@ -335,7 +355,7 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
         const now = registry.get(beside)
         if (O.exists(now.given, (given) => given === taken)) {
           registry.set(beside, { ...now, given: O.none() })
-          letGiven(member, beside)
+          letGiven(registry, member, beside)
         }
       }
       /** Asks once more, unless a request already left since: one that left after what was learned includes it. */
@@ -454,7 +474,7 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
           if (registry.getNodes().has(entry.beside)) {
             registry.update(entry.beside, (now) => ({ ...now, given: O.none() }))
           }
-          letGiven(member, entry.beside)
+          letGiven(registry, member, entry.beside)
         })
       )
     }
@@ -462,8 +482,6 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
       forget: () => {
         MutableHashMap.forEach(kept, (keep) => keep.letGo())
         MutableHashMap.clear(kept)
-        MutableHashMap.forEach(givenHeld, (hold) => hold.release())
-        MutableHashMap.clear(givenHeld)
         MutableHashMap.clear(reads)
       },
       members: () => reads.pipe(MutableHashMap.keys, A.fromIterable)
@@ -495,9 +513,12 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
       (ctx, answer: A) => {
         const member = ctx.get(memberKey)
         const { beside } = forMember(member)
-        if (!O.exists(MutableHashMap.get(givenHeld, member), (hold) => hold.beside === beside)) {
-          letGiven(member)
-          MutableHashMap.set(givenHeld, member, { beside, release: ctx.get(registryOf).mount(beside) })
+        const registry = ctx.get(registryOf)
+        if (!O.exists(HashMap.get(registry.get(givenHeld), member), (hold) => hold.beside === beside)) {
+          letGiven(registry, member)
+          const release = registry.mount(beside)
+          const hold: GivenHold = { beside, release }
+          registry.update(givenHeld, HashMap.set(member, hold))
         }
         ctx.set(beside, { newer: ctx.get(beside).newer + 1, given: O.some({ answer, at: DateTime.nowUnsafe() }) })
       },
@@ -507,7 +528,7 @@ export const makeApiAtoms = <Id, Client>(tag: Context.Key<Id, Client>): ApiAtoms
       letGo: (registry: AtomRegistry.AtomRegistry) => {
         const member = registry.get(memberKey)
         stopKeeping(member)
-        letGiven(member)
+        letGiven(registry, member)
         MutableHashMap.remove(reads, member)
         // A screen that still shows it is not left on an answer nothing refreshes: it asks the server now.
         registry.update(letGoes, (count) => count + 1)

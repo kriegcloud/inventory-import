@@ -17,7 +17,12 @@ import { DisplayName } from "@inventory/kernel/Text"
 import { Action, act, saved } from "@inventory/review/ReviewDraft"
 import { ReviewRow } from "@inventory/review/ReviewTypes"
 import type { ReviewState } from "@inventory/review/ReviewTypes"
-import { decisionFromFlags, type SavedDecisions, type SaveRequest } from "@inventory/catalog-contract/Decision"
+import {
+  decisionFromFlags,
+  type SavedDecisions,
+  type SaveRequest,
+  type DecidedSince
+} from "@inventory/catalog-contract/Decision"
 import type { ImportId } from "@inventory/catalog-contract/Ids"
 import type { ImportView } from "@inventory/catalog-contract/Import"
 import { importView, importViewShown } from "../src/Imports.atoms.ts"
@@ -60,6 +65,7 @@ type Saved = {
   readonly revision: number
   readonly changed: boolean
   readonly notApplied: ReadonlyArray<{ readonly rowId: string; readonly field: string }>
+  readonly decidedSince: ReadonlyArray<DecidedSince>
 }
 
 const settle = Effect.sleep("15 millis")
@@ -96,7 +102,7 @@ const visit = (
           sent.push(request.payload)
           if (options.saves === "lost") return Deferred.await(Deferred.makeUnsafe<Saved>())
           server.revision += 1
-          return Effect.succeed({ revision: server.revision, changed: true, notApplied: [] })
+          return Effect.succeed({ revision: server.revision, changed: true, notApplied: [], decidedSince: [] })
         }
       }
     },
@@ -201,9 +207,12 @@ describe("the undo history kept in the browser", () => {
         yield* settle
         // Both are on the screen: what the server holds, with the person's waiting row over it.
         expect(R.keys(saved(again.state()))).toEqual(["row-2", "row-3"])
-        // And the row is sent again as the person's decision, made on the revision it was made on, once the import
-        // read anew (not the view the step found) has checked it.
-        expect(again.sent).toEqual([{ madeOn: { "row-2": 10 }, set: { "row-2": out }, clear: [] }])
+        // And the row is sent again as the person's decision, made on the revision it was made on, as one that waited:
+        // written only over what the server may hold of it (nothing, when it was decided, or itself: the save that was
+        // out when the page went). The server judges it.
+        expect(again.sent).toEqual([
+          { madeOn: { "row-2": 10 }, over: { "row-2": [O.none(), O.some(out)] }, set: { "row-2": out }, clear: [] }
+        ])
         yield* settle
         // The server took it: nothing of it waits in this browser any more.
         expect(A.filter(R.keys(browser.kept), Str.includes("waiting"))).toEqual([])

@@ -1,0 +1,58 @@
+{
+  "$schema": "../../../node_modules/turbo/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // The proofs of the review's model. A proof reads the model's own blocks (the aggregates, the decisions, who is
+    // asking and the values they share), the kernel those blocks import from, how the code is compiled, and the
+    // pinned library; turbo adds the versions the lockfile resolves for this package (Effect, the solver, the
+    // parser) and the vendored kit the kernel is built on, which the root depends on. It is replayed until one of
+    // them changes: an edit to a handler, a store or a screen's rule of this package does not run the proofs again.
+    "prove": {
+      "inputs": [
+        "package.json",
+        "turbo.json",
+        "tsconfig.json",
+        "vitest.config.ts",
+        "src/**/*.aggregate.ts",
+        "src/**/*.decision.ts",
+        "src/Actor/**",
+        "src/Review/Change.schema.ts",
+        "test/**/*.prove.test.ts",
+        "test/proving.ts",
+        "test/rules.ts",
+        "$TURBO_ROOT$/packages/kernel/package.json",
+        "$TURBO_ROOT$/packages/kernel/src/**",
+        "$TURBO_ROOT$/tsconfig.base.json",
+        "$TURBO_ROOT$/vendor/alchemy/*.tgz"
+      ],
+      "outputs": []
+    },
+    // The search of the whole model: the same blocks and the model that joins them, its own test, and the lock
+    // file that keeps the rules as written.
+    "verify": {
+      // Verify reads these two: under CI it writes no lock and refuses a rule the lock does not list, and with
+      // UPDATE_VERIFY_LOCK=1 it locks every rule as written and passes. Both are in the hash, so a run under one is
+      // never replayed as a run under another.
+      "env": ["CI", "UPDATE_VERIFY_LOCK"],
+      "inputs": [
+        "package.json",
+        "turbo.json",
+        "tsconfig.json",
+        "vitest.config.ts",
+        "src/**/*.aggregate.ts",
+        "src/**/*.decision.ts",
+        "src/**/*.model.ts",
+        "src/Actor/**",
+        "src/Review/Change.schema.ts",
+        "test/**/*.verify.test.ts",
+        "test/**/*.lock.json",
+        "test/rules.ts",
+        "$TURBO_ROOT$/packages/kernel/package.json",
+        "$TURBO_ROOT$/packages/kernel/src/**",
+        "$TURBO_ROOT$/tsconfig.base.json",
+        "$TURBO_ROOT$/vendor/alchemy/*.tgz"
+      ],
+      "outputs": []
+    }
+  }
+}

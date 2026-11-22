@@ -35,20 +35,35 @@
     "./CellReading": "./src/Review/CellReading.rules.ts",
     "./NotImported": "./src/Review/NotImported.rules.ts",
     "./ItemSearch": "./src/Item/ItemSearch.rules.ts",
-    "./ItemEdit": "./src/Item/ItemEdit.rules.ts"
+    "./ItemEdit": "./src/Item/ItemEdit.rules.ts",
+    "./Actor": "./src/Actor/Actor.context.ts",
+    "./ImportAggregate": "./src/Import/Import.aggregate.ts",
+    "./RowAggregate": "./src/Row/Row.aggregate.ts",
+    "./GroupAggregate": "./src/Group/Group.aggregate.ts",
+    "./Deciding": "./src/Review/Deciding.decision.ts",
+    "./Undoing": "./src/Review/Undoing.decision.ts",
+    "./DecidingGroup": "./src/Review/DecidingGroup.decision.ts",
+    "./UndoingGroup": "./src/Review/UndoingGroup.decision.ts",
+    "./ReviewChange": "./src/Review/Change.schema.ts",
+    "./Model": "./src/Catalog.model.ts"
   },
   "scripts": {
     "check": "tsrs -p tsconfig.json && tsrs -p tsconfig.test.json",
     "lint": "oxlint --quiet src test",
-    "test": "vitest run"
+    "test": "vitest run --project fast",
+    "prove": "vitest run --project prove",
+    "verify": "vitest run --project verify"
   },
   "dependencies": {
+    "@alchemy.run/domain": "2.0.0-beta.87-734c27a",
     "@beep/schema": "workspace:*",
     "@inventory/catalog-contract": "workspace:*",
     "@inventory/kernel": "workspace:*",
+    "alchemy": "2.0.0-beta.87-734c27a",
     "effect": "4.1.5"
   },
   "devDependencies": {
+    "@effect/platform-node": "4.1.5",
     "@effect/vitest": "4.1.5",
     "@types/node": "^24.19.2",
     "vitest": "^5.1.0"

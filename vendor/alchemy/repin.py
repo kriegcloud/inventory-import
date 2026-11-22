@@ -538,7 +538,14 @@ def install_without_registry(pin: dict) -> None:
             say(f"  wrong: {line}")
         if len(wrong) > 0:
             raise SystemExit("The install without the registry failed.")
-        say(f"  installed from an empty cache without {REGISTRY_HOST}: {installed} of the pinned packages, from their files.")
+        # What this step reads is each pinned package's version where it is installed at the top of node_modules,
+        # and this commit's notice in the ones whose addresses were rewritten. That each comes from its file here is
+        # the lockfile's, which names each by its file and hash and was installed frozen and left unchanged.
+        say(
+            f"  installed from an empty cache without {REGISTRY_HOST}: {installed} of the pinned packages are there at "
+            "their pinned versions, the rewritten ones with this commit's notice; bun.lock, installed frozen, names "
+            "each by its file and hash."
+        )
     finally:
         proxy.close()
         shutil.rmtree(work, ignore_errors=True)
@@ -583,6 +590,14 @@ def put_back(before: dict) -> None:
             file.write_bytes(data)
 
 
+def uncommitted(paths: list) -> list:
+    """The files among these, or under them, that differ from the last commit or are not in it."""
+    listed = subprocess.run(
+        ["git", "status", "--porcelain", "-z", "--", *paths], cwd=ROOT, capture_output=True, text=True, check=True
+    ).stdout.split("\0")
+    return sorted(entry[3:] for entry in listed if len(entry) > 3)
+
+
 def repin(commit: str, full_check: bool) -> None:
     pinned = json.loads(SOURCES.read_text())["commit"] if SOURCES.exists() else None
     if commit == "main":
@@ -592,6 +607,16 @@ def repin(commit: str, full_check: bool) -> None:
     commit = commit[:7]
     if pinned is not None and pinned != commit:
         say(f"From {pinned} to {commit}. What the library changed: {LIBRARY}/compare/{pinned}...{commit}")
+    # The way back after a failed full check is `git checkout`, which puts these files back as git has them: a change
+    # to one of them that is not committed yet would go with the pin. So the move starts only when they are as
+    # committed.
+    unsaved = uncommitted([str(file.relative_to(ROOT)) for file in pin_files()] + ["vendor/alchemy"])
+    if len(unsaved) > 0:
+        raise SystemExit(
+            "The move rewrites these files, and they hold changes that are not committed: "
+            + ", ".join(unsaved)
+            + ". Commit them or set them aside first: going back after a failed full check restores them from git."
+        )
     before = {file: file.read_bytes() for file in pin_files()}
     installed = False
     try:
@@ -636,8 +661,9 @@ def repin(commit: str, full_check: bool) -> None:
             tracked = [file for file in changed if not (file.startswith("vendor/alchemy/") and file.endswith(".tgz"))]
             raise SystemExit(
                 f"The pin has moved to {commit} and passed its own checks; `bun run check:full -- --force` then "
-                f"failed. That is the library's change to answer in the code. To go back instead: "
-                f"`git checkout -- {' '.join(tracked)} vendor/alchemy && git clean -f -- vendor/alchemy && bun install`."
+                f"failed. That is the library's change to answer in the code. To go back instead (the files were as "
+                f"committed when the move began, so nothing else is lost): "
+                f"`git checkout HEAD -- {' '.join(tracked)} vendor/alchemy && git clean -f -- vendor/alchemy && bun install`."
             )
     else:
         say("10. Left out (--no-full-check): run `bun run check:full -- --force` before committing")

@@ -1,8 +1,10 @@
 // Proves `UndoingGroup`, the decision behind the undo of one act on a group, for every state of the import and the
 // group and every input: its own 13 rules, and every rule of the two aggregates it records on. A rule that is no
-// longer proved fails here by name. Its counterexamples need a group that was decided, and the prover does not tie an
-// instance's id to a key built from two fields of the command (`importId/step`), so a broken rule here comes back
-// "not proved", with the sentence "the real code rejects it", and not "violated". It still fails by name.
+// longer proved fails here by name. Its counterexamples need a group that was decided, under a key built from two
+// fields of the command (`importId/step`). The library as published does not tie an instance's id to such a key, and
+// a broken rule here then comes back "not proved", with the sentence "the real code rejects it". The repository
+// patches that (`packages/patches/alchemy-domain/01-computed-instance-id.patch`, docs/patches.md): with the patch a
+// broken rule comes back "violated", with the state and the command that break it.
 import * as Prove from "@alchemy.run/domain/Prove"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import { expect, layer } from "@effect/vitest"

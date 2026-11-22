@@ -77,6 +77,22 @@ export const sizesAreTrue = (level: Level): boolean =>
 export const seal = (sealed: { readonly level: Level; readonly below: string }): string =>
   `${sealed.level.change}:${sealed.level.madeOn}:${sealed.level.bySize}:${sealed.level.stepSize}:${sealed.level.labelSize}:${sealed.level.flagsSize}:${sealed.level.by}${sealed.level.step}${sealed.level.label}${sealed.level.flags}${sealed.below}`
 
+/**
+ * The last undo a row took: the change it took back, the step the undo was pressed in, and who pressed. A row keeps
+ * it whatever is decided there afterwards, so the same undo sent again (its answer was lost on the way) is known and
+ * answered as the first time, not refused as an undo of a decision the row no longer holds.
+ */
+export const Undone = S.Struct({
+  change: Change.pipe(S.annotateKey({ description: "The change the undo took back; 0 when the row took no undo" })),
+  step: S.String.pipe(S.annotateKey({ description: "The step the undo was pressed in" })),
+  by: S.String.pipe(S.annotateKey({ description: "The member who pressed it" }))
+}).annotate({ description: "The last undo a row took" })
+/** The decoded value of `Undone`. */
+export type Undone = typeof Undone.Type
+
+/** No undo: what a row holds until one is taken. No press can match it: a step is never empty. */
+export const noUndo: Undone = Undone.make({ change: 0, step: "", by: "" })
+
 /** The flags of a row with nothing decided: an act that says it on such a row changes nothing. */
 export const NO_DECISION = "{}"
 
@@ -105,20 +121,24 @@ export class RowDecided extends Domain.Event(
   { description: "A row's decision was recorded, over the one it replaces" }
 ) {}
 
-/** The current decision was taken back; `next` goes under the one put back, with `below` under it. */
+/**
+ * The current decision was taken back; `next` goes under the one put back, with `below` under it. `undo`, `step` and
+ * `by` say which change was taken back, in which step and by whom: the row keeps them as its last undo.
+ */
 export class StepUndone extends Domain.Event(
   "StepUndone",
-  { next: Level, below: S.String },
+  { next: Level, below: S.String, undo: Change, step: Step, by: S.String },
   { description: "A row's decision was taken back, and the one under it put back" }
 ) {}
 
 /**
  * What a row holds: nothing yet, nothing again after an undo, or a decision with the one under it in full and the
- * ones below that sealed into one text.
+ * ones below that sealed into one text. Each case also holds the last undo the row took (none, for a row no act has
+ * reached: it is there so a decision carries it on without asking which case it replaces).
  */
 export const RowState = S.Union([
-  S.Struct({ status: S.tag("Untouched") }),
-  S.Struct({ status: S.tag("Undecided"), importId: S.String, organizationId: S.String }),
+  S.Struct({ status: S.tag("Untouched"), undone: Undone }),
+  S.Struct({ status: S.tag("Undecided"), importId: S.String, organizationId: S.String, undone: Undone }),
   S.Struct({
     status: S.tag("Decided"),
     importId: S.String,
@@ -130,7 +150,8 @@ export const RowState = S.Union([
     madeOn: S.Int,
     label: S.String,
     under: Level,
-    below: S.String
+    below: S.String,
+    undone: Undone
   })
 ])
   .annotate({ description: "What one row of an import's review holds" })
@@ -186,7 +207,7 @@ export class Row extends Domain.Aggregate(
   {
     id: S.String,
     state: RowState,
-    initial: RowState.cases.Untouched.make({ status: "Untouched" }),
+    initial: RowState.cases.Untouched.make({ status: "Untouched", undone: noUndo }),
     invariants: {
       // The sizes kept beside the decision under the current one are its texts' own: one comparison a rule.
       TheSizeOfByIsTrue: (s) => !isDecided(s) || s.under.bySize === s.under.by.length,
@@ -235,7 +256,8 @@ export class Row extends Domain.Aggregate(
               ? ""
               : s.below.length > MOST_BELOW
                 ? CUT
-                : seal({ level: s.under, below: s.below })
+                : seal({ level: s.under, below: s.below }),
+          undone: s.undone
         }),
       StepUndone: (s, e) =>
         !isDecided(s)
@@ -252,12 +274,14 @@ export class Row extends Domain.Aggregate(
                 madeOn: s.under.madeOn,
                 label: s.under.label,
                 under: e.next,
-                below: e.below
+                below: e.below,
+                undone: Undone.make({ change: e.undo, step: e.step, by: e.by })
               })
             : RowState.cases.Undecided.make({
                 status: "Undecided",
                 importId: s.importId,
-                organizationId: s.organizationId
+                organizationId: s.organizationId,
+                undone: Undone.make({ change: e.undo, step: e.step, by: e.by })
               })
     }
   },

@@ -288,7 +288,7 @@ it.effect(
       Story.then(g1),
       // Her screen has drawn the group now, and she presses again.
       Story.when(undo({ undo: 1, step: "u2", sawGroup: 2 })),
-      Story.then(row12, StepUndone.make({ next: noLevel, below: "" })),
+      Story.then(row12, StepUndone.make({ next: noLevel, below: "", undo: 1, step: "u2", by: "dana" })),
       Story.then(life, undoneToNothing({ change: 3, step: "u2", actor: "dana" })),
       // The same for an act: typed before the group reached her screen, then again after.
       Story.when(act({ step: "d2", saw: 0, sawGroup: 0, covered: true, flags: typed })),
@@ -393,7 +393,7 @@ it.effect(
       // Dana takes hers back, from a screen that has Ana's undo.
       Story.provide(CurrentActor, dana),
       Story.when(undo({ row: "row-14", undo: 2, step: "u1", sawGroup: 3 })),
-      Story.then(row14, StepUndone.make({ next: noLevel, below: "" })),
+      Story.then(row14, StepUndone.make({ next: noLevel, below: "", undo: 2, step: "u1", by: "dana" })),
       Story.then(life, undoneToNothing({ change: 4, step: "u1", actor: "dana", row: "row-14" })),
       // The model keeps no reading of a row through its groups: what holds here is the row's own instance, with
       // nothing in it, and the group's `undoneAt`, which says it was taken back by change 3. Nothing brings the group's
@@ -529,7 +529,7 @@ it.effect(
       Story.then(row14, decided({ change: 3, by: "dana", step: "d2", flags: typedEight })),
       Story.then(life, counted({ change: 3, step: "d2", by: "dana", flags: typedEight, row: "row-14" })),
       Story.when(undo({ row: "row-14", undo: 3, step: "u1", sawGroup: 2 })),
-      Story.then(row14, StepUndone.make({ next: noLevel, below: "" })),
+      Story.then(row14, StepUndone.make({ next: noLevel, below: "", undo: 3, step: "u1", by: "dana" })),
       Story.then(
         life,
         ActCounted.make({
@@ -581,7 +581,7 @@ it.effect(
       Story.then(row14, decided({ change: 2, by: "dana", step: "d1", flags: typedEight })),
       Story.then(life, counted({ change: 2, step: "d1", by: "dana", flags: typedEight, row: "row-14" })),
       Story.when(undo({ row: "row-14", undo: 2, step: "u1", sawGroup: 1 })),
-      Story.then(row14, StepUndone.make({ next: noLevel, below: "" })),
+      Story.then(row14, StepUndone.make({ next: noLevel, below: "", undo: 2, step: "u1", by: "dana" })),
       Story.then(life, undoneToNothing({ change: 3, step: "u1", actor: "dana", row: "row-14" })),
       // Carl's screen still has Dana's 8 as the row's own, over the group. He clears it: the row's own instance holds
       // nothing already, and the group reads through it now. Refused and held, not "no change".
@@ -620,7 +620,7 @@ it.effect(
       // No group covers the row now, and the same undo is taken.
       Story.provide(CurrentActor, dana),
       Story.when(undo({ row: "row-14", undo: 1, step: "u2", sawGroup: 3 })),
-      Story.then(row14, StepUndone.make({ next: noLevel, below: "" })),
+      Story.then(row14, StepUndone.make({ next: noLevel, below: "", undo: 1, step: "u2", by: "dana" })),
       Story.then(life, undoneToNothing({ change: 4, step: "u2", actor: "dana", row: "row-14" }))
     )
 )

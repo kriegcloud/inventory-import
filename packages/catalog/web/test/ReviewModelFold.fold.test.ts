@@ -561,7 +561,7 @@ const modelSide = (input: { readonly rows: number; readonly first: Actor }) => {
     const level = O.match(under, { onNone: () => noLevel, onSome: (held) => held.level })
     steps.push(
       Story.when(command),
-      Story.then(Row.ref(`${importId}/${row}`), StepUndone.make({ next, below })),
+      Story.then(Row.ref(`${importId}/${row}`), StepUndone.make({ next, below, undo, step, by: actor.memberId })),
       Story.then(
         life,
         ActCounted.make({

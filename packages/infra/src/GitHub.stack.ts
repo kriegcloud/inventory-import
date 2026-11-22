@@ -43,8 +43,13 @@ import {
 /** The repository the deploy workflow runs in. */
 const repository = { owner: "kriegcloud", repository: "inventory-import" } as const
 
-/** The name of the job in `.github/workflows/ci.yml` that a pull request must pass. */
-const requiredCheck = "Check, test and build"
+/**
+ * The names of the jobs in `.github/workflows/ci.yml` that a pull request must pass: the checks, tests and build, and
+ * the job that proves and searches the review's model. The second is required too because the first no longer runs
+ * the model's proofs: without it a pull request that breaks a proved rule, or adds a rule the lock does not list,
+ * could be merged while that job was red. Renaming either job there blocks every merge until this is deployed again.
+ */
+const requiredChecks = ["Check, test and build", "Proofs and search of the model"] as const
 
 /** GitHub's id of the repository role "admin", the one actor that may bypass the rule on `main`. */
 const adminRole = 5
@@ -224,7 +229,10 @@ export default Alchemy.Stack(
       conditions: { include: ["~DEFAULT_BRANCH"] },
       bypassActors: [{ actorType: "RepositoryRole", actorId: adminRole, bypassMode: "always" }],
       pullRequest: { requiredApprovingReviewCount: 0 },
-      requiredStatusChecks: { checks: [{ context: requiredCheck }], strictRequiredStatusChecksPolicy: false },
+      requiredStatusChecks: {
+        checks: [{ context: requiredChecks[0] }, { context: requiredChecks[1] }],
+        strictRequiredStatusChecksPolicy: false
+      },
       deletion: true,
       nonFastForward: true
     })

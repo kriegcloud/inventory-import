@@ -13,15 +13,22 @@ accepted act made to record nothing. For each one chosen, the package's `src/`, 
 `@alchemy.run/domain` and `effect` resolve as they do for the package), the change is made there, and vitest runs the
 mutant's proof file and both story files in that copy with its JSON reporter. The class:
 
-    rule     the proof failed: a proved rule, or the report's own counts, notice the change
+    rule     the proof names a rule that is no longer proved: the rule notices the change
+    proof    the proof failed, and on no rule: only a number the test states (its paths, "some state lets it record")
     story    only a story failed: the change is seen, but no rule says it is wrong
     neither  nothing failed: the change goes unnoticed
+    timeout  nothing failed but a test that ran out of time: nothing is known, and nothing held it
+    error    a file did not load, or the run gave no result
 
-The run exits 1 when a mutant is held by neither, when one an earlier trial found held by a rule is now held by a
-story only (a rule got weaker), when a mutant does not apply (its old text is not found exactly once after its
-anchors and before its end), or when a run gives no result. A mutant held by a rule where the trial had a story is an
-improvement, said and not a failure. Before the mutants, the copy is run once unchanged (`baseline`): when that fails,
-every mutant would look held, so the run stops with exit 2. Results go to `.mutants/results.tsv`.
+A test that ran out of time has noticed nothing, whichever file it is in: it is counted apart and never makes a class.
+
+The run exits 1 when a mutant is held by neither, when all that is known of one is a timeout, when one the trial found
+held by a rule is no longer (`weaker`: no rule is named now, or a rule the trial saw break, kept in `trialRules`, is
+not among the ones named), when one the trial found held by a story has no story failing, when a mutant does not apply
+(its old text is not found exactly once after its anchors and before its end), or when a run gives no result. A mutant
+held by a rule where the trial had a story is an improvement, said and not a failure. Before the mutants, the copy is
+run once unchanged (`baseline`): when that fails or times out, every mutant would look held, so the run stops with
+exit 2. Results go to `.mutants/results.tsv`.
 
 Python 3, standard library only. No file of the package itself is ever written: only the copies.
 """
@@ -63,7 +70,7 @@ SAMPLE = [
     "stage-f-rows",              # field, story: the staged file's row count off by one; no rule of the import reads it
     "group-groupdecided-label",  # field, story: a group's label; no rule reads labels
     "stage-nothing",             # nothing, story: a stage that records nothing; no rule says an act is taken
-    "group-nothing",             # nothing, story in the trial: the proof's "some state lets it record" may hold it now
+    "group-nothing",             # nothing, story: its stories, and the proof's "some state lets it record" (class proof)
 ]
 
 
@@ -122,78 +129,103 @@ def short(text, n=110):
 
 RULE_LINE = re.compile(r"'(violated|not proved|proved for short lists only|read wrongly|not read|not decided)  ([^']+)'")
 EXPECTED = re.compile(r"expected (.{1,60}?) to (?:be|deeply equal) (.{1,60}?)(?:\s*//|$)", re.M)
+# A rule's name as a report prints it: `OutcomesAddUpToTheRows`, or `Row.TheSizeOfByIsTrue` in a decision's report.
+RULE_NAME = re.compile(r"^((?:[A-Z][A-Za-z0-9]*\.)?[A-Z][A-Za-z0-9]*)(?=$|:| \()")
+STANDING = re.compile(r"^(?:Violated|Unconfirmed|violated|not proved|proved for short lists only|read wrongly|not read|not decided)\s+")
+TIMED_OUT = "timed out"
+
+
+def rule_name(text):
+    """The rule a line names, without how it stands and without its commands; None when the line names no rule."""
+    m = RULE_NAME.match(STANDING.sub("", text.strip()))
+    return m.group(1) if m else None
 
 
 def why_proof(messages):
-    """What the proof said broke: the rules not proved, by name; else the first assertion that failed."""
+    """What the proof said broke, in two lists: the rules not proved, and what failed that is no rule."""
     text = "\n".join(messages)
     # The report printed beside a failure (`whatBroke` in test/proving.ts): a line "✗ <rule>" for each rule not
-    # proved, and under it "    ✗ <command>: <how it stands>" for the import's rules.
-    rules, current, under = [], None, []
+    # proved, and under it "    ✗ <command>: <how it stands>" for the import's rules. A "✗" line that names no rule
+    # ("✗ DecideGroup is never accepted", "✗ The real code does something else") is the report's own, and no rule.
+    found, current, under = [], None, []
     for line in text.splitlines():
         top = re.match(r"^✗ (.+?)(?:: expected .*)?$", line)
         sub = re.match(r"^\s+✗ (\S+?):? (violated|not proved|unconfirmed|read wrongly|not read|not decided)\b", line)
         if top:
             if current is not None:
-                rules.append(current + (f" ({', '.join(under)})" if under else ""))
+                found.append(current + (f" ({', '.join(under)})" if under else ""))
             current, under = top.group(1), []
         elif sub and current is not None:
             under.append(f"{sub.group(1)} {sub.group(2)}")
         elif current is not None and not line.startswith(" "):
-            rules.append(current + (f" ({', '.join(under)})" if under else ""))
+            found.append(current + (f" ({', '.join(under)})" if under else ""))
             current, under = None, []
     if current is not None:
-        rules.append(current + (f" ({', '.join(under)})" if under else ""))
-    rules = [r for r in dict.fromkeys(rules) if not r.startswith("Import folds")]
+        found.append(current + (f" ({', '.join(under)})" if under else ""))
+    found = [r for r in dict.fromkeys(found) if not r.startswith("Import folds")]
+    rules = [r for r in found if rule_name(r)]
+    other = [r for r in found if not rule_name(r)]
     if not rules:
         for standing, name in RULE_LINE.findall(text):
             item = f"{standing} {name.strip()}"
             if item not in rules:
                 rules.append(item)
-    if rules:
-        return rules
+    if rules or other:
+        return rules, other
     m = EXPECTED.search(text)
     if m:
-        return [f"expected {m.group(2).strip()}, got {m.group(1).strip()}"]
+        return [], [f"expected {m.group(2).strip()}, got {m.group(1).strip()}"]
     first = next((line for line in text.splitlines() if line.strip()), "no message")
-    return [short(first, 140)]
+    return [], [short(first, 140)]
 
 
 def read_result(path, proof):
-    """From vitest's JSON report: whether the proof failed and why, and the stories that failed."""
+    """From vitest's JSON report, what failed and how: a test that ran out of time is kept apart from one that failed."""
     with open(path) as f:
         report = json.load(f)
-    proof_failed, proof_why, stories, timeouts = False, [], [], 0
+    read = dict(rules=[], other=[], stories=[], timeouts=[], unloaded=[], missing=[])
     seen = set()
     for result in report.get("testResults", []):
         name = result.get("name", "")
         seen.add(file_of(name))
         failed = [a for a in result.get("assertionResults", []) if a.get("status") == "failed"]
-        load_failed = result.get("status") == "failed" and not failed
         is_proof = name.endswith(proof)
-        if is_proof and (failed or load_failed):
-            proof_failed = True
-            messages = [m for a in failed for m in a.get("failureMessages", [])] or [result.get("message", "")]
-            proof_why = why_proof(messages)
+        label = file_of(name).replace(".story", "")
+        if result.get("status") == "failed" and not failed:
+            read["unloaded"].append(f"{label}: did not load: {short(result.get('message', ''), 80)}")
+            continue
+        late = [a for a in failed if TIMED_OUT in " ".join(a.get("failureMessages", []))]
+        real = [a for a in failed if a not in late]
+        read["timeouts"] += [f"{label}: {a.get('title', a.get('fullName', ''))}" for a in late]
+        if is_proof and real:
+            rules, other = why_proof([m for a in real for m in a.get("failureMessages", [])])
+            read["rules"] += rules
+            read["other"] += other
         elif not is_proof:
-            story_file = file_of(name).replace(".story", "")
-            if load_failed:
-                stories.append(f"{story_file}: did not load: {short(result.get('message', ''), 80)}")
-            for a in failed:
-                said = " ".join(a.get("failureMessages", []))
-                if "timed out" in said:
-                    timeouts += 1
-                stories.append(f"{story_file}: {a.get('title', a.get('fullName', ''))}" + (" (timed out)" if "timed out" in said else ""))
+            read["stories"] += [f"{label}: {a.get('title', a.get('fullName', ''))}" for a in real]
     expected = {file_of(proof)} | {file_of(s) for s in STORIES}
-    missing = sorted(expected - seen)
-    return proof_failed, proof_why, stories, timeouts, missing
+    read["missing"] = sorted(expected - seen)
+    return read
+
+
+def class_of(read):
+    """The class of one run: the strongest thing that noticed the change. A timeout notices nothing."""
+    if read["rules"]:
+        return "rule"
+    if read["other"]:
+        return "proof"
+    if read["stories"]:
+        return "story"
+    if read["timeouts"]:
+        return "timeout"
+    return "neither"
 
 
 def run_copy(key, mutant, proof, keep, nice, timeout):
     """Copies the package, makes the change (none for the baseline), runs vitest. Returns a result record."""
     dest = os.path.join(WORK, key)
     started = time.time()
-    record = dict(key=key, cls="error", seconds=0.0, why=[], stories=[], note="")
+    record = dict(key=key, cls="error", seconds=0.0, why=[], rules=[], stories=[], note="")
     try:
         copy_package(dest)
         if mutant is not None:
@@ -240,14 +272,18 @@ def run_copy(key, mutant, proof, keep, nice, timeout):
                 tail = f.read()[-400:]
             record["note"] = (record["note"] + "; " if record["note"] else "") + "no result: " + short(tail, 200)
             return record
-        proof_failed, proof_why, stories, timeouts, missing = read_result(out, proof)
-        record["why"], record["stories"] = proof_why, stories
-        if missing:
-            record["note"] = "files that did not run: " + ", ".join(missing)
+        read = read_result(out, proof)
+        record["why"], record["stories"] = read["rules"] + read["other"], read["stories"]
+        record["rules"] = sorted({name for name in map(rule_name, read["rules"]) if name})
+        if read["missing"]:
+            record["note"] = "files that did not run: " + ", ".join(read["missing"])
             return record
-        if timeouts:
-            record["note"] = f"{timeouts} story test(s) timed out"
-        record["cls"] = "rule" if proof_failed else "story" if stories else "neither"
+        if read["unloaded"]:
+            record["note"] = "; ".join(read["unloaded"])
+            return record
+        if read["timeouts"]:
+            record["note"] = "ran out of time, and counted as nothing: " + " | ".join(read["timeouts"])
+        record["cls"] = class_of(read)
         return record
     finally:
         record["seconds"] = round(time.time() - started, 1)
@@ -255,14 +291,22 @@ def run_copy(key, mutant, proof, keep, nice, timeout):
             shutil.rmtree(dest, ignore_errors=True)
 
 
-def verdict(mutant, cls):
-    if cls in ("notapplied", "error", "neither"):
+def weaker_rules(mutant, record):
+    """The rules the trial saw this mutant break that the proof no longer names."""
+    trial = sorted({name for name in map(rule_name, mutant["trialRules"]) if name})
+    return [name for name in trial if name not in record["rules"]]
+
+
+def verdict(mutant, record):
+    cls = record["cls"]
+    if cls in ("notapplied", "error", "neither", "timeout"):
         return cls
-    if cls == mutant["expect"]:
-        return "same"
+    if mutant["expect"] == "rule":
+        return "same" if cls == "rule" and not weaker_rules(mutant, record) else "weaker"
     if cls == "rule":
         return "improvement"
-    return "weaker"
+    # The trial had a story only: a story must still fail. The proof's own numbers moving is not the story noticing.
+    return "same" if record["stories"] else "weaker"
 
 
 def load_avg():
@@ -337,10 +381,10 @@ def main():
 
     def one(m):
         r = run_copy(m["key"], m, m["proof"], opts.keep, opts.nice, opts.timeout)
-        r["verdict"] = verdict(m, r["cls"])
+        r["verdict"] = verdict(m, r)
         with lock:
             results[m["key"]] = r
-            said = "; ".join(r["why"]) if r["cls"] == "rule" else " | ".join(r["stories"])
+            said = "; ".join(r["why"]) if r["cls"] in ("rule", "proof") else " | ".join(r["stories"])
             print(f"{m['key']:36} {r['cls']:8} {r['seconds']:7.1f}s  {r['verdict']:11} {short(said or r['note'], 120)}", flush=True)
         return r
 
@@ -348,7 +392,7 @@ def main():
         list(pool.map(one, ready))
 
     for m, reason in problems:
-        results[m["key"]] = dict(key=m["key"], cls="notapplied", seconds=0.0, why=[], stories=[], note=reason, verdict="notapplied")
+        results[m["key"]] = dict(key=m["key"], cls="notapplied", seconds=0.0, why=[], rules=[], stories=[], note=reason, verdict="notapplied")
 
     rows = ["key\ttarget\tkind\ttrial\tclass\tverdict\tseconds\tproof said\tstories failed\tnote"]
     for m in chosen:
@@ -361,22 +405,29 @@ def main():
     print()
     classes = collections.Counter(results[m["key"]]["cls"] for m in chosen)
     trial = collections.Counter(m["expect"] for m in chosen)
-    print("class:   " + ", ".join(f"{c} {classes[c]}" for c in ("rule", "story", "neither", "notapplied", "error") if classes[c]))
+    print("class:   " + ", ".join(f"{c} {classes[c]}" for c in ("rule", "proof", "story", "neither", "timeout", "notapplied", "error") if classes[c]))
     print("trial:   " + ", ".join(f"{c} {trial[c]}" for c in ("rule", "story")))
     for target in sorted({m["target"] for m in chosen}):
         ms = [m for m in chosen if m["target"] == target]
         cs = collections.Counter(results[m["key"]]["cls"] for m in ms)
         secs = sum(results[m["key"]]["seconds"] for m in ms)
-        print(f"  {target:12} {len(ms):3} mutants  rule {cs['rule']:3}  story {cs['story']:3}  neither {cs['neither']}  "
+        print(f"  {target:12} {len(ms):3} mutants  rule {cs['rule']:3}  proof {cs['proof']:3}  story {cs['story']:3}  "
+              f"neither {cs['neither']}  timeout {cs['timeout']}  "
               f"test time {secs:8.1f} s  longest {max(results[m['key']]['seconds'] for m in ms):7.1f} s")
     print(f"wall {time.time() - wall:.0f} s; load before {load_before}, after {load_avg()}")
     improved = [m["key"] for m in chosen if results[m["key"]]["verdict"] == "improvement"]
     if improved:
         print("held by a rule where the trial had a story only (improvement): " + ", ".join(improved))
-    failing = [m for m in chosen if results[m["key"]]["verdict"] in ("neither", "weaker", "notapplied", "error")]
+    failing = [m for m in chosen if results[m["key"]]["verdict"] in ("neither", "weaker", "timeout", "notapplied", "error")]
     for m in failing:
         r = results[m["key"]]
-        what = {"neither": "held by neither", "weaker": "a rule got weaker: the trial saw " + ("; ".join(m["trialRules"]) or "-"),
+        gone = weaker_rules(m, r)
+        weaker = (
+            "the trial saw a story fail, and none does now" if m["expect"] == "story"
+            else "a rule got weaker: no rule is named now, where the trial saw " + ("; ".join(m["trialRules"]) or "-") if r["cls"] != "rule"
+            else "a rule got weaker: no longer named, " + ", ".join(gone)
+        )
+        what = {"neither": "held by neither", "weaker": weaker, "timeout": "only ran out of time: nothing held it",
                 "notapplied": "does not apply", "error": "no result"}[r["verdict"]]
         print(f"FAIL {m['key']}: {what}. Change in {m['file']}: {m['old']!r} -> {m['new']!r}. "
               f"Ran {m['proof']} and the stories: {short('; '.join(r['why']) + ' ' + ' | '.join(r['stories']) + ' ' + r['note'], 200)}")

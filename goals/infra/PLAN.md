@@ -80,9 +80,11 @@ Where the brief left a choice open, or the code showed the brief could not be fo
   secret: `PRODUCTION_CLOUDFLARE_ACCOUNT_ID`, `PREVIEW_CLOUDFLARE_ACCOUNT_ID` and `PRODUCTION_APPROVER` (the GitHub
   login that approves a production deploy). `SIGN_UP` defaults to `closed`; `OPENROUTER_API_KEY` is required unless
   the flag is set.
-- **The rule on `main`** (I7): a pull request, the check named "Check, test and build" (the job in `ci.yml`), no
-  deletion and no force push, and the repository's admin role may bypass it always. No approving review is
-  required, since one person works here.
+- **The rule on `main`** (I7): a pull request, the two checks named "Check, test and build" and "Proofs and search
+  of the model" (the two jobs in `ci.yml`), no deletion and no force push, and the repository's admin role may
+  bypass it always. No approving review is required, since one person works here. The second check was added on
+  2026-11-22, when the model's proofs moved out of the first job: until the repository's stack is deployed again
+  (step 14 below), a pull request whose proofs job is red can still be merged.
 - **`deploy`, `deploy:setup` and `scripts/deploy-setup.mjs` are removed**, as the brief's Map says. No script was
   added anywhere: a deploy is `bunx alchemy deploy --stage <name>`, and the workflow calls the same.
 - **Each stack provides its one layer where it is declared**, with the `strictEffectProvide` diagnostic turned off
@@ -277,3 +279,9 @@ Nothing below was started. Every command names its stage.
          flag.
 13. **Adding a person to production later**: add their email to `SIGN_UP` (step 8 again), deploy, and they sign
     up; or they sign up and an admin adds them on the People page.
+14. **The second required check** (2026-11-22). The stack now names two checks on `main`: "Check, test and build"
+    and "Proofs and search of the model". Nothing is deployed until he runs the repository's stack again (step 8,
+    the same line, `plan` first): the plan should show the ruleset "main" changing by one required status check
+    and nothing else. Until then the proofs job stops no merge. After it, a pull request waits for both jobs; one
+    that changes the model reruns its proofs (up to the job's 60 minutes), and one that does not replays them.
+    Not verified: that GitHub takes the job's `name` as the check's context (the first check rests on the same).

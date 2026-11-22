@@ -83,6 +83,10 @@
       ],
       "outputs": []
     },
+    // The Alchemy packages kept as files are the ones `vendor/alchemy/sources.json` names, hash for hash, and the
+    // overrides, the README's table and the lockfile agree with it (`vendor/alchemy/repin.py --check`; needs
+    // python3). A third of a second, so it runs every time and names no inputs.
+    "//#alchemy:check": { "cache": false },
     // The stage C ceilings of the packages with screens add up to at most 678 (`beep quality ceilings`).
     "//#ceilings:check": {
       "inputs": ["apps/*/strict-ceiling.json", "packages/**/strict-ceiling.json", "packages/tooling/tool/cli/src/**"],

@@ -1,0 +1,6 @@
+{
+  // The development scripts, for the linter that reads types (`bun run beep laws deprecated-apis`): nothing compiles them.
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": { "lib": ["ESNext"], "types": ["node"], "module": "nodenext", "allowJs": true },
+  "include": ["."]
+}

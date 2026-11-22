@@ -1,0 +1,6 @@
+{
+  // The root's own .ts files (alchemy.run.ts) and each package's vitest.config.ts (see tsconfig.json).
+  "extends": "./tsconfig.base.json",
+  "include": ["*.ts", "packages/**/vitest.config.ts"],
+  "compilerOptions": { "types": ["node"] }
+}

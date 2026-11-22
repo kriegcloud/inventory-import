@@ -56,7 +56,21 @@ My engineering rules are in `CLAUDE.md` and [patterns](../patterns.md). This pag
 - **Property tests from Schemas** (`it.prop` or `it.effect.prop`, which take Schemas as arbitraries) for rules that
   hold for every input: cents read from digits, a key normalised twice equals once, outcome counts add up to the
   rows. Check: at least one property test for the import's main rule.
-- **Anything timed is tested on `TestClock`**, never with a real wait. Check: no `sleep` or timer in a test.
+- **Anything timed is tested on `TestClock`**, never with a real wait. Check: no `sleep` or timer in a test. Not held
+  today: 28 test files wait in real time (`Effect.sleep("20 millis")`, then look), most in `packages/client/test` and
+  `packages/catalog/web/test`. A wait that runs long on a busy machine lets the code's next timer fire first, so they
+  fail now and then on code that is right: on two pinned cores the client package's tests failed in 1 run of 8.
+- **A test's limit is a guard against a hang, sized for the slowest machine that runs the check**, and is one
+  decision: `vitest.shared.ts` at the root (30 s for a test, 60 s for a hook, 120 s for a `*.slow.test.ts`), which
+  every package's `vitest.config.ts` spreads in. A test never asserts how long something took on the clock; a budget
+  is held in processor time (`packages/tooling/tool/cli/test/Startup.test.ts`).
+- **The check on CI runs two tasks at a time, with two test workers each** (`--concurrency=2`,
+  `VITEST_MAX_WORKERS=2` in `.github/workflows/ci.yml`), and `--continue`, so a red run lists everything that is
+  wrong. The runner has four cores; turbo's own ten tasks at once, each test run with a worker per core, made tests
+  several times slower than they are. Measured with the whole check pinned (`taskset`), cold: on four cores, ten at
+  once took 117 s and failed three tests on their limits; two at once took 102 to 122 s and passed three times in a
+  row; on two cores it passed three times in 144 to 160 s. To see what the runner sees:
+  `VITEST_MAX_WORKERS=2 taskset -c 0-3 bun run check:full -- --force --continue --concurrency=2`.
 - **No test re-asserts what the types or another test already prove.** Check: each test names the rule it protects.
 
 ## Documentation

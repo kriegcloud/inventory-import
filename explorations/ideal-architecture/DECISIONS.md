@@ -1013,3 +1013,32 @@ type-checked them at all. This is the agent's judgement, not a decision of his; 
 left as built. Other ways: the Effect rules on and the findings fixed; the scripts rewritten as TypeScript;
 `noImplicitAny` on alone. Reverse: remove `plugins` and `noImplicitAny` from `apps/inventory/scripts/tsconfig.json`
 and `plugins` from `apps/inventory/tsconfig.public.json`, and fix what the check then finds.
+
+### 2026-11-22 — the check on GitHub's runner (agent, not asked)
+
+CI failed twice on code that had not changed: the CLI's start-up test, then two property tests of `@beep/xlsx`, each
+"timed out in 5000ms". Reproduced with the whole check pinned to four cores (`taskset`): turbo starts ten tasks at
+once and each test run a worker per core, so tests ran several times slower than they are, and a different one hit
+its limit each time (the xlsx property, the review's parity test, a slow test's 10 s hook). Three things were
+changed, none of them a test's own number or what a test asserts:
+
+- CI runs two tasks at a time with two test workers each, and `--continue`, so a red run lists every failure.
+- One file, `vitest.shared.ts`, holds every test's limit (30 s, hooks 60 s, slow tests 120 s) in place of vitest's 5 s
+  and 10 s. Sized from the slowest tests on two pinned cores: 4.4 s and 31 s.
+- No property test's run count was lowered and nothing is skipped or tried again.
+
+Measured, cold, pinned: four cores, ten at once, 117 s and red; four cores as CI now runs it, green three times in a
+row (122, 102, 104 s); two cores, green three times (160, 144, 157 s). The job's limit is 15 minutes. Rejected: a
+longer limit for the xlsx tests alone (the next heavy test would be next); trying a failed test again (it hides a
+flaky test and, for a property, a real counterexample; measured as not needed). Reverse: the three lines in
+`.github/workflows/ci.yml` and the spread of `limits` in each `vitest.config.ts`.
+
+Two things this does not end, both found while measuring and neither in files of this change:
+
+- The tests that wait in real time (28 files, against the standard's own rule that anything timed runs on
+  `TestClock`) still fail now and then under load, on any machine.
+- One property test of the review's draft found a real counterexample: "with the person confirming: a confirm the
+  server makes writes what its screen showed, and nothing is sent beside it" is falsified by seed 369148268449177
+  after 651 runs ("after everything landed, a row of the person's still waits"), every time, on an idle machine too.
+  A second seed, -2416120108841983, falsified it after 762 runs in an unpinned run of the full check. Seeds are drawn
+  at random and it was met twice in about twenty runs here, so CI will meet it.

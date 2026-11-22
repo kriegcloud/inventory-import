@@ -41,7 +41,9 @@ from pathlib import Path
 REGISTRY = "https://pkg.alchemy.run"
 REGISTRY_HOST = "pkg.alchemy.run"
 LIBRARY = "https://github.com/alchemy-run/alchemy"
-ROOTS = ["alchemy", "@alchemy.run/domain", "@alchemy.run/cloudflare", "@alchemy.run/github"]
+# `@alchemy.run/1password` is what the stacks of `packages/infra` read their secrets through (Benjamin, 2026-11-22:
+# "use alchemy's built in 1password").
+ROOTS = ["alchemy", "@alchemy.run/domain", "@alchemy.run/cloudflare", "@alchemy.run/github", "@alchemy.run/1password"]
 ADDRESS = re.compile(r"^https://pkg\.alchemy\.run/((?:@[^/]+/)?[^/]+)/-/([0-9a-f]{64})\.tgz$")
 PINNED_SPEC = re.compile(r"^.+-[0-9a-f]{7}$")
 HERE = Path(__file__).resolve().parent

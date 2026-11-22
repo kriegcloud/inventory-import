@@ -31,7 +31,8 @@ import {
   GroupedAfter,
   GroupedSince,
   NoLongerThere,
-  PutBackSince
+  PutBackSince,
+  UndoneSince
 } from "../src/Review/Deciding.decision.ts"
 import { DecideGroup, StepTaken } from "../src/Review/DecidingGroup.decision.ts"
 import { DecidedBeforeTheConfirm, NotYourStep, UndoRowStep } from "../src/Review/Undoing.decision.ts"
@@ -141,6 +142,7 @@ const act = (input: {
   readonly flags: string
   readonly row?: string
   readonly madeOn?: number
+  readonly sawUndone?: number
 }) =>
   DecideRow.make({
     importId: id,
@@ -151,6 +153,7 @@ const act = (input: {
     asItReads: input.asItReads ?? false,
     opening: 0,
     saw: input.saw,
+    sawUndone: input.sawUndone ?? 0,
     flags: input.flags,
     madeOn: input.madeOn ?? 0,
     label: "Decide"
@@ -161,6 +164,7 @@ const undo = (input: {
   readonly sawGroup: number
   readonly row?: string
   readonly covered?: boolean
+  readonly madeOn?: number
 }) =>
   UndoRowStep.make({
     importId: id,
@@ -169,6 +173,7 @@ const undo = (input: {
     step: input.step,
     sawGroup: input.sawGroup,
     covered: input.covered ?? false,
+    madeOn: input.madeOn ?? 0,
     opening: 0,
     next: noLevel,
     below: ""
@@ -295,7 +300,7 @@ it.effect(
       Story.rejected(GroupedSince.make({})),
       Story.then(row12),
       Story.then(life),
-      Story.when(act({ step: "d3", saw: 0, sawGroup: 2, covered: true, flags: typed })),
+      Story.when(act({ step: "d3", saw: 0, sawUndone: 1, sawGroup: 2, covered: true, flags: typed })),
       Story.then(row12, decided({ change: 4, by: "dana", step: "d3", flags: typed })),
       Story.then(life, counted({ change: 4, step: "d3", by: "dana", flags: typed }))
     )
@@ -625,6 +630,67 @@ it.effect(
     )
 )
 it.effect(
+  "a row's undo under a group is refused with the import's last group in force, the one to take back first, whichever group covers the row: Dana types 8 on row 14, Ana's group covers it, and Carl's later group names other rows",
+  () =>
+    story(
+      Story.given(life, staged),
+      Story.provide(CurrentActor, dana),
+      Story.when(act({ row: "row-14", step: "d1", saw: 0, sawGroup: 0, covered: false, flags: typedEight })),
+      Story.then(row14, decided({ change: 1, by: "dana", step: "d1", flags: typedEight })),
+      Story.then(life, counted({ change: 1, step: "d1", by: "dana", flags: typedEight, row: "row-14" })),
+      Story.provide(CurrentActor, ana),
+      Story.when(group({ seen: 1, rows: "row-3,row-14", count: 2 })),
+      Story.then(g1, groupDecided({ change: 2, rows: "row-3,row-14", count: 2 })),
+      Story.then(life, groupCounted({ change: 2, rows: 2 })),
+      Story.provide(CurrentActor, carl),
+      Story.when(group({ step: "g2", seen: 2, rows: "row-20,row-21", count: 2 })),
+      Story.then(g2, groupDecided({ change: 3, step: "g2", by: "carl", rows: "row-20,row-21", count: 2, under: 2 })),
+      Story.then(life, groupCounted({ change: 3, step: "g2", rows: 2, by: "carl" })),
+      // The model keeps no reading of a group's rows, so it cannot name Ana's group as the one over row 14. It names
+      // the last group in force, Carl's: groups are taken back last first, so that is the one to take back first.
+      Story.provide(CurrentActor, dana),
+      Story.when(undo({ row: "row-14", undo: 1, step: "u1", sawGroup: 3, covered: true })),
+      Story.rejected(GroupedAfter.make({ last: 3 })),
+      Story.provide(CurrentActor, carl),
+      Story.when(undoGroup({ undo: 3, step: "g2" })),
+      Story.then(g2, GroupUndone.make({ change: 4 })),
+      Story.then(life, groupCounted({ change: 4, step: "g2", rows: 2, label: "undo", by: "carl", top: 2 })),
+      // Ana's group is the last in force again, and still over the row.
+      Story.provide(CurrentActor, dana),
+      Story.when(undo({ row: "row-14", undo: 1, step: "u1", sawGroup: 4, covered: true })),
+      Story.rejected(GroupedAfter.make({ last: 2 })),
+      Story.then(row14),
+      Story.then(life)
+    )
+)
+it.effect(
+  "an undo sent twice is answered as the first time when a group act landed between: Dana types 8 on row 14 and takes it back, Ana accepts a group, and Dana's screen sends the undo again",
+  () =>
+    story(
+      Story.given(life, staged),
+      Story.provide(CurrentActor, dana),
+      Story.when(act({ row: "row-14", step: "d1", saw: 0, sawGroup: 0, covered: false, flags: typedEight })),
+      Story.then(row14, decided({ change: 1, by: "dana", step: "d1", flags: typedEight })),
+      Story.then(life, counted({ change: 1, step: "d1", by: "dana", flags: typedEight, row: "row-14" })),
+      Story.when(undo({ row: "row-14", undo: 1, step: "u1", sawGroup: 0 })),
+      Story.then(row14, StepUndone.make({ next: noLevel, below: "", undo: 1, step: "u1", by: "dana" })),
+      Story.then(life, undoneToNothing({ change: 2, step: "u1", actor: "dana", row: "row-14" })),
+      Story.provide(CurrentActor, ana),
+      Story.when(group({ seen: 2, rows: "row-3,row-20", count: 2 })),
+      Story.then(g1, groupDecided({ change: 3, rows: "row-3,row-20", count: 2 })),
+      Story.then(life, groupCounted({ change: 3, rows: 2 })),
+      // The answer to Dana's undo was lost, and the copy cannot have seen Ana's group. The row took that very undo:
+      // nothing more is recorded, and her screen is not told to hold a press that is on the row already.
+      Story.provide(CurrentActor, dana),
+      Story.when(undo({ row: "row-14", undo: 1, step: "u1", sawGroup: 0 })),
+      Story.then(row14),
+      Story.then(life),
+      // Another undo from the screen that has not received the group is still refused and held.
+      Story.when(undo({ row: "row-14", undo: 1, step: "u2", sawGroup: 0 })),
+      Story.rejected(GroupedSince.make({}))
+    )
+)
+it.effect(
   "a covered press sent twice is written once and answered the same: Ana's group leaves row 14 out, Dana types 8 on it, and her screen sends the press again",
   () =>
     story(
@@ -644,7 +710,52 @@ it.effect(
       Story.then(life),
       // Another press of hers from a screen that has not received the first is still refused with it.
       Story.when(act({ row: "row-14", step: "d2", saw: 0, sawGroup: 1, covered: true, flags: typed })),
-      Story.rejected(DecidedSince.make({ by: "dana", change: 2 }))
+      Story.rejected(DecidedSince.make({ by: "dana", change: 2 })),
+      // So is one with the very same text, pressed anew from her second screen: it is another press, under its own
+      // step, and not the first one sent again.
+      Story.when(act({ row: "row-14", step: "d3", saw: 0, sawGroup: 1, covered: true, flags: typedEight })),
+      Story.rejected(DecidedSince.make({ by: "dana", change: 2 })),
+      // A press under her first step that says something else is no copy of it either.
+      Story.when(act({ row: "row-14", step: "d1", saw: 0, sawGroup: 1, covered: true, flags: typed })),
+      Story.rejected(DecidedSince.make({ by: "dana", change: 2 })),
+      // And nobody else is answered for her press: the same step and text from Carl is refused with her decision.
+      Story.provide(CurrentActor, carl),
+      Story.when(act({ row: "row-14", step: "d1", saw: 0, sawGroup: 1, covered: true, flags: typedEight })),
+      Story.rejected(DecidedSince.make({ by: "dana", change: 2 })),
+      Story.then(row14),
+      Story.then(life)
+    )
+)
+it.effect(
+  "a press sent again after its sender took it back is not written a second time: Ana's group leaves row 14 out, Dana types 8 on it and takes that back, and the first sending of her 8 arrives late",
+  () =>
+    story(
+      Story.given(life, staged),
+      Story.provide(CurrentActor, ana),
+      Story.when(group({ seen: 0, rows: "row-3,row-14", count: 2, patch: leftOut })),
+      Story.then(g1, groupDecided({ change: 1, rows: "row-3,row-14", count: 2, patch: leftOut })),
+      Story.then(life, groupCounted({ change: 1, rows: 2 })),
+      Story.provide(CurrentActor, dana),
+      Story.when(act({ row: "row-14", step: "d1", saw: 0, sawGroup: 1, covered: true, flags: typedEight })),
+      Story.then(row14, decided({ change: 2, by: "dana", step: "d1", flags: typedEight })),
+      Story.then(life, counted({ change: 2, step: "d1", by: "dana", flags: typedEight, row: "row-14" })),
+      Story.when(undo({ row: "row-14", undo: 2, step: "u1", sawGroup: 1 })),
+      Story.then(row14, StepUndone.make({ next: noLevel, below: "", undo: 2, step: "u1", by: "dana" })),
+      Story.then(life, undoneToNothing({ change: 3, step: "u1", actor: "dana", row: "row-14" })),
+      // A copy of the press that stalled on the way arrives now. The row holds nothing again, which is exactly what
+      // the copy says it saw: only the undo it has not received tells it from a new press. It is refused naming the
+      // undo, and her 8 is not back on the row she cleared.
+      Story.when(act({ row: "row-14", step: "d1", saw: 0, sawGroup: 1, covered: true, flags: typedEight })),
+      Story.rejected(UndoneSince.make({ by: "dana", change: 2 })),
+      Story.then(row14),
+      Story.then(life),
+      Story.state(row14, { status: "Undecided" }),
+      // A press made after the undo, on a screen that has it, is taken.
+      Story.when(
+        act({ row: "row-14", step: "d2", saw: 0, sawUndone: 2, sawGroup: 1, covered: true, flags: typedEight })
+      ),
+      Story.then(row14, decided({ change: 4, by: "dana", step: "d2", flags: typedEight })),
+      Story.then(life, counted({ change: 4, step: "d2", by: "dana", flags: typedEight, row: "row-14" }))
     )
 )
 it.effect(

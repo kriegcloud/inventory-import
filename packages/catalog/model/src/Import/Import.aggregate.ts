@@ -93,7 +93,8 @@ export class ImportConfirmed extends Domain.Event(
 
 /**
  * The import was taken back. Of the items its confirms created: how many were removed, and kept because someone
- * changed them. Of the items they replaced: how many were put back, and kept for the same reason.
+ * changed them. Of the replacements they made (a count of replacements, as the confirms said them, not of items):
+ * how many were put back, and kept for the same reason.
  */
 export class ImportTakenBack extends Domain.Event(
   "ImportTakenBack",
@@ -295,8 +296,9 @@ const kept = {
   // The number of the last change, and of the last confirm that stands (0 when none does).
   changes: S.Int,
   confirmedAt: S.Int,
-  // Items its confirms created that are in force, items they replaced and that were not put back, and its confirms not
-  // taken back.
+  // Items its confirms created that are in force; replacements its confirms made that were not put back (each
+  // confirm adds its `updated`, the sender's count, so an item replaced by two confirms counts twice: a count of
+  // replacements, not of items, and bounded by nothing but what the senders said); and its confirms not taken back.
   inForce: S.Int,
   replaced: S.Int,
   standing: S.Int,
@@ -428,7 +430,9 @@ export class Import extends Domain.Aggregate(
       // The status becomes Imported only by a confirm.
       NothingIsWrittenBeforeConfirm: ({ before, after, command }) =>
         !isImported(after) || isImported(before) || isConfirm(command),
-      AConfirmOfAClosedImportWritesNothing: ({ before, after, command }) =>
+      // A confirm leaves the status of an import that is not open as it was. It says no more: what stops a second
+      // confirm from writing is that one on a closed import is refused, and "every change has its own number".
+      AConfirmLeavesAClosedImportsStatusAsItWas: ({ before, after, command }) =>
         !isConfirm(command) || isOpen(before) || after.status === before.status,
       // Nothing is confirmed that was not on screen: the confirm names the last change, as the last of every one its
       // screen received; its plan is of that change; and the plan does what the screen said it would.
@@ -492,7 +496,9 @@ export class Import extends Domain.Aggregate(
         !isMatch(command) || !isOpen(before) || !isOpen(after) || after.columns === command.columns,
       AMatchIsTheNextOne: ({ before, after, command }) =>
         !isMatch(command) || !isOpen(before) || !isOpen(after) || after.matching === before.matching + 1,
-      OnlyAnOpenImportIsReviewed: ({ before, after }) =>
+      // The matching moves only on an open import. It reads the matching alone: that no row or group act lands on a
+      // closed import is each decision's own rule ("a row is decided only on an open import" and its like).
+      TheMatchingMovesOnlyOnAnOpenImport: ({ before, after }) =>
         isOpen(before) ||
         isUnstaged(before) ||
         isRemoved(before) ||

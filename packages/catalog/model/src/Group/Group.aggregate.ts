@@ -96,12 +96,15 @@ export class Group extends Domain.Aggregate(
     invariants: {
       // That its number is one its import gave, and that its undo comes after it, need the import: they are rules
       // over every import and group in the model, searched and not proved.
-      AGroupHasRows: (s) => !isDecidedGroup(s) || s.count >= 1
+      // The count is its sender's word: the model reads no row out of a group's rows, so nothing ties it to them.
+      AGroupSaysAtLeastOneRow: (s) => !isDecidedGroup(s) || s.count >= 1
     },
     transitions: {
       // What a group decided never changes: its rows, what it does to them, its number, whose it is.
       AGroupKeepsItsRows: ({ before, after }) =>
         !isDecidedGroup(before) || !isDecidedGroup(after) || after.rows === before.rows,
+      AGroupKeepsItsCount: ({ before, after }) =>
+        !isDecidedGroup(before) || !isDecidedGroup(after) || after.count === before.count,
       AGroupKeepsItsPatch: ({ before, after }) =>
         !isDecidedGroup(before) || !isDecidedGroup(after) || after.patch === before.patch,
       AGroupKeepsItsNumber: ({ before, after }) =>

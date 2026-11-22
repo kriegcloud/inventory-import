@@ -40,6 +40,10 @@ and meets the day's count the new model itself wrote since move 2. Decision 37 a
 has stored, so it does not settle this. While no deploy he keeps holds counts, move 7 is a fresh start; otherwise
 whether the day's count is carried across or starts again is his, asked when move 7 opens.
 
+A third rests on it, at move 8: suggestions move into an object of their own, which starts empty, so an import left
+open across that deploy has no suggestions until they are made again. Whether that matters on a stage is his, with the
+point above. Not decided.
+
 | # | Question | Recommended in the brief | Changes | Where it is argued |
 | --- | --- | --- | --- | --- |
 | 21a | With Better Auth's organization writes closed, sign-up no longer founds an organization: does the operator found each one with `FoundOrganization` on `AdminApi`, for an account that exists, and who is its actor before any member row exists? (Asked when move 6 opens.) | | 21 | [the brief](BRIEF.md), decision 21 |
@@ -406,8 +410,8 @@ again if they still mean it.
 Further answers by dialog on the same day. Reverse each: a new decision by him.
 
 - **The pin.** The library's `main` is pinned at `734c27a`, 67 commits past the `dbfd0dd` every trial on the trial page
-  ran on; no trial ran on `734c27a`. On it the model he chose is built and merged into main (`0c4c5e5`). Counted in `packages/catalog/model` here: its lock keeps 153 rules, 135 of the kinds a proof covers,
-  7 across instances and 11 "can happen"; 47 stories; 154 mutants. That the 135 are proved, the 7 searched and the 11
+  ran on; no trial ran on `734c27a`. On it the model he chose is built and merged into main (`0c4c5e5`). Counted in `packages/catalog/model` at `53654e6`: its lock keeps 162 rules, 143 of the kinds a proof
+  covers, 8 across instances and 11 "can happen"; 63 stories; 184 mutants. That the 143 are proved, the 8 searched and the 11
   reached is by the build's own report. The per-row model is on a branch of its own, not on main, as the fallback
   (96 proved, 3 searched, by the build's own report).
   His
@@ -539,11 +543,12 @@ What follows from it, as the library at the pin and the model on main show it:
 - The lock acts in `check:full`, CI's `proofs` job and the nightly run, where `Catalog.verify.test.ts` runs
   `Verify.report` over `Catalog` with `lock: "./Catalog.lock.json"` and fails on a rule the lock holds differently or a
   rule relocked. On main that test passes `require.proved` with every rule the lock keeps of the kinds a proof covers:
-  135 (114 transitions, 19 invariants, 2 relations, counted in `Catalog.lock.json` here), in place of the assertion by
+  143 at `53654e6` (122 transitions, 19 invariants, 2 relations, counted in `Catalog.lock.json`), in place of the assertion by
   kind it had before.
-- The check that every decision recording on a row or a group states that aggregate's three rules on who may change
-  it: on main each of the four decision proofs calls `missingRules` (`packages/catalog/model/test/proving.ts`), which
-  fails, naming the decision, when one leaves out the three rules. It was removed with the hand-written lists and then
+- The check that every decision recording on a row or a group states that aggregate's rules on who may change it
+  that can fail in it (three for an undo, two for an act): on main each of the four decision proofs calls
+  `missingRules` (`packages/catalog/model/test/proving.ts`), which fails, naming the decision, when one leaves out one
+  of them. It was removed with the hand-written lists and then
   restored; his answer did not name it, and he was asked later the same day: "Keep it, named as ours" (under "the four
   answers settled under the rule", below).
 
@@ -563,9 +568,11 @@ older matching is refused and held, not answered no change"), each shown by its 
 proves: with the exit put back ahead of the check of what the sender saw, every rule is still proved and both stories
 fail; with it moved between the two checks, every rule is still proved and only the matching story fails. On
 `review15` the row's act has 284 paths and 135 rules are proved, with 46 stories. No rule checks what the sender says.
-On main `Deciding.decision.ts` has the same exit, taken after the checks of the decision the sender saw and of the
-matching. Main has the saw story (Carl's, in `test/Group.story.test.ts`) and its mutant (`row-covered-early`), but not
-the matching story, nor a mutant that puts the exit between the two checks; both are still to add.
+In this repository, at `53654e6`, `Deciding.decision.ts` has the same exit, taken after the checks of the decision the
+sender saw and of the matching. Both halves have their story in `test/Group.story.test.ts` ("a press from a screen
+that is behind is held, not lost as no change", Carl's; "a covered press made on an older matching is held too") and
+their mutant (`row-covered-early`, the exit ahead of the check of what the sender saw; `row-covered-before-matching`,
+the exit between the two checks).
 
 **Keep vs earlier** (decision 14a's other order, under decision 14). Question: row 10 already had a decision before Ana
 keeps row 4: does the keep leave it out? Options: "As today, never overwrite a choice" (Recommended); "Any earlier
@@ -604,7 +611,10 @@ replaced both answers the same day. Neither is the plan.
 What it means: the new model's migrations create its tables on an empty database; the seeds (the test accounts, the
 seeded organization's reference data) are written for the new model; local development data is reset with
 `bun run db:reset`; no carry-over code or test exists. No `Adopt…` command, no rewritten rule for adoption, no use of the
-library's `import` for it. Reverse: a new decision by him, before the first deploy he keeps holds data.
+library's `import` for it. Reverse: a new decision by him, before the first deploy he keeps holds data. It is about
+the rows the current app stored before the model: a stage's own events, and the rows the model writes from move 3 on,
+stay across later moves' deploys on that stage, and a move's migrations add its tables beside them (the brief, "What
+each move needs from Benjamin, by hand").
 
 ### 2026-11-22 — several people on one import: the standing rule
 
@@ -637,9 +647,13 @@ that happens to match what the row holds be dropped or held?" Options: "Hold it 
 'no change' is given only when the sender has seen the row's latest decision, or the row's own decision is newer than
 the last group; otherwise the press is refused and shown. "Keep 'no change' as decided". Answer: "Hold it when behind
 (Recommended)". It narrows his answer of 2026-11-19, "Answer says 'no change'", as the model read it ("no change,
-whoever decided it and whether or not the sender has seen it"), for this one case. Not built on main: there `Deciding`
-answers a press its sender says no group covers "no change" when the text is what the row holds, before the check of
-what the sender saw, so Carl's press is still dropped. Not in the trial model `review15`; no trial numbers.
+whoever decided it and whether or not the sender has seen it"), for this one case. Built at `53654e6`: from a screen
+that has not seen the row's decision, `Deciding` answers a press its sender says no group covers "no change" only when
+the row's own decision is newer than the last group; otherwise it refuses with `DecidedSince`, or `PutBackSince` when
+what the sender saw was taken back, and Carl's press is refused `PutBackSince` and held. The story is "a press that
+matches what the row holds is held when its screen is behind a group" (`test/Group.story.test.ts`), with the mutants
+`row-same-behind` and `row-same-untouched-behind`. Not in the trial model `review15`; no trial numbers on `dbfd0dd`;
+that its proofs pass is by the build's own report.
 
 **A warning before a group's undo** (under decision 8). Question: "Ana is about to undo her group. Her screen already
 holds a later decision by Dana on row 14 of that group, which the undo will leave in place. Does the screen warn Ana
@@ -668,8 +682,47 @@ applied, it is held and shown" settles, one line each: the case; what the rule g
 Overrule any line by saying so.
 
 - A stale press whose text matches what the row holds, from a screen that missed the row's latest decision, on a row
-  whose own decision is not newer than the last group; refused and held with both, not answered "no change"; to build
-  in `Deciding` (`packages/catalog/model/src/Review/Deciding.decision.ts`), with a story, in move 1's remaining work.
+  whose own decision is not newer than the last group; refused and held with both, not answered "no change"; built in
+  `Deciding` (`packages/catalog/model/src/Review/Deciding.decision.ts`) at `53654e6`, with the story "a press that
+  matches what the row holds is held when its screen is behind a group" and the mutant `row-same-behind`.
+- The same text made again on a newer matching than the row's decision; a change, recorded on the matching now (a
+  press made on an older matching is refused `MatchedSince`); built in `Deciding` (`onItsMatching`) at `53654e6`, with
+  the story "the same decision made again on a newer matching is a change, and made on the older one it is refused" and
+  the mutants `row-same-matching` and `row-same-unseen-matching`.
+- A press whose sender saw a decision that was taken back since, so an older one is there again; refused
+  `PutBackSince`, naming whose decision is there again, and held with both like `DecidedSince`, the screen saying the
+  decision it showed was taken back, not that someone decided since; built in `Deciding` at `53654e6`, with the story
+  "when the decision its sender saw was taken back and an older one is there again, the refusal says so" and the
+  mutants `row-putback` and `row-putback-covered`; the queue's handling, move 3.
+- A row's undo of a decision that a later group in force covers, by its sender's word; refused `GroupedAfter`, naming
+  the import's last group in force, as a group's undo under a later group is, and taken once that group is taken back;
+  built in `Undoing` (`UndoRowStep.ARowsUndoSaysNoLaterGroupCoversIt`, the sender's `covered`) at `53654e6`, with the story "a decision a
+  later group covers is not taken back from under it" and the mutant `undo-covered`.
+- A covered press sent twice (the same step, sender and text), its first answer lost; written once, the second answered
+  with nothing new recorded and not refused with the sender's own decision; built in `Deciding` at `53654e6`, with the
+  story "a covered press sent twice is written once and answered the same" and the mutant `row-resend-covered`.
+- A press from a screen that has not received an undo landed on the row, a late copy of the very press taken back
+  among them; refused `UndoneSince`, naming who took it back and which change, and held, not written over what the undo
+  put back; built in `Deciding` (`sawUndone`) at `53654e6`, with the stories "a press drawn before an undo is not
+  written over what the undo put back" and "a press sent again after its sender took it back is not written a second
+  time" and the mutant `row-undone`; the queue's handling, move 3.
+- A row's undo pressed on a screen that has not received a match; refused `MatchedSince` and held, as a row's act is,
+  and taken once made on the matching now; built in `Undoing` (`madeOn`) at `53654e6`, with the story "a row's undo
+  pressed on a screen that has not received a match is refused and held, and taken once it has" and the mutant
+  `undo-madeon`.
+- A press or an undo sent twice, its first answer lost, with another person's act landing between (a match for a
+  press; a group act, or a confirm and a reopening, for an undo); answered as the first time, with nothing new
+  recorded; a press sent twice after a group act landed is still refused `GroupedSince` until the screen has it, and
+  sent again then on a row no group covers it is refused `DecidedSince`, naming the sender's own decision, unless the
+  queue knows its own act from the stream first (move 3's work, not built; a case in Proof 3; no story); built
+  in `Deciding` and `Undoing` at `53654e6`, with the stories "a press sent twice with a match landing between is
+  answered as the first time", "an undo sent twice is answered as the first time when a group act landed between" and
+  "an undo sent twice is answered as the first time when the import was confirmed and opened again between", and the
+  mutants `row-resend-matched`, `undo-resend-grouped` and `undo-resend-reopened`.
+- A group's undo from a screen that is behind on the rows; taken, since it takes back only its sender's own act and
+  replaces nothing of anyone else's, so a row another person decided since keeps that whole decision and the screen
+  names such rows after; built in `UndoingGroup` at `53654e6`, with the story "a group's undo is taken from a screen
+  that is behind on the rows, and touches none".
 - A group's undo while the undoer's screen holds a later decision on one of its rows; no warning before, the screen
   names the row after the undo lands ("Row 14 was changed by Dana and stays"); the Review step's screen, move 3.
 - A suggested fix accepted on a rival row after a keep; the rival stays out, as an accept made before the keep; only a

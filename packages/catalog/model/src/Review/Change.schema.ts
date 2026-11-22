@@ -72,10 +72,13 @@ export const Flags = S.String.check(S.isMaxLength(600_000)).annotate({
 export type Flags = typeof Flags.Type
 
 /**
- * The rows of one act on a group, as the one text an encoder writes for them: never empty, and bounded as a file's
- * rows are. No rule reads inside it: a group names the same rows as another when its text is the same.
+ * The rows of one act on a group, as the one text an encoder writes for them: never empty, and bounded at a million
+ * characters, a bound this model sets. It takes the ids of 50,000 items at their longest (16 characters each, quoted
+ * and with a comma: 950,001), which is every row of the largest file staged when each holds one item. A group over
+ * more than that is no valid command and gets no named refusal: its screen has to send it as more than one act. No
+ * rule reads inside it: a group names the same rows as another when its text is the same.
  */
-export const Rows = S.String.check(S.isMinLength(1), S.isMaxLength(600_000)).annotate({
+export const Rows = S.String.check(S.isMinLength(1), S.isMaxLength(1_000_000)).annotate({
   description: "The rows one act on a group names, as one text"
 })
 /** The decoded value of `Rows`. */

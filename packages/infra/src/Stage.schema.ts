@@ -152,7 +152,7 @@ export class NotGiven extends S.Opaque<NotGiven, { readonly brand: unique symbol
 ) {}
 
 /**
- * The value is read from a variable of the deploying process, which `op run` or the deploy job's environment fills.
+ * The value is read from a variable of the deploying process, which the stack's 1Password entry or the deploy job's environment fills.
  * The plan names the variable and never holds what is in it.
  */
 export class FromEnvironment extends S.Opaque<FromEnvironment, { readonly brand: unique symbol }>()(

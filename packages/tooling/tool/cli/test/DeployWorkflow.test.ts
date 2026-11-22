@@ -332,18 +332,29 @@ layer(here)("the deploy workflow", (it) => {
             does: step.uses ?? step.run,
             named: step.name ?? "",
             given: step.with ?? {},
+            told: step.env ?? {},
             when: step.if ?? "always"
           }))
         const uses = (does: string, given: Record<string, unknown>, when = "always") => ({
           does,
           named: "",
           given,
+          told: {},
           when
         })
         const checkout = (given: Record<string, unknown>) => uses("actions/checkout@v4", given)
         const node = (when = "always") => uses("actions/setup-node@v4", { "node-version": 22 }, when)
         const bun = (when = "always") => uses("oven-sh/setup-bun@v2", { "bun-version-file": ".bun-version" }, when)
-        const runs = (named: string, does: string, when = "always") => ({ does, named, given: {}, when })
+        // What a step is told is part of what it does: a guard given another commit to compare checks nothing.
+        const runs = (named: string, does: string, when = "always", told: Record<string, string> = {}) => ({
+          does,
+          named,
+          given: {},
+          told,
+          when
+        })
+        const ciBranch = "${{ github.event.workflow_run.head_branch }}"
+        const ciSha = "${{ github.event.workflow_run.head_sha }}"
         const onHead = "steps.head.outputs.deploy == 'true'"
         const ciCommit = { ref: "${{ github.event.workflow_run.head_sha }}" }
         expect(each(jobs, steps)).toEqual({
@@ -364,7 +375,7 @@ layer(here)("the deploy workflow", (it) => {
           ],
           staging: [
             checkout(ciCommit),
-            runs("Deploy only the commit main is at", onlyMainsHead),
+            runs("Deploy only the commit main is at", onlyMainsHead, "always", { CHECKED: ciSha }),
             node(onHead),
             bun(onHead),
             runs("", install, onHead),
@@ -377,12 +388,18 @@ layer(here)("the deploy workflow", (it) => {
             runs("", install),
             runs(
               "Refuse a release that is not one",
-              'bun run beep release verify-head "$BRANCH" "$CHECKED" --output "$GITHUB_OUTPUT"'
+              'bun run beep release verify-head "$BRANCH" "$CHECKED" --output "$GITHUB_OUTPUT"',
+              "always",
+              { BRANCH: ciBranch, CHECKED: ciSha }
             )
           ],
           production: [
             checkout(ciCommit),
-            runs("Deploy only a release that is still its branch's head", onlyTheBranchsHead),
+            runs("Deploy only a release that is still its branch's head", onlyTheBranchsHead, "always", {
+              BRANCH: ciBranch,
+              CHECKED: ciSha,
+              TAG: "${{ needs.release-tag.outputs.tag }}"
+            }),
             node(),
             bun(),
             runs("", install),
@@ -392,16 +409,24 @@ layer(here)("the deploy workflow", (it) => {
         // The only places the file names the deploy tool are those four commands: no script holds a fifth.
         const source = yield* text("deploy.yml")
         expect(A.length(Str.split("alchemy")(source)) - 1).toBe(4)
-        // Production's check after the approval is told the branch, the commit and the tag as values.
-        const recheck = O.getOrThrow(
-          O.flatMap(R.get(jobs, "production"), (job) =>
-            A.findFirst(job.steps, (step) => step.name === "Deploy only a release that is still its branch's head")
-          )
-        )
-        expect(recheck.env).toEqual({
-          BRANCH: "${{ github.event.workflow_run.head_branch }}",
-          CHECKED: "${{ github.event.workflow_run.head_sha }}",
-          TAG: "${{ needs.release-tag.outputs.tag }}"
+        // Each job's own variables, by name and by what is written for each: nothing is added to a job unseen.
+        const account = {
+          CLOUDFLARE_API_TOKEN: "${{ secrets.CLOUDFLARE_API_TOKEN }}",
+          CLOUDFLARE_ACCOUNT_ID: "${{ vars.CLOUDFLARE_ACCOUNT_ID }}"
+        }
+        const password = { PREVIEW_TEST_ACCOUNT_PASSWORD: "${{ secrets.PREVIEW_TEST_ACCOUNT_PASSWORD }}" }
+        const stage = { STAGE: "pr-${{ github.event.pull_request.number }}" }
+        expect(each(jobs, (job) => job.env ?? {})).toEqual({
+          preview: { ...account, ...password, ...stage },
+          cleanup: { ...account, ...stage },
+          staging: { ...account, ...password },
+          "release-tag": {},
+          production: {
+            ...account,
+            OPENROUTER_API_KEY: "${{ secrets.OPENROUTER_API_KEY }}",
+            DEPLOY_WITHOUT_MODEL_KEY: "${{ vars.DEPLOY_WITHOUT_MODEL_KEY }}",
+            SIGN_UP: "${{ vars.SIGN_UP }}"
+          }
         })
       })
   )
@@ -582,17 +607,33 @@ layer(here)("the deploy workflow's three shell guards, run", (it) => {
             const later = yield* asked(second, "v1.0.1")
             // The tag is moved off the commit that was checked.
             const movedTag = yield* asked(second, "v1.0.0")
-            // A branch and a tag whose names only end as the real ones do, at the first release's commit: `git
-            // ls-remote` lists them before the real ones, and the first release still may not deploy.
+            // A branch whose name only ends as the real one does, at the first release's commit: `git ls-remote`
+            // lists it before the real one, and the first release still may not deploy. This case runs the branch
+            // line's exact match; the one after it stops on the branch too, whatever its tag line reads.
             yield* git("push", "-q", "origin", `${first}:refs/heads/a/refs/heads/release/1.0`)
             yield* git("push", "-q", "origin", "v1.0.0:refs/tags/a/refs/tags/v1.0.1")
             const decoyBranch = yield* asked(first, "v1.0.0")
             const decoyTag = yield* asked(first, "v1.0.1")
             const laterStill = yield* asked(second, "v1.0.1")
-            return [whileHead, noSuchTag, noSuchBranch, replaced, later, movedTag, decoyBranch, decoyTag, laterStill]
+            // The tag line's exact match, run: the branch's head is the commit checked, the real v1.0.0 is on the
+            // older commit, and only a tag whose name ends as v1.0.0 does is on the head, listed first.
+            yield* git("push", "-q", "origin", "v1.0.1:refs/tags/a/refs/tags/v1.0.0")
+            const decoyTagAtHead = yield* asked(second, "v1.0.0")
+            return [
+              whileHead,
+              noSuchTag,
+              noSuchBranch,
+              replaced,
+              later,
+              movedTag,
+              decoyBranch,
+              decoyTag,
+              laterStill,
+              decoyTagAtHead
+            ]
           })
         )
-        expect(seen).toEqual([0, 1, 1, 1, 0, 1, 1, 1, 0])
+        expect(seen).toEqual([0, 1, 1, 1, 0, 1, 1, 1, 0, 1])
       })
   )
 })

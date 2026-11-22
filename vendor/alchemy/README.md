@@ -4,7 +4,7 @@
 `main`. Its registry, `https://pkg.alchemy.run`, serves a build of every commit of `main` and deletes it a week after
 `main` has moved on. So the build this repository uses is kept here, and an install needs that registry for nothing.
 
-`packages/infra` uses `alchemy`, `@alchemy.run/cloudflare` and `@alchemy.run/github`. The model of the review in
+`packages/infra` uses `alchemy`, `@alchemy.run/cloudflare`, `@alchemy.run/github` and `@alchemy.run/1password`. The model of the review in
 `packages/catalog/model`, and the test in `packages/catalog/web` that holds it against the review region, use
 `@alchemy.run/domain`, which is the reason for the pin. All of them come from the same commit because one
 `node_modules` holds one `alchemy`.
@@ -12,10 +12,11 @@
 ## What is here
 
 <!-- pin:start (written by repin.py from sources.json; do not edit by hand) -->
-The commit is `734c27a` of the library's `main`, pinned on 2026-11-22: 17 packages, 38.7 MB as files.
+The commit is `734c27a` of the library's `main`, pinned on 2026-11-22: 18 packages, 38.7 MB as files.
 
 | Package | Version | Licence | Size | Sibling addresses replaced |
 | --- | --- | --- | ---: | ---: |
+| `@alchemy.run/1password` | 2.0.0-beta.87 | Apache-2.0 | 22.8 kB | 1 |
 | `@alchemy.run/acme` | 2.0.0-beta.87 | Apache-2.0 | 61.8 kB | 2 |
 | `@alchemy.run/cloudflare` | 2.0.0-beta.87 | Apache-2.0 | 3.8 MB | 11 |
 | `@alchemy.run/cloudflare-runtime` | 2.0.0-beta.87 | Apache-2.0 | 1.6 MB | 2 |

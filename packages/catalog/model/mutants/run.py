@@ -13,8 +13,9 @@ accepted act made to record nothing. For each one chosen, the package's `src/`, 
 `@alchemy.run/domain` and `effect` resolve as they do for the package), the change is made there, and vitest runs the
 mutant's proof file and both story files in that copy with its JSON reporter. The class:
 
-    rule     the proof names a rule that is no longer proved: the rule notices the change
-    proof    the proof failed, and on no rule: only a number the test states (its paths, "some state lets it record")
+    rule     the proof names a rule as violated, with the state and the command that break it: the rule notices
+    proof    the proof failed, and no rule is shown broken: a number the test states moved (its paths, "some state
+             lets it record"), or the prover gave up on a rule or could not read the changed code
     story    only a story failed: the change is seen, but no rule says it is wrong
     neither  nothing failed: the change goes unnoticed
     timeout  nothing failed but a test that ran out of time: nothing is known, and nothing held it
@@ -132,6 +133,7 @@ EXPECTED = re.compile(r"expected (.{1,60}?) to (?:be|deeply equal) (.{1,60}?)(?:
 # A rule's name as a report prints it: `OutcomesAddUpToTheRows`, or `Row.TheSizeOfByIsTrue` in a decision's report.
 RULE_NAME = re.compile(r"^((?:[A-Z][A-Za-z0-9]*\.)?[A-Z][A-Za-z0-9]*)(?=$|:| \()")
 STANDING = re.compile(r"^(?:Violated|Unconfirmed|violated|not proved|proved for short lists only|read wrongly|not read|not decided)\s+")
+BROKEN = re.compile(r"\bviolated\b")
 TIMED_OUT = "timed out"
 
 
@@ -163,13 +165,20 @@ def why_proof(messages):
     if current is not None:
         found.append(current + (f" ({', '.join(under)})" if under else ""))
     found = [r for r in dict.fromkeys(found) if not r.startswith("Import folds")]
-    rules = [r for r in found if rule_name(r)]
-    other = [r for r in found if not rule_name(r)]
-    if not rules:
+    # Only "violated" is a rule noticing the change: the solver found a state and a command, and the real code broke
+    # the rule on them. Every other standing is the prover not finishing ("not decided": its time or work limit, or
+    # more paths than it takes), not reading the changed code ("not read", "read wrongly"), or not confirming what it
+    # found ("not proved"), and a rule the report marks only because its command may leave the schema has no standing
+    # at all. None of those shows that a rule forbids the change, so each is the proof's own and no rule's.
+    rules = [r for r in found if rule_name(r) and BROKEN.search(r)]
+    other = [r for r in found if r not in rules]
+    if not found:
         for standing, name in RULE_LINE.findall(text):
             item = f"{standing} {name.strip()}"
-            if item not in rules:
+            if standing == "violated" and item not in rules:
                 rules.append(item)
+            elif standing != "violated" and item not in other:
+                other.append(item)
     if rules or other:
         return rules, other
     m = EXPECTED.search(text)

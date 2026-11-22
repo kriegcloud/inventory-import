@@ -145,9 +145,11 @@ A patch never goes the other way: nothing lands on a release branch first.
   `release/` branch of this repository, after its guard job found a tag that may deploy, and runs that guard from
   `main`. `test/DeployWorkflow.test.ts` in the same package parses the file and holds every job's event,
   environment and secrets, and every step of every job in order: each action by name and version with what it is
-  given, each command word for word, each step's own condition. The three shell guards are held as whole scripts, and run, with a branch and a tag
-  whose names only end as the real ones do on the remote. What an action does
-  inside is not read. The workflow files are inputs of that test in `turbo.json`, so a change to one always runs it.
+  given, each command word for word, each step's own condition, and what each step and each job is told (every variable by
+  name, with what is written for it). The three shell guards are held as whole scripts, and run: main's and the
+  release branch's with a branch on the remote whose name only ends as the real one does, and production's also
+  with the branch's head as the commit checked and only a tag whose name ends as the release's does on it. What an
+  action does inside is not read. The workflow files are inputs of that test in `turbo.json`, so a change to one always runs it.
 - **The repository's stack** (`packages/infra/src/GitHub.stack.ts`): only an admin may create, move or delete a `v*`
   tag, and a `release/*` branch is never force-pushed or deleted (admins may bypass both). The `production`
   environment requires Benjamin's approval and takes only a run whose ref is `main`. A workflow started by another
@@ -176,7 +178,10 @@ for a release branch: no release has been cut.
 accounts, keeps sign-up closed, and has no model key. The rules answer, since decision I5 gives a key to production
 only. Its test accounts take the one password the previews share. It runs on the previews' Cloudflare account, from
 the `staging` environment, which only `main` may deploy to. Nobody deploys it until Benjamin has deployed the
-repository's stack with the `staging` environment in it (`goals/infra/PLAN.md`, "What Benjamin does by hand").
+repository's stack with the `staging` environment in it: `bun run beep infra setup --staging` on his workstation,
+which makes the previews' password in 1Password, finds the two Cloudflare accounts, shows the stack's plan and
+deploys it after his yes (`goals/infra/PLAN.md`, "What Benjamin does by hand"; `--dry-run` prints its steps). The
+browser logins, unlocking 1Password, reading the plan and, later, approving each production deploy stay his.
 
 Until then every push to `main` that passes CI is followed by a failed "Deploy" run: the `staging` job stops with
 `MissingPreviewPassword` ("Stage "staging" has no password for its test accounts"), because the environment that
@@ -194,3 +199,12 @@ Cloudflare token's Workers and D1 permissions cover a whole account, so every pr
 change or remove staging, and a pull request's run uses the pull request's own copy of the workflow. The `staging`
 environment's "only main" rule therefore says which run may use that environment, not who can reach staging: anyone
 who can push a branch to this repository can. Staging holds test accounts only and no model key.
+
+That token is Benjamin's own (his choice of 2026-11-22: "Use my own token"). The repository's stack does not make
+it: production's login does not reach the previews' account, so he made an account-owned token there, and the stack
+asks 1Password for it and writes it to the `preview` and `staging` environments. Said plainly: it is broader than a
+token made for the purpose, since it allows whatever he gave it in the dashboard and not only the five permissions a
+deploy needs; every preview job and every staging job holds it; and nobody rotates it but him. To rotate: make a new
+token in the previews' account (Manage Account, Account API Tokens), put its value in the 1Password item, run
+`bun run beep infra setup --staging` and read the plan (the two token secrets change, nothing else), then revoke
+the old one. Production's token is still made by the stack, narrow, in production's account.

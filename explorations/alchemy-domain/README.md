@@ -95,9 +95,10 @@ A model of this app, outside the repository ([the trial](research/04-trial.md)):
   each shown by its own mutant, which the prover still proves; the 148 mutants were not run on it, three of its change
   were. The row-by-row model of the fourth round stays on a branch of its own as the fallback, where on the pinned
   `734c27a` it gives 96 rules proved and 3 searched (its three rules on who may change a row stated on each of its two
-  decisions), by the build's own report. The model he chose is built on `734c27a` and merged into main (`0c4c5e5`), in `packages/catalog/model`: counted there, its lock keeps 135 rules of the kinds a
-  proof covers, 7 across instances and 11 "can happen", with 47 stories and 154 mutants; that the 135 are proved, the
-  7 searched and the 11 reached is the build's own report. The per-row model is on a branch of its own, not on main, so
+  decisions), by the build's own report. The model he chose is built on `734c27a` and merged into main (`0c4c5e5`), in `packages/catalog/model`: counted there at `53654e6`, its lock keeps 143 rules of
+  the kinds a proof covers, 8 across instances and 11 "can happen", with 63 stories and 184 mutants; that the 143 are
+  proved, the 8 searched and the 11 reached is the build's own report. The live numbers are in
+  [docs/verify.md](../../docs/verify.md). The per-row model is on a branch of its own, not on main, so
   its counts are not checked from main. The `dbfd0dd` builds
   the trials installed are deleted by the library's registry a week after `main` moves past that commit; they were kept
   outside the repository, so the trials cannot be run again from the registry after that.

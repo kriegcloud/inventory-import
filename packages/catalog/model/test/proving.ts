@@ -42,35 +42,48 @@ export const standings = (report: Prove.DecisionReport): ReadonlyArray<string> =
   A.map(report.rules, (rule) => `${standingOf(rule.verdict)}  ${rule.name}`)
 
 /**
- * The rules about who may change an instance of an aggregate with no command of its own. Each decision that records
- * on one of these aggregates states them under these names (`CLAUDE.md`, "The model's blocks: what Verify reads").
+ * The rules about who may change an instance of an aggregate with no command of its own, by the event that changes
+ * it. Each decision that records one of these events states the rules under these names (`CLAUDE.md`, "The model's
+ * blocks: what Verify reads"). They are asked by event and not by aggregate, so that a rule is asked only of a
+ * decision in which it can fail: "nobody clears another person's decision" says nothing of a decision that records
+ * `RowDecided`, which always leaves a decision there, and it is not asked of one.
  */
 export const ruleOfWhoMayChange: Readonly<Record<string, ReadonlyArray<string>>> = {
-  Row: ["NobodyClearsAnotherPersonsDecision", "OnlyItsOwnOrganizationChangesTheRow", "AViewerChangesNoRow"],
-  Group: ["NobodyUndoesAnotherPersonsGroup", "OnlyItsOwnOrganizationChangesTheGroup", "AViewerChangesNoGroup"]
+  RowDecided: ["OnlyItsOwnOrganizationChangesTheRow", "AViewerChangesNoRow"],
+  StepUndone: ["NobodyClearsAnotherPersonsDecision", "OnlyItsOwnOrganizationChangesTheRow", "AViewerChangesNoRow"],
+  GroupDecided: ["OnlyItsOwnOrganizationChangesTheGroup", "AViewerChangesNoGroup"],
+  GroupUndone: ["NobodyUndoesAnotherPersonsGroup", "OnlyItsOwnOrganizationChangesTheGroup", "AViewerChangesNoGroup"]
 }
 
-/** The rules about who may change an instance of this aggregate, or none when it has commands of its own. */
-export const whoMayChange = (aggregate: string): ReadonlyArray<string> =>
-  O.getOrElse(R.get(ruleOfWhoMayChange, aggregate), () => A.empty<string>())
+/** The rules about who may change an instance that a decision recording this event must state, or none. */
+export const whoMayChange = (event: string): ReadonlyArray<string> =>
+  O.getOrElse(R.get(ruleOfWhoMayChange, event), () => A.empty<string>())
 
 /**
  * What a decision's report lacks: for each aggregate it reads, at least one rule of that aggregate (so an
- * aggregate whose rules the prover reads no names from shows), and the rules about who may change it that the decision must state itself.
- * Empty when nothing is missing.
+ * aggregate whose rules the prover reads no names from shows), and, for each event it records on a row or a group
+ * (`records`, the names of its command's events), the rules about who may change it that the decision must state
+ * itself. Empty when nothing is missing.
  *
  * Ours, and no rule's standing: the lock and `require.proved` hold the rules a decision has, but only as written, and
  * nothing in the library asks whether a decision that records on a Row or a Group says whose act it records. A Row or
  * a Group has no command, so no middleware of its own: a decision added later that records on one
  * and states none of these would lock and prove, and let anyone change the row.
  */
-export const missingRules = (report: Prove.DecisionReport): ReadonlyArray<string> =>
-  A.flatMap(report.reads, (read) => [
-    ...(A.some(report.rules, (rule) => Str.startsWith(`${read.aggregate}.`)(rule.name))
+export const missingRules = (decision: {
+  readonly report: Prove.DecisionReport
+  readonly records: ReadonlyArray<string>
+}): ReadonlyArray<string> => [
+  ...A.flatMap(decision.report.reads, (read) =>
+    A.some(decision.report.rules, (rule) => Str.startsWith(`${read.aggregate}.`)(rule.name))
       ? []
-      : [`no rule of ${read.aggregate}`]),
-    ...A.map(
-      A.filter(whoMayChange(read.aggregate), (name) => !A.some(report.rules, (rule) => rule.name === name)),
-      (name) => `does not state ${name}`
-    )
-  ])
+      : [`no rule of ${read.aggregate}`]
+  ),
+  ...A.map(
+    A.filter(
+      A.dedupe(A.flatMap(decision.records, whoMayChange)),
+      (name) => !A.some(decision.report.rules, (rule) => rule.name === name)
+    ),
+    (name) => `does not state ${name}`
+  )
+]

@@ -27,6 +27,7 @@ import * as Order from "effect/Order"
 import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
+import { parseSync } from "oxc-parser"
 import { RepoError } from "../../Cli.errors.ts"
 import { Repo } from "../../Repo.service.ts"
 import { scratchpadFolder } from "../../Repo.schema.ts"
@@ -385,75 +386,60 @@ export const leakingLines = (text: string): ReadonlyArray<number> =>
 /** A comment of a file: the line it starts on, from 1, and its text with its marks. */
 type Comment = { readonly line: number; readonly text: string }
 
+// Where the compiler ends a line: a line feed, a carriage return (with its line feed as one), and the two Unicode
+// separators. A `//` comment ends there, so a directive after a lone carriage return is a comment of its own.
+const lineEnd = /\r\n|[\n\r\u2028\u2029]/
+
 /**
- * The comments of a TypeScript file, in order. What a string, a template or a regular expression holds is no comment,
- * so a fixture that quotes `// @ts-ignore` is not read as one. It is a small reader, not the compiler's: a regular
- * expression is known by what stands before its slash, and a slash after `)` or a name is taken as a division, so a
- * regular expression written there that holds a quote can hide a comment after it.
+ * The comments of a TypeScript file, in order, as a parser finds them (oxc-parser, the one the repository's laws
+ * read code with): what a string, a template, a regular expression or the text of a JSX element holds is no comment,
+ * and a slash is a division, a tag's or a regular expression's by the grammar, not by a guess at what stands before
+ * it. The path says whether the file is read as JSX. Nothing when the parser refuses the file: its comments past the
+ * error are not known.
  *
  * @example
- * commentsOf('const sample = "// no"\n// yes\n') // [{ line: 2, text: "// yes" }]
+ * commentsOf("Try.ts")('const sample = "// no"\n// yes\n') // some([{ line: 2, text: "// yes" }])
  *
  * @category rules
  */
-export const commentsOf = (text: string): ReadonlyArray<Comment> => {
-  const code =
-    /\/\/[^\n]*|\/\*[\s\S]*?(?:\*\/|$)|"(?:\\[\s\S]|[^"\\\n])*"?|'(?:\\[\s\S]|[^'\\\n])*'?|[`{}/]|[^/"'`{}]+/y
-  const template = /(?:\\[\s\S]|\$(?!\{)|[^`\\$])*(?:`|\$\{|$)/y
-  const regex = /\/(?![/*])(?:\\.|\[(?:\\.|[^\]\\\n])*\]|[^/\\\n[])+\//y
-  // A slash starts a regular expression after an operator that wants a value. After `++`, `--`, a `!` that follows a
-  // value (`count!`) and the `<` of a closing tag it is a division or a tag, and so is one after `)` or a name.
-  const mayStartRegex =
-    /(?:^|[(,=:[&|?{};*%~^]|=>|(?<![\w$)\]])!|(?<!\+)\+|(?<!-)-|\b(?:return|typeof|case|in|of|void|delete|throw|yield|await))\s*$/
-  const found: Array<Comment> = []
-  const open: Array<"brace" | "template"> = []
-  let at = 0
-  let line = 1
-  let inTemplate = false
-  let before = ""
-  const take = (pattern: RegExp): string => {
-    pattern.lastIndex = at
-    const match = pattern.exec(text)
-    return match === null ? "" : match[0]
+export const commentsOf =
+  (path: string) =>
+  (text: string): O.Option<ReadonlyArray<Comment>> => {
+    const parsed = parseSync(path, text)
+    return A.isReadonlyArrayNonEmpty(parsed.errors)
+      ? O.none()
+      : O.some(
+          A.map(parsed.comments, (comment) => ({
+            line: Str.split(lineEnd)(Str.slice(0, comment.start)(text)).length,
+            text: Str.slice(comment.start, comment.end)(text)
+          }))
+        )
   }
-  while (at < text.length) {
-    const literal = !inTemplate && mayStartRegex.test(before) ? take(regex) : ""
-    const token = inTemplate ? take(template) : literal === "" ? take(code) : literal
-    if (token === "") return found
-    if (inTemplate) {
-      inTemplate = false
-      if (Str.endsWith("${")(token)) open.push("template")
-      before = Str.endsWith("${")(token) ? "{" : "`"
-    } else if (Str.startsWith("//")(token) || Str.startsWith("/*")(token)) {
-      found.push({ line, text: token })
-    } else if (token === "`") {
-      inTemplate = true
-    } else if (token === "{") {
-      open.push("brace")
-      before = token
-    } else if (token === "}") {
-      inTemplate = open.pop() === "template"
-      before = token
-    } else if (Str.trim(token) !== "") {
-      before = token
-    }
-    line += Str.split("\n")(token).length - 1
-    at += token.length
-  }
-  return found
-}
 
-// The lines on which a comment starts with a directive, as the compiler reads one: after the comment's marks and
-// spaces, on a `//` comment or on a line of a block comment. A sentence that only mentions it is no directive.
+// The lines on which a comment starts with a directive, where the compiler reads one: after the comment's marks and
+// spaces, on a `//` comment, and for a directive it reads in a block comment too on that comment's last line, the
+// only one it looks at. A sentence that only mentions it is no directive, and neither is a line of a doc comment that
+// starts with it and is not the last. In a file the parser refuses nobody knows which lines are comments, so every
+// line that names the directive is given: the file has to be mended before it type-checks anyway, and a line that
+// hides an error must not pass meanwhile.
 const directiveLines =
-  (directive: string) =>
+  (directive: string, blocks: "last line" | "never") =>
+  (path: string) =>
   (text: string): ReadonlyArray<number> => {
+    const names = new RegExp(directive, "i")
     const starts = new RegExp(`^[/*]*\\s*${directive}`, "i")
-    return A.flatMap(commentsOf(Str.replace(/\r/g, "")(text)), (comment) =>
-      A.flatMap(Str.split("\n")(comment.text), (row, index) =>
-        starts.test(Str.trimStart(row)) ? [comment.line + index] : []
-      )
-    )
+    return !names.test(text)
+      ? []
+      : O.match(commentsOf(path)(text), {
+          onNone: () => A.flatMap(Str.split(lineEnd)(text), (row, index) => (names.test(row) ? [index + 1] : [])),
+          onSome: (comments) =>
+            A.flatMap(comments, (comment) => {
+              const rows = Str.split(lineEnd)(comment.text)
+              const last = rows.length - 1
+              const read = blocks === "last line" || Str.startsWith("//")(comment.text)
+              return read && starts.test(Str.trimStart(rows[last] ?? "")) ? [comment.line + last] : []
+            })
+        })
   }
 
 /**
@@ -467,17 +453,19 @@ export const noCheck = "@ts-nocheck"
 /**
  * The lines of a file where a comment starts with {@link noCheck}, numbered from 1, in any mix of capitals: the
  * compiler lower-cases the name before it looks it up, so `@TS-NoCheck` turns the checks off as well. The compiler
- * honours it only in a `//` comment before the code; the scratchpad refuses it at the start of any comment, so nobody
- * has to reason about which comment is the leading one. A string or a sentence that names it is left alone: the
- * compiler does not read those (asked of tsrs 7.1.0-beta, 2026-11-22).
+ * honours it only in a `//` comment before the code; the scratchpad refuses it at the start of any `//` comment, so
+ * nobody has to reason about which comment is the leading one. A string, a sentence that names it or a block comment
+ * that holds it is left alone: the compiler does not read those (asked of tsrs 7.1.0-beta, 2026-11-22). In a file the
+ * parser refuses, every line that names it is given.
  *
  * @example
- * uncheckedLines("// @ts-nocheck\nexport const count = 1\n") // [1]
- * uncheckedLines('export const sample = "// @ts-nocheck"\n') // []
+ * uncheckedLines("Try.ts")("// @ts-nocheck\nexport const count = 1\n") // [1]
+ * uncheckedLines("Try.ts")('export const sample = "// @ts-nocheck"\n') // []
+ * uncheckedLines("Try.ts")("/* @ts-nocheck *\/\nexport const count = 1\n") // []
  *
  * @category rules
  */
-export const uncheckedLines = directiveLines(noCheck)
+export const uncheckedLines = directiveLines(noCheck, "never")
 
 /**
  * The comment that hides whatever type error the next line has, and goes on hiding it once the code is right. The
@@ -496,17 +484,47 @@ export const ignore = "@ts-ignore"
 export const expectError = "@ts-expect-error"
 
 /**
- * The lines of a file where a comment starts with {@link ignore}, numbered from 1, as for {@link noCheck}: a `//`
- * comment, one at the end of a line of code, or a line of a block comment. The compiler honours only the exact
- * capitals; the scratchpad refuses any, which costs nothing.
+ * The lines of a file where a comment starts with {@link ignore}, numbered from 1: a `//` comment, one at the end of
+ * a line of code, or the last line of a block comment, which is the only line of one the compiler reads for it. A
+ * line of a doc comment that starts with it and is not the last hides nothing, and is left alone (asked of tsrs
+ * 7.1.0-beta, 2026-11-22). The compiler honours only the exact capitals; the scratchpad refuses any, which costs
+ * nothing. The path says whether the file is read as JSX.
  *
  * @example
- * ignoredLines("const count = 1\n// @ts-ignore\ncount()\n") // [2]
- * ignoredLines("/** Replaces @ts-ignore with the other. *\/\n") // []
+ * ignoredLines("Try.ts")("const count = 1\n// @ts-ignore\ncount()\n") // [2]
+ * ignoredLines("Try.ts")("/** Replaces @ts-ignore with the other. *\/\n") // []
+ * ignoredLines("Try.ts")("/**\n * @ts-ignore is what this replaces.\n *\/\n") // []
+ * ignoredLines("Try.ts")("/*\n * why\n * @ts-ignore *\/\ncount()\n") // [3]
  *
  * @category rules
  */
-export const ignoredLines = directiveLines(ignore)
+export const ignoredLines = directiveLines(ignore, "last line")
+
+/** The part of a tsconfig file the scan reads. */
+const Included = S.Struct({ include: S.String.pipe(S.Array, S.optionalKey) })
+
+// What the projects of one workspace read: the `include` of every tsconfig file in its folder, each entry absolute. A
+// folder ends in a slash and stands for everything under it (`src`, and `src/**/*.ts` cut at its first `*`); a file
+// is named whole.
+const includedBy = Effect.fnUntraced(function* (dir: string) {
+  const repo = yield* Repo
+  const entries = yield* repo.entries(dir)
+  const configs = A.filter(entries, (entry) => !entry.directory && /^tsconfig(?:\..+)?\.json$/.test(entry.name))
+  const included = yield* Effect.forEach(
+    configs,
+    Effect.fnUntraced(function* (config) {
+      const text = yield* repo.text(config.path)
+      const decoded = yield* decodeJsonc(Included)(config.path, text)
+      return decoded.include ?? []
+    }),
+    { concurrency: 1 }
+  )
+  return A.map(A.flatten(included), (entry) => {
+    const whole = !Str.includes("*")(entry) && /\.(?:[cm]?[jt]sx?|json)$/.test(entry)
+    const path = repo.normalize(repo.join(dir, Str.replace(/\*.*$/, "")(entry)))
+    return whole ? path : `${Str.replace(/\/+$/, "")(path)}/`
+  })
+})
 
 /** The files the type-check reads, each absolute. A test gives its own. */
 export type Listing = Effect.Effect<ReadonlyArray<string>, RepoError, Repo>
@@ -825,9 +843,11 @@ export const scratchCheck = Effect.fn("Scratch.scratchCheck")(function* (types: 
     : []
   const inScratchpad = (file: string) => Str.startsWith(`${state.dir}/`)(file)
   const packages = yield* repo.workspaces
-  // What a workspace's own check reads is its `src` and `test` folders (its tsconfig's `include`); a file elsewhere in
-  // its folder is held by nothing.
-  const workspaces = A.flatMap(packages, (workspace) => [`${workspace.dir}/src/`, `${workspace.dir}/test/`])
+  // What a workspace's own check reads is what the `include` of one of its tsconfig files names: `src` and `test` for
+  // most, only `test` for one with no `src`, some folders of `src` for the app. A file elsewhere in its folder, a
+  // `test` folder no project of it includes among them, is held by nothing.
+  const included = yield* Effect.forEach(packages, (workspace) => includedBy(workspace.dir), { concurrency: 1 })
+  const workspaces = A.flatten(included)
   // A library's file is one inside a package an install put in a `node_modules`: the folder after the last
   // `node_modules` of its path (two folders for a scoped name) holds a package.json. A file somebody wrote in a folder
   // of that name is the experiment's.
@@ -847,13 +867,15 @@ export const scratchCheck = Effect.fn("Scratch.scratchCheck")(function* (types: 
       }
     )
   }
-  // Outside the scratchpad, a file in the `src` or `test` folder of one of the repository's workspaces is that
+  // Outside the scratchpad, a file one of the repository's workspaces includes in a project of its own is that
   // package's own, held by its own check; any other file an experiment reached (one loose in the repository, beside a package.json of its own, or
   // outside the repository) is the experiment's.
   const ours = yield* Effect.filter(
     A.filter(
       A.dedupe(program),
-      (file) => inScratchpad(file) || !A.some(workspaces, (dir) => Str.startsWith(dir)(file))
+      (file) =>
+        inScratchpad(file) ||
+        !A.some(workspaces, (held) => (Str.endsWith("/")(held) ? Str.startsWith(held)(file) : held === file))
     ),
     (file) => Effect.map(installed(file), (library) => !library),
     { concurrency: 1 }
@@ -873,13 +895,13 @@ export const scratchCheck = Effect.fn("Scratch.scratchCheck")(function* (types: 
               `turns an Effect diagnostic off. Only a decide file (\`*.aggregate.ts\`, \`*.decision.ts\`) may, and only \`${decideFileLine}\` as its first line (decision 33 of the Alchemy brief): build with \`.make\` here`
             )
           ),
-          A.map(uncheckedLines(text), (line) =>
+          A.map(uncheckedLines(path)(text), (line) =>
             problem(
               `${path}:${line}`,
               `names \`${noCheck}\`, which turns the type-checker and every Effect diagnostic off for a whole file. No file of the scratchpad may hold it: remove the line and fix what the type-checker then says`
             )
           ),
-          A.map(ignoredLines(text), (line) =>
+          A.map(ignoredLines(path)(text), (line) =>
             problem(
               `${path}:${line}`,
               `names \`${ignore}\`, which hides a type error on the next line and keeps hiding it after the code is fixed. Fix the error, or, where the experiment shows that a wrong call does not compile, write \`${expectError}\`, which fails by itself once the error is gone`
@@ -999,6 +1021,39 @@ export const scratchCheck = Effect.fn("Scratch.scratchCheck")(function* (types: 
     }),
     { concurrency: 1 }
   )
+  // Its scripts are the CLI's too: the type-check and the list of the files it reads are both `bun run types` there,
+  // so a `types` script that says something else is another check, and its list another program's.
+  const scriptsIn = (text: string): ReadonlyArray<readonly [string, string]> =>
+    O.match(objectOf("scripts")(text), {
+      onNone: () => [],
+      onSome: (block) => A.map(entriesOf(block)(text), ([script, command]) => [script.value, command.value] as const)
+    })
+  const written = scriptsIn(state.manifestText)
+  const scripts = A.flatMap(
+    scriptsIn(
+      O.match(
+        A.findFirst(scratchpadFiles, (file) => file.name === "package.json"),
+        {
+          onNone: () => "",
+          onSome: (file) => file.text
+        }
+      )
+    ),
+    ([script, command]) => {
+      const found = A.findFirst(written, ([name]) => name === script)
+      return O.exists(found, ([, theirs]) => theirs === command)
+        ? []
+        : [
+            problem(
+              `${scratchpad}/package.json`,
+              `its \`${script}\` script is ${O.match(found, {
+                onNone: () => "missing",
+                onSome: ([, theirs]) => `\`${theirs}\``
+              })}, not \`${command}\` as the CLI writes it (packages/tooling/tool/cli/src/commands/Scratch/Scratch.config.ts): the scratchpad's checks run through its scripts, so change both together`
+            )
+          ]
+    }
+  )
   const undeclared = A.map(
     A.filter(named, (one) => !A.some(declared, ([dependency]) => dependency === one.library)),
     (one) =>
@@ -1015,7 +1070,8 @@ export const scratchCheck = Effect.fn("Scratch.scratchCheck")(function* (types: 
     unaccounted,
     undeclared,
     unlocked,
-    A.flatten(configs)
+    A.flatten(configs),
+    scripts
   ])
   const structure = A.isArrayNonEmpty(problems)
     ? A.prepend<ScratchFinding, ScratchFinding>(

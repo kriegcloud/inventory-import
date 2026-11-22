@@ -89,6 +89,10 @@ export class UndoingGroup extends Domain.Decision(
       ),
       AGroupsUndoIsOfThisOpening: ({ before, command }) =>
         isOpen(before.life) && command.opening === before.life.confirms,
+      // It is an undo of a group of the import it names: the group's key is built from the import's id and the step,
+      // and two pairs can build the same key.
+      AGroupsUndoIsOfAGroupOfTheImportItNames: ({ before, command }) =>
+        isDecidedGroup(before.group) && before.group.importId === command.importId,
       // Only the last group still in force is taken back; then the one that was under it is the last in force.
       OnlyTheLastGroupInForceIsTakenBack: ({ before }) =>
         isOpen(before.life) && isDecidedGroup(before.group) && before.group.change === before.life.topGroup,

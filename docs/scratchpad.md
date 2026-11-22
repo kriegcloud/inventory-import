@@ -59,20 +59,28 @@ the test's name says it was not run, and it was checked by hand.
   - any other `@effect-diagnostics` line, wherever it stands (the checker reads it in a string too);
   - `@effect-leakable-service` and `@effect-expect-leaking`, the two comments that silence the `leakingRequirements`
     diagnostic, in any mix of capitals, wherever they stand;
-  - a comment that starts with `@ts-nocheck` or `@ts-ignore`, in any mix of capitals. A string, a template or a
-    sentence that only names one is left alone, as the compiler leaves it. `@ts-expect-error` is allowed: it is how an
-    experiment shows that a wrong call does not compile, and it fails by itself once the error is gone, where
-    `@ts-ignore` would go on hiding it.
+  - a comment that starts with `@ts-nocheck` or `@ts-ignore`, in any mix of capitals, where the compiler reads one:
+    `@ts-ignore` in a `//` comment or on the last line of a block comment, `@ts-nocheck` in a `//` comment. A string,
+    a template, the text of a JSX element, a sentence that only names one, and a line of a doc comment that starts
+    with one and is not its last are left alone, as the compiler leaves them. `@ts-expect-error`
+    is allowed: it is how an experiment shows that a wrong call does not compile, and it fails by itself once the
+    error is gone, where `@ts-ignore` would go on hiding it. Which stretches of a file are comments is a parser's
+    answer (oxc-parser, the one the repository's laws read code with), not a guess from the characters around a
+    slash; in a file the parser refuses, every line that names one of the two is refused until the file parses.
 
   It reads the files the compiler itself lists for the scratchpad's type-check (`tsrs -p tsconfig.json
   --listFilesOnly`): the experiments and the scratchpad's configuration, a file loose beside them or in a `dist`
   folder, a folder linked in, and every file one of those reaches by an import, whatever its folder is called and
   whether or not it is in the scratchpad. A list without the scratchpad's own `vite.config.ts` and `vitest.config.ts`
   is not the compiler's whole list, and the check fails and says so. Left alone are a file of an installed library
-  (under a `node_modules`, in a folder with a package.json), a file in the `src` or `test` folder of one of the repository's
-  workspaces, which that package's own check holds, and a file the compiler never loads (JavaScript, or a cache nothing imports). A file
-  somebody wrote in a folder named `node_modules`, beside a package.json that is no workspace's, or in a
-  workspace's folder outside its `src` and `test`, is read.
+  (under a `node_modules`, in a folder with a package.json), a file one of the repository's workspaces includes in a
+  project of its own (the `include` of a tsconfig file in its folder: `src` and `test` for most), which that
+  package's own check holds, and a file the compiler never loads (JavaScript, or a cache nothing imports). A file
+  somebody wrote in a folder named `node_modules`, beside a package.json that is no workspace's, or in a workspace's
+  folder where none of its projects reads (a `test` folder of a package with no test project), is read.
+
+  The scratchpad's `types`, `tests` and `serve` scripts are the CLI's as well: the type-check and the compiler's
+  list both run through `bun run types`, so `scratch:check` fails on a script that says anything else.
 - **Not enforced inside:** the laws on how code is written (no `_tag` told apart by hand, the form of an Effect
   import, a ref that stays the same across draws) and the linter. Each of those laws names the scratchpad as left
   out. They apply the moment code graduates into a package, so write an experiment the way a package is written when

@@ -80,10 +80,11 @@ const note = (started: string, template = "probe", libraries = "") =>
   ])
 
 // The scratchpad's package.json: only the libraries experiments added, everything else from the root's install.
-const manifest = (dependencies: ReadonlyArray<string>) =>
+const manifest = (dependencies: ReadonlyArray<string>, types = "tsrs -p tsconfig.json") =>
   lines([
     "{",
     '  "name": "@x/scratchpad",',
+    `  "scripts": { "types": "${types}", "tests": "vitest run", "serve": "vite --config vite.config.ts" },`,
     dependencies.length === 0 ? '  "dependencies": {}' : '  "dependencies": {',
     ...A.map(dependencies, (line, index) => `    ${line}${index === dependencies.length - 1 ? "" : ","}`),
     ...(dependencies.length === 0 ? [] : ["  }"]),
@@ -423,10 +424,17 @@ describe("scratch", () => {
           "notes/own/package.json": "{}",
           "notes/own/Beside.ts": off,
           // A package's file is that package's, held by its own check.
+          // A package's file is that package's, held by its own check: what a tsconfig file of it includes.
           "packages/kernel/package.json": json({ name: "@x/kernel" }),
+          "packages/kernel/tsconfig.json": json({ include: ["src/**/*.ts"] }),
+          "packages/kernel/tsconfig.node.json":
+            '{\n  // its one configuration file\n  "include": ["vite.config.ts",],\n}\n',
           "packages/kernel/src/Role.ts": off,
-          // Elsewhere in a package's folder its check reads nothing, so there the file is the experiment's.
-          "packages/kernel/notes/Stray.ts": off
+          "packages/kernel/vite.config.ts": off,
+          // Elsewhere in a package's folder its check reads nothing, so there the file is the experiment's: a folder
+          // beside `src`, and a `test` folder no project of the package includes.
+          "packages/kernel/notes/Stray.ts": off,
+          "packages/kernel/test/Unread.ts": off
         },
         scratchCheck(
           types,
@@ -444,16 +452,19 @@ describe("scratch", () => {
             "notes/Outside.ts",
             "notes/own/Beside.ts",
             "packages/kernel/notes/Stray.ts",
-            "packages/kernel/src/Role.ts"
+            "packages/kernel/src/Role.ts",
+            "packages/kernel/test/Unread.ts",
+            "packages/kernel/vite.config.ts"
           )
         ).pipe(said)
       )
       const refused = `turns an Effect diagnostic off. Only a decide file (\`*.aggregate.ts\`, \`*.decision.ts\`) may, and only \`${decideFileLine}\` as its first line (decision 33 of the Alchemy brief): build with \`.make\` here`
       expect(result).toEqual([
-        "err: scratch:check FAIL  11 problems",
+        "err: scratch:check FAIL  12 problems",
         `err:   notes/Outside.ts:1: ${refused}`,
         `err:   notes/own/Beside.ts:1: ${refused}`,
         `err:   packages/kernel/notes/Stray.ts:1: ${refused}`,
+        `err:   packages/kernel/test/Unread.ts:1: ${refused}`,
         `err:   scratchpad/experiments/Loose.ts:1: ${refused}`,
         `err:   scratchpad/experiments/shelf/.lib/Imported.ts:1: ${refused}`,
         `err:   scratchpad/experiments/shelf/.state/Imported.ts:1: names \`${noCheck}\`, which turns the type-checker and every Effect diagnostic off for a whole file. No file of the scratchpad may hold it: remove the line and fix what the type-checker then says`,
@@ -498,9 +509,9 @@ describe("scratch", () => {
     })
   )
 
-  it("a comment is what the compiler would read as one: not a string, a template or a regular expression", () => {
+  it("a comment is what the parser reads as one: not a string, a template, a regular expression or JSX text", () => {
     expect(
-      commentsOf(
+      commentsOf("Try.tsx")(
         A.join(
           [
             'const quoted = "// no" // one',
@@ -510,42 +521,66 @@ describe("scratch", () => {
             "// no`",
             'const pattern = /[/]\\/"/ // three',
             "const half = 4 / 2 /* four",
-            "still four */"
+            "still four */",
+            "const after = (4) /2/ 1 // five",
+            "const text = <p>Don't // no</p> // six"
           ],
           "\n"
         )
       )
-    ).toEqual([
-      { line: 1, text: "// one" },
-      { line: 4, text: "/* two */" },
-      { line: 6, text: "// three" },
-      { line: 7, text: "/* four\nstill four */" }
-    ])
+    ).toEqual(
+      O.some([
+        { line: 1, text: "// one" },
+        { line: 4, text: "/* two */" },
+        { line: 6, text: "// three" },
+        { line: 7, text: "/* four\nstill four */" },
+        { line: 9, text: "// five" },
+        { line: 10, text: "// six" }
+      ])
+    )
   })
 
-  it("a slash after a closing tag's `<`, a `++`, a `--` or a value's `!` starts no regular expression", () => {
+  it("a directive is found after a tag that closes itself, after JSX text with a quote, and after `++` or a `!`", () => {
     const code = A.join(
       [
-        "const label = <b>{name}</b> // one",
-        "const half = count++ / 2 // two",
-        "const less = count-- / 2 // three",
-        "const sure = count! / 2 // four",
-        "const not = !/[/]/.test(name) // five",
-        "const sum = 1 + /\\//.source.length // six"
+        `const row = <Row item={item} /> // ${ignore}`,
+        `const spread = <Row {...props} /> // ${ignore}`,
+        `const tight = <Row item={item}/> // ${ignore}`,
+        `const button = <Btn onClick={() => { go() }} /> // ${ignore}`,
+        `const text = <p>Don't</p> // ${ignore}`,
+        `const said = <p>say "hi \`</p> // ${ignore}`,
+        "const list = (",
+        "  <div>",
+        `    <Row item={item} /> {/* ${ignore} */}`,
+        `    <p>Don't</p> {/* ${ignore} */}`,
+        "  </div>",
+        ")",
+        `const label = <b>{name}</b> // ${ignore}`,
+        `const half = count++ / 2 // ${ignore}`,
+        `const less = count-- / 2 // ${ignore}`,
+        `const sure = count! / 2 // ${ignore}`,
+        `const not = !/[/]/.test(name) // ${ignore}`,
+        `const sum = (1) / 2 + /"/.source.length // ${ignore}`
       ],
       "\n"
     )
-    expect(A.map(commentsOf(code), (comment) => comment.text)).toEqual([
-      "// one",
-      "// two",
-      "// three",
-      "// four",
-      "// five",
-      "// six"
-    ])
-    expect(ignoredLines(`const label = <b>{name}</b> // ${ignore}\nconst half = count++ / 2 // ${ignore}\n`)).toEqual([
-      1, 2
-    ])
+    expect(ignoredLines("Try.tsx")(code)).toEqual([1, 2, 3, 4, 5, 6, 9, 10, 13, 14, 15, 16, 17, 18])
+  })
+
+  it("a line ends where the compiler ends one: a lone carriage return and the two separators too", () => {
+    expect(ignoredLines("Try.ts")(`const a = 1 // note\u2028// ${ignore}\nconst b: number = "x"\n`)).toEqual([2])
+    expect(ignoredLines("Try.ts")(`const a = 1 // note\u2029// ${ignore}\nconst b: number = "x"\n`)).toEqual([2])
+    expect(ignoredLines("Try.ts")(`// note\r// ${ignore}\rconst b: number = "x"\r`)).toEqual([2])
+    expect(uncheckedLines("Try.ts")(`// note\u2028// ${noCheck}\n`)).toEqual([2])
+    expect(uncheckedLines("Try.ts")(`// note\r// ${noCheck}\r`)).toEqual([2])
+  })
+
+  it("in a file the parser refuses, every line that names a directive is given", () => {
+    const broken = `export const broken = {\nconst count = 1\n// ${ignore}\nconst sample = "${ignore}"\n`
+    expect(commentsOf("Try.ts")(broken)).toEqual(O.none())
+    expect(ignoredLines("Try.ts")(broken)).toEqual([3, 4])
+    expect(uncheckedLines("Try.ts")(`/* never closed\n${noCheck}\n`)).toEqual([2])
+    expect(ignoredLines("Try.ts")("export const broken = {\n")).toEqual([])
   })
 
   it("a directive is one where a comment starts with it; a string or a sentence that names it is none", () => {
@@ -558,9 +593,24 @@ describe("scratch", () => {
       ],
       "\n"
     )
-    expect(ignoredLines(quoted)).toEqual([])
-    expect(uncheckedLines(quoted)).toEqual([])
-    expect(ignoredLines(`const count = 1 // ${ignore}\n/*\n * ${ignore} */\n/// ${ignore}: why\n`)).toEqual([1, 3, 4])
+    expect(ignoredLines("Try.ts")(quoted)).toEqual([])
+    expect(uncheckedLines("Try.ts")(quoted)).toEqual([])
+    expect(ignoredLines("Try.ts")(`const count = 1 // ${ignore}\n/*\n * ${ignore} */\n/// ${ignore}: why\n`)).toEqual([
+      1, 3, 4
+    ])
+  })
+
+  it("in a block comment only the last line is read for the one, and none for the other, as the compiler reads them", () => {
+    // A doc comment whose line starts with the name hides nothing: the compiler reports the next line's error.
+    expect(ignoredLines("Try.ts")(`/**\n * ${ignore} is what this wrapper replaces.\n */\ncount()\n`)).toEqual([])
+    expect(ignoredLines("Try.ts")(`/*\n * ${ignore}\n * and more */\ncount()\n`)).toEqual([])
+    // On the last line it hides the line after the comment, whatever stands above it.
+    expect(ignoredLines("Try.ts")(`/**\n * why\n * ${ignore} */\ncount()\n`)).toEqual([3])
+    expect(ignoredLines("Try.ts")(`/* a\n b */ /* ${ignore} */\ncount()\n`)).toEqual([2])
+    expect(ignoredLines("Try.ts")(`/* ${ignore} */ count()\ncount()\n`)).toEqual([1])
+    // The whole file's switch is read in a `//` comment only.
+    expect(uncheckedLines("Try.ts")(`/* ${noCheck} */\n/**\n * ${noCheck}\n */\n/*\n ${noCheck} */\n`)).toEqual([])
+    expect(uncheckedLines("Try.ts")(`/* a note */ // ${noCheck}\n`)).toEqual([1])
   })
 
   it("the comments that silence a leaking requirement are found in any capitals, wherever they stand", () => {
@@ -590,10 +640,10 @@ describe("scratch", () => {
   )
 
   it("the comment that turns a whole file's checks off is found on any line", () => {
-    expect(uncheckedLines(`// ${noCheck}\nexport const count = 1\n`)).toEqual([1])
-    expect(uncheckedLines(`/* a note */\r\n/// ${noCheck}\r\n`)).toEqual([2])
-    expect(uncheckedLines("// @TS-NoCheck\nexport const count = 1\n// @ts-NOCHECK\n")).toEqual([1, 3])
-    expect(uncheckedLines("// @ts-check\nexport const count = 1\n")).toEqual([])
+    expect(uncheckedLines("Try.ts")(`// ${noCheck}\nexport const count = 1\n`)).toEqual([1])
+    expect(uncheckedLines("Try.ts")(`/* a note */\r\n/// ${noCheck}\r\n`)).toEqual([2])
+    expect(uncheckedLines("Try.ts")("// @TS-NoCheck\nexport const count = 1\n// @ts-NOCHECK\n")).toEqual([1, 3])
+    expect(uncheckedLines("Try.ts")("// @ts-check\nexport const count = 1\n")).toEqual([])
   })
 
   it.effect("check refuses a file that turns the type-checker off whole, a decide file too", () =>
@@ -617,9 +667,9 @@ describe("scratch", () => {
   )
 
   it("the comment that hides the next line's error is found in any capitals; the one that expects it is not", () => {
-    expect(ignoredLines(`const count = 1\n// ${ignore}\ncount()\n`)).toEqual([2])
-    expect(ignoredLines("// @TS-Ignore\r\n/* @ts-IGNORE */\r\n")).toEqual([1, 2])
-    expect(ignoredLines(`// ${expectError}\ncount()\n`)).toEqual([])
+    expect(ignoredLines("Try.ts")(`const count = 1\n// ${ignore}\ncount()\n`)).toEqual([2])
+    expect(ignoredLines("Try.ts")("// @TS-Ignore\r\n/* @ts-IGNORE */\r\n")).toEqual([1, 2])
+    expect(ignoredLines("Try.ts")(`// ${expectError}\ncount()\n`)).toEqual([])
   })
 
   it.effect("check refuses a line that hides a type error, and lets one that expects it stand", () =>
@@ -641,6 +691,25 @@ describe("scratch", () => {
         "out: scratch:check OK  the scratchpad's configuration and 1 experiment pass the type-checker and the Effect diagnostics"
       ])
     })
+  )
+
+  it.effect(
+    "check holds the scratchpad's scripts to the CLI's: the type-check and its list of files run through them",
+    () =>
+      Effect.gen(function* () {
+        const result = yield* inTree(
+          {
+            ...repository({ "scratchpad/experiments/idea/NOTE.md": note("2026-11-22") }),
+            "scratchpad/package.json": manifest([], "tsrs -p tsconfig.json --noCheck")
+          },
+          scratchCheck(types, included).pipe(said)
+        )
+        expect(result).toEqual([
+          "err: scratch:check FAIL  1 problem",
+          "err:   scratchpad/package.json: its `types` script is `tsrs -p tsconfig.json --noCheck`, not `tsrs -p tsconfig.json` as the CLI writes it (packages/tooling/tool/cli/src/commands/Scratch/Scratch.config.ts): the scratchpad's checks run through its scripts, so change both together",
+          "out: scratch:check OK  the scratchpad's configuration and 1 experiment pass the type-checker and the Effect diagnostics"
+        ])
+      })
   )
 
   it.effect("check asks for the scratchpad's own lockfile once it lists a library", () =>

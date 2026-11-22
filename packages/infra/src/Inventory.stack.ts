@@ -12,6 +12,7 @@
  */
 import * as Cloudflare from "@alchemy.run/cloudflare"
 import * as Alchemy from "alchemy"
+import * as Secrets from "alchemy/Secrets"
 import * as Output from "alchemy/Output"
 import * as A from "effect/Array"
 import * as Config from "effect/Config"
@@ -22,12 +23,15 @@ import * as Redacted from "effect/Redacted"
 import * as Result from "effect/Result"
 import * as Str from "effect/String"
 import { InfraStage } from "./InfraStage.context.ts"
+import { secretNamesOf } from "./OpReferences.rules.ts"
+import { opEnvReferences } from "./OpReferences.secrets.ts"
 import type { SettingSource } from "./Stage.schema.ts"
 import {
   givenTestPassword,
   modelKeyFor,
   previewPasswordVariable,
   testPasswordOf,
+  planFor,
   withoutModelKeyFlag
 } from "./StagePlan.rules.ts"
 
@@ -56,7 +60,16 @@ const textFrom = Effect.fnUntraced(function* (source: SettingSource) {
  */
 export default Alchemy.Stack(
   "inventory",
-  { providers: Cloudflare.providers(), state: Cloudflare.state() },
+  {
+    providers: Cloudflare.providers(),
+    state: Cloudflare.state(),
+    // What a stage's plan names as a secret is asked of 1Password from a workstation; a workflow's job is given
+    // its own. A `.env` at the root is still read first, as before this option was set.
+    secrets: [
+      Secrets.DotEnv(),
+      opEnvReferences((stage) => Result.match(planFor(stage), { onFailure: () => [], onSuccess: secretNamesOf }))
+    ]
+  },
   Effect.gen(function* () {
     const plan = yield* InfraStage
     const path = yield* Path.Path
@@ -98,6 +111,9 @@ export default Alchemy.Stack(
     const givenPassword = passwordFrom === "given" ? yield* readGivenPassword() : O.none()
     // A workflow's log is public, so a minted password is shown only to a person deploying from their own machine.
     const inWorkflow = yield* Config.Boolean("CI").pipe(Config.withDefault(false))
+    // The setup command hands its terminal to the deploy, and a terminal is not proof of a person: it asks for the
+    // password to be left out, and its owner reads it with a deploy of his own (`goals/infra/PLAN.md`).
+    const hidden = yield* Config.String("HIDE_TEST_ACCOUNT_PASSWORD").pipe(Config.withDefault(""))
 
     const website = yield* Cloudflare.Website.Vite("Website", {
       rootDir: app,
@@ -142,7 +158,9 @@ export default Alchemy.Stack(
         onSome: (password) =>
           inWorkflow
             ? "minted for this stage; not shown in a workflow's log"
-            : Output.map(password.text, Redacted.value)
+            : hidden === "true"
+              ? "minted for this stage; not shown in this run. Deploy the stage again yourself to read it"
+              : Output.map(password.text, Redacted.value)
       })
     }
     // The stack is the entry point the CLI runs: this is where its one layer is provided.

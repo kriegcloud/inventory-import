@@ -16,7 +16,14 @@ import * as Effect from "effect/Effect"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import { scratchpadFiles } from "../src/commands/Scratch/Scratch.config.ts"
-import { bunFiles, noCheck, scratchCheck, scratchNew, scratchSentence } from "../src/commands/Scratch/Scratch.rules.ts"
+import {
+  bunFiles,
+  ignore,
+  noCheck,
+  scratchCheck,
+  scratchNew,
+  scratchSentence
+} from "../src/commands/Scratch/Scratch.rules.ts"
 import { diagnosticDirective } from "../src/commands/Scratch/Scratch.templates.ts"
 import { render } from "../src/Report.schema.ts"
 import { Repo } from "../src/Repo.service.ts"
@@ -77,6 +84,54 @@ describe("what scratch:check reads", () => {
             yield* repo.run("ln", ["-s", repo.join(repo.root, "elsewhere"), repo.join(shelf, "linked")])
             // JavaScript is not in the program (`allowJs` is off), so its header changes nothing.
             yield* repo.write(repo.join(shelf, "gen/api.js"), `// ${noCheck}\nexport const api = 1\n`)
+            // A screen whose two wrong lines each stand under a comment the compiler honours: after a tag that closes
+            // itself, after JSX text with an apostrophe, and on the last line of a block comment. The compiler passes
+            // the file, so it read all three as directives; the scan has to find the same three.
+            yield* repo.write(
+              repo.join(shelf, "Hidden.tsx"),
+              A.join(
+                [
+                  "export const Row = (props: { readonly item: string }) => <b>{props.item}</b>",
+                  'const item = "shelf"',
+                  `export const row = <Row item={item} /> // ${ignore}`,
+                  'export const one: number = "one"',
+                  `export const text = <p>Don't</p> // ${ignore}`,
+                  'export const two: number = "two"',
+                  "/* why this one is wrong,",
+                  ` * ${ignore} */`,
+                  'export const three: number = "three"',
+                  ""
+                ],
+                "\n"
+              )
+            )
+            const compiled = yield* repo.run(repo.join(here, "node_modules/.bin/tsrs"), ["-p", "tsconfig.json"], {
+              cwd: repo.join(repo.root, "scratchpad")
+            })
+            // The comments the compiler does not honour, each over a wrong line: a line of a doc comment that starts
+            // with the name and is not its last, and the whole file's switch in a block comment. The compiler reports
+            // both lines, so nothing is hidden, and the scan leaves the file alone.
+            yield* repo.write(
+              repo.join(shelf, "Loud.ts"),
+              A.join(
+                [
+                  `/* ${noCheck} */`,
+                  "/**",
+                  ` * ${ignore} is what this wrapper replaces.`,
+                  " */",
+                  'export const four: number = "four"',
+                  "/*",
+                  ` * ${ignore}`,
+                  " * and more */",
+                  'export const five: number = "five"',
+                  ""
+                ],
+                "\n"
+              )
+            )
+            const loud = yield* repo.run(repo.join(here, "node_modules/.bin/tsrs"), ["-p", "tsconfig.json"], {
+              cwd: repo.join(repo.root, "scratchpad")
+            })
             // The list is asked for as `scratch:check` asks: `bun run types --listFilesOnly` in the scratchpad.
             const types = Effect.succeed({ code: 0, output: "" })
             const errors = (found: Effect.Success<ReturnType<typeof scratchCheck>>) =>
@@ -89,14 +144,29 @@ describe("what scratch:check reads", () => {
             // error is the type-check's to report.
             yield* repo.write(repo.join(shelf, "Broken.ts"), "export const broken = {\n")
             const broken = yield* scratchCheck(types, bunFiles)
-            return { whole: errors(whole), broken: errors(broken) }
+            return {
+              compiled: { code: compiled.code, said: `${compiled.stdout}${compiled.stderr}` },
+              loud: A.flatMap(Str.split("\n")(`${loud.stdout}${loud.stderr}`), (line) =>
+                A.fromNullishOr(/Loud\.ts\(\d+/.exec(line)?.[0])
+              ),
+              whole: errors(whole),
+              broken: errors(broken)
+            }
           })
         )
         const refused = [
           "err:   scratchpad/experiments/shelf/.lib/Imported.ts:1: turns",
+          "err:   scratchpad/experiments/shelf/Hidden.tsx:3: names",
+          "err:   scratchpad/experiments/shelf/Hidden.tsx:5: names",
+          "err:   scratchpad/experiments/shelf/Hidden.tsx:8: names",
           "err:   scratchpad/experiments/shelf/linked/Linked.ts:1: names"
         ]
-        expect(result).toEqual({ whole: refused, broken: refused })
+        expect(result).toEqual({
+          compiled: { code: 0, said: "" },
+          loud: ["Loud.ts(5", "Loud.ts(9"],
+          whole: refused,
+          broken: refused
+        })
       }),
     slowLimits.testTimeout
   )

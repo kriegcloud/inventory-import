@@ -95,7 +95,7 @@ From `packages/catalog/model` (the runner finds its paths from its own place, so
 
 ```sh
 python3 -I mutants/run.py --sample              # nine fast mutants, about 25 s
-python3 -I mutants/run.py --all --jobs 4        # all 190
+python3 -I mutants/run.py --all --jobs 4        # all 191
 python3 -I mutants/run.py --all --except row-open   # all but the ones named
 python3 -I mutants/run.py --only confirm-sum,group-madeon
 python3 -I mutants/run.py --list                # every mutant, and nothing run
@@ -145,7 +145,7 @@ time: one run of all 190.
   proof test's limit stays 50 minutes, below the hour a run is given, and the nightly runs this mutant apart: the
   job of all mutants leaves it out (`--except row-open`), and a job of its own runs it alone with the proof's limit
   made 100 minutes in its copy (`--only row-open --jobs 1 --proof-limit 6000 --timeout 6600`), so that
-  running out of time there fails that job, named for it, and says nothing of the other 189. On GitHub's runner,
+  running out of time there fails that job, named for it, and says nothing of the other 190. On GitHub's runner,
   at about half this machine's speed, it would take about 51 minutes: an estimate, not measured there. A run that
   only ran out of time still fails, as it must: nothing is known of the mutant then.
 - `--sample`: about 25 s of wall time, each mutant 1 to 4 s.
@@ -153,6 +153,10 @@ time: one run of all 190.
 The result of that one run: all 190 as recorded, none held by neither, none out of time. Held by a rule violated:
 124. By the proof's own numbers or its "not decided" and "not read", with a story failing too: 38. By a story only:
 28. Every mutant kept as held by a rule is held by every rule recorded for it, each given as violated.
+
+One mutant was added after that run, so there are 191: `undo-undone`, the check that a row's undo is made on a
+screen that has the row's last undo, held by its rule violated. The 51 mutants of the two undos were run again with
+it, four at a time, and all came out as recorded (371 s of wall time); the other 140 were not run again.
 
 ## The sample
 

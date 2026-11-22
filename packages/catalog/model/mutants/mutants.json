@@ -1936,6 +1936,22 @@
       ]
     },
     {
+      "key": "undo-undone",
+      "target": "UndoRowStep",
+      "kind": "check",
+      "file": "src/Review/Undoing.decision.ts",
+      "anchors": ["Effect.fn(\"Undoing.decide\")"],
+      "until": "    transitions: {",
+      "old": "      // An undo landed on the row that the sender's screen has not received: another person decided over the sender's\n      // decision and took that back, so the row holds the sender's decision again, as the screen that is behind shows\n      // it. The press names what the row holds and would be applied from a screen that has neither act. It is refused\n      // with who took that undo and of which change, and held (2026-11-22, by the rule on a press from a screen that\n      // is behind), as a row's act is.\n      if (cmd.sawUndone !== row.state.undone.change) {\n        return yield* new UndoneSince({ by: row.state.undone.by, change: row.state.undone.change })\n      }\n",
+      "new": "",
+      "proof": "test/Undoing.prove.test.ts",
+      "expect": "rule",
+      "trialRules": ["Violated AnUndoIsMadeOnAScreenThatHasTheRowsLastUndo"],
+      "trialStories": [
+        "Review: a row's undo from a screen that has neither another person's decision over its sender's nor that person's undo is held, not applied: Dana keeps row 12, Ana leaves it out and takes that back, and Dana, whose screen has neither, takes her keep back"
+      ]
+    },
+    {
       "key": "undo-confirmed",
       "target": "UndoRowStep",
       "kind": "check",

@@ -58,7 +58,7 @@ jobs:
               await github.rest.issues.create({ ...context.repo, title: "The nightly proofs failed", body, labels: [label] })
             }
 
-  # Every mutant of the model but the slow one (packages/catalog/model/mutants/README.md): 189 changes, each run
+  # Every mutant of the model but the slow one (packages/catalog/model/mutants/README.md): 190 changes, each run
   # against its proof and the stories. Measured on a busy workstation for the first 148, four at a time: 5,402 s of
   # test time in 24 minutes. On this runner, four cores each about half as fast, four at a time: about an hour, and
   # the step's limit leaves room for twice that. Not measured on this runner.

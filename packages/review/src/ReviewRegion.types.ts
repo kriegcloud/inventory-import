@@ -974,7 +974,13 @@ export class ReviewWords extends S.Opaque<ReviewWords, { readonly brand: unique 
     nothingNew: S.String.pipe(
       S.annotateKey({ description: "Ends a review whose every row is already there, in place of the import button" })
     ),
-    nothingToImport: S.String.pipe(S.annotateKey({ description: "Ends a review in which nothing can be imported" }))
+    nothingToImport: S.String.pipe(S.annotateKey({ description: "Ends a review in which nothing can be imported" })),
+    search: S.String.pipe(
+      S.annotateKey({ description: "Names the search: its button, and the chip that says the table is searched" })
+    ),
+    clear: S.String.pipe(
+      S.annotateKey({ description: "The verb on a chip's cross that takes a search or a filter off" })
+    )
   }).pipe($I.annoteSchema("ReviewWords", { description: "Every status and tab word the region shows" }))
 ) {}
 

@@ -1,9 +1,9 @@
 // The review region with no screen: its atoms in a registry, a table made and drawn as the screen's hook makes and
-// draws one, the grid's own virtual list in a frame, and the person's actions called as a button, a key or a toast calls
-// them. The rules here are the ones a wrong result breaks without a word: a decision that is not undone or brought
-// back, a caller told twice or not at all, a second search that shows the first one's rows, a filled button on a
-// heading that is not on screen, and a region that has left the page still writing the decisions of the one that took
-// its place.
+// draws one, the grid's own virtual list in a frame, and the person's actions called as a button or a key calls them.
+// The rules here are the ones a wrong result breaks without a word: a decision that is not undone or brought back, a
+// caller told twice or not at all, a second search that shows the first one's rows, a filled button on a heading that
+// is not on screen, a region that has left the page still writing the decisions of the one that took its place, a
+// narrowed table without its chip, and the second click of a double click accepting the group that slid under it.
 import { constructTable, functionalUpdate, type SortingState, type Updater } from "@tanstack/react-table"
 // The table's own store, driven as the table drives it: a devDependency for this test, refused in src by the atoms lint.
 // oxlint-disable-next-line no-restricted-imports
@@ -17,6 +17,11 @@ import * as Str from "effect/String"
 import * as Atom from "effect/reactivity/Atom"
 import * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import { describe, expect, it, vi } from "vitest"
+import { it as itEffect } from "@effect/vitest"
+import * as Clock from "effect/Clock"
+import * as Duration from "effect/Duration"
+import * as Effect from "effect/Effect"
+import * as TestClock from "effect/testing/TestClock"
 import { dataTableFeatures } from "@inventory/ui/components/data-table/data-table-features"
 import { choicesOf, proposing, saved, waitingGroups } from "@inventory/review/ReviewDraft"
 import { Entry, type ProblemKind, type ReviewRow, type ReviewState, type RowView } from "@inventory/review/ReviewTypes"
@@ -37,8 +42,8 @@ type Key = {
 }
 
 // A desk-wide page with no sidebar cookie (the region asks the page how much room it has when it is first read), the
-// page's key listeners and its next frames kept so the test can raise a key and let a frame pass, and the toasts
-// kept, so the test can press the Undo a bulk step offers.
+// page's key listeners and its next frames kept so the test can raise a key and let a frame pass, and any toast kept,
+// so the test can tell that a review action raises none.
 const page = vi.hoisted(() => {
   const keys: Array<(event: Key) => void> = []
   const frames: Array<() => void> = []
@@ -292,12 +297,7 @@ describe("the review region's atoms", () => {
 
     const ui = at.registry.get(at.region.ui)
     const nav = at.registry.get(at.region.nav)
-    // The bulk step's toast is still up when the region goes (the import was confirmed, or the region was drawn
-    // again from a newer draft): the region takes it down, and its Undo, pressed all the same, reaches nobody.
-    const offered = page.toasts[page.toasts.length - 1]
     at.leave?.()
-    expect(page.dismissed).toContain(offered?.id)
-    offered?.undo()
     // A key raised while the listener is still there reaches nobody either, and is left for whoever is on the page:
     // the region does not take it.
     expect(press("z", { ctrl: true })).toBe(false)
@@ -649,4 +649,81 @@ describe("the review grid's atoms", () => {
     at.registry.set(at.region.reveal, O.some({ rowId: "no-such-row", n: 3 }))
     expect(asked).toHaveLength(2)
   })
+})
+
+describe("the review's toolbar: the words beside Undo, the chips and the double click's guard", () => {
+  it("says what an action did beside Undo, and raises no toast", () => {
+    const at = onPage()
+    const group = firstGroup(at)
+    // A step that settles several rows: the one that used to raise a toast with its own Undo.
+    expect(group.rowIds.length).toBeGreaterThan(1)
+    const raised = page.toasts.length
+
+    at.regionTable.groupActions.accept(group.id)
+    const said = at.registry.get(at.region.ui).said
+    expect(said).toMatch(/accepted$/)
+    expect(page.toasts).toHaveLength(raised)
+
+    // Undo is the toolbar's arrow: the words beside it say what it took back, until the next action.
+    at.regionTable.run({ type: "undo" as const })
+    expect(at.registry.get(at.region.ui).said).toBe(`Undone: ${said}`)
+    at.region.change(() => ({ picked: "all" }))
+    expect(at.registry.get(at.region.ui).said).toBe(`Undone: ${said}`)
+    expect(page.toasts).toHaveLength(raised)
+  })
+
+  it("lists a chip for the search and for each ticked choice, and a chip's cross takes off that one only", () => {
+    // Five rows filed under "packaging", as a messy file spells a category.
+    const rows = A.map(makeRows({ size: 178 }), (row, at) =>
+      at < 5 ? { ...row, cells: { ...row.cells, category: "packaging" } } : row
+    )
+    const at = onPage({ rows })
+    const labels = () => A.map(at.registry.get(at.region.chips), (chip) => chip.label)
+    at.region.change(() => ({ picked: "all" }))
+    expect(labels()).toEqual([])
+
+    at.region.change(() => ({ search: "washer" }))
+    at.region.change(() => ({ facetPicked: { category: ["packaging"] } }))
+    expect(labels()).toEqual(["Search: washer", "Category: packaging"])
+
+    const [search, category] = at.registry.get(at.region.chips)
+    if (search === undefined || category === undefined) throw new Error("two chips were listed")
+    at.region.clearChip(category)
+    expect(labels()).toEqual(["Search: washer"])
+    expect(at.registry.get(at.region.ui).facetPicked).toEqual({ category: [] })
+    at.region.clearChip(search)
+    expect(labels()).toEqual([])
+    expect(at.registry.get(at.region.ui).search).toBe("")
+  })
+
+  itEffect.effect("holds back a pointer's accept within 400 ms of another group's accept, never the keyboard's", () =>
+    Effect.gen(function* () {
+      const at = onPage({ rows: makeRows({ size: 178 * 3 }) })
+      /** Presses the accept of the group now first under "Needs you", by the given hand, at the clock's time. */
+      const press = Effect.fn("press")(function* (by: "pointer" | "keyboard") {
+        const now = yield* Clock.currentTimeMillis
+        at.regionTable.groupActions.accept(firstGroup(at).id, { by, at: now })
+      })
+
+      yield* press("pointer")
+      expect(at.told).toHaveLength(1)
+      const said = at.registry.get(at.region.ui).said
+
+      // The second click of a double click, on the group that slid up under the pointer: nothing changes, not even
+      // the words beside Undo.
+      yield* TestClock.adjust(Duration.millis(399))
+      yield* press("pointer")
+      expect(at.told).toHaveLength(1)
+      expect(at.registry.get(at.region.ui).said).toBe(said)
+
+      yield* TestClock.adjust(Duration.millis(1))
+      yield* press("pointer")
+      expect(at.told).toHaveLength(2)
+
+      // Enter on the next group's accept 10 ms later: the keyboard is never held back.
+      yield* TestClock.adjust(Duration.millis(10))
+      yield* press("keyboard")
+      expect(at.told).toHaveLength(3)
+    })
+  )
 })

@@ -18,7 +18,9 @@ export const defaultReviewWords: ReviewWords = ReviewWords.make({
   edited: "Edited",
   chosen: "Chosen",
   nothingNew: "Nothing new: this file is already in",
-  nothingToImport: "Nothing here can be imported"
+  nothingToImport: "Nothing here can be imported",
+  search: "Search",
+  clear: "Clear"
 })
 
 /** The caller's words over the defaults. */

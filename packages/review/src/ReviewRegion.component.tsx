@@ -10,8 +10,10 @@ import {
   Rows3Icon,
   Redo2Icon,
   SearchIcon,
-  Undo2Icon
+  Undo2Icon,
+  XIcon
 } from "lucide-react"
+import * as A from "effect/Array"
 import * as HashSet from "effect/HashSet"
 import * as O from "effect/Option"
 import { useAtomMount, useAtomSet, useAtomSubscribe, useAtomValue } from "@effect/atom-react"
@@ -43,6 +45,7 @@ import {
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "@inventory/ui/components/empty"
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@inventory/ui/components/input-group"
 import { Separator } from "@inventory/ui/components/separator"
+import { contentBelow } from "@inventory/ui/ContentWidth"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@inventory/ui/components/sheet"
 import { Skeleton } from "@inventory/ui/components/skeleton"
 import { Spinner } from "@inventory/ui/components/spinner"
@@ -81,6 +84,25 @@ const whole = new Intl.NumberFormat("en-US")
 const onMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform)
 const undoKeys = onMac ? "\u2318Z" : "Ctrl+Z"
 const redoKeys = onMac ? "\u21e7\u2318Z" : "Ctrl+Shift+Z"
+const searchKeys = onMac ? "\u2318K" : "Ctrl+K"
+
+/**
+ * The page's own width (the sidebar already taken off) from which the toolbar is one line: the search's icon, the
+ * history and the words beside Undo, the view's tools, the download, "Why flagged?", the views and Import. Measured
+ * in Chrome on the messy sample (items_messy.csv: the four views with Cannot import, "Import 155, skip 45"): the
+ * line's fixed parts take 1,397 px of the page with the card's margins, and the words beside Undo want 80 px or more
+ * (two lines of small text). So from 1,490 px it is one line (a 1,541 px window with the sidebar folded); below, it
+ * folds to two: the search, the history and Import, then the views and the tools.
+ */
+const oneLineFrom = 1490
+/** How much wider the open search's field (`w-48`) is than its icon: an open search needs that much more. */
+const searchFieldExtra = 160
+/**
+ * Folded, the views and the filters with words (View, Category, Unit of measure) share the second line from this
+ * width of the page: measured on the messy sample, the views take 475 px and the filters 350, so with the card's
+ * margins and the gaps they need 920 px. Below it the filters take a third line, at its right end.
+ */
+const filtersBesideViewsFrom = 920
 const stepTag = { read: "Read", rule: "Rule", model: "Model" } as const
 /** What the run did, behind one button: steps tagged Read, Rule or Model, what it was allowed to do, and what it cost. */
 function ActivityPanel(props: {
@@ -286,13 +308,19 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
   const readOnly = useAtomValue(region.input.readOnly)
   const embedded = props.embedded === true
   useAtomMount(readOnly ? noKeys : regionTable.keys)
+  useAtomMount(narrow ? noKeys : regionTable.searchKeys)
+  // An open search takes its field's width more than its icon: the line needs that much more room to stay one.
+  const roomy = !useAtomValue(contentBelow(oneLineFrom))
+  const roomyWithField = !useAtomValue(contentBelow(oneLineFrom + searchFieldExtra))
+  const filtersBeside = !useAtomValue(contentBelow(filtersBesideViewsFrom))
+  const chips = useAtomValue(region.chips)
   // After a decision focus goes to the next row that needs one; after an undo, back to the row.
   useAtomSubscribe(regionTable.moves, regionTable.settleSoon)
 
   const own = useAtomValue(region.ui)
   const change = region.change
   const state = useAtomValue(region.input.decisions)
-  const { activityOpen, whyOpen, confirmOpen, search, said } = own
+  const { activityOpen, whyOpen, confirmOpen, search, searchOpen, said } = own
   const setPicked = (next: FilterId | undefined) => change(() => ({ picked: next }))
   const setKind = (next: string | undefined) => change(() => ({ kind: next }))
   const setActivityOpen = (next: boolean) => change(() => ({ activityOpen: next }))
@@ -332,6 +360,7 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
 
   const importButton = useRef<HTMLButtonElement>(null)
   const activityReturn = useRef<HTMLButtonElement>(null)
+  const searchButton = useRef<HTMLButtonElement>(null)
   const { run, step } = regionTable
 
   const chooseFilter = (next: FilterId) => {
@@ -410,6 +439,19 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
         </EmptyHeader>
         <EmptyContent>{props.emptyAction}</EmptyContent>
       </Empty>
+    ) : chips.length > 0 ? (
+      // Narrowed by a search or a filter: that is why nothing shows, not that nothing is left.
+      <span className="inline-flex items-center gap-1">
+        No {noun} match{" "}
+        {A.join(
+          A.map(chips, (chip) => chip.label),
+          ", "
+        )}
+        .
+        <Button variant="link" size="sm" onClick={() => A.forEach(chips, region.clearChip)}>
+          {words.clear} {chips.length === 1 ? "it" : "them"}
+        </Button>
+      </span>
     ) : (
       <span className="inline-flex items-center gap-1">
         {filter === "needs" && search === ""
@@ -426,6 +468,19 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
         )}
       </span>
     )
+
+  // What the last action did, in words beside Undo, which takes it back. Always in the page, so a screen reader hears
+  // each new sentence (`aria-live` polite); never a toast over the table.
+  const saidLine = (
+    <span
+      role="status"
+      aria-live="polite"
+      // Read whole, on as many short lines as it needs where the line is tight: never cut with an ellipsis.
+      className="min-w-24 flex-1 text-xs leading-4 text-muted-foreground"
+    >
+      {said}
+    </span>
+  )
 
   // Undo and redo, each saying the step it would take back or bring back, and its keys. With nothing to do they stay
   // in place, dimmed, and say so.
@@ -735,23 +790,79 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
     </div>
   ) : null
 
-  const searchField = (
-    <InputGroup className={layout === "wide" ? "h-8 w-56" : "h-8 max-w-72 min-w-0 flex-1"}>
+  // The search: an icon until it is opened (a click, "/" or Ctrl+K), then the field. It stays open while it holds
+  // text, and Escape on an empty field closes it and hands the focus back to the icon. The table follows the region's
+  // search (`RegionTable`), so the field writes only that.
+  const searchShown = searchOpen || search !== ""
+  const oneLine = searchShown ? roomyWithField : roomy
+  const closeSearch = () => {
+    change(() => ({ searchOpen: false }))
+    requestAnimationFrame(() => searchButton.current?.focus())
+  }
+  const searchField = searchShown ? (
+    <InputGroup className={oneLine ? "h-8 w-48 flex-none" : "h-8 max-w-72 min-w-0 flex-1"}>
       <InputGroupAddon>
         <SearchIcon aria-hidden />
       </InputGroupAddon>
       <InputGroupInput
+        id={regionTable.searchFieldId}
         type="search"
-        aria-label={`Search ${noun}`}
-        placeholder="Search"
+        aria-label={`${words.search} ${noun}`}
+        placeholder={words.search}
         value={search}
-        onChange={(event) => {
-          setSearch(event.target.value)
-          table.setGlobalFilter(event.target.value)
+        onChange={(event) => setSearch(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key !== "Escape") return
+          // With text the field stays as it is (its chip clears it); empty, it closes.
+          event.preventDefault()
+          if (search === "") closeSearch()
+        }}
+        onBlur={() => {
+          if (search === "") change(() => ({ searchOpen: false }))
         }}
       />
     </InputGroup>
+  ) : (
+    <ToolButton
+      ref={searchButton}
+      label={`${words.search} ${noun}`}
+      tip={`${words.search} ${noun} (/ or ${searchKeys})`}
+      narrow={false}
+      onClick={regionTable.openSearch}
+    >
+      <SearchIcon aria-hidden />
+    </ToolButton>
   )
+
+  // What narrows the table, each a chip with a cross: worked out from the same atoms the search and the filters write.
+  const chipLine =
+    chips.length === 0 ? null : (
+      <div className="flex flex-none flex-wrap items-center gap-1.5 border-b px-3 py-1.5">
+        {A.map(chips, (chip) => (
+          <Button
+            key={chip.label}
+            variant="outline"
+            size="xs"
+            onClick={() => {
+              region.clearChip(chip)
+              // The chip goes with what it said: the focus goes to the search's icon, or to the table.
+              requestAnimationFrame(() =>
+                (
+                  searchButton.current ??
+                  document.querySelector<HTMLElement>(
+                    `[data-review-region="${region.id}"] [data-slot="sticky-table-frame"]`
+                  )
+                )?.focus()
+              )
+            }}
+          >
+            <span className="sr-only">{words.clear} </span>
+            {chip.label}
+            <XIcon aria-hidden />
+          </Button>
+        ))}
+      </div>
+    )
 
   const heading = embedded ? (
     <h2 id={titleId} className="min-w-0 truncate text-base font-semibold tracking-tight">
@@ -828,6 +939,72 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
       </AlertDialogContent>
     </AlertDialog>
   )
+
+  // The toolbar's groups, each in one place, by what it is about.
+  const historyGroup = (
+    <span className="flex flex-none items-center gap-1">
+      {activityButton}
+      {undoButton}
+    </span>
+  )
+  // The view's tools: its icons (matched columns, row height) and its filters with words (View, Category, Unit of
+  // measure). On one line they stand together; folded, the icons stay up with the history and the filters go down
+  // beside the views, the line with room for their words.
+  const viewIcons = (
+    <span className="flex flex-none items-center gap-1">
+      {matchButton}
+      {densityMenu}
+    </span>
+  )
+  const viewFilters = (
+    <span className="flex flex-none items-center gap-1">
+      <DataTableViewOptions table={table} align="end" />
+      {filterMenu}
+    </span>
+  )
+  const fileTools = (
+    <>
+      <Separator orientation="vertical" className="mx-1 h-6" />
+      {download}
+      {whyButton}
+    </>
+  )
+  const toolGroups = loading ? null : (
+    <>
+      <Separator orientation="vertical" className="mx-1 h-6" />
+      {viewIcons}
+      {viewFilters}
+      {fileTools}
+    </>
+  )
+  const foldedTools = loading ? null : (
+    <>
+      <Separator orientation="vertical" className="mx-1 h-6" />
+      {viewIcons}
+      {fileTools}
+    </>
+  )
+  const importNode = importButtonNode === null ? null : <span className="flex flex-none">{importButtonNode}</span>
+
+  // The footer's counts as parts the line may fold between, never inside: what will not be imported, then each of the
+  // caller's sums. The same words as `tally`.
+  const tallyParts: ReadonlyArray<{ readonly text: string; readonly before: string }> =
+    loading || embedded || (readOnly && props.readOnlyNote !== undefined)
+      ? tally === ""
+        ? []
+        : [{ text: tally, before: "" }]
+      : [
+          ...(heldLine(counts, words) === "" ? [] : [{ text: heldLine(counts, words), before: "" }]),
+          ...(props.totals === undefined || counts.ready === 0
+            ? []
+            : A.map(props.totals, (total, at) => ({
+                text:
+                  at === 0
+                    ? `${whole.format(counts.ready)} to import: ${total.label} ${total.value}`
+                    : `${total.label} ${total.value}`,
+                before: at === 0 ? " · " : ", "
+              })))
+        ]
 
   const activityPanel =
     props.activity === undefined ? null : (
@@ -920,50 +1097,39 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
             failure
           ) : (
             <>
-              {/* One toolbar. On a desk: the search, then the history and the table's tools at fixed places from the
-                  left edge, then the views and the import at the right. A tab that comes or goes ("Left out") or an
-                  import button whose count changes moves only what is right of the gap, never Undo, Redo or Columns
-                  under the pointer. Short of room (a tablet) it takes two lines: the search and the import, then the
-                  views and the tools, the tools at the line's right end. */}
-              <div className="flex flex-none flex-wrap items-center gap-2 border-b px-3 py-1">
-                {loading ? <Skeleton className="h-8 w-56" /> : searchField}
-                {layout === "wide" ? (
-                  <>
-                    <div className="flex flex-none items-center gap-1">
-                      {readOnly ? null : <Separator orientation="vertical" className="mx-1 h-6" />}
-                      {undoButton}
-                      <Separator orientation="vertical" className="mx-1 h-6" />
-                      {loading ? null : columnsMenu}
-                      {loading ? null : filterMenu}
-                      {densityMenu}
-                      {loading ? null : download}
-                      {whyButton}
-                      {activityButton}
-                    </div>
-                    <div className="ml-auto flex min-w-0 items-center gap-2">
-                      {loading ? <Skeleton className="h-8 w-72" /> : filterGroup}
-                      {importButtonNode === null ? null : <span className="flex">{importButtonNode}</span>}
-                    </div>
-                  </>
+              {/* One toolbar, its icons grouped by what they are about: the search; the history (Activity, Undo,
+                  Redo) with the words of the last action beside Undo and Redo; the view (matched columns, row height, the
+                  columns shown, the filters); the download; "Why flagged?"; then the views and Import, the one filled
+                  button, at the right end. The words beside Undo take the line's slack, so a new sentence moves
+                  nothing under the pointer. With less room than the page's area has from `oneLineFrom` it folds,
+                  never inside a group: the search, the history, the view's icons, the download, "Why flagged?" and
+                  Import; then the views, and the filters at that line's right end (below `filtersBesideViewsFrom`
+                  they take a third line of their own). */}
+              <div className="flex flex-none flex-wrap items-center gap-x-2 gap-y-1 border-b px-3 py-1">
+                <div className="flex min-w-0 flex-1 items-center gap-1">
+                  {loading ? <Skeleton className="h-8 w-8" /> : searchField}
+                  <Separator orientation="vertical" className="mx-1 h-6" />
+                  {historyGroup}
+                  {saidLine}
+                  {oneLine ? toolGroups : foldedTools}
+                  {oneLine ? null : importNode}
+                </div>
+                {oneLine ? (
+                  <div className="flex flex-none items-center gap-2">
+                    {loading ? <Skeleton className="h-8 w-72" /> : filterGroup}
+                    {importNode}
+                  </div>
                 ) : (
                   <>
-                    <span className="ml-auto flex flex-none">{importButtonNode}</span>
-                    <div className="flex w-full items-center gap-1">
+                    <div className="flex w-full min-w-0 items-center gap-2">
                       {loading ? <Skeleton className="h-8 w-72" /> : filterGroup}
-                      <span className="flex-1" />
-                      <Separator orientation="vertical" className="mx-1 h-6" />
-                      {undoButton}
-                      {readOnly ? null : <Separator orientation="vertical" className="mx-1 h-6" />}
-                      {loading ? null : columnsMenu}
-                      {loading ? null : filterMenu}
-                      {densityMenu}
-                      {loading ? null : download}
-                      {whyButton}
-                      {activityButton}
+                      {loading || !filtersBeside ? null : <span className="ml-auto flex flex-none">{viewFilters}</span>}
                     </div>
+                    {loading || filtersBeside ? null : <div className="flex w-full justify-end">{viewFilters}</div>}
                   </>
                 )}
               </div>
+              {chipLine}
               {listMode === "chips" ? (
                 <WorkList items={work} active={activeKind} onPick={pickKind} mode="chips" />
               ) : null}
@@ -974,12 +1140,15 @@ function RegionBody(props: WithTable & { regionTable: RegionTable }) {
                 <div className="flex min-h-0 min-w-0 flex-1 flex-col">{tableNode}</div>
               </div>
               <div className="flex min-h-8 flex-none items-center gap-3 border-t px-3 py-1 text-sm">
+                {/* Folded only between totals, never inside one ("L 8,804" stays whole). */}
                 <p role="status" className="min-w-0 flex-1 text-muted-foreground tabular-nums">
-                  {tally}
+                  {A.map(tallyParts, (part, at) => (
+                    <span key={part.text}>
+                      {at === 0 ? null : part.before}
+                      <span className="whitespace-nowrap">{part.text}</span>
+                    </span>
+                  ))}
                 </p>
-                <span role="status" className="sr-only">
-                  {said}
-                </span>
                 {readOnly || loading || counts.needs === 0 ? null : (
                   <>
                     <span className="flex-none text-muted-foreground tabular-nums">

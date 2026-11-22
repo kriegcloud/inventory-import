@@ -8,10 +8,11 @@ tags: [ui, components, import, review]
 # The review region
 
 `ReviewRegion` (`@inventory/review` (`packages/review`)) is the Review step of an import as one region that fills the screen and
-never scrolls the page: the title and one line, then one card holding a toolbar (the search at the left, then Undo and
-Redo and the icon buttons for columns, filter, row height, the download of the rows not imported and the activity, at
-fixed places; the views "Needs you 42 · Can't fix here 3 · Ready 133 · All 178" as a button group and one button at the
-far right, "Import 133, skip 45"), a work list
+never scrolls the page: the title and one line, then one card holding a toolbar (the search as an icon at the left;
+the history, Activity, Undo and Redo, with the words of the last action beside them; the view, matched columns, row
+height, View, Category and the other filters; the download of the rows not imported and "Why flagged?"; the views
+"Needs you 42 · Can't fix here 3 · Ready 133 · All 178" as a button group and one button at the far right, "Import 133,
+skip 45"), a line of chips while a search or a filter narrows the table, a work list
 of the problem kinds beside the table, the rows with each problem and a button that says what it will do about it, and a
 footer with what will not be imported and how many decisions are left. It is built only from `@inventory/ui` parts
 (`sticky-table`, `data-table` headers, `Button` variants) and passes both design lints. It holds no product words and
@@ -198,8 +199,10 @@ choice suggested), a decimal comma under one labelled group, a SKU not in stock,
 - A decision is one undo step. Undo and Redo are two icon buttons in the toolbar, each naming the step and its keys
   in a tooltip ("Undo: 5 fixes accepted (Ctrl+Z)"), dimmed with nothing to do. Ctrl or Cmd+Z undoes; Ctrl or
   Cmd+Shift+Z and Ctrl+Y redo; inside a text field the browser's own undo applies. Any new decision empties the redo
-  stack. A step that settled several rows also shows a toast with Undo, which takes back that step only while it is
-  still the last. Focus then moves to the next row that needs a decision in the kind on screen, then to the next kind
+  stack. What the last action did is said in words beside Undo ("2 fixes accepted", "Undone: 2 fixes accepted"), and
+  read out politely, until the next action says its own; no toast covers the table, and Undo is the arrow beside the
+  words. A pointer's click on a group's accept within 400 ms of another group's accept does nothing (the second click
+  of a double click lands on the group that slid up); Enter and Space are never held back. Focus then moves to the next row that needs a decision in the kind on screen, then to the next kind
   on the work list, then to the import button (or the table, where there is none), never to the page's body.
 - The problem kinds are a work list (`WorkList.tsx`): a rail beside the table on a desk, one row of toggle chips above
   it on a tablet, each kind with how many rows are left and a tick once none are. Needs you shows the kind picked on
@@ -231,12 +234,15 @@ choice suggested), a decimal comma under one labelled group, a SKU not in stock,
   is shown the same way in its row; a longer one (a SKU, a name) stands alone.
 - Sort and hide from each column's header menu (the heading is one control as large as its cell); the Columns icon
   lists every column with a tick to show it and the file column it was read from (a column the file did not answer
-  turns the icon amber and has its choice there); one search box searches the name and the `search` columns. Rows are
-  virtualised; 5,000 are fine.
-- "Filter" (an icon) is one panel: for each `facet` column, a tick box per value the file has, with how many rows of
-  the showing view have it. Values that differ only by spaces around them are one choice. The icon is pressed while a
-  filter is on, because hidden rows give no other sign, and "Clear filters" takes them all off. A long list scrolls
-  inside the panel on a thin bar of its own (`ScrollArea`), as do the units to choose from and the Columns menu.
+  turns the icon amber and has its choice there); one search searches the name and the `search` columns. Closed it is
+  an icon; a click, "/" or Ctrl+K (⌘K) opens it with the caret in it; Escape on an empty field closes it and gives the
+  icon its focus back; while it holds text it stays open. Rows are virtualised; 5,000 are fine.
+- What narrows the table is said as chips under the toolbar, worked out from the same state the search and the filters
+  write ("Search: washer ×", "Category: packaging ×"); a chip's cross takes off that one. A view the chips leave empty
+  says so and offers to clear them.
+- Each `facet` column is a filter button named for it ("Category", "Unit of measure"): a tick box per value the file
+  has, with how many rows of the showing view have it. Values that differ only by spaces around them are one choice.
+  A ticked choice shows on its button and as a chip under the toolbar, because hidden rows give no other sign.
 - Row height is compact (36 px) or comfortable (44 px), from the toolbar, remembered in this browser.
 - The download icon gives the rows that will not be imported as a CSV with a reason on every line.
 - "Import 136 records" opens a confirm when rows are held: what will be imported and what will not.
@@ -244,8 +250,10 @@ choice suggested), a decimal comma under one labelled group, a SKU not in stock,
   column's header and changes the button to "Match Unit to import".
 - Widths are the page's own room, not the window's: the window less a sidebar beside the page, which the shell
   reports with `setContentInset` (`@inventory/ui/ContentWidth`; without one it is the window), less the card's margins and
-  the rail. From 1101 px a full toolbar and the rail; 768 to 1100 px the toolbar on two lines (the search and the
-  import, then the views and the tools) and the work list as chips; under 768 px one decision at a time (a group is
+  the rail. From 1,490 px of the page the toolbar is one line (1,650 px while the search is open); below that it folds
+  between groups: the search, the history, the view's icons, the download, "Why flagged?" and Import, then the views
+  with View and the filters at the line's right end, which take a third line of their own under 920 px. From 1101 px
+  the rail; 768 to 1100 px the work list as chips; under 768 px one decision at a time (a group is
   one decision), with "Decision 3 of 14" counted the same way as the footer's "decisions left", Undo and Redo, 44 px
   buttons and bottom sheets, and the tabs' counts under their words so a long label never runs into its number.
 - The Status column is left out while every row showing would say the same word ("Ready", before anything was

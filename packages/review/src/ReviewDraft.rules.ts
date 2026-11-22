@@ -595,6 +595,32 @@ export type Outcome = {
   readonly focus: O.Option<string>
 }
 
+/**
+ * How long after one group is accepted a pointer click on a group's accept is held back, in milliseconds. Once a group
+ * is accepted its heading goes and the next group's accept slides up under the pointer: the second click of a double
+ * click then accepted a group the person never read (Benjamin, 2026-11-22: "400 ms").
+ */
+export const doubleClickHold = 400
+
+/** How a press was made: a pointer's click, or Enter or Space on the focused button. */
+export type PressedBy = "pointer" | "keyboard"
+
+/**
+ * Whether a press on a group's accept is taken: always from the keyboard, and from a pointer unless another group was
+ * accepted less than `doubleClickHold` ago. `last` is when the last group was accepted; times in milliseconds on one
+ * clock.
+ *
+ * @example mayAccept({ last: O.some(1000), now: 1399, by: "pointer" }) // false
+ * @example mayAccept({ last: O.some(1000), now: 1010, by: "keyboard" }) // true
+ */
+export const mayAccept = (input: {
+  readonly last: O.Option<number>
+  readonly now: number
+  readonly by: PressedBy
+}): boolean =>
+  input.by === "keyboard" ||
+  O.match(input.last, { onNone: () => true, onSome: (at) => input.now - at >= doubleClickHold })
+
 /** Nothing changed: the state as it was, nothing to announce. */
 const unchanged = (state: ReviewState): Outcome => ({ state, label: "", changed: [], focus: O.none() })
 
@@ -787,7 +813,9 @@ export function act(input: ActInput): Outcome {
             d.set(rowId, ReviewDecision.make({ ...decision, edits: { ...decision.edits, [column]: value } }))
           }
         }
-        return `${plural(d.written(), "row", "rows")} set to ${value}`
+        // Said in the words the answer had ("Ridgeline Metals preferred"), never the file's JSON behind it: the words
+        // stand beside Undo, and a step's label is kept with the saved progress, which holds 200 characters at most.
+        return `${plural(d.written(), "row", "rows")} set to ${valueWords(group, value)}`
       }),
     leaveOut: ({ rowIds }) =>
       decide(input, O.none(), (d) => {

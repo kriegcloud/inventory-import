@@ -22,9 +22,9 @@ import * as MutableHashMap from "effect/MutableHashMap"
 import * as MutableHashSet from "effect/MutableHashSet"
 import * as O from "effect/Option"
 import * as R from "effect/Record"
+import * as Str from "effect/String"
 import * as Atom from "effect/reactivity/Atom"
 import type * as AtomRegistry from "effect/reactivity/AtomRegistry"
-import { toast } from "sonner"
 import type { DataTableFeatures } from "@inventory/ui/components/data-table/data-table-features"
 import { contentWidth } from "@inventory/ui/ContentWidth"
 import { stringify } from "@inventory/ui/Json"
@@ -38,7 +38,9 @@ import {
   fixableBy,
   heldCsv,
   kindCount,
+  mayAccept,
   nextKind,
+  type PressedBy,
   sections as sectionsOf,
   viewRows,
   visible,
@@ -130,16 +132,31 @@ export type RegionUi = {
   readonly whyOpen: boolean
   readonly confirmOpen: boolean
   readonly search: string
+  /** The search's field is open: opened by its button or its key, closed by Escape while it is empty. */
+  readonly searchOpen: boolean
   /** Rows the person took out of their group's one action, and kinds whose rows they folded or unfolded. */
   readonly excluded: HashSet.HashSet<string>
   readonly folded: HashSet.HashSet<string>
-  /** The last thing that happened, for a screen reader. */
+  /**
+   * What the person's last action did ("2 fixes accepted", "Undone: Row left out"), said beside the toolbar's Undo
+   * and read out politely: kept until the next action says its own. No toast says it: it covered the table.
+   */
   readonly said: string
   /** Groups the person chose to go through row by row on a phone: each of their rows is then a decision of its own. */
   readonly split: HashSet.HashSet<string>
   readonly facetPicked: Readonly<Record<string, ReadonlyArray<string>>>
   /** The row height: the browser's remembered choice, read once when the region is made, then what the person picks. */
 }
+
+/**
+ * One thing that narrows the table, said as a chip with a cross: the search, or one choice ticked under a facet. The
+ * chips are worked out from the very state the search and the filters write, so a narrowed table always says so.
+ */
+export type Chip = Data.TaggedEnum<{
+  Search: { readonly label: string }
+  Facet: { readonly label: string; readonly column: string; readonly option: string }
+}>
+export const Chip = Data.taggedEnum<Chip>()
 
 /** One facet column's choices: spellings that read the same are one choice, with the rows it has in the view on screen. */
 export interface Facet {
@@ -222,6 +239,10 @@ export interface Region {
   /** True where the rules' fixes arrive in force, so a row offers "Reject". */
   readonly rejects: Atom.Atom<boolean>
   readonly facets: Atom.Atom<ReadonlyArray<Facet>>
+  /** What narrows the table now, each as a chip: the search first, then every ticked choice in the filters' order. */
+  readonly chips: Atom.Atom<ReadonlyArray<Chip>>
+  /** Takes one chip's search or choice off: its chip goes with it. */
+  readonly clearChip: (chip: Chip) => void
   readonly groups: Atom.Atom<ReadonlyArray<FixGroup>>
   /** The columns the problems on screen are about: they stay in the table. */
   readonly subjects: Atom.Atom<HashSet.HashSet<string>>
@@ -233,12 +254,10 @@ export interface Region {
   /** The row the table is asked to bring into view; the count makes each ask a new value. */
   readonly reveal: Atom.Writable<O.Option<{ readonly rowId: string; readonly n: number }>>
   /**
-   * True from when the region's section appears until it goes. A region that has gone does nothing: a toast's Undo,
-   * a key or a late callback that still holds its actions reaches neither the caller's decisions nor the screen.
+   * True from when the region's section appears until it goes. A region that has gone does nothing: a key or a late
+   * callback that still holds its actions reaches neither the caller's decisions nor the screen.
    */
   readonly present: Atom.Atom<boolean>
-  /** The toasts the region has put up for a bulk step, each with an Undo: they go when the region goes. */
-  readonly toasts: Atom.Writable<ReadonlyArray<string | number>>
   /** For the region's section: marks the region present while its node is on the page. */
   readonly attach: (node: HTMLElement | null) => undefined | (() => void)
   /** Changes what the region owns: a patch worked out from what it owns now. */
@@ -307,6 +326,7 @@ const makeRegion = (input: RegionInput, registry: AtomRegistry.AtomRegistry): Re
     whyOpen: false,
     confirmOpen: false,
     search: "",
+    searchOpen: false,
     excluded: HashSet.empty(),
     folded: HashSet.empty(),
     said: "",
@@ -398,6 +418,27 @@ const makeRegion = (input: RegionInput, registry: AtomRegistry.AtomRegistry): Re
       : A.filter(rows, (view) => A.every(wanted, (facet) => HashSet.has(facet.values, view.cells[facet.column] ?? "")))
   })
   const tableData = Atom.map(shown, (rows) => [...rows])
+  const search = Atom.map(ui, (now) => now.search)
+  const chips = Atom.readable((get): ReadonlyArray<Chip> => {
+    const said = get(words)
+    const text = Str.trim(get(search))
+    return [
+      ...(text === "" ? [] : [Chip.Search({ label: `${said.search}: ${text}` })]),
+      ...A.flatMap(get(facets), (facet) =>
+        A.flatMap(facet.picked, (key) =>
+          O.match(
+            A.findFirst(facet.options, (option) => option.key === key),
+            {
+              onNone: (): ReadonlyArray<Chip> => [],
+              onSome: (option): ReadonlyArray<Chip> => [
+                Chip.Facet({ label: `${facet.column.label}: ${option.label}`, column: facet.column.id, option: key })
+              ]
+            }
+          )
+        )
+      )
+    ]
+  })
   const groups = Atom.readable((get): ReadonlyArray<FixGroup> => {
     const now = get(filter)
     return now === "auto"
@@ -437,18 +478,18 @@ const makeRegion = (input: RegionInput, registry: AtomRegistry.AtomRegistry): Re
   const nav = Atom.make<Nav>({ wanted: O.none(), stepped: undefined })
   const reveal = Atom.make<O.Option<{ readonly rowId: string; readonly n: number }>>(O.none())
   const present = Atom.make(false)
-  const toasts = Atom.make<ReadonlyArray<string | number>>([])
   const attach = (node: HTMLElement | null) => {
     if (node === null) return undefined
     registry.set(present, true)
-    return () => {
-      registry.set(present, false)
-      // A toast outlives the screen that put it up: the region takes its own with it, so no Undo is left standing
-      // on the next screen (the result of the import, the region drawn again from a newer draft).
-      for (const id of registry.get(toasts)) toast.dismiss(id)
-      registry.set(toasts, [])
-    }
+    return () => registry.set(present, false)
   }
+  const change = (update: (before: RegionUi) => Partial<RegionUi>) =>
+    registry.update(ui, (before) => {
+      const patch = update(before)
+      const now: Readonly<Record<string, unknown>> = before
+      const same = A.every(R.toEntries<string, unknown>(patch), ([key, value]) => Object.is(now[key], value))
+      return same ? before : { ...before, ...patch }
+    })
 
   return {
     id,
@@ -470,6 +511,17 @@ const makeRegion = (input: RegionInput, registry: AtomRegistry.AtomRegistry): Re
     fixable,
     rejects,
     facets,
+    chips,
+    clearChip: Chip.$match({
+      Search: () => change(() => ({ search: "", searchOpen: false })),
+      Facet: ({ column, option }) =>
+        change((before) => ({
+          facetPicked: {
+            ...before.facetPicked,
+            [column]: A.filter(R.get(before.facetPicked, column).pipe(O.getOrElse(A.empty)), (key) => key !== option)
+          }
+        }))
+    }),
     shown,
     groups,
     subjects,
@@ -478,16 +530,9 @@ const makeRegion = (input: RegionInput, registry: AtomRegistry.AtomRegistry): Re
     nav,
     reveal,
     present,
-    toasts,
     attach,
     // A change that changes nothing is no change: the region is not drawn again for it.
-    change: (update) =>
-      registry.update(ui, (before) => {
-        const patch = update(before)
-        const now: Readonly<Record<string, unknown>> = before
-        const same = A.every(R.toEntries<string, unknown>(patch), ([key, value]) => Object.is(now[key], value))
-        return same ? before : { ...before, ...patch }
-      }),
+    change,
     notImported: () =>
       heldCsv({
         views: registry.get(views),
@@ -526,14 +571,30 @@ export type RowActions = {
   peek: (rowId: string) => RowView | undefined
 }
 
+/**
+ * One press of a button that accepts a group: how it was made, and when (the event's own time stamp, in milliseconds).
+ * A pointer's press close after another group's accept is held back (`mayAccept`); the keyboard never is.
+ */
+export type Press = { readonly by: PressedBy; readonly at: number }
+
+/**
+ * A button's click as a press: a click the keyboard made (Enter or Space on the button) counts no clicks
+ * (`detail` 0), a pointer's counts one or more.
+ */
+export const pressOf = (event: { readonly detail: number; readonly timeStamp: number }): Press => ({
+  by: event.detail === 0 ? "keyboard" : "pointer",
+  at: event.timeStamp
+})
+
 /** What a group heading can ask for. Each is one undo step. */
 export type GroupActions = {
-  accept: (groupId: string) => void
-  choose: (groupId: string, value: string) => void
+  /** `press`: how the accept was pressed; without one (a test, a caller with no button) it is always taken. */
+  accept: (groupId: string, press?: Press) => void
+  choose: (groupId: string, value: string, press?: Press) => void
   /** Take a row out of its group's action, or put it back. */
   toggle: (rowId: string) => void
   /** Take the rules' lossless fixes for these rows in one step. */
-  acceptRows: (rowIds: ReadonlyArray<string>) => void
+  acceptRows: (rowIds: ReadonlyArray<string>, press?: Press) => void
   /** Show or hide the rows under a problem kind's heading. */
   fold: (kindId: string) => void
   leaveOut: (rowIds: ReadonlyArray<string>) => void
@@ -563,7 +624,8 @@ export interface RegionTable {
   readonly moves: Atom.Atom<number>
   /** For `moves`: settles the wanted move once the change is on screen. */
   readonly settleSoon: () => void
-  readonly run: (action: Action, from?: string) => void
+  /** Does what the person asked; true when it changed something. */
+  readonly run: (action: Action, from?: string) => boolean
   readonly step: (back: boolean) => void
   readonly actions: RowActions
   /** Where the rules' fixes are proposals there is nothing in force to turn down: the rows offer no "Reject". */
@@ -571,6 +633,12 @@ export interface RegionTable {
   readonly groupActions: GroupActions
   /** The undo, redo and stepping keys, heard on the page while this is mounted. */
   readonly keys: Atom.Atom<void>
+  /** "/" or Ctrl+K (⌘K) opens the search and puts the caret in it, heard while this is mounted. */
+  readonly searchKeys: Atom.Atom<void>
+  /** Opens the search's field and puts the caret in it once it is drawn. */
+  readonly openSearch: () => void
+  /** The id of the search's field, for its label and its key. */
+  readonly searchFieldId: string
 }
 
 const isTyping = (target: EventTarget | null): boolean =>
@@ -613,6 +681,15 @@ const makeRegionTable = (
   // (`useDataTable`, over TanStack's `useTable`) still sets the table's options, the rows among them, in every draw of
   // the region: that is TanStack's React binding, kept by decision A4, and not ours to change without changing the
   // vendored kit.
+  // The table's search follows the region's (`search`): the field, a chip's cross and a key all write the region's, and
+  // the table is told here, in the change that made it, so the chip and the rows can never say two searches.
+  const searchText = Atom.map(region.ui, (now) => now.search)
+  ctx.subscribe(searchText, (text) => {
+    if (table.atoms.globalFilter.get() !== text) table.setGlobalFilter(text)
+  })
+  // When the last group was accepted, by any means: a pointer's press on a group's accept shortly after is held back.
+  const lastGroupAccept = Atom.make<O.Option<number>>(O.none())
+  ctx.mount(lastGroupAccept)
   ctx.subscribe(region.tableData, (data) => {
     const own = core()
     if (own.options.data !== data) {
@@ -678,9 +755,8 @@ const makeRegionTable = (
   const moves = Atom.readable((get) => {
     get(lines)
     get(region.nav)
-    // Held here so the region's presence and its toasts are kept for as long as its moves are followed.
+    // Held here so the region's presence is kept for as long as its moves are followed.
     get(region.present)
-    get(region.toasts)
     return O.getOrElse(get.self<number>(), () => 0) + 1
   })
 
@@ -724,8 +800,8 @@ const makeRegionTable = (
   /** The rows a stop stands for: its own, or every row of the kind it folds. */
   const rowsAt = Stop.$match({ Row: ({ rowId }) => [rowId], Folded: ({ among }) => among })
 
-  const run = (action: Action, from?: string) => {
-    if (!onPage()) return
+  const run = (action: Action, from?: string): boolean => {
+    if (!onPage()) return false
     const outcome = act({
       rows: registry.get(region.input.rows),
       state: registry.get(region.input.decisions),
@@ -734,7 +810,7 @@ const makeRegionTable = (
       fixable: registry.get(region.fixable),
       rejects: registry.get(region.rejects)
     })
-    if (outcome.label === "") return
+    if (outcome.label === "") return false
     const narrow = registry.get(regionLayout) === "narrow"
     const history = isActionUndo(action) || isActionRedo(action)
     let unfold: string | undefined
@@ -774,6 +850,7 @@ const makeRegionTable = (
             })
       )
     }
+    // What it did is said beside the toolbar's Undo, which takes it back (`said`): never in a toast over the table.
     Atom.batch(() => {
       want(move)
       region.change((before) => ({
@@ -783,22 +860,18 @@ const makeRegionTable = (
       // The caller's atom: whoever keeps the decisions (a server draft, the browser) follows it.
       registry.set(region.input.decisions, outcome.state)
     })
-    // A step that settled several rows at once can be taken back from where the eye is: a toast with Undo. It takes
-    // back that step only, and only while it is still the last one.
-    const bulk = !history && outcome.changed.length > 1
-    const step = outcome.state.undo[outcome.state.undo.length - 1]
-    if (bulk && step !== undefined && !narrow) {
-      const shown = toast(outcome.label, {
-        action: {
-          label: "Undo",
-          onClick: () => {
-            const undo = registry.get(region.input.decisions).undo
-            if (undo[undo.length - 1] === step) run({ type: "undo" as const })
-          }
-        }
-      })
-      registry.update(region.toasts, (before) => [...before, shown])
-    }
+    return true
+  }
+
+  /**
+   * A group's accept, pressed: held back when a pointer pressed it within `doubleClickHold` of another group's accept
+   * (the second click of a double click, landed on the group that slid up), and nothing changes, not even the words
+   * beside Undo. The keyboard is never held back.
+   */
+  const acceptPressed = (press: Press | undefined, action: Action) => {
+    if (!onPage()) return
+    if (press !== undefined && !mayAccept({ last: registry.get(lastGroupAccept), now: press.at, by: press.by })) return
+    if (run(action) && press !== undefined) registry.set(lastGroupAccept, O.some(press.at))
   }
 
   const step = (back: boolean) => {
@@ -894,21 +967,22 @@ const makeRegionTable = (
 
   const excluded = () => [...registry.get(region.ui).excluded]
   const actions: RowActions = {
-    accept: (rowId) => run({ type: "accept" as const, rowIds: [rowId] }, rowId),
-    keep: (rowId) => run({ type: "keep" as const, rowId }, rowId),
-    leaveOut: (rowId) => run({ type: "leaveOut" as const, rowIds: [rowId] }, rowId),
-    putBack: (rowId) => run({ type: "putBack" as const, rowId }, rowId),
-    edit: (rowId, column, value) => run({ type: "edit" as const, rowId, column, value }, rowId),
-    undoFix: (rowId, column) => run({ type: "revert" as const, rowId, column, how: "undo" }, rowId),
-    reject: (rowId, column) => run({ type: "revert" as const, rowId, column, how: "reject" }, rowId),
+    accept: (rowId) => void run({ type: "accept" as const, rowIds: [rowId] }, rowId),
+    keep: (rowId) => void run({ type: "keep" as const, rowId }, rowId),
+    leaveOut: (rowId) => void run({ type: "leaveOut" as const, rowIds: [rowId] }, rowId),
+    putBack: (rowId) => void run({ type: "putBack" as const, rowId }, rowId),
+    edit: (rowId, column, value) => void run({ type: "edit" as const, rowId, column, value }, rowId),
+    undoFix: (rowId, column) => void run({ type: "revert" as const, rowId, column, how: "undo" }, rowId),
+    reject: (rowId, column) => void run({ type: "revert" as const, rowId, column, how: "reject" }, rowId),
     peek: (rowId) => O.getOrUndefined(A.findFirst(registry.get(region.views), (view) => view.row.id === rowId))
   }
   const groupActions: GroupActions = {
-    accept: (groupId) => run({ type: "acceptGroup" as const, groupId, except: excluded() }),
-    choose: (groupId, value) => run({ type: "chooseGroup" as const, groupId, value, except: excluded() }),
-    leaveOut: (rowIds) => run({ type: "leaveOut" as const, rowIds }),
-    revert: (groupId) => run({ type: "revertGroup" as const, groupId }),
-    acceptRows: (rowIds) => run({ type: "accept" as const, rowIds }),
+    accept: (groupId, press) => acceptPressed(press, { type: "acceptGroup" as const, groupId, except: excluded() }),
+    choose: (groupId, value, press) =>
+      acceptPressed(press, { type: "chooseGroup" as const, groupId, value, except: excluded() }),
+    leaveOut: (rowIds) => void run({ type: "leaveOut" as const, rowIds }),
+    revert: (groupId) => void run({ type: "revertGroup" as const, groupId }),
+    acceptRows: (rowIds, press) => acceptPressed(press, { type: "accept" as const, rowIds }),
     toggle: (rowId) => {
       if (onPage()) region.change((before) => ({ excluded: flip(before.excluded, rowId) }))
     },
@@ -945,6 +1019,36 @@ const makeRegionTable = (
     0
   )
 
+  const searchFieldId = `review-search-${region.id}`
+  const openSearch = () => {
+    region.change(() => ({ searchOpen: true }))
+    // The field is drawn once the region is: the caret goes in a frame later.
+    requestAnimationFrame(() => {
+      const field = document.getElementById(searchFieldId)
+      if (field instanceof HTMLInputElement) {
+        field.focus()
+        field.select()
+      }
+    })
+  }
+  // Let go the moment nothing mounts it, as the keys are.
+  const searchKeys = Atom.setIdleTTL(
+    Atom.readable((get) => {
+      const onKey = (event: KeyboardEvent) => {
+        if (!onPage() || event.defaultPrevented) return
+        const slash = event.key === "/" && !event.ctrlKey && !event.metaKey && !event.altKey && !isTyping(event.target)
+        const command = Str.toLowerCase(event.key) === "k" && (event.ctrlKey || event.metaKey) && !event.altKey
+        const inDialog = event.target instanceof Element && event.target.closest("[role=dialog]") !== null
+        if ((!slash && !command) || inDialog) return
+        event.preventDefault()
+        openSearch()
+      }
+      document.addEventListener("keydown", onKey)
+      get.addFinalizer(() => document.removeEventListener("keydown", onKey))
+    }),
+    0
+  )
+
   return {
     ordered,
     visibility,
@@ -958,7 +1062,10 @@ const makeRegionTable = (
     actions,
     plainActions,
     groupActions,
-    keys
+    keys,
+    searchKeys,
+    openSearch,
+    searchFieldId
   }
 }
 

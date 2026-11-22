@@ -1,5 +1,7 @@
 import { CellMark } from "@inventory/review/ReviewTypes"
+import * as A from "effect/Array"
 import * as O from "effect/Option"
+import * as Str from "effect/String"
 import {
   ArrowRightIcon,
   CheckIcon,
@@ -12,7 +14,7 @@ import {
 import { useAtom, useAtomValue } from "@effect/atom-react"
 import * as ScopedAtom from "@effect/atom-react/ScopedAtom"
 import * as Atom from "effect/reactivity/Atom"
-import { lazy, type ReactNode, Suspense, useId, useRef } from "react"
+import { Fragment, lazy, type ReactNode, Suspense, useId, useRef } from "react"
 import { cn } from "cn"
 import { Slot } from "radix-ui"
 import { ProposedChip, SourceMark } from "@inventory/ui/ProposedValue"
@@ -265,6 +267,30 @@ export const codeFace = (column: ReviewColumn | undefined): string | undefined =
 export function ColumnText(props: { column: ReviewColumn | undefined; children: ReactNode }) {
   const face = codeFace(props.column)
   return face === undefined ? props.children : <span className={face}>{props.children}</span>
+}
+
+/**
+ * A value read whole on as many lines as it takes, broken only after a comma or at a space: a value with no spaces
+ * (`{"length":31.2,"width":41.4}`) once broke inside a number ("4" / "1.4"). `wrap-break-word` breaks a part inside
+ * only when the part alone is wider than the line.
+ */
+export function WholeValue(props: { text: string; className?: string }) {
+  const parts = Str.split(props.text, ",")
+  return (
+    <span className={cn("min-w-0 wrap-break-word", props.className)}>
+      {A.map(parts, (part, at) => (
+        // The parts of one value never move: their place is their key.
+        <Fragment key={at}>
+          {part}
+          {at < parts.length - 1 ? (
+            <>
+              ,<wbr />
+            </>
+          ) : null}
+        </Fragment>
+      ))}
+    </span>
+  )
 }
 
 /** A mark's source as the shared mark takes it: `unknown` is a source the caller did not name. */
@@ -521,6 +547,21 @@ export function GroupChange(props: {
   const { group } = props
   const choices = choicesOf(group)
   const variants = variantsText(group, props.display)
+  if (choices !== undefined && props.oneLine !== true && group.mixed !== true) {
+    // A question is read as one sentence that runs on from line to line: the arrow flows with the words, so a narrow
+    // band is not given a line for the arrow alone (at 1024 px a vendors question took five lines that way).
+    return (
+      <span>
+        {variants} <ArrowRightIcon aria-hidden className="inline size-3.5 align-middle text-muted-foreground" />
+        <span className="sr-only">becomes</span>{" "}
+        {A.join(
+          A.map(choices, (choice) => valueWords(group, choice)),
+          " or "
+        )}
+        ?
+      </span>
+    )
+  }
   return (
     <span
       className={cn(

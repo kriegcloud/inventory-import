@@ -17,6 +17,7 @@ import {
   type Density,
   density as keptDensity,
   type GroupActions,
+  pressOf,
   type Region,
   RegionScope,
   type RegionTable,
@@ -86,7 +87,8 @@ import {
   Reason,
   ReasonTag,
   regionLayout,
-  WhyBody
+  WhyBody,
+  WholeValue
 } from "./parts.tsx"
 import { ReviewColumn } from "@inventory/review/ReviewTypes"
 import type { Fix, FixGroup, ProblemKind, ReviewRegionProps, ReviewWords, RowView } from "@inventory/review/ReviewTypes"
@@ -555,13 +557,13 @@ const Row = memo(function Row(props: {
       >
         {(out || view.marks[column.id] === undefined) && (view.cells[column.id] ?? "") !== "" ? (
           whole ? (
-            <span className="min-w-0 wrap-anywhere">{shownWith(column, view.cells[column.id] ?? "", view.cells)}</span>
+            <WholeValue text={shownWith(column, view.cells[column.id] ?? "", view.cells)} />
           ) : (
             // A plain value that does not fit ends in an ellipsis; its whole text is one hover, focus or tap away.
             <CutText text={shownWith(column, view.cells[column.id] ?? "", view.cells)} className="min-w-0" />
           )
         ) : (
-          <span className={whole ? "min-w-0 wrap-anywhere" : "min-w-0 truncate"}>
+          <span className={whole ? "min-w-0 wrap-break-word" : "min-w-0 truncate"}>
             <CellValue
               value={view.cells[column.id] ?? ""}
               display={(text) => shownWith(column, text, view.cells)}
@@ -1088,7 +1090,7 @@ function KindRow(props: {
         </span>
         <span className="min-w-0 flex-1 truncate text-muted-foreground">{kind.help}</span>
         {props.readOnly || safe.length === 0 ? null : (
-          <Button variant="secondary" size="xs" onClick={() => props.actions.acceptRows(safe)}>
+          <Button variant="secondary" size="xs" onClick={(event) => props.actions.acceptRows(safe, pressOf(event))}>
             Accept {safe.length} safe {safe.length === 1 ? "fix" : "fixes"}
           </Button>
         )}
@@ -1113,6 +1115,8 @@ declare module "react" {
 const bandInset = 48
 // However short of room, a band's words get at least this much width: they wrap, never down to one word a line.
 const bandLeast = 240
+// Below this a band's words are short of room: a question there starts nearer the edge (`GroupRow`).
+const bandRoomy = 400
 
 /**
  * A group of identical fixes as one decision, directly above the rows it would change, and the only place it is
@@ -1147,6 +1151,7 @@ function GroupRow(props: {
   const rowIds = group.rowIds.filter((rowId) => !HashSet.has(props.excluded, rowId))
   const n = rowIds.length
   const choices = choicesOf(group)
+  const bandRoom = Math.max(bandLeast, props.room - props.actionsWidth - bandInset)
   const column = O.getOrElse(HashMap.get(props.labels, group.column), () => group.column)
   const other = `Other ${inSentence(column)}`
   const leaveOut = `Leave out ${n}`
@@ -1194,7 +1199,7 @@ function GroupRow(props: {
               variant="outline"
               size="xs"
               disabled={n === 0}
-              onClick={() => props.actions.choose(group.id, choice)}
+              onClick={(event) => props.actions.choose(group.id, choice, pressOf(event))}
             >
               Use {valueWords(group, choice)} for {n}
             </Button>
@@ -1206,7 +1211,7 @@ function GroupRow(props: {
           size="xs"
           disabled={n === 0}
           data-group-accept=""
-          onClick={() => props.actions.accept(group.id)}
+          onClick={(event) => props.actions.accept(group.id, pressOf(event))}
         >
           {groupUse({ group, n, ticks: props.ticks })}
         </Button>
@@ -1275,25 +1280,40 @@ function GroupRow(props: {
       <div
         className={cn(
           "sticky left-0 flex max-w-(--band-room) min-w-0 flex-col gap-0.5",
-          props.indent ? "pl-16" : "pl-10"
+          // Short of room a question gives up the indent past the rows' expand button: its sentence needs the width
+          // more than the line-up (at 1024 px with the sidebar open, three lines instead of four).
+          props.indent && !(choices !== undefined && bandRoom < bandRoomy) ? "pl-16" : "pl-10"
         )}
-        style={{ "--band-room": `${Math.max(bandLeast, props.room - props.actionsWidth - bandInset)}px` }}
+        style={{ "--band-room": `${bandRoom}px` }}
       >
-        <span className="flex min-w-0 items-start gap-2 text-sm font-semibold">
-          {choices === undefined ? null : (
-            // A question, marked as the caller says who asks it: the sparkle only for a model.
-            <StatusPill
-              tone="outline"
-              icon={group.by === "model" ? <SparklesIcon aria-hidden /> : <CircleHelpIcon aria-hidden />}
-            >
-              Guess
-            </StatusPill>
-          )}
-          <GroupChange group={group} applied={props.applied} display={props.display} />
-          <Badge variant="secondary" className="flex-none">
-            {rowsWord(group.rowIds.length)}
-          </Badge>
-        </span>
+        {choices === undefined ? (
+          <span className="flex min-w-0 items-start gap-2 text-sm font-semibold">
+            <GroupChange group={group} applied={props.applied} display={props.display} />
+            <Badge variant="secondary" className="flex-none">
+              {rowsWord(group.rowIds.length)}
+            </Badge>
+          </span>
+        ) : (
+          // A question: its pill and its count on a line of their own, so the question below has the band's whole
+          // width (beside them, at 1024 px, a vendors question took eight lines).
+          <>
+            <span className="flex items-center gap-2">
+              {/* Marked as the caller says who asks it: the sparkle only for a model. */}
+              <StatusPill
+                tone="outline"
+                icon={group.by === "model" ? <SparklesIcon aria-hidden /> : <CircleHelpIcon aria-hidden />}
+              >
+                Guess
+              </StatusPill>
+              <Badge variant="secondary" className="flex-none">
+                {rowsWord(group.rowIds.length)}
+              </Badge>
+            </span>
+            <span className="min-w-0 text-sm font-semibold">
+              <GroupChange group={group} applied={props.applied} display={props.display} />
+            </span>
+          </>
+        )}
         <span className="flex min-w-0 items-start gap-2 text-sm">
           <Badge variant="outline" className="mt-0.5 flex-none">
             {sourceWordsFor(group.by === "unknown" ? undefined : group.by).tag}

@@ -1,6 +1,7 @@
 import { CellMark, Entry } from "@inventory/review/ReviewTypes"
 import { OtherAnswer } from "@inventory/review/ReviewDraft"
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
+import * as A from "effect/Array"
 import * as HashMap from "effect/HashMap"
 import * as HashSet from "effect/HashSet"
 import * as O from "effect/Option"
@@ -8,7 +9,7 @@ import { useAtom, useAtomSubscribe, useAtomValue } from "@effect/atom-react"
 import * as ScopedAtom from "@effect/atom-react/ScopedAtom"
 import * as Atom from "effect/reactivity/Atom"
 import { Fragment, type ReactNode } from "react"
-import { type Region, RegionScope, TableScope } from "../ReviewRegion.atoms.ts"
+import { pressOf, type Region, RegionScope, TableScope } from "../ReviewRegion.atoms.ts"
 import { Button } from "@inventory/ui/components/button"
 import { Checkbox } from "@inventory/ui/components/checkbox"
 import { ButtonGroup } from "@inventory/ui/components/button-group"
@@ -198,6 +199,11 @@ function GroupCard(props: CardProps & { group: FixGroup }) {
   const columnOf = (id: string | undefined) => props.columns.find((column) => column.id === id)
   const n = group.rowIds.filter((rowId) => !HashSet.has(props.excluded, rowId)).length
   const choices = choicesOf(group)
+  /** A value of the group's column as the column shows it; an empty one says so. */
+  const inWords = (value: string, cells: Readonly<Record<string, string>>): string => {
+    const shown = shownWith(columnOf(group.column) ?? {}, value, cells)
+    return shown === "" ? "empty" : shown
+  }
   return (
     <Item variant="outline" className="w-full min-w-0">
       <ItemHeader>
@@ -229,14 +235,14 @@ function GroupCard(props: CardProps & { group: FixGroup }) {
                   variant="outline"
                   size="touch"
                   {...(at === 0 ? first : {})}
-                  onClick={() => groupActions.choose(group.id, choice)}
+                  onClick={(event) => groupActions.choose(group.id, choice, pressOf(event))}
                 >
                   {valueWords(group, choice)} for {n}
                 </Button>
               ))}
             </ButtonGroup>
           ) : (
-            <Button size="touch" {...first} onClick={() => groupActions.accept(group.id)}>
+            <Button size="touch" {...first} onClick={(event) => groupActions.accept(group.id, pressOf(event))}>
               {group.mixed === true ? `Accept for ${n}` : `Use ${group.label ?? group.to} for ${n}`}
             </Button>
           )}
@@ -268,17 +274,26 @@ function GroupCard(props: CardProps & { group: FixGroup }) {
                       className="size-5"
                       onCheckedChange={() => groupActions.toggle(rowId)}
                     />
-                    <span className="min-w-0 flex-1 leading-5">
+                    <span className="min-w-0 flex-1 py-1 leading-5">
                       <span className="block truncate font-medium">{name}</span>
                       <span className="block truncate font-normal text-muted-foreground">
                         {contextOf(view, props.columns, group.column)}
                       </span>
-                    </span>
-                    {/* At most half the line: the row's name beside it is how the person knows which row it is. */}
-                    <span className="max-w-1/2 min-w-0 truncate font-normal text-muted-foreground">
-                      <ColumnText column={columnOf(group.column)}>{view.row.cells[group.column]}</ColumnText> →{" "}
-                      {/* Each row's own new value: under a `label` the rows of one group end in different values. */}
-                      {choices === undefined ? (view.problem?.fix?.to ?? group.to) : "?"}
+                      {/* What the row has and what it becomes, in the column's own words (vendors as "2 · Acme
+                          preferred", never the file's JSON), on a line of its own and read whole. */}
+                      <span className="block font-normal whitespace-normal text-muted-foreground">
+                        <ColumnText column={columnOf(group.column)}>
+                          {inWords(view.row.cells[group.column] ?? "", view.row.cells)}
+                        </ColumnText>{" "}
+                        →{" "}
+                        {/* Each row's own new value: under a `label` the rows of one group end in different values. */}
+                        {choices === undefined
+                          ? inWords(view.problem?.fix?.to ?? group.to, view.row.cells)
+                          : `${A.join(
+                              A.map(choices, (choice) => valueWords(group, choice)),
+                              " or "
+                            )}?`}
+                      </span>
                     </span>
                   </Label>
                 </li>

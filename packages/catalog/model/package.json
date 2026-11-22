@@ -52,7 +52,9 @@
     "lint": "oxlint --quiet src test",
     "test": "vitest run --project fast",
     "prove": "vitest run --project prove",
-    "verify": "vitest run --project verify"
+    "verify": "vitest run --project verify",
+    "mutants": "python3 -I mutants/run.py --all --jobs 2",
+    "mutants:sample": "python3 -I mutants/run.py --sample"
   },
   "dependencies": {
     "@alchemy.run/domain": "2.0.0-beta.87-734c27a",

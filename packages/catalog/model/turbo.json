@@ -19,7 +19,6 @@
         "src/Review/Change.schema.ts",
         "test/**/*.prove.test.ts",
         "test/proving.ts",
-        "test/rules.ts",
         "$TURBO_ROOT$/packages/kernel/package.json",
         "$TURBO_ROOT$/packages/kernel/src/**",
         "$TURBO_ROOT$/tsconfig.base.json",
@@ -46,11 +45,63 @@
         "src/Review/Change.schema.ts",
         "test/**/*.verify.test.ts",
         "test/**/*.lock.json",
-        "test/rules.ts",
         "$TURBO_ROOT$/packages/kernel/package.json",
         "$TURBO_ROOT$/packages/kernel/src/**",
         "$TURBO_ROOT$/tsconfig.base.json",
         "$TURBO_ROOT$/vendor/alchemy/*.tgz"
+      ],
+      "outputs": []
+    },
+    // The mutants of the model (mutants/README.md): each one change to a `decide`, run against its proof and the
+    // stories, which must notice it. The sample is fast and in `bun run check:full`; all of them run every night.
+    // Both read what the proofs read, the stories and the mutants themselves, and are replayed until one changes.
+    "mutants:sample": {
+      "inputs": [
+        "package.json",
+        "turbo.json",
+        "tsconfig.json",
+        "vitest.config.ts",
+        "src/**/*.aggregate.ts",
+        "src/**/*.decision.ts",
+        "src/Actor/**",
+        "src/Review/Change.schema.ts",
+        "test/proving.ts",
+        "$TURBO_ROOT$/packages/kernel/package.json",
+        "$TURBO_ROOT$/packages/kernel/src/**",
+        "$TURBO_ROOT$/tsconfig.base.json",
+        "$TURBO_ROOT$/vendor/alchemy/*.tgz",
+        "test/**/*.story.test.ts",
+        "test/**/*.prove.test.ts",
+        "mutants/**",
+        "src/**/*.model.ts",
+        "$TURBO_ROOT$/packages/catalog/contract/package.json",
+        "$TURBO_ROOT$/packages/catalog/contract/src/**",
+        "$TURBO_ROOT$/vitest.shared.ts"
+      ],
+      "outputs": []
+    },
+    "mutants": {
+      "inputs": [
+        "package.json",
+        "turbo.json",
+        "tsconfig.json",
+        "vitest.config.ts",
+        "src/**/*.aggregate.ts",
+        "src/**/*.decision.ts",
+        "src/Actor/**",
+        "src/Review/Change.schema.ts",
+        "test/proving.ts",
+        "$TURBO_ROOT$/packages/kernel/package.json",
+        "$TURBO_ROOT$/packages/kernel/src/**",
+        "$TURBO_ROOT$/tsconfig.base.json",
+        "$TURBO_ROOT$/vendor/alchemy/*.tgz",
+        "test/**/*.story.test.ts",
+        "test/**/*.prove.test.ts",
+        "mutants/**",
+        "src/**/*.model.ts",
+        "$TURBO_ROOT$/packages/catalog/contract/package.json",
+        "$TURBO_ROOT$/packages/catalog/contract/src/**",
+        "$TURBO_ROOT$/vitest.shared.ts"
       ],
       "outputs": []
     }

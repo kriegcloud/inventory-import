@@ -39,6 +39,7 @@ import {
   getUrlHref,
   insertTextAtSelection,
   moveCaretToEnd,
+  // Local change: `selectEditableText` is imported where upstream imported `execInsertText` and `replaceEditableText`.
   parseLocalDate,
   selectEditableText
 } from "@inventory/ui/components/data-grid/data-grid-utils"
@@ -71,6 +72,7 @@ export function ShortTextCell<TData extends RowData>(props: DataGridCellProps<TD
   const { onCommit, onCancel, textProps } = useEditableText(props)
 
   return (
+    // Local change: `typesInPlace`.
     <DataGridCell<TData> {...props} onCommit={onCommit} onCancel={onCancel} commitOnEnter typesInPlace>
       <EditableText {...textProps} />
     </DataGridCell>
@@ -279,6 +281,7 @@ export function NumberCell<TData extends RowData>(props: DataGridCellProps<TData
       // Local change: the browser types the key over the selection (see `typesInPlace`).
       if (getPendingChar(cell)) inputRef.current.select()
     }
+    // Local change: upstream's list also held `setDraftValue`, which its fallback called.
   }, [cell, isEditing])
 
   return (
@@ -288,6 +291,7 @@ export function NumberCell<TData extends RowData>(props: DataGridCellProps<TData
       onCommit={onSave}
       onCancel={onCancel}
       commitOnEnter
+      // Local change: `typesInPlace`.
       typesInPlace
     >
       {isEditing ? (
@@ -366,6 +370,7 @@ export function UrlCell<TData extends RowData>(props: DataGridCellProps<TData>) 
       onCancel={onCancel}
       onKeyDown={onWrapperKeyDown}
       commitOnEnter
+      // Local change: `typesInPlace`.
       typesInPlace
     >
       {!isEditing && displayValue ? (

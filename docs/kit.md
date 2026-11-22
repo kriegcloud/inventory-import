@@ -157,9 +157,12 @@ return <DataGrid {...grid} table={table} height={560} actionBar={<ReviewActions 
 - Keyboard: arrows move, Enter or F2 edits, Enter commits and moves down, Escape cancels, Ctrl or Cmd+F searches
   (`enableSearch`), Space on the first column selects the row. **Local patch:** Tab leaves the grid (upstream moved
   cell by cell, which kept the action bar out of reach). Say so in a `Kbd` hint under the grid.
-- **Local patch:** typing on a focused cell opens its editor and the browser types that key into it (text, number, url);
-  upstream typed it with the deprecated `document.execCommand`. In the long-text editor the key that opened it is not
-  in the browser's own undo.
+- **Local patch, not yet decided:** typing on a focused cell opens its editor, and in a text, number or url column
+  the browser is left to type that key into it; upstream typed it with the deprecated `document.execCommand`. Measured
+  in Chromium only. **It is wrong for a column with a variant and its own `cell`** (the patch above): there the key
+  that opens the editor is lost and the next key replaces the whole value, so a typed 56 stores 6. In the long-text
+  editor the key that opened it is not in the browser's own undo. Whether this design stands is with Benjamin
+  (`explorations/ideal-architecture/DECISIONS.md`, 2026-11-21); no screen uses the grid today.
 - Selection: `table.getSelectedRowModel().rows`, `table.getSelectedCells()` (a range of cells),
   `table.clearSelection()`. Re-render on change with `<Subscribe source={table.store} selector={(s) => s.rowSelection}>`
   from `@tanstack/react-table`. Write values with `table.updateCells([{ rowId, columnId, value }])`.

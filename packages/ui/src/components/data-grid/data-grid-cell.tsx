@@ -5,6 +5,7 @@ import type { Cell, RowData } from "@tanstack/react-table"
 import { cn } from "cn"
 import { useComposedRefs } from "radix-ui/internal"
 import * as React from "react"
+// Local change: `flushSync`, for `typesInPlace` below.
 import { flushSync } from "react-dom"
 
 import type { DataGridFeatures } from "@inventory/ui/components/data-grid/data-grid-features"
@@ -42,6 +43,7 @@ export function DataGridCell<TData extends RowData>({
   onCancel,
   onKeyDown: onKeyDownProp,
   commitOnEnter = false,
+  // Local change: `typesInPlace`.
   typesInPlace = false,
   className,
   style,
@@ -139,6 +141,7 @@ export function DataGridCell<TData extends RowData>({
         cell.startEditing(isPrintable ? { pendingChar: event.key } : undefined)
       }
     },
+    // Local change: `typesInPlace` is in the list.
     [cell, onKeyDownProp, isFocused, isEditing, readOnly, onCommit, onCancel, commitOnEnter, typesInPlace]
   )
 

@@ -887,16 +887,25 @@ the "Local change" blocks in those eleven files.
 
 He asked, in his words: "In beep-effect we have this lint rule or something that errors when deprecated api's are
 used. Can you […] configure and set this up for us?" Built as beep-effect has it, oxlint's
-`typescript/no-deprecated` on every code file, as a law and a root task, `deprecated:check`
-(`docs/standards/deprecated-apis.md`). Reverse: drop the task from `check` and `check:full`.
+`typescript/no-deprecated`, as a law and a root task, `deprecated:check` (`docs/standards/deprecated-apis.md`), on
+every code file git would commit but the vendored skills under `.agents/`, which the agent left out and he has not
+been asked about. Reverse: drop the task from `check` and `check:full`.
 
 ### 2026-11-21 — deprecated APIs, the vendored data grid's `document.execCommand`
 
 The check found `document.execCommand("insertText", …)` in the vendored data grid, which names no replacement.
 Question: what should happen to it? Options: "Local change (Recommended)"; "Exempt vendored kit"; also named, deleting
-the grid, which no screen uses. Answer: "Local change"; the agent recommended the same. The option was put as the
-fallbacks already in the file, at the cost of the browser's own undo in a cell's editor. Measured in Chromium, the
-number cell's fallback stored 6 for a typed 56 and 5 for a typed -5, so it is not used: the text, number and url
-editors let the browser type the key that opens them, which stores what it did before, undo included. Only the
-long-text editor uses its fallback, and pays that cost. Reverse: the "Local change" blocks in
-`packages/ui/src/components/data-grid/` (`data-grid-cell.tsx`, `data-grid-cell-variants.tsx`, `data-grid-utils.ts`).
+the grid, which no screen uses. Answer: "Local change"; the agent recommended the same. His answer covers the option as
+it was put to him: the fallbacks already in the file, at the cost of the browser's own undo in a cell's editor.
+
+**Built, and not decided.** What is in the code is a different design, and it was not put to him before it was built.
+Measured in Chromium, the number cell's fallback stored 6 for a typed 56 and 5 for a typed -5, so the agent did not use
+it. It added a prop to the vendored cell (`typesInPlace`) and a `flushSync` in its key handler, across three files: the
+text, number and url editors open and select their value while the key is still being handled, and the browser types
+the key itself. Only the long-text editor uses its fallback. It was measured in Chromium only: not in Firefox or
+Safari, not with a touch keyboard or an input method, and no automated test holds it. A review then found it wrong in
+one place: a column with a variant and its own `cell` (the local patch in `docs/kit.md`) draws through a branch that
+does not pass `typesInPlace`, so there the key that opens the editor is lost and a typed 56 stores 6. The grid's code
+is unchanged since, on hold until he answers which design stands. Reverse: the "Local change" marks in
+`packages/ui/src/components/data-grid/` (`data-grid-cell.tsx`, `data-grid-cell-variants.tsx`, `data-grid-utils.ts`),
+one on every changed line.

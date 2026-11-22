@@ -909,7 +909,9 @@ export function insertTextAtSelection(element: HTMLTextAreaElement | HTMLInputEl
   dispatchInsertTextInput(element, text)
 }
 
-// Local change: selects the whole text and leaves the typing to the browser (upstream typed it here).
+// Local change: selects the whole text and leaves the typing to the browser. Upstream's `replaceEditableText(element,
+// text)` typed it here, and its exported `execInsertText(text)`, which called the deprecated `document.execCommand`,
+// stood below `dispatchInsertTextInput`: both are removed.
 export function selectEditableText(element: HTMLElement) {
   element.focus()
   const selection = window.getSelection()

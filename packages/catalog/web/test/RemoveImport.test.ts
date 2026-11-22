@@ -12,7 +12,7 @@ import * as AtomRegistry from "effect/reactivity/AtomRegistry"
 import { vi } from "vitest"
 import { AlreadyImported, ImportNotFound } from "@inventory/catalog-contract/ImportRejection"
 import { draftOf } from "../src/Draft.atoms.ts"
-import { emptyDraft } from "../src/Draft.machine.ts"
+import { type Draft, emptyDraft, type Side, startAgain } from "../src/Draft.machine.ts"
 import { importTable, openImports, openWorkbook, removeImport } from "../src/Imports.atoms.ts"
 import { importNo, registryWith, viewAt } from "./support/catalog.ts"
 
@@ -107,7 +107,17 @@ describe("removing an open import", () => {
       const t = world(() => Effect.void)
       yield* settle
       // Both imports have a decision waiting in their draft, and the workbook each was read from is in the tab.
-      const waits = { ...emptyDraft, unsent: { "row-2": O.none() }, stalled: true }
+      const side: Side = {
+        decision: O.none(),
+        madeOn: 1,
+        dates: {},
+        seen: [O.none()],
+        live: false,
+        here: true,
+        overtaken: false,
+        refused: O.none()
+      }
+      const waits: Draft = { ...emptyDraft, unsent: { "row-2": side } }
       const book = O.some({ file: new File([], "a.xlsx"), sheets: [], chosen: { name: "Items" } as never })
       for (const view of [t.first, t.second]) {
         t.registry.set(draftOf(view.id), waits)
@@ -115,8 +125,9 @@ describe("removing an open import", () => {
       }
       yield* t.press(t.first)
       yield* settle
+      // Emptied, as a draft let go is: nothing of the person's is in it, and its ids carry on (never used twice).
       expect([t.registry.get(draftOf(t.first.id)), t.registry.get(openWorkbook(t.first.id))]).toEqual([
-        emptyDraft,
+        startAgain(waits),
         O.none()
       ])
       expect([t.registry.get(draftOf(t.second.id)), O.isSome(t.registry.get(openWorkbook(t.second.id)))]).toEqual([

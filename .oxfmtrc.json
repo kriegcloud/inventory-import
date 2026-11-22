@@ -13,7 +13,7 @@
     "packages/foundation/modeling/identity/**",
     "packages/foundation/modeling/schema/**",
     "packages/foundation/modeling/utils/**",
-    "scratchpad/experiments/**",
+    "scratchpad/**",
     "**/dist/**",
     "apps/inventory/migrations/**",
     "bun.lock",

@@ -28,7 +28,16 @@ import { kept } from "@inventory/review/Kept"
 import { progressKey } from "@inventory/review/SavedProgress"
 import { leavingApp } from "@inventory/ui/Route"
 import { call } from "./Catalog.runtime.ts"
-import { decisionsIn, type Draft, eachOnce, emptyDraft, type Named, type Waiting, waiting } from "./Draft.machine.ts"
+import {
+  decisionsIn,
+  type Draft,
+  eachOnce,
+  emptyDraft,
+  type Named,
+  startAgain,
+  type Waiting,
+  waiting
+} from "./Draft.machine.ts"
 import { fileNameOf, StoredWaiting, storedFromText, toStored, toWaiting } from "./internal/storedWaiting.ts"
 import { leaveRemoved, leaveTakenUp } from "./Notices.atoms.ts"
 
@@ -110,7 +119,7 @@ export const letAnothersDraftGo = ({ id, registry }: DraftIn): void => {
   O.map(O.all({ owner: registry.get(draftOwner(id)), tab: registry.get(thisTab) }), ({ owner, tab }) =>
     registry.update(keysRead, HashSet.remove(keyOf(owner, id, tab)))
   )
-  registry.set(draftOf(id), { ...emptyDraft, epoch: registry.get(draftOf(id)).epoch + 1 })
+  registry.update(draftOf(id), startAgain)
   registry.set(draftOwner(id), O.none())
 }
 
@@ -212,7 +221,8 @@ export const takeUpGoneTabs = (input: {
               of: actor,
               tab: from,
               from: { id, fileName: fileNameOf(stored) },
-              rows: R.keys(decisionsIn(kept).rows)
+              rows: R.keys(decisionsIn(kept).rows),
+              named: O.isSome(kept.leftOver)
             })
           )
           input.take(kept)
@@ -323,6 +333,12 @@ export const unreadKept = (input: {
   )
 
 /**
+ * True for an entry with rows still to be sent. Rows on a line wait for the person, and rows left over are only to be
+ * named: they are kept, and ask nothing before the page is left.
+ */
+const sends = (waits: Waiting): boolean => !R.isEmptyReadonlyRecord(waits.rows)
+
+/**
  * Keeps what waits of one import's draft after an event, under the member the rows belong to (`claimDraft`): the
  * person signed in when the step opened or a row was decided, not whoever is signed in when the server answers.
  * Nothing waiting is no entry, and the import's draft then belongs to nobody until the next press.
@@ -335,24 +351,29 @@ export const keepWaiting = (input: {
   readonly fileName: O.Option<string>
 }): void => {
   const { registry, id } = input
-  O.map(O.all({ owner: registry.get(draftOwner(id)), tab: registry.get(thisTab) }), ({ owner, tab }) => {
-    const key = keyOf(owner, id, tab)
-    // An entry not read into the draft yet is left as it is: the draft does not hold what it keeps.
-    if (!HashSet.has(registry.get(keysRead), key)) return
-    const now = registry.get(waitingAt(key))
-    const stored = toStored(
-      input.waits,
-      O.orElse(input.fileName, () => fileNameOf(now))
-    )
-    if (!Eq.equals(now, stored)) registry.set(waitingAt(key), stored)
-  })
-  if (O.isNone(input.waits)) registry.set(draftOwner(id), O.none())
-  registry.update(waitingImports, (now) =>
-    // Rows on hold are kept, and not to be sent by themselves: they ask nothing before the page is left.
-    O.exists(input.waits, (waits) => !waits.leftOver && !R.isEmptyReadonlyRecord(waits.rows))
-      ? HashSet.add(now, id)
-      : HashSet.remove(now, id)
+  const key = O.map(O.all({ owner: registry.get(draftOwner(id)), tab: registry.get(thisTab) }), ({ owner, tab }) =>
+    keyOf(owner, id, tab)
   )
+  // An entry not read into the draft yet is left as it is: the draft does not hold what it keeps.
+  const unread = O.exists(key, (kept) => !HashSet.has(registry.get(keysRead), kept))
+  const waits = O.exists(input.waits, sends)
+  if (!unread) {
+    O.map(key, (kept) => {
+      const now = registry.get(waitingAt(kept))
+      const stored = toStored(
+        input.waits,
+        O.orElse(input.fileName, () => fileNameOf(now))
+      )
+      if (!Eq.equals(now, stored)) registry.set(waitingAt(kept), stored)
+    })
+  }
+  if (O.isNone(input.waits)) registry.set(draftOwner(id), O.none())
+  // Counted under the key they are kept under, and under the import's id alone while nobody, or no tab, is known.
+  registry.update(entriesToSend, (now) => {
+    const before = HashSet.remove(now, id)
+    const of = O.getOrElse(key, () => id)
+    return waits ? HashSet.add(before, of) : unread ? before : HashSet.remove(before, of)
+  })
 }
 
 /**
@@ -402,15 +423,16 @@ const lettingGo = (
   const of = registry.get(draftOwner(id))
   const isOwner = (owner: Owner): boolean => O.exists(of, (drafts) => sameMember(drafts, owner))
   if (O.isNone(of) || A.some(owners, isOwner)) {
-    registry.set(draftOf(id), emptyDraft)
+    registry.update(draftOf(id), startAgain)
     registry.set(draftOwner(id), O.none())
-    registry.update(waitingImports, HashSet.remove(id))
+    registry.update(entriesToSend, HashSet.remove<string>(id))
   }
   // What each of them dismissed of the take-backs a match made goes with the import.
   for (const owner of owners) registry.set(takeBackDismissals(dismissalsKey({ actor: owner, id })), O.none())
   O.map(registry.get(thisTab), (tab) => {
     for (const owner of owners) {
       const own = registry.get(waitingAt(keyOf(owner, id, tab)))
+      registry.update(entriesToSend, HashSet.remove(keyOf(owner, id, tab)))
       // The draft in memory holds all its entry keeps, unless that was never read into it.
       const inMemory = isOwner(owner) ? waiting(draft) : O.none<Waiting>()
       const named = eachOnce(A.map(A.getSomes([inMemory, toWaiting(own)]), decisionsIn))
@@ -477,40 +499,40 @@ const onceTabKnown = (registry: AtomRegistry.AtomRegistry, then: (tab: string) =
   })
 
 /**
- * The imports this tab kept rows for, read from the keys in the browser's storage, and whether any are still to be sent
- * (not only on hold, or left over to be named): each key is the member's scope, then `import:<id>:waiting:<tab>`
- * (escaped by `progressKey`).
+ * The entries of waiting rows this tab kept, whoever they belong to, read from the keys in the browser's storage: each
+ * key is its member's scope, then `import:<id>:waiting:<tab>` (escaped by `progressKey`). Whether any of its rows are
+ * still to be sent, and whether it is this member's own.
  */
-const waitingOfThisTab = (input: {
+const entriesOfThisTab = (input: {
   readonly registry: AtomRegistry.AtomRegistry
   readonly actor: Owner
   readonly tab: string
-}): ReadonlyArray<{ readonly id: ImportId; readonly sends: boolean }> => {
+}): ReadonlyArray<{ readonly key: string; readonly id: ImportId; readonly sends: boolean; readonly own: boolean }> => {
   const storage = sharedStorage()
   if (storage === undefined) return []
   const { actor, registry, tab } = input
-  const scope = { organizationId: actor.organizationId, memberId: actor.id }
-  const start = progressKey({ ...scope, screen: "import:" })
-  // The escaped end of every key this tab writes, whatever the import.
-  const bare = progressKey({ organizationId: "", memberId: "", screen: "" })
-  const end = Str.slice(Str.length(bare))(progressKey({ organizationId: "", memberId: "", screen: `:waiting:${tab}` }))
-  const found: Array<{ readonly id: ImportId; readonly sends: boolean }> = []
+  const own = progressKey({ organizationId: actor.organizationId, memberId: actor.id, screen: "" })
+  // The escaped start and end of the last part of every key this tab writes, whatever the member and the import.
+  const bare = Str.length(progressKey({ organizationId: "", memberId: "", screen: "" }))
+  const escaped = (screen: string) => Str.slice(bare)(progressKey({ organizationId: "", memberId: "", screen }))
+  const start = escaped("import:")
+  const end = escaped(`:waiting:${tab}`)
+  const found: Array<{ key: string; id: ImportId; sends: boolean; own: boolean }> = []
   try {
     for (let index = 0; index < storage.length; index += 1) {
       const key = storage.key(index)
-      if (key === null || !Str.startsWith(start)(key) || !Str.endsWith(end)(key)) continue
+      if (key === null || !Str.endsWith(end)(key)) continue
+      const screen = O.getOrElse(A.last(Str.split(":")(key)), () => "")
+      if (!Str.startsWith(start)(screen)) continue
       const id = pipe(
-        key,
-        Str.slice(Str.length(start), Str.length(key) - Str.length(end)),
+        screen,
+        Str.slice(Str.length(start), Str.length(screen) - Str.length(end)),
         Str.replaceAll("%3A", ":"),
         Str.replaceAll("%25", "%")
       )
-      // Rows left over are only to be named, and rows on hold wait for the person.
-      const sends = O.exists(
-        toWaiting(registry.get(waitingAt(key))),
-        (waits) => !waits.leftOver && !R.isEmptyReadonlyRecord(waits.rows)
-      )
-      if (S.is(ImportId)(id)) found.push({ id, sends })
+      if (!S.is(ImportId)(id)) continue
+      const waits = O.exists(toWaiting(registry.get(waitingAt(key))), sends)
+      found.push({ key, id, sends: waits, own: Str.startsWith(own)(key) })
     }
   } catch {
     return []
@@ -518,8 +540,11 @@ const waitingOfThisTab = (input: {
   return found
 }
 
-/** The imports whose drafts have rows still to be sent, in this tab: rows left over to be named are not counted. */
-const waitingImports = Atom.make(HashSet.empty<ImportId>()).pipe(Atom.keepAlive)
+/**
+ * The entries with rows still to be sent in this tab, whoever they belong to (a switch of organization leaves the other
+ * one's rows waiting here): counted as they are kept, and as they are found at page start.
+ */
+const entriesToSend = Atom.make(HashSet.empty<string>()).pipe(Atom.keepAlive)
 
 /**
  * An import this tab kept rows for is asked for once at page start: one that was removed meanwhile (by anyone) has its
@@ -543,7 +568,7 @@ const forgetIfRemoved = ({ id, of, registry }: DraftIn & { readonly of: Owner })
  * so they ask nothing; nor do rows of an import removed meanwhile. A page the app leaves on purpose (a sign-out, a
  * sign-in as somebody else) asks nothing either: the session is ended by then, and the rows stay kept in this browser
  * for that person's next visit. This tab's rows are counted once its id is its own (a copied tab counts none of the
- * original's), and again for whoever is signed in.
+ * original's), and again when somebody else is signed in: what the last one's entries still have to send stays counted.
  */
 export const askBeforeLeaving = Atom.readable((get) => {
   if (typeof window === "undefined") return
@@ -551,15 +576,18 @@ export const askBeforeLeaving = Atom.readable((get) => {
   // Rows this tab kept before a reload wait to be sent wherever the person is, whether or not their import's step is
   // opened again: they count from the start.
   O.map(O.all({ actor: get(member), tab: get(thisTab) }), ({ actor, tab }) => {
-    const found = waitingOfThisTab({ registry, actor, tab })
-    const sending = A.filter(found, (one) => one.sends)
-    registry.set(waitingImports, HashSet.fromIterable(A.map(sending, (one) => one.id)))
-    for (const { id } of found) {
-      forgetIfRemoved({ registry, id, of: { organizationId: actor.organizationId, id: actor.id } })
+    const found = entriesOfThisTab({ registry, actor, tab })
+    const sending = A.map(
+      A.filter(found, (entry) => entry.sends),
+      (entry) => entry.key
+    )
+    registry.update(entriesToSend, (now) => HashSet.union(now, HashSet.fromIterable(sending)))
+    for (const { id, own } of found) {
+      if (own) forgetIfRemoved({ registry, id, of: { organizationId: actor.organizationId, id: actor.id } })
     }
   })
   const ask = (event: BeforeUnloadEvent) => {
-    if (HashSet.size(registry.get(waitingImports)) > 0) event.preventDefault()
+    if (HashSet.size(registry.get(entriesToSend)) > 0) event.preventDefault()
   }
   const onPurpose = () => window.removeEventListener("beforeunload", ask)
   window.addEventListener("beforeunload", ask)

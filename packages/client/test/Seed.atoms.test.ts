@@ -37,7 +37,7 @@ const world = (takes: Duration.Input | Effect.Effect<void> = "10 millis", idle =
   const forever = api.query((server) => server.rows, { keep: "page" })
   const registry = AtomRegistry.make({ initialValues: [provideApi(layer)], defaultIdleTTL: idle })
   const seen = (atom: typeof rows) => registry.get(atom).pipe(AsyncResult.value, O.getOrUndefined)
-  return { registry, rows, forever, seen, reads: () => reads, starts: () => starts }
+  return { registry, layer, rows, forever, seen, reads: () => reads, starts: () => starts }
 }
 
 describe("a read the screen gives its answer", () => {
@@ -336,6 +336,28 @@ describe("asking again for an answer no older than a write", () => {
       expect([t.seen(t.rows), t.starts()]).toEqual(["server's rows 2", 3])
       yield* Effect.sleep("300 millis")
       expect([t.seen(t.rows), t.starts()]).toEqual(["server's rows 3", 3])
+    })
+  )
+})
+
+describe("an answer given on two pages at once", () => {
+  it.live("is held by each page's own registry: one page giving its answer never lets the other's go", () =>
+    Effect.gen(function* () {
+      const t = world()
+      // Another page of the same app, beside the first (a test's second registry, or a second root).
+      const other = AtomRegistry.make({ initialValues: [provideApi(t.layer)], defaultIdleTTL: 50 })
+      t.registry.set(t.rows, "page one's view")
+      other.set(t.rows, "page two's view")
+      // Nobody shows either for longer than the idle time: each given answer is still held where it was given.
+      yield* Effect.sleep("200 millis")
+      other.mount(t.rows)
+      t.registry.mount(t.rows)
+      yield* Effect.sleep("5 millis")
+      expect([other.get(t.rows).pipe(AsyncResult.value, O.getOrUndefined), t.seen(t.rows), t.reads()]).toEqual([
+        "page two's view",
+        "page one's view",
+        0
+      ])
     })
   )
 })

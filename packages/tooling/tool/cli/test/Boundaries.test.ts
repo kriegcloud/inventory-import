@@ -243,4 +243,62 @@ describe("laws boundaries", () => {
         expect(printed(report)).toEqual(["out: check-boundaries OK  3 workspaces"])
       })
   )
+
+  it.effect(
+    "refuses the other ways in: the root's files and manifest, an alias, an import map, a glob, a stylesheet",
+    () =>
+      Effect.gen(function* () {
+        // Put together here, so the rule does not read this file's fixtures as its own.
+        const quote = (text: string) => `"${text}"`
+        const report = yield* inTree(
+          {
+            ...base,
+            "package.json": json({
+              name: "root",
+              workspaces: ["apps/*", "packages/*", "scratchpad"],
+              devDependencies: { "@x/scratchpad": "workspace:*" },
+              imports: { "#exp/*": "./scratchpad/experiments/*" }
+            }),
+            "scratchpad/package.json": pkg("@x/scratchpad", { family: "scratchpad" }),
+            "alchemy.run.ts": `import ${quote("./scratchpad/experiments/idea/Stack.ts")}\n`,
+            "apps/shop/package.json": json({
+              name: "@x/shop",
+              beep: { family: "app" },
+              imports: { "#idea": "../../scratchpad/experiments/idea/Idea.ts" }
+            }),
+            "apps/shop/src/web/Page.tsx": `import ${quote("@/../../../../scratchpad/experiments/idea/Idea.ts")}\nconst all = import.meta.glob(${quote("../../../../scratchpad/experiments/**/*.ts")})\nexport { all }\n`,
+            "apps/shop/src/web/index.css": `@source ${quote("../../../../scratchpad/experiments")};\n@import ${quote("../../../../scratchpad/experiments/idea/screen.css")};\n`
+          },
+          Effect.map(boundaries(), render(boundariesSentence))
+        )
+        const refused = (where: string, specifier: string) =>
+          `err:   ${where} imports "${specifier}": nothing imports from the scratchpad. An experiment's code graduates into a package first`
+        expect(printed(report)).toEqual([
+          "err: check-boundaries FAIL",
+          "err:   the root's package.json declares @x/scratchpad: nothing depends on the scratchpad. Move what it needs into a package",
+          refused("package.json", "./scratchpad/experiments/*"),
+          refused("alchemy.run.ts", "./scratchpad/experiments/idea/Stack.ts"),
+          refused("apps/shop/src/web/Page.tsx", "../../../../scratchpad/experiments/**/*.ts"),
+          refused("apps/shop/src/web/Page.tsx", "@/../../../../scratchpad/experiments/idea/Idea.ts"),
+          refused("apps/shop/src/web/index.css", "../../../../scratchpad/experiments"),
+          refused("apps/shop/src/web/index.css", "../../../../scratchpad/experiments/idea/screen.css"),
+          refused("apps/shop/package.json", "../../scratchpad/experiments/idea/Idea.ts")
+        ])
+      })
+  )
+
+  it.effect("a folder of a package that is only named scratchpad is not the scratchpad", () =>
+    Effect.gen(function* () {
+      const report = yield* inTree(
+        {
+          ...base,
+          "scratchpad/package.json": pkg("@x/scratchpad", { family: "scratchpad" }),
+          "packages/ui/src/scratchpad/Note.ts": "export const note = 1\n",
+          "packages/ui/src/Use.ts": 'import { note } from "./scratchpad/Note.ts"\nexport { note }\n'
+        },
+        Effect.map(boundaries(), render(boundariesSentence))
+      )
+      expect(printed(report)).toEqual(["out: check-boundaries OK  3 workspaces"])
+    })
+  )
 })

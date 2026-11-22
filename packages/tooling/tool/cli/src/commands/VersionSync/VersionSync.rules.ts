@@ -13,7 +13,6 @@
  * | a GitHub action's version | `.github/workflows/ci.yml` | the same action in every other workflow |
  * | the CLI's version | its package.json | `version` in its `src/bin.ts` |
  * | the Effect language service's schema | the installed `@effect/tsgo` | a `$schema` that names the library's repository instead |
- * | what the scratchpad runs on | the version the package.json files state for each dependency | the same dependency in `scratchpad/package.json` (a library only an experiment uses is left alone) |
  *
  * The standing documents are `CLAUDE.md`, `AGENTS.md`, `README.md`, `docs/` (its evidence folders `docs/qa` and
  * `docs/session` left out) and `.claude/agents`. A version is read only after its own name, and after a name written
@@ -34,10 +33,9 @@ import * as R from "effect/Record"
 import * as S from "effect/Schema"
 import * as Str from "effect/String"
 import { Repo, type Workspace } from "../../Repo.service.ts"
-import { scratchpadFolder } from "../../Repo.schema.ts"
 import {
+  blankComments,
   decodeJsonc,
-  entriesOf,
   type Found,
   type FoundBlock,
   lineAt,
@@ -132,7 +130,7 @@ export const places =
   (pattern: RegExp): Plan => {
     const { at, what, expected } = site
     const matches = A.filter(
-      A.fromIterable(Str.matchAll(pattern)(at.text)),
+      A.fromIterable(Str.matchAll(pattern)(withoutComments(at.file)(at.text))),
       (match) => site.unless === undefined || !site.unless(match[0], match[1] ?? "")
     )
     return Plan.make({
@@ -159,6 +157,37 @@ export const places =
       })
     })
   }
+
+/** The packages named `@effect/*` that are not released with `effect`. */
+const apart = ["@effect/tsgo", "@effect/language-service"]
+
+/** Whether a dependency is released with `effect`, at its version. */
+const movesWithEffect = (name: string): boolean =>
+  name === "effect" || (Str.startsWith("@effect/")(name) && !A.contains(apart, name))
+
+/**
+ * A file's text with its comments turned into spaces, so a value in a comment is never a place and every offset is
+ * the file's own: `//` and `/* *\/` in JSON with comments and in code, `#` to the end of a line in YAML. A document's
+ * text is read whole: its sentences are the places.
+ *
+ * @category rules
+ */
+export const withoutComments =
+  (file: string) =>
+  (text: string): string =>
+    /\.(jsonc?|[cm]?[jt]sx?)$/.test(file)
+      ? blankComments(text)
+      : /\.ya?ml$/.test(file)
+        ? A.join(
+            A.map(Str.split("\n")(text), (line) => {
+              const comment = /(^|[ \t])#/.exec(line)
+              if (comment === null) return line
+              const from = comment.index + (comment[1] ?? "").length
+              return `${Str.slice(0, from)(line)}${Str.repeat(line.length - from)(" ")}`
+            }),
+            "\n"
+          )
+        : text
 
 /**
  * A name followed by a version in a sentence: "Effect 4.1", "`effect` 4.1.4's source", "Better Auth 1.7.22".
@@ -341,7 +370,7 @@ export const versionSyncPlan = Effect.fn("VersionSync.plan")(function* () {
       A.flatten([
         [
           places({ at: rootPackage, what: "`packageManager`, from .bun-version", expected: same })(
-            /"packageManager"\s*:\s*"bun@([^"]+)(?=")/g
+            /"packageManager"\s*:\s*"bun@(\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?)(?=["+])/g
           )
         ],
         A.map(workflows, (at) =>
@@ -378,7 +407,9 @@ export const versionSyncPlan = Effect.fn("VersionSync.plan")(function* () {
     })
     return mergePlans(
       A.flatten([
-        A.map(workflows, (at) => places({ at: at, what: what, expected: same })(/\bnode-version:\s*["']?([\w.]+)/g)),
+        A.map(workflows, (at) =>
+          places({ at: at, what: what, expected: same })(/\bnode-version:\s*["']?(\d+(?:\.[\dx]+)*)(?![\w/*])/g)
+        ),
         A.map(documents, (at) =>
           places({ at: at, what: what, expected: same })(/\bNode(?:\.js)?\s+(\d+)(?= or newer)/g)
         ),
@@ -397,7 +428,6 @@ export const versionSyncPlan = Effect.fn("VersionSync.plan")(function* () {
   }
 
   // Effect: the packages released with it, the documents, and what `vendor sync` writes.
-  const apart = ["@effect/tsgo", "@effect/language-service"]
   const effectPlan = Effect.fn("VersionSync.effect")(function* () {
     const source = stated("effect")
     if (O.isNone(source.spec)) return Plan.make({ checked: 0, drifts: [], problems: source.problems })
@@ -413,7 +443,9 @@ export const versionSyncPlan = Effect.fn("VersionSync.plan")(function* () {
       onNone: () => A.empty<Plan>(),
       onSome: (at) =>
         A.map(pinnedInCode, (name) => {
-          const own = stated(name)
+          // An Effect package follows `effect`, as the same plan moves it in every package.json: read from the
+          // files before the write, it would lag one run behind.
+          const own = movesWithEffect(name) ? { spec: O.some(spec), problems: [] } : stated(name)
           return O.match(own.spec, {
             onNone: () => Plan.make({ checked: 0, drifts: [], problems: own.problems }),
             onSome: (ownSpec) =>
@@ -425,11 +457,28 @@ export const versionSyncPlan = Effect.fn("VersionSync.plan")(function* () {
           })
         })
     })
+    // `vendor sync` gives a vendored package type-fest at the version the packages ask for.
+    const typeFest = stated("type-fest")
+    const typeFestInVendorSync = O.match(vendorSync, {
+      onNone: () => A.empty<Plan>(),
+      onSome: (at) => [
+        O.match(typeFest.spec, {
+          onNone: () => Plan.make({ checked: 0, drifts: [], problems: typeFest.problems }),
+          onSome: (wanted) =>
+            places({
+              at,
+              what: "the `type-fest` a vendored package is given, from the package.json files",
+              expected: () => wanted
+            })(/name === "type-fest" \? "([^"]+)(?=")/g)
+        })
+      ]
+    })
     return mergePlans(
       A.flatten([
         A.map(family, (name) => following(name, spec, "an Effect package's version, from `effect`")),
         [inDocuments("Effect", ["Effect", "effect"], numbered(spec), "the `effect` the package.json files state")],
-        inVendorSync
+        inVendorSync,
+        typeFestInVendorSync
       ])
     )
   })
@@ -531,7 +580,8 @@ export const versionSyncPlan = Effect.fn("VersionSync.plan")(function* () {
   })
 
   // A GitHub action: the version the check's workflow uses.
-  const uses = /\buses:\s*([\w./-]+)@([\w.-]+)/g
+  // An action pinned by a commit is left alone: its version comment would go stale, and a commit is a choice.
+  const uses = /\buses:\s*([\w./-]+)@(?![0-9a-f]{40}\b)([\w.-]+)/g
   const actionsPlan = (): Plan => {
     const source = A.findFirst(workflows, (at) => Str.endsWith("/ci.yml")(at.file))
     if (O.isNone(source)) return nothing
@@ -544,7 +594,7 @@ export const versionSyncPlan = Effect.fn("VersionSync.plan")(function* () {
         (at: Text) =>
           A.map(R.toEntries(pinned), ([action, version]) =>
             places({ at: at, what: `${action}'s version, from ${source.value.file}`, expected: () => version })(
-              new RegExp(`\\buses:\\s*${literally(action)}@([\\w.-]+)`, "g")
+              new RegExp(`\\buses:\\s*${literally(action)}@(?![0-9a-f]{40}\\b)([\\w.-]+)`, "g")
             )
           )
       )
@@ -589,61 +639,7 @@ export const versionSyncPlan = Effect.fn("VersionSync.plan")(function* () {
     )
   })
 
-  // The scratchpad: what it shares with the packages is at the packages' version; the rest is an experiment's.
-  const scratchPlan = Effect.fn("VersionSync.scratchpad")(function* () {
-    const at = yield* readIfThere(repo.join(repo.root, scratchpadFolder, "package.json"))
-    if (O.isNone(at)) return nothing
-    const own = A.flatMap(["dependencies", "devDependencies"], (block) =>
-      O.match(objectOf(block)(at.value.text), {
-        onNone: () => A.empty<readonly [Found, Found]>(),
-        onSome: (found) => entriesOf(found)(at.value.text)
-      })
-    )
-    return mergePlans(
-      A.map(
-        A.filter(own, ([, spec]) => isRegistryVersion(spec.value)),
-        ([name, spec]) => {
-          // A package kept as a file is asked for at its version and commit, by an experiment as by a package.
-          const source = O.orElse(R.get(keptSpecs, name.value), () => stated(name.value).spec)
-          return O.match(source, {
-            // Two packages that disagree are named once already, where the dependency is the packages' own.
-            onNone: () => nothing,
-            onSome: (wanted) =>
-              Plan.make({
-                checked: 1,
-                problems: [],
-                drifts:
-                  spec.value === wanted
-                    ? []
-                    : [
-                        Drift.make({
-                          file: at.value.file,
-                          line: lineAt(at.value.text)(spec.start),
-                          what: `the scratchpad's \`${name.value}\`, from the package.json files`,
-                          found: spec.value,
-                          expected: wanted,
-                          start: spec.start,
-                          end: spec.end,
-                          text: wanted
-                        })
-                      ]
-              })
-          })
-        }
-      )
-    )
-  })
-
   const bun = yield* bunPlan()
-  const keptRecord = yield* readIfThere(repo.join(repo.root, "vendor", "alchemy", "sources.json"))
-  const keptSpecs = yield* O.match(keptRecord, {
-    onNone: () => Effect.succeed<Record<string, string>>({}),
-    onSome: (record) =>
-      Effect.map(decodeJsonc(KeptPackages)(record.file, record.text), (kept) =>
-        R.fromEntries(A.map(kept.packages, (one) => [one.package, `${one.version}-${kept.commit}`] as const))
-      )
-  })
-  const scratch = yield* scratchPlan()
   const effect = yield* effectPlan()
   const alchemy = yield* alchemyPlan()
   const date = yield* datePlan()
@@ -660,8 +656,7 @@ export const versionSyncPlan = Effect.fn("VersionSync.plan")(function* () {
     date,
     actionsPlan(),
     cli,
-    schema,
-    scratch
+    schema
   ])
 })
 

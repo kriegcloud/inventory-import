@@ -24,6 +24,7 @@
 import { $RepoCliId } from "@beep/identity/packages"
 import * as A from "effect/Array"
 import * as Effect from "effect/Effect"
+import * as MutableHashMap from "effect/MutableHashMap"
 import * as O from "effect/Option"
 import * as Order from "effect/Order"
 import * as R from "effect/Record"
@@ -34,7 +35,7 @@ import { Repo } from "../../Repo.service.ts"
 import { err, Line, out } from "../../Report.schema.ts"
 import { decodeJsonc, fits, type Found, lineAt, objectOf, stringsIn } from "../../Sync.rules.ts"
 import { Drift, type Mode, Plan, settle, type SyncFinding, syncSentence } from "../../Sync.schema.ts"
-import { versionSync } from "../VersionSync/VersionSync.rules.ts"
+import { versionSyncPlan } from "../VersionSync/VersionSync.rules.ts"
 
 const $I = $RepoCliId.create("commands/Deps/Deps.rules")
 
@@ -201,6 +202,7 @@ export const DepsFinding = S.TaggedUnion({
   },
   Installed: {},
   InstallFailed: {
+    files: S.Int.pipe(S.annotateKey({ description: "How many written files were put back" })),
     output: S.String.pipe(S.annotateKey({ description: "What bun said, its last lines" }))
   },
   Synced: {
@@ -435,9 +437,9 @@ export const depsSentence: (finding: DepsFinding) => Line = DepsFinding.match({
       `  ${written ? "moved" : "move "}  ${name} ${from} -> ${to} (${plural(files, "package.json", "package.json files")})`
     ),
   Installed: () => out("deps:update  bun install ran: bun.lock and node_modules follow the new versions"),
-  InstallFailed: ({ output }) =>
+  InstallFailed: ({ files, output }) =>
     err(
-      `deps:update FAIL  bun install did not finish after the versions were written. The package.json files hold the new versions; bun.lock may not. bun said:\n${output}`
+      `deps:update FAIL  bun install did not finish, so the ${files} files written (the package.json files, what version-sync brought along, bun.lock) are put back as they were. node_modules may be half installed: \`bun install\` puts it back. Fix what bun said, then run \`bun run deps:update\` again. bun said:\n${output}`
     ),
   Synced: ({ line }) => line
 })
@@ -551,22 +553,47 @@ export const depsUpdate = Effect.fn("Deps.depsUpdate")(function* (mode: Mode, pa
   const plan = depsPlan({ asks, holds, latest: R.fromEntries(known), written: mode === "write" })
   if (mode !== "write" || plan.drifts.length === 0) return plan.findings
 
+  // Every file is written before the one install, so the lockfile is made from what the files finally say: the
+  // moves, then what version-sync brings along (the scratchpad, the documents, the pins in code). What each held
+  // before is kept, and if the install fails all of it goes back, the lockfile too: a second run then finds the same
+  // moves, not a tree half moved.
+  const kept = MutableHashMap.empty<string, string>()
+  const keep = Effect.fn("Deps.keep")(function* (file: string) {
+    const absolute = repo.join(repo.root, file)
+    if (MutableHashMap.has(kept, absolute) || !(yield* repo.exists(absolute))) return
+    const text = yield* repo.text(absolute)
+    MutableHashMap.set(kept, absolute, text)
+  })
+  yield* keep("bun.lock")
+  yield* Effect.forEach(plan.drifts, (drift) => keep(drift.file), { concurrency: 1, discard: true })
   yield* settle(
     { command: "deps:update", repair: "bun run deps:update", mode },
     Plan.make({ checked: asks.length, drifts: plan.drifts, problems: [] })
   )
+  const following = yield* versionSyncPlan()
+  yield* Effect.forEach(following.drifts, (drift) => keep(drift.file), { concurrency: 1, discard: true })
+  const synced = yield* settle(
+    { command: "version-sync", repair: "bun run version-sync -- --write", mode: "write" },
+    following
+  )
   const install = yield* packages.install
   if (install.code !== 0) {
+    yield* Effect.forEach(A.fromIterable(kept), ([absolute, text]) => repo.write(absolute, text), {
+      concurrency: 1,
+      discard: true
+    })
     const lines = Str.split("\n")(install.output)
     return A.append<DepsFinding, DepsFinding>(
       plan.findings,
-      DepsFinding.cases.InstallFailed.make({ output: A.join(A.takeRight(lines, 12), "\n") })
+      DepsFinding.cases.InstallFailed.make({
+        files: MutableHashMap.size(kept),
+        output: A.join(A.takeRight(lines, 12), "\n")
+      })
     )
   }
-  const synced = yield* versionSync("write")
   return A.flatten<ReadonlyArray<ReadonlyArray<DepsFinding>>>([
     plan.findings,
-    [DepsFinding.cases.Installed.make({})],
-    A.map(synced, (finding: SyncFinding) => DepsFinding.cases.Synced.make({ line: syncSentence(finding) }))
+    A.map(synced, (finding: SyncFinding) => DepsFinding.cases.Synced.make({ line: syncSentence(finding) })),
+    [DepsFinding.cases.Installed.make({})]
   ])
 })

@@ -34,6 +34,17 @@ describe("the plan of a stage", () => {
     })
   })
 
+  it("staging, what main holds, is on workers.dev with the test accounts, no model key, and sign-up closed", () => {
+    expect(plan("staging")).toMatchObject({
+      kind: "staging",
+      address: { at: "workersDev" },
+      seeds: ["organizations", "accounts"],
+      modelKey: { from: "nowhere" },
+      signUp: { from: "nowhere" },
+      deployed: true
+    })
+  })
+
   it("a test stage has the test accounts, no model key, and sign-up closed", () => {
     expect(plan("test_ben")).toMatchObject({
       kind: "test",
@@ -50,7 +61,7 @@ describe("the plan of a stage", () => {
   })
 
   it("only production is at a host name, holds a model key, and has no seed", () => {
-    const others = A.map(["pr-1", "pr-999", "test_a", "dev_a"], plan)
+    const others = A.map(["pr-1", "pr-999", "staging", "test_a", "dev_a"], plan)
     expect(A.every(others, (other) => other.address.at === "workersDev")).toBe(true)
     expect(A.every(others, (other) => other.modelKey.from === "nowhere")).toBe(true)
     expect(A.every(others, (other) => other.seeds.length > 0)).toBe(true)
@@ -65,7 +76,8 @@ describe("the plan of a stage", () => {
       "pr-0",
       "pr-1a",
       "PR-1",
-      "staging",
+      "stage",
+      "staging_1",
       "test_",
       "",
       "prod "
@@ -75,13 +87,13 @@ describe("the plan of a stage", () => {
     }
     const refused = kindOf("live_ben")
     expect(Result.isFailure(refused) ? refused.failure.message : "").toBe(
-      '"live_ben" is not a stage of this app. Name one with --stage: prod, pr-<number>, test_<user> or dev_<user>.'
+      '"live_ben" is not a stage of this app. Name one with --stage: prod, staging, pr-<number>, test_<user> or dev_<user>.'
     )
   })
 
   it.prop(
     "every plan a stage name gives is a valid plan",
-    [Arbitrary.schema(S.Literals(["prod", "pr-7", "test_x", "dev_x"]))],
+    [Arbitrary.schema(S.Literals(["prod", "staging", "pr-7", "test_x", "dev_x"]))],
     ([name]) => {
       expect(S.is(StagePlan)(plan(name))).toBe(true)
     }
@@ -92,10 +104,13 @@ describe("the plan of a stage", () => {
   })
 
   describe("the password a stage's test accounts take", () => {
-    it("is minted for a test stage, given to a preview, and the repository's only on a developer's machine", () => {
-      expect(A.map(["prod", "pr-42", "test_ben", "dev_ben"], (stage) => [stage, testPasswordOf(plan(stage))])).toEqual([
+    it("is minted for a test stage, given to a preview and to staging, and the repository's only on a developer's machine", () => {
+      expect(
+        A.map(["prod", "pr-42", "staging", "test_ben", "dev_ben"], (stage) => [stage, testPasswordOf(plan(stage))])
+      ).toEqual([
         ["prod", "none"],
         ["pr-42", "given"],
+        ["staging", "given"],
         ["test_ben", "minted"],
         ["dev_ben", "none"]
       ])
@@ -104,6 +119,16 @@ describe("the plan of a stage", () => {
     it("a preview takes the password it is given", () => {
       expect(givenTestPassword({ stage: "pr-42", given: O.some("the previews' password") })).toEqual(
         Result.succeed("the previews' password")
+      )
+    })
+
+    it("staging with none stops too, and says it is the staging environment", () => {
+      const stopped = givenTestPassword({ stage: "staging", given: O.none<string>() })
+      expect(Result.isFailure(stopped) ? stopped.failure.message : "").toContain(
+        "so nobody could sign in to this stage. Write the reference PREVIEW_TEST_ACCOUNT_PASSWORD="
+      )
+      expect(Result.isFailure(stopped) ? stopped.failure.message : "").toContain(
+        "to the staging environment as a secret."
       )
     })
 
@@ -138,8 +163,10 @@ describe("the plan of a stage", () => {
       expect(keyFor("prod", O.none(), true)).toEqual(Result.succeed(O.none()))
     })
 
-    it("gives a preview and a test stage no key, whatever the environment holds", () => {
+    it("gives a preview, staging and a test stage no key, whatever the environment holds", () => {
       expect(keyFor("pr-42", O.some("key"), false)).toEqual(Result.succeed(O.none()))
+      // Decision I5: production alone holds a key, so staging's deploy never stops for want of one.
+      expect(keyFor("staging", O.none(), false)).toEqual(Result.succeed(O.none()))
       expect(keyFor("test_ben", O.none(), false)).toEqual(Result.succeed(O.none()))
     })
   })

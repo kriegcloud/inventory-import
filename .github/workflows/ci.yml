@@ -2,7 +2,8 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # A release branch is checked as main is: a fix cherry-picked onto it is green before its tag is pushed.
+    branches: [main, "release/**"]
   pull_request:
 
 permissions:
@@ -39,7 +40,10 @@ jobs:
       # Chrome at this path (CHROME_BIN in actions/runner-images; the runs are on Ubuntu 26.04, whose image lists
       # Google Chrome as 24.04's does). The browser says its version first,
       # so a path that is wrong fails on that line with the path in it.
+      # It runs when the check above failed as well, so a red run says whether the grid still stores what is typed; the
+      # job still fails on the check's failure. Not on a cancelled run.
       - name: Type on the data grid
+        if: ${{ !cancelled() }}
         run: |
           "$CHROME_PATH" --version
           bun run --cwd apps/inventory grid:keys

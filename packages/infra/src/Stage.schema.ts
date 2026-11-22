@@ -62,11 +62,11 @@ export type VariableName = typeof VariableName.Type
 
 /**
  * What a stage is for. Personal is one developer's machine; test is the deploy test's own copy; preview is a pull
- * request's; production is the one people use.
+ * request's; staging is what `main` holds, deployed after every green push; production is the one people use.
  *
  * @category schemas
  */
-export const StageKind = LiteralKit(["personal", "test", "preview", "production"]).pipe(
+export const StageKind = LiteralKit(["personal", "test", "preview", "staging", "production"]).pipe(
   $I.annoteSchema("StageKind", { description: "What a stage is for" })
 )
 

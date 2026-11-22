@@ -1078,7 +1078,7 @@ per-row model from a local branch on his own machine, and says plainly that it i
 That branch is kept running on the pinned build and gets nothing else. Reverse: none needed; the fallback is deleted
 once the chosen model is in `main`.
 
-### 2026-11-22 — the check on GitHub's runner (agent, not asked)
+### 2026-11-22 — the check on GitHub's runner
 
 CI failed twice on code that had not changed: the CLI's start-up test, then two property tests of `@beep/xlsx`, each
 "timed out in 5000ms". Reproduced with the whole check pinned to four cores (`taskset`): turbo starts ten tasks at
@@ -1090,8 +1090,8 @@ of it a test's own number or what a test asserts:
 - One file, `vitest.shared.ts`, holds every test's limit (30 s, hooks 60 s, slow tests 120 s) in place of vitest's 5 s
   and 10 s. Sized from the slowest tests on two pinned cores: 4.4 s and 31 s.
 - In the four places whose tests wait in real time (`packages/client`, `packages/catalog/web`, `packages/review` and
-  the app's fast tests), a test that fails is tried again, three times at most and half a second apart; a property that was falsified
-  never is.
+  the app's fast tests), a test that fails is tried again, three times at most and half a second apart; a property
+  that was falsified, and a test or hook that ran out of time, never are. This one is his decision, below.
 - No property test's run count was lowered and nothing is skipped.
 
 Measured, cold, pinned (`taskset`), the whole check each time, 80 tasks:
@@ -1107,17 +1107,35 @@ Measured, cold, pinned (`taskset`), the whole check each time, 80 tasks:
 | 2 | 2 | 1 | three times, 0.5 s apart | 1 | 1 | 342 |
 
 The last two rows are what CI runs. Every red run after the first row was a test that waits in real time, never a
-limit. One test worker costs about a minute on four cores; the job's limit is 15 minutes and the two-core run, which
-stands in for the runner's slower cores, took under six. The runner itself has not run this yet: nothing is pushed.
+limit. One test worker costs about a minute on four cores.
 
-The second try is the part to look at twice: it makes a test that fails now and then pass in silence (the reporter
-names a try only on a test that still failed), and it is not a cure: with two tries one session test failed all
-three times in one run. It stands only because those tests break the standard's own rule that
-anything timed runs on `TestClock`. Rejected: a longer limit for the xlsx tests alone (the next heavy test would be
-next); a second try for every package (only these four wait in real time); trying a falsified property again.
-Reverse: the three lines in `.github/workflows/ci.yml`, and `limits` and `realTime` in each `vitest.config.ts`.
+Measured again on the tree with everything merged (main at 46eed3e with the loud retries and the sized limits, 85
+tasks; the table above had 80 and lacked the atoms and sync branches), cold, as CI runs it: four pinned cores, green
+three times in a row in 235, 208 and 276 s; two pinned cores, green in 298 s. No test needed a second try in any of
+them. The slowest, five minutes, leaves about ten of the job's 15 for the install, the browser step and a runner
+slower than two pinned cores here. The runner itself has not run this yet: nothing is pushed.
 
-Two things this does not end, both found while measuring and neither in files of this change:
+The concurrency, workers and limits were the agent's, not asked; the second try was put to him. Question, by dialog:
+the tests that wait in real time fail now and then under load and are tried again with no word, which can hide an
+intermittent fault in the review's save and confirm, and it is not a cure; what should happen to the retry? Options:
+"Retry for now, said aloud; remove after TestClock" (Recommended), "Remove it now", "Keep it as is". Answer: "Retry
+for now, said aloud; remove after TestClock". I chose; the agent recommended the same. Built as: a reporter
+(`vitest.retries.ts`) names every test that passed on a later try, with its file, line and which try, in the run's
+output and as a GitHub warning on that line, and counts them at the end of each run; a test or hook that ran out of
+time is never tried again, so a hang cannot eat the job four times over. The retry is removed in the same change that
+moves the last of the 28 files onto `TestClock` (the atoms work). Rejected besides: a longer limit for the xlsx tests
+alone (the next heavy test would be next); a second try for every package (only these four wait in real time);
+trying a falsified property again. Reverse: the three lines in `.github/workflows/ci.yml`, `limits` in each
+`vitest.config.ts`, and `realTime` and `saidAloud` in the four that wait in real time.
+
+A limit above the shared one is set only with what was measured written beside it: the 2,000-run waited-rows property
+(180 s; 24 s alone on two pinned cores), the draft machine's four properties (120 s; 12 s the slowest seen), Steps'
+heaviest shapes (60 s; 9.7 s), the scratchpad's nested run (120 s) and the CLI's start-up (120 s: five starts, each
+stopped at 20 s). Limits set below the shared one were taken out, so the shared one applies: six test files had 10 s
+or 20 s, the 50,000-row slow tests 60 s. The vendored kit and the scratchpad use the shared limits too; vendor sync
+writes them into the kit's configs.
+
+Two things this does not end, both found while measuring:
 
 - The tests that wait in real time (28 files) still fail now and then under load on any machine, and only the second
   try keeps that out of sight.
@@ -1285,3 +1303,45 @@ untouched.
 The agent chose, and I was not asked: the Verify template takes the prover from the root's install (a library of the
 scratchpad would be a second Effect), so it works once a package asks for `@alchemy.run/domain`, and until then
 `scratch:new` says so.
+
+### 2026-11-22 — releases and deploys: trunk, release branches, tags
+
+He asked, in his words: "We should also setup deploys only on release branches with tags for releases. I'm thinking
+we follow some kind of trunk based strategy". Four questions by dialog; each answer was the recommended option.
+
+1. What deploys production? Answer: "A tag on a release branch". Work lands on `main`; a release is cut as
+   `release/<major>.<minor>` from `main`; pushing a tag `v<major>.<minor>.<patch>` on that branch deploys production;
+   a fix to a released version lands on `main` first and is cherry-picked onto its release branch, then tagged with
+   the next patch. `main` never deploys production. Rejected: "A tag on main, no branches". I chose; the agent
+   recommended the same.
+2. What does `main` deploy? Answer: "A staging stage". Every green push to `main` deploys one staging stage.
+   Rejected: "Nothing"; "Pull-request previews only". I chose; the agent recommended the same.
+3. Does each production deploy wait for my approval? Answer: "Yes, I approve each one": the production job waits on
+   the `production` environment's required reviewer. I chose; the agent recommended the same.
+4. How is a release cut? First answer: "One repo command", in his words "maybe changsets too for our packages. I
+   recommend you look up the turbo documentation on this". Turborepo's guide recommends Changesets only for packages
+   published to npm and calls the others Internal Packages; every package here is private. Second answer: "App
+   version only, for now": one version for the app, set by the release command and tagged on the release branch; the
+   packages stay Internal Packages; Changesets is added only if a package is ever published. Rejected: "Trial
+   Changesets first"; "Changesets now". I chose; the agent recommended the same.
+
+Built as: `bun run release` in the repository's CLI (`docs/releasing.md`); `.github/workflows/deploy.yml` deploys
+staging after CI passes on `main`, and production only from a `v*` tag whose commit is on a `release/*` branch,
+behind the `production` environment; the previews are unchanged. Reverse: production on a push to `main` again in
+`deploy.yml`, and the `staging` stage out of the stage plan.
+
+The agent chose these, and I was not asked:
+
+- The approval stays as code. The `production` environment and its reviewer are already made by the repository's
+  stack (`packages/infra/src/GitHub.stack.ts`, decision I7), so nothing is clicked in GitHub's settings: the stack
+  now leaves the environment open to any ref (Alchemy's GitHub provider writes only branch rules, and deletes any rule
+  it did not write, so a `v*` tag rule could not be kept there), and a tag ruleset lets only an admin create, move or
+  delete a `v*` tag. The deploy job checks the tag and its branch itself, and the reviewer approves each one. Until
+  he deploys that stack again, GitHub still allows only `main` to deploy to production, so a tag deploy waits there.
+- The staging stage is named `staging`, answers on `workers.dev`, and is a rehearsal like a preview: the test
+  organizations and accounts, sign-up closed (decision I8: no real email outside production), and no model key:
+  decision I5 gives one to production only, so the missing-model-key guard has nothing to guard and the rules answer.
+  Its test accounts take the one password the previews share. It runs on the previews' Cloudflare account.
+- The release notes are the conventional commits since the last tag, grouped by type, written to `CHANGELOG.md` and
+  into the annotated tag's message. The app's version is `apps/inventory/package.json`; the "(v0.6.1)" in
+  `README.md` names the version that was submitted and is never moved.

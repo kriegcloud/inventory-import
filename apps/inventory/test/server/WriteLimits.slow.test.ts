@@ -162,7 +162,7 @@ const createdBefore = Effect.fn("createdBefore")(function* (id: ImportId) {
     SELECT ${org}, ${id}, i + 2, part, 'AAA-0000', 'Oak Crate', 'created', '' FROM n, p`
 })
 
-layer(App, { timeout: 60_000 })("a save of every row of a file of 50,000", (it) => {
+layer(App)("a save of every row of a file of 50,000", (it) => {
   it.effect(
     "carrying a Replace made before its cost was matched again, with 12,000 of the file's SKUs stored: every row is saved",
     () =>
@@ -183,7 +183,7 @@ layer(App, { timeout: 60_000 })("a save of every row of a file of 50,000", (it) 
   )
 })
 
-layer(App, { timeout: 60_000 })("the most rows one save may name", (it) => {
+layer(App)("the most rows one save may name", (it) => {
   it.effect("50,000 set and 50,000 cleared, with nothing judged: every row set is saved, one revision on", () =>
     Effect.gen(function* () {
       const id = ImportId.make("00000000-0000-4000-8000-0000000000d0")
@@ -202,7 +202,7 @@ layer(App, { timeout: 60_000 })("the most rows one save may name", (it) => {
   )
 })
 
-layer(App, { timeout: 60_000 })("a save of long typed values", (it) => {
+layer(App)("a save of long typed values", (it) => {
   it.effect("2,000 rows with 1,500 characters typed on each: more than one value may hold, and all are saved", () =>
     Effect.gen(function* () {
       const id = ImportId.make("00000000-0000-4000-8000-0000000000e0")
@@ -228,60 +228,57 @@ const heavy: ReadonlyArray<readonly [string, string]> = [
   ["characters of four bytes", "📦"]
 ]
 
-layer(App, { timeout: 60_000 })(
-  "a save, a match and a confirm of long typed values whose bytes are more than their characters",
-  (it) => {
-    for (const [index, [name, text]] of A.map(heavy, (one, index) => [index, one] as const)) {
-      it.effect(
-        `2,000 rows with 1,500 ${name} typed on each: every piece fits, and all are saved, matched and confirmed`,
-        () =>
-          Effect.gen(function* () {
-            const id = ImportId.make(`00000000-0000-4000-8000-0000000000${index + 1}1`)
-            yield* seeded(id, index === 0 ? 1 : 0)
-            const store = yield* ImportStore
-            const at = yield* DateTime.now
-            const draftNow = Effect.map(store.find(org, id), O.getOrThrow)
-            // The unit accepted too, so a match of the unit rewrites every one of them.
-            const typed = (by: string) =>
-              decisionFromFlags({ accepted: ["uom"], edits: { description: Str.repeat(1500)(text), name: by } })
-            const set = (by: string): Readonly<Record<string, RowDecision>> =>
-              R.fromEntries(counted(2000, (n) => [`row-${n + 2}`, typed(by)] as const))
-            const first = yield* draftNow
-            const saved = yield* store.decide(marcus, first, { set: set("saved"), clear: [] })
-            const second = yield* draftNow
-            const matched = yield* store.matchColumn(marcus, second, { field: "uom", column: null }, "Unit of measure")
-            const third = yield* draftNow
-            const confirmed = yield* store.commit(
-              ConfirmWrite.make({
-                draft: id,
-                fileName: "large.csv",
-                confirm: ConfirmId.make(`00000000-0000-4000-8000-0000000000${index + 1}2`),
-                expected: third.revision,
-                unsaved: { set: set("confirmed"), clear: [] },
-                plan: ConfirmPlan.make({ draft: id, rows: [] }),
-                itemIds: [],
-                read: noItemsRead,
-                audit: Activity.make({
-                  id: ActivityId.make(`00000000-0000-4000-8000-0000000000${index + 1}3`),
-                  organizationId: org,
-                  actorId: marcus.id,
-                  actorName: marcus.name,
-                  action: "Imported items",
-                  detail: "",
-                  agent: O.none(),
-                  createdAt: at
-                })
+layer(App)("a save, a match and a confirm of long typed values whose bytes are more than their characters", (it) => {
+  for (const [index, [name, text]] of A.map(heavy, (one, index) => [index, one] as const)) {
+    it.effect(
+      `2,000 rows with 1,500 ${name} typed on each: every piece fits, and all are saved, matched and confirmed`,
+      () =>
+        Effect.gen(function* () {
+          const id = ImportId.make(`00000000-0000-4000-8000-0000000000${index + 1}1`)
+          yield* seeded(id, index === 0 ? 1 : 0)
+          const store = yield* ImportStore
+          const at = yield* DateTime.now
+          const draftNow = Effect.map(store.find(org, id), O.getOrThrow)
+          // The unit accepted too, so a match of the unit rewrites every one of them.
+          const typed = (by: string) =>
+            decisionFromFlags({ accepted: ["uom"], edits: { description: Str.repeat(1500)(text), name: by } })
+          const set = (by: string): Readonly<Record<string, RowDecision>> =>
+            R.fromEntries(counted(2000, (n) => [`row-${n + 2}`, typed(by)] as const))
+          const first = yield* draftNow
+          const saved = yield* store.decide(marcus, first, { set: set("saved"), clear: [] })
+          const second = yield* draftNow
+          const matched = yield* store.matchColumn(marcus, second, { field: "uom", column: null }, "Unit of measure")
+          const third = yield* draftNow
+          const confirmed = yield* store.commit(
+            ConfirmWrite.make({
+              draft: id,
+              fileName: "large.csv",
+              confirm: ConfirmId.make(`00000000-0000-4000-8000-0000000000${index + 1}2`),
+              expected: third.revision,
+              unsaved: { set: set("confirmed"), clear: [] },
+              plan: ConfirmPlan.make({ draft: id, rows: [] }),
+              itemIds: [],
+              read: noItemsRead,
+              audit: Activity.make({
+                id: ActivityId.make(`00000000-0000-4000-8000-0000000000${index + 1}3`),
+                organizationId: org,
+                actorId: marcus.id,
+                actorName: marcus.name,
+                action: "Imported items",
+                detail: "",
+                agent: O.none(),
+                createdAt: at
               })
-            )
-            const held = yield* savedFor(id)
-            expect([saved.kind, matched, confirmed.kind, held]).toEqual(["saved", "saved", "confirmed", [[2000, 0]]])
-          })
-      )
-    }
+            })
+          )
+          const held = yield* savedFor(id)
+          expect([saved.kind, matched, confirmed.kind, held]).toEqual(["saved", "saved", "confirmed", [[2000, 0]]])
+        })
+    )
   }
-)
+})
 
-layer(App, { timeout: 60_000 })("a save of 50,000 rows that waited", (it) => {
+layer(App)("a save of 50,000 rows that waited", (it) => {
   it.effect("each named with what it may be written over: every row but the one decided since is written", () =>
     Effect.gen(function* () {
       const id = ImportId.make("00000000-0000-4000-8000-0000000000f0")
@@ -311,7 +308,7 @@ layer(App, { timeout: 60_000 })("a save of 50,000 rows that waited", (it) => {
   )
 })
 
-layer(App, { timeout: 60_000 })("a save of 50,000 Replaces that waited across a match of their cost", (it) => {
+layer(App)("a save of 50,000 Replaces that waited across a match of their cost", (it) => {
   it.effect("each naming three decisions it may be written over: judged once, and every row written", () =>
     Effect.gen(function* () {
       const id = ImportId.make("00000000-0000-4000-8000-0000000000f1")
@@ -340,7 +337,7 @@ layer(App, { timeout: 60_000 })("a save of 50,000 Replaces that waited across a 
   )
 })
 
-layer(App, { timeout: 60_000 })("a confirm that writes every row of a file of 50,000", (it) => {
+layer(App)("a confirm that writes every row of a file of 50,000", (it) => {
   it.effect(
     "items created and replaced, rows left out, values typed: each is stored, and counted as stored",
     () =>
@@ -391,7 +388,7 @@ layer(App, { timeout: 60_000 })("a confirm that writes every row of a file of 50
   )
 })
 
-layer(App, { timeout: 60_000 })("a match and a confirm of a file of 50,000 rows", (it) => {
+layer(App)("a match and a confirm of a file of 50,000 rows", (it) => {
   it.effect("the match checks everything its review read, however much that is, and is written", () =>
     Effect.gen(function* () {
       const id = ImportId.make("00000000-0000-4000-8000-0000000000b0")

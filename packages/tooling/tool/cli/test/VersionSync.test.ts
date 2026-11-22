@@ -235,6 +235,80 @@ describe("version-sync", () => {
       })
   )
 
+  it.effect(
+    "a write leaves nothing for the next check when an Effect package lags `effect`, type-fest's pin included",
+    () =>
+      Effect.gen(function* () {
+        const result = yield* run(
+          {
+            "package.json": json({ name: "root", workspaces: ["packages/*"] }),
+            "packages/a/package.json": json({
+              name: "@x/a",
+              dependencies: { effect: "4.2.0", "type-fest": "^6.2.0" },
+              devDependencies: { "@effect/vitest": "4.1.5" }
+            }),
+            "packages/cli/package.json": json({ name: "@beep/repo-cli" }),
+            "packages/cli/src/commands/Vendor/VendorSync.rules.ts": lines([
+              'const kit = [["@effect/vitest", "4.1.5"]]',
+              'const versionOf = (name: string) => (name === "type-fest" ? "^6.0.1" : "workspace:*")'
+            ])
+          },
+          ["packages/cli/src/commands/Vendor/VendorSync.rules.ts"]
+        )
+        expect(result.files).toEqual({
+          "packages/cli/src/commands/Vendor/VendorSync.rules.ts": lines([
+            'const kit = [["@effect/vitest", "4.2.0"]]',
+            'const versionOf = (name: string) => (name === "type-fest" ? "^6.2.0" : "workspace:*")'
+          ])
+        })
+        // One write, and the next check agrees.
+        expect(result.after[0]).toMatch(/^out: version-sync OK /)
+      })
+  )
+
+  it.effect("a value in a comment is not a place, and a value that only looks like a version is left alone", () =>
+    Effect.gen(function* () {
+      const workflow = lines([
+        "jobs:",
+        "  check:",
+        "    steps:",
+        "      # node-version: 20 broke the build once",
+        "      - uses: actions/setup-node@v4 # node-version: 18",
+        "        with:",
+        "          node-version: lts/*",
+        "      - uses: actions/checkout@0123456789abcdef0123456789abcdef01234567 # v4.2.2"
+      ])
+      const wrangler = lines([
+        "{",
+        '  // "compatibility_date": "2025-06-01" was needed once',
+        '  "compatibility_date": "2026-11-01"',
+        "}"
+      ])
+      const result = yield* run(
+        {
+          ".bun-version": "1.4.4\n",
+          "package.json": json({
+            name: "root",
+            workspaces: ["apps/*", "packages/*"],
+            engines: { node: ">=22" },
+            packageManager: "bun@1.4.4+sha512.abc123"
+          }),
+          ".github/workflows/ci.yml": lines(["jobs:", "  check:", "    steps:", "      - uses: actions/checkout@v5"]),
+          ".github/workflows/deploy.yml": workflow,
+          "apps/shop/package.json": json({ name: "@x/shop" }),
+          "apps/shop/wrangler.jsonc": lines(["{", '  "compatibility_date": "2026-11-01"', "}"]),
+          "packages/d1/package.json": json({ name: "@x/d1" }),
+          "packages/d1/wrangler.test.jsonc": wrangler
+        },
+        [".github/workflows/deploy.yml", "packages/d1/wrangler.test.jsonc", "package.json"]
+      )
+      expect(result.before[0]).toMatch(/^out: version-sync OK /)
+      expect(result.files[".github/workflows/deploy.yml"]).toBe(workflow)
+      expect(result.files["packages/d1/wrangler.test.jsonc"]).toBe(wrangler)
+      expect(result.files["package.json"]).toContain('"packageManager":"bun@1.4.4+sha512.abc123"')
+    })
+  )
+
   it.effect("with a catalog at the root, the catalog is the source", () =>
     Effect.gen(function* () {
       const result = yield* run(
@@ -346,22 +420,15 @@ describe("version-sync", () => {
             '    "alchemy": "2.0.0-beta.88-bbb2222"',
             "  }",
             "}"
-          ]),
-          // An experiment that uses a kept package asks for it as a package does.
-          "scratchpad/package.json": json({
-            name: "@x/scratchpad",
-            dependencies: { "@alchemy.run/cloudflare": "2.0.0-beta.87-aaa1111" }
-          })
+          ])
         },
-        ["package.json", "packages/infra/package.json", "scratchpad/package.json"]
+        ["package.json", "packages/infra/package.json"]
       )
       expect(result.before).toEqual([
-        "err: version-sync FAIL  3 places differ from what they are derived from (`bun run version-sync -- --write` writes them)",
+        "err: version-sync FAIL  2 places differ from what they are derived from (`bun run version-sync -- --write` writes them)",
         "err:   package.json:5  a kept package's override, from vendor/alchemy/sources.json: found file:vendor/alchemy/alchemy.run-cloudflare-aaa1111.tgz, expected file:vendor/alchemy/alchemy.run-cloudflare-bbb2222.tgz",
-        "err:   packages/infra/package.json:4  a kept package's version and commit, from vendor/alchemy/sources.json: found 2.0.0-beta.87-aaa1111, expected 2.0.0-beta.88-bbb2222",
-        "err:   scratchpad/package.json:1  the scratchpad's `@alchemy.run/cloudflare`, from the package.json files: found 2.0.0-beta.87-aaa1111, expected 2.0.0-beta.88-bbb2222"
+        "err:   packages/infra/package.json:4  a kept package's version and commit, from vendor/alchemy/sources.json: found 2.0.0-beta.87-aaa1111, expected 2.0.0-beta.88-bbb2222"
       ])
-      expect(result.files["scratchpad/package.json"]).toContain('"@alchemy.run/cloudflare":"2.0.0-beta.88-bbb2222"')
       expect(result.files["packages/infra/package.json"]).toContain(
         '"@alchemy.run/cloudflare": "2.0.0-beta.88-bbb2222"'
       )
@@ -399,42 +466,19 @@ describe("version-sync", () => {
     })
   )
 
-  it.effect("the scratchpad runs on the packages' versions, and an experiment's own library is left alone", () =>
+  it.effect("the scratchpad is not read: its libraries are its experiments', at their own versions", () =>
     Effect.gen(function* () {
-      const scratch = (effect: string, vitest: string) =>
-        lines([
-          "{",
-          '  "name": "@x/scratchpad",',
-          '  "dependencies": {',
-          '    "@x/kernel": "workspace:*",',
-          `    "effect": "${effect}",`,
-          '    "zod": "^3.0.0"',
-          "  },",
-          '  "devDependencies": {',
-          `    "vitest": "${vitest}"`,
-          "  }",
-          "}"
-        ])
+      const scratch = json({ name: "@x/scratchpad", dependencies: { "left-pad": "^1.0.0", effect: "4.1.4" } })
       const result = yield* run(
         {
-          "package.json": json({ name: "root", workspaces: ["packages/*", "scratchpad"] }),
-          "packages/kernel/package.json": json({
-            name: "@x/kernel",
-            dependencies: { effect: "4.1.5" },
-            devDependencies: { vitest: "^5.1.1" }
-          }),
-          "scratchpad/package.json": scratch("4.1.4", "^5.1.0")
+          "package.json": json({ name: "root", workspaces: ["packages/*"] }),
+          "packages/kernel/package.json": json({ name: "@x/kernel", dependencies: { effect: "4.1.5" } }),
+          "scratchpad/package.json": scratch
         },
         ["scratchpad/package.json"]
       )
-      expect(result.before).toEqual([
-        "err: version-sync FAIL  2 places differ from what they are derived from (`bun run version-sync -- --write` writes them)",
-        "err:   scratchpad/package.json:5  the scratchpad's `effect`, from the package.json files: found 4.1.4, expected 4.1.5",
-        "err:   scratchpad/package.json:9  the scratchpad's `vitest`, from the package.json files: found ^5.1.0, expected ^5.1.1"
-      ])
-      expect(result.files).toEqual({ "scratchpad/package.json": scratch("4.1.5", "^5.1.1") })
-      expect(result.after).toEqual(["out: version-sync OK  2 places agree with what they are derived from"])
-      expect(result.again).toEqual(result.after)
+      expect(result.before[0]).toMatch(/^out: version-sync OK /)
+      expect(result.files).toEqual({ "scratchpad/package.json": scratch })
     })
   )
 

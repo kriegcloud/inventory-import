@@ -236,16 +236,16 @@ package's task and replays it when nothing it reads has changed. The app's own s
 | Root command | What it does |
 | --- | --- |
 | `bun run dev` | Applies local migrations and the test accounts, then serves the app and API on http://localhost:5173, signed in by itself as the first test account |
-| `bun run check` | The loop check through turbo: type-check with Effect diagnostics, lint (with the two design lints), the fast tests, the format check, `docs:check`, the key scan (`keys:check`), the vendored-kit hash check (`vendor:check`), which package may import which (`boundaries:check`), the two stylesheet lists (`screens:check`), every `ref` a DOM ref or a callback that stays the same across draws (`refs:check`), no `_tag` compared or built by hand in any src or test folder (`tags:check`), no deprecated API used, read from every file's types (`deprecated:check`; `docs/standards/deprecated-apis.md`), the root's own configuration files type-check (`configs:check`) and the Effect imports (`imports:check`; `imports:fix` repairs code), every version written in more than one place equal to its one source (`version-sync`) and the configuration that follows from the workspaces (`config-sync:check`). Before every commit |
+| `bun run check` | The loop check through turbo: type-check with Effect diagnostics, lint (with the two design lints), the fast tests, the format check, `docs:check`, the key scan (`keys:check`), the vendored-kit hash check (`vendor:check`), which package may import which (`boundaries:check`), the two stylesheet lists (`screens:check`), every `ref` a DOM ref or a callback that stays the same across draws (`refs:check`), no `_tag` compared or built by hand in any src or test folder (`tags:check`), no deprecated API used, read from every file's types (`deprecated:check`; `docs/standards/deprecated-apis.md`), the root's own configuration files type-check (`configs:check`) and the Effect imports (`imports:check`; `imports:fix` repairs code), every version written in more than one place equal to its one source (`version-sync`) and the configuration that follows from the workspaces (`config-sync:check`), `bun.lock` holding what every package.json asks for (`lockfile:check`), and no home path or private folder in the scratchpad (`private-paths:check`). Before every commit |
 | `bun run beep <group> <command>` | One of the repository's own rules by hand: `bun run beep laws boundaries`, `bun run beep quality ceilings`, `bun run beep vendor check`; `--help` on any of them lists its flags. `bun run check` runs them all under their root script names (`boundaries:check`, `vendor:check` and the rest) |
 | `bun run check:full` | `check` plus the slow tests (`*.slow.test.ts`) and the production build. CI runs it |
 | `bun run build` | The production build through turbo |
 | `bun run test` | Every test, fast and slow (Vitest, Node) |
 | `bun run format` | oxfmt, writes files: `bun run format -- <files>` for only yours, since a bare run rewrites every file. `format:check` only reports |
-| `bun run deps:update` | Moves every dependency of every package to its newest version, except the ones `.syncpackrc.json` holds back (each is named with its reason), runs `bun install`, then `version-sync -- --write`, and says what moved from which version to which. `-- --dry-run` says the same and writes nothing. `deps:lint` and `deps:outdated` (syncpack) read the same packages and the same held list |
+| `bun run deps:update` | Moves every dependency of every package to its newest version, except the ones `.syncpackrc.json` holds back (each is named with its reason and how to move it), runs `version-sync -- --write`, then `bun install` once, and says what moved from which version to which; a failed install puts every file back. `-- --dry-run` lists the moves and writes nothing. `deps:lint` and `deps:outdated` (syncpack) read the same packages and the same held list |
 | `bun run version-sync` | Names every place where a version or a date differs from its one source (`.bun-version`, `engines.node`, the `effect` the packages state, the app's `wrangler.jsonc` and the rest) and fails. `-- --write` rewrites them, `-- --dry-run` lists what would be written. `docs/sync-commands.md` has every source and what is left alone |
-| `bun run config-sync` | Writes what follows from the workspaces: syncpack's sources, tsconfig references, each package's scripts, the paths that depend on a package's depth, the root tasks the two checks run. `config-sync:check` only compares, `-- --dry-run` lists what would be written |
-| `bun run scratch:new <name> --template <probe\|service\|screen\|verify>` | Starts an experiment in `scratchpad/experiments/<name>` from a template whose test already passes. `scratch:test [name]` runs the experiments' tests (Vitest, Node); `scratch:check` holds the scratchpad's own rules (no install inside an experiment, a note for each) and runs the type-checker with the Effect diagnostics; `scratch:list` shows what is open with its age; `scratch:serve experiments/<name>` serves a screen on http://localhost:5273; `scratch:graduate <name> --to <path> --learned "<line>"` or `scratch:drop <name> --learned "<line>"` ends one. `bun run check`, the build and CI never read the scratchpad (`docs/scratchpad.md`) |
+| `bun run config-sync` | Writes what follows from the workspaces: syncpack's sources, tsconfig references, each package's scripts, the paths that depend on a package's depth, the root tasks the two checks run; installs when it wrote a package.json. `config-sync:check` only compares, `-- --dry-run` lists what would be written |
+| `bun run scratch:new <name> --template <probe\|service\|screen\|verify>` | Starts an experiment in `scratchpad/experiments/<name>` from a template whose test already passes. `scratch:test [name]` runs the experiments' tests, or one experiment's folder only (Vitest, Node); `scratch:check` holds the scratchpad's own rules (no install inside an experiment, a note for each) and runs the type-checker with the Effect diagnostics; `scratch:list` shows what is open with its age; `scratch:serve experiments/<name>` serves a screen on the first free port from 5273; `scratch:graduate <name> --to <path> --learned "<line>"` or `scratch:drop <name> --learned "<line>"` ends one. `bun run check`, the build and CI never read the scratchpad (`docs/scratchpad.md`) |
 | `bun run docs:check` | Checks that `docs/`, `explorations/` and `goals/` are Open Knowledge Format bundles (the OKF skill's validator). Needs bash |
 | `bun run db:reset` | Deletes the local database and re-applies migrations. **Restart `bun run dev` afterwards.** |
 | `bun run preview` | Builds and serves the production build on http://localhost:4173, with security headers, compressed (brotli, else gzip) as Cloudflare serves it; `PREVIEW_COMPRESSION=off` for the raw bytes |
@@ -268,8 +268,9 @@ Hosting is not a script: `bunx alchemy deploy --stage <name>` from the root runs
 only Benjamin runs it (`goals/infra/PLAN.md`, "What Benjamin does by hand").
 
 If you add or remove a dependency, do it with `bun add` or `bun remove` in the workspace that uses it
-(`bun add --cwd apps/inventory <name>`); `bun.lock` at the root is the only lockfile, and `bunfig.toml` keeps one
-hoisted `node_modules`.
+(`bun add --cwd apps/inventory <name>`); `bun.lock` at the root is the only lockfile of the workspaces, and `bunfig.toml` keeps one
+hoisted `node_modules`. The one other lockfile is the scratchpad's (`scratchpad/bun.lock`, committed), for the
+libraries an experiment added: the scratchpad is no workspace, and a library the root already has never goes there.
 
 **A second dev server.** Benjamin usually runs the dev server in his own terminal on port 5173; ask before starting
 another. Start one with `bun run dev -- --port 5174 --strictPort & echo $! > .dev.pid`, stop it with
@@ -338,17 +339,18 @@ explorations/           Questions being shaped: research, decisions, briefs.
 goals/                  Work with a definition of done: SPEC.md and PLAN.md.
 packages/tooling/tool/cli/  @beep/repo-cli: the repository's own rules as commands (`bun run beep <group> <command>`):
                         `laws` (boundaries: which package may import which; screens: every package with screens in
-                        both stylesheet lists; ref-callbacks: no ref callback made on each draw; tags: no `_tag` compared or built by hand in any src or test folder; exports; keys; deprecated-apis: no deprecated API used, in any code file git would commit outside `.agents` and `scratchpad`; effect-imports: every Effect import from its own path
+                        both stylesheet lists; ref-callbacks: no ref callback made on each draw; tags: no `_tag` compared or built by hand in any src or test folder; exports; keys; private-paths: no home path or private folder in the scratchpad; deprecated-apis: no deprecated API used, in any code file git would commit outside `.agents` and `scratchpad`; effect-imports: every Effect import from its own path
                         under its one name), `quality` (strict, ceilings), `docs check` and `vendor` (check; sync,
                         which copies the kit from a beep-effect checkout); `deps update`, `version-sync` and
                         `config-sync`, which move dependencies and keep repeated versions and derived configuration in
                         step (`docs/sync-commands.md`); and `scratch` (new, list, check, graduate, drop). Nothing
                         imports it.
-scratchpad/             @inventory/scratchpad: a private workspace package that depends on every package, where an idea
-                        is tried in a folder of its own (experiments/<name>/: a NOTE.md, code and a test). No check,
-                        build or deploy reads it, and nothing may import from it (`bun run beep laws boundaries`). The
-                        laws on how code is written apply when an experiment's code graduates into a package; only the
-                        law on secrets reads it. LOG.md keeps one line for each experiment that ended
+scratchpad/             A folder beside the workspaces, not one of them, where an idea is tried in a folder of its own
+                        (experiments/<name>/: a NOTE.md, code and a test), importing every package from the root's
+                        install. Its package.json and its own bun.lock hold only libraries experiments added; its
+                        configuration is the CLI's. The root's install, the build and a deploy never read it; `bun run
+                        check` reads it only for an import of it (`laws boundaries`), a key and a home path. The laws on
+                        how code is written apply when an experiment's code graduates into a package. LOG.md keeps one line for each experiment that ended
                         (`docs/scratchpad.md`).
 tsconfig.json           References every package's tsconfig.test.json and tsconfig.config.json, so a linter that reads
                         types and an editor find a test's project. Nothing compiles it. `bun run config-sync` writes

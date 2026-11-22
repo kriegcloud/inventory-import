@@ -34,9 +34,9 @@
     "build": { "dependsOn": ["transit"], "outputs": ["dist/**"] },
     "dev": { "cache": false, "persistent": true },
     // Repository checks: root scripts that do not call turbo.
-    // Every file but an experiment of the scratchpad: the formatter leaves those alone (.oxfmtrc.json), and an
-    // experiment that is not formatted, or does not parse, fails nothing here.
-    "//#format:check": { "inputs": ["$TURBO_DEFAULT$", "!scratchpad/experiments/**"], "outputs": [] },
+    // Every file but the scratchpad's: the formatter leaves it alone (.oxfmtrc.json), and an experiment that is not
+    // formatted, or does not parse, fails nothing here.
+    "//#format:check": { "inputs": ["$TURBO_DEFAULT$", "!scratchpad/**"], "outputs": [] },
     // Vendored kit packages still match the beep-effect files they were copied from (`beep vendor check`).
     "//#vendor:check": {
       "inputs": [
@@ -55,14 +55,20 @@
     },
     // Which package may import which (`beep laws boundaries`): every package.json and every import under src and test.
     "//#boundaries:check": {
+      // What the law reads: every manifest, every file under src and test, and for the scratchpad's rule also each
+      // workspace's scripts, its root files and stylesheets, and the repository's own root files and manifest.
       "inputs": [
+        "package.json",
+        "*.{ts,tsx,mts,cts,js,mjs,cjs}",
         "apps/**/package.json",
-        "apps/**/src/**",
-        "apps/**/test/**",
+        "apps/**/*.{ts,tsx,mts,cts,js,mjs,cjs,css}",
         "packages/**/package.json",
-        "packages/**/src/**",
-        "packages/**/test/**",
-        "packages/tooling/tool/cli/src/**"
+        "packages/**/*.{ts,tsx,mts,cts,js,mjs,cjs,css}",
+        "scratchpad/package.json",
+        "packages/tooling/tool/cli/src/**",
+        "!**/node_modules/**",
+        "!**/dist/**",
+        "!**/.wrangler/**"
       ],
       "outputs": []
     },
@@ -131,6 +137,9 @@
     // source. The installed @effect/tsgo it compares a `$schema` with is hashed through bun.lock.
     "//#version-sync": {
       "inputs": [
+        "packages/foundation/modeling/identity/src/**",
+        "packages/foundation/modeling/schema/src/**",
+        "packages/foundation/modeling/utils/src/**",
         "package.json",
         "apps/**/package.json",
         "packages/**/package.json",
@@ -147,7 +156,6 @@
         "packages/**/wrangler*.jsonc",
         "packages/**/src/**/*.ts",
         "vendor/alchemy/sources.json",
-        "scratchpad/package.json",
         "bun.lock",
         "!**/node_modules/**"
       ],
@@ -159,9 +167,10 @@
     // bun.lock.
     "//#config-sync:check": {
       "inputs": [
+        "packages/foundation/modeling/identity/src/**",
+        "packages/foundation/modeling/schema/src/**",
+        "packages/foundation/modeling/utils/src/**",
         "*.{json,jsonc}",
-        "scratchpad/package.json",
-        "scratchpad/tsconfig*.json",
         ".oxlintrc*.json",
         ".oxfmtrc.json",
         ".syncpackrc.json",
@@ -236,6 +245,25 @@
         "$TURBO_ROOT$/node_modules/*/package.json",
         "$TURBO_ROOT$/node_modules/@*/*/package.json"
       ],
+      "outputs": []
+    },
+    // bun.lock says what every package.json asks for, so CI's `bun install --frozen-lockfile` accepts it. Resolved
+    // from bun's cache, never the network, and nothing is written or installed: a package.json that asks for a
+    // version bun.lock does not hold fails here, before a push.
+    "//#lockfile:check": {
+      "inputs": [
+        "package.json",
+        "apps/**/package.json",
+        "packages/**/package.json",
+        "bun.lock",
+        "bunfig.toml",
+        "!**/node_modules/**"
+      ],
+      "outputs": []
+    },
+    // No home path or private folder is named in the scratchpad (`beep laws private-paths`): every file in it.
+    "//#private-paths:check": {
+      "inputs": ["scratchpad/**", "!scratchpad/**/node_modules/**", "packages/tooling/tool/cli/src/**"],
       "outputs": []
     },
     // Every file git would commit, so its hash is the whole repository's, the scratchpad's experiments included: a
